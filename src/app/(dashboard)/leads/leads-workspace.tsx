@@ -42,6 +42,7 @@ import { LeadAssignmentHistory } from "./_components/lead-assignment-history";
 import { StartQualificationButton } from "./_components/qualifying-lead-actions";
 import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
 import { LeadsListSwitch } from "./leads-lite-list";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { EmptyState } from "@/components/empty-state";
 import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-badges";
@@ -239,6 +240,8 @@ export function LeadsWorkspace({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Chave do diretor: a lista Lite traz a própria barra de lote, com as mesmas ações de `selectionActions`.
+  const directorLite = useArcScopeEnabled();
   const [workspaceLeads, setWorkspaceLeads] = useState<LeadWorkspaceItem[]>(leads);
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
   const selectedMetaDetails = selectedLead
@@ -642,13 +645,15 @@ export function LeadsWorkspace({
         {/* ─── TAB 1: LISTA PRINCIPAL (TABELA) ─── */}
         <TabsContent value="list" className="mt-4">
           <div className="space-y-4">
-            <SelectionToolbar
-              selectedCount={multiSelect.count}
-              totalCount={workspaceLeads.length}
-              onClear={multiSelect.clear}
-            >
-              {selectionActions}
-            </SelectionToolbar>
+            {directorLite ? null : (
+              <SelectionToolbar
+                selectedCount={multiSelect.count}
+                totalCount={workspaceLeads.length}
+                onClear={multiSelect.clear}
+              >
+                {selectionActions}
+              </SelectionToolbar>
+            )}
             <div className="w-full">
               <LeadsListSwitch
                 leads={workspaceLeads}
@@ -666,6 +671,15 @@ export function LeadsWorkspace({
                   else multiSelect.clear();
                 }}
                 onRowClick={setSelectedLead}
+                liteBulk={directorLite ? {
+                  role: contextRole,
+                  brokers,
+                  branches,
+                  onStatusCommitted: handleBulkStatusCommitted,
+                  onReassignCommitted: handleBulkReassignCommitted,
+                  onBranchCommitted: handleBulkBranchCommitted,
+                  onRevertCommitted: handleBulkRevertCommitted,
+                } : undefined}
               />
             </div>
           </div>

@@ -13,17 +13,24 @@ vi.mock("./leads-data-table", () => ({
 }));
 
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams("search=Maria") }));
+// Server Actions do lote: fora do teste da lista.
+vi.mock("./status-actions", () => ({
+  bulkChangeLeadStatusAction: vi.fn(),
+  bulkReassignLeadsAction: vi.fn(),
+  bulkReassignBranchAction: vi.fn(),
+  bulkRevertToQualificationAction: vi.fn(),
+}));
 
 afterEach(cleanup);
 
 describe("cabeçalho e ações da lista Lite", () => {
-  it("mostra busca com o valor da URL, contagem e alternância lista/kanban", () => {
+  it("mostra contagem e alternância lista/kanban; a busca fica nos filtros Lite", () => {
     const { container } = render(
       <ArcScopeProvider enabled>
         <LeadsListSwitch {...props} onRowClick={() => {}} />
       </ArcScopeProvider>,
     );
-    expect(screen.getByRole("searchbox", { name: "Buscar lead por nome ou telefone" })).toHaveValue("Maria");
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
     expect(container.querySelector(".count, [class*='count']")).toHaveTextContent("1 lead");
     expect(screen.getByRole("link", { name: "Kanban" })).toHaveAttribute("href", "/leads?view=kanban");
     expect(screen.getByRole("link", { name: "Lista" })).toHaveAttribute("aria-current", "page");
