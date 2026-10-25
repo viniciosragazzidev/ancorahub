@@ -23,7 +23,7 @@ function pageRoutes(directory = dashboardRoot): string[] {
 describe("rotas do Diretor Lite", () => {
   it("mantém em opt-out todas as páginas ainda não revisadas (saíram o painel, a lista e o perfil do lead e as telas simples da passada rápida)", () => {
     const revised = pageRoutes().filter((route) => !isDirectorLiteRouteOptedOut(route));
-    expect([...revised].sort()).toEqual(["/assistente", "/dashboard", "/distribuicao", "/documentos", "/empresas", "/ferramentas", "/integridade", "/leads", "/leads/[id]", "/leads/distribuicao", "/noc", "/notificacoes", "/propostas", "/relatorios", "/relatorios/drill/[drillId]", "/tarefas/dashboard", "/vendas", "/vendas/[id]"]);
+    expect([...revised].sort()).toEqual(["/assistente", "/dashboard", "/distribuicao", "/distribuicao/dashboard", "/documentos", "/empresas", "/ferramentas", "/integridade", "/leads", "/leads/[id]", "/leads/distribuicao", "/leads/distribuicao/plantao/[scheduleId]", "/noc", "/notificacoes", "/plantoes/corretor/[brokerId]", "/propostas", "/relatorios", "/relatorios/drill/[drillId]", "/tarefas/dashboard", "/vendas", "/vendas/[id]"]);
     expect(DIRECTOR_LITE_OPT_OUT_ROUTES.length).toBeGreaterThan(0);
   });
 
@@ -49,7 +49,9 @@ describe("rotas do Diretor Lite", () => {
 
   it("tira a central de distribuição do opt-out e mantém os detalhes ainda não revisados", () => {
     expect(isDirectorLiteRouteOptedOut("/distribuicao?view=resumo_dia")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/distribuicao/dashboard")).toBe(false);
     expect(isDirectorLiteRouteOptedOut("/leads/distribuicao?view=roteamento")).toBe(false);
-    expect(DIRECTOR_LITE_OPT_OUT_ROUTES).toContain("/leads/distribuicao/plantao/[scheduleId]");
+    expect(isDirectorLiteRouteOptedOut("/leads/distribuicao/plantao/schedule-123")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/plantoes/corretor/broker-123")).toBe(false);
   });
 });
