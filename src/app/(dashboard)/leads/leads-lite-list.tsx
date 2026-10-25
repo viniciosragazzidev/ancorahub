@@ -8,7 +8,7 @@
  * Ações da linha num menu; seleção em massa com a barra de lote. A busca fica nos filtros Lite.
  */
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
@@ -277,12 +277,19 @@ export function LeadsListSwitch({ liteBulk, ...props }: LeadsDataTableProps & { 
 /**
  * Fila da Qualificação IA: a lista Lite com a chave (mesmas colunas da tabela atual que cabem nesse lead: etapa, fila,
  * qualificação, origem, chegada e ações; ainda sem corretor) e a tabela atual nos demais casos. Sem seleção em massa,
- * como hoje.
+ * como hoje. Paginação no cliente, de 20 em 20.
  */
+const QUALIFYING_PAGE_SIZE = 20;
+
 export function QualifyingLeadsListSwitch(props: QualifyingLeadsDataTableProps) {
   const lite = useDirectorLitePage();
+  const [page, setPage] = useState(1);
   if (!lite) return <QualifyingLeadsDataTable {...props} />;
-  const rows: LeadWorkspaceItem[] = props.leads.map((lead) => ({
+  // Os leads em qualificação já vêm todos para o cliente: páginas de 20 aqui, para não renderizar centenas de linhas.
+  const totalPages = Math.max(1, Math.ceil(props.leads.length / QUALIFYING_PAGE_SIZE));
+  const current = Math.min(page, totalPages);
+  const pageLeads = props.leads.slice((current - 1) * QUALIFYING_PAGE_SIZE, current * QUALIFYING_PAGE_SIZE);
+  const rows: LeadWorkspaceItem[] = pageLeads.map((lead) => ({
     ...lead,
     sourceCampaign: lead.sourceCampaign ?? null,
     assignedAt: null,
@@ -303,6 +310,8 @@ export function QualifyingLeadsListSwitch(props: QualifyingLeadsDataTableProps) 
         const original = props.leads.find((lead) => lead.id === row.id);
         if (original) open(original);
       } : undefined}
+      pagination={{ currentPage: current, pageSize: QUALIFYING_PAGE_SIZE, totalItems: props.leads.length, totalPages }}
+      onPageChange={setPage}
     />
   );
 }

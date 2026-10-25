@@ -222,4 +222,19 @@ describe("nome, telefone e a visão Qualificação IA", () => {
     fireEvent.click(screen.getAllByText("Cristiane Farizele")[0]!);
     expect(open).toHaveBeenCalledWith(qualifying);
   });
+
+  it("a Qualificação IA pagina de 20 em 20 no cliente", () => {
+    const many = Array.from({ length: 45 }, (_, index) => ({ id: `q${index}`, nome: `Lead ${index + 1}`, telefone: "21999990000", email: null, status: "new", qualificationStatus: "pending", qualificationState: "IN_PROGRESS", qualificationScore: 0, origem: "webhook", tipo: "PF", createdAt: "2026-10-24T14:02:00.000Z" }));
+    const { container } = render(
+      <ArcScopeProvider enabled>
+        <QualifyingLeadsListSwitch leads={many} onOpen={() => {}} />
+      </ArcScopeProvider>,
+    );
+    expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(20);
+    expect(screen.getByText("1 a 20 de 45")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(5);
+    expect(screen.getByText("41 a 45 de 45")).toBeInTheDocument();
+  });
 });
