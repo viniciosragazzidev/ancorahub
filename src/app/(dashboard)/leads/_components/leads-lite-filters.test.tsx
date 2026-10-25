@@ -11,6 +11,7 @@ const replace = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace, push: vi.fn(), refresh: vi.fn() }),
   useSearchParams: () => params.current,
+  usePathname: () => "/leads",
 }));
 
 beforeEach(() => {

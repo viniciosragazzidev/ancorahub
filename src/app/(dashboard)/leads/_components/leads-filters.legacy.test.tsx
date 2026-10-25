@@ -11,6 +11,7 @@ const replace = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace, push: vi.fn(), refresh: vi.fn() }),
   useSearchParams: () => params.current,
+  usePathname: () => "/leads",
 }));
 
 afterEach(() => {
@@ -39,7 +40,7 @@ describe("filtros de /leads com a chave desligada", () => {
       fireEvent.click(screen.getByRole("button", { name: /Filtros/ }));
     });
     expect(document.body.innerHTML).toMatchSnapshot("aberto");
-  });
+  }, 20_000); // a primeira renderização carrega o popover inteiro; com a suíte em paralelo passa de 5s
 
   it("remover um chip navega com os demais parâmetros", () => {
     render(<LeadsFilters {...props} />);

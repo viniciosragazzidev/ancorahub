@@ -44,7 +44,7 @@ import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
 import { LeadsListSwitch } from "./leads-lite-list";
 import { LeadsLiteKanban } from "./leads-lite-kanban";
 import { computeSlaInfo, type SlaInfo } from "./lead-sla";
-import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { EmptyState } from "@/components/empty-state";
 import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-badges";
@@ -243,7 +243,7 @@ export function LeadsWorkspace({
   const router = useRouter();
   const searchParams = useSearchParams();
   // Chave do diretor: a lista Lite traz a própria barra de lote, com as mesmas ações de `selectionActions`.
-  const directorLite = useArcScopeEnabled();
+  const directorLite = useDirectorLitePage();
   const [workspaceLeads, setWorkspaceLeads] = useState<LeadWorkspaceItem[]>(leads);
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
   const selectedMetaDetails = selectedLead
@@ -678,6 +678,7 @@ export function LeadsWorkspace({
                   else multiSelect.clear();
                 }}
                 onRowClick={setSelectedLead}
+                onViewChange={directorLite ? handleViewChange : undefined}
                 liteBulk={directorLite ? {
                   role: contextRole,
                   brokers,

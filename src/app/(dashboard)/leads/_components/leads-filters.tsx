@@ -1,8 +1,10 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import ActionButton from "@/components/arc/action-button/action-button";
 import { StatefulButton } from "@/components/ui/stateful-button";
 import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
@@ -16,12 +18,14 @@ import { useLeadFilters, type LeadsFiltersProps } from "./use-lead-filters";
 
 /** Filtros de /leads: a versão Lite com a chave do diretor ligada; a tela atual, sem mudança, nos demais casos. */
 export function LeadsFilters(props: LeadsFiltersProps) {
-  const directorLite = useArcScopeEnabled();
-  if (directorLite) return <LeadsLiteFilters {...props} />;
+  const litePage = useDirectorLitePage();
+  if (litePage) return <LeadsLiteFilters {...props} />;
   return <LeadsFiltersClassic {...props} />;
 }
 
 function LeadsFiltersClassic(props: LeadsFiltersProps) {
+  // Mesmo comportamento de antes: com o provider ligado numa rota em opt-out, o botão de aplicar é o do Arc.
+  const directorLite = useArcScopeEnabled();
   const { hideOriginFilters = false, branches, brokers, tags = [] } = props;
   const {
     open, setOpen,
@@ -319,15 +323,25 @@ function LeadsFiltersClassic(props: LeadsFiltersProps) {
                 Limpar
               </Button>
 
-              <StatefulButton
-                state="idle"
-                onClick={() => applyFilters()}
-                size="sm"
-                className="h-8 gap-1.5 px-3.5 text-xs font-semibold"
-                icon={<SlidersHorizontal className="size-3.5" />}
-              >
-                Aplicar
-              </StatefulButton>
+              {directorLite ? (
+                <ActionButton
+                  label="Aplicar filtros"
+                  pendingLabel="Aplicando"
+                  successLabel="Filtros aplicados"
+                  onAction={async () => { await applyFilters(); }}
+                  className="min-h-11 gap-1.5 px-3.5 text-xs font-semibold"
+                />
+              ) : (
+                <StatefulButton
+                  state="idle"
+                  onClick={() => applyFilters()}
+                  size="sm"
+                  className="h-8 gap-1.5 px-3.5 text-xs font-semibold"
+                  icon={<SlidersHorizontal className="size-3.5" />}
+                >
+                  Aplicar
+                </StatefulButton>
+              )}
             </div>
           </>
         }
