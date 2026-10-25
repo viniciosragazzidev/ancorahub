@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useCallback, useState } from "react";
+import { useActionState, useCallback, useEffect, useState } from "react";
 import { toast } from "@/components/ui/sonner";
 import { UserSwitch, Buildings, RotateCcw } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import {
 } from "@/app/(dashboard)/leads/status-actions";
 import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 
-type BulkMode = "broker" | "branch" | "revert";
+export type BulkMode = "broker" | "branch" | "revert";
 
 export function BulkReassignDialog({
   leadIds,
@@ -33,6 +33,10 @@ export function BulkReassignDialog({
   onCommitted,
   onBranchCommitted,
   onRevertCommitted,
+  open: openProp,
+  onOpenChange,
+  hideTrigger = false,
+  initialMode,
 }: {
   leadIds: string[];
   brokers: Array<{ id: string; name: string; branchId: string | null }>;
@@ -41,9 +45,24 @@ export function BulkReassignDialog({
   onCommitted?: (input: { leadIds: string[]; brokerId: string }) => void;
   onBranchCommitted?: (input: { leadIds: string[]; branchId: string }) => void;
   onRevertCommitted?: (input: { leadIds: string[] }) => void;
+  /** Abertura controlada por fora (barra de lote Lite). Sem estes, o diálogo abre pelo próprio botão, como sempre. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+  /** Aba que abre selecionada quando a abertura vem de fora. */
+  initialMode?: BulkMode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = openProp ?? uncontrolledOpen;
+  const setOpen = useCallback((next: boolean) => {
+    if (openProp === undefined) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  }, [openProp, onOpenChange]);
   const [mode, setMode] = useState<BulkMode>("broker");
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a aba acompanha a ação escolhida na barra de lote
+    if (open && initialMode) setMode(initialMode);
+  }, [open, initialMode]);
   const [selectedBrokerId, setSelectedBrokerId] = useState("");
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
   const [visibleError, setVisibleError] = useState<string | null>(null);
@@ -78,7 +97,7 @@ export function BulkReassignDialog({
         onCommitted?.({ leadIds: result.changedLeadIds, brokerId: result.brokerId });
       }
     },
-    [leadIds.length, onCommitted],
+    [leadIds.length, onCommitted, setOpen],
   );
 
   useActionDialogLifecycle({
@@ -103,7 +122,7 @@ export function BulkReassignDialog({
         onBranchCommitted?.({ leadIds: result.changedLeadIds, branchId: result.branchId });
       }
     },
-    [onBranchCommitted],
+    [onBranchCommitted, setOpen],
   );
 
   useActionDialogLifecycle({
@@ -127,7 +146,7 @@ export function BulkReassignDialog({
         onRevertCommitted?.({ leadIds: result.changedLeadIds });
       }
     },
-    [onRevertCommitted],
+    [onRevertCommitted, setOpen],
   );
 
   useActionDialogLifecycle({
@@ -151,12 +170,12 @@ export function BulkReassignDialog({
         setVisibleError(null);
       }
     },
-    [isPending],
+    [isPending, setOpen],
   );
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button size="sm" variant="outline"><UserSwitch className="size-4" /> Gestão em lote</Button>} />
+      {hideTrigger ? null : <DialogTrigger render={<Button size="sm" variant="outline"><UserSwitch className="size-4" /> Gestão em lote</Button>} />}
       <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Gestão de leads em lote</DialogTitle>
