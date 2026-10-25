@@ -652,7 +652,7 @@ export function LeadsWorkspace({
     <HideLeadArrivalContext.Provider value={contextRole === "broker"}>
     <div className={directorLite ? `operational-workspace ${litePageStyles.workspace}` : "operational-workspace flex min-h-0 flex-1 flex-col gap-4"}>
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
-      <Tabs value={activeTab} onValueChange={handleViewChange} className="flex min-h-0 flex-1 flex-col">
+      <Tabs value={activeTab} onValueChange={handleViewChange} className={directorLite ? "flex min-h-0 flex-1 flex-col gap-0" : "flex min-h-0 flex-1 flex-col"}>
         {directorLite ? (
           <div className={litePageStyles.bar}>
             {liteFilters ? cloneElement(liteFilters, { trailing: <>{viewTabs}{columnsMenu}</> }) : (
