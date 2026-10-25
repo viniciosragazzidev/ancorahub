@@ -60,4 +60,11 @@ describe("clientes Lite", () => {
     expect(screen.getByRole("heading", { name: "Nenhum cliente convertido ainda" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Ir para leads/ })).toHaveAttribute("href", "/leads");
   });
+
+  it("cartão do celular tem o selo Ativo e taxa \"0,0\" não quebra os números", () => {
+    render(<ClientesLite clients={[client(1)]} metrics={{ ...metrics, conversionRate: "0,0" }} period={30} branches={[]} />);
+    expect(screen.getAllByTestId("stat")[1]).toHaveTextContent("Taxa de conversão: 0,0%");
+    const list = document.querySelector('[data-lite="list"]') as HTMLElement;
+    expect(within(list).getByText("Ativo")).toBeInTheDocument();
+  });
 });

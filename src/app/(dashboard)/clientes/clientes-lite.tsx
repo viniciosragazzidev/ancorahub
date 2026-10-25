@@ -17,6 +17,7 @@ import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data
 import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import { formatLiteDate } from "@/components/lite/format/date";
 import page from "@/components/lite/page/lite-page.module.css";
+import styles from "./clientes-lite.module.css";
 import { DEFAULT_PERIOD, PERIOD_OPTIONS, type PeriodValue } from "@/shared/period";
 
 import { clientConversionTrend, type ClientsMetrics } from "./clientes-list";
@@ -53,6 +54,8 @@ export function ClientesLite({ clients, metrics, period, branches, branchId }: {
   const { pageRows, pagination, reset } = useLitePages(filtered, PAGE_SIZE);
 
   const trend = useMemo(() => clientConversionTrend(clients, period), [clients, period]);
+  // A taxa chega como texto: "8.4" com leads, "0,0" sem leads. Number("0,0") daria NaN no gráfico.
+  const conversionRate = parseFloat(metrics.conversionRate.replace(",", ".")) || 0;
 
   const columns = useMemo<LiteColumn<ClientLiteRow>[]>(() => [
     {
@@ -60,7 +63,11 @@ export function ClientesLite({ clients, metrics, period, branches, branchId }: {
       label: "Cliente",
       primary: true,
       render: (client) => (
-        <Link href={`/clientes/${client.id}`} className={`${page.cellLink} ${page.cellTitle}`}>{client.name}</Link>
+        <span className={styles.title}>
+          <Link href={`/clientes/${client.id}`} className={`${page.cellLink} ${page.cellTitle}`}>{client.name}</Link>
+          {/* Selo do cartão do celular, como na versão completa; na tabela todos já são clientes ativos. */}
+          <span className={`${page.badge} ${styles.phoneOnly}`} data-tone="success">Ativo</span>
+        </span>
       ),
     },
     {
@@ -83,7 +90,7 @@ export function ClientesLite({ clients, metrics, period, branches, branchId }: {
     <div className={`arc-venancor ${page.stack}`} data-skin="diretor">
       <div className={page.stats}>
         <StatCard label="Total de clientes" value={metrics.totalClients} sublabel={`${metrics.recentConversions} nos últimos ${period} dias`} sparklineData={trend} sparklineColor="var(--chart-1)" animated />
-        <StatCard label="Taxa de conversão" value={`${metrics.conversionRate.replace(".", ",")}%`} sublabel="Clientes por lead" sparklineData={trend.map((value) => Math.round(value * Number(metrics.conversionRate)))} sparklineColor="var(--chart-3)" animated animationDelay={0.06} />
+        <StatCard label="Taxa de conversão" value={`${metrics.conversionRate.replace(".", ",")}%`} sublabel="Clientes por lead" sparklineData={trend.map((value) => Math.round(value * conversionRate))} sparklineColor="var(--chart-3)" animated animationDelay={0.06} />
         <StatCard label="Média por corretor" value={metrics.avgClientsPerBroker} sublabel={`${metrics.totalBrokers} responsável(is)`} sparklineData={trend.map((value) => Math.max(0, value / Math.max(1, metrics.totalBrokers)))} sparklineColor="var(--chart-4)" animated animationDelay={0.12} />
         <StatCard label="Renovações próximas" value={metrics.upcomingRenewals} sublabel="Próximos 30 dias" sparklineData={trend.map((value) => Math.max(0, metrics.upcomingRenewals ? value + 1 : value))} sparklineColor="var(--chart-2)" animated animationDelay={0.18} />
       </div>
