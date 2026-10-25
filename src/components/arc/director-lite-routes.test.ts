@@ -23,7 +23,7 @@ function pageRoutes(directory = dashboardRoot): string[] {
 describe("rotas do Diretor Lite", () => {
   it("mantém em opt-out todas as páginas ainda não revisadas (saíram o painel, a lista e o perfil do lead e as telas simples da passada rápida)", () => {
     const revised = pageRoutes().filter((route) => !isDirectorLiteRouteOptedOut(route));
-    expect([...revised].sort()).toEqual(["/assistente", "/conversas", "/dashboard", "/documentos", "/empresas", "/ferramentas", "/integrations", "/integridade", "/leads", "/leads/[id]", "/noc", "/notificacoes", "/propostas", "/relatorios", "/relatorios/drill/[drillId]", "/settings", "/settings/extension", "/settings/feedback-templates", "/settings/integrations", "/settings/meta", "/settings/waha-diagnostic", "/settings/whatsapp", "/tarefas/dashboard", "/vendas", "/vendas/[id]"]);
+    expect([...revised].sort()).toEqual(["/assistente", "/conversas", "/dashboard", "/documentos", "/empresas", "/ferramentas", "/integrations", "/integrations/whatsapp", "/integridade", "/leads", "/leads/[id]", "/noc", "/notificacoes", "/propostas", "/relatorios", "/relatorios/drill/[drillId]", "/settings", "/settings/extension", "/settings/feedback-templates", "/settings/integrations", "/settings/meta", "/settings/waha-diagnostic", "/settings/whatsapp", "/tarefas/dashboard", "/vendas", "/vendas/[id]"]);
     expect(DIRECTOR_LITE_OPT_OUT_ROUTES.length).toBeGreaterThan(0);
   });
 

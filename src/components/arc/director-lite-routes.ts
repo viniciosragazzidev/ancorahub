@@ -38,7 +38,6 @@
   "/guia/webhook",
   "/integrations/meta",
   "/integrations/whats_alt",
-  "/integrations/whatsapp",
   "/internal/design-system",
   "/internal/design-system/motion",
   "/jornada",
