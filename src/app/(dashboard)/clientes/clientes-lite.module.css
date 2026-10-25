@@ -1,0 +1,18 @@
+/* Nome do cliente e o selo "Ativo" (só no cartão do celular, como na versão completa). */
+.title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.phoneOnly {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .phoneOnly {
+    display: inline-flex;
+  }
+}

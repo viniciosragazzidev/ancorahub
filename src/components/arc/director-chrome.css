@@ -874,6 +874,14 @@
     padding-bottom: 8px;
   }
 
+  /* Com ações de página (ex.: "Voltar"), a linha de ações desce para baixo do título: a barra cresce em vez de
+     manter os 64px e deixar o botão por cima do conteúdo. */
+  .arc-venancor[data-skin="diretor"] .director-dashboard-header:has(.director-page-actions),
+  .arc-venancor[data-skin="diretor"].director-dashboard-header:has(.director-page-actions),
+  .arc-venancor[data-skin="diretor"] .director-light-app-header > div:has(.director-page-actions) {
+    height: auto;
+  }
+
   .arc-venancor[data-skin="diretor"] .director-page-actions {
     order: 2;
     width: 100%;

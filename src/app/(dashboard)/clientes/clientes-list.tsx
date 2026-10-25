@@ -28,7 +28,7 @@ type ClientItem = {
   branchName: string | null;
 };
 
-type ClientsMetrics = {
+export type ClientsMetrics = {
   totalClients: number;
   conversionRate: string;
   avgClientsPerBroker: number;
@@ -127,6 +127,25 @@ export const columns: ColumnDef<ClientItem>[] = [
   },
 ];
 
+/** Conversões por dia no período (do mais antigo para hoje), a mesma série da versão completa e da Lite. */
+export function clientConversionTrend(clients: { convertedAt: Date | string }[], period: number) {
+  return clients.reduce<number[]>((acc, client) => {
+    const convertedAt = new Date(client.convertedAt).getTime();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let index = 0; index < period; index += 1) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - (period - 1 - index));
+      const dayStart = date.getTime();
+      const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+      if (convertedAt >= dayStart && convertedAt < dayEnd) acc[index] += 1;
+    }
+
+    return acc;
+  }, Array.from({ length: period }, () => 0));
+}
+
 /* ─── Main Component ─── */
 
 export function ClientesList({
@@ -147,21 +166,7 @@ export function ClientesList({
         .some((value) => value.toLocaleLowerCase("pt-BR").includes(normalized)),
     );
   }, [clients, query]);
-  const conversionTrend = clients.reduce<number[]>((acc, client) => {
-    const convertedAt = new Date(client.convertedAt).getTime();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    for (let index = 0; index < period; index += 1) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - (period - 1 - index));
-      const dayStart = date.getTime();
-      const dayEnd = dayStart + 24 * 60 * 60 * 1000;
-      if (convertedAt >= dayStart && convertedAt < dayEnd) acc[index] += 1;
-    }
-
-    return acc;
-  }, Array.from({ length: period }, () => 0));
+  const conversionTrend = clientConversionTrend(clients, period);
 
   return (
     <div className="flex flex-col gap-6">

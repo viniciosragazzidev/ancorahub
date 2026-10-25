@@ -19,6 +19,7 @@ import { LeadsShellScreen } from "./leads-screen";
 import { ONDA3_SCREENS } from "./onda3-registry";
 import { ONDA6_SCREENS } from "./onda6-registry";
 import { ONDA5_SCREENS } from "./onda5-screens";
+import { ONDA10_SCREENS } from "./onda10-registry";
 
 const permissions = [
   "acessar_dashboard",
@@ -166,7 +167,7 @@ export default async function DirectorShellRealPage({
   const screen = typeof params.tela === "string" ? params.tela : "dashboard";
   const leadsViews: Record<string, "list" | "kanban" | "qualificacoes" | "sem-atribuicao" | "radar"> = { leads: "list", kanban: "kanban", qualificacao: "qualificacoes", "sem-atribuicao": "sem-atribuicao", radar: "radar" };
   const leadsView = leadsViews[screen];
-  const onda3 = ONDA3_SCREENS[screen] ?? ONDA6_SCREENS[screen];
+  const onda3 = ONDA3_SCREENS[screen] ?? ONDA6_SCREENS[screen] ?? ONDA10_SCREENS[screen];
   const onda5 = ONDA5_SCREENS[screen];
   const pathname = showConversations ? "/conversas" : onda5 ? onda5.path : onda3 ? onda3.path : leadsView ? "/leads" : screen === "lead" ? "/leads/11111111-1111-4111-8111-111111111111" : "/dashboard";
   const name = isSuperAdminViewingDirector ? "Alex Exemplo" : "Marina Exemplo";

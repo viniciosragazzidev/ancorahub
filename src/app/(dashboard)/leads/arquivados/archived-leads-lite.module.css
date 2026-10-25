@@ -1,0 +1,8 @@
+/* Busca dos arquivados: campo e "Buscar" na mesma linha também no celular (o campo encolhe, o botão não). */
+.searchRow {
+  flex-wrap: nowrap;
+}
+
+.searchRow > label {
+  flex: 1 1 auto;
+}

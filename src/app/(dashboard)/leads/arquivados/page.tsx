@@ -12,6 +12,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DashboardHeader } from "@/components/dashboard-header";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+
+import { ArchivedLeadsLite } from "./archived-leads-lite";
 
 const PAGE_SIZE = 50;
 
@@ -72,6 +76,38 @@ export default async function ArchivedLeadsPage({
   ]);
   const total = Number(totalRows[0]?.total ?? 0);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // Chave do diretor: a mesma lista no visual Lite, com o "Voltar para leads" no topo da moldura.
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/leads/arquivados")) {
+    return (
+      <>
+        <DashboardHeader
+          breadcrumb="Operação comercial"
+          title="Leads arquivados"
+          rightSlot={<Link href="/leads" className={litePage.button}><ArrowLeft className="size-4" aria-hidden="true" />Voltar para leads</Link>}
+        />
+        <main className={litePage.stack}>
+          <ArchivedLeadsLite
+            rows={rows.map((lead) => ({
+              id: lead.id,
+              name: lead.name,
+              phone: lead.phone,
+              email: lead.email,
+              status: lead.status,
+              qualificationStatus: lead.qualificationStatus,
+              archivedAt: lead.archivedAt ? new Date(lead.archivedAt).toISOString() : null,
+              archivedBy: lead.archivedBy,
+            }))}
+            total={total}
+            page={page}
+            totalPages={totalPages}
+            pageSize={PAGE_SIZE}
+            search={search}
+          />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
