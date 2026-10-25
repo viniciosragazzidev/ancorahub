@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
+import { StatCard } from "@/components/dashboard/metric-card";
 import page from "@/components/lite/page/lite-page.module.css";
 import sections from "@/components/lite/page/lite-sections.module.css";
 
@@ -24,11 +25,8 @@ export function LeadsOverviewLite({ period, metrics, attention, attentionCount, 
     <div className={`arc-venancor ${page.stack}`} data-skin="diretor">
       <p className={page.cardDescription}>Saúde da carteira nos últimos {period} dias, dentro do seu escopo.</p>
       <section className={page.stats} aria-label="Indicadores de leads">
-        {metrics.map(([label, value]) => (
-          <div key={label} className={page.stat}>
-            <span className={page.statLabel}>{label}</span>
-            <span className={page.statValue}>{value}</span>
-          </div>
+        {metrics.map(([label, value], index) => (
+          <StatCard key={label} label={label} value={value} animated animationDelay={index * 0.06} />
         ))}
       </section>
 
