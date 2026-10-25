@@ -1,7 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const state = vi.hoisted(() => ({ managerLite: "false", select: vi.fn() }));
+const state = vi.hoisted(() => ({
+  managerLite: "false",
+  select: vi.fn(),
+  displayUser: {
+    roleKey: "manager" as "manager" | "broker",
+    jobTitle: "manager" as "manager" | "broker",
+    permissions: [] as string[],
+    relationshipCenterEnabled: false,
+  },
+}));
 
 vi.mock("drizzle-orm", () => ({
   and: (...conditions: unknown[]) => conditions,
@@ -15,6 +24,7 @@ vi.mock("@/features/team/supervisor-scope", () => ({ inSupervisorTeam: vi.fn(), 
 vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: vi.fn(async () => ({
   tenantId: "tenant-1", userId: "manager-1", role: "manager", branchId: null,
 })) }));
+vi.mock("@/shared/auth/actions", () => ({ getUserDisplayInfo: vi.fn(async () => state.displayUser) }));
 vi.mock("@/features/system-settings/queries", () => ({
   FEATURE_FLAGS: { MANAGER_LITE: { key: "feature_manager_lite_enabled" } },
   getFeatureFlag: vi.fn(async () => state.managerLite),
@@ -42,6 +52,9 @@ describe("manager search without a unit", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     state.managerLite = "false";
+    state.displayUser.roleKey = "manager";
+    state.displayUser.jobTitle = "manager";
+    state.displayUser.permissions = [];
   });
 
   it("preserves the pre-Lite search when the manager flag is off", async () => {
@@ -55,5 +68,26 @@ describe("manager search without a unit", () => {
     const response = await GET(new NextRequest("http://localhost/api/search?q=lead"));
     expect(response.status).toBe(200);
     expect(state.select).not.toHaveBeenCalled();
+  });
+
+  it("returns only feature results permitted by the menu access policy", async () => {
+    state.displayUser.permissions = ["acessar_leads"];
+    const response = await GET(new NextRequest("http://localhost/api/search?q=lead"));
+    const payload = await response.json() as { groups: Array<{ type: string; items: Array<{ title: string }> }> };
+    const features = payload.groups.find((group) => group.type === "features")?.items ?? [];
+
+    expect(features.some((item) => item.title === "Gestão de Leads")).toBe(true);
+    expect(features.some((item) => item.title === "Regras de Distribuição de Leads")).toBe(false);
+  });
+
+  it("does not expose hidden broker destinations through the feature search", async () => {
+    state.displayUser.roleKey = "broker";
+    state.displayUser.jobTitle = "broker";
+    state.displayUser.permissions = ["acessar_cotacoes"];
+    const response = await GET(new NextRequest("http://localhost/api/search?q=simulador"));
+    const payload = await response.json() as { groups: Array<{ type: string; items: Array<{ title: string }> }> };
+    const features = payload.groups.find((group) => group.type === "features")?.items ?? [];
+
+    expect(features).toHaveLength(0);
   });
 });

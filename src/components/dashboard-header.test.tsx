@@ -14,7 +14,7 @@ vi.mock("@/components/arc/avatar/avatar", () => ({ Avatar: ({ name }: { name: st
 vi.mock("@/components/light/use-director-route", () => ({ useDirectorRoute: () => ({ title: "Lead", parentHref: "/leads" }) }));
 vi.mock("@/components/light/director-more-sheet", () => ({ DirectorMoreSheet: ({ open }: { open: boolean }) => open ? <div role="dialog">Mais opções</div> : null }));
 vi.mock("@/components/light/light-app-header", () => ({
-  LightAppHeader: ({ routeOverride, leading, actions, onOpenMore }: { routeOverride: { title: string }; leading?: React.ReactNode; actions?: React.ReactNode; onOpenMore: () => void }) => <header data-testid="lite-header">{leading}<h1>{routeOverride.title}</h1>{actions}<button aria-label="Abrir menu Mais" onClick={onOpenMore}>Mais</button></header>,
+  LightAppHeader: ({ routeOverride, leading, actions, onOpenMore, titleAsHeading }: { routeOverride: { title: string }; leading?: React.ReactNode; actions?: React.ReactNode; onOpenMore: () => void; titleAsHeading?: boolean }) => <header data-testid="lite-header">{leading}{titleAsHeading ? <h1>{routeOverride.title}</h1> : <p>{routeOverride.title}</p>}{actions}<button aria-label="Abrir menu Mais" onClick={onOpenMore}>Mais</button></header>,
 }));
 
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
@@ -40,5 +40,10 @@ describe("DashboardHeader", () => {
     expect(screen.getByRole("button", { name: "Abrir perfil e mais opções" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Abrir menu Mais" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("Mais opções");
+  });
+
+  it("mantém o título do painel como único h1 do topo global", () => {
+    render(<ArcScopeProvider enabled><DashboardHeader breadcrumb="Início" title="Painel" /></ArcScopeProvider>);
+    expect(screen.getByRole("heading", { level: 1, name: "Painel" })).toBeInTheDocument();
   });
 });

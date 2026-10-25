@@ -130,13 +130,25 @@ function QueuesBlock({ rows, totals, label, empty }: { rows: EssentialQueue[]; t
           <h2 className={styles.cardTitle}>Leads por fila</h2>
           <p className={styles.cardDescription}>{totals.arrived ? `${plural(totals.arrived, "lead entrou", "leads entraram")} ${label}.` : `Nenhum lead entrou ${label}.`}</p>
         </div>
-        <span className={styles.badge} data-tone="info">{label}</span>
+        <div className={styles.cardTools}>
+          <span className={styles.badge} data-tone="info">{label}</span>
+          <Help
+            label="Como ler os dados de leads por fila"
+            lines={[
+              "Qualificados: leads quentes e mornos.",
+              "Em qualificação: leads sem temperatura definida.",
+              "Requalificação: tentativas enviadas a leads frios.",
+              "Cada lead conta pela tentativa mais alta.",
+            ]}
+          />
+        </div>
       </header>
       {rows.length && !empty ? (
         <div className={styles.cardBody}>
-          <table className={styles.table}>
-            <caption className={styles.srOnly}>Leads por fila, {label}</caption>
-            <thead>
+          <div className={styles.tableWrap} tabIndex={0} aria-label="Tabela de leads por fila. Use as setas para navegar horizontalmente.">
+            <table className={styles.table}>
+              <caption className={styles.srOnly}>Leads por fila, {label}</caption>
+              <thead>
               <tr>
                 <th scope="col">Fila</th>
                 <th scope="col" className={styles.numCol} title="Leads que entraram na janela">Entraram</th>
@@ -146,8 +158,8 @@ function QueuesBlock({ rows, totals, label, empty }: { rows: EssentialQueue[]; t
                 <th scope="col" className={styles.numCol} title="Leads ainda sem temperatura">Em qualificação</th>
                 <th scope="col">Temperatura</th>
               </tr>
-            </thead>
-            <tbody>
+              </thead>
+              <tbody>
               {rows.map((queue, index) => (
                 <tr key={queue.id ?? "none"}>
                   <td data-label="Fila">
@@ -179,11 +191,9 @@ function QueuesBlock({ rows, totals, label, empty }: { rows: EssentialQueue[]; t
                 <td data-label="Em qualificação" className={styles.numCol}><LiteNumber value={totals.inQualification} /></td>
                 <td data-label="Temperatura"><StackedTemperature queue={totals} delay={0} /></td>
               </tr>
-            </tbody>
-          </table>
-          <p className={styles.hint}>
-            Qualificados = quentes + mornos. Em qualificação = leads que ainda não têm temperatura, para a conta fechar. Requalificação = tentativas de WhatsApp enviadas aos frios; cada frio conta uma vez na faixa da sua tentativa mais alta.
-          </p>
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div className={styles.cardEmpty}>

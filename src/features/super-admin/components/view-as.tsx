@@ -23,12 +23,12 @@ const Bolt = ({ size = 18 }: { size?: number }) => (
  * opens "Ver como" to see the app as a broker or a supervisor, or goes back to
  * the admin's own access while viewing as someone.
  */
-export function ViewAsButton({ state, variant = "menu", onNavigate }: { state: ViewAsState; variant?: "menu" | "sidebar"; onNavigate?: () => void }) {
+export function ViewAsButton({ state, variant = "menu", onNavigate, directorLite = false }: { state: ViewAsState; variant?: "menu" | "sidebar"; onNavigate?: () => void; directorLite?: boolean }) {
   const [open, setOpen] = useState(false);
   if (!state.canViewAs) return null;
   if (state.viewingAs) {
     return (
-      <a href={EXIT_VIEW_AS_HREF} className={styles.button} data-variant={variant} data-active="true" onClick={onNavigate}>
+      <a href={EXIT_VIEW_AS_HREF} className={directorLite ? styles.button + " " + styles.directorLiteButton : styles.button} data-variant={variant} data-active="true" onClick={onNavigate}>
         <span className={styles.bolt}><Bolt /></span>
         <span className={styles.label}><strong>Voltar ao meu acesso</strong><small>Vendo como {state.viewingAs.name}</small></span>
       </a>
@@ -36,7 +36,7 @@ export function ViewAsButton({ state, variant = "menu", onNavigate }: { state: V
   }
   return (
     <>
-      <button type="button" className={styles.button} data-variant={variant} onClick={() => setOpen(true)} aria-haspopup="dialog">
+      <button type="button" className={directorLite ? styles.button + " " + styles.directorLiteButton : styles.button} data-variant={variant} onClick={() => setOpen(true)} aria-haspopup="dialog">
         <span className={styles.bolt}><Bolt /></span>
         <span className={styles.label}><strong>Ver como</strong><small>Entre como corretor, supervisor ou gestor</small></span>
       </button>

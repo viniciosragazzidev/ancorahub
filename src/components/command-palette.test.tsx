@@ -26,6 +26,16 @@ afterEach(() => {
 });
 
 describe("paleta do diretor", () => {
+  it("mostra carregamento durante a espera do debounce", () => {
+    render(<ArcScopeProvider enabled><CommandPalette /></ArcScopeProvider>);
+
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    fireEvent.change(screen.getByPlaceholderText("Buscar páginas, leads e clientes..."), { target: { value: "Marina" } });
+
+    expect(screen.getByRole("status")).toHaveTextContent("Buscando no CRM");
+    expect(screen.queryByText("Nenhum resultado encontrado.")).not.toBeInTheDocument();
+  });
+
   it("Ctrl+K abre a busca unificada de páginas e leads", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ groups: [{ type: "lead", label: "Leads", items: [{ id: "lead-1", title: "Marina Costa", subtitle: "Cliente", href: "/leads/lead-1" }] }] }) });
     vi.stubGlobal("fetch", fetchMock);

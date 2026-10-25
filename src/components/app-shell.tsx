@@ -3,7 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { CorreTopSidebar } from "@/components/corretop-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -72,6 +72,7 @@ export function AppShell({
   directorLiteEnabled = false,
   initialSidebarUser,
   initialSidebarPathname,
+  initialSidebarOnDuty,
 }: {
   children: ReactNode;
   branding?: Branding;
@@ -99,6 +100,8 @@ export function AppShell({
   initialSidebarUser?: UserDisplayInfo | null;
   /** Só usado pela prévia de desenvolvimento para destacar a rota representada. */
   initialSidebarPathname?: string;
+  /** So usado pela previa de desenvolvimento para mostrar o estado de plantao. */
+  initialSidebarOnDuty?: boolean;
 }) {
   const pathname = usePathname();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -106,6 +109,22 @@ export function AppShell({
   const readableBrandForeground = branding?.brandColor
     ? getReadableForeground(branding.brandColor)
     : null;
+  const hasShellUser = Boolean(user);
+  const shellUserName = user?.name;
+  const shellUserEmail = user?.email;
+  const shellUserRole = user?.role;
+  const shellUserJobTitle = user?.jobTitle;
+  const shellUserIsPlatformAdmin = user?.isPlatformAdmin;
+  const shellUser = useMemo(
+    () => hasShellUser ? {
+      name: shellUserName ?? null,
+      email: shellUserEmail ?? null,
+      role: shellUserRole,
+      jobTitle: shellUserJobTitle,
+      isPlatformAdmin: shellUserIsPlatformAdmin,
+    } : undefined,
+    [hasShellUser, shellUserName, shellUserEmail, shellUserRole, shellUserJobTitle, shellUserIsPlatformAdmin],
+  );
 
   useEffect(() => {
     const root = document.documentElement;
@@ -219,7 +238,7 @@ export function AppShell({
   return (
     <ArcScopeProvider enabled={directorLiteEnabled}>
     <DirectorChromeProvider
-      shellUser={user ? { name: user.name, email: user.email, role: user.role, jobTitle: user.jobTitle, isPlatformAdmin: user.isPlatformAdmin } : undefined}
+      shellUser={shellUser}
       viewAs={viewAs}
     >
     <TooltipProvider delay={directorLiteEnabled ? 400 : 300} timeout={directorLiteEnabled ? 600 : 400}>
@@ -248,10 +267,10 @@ export function AppShell({
         {directorLiteEnabled ? <div className="arc-venancor director-view-as-banner" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}><ViewAsBanner viewingAs={viewAs.viewingAs} /></div> : <ViewAsBanner viewingAs={viewAs.viewingAs} />}
         {directorLiteEnabled ? (
           <div className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}>
-            <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} />
+            <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} />
           </div>
         ) : (
-          <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} />
+          <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} />
         )}
         {directorLiteEnabled ? <div id={DIRECTOR_LITE_PORTAL_ROOT_ID} className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }} /> : null}
         <SidebarInset

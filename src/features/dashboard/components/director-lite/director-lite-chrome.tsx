@@ -2,6 +2,7 @@
 
 /** Topo do painel do diretor no visual Lite nas abas Visão, Qualidade e Funil: o cabeçalho compartilhado com os links reais. */
 import { useRouter } from "next/navigation";
+import { DashboardHeader } from "@/components/dashboard-header";
 import type { ReactNode } from "react";
 
 import type { OverviewPeriod } from "@/features/dashboard/overview-filter";
@@ -49,19 +50,24 @@ export function DirectorLiteChrome({ now, tab, period, branchId, branches, first
   const units = branches.length ? [{ value: "", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))] : undefined;
 
   return (
-    <div className={styles.dashboard}>
-      <DirectorLiteHeader
-        firstName={firstName}
-        now={now}
-        tabs={tabs}
-        activeTab={tab}
-        periods={periods}
-        activePeriod={periodValue}
-        units={units}
-        activeUnit={branchId ?? ""}
-        onUnit={(value) => router.push(dashboardHref(tab, periodValue, value || null))}
-      />
-      {children}
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <DashboardHeader breadcrumb="Início" title="Painel" />
+      <main className={styles.pageContainer} aria-label="Painel do diretor">
+        <div className={styles.dashboard}>
+          <DirectorLiteHeader
+            firstName={firstName}
+            now={now}
+            tabs={tabs}
+            activeTab={tab}
+            periods={periods}
+            activePeriod={periodValue}
+            units={units}
+            activeUnit={branchId ?? ""}
+            onUnit={(value) => router.push(dashboardHref(tab, periodValue, value || null))}
+          />
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

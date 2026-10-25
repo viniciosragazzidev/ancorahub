@@ -61,7 +61,7 @@ export function SuperAdminRoleSwitcher({ activeOverride, compact = false }: Supe
   const isSimulating = activeOverride && activeOverride !== "none";
 
   return (
-    <div className={cn(compact ? "relative z-10 w-full" : "fixed bottom-24 right-6 z-50 max-[559px]:bottom-32 max-[559px]:right-3")}>
+    <div className={cn(compact ? "relative z-10 w-full" : "fixed bottom-24 right-6 z-50 max-[559px]:bottom-32 max-[559px]:right-3", directorLite && "director-role-switcher")}>
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button
             size={compact ? "default" : "icon"}
@@ -71,7 +71,7 @@ export function SuperAdminRoleSwitcher({ activeOverride, compact = false }: Supe
           >
             <Lightning className="size-5 text-foreground" />
             {compact && <span className="truncate">Visão: {ROLE_OPTIONS.find((role) => role.value === selectedRole)?.badge ?? "Super-Admin"}</span>}
-            {isSimulating && (
+            {isSimulating && !directorLite && (
               <span className="absolute -top-1 -right-1 flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>

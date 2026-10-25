@@ -99,10 +99,12 @@ function DirectorDashboardHeader({
         onToggleAvailability={() => undefined}
         onOpenMore={() => setMoreOpen(true)}
         hideAvailability
+        titleAsHeading={title === "Painel"}
         routeOverride={{ title, isRoot: root, parentHref: route.parentHref, backToParent: true }}
-        leading={root && showSidebarTrigger ? <SidebarTrigger aria-label="Abrir menu principal" className="size-11" /> : null}
+        leading={root && showSidebarTrigger && title !== "Painel" ? <SidebarTrigger aria-label="Abrir menu principal" className="size-11" /> : null}
         actions={(
           <>
+            {root && showSidebarTrigger && title === "Painel" ? <SidebarTrigger aria-label="Abrir menu principal" className="size-11" /> : null}
             {rightSlot ? <div data-slot="page-actions" aria-label="Ações da página" className="director-page-actions">{rightSlot}</div> : null}
             <button type="button" aria-label="Buscar páginas, leads e clientes" title="Buscar (Ctrl+K)" className="director-header-action director-search-trigger" onClick={() => window.dispatchEvent(new Event("open-command-palette"))}>
               <Search aria-hidden="true" className="size-4" />

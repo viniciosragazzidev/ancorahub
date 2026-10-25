@@ -28,6 +28,7 @@ export function LightAppHeader({
   leading,
   moreButton,
   showMoreButton = true,
+  titleAsHeading = false,
 }: {
   /** Supervisor Lite: no availability (they do not receive leads). */
   hideAvailability?: boolean;
@@ -43,12 +44,15 @@ export function LightAppHeader({
   leading?: ReactNode;
   moreButton?: ReactNode;
   showMoreButton?: boolean;
+  /** Página com título global mantém um único h1 sem repetir outro no conteúdo. */
+  titleAsHeading?: boolean;
 }) {
   const lightRoute = useLightRoute();
   const title = routeOverride?.title ?? lightRoute.title;
   const isRoot = routeOverride?.isRoot ?? lightRoute.isRoot;
   const parentHref = routeOverride?.parentHref ?? lightRoute.parentHref;
   const backToParent = routeOverride?.backToParent ?? lightRoute.backToParent;
+  const Title = titleAsHeading ? "h1" : "p";
 
   return (
     <header
@@ -62,14 +66,14 @@ export function LightAppHeader({
       <div className="flex min-h-[60px] w-full items-center gap-2.5 px-3 py-2.5">
         {leading}
         {!isRoot && parentHref ? <LightBackButton fallbackHref={parentHref} alwaysParent={backToParent} className={routeOverride ? "size-11 border border-(--border)" : "size-10 border border-(--border)"} /> : null}
-        <p
+        <Title
           className={cn(
             "min-w-0 flex-1 truncate tracking-tight text-(--foreground)",
             isRoot ? "text-xl font-medium" : "text-base font-medium",
           )}
         >
           {title}
-        </p>
+        </Title>
         {actions}
         {isRoot && !hideAvailability ? (
           <LightAvailabilityPill

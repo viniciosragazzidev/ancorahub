@@ -1,6 +1,6 @@
 # Diretor Lite, F2 chrome
 
-Status: implementado na branch `feat/diretor-lite-f2`; aprovação visual dos prints ainda pendente.
+Status: aprovado pelo Vinicios e integrado em `4af57b0c`; correções posteriores estão registradas em `2026-10-25-diretor-lite-f2b.md`.
 
 ## Contrato
 
@@ -33,7 +33,7 @@ Status: implementado na branch `feat/diretor-lite-f2`; aprovação visual dos pr
 
 - Oito prints do shell real em 1440, 1024, 768 e 390px, com chave ligada e desligada, estão em `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/f2-prints/`.
 - Prints adicionais mostram a navegação e o menu Mais abertos em 390px. O Mais abre expandido e mantém Sair visível; os controles e linhas de navegação têm pelo menos 44px.
-- Todas as oito capturas retornaram 200, mantiveram os 13 itens de menu e não tiveram rolagem horizontal. Os prints aguardam aprovação do Vinicios antes de qualquer merge.
+- Todas as oito capturas retornaram 200, mantiveram os 13 itens de menu e não tiveram rolagem horizontal. O Vinicios aprovou os prints antes da integração em `4af57b0c`.
 
 ## Itens fora desta etapa
 

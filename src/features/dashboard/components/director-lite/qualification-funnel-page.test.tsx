@@ -18,11 +18,16 @@ vi.mock("motion/react", async (importOriginal) => {
   const { captureMotion } = await import("@/components/lite/motion/capture-motion");
   return { ...actual, motion: captureMotion(), useReducedMotion: () => motionState.reduce };
 });
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: motionState.push }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: motionState.push }), usePathname: () => "/dashboard" }));
 
 import type { QualificationFunnel } from "@/features/qualification-turbo/funnel";
 
+vi.mock("@/components/dashboard-header", () => ({
+  DashboardHeader: ({ breadcrumb, title }: { breadcrumb: string; title: string }) => <header data-testid="director-dashboard-header"><span>{breadcrumb}</span><h1>{title}</h1></header>,
+}));
+
 import { DirectorLiteQualificationFunnelPage } from "./qualification-funnel-page";
+import styles from "./director-lite.module.css";
 
 const data: QualificationFunnel = {
   period: 30,
@@ -43,7 +48,10 @@ afterEach(() => cleanup());
 describe("filtros da aba Funil Lite", () => {
   it("mantém o período e a unidade nas opções e expõe só as unidades recebidas do servidor", () => {
     render(<DirectorLiteQualificationFunnelPage data={data} branchId="branch-autorizada" branches={branches} firstName="Renata" now={now} />);
-    expect(screen.getByRole("heading", { level: 1, name: "Olá, Renata" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Painel" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: /Ol\u00e1, Renata/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Ol\u00e1, Renata/)).toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "Painel do diretor" })).toHaveClass(styles.pageContainer);
     const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
     expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("href", "/dashboard?periodo=30&unidade=branch-autorizada");
     expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=30&unidade=branch-autorizada");

@@ -1,14 +1,22 @@
 "use client";
 
-/**
- * Cabeçalho do painel do diretor no visual Lite (uma fonte só): saudação com o primeiro nome, data, seletor de
- * unidade, período em controle segmentado e as seções em controle segmentado. Usado pelo painel real (links e
- * `onUnit`) e pela prévia (`onTab`/`onPeriod` com estado).
- */
+/** Controles do painel do diretor no visual Lite: unidade, periodo e abas. */
 import Link from "next/link";
 
 import styles from "./director-lite.module.css";
 import { dateTitle } from "./format";
+
+function PeriodHelp() {
+  return (
+    <details className={styles.help}>
+      <summary className={styles.helpButton} aria-label="Sobre o período" title="Sobre o período">?</summary>
+      <ul className={styles.helpPanel}>
+        <li>O período altera apenas os leads por fila.</li>
+        <li>Plantões e WhatsApp mostram o momento atual.</li>
+      </ul>
+    </details>
+  );
+}
 
 /** `short` é o rótulo do celular (abaixo de 640px); o `label` completo segue no aria-label e no computador. */
 export type HeaderOption = { value: string; label: string; href: string; short?: string };
@@ -65,12 +73,13 @@ export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, per
   activeUnit: string;
   onUnit?: (value: string) => void;
 }) {
+  const shortDate = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "numeric", month: "short" }).format(now);
+
   return (
     <header className={styles.headerBlock}>
       <div className={styles.pageHead}>
         <div className={styles.titleBlock}>
-          <h1 className={styles.pageTitle}>Olá, {firstName ?? "diretor"}</h1>
-          <p className={styles.pageSubtitle}>{dateTitle(now)}. O dia da operação começa às 19h de ontem.</p>
+          <p className={styles.pageSubtitle} title={`${dateTitle(now)}. O dia da operação começa às 19h.`}>Olá, {firstName ?? "diretor"} · {shortDate} · dia começa às 19h</p>
         </div>
         <div className={styles.filters}>
           {units && units.length > 0 ? (
@@ -83,7 +92,10 @@ export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, per
               </select>
             </label>
           ) : null}
-          <Segmented label="Período" items={periods} active={activePeriod} onSelect={onPeriod} kind="period" />
+          <div className={styles.periodGroup}>
+            <Segmented label="Período" items={periods} active={activePeriod} onSelect={onPeriod} kind="period" />
+            <PeriodHelp />
+          </div>
         </div>
       </div>
       {tabs.length ? (

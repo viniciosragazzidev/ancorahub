@@ -26,4 +26,13 @@ describe("atalhos do chrome do diretor", () => {
     fireEvent.keyDown(document, { key: "d" });
     expect(handler).toHaveBeenCalledOnce();
   });
+
+  it("preserva o escopo Arc no elemento raiz do diálogo", () => {
+    render(<KeyboardShortcutsProvider directorLiteEnabled><div /></KeyboardShortcutsProvider>);
+    fireEvent.keyDown(document, { key: "?" });
+
+    const dialog = document.querySelector('[data-slot="keyboard-shortcuts-dialog"]');
+    expect(dialog).toHaveClass("arc-venancor");
+    expect(dialog).toHaveAttribute("data-skin", "diretor");
+  });
 });
