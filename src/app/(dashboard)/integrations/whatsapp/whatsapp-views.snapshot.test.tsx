@@ -40,3 +40,17 @@ describe("visões do WhatsApp com a chave desligada", () => {
     expect(renderToStaticMarkup(await MaterialsWhatsAppView({ context }))).toMatchSnapshot();
   });
 });
+
+describe("visões do WhatsApp com a chave", () => {
+  it("diretoria e materiais trocam de visão em chips de link e mantêm os mesmos cartões", async () => {
+    const director = renderToStaticMarkup(await DirectorWhatsAppView({ context, lite: true }));
+    expect(director).toContain('aria-current="page"');
+    expect(director).toContain('data-stub="tenant-channel"');
+    expect(director).toContain('data-stub="team-notices"');
+    expect(director).not.toContain("shadow-sm");
+    const materials = renderToStaticMarkup(await MaterialsWhatsAppView({ context, lite: true }));
+    expect(materials).toContain("Material publicado");
+    expect(materials).toContain('data-stub="material-groups"');
+    expect(materials).toContain("Captura ligada");
+  });
+});
