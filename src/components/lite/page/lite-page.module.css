@@ -30,6 +30,11 @@
   gap: 16px;
 }
 
+/* Poucos números (1 ou 2): mantêm a largura de um cartão em vez de esticar pela linha toda. */
+.statsFill {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
 /* Cartão de número em repouso: borda de 1px e nenhuma sombra (contrato de refino). A classe dobrada vence a pele diretor. */
 .stats.stats :global([data-slot="stat-card"]) {
   border: 1px solid var(--border);
@@ -325,4 +330,11 @@
   .toolbarEnd {
     margin-left: 0;
   }
+}
+
+/* Título de seção dentro da página (o h1 é do cabeçalho do app). */
+.sectionTitle {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
 }

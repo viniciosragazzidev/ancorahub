@@ -12,6 +12,7 @@ import { SaleDetailLite } from "@/app/(dashboard)/vendas/[id]/sale-detail-lite";
 import { PropostasLite } from "@/app/(dashboard)/propostas/_components/propostas-lite";
 import { PROPOSAL_FIXTURES, PROPOSAL_LEADS } from "@/app/(dashboard)/propostas/_components/proposals-fixtures";
 import { DocumentsLite } from "@/features/documents/components/documents-lite";
+import { DrilldownLite } from "@/app/(dashboard)/relatorios/drill/_components/drilldown-lite";
 import { DomainDashboardLite } from "@/features/dashboard/components/domain-dashboard-lite";
 import { CARRIER_FIXTURES, DOC_FIXTURES, PLAN_FIXTURES, REQUIREMENT_FIXTURES } from "@/features/documents/components/documents-fixtures";
 
@@ -140,6 +141,32 @@ export function TarefasShellScreen() {
       <DashboardHeader breadcrumb="Tarefas" title="Visão geral" />
       <main className={litePage.stack}>
         <DomainDashboardLite data={data} actionLabel="Abrir tarefas" />
+      </main>
+    </>
+  );
+}
+
+const DRILL_STATUSES = ["negotiation", "documentation_pending", "under_analysis", "in_contact", "quote_sent"];
+
+export function DrillShellScreen() {
+  const rows = SALE_NAMES.concat(SALE_NAMES.map((name) => `${name} (2)`)).map((name, index) => ({
+    id: `lead-${index + 1}`,
+    nome: name,
+    status: DRILL_STATUSES[index % DRILL_STATUSES.length]!,
+    brokerName: index % 5 === 4 ? null : ["Ana Souza", "Bruno Lima", "Carla Dias", "Maximiliano Cavalcanti Rocha"][index % 4]!,
+    branchName: BRANCHES[index % 3]?.name ?? null,
+    createdAt: new Date(Date.UTC(2026, 9, 24 - (index % 20), 1, 30)).toISOString(),
+  }));
+  const brokers = [
+    { brokerId: "b1", brokerName: "Maximiliano Cavalcanti Rocha", activeLeads: 48, capacity: 30 },
+    { brokerId: "b2", brokerName: "Ana Souza", activeLeads: 36, capacity: 30 },
+    { brokerId: "b3", brokerName: "Bruno Lima", activeLeads: 31, capacity: 25 },
+  ];
+  return (
+    <>
+      <DashboardHeader breadcrumb="Relatórios / Negociações paradas" title="Negociações paradas" rightSlot={<a href="/dashboard?period=30&tab=overview" className={litePage.button}>Voltar</a>} />
+      <main className={litePage.stack}>
+        <DrilldownLite explanation="Leads em negociação, documentação ou análise cuja entrada na etapa atual excede o prazo de estagnação do tenant." total={312} rows={rows} brokers={brokers} />
       </main>
     </>
   );

@@ -67,8 +67,6 @@
   "/qualificacao",
   "/qualificacao/turbo",
   "/relacionamento",
-  "/relatorios",
-  "/relatorios/drill/[drillId]",
   "/roadmap",
   "/settings",
   "/settings/extension",

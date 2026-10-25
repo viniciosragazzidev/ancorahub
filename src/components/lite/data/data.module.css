@@ -79,7 +79,8 @@
   text-overflow: ellipsis;
 }
 
-.numeric {
+.numeric,
+.table th.numeric {
   text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
