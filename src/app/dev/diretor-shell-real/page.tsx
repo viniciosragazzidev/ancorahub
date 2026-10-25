@@ -10,6 +10,11 @@ import { LeadDetailFixture } from "@/app/dev/diretor-lead-real/lead-detail-fixtu
 import { ConversationsFrame } from "@/app/(dashboard)/conversas/conversations-frame";
 import type { ConversationItem } from "@/app/(dashboard)/conversas/conversations-workspace";
 
+import { DirectorLiteChrome } from "@/features/dashboard/components/director-lite/director-lite-chrome";
+import { DirectorLiteQualificationFunnelPage } from "@/features/dashboard/components/director-lite/qualification-funnel-page";
+import { QualityToolbar, QualityView } from "@/features/dashboard/components/director-lite/quality-view";
+
+import { CASE_NOW, DASHBOARD_CASES, essentialCase, funnelCase, qualityCase, type DashboardCase } from "./dashboard-cases";
 import { LeadsShellScreen } from "./leads-screen";
 import { ONDA3_SCREENS } from "./onda3-registry";
 
@@ -162,6 +167,27 @@ export default async function DirectorShellRealPage({
   const onda3 = ONDA3_SCREENS[screen];
   const pathname = showConversations ? "/conversas" : onda3 ? onda3.path : leadsView ? "/leads" : screen === "lead" ? "/leads/11111111-1111-4111-8111-111111111111" : "/dashboard";
   const name = isSuperAdminViewingDirector ? "Alex Exemplo" : "Marina Exemplo";
+  // Painel: ?aba=operacao|qualidade|funil e ?caso=uma-hora|zerado|cheio|uma-fila (casos de borda com dados de exemplo).
+  const tab = params.aba === "qualidade" ? "qualidade" : params.aba === "funil" ? "funil" : "operacao";
+  const dashboardCase = DASHBOARD_CASES.find((item) => item === params.caso) as DashboardCase | undefined;
+  const firstName = name.split(" ")[0] ?? name;
+  const caseNow = dashboardCase ? CASE_NOW[dashboardCase] : demoNow;
+  const dashboard = tab === "qualidade" ? (
+    <DirectorLiteChrome now={caseNow} tab="quality" period="today" branchId={null} branches={demoBranches} firstName={firstName}>
+      <QualityToolbar legacyHref="/dashboard?tab=quality&period=today&legado=1" detailedHref="/dashboard?tab=quality&period=today&vista=detalhada&legado=1" />
+      <QualityView report={qualityCase(dashboardCase ?? "cheio")} unitName={null} now={caseNow} widerHref="/dashboard?tab=quality&periodo=7" />
+    </DirectorLiteChrome>
+  ) : tab === "funil" ? (
+    <DirectorLiteQualificationFunnelPage data={funnelCase(dashboardCase ?? "cheio")} branchId={null} branches={demoBranches} firstName={firstName} now={caseNow} />
+  ) : (
+    <DirectorLiteDashboard
+      data={{ ...(dashboardCase ? essentialCase(dashboardCase) : buildEssential("today", "all", demoNow)), firstName }}
+      period="today"
+      branchId={null}
+      branches={demoBranches}
+      now={caseNow}
+    />
+  );
   const previewUser: UserDisplayInfo = {
     name,
     role: "Diretor",
@@ -212,15 +238,7 @@ export default async function DirectorShellRealPage({
             <LeadDetailFixture />
           </main>
         </>
-      ) : (
-        <DirectorLiteDashboard
-          data={{ ...buildEssential("today", "all", demoNow), firstName: name.split(" ")[0] ?? name }}
-          period="today"
-          branchId={null}
-          branches={demoBranches}
-          now={demoNow}
-        />
-      )}
+      ) : dashboard}
     </AppShell>
   );
 }
