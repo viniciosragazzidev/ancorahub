@@ -115,7 +115,7 @@ export function CommandPalette() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={directorLite ? handleOpenChange : setOpen}>
       <DialogPopup className={`max-w-2xl gap-0 p-0 overflow-hidden rounded-xl border-border/80 shadow-2xl${directorLite ? " director-command-palette" : ""}`}>
         <DialogHeader className="p-4 border-b border-border/60">
           <DialogTitle className="sr-only">Busca Global e Atalhos do AncoraHub</DialogTitle>
@@ -134,7 +134,7 @@ export function CommandPalette() {
           </div>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[min(70vh,520px)] p-2">
+        <ScrollArea className={directorLite ? "max-h-[min(70vh,520px)] p-2" : "max-h-[380px] p-2"}>
           {directorLite && query.trim().length >= 2 ? (
             <section aria-label="Resultados da busca global" className="space-y-1 p-1">
               {searchLoading ? <p role="status" className="px-3 py-4 text-sm text-muted-foreground">Buscando no CRM…</p> : null}
