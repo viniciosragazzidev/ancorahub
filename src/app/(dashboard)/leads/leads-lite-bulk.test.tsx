@@ -8,7 +8,7 @@ import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspa
 import { LeadsListSwitch } from "./leads-lite-list";
 
 vi.mock("./leads-data-table", () => ({ LeadsDataTable: () => <div data-testid="legacy-table" /> }));
-vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
+vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => "/leads", useRouter: () => ({ replace: vi.fn() }) }));
 const actions = vi.hoisted(() => ({
   bulkChangeLeadStatusAction: vi.fn(async () => ({})),
   bulkReassignLeadsAction: vi.fn(async () => ({})),
