@@ -493,42 +493,49 @@
   font-size: var(--text-xs);
 }
 
-.arc-venancor[data-skin="diretor"] [aria-label="Seções do atendimento"],
-.arc-venancor[data-skin="diretor"] [aria-label="Canais WhatsApp"],
-.arc-venancor[data-skin="diretor"] [aria-label="Gestão de equipe e unidades"] {
-  gap: 8px;
+/* Abas por URL recebem a pele do diretor no canvas e em rota ainda opt-out. */
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Seções do atendimento"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Seções do atendimento"]),
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Gestão de equipe e unidades"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Gestão de equipe e unidades"]),
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Canais WhatsApp"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Canais WhatsApp"]) {
+  width: fit-content;
+  max-width: 100%;
+  gap: var(--space-1, .25rem);
   overflow-x: auto;
   overflow-y: hidden;
   border: 0;
-  padding: 4px;
+  border-radius: var(--radius-control, var(--radius));
+  padding: var(--space-1, .25rem);
+  background: var(--surface-muted, var(--muted));
   scrollbar-width: none;
 }
 
-.arc-venancor[data-skin="diretor"] [aria-label="Seções do atendimento"]::-webkit-scrollbar,
-.arc-venancor[data-skin="diretor"] [aria-label="Canais WhatsApp"]::-webkit-scrollbar,
-.arc-venancor[data-skin="diretor"] [aria-label="Gestão de equipe e unidades"]::-webkit-scrollbar { display: none; }
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Seções do atendimento"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Seções do atendimento"])::-webkit-scrollbar,
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Gestão de equipe e unidades"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Gestão de equipe e unidades"])::-webkit-scrollbar,
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Canais WhatsApp"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Canais WhatsApp"])::-webkit-scrollbar { display: none; }
 
-.arc-venancor[data-skin="diretor"] [aria-label="Seções do atendimento"] a,
-.arc-venancor[data-skin="diretor"] [aria-label="Canais WhatsApp"] a,
-.arc-venancor[data-skin="diretor"] [aria-label="Gestão de equipe e unidades"] a {
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Seções do atendimento"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Seções do atendimento"]) > a,
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Gestão de equipe e unidades"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Gestão de equipe e unidades"]) > a,
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Canais WhatsApp"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Canais WhatsApp"]) > a {
   min-height: var(--control-height-sm, 44px);
-  border-radius: 999px;
-  padding: 0 14px;
-  background: var(--surface-muted);
+  border-radius: var(--radius-control, var(--radius));
+  padding-inline: var(--space-3, .75rem);
+  background: var(--surface-muted, var(--muted));
+  color: var(--text-secondary, var(--muted-foreground));
+  font-size: var(--text-sm, .875rem);
+  transition: background-color var(--duration-fast, 250ms) var(--ease-in-out, ease-in-out), color var(--duration-fast, 250ms) var(--ease-in-out, ease-in-out);
 }
 
-.arc-venancor[data-skin="diretor"] [aria-label="Seções do atendimento"] a[aria-current="page"],
-.arc-venancor[data-skin="diretor"] [aria-label="Canais WhatsApp"] a[aria-current="page"],
-.arc-venancor[data-skin="diretor"] [aria-label="Gestão de equipe e unidades"] a[aria-current="page"] {
-  background: var(--accent-subtle);
-  color: var(--accent-strong);
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Seções do atendimento"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Seções do atendimento"]) > a[aria-current="page"],
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Gestão de equipe e unidades"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Gestão de equipe e unidades"]) > a[aria-current="page"],
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Canais WhatsApp"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Canais WhatsApp"]) > a[aria-current="page"] {
+  background: var(--surface, var(--card));
+  color: var(--accent-strong, var(--foreground));
+  box-shadow: var(--shadow-resting, none);
 }
 
-.arc-venancor[data-skin="diretor"] [aria-label="Seções do atendimento"] a > span,
-.arc-venancor[data-skin="diretor"] [aria-label="Canais WhatsApp"] a > span,
-.arc-venancor[data-skin="diretor"] [aria-label="Gestão de equipe e unidades"] a > span {
-  display: none;
-}
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Seções do atendimento"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Seções do atendimento"]) > a[aria-current="page"] > span,
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Gestão de equipe e unidades"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Gestão de equipe e unidades"]) > a[aria-current="page"] > span,
+:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Canais WhatsApp"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"][data-skin="off"] nav[aria-label="Canais WhatsApp"]) > a[aria-current="page"] > span { display: none; }
 
 .arc-venancor[data-skin="diretor"] [data-slot="dialog-popup"].director-wizard-popup {
   display: grid;
@@ -781,42 +788,4 @@
   .arc-venancor[data-skin="diretor"] .director-header-action {
     transition-duration: var(--duration-instant);
   }
-}
-
-/* Abas por URL usam a marcação compartilhada sem alterar o HTML para os outros papéis. */
-:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Seções do atendimento"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"] nav[aria-label="Seções do atendimento"]),
-:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Gestão de equipe e unidades"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"] nav[aria-label="Gestão de equipe e unidades"]),
-:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Canais WhatsApp"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"] nav[aria-label="Canais WhatsApp"]) {
-  width: fit-content;
-  max-width: 100%;
-  gap: var(--space-1);
-  overflow-x: auto;
-  border: 0;
-  border-radius: var(--radius-control, var(--radius));
-  padding: var(--space-1);
-  background: var(--surface-muted, var(--muted));
-}
-
-:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Seções do atendimento"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"] nav[aria-label="Seções do atendimento"]) > a,
-:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Gestão de equipe e unidades"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"] nav[aria-label="Gestão de equipe e unidades"]) > a,
-:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Canais WhatsApp"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"] nav[aria-label="Canais WhatsApp"]) > a {
-  min-height: var(--control-height-sm, 44px);
-  border-radius: var(--radius-control, var(--radius));
-  color: var(--text-secondary, var(--muted-foreground));
-  font-size: var(--text-sm);
-  transition: background-color var(--duration-fast) var(--ease-in-out), color var(--duration-fast) var(--ease-in-out);
-}
-
-:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Seções do atendimento"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"] nav[aria-label="Seções do atendimento"]) > a[aria-current="page"],
-:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Gestão de equipe e unidades"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"] nav[aria-label="Gestão de equipe e unidades"]) > a[aria-current="page"],
-:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Canais WhatsApp"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"] nav[aria-label="Canais WhatsApp"]) > a[aria-current="page"] {
-  background: var(--surface, var(--card));
-  color: var(--accent-strong, var(--foreground));
-  box-shadow: var(--shadow-resting, none);
-}
-
-:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Seções do atendimento"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"] nav[aria-label="Seções do atendimento"]) > a[aria-current="page"] > span,
-:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Gestão de equipe e unidades"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"] nav[aria-label="Gestão de equipe e unidades"]) > a[aria-current="page"] > span,
-:is(.arc-venancor[data-skin="diretor"] nav[aria-label="Canais WhatsApp"], .arc-venancor[data-skin="diretor"] ~ [data-slot="app-scroll-frame"] nav[aria-label="Canais WhatsApp"]) > a[aria-current="page"] > span {
-  display: none;
 }

@@ -9,6 +9,7 @@ describe("abas por URL no chrome do diretor", () => {
     for (const label of ["Seções do atendimento", "Gestão de equipe e unidades", "Canais WhatsApp"]) {
       expect(sectionTabs).toContain(`.arc-venancor[data-skin="diretor"] nav[aria-label="${label}"]`);
     }
+    expect(sectionTabs).toContain('~ [data-slot="app-scroll-frame"][data-skin="off"]');
     expect(sectionTabs).toContain("min-height: var(--control-height-sm, 44px)");
     expect(sectionTabs).toContain("background: var(--surface-muted, var(--muted))");
     expect(sectionTabs).toContain("background: var(--surface, var(--card))");
