@@ -1,0 +1,135 @@
+.desktop {
+  display: block;
+}
+
+.mobile {
+  display: none;
+}
+
+.days,
+.shifts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.day {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 0;
+}
+
+.day h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.today {
+  color: var(--accent-strong);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.dayAction {
+  display: grid;
+  width: var(--control-height-md);
+  height: var(--control-height-md);
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  opacity: 1;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+
+.dayAction:hover {
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+
+.dayAction:focus-visible,
+.calendarItem:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: 2px;
+}
+
+.calendarItem {
+  min-height: var(--control-height-md);
+  border-radius: var(--radius-control);
+}
+
+.shift {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+}
+
+.shift:hover {
+  background: var(--surface-muted);
+}
+
+.shift:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: 2px;
+}
+
+.shiftName {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shiftMeta {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.create {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.create > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.create > div > * {
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .desktop {
+    display: none;
+  }
+
+  .mobile {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+  }
+}

@@ -65,6 +65,8 @@ import { DutyMonthCalendar } from "./duty-month-calendar";
 import { MonthlyDutyPlanner, monthLabel, useMonthlyDutyPlans } from "./monthly-duty-planner";
 import { DutyTypeDialog, DutyTypesSheet, DutyTypeTag, MODALITY_LABEL, typeUnitsLabel } from "./duty-type-ui";
 import { getOperationalMonthKey } from "./duty-schedule-month-groups";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import directorLiteStyles from "./director-duty-operations.module.css";
 
 type Snapshot = DutyRosterSnapshot;
 type Schedule = Snapshot["schedules"][number];
@@ -1272,6 +1274,7 @@ function outsideLabel(schedule: Schedule, reason: "ends_before" | "starts_after"
 
 export function DutyOperationsWorkspace({ snapshot, queues = [], monthlySchedulingEnabled = false, canPlanMonthlySchedule = false, initialMonthlyScheduleMonth = null }: { snapshot: Snapshot; queues?: QueueOption[]; monthlySchedulingEnabled?: boolean; canPlanMonthlySchedule?: boolean; initialMonthlyScheduleMonth?: string | null }) {
   const router = useRouter();
+  const directorLite = useDirectorLitePage();
   const currentMonthKey = getOperationalMonthKey();
   // One month drives the whole tab: the plantões shown, the scale and "Novo plantão".
   const [month, setMonth] = useState(() => initialMonthlyScheduleMonth ?? currentMonthKey);
@@ -1488,13 +1491,13 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
                     type="button"
                     aria-pressed={active}
                     onClick={() => setTypeFilter((current) => (active ? current.filter((key) => key !== type.key) : [...current, type.key]))}
-                    className={cn("rounded-full border px-2.5 py-1 transition-colors", active ? "border-foreground/40 bg-muted" : "border-border bg-card hover:border-foreground/30")}
+                    className={cn(directorLite ? "border transition-colors" : "rounded-full border px-2.5 py-1 transition-colors", active ? "border-foreground/40 bg-muted" : "border-border bg-card hover:border-foreground/30", directorLite && directorLiteStyles.filterControl)}
                   >
                     <DutyTypeTag name={type.name} hue={type.hue} />
                   </button>
                 );
               })}
-              {typeFilter.length ? <button type="button" className="text-xs text-muted-foreground underline-offset-2 hover:underline" onClick={() => setTypeFilter([])}>Limpar</button> : null}
+              {typeFilter.length ? <button type="button" className={cn("text-xs text-muted-foreground underline-offset-2 hover:underline", directorLite && directorLiteStyles.clearControl)} onClick={() => setTypeFilter([])}>Limpar</button> : null}
             </div>
           ) : null}
           {monthSchedules.length ? (
@@ -1534,7 +1537,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
                   const reason = coverage && !coverage.covered ? coverage.reason : "no_weekday";
                   return (
                     <li key={schedule.id} className="flex items-center justify-between gap-2">
-                      <button type="button" className="min-w-0 text-left hover:underline" onClick={() => setSelectedSchedule(schedule)}>
+                      <button type="button" className={cn("min-w-0 text-left hover:underline", directorLite && directorLiteStyles.scheduleTrigger)} onClick={() => setSelectedSchedule(schedule)}>
                         <span className="block truncate text-foreground">{schedule.name} · {DAYS[schedule.dayOfWeek]} {schedule.startsAt.slice(0, 5)}–{schedule.endsAt.slice(0, 5)}</span>
                         <span className="block text-muted-foreground">{outsideLabel(schedule, reason)}</span>
                       </button>
