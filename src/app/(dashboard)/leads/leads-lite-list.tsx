@@ -21,7 +21,7 @@ import { LEAD_QUALIFICATION_LABELS, type LeadQualificationStatus } from "@/featu
 import { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";
 import { openWhatsApp } from "@/lib/whatsapp-open";
 
-import { LeadsDataTable, type LeadsDataTableProps } from "./leads-data-table";
+import { LeadsDataTable, QualifyingLeadsDataTable, type LeadsDataTableProps, type QualifyingLeadsDataTableProps } from "./leads-data-table";
 import { LeadsLiteBulk, type LeadsLiteBulkConfig } from "./leads-lite-bulk";
 import styles from "./leads-lite-list.module.css";
 import { liteStageLabel } from "./lite-stage-labels";
@@ -94,7 +94,7 @@ export function LeadsLiteList({
   const columns = useMemo<LiteColumn<LeadWorkspaceItem>[]>(() => {
     const base: LiteColumn<LeadWorkspaceItem>[] = [
       { id: "lead", label: "Lead", render: (lead) => <LeadName lead={lead} hideEntry={isBroker} />, primary: true },
-      { id: "phone", label: "Telefone", render: (lead) => <span className={styles.nowrap}>{lead.telefone}</span>, secondary: true },
+      { id: "phone", label: "Telefone", render: (lead) => <span className={styles.nowrap}>{formatLeadPhone(lead.telefone)}</span>, secondary: true },
       {
         id: "stage",
         label: "Etapa",
@@ -176,20 +176,22 @@ export function LeadsLiteList({
 /** Até 2 etiquetas e "+N" (com os nomes no title): nunca passa de 2 linhas no cartão nem na tabela. */
 const MAX_TAGS = 2;
 
-/** Nome com a entrada pelo WhatsApp e as etiquetas, como na tabela atual. */
+/**
+ * Nome (até 2 linhas, quebra só nos espaços, reticências e nome inteiro no title), e embaixo a entrada pelo WhatsApp e
+ * as etiquetas, como na tabela atual.
+ */
 function LeadName({ lead, hideEntry }: { lead: LeadWorkspaceItem; hideEntry: boolean }) {
   const entry = hideEntry ? null : readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata);
   const tags = lead.tags ?? [];
+  const whatsapp = entry?.entry === "whatsapp";
   return (
     <span className={styles.leadCell}>
-      <span className={styles.nameLine}>
-        <span className={styles.leadName}>{lead.nome}</span>
-        {entry?.entry === "whatsapp" ? (
-          <span className={styles.tag} title={entry.adsLabel ? `Entrou pelo WhatsApp: ${entry.adsLabel}` : "Entrou pelo WhatsApp"}>WhatsApp</span>
-        ) : null}
-      </span>
-      {tags.length ? (
+      <span className={styles.leadName} title={lead.nome}>{lead.nome}</span>
+      {whatsapp || tags.length ? (
         <span className={styles.tags}>
+          {whatsapp ? (
+            <span className={styles.tag} title={entry?.adsLabel ? `Entrou pelo WhatsApp: ${entry.adsLabel}` : "Entrou pelo WhatsApp"}>WhatsApp</span>
+          ) : null}
           {tags.slice(0, MAX_TAGS).map((tag) => (
             <span key={tag.id} className={styles.tag} title={tag.name}>
               <QueueColorDot hue={tag.colorHue} />
@@ -201,6 +203,18 @@ function LeadName({ lead, hideEntry }: { lead: LeadWorkspaceItem; hideEntry: boo
       ) : null}
     </span>
   );
+}
+
+/**
+ * Telefone legível e alinhado: com DDI 55, "(55) 21 99883-6148"; só com DDD, "(21) 99883-6148"; fora desses formatos,
+ * como veio.
+ */
+export function formatLeadPhone(raw: string) {
+  const digits = raw.replace(/\D/g, "");
+  const local = (ddd: string, number: string) => `${ddd} ${number.slice(0, number.length - 4)}-${number.slice(-4)}`;
+  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) return `(55) ${local(digits.slice(2, 4), digits.slice(4))}`;
+  if (digits.length === 10 || digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, digits.length - 4)}-${digits.slice(-4)}`;
+  return raw;
 }
 
 /** Corretor e unidade (numa coluna só, para a tabela caber), com os sinais da tabela atual: plantão ativo,
@@ -256,6 +270,39 @@ export function LeadsListSwitch({ liteBulk, ...props }: LeadsDataTableProps & { 
       onSelectAll={props.onSelectAll}
       isAllSelected={props.isAllSelected}
       bulk={liteBulk}
+    />
+  );
+}
+
+/**
+ * Fila da Qualificação IA: a lista Lite com a chave (mesmas colunas da tabela atual que cabem nesse lead: etapa, fila,
+ * qualificação, origem, chegada e ações; ainda sem corretor) e a tabela atual nos demais casos. Sem seleção em massa,
+ * como hoje.
+ */
+export function QualifyingLeadsListSwitch(props: QualifyingLeadsDataTableProps) {
+  const lite = useDirectorLitePage();
+  if (!lite) return <QualifyingLeadsDataTable {...props} />;
+  const rows: LeadWorkspaceItem[] = props.leads.map((lead) => ({
+    ...lead,
+    sourceCampaign: lead.sourceCampaign ?? null,
+    assignedAt: null,
+    stageEnteredAt: null,
+    serviceStartedAt: null,
+    firstContactAt: null,
+    corretorId: null,
+    corretorNome: null,
+    branchId: lead.branchId ?? null,
+    branchName: lead.branchName ?? null,
+  }));
+  const open = props.onOpen;
+  return (
+    <LeadsLiteList
+      leads={rows}
+      contextRole="director"
+      onRowClick={open ? (row) => {
+        const original = props.leads.find((lead) => lead.id === row.id);
+        if (original) open(original);
+      } : undefined}
     />
   );
 }

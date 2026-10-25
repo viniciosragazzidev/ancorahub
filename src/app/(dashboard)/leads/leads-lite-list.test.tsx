@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 
-import { LeadsListSwitch } from "./leads-lite-list";
+import { formatLeadPhone, LeadsListSwitch, QualifyingLeadsListSwitch } from "./leads-lite-list";
 
 // A tabela atual usa nuqs (precisa de adaptador de rota): nos testes, só se confirma que ela foi escolhida.
 vi.mock("./leads-data-table", () => ({
@@ -186,5 +186,40 @@ describe("LeadsListSwitch", () => {
     );
     expect(screen.queryByRole("columnheader", { name: "Origem" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Corretor e unidade" })).toBeInTheDocument();
+  });
+});
+
+describe("nome, telefone e a visão Qualificação IA", () => {
+  it("telefone no formato da tabela, com e sem DDI", () => {
+    expect(formatLeadPhone("5521998836148")).toBe("(55) 21 99883-6148");
+    expect(formatLeadPhone("21 99883-6148")).toBe("(21) 99883-6148");
+    expect(formatLeadPhone("2133334444")).toBe("(21) 3333-4444");
+    expect(formatLeadPhone("123")).toBe("123");
+  });
+
+  it("nome com title e a entrada pelo WhatsApp embaixo do nome, não ao lado", () => {
+    const longName: LeadWorkspaceItem = { ...lead, nome: "Justiniano Albuquerque de Souza", sourceChannel: "whatsapp_ctwa" };
+    const { container } = render(
+      <ArcScopeProvider enabled>
+        <LeadsListSwitch {...props} leads={[longName]} onRowClick={() => {}} />
+      </ArcScopeProvider>,
+    );
+    const name = container.querySelector('[data-lite="table"] [title="Justiniano Albuquerque de Souza"]')!;
+    expect(name).toHaveTextContent("Justiniano Albuquerque de Souza");
+    expect(name.parentElement?.children[0]).toBe(name);
+  });
+
+  it("com a chave, a Qualificação IA usa a lista Lite e abre o lead original", () => {
+    const open = vi.fn();
+    const qualifying = { id: "q1", nome: "Cristiane Farizele", telefone: "5521979896800", email: null, status: "new", qualificationStatus: "qualifying", qualificationState: "IN_PROGRESS", qualificationScore: 0, origem: "webhook", tipo: "PF", queueName: "FILA TATIANA", queueColorHue: 300, createdAt: "2026-10-24T14:02:00.000Z" };
+    const { container } = render(
+      <ArcScopeProvider enabled>
+        <QualifyingLeadsListSwitch leads={[qualifying]} onOpen={open} />
+      </ArcScopeProvider>,
+    );
+    expect(container.querySelector('[data-lite="table"]')).not.toBeNull();
+    expect(container).toHaveTextContent("(55) 21 97989-6800");
+    fireEvent.click(screen.getAllByText("Cristiane Farizele")[0]!);
+    expect(open).toHaveBeenCalledWith(qualifying);
   });
 });

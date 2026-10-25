@@ -45,13 +45,20 @@
   justify-items: start;
 }
 
-/* O nome quebra em até duas linhas em vez de sumir em reticências; telefone e datas não quebram. */
+/* Nome: coluna de ao menos 220px; quebra só nos espaços (nunca no meio da palavra), até 2 linhas com reticências. */
 .leadCell {
-  min-width: 136px;
+  min-width: 220px;
 }
 
 .leadName {
-  overflow-wrap: anywhere;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-weight: 500;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
 }
 
 .nowrap {
