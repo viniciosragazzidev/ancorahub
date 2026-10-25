@@ -1,0 +1,94 @@
+/* /documentos Lite: visões, fila e configuração. Só tokens; alvos de 44px; 24px entre regiões. */
+
+.tabs {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+
+.views {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: min(100%, 260px);
+  min-height: 44px;
+  color: var(--foreground);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--primary);
+}
+
+.ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.iconSuccess {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--success-subtle);
+  color: var(--success);
+  cursor: pointer;
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.iconDanger {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--danger-subtle);
+  color: var(--danger);
+  cursor: pointer;
+}
+
+.fileCell {
+  display: grid;
+  min-width: 0;
+}
+
+.configGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+
+@media (min-width: 1100px) {
+  .configGrid {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+}

@@ -4,6 +4,9 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { DocumentsWorkspace } from "@/features/documents/components/documents-workspace";
+import { DocumentsLite } from "@/features/documents/components/documents-lite";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import {
   getDocumentRequirements,
   getPendingDocuments,
@@ -39,6 +42,23 @@ export default async function DocumentsPage() {
     getDocumentRequirements(),
     getPendingDocuments(),
   ]);
+
+  // Chave do diretor: a mesma tela (fila e requisitos) no visual Lite.
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/documentos")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Operação comercial" title="Documentos" />
+        <main className={litePage.stack}>
+          <DocumentsLite
+            carriers={carriers}
+            plans={plans}
+            initialRequirements={requirements}
+            initialPendingDocs={pendingDocs.map((doc) => ({ ...doc, createdAt: new Date(doc.createdAt) }))}
+          />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
