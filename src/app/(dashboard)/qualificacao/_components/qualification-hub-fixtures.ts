@@ -1,9 +1,5 @@
 /** Dados de exemplo do hub de qualificação (testes e a moldura real em desenvolvimento). Nunca dados reais. */
-import type { ComponentProps } from "react";
-
-import type { QualificationHubClient } from "./qualification-hub-client";
-
-type HubProps = ComponentProps<typeof QualificationHubClient>;
+import type { QualificationHubProps as HubProps } from "./qualification-hub-types";
 
 export const QUALIFICATION_HUB_FIXTURE: HubProps = {
   settings: {
