@@ -12,6 +12,9 @@ import { getSaleById, getCommissionSchedule } from "@/features/sales/queries";
 import { formatCurrency } from "@/features/quotes/utils";
 import { SaleDetailsTabs } from "./sale-details-tabs";
 import { SaleStatsCards } from "./sale-stats-cards";
+import { SaleDetailLite } from "./sale-detail-lite";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import litePage from "@/components/lite/page/lite-page.module.css";
 
 export default async function SaleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,6 +26,36 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
   ]);
 
   if (!sale) notFound();
+
+  // Chave do diretor: o mesmo detalhe no visual Lite, com as mesmas ações.
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, `/vendas/${id}`)) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Operação comercial / Vendas" title="Detalhes da venda" />
+        <main className={litePage.stack}>
+          <SaleDetailLite
+            sale={{
+              id: sale.id,
+              leadId: sale.leadId,
+              leadName: sale.leadName,
+              clientName: sale.clientName,
+              brokerName: sale.brokerName,
+              branchName: sale.branchName,
+              planName: sale.planName,
+              carrierName: sale.carrierName,
+              ruleName: sale.ruleName,
+              status: sale.status,
+              saleDate: new Date(sale.saleDate).toISOString(),
+              saleValue: Number(sale.saleValue),
+              notes: sale.notes,
+            }}
+            schedule={schedule.map((item) => ({ ...item, dueDate: item.dueDate?.toISOString() ?? null, paidAt: item.paidAt?.toISOString() ?? null }))}
+            canManage={context.role === "director"}
+          />
+        </main>
+      </>
+    );
+  }
 
   const totalCommissions = schedule.reduce((sum, item) => sum + Number(item.amount), 0);
   const paidCommissions = schedule

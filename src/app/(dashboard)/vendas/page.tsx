@@ -10,6 +10,10 @@ import { SalesWorkspace } from "./sales-workspace";
 import { RelatedActions } from "@/components/related-actions";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import { buildSalesPageScope } from "@/features/sales/sales-page-scope";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { LiteRelatedLinks } from "@/components/lite/page/related-links";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { SalesWorkspaceLite } from "./sales-workspace-lite";
 
 export default async function SalesPage({
   searchParams,
@@ -67,6 +71,35 @@ export default async function SalesPage({
 
   const [branches, sales] = await Promise.all([branchesPromise, salesPromise]);
   const totalRevenue = sales.reduce((sum, row) => sum + Number(row.saleValue), 0);
+
+  // Chave do diretor: a mesma página no visual Lite (unidade e período vão para a barra da lista).
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/vendas")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Operação comercial" title="Vendas" />
+        <main className={litePage.stack}>
+          <SalesWorkspaceLite
+            sales={sales.map((s) => ({ ...s, saleValue: Number(s.saleValue), saleDate: s.saleDate.toISOString(), createdAt: s.createdAt.toISOString() }))}
+            totalRevenue={totalRevenue}
+            currentRole={context.role}
+            period={period}
+            branches={canFilterBranch ? branches : []}
+            branchId={effectiveBranchId}
+          />
+          <LiteRelatedLinks
+            title="Navegação comercial relacionada"
+            description="Funções ligadas a vendas e faturamento."
+            links={[
+              { label: "Ver base de clientes", href: "/clientes", description: "Gestão da carteira de contratos ativos" },
+              { label: "Tabela de comissões", href: "/settings?tab=comissoes", description: "Regras de comissionamento por produto" },
+              { label: "Anexar documentos de propostas", href: "/documentos", description: "Conferência de documentos e apólices" },
+              { label: "Relatório de desempenho", href: "/dashboard?tab=commercial", description: "Métricas de fechamento por corretor" },
+            ]}
+          />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
