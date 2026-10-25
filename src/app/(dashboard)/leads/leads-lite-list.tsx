@@ -77,7 +77,7 @@ export function LeadsLiteList({ leads, contextRole, onRowClick, search = "", vie
       <div className={styles.head}>
         <form role="search" action="/leads" method="get" className={styles.search}>
           <Search aria-hidden="true" size={18} className={styles.searchIcon} />
-          <input type="search" name="search" defaultValue={search} placeholder="Buscar lead por nome ou telefone" aria-label="Buscar lead por nome ou telefone" className={styles.searchInput} />
+          <input type="search" name="search" defaultValue={search} placeholder="Buscar lead" aria-label="Buscar lead por nome ou telefone" className={styles.searchInput} />
           {view === "kanban" ? <input type="hidden" name="view" value="kanban" /> : null}
         </form>
         <p className={styles.count} aria-live="polite">{count} {count === 1 ? "lead" : "leads"}</p>
