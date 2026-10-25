@@ -14,7 +14,7 @@ vi.stubGlobal("matchMedia", (media: string) => ({
   dispatchEvent: vi.fn(),
 }));
 // O cabeçalho navega com o router do Next; nos testes, só o push é observado.
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), usePathname: () => "/dashboard" }));
 vi.mock("motion/react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("motion/react")>();
   const { captureMotion } = await import("@/components/lite/motion/capture-motion");
@@ -26,7 +26,12 @@ import { buildEssential, emptyEssential } from "@/app/dev/diretor-dashboard-prev
 
 import { displacementOf, readMotion } from "@/components/lite/motion/capture-motion";
 
+vi.mock("@/components/dashboard-header", () => ({
+  DashboardHeader: ({ breadcrumb, title }: { breadcrumb: string; title: string }) => <header data-testid="director-dashboard-header"><span>{breadcrumb}</span><h1>{title}</h1></header>,
+}));
+
 import { DirectorLiteDashboard } from "./director-lite-dashboard";
+import styles from "./director-lite.module.css";
 
 const NOW = new Date("2026-10-24T16:42:00.000Z");
 const BRANCHES = [
@@ -40,13 +45,17 @@ afterEach(() => {
 });
 
 describe("painel essencial: ordem, cabeçalho e filtros", () => {
-  it("mostra a saudação, as abas e a nota de que o período muda só os leads por fila", () => {
+  it("mostra o topo global, as abas e a nota de que o período muda só os leads por fila", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    expect(screen.getByRole("heading", { level: 1, name: "Olá, Renata" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Painel" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: /Ol\u00e1, Renata/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Ol\u00e1, Renata/)).toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "Painel do diretor" })).toHaveClass(styles.pageContainer);
     const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
     expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("aria-current", "page");
     expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=hoje");
-    expect(screen.getByText("O período muda só os leads por fila. Plantões e WhatsApp mostram agora.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Sobre o per\u00edodo")).toBeInTheDocument();
+    expect(screen.getByText("O per\u00edodo altera apenas os leads por fila.")).toBeInTheDocument();
   });
 
   it("mostra só os três blocos, nesta ordem", () => {
@@ -124,7 +133,8 @@ describe("bloco 2: leads por fila", () => {
     expect(table.getByText("PF Renan")).toBeInTheDocument();
     expect(table.getByText("Total")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "9 quentes, 6 mornos, 7 frios" })).toBeInTheDocument();
-    expect(screen.getByText(/Qualificados = quentes \+ mornos/)).toBeInTheDocument();
+    expect(screen.getByText("Qualificados: leads quentes e mornos.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Como ler os dados de leads por fila")).toBeInTheDocument();
   });
 
   it("conta as tentativas de requalificação e quantos frios tiveram 1, 2 ou 3+", () => {
@@ -177,11 +187,17 @@ describe("movimento", () => {
     }
   });
 
-  it("move os blocos com movimento ligado, para o teste reduzido ter sentido", () => {
+  it("entra com opacidade sem deslocar o layout", () => {
     motionState.reduce = false;
     const { container } = render(<DirectorLiteDashboard data={buildEssential("30d", "all", NOW)} period="30d" branchId={null} branches={BRANCHES} now={NOW} />);
-    const moving = Array.from(container.querySelectorAll("[data-initial]")).filter((element) => displacementOf(readMotion(element).initial).length > 0);
-    expect(moving.length).toBeGreaterThan(0);
+    const entering = Array.from(container.querySelectorAll("[data-initial]")).filter((element) => readMotion(element).initial?.opacity === 0);
+    expect(entering.length).toBeGreaterThan(0);
+    for (const element of entering) {
+      const motion = readMotion(element);
+      expect(displacementOf(motion.initial)).toEqual([]);
+      const nestedTransition = motion.animate?.transition as { duration?: number } | undefined;
+      expect(motion.transition?.duration ?? nestedTransition?.duration).toBeGreaterThan(0);
+    }
   });
 
   it("com a preferência de movimento do site, o odômetro dos números não roda", () => {

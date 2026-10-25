@@ -122,8 +122,8 @@ export function LiteItem({ children, index, className, as = "div" }: { children:
   return (
     <Tag
       className={className}
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y: m.distance.sm }}
-      animate={{ opacity: 1, y: 0, transition: reduce ? fadeT : { ...enterT, delay: staggerDelay(index) } }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1, transition: reduce ? fadeT : { ...enterT, delay: staggerDelay(index) } }}
     >
       {children}
     </Tag>
@@ -157,8 +157,8 @@ export function LiteReveal({ children, className, delay = 0, as = "div", label }
     <Tag
       className={className}
       aria-label={label}
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y: m.distance.lg }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
       viewport={{ once: true, amount: 0.15 }}
       transition={reduce ? fadeT : { ...enterT, delay }}
     >

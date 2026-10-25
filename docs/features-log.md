@@ -470,3 +470,7 @@ O snapshot HTML das primitivas sem provider usa a referência de `origin/feat/di
 ## 2026-10-24 - Diretor Lite, Funil de qualificação
 
 A aba Funil usa o mesmo `getQualificationFunnel` e as métricas existentes, com período e unidade autorizada. O filtro de unidade é aplicado à coorte do tenant; o custo empresarial da Meta não aparece para uma unidade específica. A flag desligada mantém a apresentação antiga. O painel compartilha `DirectorLiteHeader`, e `/dev/diretor-dashboard-real?tab=funnel` valida o componente real com fixtures tipadas. Implementação: `docs/implementations/completed/2026-10-24-diretor-lite-funil.md`.
+
+## 2026-10-25 - Refinamento da moldura e painel Diretor Lite
+
+O topo global e o /dashboard agora seguem um container e ritmo Arc comum, com cards por borda, ajuda alinhada, linhas de plantao e alvo minimo de 44px. A rota de desenvolvimento `/dev/diretor-shell-real` valida AppShell e painel reais para diretor e super-admin em 390, 768, 1024 e 1440; prints e checklist linha a linha estao em `docs/implementations/completed/2026-10-25-diretor-lite-f2b.md`.
