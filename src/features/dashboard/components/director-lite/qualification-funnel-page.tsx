@@ -31,7 +31,7 @@ export function DirectorLiteQualificationFunnelPage({
 
   return (
     <DirectorLiteChrome now={now} tab="funnel" period={period} branchId={branchId} branches={branches} firstName={firstName}>
-      <QualificationFunnelView data={data} unitName={selectedBranch?.name ?? null} widerHref={dashboardHref("funnel", "7", branchId)} />
+      <QualificationFunnelView data={data} unitName={selectedBranch?.name ?? null} widerHref={dashboardHref("funnel", "7", branchId)} now={now} />
     </DirectorLiteChrome>
   );
 }

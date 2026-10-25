@@ -13,7 +13,7 @@ import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import type { SimpleLeadQualityReportData } from "@/features/reports/metrics/lead-quality-service";
 
 import styles from "./director-lite.module.css";
-import { noDataLabel, n, pct, periodWords, plural, ranOutLabel, share } from "./format";
+import { noDataLabel, noLeadsSince, n, pct, periodWords, plural, ranOutLabel, share } from "./format";
 import { hourAxis, tickEvery } from "./hour-axis";
 import { enterT, exitT, LiteColumn, LiteItem, LiteNumber, LiteReveal } from "./motion";
 
@@ -138,7 +138,7 @@ export function QualityView({ report, unitName, now, widerHref }: { report: Simp
           <EmptyState
             icon={<SearchX aria-hidden="true" />}
             title={today ? "Nenhum lead entrou hoje" : "Nenhum lead neste período"}
-            description={today ? "O dia da operação começa às 19h. Os números aparecem quando o primeiro lead entrar." : "Escolha outro período ou outra unidade."}
+            description={today ? `${noLeadsSince(report.window.since, now)} Os números aparecem quando o primeiro lead entrar.` : "Escolha outro período ou outra unidade."}
             action={today && widerHref ? <Link href={widerHref} className={styles.secondaryButton}>Ver os últimos 7 dias</Link> : undefined}
           />
         </div>

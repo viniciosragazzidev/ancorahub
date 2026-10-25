@@ -83,3 +83,21 @@ export function noDataLabel(period: unknown) {
 export function ranOutLabel(label: string, period: unknown) {
   return period === "today" ? label.split(" ").pop() ?? label : label;
 }
+
+const dayOf = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE });
+const weekdayOf = new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, weekday: "long" });
+
+/**
+ * Estado vazio de "Hoje": "Nenhum lead desde as 19h de ontem". Com a janela real (`since`) e o `now` do servidor,
+ * nomeia o dia de verdade (na segunda, "desde as 19h de sexta-feira"); sem eles, fica "de ontem".
+ */
+export function noLeadsSince(since?: string | null, now?: Date | null) {
+  if (!since || !now) return "Nenhum lead desde as 19h de ontem.";
+  const start = new Date(since);
+  const hour = `${new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(start).replace(/^0/, "")}h`;
+  const today = dayOf.format(now);
+  const yesterday = dayOf.format(new Date(now.getTime() - 86_400_000));
+  const day = dayOf.format(start);
+  const words = day === today ? "de hoje" : day === yesterday ? "de ontem" : `de ${weekdayOf.format(start)}`;
+  return `Nenhum lead desde as ${hour} ${words}.`;
+}

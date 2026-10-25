@@ -23,7 +23,7 @@ vi.mock("motion/react", async (importOriginal) => importOriginal<typeof import("
 import { CASE_NOW, essentialCase, funnelCase, qualityCase } from "@/app/dev/diretor-shell-real/dashboard-cases";
 
 import { EssentialView } from "./essential-view";
-import { noDataLabel, periodWords } from "./format";
+import { noDataLabel, noLeadsSince, periodWords } from "./format";
 import { hourAxis, tickEvery } from "./hour-axis";
 import { QualificationFunnelView, repliedDetail } from "./qualification-funnel-view";
 import { QualityView } from "./quality-view";
@@ -108,6 +108,14 @@ describe("Qualidade nas bordas", () => {
     render(<QualityView report={qualityCase("zerado")} unitName={null} now={CASE_NOW.zerado} widerHref="/dashboard?tab=quality&periodo=7" />);
     expect(screen.getByText("Nenhum lead entrou hoje")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Ver os últimos 7 dias" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=7");
+    expect(screen.getByText(/Nenhum lead desde as 19h de ontem/)).toBeInTheDocument();
+  });
+
+  it("estado vazio nomeia a janela real: na segunda, desde as 19h de sexta-feira", () => {
+    const monday = new Date("2026-10-26T15:00:00.000Z");
+    expect(noLeadsSince("2026-10-23T22:00:00.000Z", monday)).toBe("Nenhum lead desde as 19h de sexta-feira.");
+    expect(noLeadsSince("2026-10-25T22:00:00.000Z", monday)).toBe("Nenhum lead desde as 19h de ontem.");
+    expect(noLeadsSince(null, null)).toBe("Nenhum lead desde as 19h de ontem.");
   });
 
   it("dia cheio: números grandes no formato pt-BR", () => {

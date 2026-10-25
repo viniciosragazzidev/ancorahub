@@ -10,7 +10,7 @@ import type { QualificationFunnel } from "@/features/qualification-turbo/funnel"
 
 import styles from "./director-lite.module.css";
 import { LiteBar, LiteItem, LiteNumber, LiteReveal, useReduce } from "./motion";
-import { minutesLabel, n, pct, periodWords, plural } from "./format";
+import { minutesLabel, n, noLeadsSince, pct, periodWords, plural } from "./format";
 
 const enterT: Transition = { duration: m.duration.standard, ease: [...m.ease.enter] };
 const fadeT: Transition = { duration: m.duration.instant };
@@ -76,7 +76,7 @@ export function repliedDetail(replied: number, medianMinutes: number | null) {
 }
 
 /** `widerHref` é o próximo passo do dia sem leads (a mesma aba nos últimos 7 dias). */
-export function QualificationFunnelView({ data, unitName, widerHref }: { data: QualificationFunnel; unitName: string | null; widerHref?: string }) {
+export function QualificationFunnelView({ data, unitName, widerHref, now }: { data: QualificationFunnel; unitName: string | null; widerHref?: string; now?: Date | null }) {
   const byKey = new Map(data.stages.map((stage) => [stage.key, stage.count]));
   const arrived = byKey.get("arrived") ?? 0;
   const replied = byKey.get("replied") ?? 0;
@@ -97,7 +97,7 @@ export function QualificationFunnelView({ data, unitName, widerHref }: { data: Q
         <EmptyState
           icon={<Funnel aria-hidden="true" />}
           title={data.period === "today" ? "Nenhum lead chegou hoje" : "Nenhum lead chegou neste período"}
-          description={data.period === "today" ? "O dia da operação começa às 19h. O funil aparece quando o primeiro lead chegar." : "Tente ampliar o período ou escolher outra unidade."}
+          description={data.period === "today" ? `${noLeadsSince(data.since, now)} O funil aparece quando o primeiro lead chegar.` : "Tente ampliar o período ou escolher outra unidade."}
           action={data.period === "today" && widerHref ? <Link href={widerHref} className={styles.secondaryButton}>Ver os últimos 7 dias</Link> : undefined}
         />
       </section>
