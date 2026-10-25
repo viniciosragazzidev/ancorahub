@@ -1,0 +1,44 @@
+/*
+ * Próxima ação no visual Lite do diretor (só com a chave): cartão de borda fina, sem gradiente nem sombra, rótulos
+ * em sentence case e o ícone de ajuda com alvo de 44px.
+ */
+
+.card {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.badge {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.eyebrowless {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.helpTarget {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -12px 0;
+  border-radius: 999px;
+}
+
+@media (max-width: 767px) {
+  .card {
+    padding: 16px;
+  }
+}

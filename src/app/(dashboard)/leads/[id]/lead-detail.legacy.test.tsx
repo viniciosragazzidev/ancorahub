@@ -234,6 +234,8 @@ vi.mock("@/shared/auth/actions", serverModule);
 vi.mock("@/shared/auth/password-recovery-client", serverModule);
 vi.mock("@/utils/plugins/actions", serverModule);
 
+import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
+
 import LeadDetailPage from "./page";
 
 beforeAll(() => {
@@ -263,7 +265,8 @@ describe("perfil do lead com a chave desligada", () => {
   it("com a chave do diretor, mostra o perfil Lite com as mesmas peças e ações", async () => {
     fixtures.liteStyle.current = true;
     const tree = await resolveLeadDetailPage();
-    const { container } = render(<NuqsTestingAdapter>{tree}</NuqsTestingAdapter>);
+    // Na moldura real, o AppShell liga o provider da pele do diretor; as peças compartilhadas leem a chave dele.
+    const { container } = render(<NuqsTestingAdapter><ArcScopeProvider enabled>{tree}</ArcScopeProvider></NuqsTestingAdapter>);
     fixtures.liteStyle.current = false;
     expect(container.querySelector('[data-skin="diretor"]')).not.toBeNull();
     expect(screen.getByTestId("dashboard-header")).toHaveTextContent("Perfil do lead");
@@ -276,7 +279,12 @@ describe("perfil do lead com a chave desligada", () => {
     expect(screen.getByRole("link", { name: /Conversas/ })).toHaveAttribute("href", `/conversas?leadId=${fixtures.lead.id}&draft=broker_intro`);
     expect(screen.getByRole("heading", { name: "Dados da empresa (PME)" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Origem Meta Ads" })).toBeInTheDocument();
-    expect(container.textContent).toContain("Supervisão");
+    expect(container.textContent).toContain("Painel de supervisão e gestão");
+    // Peças compartilhadas no visual Lite: rótulos em sentence case e sem caixa alta.
+    for (const label of ["Status do SLA", "Responsável", "Tarefas no lead"]) {
+      for (const element of screen.getAllByText(label)) expect(element.className).not.toMatch(/uppercase/);
+    }
+    expect(screen.getByText("Próxima ação").className).not.toMatch(/uppercase/);
     expect(container.textContent).toContain("Excluir");
     // Contrato: sem título da página repetido no corpo e sem caixa alta nas peças Lite.
     expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();

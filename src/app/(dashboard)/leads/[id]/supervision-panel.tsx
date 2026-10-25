@@ -16,6 +16,8 @@ import { ConfirmDialog } from "@/components/foundations/confirm-dialog";
 import { LeadAssignedNotificationButton } from "@/components/plugins/lead-assigned-notification-button";
 import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction, removeLeadAssignmentAction } from "@/features/leads/management-actions";
 import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import lite from "./supervision-panel-lite.module.css";
 
 type Broker = { id: string; name: string };
 type TaskItem = { completedAt: string | null | Date };
@@ -201,17 +203,19 @@ export function SupervisionPanel({
     });
   };
 
+  // Chave do diretor: mesmo painel e mesmas ações, só com o visual Lite (sem caixa alta, tokens, raios concêntricos).
+  const litePage = useDirectorLitePage();
   const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(displayedAssignment.status);
 
   return (
     <>
-    <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/[0.01] shadow-none">
+    <Card className={litePage ? lite.card : "border-primary/20 bg-gradient-to-br from-card to-primary/[0.01] shadow-none"}>
       <CardHeader className="border-b border-border/40 pb-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-              <CardTitle className="text-base font-semibold">Painel de Supervisão e Gestão</CardTitle>
+              <CardTitle className="text-base font-semibold">{litePage ? "Painel de supervisão e gestão" : "Painel de Supervisão e Gestão"}</CardTitle>
             </div>
             <CardDescription className="text-xs">
               Métricas de SLA, desempenho e ferramentas de intervenção para este lead.
@@ -233,18 +237,18 @@ export function SupervisionPanel({
         {/* Row 1: Metrics Grid */}
         <div className="grid gap-4 sm:grid-cols-3">
           {/* Card: SLA Status */}
-          <div className="rounded-[var(--radius-card)] border border-border bg-muted/30 p-4 space-y-2">
+          <div className={litePage ? lite.metric : "rounded-[var(--radius-card)] border border-border bg-muted/30 p-4 space-y-2"}>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Clock className="size-4 text-primary" />
-              <span className="text-xs font-semibold uppercase tracking-wider">Status do SLA</span>
+              <span className={litePage ? lite.metricLabel : "text-xs font-semibold uppercase tracking-wider"}>Status do SLA</span>
             </div>
             <div>
               {serviceStartedAt ? (
-                <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Atendimento Iniciado</p>
+                <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{litePage ? "Atendimento iniciado" : "Atendimento Iniciado"}</p>
               ) : isSlaExpired ? (
-                <p className="text-sm font-semibold text-destructive">SLA Estourado</p>
+                <p className="text-sm font-semibold text-destructive">{litePage ? "SLA estourado" : "SLA Estourado"}</p>
               ) : (
-                <p className="text-sm font-semibold text-warning">Aguardando Contato</p>
+                <p className="text-sm font-semibold text-warning">{litePage ? "Aguardando contato" : "Aguardando Contato"}</p>
               )}
               <p className="text-xs text-muted-foreground mt-1">
                 {serviceStartedAt
@@ -257,10 +261,10 @@ export function SupervisionPanel({
           </div>
 
           {/* Card: Assigned Broker */}
-          <div className="rounded-[var(--radius-card)] border border-border bg-muted/30 p-4 space-y-2">
+          <div className={litePage ? lite.metric : "rounded-[var(--radius-card)] border border-border bg-muted/30 p-4 space-y-2"}>
             <div className="flex items-center gap-2 text-muted-foreground">
               <UserPlus className="size-4 text-primary" />
-              <span className="text-xs font-semibold uppercase tracking-wider">Responsável</span>
+              <span className={litePage ? lite.metricLabel : "text-xs font-semibold uppercase tracking-wider"}>Responsável</span>
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground truncate">{displayedAssignment.ownerName || "Não distribuído"}</p>
@@ -271,10 +275,10 @@ export function SupervisionPanel({
           </div>
 
           {/* Card: Tasks Progress */}
-          <div className="rounded-[var(--radius-card)] border border-border bg-muted/30 p-4 space-y-2">
+          <div className={litePage ? lite.metric : "rounded-[var(--radius-card)] border border-border bg-muted/30 p-4 space-y-2"}>
             <div className="flex items-center gap-2 text-muted-foreground">
               <ListChecks className="size-4 text-primary" />
-              <span className="text-xs font-semibold uppercase tracking-wider">Tarefas no Lead</span>
+              <span className={litePage ? lite.metricLabel : "text-xs font-semibold uppercase tracking-wider"}>{litePage ? "Tarefas no lead" : "Tarefas no Lead"}</span>
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">
@@ -292,9 +296,9 @@ export function SupervisionPanel({
 
         {/* Row 2: Takeover banner if active under someone else */}
         {activeStatus && displayedAssignment.ownerId && displayedAssignment.ownerId !== currentUserId && (
-          <div className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-primary/20 bg-primary/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className={litePage ? lite.takeover : "flex flex-col gap-4 rounded-[var(--radius-card)] border border-primary/20 bg-primary/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between"}>
             <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">Intervir no Atendimento</p>
+              <p className="text-sm font-medium text-foreground">{litePage ? "Intervir no atendimento" : "Intervir no Atendimento"}</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Este lead está sendo atendido por <strong>{displayedAssignment.ownerName}</strong>. Se necessário, assuma o controle da conversa.
               </p>
@@ -313,7 +317,7 @@ export function SupervisionPanel({
 
         {/* Row 2.5: Remove current assignment, even mid-service */}
         {displayedAssignment.ownerId && (
-          <div className="rounded-[var(--radius-card)] border border-warning/25 bg-warning/[0.04] p-3 space-y-2">
+          <div className={litePage ? lite.inner : "rounded-[var(--radius-card)] border border-warning/25 bg-warning/[0.04] p-3 space-y-2"}>
             <div className="flex items-center gap-2">
               <UserSwitch className="size-4 text-warning" />
               <p className="text-xs font-semibold text-foreground">Atribuição atual</p>
@@ -346,14 +350,14 @@ export function SupervisionPanel({
         {/* Row 3: Management Form Actions */}
         <div className="border-t border-border/40 pt-5 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-foreground">Ações Administrativas</span>
+            <span className="text-sm font-medium text-foreground">{litePage ? "Ações administrativas" : "Ações Administrativas"}</span>
             <div className="inline-flex rounded-[var(--radius-card)] border border-border bg-muted/50 p-0.5" role="group">
               <Button className="h-10 text-xs px-3" onClick={() => setMode("reassign")} size="sm" type="button" variant={mode === "reassign" ? "secondary" : "ghost"}>Reatribuir</Button>
               <Button className="h-10 text-xs px-3" onClick={() => setMode("investigate")} size="sm" type="button" variant={mode === "investigate" ? "secondary" : "ghost"}>Investigar</Button>
             </div>
           </div>
 
-          <div className="rounded-[var(--radius-card)] border border-border bg-muted/[0.15] p-4">
+          <div className={litePage ? lite.inner : "rounded-[var(--radius-card)] border border-border bg-muted/[0.15] p-4"}>
             {mode === "reassign" ? (
               <form key={`${formKey}-reassign-${reassignVersion}`} action={reassign} className="space-y-4" onSubmit={handleOptimisticReassign}>
                 <input name="leadId" type="hidden" value={leadId} />

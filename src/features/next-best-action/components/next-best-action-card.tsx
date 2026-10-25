@@ -14,6 +14,11 @@ import {
 import type { NextBestAction } from "../types";
 import { RelatedActionsMenu } from "./related-actions-menu";
 import { trackNBADisplayed, trackNBAClicked } from "../analytics";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import lite from "./next-best-action-card-lite.module.css";
+
+/** Rótulos em sentence case para o visual Lite do diretor. */
+const LITE_PRIORITY_LABELS: Record<string, string> = { critical: "Urgente", high: "Recomendado", normal: "Próximo passo", low: "Opcional" };
 
 type NextBestActionCardProps = {
   action: NextBestAction | null;
@@ -36,6 +41,7 @@ export function NextBestActionCard({
   compact = false,
   className = "",
 }: NextBestActionCardProps) {
+  const litePage = useDirectorLitePage();
   useEffect(() => {
     if (action) {
       trackNBADisplayed(action);
@@ -48,31 +54,31 @@ export function NextBestActionCard({
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/5 via-background to-card p-4 sm:p-5 shadow-sm transition-all hover:border-primary/40 ${className}`}
+      className={litePage ? `${lite.card} ${className}` : `group relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/5 via-background to-card p-4 sm:p-5 shadow-sm transition-all hover:border-primary/40 ${className}`}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1.5 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge
               variant={priorityConfig.variant}
-              className={`text-[10px] uppercase font-bold tracking-wider gap-1 ${priorityConfig.className}`}
+              className={litePage ? `${lite.badge} gap-1 ${priorityConfig.className}` : `text-[10px] uppercase font-bold tracking-wider gap-1 ${priorityConfig.className}`}
             >
               {action.priority === "critical" ? (
                 <AlertTriangle className="size-3 shrink-0 animate-pulse" />
               ) : (
                 <Sparkles className="size-3 shrink-0" />
               )}
-              {priorityConfig.label}
+              {litePage ? LITE_PRIORITY_LABELS[action.priority] ?? priorityConfig.label : priorityConfig.label}
             </Badge>
 
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
-              Próxima Ação
+            <span className={litePage ? lite.eyebrowless : "text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80"}>
+              {litePage ? "Próxima ação" : "Próxima Ação"}
             </span>
 
             {action.reason && (
               <TooltipProvider delay={150}>
                 <Tooltip>
-                  <TooltipTrigger>
+                  <TooltipTrigger className={litePage ? lite.helpTarget : undefined} aria-label={litePage ? "Por que estou vendo isso?" : undefined}>
                     <span className="inline-flex items-center text-muted-foreground/70 hover:text-foreground transition-colors">
                       <Info className="size-3.5" />
                     </span>
@@ -86,7 +92,7 @@ export function NextBestActionCard({
             )}
           </div>
 
-          <h4 className="text-sm font-bold tracking-tight text-foreground sm:text-base">
+          <h4 className={litePage ? lite.title : "text-sm font-bold tracking-tight text-foreground sm:text-base"}>
             {action.title}
           </h4>
 

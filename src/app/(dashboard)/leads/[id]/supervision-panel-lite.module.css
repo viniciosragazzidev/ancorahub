@@ -1,0 +1,47 @@
+/*
+ * Painel de supervisão no visual Lite do diretor (só com a chave): cartão de borda fina e raio de superfície, sem
+ * gradiente; métricas e grupos internos com raio concêntrico; rótulos em sentence case, sem caixa alta.
+ */
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.metric {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: calc(var(--radius-surface) - 16px);
+  background: var(--surface-muted);
+}
+
+.metricLabel {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.takeover {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border-radius: calc(var(--radius-surface) - 16px);
+  background: var(--accent-subtle);
+}
+
+.inner {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: calc(var(--radius-surface) - 16px);
+  background: var(--surface);
+}
