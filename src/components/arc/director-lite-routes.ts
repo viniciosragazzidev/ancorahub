@@ -36,7 +36,6 @@
   "/gestao/equipes/[supervisorId]",
   "/guia",
   "/guia/webhook",
-  "/integrations",
   "/integrations/meta",
   "/integrations/whats_alt",
   "/integrations/whatsapp",
