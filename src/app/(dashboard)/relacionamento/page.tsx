@@ -16,6 +16,9 @@ import { RelationshipJourneyTabs } from "@/features/relationship/components/rela
 import { getDirectorJourneyPageData } from "@/features/journey/director-queries";
 import { createCampaign, pauseCampaign } from "@/features/journey/campaign-actions";
 import { updateRule, restoreRules, reverseEvent } from "@/features/journey/director-actions";
+import { RelationshipJourneyLite } from "@/features/relationship/components/director-lite/relationship-journey-lite";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import litePage from "@/components/lite/page/lite-page.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +40,25 @@ export default async function RelationshipPage({ searchParams }: { searchParams:
     ]);
     const [audienceOptions, broadcasts] = messageData;
     const historyItems = broadcasts.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }));
+    // Diretor com a chave ligada e a rota fora do opt-out: mesmos dados e mesmas Server Actions, visual Lite.
+    if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/relacionamento")) {
+      return (
+        <>
+          <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" />
+          <main className={litePage.stack}>
+            <RelationshipJourneyLite
+              relationshipEnabled={enabled}
+              journeyEnabled={journeyEnabled}
+              options={audienceOptions}
+              history={historyItems}
+              data={data}
+              actions={{ createCampaign, pauseCampaign, updateRule, restoreRules, reverseEvent }}
+              today={new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date())}
+            />
+          </main>
+        </>
+      );
+    }
     return (
       <>
         <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" />
