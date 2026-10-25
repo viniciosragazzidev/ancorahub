@@ -15,7 +15,7 @@ import { toast } from "@/components/ui/sonner";
 import { updateTenantBrandingAction } from "../../actions";
 import { ColorPicker } from "../color-picker";
 import { LogoUpload } from "../logo-upload";
-import styles from "./sections-lite.module.css";
+import styles from "@/components/lite/page/lite-sections.module.css";
 
 type Tenant = { name: string; legalName: string | null; cnpj: string | null; logoUrl: string | null; brandColor: string | null };
 

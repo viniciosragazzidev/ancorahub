@@ -17,7 +17,7 @@ import { updateAiStageModeAction } from "@/features/conversation-intelligence/ac
 import type { AiStageMode } from "@/features/conversation-intelligence/stage-mode";
 
 import { updateFeedbackSettingsAction } from "../../feedback-actions";
-import styles from "./sections-lite.module.css";
+import styles from "@/components/lite/page/lite-sections.module.css";
 
 type FeedbackProps = {
   feedbackReminderInterval: string;

@@ -13,7 +13,7 @@ import { LiteConfirmDialog, LiteSelect } from "@/components/lite/controls";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
-import sections from "@/app/(dashboard)/settings/_components/lite/sections-lite.module.css";
+import sections from "@/components/lite/page/lite-sections.module.css";
 import { toast } from "@/components/ui/sonner";
 import {
   createChecklistTemplateAction,

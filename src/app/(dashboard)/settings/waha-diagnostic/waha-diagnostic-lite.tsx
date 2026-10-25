@@ -8,7 +8,7 @@ import { useState } from "react";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import page from "@/components/lite/page/lite-page.module.css";
-import sections from "@/app/(dashboard)/settings/_components/lite/sections-lite.module.css";
+import sections from "@/components/lite/page/lite-sections.module.css";
 
 import { diagnoseWahaConnection } from "../whatsapp-actions";
 

@@ -17,7 +17,7 @@ import { toast } from "@/components/ui/sonner";
 import { authClient } from "@/shared/auth/client";
 
 import { recordSecurityAuditAction } from "../../security-actions";
-import styles from "./sections-lite.module.css";
+import styles from "@/components/lite/page/lite-sections.module.css";
 
 function getSecretFromUri(uri: string | null) {
   if (!uri) return null;

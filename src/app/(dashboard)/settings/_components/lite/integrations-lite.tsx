@@ -17,7 +17,7 @@ import page from "@/components/lite/page/lite-page.module.css";
 import { toast } from "@/components/ui/sonner";
 
 import { createIntegrationAction, revokeIntegrationAction, toggleIntegrationAction, type IntegrationRecord } from "../../integrations-actions";
-import styles from "./sections-lite.module.css";
+import styles from "@/components/lite/page/lite-sections.module.css";
 
 type Branch = { id: string; name: string };
 

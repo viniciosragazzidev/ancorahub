@@ -8,7 +8,7 @@ import { ArrowRight } from "lucide-react";
 import { formatLiteDate } from "@/components/lite/format/date";
 import page from "@/components/lite/page/lite-page.module.css";
 
-import styles from "./sections-lite.module.css";
+import styles from "@/components/lite/page/lite-sections.module.css";
 
 type BranchInfo = { id: string; name: string; status: "active" | "inactive"; acceptingLeads: boolean; autoDistribute: boolean; createdAt: Date };
 

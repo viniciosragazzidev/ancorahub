@@ -8,7 +8,7 @@ import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import page from "@/components/lite/page/lite-page.module.css";
 import { createExtensionCodeAction } from "@/features/browser-extension/actions";
 
-import styles from "./sections-lite.module.css";
+import styles from "@/components/lite/page/lite-sections.module.css";
 
 export function ExtensionConnectLite() {
   const [code, setCode] = useState<string | null>(null);

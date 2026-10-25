@@ -3,7 +3,7 @@ import page from "@/components/lite/page/lite-page.module.css";
 import { updateExtensionSettingsAction } from "@/features/browser-extension/actions";
 
 import { ExtensionConnectLite, ExtensionHelpLite } from "./extension-lite-parts";
-import styles from "./sections-lite.module.css";
+import styles from "@/components/lite/page/lite-sections.module.css";
 
 export type ExtensionLiteData = { enabled: boolean; minimumVersion: string; canConfigure: boolean };
 

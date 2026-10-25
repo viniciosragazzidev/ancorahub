@@ -1,5 +1,5 @@
 /** Resumo de "Minha conta" no visual Lite (sem perfil completo): nome, e-mail e perfil de acesso. */
-import styles from "./sections-lite.module.css";
+import styles from "@/components/lite/page/lite-sections.module.css";
 
 export function AccountSummaryLite({ name, email, role }: { name: string; email: string; role: string }) {
   return (

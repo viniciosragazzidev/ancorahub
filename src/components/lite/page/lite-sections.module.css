@@ -1,4 +1,4 @@
-/* Seções de /settings Lite: grupos de linhas com divisórias, campos de 44px e status com texto. Só tokens. */
+/* Seções Lite (Onda 6): grupos de linhas com divisórias, campos de 44px, avisos e status com texto. Só tokens. */
 
 .group {
   display: grid;
