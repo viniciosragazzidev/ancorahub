@@ -51,7 +51,6 @@
   "/plantoes",
   "/plantoes/agora",
   "/plantoes/corretor/[brokerId]",
-  "/qualificacao",
   "/relacionamento",
   "/roadmap",
   "/unidades/[branchId]",
