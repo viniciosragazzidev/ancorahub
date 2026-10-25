@@ -14,6 +14,8 @@ import { PROPOSAL_FIXTURES, PROPOSAL_LEADS } from "@/app/(dashboard)/propostas/_
 import { DocumentsLite } from "@/features/documents/components/documents-lite";
 import { DrilldownLite } from "@/app/(dashboard)/relatorios/drill/_components/drilldown-lite";
 import { IntegrityLite } from "@/app/(dashboard)/integridade/_components/integrity-lite";
+import { NocLite } from "@/app/(dashboard)/noc/_components/noc-lite";
+import { NOC_FIXTURE, NOC_NOW } from "@/app/(dashboard)/noc/_components/noc-fixtures";
 import { DomainDashboardLite } from "@/features/dashboard/components/domain-dashboard-lite";
 import { CARRIER_FIXTURES, DOC_FIXTURES, PLAN_FIXTURES, REQUIREMENT_FIXTURES } from "@/features/documents/components/documents-fixtures";
 
@@ -190,6 +192,17 @@ export function IntegridadeShellScreen() {
       <DashboardHeader breadcrumb="Governança" title="Integridade" />
       <main className={litePage.stack}>
         <IntegrityLite data={{ stalled: 214, unworked: 37, totalLeads: 48_912, leadsTrend: [180, 212, 196, 240, 228, 251, 233], auditsTrend: [32, 41, 28, 55, 47, 39, 61], logs }} />
+      </main>
+    </>
+  );
+}
+
+export function NocShellScreen() {
+  return (
+    <>
+      <DashboardHeader breadcrumb="Operações" title="Centro de operações" />
+      <main className={litePage.stack}>
+        <NocLite data={NOC_FIXTURE} period={30} now={NOC_NOW} urgentLead={{ id: "lead-1", nome: "Justiniano Albuquerque de Souza", reason: "Alta intenção sem contato há 12 min" }} />
       </main>
     </>
   );

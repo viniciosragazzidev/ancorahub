@@ -59,7 +59,6 @@
   "/mensagens",
   "/mensagens/[leadId]",
   "/minha-fila",
-  "/noc",
   "/plantoes",
   "/plantoes/agora",
   "/plantoes/corretor/[brokerId]",
