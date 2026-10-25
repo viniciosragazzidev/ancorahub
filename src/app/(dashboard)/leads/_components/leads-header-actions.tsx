@@ -19,7 +19,12 @@ import { PeriodSelect } from "@/components/period-select";
 import { DEFAULT_PERIOD, PERIOD_OPTIONS, type PeriodValue } from "@/shared/period";
 import type { TenantRole } from "@/shared/db/schema";
 
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import { LiteMenu, type LiteMenuItem } from "@/components/lite/controls";
+import { Plus as LitePlus, Zap } from "lucide-react";
+
 import { BulkLeadImportDialog } from "./bulk-lead-import-dialog";
+import liteStyles from "./leads-header-actions.module.css";
 import { ManualLeadSheet } from "./manual-lead-sheet";
 
 type PlanOption = { id: string; name: string; carrierName: string };
@@ -66,11 +71,59 @@ export function LeadsHeaderActions({
   const isCentralMarketing = jobTitle === "marketing" && branchId === null;
   const canImport = role === "director" || role === "manager" || role === "supervisor" || isCentralMarketing;
 
+  const litePage = useDirectorLitePage();
+
   function selectPeriod(days: PeriodValue) {
     const params = new URLSearchParams(searchParams.toString());
     if (days === DEFAULT_PERIOD) params.delete("period");
     else params.set("period", String(days));
     if (pathname) router.push(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`);
+  }
+
+  const dialogs = (
+    <>
+      <BulkLeadImportDialog
+        branches={branches}
+        queues={queues}
+        role={role}
+        jobTitle={jobTitle}
+        branchId={branchId}
+        open={importOpen}
+        onOpenChange={setImportOpen}
+      />
+      <ManualLeadSheet plans={plans} open={leadSheetOpen} onOpenChange={setLeadSheetOpen} />
+    </>
+  );
+
+  if (litePage) {
+    // Chave do diretor: só a ação principal à vista ("Novo lead") e "Próximo lead" como secundária neutra; arquivados
+    // e importação no menu "Mais ações". Abaixo de 1024px, "Próximo lead" também vai para o menu. O período mora na
+    // barra de filtros da página. Mesmas ações, mesmas permissões e os mesmos diálogos de hoje.
+    const moreItems: LiteMenuItem[] = [];
+    if (role === "director") moreItems.push({ id: "archived", label: "Leads arquivados", href: "/leads/arquivados" });
+    if (canImport) moreItems.push({ id: "import", label: "Importar leads", onSelect: () => setImportOpen(true) });
+    const compactItems: LiteMenuItem[] = urgentLead
+      ? [{ id: "next", label: "Próximo lead", href: `/leads/${urgentLead.id}` }, ...moreItems]
+      : moreItems;
+    return (
+      <>
+        <div className={liteStyles.actions}>
+          {urgentLead ? (
+            <Link className={`${liteStyles.secondary} ${liteStyles.wide}`} href={`/leads/${urgentLead.id}`} title={`${urgentLead.nome}: ${urgentLead.urgentReason}`}>
+              <Zap aria-hidden="true" size={16} />
+              Próximo lead
+            </Link>
+          ) : null}
+          <button type="button" className={liteStyles.primary} onClick={() => setLeadSheetOpen(true)}>
+            <LitePlus aria-hidden="true" size={16} />
+            Novo lead
+          </button>
+          {moreItems.length ? <span className={liteStyles.wide}><LiteMenu label="Mais ações" items={moreItems} /></span> : null}
+          {compactItems.length ? <span className={liteStyles.compact}><LiteMenu label="Mais ações" items={compactItems} /></span> : null}
+        </div>
+        {dialogs}
+      </>
+    );
   }
 
   return (
@@ -150,16 +203,7 @@ export function LeadsHeaderActions({
       </div>
 
       {/* Instâncias únicas dos diálogos, controladas por estado local */}
-      <BulkLeadImportDialog
-        branches={branches}
-        queues={queues}
-        role={role}
-        jobTitle={jobTitle}
-        branchId={branchId}
-        open={importOpen}
-        onOpenChange={setImportOpen}
-      />
-      <ManualLeadSheet plans={plans} open={leadSheetOpen} onOpenChange={setLeadSheetOpen} />
+      {dialogs}
     </>
   );
 }

@@ -1,0 +1,56 @@
+/* Ações do topo de /leads com a chave do diretor: 44px, sentence case, uma ação principal. Só tokens. */
+
+.actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.primary,
+.secondary {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.secondary {
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+
+.secondary:hover {
+  background: var(--border-subtle);
+}
+
+.compact {
+  display: none;
+}
+
+/* Abaixo de 1024px: "Próximo lead" e o menu largo saem; o menu compacto leva as secundárias. */
+@media (max-width: 1023px) {
+  .wide {
+    display: none;
+  }
+
+  .compact {
+    display: inline-flex;
+  }
+}

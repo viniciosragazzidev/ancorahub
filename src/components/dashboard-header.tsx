@@ -101,11 +101,9 @@ function DirectorDashboardHeader({
         hideAvailability
         titleAsHeading={title === "Painel"}
         routeOverride={{ title, isRoot: root, parentHref: route.parentHref, backToParent: true }}
-        leading={null}
+        leading={root && showSidebarTrigger ? <SidebarTrigger aria-label="Abrir menu principal" className="size-11" /> : null}
         actions={(
           <>
-            {/* O botão do menu fica à direita em toda tela raiz: o título começa na mesma borda do conteúdo. */}
-            {root && showSidebarTrigger ? <SidebarTrigger aria-label="Abrir menu principal" className="size-11" /> : null}
             {rightSlot ? <div data-slot="page-actions" aria-label="Ações da página" className="director-page-actions">{rightSlot}</div> : null}
             <button type="button" aria-label="Buscar páginas, leads e clientes" title="Buscar (Ctrl+K)" className="director-header-action director-search-trigger" onClick={() => window.dispatchEvent(new Event("open-command-palette"))}>
               <Search aria-hidden="true" className="size-4" />
