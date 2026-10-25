@@ -40,10 +40,9 @@ import { LeadDrawerManagementActions } from "./_components/lead-drawer-managemen
 import { LeadDistributionRemovedTag } from "./_components/lead-distribution-removal";
 import { LeadAssignmentHistory } from "./_components/lead-assignment-history";
 import { StartQualificationButton } from "./_components/qualifying-lead-actions";
-import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
 import { LeadsFilters } from "./_components/leads-filters";
 import type { LeadsFiltersProps } from "./_components/use-lead-filters";
-import { LeadsListSwitch } from "./leads-lite-list";
+import { LeadsListSwitch, QualifyingLeadsListSwitch } from "./leads-lite-list";
 import { LeadsLiteKanban } from "./leads-lite-kanban";
 import litePageStyles from "./leads-lite-page.module.css";
 import { computeSlaInfo, type SlaInfo } from "./lead-sla";
@@ -632,6 +631,20 @@ export function LeadsWorkspace({
       ) : null}
     </TabsList>
   );
+  // Visões no Lite: as mesmas abas, em sentence case e rótulos curtos, com as contagens de hoje.
+  const lostCount = workspaceLeads.filter((l) => l.status === "lost").length;
+  const liteViewTabs = (
+    <TabsList aria-label="Visualização de leads" variant="segment" className="w-max">
+      <TabsTrigger value="list">Todos os leads{leadCount > 0 ? <span className={litePageStyles.tabCount}>{leadCount.toLocaleString("pt-BR")}</span> : null}</TabsTrigger>
+      <TabsTrigger value="kanban">Kanban</TabsTrigger>
+      <TabsTrigger value="qualificacoes">Qualificação IA{qualifyingLeads.length > 0 ? <span className={litePageStyles.tabCount}>{qualifyingLeads.length.toLocaleString("pt-BR")}</span> : null}</TabsTrigger>
+      <TabsTrigger value="radar">Radar IA</TabsTrigger>
+      <TabsTrigger value="perdidos">Perdidos{lostCount > 0 ? <span className={litePageStyles.tabCount}>{lostCount.toLocaleString("pt-BR")}</span> : null}</TabsTrigger>
+      {showUnassignedFilter ? (
+        <TabsTrigger value="sem-atribuicao">Sem atribuição{unassignedCount > 0 ? <span className={litePageStyles.tabCount}>{unassignedCount.toLocaleString("pt-BR")}</span> : null}</TabsTrigger>
+      ) : null}
+    </TabsList>
+  );
   const columnsMenu = (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="shrink-0 gap-1.5 text-xs" />}>
@@ -662,9 +675,12 @@ export function LeadsWorkspace({
       <Tabs value={activeTab} onValueChange={handleViewChange} className={directorLite ? "flex min-h-0 flex-1 flex-col gap-0" : "flex min-h-0 flex-1 flex-col"}>
         {directorLite ? (
           <div className={litePageStyles.bar}>
-            {liteFilters ? <LeadsFilters {...liteFilters} trailing={<>{viewTabs}{columnsMenu}</>} /> : (
-              <div className="flex min-w-0 items-center gap-2">{viewTabs}{columnsMenu}</div>
-            )}
+            {/* Uma linha de visões (rola dentro dela) e, embaixo, a barra de busca, filtros, etapa, fila e período. */}
+            <div className={litePageStyles.viewsRow}>
+              <div className={litePageStyles.views}>{liteViewTabs}</div>
+              {columnsMenu}
+            </div>
+            {liteFilters ? <LeadsFilters {...liteFilters} /> : null}
             {queueTabs}
           </div>
         ) : (
@@ -823,7 +839,7 @@ export function LeadsWorkspace({
             />
           ) : (
             <div className="w-full">
-              <QualifyingLeadsDataTable
+              <QualifyingLeadsListSwitch
                 leads={qualifyingLeads}
                 queues={queues}
                 pageSize={pageSize}
@@ -847,7 +863,7 @@ export function LeadsWorkspace({
         <TabsContent value="perdidos" className={directorLite ? litePageStyles.region : "mt-4"}>
           <div className="space-y-4">
             <div className="w-full">
-              <LeadsDataTable
+              <LeadsListSwitch
                 leads={workspaceLeads.filter((l) => l.status === "lost")}
                 contextRole={contextRole}
                 shouldMask={shouldMask}
@@ -860,6 +876,7 @@ export function LeadsWorkspace({
                 onToggleRow={multiSelect.toggle}
                 onSelectAll={() => {}}
                 onRowClick={setSelectedLead}
+                liteBulk={directorLite ? { brokers: [], branches: [] } : undefined}
               />
             </div>
           </div>
@@ -877,7 +894,7 @@ export function LeadsWorkspace({
               />
             ) : (
               <div className="space-y-4">
-                <div className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-border/70 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className={directorLite ? litePageStyles.notice : "flex flex-col gap-3 rounded-[var(--radius-card)] border border-border/70 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"}>
                   <div>
                     <p className="text-sm font-medium text-foreground">Recuperar leads sem corretor</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
@@ -895,15 +912,17 @@ export function LeadsWorkspace({
                     {isDistributingAll ? "Distribuindo..." : "Distribuir todos"}
                   </Button>
                 </div>
-                <SelectionToolbar
-                  selectedCount={multiSelect.count}
-                  totalCount={unassignedLeads.length}
-                  onClear={multiSelect.clear}
-                >
-                  {selectionActions}
-                </SelectionToolbar>
+                {directorLite ? null : (
+                  <SelectionToolbar
+                    selectedCount={multiSelect.count}
+                    totalCount={unassignedLeads.length}
+                    onClear={multiSelect.clear}
+                  >
+                    {selectionActions}
+                  </SelectionToolbar>
+                )}
                 <div className="w-full">
-                  <LeadsDataTable
+                  <LeadsListSwitch
                     leads={unassignedLeads}
                     contextRole={contextRole}
                     shouldMask={shouldMask}
@@ -919,6 +938,15 @@ export function LeadsWorkspace({
                       else multiSelect.clear();
                     }}
                     onRowClick={setSelectedLead}
+                    liteBulk={directorLite ? {
+                      role: contextRole,
+                      brokers,
+                      branches,
+                      onStatusCommitted: handleBulkStatusCommitted,
+                      onReassignCommitted: handleBulkReassignCommitted,
+                      onBranchCommitted: handleBulkBranchCommitted,
+                      onRevertCommitted: handleBulkRevertCommitted,
+                    } : undefined}
                   />
                 </div>
               </div>

@@ -753,6 +753,14 @@ async function LeadsPageContent({
     initialTag: filters.tag,
     tags: leadTagList,
     storageKey: `ancorahub:leads-filters:${context.tenantId}:${context.userId}`,
+    // Só o Lite usa: as filas e o período viram seletores na barra (mesmos ?fila= e ?period= de hoje).
+    ...(directorLitePage ? {
+      queueTabs: {
+        tabs: buildQueueTabs({ activeQueues, counts: queueCounts.map((row) => ({ ...row, total: Number(row.total) })) }),
+        current: queueTab?.kind === "none" ? "sem-fila" : queueTab?.kind === "queue" ? queueTab.queueId : "",
+      },
+      period,
+    } : {}),
   } satisfies LeadsFiltersProps;
   const leadsFilters = <LeadsFilters {...leadsFiltersProps} />;
 
@@ -866,14 +874,14 @@ async function LeadsPageContent({
                 totalItems: unassignedTotalItems,
                 totalPages: unassignedTotalPages,
               }}
-              queueTabs={queueTabs}
+              queueTabs={directorLitePage ? undefined : queueTabs}
               liteFilters={directorLitePage ? leadsFiltersProps : undefined}
             />
           </div>
         ) : (
           /* RCD: Directional empty state — eliminates cognitive void, guides to next action */
           <div className="space-y-4">
-          {queueTabs}
+          {directorLitePage ? null : queueTabs}
           <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border px-6 py-14 text-center">
             {!isFiltered && (
               <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/8 ring-1 ring-primary/15">

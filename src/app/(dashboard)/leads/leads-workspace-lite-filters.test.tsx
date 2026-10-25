@@ -179,7 +179,7 @@ const leads: LeadWorkspaceItem[] = [
 ];
 
 describe("filtros Lite na barra do workspace de /leads", () => {
-  it("recebe as props serializáveis da page e monta os filtros com as abas de visão no fim", () => {
+  it("recebe as props serializáveis da page e monta os filtros, com as visões numa linha própria", () => {
     render(
       <NuqsTestingAdapter>
         <ArcScopeProvider enabled>
@@ -196,6 +196,9 @@ describe("filtros Lite na barra do workspace de /leads", () => {
     );
     const filters = screen.getByTestId("lite-filters");
     expect(filters).toHaveAttribute("data-storage-key", "teste:filtros");
-    expect(within(filters).getByRole("tablist", { name: "Visualização de leads" })).toBeInTheDocument();
+    // As visões ficam numa linha própria acima da barra (não mais no fim dela).
+    expect(within(filters).queryByRole("tablist", { name: "Visualização de leads" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Visualização de leads" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Todos os leads/ })).toBeInTheDocument();
   });
 });
