@@ -45,11 +45,6 @@
   border-color: var(--border-strong);
 }
 
-.trigger:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
 .value,
 .placeholder {
   min-width: 0;
@@ -121,8 +116,8 @@
 }
 
 .searchInput:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 0;
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: var(--focus-outline-offset, 2px);
 }
 
 .list {

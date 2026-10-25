@@ -15,12 +15,13 @@
   font-size: var(--text-sm);
 }
 
-/* Moldura da tabela: superfície branca com borda fina e raio de cartão (sem sombra pesada). */
+/* Moldura da tabela: cartão de borda fina e raio de superfície; a tabela larga rola dentro dele, nunca a página. */
 .tableWrap {
   width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
+  border-radius: var(--radius-surface);
   background: var(--surface);
 }
 
@@ -31,8 +32,9 @@
 }
 
 .table th {
-  padding: 10px 14px;
-  color: var(--text-muted);
+  height: 44px;
+  padding: 0 16px;
+  color: var(--text-secondary);
   font-size: var(--text-xs);
   font-weight: 500;
   text-align: left;
@@ -40,7 +42,8 @@
 }
 
 .table td {
-  padding: 10px 14px;
+  height: 52px;
+  padding: 8px 16px;
   border-top: 1px solid var(--border-subtle);
   vertical-align: middle;
 }
@@ -53,11 +56,6 @@
   cursor: pointer;
 }
 
-.clickable:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: -2px;
-}
-
 .numeric {
   text-align: right;
   white-space: nowrap;
@@ -66,31 +64,26 @@
 
 .cards {
   display: grid;
-  gap: 8px;
+  gap: 16px;
   margin: 0;
-  padding: 0 16px 16px;
+  padding: 0;
   list-style: none;
 }
 
 .card,
 .cardStatic {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  padding: 14px 16px;
+  padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-surface);
   background: var(--surface);
 }
 
 .card {
   min-height: 44px;
   cursor: pointer;
-}
-
-.card:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
 }
 
 .cardTitle {
@@ -109,9 +102,15 @@
 .cardDetails {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 12px;
-  margin: 4px 0 0;
+  gap: 12px 16px;
+  margin: 8px 0 0;
   font-size: var(--text-xs);
+}
+
+.cardDetails > div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
 }
 
 .cardDetails dt {
@@ -148,7 +147,7 @@
 /* Seleção em massa: caixa nativa de 18px com alvo de 44px; linha e cartão selecionados em acento suave. */
 .table .selectCell {
   width: 44px;
-  padding: 0 0 0 6px;
+  padding: 0 0 0 4px;
 }
 
 .selectBox {
@@ -168,8 +167,8 @@
 }
 
 .checkbox:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: var(--focus-outline-offset, 2px);
 }
 
 /* Destaques de linha (sempre com texto na própria linha): atenção e cinza. */
@@ -179,10 +178,14 @@
   background: var(--warning-subtle);
 }
 
-.table tbody tr[data-tone="muted"],
+/* Cinza vira uma faixa na borda esquerda: o fundo cinza apagava os badges neutros da linha. */
+.table tbody tr[data-tone="muted"] > td:first-child {
+  border-left: 3px solid var(--border-strong);
+}
+
 .card[data-tone="muted"],
 .cardStatic[data-tone="muted"] {
-  background: var(--surface-muted);
+  border-left: 3px solid var(--border-strong);
 }
 
 .table tbody tr[data-selected="true"],
@@ -197,5 +200,5 @@
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
-  margin: -10px -10px -6px 0;
+  margin: -12px -12px -4px 0;
 }

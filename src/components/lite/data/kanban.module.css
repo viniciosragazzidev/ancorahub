@@ -12,6 +12,7 @@
 .root {
   position: relative;
   min-width: 0;
+  container-type: inline-size;
 }
 
 .toStart {
@@ -36,29 +37,49 @@
   cursor: pointer;
 }
 
-.toStart:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
+/*
+ * Faixa de colunas: rola dentro do próprio container, nunca a página. A largura da coluna (280 a 320px, ou a largura
+ * toda no celular) é calculada para caber um número inteiro de colunas; com o encaixe obrigatório, a coluna da borda
+ * direita nunca fica cortada pela metade quando a rolagem para.
+ */
 .board {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  --kanban-columns: 1;
+  display: grid;
+  grid-auto-columns: calc((100% - (var(--kanban-columns) - 1) * 16px) / var(--kanban-columns));
+  grid-auto-flow: column;
+  align-items: start;
+  gap: 16px;
   min-width: 0;
   padding-bottom: 12px;
   overflow-x: auto;
-  scroll-snap-type: x proximity;
+  scroll-snap-type: x mandatory;
   overscroll-behavior-x: contain;
+}
+
+@container (min-width: 576px) {
+  .board {
+    --kanban-columns: 2;
+  }
+}
+
+@container (min-width: 872px) {
+  .board {
+    --kanban-columns: 3;
+  }
+}
+
+@container (min-width: 1168px) {
+  .board {
+    --kanban-columns: 4;
+  }
 }
 
 .column {
   display: grid;
-  flex: none;
-  gap: 10px;
-  width: 300px;
-  padding: 10px;
-  border-radius: var(--radius-panel);
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: var(--radius-surface);
   background: var(--surface-muted);
   scroll-snap-align: start;
   transition: scale var(--duration-fast) var(--ease-standard);
@@ -96,11 +117,6 @@
   color: var(--foreground);
 }
 
-.handle:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: -2px;
-}
-
 .title {
   flex: 1 1 auto;
   min-width: 0;
@@ -118,7 +134,7 @@
   place-items: center;
   min-width: 28px;
   height: 24px;
-  margin-right: 6px;
+  margin-right: 10px;
   padding: 0 8px;
   border-radius: 999px;
   background: var(--surface);
@@ -129,7 +145,7 @@
 
 .cards {
   display: grid;
-  gap: 8px;
+  gap: 12px;
   max-height: calc(80vh - 7rem);
   margin: 0;
   padding: 0;
@@ -139,18 +155,12 @@
 
 .empty {
   margin: 0;
-  padding: 24px 12px;
+  padding: 24px 16px;
   border: 1px dashed var(--border);
-  border-radius: 12px;
+  border-radius: calc(var(--radius-surface) - 12px);
   color: var(--text-muted);
   font-size: var(--text-xs);
   text-align: center;
-}
-
-@media (max-width: 767px) {
-  .column {
-    width: min(300px, calc(100vw - 64px));
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
