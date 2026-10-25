@@ -64,3 +64,20 @@ describe("/leads/arquivados com a chave desligada", () => {
     await expect(ArchivedLeadsPage({ searchParams: Promise.resolve({}) })).rejects.toThrow("NEXT_REDIRECT:/access-denied");
   });
 });
+
+describe("/leads/arquivados com a chave ligada", () => {
+  it("diretor vê a lista Lite com a mesma busca e página", async () => {
+    state.liteKey.on = true;
+    state.results = [rows, [{ total: 120 }]];
+    const html = renderToStaticMarkup(await ArchivedLeadsPage({ searchParams: Promise.resolve({ page: "2", search: "ana" }) }));
+    expect(html).toContain('data-skin="diretor"');
+    expect(html).toContain('data-lite="table"');
+    expect(html).toContain('name="search"');
+    expect(html).toContain('value="ana"');
+    expect(html).toContain("51 a 100 de 120");
+    expect(html).toContain("Perdido");
+    expect(html).toContain("Sem data");
+    expect(html).not.toContain("—");
+  });
+});
+
