@@ -771,9 +771,9 @@ button.heatCell:hover { transform: scale(1.12); }
 }
 
 /* Requalificação: "N tentativas" numa linha e o detalhe embaixo, em texto menor. No celular ocupa a largura toda. */
-.requalCell {
-  display: grid;
-  gap: 2px;
+/* O td continua table-cell (a divisória da linha não quebra); as duas linhas empilham pelos spans. */
+.requalCell > span {
+  display: block;
 }
 
 .requalMain {
@@ -782,6 +782,7 @@ button.heatCell:hover { transform: scale(1.12); }
 }
 
 .requalDetail {
+  margin-top: 2px;
   color: var(--text-muted);
   font-size: var(--text-xs);
   line-height: 1.4;
