@@ -1,6 +1,5 @@
 ﻿export const DIRECTOR_LITE_OPT_OUT_ROUTES = [
   "/agenda",
-  "/clientes/[clientId]",
   "/conversas/broker",
   "/cotacao",
   "/dashboard/c/[assistant]",
@@ -21,7 +20,6 @@
   "/mensagens",
   "/mensagens/[leadId]",
   "/plantoes",
-  "/relacionamento",
 ] as const;
 
 function routePatternMatches(pattern: string, pathname: string) {

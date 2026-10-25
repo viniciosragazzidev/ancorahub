@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 
 import { ONDA78_SCREENS } from "./onda78-registry";
+import { ONDA9_SCREENS } from "./onda9-registry";
 import { AssistenteShellScreen, DocumentosShellScreen, DrillShellScreen, IntegridadeShellScreen, NocShellScreen, PropostasShellScreen, TarefasShellScreen, VendaShellScreen, VendasShellScreen } from "./onda3-screens";
 import { CargosShellScreen, ConvidarShellScreen, EquipeShellScreen, MembroShellScreen, RecuperacoesShellScreen, UnidadeShellScreen, UnidadesShellScreen } from "./onda4-screens";
 
@@ -24,4 +25,5 @@ export const ONDA3_SCREENS: Record<string, { path: string; render: () => ReactNo
   noc: { path: "/noc", render: () => <NocShellScreen /> },
   tarefas: { path: "/tarefas/dashboard", render: () => <TarefasShellScreen /> },
   ...ONDA78_SCREENS,
+  ...ONDA9_SCREENS,
 };

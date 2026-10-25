@@ -23,7 +23,7 @@ function pageRoutes(directory = dashboardRoot): string[] {
 describe("rotas do Diretor Lite", () => {
   it("mantém em opt-out todas as páginas ainda não revisadas (saíram o painel, a lista e o perfil do lead e as telas simples da passada rápida)", () => {
     const revised = pageRoutes().filter((route) => !isDirectorLiteRouteOptedOut(route));
-    expect([...revised].sort()).toEqual(["/assinatura", "/assistente", "/atendimento", "/atendimento/fluxo", "/atendimento/mensagens", "/atendimento/situacoes", "/clientes", "/configuracoes/comissoes", "/conversas", "/conversas/dashboard", "/dashboard", "/dashboard/drill/[drillId]", "/distribuicao", "/distribuicao/dashboard", "/documentos", "/empresas", "/equipe", "/equipe/[id]", "/equipe/cargos", "/equipe/convidar", "/equipe/dashboard", "/equipe/recuperacoes", "/ferramentas", "/ferramentas/materiais-operadoras", "/ferramentas/validador-comprovante", "/filiais", "/fluxos-whatsapp", "/guia", "/guia/webhook", "/integrations", "/integrations/meta", "/integrations/whats_alt", "/integrations/whatsapp", "/integridade", "/leads", "/leads/[id]", "/leads/arquivados", "/leads/dashboard", "/leads/distribuicao", "/leads/distribuicao/plantao/[scheduleId]", "/marketing", "/marketing/campanhas", "/marketing/campanhas/[id]", "/marketing/importacoes", "/marketing/meta", "/minha-fila", "/noc", "/notificacoes", "/plantoes/agora", "/plantoes/corretor/[brokerId]", "/propostas", "/qualificacao", "/qualificacao/turbo", "/relatorios", "/relatorios/drill/[drillId]", "/roadmap", "/settings", "/settings/extension", "/settings/feedback-templates", "/settings/integrations", "/settings/meta", "/settings/waha-diagnostic", "/settings/whatsapp", "/tarefas/dashboard", "/unidades/[branchId]", "/vendas", "/vendas/[id]", "/vendas/dashboard", "/welcome"]);
+    expect([...revised].sort()).toEqual(["/assinatura", "/assistente", "/atendimento", "/atendimento/fluxo", "/atendimento/mensagens", "/atendimento/situacoes", "/clientes", "/clientes/[clientId]", "/configuracoes/comissoes", "/conversas", "/conversas/dashboard", "/dashboard", "/dashboard/drill/[drillId]", "/distribuicao", "/distribuicao/dashboard", "/documentos", "/empresas", "/equipe", "/equipe/[id]", "/equipe/cargos", "/equipe/convidar", "/equipe/dashboard", "/equipe/recuperacoes", "/ferramentas", "/ferramentas/materiais-operadoras", "/ferramentas/validador-comprovante", "/filiais", "/fluxos-whatsapp", "/guia", "/guia/webhook", "/integrations", "/integrations/meta", "/integrations/whats_alt", "/integrations/whatsapp", "/integridade", "/leads", "/leads/[id]", "/leads/arquivados", "/leads/dashboard", "/leads/distribuicao", "/leads/distribuicao/plantao/[scheduleId]", "/marketing", "/marketing/campanhas", "/marketing/campanhas/[id]", "/marketing/importacoes", "/marketing/meta", "/minha-fila", "/noc", "/notificacoes", "/plantoes/agora", "/plantoes/corretor/[brokerId]", "/propostas", "/qualificacao", "/qualificacao/turbo", "/relacionamento", "/relatorios", "/relatorios/drill/[drillId]", "/roadmap", "/settings", "/settings/extension", "/settings/feedback-templates", "/settings/integrations", "/settings/meta", "/settings/waha-diagnostic", "/settings/whatsapp", "/tarefas/dashboard", "/unidades/[branchId]", "/vendas", "/vendas/[id]", "/vendas/dashboard", "/welcome"]);
     expect(DIRECTOR_LITE_OPT_OUT_ROUTES.length).toBeGreaterThan(0);
   });
 
@@ -39,6 +39,12 @@ describe("rotas do Diretor Lite", () => {
     expect(isDirectorLiteRouteOptedOut("/leads/abc-123")).toBe(false);
     expect(isDirectorLiteRouteOptedOut("/leads/abc-123/feedback")).toBe(true);
     expect(isDirectorLiteRouteOptedOut("/leads/arquivados")).toBe(false);
+  });
+
+  it("tira /relacionamento e as telas de clientes do opt-out", () => {
+    expect(isDirectorLiteRouteOptedOut("/relacionamento")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/clientes/client-1")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/clientes")).toBe(false);
   });
 
   it("libera a central de conversas e a visão geral no gate e mantém opt-out da rota de corretor", () => {

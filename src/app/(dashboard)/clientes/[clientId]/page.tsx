@@ -23,6 +23,9 @@ import { PersonRecordDetails } from "@/features/customer-record/components/perso
 import { buildClientScopeWhere } from "@/features/customers/customer-authorization";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { LightClientDetail } from "@/features/broker-workspace/components/light-client-detail";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { ClientDetailLite } from "./client-detail-lite";
 
 export const dynamic = "force-dynamic";
 
@@ -206,6 +209,42 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
     : null;
 
   const anniversaryIsUpcoming = anniversarySoon !== null && anniversarySoon >= 0 && anniversarySoon <= 45;
+
+  // Diretor com a chave ligada e a rota fora do opt-out: mesma ficha, mesmas ações e mesmas peças de documentos e
+  // linha do tempo, no visual Lite.
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/clientes/[clientId]")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Pós-venda" title={client.name} />
+        <main className={litePage.stack}>
+          <ClientDetailLite
+            client={client}
+            consentimentoLgpd={lead?.consentimentoLgpd ?? false}
+            sales={sales}
+            activeCustomer={activeCustomer}
+            renewal={{ days: anniversarySoon, upcoming: anniversaryIsUpcoming }}
+            dependents={beneficiaries}
+            documentCount={leadDocs.length}
+            canAccessConversas={hasPermission(context.role, "acessar_conversas")}
+            hideRegistrationDate={context.role === "broker"}
+            slots={{
+              documents: (
+                <LeadDocumentsSection
+                  leadId={client.leadId}
+                  clientId={client.id}
+                  requirements={requirements}
+                  documents={leadDocs}
+                  checklist={checklist}
+                  beneficiaries={beneficiaries.map((b) => ({ id: b.id, name: b.name, isHolder: b.isHolder }))}
+                />
+              ),
+              timeline: interactions && interactions.length > 0 ? <LeadTimeline leadId={client.leadId} interactions={interactions} /> : null,
+            }}
+          />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
