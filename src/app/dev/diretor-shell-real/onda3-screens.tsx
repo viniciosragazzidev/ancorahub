@@ -16,6 +16,7 @@ import { DrilldownLite } from "@/app/(dashboard)/relatorios/drill/_components/dr
 import { IntegrityLite } from "@/app/(dashboard)/integridade/_components/integrity-lite";
 import { NocLite } from "@/app/(dashboard)/noc/_components/noc-lite";
 import { NOC_FIXTURE, NOC_NOW } from "@/app/(dashboard)/noc/_components/noc-fixtures";
+import { AssistenteLite } from "@/app/(dashboard)/assistente/_components/assistente-lite";
 import { DomainDashboardLite } from "@/features/dashboard/components/domain-dashboard-lite";
 import { CARRIER_FIXTURES, DOC_FIXTURES, PLAN_FIXTURES, REQUIREMENT_FIXTURES } from "@/features/documents/components/documents-fixtures";
 
@@ -203,6 +204,17 @@ export function NocShellScreen() {
       <DashboardHeader breadcrumb="Operações" title="Centro de operações" />
       <main className={litePage.stack}>
         <NocLite data={NOC_FIXTURE} period={30} now={NOC_NOW} urgentLead={{ id: "lead-1", nome: "Justiniano Albuquerque de Souza", reason: "Alta intenção sem contato há 12 min" }} />
+      </main>
+    </>
+  );
+}
+
+export function AssistenteShellScreen() {
+  return (
+    <>
+      <DashboardHeader breadcrumb="Inteligência" title="Assistente IA" />
+      <main className={litePage.stack}>
+        <AssistenteLite />
       </main>
     </>
   );

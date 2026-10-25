@@ -1,7 +1,6 @@
 ﻿export const DIRECTOR_LITE_OPT_OUT_ROUTES = [
   "/agenda",
   "/assinatura",
-  "/assistente",
   "/atendimento",
   "/atendimento/fluxo",
   "/atendimento/mensagens",
