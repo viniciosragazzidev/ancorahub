@@ -10,6 +10,7 @@ import { LeadDetailFixture } from "@/app/dev/diretor-lead-real/lead-detail-fixtu
 
 import { LeadsShellScreen } from "./leads-screen";
 import { ONDA3_SCREENS } from "./onda3-registry";
+import { ONDA5_SCREENS } from "./onda5-screens";
 
 const permissions = [
   "acessar_dashboard",
@@ -42,7 +43,8 @@ export default async function DirectorShellRealPage({
   const leadsViews: Record<string, "list" | "kanban" | "qualificacoes" | "sem-atribuicao" | "radar"> = { leads: "list", kanban: "kanban", qualificacao: "qualificacoes", "sem-atribuicao": "sem-atribuicao", radar: "radar" };
   const leadsView = leadsViews[screen];
   const onda3 = ONDA3_SCREENS[screen];
-  const pathname = onda3 ? onda3.path : leadsView ? "/leads" : screen === "lead" ? "/leads/11111111-1111-4111-8111-111111111111" : "/dashboard";
+  const onda5 = ONDA5_SCREENS[screen];
+  const pathname = onda5 ? onda5.path : onda3 ? onda3.path : leadsView ? "/leads" : screen === "lead" ? "/leads/11111111-1111-4111-8111-111111111111" : "/dashboard";
   const name = isSuperAdminViewingDirector ? "Alex Exemplo" : "Marina Exemplo";
   const previewUser: UserDisplayInfo = {
     name,
@@ -67,7 +69,7 @@ export default async function DirectorShellRealPage({
       branding={{ brandColor: null, logoUrl: null, tenantName: "\u00c2ncora Sa\u00fade" }}
       viewAs={{ canViewAs: isSuperAdminViewingDirector, viewingAs: null }}
     >
-      {onda3 ? onda3.render() : leadsView ? (
+      {onda5 ? onda5.render({ role: previewUser.roleKey ?? "director", jobTitle: previewUser.jobTitle, branchId: null }) : onda3 ? onda3.render() : leadsView ? (
         <LeadsShellScreen view={leadsView} />
       ) : screen === "lead" ? (
         <>
