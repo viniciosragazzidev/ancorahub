@@ -7,37 +7,63 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { AlertTriangle, Info, SearchX, Table2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Info, SearchX, Table2 } from "lucide-react";
 
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import type { SimpleLeadQualityReportData } from "@/features/reports/metrics/lead-quality-service";
 
 import styles from "./director-lite.module.css";
-import { n, pct, share } from "./format";
+import { noDataLabel, n, pct, periodWords, plural, ranOutLabel, share } from "./format";
+import { hourAxis, tickEvery } from "./hour-axis";
 import { enterT, exitT, LiteColumn, LiteItem, LiteNumber, LiteReveal } from "./motion";
 
-function Stat({ label, value, detail, tone, index, kind = "int" }: { label: string; value: number; detail?: string; tone?: "good" | "weak"; index: number; kind?: "int" | "dec" }) {
+/** Um número do grupo. `value` null = não dá para calcular: texto curto e sem a linha de comparação. */
+function Stat({ label, value, detail, tone, index, kind = "int", empty }: { label: string; value: number | null; detail?: string; tone?: "good" | "weak"; index: number; kind?: "int" | "dec"; empty: string }) {
   return (
     <LiteItem index={index} className={styles.stat}>
       <span className={styles.statLabel}>{label}</span>
-      <LiteNumber value={value} kind={kind} className={`${styles.statValue} ${tone === "good" ? styles.good : tone === "weak" ? styles.weak : ""}`} />
-      {detail ? <span className={styles.statDetail}>{detail}</span> : null}
+      {value === null ? (
+        <span className={styles.statEmpty}>{empty}</span>
+      ) : (
+        <>
+          <LiteNumber value={value} kind={kind} className={`${styles.statValue} ${tone === "good" ? styles.good : tone === "weak" ? styles.weak : ""}`} />
+          {detail ? <span className={styles.statDetail}>{detail}</span> : null}
+        </>
+      )}
     </LiteItem>
   );
 }
 
-function Question({ number, title, children, help }: { number: number; title: string; children: ReactNode; help?: ReactNode }) {
+/** Seção da página: título simples e uma linha de descrição (sem número em círculo). */
+function Section({ title, children, help }: { title: string; children: ReactNode; help?: ReactNode }) {
   return (
     <LiteReveal as="section" className={styles.block} label={title}>
-      <h2 className={styles.blockTitle}><span className={styles.stepNumber}>{number}</span>{title}</h2>
-      {help ? <p className={styles.blockHelp}>{help}</p> : null}
+      <header className={styles.sectionHeader}>
+        <h2 className={styles.sectionTitle}>{title}</h2>
+        {help ? <p className={styles.sectionDescription}>{help}</p> : null}
+      </header>
       {children}
     </LiteReveal>
   );
 }
 
-function HourChart({ report }: { report: SimpleLeadQualityReportData }) {
-  const max = Math.max(1, ...report.hours.map((hour) => Math.max(hour.arrived.good, hour.arrived.cold + hour.arrived.noReply)));
+/** Uma linha de estado zerado: o que aconteceu e, quando ajuda, o próximo passo. */
+function ZeroLine({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <div className={styles.zeroLine} role="status">
+      <p>{children}</p>
+      {action}
+    </div>
+  );
+}
+
+function HourChart({ report, now }: { report: SimpleLeadQualityReportData; now?: Date | null }) {
+  const axis = hourAxis(report, now);
+  if (axis.every((hour) => hour.empty)) {
+    return <p className={styles.chartEmpty}>Nenhum lead entrou {periodWords(report.period)}.</p>;
+  }
+  const max = Math.max(1, ...axis.map((hour) => Math.max(hour.good, hour.weak)));
+  const every = tickEvery(axis.length);
   return (
     <div className={styles.hourChart}>
       <div className={styles.legend} aria-hidden="true">
@@ -45,20 +71,16 @@ function HourChart({ report }: { report: SimpleLeadQualityReportData }) {
         <span><span className={styles.legendSwatch} data-tone="neutral" />Entraram frios</span>
         {report.hourly === "timeline" ? <span><span className={styles.legendSwatch} data-tone="warning" />Bons acabaram</span> : null}
       </div>
-      <div className={styles.hourBars} role="img" aria-label="Leads bons e frios que entraram por hora">
-        {report.hours.map((hour, index) => {
-          const weak = hour.arrived.cold + hour.arrived.noReply;
-          const ranOut = hour.goodWaiting === 0 && hour.distributed.cold + hour.distributed.noReply > 0;
-          return (
-            <span key={hour.startsAt} className={styles.hourSlot} data-ranout={ranOut || undefined}>
-              <span className={styles.hourPair}>
-                <LiteColumn value={hour.arrived.good / max} delay={Math.min(index, 12) * 0.03} tone="success" label={`${hour.label}: ${n(hour.arrived.good)} bons`} />
-                <LiteColumn value={weak / max} delay={Math.min(index, 12) * 0.03} tone="neutral" label={`${hour.label}: ${n(weak)} frios`} />
-              </span>
-              <span className={styles.hourTick}>{index % 2 === 0 ? hour.label : ""}</span>
+      <div className={styles.hourBars} role="img" aria-label={`Leads bons e frios que entraram por hora, de ${axis[0].label} a ${axis[axis.length - 1].label}`} data-hours={axis.length}>
+        {axis.map((hour, index) => (
+          <span key={hour.key} className={styles.hourSlot} data-ranout={hour.ranOut || undefined} data-empty={hour.empty || undefined} data-future={hour.future || undefined}>
+            <span className={styles.hourPair}>
+              <LiteColumn value={hour.good / max} delay={Math.min(index, 12) * 0.03} tone="success" label={`${hour.label}: ${n(hour.good)} bons`} />
+              <LiteColumn value={hour.weak / max} delay={Math.min(index, 12) * 0.03} tone="neutral" label={`${hour.label}: ${n(hour.weak)} frios`} />
             </span>
-          );
-        })}
+            <span className={styles.hourTick}>{index % every === 0 ? hour.label : ""}</span>
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -96,89 +118,104 @@ export function QualityToolbar({ legacyHref, detailedHref }: { legacyHref: strin
   );
 }
 
-/** A vista Simples: entraram e bons, por fila, hora a hora e o que mudaria sem os frios. `unitName` null = todas as unidades. */
-export function QualityView({ report, unitName }: { report: SimpleLeadQualityReportData; unitName: string | null }) {
+/**
+ * A vista Simples: entraram e bons, por fila, hora a hora e o que mudaria sem os frios. `unitName` null = todas as unidades.
+ * `now` vem do servidor e fecha o eixo do gráfico na hora atual; `widerHref` é o próximo passo do dia zerado (7 dias).
+ */
+export function QualityView({ report, unitName, now, widerHref }: { report: SimpleLeadQualityReportData; unitName: string | null; now?: Date | null; widerHref?: string }) {
   const [table, setTable] = useState(false);
   const arrivedWeak = report.arrived.cold + report.arrived.noReply;
   const sentWeak = report.distributed.cold + report.distributed.noReply;
   const runOuts = report.byQueue.filter((queue) => queue.goodRanOut);
   const inversions = report.byQueue.filter((queue) => queue.weakWhileGoodWaiting > 0);
+  const when = periodWords(report.period);
+  const empty = noDataLabel(report.period);
+  const today = report.period === "today";
   if (!report.arrived.total) {
     return (
       <div className={styles.card}>
         <div className={styles.cardEmpty}>
-          <EmptyState icon={<SearchX aria-hidden="true" />} title="Nenhum lead neste período" description="Escolha outro período ou outra unidade." />
+          <EmptyState
+            icon={<SearchX aria-hidden="true" />}
+            title={today ? "Nenhum lead entrou hoje" : "Nenhum lead neste período"}
+            description={today ? "O dia da operação começa às 19h. Os números aparecem quando o primeiro lead entrar." : "Escolha outro período ou outra unidade."}
+            action={today && widerHref ? <Link href={widerHref} className={styles.secondaryButton}>Ver os últimos 7 dias</Link> : undefined}
+          />
         </div>
       </div>
     );
   }
   const scope = unitName ? `Unidade ${unitName}` : "Todas as unidades";
+  const sent = report.distributed.total;
   return (
     <div className={styles.stack}>
       {report.truncated ? <p className={styles.note} data-tone="warning"><AlertTriangle aria-hidden="true" size={16} />Período muito longo: o relatório usa só os leads mais recentes. Escolha um período menor para ver tudo.</p> : null}
-      <Question number={1} title="Quantos leads entraram e quantos são bons" help="Bom é quente ou morno validado. Lead de WhatsApp só conta como bom se o cliente respondeu a qualificação.">
+      <Section title="Quantos leads entraram e quantos são bons" help="Bom é quente ou morno validado. Lead de WhatsApp só conta como bom se o cliente respondeu a qualificação.">
         <div className={styles.stats4}>
-          <Stat index={0} label="Entraram" value={report.arrived.total} detail={scope} />
-          <Stat index={1} label="Bons (quentes e mornos)" value={report.arrived.good} detail={`${pct(report.arrived.good, report.arrived.total)} do que entrou`} tone="good" />
-          <Stat index={2} label="Frios" value={arrivedWeak} detail={`${n(report.arrived.cold)} frios e ${n(report.arrived.noReply)} de WhatsApp que não responderam, ${pct(arrivedWeak, report.arrived.total)}`} tone="weak" />
-          <Stat index={3} label="Descartados ou em qualificação" value={report.arrived.other} detail={pct(report.arrived.other, report.arrived.total)} />
+          <Stat index={0} empty={empty} label="Entraram" value={report.arrived.total} detail={scope} />
+          <Stat index={1} empty={empty} label="Bons (quentes e mornos)" value={report.arrived.good} detail={`${pct(report.arrived.good, report.arrived.total)} do que entrou`} tone="good" />
+          <Stat index={2} empty={empty} label="Frios" value={arrivedWeak} detail={arrivedWeak ? `${pct(arrivedWeak, report.arrived.total)}: ${plural(report.arrived.cold, "frio", "frios")} e ${n(report.arrived.noReply)} sem resposta no WhatsApp` : "Nenhum lead frio"} tone="weak" />
+          <Stat index={3} empty={empty} label="Descartados ou em qualificação" value={report.arrived.other} detail={report.arrived.other ? `${pct(report.arrived.other, report.arrived.total)} do que entrou` : undefined} />
         </div>
-      </Question>
+      </Section>
 
-      <Question number={2} title="Por fila">
+      <Section title="Por fila" help={report.byQueue.length === 1 ? "Só uma fila recebeu leads." : undefined}>
         <div className={styles.card}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th scope="col">Fila de entrada</th>
-                <th scope="col">Reter frios</th>
-                <th scope="col" className={styles.numCol}>Entraram</th>
-                <th scope="col" className={styles.numCol}>Bons</th>
-                <th scope="col" className={styles.numCol}>Frios</th>
-                <th scope="col" className={styles.numCol}>Distribuídos</th>
-                <th scope="col" className={styles.numCol}>Frios distribuídos</th>
-                <th scope="col" className={styles.numCol}>Bons acabaram</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.byQueue.map((queue) => (
-                <tr key={queue.queue}>
-                  <td data-label="Fila"><span className={styles.cellMain}>{queue.queue}</span></td>
-                  <td data-label="Reter frios"><span className={styles.badge} data-tone={queue.holdColdLeads ? "success" : "neutral"}>{queue.holdColdLeads ? "Ligada" : "Desligada"}</span></td>
-                  <td data-label="Entraram" className={styles.numCol}>{n(queue.arrived)}</td>
-                  <td data-label="Bons" className={styles.numCol}>{n(queue.good)} <span className={styles.muted}>({pct(queue.good, queue.arrived)})</span></td>
-                  <td data-label="Frios" className={styles.numCol}>{n(queue.weak)}</td>
-                  <td data-label="Distribuídos" className={styles.numCol}>{n(queue.distributed)}</td>
-                  <td data-label="Frios distribuídos" className={styles.numCol}>{n(queue.distributedWeak)}</td>
-                  <td data-label="Bons acabaram" className={styles.numCol}>{report.hourly === "timeline" ? queue.goodRanOut ?? "Não acabaram" : "Escolha um dia"}</td>
+          <div className={styles.tableScroll}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th scope="col">Fila de entrada</th>
+                  <th scope="col">Reter frios</th>
+                  <th scope="col" className={styles.numCol}>Entraram</th>
+                  <th scope="col" className={styles.numCol}>Bons</th>
+                  <th scope="col" className={styles.numCol}>Frios</th>
+                  <th scope="col" className={styles.numCol}>Distribuídos</th>
+                  <th scope="col" className={styles.numCol}>Frios distribuídos</th>
+                  <th scope="col" className={styles.numCol}>Bons acabaram</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {report.byQueue.map((queue) => (
+                  <tr key={queue.queueId ?? queue.queue}>
+                    <td data-label="Fila"><span className={styles.cellMain}>{queue.queue}</span></td>
+                    <td data-label="Reter frios"><span className={styles.badge} data-tone={queue.holdColdLeads ? "success" : "neutral"}>{queue.holdColdLeads ? "Ligada" : "Desligada"}</span></td>
+                    <td data-label="Entraram" className={styles.numCol}>{n(queue.arrived)}</td>
+                    <td data-label="Bons" className={styles.numCol}><span>{n(queue.good)} <span className={styles.muted}>({pct(queue.good, queue.arrived)})</span></span></td>
+                    <td data-label="Frios" className={styles.numCol}>{n(queue.weak)}</td>
+                    <td data-label="Distribuídos" className={styles.numCol}>{n(queue.distributed)}</td>
+                    <td data-label="Frios distribuídos" className={styles.numCol}>{n(queue.distributedWeak)}</td>
+                    <td data-label="Bons acabaram" className={styles.numCol}>{report.hourly === "timeline" ? (queue.goodRanOut ? ranOutLabel(queue.goodRanOut, report.period) : null) ?? <span className={styles.muted}>Não acabaram</span> : <span className={styles.muted}>Escolha um dia</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </Question>
+      </Section>
 
-      <Question
-        number={3}
+      <Section
         title="Hora a hora: quando os bons acabaram"
         help={
           report.hourly === "timeline"
             ? runOuts.length
-              ? `${runOuts.map((queue) => `${queue.queue}: os bons acabaram às ${queue.goodRanOut}`).join("; ")}. Dali em diante só havia frios para entregar.`
-              : "Em nenhuma hora os bons acabaram: sempre havia lead bom qualificado esperando."
+              ? `${runOuts.map((queue) => `${queue.queue}: os bons acabaram às ${ranOutLabel(queue.goodRanOut ?? "", report.period)}`).join("; ")}. Dali em diante só havia frios para entregar.`
+              : sent
+                ? "Em nenhuma hora os bons acabaram: sempre havia lead bom qualificado esperando."
+                : `Nenhum lead foi distribuído ${when}, então os bons ainda não acabaram.`
             : "Período longo: cada coluna soma a mesma hora de todos os dias. A hora em que os bons acabam aparece escolhendo um dia só."
         }
       >
         <div className={styles.card}>
-          <div className={styles.cardBody}>
-            <HourChart report={report} />
+          <div className={styles.cardBodyTop}>
+            <HourChart report={report} now={now} />
             <button type="button" className={styles.ghostButton} onClick={() => setTable((was) => !was)} aria-expanded={table}>
               <Table2 aria-hidden="true" size={16} /> {table ? "Esconder a tabela" : "Ver hora a hora em tabela"}
             </button>
           </div>
           <AnimatePresence initial={false}>
             {table ? (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1, transition: enterT }} exit={{ opacity: 0, transition: exitT }}>
+              <motion.div className={styles.tableScroll} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: enterT }} exit={{ opacity: 0, transition: exitT }}>
                 <table className={styles.table}>
                   <thead>
                     <tr>
@@ -216,36 +253,53 @@ export function QualityView({ report, unitName }: { report: SimpleLeadQualityRep
             Atenção: {inversions.map((queue) => `${queue.queue} mandou ${n(queue.weakWhileGoodWaiting)} frios com lead bom qualificado esperando na mesma fila`).join("; ")}. Aqui não faltou lead bom: vale revisar a distribuição.
           </p>
         ) : null}
-      </Question>
+      </Section>
 
-      <Question number={4} title="E se não mandasse os frios? (estimativa)" help="Estimativa: tira os frios do que foi entregue e supõe que os bons seriam entregues igual.">
-        <div className={styles.stats3}>
-          <Stat index={0} label="Foram para os corretores" value={report.distributed.total} detail={`${n(report.distributed.good)} bons e ${n(sentWeak)} frios, ${n(report.brokers)} corretores`} />
-          <Stat index={1} label="Sem os frios seriam (estimativa)" value={report.withoutWeak.distributed} detail={`${n(report.withoutWeak.removed)} leads a menos (${share(report.withoutWeak.removedShare)})`} tone="weak" />
-          <LiteItem index={2} className={styles.stat}>
-            <span className={styles.statLabel}>Média por corretor</span>
-            <span className={styles.statValue}>
-              {report.withoutWeak.perBrokerNow === null ? "sem dados" : <LiteNumber value={report.withoutWeak.perBrokerNow} kind="dec" />}
-              <span className={styles.statArrow} aria-label="para">para</span>
-              {report.withoutWeak.perBrokerWithout === null ? "sem dados" : <LiteNumber value={report.withoutWeak.perBrokerWithout} kind="dec" />}
-            </span>
-            <span className={styles.statDetail}>Hoje, e sem os frios</span>
-          </LiteItem>
-        </div>
-        <div className={styles.split11}>
-          {report.shifts.map((shift, index) => {
-            const total = shift.distributedGood + shift.distributedWeak;
-            return (
-              <LiteItem key={shift.key} index={index} className={styles.mutedCard}>
-                <h3 className={styles.cardTitleSm}>{shift.label}</h3>
-                <p>Receberam <strong className={styles.strong}>{n(total)}</strong> leads: {n(shift.distributedGood)} bons e {n(shift.distributedWeak)} frios ({n(shift.brokers)} corretores).</p>
-                <p className={styles.muted}>Sem os frios: <strong className={styles.strong}>{n(shift.distributedGood)}</strong> leads{shift.brokers ? `, ${(shift.distributedGood / shift.brokers).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} por corretor` : ""}.</p>
+      <Section title="E se não mandasse os frios? (estimativa)" help="Tira os frios do que foi entregue e supõe que os bons seriam entregues igual.">
+        {sent ? (
+          <>
+            <div className={styles.stats3}>
+              <Stat index={0} empty={empty} label="Foram para os corretores" value={sent} detail={`${n(report.distributed.good)} bons e ${n(sentWeak)} frios, ${plural(report.brokers, "corretor", "corretores")}`} />
+              <Stat index={1} empty={empty} label="Sem os frios seriam" value={report.withoutWeak.distributed} detail={report.withoutWeak.removed ? `${plural(report.withoutWeak.removed, "lead a menos", "leads a menos")} (${share(report.withoutWeak.removedShare)})` : "Nenhum frio foi entregue"} tone="weak" />
+              <LiteItem index={2} className={styles.stat}>
+                <span className={styles.statLabel}>Média por corretor, agora e sem os frios</span>
+                {report.withoutWeak.perBrokerNow === null || report.withoutWeak.perBrokerWithout === null ? (
+                  <span className={styles.statEmpty}>{empty}</span>
+                ) : (
+                  <span className={styles.statValue}>
+                    <LiteNumber value={report.withoutWeak.perBrokerNow} kind="dec" />
+                    <span className={styles.statArrow} aria-label="para">para</span>
+                    <LiteNumber value={report.withoutWeak.perBrokerWithout} kind="dec" />
+                  </span>
+                )}
               </LiteItem>
-            );
-          })}
-        </div>
-        <p className={styles.footnote}>Vendas vindas de leads frios no período: {n(report.converted.weak)}. De leads bons: {n(report.converted.good)}.</p>
-      </Question>
+            </div>
+            <div className={styles.stats2}>
+              {report.shifts.map((shift, index) => {
+                const total = shift.distributedGood + shift.distributedWeak;
+                return (
+                  <LiteItem key={shift.key} index={index} className={styles.stat}>
+                    <h3 className={styles.statLabel}>{shift.label}</h3>
+                    {total ? (
+                      <>
+                        <p className={styles.shiftLine}>Receberam <strong className={styles.strong}>{n(total)}</strong> leads: {n(shift.distributedGood)} bons e {n(shift.distributedWeak)} frios ({plural(shift.brokers, "corretor", "corretores")}).</p>
+                        <p className={styles.statDetail}>Sem os frios: {n(shift.distributedGood)} leads{shift.brokers ? `, ${(shift.distributedGood / shift.brokers).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} por corretor` : ""}.</p>
+                      </>
+                    ) : (
+                      <p className={styles.statEmpty}>Nenhum lead distribuído neste turno.</p>
+                    )}
+                  </LiteItem>
+                );
+              })}
+            </div>
+            <p className={styles.footnote}>Vendas vindas de leads frios {when}: {n(report.converted.weak)}. De leads bons: {n(report.converted.good)}.</p>
+          </>
+        ) : (
+          <ZeroLine action={<Link href="/leads/distribuicao?view=plantao" className={styles.textLink}>Ver plantões <ArrowRight aria-hidden="true" size={14} /></Link>}>
+            Nenhum lead foi para os corretores {when}. A estimativa aparece com a primeira distribuição.
+          </ZeroLine>
+        )}
+      </Section>
     </div>
   );
 }
