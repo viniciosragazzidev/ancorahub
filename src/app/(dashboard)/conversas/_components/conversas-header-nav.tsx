@@ -2,7 +2,33 @@
 
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { Sparkles } from "lucide-react";
+import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
+
+export function ConversationsBulkQualificationAction() {
+  const directorSkinEnabled = useArcScopeEnabled();
+  if (!directorSkinEnabled) return <BulkQualificationDialog />;
+
+  return (
+    <BulkQualificationDialog
+      trigger={(
+        <Button
+          aria-label="Abrir qualificação em massa"
+          title="Qualificação em massa"
+          size="sm"
+          variant="outline"
+          className="gap-2 px-3 max-[559px]:size-11 max-[559px]:gap-0 max-[559px]:px-0"
+        >
+          <Sparkles aria-hidden="true" className="size-4" />
+          <span className="max-[559px]:sr-only">Qualificação em massa</span>
+        </Button>
+      )}
+    />
+  );
+}
 
 interface ConversasHeaderNavProps {
   currentTab: "leads" | "corretores" | "coex";
@@ -17,14 +43,16 @@ export function ConversasHeaderNav({
   leadsCount,
   coexLabel,
 }: ConversasHeaderNavProps) {
+  const directorSkinEnabled = useArcScopeEnabled();
   const isLeadsActive = currentTab === "leads";
   const isBrokersActive = currentTab === "corretores";
   const isCoexActive = currentTab === "coex";
 
   return (
-    <div className="flex items-center rounded-[var(--radius-card)] border border-border/80 bg-muted/50 p-1 backdrop-blur-sm shadow-none">
+    <div data-conversations-nav={directorSkinEnabled ? "true" : undefined} className="flex items-center rounded-[var(--radius-card)] border border-border/80 bg-muted/50 p-1 backdrop-blur-sm shadow-none">
       <Link
         href="/conversas"
+        aria-current={directorSkinEnabled && isLeadsActive ? "page" : undefined}
         className={cn(
           "flex items-center gap-1.5 rounded-[var(--radius-card)] px-3 py-1.5 text-xs font-medium transition-colors",
           isLeadsActive
@@ -42,6 +70,8 @@ export function ConversasHeaderNav({
 
       <Link
         href="/conversas?tab=corretores"
+        aria-label={directorSkinEnabled ? "Número oficial com conversas de corretores" : undefined}
+        aria-current={directorSkinEnabled && isBrokersActive ? "page" : undefined}
         className={cn(
           "flex items-center gap-1.5 rounded-[var(--radius-card)] px-3 py-1.5 text-xs font-medium transition-colors",
           isBrokersActive
@@ -49,12 +79,13 @@ export function ConversasHeaderNav({
             : "text-muted-foreground hover:text-foreground hover:bg-background/40",
         )}
       >
-        <span>Número oficial <span className="hidden lg:inline">· corretores</span></span>
+        <span>{directorSkinEnabled ? <><span className="max-[559px]:hidden">Número </span>oficial</> : "Número oficial"} <span className="hidden lg:inline">· corretores</span></span>
       </Link>
 
       {coexLabel ? (
         <Link
           href="/conversas?tab=coex"
+          aria-current={directorSkinEnabled && isCoexActive ? "page" : undefined}
           className={cn(
             "flex items-center gap-1.5 rounded-[var(--radius-card)] px-3 py-1.5 text-xs font-medium transition-colors",
             isCoexActive

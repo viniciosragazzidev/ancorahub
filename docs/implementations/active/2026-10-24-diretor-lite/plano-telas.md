@@ -2547,3 +2547,8 @@ Fora da conta de 92 (no repo, mas fora do modo diretor): 7 rotas de `(auth)` e 1
 - Decisão de escopo para `/minha-fila`, `/equipe/desempenho`, `/gestao` e `/gestao/equipes`: liberar para o diretor ou não.
 - `clientes` foi para a Onda 1 conforme a revisão (LightClientsList com management); filtro de filial e paginação a conferir antes da entrega.
 
+
+
+#### Estado desta entrega (25/10/2026)
+
+A pele Arc de `/conversas` foi preparada e validada na rota real `/dev/diretor-shell-real` com fixtures. A chave desligada preserva o HTML legado. Como esta base ainda nao contem `useDirectorLitePage`, `/conversas` continua no opt-out de producao; retirar o opt-out depende de integrar esse gate. Dados, permissoes e acoes da rota nao mudaram. Evidencia: `docs/implementations/active/2026-10-25-diretor-lite-conversas.md`.

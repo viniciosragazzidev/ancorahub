@@ -82,3 +82,487 @@
     transition: none;
   }
 }
+
+/* Conversas do Diretor usa os tokens Arc padrao. Os marcadores data-lite acima
+   permanecem somente no ramo legado, para preservar o HTML quando a chave esta desligada. */
+.root[data-skin="diretor"] [data-conversations-part="content"] {
+  box-sizing: border-box;
+  width: min(100%, 1328px);
+  min-width: 0;
+  margin-inline: auto;
+  padding: 24px clamp(16px, 4vw, 32px) 16px;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="frame"],
+.root[data-skin="diretor"] [data-conversations-part="workspace"] {
+  min-width: 0;
+  min-height: 0;
+  background: var(--background);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="toolbar"] {
+  align-items: center;
+  gap: 16px;
+  padding: 0 0 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="toolbar"] > div:first-child {
+  gap: 8px;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="page-actions"] {
+  min-width: 0;
+  padding-bottom: 16px;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="page-actions"] > nav {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="page-actions"] > nav::-webkit-scrollbar {
+  display: none;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="page-actions"] > nav > * {
+  flex: 0 0 auto;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="filters"] {
+  gap: 8px;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="panes"] {
+  gap: 16px;
+  padding: 0;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="pane"] {
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="pane"] > header,
+.root[data-skin="diretor"] [data-conversations-part="pane"] > div > header {
+  border-color: var(--border-subtle);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="search"] input {
+  min-height: var(--control-height-sm);
+  border-color: transparent;
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="filters"] > button,
+.root[data-skin="diretor"] [data-conversations-part="official-workspace"] :is(button, a, [role="button"]) {
+  min-height: var(--control-height-sm);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="workspace"] :is(button, [role="button"], a[aria-label]) {
+  min-height: var(--control-height-sm);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="workspace"] :is(button[data-size="icon"], button[data-size="icon-sm"], [role="button"], a[aria-label]) {
+  min-width: var(--control-height-sm);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="filters"] > button {
+  border-radius: var(--radius-control);
+  padding-inline: 12px;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="filters"] > button > span[aria-hidden="true"] {
+  border-radius: var(--radius-control);
+  background: var(--accent-subtle);
+  box-shadow: none;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="row"] {
+  min-height: var(--control-height-sm);
+  border-radius: var(--radius-control);
+  color: var(--foreground);
+  transition: background-color var(--duration-fast) var(--ease-in-out);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="row"]:hover {
+  background: var(--surface-muted);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="row"][aria-current="page"] {
+  background: var(--accent-subtle);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="chip-count"] {
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  padding: 2px 8px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.root[data-skin="diretor"] [data-conversations-nav] {
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.root[data-skin="diretor"] [data-conversations-nav] > a {
+  min-height: var(--control-height-sm);
+  border-radius: var(--radius-control);
+  padding-inline: 12px;
+  color: var(--text-secondary);
+  transition: color var(--duration-fast) var(--ease-in-out), background-color var(--duration-fast) var(--ease-in-out);
+}
+
+.root[data-skin="diretor"] [data-conversations-nav] > a[aria-current="page"] {
+  background: var(--accent-subtle);
+  color: var(--accent-strong);
+  font-weight: 500;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="official-workspace"] {
+  min-width: 0;
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="official-workspace"] :is(input, textarea, select) {
+  min-height: var(--control-height-sm);
+  border-radius: var(--radius-control);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="official-workspace"] button[aria-label],
+.root[data-skin="diretor"] [data-conversations-part="official-workspace"] a[aria-label] {
+  min-width: var(--control-height-sm);
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [data-slot="button"][class*="bg-emerald-"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [data-slot="button"][class*="bg-emerald-"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="text-emerald-"]:not([data-conversations-brand="whatsapp"]),
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="text-green-"]:not([data-conversations-brand="whatsapp"]) {
+  color: var(--success) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="bg-emerald-"]:not([data-conversations-brand="whatsapp"]),
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="bg-green-"]:not([data-conversations-brand="whatsapp"]) {
+  background-color: var(--success-subtle) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [data-slot="button"][class*="bg-emerald-"] {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="text-amber-"],
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="text-yellow-"] {
+  color: var(--warning) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="bg-amber-"],
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="bg-yellow-"] {
+  background-color: var(--warning-subtle) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="text-red-"] {
+  color: var(--danger) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="text-rose-"] {
+  color: var(--danger) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="text-blue-"] {
+  color: var(--info) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="text-sky-"] {
+  color: var(--info) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="text-gray-"] {
+  color: var(--text-secondary) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="bg-red-"] {
+  background-color: var(--danger-subtle) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="bg-sky-"],
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="bg-blue-"] {
+  background-color: var(--info-subtle) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="border-rose-"] {
+  border-color: color-mix(in oklab, var(--danger) 32%, transparent) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="border-amber-"] {
+  border-color: color-mix(in oklab, var(--warning) 32%, transparent) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="border-sky-"] {
+  border-color: color-mix(in oklab, var(--info) 32%, transparent) !important;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) [class*="border-gray-"] {
+  border-color: var(--border-subtle) !important;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="workspace"] [data-slot="badge"][class*="rose-"] {
+  border-color: color-mix(in oklab, var(--danger) 32%, transparent);
+  background: var(--danger-subtle);
+  color: var(--danger);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="workspace"] [data-slot="badge"][class*="amber-"] {
+  border-color: color-mix(in oklab, var(--warning) 32%, transparent);
+  background: var(--warning-subtle);
+  color: var(--warning);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="workspace"] [data-slot="badge"][class*="sky-"] {
+  border-color: color-mix(in oklab, var(--info) 32%, transparent);
+  background: var(--info-subtle);
+  color: var(--info);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="workspace"] [data-slot="badge"][class*="emerald-"] {
+  border-color: color-mix(in oklab, var(--success) 32%, transparent);
+  background: var(--success-subtle);
+  color: var(--success);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="workspace"] [data-slot="badge"][class*="gray-"] {
+  border-color: var(--border-subtle);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="chat-header-layout"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="chat-header-identity"] {
+  width: 100%;
+  flex: initial;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="chat-header-details"] {
+  min-width: 0;
+  flex: 1 1 0%;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="chat-header-title"] {
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] h2 {
+  flex: 0 1 auto;
+  min-width: 6rem;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="chat-header-actions"] {
+  width: 100%;
+  gap: 4px;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="workspace"] [aria-label="Perfil do cliente"] [class*="rounded-[var(--radius-card)]"][class*="border"] {
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-control);
+  background-color: var(--surface-muted);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="filters"] button[aria-pressed="true"] > span[aria-hidden="true"] {
+  border-radius: var(--radius-control);
+  background: var(--accent-subtle);
+  box-shadow: none;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Copiar link direto da conversa"],
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Ligar para cliente"] {
+  display: none;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Ações do atendimento"] {
+  min-height: var(--control-height-sm);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Ligar para cliente"],
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Copiar link direto da conversa"],
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Abrir WhatsApp do cliente"],
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Abrir perfil do atendimento"] {
+  min-width: var(--control-height-sm);
+  min-height: var(--control-height-sm);
+}
+
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Ações do atendimento"] > span:first-of-type {
+  display: none;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Ações do atendimento"] > span:nth-of-type(2) {
+  display: inline;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) :is([class~="uppercase"], [class~="tracking-wide"], [class~="tracking-wider"], [class~="tracking-widest"]) {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) :is([class~="font-semibold"], [class~="font-bold"]) {
+  font-weight: 500;
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="workspace"], [data-conversations-part="official-workspace"]) :is([class~="text-[9px]"], [class~="text-[10px]"], [class~="text-[11px]"]) {
+  font-size: var(--text-xs);
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="row"], [data-conversations-part="official-workspace"]) [data-slot="badge"][class*="amber-"] {
+  border-color: color-mix(in oklab, var(--warning) 32%, transparent);
+  background: var(--warning-subtle);
+  color: var(--warning);
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="row"], [data-conversations-part="official-workspace"]) [data-slot="badge"][class*="sky-"] {
+  border-color: color-mix(in oklab, var(--info) 32%, transparent);
+  background: var(--info-subtle);
+  color: var(--info);
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="row"], [data-conversations-part="official-workspace"]) [data-slot="badge"][class*="emerald-"],
+.root[data-skin="diretor"] :is([data-conversations-part="row"], [data-conversations-part="official-workspace"]) [data-slot="badge"][class*="green-"] {
+  border-color: color-mix(in oklab, var(--success) 32%, transparent);
+  background: var(--success-subtle);
+  color: var(--success);
+}
+
+.root[data-skin="diretor"] :is([data-conversations-part="row"], [data-conversations-part="official-workspace"]) [data-slot="badge"][class*="gray-"] {
+  border-color: var(--border-subtle);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 767px) {
+  .root[data-skin="diretor"] [data-conversations-part="content"] {
+    gap: 0;
+    padding-top: 16px;
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="toolbar"] {
+    align-items: stretch;
+    gap: 12px;
+    padding-bottom: 12px;
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="toolbar"] > div:first-child {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="filters"] {
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .root[data-skin="diretor"] [data-conversations-part="panes"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Voltar para lista de atendimentos"] {
+    display: none;
+  }
+}
+
+@media (min-width: 1280px) {
+  .root[data-skin="diretor"] [data-conversations-part="chat-header-layout"] {
+    grid-template-columns: minmax(12rem, 1fr) auto;
+    align-items: start;
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="chat-header-identity"] {
+    width: auto;
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="chat-header-actions"] {
+    width: auto;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .root[data-skin="diretor"] [data-conversations-part="panes"] {
+    grid-template-columns: minmax(16rem, 0.68fr) minmax(0, 1.65fr);
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="pane"][aria-label="Perfil do cliente"] {
+    display: none;
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Abrir perfil do atendimento"] {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 559px) {
+  .root[data-skin="diretor"] [data-conversations-part="chat-header-identity"] {
+    width: 100%;
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="chat-header-actions"] {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Abrir lead completo"] {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root[data-skin="diretor"] [data-conversations-part="row"],
+  .root[data-skin="diretor"] [data-conversations-nav] > a {
+    transition: none;
+  }
+}
+
+:global(html[data-reduce-motion="1"]) .root[data-skin="diretor"] [data-conversations-part="row"],
+:global(html[data-reduce-motion="1"]) .root[data-skin="diretor"] [data-conversations-nav] > a {
+  transition: none;
+}

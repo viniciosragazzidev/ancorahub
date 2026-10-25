@@ -5,7 +5,7 @@ import { and, asc, desc, eq, exists, gte, inArray, isNotNull, isNull, like, lte,
 import "@/components/arc/venancor-scope.css";
 import { DashboardHeader } from "@/components/dashboard-header";
 
-import liteStyles from "./conversas-lite.module.css";
+import { ConversationsFrame } from "./conversations-frame";
 import {
   ConversationsWorkspace,
   type ConversationItem,
@@ -16,7 +16,7 @@ import {
   type OfficialBrokerConversation,
   type OfficialBrokerMessage,
 } from "./official-broker-conversations";
-import { ConversasHeaderNav } from "./_components/conversas-header-nav";
+import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
 import { getLeadTagsByLead, listLeadTags } from "@/features/lead-tags/service";
 import { canManageLeadTags } from "@/features/lead-tags/rules";
 import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
@@ -34,7 +34,6 @@ import { samePhoneSubscriber } from "@/features/waha-cadence/phone-matching";
 import { getDirectorFacingMetaDeliveryFailure } from "@/features/communication-channels/meta-delivery-failure";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { hasPermission } from "@/shared/auth/permissions";
@@ -1067,47 +1066,42 @@ export default async function ConversationsPage({
     }
   }
 
-  return (
-    <div className={`arc-venancor ${liteStyles.root} flex h-app min-h-0 w-full flex-1 flex-col overflow-hidden`}>
-      <DashboardHeader
-        breadcrumb="Atendimento"
-        title="Conversas"
-        rightSlot={
-          canSeeBrokerTab ? (
-            <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
-              <BulkQualificationDialog />
-              <ConversasHeaderNav
-                currentTab={officialBrokerTab ? "corretores" : coexTab ? "coex" : "leads"}
-                leadsCount={!officialBrokerTab ? finalConversations.length : undefined}
-                coexLabel={coexLabel}
-              />
-            </nav>
-          ) : undefined
-        }
+  const pageActions = canSeeBrokerTab ? (
+    <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
+      <ConversationsBulkQualificationAction />
+      <ConversasHeaderNav
+        currentTab={officialBrokerTab ? "corretores" : coexTab ? "coex" : "leads"}
+        leadsCount={!officialBrokerTab ? finalConversations.length : undefined}
+        coexLabel={coexLabel}
       />
-      <main className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background p-0">
-        <div data-lite="frame" className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card">
-          {officialBrokerTab ? (
-            <OfficialBrokerConversations
-              enabled={officialBrokerMessagesEnabled}
-              deliveryChannel={internalBrokerDeliveryChannel}
-              conversations={officialBrokerConversations}
-            />
-          ) : (
-            <ConversationsWorkspace
-              role={context.role}
-              branches={branches}
-              conversations={finalConversations}
-              initialLeadId={leadId}
-              userId={context.userId}
-              tenantId={context.tenantId}
-              leadTags={leadTags}
-              canManageTags={canManageLeadTags(context.role)}
-            />
-          )}
-        </div>
-      </main>
-    </div>
+    </nav>
+  ) : undefined;
+
+  return (
+    <ConversationsFrame
+      legacyHeader={<DashboardHeader breadcrumb="Atendimento" title="Conversas" rightSlot={pageActions} />}
+      directorHeader={<DashboardHeader breadcrumb="Atendimento" title="Conversas" />}
+      pageActions={pageActions}
+    >
+      {officialBrokerTab ? (
+        <OfficialBrokerConversations
+          enabled={officialBrokerMessagesEnabled}
+          deliveryChannel={internalBrokerDeliveryChannel}
+          conversations={officialBrokerConversations}
+        />
+      ) : (
+        <ConversationsWorkspace
+          role={context.role}
+          branches={branches}
+          conversations={finalConversations}
+          initialLeadId={leadId}
+          userId={context.userId}
+          tenantId={context.tenantId}
+          leadTags={leadTags}
+          canManageTags={canManageLeadTags(context.role)}
+        />
+      )}
+    </ConversationsFrame>
   );
 }
 

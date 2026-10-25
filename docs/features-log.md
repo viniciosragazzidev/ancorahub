@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 25/10/2026 - Pele Arc preparada para Conversas do Diretor
+
+- A central reaproveita as mesmas consultas, permissoes e acoes; o modo desligado preserva o HTML legado por snapshot.
+- A pele usa tokens Arc para lista, conversa e perfil, com uma coluna no celular e tablet compacto, duas em 1024px e tres a partir de 1280px.
+- A previsualizacao real usa AppShell e fixtures para Diretor e Super-admin. `/conversas` permanece no opt-out porque `useDirectorLitePage` ainda nao existe nesta base.
+- Evidencia, checklist Arc e medidas: `docs/implementations/active/2026-10-25-diretor-lite-conversas.md`.
 ## 24/10/2026 - Correcoes de revisao da moldura F2 do Diretor Lite
 
 - Seletores do chrome alcancam portais e estados em que o elemento raiz tambem recebe `arc-venancor`; o dialogo de atalhos preserva as classes Arc.
