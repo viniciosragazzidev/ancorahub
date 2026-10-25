@@ -1,0 +1,14 @@
+.filterControl {
+  min-height: var(--control-height-md);
+  border-radius: var(--radius-control);
+  padding-inline: var(--space-3);
+}
+
+.clearControl {
+  min-height: var(--control-height-md);
+  padding-inline: var(--space-3);
+}
+
+.scheduleTrigger {
+  min-height: var(--control-height-md);
+}

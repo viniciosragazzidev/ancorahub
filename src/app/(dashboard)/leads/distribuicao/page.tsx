@@ -40,6 +40,10 @@ import { getDddRoutingSettings } from "@/features/lead-distribution/ddd-routing-
 import { DisqualifiedLeadsRoutingPanel } from "./_components/disqualified-leads-routing-panel";
 import { ColdLeadRequalificationPanel } from "./_components/cold-lead-requalification-panel";
 import { getColdLeadRequalificationReview } from "@/features/ai-qualification/cold-lead-requalification";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { canViewDistributionQueues, DirectorDistributionTabs } from "./_components/director-distribution-tabs";
+import { DirectorDistributionHealth } from "./_components/director-distribution-health";
+import directorDistributionStyles from "./_components/director-distribution-page.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -605,6 +609,144 @@ export default async function LeadDistributionPage({
   const coldLeadReview = context.role === "director"
     ? await getColdLeadRequalificationReview(context)
     : null;
+
+  const directorLite = await isDirectorLitePageOnServer(context.role, context.tenantId, "/leads/distribuicao");
+  if (directorLite && ["resumo_dia", "roteamento", "operar", "filas", "plantao", "saude_historico"].includes(view)) {
+    const manualAssignmentChoiceEnabled = view === "operar"
+      ? (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false"
+      : false;
+    return (
+      <>
+        <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" />
+        <main className={directorDistributionStyles.page}>
+          <DirectorDistributionTabs
+            activeView={view}
+            showQueues={canViewDistributionQueues(context.role)}
+            status={params.status}
+            escalaMes={params.escalaMes}
+          />
+          {view === "resumo_dia" ? (
+            <section className={directorDistributionStyles.stack} aria-label="Resumo diário da distribuição">
+              <BrokerDailySummaryPanel
+                initialData={brokerSummary}
+                branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+                canFilterBranch={context.role === "director"}
+              />
+            </section>
+          ) : view === "roteamento" ? (
+            <section className={directorDistributionStyles.stack} aria-label="Entradas e regras">
+              <DisqualifiedLeadsRoutingPanel
+                initialHoldDisqualifiedLeads={holdDisqualifiedLeads}
+                canEdit={context.role === "director"}
+              />
+              <DddRoutingPanel
+                initialSettings={dddRoutingSettings}
+                queues={queues.map((queue) => ({ id: queue.id, name: queue.name }))}
+                canEdit={context.role === "director"}
+              />
+              <RoutingMatrixPanel
+                rules={routingRules}
+                queues={queues.map((queue) => ({ id: queue.id, name: queue.name }))}
+                branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+                brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
+                canEdit={context.role === "director" || context.role === "manager"}
+              />
+            </section>
+          ) : view === "operar" ? (
+            <section className={directorDistributionStyles.stack} aria-label="Operação de distribuição">
+              <DistributionMetrics
+                metrics={{
+                  totalBranches,
+                  acceptingBranches,
+                  autoDistributeBranches,
+                  totalBrokers,
+                  totalAvailable,
+                  totalNewLeads,
+                }}
+              />
+              <DistributionInbox
+                key={queueFilter}
+                role={context.role}
+                manualAssignmentChoiceEnabled={manualAssignmentChoiceEnabled}
+                totalUnassigned={totalUnassignedForArchive}
+                initialStatusFilter={queueFilter}
+                branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+                brokers={brokers.map((broker) => ({
+                  id: broker.id,
+                  name: broker.name,
+                  branchId: broker.branchId,
+                  availabilityStatus: broker.availabilityStatus,
+                  activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
+                }))}
+                leads={unassignedLeads.map((lead) => ({
+                  ...lead,
+                  createdAt: lead.createdAt.toISOString(),
+                }))}
+              />
+            </section>
+          ) : view === "filas" && canViewDistributionQueues(context.role) ? (
+            <section className={directorDistributionStyles.stack} aria-label="Filas de distribuição">
+              {coldLeadReview ? <ColdLeadRequalificationPanel {...coldLeadReview} /> : null}
+              <QueueControlCenter
+                queues={queuesForControl}
+                branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+                brokers={brokers.map((broker) => ({
+                  id: broker.id,
+                  name: broker.name,
+                  branchId: broker.branchId ?? "",
+                  branchName: broker.branchName ?? "",
+                }))}
+                dutySchedules={dutySchedules}
+                campaigns={metaCampaigns}
+                ads={metaAds}
+                campaignRoutes={metaCampaignRoutes.map((route) => ({
+                  ...route,
+                  queueId: route.queueId ?? "",
+                }))}
+                adRoutes={metaAdRoutes.map((route) => ({ ...route, queueId: route.queueId ?? "" }))}
+                attendanceFlows={attendanceFlowOptions}
+                canEdit={context.role === "director"}
+              />
+              <BrokerAcceptanceSlaPanel
+                initialMinutes={Number(tenantSlaSettings?.slaFirstContactMinutes) || 15}
+                initialAutoRedistribute={tenantSlaSettings?.autoRedistributeOnFeedbackTimeout ?? true}
+                canEdit={context.role === "director" || context.role === "manager"}
+              />
+              <DistributionPolicyPanel
+                canEdit={context.role === "director"}
+                brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
+                policy={globalPolicy.find((policy) => !policy.queueId)?.policy ?? {}}
+              />
+              <aside className={directorDistributionStyles.note}>
+                O roteamento segue entrada, unidade, fila, corretor e SLA.
+              </aside>
+            </section>
+          ) : view === "filas" ? null : view === "plantao" ? (
+            <section className={directorDistributionStyles.stack} aria-label="Gestão de plantões">
+              <DutyOperationsWorkspace
+                snapshot={dutyRoster}
+                monthlySchedulingEnabled={monthlyDutySchedulingEnabled}
+                canPlanMonthlySchedule={context.role === "director"}
+                initialMonthlyScheduleMonth={view === "plantao" && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.escalaMes ?? "") ? params.escalaMes : null}
+                queues={queuesForControl
+                  .filter((queue) => queue.status === "active")
+                  .map((queue) => ({ id: queue.id, name: queue.name, offerIntervalMinutes: queue.offerIntervalMinutes }))}
+              />
+            </section>
+          ) : (
+            <DirectorDistributionHealth
+              events={recentEvents.map((event) => ({ ...event, createdAt: event.createdAt.toISOString() }))}
+              jobs={jobHealth}
+              jobsAvailable={jobHealth.available}
+              jobsEnabled={jobConfig.enabled}
+              effects={effectHealth}
+              failedEffects={failedEffects}
+            />
+          )}
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

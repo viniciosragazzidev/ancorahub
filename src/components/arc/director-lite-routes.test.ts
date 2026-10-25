@@ -23,7 +23,7 @@ function pageRoutes(directory = dashboardRoot): string[] {
 describe("rotas do Diretor Lite", () => {
   it("mantém em opt-out todas as páginas ainda não revisadas (saíram o painel, a lista e o perfil do lead e as telas simples da passada rápida)", () => {
     const revised = pageRoutes().filter((route) => !isDirectorLiteRouteOptedOut(route));
-    expect([...revised].sort()).toEqual(["/assinatura", "/assistente", "/atendimento", "/atendimento/fluxo", "/atendimento/mensagens", "/atendimento/situacoes", "/configuracoes/comissoes", "/conversas", "/dashboard", "/documentos", "/empresas", "/equipe", "/equipe/[id]", "/equipe/cargos", "/equipe/convidar", "/equipe/recuperacoes", "/ferramentas", "/ferramentas/materiais-operadoras", "/ferramentas/validador-comprovante", "/fluxos-whatsapp", "/guia", "/guia/webhook", "/integrations", "/integrations/meta", "/integrations/whats_alt", "/integrations/whatsapp", "/integridade", "/leads", "/leads/[id]", "/marketing", "/marketing/campanhas", "/marketing/campanhas/[id]", "/marketing/importacoes", "/marketing/meta", "/minha-fila", "/noc", "/notificacoes", "/propostas", "/qualificacao", "/qualificacao/turbo", "/relatorios", "/relatorios/drill/[drillId]", "/roadmap", "/settings", "/settings/extension", "/settings/feedback-templates", "/settings/integrations", "/settings/meta", "/settings/waha-diagnostic", "/settings/whatsapp", "/tarefas/dashboard", "/unidades/[branchId]", "/vendas", "/vendas/[id]", "/welcome"]);
+    expect([...revised].sort()).toEqual(["/assinatura", "/assistente", "/atendimento", "/atendimento/fluxo", "/atendimento/mensagens", "/atendimento/situacoes", "/configuracoes/comissoes", "/conversas", "/dashboard", "/distribuicao", "/distribuicao/dashboard", "/documentos", "/empresas", "/equipe", "/equipe/[id]", "/equipe/cargos", "/equipe/convidar", "/equipe/recuperacoes", "/ferramentas", "/ferramentas/materiais-operadoras", "/ferramentas/validador-comprovante", "/fluxos-whatsapp", "/guia", "/guia/webhook", "/integrations", "/integrations/meta", "/integrations/whats_alt", "/integrations/whatsapp", "/integridade", "/leads", "/leads/[id]", "/leads/distribuicao", "/leads/distribuicao/plantao/[scheduleId]", "/marketing", "/marketing/campanhas", "/marketing/campanhas/[id]", "/marketing/importacoes", "/marketing/meta", "/minha-fila", "/noc", "/notificacoes", "/plantoes/agora", "/plantoes/corretor/[brokerId]", "/propostas", "/qualificacao", "/qualificacao/turbo", "/relatorios", "/relatorios/drill/[drillId]", "/roadmap", "/settings", "/settings/extension", "/settings/feedback-templates", "/settings/integrations", "/settings/meta", "/settings/waha-diagnostic", "/settings/whatsapp", "/tarefas/dashboard", "/unidades/[branchId]", "/vendas", "/vendas/[id]", "/welcome"]);
     expect(DIRECTOR_LITE_OPT_OUT_ROUTES.length).toBeGreaterThan(0);
   });
 
@@ -60,7 +60,12 @@ describe("rotas do Diretor Lite", () => {
     expect(isDirectorLiteRouteOptedOut("/equipe/plantao")).toBe(true);
   });
 
-  it("inclui a distribuição abreviada no inventário opt-out", () => {
-    expect(DIRECTOR_LITE_OPT_OUT_ROUTES).toContain("/distribuicao");
+  it("tira a central de distribuição do opt-out e mantém os detalhes ainda não revisados", () => {
+    expect(isDirectorLiteRouteOptedOut("/distribuicao?view=resumo_dia")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/distribuicao/dashboard")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/leads/distribuicao?view=roteamento")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/leads/distribuicao/plantao/schedule-123")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/plantoes/corretor/broker-123")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/plantoes/agora")).toBe(false);
   });
 });

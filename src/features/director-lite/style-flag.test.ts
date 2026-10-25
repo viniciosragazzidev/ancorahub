@@ -4,7 +4,7 @@ const { getSystemSetting } = vi.hoisted(() => ({ getSystemSetting: vi.fn() }));
 
 vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting }));
 
-import { directorLiteStyleSettingKey, isDirectorLiteStyleEnabled, shouldUseDirectorLiteStyle } from "./style-flag";
+import { directorLiteStyleSettingKey, isDirectorLitePageOnServer, isDirectorLiteStyleEnabled, shouldUseDirectorLiteStyle } from "./style-flag";
 import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
 
 describe("director Lite style flag", () => {
@@ -25,6 +25,14 @@ describe("director Lite style flag", () => {
     await expect(shouldUseDirectorLiteStyle("manager", "tenant-1")).resolves.toBe(false);
     await expect(shouldUseDirectorLiteStyle("supervisor", "tenant-1")).resolves.toBe(false);
     expect(getSystemSetting).toHaveBeenCalledTimes(1);
+  });
+
+  it("enables the migrated distribution page only for a director and an active tenant flag", async () => {
+    getSystemSetting.mockResolvedValue("true");
+
+    await expect(isDirectorLitePageOnServer("director", "tenant-1", "/distribuicao")).resolves.toBe(true);
+    await expect(isDirectorLitePageOnServer("manager", "tenant-1", "/distribuicao")).resolves.toBe(false);
+    await expect(isDirectorLitePageOnServer("director", "tenant-1", "/distribuicao/dashboard")).resolves.toBe(false);
   });
 
   it("keeps the director's light theme active on routes whose page skin is opted out", async () => {

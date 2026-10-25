@@ -1,0 +1,134 @@
+.root {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+
+.healthGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+
+.section {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.sectionHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.sectionHeading h2 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.sectionHeading p,
+.empty,
+.note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.events,
+.failures {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event,
+.failures li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-width: 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.eventCopy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.eventCopy p,
+.failures strong,
+.failures span {
+  overflow-wrap: anywhere;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.eventCopy p + p,
+.failures span {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.event time {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.metrics > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.metrics dt {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.metrics dd {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-2xl);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.failures li {
+  display: grid;
+  gap: 4px;
+}
+
+@media (min-width: 1024px) {
+  .healthGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

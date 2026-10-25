@@ -484,3 +484,7 @@ O topo global e o /dashboard agora seguem um container e ritmo Arc comum, com ca
 ## 2026-10-25 - Conversas do Diretor liberadas no gate Lite
 
 `/conversas` passou a usar `useDirectorLitePage` em todos os pontos visuais e saiu do opt-out; `/conversas/broker` e `/conversas/dashboard` continuam opt-out. `ConversationsFrame` monta o layout cliente a partir de props serializaveis. A lista reserva largura para o horario e trunca nomes longos. Quatro capturas finais do AppShell real em 390 e 1440, com medidas, ficam em `scratchpad/final-prints`.
+
+## 2026-10-25 - Onda 5, distribuicao e plantoes no Lite
+
+Operação, filas, calendário, ocorrência, saúde da distribuição e dashboard mantêm consultas, ações e permissões existentes. /plantoes/agora também usa o gate Lite, preservando os checks atuais do corretor. Validação final: 18 arquivos e 86 testes Vitest aprovados, TypeScript sem erros, ESLint sem erros e 24 capturas reais sem rolagem horizontal. Execução: docs/implementations/active/2026-10-24-diretor-lite/onda5-execution.md.

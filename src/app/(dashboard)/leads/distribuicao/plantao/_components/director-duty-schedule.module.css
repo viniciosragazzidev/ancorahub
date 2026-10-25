@@ -1,0 +1,44 @@
+.page {
+  gap: 24px;
+}
+
+.page > section,
+.page > div {
+  min-width: 0;
+}
+
+.page :global([data-slot="card"]) {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  box-shadow: none;
+}
+
+.page :global([data-slot="card-content"]) {
+  min-width: 0;
+}
+
+.page :global([data-slot="badge"]) {
+  font-variant-numeric: tabular-nums;
+}
+
+.page :global(button:not([data-slot])) {
+  min-height: 44px;
+}
+
+.page :global(nav a) {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+
+.page :global(button:focus-visible),
+.page :global(a:focus-visible) {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: var(--focus-outline-offset, 2px);
+}
+
+@media (max-width: 767px) {
+  .page {
+    gap: 16px;
+  }
+}

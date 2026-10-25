@@ -58,6 +58,12 @@ import { cn } from "@/utils/core/cn";
 import { dataTableStyles } from "@/components/ui/data-table/data-table-frame";
 import { LeadTemperature } from "@/components/status-badges";
 import { sortByTemperaturePriority } from "@/features/lead-distribution/temperature-priority";
+import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
+import { LitePagination } from "@/components/lite/data/pagination";
+import { LiteBulkBar } from "@/components/lite/controls";
+import { formatLiteDate } from "@/components/lite/format/date";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import liteStyles from "./director-distribution-inbox.module.css";
 
 type Lead = {
   id: string;
@@ -113,22 +119,26 @@ function useActionFeedback(state: DistributionActionState, label: string) {
 /** Botão de ação com estado de processamento sem duplicar o conteúdo visível. */
 function ActionButton({
   pending,
+  disabled = false,
   success,
   variant = "outline",
   size = "sm",
   className,
+  lite = false,
   children,
 }: {
   pending: boolean;
+  disabled?: boolean;
   success?: boolean;
   variant?: "default" | "outline" | "ghost";
   size?: "xs" | "sm" | "default";
   className?: string;
+  lite?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <Button
-      disabled={pending}
+      disabled={pending || disabled}
       size={size}
       type="submit"
       variant={variant}
@@ -136,7 +146,9 @@ function ActionButton({
         "gap-1.5 transition-[color,background-color,border-color,transform] duration-150",
         "active:scale-[0.96]",
         pending && "pointer-events-none",
-        success && "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+        success && (lite
+          ? "border-success-subtle bg-success-subtle text-success-foreground"
+          : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"),
         className,
       )}
     >
@@ -178,6 +190,7 @@ function ActionForm({
   onCommitted?: (state: DistributionActionState) => void;
 }) {
   const router = useRouter();
+  const directorLite = useDirectorLitePage();
   const formKey = useId();
   const [state, formAction, pending] = useActionState(action, {});
   const [formVersion, setFormVersion] = useState(0);
@@ -221,7 +234,7 @@ function ActionForm({
       {Object.entries(fields).map(([name, value]) => (
         <input key={name} name={name} type="hidden" value={value} />
       ))}
-      <ActionButton pending={pending} success={showSuccess}>
+      <ActionButton pending={pending} success={showSuccess} lite={directorLite}>
         {showSuccess ? <CheckCircle className="size-4" /> : children}
       </ActionButton>
     </form>
@@ -359,6 +372,7 @@ export function DistributionInbox({
   initialStatusFilter?: "all" | "unassigned" | "queued" | "returned_to_queue" | "manual_hold";
 }) {
   const router = useRouter();
+  const directorLite = useDirectorLitePage();
   const [inboxLeads, setInboxLeads] = useState(leads);
   const [selected, setSelected] = useState<string[]>([]);
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
@@ -580,6 +594,344 @@ export function DistributionInbox({
     setArchiveDialogOpen(false);
     startTransition(() => router.refresh());
   }, [archiveState.mutationId, archiveState.processedLeadIds, archiveState.success, router]);
+
+  const liteColumns: LiteColumn<Lead>[] = [
+    {
+      id: "lead",
+      label: "Lead",
+      primary: true,
+      render: (lead) => <span className={liteStyles.leadName} title={lead.name || "Lead sem nome"}>{lead.name || "Lead sem nome"}</span>,
+    },
+    { id: "phone", label: "Telefone", secondary: true, render: (lead) => lead.phone || "Sem telefone" },
+    {
+      id: "temperature",
+      label: "Qualificação",
+      render: (lead) => {
+        const status = lead.qualificationStatus;
+        if (status === "hot") return <Badge variant="destructive">Quente</Badge>;
+        if (status === "warm") return <Badge variant="warning">Morno</Badge>;
+        if (status === "cold") return <Badge variant="info">Frio</Badge>;
+        if (status === "disqualified") return <Badge variant="destructive">Desqualificado</Badge>;
+        if (status === "qualified") return <Badge variant="success">Qualificado</Badge>;
+        return <Badge variant="outline">Sem temperatura</Badge>;
+      },
+    },
+    {
+      id: "destination",
+      label: "Unidade",
+      render: (lead) => branches.find((branch) => branch.id === lead.branchId)?.name ?? "Inbox geral",
+    },
+    {
+      id: "status",
+      label: "Status",
+      render: (lead) => {
+        if (lead.distributionStatus === "queued") return <Badge variant="warning">Aguardando corretor</Badge>;
+        if (lead.distributionStatus === "returned_to_queue") return <Badge variant="warning">Devolvido à fila</Badge>;
+        if (lead.distributionStatus === "manual_hold") return <Badge variant="secondary">Aguardando ação manual</Badge>;
+        return <Badge variant="outline">Aguardando unidade</Badge>;
+      },
+    },
+    {
+      id: "source",
+      label: "Origem",
+      render: (lead) => lead.sourceCampaign || lead.metaCampaignId || lead.sourceAd || lead.metaAdId || "Entrada manual",
+    },
+    {
+      id: "next-action",
+      label: "Próxima ação",
+      render: (lead) => {
+        const leadBrokers = brokers.filter((broker) => broker.branchId === lead.branchId && broker.availabilityStatus === "available");
+        if (!lead.branchId && role === "director") {
+          return (
+            <div className={liteStyles.rowActions}>
+              <AppSelect
+                aria-label={`Unidade para ${lead.name}`}
+                value={branchId}
+                onValueChange={setBranchId}
+                placeholder="Unidade"
+                options={branches.map((branch) => ({ value: branch.id, label: branch.name }))}
+              />
+              <ActionForm
+                action={routeLeadToBranchAction}
+                fields={{ leadId: lead.id, branchId }}
+                label={`enviar lead ${lead.name} para a unidade`}
+                onCampaignConflict={(conflict, fields) => {
+                  setCampaignConflictDialog(conflict);
+                  setPendingOverrideFields(fields);
+                }}
+                onCommitted={applySingleCommit}
+              >
+                <ArrowRight /> Enviar
+              </ActionForm>
+            </div>
+          );
+        }
+        if (!lead.branchId) return <span>Defina uma unidade</span>;
+        return (
+          <div className={liteStyles.rowActions}>
+            <AppSelect
+              aria-label={`Corretor para ${lead.name}`}
+              value={brokerByLead[lead.id] ?? ""}
+              onValueChange={(value) => setBrokerByLead((current) => ({ ...current, [lead.id]: value }))}
+              placeholder="Corretor"
+              options={[{ value: "", label: "Corretor" }, ...leadBrokers.map((broker) => ({ value: broker.id, label: broker.name }))]}
+            />
+            {brokerByLead[lead.id] ? (manualAssignmentChoiceEnabled ? (
+              <ManualAssignmentChoiceDialog lead={lead} brokerId={brokerByLead[lead.id]!} onCommitted={applySingleCommit} />
+            ) : (
+              <ActionForm
+                action={assignLeadToBrokerAction}
+                fields={{ leadId: lead.id, brokerId: brokerByLead[lead.id]! }}
+                label={`atribuir lead ${lead.name}`}
+                onCommitted={applySingleCommit}
+              >
+                <UserList /> Atribuir
+              </ActionForm>
+            )) : null}
+            {lead.distributionStatus !== "manual_hold" ? (
+              <ActionForm
+                action={distributeLeadAutomaticallyAction}
+                fields={{ leadId: lead.id }}
+                label={`distribuir lead ${lead.name}`}
+                onCommitted={applySingleCommit}
+              >
+                <MagicWand /> Auto
+              </ActionForm>
+            ) : null}
+          </div>
+        );
+      },
+    },
+  ];
+
+  const archivedLeadColumns: LiteColumn<Lead>[] = [
+    { id: "lead", label: "Lead", primary: true, render: (lead) => lead.name || "Lead sem nome" },
+    { id: "phone", label: "Telefone", secondary: true, render: (lead) => lead.phone || "Sem telefone" },
+    { id: "branch", label: "Unidade", render: (lead) => branches.find((branch) => branch.id === lead.branchId)?.name ?? "Inbox geral" },
+    {
+      id: "reason",
+      label: "Motivo",
+      render: (lead) => lead.qualificationStatus === "disqualified"
+        ? "Desqualificado"
+        : lead.status === "lost" ? "Perdido" : "Fora da fila operacional",
+    },
+    { id: "received", label: "Entrada", numeric: true, render: (lead) => formatLiteDate(lead.createdAt, { dateStyle: "short" }) },
+  ];
+
+  function selectVisible(checked: boolean) {
+    const visibleIds = visible.map((lead) => lead.id);
+    if (!checked) {
+      setSelected((current) => current.filter((id) => !visibleIds.includes(id)));
+      return;
+    }
+    const missing = visibleIds.filter((id) => !selected.includes(id));
+    if (selected.length + missing.length > MAX_BATCH) {
+      toast.error(`Máximo de ${MAX_BATCH} leads por envio.`, { description: "Selecione menos leads para continuar." });
+      return;
+    }
+    setSelected((current) => [...current, ...missing]);
+  }
+
+  if (directorLite) {
+    return (
+      <>
+        <section className={liteStyles.root} aria-labelledby="distribution-inbox-title">
+          <header className={liteStyles.header}>
+            <div className={liteStyles.heading}>
+              <h2 id="distribution-inbox-title">Leads para distribuir</h2>
+              <p>{filtered.length} na fila. Selecione até {MAX_BATCH} para enviar em lote.</p>
+            </div>
+            <div className={liteStyles.headerActions}>
+              <Button variant="outline" render={<a href="/api/reports/distribution-unassigned" download />}>
+                <Download aria-hidden="true" /> Baixar PDF
+              </Button>
+              <Button
+                variant="outline"
+                disabled={!totalUnassigned || archivePending}
+                onClick={() => {
+                  archiveCandidateIdsRef.current = inboxLeads.map((lead) => lead.id);
+                  setArchiveDialogOpen(true);
+                }}
+              >
+                <Archive aria-hidden="true" /> Arquivar sem corretor
+              </Button>
+            </div>
+          </header>
+
+          <div className={liteStyles.filters}>
+            <AppSelect
+              aria-label="Filtrar por unidade"
+              value={unitFilter}
+              onValueChange={changeUnitFilter}
+              options={[{ value: "all", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))]}
+            />
+            <AppSelect
+              aria-label="Filtrar por status"
+              value={statusFilter}
+              onValueChange={changeStatusFilter}
+              options={[
+                { value: "all", label: "Todos os status" },
+                { value: "unassigned", label: "Aguardando unidade" },
+                { value: "queued", label: "Aguardando corretor" },
+                { value: "returned_to_queue", label: "Devolvido à fila" },
+                { value: "manual_hold", label: "Aguardando ação manual" },
+              ]}
+            />
+          </div>
+
+          <LiteBulkBar count={selected.length} actions={[]} onClear={clearBatchUi} />
+          {selected.length ? (
+            <div className={liteStyles.bulkForms}>
+              <form action={batchAction} onSubmit={submitBatch}>
+                <input name="leadIds" type="hidden" value={selected.join(",")} />
+                <AppSelect
+                  aria-label="Unidade de destino"
+                  name="branchId"
+                  value={branchId}
+                  onValueChange={changeBatchUnit}
+                  options={branches.map((branch) => ({ value: branch.id, label: branch.name }))}
+                />
+                <ActionButton pending={batchPending} success={batchSuccess} variant="default" lite>
+                  <ArrowRight /> Enviar {selected.length}/{MAX_BATCH}
+                </ActionButton>
+              </form>
+              <form action={assignAction} onSubmit={submitBatch}>
+                <input name="leadIds" type="hidden" value={selected.join(",")} />
+                <input name="branchId" type="hidden" value={branchId} />
+                <AppSelect
+                  aria-label="Corretor em massa"
+                  value={batchBrokerId}
+                  onValueChange={setBatchBrokerId}
+                  placeholder="Corretor"
+                  options={[{ value: "", label: "Corretor" }, ...unitBrokers.map((broker) => ({ value: broker.id, label: broker.name }))]}
+                />
+                <ActionButton pending={assignPending} success={assignSuccess} variant="outline" disabled={!batchBrokerId} lite>
+                  <UserList /> Atribuir {selected.length}
+                </ActionButton>
+              </form>
+            </div>
+          ) : null}
+
+          {!selectable.length ? (
+            <p className={liteStyles.empty}>Inbox em dia. Não há leads aguardando unidade ou corretor.</p>
+          ) : !filtered.length ? (
+            <p className={liteStyles.empty}>Nenhum lead com os filtros atuais.</p>
+          ) : (
+            <>
+              <LiteResponsiveData
+                caption="Leads aguardando distribuição"
+                columns={liteColumns}
+                rows={visible}
+                rowKey={(lead) => lead.id}
+                empty={<p>Nenhum lead nesta página.</p>}
+                selection={{
+                  isSelected: (lead) => selected.includes(lead.id),
+                  onToggle: (lead) => toggle(lead.id),
+                  allSelected: visible.length > 0 && visible.every((lead) => selected.includes(lead.id)),
+                  onToggleAll: selectVisible,
+                  rowLabel: (lead) => `Selecionar ${lead.name || "lead sem nome"}`,
+                }}
+                rowTone={(lead) => lead.distributionStatus === "manual_hold" ? "warning" : undefined}
+              />
+              <LitePagination
+                page={currentPage}
+                totalPages={totalPages}
+                totalItems={filtered.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+                pending={batchPending || assignPending}
+                label="Páginas de leads para distribuir"
+              />
+            </>
+          )}
+        </section>
+
+        {inboxLeads.length ? (
+          <section className={liteStyles.root} aria-labelledby="distribution-archive-title">
+            <header className={liteStyles.header}>
+              <div className={liteStyles.heading}>
+                <h2 id="distribution-archive-title">Todos os leads sem corretor</h2>
+                <p>{inboxLeads.length} carregados de {totalUnassigned}. Inclui leads fora da fila operacional.</p>
+              </div>
+            </header>
+            <LiteResponsiveData
+              caption="Todos os leads sem corretor"
+              columns={archivedLeadColumns}
+              rows={inboxLeads}
+              rowKey={(lead) => lead.id}
+              empty={<p>Nenhum lead sem corretor.</p>}
+            />
+          </section>
+        ) : null}
+
+        <CampaignConflictDialog
+          conflict={campaignConflictDialog}
+          fields={pendingOverrideFields}
+          onClose={() => {
+            setCampaignConflictDialog(null);
+            setPendingOverrideFields(null);
+          }}
+        />
+        <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+          <DialogPopup className="sm:max-w-md">
+            <DialogPanel>
+              <DialogHeader>
+                <DialogTitle>Escolha quais leads arquivar</DialogTitle>
+                <DialogDescription>O arquivamento remove os leads escolhidos da distribuição, sem apagar os dados. O servidor confere a seleção.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-2">
+                <p className="text-sm font-medium text-foreground">Escopo do arquivamento</p>
+                <AppSelect
+                  value={archiveScope}
+                  onValueChange={(value) => setArchiveScope(value as ArchiveScope)}
+                  options={[
+                    { value: "all", label: `Todos sem corretor (${totalUnassigned})` },
+                    { value: "period", label: "Por período de entrada" },
+                    { value: "status", label: "Por situação do lead" },
+                  ]}
+                />
+                {archiveScope === "period" ? (
+                  <AppSelect
+                    aria-label="Período de entrada"
+                    value={archivePeriodDays}
+                    onValueChange={setArchivePeriodDays}
+                    options={[{ value: "7", label: "7 dias" }, { value: "30", label: "30 dias" }, { value: "90", label: "90 dias" }, { value: "365", label: "12 meses" }]}
+                  />
+                ) : null}
+                {archiveScope === "status" ? (
+                  <AppSelect
+                    aria-label="Situação"
+                    value={archiveStatus}
+                    onValueChange={(value) => setArchiveStatus(value as ArchiveStatus)}
+                    options={[{ value: "all", label: "Todos os status" }, { value: "operational", label: "Operacionais" }, { value: "lost", label: "Perdidos" }, { value: "disqualified", label: "Desqualificados" }]}
+                  />
+                ) : null}
+                <p className={liteStyles.confirmNote}>
+                  {archiveScope === "all"
+                    ? `${totalUnassigned} lead${totalUnassigned === 1 ? "" : "s"} sem corretor serão arquivados.`
+                    : `${archivePreview.length} lead${archivePreview.length === 1 ? "" : "s"} corresponde${archivePreview.length === 1 ? "" : "m"}. O servidor fará a conferência final.`}
+                </p>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setArchiveDialogOpen(false)}>Cancelar</Button>
+                <form
+                  action={archiveAction}
+                  onSubmit={() => { archiveCandidateIdsRef.current = archivePreview.map((lead) => lead.id); }}
+                >
+                  <input type="hidden" name="archiveScope" value={archiveScope} />
+                  <input type="hidden" name="archivePeriodDays" value={archivePeriodDays} />
+                  <input type="hidden" name="archiveStatus" value={archiveStatus} />
+                  <Button type="submit" disabled={archivePending || !archivePreview.length}>
+                    {archivePending ? "Arquivando…" : "Arquivar leads"}
+                  </Button>
+                </form>
+              </DialogFooter>
+            </DialogPanel>
+          </DialogPopup>
+        </Dialog>
+      </>
+    );
+  }
 
   return (
     <>

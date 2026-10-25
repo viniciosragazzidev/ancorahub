@@ -7,6 +7,16 @@
 .choice[aria-current="page"] { color: var(--foreground); background: var(--surface); box-shadow: var(--shadow-resting); }
 
 .hero { display: grid; gap: 16px; padding: 20px; border-radius: var(--radius-panel); background: linear-gradient(150deg, color-mix(in oklch, oklch(70% 0.17 45) 14%, var(--surface)), var(--surface-muted)); }
+.litePage .hero { border: 1px solid var(--border); border-radius: var(--radius-surface); background: var(--surface-muted); box-shadow: none; }
+.litePage .stat { border: 1px solid var(--border); border-radius: var(--radius-surface); }
+.litePage .stateOn { background: var(--success-subtle); color: var(--success-foreground); }
+.litePage .stateOn .stateDot { animation: none; }
+.litePage .fill { background: var(--primary); }
+.litePage .statAlert .statValue,
+.litePage .badgeLost { color: var(--danger-foreground); }
+.litePage .badgeOk { background: var(--success-subtle); color: var(--success-foreground); }
+.litePage .badgeWait { background: var(--info-subtle); color: var(--info-foreground); }
+.progressBar { width: 100%; }
 .heroTop { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; }
 .heroText { min-width: 0; }
 .title { margin: 0; font-family: var(--font-display); font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-display); }

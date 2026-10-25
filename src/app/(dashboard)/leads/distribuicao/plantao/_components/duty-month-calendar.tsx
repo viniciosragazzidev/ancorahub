@@ -1,10 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Plus } from "@/components/huge-icons";
+import { Button } from "@/components/arc/button/button";
+import { Input } from "@/components/arc/input/input";
 import { cn } from "@/lib/utils";
 import { typeStripe } from "./duty-type-tag";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import { formatLiteDate } from "@/components/lite/format/date";
+import styles from "./director-duty-calendar.module.css";
 
 type CalendarSchedule = { id: string; name: string; startsAt: string; endsAt: string; status: string; validFrom: Date; validUntil: Date | null; typeName?: string | null; typeHue?: number | null };
 type Progress = { dates: Array<{ date: string; done: boolean }> };
@@ -14,6 +19,12 @@ const WEEKDAY_HEADERS = ["Seg", "Ter", "Qua", "Qui", "Sex"] as const;
 
 function todayKey() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+function lastDayOfMonth(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const day = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  return `${month}-${String(day).padStart(2, "0")}`;
 }
 
 /**
@@ -47,6 +58,37 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
   onCreateOnDate: (date: string) => void;
 }) {
   const today = todayKey();
+  const directorLite = useDirectorLitePage();
+  const desktopViewRef = useRef<HTMLDivElement>(null);
+  const mobileViewRef = useRef<HTMLElement>(null);
+  const [newDutyDate, setNewDutyDate] = useState(today);
+  useEffect(() => {
+    if (!directorLite) return;
+
+    const desktopView = desktopViewRef.current;
+    const mobileView = mobileViewRef.current;
+    if (!desktopView || !mobileView) return;
+
+    const mobileViewport = window.matchMedia("(max-width: 767px)");
+    const syncVisibility = () => {
+      const desktopHidden = mobileViewport.matches;
+      if (desktopHidden) {
+        desktopView.setAttribute("inert", "");
+        desktopView.setAttribute("aria-hidden", "true");
+        mobileView.removeAttribute("inert");
+        mobileView.removeAttribute("aria-hidden");
+      } else {
+        desktopView.removeAttribute("inert");
+        desktopView.removeAttribute("aria-hidden");
+        mobileView.setAttribute("inert", "");
+        mobileView.setAttribute("aria-hidden", "true");
+      }
+    };
+
+    syncVisibility();
+    mobileViewport.addEventListener("change", syncVisibility);
+    return () => mobileViewport.removeEventListener("change", syncVisibility);
+  }, [directorLite]);
   const { cells, byDate, weekendCount } = useMemo(() => {
     const [year, monthNumber] = month.split("-").map(Number);
     const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
@@ -74,7 +116,8 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
   }, [month, progressById, schedules, today]);
 
   return (
-    <div className="overflow-x-auto">
+    <>
+    <div ref={desktopViewRef} className={cn("overflow-x-auto", directorLite && styles.desktop)}>
       <div className="grid min-w-[640px] grid-cols-5 overflow-hidden rounded-[var(--radius-card)] border border-border bg-border gap-px" role="grid" aria-label="Calendário de plantões">
         {WEEKDAY_HEADERS.map((day) => (
           <div key={day} role="columnheader" className="bg-muted/40 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">{day}</div>
@@ -110,7 +153,7 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
                     type="button"
                     onClick={() => onCreateOnDate(date)}
                     aria-label={`Novo plantão em ${date.slice(8, 10)}/${date.slice(5, 7)}`}
-                    className="grid size-5 place-items-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/day:opacity-100"
+                    className={directorLite ? styles.dayAction : "grid size-5 place-items-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/day:opacity-100"}
                   >
                     <Plus className="size-3" />
                   </button>
@@ -128,7 +171,10 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
                     title={`${schedule.typeName ? `${schedule.typeName} · ` : ""}${schedule.name} · ${schedule.startsAt.slice(0, 5)}–${schedule.endsAt.slice(0, 5)}${repeatingScheduleIds.has(schedule.id) ? " · repete toda semana" : ""}${done ? " · encerrado" : ""}`}
                     style={schedule.typeName ? typeStripe(schedule.typeHue) : undefined}
                     className={cn(
-                      "w-full min-w-0 rounded-md border px-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      directorLite
+                        ? "w-full min-w-0 border px-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        : "w-full min-w-0 rounded-md border px-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      directorLite && styles.calendarItem,
                       done
                         ? "border-dashed border-border bg-transparent py-0.5 text-muted-foreground hover:bg-muted/60"
                         : cn("bg-card py-1 hover:border-foreground/30", gap ? "border-warning/50" : "border-border", published && "border-success/50"),
@@ -156,5 +202,59 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
         </p>
       ) : null}
     </div>
+    {directorLite ? (
+      <section ref={mobileViewRef} className={styles.mobile} aria-label="Plantões do mês">
+        <ul className={styles.days}>
+          {[...byDate.keys()].filter((date) => date.startsWith(`${month}-`)).sort().map((date) => {
+            const items = byDate.get(date) ?? [];
+            return (
+              <li key={date} className={styles.day}>
+                <h3>
+                  <time dateTime={date}>{formatLiteDate(new Date(`${date}T12:00:00.000Z`), { weekday: "long", day: "numeric", month: "long" })}</time>
+                  {date === today ? <span className={styles.today}>Hoje</span> : null}
+                </h3>
+                <ul className={styles.shifts}>
+                  {items.map(({ schedule, done }) => {
+                    const published = publishedScheduleIds.has(schedule.id);
+                    const inDraft = !published && Boolean(draftScheduleIds?.has(schedule.id));
+                    const gap = !done && !published && !inDraft && gapScheduleIds.has(schedule.id);
+                    return (
+                      <li key={schedule.id}>
+                        <Button type="button" variant="secondary" className={styles.shift} onClick={() => onOpen(schedule)}>
+                          <span className={styles.shiftContent}>
+                            <span className={styles.shiftName}>{schedule.name}</span>
+                            <span className={styles.shiftMeta}>
+                              {schedule.startsAt.slice(0, 5)} às {schedule.endsAt.slice(0, 5)}
+                              {done ? " · encerrado" : published ? " · escala publicada" : inDraft ? " · na escala, rascunho" : gap ? " · falta corretor" : ""}
+                            </span>
+                          </span>
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            );
+          })}
+        </ul>
+        {canCreate && lastDayOfMonth(month) >= today ? (
+          <div className={styles.create}>
+            <div>
+              <Input
+                id="director-new-duty-date"
+                type="date"
+                label="Data do novo plantão"
+                min={month === today.slice(0, 7) ? today : `${month}-01`}
+                max={lastDayOfMonth(month)}
+                value={newDutyDate.startsWith(`${month}-`) ? newDutyDate : (month === today.slice(0, 7) ? today : `${month}-01`)}
+                onChange={(event) => setNewDutyDate(event.target.value)}
+              />
+              <Button type="button" onClick={() => onCreateOnDate(newDutyDate.startsWith(`${month}-`) ? newDutyDate : `${month}-01`)}>Novo plantão</Button>
+            </div>
+          </div>
+        ) : null}
+      </section>
+    ) : null}
+    </>
   );
 }
