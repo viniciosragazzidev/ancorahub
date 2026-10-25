@@ -41,7 +41,7 @@ function getGreeting() {
 
 // ─── Role configuration ─────────────────────────────────────────────────────
 
-const roleConfig = {
+export const roleConfig = {
   director: {
     label: "Diretor",
     icon: ChartLineUp,

@@ -2,6 +2,10 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 
 import { WelcomeScreen } from "@/features/onboarding/components/welcome-screen";
+import { WelcomeScreenLite } from "@/features/onboarding/components/welcome-screen-lite";
+import { DashboardHeader } from "@/components/dashboard-header";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { getCurrentTenantOnboarding } from "@/features/onboarding/queries/get-current-tenant-onboarding";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -43,6 +47,20 @@ export default async function WelcomePage() {
       broker: "/minha-fila",
     } as const;
     redirect(redirectMap[role]);
+  }
+
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/welcome")) {
+    // Saudação pela hora de São Paulo, no servidor: o cliente não lê o relógio no primeiro render.
+    const hour = Number(new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", hourCycle: "h23", timeZone: "America/Sao_Paulo" }).format(new Date()));
+    const greeting = hour >= 5 && hour < 12 ? "Bom dia" : hour >= 12 && hour < 18 ? "Boa tarde" : "Boa noite";
+    return (
+      <>
+        <DashboardHeader breadcrumb="Início" title="Boas-vindas" />
+        <main className={litePage.stack}>
+          <WelcomeScreenLite userName={user?.name ?? "Usuário"} role={role} tenantName={tenant?.name ?? "Âncora Corretora"} onboarding={onboarding} greeting={greeting} />
+        </main>
+      </>
+    );
   }
 
   return (
