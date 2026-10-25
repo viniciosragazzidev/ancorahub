@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 const state = vi.hoisted(() => ({
   managerLite: "false",
+  directorLite: false,
   select: vi.fn(),
   displayUser: {
     roleKey: "manager" as "manager" | "broker",
@@ -24,6 +25,7 @@ vi.mock("@/features/team/supervisor-scope", () => ({ inSupervisorTeam: vi.fn(), 
 vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: vi.fn(async () => ({
   tenantId: "tenant-1", userId: "manager-1", role: "manager", branchId: null,
 })) }));
+vi.mock("@/features/director-lite/style-flag", () => ({ shouldUseDirectorLiteStyle: vi.fn(async () => state.directorLite) }));
 vi.mock("@/shared/auth/actions", () => ({ getUserDisplayInfo: vi.fn(async () => state.displayUser) }));
 vi.mock("@/features/system-settings/queries", () => ({
   FEATURE_FLAGS: { MANAGER_LITE: { key: "feature_manager_lite_enabled" } },
@@ -52,6 +54,7 @@ describe("manager search without a unit", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     state.managerLite = "false";
+    state.directorLite = false;
     state.displayUser.roleKey = "manager";
     state.displayUser.jobTitle = "manager";
     state.displayUser.permissions = [];
@@ -70,7 +73,17 @@ describe("manager search without a unit", () => {
     expect(state.select).not.toHaveBeenCalled();
   });
 
+  it("keeps the pre-Lite feature results when the director Lite key is off", async () => {
+    state.displayUser.permissions = ["acessar_leads"];
+    const response = await GET(new NextRequest("http://localhost/api/search?q=lead"));
+    const payload = await response.json() as { groups: Array<{ type: string; items: Array<{ title: string }> }> };
+    const features = payload.groups.find((group) => group.type === "features")?.items ?? [];
+
+    expect(features.some((item) => item.title === "Regras de Distribuição de Leads")).toBe(true);
+  });
+
   it("returns only feature results permitted by the menu access policy", async () => {
+    state.directorLite = true;
     state.displayUser.permissions = ["acessar_leads"];
     const response = await GET(new NextRequest("http://localhost/api/search?q=lead"));
     const payload = await response.json() as { groups: Array<{ type: string; items: Array<{ title: string }> }> };
@@ -81,6 +94,7 @@ describe("manager search without a unit", () => {
   });
 
   it("does not expose hidden broker destinations through the feature search", async () => {
+    state.directorLite = true;
     state.displayUser.roleKey = "broker";
     state.displayUser.jobTitle = "broker";
     state.displayUser.permissions = ["acessar_cotacoes"];

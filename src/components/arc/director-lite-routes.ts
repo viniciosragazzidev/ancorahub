@@ -68,6 +68,7 @@
   "/propostas",
   "/qualificacao",
   "/qualificacao/turbo",
+  "/relacionamento",
   "/relatorios",
   "/relatorios/drill/[drillId]",
   "/roadmap",
