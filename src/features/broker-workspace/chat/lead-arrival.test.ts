@@ -45,10 +45,10 @@ describe("nextStepFor: o único passo que o corretor precisa dar agora", () => {
     expect(nextStepFor({ ...base, accepted: false })).toMatchObject({ kind: "accept", tone: "urgent" });
   });
 
-  it("says the client replied and how long ago, when the broker has not answered", () => {
+  it("says the client replied and waits, without when, when the broker has not answered", () => {
     const step = nextStepFor({ ...base, lastClientAt: new Date("2026-10-17T17:55:00.000Z"), lastBrokerAt: new Date("2026-10-17T17:00:00.000Z") });
 
-    expect(step).toMatchObject({ kind: "reply", title: "Responder o cliente", detail: "Cliente respondeu há 5 min." });
+    expect(step).toMatchObject({ kind: "reply", title: "Responder o cliente", detail: "O cliente respondeu e espera sua resposta." });
   });
 
   it("says the broker has not called yet when there is no outgoing message", () => {

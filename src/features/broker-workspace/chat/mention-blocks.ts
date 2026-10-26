@@ -193,8 +193,9 @@ export async function buildLeadCard(context: TenantContext, leadId: string, now 
   if (nextTask?.dueAt && nextTask.dueAt.getTime() < now.getTime()) alert = { tone: "danger", text: `Retorno atrasado desde ${when(nextTask.dueAt, now)}` };
   else if (!lead.firstContactAt && lead.assignedAt && !isNew) alert = { tone: "warning", text: `Primeiro contato pendente ${since(lead.assignedAt, now)}` };
   else if (isNew) alert = { tone: "info", text: "Lead novo: aceite para ver o contato" };
-  else if (lastMessage?.direction === "incoming") alert = { tone: "success", text: `Respondeu ${since(lastMessage.sentAt, now)} e espera você` };
-  else if (lastMessage && now.getTime() - lastMessage.sentAt.getTime() > 2 * 86_400_000) alert = { tone: "warning", text: `Sem resposta ${since(lastMessage.sentAt, now)}` };
+  // The broker does not see when the client wrote (26/10): only that the client waits, or went quiet.
+  else if (lastMessage?.direction === "incoming") alert = { tone: "success", text: "Respondeu e espera você" };
+  else if (lastMessage && now.getTime() - lastMessage.sentAt.getTime() > 2 * 86_400_000) alert = { tone: "warning", text: "Sem resposta do cliente" };
   else if (lead.status === "quote_sent" && now.getTime() - lead.stageEnteredAt.getTime() > 3 * 86_400_000) alert = { tone: "warning", text: `Cotação parada ${since(lead.stageEnteredAt, now)}` };
 
   const rows: Array<{ label: string; value: string }> = [];
@@ -202,7 +203,7 @@ export async function buildLeadCard(context: TenantContext, leadId: string, now 
   if (plan) rows.push({ label: "Plano", value: plan });
   if (city) rows.push({ label: "Cidade", value: city });
   rows.push({ label: "Chegou", value: when(lead.assignedAt ?? lead.createdAt, now) });
-  if (lastMessage) rows.push({ label: "Última mensagem", value: `${lastMessage.direction === "incoming" ? "do cliente" : "sua"}, ${when(lastMessage.sentAt, now)}` });
+  if (lastMessage) rows.push({ label: "Última mensagem", value: lastMessage.direction === "incoming" ? "do cliente" : "sua" });
   if (nextTask) rows.push({ label: "Próximo retorno", value: `${nextTask.dueAt ? when(nextTask.dueAt, now) : "sem horário"}` });
   if (summary) rows.push({ label: "Resumo", value: summary.length > 140 ? `${summary.slice(0, 137)}...` : summary });
 

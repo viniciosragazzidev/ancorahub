@@ -86,7 +86,8 @@ export function nextStepFor(input: {
     const ago = elapsedLabel(input.lastClientAt as Date, input.now);
     return management
       ? { kind: "wait", title: "Cliente aguardando resposta", detail: `Respondeu ${ago}. ${owner} ainda não respondeu.`, tone: "urgent" }
-      : { kind: "reply", title: "Responder o cliente", detail: `Cliente respondeu ${ago}.`, tone: "urgent" };
+      // The broker does not see when the client wrote (26/10): only that the client waits.
+      : { kind: "reply", title: "Responder o cliente", detail: "O cliente respondeu e espera sua resposta.", tone: "urgent" };
   }
   if (!input.lastBrokerAt) {
     return management

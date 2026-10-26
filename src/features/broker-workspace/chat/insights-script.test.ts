@@ -41,7 +41,7 @@ describe("buildInsightsScript", () => {
         conversation("c", { outbound: true }),
       ],
     });
-    expect(script.blocks[0]).toMatchObject({ id: "i-count", text: expect.stringMatching(/ 2 clientes esperando sua resposta. Comece por Cliente, que espera há 2h.$/) });
+    expect(script.blocks[0]).toMatchObject({ id: "i-count", text: expect.stringMatching(/ 2 clientes esperando sua resposta. Comece por Cliente.$/) });
     expect(script.blocks.find((block) => block.id === "i-next")).toMatchObject({ text: "Próximo passo: Mandar a tabela da Amil" });
     // Insights never copies the transcript: no client message quoted.
     expect(JSON.stringify(script.blocks)).not.toContain("quanto fica o plano");
@@ -49,7 +49,9 @@ describe("buildInsightsScript", () => {
     expect(choices[0]).toMatchObject({ id: "reply", action: { kind: "href", href: "https://web.whatsapp.com/send?phone=5521999998888" } });
     expect(choices[1]?.action).toEqual({ kind: "href", href: "/conversas/broker?insight=a" });
     expect(choices[2]?.action).toEqual({ kind: "href", href: "/leads/a" });
-    expect(script.blocks.find((block) => block.id === "i-others")).toMatchObject({ items: [{ id: "b", trailing: "10 min" }] });
+    // The broker does not see when the client wrote (26/10): no time beside the name.
+    expect(script.blocks.find((block) => block.id === "i-others")).toMatchObject({ items: [{ id: "b" }] });
+    expect(JSON.stringify(script.blocks)).not.toMatch(/ há \d|às \d{2}:\d{2}|"trailing"/);
     expect(script.status?.tone).toBe("waiting");
   });
 

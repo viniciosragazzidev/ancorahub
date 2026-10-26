@@ -57,20 +57,20 @@ export function quickTip(item: BrokerConversationInsight, now: Date) {
   const last = item.latestMessage;
   if (!last) return "Ainda sem conversa: mande um oi se apresentando e pergunte a melhor hora para falar.";
   const ago = waited(last.sentAt, now);
-  if (!isOutboundMessage(last.direction)) return `O cliente escreveu há ${ago}. Responda agora, mesmo que curto: quem responde rápido vende mais.`;
+  // The broker does not see when the client wrote (26/10).
+  if (!isOutboundMessage(last.direction)) return "O cliente escreveu e espera sua resposta. Responda agora, mesmo que curto: quem responde rápido vende mais.";
   const hours = (now.getTime() - Date.parse(last.sentAt)) / 3_600_000;
   if (hours >= 24) return `Sua última mensagem foi há ${ago} e ficou sem resposta. Mande uma retomada leve, tipo: "Conseguiu ver o que te mandei?"`;
   return "Você já respondeu. Combine o próximo passo com data, por exemplo um horário para apresentar a cotação.";
 }
 
-/** The client in focus: name in highlight, stage, how long they wait and when they last wrote. */
-function clientCard(id: string, item: BrokerConversationInsight, now: Date): ChatBlock {
+/** The client in focus: name in highlight, stage and whether they wait for the broker (never when they wrote, 26/10). */
+function clientCard(id: string, item: BrokerConversationInsight): ChatBlock {
   const chips: Array<{ label: string; tone?: "info" | "success" | "warning" | "danger" | "neutral" }> = [];
   // One chromatic color per card: only the delay is red; the rest stay neutral.
   chips.push({ label: item.kind === "client" ? "Cliente" : LEAD_STATUS_LABELS[item.status] ?? item.status, tone: "neutral" });
   const inbound = lastInbound(item);
-  if (isWaitingForBroker(item) && inbound) chips.push({ label: `Esperando há ${waited(inbound.sentAt, now)}`, tone: "danger" });
-  else if (item.latestMessage) chips.push({ label: `Última mensagem às ${time(item.latestMessage.sentAt)}`, tone: "neutral" });
+  if (isWaitingForBroker(item) && inbound) chips.push({ label: "Esperando sua resposta", tone: "danger" });
   const intent = item.intelligence?.customerIntent ? intelligenceLabel.intent(item.intelligence.customerIntent) : null;
   if (intent) chips.push({ label: `Intenção: ${intent}`, tone: "neutral" });
   return { type: "client", id, name: item.name, initials: initialsOf(item.name), chips };
@@ -143,23 +143,23 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
 
   if (!waiting.length) {
     blocks.push({ type: "assistant", id: "i-clear", text: "Ninguém esperando sua resposta agora." });
-    const recent = insights.slice(0, OTHERS_SHOWN).map((item) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : clip(quickTip(item, now), 70)), trailing: item.latestMessage ? time(item.latestMessage.sentAt) : undefined, href: detailHref(item) }));
+    const recent = insights.slice(0, OTHERS_SHOWN).map((item) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : clip(quickTip(item, now), 70)), href: detailHref(item) }));
     if (recent.length) blocks.push({ type: "list", id: "i-recent", title: "Conversas recentes", subtitle: "Toque para ver o diagnóstico", items: recent });
     blocks.push({ type: "question", id: "i-clear-choice", prompt: "Quer ver mais?", choices: [all] });
     return { blocks, status: { label: "Em dia", tone: "idle" } };
   }
 
-  const [{ item: first, since }, ...rest] = waiting;
+  const [{ item: first }, ...rest] = waiting;
   const name = firstName(first.name);
   const inbound = lastInbound(first);
   blocks.push({
     type: "assistant",
     id: "i-count",
-    text: `${OPENERS[(Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(now)) + Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, day: "2-digit" }).format(now))) % OPENERS.length]} ${waiting.length === 1 ? `${name} está esperando sua resposta há ${waited(since, now)}.` : `${waiting.length} clientes esperando sua resposta. Comece por ${name}, que espera há ${waited(since, now)}.`}`,
+    text: `${OPENERS[(Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(now)) + Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, day: "2-digit" }).format(now))) % OPENERS.length]} ${waiting.length === 1 ? `${name} está esperando sua resposta.` : `${waiting.length} clientes esperando sua resposta. Comece por ${name}.`}`,
   });
-  blocks.push(clientCard("i-client", first, now));
+  blocks.push(clientCard("i-client", first));
   if (first.intelligence?.summary) blocks.push({ type: "assistant", id: "i-summary", text: first.intelligence.summary });
-  else if (inbound) blocks.push({ type: "system", id: "i-last", strong: name, text: `escreveu às ${time(inbound.sentAt)}` });
+  else if (inbound) blocks.push({ type: "system", id: "i-last", strong: name, text: "escreveu e espera sua resposta" });
   const step = nextStepText(first.intelligence?.nextBestAction);
   blocks.push({ type: "assistant", id: "i-next", variant: "tip", text: step ? `Próximo passo: ${step}` : quickTip(first, now) });
 
@@ -180,7 +180,7 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
       id: "i-others",
       title: "Depois",
       subtitle: "Também esperando você",
-      items: rest.slice(0, OTHERS_SHOWN).map(({ item, since: at }) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : clip(quickTip(item, now), 80)), trailing: waited(at, now), href: detailHref(item) })),
+      items: rest.slice(0, OTHERS_SHOWN).map(({ item }) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : clip(quickTip(item, now), 80)), href: detailHref(item) })),
     });
   }
   if (others.length) {
@@ -189,7 +189,7 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
       id: "i-recent",
       title: "Outros clientes",
       subtitle: "Toque para ver o diagnóstico",
-      items: others.map((item) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : clip(quickTip(item, now), 80)), trailing: item.latestMessage ? time(item.latestMessage.sentAt) : undefined, href: detailHref(item) })),
+      items: others.map((item) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : clip(quickTip(item, now), 80)), href: detailHref(item) })),
     });
   }
 
@@ -226,7 +226,7 @@ export function buildLeadInsightScript(input: { item: BrokerConversationInsight;
   if (!ai || (!ai.summary && !ai.nextBestAction)) {
     return {
       blocks: [
-        clientCard("n-client", item, now),
+        clientCard("n-client", item),
         { type: "assistant", id: "n-empty", text: input.analyzing ? `Estou lendo a conversa com ${name} agora. Em alguns segundos a análise aparece aqui.` : `Ainda não li a conversa com ${name}.` },
         { type: "assistant", id: "n-quick", variant: "tip", text: quickTip(item, now) },
         { type: "question", id: "n-choice", prompt: "Como quer seguir?", choices: actions },
@@ -235,7 +235,7 @@ export function buildLeadInsightScript(input: { item: BrokerConversationInsight;
     };
   }
 
-  const blocks: ChatBlock[] = [{ type: "date", id: "n-date", label: analyzedLabel(ai.lastAnalyzedAt, now) }, clientCard("n-client", item, now)];
+  const blocks: ChatBlock[] = [{ type: "date", id: "n-date", label: analyzedLabel(ai.lastAnalyzedAt, now) }, clientCard("n-client", item)];
   if (ai.summary) blocks.push({ type: "assistant", id: "n-summary", text: ai.summary });
 
   const rows = [
