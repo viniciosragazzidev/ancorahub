@@ -150,8 +150,6 @@ export function automaticDistributionHoldReason(
   return null;
 }
 
-const BROKER_COOLDOWN_MS = 5 * 60 * 1000;
-
 /**
  * Fisher-Yates, with an injectable random source so callers (tests, mainly)
  * can get a reproducible order. Array.prototype.sort is stable (guaranteed
@@ -170,37 +168,33 @@ export function shuffle<T>(items: readonly T[], random: () => number = Math.rand
 }
 
 export function rankBrokers(brokers: RankedBroker[], policy: IntelligentDistributionPolicy, now = new Date(), random: () => number = Math.random): RankedBroker[] {
-  const nowMs = now.getTime();
+  void now;
   return shuffle(brokers, random)
     .filter((broker) => !policy.excludedBrokerIds.includes(broker.id) && (broker.capacity === null || broker.activeLeads < broker.capacity))
     .sort((a, b) => {
       // 1. Plantão (On-Duty) ativo primeiro
       if (Number(b.onDuty) !== Number(a.onDuty)) return Number(b.onDuty) - Number(a.onDuty);
 
-      // 2. Cooldown de 5 minutos (corretor que nao recebeu lead nos ultimos 5 min tem prioridade)
-      const aCooled = a.lastAssignedAt ? (nowMs - a.lastAssignedAt.getTime() < BROKER_COOLDOWN_MS) : false;
-      const bCooled = b.lastAssignedAt ? (nowMs - b.lastAssignedAt.getTime() < BROKER_COOLDOWN_MS) : false;
-      if (aCooled !== bCooled) return Number(aCooled) - Number(bCooled);
-
-      // 3. Menor carga no plantão: quem recebeu menos indicações no dia da operação.
+      // (A prioridade de 5 minutos sem lead saiu com o intervalo entre ofertas, DEC-151.)
+      // 2. Menor carga no plantão: quem recebeu menos indicações no dia da operação.
       //    Antes a carga era a carteira inteira (leads ativos e não iniciados de
       //    qualquer data), e quem tinha leads antigos em aberto nunca recebia,
       //    mesmo com 0 leads no plantão.
       const aDuty = a.receivedInDuty ?? 0;
       const bDuty = b.receivedInDuty ?? 0;
       if (aDuty !== bDuty) return aDuty - bDuty;
-      // 4. Menor quantidade de leads sem iniciar atendimento
+      // 3. Menor quantidade de leads sem iniciar atendimento
       const aUnstarted = a.unstartedLeads ?? 0;
       const bUnstarted = b.unstartedLeads ?? 0;
       if (aUnstarted !== bUnstarted) return aUnstarted - bUnstarted;
 
-      // 5. Menor quantidade de leads ativos totais
+      // 4. Menor quantidade de leads ativos totais
       if (a.activeLeads !== b.activeLeads) return a.activeLeads - b.activeLeads;
 
-      // 6. Pontuação de desempenho / ranking inteligente
+      // 5. Pontuação de desempenho / ranking inteligente
       if (policy.ranking.enabled && b.rankingScore !== a.rankingScore) return b.rankingScore - a.rankingScore;
 
-      // 7. Maior tempo em descanso (idleSince)
+      // 6. Maior tempo em descanso (idleSince)
       const aIdle = a.idleSince?.getTime() ?? 0;
       const bIdle = b.idleSince?.getTime() ?? 0;
       if (aIdle !== bIdle) return aIdle - bIdle;

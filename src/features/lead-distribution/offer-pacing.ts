@@ -2,12 +2,11 @@
  * Offer pacing: protects a broker from a flood of simultaneous offers (for
  * example when a backlog is released at the start of a duty window).
  *
- * Two independent rules, both configured per queue:
- *  - interval: at least N minutes between two offers to the same broker;
- *  - max pending: at most M offers awaiting a response at the same time.
- * A value of 0 disables the corresponding rule.
+ * Max pending: at most M offers awaiting a response at the same time, per queue (0 disables it).
+ * The interval between offers was retired (DEC-151, 26/10/2026): a qualified lead goes to the
+ * next broker at once. The queue column stays for history but is no longer read.
  */
-export const DEFAULT_OFFER_INTERVAL_MINUTES = 5;
+export const DEFAULT_OFFER_INTERVAL_MINUTES = 0;
 export const DEFAULT_MAX_PENDING_OFFERS = 1;
 
 const PENDING_STATUSES = new Set(["PENDING", "SENT", "DELIVERED", "READ"]);
@@ -32,7 +31,8 @@ function normalizeCount(value: number | null | undefined, fallback: number) {
 
 export function normalizeOfferPacing(input: { intervalMinutes?: number | null; maxPending?: number | null } | undefined | null): OfferPacingConfig {
   return {
-    intervalMinutes: normalizeCount(input?.intervalMinutes, DEFAULT_OFFER_INTERVAL_MINUTES),
+    // DEC-151: no interval between offers, whatever the queue still stores.
+    intervalMinutes: 0,
     maxPending: normalizeCount(input?.maxPending, DEFAULT_MAX_PENDING_OFFERS),
   };
 }

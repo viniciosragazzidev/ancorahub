@@ -7,9 +7,11 @@ const minutes = (value: number) => new Date(now.getTime() + value * 60_000);
 const config = { intervalMinutes: 5, maxPending: 1 };
 
 describe("normalizeOfferPacing", () => {
-  it("defaults to 5 minutes and 1 pending offer", () => {
-    expect(normalizeOfferPacing(undefined)).toEqual({ intervalMinutes: 5, maxPending: 1 });
-    expect(normalizeOfferPacing({ intervalMinutes: null, maxPending: null })).toEqual({ intervalMinutes: 5, maxPending: 1 });
+  it("has no interval between offers (DEC-151) and defaults to 1 pending offer", () => {
+    expect(normalizeOfferPacing(undefined)).toEqual({ intervalMinutes: 0, maxPending: 1 });
+    expect(normalizeOfferPacing({ intervalMinutes: null, maxPending: null })).toEqual({ intervalMinutes: 0, maxPending: 1 });
+    // A queue that still stores 5 or 15 minutes no longer waits between offers.
+    expect(normalizeOfferPacing({ intervalMinutes: 15, maxPending: 2 })).toEqual({ intervalMinutes: 0, maxPending: 2 });
   });
 
   it("keeps 0 as disabled and clamps negatives", () => {

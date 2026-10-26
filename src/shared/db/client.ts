@@ -134,7 +134,10 @@ function statementTimeoutMs(): number {
 export function backgroundConnectionLimit() {
   const configured = Number.parseInt(process.env.DB_BACKGROUND_POOL_MAX ?? "", 10);
   if (Number.isFinite(configured) && configured >= 1 && configured <= 10) return configured;
-  return process.env.NODE_ENV === "production" ? 3 : 1;
+  // 26/10: with one pool per process (EMAXCONNSESSION fix), 3 sockets served every job and
+  // webhook at once and the distribution job hit Coolify's 300 s timeout. 8 + 4 for pages = 12
+  // per container, still under the 18 a single container held before that fix.
+  return process.env.NODE_ENV === "production" ? 8 : 1;
 }
 
 function createPostgresDatabase(databaseUrl: string, max = connectionLimit()): Database {

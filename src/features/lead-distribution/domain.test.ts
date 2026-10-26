@@ -307,13 +307,13 @@ describe("lead distribution domain", () => {
     expect(ranked[0]?.id).toBe("zero-in-plantao");
   });
 
-  it("still lets the 5-minute cooldown and on-duty rules come first", () => {
+  it("no longer holds back who just got a lead: the duty load decides (DEC-151)", () => {
     const now = new Date();
     const ranked = rankBrokers([
       { id: "just-got-one", createdAt: new Date("2026-01-01"), activeLeads: 0, receivedInDuty: 0, lastAssignedAt: new Date(now.getTime() - 60_000), capacity: null, onDuty: true, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0 },
       { id: "rested", createdAt: new Date("2026-01-02"), activeLeads: 0, receivedInDuty: 1, capacity: null, onDuty: true, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0 },
     ], defaultIntelligentDistributionPolicy, now);
-    expect(ranked[0]?.id).toBe("rested");
+    expect(ranked[0]?.id).toBe("just-got-one");
   });
 
   it("always ranks active duty before performance", () => {

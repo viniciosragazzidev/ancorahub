@@ -121,7 +121,6 @@ export function QueueDetailSheet({
                 <dl className="divide-y divide-border/60 py-1">
                   <Detail label="Distribuição">{assignmentLabel(queue)}</Detail>
                   <Detail label="Capacidade">{queue.capacityEnabled ? `${queue.capacityPerBroker} leads por corretor` : "Sem limite"}</Detail>
-                  <Detail label="Intervalo entre ofertas">{queue.offerIntervalMinutes ?? 5} min</Detail>
                   <Detail label="Ofertas pendentes">{queue.maxPendingOffersPerBroker ?? 1} por corretor</Detail>
                   <Detail label="Qualificação por IA">{queue.aiQualificationEnabled === false ? "Pausada" : "Ativa"}</Detail>
                   <Detail label="Não distribuir leads frios no plantão">{queue.holdColdLeads ? "Ligado" : "Desligado"}</Detail>

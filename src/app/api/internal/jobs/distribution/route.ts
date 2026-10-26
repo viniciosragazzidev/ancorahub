@@ -14,22 +14,24 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  let result: Awaited<ReturnType<typeof drainLeadDistributionBacklog>> | null = null;
-  let distributionFailed = false;
-  try {
-    result = await drainLeadDistributionBacklog({ maxBatches: 4 });
-  } catch (error) {
-    distributionFailed = true;
-    console.error("[distribution-job] backlog drain failed", error instanceof Error ? { name: error.name } : { name: "UnknownError" });
-  }
+  // The plantão link goes first (26/10): with the drain first, a slow backlog held every
+  // reminder of the afternoon presencial for over 30 minutes.
   let dutyPresence: Awaited<ReturnType<typeof processDutyPresenceReminders>> | { enabled: boolean; error: true };
   let dutyPresenceFailed = false;
   try {
     dutyPresence = await processDutyPresenceReminders();
   } catch (error) {
     dutyPresenceFailed = true;
-    console.error("[duty-presence] reminder sweep failed", error instanceof Error ? { name: error.name } : { name: "UnknownError" });
+    console.error("[duty-presence] reminder sweep failed", error instanceof Error ? { name: error.name, message: error.message } : { name: "UnknownError" });
     dutyPresence = { enabled: true, error: true };
+  }
+  let result: Awaited<ReturnType<typeof drainLeadDistributionBacklog>> | null = null;
+  let distributionFailed = false;
+  try {
+    result = await drainLeadDistributionBacklog({ maxBatches: 4 });
+  } catch (error) {
+    distributionFailed = true;
+    console.error("[distribution-job] backlog drain failed", error instanceof Error ? { name: error.name, message: error.message } : { name: "UnknownError" });
   }
   const success = !distributionFailed && !dutyPresenceFailed;
   return NextResponse.json({ success, result, dutyPresence }, { status: success ? 200 : 500 });

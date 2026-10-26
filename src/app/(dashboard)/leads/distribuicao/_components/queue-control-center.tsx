@@ -429,7 +429,7 @@ export function QueueControlCenter({
       // queues no longer cap active leads.
       capacityEnabled: false,
       capacityPerBroker: null,
-      offerIntervalMinutes: Math.max(0, Math.trunc(Number(form.offerIntervalMinutes) || 0)),
+      offerIntervalMinutes: 0,
       maxPendingOffersPerBroker: Math.max(0, Math.trunc(Number(form.maxPendingOffersPerBroker) || 0)),
       aiQualificationEnabled: form.aiQualificationEnabled,
       holdColdLeads: form.holdColdLeads,
@@ -1046,24 +1046,8 @@ export function QueueControlCenter({
                 </Button>
               </div>
 
+              {/* O intervalo entre ofertas saiu (DEC-151): o lead qualificado vai na hora para o próximo corretor. */}
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-1.5 text-sm font-medium">
-                  <span className="flex items-center gap-1.5">
-                    Intervalo entre ofertas (min)
-                    <InfoTooltip
-                      title="Intervalo entre ofertas"
-                      description="Tempo mínimo entre dois leads oferecidos ao mesmo corretor. Evita enxurrada quando leads guardados são liberados no início do plantão. Use 0 para desativar."
-                    />
-                  </span>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={120}
-                    value={form.offerIntervalMinutes}
-                    onChange={(event) => setForm({ ...form, offerIntervalMinutes: event.target.value })}
-                    className="w-full"
-                  />
-                </label>
                 <label className="grid gap-1.5 text-sm font-medium">
                   <span className="flex items-center gap-1.5">
                     Ofertas pendentes por corretor
