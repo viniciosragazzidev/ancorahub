@@ -47,7 +47,7 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     description: "Leads criados no período, excluídos registros apagados.",
     format: "count",
     explanation: "Contagem de leads com data de criação dentro do período, no escopo autorizado.",
-    allowedDimensions: ["unit", "broker", "source", "period"],
+    allowedDimensions: ["unit", "team", "broker", "source", "period"],
     version: 1,
   },
   {

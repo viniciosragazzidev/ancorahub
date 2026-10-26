@@ -9,6 +9,10 @@ describe("canonical team metrics", () => {
       description: expect.stringContaining("Coorte de entrada"),
     });
     expect(getMetricDefinition("commercial.leads_converted")?.explanation).toContain("commercial.conversion_rate");
+    // A coorte de entrada (denominador) acompanha a conversão: a gestão lê os dois por equipe.
+    for (const id of ["commercial.leads_received", "commercial.leads_converted"]) {
+      expect(getMetricDefinition(id), id).toMatchObject({ allowedDimensions: expect.arrayContaining(["unit", "team", "broker"]) });
+    }
   });
 
   it("registers operational indicators as team metrics for unit, team, and broker scopes", () => {
