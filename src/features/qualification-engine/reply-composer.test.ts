@@ -79,10 +79,10 @@ describe("reply composer", () => {
 
   it("renders {{nome}} and {{resumo}} and drops them cleanly when empty", () => {
     const text = getDefaultQuickReplyTemplates()["human.requested"]!.body;
-    expect(renderConversationVariables(text, createEmptyMemory())).toBe("Claro! Já passei seu atendimento para um corretor especialista com o que você me contou. Ele continua a conversa por aqui em instantes.");
+    expect(renderConversationVariables(text, createEmptyMemory())).toBe("Claro, já passei seu atendimento para um corretor especialista, com tudo que você me contou. Ele continua por aqui em instantes, sem você precisar repetir nada.");
     const memory = { ...withName("Torquato"), planType: { value: "individual", confidence: 1 as const }, age: { value: "40", confidence: 1 as const }, city: { value: "Itaboraí", confidence: 1 as const } };
     expect(summarizeQualification(memory)).toBe("individual, 40 anos e Itaboraí");
-    expect(renderConversationVariables(text, memory)).toBe("Claro, Torquato! Já passei seu atendimento para um corretor especialista com o que você me contou (individual, 40 anos e Itaboraí). Ele continua a conversa por aqui em instantes.");
+    expect(renderConversationVariables(text, memory)).toBe("Claro, Torquato, já passei seu atendimento para um corretor especialista, com tudo que você me contou (individual, 40 anos e Itaboraí). Ele continua por aqui em instantes, sem você precisar repetir nada.");
     expect(renderConversationVariables("Oi, {{nome}}!", createEmptyMemory(), "Lead WhatsApp (5521)")).toBe("Oi!");
   });
 });
@@ -118,7 +118,7 @@ describe("mid-conversation situations", () => {
       collectedFields: ["customerName", "planType", "numberOfLives", "age", "city", "email"],
     };
     expect(resolveDeterministicQualificationTurn({ memory: done, policy, handoffMessage: "Vou encaminhar você para um corretor da equipe agora." }).reply)
-      .toBe("Obrigado, Torquato! Com essas informações (individual, 40 anos e Itaboraí), já passei seu atendimento para um corretor especialista. Ele continua a conversa por aqui em instantes.");
+      .toBe("Muito obrigado, Torquato! Já tenho o que preciso (individual, 40 anos e Itaboraí), então passei seu atendimento para um corretor especialista. Ele continua por aqui em instantes, sem você repetir nada.");
     expect(resolveDeterministicQualificationTurn({ memory: done, policy, handoffMessage: "Texto nosso." }).reply).toBe("Texto nosso.");
   });
 
@@ -175,7 +175,7 @@ describe("the reported conversation (Torquato), end to end", () => {
 
     expect(parseHumanRequest("Falar com humano")).toBe(true);
     const handoff = renderConversationVariables(getDefaultQuickReplyTemplates()["human.requested"]!.body, memory);
-    expect(handoff).toBe("Claro, Torquato! Já passei seu atendimento para um corretor especialista com o que você me contou (individual, 40 anos e Itaboraí). Ele continua a conversa por aqui em instantes.");
+    expect(handoff).toBe("Claro, Torquato, já passei seu atendimento para um corretor especialista, com tudo que você me contou (individual, 40 anos e Itaboraí). Ele continua por aqui em instantes, sem você precisar repetir nada.");
     expect(handoff).not.toMatch(/nome|quantas pessoas/i);
   });
 });

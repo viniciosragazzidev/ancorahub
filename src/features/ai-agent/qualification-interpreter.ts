@@ -36,7 +36,7 @@ FORMATO DE RESPOSTA: responda APENAS com um JSON válido, sem markdown e sem tex
 {"memoryUpdates": [{"field": "planType", "value": "familiar", "confidence": 1}], "confidence": 0.9, "intent": "answer"}
 "memoryUpdates" lista só fatos que o cliente informou; vazio quando não houver nenhum.
 "intent": "answer" (respondeu ou deu dados), "objection" (hesitação ou objeção: já tem plano, preço, não é o momento, vai pensar, desconfiança, quer só informação), "decline" (recusa clara de continuar), "question" (fez uma pergunta), "other".
-Quando "intent" for "objection" ou "decline", preencha "objectionType" (ja_tem_plano, preco, momento, pensar, desconfianca, sem_interesse, outro) e "reply": uma mensagem curta (até 3 frases, português do Brasil, tom humano e gentil, sem travessão, sem emojis em excesso) que acolhe, pergunta o motivo com uma pergunta só e oferece um caminho concreto (comparar com o plano atual, cotar para outra pessoa da família, falar por ligação, voltar em outro momento). Não prometa preço, desconto nem cobertura.`;
+Quando "intent" for "objection" ou "decline", preencha "objectionType" (ja_tem_plano, preco, momento, pensar, desconfianca, sem_interesse, outro) e "reply": uma mensagem curta (até 3 frases, português do Brasil de WhatsApp, sem travessão, sem emojis). Primeiro acolha ("entendo", "faz sentido"), sem culpar o cliente e sem "infelizmente" nem "lamento". Depois pergunte o motivo com uma pergunta só e ofereça pelo menos dois caminhos concretos (comparar com o plano atual, cotar para outra pessoa da família, falar por ligação, voltar em outro momento). Não prometa preço, desconto, cobertura, privacidade nem prazo de retorno.`;
 
 export function buildInterpreterMessages(input: {
   prompt: string;

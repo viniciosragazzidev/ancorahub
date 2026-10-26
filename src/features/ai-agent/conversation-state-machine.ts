@@ -28,6 +28,7 @@ import { recordLearningEvent } from "@/features/situation-learning/service";
 import { loadQuickReplyTemplates, parseExplicitStop, parseOptOut, parseSoftDecline, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
 import { AFTER_HOURS_HUMAN_REQUEST_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, composeGreeting, DEFAULT_HUMAN_REQUEST_TEXT, effectiveHandoffText, isAfterHoursInSaoPaulo, priceConcernLine, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
 import { isAutomatedInboundMessage } from "./automated-inbound";
+import { withBrokerReturnPhrase } from "@/features/qualification-engine/broker-window";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
@@ -1143,7 +1144,7 @@ async function applyCustomerCorrectionAfterHandoff(input: {
     await publishNotification({ capability: "quick_reply_human", tenantId: input.tenantId, recipientUserId: lead.corretorId, leadId: input.leadId, type: "quick_reply_human", title: "Cliente corrigiu os dados", message: summary, pushTitle: "Dados do lead corrigidos", pushBody: summary, url: `/leads/${input.leadId}`, tag: `lead-correction-${input.leadId}` }).catch(() => undefined);
   }
   const firstName = memory.customerFirstName?.value ? `, ${memory.customerFirstName.value}` : "";
-  const reply = `Anotei a correção${firstName}: ${summary}. Já avisei o corretor, que continua a conversa por aqui.`;
+  const reply = `Obrigado por corrigir${firstName}! Anotei: ${summary}. Já avisei o corretor, que segue a conversa por aqui.`;
   await db.insert(schema.whatsappMessages).values({
     id: `ai_msg_correction_${crypto.randomUUID()}`, tenantId: input.tenantId, leadId: input.leadId, conversationId: input.conversationId,
     senderRole: "assistant", provider: input.transport, phone: input.phone, direction: "outbound", body: reply, sentAt: new Date(),
@@ -1165,7 +1166,7 @@ const REOPEN_AFTER_DECLINE_MS = 14 * 24 * 60 * 60_000;
 
 /** Used when the interpreter is unavailable: still asks why instead of closing. */
 export function defaultObjectionReply(firstName: string) {
-  return `Entendi${firstName ? `, ${firstName}` : ""}. Posso te perguntar o motivo? Se você já tem plano, consigo comparar com o atual; se for para outra pessoa da família, também cotamos. E se preferir, um especialista te liga.`;
+  return `Entendi${firstName ? `, ${firstName}` : ""}, obrigado por avisar. Se você já tem plano, eu comparo com o atual, e se for pra outra pessoa da família também cotamos. Posso perguntar o que pesou?`;
 }
 
 /**
@@ -1544,7 +1545,7 @@ export async function processInboundAiResponse({
     const [leadForTemplate] = await db.select({ nome: schema.leads.nome }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId))).limit(1);
     // {{nome}} and {{resumo}}: never ask again what the customer already told.
     // At night the "talk to a person" reply promises the first available broker, not "em instantes".
-    const nightBody = rawTemplate && quickReply.templateKey === "human.requested" && isAfterHoursInSaoPaulo() ? AFTER_HOURS_HUMAN_REQUEST_TEXT : rawTemplate?.body;
+    const nightBody = rawTemplate && quickReply.templateKey === "human.requested" && isAfterHoursInSaoPaulo() ? withBrokerReturnPhrase(AFTER_HOURS_HUMAN_REQUEST_TEXT) : rawTemplate?.body;
     const template = rawTemplate ? { ...rawTemplate, body: renderConversationVariables(nightBody ?? rawTemplate.body, currentMemory, leadForTemplate?.nome) } : undefined;
     const now = new Date();
     const suppressed = Boolean(quickReply.suppressReason);
@@ -1751,7 +1752,7 @@ export async function processInboundAiResponse({
 
   if (detectHumanTransferRequest(userMessageBody)) {
     return transferToHuman(
-      renderConversationVariables(isAfterHoursInSaoPaulo() ? AFTER_HOURS_HUMAN_REQUEST_TEXT : effectiveHandoffText(tenantConfig.handoffMessage, DEFAULT_HUMAN_REQUEST_TEXT), updatedMemory, lead?.nome),
+      renderConversationVariables(isAfterHoursInSaoPaulo() ? withBrokerReturnPhrase(AFTER_HOURS_HUMAN_REQUEST_TEXT) : effectiveHandoffText(tenantConfig.handoffMessage, DEFAULT_HUMAN_REQUEST_TEXT), updatedMemory, lead?.nome),
       "Solicitação explícita de atendimento humano",
     );
   }
@@ -1860,7 +1861,7 @@ export async function processInboundAiResponse({
     const recovering = attempts < MAX_OBJECTION_RECOVERIES;
     const text = recovering
       ? aiFallbackResult?.reply?.trim() || defaultObjectionReply(firstName)
-      : `Tudo bem${firstName ? `, ${firstName}` : ""}. Obrigado pela atenção. Se mudar de ideia ou quiser cotar para outra pessoa, é só me chamar por aqui.`;
+      : `Tudo bem${firstName ? `, ${firstName}` : ""}, obrigado pela atenção. Fica à vontade pra voltar quando quiser, ou pra cotar pra alguém da família. É só me chamar por aqui.`;
     const now = new Date();
     const replyId = `ai_msg_objection_${crypto.randomUUID()}`;
     await db.insert(schema.whatsappMessages).values({ id: replyId, tenantId, leadId, communicationChannelId: communicationChannelId ?? null, conversationId: conversation.id, senderRole: "assistant", provider: transport, phone, direction: "outbound", body: text, sentAt: now });
@@ -1956,7 +1957,7 @@ export async function processInboundAiResponse({
   // question again, without echoing it as if the person had answered.
   // At night no broker answers "em instantes": the first available one gets in touch.
   if (deterministicTurn.kind === "handoff" && afterHours) {
-    deterministicTurn = { ...deterministicTurn, reply: renderConversationVariables(AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, updatedMemory, lead?.nome) };
+    deterministicTurn = { ...deterministicTurn, reply: renderConversationVariables(withBrokerReturnPhrase(AFTER_HOURS_QUALIFIED_HANDOFF_TEXT), updatedMemory, lead?.nome) };
   }
   // The customer said the current plan costs too much: show it was heard before the question.
   if (deterministicTurn.kind === "collecting" && !inboundIsAutomated) {

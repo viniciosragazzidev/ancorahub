@@ -751,7 +751,7 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
 
   if (purpose === "leadQualification" || purpose === "lead_qualification") {
     const nome = rawVariables[0] || "Cliente";
-    return `Olá *${nome}*! 👋\n\nSomos da equipe de atendimento. Como podemos te ajudar a encontrar o melhor plano de saúde hoje?`;
+    return `Olá *${nome}*!\n\nSomos da equipe de atendimento. Como podemos te ajudar a encontrar o melhor plano de saúde hoje?`;
   }
 
   return rawVariables.filter(Boolean).join("\n") || "Notificação Âncora CRM";

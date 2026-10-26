@@ -1,4 +1,5 @@
 import type { ConversationMemory } from "@/features/ai-agent/memory";
+import { brokerAvailability } from "./broker-window";
 
 /**
  * Wording of the qualification replies. The engine decides WHAT to ask (field
@@ -273,23 +274,23 @@ export function renderConversationVariables(text: string, memory: ConversationMe
     .trim();
 }
 
-/** Default text when a customer asks for a person, and when the qualification is complete. */
-export const DEFAULT_HUMAN_REQUEST_TEXT = "Claro, {{nome}}! Já passei seu atendimento para um corretor especialista com o que você me contou ({{resumo}}). Ele continua a conversa por aqui em instantes.";
-export const DEFAULT_QUALIFIED_HANDOFF_TEXT = "Obrigado, {{nome}}! Com essas informações ({{resumo}}), já passei seu atendimento para um corretor especialista. Ele continua a conversa por aqui em instantes.";
+/**
+ * Default text when a customer asks for a person, and when the qualification is complete. Written
+ * for the working hours: a broker answers "em instantes". Vinicios, 26/10: no promise of privacy.
+ */
+export const DEFAULT_HUMAN_REQUEST_TEXT = "Claro, {{nome}}, já passei seu atendimento para um corretor especialista, com tudo que você me contou ({{resumo}}). Ele continua por aqui em instantes, sem você precisar repetir nada.";
+export const DEFAULT_QUALIFIED_HANDOFF_TEXT = "Muito obrigado, {{nome}}! Já tenho o que preciso ({{resumo}}), então passei seu atendimento para um corretor especialista. Ele continua por aqui em instantes, sem você repetir nada.";
 
 /**
- * Between 19h and 9h (São Paulo) no broker answers "em instantes": the brokers start at
- * 9h, so the closing says the first available broker gets in touch as soon as possible
- * (Vinicios, 21/10). Used instead of the configured text at night.
+ * Outside the broker's working hours (Sunday, national holidays, 19h to 9h) the text says when the
+ * next one answers: "{{quando}}" is filled by withBrokerReturnPhrase (broker-window.ts).
  */
-export const AFTER_HOURS_QUALIFIED_HANDOFF_TEXT = "Obrigado, {{nome}}! Com essas informações ({{resumo}}), seu atendimento já está com a nossa equipe. O mais breve possível, o primeiro corretor disponível entra em contato com você por aqui.";
-export const AFTER_HOURS_HUMAN_REQUEST_TEXT = "Claro, {{nome}}! Já passei seu atendimento para a nossa equipe com o que você me contou ({{resumo}}). O mais breve possível, o primeiro corretor disponível continua a conversa por aqui.";
-export const AFTER_HOURS_START_HOUR = 19;
-export const AFTER_HOURS_END_HOUR = 9;
+export const AFTER_HOURS_QUALIFIED_HANDOFF_TEXT = "Obrigado, {{nome}}! Com essas informações ({{resumo}}), seu atendimento já está com a nossa equipe. Um corretor fala com você por aqui {{quando}}.";
+export const AFTER_HOURS_HUMAN_REQUEST_TEXT = "Claro, {{nome}}, já deixei tudo com a nossa equipe ({{resumo}}). Um corretor continua a conversa por aqui {{quando}}, sem você precisar repetir nada.";
 
+/** Outside working hours: Sunday, national holidays, 19h to 9h (São Paulo). */
 export function isAfterHoursInSaoPaulo(now: Date = new Date()) {
-  const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23" }).format(now));
-  return hour >= AFTER_HOURS_START_HOUR || hour < AFTER_HOURS_END_HOUR;
+  return !brokerAvailability(now).open;
 }
 
 /**
@@ -300,6 +301,8 @@ export function isAfterHoursInSaoPaulo(now: Date = new Date()) {
 const RETIRED_HANDOFF_TEXTS = new Set([
   "Vou encaminhar você para um corretor da equipe agora.",
   "Obrigado pelas informações. Vou encaminhar seu atendimento para um corretor da equipe agora.",
+  "Obrigado, {{nome}}! Com essas informações ({{resumo}}), já passei seu atendimento para um corretor especialista. Ele continua a conversa por aqui em instantes.",
+  "Claro, {{nome}}! Já passei seu atendimento para um corretor especialista com o que você me contou ({{resumo}}). Ele continua a conversa por aqui em instantes.",
 ]);
 
 export function effectiveHandoffText(configured: string | null | undefined, fallback: string) {

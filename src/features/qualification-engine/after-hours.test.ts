@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createEmptyMemory } from "@/features/ai-agent/memory";
 import { shouldVerifyExtraction } from "@/features/ai-agent/qualification-interpreter";
+import { withBrokerReturnPhrase } from "./broker-window";
 import { AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, isAfterHoursInSaoPaulo, renderConversationVariables } from "./reply-composer";
 
 /** São Paulo is UTC-3. */
@@ -16,10 +17,15 @@ describe("encerramento fora do horário (19h às 9h)", () => {
     expect(isAfterHoursInSaoPaulo(new Date(Date.UTC(2026, 9, 22, 12, 0)))).toBe(false); // 9h
   });
 
-  it("não promete contato em instantes", () => {
-    const text = renderConversationVariables(AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, createEmptyMemory(), "Edivaldo Souza");
-    expect(text).toContain("o primeiro corretor disponível");
-    expect(text).not.toMatch(/instantes|agora/);
+  it("diz quando o corretor volta, sem prometer instantes à noite", () => {
+    const text = renderConversationVariables(withBrokerReturnPhrase(AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, sp(20)), createEmptyMemory(), "Edivaldo Souza");
+    expect(text).toContain("Um corretor fala com você por aqui amanhã, a partir das 9h.");
+    expect(text).not.toMatch(/instantes|agora|\{\{/);
+  });
+
+  it("não deixa a frase de retorno sem preencher", () => {
+    const text = renderConversationVariables(withBrokerReturnPhrase(AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, sp(10)), createEmptyMemory(), "Edivaldo Souza");
+    expect(text).toContain("por aqui em instantes.");
   });
 });
 

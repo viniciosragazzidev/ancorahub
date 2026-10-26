@@ -133,9 +133,9 @@ function createLegacySafeFallbackResponse(
   const pendingLine = memoryContext?.split("DADOS AINDA NECESSÁRIOS:")[1]?.split("\n").find((line) => line.trim().startsWith("-"));
   const pendingField = pendingLine?.replace(/^\s*-\s*/, "").trim().toLowerCase();
   const name = customerName?.split(" ")[0];
-  const prefix = name ? `Perfeito, ${name}. ` : "Perfeito. ";
+  const prefix = name ? `Obrigado, ${name}! ` : "Obrigado! ";
   const followUps: Record<string, { message: string; field: string }> = {
-    "nome completo": { message: "Como você prefere ser chamado(a)?", field: "customerName" },
+    "nome completo": { message: "Como você prefere que eu te chame?", field: "customerName" },
     cidade: { message: "Em qual cidade você mora?", field: "city" },
     "tipo de plano": { message: "O plano seria individual, familiar ou empresarial?", field: "planType" },
     "n° de vidas": { message: "Quantas pessoas serão incluídas no plano?", field: "numberOfLives" },
@@ -147,8 +147,8 @@ function createLegacySafeFallbackResponse(
     message: followUp
       ? `${prefix}${followUp.message}`
       : customerName
-      ? `${customerName}, recebi sua mensagem. Pode me contar um pouco mais sobre o que você está procurando?`
-      : "Recebi sua mensagem! Pode me contar um pouco mais sobre o que você está procurando?",
+      ? `${customerName}, recebi sua mensagem, obrigado! Pode me contar um pouco mais sobre o que você está procurando?`
+      : "Recebi sua mensagem, obrigado! Pode me contar um pouco mais sobre o que você está procurando?",
     language: "pt-BR",
     detectedIntent: "collecting_info",
     shouldTransfer: false,

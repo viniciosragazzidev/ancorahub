@@ -20,9 +20,9 @@ export function createSafeFallbackResponse(
   const label = normalize(pending?.replace(/^\s*-\s*/, "").trim() ?? "");
   const isPme = lines.some((line) => normalize(line).includes("tipo de plano: empresarial"));
   const next = label.includes("nome")
-    ? { field: "customerName", message: "Como você prefere ser chamado(a)?" }
+    ? { field: "customerName", message: "Como você prefere que eu te chame?" }
     : label.includes("cidade")
-      ? { field: "city", message: "Em qual cidade você mora?" }
+      ? { field: "city", message: "Em qual cidade você mora? Assim eu já busco opções perto de você." }
       : label.includes("tipo de plano")
         ? { field: "planType", message: "O plano seria individual, familiar ou empresarial?" }
         : label.includes("vidas") || label.includes("pessoas")
@@ -35,12 +35,12 @@ export function createSafeFallbackResponse(
               ? { field: "email", message: "Qual e-mail podemos usar para continuar o atendimento?" }
               : undefined;
   const firstName = customerName?.split(/\s+/)[0];
-  const prefix = firstName ? `Perfeito, ${firstName}. ` : "Perfeito. ";
+  const prefix = firstName ? `Obrigado, ${firstName}! ` : "Obrigado! ";
   const message = next
     ? `${prefix}${next.message}`
     : customerName
-      ? `${customerName}, recebi sua mensagem. Qual é o próximo detalhe que você gostaria de informar?`
-      : "Recebi sua mensagem. Qual detalhe você gostaria de informar primeiro?";
+      ? `${customerName}, recebi sua mensagem, obrigado! Me conta o próximo detalhe que você quiser, do seu jeito.`
+      : "Recebi sua mensagem, obrigado! Qual detalhe você prefere me passar primeiro?";
 
   return {
     message,

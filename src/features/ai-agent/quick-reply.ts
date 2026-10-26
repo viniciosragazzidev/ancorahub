@@ -283,24 +283,24 @@ export function resolveQuickReply(input: QuickReplyInput & { cooldownConfig?: Qu
 
 export function getDefaultQuickReplyTemplates(): Record<string, QuickReplyTemplate> {
   return {
-    "human.already_assigned": { ruleKey: "human.already_assigned", templateKey: "human.already_assigned", body: "Recebi sua mensagem. O corretor respons\u00e1vel j\u00e1 foi avisado e continuar\u00e1 seu atendimento por aqui.", active: true },
-    "human.waiting_reminder": { ruleKey: "human.waiting_reminder", templateKey: "human.waiting_reminder", body: "Sua mensagem foi recebida. Reforcei o chamado para o corretor respons\u00e1vel.", active: true },
-    "conversation.returning_lead": { ruleKey: "conversation.returning_lead", templateKey: "conversation.returning_lead", body: "Ol\u00e1 novamente. Vou avisar o corretor que acompanhou seu atendimento.", active: true },
-    "greeting.initial": { ruleKey: "greeting.initial", templateKey: "greeting.initial", body: "Ol\u00e1! Vou fazer algumas perguntas r\u00e1pidas para preparar seu atendimento.", active: true },
+    "human.already_assigned": { ruleKey: "human.already_assigned", templateKey: "human.already_assigned", body: "Recebi sua mensagem, obrigado! O corretor responsável já foi avisado e continua seu atendimento por aqui.", active: true },
+    "human.waiting_reminder": { ruleKey: "human.waiting_reminder", templateKey: "human.waiting_reminder", body: "Recebi sua mensagem e já avisei o corretor responsável, que te responde por aqui.", active: true },
+    "conversation.returning_lead": { ruleKey: "conversation.returning_lead", templateKey: "conversation.returning_lead", body: "Oi, {{nome}}! Que bom ter você de volta. Vou avisar o corretor que acompanhou seu atendimento.", active: true },
+    "greeting.initial": { ruleKey: "greeting.initial", templateKey: "greeting.initial", body: "Oi! Obrigado pelo contato, espero que esteja bem. Vou fazer algumas perguntas rápidas pra preparar seu atendimento.", active: true },
     // {{nome}} and {{resumo}} come from what the customer already told; an empty one disappears with its punctuation.
     "human.requested": { ruleKey: "human.requested", templateKey: "human.requested", body: DEFAULT_HUMAN_REQUEST_TEXT, active: true },
-    "faq.price": { ruleKey: "faq.price", templateKey: "faq.price", body: "O valor depende principalmente da idade, da cidade e do tipo de plano. Com essas respostas o corretor já te manda as opções com preço.", active: true },
-    "faq.operators": { ruleKey: "faq.operators", templateKey: "faq.operators", body: "Trabalhamos com as principais operadoras da região. O corretor vai te mostrar as que melhor atendem o seu perfil.", active: true },
-    "faq.waiting_period": { ruleKey: "faq.waiting_period", templateKey: "faq.waiting_period", body: "As carências variam por operadora e por plano, e em alguns casos dá para reduzir. O corretor te explica certinho junto com as opções.", active: true },
-    "faq.who": { ruleKey: "faq.who", templateKey: "faq.who", body: "Sou a assistente virtual da corretora e estou preparando seu atendimento para um corretor especialista.", active: true },
-    "opt_out.confirmed": { ruleKey: "opt_out.confirmed", templateKey: "opt_out.confirmed", body: "Entendido. Registrei sua solicita\u00e7\u00e3o e o atendimento autom\u00e1tico ser\u00e1 interrompido.", active: true },
-    "wrong_number.confirmed": { ruleKey: "wrong_number.confirmed", templateKey: "wrong_number.confirmed", body: "Entendido. Vou interromper este atendimento e sinalizar o contato para a equipe.", active: true },
-    "media.received": { ruleKey: "media.received", templateKey: "media.received", body: "Recebi o arquivo. O corretor respons\u00e1vel foi avisado para verificar.", active: true },
-    "message.unclear": { ruleKey: "message.unclear", templateKey: "message.unclear", body: "Recebi sua mensagem. Se preferir, posso encaminhar seu atendimento para um corretor.", active: true },
-    "callback.requested": { ruleKey: "callback.requested", templateKey: "callback.requested", body: "Certo. Vou avisar o corretor para retornar o contato assim que poss\u00edvel.", active: true },
-    "urgent.requested": { ruleKey: "urgent.requested", templateKey: "urgent.requested", body: "Entendi a urg\u00eancia. Vou sinalizar o corretor respons\u00e1vel agora.", active: true },
-    "goodbye.confirmed": { ruleKey: "goodbye.confirmed", templateKey: "goodbye.confirmed", body: "Tudo bem. Quando precisar, estaremos por aqui.", active: true },
-    "thanks.confirmed": { ruleKey: "thanks.confirmed", templateKey: "thanks.confirmed", body: "Por nada! O corretor continua \u00e0 disposi\u00e7\u00e3o.", active: true },
+    "faq.price": { ruleKey: "faq.price", templateKey: "faq.price", body: "O valor depende principalmente da idade, da cidade e do tipo de plano. Com essas respostas, o corretor já te manda as opções com preço certinho.", active: true },
+    "faq.operators": { ruleKey: "faq.operators", templateKey: "faq.operators", body: "Trabalhamos com as principais operadoras da região, e a gente escolhe com você as que combinam com o seu perfil.", active: true },
+    "faq.waiting_period": { ruleKey: "faq.waiting_period", templateKey: "faq.waiting_period", body: "Cada operadora tem suas carências, que variam por plano, e em alguns casos dá pra reduzir. O corretor te explica tudo com calma junto com as opções.", active: true },
+    "faq.who": { ruleKey: "faq.who", templateKey: "faq.who", body: "Sou a assistente virtual da corretora e estou organizando seu atendimento pra um corretor especialista te atender.", active: true },
+    "opt_out.confirmed": { ruleKey: "opt_out.confirmed", templateKey: "opt_out.confirmed", body: "Tudo bem, respeito sua escolha. Registrei seu pedido e não vou mais enviar mensagens automáticas por aqui. Se precisar, é só chamar.", active: true },
+    "wrong_number.confirmed": { ruleKey: "wrong_number.confirmed", templateKey: "wrong_number.confirmed", body: "Desculpa o incômodo, obrigado por avisar. Vou tirar esse número do nosso atendimento.", active: true },
+    "media.received": { ruleKey: "media.received", templateKey: "media.received", body: "Recebi, obrigado! Já avisei o corretor responsável pra dar uma olhada com calma.", active: true },
+    "message.unclear": { ruleKey: "message.unclear", templateKey: "message.unclear", body: "Não consegui entender essa mensagem, tudo bem. Se preferir falar com uma pessoa, posso passar seu atendimento para um corretor.", active: true },
+    "callback.requested": { ruleKey: "callback.requested", templateKey: "callback.requested", body: "Combinado! Já avisei o corretor para te ligar assim que possível.", active: true },
+    "urgent.requested": { ruleKey: "urgent.requested", templateKey: "urgent.requested", body: "Entendi, vou avisar o corretor responsável agora mesmo, com prioridade.", active: true },
+    "goodbye.confirmed": { ruleKey: "goodbye.confirmed", templateKey: "goodbye.confirmed", body: "Tudo bem, {{nome}}! Quando quiser retomar, é só me chamar por aqui.", active: true },
+    "thanks.confirmed": { ruleKey: "thanks.confirmed", templateKey: "thanks.confirmed", body: "Imagina, foi um prazer! Qualquer coisa, é só chamar por aqui.", active: true },
   };
 }
 
@@ -310,7 +310,23 @@ export function getDefaultQuickReplyTemplates(): Record<string, QuickReplyTempla
  * human-request text asked again for the name and the number of people).
  */
 const RETIRED_DEFAULT_BODIES: Record<string, readonly string[]> = {
-  "human.requested": ["Certo! Estou transferindo seu atendimento para a fila de um corretor especialista agora mesmo. Para agilizar seu atendimento, pode me informar seu nome e para quantas pessoas busca o plano?"],
+  "human.requested": ["Certo! Estou transferindo seu atendimento para a fila de um corretor especialista agora mesmo. Para agilizar seu atendimento, pode me informar seu nome e para quantas pessoas busca o plano?", "Claro, {{nome}}! Já passei seu atendimento para um corretor especialista com o que você me contou ({{resumo}}). Ele continua a conversa por aqui em instantes."],
+  "human.already_assigned": ["Recebi sua mensagem. O corretor responsável já foi avisado e continuará seu atendimento por aqui."],
+  "human.waiting_reminder": ["Sua mensagem foi recebida. Reforcei o chamado para o corretor responsável."],
+  "conversation.returning_lead": ["Olá novamente. Vou avisar o corretor que acompanhou seu atendimento."],
+  "greeting.initial": ["Olá! Vou fazer algumas perguntas rápidas para preparar seu atendimento."],
+  "faq.price": ["O valor depende principalmente da idade, da cidade e do tipo de plano. Com essas respostas o corretor já te manda as opções com preço."],
+  "faq.operators": ["Trabalhamos com as principais operadoras da região. O corretor vai te mostrar as que melhor atendem o seu perfil."],
+  "faq.waiting_period": ["As carências variam por operadora e por plano, e em alguns casos dá para reduzir. O corretor te explica certinho junto com as opções."],
+  "faq.who": ["Sou a assistente virtual da corretora e estou preparando seu atendimento para um corretor especialista."],
+  "opt_out.confirmed": ["Entendido. Registrei sua solicitação e o atendimento automático será interrompido."],
+  "wrong_number.confirmed": ["Entendido. Vou interromper este atendimento e sinalizar o contato para a equipe."],
+  "media.received": ["Recebi o arquivo. O corretor responsável foi avisado para verificar."],
+  "message.unclear": ["Recebi sua mensagem. Se preferir, posso encaminhar seu atendimento para um corretor."],
+  "callback.requested": ["Certo. Vou avisar o corretor para retornar o contato assim que possível."],
+  "urgent.requested": ["Entendi a urgência. Vou sinalizar o corretor responsável agora."],
+  "goodbye.confirmed": ["Tudo bem. Quando precisar, estaremos por aqui."],
+  "thanks.confirmed": ["Por nada! O corretor continua à disposição."],
 };
 
 export function isRetiredDefaultBody(ruleKey: string, body: string) {
