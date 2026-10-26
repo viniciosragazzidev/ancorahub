@@ -92,12 +92,12 @@ export function computeNegotiationLevel(input: NegotiationSignals): NegotiationA
   let level: NegotiationLevel | null = null;
   if (noCrmConversation) {
     level = "no_crm_conversation";
-  } else if (waitingTooLong) {
-    level = "cooling";
   } else if (hasRecentTwoWay && closingSignal) {
     level = "closing";
   } else if (hasRecentTwoWay && input.twoWayExchangeDaysLast5 >= 2 && advancedSignal) {
     level = "advanced";
+  } else if (hasRecentTwoWay && waitingTooLong && !advancedSignal) {
+    level = "cooling";
   } else if (hasRecentTwoWay) {
     level = "in_conversation";
   } else if (advancedSignal && exchangeStale) {

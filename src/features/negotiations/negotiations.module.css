@@ -141,7 +141,9 @@
 .cellLead { display: grid; gap: 4px; min-width: 168px; }
 .cellLeadName { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .cellLeadStatus { color: var(--text-muted); font-size: var(--text-xs); }
+.levelGroup { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .level { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: var(--radius-control); background: var(--surface-muted); color: var(--text-secondary); font-size: var(--text-xs); white-space: nowrap; }
+.waitingBadge { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: var(--radius-control); background: var(--warning-subtle); color: var(--warning-foreground); font-size: var(--text-xs); white-space: nowrap; }
 .level[data-level="closing"] { background: var(--success-subtle); color: color-mix(in oklab, var(--success) 55%, var(--foreground)); }
 .level[data-level="advanced"] { background: var(--info-subtle); color: var(--accent-strong); }
 .level[data-level="cooling"], .level[data-level="no_crm_conversation"] { background: var(--warning-subtle); color: color-mix(in oklab, var(--warning) 55%, var(--foreground)); }

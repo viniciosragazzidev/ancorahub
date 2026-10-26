@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createNegotiationsFixture } from "./fixtures";
@@ -30,6 +30,9 @@ describe("NegotiationsDashboard", () => {
     expect(container.querySelector('.arc-venancor[data-skin="diretor"]')).toBeTruthy();
     expect(screen.getByRole("navigation", { name: "Visões de negociações" })).toBeTruthy();
     expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(20);
+    const firstRow = container.querySelector('[data-lite="table"] tbody tr') as HTMLElement;
+    expect(within(firstRow).getByText("Aguardando resposta")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Aguardando resposta/ }).textContent).toContain(String(data.counts.customers_waiting));
 
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
     await waitFor(() => expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(10));
@@ -45,6 +48,8 @@ describe("NegotiationsDashboard", () => {
     rerender(<NegotiationsDashboard data={data} activeTab="statistics" generatedAt={new Date(data.generatedAt)} />);
     expect(screen.getByRole("heading", { name: "Saúde da IA" })).toBeTruthy();
     expect(screen.getByText("Análises nas últimas 24 horas")).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "Em avançada (atual)" })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "Em fechamento (atual)" })).toBeTruthy();
   });
 
   it("abre o painel lateral do lead ao selecionar uma linha", async () => {

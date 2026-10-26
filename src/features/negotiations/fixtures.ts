@@ -101,7 +101,7 @@ function buildDailyStats(): NegotiationDayStats[] {
     day.setUTCDate(day.getUTCDate() - (6 - offset));
     const key = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(day);
     const label = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "2-digit" }).format(day);
-    return { day: key, label, leadsWithExchange: 4 + (offset % 8), brokerMessages: 8 + offset * 2, newlyAdvanced: offset % 3, newlyClosing: offset === 5 ? 1 : 0 };
+    return { day: key, label, leadsWithExchange: 4 + (offset % 8), brokerMessages: 8 + offset * 2, currentlyAdvanced: offset % 3, currentlyClosing: offset === 5 ? 1 : 0 };
   });
 }
 

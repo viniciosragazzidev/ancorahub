@@ -63,8 +63,13 @@ function LeadCell({ lead }: { lead: NegotiationLead }) {
   );
 }
 
-function LevelBadge({ level }: { level: NegotiationLevel }) {
-  return <span className={styles.level} data-level={level}>{LEVEL_LABELS[level]}</span>;
+function LevelBadge({ level, customerWaiting }: { level: NegotiationLevel; customerWaiting: boolean }) {
+  return (
+    <span className={styles.levelGroup}>
+      <span className={styles.level} data-level={level}>{LEVEL_LABELS[level]}</span>
+      {customerWaiting ? <span className={styles.waitingBadge}>Aguardando resposta</span> : null}
+    </span>
+  );
 }
 
 export function createNegotiationLeadColumns(): LiteColumn<NegotiationLead>[] {
@@ -72,7 +77,7 @@ export function createNegotiationLeadColumns(): LiteColumn<NegotiationLead>[] {
     { id: "lead", label: "Lead", primary: true, render: (lead) => <LeadCell lead={lead} /> },
     { id: "broker", label: "Corretor", secondary: true, nowrap: true, render: (lead) => <span title={lead.brokerName}>{lead.brokerName}</span> },
     { id: "branch", label: "Unidade", nowrap: true, render: (lead) => lead.branchName ?? "Sem unidade" },
-    { id: "level", label: "Nível", render: (lead) => <LevelBadge level={lead.level} /> },
+    { id: "level", label: "Nível", render: (lead) => <LevelBadge level={lead.level} customerWaiting={lead.customerWaiting} /> },
     { id: "stage", label: "Etapa", render: (lead) => <span className={styles.stageCell}><span>{statusLabel(lead.status)}</span><span className={styles.muted}>{stageLabel[lead.ai.conversationStage] ?? "Em andamento"}{lead.statusBehindAi ? " · IA à frente" : ""}</span></span> },
     { id: "age", label: "Dias na etapa", numeric: true, render: (lead) => formatAge(lead.daysAtStage) },
     { id: "last", label: "Última troca", nowrap: true, render: (lead) => <span className={styles.tableText} title={formatWhen(lead.lastExchangeAt)}>{formatWhen(lead.lastExchangeAt)}</span> },
@@ -100,8 +105,8 @@ export function NegotiationStatsView({ brokerStats, dailyStats, aiHealth }: { br
     { id: "day", label: "Dia", primary: true, render: (row) => row.label },
     { id: "exchange", label: "Leads com troca", numeric: true, render: (row) => formatNegotiationMetric(row.leadsWithExchange) },
     { id: "messages", label: "Mensagens do corretor", numeric: true, render: (row) => formatNegotiationMetric(row.brokerMessages) },
-    { id: "advanced", label: "Novos avançados", numeric: true, render: (row) => formatNegotiationMetric(row.newlyAdvanced) },
-    { id: "closing", label: "Novos em fechamento", numeric: true, render: (row) => formatNegotiationMetric(row.newlyClosing) },
+    { id: "advanced", label: "Em avançada (atual)", numeric: true, render: (row) => formatNegotiationMetric(row.currentlyAdvanced) },
+    { id: "closing", label: "Em fechamento (atual)", numeric: true, render: (row) => formatNegotiationMetric(row.currentlyClosing) },
   ];
 
   return (
@@ -112,7 +117,7 @@ export function NegotiationStatsView({ brokerStats, dailyStats, aiHealth }: { br
       </section>
       <section className={styles.statsBlock} aria-labelledby="negotiations-days-title">
         <h2 className={styles.sectionTitle} id="negotiations-days-title">Últimos 7 dias</h2>
-        <p className={styles.sectionHint}>Novas etapas consideram a entrada atual no CRM, calculada na hora.</p>
+        <p className={styles.sectionHint}>Leads que hoje seguem nesses níveis, agrupados pelo dia de entrada na etapa.</p>
         <LiteResponsiveData caption="Atividade diária de negociação" columns={dailyColumns} rows={dailyStats} rowKey={(row) => row.day} empty={<p className={styles.emptyText}>Sem atividade registrada no período.</p>} />
       </section>
       <section className={styles.statsBlock} aria-labelledby="negotiations-health-title">

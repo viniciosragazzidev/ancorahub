@@ -62,10 +62,36 @@ describe("computeNegotiationLevel", () => {
   it("marca cliente aguardando há quatro horas como esfriando", () => {
     const result = computeNegotiationLevel({
       ...base,
-      lastCustomerMessageAt: "2026-10-26T10:00:00.000Z",
-      lastBrokerMessageAt: "2026-10-25T12:00:00.000Z",
+      lastCustomerMessageAt: "2026-10-26T11:00:00.000Z",
+      lastBrokerMessageAt: "2026-10-26T10:50:00.000Z",
     });
     expect(result.level).toBe("cooling");
+    expect(result.customerWaiting).toBe(true);
+    expect(result.replyOwedBy).toBe("broker");
+  });
+
+  it("mantém o nível avançado com selo de espera quando o cliente aguarda há quatro horas", () => {
+    const result = computeNegotiationLevel({
+      ...base,
+      status: "negotiation",
+      twoWayExchangeDaysLast5: 2,
+      lastCustomerMessageAt: "2026-10-26T10:00:00.000Z",
+      lastBrokerMessageAt: "2026-10-26T09:50:00.000Z",
+    });
+    expect(result.level).toBe("advanced");
+    expect(result.customerWaiting).toBe(true);
+    expect(result.replyOwedBy).toBe("broker");
+  });
+
+  it("mantém o nível de fechamento com selo de espera quando o cliente aguarda há quatro horas", () => {
+    const result = computeNegotiationLevel({
+      ...base,
+      status: "under_analysis",
+      customerSentPdf: true,
+      lastCustomerMessageAt: "2026-10-26T10:00:00.000Z",
+      lastBrokerMessageAt: "2026-10-26T09:50:00.000Z",
+    });
+    expect(result.level).toBe("closing");
     expect(result.customerWaiting).toBe(true);
     expect(result.replyOwedBy).toBe("broker");
   });
@@ -86,6 +112,13 @@ describe("computeNegotiationLevel", () => {
     expect(computeNegotiationLevel({
       ...base,
       status: "negotiation",
+      lastCustomerMessageAt: "2026-10-22T10:00:00.000Z",
+      lastBrokerMessageAt: "2026-10-22T11:00:00.000Z",
+      now: new Date("2026-10-26T15:00:00.000Z"),
+    }).level).toBe("cooling");
+    expect(computeNegotiationLevel({
+      ...base,
+      status: "under_analysis",
       lastCustomerMessageAt: "2026-10-22T10:00:00.000Z",
       lastBrokerMessageAt: "2026-10-22T11:00:00.000Z",
       now: new Date("2026-10-26T15:00:00.000Z"),

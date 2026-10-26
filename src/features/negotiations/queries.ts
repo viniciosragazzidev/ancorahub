@@ -77,7 +77,7 @@ export type NegotiationBrokerStats = {
   crmConversationPercent: number;
 };
 
-export type NegotiationDayStats = { day: string; label: string; leadsWithExchange: number; brokerMessages: number; newlyAdvanced: number; newlyClosing: number };
+export type NegotiationDayStats = { day: string; label: string; leadsWithExchange: number; brokerMessages: number; currentlyAdvanced: number; currentlyClosing: number };
 
 export type NegotiationsDashboardData = {
   generatedAt: string;
@@ -100,11 +100,8 @@ function toIso(value: Date | string | null | undefined) {
   return asDate(value)?.toISOString() ?? null;
 }
 
-function parseAiDetails(value: unknown) {
-  const details = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-  const raw = details.aiIntelligence && typeof details.aiIntelligence === "object" && !Array.isArray(details.aiIntelligence)
-    ? details.aiIntelligence as Record<string, unknown>
-    : {};
+function parseAiDetails(value: unknown, lastAnalyzedAt: unknown) {
+  const raw = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
   const strings = (item: unknown) => Array.isArray(item) ? item.filter((entry): entry is string => typeof entry === "string") : [];
   return {
     conversationStage: typeof raw.conversationStage === "string" ? raw.conversationStage : "UNKNOWN",
@@ -115,7 +112,7 @@ function parseAiDetails(value: unknown) {
     risk: typeof raw.risk === "string" ? raw.risk : null,
     objections: strings(raw.objections),
     buyingSignals: strings(raw.buyingSignals),
-    lastAnalyzedAt: toIso(details.aiLastAnalyzedAt as string | null | undefined),
+    lastAnalyzedAt: toIso(lastAnalyzedAt as string | null | undefined),
   };
 }
 
@@ -222,7 +219,8 @@ export async function getNegotiationsDashboard(context: TenantContext, requested
     firstContactAt: schema.leads.firstContactAt,
     firstContactLatencySeconds: schema.leads.firstContactLatencySeconds,
     stageEnteredAt: schema.leads.stageEnteredAt,
-    qualificationDetails: schema.leads.qualificationDetails,
+    aiIntelligence: sql<unknown>`${schema.leads.qualificationDetails}->'aiIntelligence'`,
+    aiLastAnalyzedAt: sql<string | null>`${schema.leads.qualificationDetails}->>'aiLastAnalyzedAt'`,
     hasBrokerMessageEver: brokerExists,
     hasAnyMessageEver: anyMessageExists,
   })
@@ -233,80 +231,105 @@ export async function getNegotiationsDashboard(context: TenantContext, requested
     .orderBy(desc(schema.leads.stageEnteredAt), asc(schema.leads.nome));
 
   const leadIds = leadRows.map((lead) => lead.id);
-  if (!leadIds.length) {
-    // A read-only audit entry keeps access to customer and AI summary data accountable without recording message content.
-    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "negotiations_area", entidadeId: branchId ?? context.tenantId, acao: "negotiations.viewed", createdAt: now }).catch(() => undefined);
-    return emptyData(scope, now);
-  }
+  if (!leadIds.length) return emptyData(scope, now);
 
   const since = new Date(now.getTime() - NEGOTIATION_LIMITS.messageWindowDays * 24 * 60 * 60 * 1000);
   const since24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const dayKey = sql<string>`to_char(${schema.whatsappMessages.sentAt} at time zone 'America/Sao_Paulo', 'YYYY-MM-DD')`;
-  const customerAt = sql<Date | null>`max(${schema.whatsappMessages.sentAt}) filter (where ${schema.whatsappMessages.direction} = 'incoming' and ${REAL_MESSAGE})`;
-  const brokerAt = sql<Date | null>`max(${schema.whatsappMessages.sentAt}) filter (where ${BROKER_MESSAGE} and ${REAL_MESSAGE})`;
-  const messagesByLeadAndDay = await db.select({
-    leadId: schema.whatsappMessages.leadId,
-    day: dayKey,
-    customerAt,
-    brokerAt,
-    brokerMessages: sql<number>`count(*) filter (where ${BROKER_MESSAGE} and ${REAL_MESSAGE})::int`,
-    customerPdf: sql<boolean>`bool_or(${schema.whatsappMessages.direction} = 'incoming' and ${schema.whatsappMessages.mediaKind} = 'document' and (lower(coalesce(${schema.whatsappMessages.mediaMimeType}, '')) = 'application/pdf' or lower(coalesce(${schema.whatsappMessages.mediaFilename}, '')) like '%.pdf') and ${schema.whatsappMessages.sentAt} >= ${schema.leads.assignedAt})`,
-    customerImage: sql<boolean>`bool_or(${schema.whatsappMessages.direction} = 'incoming' and ${schema.whatsappMessages.mediaKind} = 'image' and ${schema.whatsappMessages.sentAt} >= ${schema.leads.assignedAt})`,
-    customerDocument: sql<boolean>`bool_or(${schema.whatsappMessages.direction} = 'incoming' and ${schema.whatsappMessages.mediaKind} = 'document' and ${schema.whatsappMessages.sentAt} >= ${schema.leads.assignedAt})`,
-  })
-    .from(schema.whatsappMessages)
-    .innerJoin(schema.leads, eq(schema.leads.id, schema.whatsappMessages.leadId))
-    .where(and(
-      eq(schema.whatsappMessages.tenantId, context.tenantId),
-      eq(schema.leads.tenantId, context.tenantId),
-      inArray(schema.whatsappMessages.leadId, leadIds),
-      gte(schema.whatsappMessages.sentAt, since),
-      sql`${REAL_MESSAGE}`,
-    ))
-    .groupBy(schema.whatsappMessages.leadId, dayKey);
-
-  const groupedMessages = new Map<string, typeof messagesByLeadAndDay>();
-  for (const row of messagesByLeadAndDay) {
-    if (!row.leadId) continue;
-    const rows = groupedMessages.get(row.leadId) ?? [];
+  const messageIds = sql.join(leadIds.map((leadId) => sql`${leadId}`), sql`, `);
+  const rawMessageRows = await db.execute(sql`
+    with message_window as materialized (
+      select
+        m.lead_id,
+        l.corretor_id as broker_id,
+        m.sent_at,
+        m.direction,
+        m.sender_role,
+        m.body,
+        m.media_kind,
+        m.media_mime_type,
+        m.media_filename,
+        l.assigned_at,
+        to_char(m.sent_at at time zone 'America/Sao_Paulo', 'YYYY-MM-DD') as day,
+        (m.direction = 'outgoing' or (m.direction = 'outbound' and coalesce(m.sender_role, '') not in ('assistant', 'system'))) as is_broker
+      from whatsapp_messages m
+      inner join leads l on l.id = m.lead_id
+      where m.tenant_id = ${context.tenantId}
+        and l.tenant_id = ${context.tenantId}
+        and m.sent_at >= ${since.toISOString()}::timestamptz
+        and m.lead_id in (${messageIds})
+        and (m.media_kind is not null or lower(trim(coalesce(m.body, ''))) not in ('', '[text]'))
+    ), daily_messages as (
+      select
+        lead_id,
+        broker_id,
+        day,
+        max(sent_at) filter (where direction = 'incoming') as customer_at,
+        max(sent_at) filter (where is_broker) as broker_at,
+        count(*) filter (where is_broker)::int as broker_messages,
+        bool_or(direction = 'incoming' and media_kind = 'document' and (lower(coalesce(media_mime_type, '')) = 'application/pdf' or lower(coalesce(media_filename, '')) like '%.pdf') and sent_at >= assigned_at) as customer_pdf,
+        bool_or(direction = 'incoming' and media_kind = 'image' and sent_at >= assigned_at) as customer_image
+      from message_window
+      group by lead_id, broker_id, day
+    ), ordered_messages as (
+      select
+        lead_id,
+        broker_id,
+        sent_at,
+        is_broker,
+        max(sent_at) filter (where direction = 'incoming') over (partition by lead_id order by sent_at rows between unbounded preceding and 1 preceding) as last_customer_at
+      from message_window
+    ), broker_reply_candidates as (
+      select
+        lead_id,
+        broker_id,
+        sent_at,
+        last_customer_at,
+        row_number() over (partition by lead_id, last_customer_at order by sent_at) as reply_order
+      from ordered_messages
+      where is_broker and last_customer_at is not null
+    ), reply_averages as (
+      select broker_id, avg(extract(epoch from (sent_at - last_customer_at)))::float8 as average_reply_seconds
+      from broker_reply_candidates
+      where reply_order = 1
+      group by broker_id
+    )
+    select
+      daily_messages.lead_id,
+      daily_messages.broker_id,
+      daily_messages.day,
+      daily_messages.customer_at,
+      daily_messages.broker_at,
+      daily_messages.broker_messages,
+      daily_messages.customer_pdf,
+      daily_messages.customer_image,
+      reply_averages.average_reply_seconds
+    from daily_messages
+    left join reply_averages on reply_averages.broker_id = daily_messages.broker_id
+  `);
+  type NegotiationMessageDayRow = {
+    lead_id: string | null;
+    broker_id: string | null;
+    day: string;
+    customer_at: Date | string | null;
+    broker_at: Date | string | null;
+    broker_messages: number | string;
+    customer_pdf: boolean | null;
+    customer_image: boolean | null;
+    average_reply_seconds: number | string | null;
+  };
+  const messageRows = (Array.isArray(rawMessageRows) ? rawMessageRows : (rawMessageRows as { rows?: unknown[] }).rows ?? []) as NegotiationMessageDayRow[];
+  const groupedMessages = new Map<string, NegotiationMessageDayRow[]>();
+  const replyAverageByBroker = new Map<string, { totalSeconds: number; count: number }>();
+  for (const row of messageRows) {
+    if (!row.lead_id) continue;
+    const rows = groupedMessages.get(row.lead_id) ?? [];
     rows.push(row);
-    groupedMessages.set(row.leadId, rows);
+    groupedMessages.set(row.lead_id, rows);
+    const averageReplySeconds = Number(row.average_reply_seconds);
+    if (row.broker_id && row.average_reply_seconds !== null && Number.isFinite(averageReplySeconds) && averageReplySeconds >= 0) {
+      replyAverageByBroker.set(row.broker_id, { totalSeconds: averageReplySeconds, count: 1 });
+    }
   }
-
-  const replyWindow = sql<Date | null>`max(${schema.whatsappMessages.sentAt}) filter (where ${schema.whatsappMessages.direction} = 'incoming') over (partition by ${schema.whatsappMessages.leadId} order by ${schema.whatsappMessages.sentAt} rows between unbounded preceding and 1 preceding)`;
-  const orderedMessages = db.select({
-    brokerId: schema.leads.corretorId,
-    leadId: schema.whatsappMessages.leadId,
-    sentAt: schema.whatsappMessages.sentAt,
-    lastCustomerAt: replyWindow,
-    isBroker: sql<boolean>`${BROKER_MESSAGE}`,
-  })
-    .from(schema.whatsappMessages)
-    .innerJoin(schema.leads, eq(schema.leads.id, schema.whatsappMessages.leadId))
-    .where(and(
-      eq(schema.whatsappMessages.tenantId, context.tenantId),
-      eq(schema.leads.tenantId, context.tenantId),
-      inArray(schema.whatsappMessages.leadId, leadIds),
-      gte(schema.whatsappMessages.sentAt, since),
-      REAL_MESSAGE,
-    )).as("ordered_messages");
-  const brokerReplyCandidates = db.select({
-    brokerId: orderedMessages.brokerId,
-    sentAt: orderedMessages.sentAt,
-    lastCustomerAt: orderedMessages.lastCustomerAt,
-    replyOrder: sql<number>`row_number() over (partition by ${orderedMessages.leadId}, ${orderedMessages.lastCustomerAt} order by ${orderedMessages.sentAt})`,
-  })
-    .from(orderedMessages)
-    .where(and(eq(orderedMessages.isBroker, true), isNotNull(orderedMessages.lastCustomerAt)))
-    .as("broker_reply_candidates");
-  const replyRows = await db.select({
-    brokerId: brokerReplyCandidates.brokerId,
-    averageReplySeconds: sql<number | null>`avg(extract(epoch from (${brokerReplyCandidates.sentAt} - ${brokerReplyCandidates.lastCustomerAt})))::float8`,
-  })
-    .from(brokerReplyCandidates)
-    .where(eq(brokerReplyCandidates.replyOrder, 1))
-    .groupBy(brokerReplyCandidates.brokerId);
-  const replyAverageByBroker = new Map(replyRows.filter((row): row is typeof row & { brokerId: string; averageReplySeconds: number } => Boolean(row.brokerId && row.averageReplySeconds !== null && Number.isFinite(row.averageReplySeconds) && row.averageReplySeconds >= 0)).map((row) => [row.brokerId!, { totalSeconds: row.averageReplySeconds!, count: 1 }]));
 
   const leads: NegotiationLead[] = [];
   const dayExchangeLeadIds = new Map<string, Set<string>>();
@@ -315,13 +338,23 @@ export async function getNegotiationsDashboard(context: TenantContext, requested
   for (const row of leadRows) {
     if (!row.brokerId) continue;
     const daily = groupedMessages.get(row.id) ?? [];
-    const latestCustomer = daily.reduce<Date | null>((latest, item) => item.customerAt && (!latest || item.customerAt > latest) ? item.customerAt : latest, null);
-    const latestBroker = daily.reduce<Date | null>((latest, item) => item.brokerAt && (!latest || item.brokerAt > latest) ? item.brokerAt : latest, null);
+    const latestCustomer = daily.reduce<Date | null>((latest, item) => {
+      const customerAt = asDate(item.customer_at);
+      return customerAt && (!latest || customerAt > latest) ? customerAt : latest;
+    }, null);
+    const latestBroker = daily.reduce<Date | null>((latest, item) => {
+      const brokerAt = asDate(item.broker_at);
+      return brokerAt && (!latest || brokerAt > latest) ? brokerAt : latest;
+    }, null);
     const fiveDayCutoff = now.getTime() - NEGOTIATION_LIMITS.exchangeHistoryDays * 24 * 60 * 60 * 1000;
-    const twoWayDaysLast5 = daily.filter((item) => item.customerAt && item.brokerAt && item.customerAt.getTime() >= fiveDayCutoff && item.brokerAt.getTime() >= fiveDayCutoff).length;
-    const ai = parseAiDetails(row.qualificationDetails);
-    const customerSentPdf = daily.some((item) => item.customerPdf === true);
-    const customerSentImage = daily.some((item) => item.customerImage === true);
+    const twoWayDaysLast5 = daily.filter((item) => {
+      const customerAt = asDate(item.customer_at);
+      const brokerAt = asDate(item.broker_at);
+      return customerAt !== null && brokerAt !== null && customerAt.getTime() >= fiveDayCutoff && brokerAt.getTime() >= fiveDayCutoff;
+    }).length;
+    const ai = parseAiDetails(row.aiIntelligence, row.aiLastAnalyzedAt);
+    const customerSentPdf = daily.some((item) => item.customer_pdf === true);
+    const customerSentImage = daily.some((item) => item.customer_image === true);
     const assessment = computeNegotiationLevel({
       status: row.status,
       stageEnteredAt: row.stageEnteredAt,
@@ -337,12 +370,12 @@ export async function getNegotiationsDashboard(context: TenantContext, requested
       ai,
     });
     for (const item of daily) {
-      if (item.customerAt && item.brokerAt) {
+      if (item.customer_at && item.broker_at) {
         const ids = dayExchangeLeadIds.get(item.day) ?? new Set<string>();
         ids.add(row.id);
         dayExchangeLeadIds.set(item.day, ids);
       }
-      brokerMessageCounts.set(item.day, (brokerMessageCounts.get(item.day) ?? 0) + item.brokerMessages);
+      brokerMessageCounts.set(item.day, (brokerMessageCounts.get(item.day) ?? 0) + Number(item.broker_messages));
     }
     const baseSummary = brokerBase.get(row.brokerId) ?? { name: row.brokerName ?? "Corretor", total: 0, crmCount: 0, firstResponseSum: 0, firstResponseCount: 0 };
     baseSummary.total += 1;
@@ -416,7 +449,7 @@ export async function getNegotiationsDashboard(context: TenantContext, requested
     const day = localDayKey(date);
     const advanced = new Set(leads.filter((lead) => lead.level === "advanced" && lead.stageEnteredAt && localDayKey(new Date(lead.stageEnteredAt)) === day).map((lead) => lead.id));
     const closing = new Set(leads.filter((lead) => lead.level === "closing" && lead.stageEnteredAt && localDayKey(new Date(lead.stageEnteredAt)) === day).map((lead) => lead.id));
-    dailyStats.push({ day, label: dateLabel(day), leadsWithExchange: dayExchangeLeadIds.get(day)?.size ?? 0, brokerMessages: brokerMessageCounts.get(day) ?? 0, newlyAdvanced: advanced.size, newlyClosing: closing.size });
+    dailyStats.push({ day, label: dateLabel(day), leadsWithExchange: dayExchangeLeadIds.get(day)?.size ?? 0, brokerMessages: brokerMessageCounts.get(day) ?? 0, currentlyAdvanced: advanced.size, currentlyClosing: closing.size });
   }
 
   const aiAuditPromise = db.select({ total: countDistinct(schema.auditLogs.id) })
@@ -432,15 +465,6 @@ export async function getNegotiationsDashboard(context: TenantContext, requested
       gte(schema.aiAttendanceLogs.createdAt, since24Hours),
     ));
   const [aiAudit, aiFailures] = await Promise.all([aiAuditPromise, aiFailuresPromise]);
-
-  await db.insert(schema.auditLogs).values({
-    id: randomUUID(),
-    userId: context.userId,
-    entidade: "negotiations_area",
-    entidadeId: branchId ?? context.tenantId,
-    acao: "negotiations.viewed",
-    createdAt: now,
-  }).catch((error) => console.warn("[negotiations] auditoria de visualização indisponível", error));
 
   return {
     generatedAt: now.toISOString(),
