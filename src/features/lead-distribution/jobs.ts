@@ -457,6 +457,20 @@ async function claimNextJob(workerId: string, config: DistributionJobConfig, ten
   return claimed ? { job: claimed, rank: Number(candidate.rank) as TemperatureRank } : null;
 }
 
+/** Hands a claimed job back untouched (time budget reached): same attempt count, runs again next pass. */
+async function releaseJob(jobId: string) {
+  const now = new Date();
+  await getDatabase().update(schema.leadDistributionJobs).set({
+    status: "pending",
+    attemptCount: sql`greatest(${schema.leadDistributionJobs.attemptCount} - 1, 0)`,
+    lockedAt: null,
+    lockedBy: null,
+    leaseExpiresAt: null,
+    runAfter: now,
+    updatedAt: now,
+  }).where(and(eq(schema.leadDistributionJobs.id, jobId), eq(schema.leadDistributionJobs.status, "processing")));
+}
+
 async function completeJob(jobId: string) {
   const now = new Date();
   await getDatabase().update(schema.leadDistributionJobs).set({ status: "completed", completedAt: now, lockedAt: null, lockedBy: null, leaseExpiresAt: null, lastErrorCode: null, lastErrorMessage: null, updatedAt: now }).where(eq(schema.leadDistributionJobs.id, jobId));
@@ -500,7 +514,7 @@ async function deferOrFailJob(
   return exhausted;
 }
 
-export async function runLeadDistributionProcessor(input: { tenantId?: string; leadId?: string; limit?: number } = {}): Promise<DistributionJobRunResult> {
+export async function runLeadDistributionProcessor(input: { tenantId?: string; leadId?: string; limit?: number; deadline?: number } = {}): Promise<DistributionJobRunResult> {
   const config = await getDistributionJobConfig();
   const result: DistributionJobRunResult = { seeded: 0, claimed: 0, assigned: 0, offered: 0, outboundMessageIds: [], deferred: 0, failed: 0, skipped: 0, recoveredLeases: 0, recoveredAssignments: 0 };
   if (!config.enabled) return result;
@@ -526,7 +540,9 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
   const workerId = `distribution:${randomUUID()}`;
 
   const claimedJobs: Array<{ job: typeof schema.leadDistributionJobs.$inferSelect; rank: TemperatureRank }> = [];
+  const pastDeadline = () => input.deadline !== undefined && Date.now() >= input.deadline;
   for (let index = 0; index < effectiveConfig.batchSize; index += 1) {
+    if (pastDeadline()) break;
     const claimed = await claimNextJob(workerId, effectiveConfig, input.tenantId, input.leadId);
     if (!claimed) break;
     claimedJobs.push(claimed);
@@ -538,6 +554,13 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
   for (const wave of groupByTemperatureRank(claimedJobs, (claimed) => claimed.rank).map((group) => group.map((claimed) => claimed.job))) {
     // 2 at a time: the jobs share a small set of DB sockets (24/10).
     await runWithConcurrency(wave, Math.min(2, wave.length || 1), async (job) => {
+      // Offering a lead sends its WhatsApp inline (spacing + humanized WAHA), so one batch could
+      // run for minutes. Past the run's budget the job goes back untouched to the next pass (26/10).
+      if (pastDeadline()) {
+        await releaseJob(job.id);
+        result.skipped += 1;
+        return;
+      }
       const [currentLead] = await getDatabase().select({ status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, qualificationState: schema.leads.qualificationState, distributionStatus: schema.leads.distributionStatus, deletedAt: schema.leads.deletedAt, archivedAt: schema.leads.archivedAt, nome: schema.leads.nome })
         .from(schema.leads)
         .where(and(eq(schema.leads.id, job.leadId), eq(schema.leads.tenantId, job.tenantId)))
@@ -604,6 +627,7 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
  * which runs every minute.
  */
 export const DISTRIBUTION_DRAIN_BUDGET_MS = 90_000;
+export const DISTRIBUTION_DRAIN_BATCH_LIMIT = 20;
 
 export async function drainLeadDistributionBacklog(input: { tenantId?: string; maxBatches?: number; budgetMs?: number } = {}) {
   const aggregate: DistributionJobRunResult & { stoppedByBudget: boolean } = { seeded: 0, claimed: 0, assigned: 0, offered: 0, outboundMessageIds: [], deferred: 0, failed: 0, skipped: 0, recoveredLeases: 0, recoveredAssignments: 0, stoppedByBudget: false };
@@ -614,7 +638,8 @@ export async function drainLeadDistributionBacklog(input: { tenantId?: string; m
       aggregate.stoppedByBudget = true;
       break;
     }
-    const result = await runLeadDistributionProcessor({ tenantId: input.tenantId });
+    // Smaller batches with the deadline checked per lead: a single batch of 100 offers could last minutes.
+    const result = await runLeadDistributionProcessor({ tenantId: input.tenantId, limit: DISTRIBUTION_DRAIN_BATCH_LIMIT, deadline });
     for (const key of ["seeded", "claimed", "assigned", "offered", "deferred", "failed", "skipped", "recoveredLeases", "recoveredAssignments"] as const) {
       aggregate[key] += result[key];
     }
