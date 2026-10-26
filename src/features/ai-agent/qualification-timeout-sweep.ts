@@ -17,6 +17,23 @@ export interface QualificationTimeoutSweepResult {
   distributedLeads: number;
 }
 
+/**
+ * Statuses the sweep never touches. "hot" is not here: since 23/10 a lead with
+ * plan type, lives and ages is hot while the conversation is still IN_PROGRESS,
+ * and only this sweep closes it when the customer stops answering. Excluding it
+ * left those hot leads out of distribution for good (incident 26/10).
+ */
+export const QUALIFICATION_TIMEOUT_SKIPPED_STATUSES = [
+  "qualified",
+  "warm",
+  "cold",
+  "disqualified",
+  "not_qualified",
+  "waiting_human",
+  "no_whatsapp_contact",
+  "meta_blocked",
+] as const;
+
 export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Promise<QualificationTimeoutSweepResult> {
   let db;
   try {
@@ -78,17 +95,7 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
             eq(schema.leads.qualificationStatus, "pending"),
             isNull(schema.leads.qualificationStatus)
           ),
-          notInArray(schema.leads.qualificationStatus, [
-            "qualified",
-            "hot",
-            "warm",
-            "cold",
-            "disqualified",
-            "not_qualified",
-            "waiting_human",
-            "no_whatsapp_contact",
-            "meta_blocked"
-          ])
+          notInArray(schema.leads.qualificationStatus, [...QUALIFICATION_TIMEOUT_SKIPPED_STATUSES])
         )
       );
 
