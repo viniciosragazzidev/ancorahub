@@ -353,6 +353,20 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Exige confirmação do corretor antes de torná-lo elegível aos leads do plantão vigente.",
   },
+  DUTY_OVERNIGHT_EXTRA_SHIFT: {
+    key: "feature_duty_overnight_extra_shift_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Plantão extra dos leads da noite (DEC-152): os leads das 19h às 8h vão, a partir do horário do extra, para os escalados da manhã da fila que confirmarem o link.",
+  },
+  DUTY_OVERNIGHT_EXTRA_STARTS_AT: {
+    key: "duty_overnight_extra_shift_starts_at",
+    scope: "global",
+    defaultValue: "07:00",
+    allowedValues: ["06:00", "06:30", "07:00", "07:30", "08:00"] as const,
+    description: "Horário em que o plantão extra dos leads da noite começa e o link é enviado.",
+  },
   ATTENDANCE_FLOWS: {
     key: "feature_attendance_flows_enabled",
     scope: "global",

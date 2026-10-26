@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, exists, gt, lte, or, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
-import { effectiveAttendanceMode, getSelfDutyConfirmationWindowState, SELF_CONFIRM_LATE_MESSAGE, SELF_CONFIRM_OPENS_MINUTES, SELF_CONFIRM_TOLERANCE_MINUTES } from "@/features/lead-distribution/duty-presence-domain";
+import { effectiveAttendanceMode, getExtraShiftConfirmationWindowState, getSelfDutyConfirmationWindowState, isExtraShiftRecord, SELF_CONFIRM_LATE_MESSAGE, SELF_CONFIRM_OPENS_MINUTES, SELF_CONFIRM_TOLERANCE_MINUTES } from "@/features/lead-distribution/duty-presence-domain";
 import { wakeLeadsAwaitingEligibleBroker } from "@/features/lead-distribution/jobs";
 
 export const runtime = "nodejs";
@@ -18,16 +18,22 @@ export async function POST(request: NextRequest) {
   const db = getDatabase();
   // Presencial is confirmed only in the app, with the photo of the place (the link page sends the broker there).
   // A broker marked online inside a presencial plantão confirms here with one tap.
-  const [mode] = await db.select({ status: schema.dutyPresenceConfirmations.status, attendanceMode: schema.unitDutySchedules.attendanceMode, assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode, shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt, shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt, joinedAt: schema.dutyRosterAssignments.createdAt })
+  const [mode] = await db.select({ status: schema.dutyPresenceConfirmations.status, attendanceMode: schema.unitDutySchedules.attendanceMode, assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode, shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt, shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt, joinedAt: schema.dutyRosterAssignments.createdAt, assignmentStartsAt: schema.dutyRosterAssignments.startsAt, timezone: schema.unitDutySchedules.timezone })
     .from(schema.dutyPresenceConfirmations)
     .innerJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.dutyPresenceConfirmations.scheduleId), eq(schema.unitDutySchedules.tenantId, schema.dutyPresenceConfirmations.tenantId)))
     .leftJoin(schema.dutyRosterAssignments, and(eq(schema.dutyRosterAssignments.id, schema.dutyPresenceConfirmations.assignmentId), eq(schema.dutyRosterAssignments.tenantId, schema.dutyPresenceConfirmations.tenantId)))
     .where(eq(schema.dutyPresenceConfirmations.id, parsed.data.id)).limit(1);
   const now = new Date();
-  const windowState = mode ? getSelfDutyConfirmationWindowState({ startsAt: mode.shiftStartsAt, endsAt: mode.shiftEndsAt, now, joinedAt: mode.joinedAt }) : null;
+  // Plantão extra dos leads da noite (DEC-152): confirma com um toque, sem foto e sem tolerância, até o plantão normal começar.
+  const isExtra = Boolean(mode && isExtraShiftRecord({ shiftEndsAt: mode.shiftEndsAt, assignmentStartsAt: mode.assignmentStartsAt, timezone: mode.timezone }));
+  const windowState = mode
+    ? isExtra
+      ? getExtraShiftConfirmationWindowState({ startsAt: mode.shiftStartsAt, endsAt: mode.shiftEndsAt, now })
+      : getSelfDutyConfirmationWindowState({ startsAt: mode.shiftStartsAt, endsAt: mode.shiftEndsAt, now, joinedAt: mode.joinedAt })
+    : null;
   if (mode?.status === "pending" && windowState === "late") return NextResponse.json({ success: false, error: SELF_CONFIRM_LATE_MESSAGE }, { status: 409 });
   if (mode?.status === "pending" && windowState === "not_open") return NextResponse.json({ success: false, error: `A confirmação abre ${SELF_CONFIRM_OPENS_MINUTES} minutos antes do plantão.` }, { status: 409 });
-  if (mode && effectiveAttendanceMode(mode.assignmentAttendanceMode, mode.attendanceMode) === "presencial") return NextResponse.json({ success: false, error: "Este plantão é presencial: confirme pelo app, tirando uma foto do local." }, { status: 409 });
+  if (mode && !isExtra && effectiveAttendanceMode(mode.assignmentAttendanceMode, mode.attendanceMode) === "presencial") return NextResponse.json({ success: false, error: "Este plantão é presencial: confirme pelo app, tirando uma foto do local." }, { status: 409 });
   const result = await db.transaction(async (tx) => {
     const [confirmed] = await tx.update(schema.dutyPresenceConfirmations).set({ status: "confirmed", confirmedAt: now, updatedAt: now })
       .where(and(
@@ -53,7 +59,10 @@ export async function POST(request: NextRequest) {
             // Tolerance counts from the start, or from when the broker joined a plantão already running.
             // ISO string + cast: a Date in a raw `sql` reaches Postgres as Date.toString() and the
             // whole confirmation failed (23/10, every broker at 08:50 saw "Não foi possível confirmar agora").
-            sql`greatest(${schema.dutyPresenceConfirmations.shiftStartsAt}, ${schema.dutyRosterAssignments.createdAt}) >= ${new Date(now.getTime() - SELF_CONFIRM_TOLERANCE_MINUTES * 60_000).toISOString()}::timestamptz`,
+            // The extra plantão has no tolerance (DEC-152).
+            isExtra
+              ? sql`true`
+              : sql`greatest(${schema.dutyPresenceConfirmations.shiftStartsAt}, ${schema.dutyRosterAssignments.createdAt}) >= ${new Date(now.getTime() - SELF_CONFIRM_TOLERANCE_MINUTES * 60_000).toISOString()}::timestamptz`,
           ))),
       ))
       .returning({ id: schema.dutyPresenceConfirmations.id, brokerId: schema.dutyPresenceConfirmations.brokerId, tenantId: schema.dutyPresenceConfirmations.tenantId });
@@ -71,7 +80,9 @@ export async function POST(request: NextRequest) {
       .where(eq(schema.dutyPresenceConfirmations.id, parsed.data.id)).limit(1);
     if (existing?.status === "confirmed") return { state: "already_confirmed" as const };
     if (existing?.status === "pending") {
-      const existingWindowState = getSelfDutyConfirmationWindowState({ startsAt: existing.shiftStartsAt, endsAt: existing.shiftEndsAt, now, joinedAt: existing.joinedAt });
+      const existingWindowState = isExtra
+        ? getExtraShiftConfirmationWindowState({ startsAt: existing.shiftStartsAt, endsAt: existing.shiftEndsAt, now })
+        : getSelfDutyConfirmationWindowState({ startsAt: existing.shiftStartsAt, endsAt: existing.shiftEndsAt, now, joinedAt: existing.joinedAt });
       if (existingWindowState === "late") return { state: "late" as const };
       if (existingWindowState === "not_open") return { state: "not_open" as const };
     }

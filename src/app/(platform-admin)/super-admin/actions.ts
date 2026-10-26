@@ -850,6 +850,25 @@ export async function updateDutyPresenceConfirmationSettingsAction(formData: For
   });
 }
 
+/** Plantão extra dos leads da noite (DEC-152): liga/desliga e horário de início, com auditoria. */
+export async function updateDutyOvernightExtraSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("dutyOvernightExtraEnabled") === "true" ? "true" : "false";
+  const startsAtRaw = String(formData.get("dutyOvernightExtraStartsAt") ?? "").trim();
+  const allowed = FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.allowedValues;
+  if (!allowed.includes(startsAtRaw as (typeof allowed)[number])) throw new Error("Escolha um horário válido para o plantão extra.");
+  const now = new Date();
+  await setSystemSetting(FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_SHIFT.key, enabled, now);
+  await setSystemSetting(FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.key, startsAtRaw, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId,
+    action: "duty_overnight_extra_shift.settings_updated",
+    targetType: "system_settings", targetId: FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_SHIFT.key,
+    metadata: { enabled: enabled === "true", startsAt: startsAtRaw }, createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+}
+
 export async function updateAttendanceFlowsSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("attendanceFlowsEnabled") === "true" ? "true" : "false";

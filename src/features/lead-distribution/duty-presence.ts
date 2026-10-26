@@ -5,7 +5,7 @@ import { and, eq, gt, inArray, isNull, lte, lt, ne, or, sql } from "drizzle-orm"
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
-import { effectiveAttendanceMode, findDutyOccurrenceConfirmation, formatDutyPresenceHourLabel, getRelevantDutyWindow, getSelfDutyConfirmationWindowState, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
+import { DEFAULT_EXTRA_SHIFT_STARTS_AT, effectiveAttendanceMode, extraShiftWindow, findDutyOccurrenceConfirmation, formatDutyPresenceHourLabel, getRelevantDutyWindow, getSelfDutyConfirmationWindowState, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
 import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "./dated-duty-roster";
 
 export { SELF_CONFIRM_LATE_MESSAGE, SELF_CONFIRM_OPENS_MINUTES, SELF_CONFIRM_TOLERANCE_MINUTES } from "./duty-presence-domain";
@@ -16,6 +16,16 @@ type PresenceSchedule = { id: string; dayOfWeek: number; startsAt: string; endsA
 
 export async function isDutyPresenceConfirmationEnabled() {
   return (await getFeatureFlag(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION)) === "true";
+}
+
+/** Plantão extra dos leads da noite (DEC-152): ligado pelo Super-admin, com horário de início. */
+export async function getOvernightExtraShiftSettings(): Promise<{ enabled: boolean; startsAt: string }> {
+  const [enabled, startsAt] = await Promise.all([
+    getFeatureFlag(FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_SHIFT).catch(() => "false"),
+    getFeatureFlag(FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT).catch(() => DEFAULT_EXTRA_SHIFT_STARTS_AT),
+  ]);
+  const allowed = FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.allowedValues as readonly string[];
+  return { enabled: enabled === "true", startsAt: allowed.includes(startsAt) ? startsAt : DEFAULT_EXTRA_SHIFT_STARTS_AT };
 }
 
 function getWindow(schedule: PresenceSchedule, now: Date): DutyWindow | null {
@@ -147,22 +157,16 @@ export async function processDutyPresenceReminders(now = new Date()) {
   let considered = 0;
   let queued = 0;
   let failed = 0;
-  for (const assignment of assignments) {
-    const schedule = scheduleById.get(assignment.scheduleId);
-    // Presencial also gets the WhatsApp reminder (2026-10-12): its link opens the app, where the photo of the place confirms.
-    if (!schedule || schedule.tenantId !== assignment.tenantId) continue;
-    const window = getWindow({
-      id: schedule.id, dayOfWeek: assignment.dayOfWeek, startsAt: assignment.startsAt,
-      endsAt: assignment.endsAt, timezone: schedule.timezone,
-      validFrom: assignment.validFrom, validUntil: assignment.validUntil,
-    }, now);
-    // Do not create reminders outside the 30-minute pre-shift window or active shift.
-    if (!window) continue;
-    const reminderOpensAt = new Date(window.startsAt.getTime() - 30 * 60_000);
-    if (now < reminderOpensAt || now >= window.endsAt) continue;
-    const shiftDay = getSaoPauloDateKey(window.startsAt);
+  const extraShift = await getOvernightExtraShiftSettings();
+  type Assignment = (typeof assignments)[number];
+  type Schedule = (typeof schedules)[number];
+  const isEffectiveOn = async (assignment: Assignment, shiftDay: string) => {
     const group = sameBrokerRows.get(`${assignment.tenantId}|${assignment.scheduleId}|${assignment.brokerId}`) ?? [assignment];
-    if (!selectEffectiveDutyAssignments(group, shiftDay, await publishedFor(assignment.tenantId, shiftDay)).some((row) => row.id === assignment.id)) continue;
+    return selectEffectiveDutyAssignments(group, shiftDay, await publishedFor(assignment.tenantId, shiftDay)).some((row) => row.id === assignment.id);
+  };
+
+  /** One idempotent confirmation per occurrence (normal or extra) and its WhatsApp link. */
+  const remind = async (assignment: Assignment, schedule: Schedule, window: DutyWindow, labelName: string) => {
     considered += 1;
     const confirmationId = randomUUID();
     const [inserted] = await db.insert(schema.dutyPresenceConfirmations).values({
@@ -188,7 +192,7 @@ export async function processDutyPresenceReminders(now = new Date()) {
     // Already confirmed (e.g. released by a director/manager): no invite.
     if (!record || record.status === "confirmed" || record.status === "absent" || record.notificationStatus === "queued" || record.notificationStatus === "sent"
       || record.notificationErrorCode === "OUTBOX_DELIVERY_FAILED"
-      || record.notificationErrorCode === "TEMPLATE_DELIVERY_FAILED") continue;
+      || record.notificationErrorCode === "TEMPLATE_DELIVERY_FAILED") return;
     const staleDispatchCutoff = new Date(now.getTime() - 5 * 60_000);
     const [claimed] = await db.update(schema.dutyPresenceConfirmations).set({ notificationStatus: "dispatching", updatedAt: now }).where(and(
       eq(schema.dutyPresenceConfirmations.id, record.id),
@@ -197,7 +201,7 @@ export async function processDutyPresenceReminders(now = new Date()) {
         and(eq(schema.dutyPresenceConfirmations.notificationStatus, "dispatching"), lt(schema.dutyPresenceConfirmations.updatedAt, staleDispatchCutoff)),
       ),
     )).returning({ id: schema.dutyPresenceConfirmations.id });
-    if (!claimed) continue;
+    if (!claimed) return;
     try {
       if (!assignment.phone) throw new Error("BROKER_PHONE_UNAVAILABLE");
       const delivery = await enqueueMetaTemplateMessage({
@@ -206,14 +210,14 @@ export async function processDutyPresenceReminders(now = new Date()) {
         recipientId: assignment.brokerId,
         destinationPhone: assignment.phone,
         purpose: "dutyPresenceConfirmation",
-        variables: [assignment.brokerName, formatDutyPresenceHourLabel(window.startsAt, schedule.timezone, schedule.name), record.id],
+        variables: [assignment.brokerName, formatDutyPresenceHourLabel(window.startsAt, schedule.timezone, labelName), record.id],
         requestedBy: null,
         idempotencyKey: `duty-presence:${record.id}`,
       });
       if (["failed", "cancelled", "expired"].includes(delivery.status)) {
         await db.update(schema.dutyPresenceConfirmations).set({ notificationStatus: "error", notificationErrorCode: "OUTBOX_DELIVERY_FAILED", updatedAt: now }).where(eq(schema.dutyPresenceConfirmations.id, record.id));
         failed += 1;
-        continue;
+        return;
       }
       const delivered = ["sent", "delivered", "read"].includes(delivery.status);
       await db.update(schema.dutyPresenceConfirmations).set({ notificationStatus: delivered ? "sent" : "queued", notificationErrorCode: null, updatedAt: now }).where(eq(schema.dutyPresenceConfirmations.id, record.id));
@@ -223,6 +227,37 @@ export async function processDutyPresenceReminders(now = new Date()) {
       await db.update(schema.dutyPresenceConfirmations).set({ notificationStatus: "error", notificationErrorCode: safeCode, updatedAt: now }).where(eq(schema.dutyPresenceConfirmations.id, record.id));
       failed += 1;
     }
+  };
+
+  for (const assignment of assignments) {
+    const schedule = scheduleById.get(assignment.scheduleId);
+    // Presencial also gets the WhatsApp reminder (2026-10-12): its link opens the app, where the photo of the place confirms.
+    if (!schedule || schedule.tenantId !== assignment.tenantId) continue;
+    const weekly = {
+      id: schedule.id, dayOfWeek: assignment.dayOfWeek, startsAt: assignment.startsAt,
+      endsAt: assignment.endsAt, timezone: schedule.timezone,
+      validFrom: assignment.validFrom, validUntil: assignment.validUntil,
+    };
+
+    // Plantão extra (DEC-152): from the extra start until the morning shift begins, every broker on
+    // that morning's roster gets a link saying it is an extra plantão for the night's leads.
+    if (extraShift.enabled) {
+      const upcoming = getRelevantDutyWindow(weekly, now, 6 * 60);
+      const extra = upcoming ? extraShiftWindow(upcoming, schedule.timezone, extraShift.startsAt) : null;
+      const valid = upcoming && upcoming.startsAt >= assignment.validFrom && (!assignment.validUntil || upcoming.startsAt < assignment.validUntil);
+      if (upcoming && extra && valid && now >= extra.startsAt && now < extra.endsAt
+        && await isEffectiveOn(assignment, getSaoPauloDateKey(upcoming.startsAt))) {
+        await remind(assignment, schedule, extra, `extra da noite · ${schedule.name}`);
+      }
+    }
+
+    const window = getWindow(weekly, now);
+    // Do not create reminders outside the 30-minute pre-shift window or active shift.
+    if (!window) continue;
+    const reminderOpensAt = new Date(window.startsAt.getTime() - 30 * 60_000);
+    if (now < reminderOpensAt || now >= window.endsAt) continue;
+    if (!(await isEffectiveOn(assignment, getSaoPauloDateKey(window.startsAt)))) continue;
+    await remind(assignment, schedule, window, schedule.name);
   }
   return { enabled: true, considered, queued, failed, expired: expiredRows.length };
 }

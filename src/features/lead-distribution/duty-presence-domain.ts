@@ -406,3 +406,62 @@ export function isLeadInDutyWindow(lead: { createdAt: Date; assignedAt?: Date | 
   const inside = (value: Date | null | undefined) => Boolean(value && value >= bounds.since && (!bounds.until || value <= bounds.until));
   return inside(lead.createdAt) || inside(lead.assignedAt);
 }
+
+/*
+ * Plantão extra dos leads da noite (DEC-152, 26/10/2026). Os leads que chegaram das 19:00 do dia útil
+ * anterior (sexta, na segunda) até as 08:00 vão para os corretores escalados nos plantões da manhã da
+ * fila do lead, a partir de um horário configurável (07:00), antes do plantão normal. Sem migração: a
+ * confirmação do extra é uma ocorrência própria que termina exatamente quando o plantão normal começa.
+ */
+
+/** Fim da janela dos leads da noite. */
+export const OVERNIGHT_LEADS_UNTIL = "08:00";
+/** Só plantões que começam antes deste horário contam como "da manhã". */
+export const MORNING_SHIFT_STARTS_BEFORE = "12:00";
+export const DEFAULT_EXTRA_SHIFT_STARTS_AT = "07:00";
+
+const clockMinutes = (clock: string) => {
+  const [hour, minute] = clock.split(":").map(Number);
+  return (hour ?? 0) * 60 + (minute ?? 0);
+};
+
+export function localClock(date: Date, timezone: string) {
+  const parts = zonedParts(date, timezone);
+  return `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+}
+
+/**
+ * Janela do plantão extra de uma ocorrência normal: do horário do extra até o início do plantão, no mesmo
+ * dia. Null quando o plantão não é da manhã ou começa antes do extra.
+ */
+export function extraShiftWindow(occurrence: DutyWindow, timezone: string, extraStartsAt = DEFAULT_EXTRA_SHIFT_STARTS_AT): DutyWindow | null {
+  const start = clockMinutes(localClock(occurrence.startsAt, timezone));
+  if (start >= clockMinutes(MORNING_SHIFT_STARTS_BEFORE) || start <= clockMinutes(extraStartsAt)) return null;
+  const startsAt = localTimeToUtc(occurrence.dutyDate, extraStartsAt, timezone);
+  return { dutyDate: occurrence.dutyDate, startsAt, endsAt: occurrence.startsAt };
+}
+
+/** Leads da noite de um dia de plantão: das 19:00 do dia útil anterior (sexta, na segunda) até as 08:00. */
+export function overnightLeadWindow(dutyDate: string, timezone: string) {
+  return {
+    since: localTimeToUtc(addCalendarDays(dutyDate, -daysBackForLeadWindowOn(dutyDate)), DUTY_LEADS_FROM_PREVIOUS_DAY_AT, timezone),
+    until: localTimeToUtc(dutyDate, OVERNIGHT_LEADS_UNTIL, timezone),
+  };
+}
+
+export function isOvernightLead(createdAt: Date, dutyDate: string, timezone: string) {
+  const window = overnightLeadWindow(dutyDate, timezone);
+  return createdAt >= window.since && createdAt < window.until;
+}
+
+/** Confirmação do extra: termina na hora em que o plantão normal do corretor começa. */
+export function isExtraShiftRecord(input: { shiftEndsAt: Date; assignmentStartsAt: string | null | undefined; timezone: string }) {
+  return Boolean(input.assignmentStartsAt) && localClock(input.shiftEndsAt, input.timezone) === input.assignmentStartsAt;
+}
+
+/** O extra não tem tolerância nem foto: dá para confirmar do início da janela até o plantão normal começar. */
+export function getExtraShiftConfirmationWindowState(input: { startsAt: Date; endsAt: Date; now: Date }): SelfDutyConfirmationWindowState {
+  if (input.now.getTime() < input.startsAt.getTime() - SELF_CONFIRM_OPENS_MINUTES * 60_000) return "not_open";
+  if (input.now >= input.endsAt) return "ended";
+  return "available";
+}

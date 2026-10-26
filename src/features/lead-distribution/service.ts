@@ -22,8 +22,8 @@ import { normalizeQueueSource } from "./routing-catalog";
 import { findBrokerRunningDutyScheduleId, getActiveQueueDutyRoster } from "./active-queue-duty-roster";
 import { countReceivedInDuty, type DutyReceipt } from "./duty-attribution";
 import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
-import { getPresenceEligibleAssignments } from "./duty-presence";
-import { findRunningDutySchedule } from "./duty-presence-domain";
+import { getOvernightExtraShiftSettings, getPresenceEligibleAssignments } from "./duty-presence";
+import { extraShiftWindow, findRunningDutySchedule, getRelevantDutyWindow, isExtraShiftRecord, isOvernightLead, MORNING_SHIFT_STARTS_BEFORE } from "./duty-presence-domain";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { countLeadsReceivedInDuty, type DutyLeadCap } from "./duty-lead-cap";
 import { selectBrokerDutyScheduleIds } from "./shared-duty-roster";
@@ -56,6 +56,7 @@ async function getRosterBrokerIds(
   exclusiveScheduleIds?: string[] | null,
   dutyFallbackPolicy: DutyFallbackPolicy = "unit_roster",
   dutyLeadCaps?: ReadonlyMap<string, DutyLeadCap>,
+  leadCreatedAt?: Date | null,
 ): Promise<RosterResolution> {
   const db = getDatabase();
   const local = getLocalDutyParts(date);
@@ -87,6 +88,13 @@ async function getRosterBrokerIds(
   const scopedSchedules = exclusiveScheduleIds?.length
     ? activeSchedules.filter((schedule) => exclusiveScheduleIds.includes(schedule.id))
     : activeSchedules;
+
+  // DEC-152: no plantão running yet, but a lead of the night (19:00 to 08:00) inside the extra window
+  // goes to the morning plantões of this queue, only to the brokers who confirmed the extra link.
+  if (!scopedSchedules.length && leadCreatedAt) {
+    const extra = await resolveOvernightExtraRoster({ tenantId, branchId, date, local, webhookCredentialId, exclusiveScheduleIds, leadCreatedAt });
+    if (extra) return extra;
+  }
 
   // No plantões at all → fallback to all brokers (legacy behavior). A queue
   // with explicit exclusivity is different: no active selected schedule means
@@ -171,6 +179,114 @@ async function getRosterBrokerIds(
     presence.confirmedPresenceAssignmentIds,
   );
   return { brokerIds: new Set(scheduleIdByBroker.keys()), hasActiveSelectedSchedule: true, scheduleIdByBroker, brokersStoppedByDutyCap };
+}
+
+/**
+ * Plantão extra dos leads da noite (DEC-152). Null when it does not apply (switch off, before the extra
+ * start, no morning plantão of the queue today, or the lead is not from the night), so the caller keeps
+ * its usual behavior. When it applies, only brokers with a confirmed extra occurrence are eligible; with
+ * nobody confirmed yet the lead waits and is woken by the confirmation.
+ */
+async function resolveOvernightExtraRoster(input: {
+  tenantId: string;
+  branchId: string;
+  date: Date;
+  local: { weekday: number; time: string };
+  webhookCredentialId?: string | null;
+  exclusiveScheduleIds?: string[] | null;
+  leadCreatedAt: Date;
+}): Promise<RosterResolution | null> {
+  const settings = await getOvernightExtraShiftSettings();
+  if (!settings.enabled || input.local.time < settings.startsAt) return null;
+  const db = getDatabase();
+  const { tenantId, branchId, date, local } = input;
+
+  const morningSchedules = await db.select({
+    id: schema.unitDutySchedules.id,
+    webhookCredentialId: schema.unitDutySchedules.webhookCredentialId,
+    dayOfWeek: schema.unitDutySchedules.dayOfWeek,
+    startsAt: schema.unitDutySchedules.startsAt,
+    endsAt: schema.unitDutySchedules.endsAt,
+    timezone: schema.unitDutySchedules.timezone,
+  })
+    .from(schema.unitDutySchedules)
+    .where(and(
+      eq(schema.unitDutySchedules.tenantId, tenantId),
+      or(eq(schema.unitDutySchedules.branchId, branchId), isNull(schema.unitDutySchedules.branchId)),
+      eq(schema.unitDutySchedules.dayOfWeek, local.weekday),
+      eq(schema.unitDutySchedules.status, "active"),
+      gt(schema.unitDutySchedules.startsAt, local.time),
+      sql`${schema.unitDutySchedules.startsAt} < ${MORNING_SHIFT_STARTS_BEFORE}`,
+      lte(schema.unitDutySchedules.validFrom, date),
+      or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, date)),
+    ));
+  const inExtraWindow = morningSchedules.filter((schedule) => {
+    if (input.exclusiveScheduleIds?.length && !input.exclusiveScheduleIds.includes(schedule.id)) return false;
+    const occurrence = getRelevantDutyWindow(schedule, date, 6 * 60);
+    const extra = occurrence ? extraShiftWindow(occurrence, schedule.timezone, settings.startsAt) : null;
+    return Boolean(occurrence && extra && date >= extra.startsAt && date < extra.endsAt
+      && isOvernightLead(input.leadCreatedAt, occurrence.dutyDate, schedule.timezone));
+  });
+  if (!inExtraWindow.length) return null;
+
+  const matchingScheduleIds = selectMatchingDutyScheduleIds(inExtraWindow, input.webhookCredentialId);
+  if (!matchingScheduleIds.length) return { brokerIds: new Set<string>(), hasActiveSelectedSchedule: true, scheduleIdByBroker: new Map(), brokersStoppedByDutyCap: 0 };
+
+  const assignments = await db.select({
+    id: schema.dutyRosterAssignments.id,
+    brokerId: schema.dutyRosterAssignments.brokerId,
+    scheduleId: schema.dutyRosterAssignments.scheduleId,
+    dayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
+    startsAt: schema.dutyRosterAssignments.startsAt,
+    endsAt: schema.dutyRosterAssignments.endsAt,
+    validFrom: schema.dutyRosterAssignments.validFrom,
+    validUntil: schema.dutyRosterAssignments.validUntil,
+    branchId: schema.dutyRosterAssignments.branchId,
+    dutyDate: schema.dutyRosterAssignments.dutyDate,
+    attendanceMode: schema.dutyRosterAssignments.attendanceMode,
+  })
+    .from(schema.dutyRosterAssignments)
+    .where(and(
+      eq(schema.dutyRosterAssignments.tenantId, tenantId),
+      eq(schema.dutyRosterAssignments.branchId, branchId),
+      eq(schema.dutyRosterAssignments.dayOfWeek, local.weekday),
+      eq(schema.dutyRosterAssignments.status, "active"),
+      isNull(schema.dutyRosterAssignments.pausedAt),
+      gt(schema.dutyRosterAssignments.startsAt, local.time),
+      lte(schema.dutyRosterAssignments.validFrom, date),
+      or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, date)),
+      inArray(schema.dutyRosterAssignments.scheduleId, matchingScheduleIds),
+    ));
+  const effectiveAssignments = await resolveEffectiveDutyAssignments(tenantId, assignments, date);
+  if (!effectiveAssignments.length) return { brokerIds: new Set<string>(), hasActiveSelectedSchedule: true, scheduleIdByBroker: new Map(), brokersStoppedByDutyCap: 0 };
+
+  const timezoneBySchedule = new Map(inExtraWindow.map((schedule) => [schedule.id, schedule.timezone]));
+  const confirmations = await db.select({
+    assignmentId: schema.dutyPresenceConfirmations.assignmentId,
+    shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt,
+  })
+    .from(schema.dutyPresenceConfirmations)
+    .where(and(
+      eq(schema.dutyPresenceConfirmations.tenantId, tenantId),
+      inArray(schema.dutyPresenceConfirmations.assignmentId, effectiveAssignments.map((assignment) => assignment.id)),
+      eq(schema.dutyPresenceConfirmations.status, "confirmed"),
+      lte(schema.dutyPresenceConfirmations.shiftStartsAt, date),
+      gt(schema.dutyPresenceConfirmations.shiftEndsAt, date),
+    ));
+  const assignmentById = new Map(effectiveAssignments.map((assignment) => [assignment.id, assignment]));
+  const confirmedExtra = new Set(confirmations.flatMap((confirmation) => {
+    const assignment = confirmation.assignmentId ? assignmentById.get(confirmation.assignmentId) : undefined;
+    if (!assignment) return [];
+    const timezone = timezoneBySchedule.get(assignment.scheduleId) ?? "America/Sao_Paulo";
+    return isExtraShiftRecord({ shiftEndsAt: confirmation.shiftEndsAt, assignmentStartsAt: assignment.startsAt, timezone }) ? [assignment.id] : [];
+  }));
+  const scheduleIdByBroker = selectBrokerDutyScheduleIds(
+    effectiveAssignments.map((assignment) => ({ id: assignment.id, brokerId: assignment.brokerId, scheduleId: assignment.scheduleId })),
+    new Set(matchingScheduleIds),
+    confirmedExtra,
+    confirmedExtra,
+  );
+  return { brokerIds: new Set(scheduleIdByBroker.keys()), hasActiveSelectedSchedule: true, scheduleIdByBroker, brokersStoppedByDutyCap: 0 };
 }
 
 export async function ensureDefaultQueue(tenantId: string, branchId: string, actorId: string) {
@@ -898,7 +1014,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   let brokersStoppedByDutyCap = 0;
 
   const loadEligibleBrokers = async (branchIds: string[]) => {
-    const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId, exclusiveScheduleIds, (queue?.dutyFallbackPolicy as DutyFallbackPolicy | undefined) ?? (exclusiveScheduleIds?.length ? "wait_next_duty" : "unit_roster"), dutyLeadCaps)] as const));
+    const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId, exclusiveScheduleIds, (queue?.dutyFallbackPolicy as DutyFallbackPolicy | undefined) ?? (exclusiveScheduleIds?.length ? "wait_next_duty" : "unit_roster"), dutyLeadCaps, lead.createdAt)] as const));
     // A broker on the plantão receives its leads whatever unit their membership
     // is in (22/10, case Kelven: escalado e confirmado no PRESENCIAL TARDE de
     // outra unidade, never offered a lead). The plantão's unit is theirs here.

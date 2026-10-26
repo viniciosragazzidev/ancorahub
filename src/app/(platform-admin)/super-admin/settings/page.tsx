@@ -34,6 +34,7 @@ import {
   updateLeadManagementActionsSettingsAction,
   updateManualLeadAssignmentOfferChoiceSettingsAction,
   updateDutyPresenceConfirmationSettingsAction,
+  updateDutyOvernightExtraSettingsAction,
   updateAttendanceFlowsSettingsAction,
   updateDutyMonthlySchedulingSettingsAction,
   updateDutyInactiveBrokersSettingsAction,
@@ -113,6 +114,8 @@ export default async function SuperAdminSettingsPage() {
     "feature_manual_lead_assignment_offer_choice_enabled",
     FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key,
     FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key,
+    FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_SHIFT.key,
+    FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.key,
     FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.key,
     FEATURE_FLAGS.BROKER_DUTY_CALENDAR.key,
     FEATURE_FLAGS.RELATIONSHIP_CENTER.key,
@@ -192,6 +195,11 @@ export default async function SuperAdminSettingsPage() {
     settingMap.get("feature_lead_management_actions_enabled") !== "false";
   const manualLeadAssignmentOfferChoiceEnabled = settingMap.get("feature_manual_lead_assignment_offer_choice_enabled") !== "false";
   const dutyPresenceConfirmationEnabled = settingMap.get(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key) === "true";
+  const dutyOvernightExtraEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_SHIFT.key) ?? FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_SHIFT.defaultValue) === "true";
+  const savedOvernightExtraStartsAt = settingMap.get(FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.key) ?? FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.defaultValue;
+  const dutyOvernightExtraStartsAt = FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.allowedValues.includes(savedOvernightExtraStartsAt as (typeof FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.allowedValues)[number])
+    ? savedOvernightExtraStartsAt
+    : FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.defaultValue;
   const dutyMonthlySchedulingEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key) ?? FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.defaultValue) === "true";
   const dutyInactiveBrokersEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.key) ?? FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.defaultValue) === "true";
   const attendanceFlowsEnabled = (settingMap.get(FEATURE_FLAGS.ATTENDANCE_FLOWS.key) ?? FEATURE_FLAGS.ATTENDANCE_FLOWS.defaultValue) === "true";
@@ -1391,6 +1399,32 @@ export default async function SuperAdminSettingsPage() {
                       <span className="block text-xs text-muted-foreground">Desligada por padrão. Antes de ativar, aplique a migration 0156, aprove/sincronize o template e confirme a agenda de distribuição.</span>
                     </span>
                   </label>
+                  <Button type="submit" variant="outline">Salvar configuração</Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Plantão extra dos leads da noite</CardTitle>
+                <CardDescription>
+                  Os leads que chegaram das 19h do dia útil anterior (sexta, na segunda) até as 8h vão para os escalados dos plantões da manhã da fila do lead, a partir do horário abaixo. No início do extra cada escalado recebe o link avisando que é um plantão extra; quem confirma entra na divisão, sem foto, mesmo no presencial. O presencial continua recebendo o link normal 30 minutos antes do próprio plantão.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateDutyOvernightExtraSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" name="dutyOvernightExtraEnabled" value="true" defaultChecked={dutyOvernightExtraEnabled} className="size-4 accent-primary" />
+                      <span className="font-medium">Plantão extra ligado</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <span>Começa às</span>
+                      <select name="dutyOvernightExtraStartsAt" defaultValue={dutyOvernightExtraStartsAt} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+                        {FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.allowedValues.map((value) => <option key={value} value={value}>{value}</option>)}
+                      </select>
+                    </label>
+                  </div>
                   <Button type="submit" variant="outline">Salvar configuração</Button>
                 </form>
               </CardContent>
