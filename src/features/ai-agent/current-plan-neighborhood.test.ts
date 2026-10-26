@@ -34,7 +34,7 @@ describe("already has a plan (23/10)", () => {
   it("asks it together with the last question, once", () => {
     const memory = { ...createEmptyMemory(), planType: { value: "familiar", confidence: 1 as const }, numberOfLives: { value: "2", confidence: 1 as const } };
     const reply = composeQuestionReply({ key: "email", memory, answered: [], seed: "s", last: true, askCurrentPlan: true });
-    expect(reply).toMatch(/^Pra fechar: /);
+    expect(reply).toMatch(/^Pra fechar a cotação,/);
     expect(asksCurrentPlan(reply)).toBe(true);
     expect(reply).toMatch(/vocês/);
     const next = extractFieldsFromMessage("ana@gmail.com, temos Amil", { ...memory, lastQuestionAsked: reply }, "m2");

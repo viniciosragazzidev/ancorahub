@@ -49,7 +49,7 @@ describe("short answers to the lives question", () => {
     expect(isSingleLifeBusinessPlan(updated)).toBe(true);
     expect(buildPrivateQualificationContext(updated).facts).toContain(PME_SINGLE_LIFE_NOTE);
     const reply = composeQuestionReply({ key: "city", memory: updated, answered: ["numberOfLives"], seed: "s" });
-    expect(reply).toMatch(/^(1 vida, anotado!|Beleza, 1 vida\.)/);
+    expect(reply).toMatch(/^(1 vida, anotado\.|Beleza, 1 vida\.)/);
     expect(reply).not.toMatch(/quantas vidas/i);
   });
 });

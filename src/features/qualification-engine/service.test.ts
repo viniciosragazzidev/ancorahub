@@ -30,6 +30,7 @@ describe("scripted reply acknowledgement", () => {
       planType: { value: "familiar", confidence: 1 as const },
       numberOfLives: { value: "2", confidence: 1 as const },
       age: { value: "46, 10", confidence: 1 as const },
+      city: { value: "Niterói", confidence: 1 as const },
       collectedFields: ["customerName", "city", "planType", "numberOfLives", "age"],
     };
     const turn = resolveDeterministicQualificationTurn({ memory: family, policy });

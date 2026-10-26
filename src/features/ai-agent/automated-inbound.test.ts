@@ -27,19 +27,23 @@ describe("automated inbound messages", () => {
 
 describe("greeting on the first reply", () => {
   it("greets by name and says who is talking and from which company", () => {
-    const greeting = composeGreeting({ name: "NEUZA maria", assistantName: "Ana", companyName: "Âncora Saúde", seed: "conv-1" });
-    expect(greeting).toMatch(/^(Oi|Olá), Neuza/);
-    expect(greeting).toContain("Me chamo Ana e falo da Âncora Saúde");
+    const greeting = composeGreeting({ name: "NEUZA maria", assistantName: "Ana", companyName: "Âncora Saúde", seed: "conv-1", now: new Date("2026-10-21T12:00:00.000Z") });
+    expect(greeting).toMatch(/^Bom dia, Neuza/);
+    expect(greeting).toContain("aqui é Ana, da Âncora Saúde");
   });
 
   it("does not use a placeholder lead name or a generic assistant label as a person", () => {
-    const greeting = composeGreeting({ name: "Lead WhatsApp 5521999", assistantName: "Assistente Âncora Corretora", companyName: "Âncora Saúde", seed: "conv-2" });
-    expect(greeting).toMatch(/^(Oi!|Olá, tudo bem\?|Oi, tudo bem\?) Aqui é da Âncora Saúde\./);
+    const greeting = composeGreeting({ name: "Lead WhatsApp 5521999", assistantName: "Assistente Âncora Corretora", companyName: "Âncora Saúde", seed: "conv-2", now: new Date("2026-10-21T12:00:00.000Z") });
+    expect(greeting).toBe("Bom dia, aqui é da Âncora Saúde.");
     expect(greetingName("Cliente")).toBeNull();
   });
 
-  it("varies the wording across conversations", () => {
-    const texts = new Set(Array.from({ length: 12 }, (_, index) => composeGreeting({ name: "Neuza", assistantName: "Ana", seed: `conv-${index}` })));
-    expect(texts.size).toBeGreaterThan(2);
+  it("uses the São Paulo greeting for each period and is stable within the period", () => {
+    const morning = composeGreeting({ name: "Neuza", assistantName: "Ana", seed: "conv-1", now: new Date("2026-10-21T12:00:00.000Z") });
+    const afternoon = composeGreeting({ name: "Neuza", assistantName: "Ana", seed: "conv-2", now: new Date("2026-10-21T18:00:00.000Z") });
+    const night = composeGreeting({ name: "Neuza", assistantName: "Ana", seed: "conv-3", now: new Date("2026-10-21T22:00:00.000Z") });
+    const samePeriod = composeGreeting({ name: "Neuza", assistantName: "Ana", seed: "conv-4", now: new Date("2026-10-21T12:00:00.000Z") });
+    expect(new Set([morning, afternoon, night]).size).toBe(3);
+    expect(samePeriod).toBe(morning);
   });
 });

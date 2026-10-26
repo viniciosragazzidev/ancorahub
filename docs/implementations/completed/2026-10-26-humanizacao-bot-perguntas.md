@@ -13,13 +13,15 @@
 - O mapeamento por ordem agora exige coerência entre parentesco e idade: titular e cônjuge adultos, filhos/netos mais novos que o titular e pai/mãe mais velhos. Contradição permanece ambígua e não recebe associação.
 - No pós-handoff, correções são aplicadas antes de tentar capturar a resposta opcional de parentesco. Idades novas junto a parentesco entram na correção e no resumo ao corretor; o texto livre não entra no resumo.
 - A captura e a correção usam `lockVersion` ao gravar `lastProcessedMessageId`. A ficha mantém o texto original com o rótulo `O cliente escreveu:`.
+- No handoff noturno, `afterHoursText` preserva o texto do tenant e a troca do corpo mantém o sufixo do turno, incluindo o convite. A extensão de encerramento removida pelo Vigia não foi reintroduzida.
+- Atualizei expectativas de testes que ainda usavam os textos anteriores de saudação, confirmação, pergunta de plano e handoff.
 
 ## Validação
 
 - Vitest focado: 9 arquivos, 115 testes aprovados, sem testes de banco.
 - `npx tsc --noEmit -p .`: aprovado.
 - ESLint nos arquivos alterados: sem erros. Os avisos existentes foram registrados no relatório de verificação.
-- Validação das correções da revisão: Vitest em 7 arquivos, 92 testes aprovados; `npx tsc --noEmit -p .` aprovado; ESLint sem erros, com 16 avisos preexistentes.
+- Validação após integração: Vitest nas suítes `qualification-engine`, `ai-agent`, `ai-qualification`, `message-library` e `leads`, 65 arquivos aprovados, 540 testes aprovados e 2 ignorados; `npx tsc --noEmit -p .` aprovado; ESLint sem erros, com 17 avisos existentes.
 - A verificação global de codificação apontou três arquivos não alterados: `docs/business-rules.md`, `src/features/leads/management-actions.test.ts` e `src/features/reports/metrics/lead-quality-period.test.ts`.
 
 ## Fora desta entrega
