@@ -21,6 +21,17 @@ function todayKey() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
+function nowClock() {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
+}
+
+/** Running now first, then the ones still ahead, then the closed ones; by start time inside each. */
+function dayOrder(date: string, today: string, clock: string, item: { schedule: CalendarSchedule; done: boolean }) {
+  if (item.done) return 2;
+  const running = date === today && item.schedule.startsAt.slice(0, 5) <= clock && clock < item.schedule.endsAt.slice(0, 5);
+  return running ? 0 : 1;
+}
+
 function lastDayOfMonth(month: string) {
   const [year, monthNumber] = month.split("-").map(Number);
   const day = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
@@ -62,6 +73,15 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
   const desktopViewRef = useRef<HTMLDivElement>(null);
   const mobileViewRef = useRef<HTMLElement>(null);
   const [newDutyDate, setNewDutyDate] = useState(today);
+  // Past weeks and the plantões of past days start closed: the board opens on what is still running.
+  const [showPastWeeks, setShowPastWeeks] = useState(false);
+  const [openPastDays, setOpenPastDays] = useState<ReadonlySet<string>>(new Set());
+  const togglePastDay = (date: string) => setOpenPastDays((current) => {
+    const next = new Set(current);
+    if (next.has(date)) next.delete(date);
+    else next.add(date);
+    return next;
+  });
   useEffect(() => {
     if (!directorLite) return;
 
@@ -89,7 +109,8 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
     mobileViewport.addEventListener("change", syncVisibility);
     return () => mobileViewport.removeEventListener("change", syncVisibility);
   }, [directorLite]);
-  const { cells, byDate, weekendCount } = useMemo(() => {
+  const { cells, byDate, weekendCount, pastWeekCount } = useMemo(() => {
+    const clock = nowClock();
     const [year, monthNumber] = month.split("-").map(Number);
     const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
     const firstWeekday = (new Date(Date.UTC(year, monthNumber - 1, 1)).getUTCDay() + 6) % 7; // Monday first
@@ -104,20 +125,35 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
         map.set(item.date, [...(map.get(item.date) ?? []), { schedule, done: item.done }]);
       }
     }
-    for (const list of map.values()) list.sort((a, b) => a.schedule.startsAt.localeCompare(b.schedule.startsAt) || a.schedule.name.localeCompare(b.schedule.name, "pt-BR"));
+    for (const [date, list] of map) list.sort((a, b) => dayOrder(date, today, clock, a) - dayOrder(date, today, clock, b) || a.schedule.startsAt.localeCompare(b.schedule.startsAt) || a.schedule.name.localeCompare(b.schedule.name, "pt-BR"));
     // Drop whole weeks that are already over and had no plantão: the month
     // starts at the first week that still matters (never removes single days).
     const weeks: Array<Array<string | null>> = [];
     for (let index = 0; index < days.length; index += 7) weeks.push(days.slice(index, index + 7));
-    const visibleWeeks = weeks.filter((week) => week.slice(0, 5).some((date) => date && (date >= today || map.has(date))));
+    const relevantWeeks = weeks.filter((week) => week.slice(0, 5).some((date) => date && (date >= today || map.has(date))));
+    const isPastWeek = (week: Array<string | null>) => week.slice(0, 5).every((date) => !date || date < today);
+    const pastWeekCount = relevantWeeks.filter(isPastWeek).length;
+    const visibleWeeks = showPastWeeks ? relevantWeeks : relevantWeeks.filter((week) => !isPastWeek(week));
     // Saturday and Sunday are left out of the board (count shown below if any).
     const weekendCount = weeks.flatMap((week) => week.slice(5)).reduce((sum, date) => sum + (date ? map.get(date)?.length ?? 0 : 0), 0);
-    return { cells: visibleWeeks.flatMap((week) => week.slice(0, 5)), byDate: map, weekendCount };
-  }, [month, progressById, schedules, today]);
+    return { cells: visibleWeeks.flatMap((week) => week.slice(0, 5)), byDate: map, weekendCount, pastWeekCount };
+  }, [month, progressById, schedules, showPastWeeks, today]);
 
   return (
     <>
     <div ref={desktopViewRef} className={cn("overflow-x-auto", directorLite && styles.desktop)}>
+      {pastWeekCount ? (
+        <button
+          type="button"
+          aria-expanded={showPastWeeks}
+          onClick={() => setShowPastWeeks((current) => !current)}
+          className="mb-2 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        >
+          {showPastWeeks
+            ? "Esconder as semanas que já passaram"
+            : `Mostrar ${pastWeekCount} ${pastWeekCount === 1 ? "semana que já passou" : "semanas que já passaram"}`}
+        </button>
+      ) : null}
       <div className="grid min-w-[640px] grid-cols-5 overflow-hidden rounded-[var(--radius-card)] border border-border bg-border gap-px" role="grid" aria-label="Calendário de plantões">
         {WEEKDAY_HEADERS.map((day) => (
           <div key={day} role="columnheader" className="bg-muted/40 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">{day}</div>
@@ -159,7 +195,17 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
                   </button>
                 ) : null}
               </div>
-              {items.map(({ schedule, done }) => {
+              {past && hasItems ? (
+                <button
+                  type="button"
+                  aria-expanded={openPastDays.has(date)}
+                  onClick={() => togglePastDay(date)}
+                  className="w-full rounded-md border border-dashed border-border px-1.5 py-0.5 text-left text-[10px] text-muted-foreground hover:bg-muted/60"
+                >
+                  {openPastDays.has(date) ? "Recolher" : `${items.length} ${items.length === 1 ? "encerrado" : "encerrados"}`}
+                </button>
+              ) : null}
+              {(past && !openPastDays.has(date) ? [] : items).map(({ schedule, done }) => {
                 const published = publishedScheduleIds.has(schedule.id);
                 const inDraft = !published && Boolean(draftScheduleIds?.has(schedule.id));
                 const gap = !done && !published && !inDraft && gapScheduleIds.has(schedule.id);
@@ -204,8 +250,12 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
     </div>
     {directorLite ? (
       <section ref={mobileViewRef} className={styles.mobile} aria-label="Plantões do mês">
+        {[false, true].map((pastGroup) => {
+          const dates = [...byDate.keys()].filter((date) => date.startsWith(`${month}-`) && (date < today) === pastGroup).sort();
+          if (!dates.length) return null;
+          const list = (
         <ul className={styles.days}>
-          {[...byDate.keys()].filter((date) => date.startsWith(`${month}-`)).sort().map((date) => {
+          {dates.map((date) => {
             const items = byDate.get(date) ?? [];
             return (
               <li key={date} className={styles.day}>
@@ -237,6 +287,14 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
             );
           })}
         </ul>
+          );
+          return pastGroup ? (
+            <details key="past" className="mt-3 text-sm">
+              <summary className="cursor-pointer text-xs text-muted-foreground">{dates.length} {dates.length === 1 ? "dia que já passou" : "dias que já passaram"}</summary>
+              {list}
+            </details>
+          ) : <div key="upcoming">{list}</div>;
+        })}
         {canCreate && lastDayOfMonth(month) >= today ? (
           <div className={styles.create}>
             <div>

@@ -3,6 +3,7 @@
 import { Badge, type BadgeTone } from "@/components/arc/badge/badge";
 import { LeadStatusBadge, LeadTemperature } from "@/components/status-badges";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatLiteDate } from "@/components/lite/format/date";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { MessageCircle } from "lucide-react";
@@ -103,13 +104,16 @@ export function DirectorDutyLeads({
             <h3 className="min-w-0 text-sm font-semibold text-foreground">{group.label}</h3>
             <Badge className="shrink-0 tabular-nums">{group.leads.length}</Badge>
           </div>
-          <LiteResponsiveData
-            caption={group.label}
-            columns={columns}
-            rows={group.leads}
-            rowKey={(row) => row.lead.id}
-            empty={<p>{empty}</p>}
-          />
+          {/* Long waiting lists scroll inside the card instead of stretching the page. */}
+          <ScrollArea className="[&>[data-slot=scroll-area-viewport]]:max-h-[min(26rem,55vh)]">
+            <LiteResponsiveData
+              caption={group.label}
+              columns={columns}
+              rows={group.leads}
+              rowKey={(row) => row.lead.id}
+              empty={<p>{empty}</p>}
+            />
+          </ScrollArea>
         </section>
       ))}
     </div>
