@@ -34,6 +34,7 @@ import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
 import { getRouteDefinition } from "@/features/custom-roles/routes";
 import { hasEffectiveRouteAccess } from "@/features/custom-roles/service";
 import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
+import { resolveNegotiationsRouteAccess } from "@/features/negotiations/route-access";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   let context;
@@ -75,6 +76,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const cleanUiPromise = isCleanUiOperationalEnabled(context.tenantId);
   // Visual Lite das telas internas: chave da empresa + modo normal (fora de um Lite próprio). Ver style-flag.ts.
   const directorLiteStylePromise = shouldUseDirectorLiteStyle(context).catch(() => false);
+  // getFeatureFlag reads the shared getSystemSettings bulk cache used by the other layout flags.
   const negotiationsAreaPromise = context.role === "director" || context.role === "manager" || context.role === "supervisor"
     ? getFeatureFlag(FEATURE_FLAGS.NEGOTIATIONS_AREA).catch(() => "false")
     : Promise.resolve("false");
@@ -118,17 +120,19 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
       fallbackPermission: definition.fallbackPermission,
     });
   });
-  const negotiationsRouteAccessPromise = pathnamePromise.then(async (pathname) => {
-    if (context.role !== "director" && context.role !== "manager" && context.role !== "supervisor") return false;
-    if (pathname.split("?")[0] === "/negociacoes") return routeAccessPromise;
-    return hasEffectiveRouteAccess({
+  const negotiationsRouteAccessPromise = resolveNegotiationsRouteAccess({
+    featureSetting: negotiationsAreaPromise,
+    role: context.role,
+    getPathname: () => pathnamePromise,
+    getCurrentRouteAccess: () => routeAccessPromise,
+    checkRouteAccess: () => hasEffectiveRouteAccess({
       tenantId: context.tenantId,
       role: context.role,
       jobTitle: context.jobTitle,
       customRoleId: context.customRoleId ?? null,
       routeKey: "negociacoes",
       fallbackPermission: "ver_dashboard_equipe",
-    }).catch(() => false);
+    }).catch(() => false),
   });
   // Leads waiting for this broker to accept: badge on the Fila tab of the app shell.
   const queueBadgeCountPromise = context.role === "broker"
