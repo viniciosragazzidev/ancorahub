@@ -26,7 +26,7 @@ describe("feriados nacionais e Páscoa", () => {
     expect(isNationalHoliday(2026, 12, 25)).toBe(true);
   });
 
-  it("deixa Carnaval e Corpus Christi de fora (a confirmar)", () => {
+  it("Carnaval e Corpus Christi são dia normal de atendimento", () => {
     expect(isNationalHoliday(2026, 2, 16)).toBe(false);
     expect(isNationalHoliday(2026, 2, 17)).toBe(false);
     expect(isNationalHoliday(2026, 6, 4)).toBe(false);

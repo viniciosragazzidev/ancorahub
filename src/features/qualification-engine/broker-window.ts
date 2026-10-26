@@ -9,7 +9,7 @@ export const BROKER_CLOSING_HOUR = 19;
 
 const TIME_ZONE = "America/Sao_Paulo";
 
-/** National fixed holidays, as MM-DD. Carnaval and Corpus Christi stay out (to be confirmed). */
+/** National holidays when brokers do not work, as MM-DD. Carnaval and Corpus Christi are normal working days. */
 const NATIONAL_FIXED_HOLIDAYS = new Set([
   "01-01", // Confraternização universal
   "04-21", // Tiradentes

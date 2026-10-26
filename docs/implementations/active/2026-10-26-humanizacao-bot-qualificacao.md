@@ -322,7 +322,7 @@ Ordem sugerida: F0, F1, F6 (para ter a linha de base), depois F2 e F3 juntas, F4
 - D1: o `customText` do diretor sai exatamente como escrito.
 - D2 e D6: a saudação de período volta depois de 6 horas de silêncio.
 - D3: sem resposta jurídica. Fica valendo o risco 4: nenhuma promessa de privacidade (nada de "seus dados ficam só com a corretora"). A segurança vem de explicar por que cada dado é pedido e de dizer que um corretor de verdade continua.
-- D4: a equipe atende de segunda a sábado; domingo NÃO. Mensagem fora do horário no sábado à noite e no domingo diz que o corretor retorna na segunda, a partir das 9h, sem prometer minutos. Feriado: tratar como dia normal até ele confirmar (a confirmar).
+- D4: a equipe atende de segunda a sábado; domingo NÃO. Mensagem fora do horário no sábado à noite e no domingo diz que o corretor retorna na segunda, a partir das 9h, sem prometer minutos. Feriados nacionais (fixos e Sexta-feira Santa): não atende, como domingo, com a frase do próximo dia útil. Carnaval e Corpus Christi: dia normal, a equipe atende (confirmado pelo Vinicios, 26/10).
 - D5: o emoji 👋 sai.
 - D7: o parentesco vai como convite opcional na mensagem de encerramento.
 
