@@ -21,6 +21,25 @@ export function resolveTeamMetricsScope(context: TenantContext): TeamMetricsScop
   throw new Error("As métricas de equipe estão disponíveis apenas para gestor da unidade ou supervisor da própria equipe.");
 }
 
+/** The broker's own boundary: one person, never a team or unit aggregate. */
+export type BrokerMetricsScope = { readonly kind: "broker"; readonly tenantId: string; readonly brokerId: string };
+
+export type CanonicalMetricsScope = TeamMetricsScope | BrokerMetricsScope;
+
+/** Resolve the broker's own metrics boundary from the authenticated server context only. */
+export function resolveBrokerMetricsScope(context: TenantContext): BrokerMetricsScope {
+  if (context.role !== "broker") throw new Error("As métricas pessoais estão disponíveis apenas para o próprio corretor.");
+  return { kind: "broker", tenantId: context.tenantId, brokerId: context.userId };
+}
+
+/** A broker scope only ever returns the broker's own row. */
+export function isBrokerMetricRowVisibleInScope(
+  scope: BrokerMetricsScope,
+  row: { readonly tenantId: string; readonly scopeType: "broker" | "team" | "unit"; readonly brokerId: string | null },
+): boolean {
+  return row.tenantId === scope.tenantId && row.scopeType === "broker" && row.brokerId === scope.brokerId;
+}
+
 /** Pure membership check used by scope tests and by server-side result shaping. */
 export function isBrokerVisibleInTeamMetricsScope(
   scope: TeamMetricsScope,

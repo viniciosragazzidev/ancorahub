@@ -2,15 +2,29 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { isLightRouteAllowed } from "@/components/light/light-routes";
+import { BrokerPerformanceLite } from "@/features/broker-performance/components/broker-performance-lite";
+import { buildBrokerPerformanceView, parseBrokerPerformancePeriod } from "@/features/broker-performance/domain";
+import { getBrokerPerformance, isBrokerPerformanceLiteEnabled } from "@/features/broker-performance/queries";
 import { getBrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
 export const dynamic = "force-dynamic";
 
-export default async function BrokerPerformancePage() {
+export default async function BrokerPerformancePage({ searchParams }: { searchParams: Promise<{ periodo?: string | string[] }> }) {
   const context = await getRequiredTenantContext();
   if (context.role !== "broker" || (await getLiteAudience(context)) !== "broker" || !isLightRouteAllowed("/desempenho", "broker")) redirect("/dashboard");
+
+  // Flag do Super-admin: desligada, o corretor continua com o resumo do dia abaixo.
+  if (await isBrokerPerformanceLiteEnabled()) {
+    const period = parseBrokerPerformancePeriod((await searchParams).periodo);
+    const data = await getBrokerPerformance(context, { period, now: new Date() });
+    return (
+      <main className="arc-venancor lite-page flex min-h-full flex-col bg-(--surface) text-(--foreground)">
+        <BrokerPerformanceLite view={buildBrokerPerformanceView(data)} />
+      </main>
+    );
+  }
 
   const data = await getBrokerWorkspaceData();
   const { receivedToday, acceptedToday, inServiceNow, slaAtRiskNow } = data.today;

@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 26/10/2026 - Desempenho Lite do corretor
+
+- `/desempenho` ganha período (Hoje, 7 e 30 dias em `?periodo=`), quatro números com ícone e variação (leads, cotações, vendas e receita), anel da meta com quanto falta por dia útil, funil pessoal, uma frase de insight por regra fixa e vendas por operadora.
+- Dados só do próprio corretor pelo novo escopo `broker` do motor canônico, para bater com o `/gestao`; janela Hoje e receita (`financial.gross_revenue`) entram no motor. Sem ranking nem comparação com a equipe (DEC-150).
+- Atrás de `feature_broker_performance_lite_enabled` no Super-admin; desligada, volta o resumo do dia. Leitura auditada.
+- Implementação: `docs/implementations/active/2026-10-26-desempenho-lite-corretor.md`.
 ## 25/10/2026 - Pele Arc preparada para Conversas do Diretor
 
 - A central reaproveita as mesmas consultas, permissoes e acoes; o modo desligado preserva o HTML legado por snapshot.

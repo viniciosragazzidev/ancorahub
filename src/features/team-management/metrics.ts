@@ -80,7 +80,8 @@ function value(row: CanonicalTeamMetricRow, id: string): number | null {
   return row.metrics[id as keyof typeof row.metrics] ?? null;
 }
 
-function windowValue(row: CanonicalTeamMetricRow): TeamMetricWindow {
+/** Projection of one canonical row into the window shape shared by team and broker views. */
+export function windowValue(row: CanonicalTeamMetricRow): TeamMetricWindow {
   const received = value(row, "team.offers_received") ?? 0;
   const accepted = value(row, "team.offers_accepted") ?? 0;
   const leadCohort = value(row, "commercial.leads_received") ?? 0;
@@ -110,7 +111,7 @@ function windowValue(row: CanonicalTeamMetricRow): TeamMetricWindow {
   };
 }
 
-function buildResult(snapshot: Awaited<ReturnType<typeof resolveCanonicalTeamMetrics>>): TeamMetricsResult {
+function buildResult(snapshot: Awaited<ReturnType<typeof resolveCanonicalTeamMetrics>>, window: 7 | 30): TeamMetricsResult {
   const rows = snapshot.rows;
   const brokerRows = rows.filter((row) => row.scopeType === "broker");
   const teamRows = rows.filter((row) => row.scopeType === "team");
@@ -175,7 +176,7 @@ function buildResult(snapshot: Awaited<ReturnType<typeof resolveCanonicalTeamMet
   }
 
   return {
-    window: snapshot.windowDays,
+    window,
     generatedAt: snapshot.now,
     slaFirstContactMinutes: snapshot.slaFirstContactMinutes,
     unit,
@@ -211,7 +212,7 @@ export async function getTeamMetrics(
     if (snapshot.rows.some((row) => !isTeamMetricRowVisibleInScope(scope, { ...row, tenantId: snapshot.tenantId }))) {
       throw new Error("A consulta agregada retornou uma métrica fora do escopo autorizado.");
     }
-    const built = buildResult(snapshot);
+    const built = buildResult(snapshot, input.window);
     if (scope.kind === "team" && includeUnitConversionRate) built.unitConversionRate = await unitConversionReference(context, scope, input);
     return built;
   });

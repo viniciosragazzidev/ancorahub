@@ -214,6 +214,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Habilita a camada de métricas da Gestão de Equipes para gestor e supervisor.",
   },
+  BROKER_PERFORMANCE_LITE: {
+    key: "feature_broker_performance_lite_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Mostra ao corretor Lite o painel de Desempenho com os próprios números, funil, meta e vendas por operadora.",
+  },
 
   SUPERVISOR_TEAM_SCOPE: {
     key: "feature_supervisor_team_scope_enabled",

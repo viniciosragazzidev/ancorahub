@@ -2,12 +2,13 @@ import "server-only";
 
 import { sql } from "drizzle-orm";
 
-import type { TeamMetricsScope } from "@/features/team-management/scope";
+import type { CanonicalMetricsScope } from "@/features/team-management/scope";
 import { inSupervisorTeam } from "@/features/team/supervisor-scope";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 
 import { getMetricDefinition } from "./metric-catalog";
+import { canonicalWindowBounds, type CanonicalMetricWindowDays } from "./metric-windows";
 import { cohortConversionRate, percentage } from "./metrics-math";
 
 export type TeamMetricsWindowKey = "current" | "previous" | "trailing3" | "previous3";
@@ -29,7 +30,8 @@ export type CanonicalTeamMetricId =
   | "team.quotes"
   | "team.sales"
   | "team.losses"
-  | "team.last_activity_at";
+  | "team.last_activity_at"
+  | "financial.gross_revenue";
 
 export type CanonicalTeamMetricValues = Readonly<Record<CanonicalTeamMetricId, number | null>>;
 
@@ -53,7 +55,7 @@ export interface CanonicalTeamMetricSnapshot {
   readonly branchId: string | null;
   readonly branchName: string | null;
   readonly slaFirstContactMinutes: number;
-  readonly windowDays: 7 | 30;
+  readonly windowDays: CanonicalMetricWindowDays;
   readonly now: Date;
   readonly rows: readonly CanonicalTeamMetricRow[];
 }
@@ -79,6 +81,7 @@ const CATALOG_METRIC_IDS: readonly CanonicalTeamMetricId[] = [
   "team.sales",
   "team.losses",
   "team.last_activity_at",
+  "financial.gross_revenue",
 ];
 
 function numberValue(value: unknown): number {
@@ -104,20 +107,24 @@ function assertCanonicalCatalog() {
 /**
  * One grouped SQL query resolves both equal windows, their broker/team/unit
  * dimensions, and current portfolio snapshots. Access scope is supplied only
- * by the server-side team-management boundary resolver.
+ * by the server-side boundary resolvers (team management or the broker's own).
+ * A broker scope rosters only that broker and returns only their own rows.
  */
 export async function resolveCanonicalTeamMetrics(
   context: TenantContext,
-  scope: TeamMetricsScope,
-  input: { window: 7 | 30; now: Date },
+  scope: CanonicalMetricsScope,
+  input: { window: CanonicalMetricWindowDays; now: Date },
 ): Promise<CanonicalTeamMetricSnapshot> {
   assertCanonicalCatalog();
   if (scope.tenantId !== context.tenantId) throw new Error("O escopo de métricas não pertence ao tenant autenticado.");
+  if (scope.kind === "broker" && scope.brokerId !== context.userId) throw new Error("O escopo pessoal pertence a outro usuário.");
 
   const now = input.now;
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new Error("A data de referência das métricas é inválida.");
+  const bounds = canonicalWindowBounds(input.window, now);
   const branchId = scope.kind === "unit" ? scope.branchId : null;
   const supervisorId = scope.kind === "team" ? scope.supervisorId : null;
+  const brokerId = scope.kind === "broker" ? scope.brokerId : null;
   const managerScope = scope.kind === "unit";
   const supervisorOfferScope = supervisorId
     ? sql`and ${inSupervisorTeam(schema.leadOffers.brokerId, context.tenantId, supervisorId)}`
@@ -136,9 +143,12 @@ export async function resolveCanonicalTeamMetrics(
         ${context.tenantId}::text as tenant_id,
         ${branchId}::text as branch_id,
         ${supervisorId}::text as supervisor_id,
+        ${brokerId}::text as broker_id,
         ${managerScope}::boolean as is_manager,
         ${now.toISOString()}::timestamptz as now_at,
-        ${input.window}::int as window_days,
+        ${bounds.current.startsAt.toISOString()}::timestamptz as current_starts_at,
+        ${bounds.previous.startsAt.toISOString()}::timestamptz as previous_starts_at,
+        ${bounds.previous.endsAt.toISOString()}::timestamptz as previous_ends_at,
         case
           when t.sla_first_contact_minutes ~ '^[0-9]+$'
             and t.sla_first_contact_minutes::int > 0 then t.sla_first_contact_minutes::int
@@ -148,9 +158,9 @@ export async function resolveCanonicalTeamMetrics(
       where t.id = ${context.tenantId}
     ),
     periods as (
-      select 'current'::text as window_key, p.now_at - (p.window_days * interval '1 day') as starts_at, p.now_at as ends_at from params p
+      select 'current'::text as window_key, p.current_starts_at as starts_at, p.now_at as ends_at from params p
       union all
-      select 'previous', p.now_at - (p.window_days * 2 * interval '1 day'), p.now_at - (p.window_days * interval '1 day') from params p
+      select 'previous', p.previous_starts_at, p.previous_ends_at from params p
       union all
       select 'trailing3', p.now_at - interval '3 days', p.now_at from params p
       union all
@@ -175,7 +185,11 @@ export async function resolveCanonicalTeamMetrics(
       where tm.tenant_id = p.tenant_id
         and tm.role = 'broker'
         and tm.status = 'active'
-        and ((p.is_manager and tm.branch_id = p.branch_id) or (not p.is_manager and tm.supervisor_id = p.supervisor_id))
+        and (
+          (p.is_manager and tm.branch_id = p.branch_id)
+          or (not p.is_manager and p.broker_id is null and tm.supervisor_id = p.supervisor_id)
+          or (p.broker_id is not null and tm.user_id = p.broker_id)
+        )
     ),
     event_facts as (
       select
@@ -193,7 +207,8 @@ export async function resolveCanonicalTeamMetrics(
         0::int as converted,
         0::int as losses,
         0::int as quotes,
-        0::int as sales
+        0::int as sales,
+        0::numeric as revenue
       from lead_offers o
       join roster r on r.broker_id = o.broker_id
       cross join params p
@@ -210,7 +225,7 @@ export async function resolveCanonicalTeamMetrics(
         1,
         case when leads.status = 'converted' then 1 else 0 end,
         case when leads.status = 'lost' then 1 else 0 end,
-        0, 0
+        0, 0, 0
       from leads
       join roster r on r.broker_id = leads.corretor_id
       cross join params p
@@ -228,7 +243,7 @@ export async function resolveCanonicalTeamMetrics(
         1,
         case when leads.first_contact_at is not null
           and leads.first_contact_at <= leads.assigned_at + (p.sla_minutes * interval '1 minute') then 1 else 0 end,
-        0, 0, 0, 0, 0
+        0, 0, 0, 0, 0, 0
       from leads
       join roster r on r.broker_id = leads.corretor_id
       cross join params p
@@ -243,7 +258,7 @@ export async function resolveCanonicalTeamMetrics(
 
       select
         r.broker_id, r.supervisor_id, w.window_key,
-        0, 0, null, 0, 0, 0, 0, 0, 0, 1, 0
+        0, 0, null, 0, 0, 0, 0, 0, 0, 1, 0, 0
       from quotes
       join leads on leads.id = quotes.lead_id and leads.tenant_id = quotes.tenant_id
       join roster r on r.broker_id = leads.corretor_id
@@ -258,7 +273,7 @@ export async function resolveCanonicalTeamMetrics(
 
       select
         r.broker_id, r.supervisor_id, w.window_key,
-        0, 0, null, 0, 0, 0, 0, 0, 0, 0, 1
+        0, 0, null, 0, 0, 0, 0, 0, 0, 0, 1, sales.sale_value
       from sales
       join leads on leads.id = sales.lead_id and leads.tenant_id = sales.tenant_id
       join roster r on r.broker_id = sales.broker_id
@@ -287,7 +302,8 @@ export async function resolveCanonicalTeamMetrics(
         sum(f.converted)::int as converted,
         sum(f.losses)::int as losses,
         sum(f.quotes)::int as quotes,
-        sum(f.sales)::int as sales
+        sum(f.sales)::int as sales,
+        sum(f.revenue)::numeric as revenue
       from event_facts f
       group by f.window_key, grouping sets ((f.broker_id, f.supervisor_id), (f.supervisor_id), ())
       having (select is_manager from params) or grouping(f.supervisor_id) = 0
@@ -300,7 +316,7 @@ export async function resolveCanonicalTeamMetrics(
         case when lead_offers.accepted_at is not null and lead_offers.accepted_at >= lead_offers.offered_at
           then extract(epoch from (lead_offers.accepted_at - lead_offers.offered_at))::double precision else null end as accepted_seconds,
         case when lead_offers.status in ('EXPIRED', 'DECLINED', 'REPLACED') then 1 else 0 end::int as redistributions,
-        0::int as sla_assigned, 0::int as sla_within, 0::int as cohort_received, 0::int as converted, 0::int as losses, 0::int as quotes, 0::int as sales
+        0::int as sla_assigned, 0::int as sla_within, 0::int as cohort_received, 0::int as converted, 0::int as losses, 0::int as quotes, 0::int as sales, 0::numeric as revenue
       from lead_offers
       join leads on leads.id = lead_offers.lead_id and leads.tenant_id = lead_offers.tenant_id
       cross join params p
@@ -311,7 +327,7 @@ export async function resolveCanonicalTeamMetrics(
       union all
       select w.window_key, 0, 0, null, 0, 0, 0, 1,
         case when leads.status = 'converted' then 1 else 0 end,
-        case when leads.status = 'lost' then 1 else 0 end, 0, 0
+        case when leads.status = 'lost' then 1 else 0 end, 0, 0, 0
       from leads cross join params p join periods w on leads.created_at >= w.starts_at and leads.created_at < w.ends_at
       where p.is_manager and leads.tenant_id = p.tenant_id and leads.branch_id = p.branch_id
         and leads.deleted_at is null and leads.archived_at is null
@@ -320,20 +336,20 @@ export async function resolveCanonicalTeamMetrics(
       select w.window_key, 0, 0, null, 0, 1,
         case when leads.first_contact_at is not null
           and leads.first_contact_at <= leads.assigned_at + (p.sla_minutes * interval '1 minute') then 1 else 0 end,
-        0, 0, 0, 0, 0
+        0, 0, 0, 0, 0, 0
       from leads cross join params p join periods w on leads.assigned_at >= w.starts_at and leads.assigned_at < w.ends_at
       where p.is_manager and leads.tenant_id = p.tenant_id and leads.branch_id = p.branch_id
         and leads.assigned_at is not null and leads.deleted_at is null and leads.archived_at is null
 
       union all
-      select w.window_key, 0, 0, null, 0, 0, 0, 0, 0, 0, 1, 0
+      select w.window_key, 0, 0, null, 0, 0, 0, 0, 0, 0, 1, 0, 0
       from quotes join leads on leads.id = quotes.lead_id and leads.tenant_id = quotes.tenant_id
       cross join params p join periods w on quotes.created_at >= w.starts_at and quotes.created_at < w.ends_at
       where p.is_manager and quotes.tenant_id = p.tenant_id and leads.branch_id = p.branch_id
         and leads.deleted_at is null and leads.archived_at is null
 
       union all
-      select w.window_key, 0, 0, null, 0, 0, 0, 0, 0, 0, 0, 1
+      select w.window_key, 0, 0, null, 0, 0, 0, 0, 0, 0, 0, 1, sales.sale_value
       from sales join leads on leads.id = sales.lead_id and leads.tenant_id = sales.tenant_id
       cross join params p join periods w on sales.sale_date >= w.starts_at and sales.sale_date < w.ends_at
       where p.is_manager and sales.tenant_id = p.tenant_id and sales.status = 'active'
@@ -353,7 +369,8 @@ export async function resolveCanonicalTeamMetrics(
         sum(f.converted)::int as converted,
         sum(f.losses)::int as losses,
         sum(f.quotes)::int as quotes,
-        sum(f.sales)::int as sales
+        sum(f.sales)::int as sales,
+        sum(f.revenue)::numeric as revenue
       from unit_facts f
       group by f.window_key
     ),
@@ -485,6 +502,7 @@ export async function resolveCanonicalTeamMetrics(
       coalesce(case when e.scope_type = 'unit' then ur.losses else er.losses end, 0)::int as losses,
       coalesce(case when e.scope_type = 'unit' then ur.quotes else er.quotes end, 0)::int as quotes,
       coalesce(case when e.scope_type = 'unit' then ur.sales else er.sales end, 0)::int as sales,
+      coalesce(case when e.scope_type = 'unit' then ur.revenue else er.revenue end, 0)::numeric as revenue,
       case when w.window_key = 'current' then coalesce(sr.active_leads, 0)::int else null end as active_leads,
       case when w.window_key = 'current' then coalesce(sr.overdue_returns, 0)::int else null end as overdue_returns,
       case when w.window_key = 'current' then coalesce(sr.critical_overdue_returns, 0)::int else null end as critical_overdue_returns,
@@ -502,7 +520,9 @@ export async function resolveCanonicalTeamMetrics(
   `);
 
   const rawRows = result as unknown as RawMetricRow[];
-  const rows: CanonicalTeamMetricRow[] = rawRows.map((row) => {
+  // The broker roster holds one person, but the rollups still emit the matching team row: keep only the broker's own.
+  const scopedRows = brokerId ? rawRows.filter((row) => row.scope_type === "broker" && row.broker_id === brokerId) : rawRows;
+  const rows: CanonicalTeamMetricRow[] = scopedRows.map((row) => {
     const windowKey = String(row.window_key) as TeamMetricsWindowKey;
     const received = numberValue(row.offers_received);
     const accepted = numberValue(row.offers_accepted);
@@ -530,6 +550,7 @@ export async function resolveCanonicalTeamMetrics(
       "team.sales": numberValue(row.sales),
       "team.losses": numberValue(row.losses),
       "team.last_activity_at": snapshot ? timestampValue(row.last_activity_at) : null,
+      "financial.gross_revenue": Math.round(numberValue(row.revenue) * 100) / 100,
     } satisfies Record<CanonicalTeamMetricId, number | null>;
 
     return {
