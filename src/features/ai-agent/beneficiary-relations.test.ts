@@ -33,6 +33,21 @@ describe("optional beneficiary relationship capture", () => {
     expect(result.beneficiaries.map(({ relation }) => relation)).toEqual(["conjuge", "titular"]);
   });
 
+  it("does not map by order when ages contradict the stated relationships", () => {
+    const childBeforeLead = captureBeneficiaryRelations({ message: "meu filho e eu", ages: [46, 10], planType: "familiar" });
+    expect(childBeforeLead).toMatchObject({ status: "ambiguous", raw: "meu filho e eu" });
+    expect(childBeforeLead.beneficiaries.every((beneficiary) => beneficiary.relation === null)).toBe(true);
+
+    const leadBeforeChild = captureBeneficiaryRelations({ message: "eu e meu filho", ages: [46, 10], planType: "familiar" });
+    expect(leadBeforeChild.beneficiaries.map(({ age, relation }) => [age, relation])).toEqual([[46, "titular"], [10, "filho"]]);
+  });
+
+  it("requires adults for titular and spouse and a titular age for child or parent order mappings", () => {
+    expect(captureBeneficiaryRelations({ message: "eu e minha esposa", ages: [16, 17], planType: "familiar" }).status).toBe("ambiguous");
+    expect(captureBeneficiaryRelations({ message: "minha mãe e eu", ages: [35, 60], planType: "familiar" }).status).toBe("ambiguous");
+    expect(captureBeneficiaryRelations({ message: "meu filho e minha esposa", ages: [10, 35], planType: "familiar" }).status).toBe("ambiguous");
+  });
+
   it("does not guess when a plural relationship cannot be assigned to each age", () => {
     const result = captureBeneficiaryRelations({ message: "filhos", ages: [35, 32], planType: "familiar" });
     expect(result).toMatchObject({ status: "ambiguous", raw: "filhos" });

@@ -96,6 +96,7 @@ describe("reply composer", () => {
     expect(summarizeQualification(mapped)).toBe("familiar, você 46 e filho 10 anos");
     expect(summarizeQualification(ambiguous)).toBe("familiar, 2 pessoas, 46 e 10 anos");
     expect(summarizeQualification(mapped)).not.toContain("Ana");
+    expect(summarizeQualification({ ...mapped, beneficiaryRaw: "minha filha Ana, 10" })).not.toContain("minha filha Ana");
   });
 
   it("keeps the optional relationship invitation out of qualification requirements", () => {

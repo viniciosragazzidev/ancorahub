@@ -863,7 +863,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                       ) : (
                         <div><p className="text-xs text-muted-foreground">{beneficiaryDetails.label}</p><p className="mt-1 font-medium">{beneficiaryDetails.value ?? qualificationDetails.individualAges ?? "Não informadas"}</p></div>
                       )}
-                      {lead.tipo !== "PME" && beneficiaryDetails.raw ? <div><p className="text-xs text-muted-foreground">Parentesco informado</p><p className="mt-1 font-medium">{beneficiaryDetails.raw}</p></div> : null}
+                      {lead.tipo !== "PME" && beneficiaryDetails.raw ? <div><p className="text-xs text-muted-foreground">O cliente escreveu:</p><p className="mt-1 font-medium">{beneficiaryDetails.raw}</p></div> : null}
                       <div><p className="text-xs text-muted-foreground">Tipo de atendimento</p><p className="mt-1 font-medium">{metaLeadDetails.tipoPlanoStatus === "not_provided" ? "Não informado" : lead.tipo === "PME" ? "Empresa / PME" : lead.tipo === "PJ" ? "Pessoa jurídica" : "Pessoa física"}</p></div>
                       {qualificationDetails.neighborhood ? <div><p className="text-xs text-muted-foreground">Bairro</p><p className="mt-1 font-medium">{qualificationDetails.neighborhood}</p></div> : null}
                       {qualificationDetails.currentPlan ? <div><p className="text-xs text-muted-foreground">Plano atual</p><p className="mt-1 font-medium">{qualificationDetails.currentPlan}</p></div> : null}
@@ -1092,7 +1092,7 @@ function readQualificationDetails(value: unknown) {
     resumoNecessidade: read("resumoNecessidade"),
     urgenciaContratacao: read("urgenciaContratacao") ?? read("urgency"),
     beneficiaries: beneficiaries.length || !legacyRelation ? beneficiaries : [{ age: null, relation: "outro", text: legacyRelation }],
-    beneficiaryRaw: typeof details.beneficiaryRaw === "string" ? details.beneficiaryRaw : null,
+    beneficiaryRaw: typeof details.beneficiaryRaw === "string" ? details.beneficiaryRaw : legacyRelation,
   };
 }
 

@@ -127,7 +127,7 @@ export function buildLeadClientInfo(input: LeadClientInfoInput): LeadClientInfoI
   const averageAge = firstText(details.averageAge, details.mediaIdades, form.mediaIdades);
   const beneficiaryDetails = formatLeadBeneficiaryDetails(details, ages);
   push("ages", beneficiaryDetails.label, beneficiaryDetails.value ?? (averageAge ? `média de ${averageAge} anos` : null));
-  push("beneficiaryRelation", "Parentesco informado", beneficiaryDetails.raw);
+  push("beneficiaryRelation", "O cliente escreveu:", beneficiaryDetails.raw);
   push("city", "Cidade", firstText(details.city, details.cidade, memory.city, input.city, form.cidade, form.city));
   push("email", "E-mail", firstText(input.email, details.email, memory.email));
   push("tipoCnpj", "Tipo de CNPJ", firstText(meta.tipoCnpj, input.tipoCnpj, details.tipoCnpj));

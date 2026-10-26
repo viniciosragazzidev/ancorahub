@@ -58,7 +58,7 @@ describe("buildLeadClientInfo", () => {
       beneficiaryRaw: "filhos",
     } });
     expect(ambiguous).toContainEqual({ key: "ages", label: "Idades", value: "46 e 10 (parentesco não informado)" });
-    expect(ambiguous).toContainEqual({ key: "beneficiaryRelation", label: "Parentesco informado", value: "filhos" });
+    expect(ambiguous).toContainEqual({ key: "beneficiaryRelation", label: "O cliente escreveu:", value: "filhos" });
 
     const otherRelation = buildLeadClientInfo({ qualificationDetails: {
       beneficiarios: [{ idade: 28, parentesco: "outro", texto: "meu irmão" }, { idade: 31, parentesco: "titular", texto: "eu" }],
@@ -75,7 +75,7 @@ describe("buildLeadClientInfo", () => {
       beneficiaryRelation: "filhos",
     } })).toEqual(expect.arrayContaining([
       { key: "ages", label: "Idades", value: "46 e 10 (parentesco não informado)" },
-      { key: "beneficiaryRelation", label: "Parentesco informado", value: "filhos" },
+      { key: "beneficiaryRelation", label: "O cliente escreveu:", value: "filhos" },
     ]));
   });
 

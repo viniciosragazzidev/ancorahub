@@ -42,7 +42,7 @@ import { isConfirmedClosingDelivery } from "@/features/ai-qualification/closing-
 import { buildHumanHandoffLeadUpdate } from "./human-handoff-state";
 import { applyAiMemoryUpdates, buildQualificationFallbackPrompt, shouldUseQualificationFallback } from "./qualification-fallback";
 import { interpretQualificationTurn, shouldVerifyExtraction, VERIFIABLE_FIELDS, verifyExtractedFacts, type InterpreterResult, type VerifiableField } from "./qualification-interpreter";
-import { describeQualificationCorrections, detectQualificationCorrections } from "./qualification-corrections";
+import { applyQualificationCorrectionsToMemory, describeQualificationCorrections, detectQualificationCorrections } from "./qualification-corrections";
 import { generateLateralAnswer, isCustomerQuestion } from "./lateral-answer";
 
 
@@ -1119,6 +1119,8 @@ async function applyCustomerCorrectionAfterHandoff(input: {
   tenantId: string;
   leadId: string;
   conversationId: string;
+  lockVersion: number;
+  sourceMessageId?: string | null;
   phone: string;
   transport: AiTransport;
   openWaSessionId?: string | null;
@@ -1126,19 +1128,33 @@ async function applyCustomerCorrectionAfterHandoff(input: {
   memory: ConversationMemory;
   message: string;
   policy: Parameters<typeof persistQualificationEvaluation>[0]["policy"];
-}) {
+}): Promise<false | "applied" | "stale"> {
   const corrections = detectQualificationCorrections(input.memory, input.message);
   if (!corrections.length) return false;
   const db = getDatabase();
-  const memory: ConversationMemory = { ...input.memory, collectedFields: [...input.memory.collectedFields], updatedAt: new Date().toISOString() };
-  for (const correction of corrections) {
-    (memory as Record<string, unknown>)[correction.field] = { value: correction.value, confidence: 1 };
-    if (!memory.collectedFields.includes(correction.field)) memory.collectedFields.push(correction.field);
-  }
-  await db.update(schema.aiConversations).set({ memory: memory as unknown as Record<string, unknown>, lastActivityAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(schema.aiConversations.id, input.conversationId), eq(schema.aiConversations.tenantId, input.tenantId)));
+  const { memory, beneficiaryCapture } = applyQualificationCorrectionsToMemory({
+    memory: input.memory,
+    corrections,
+    message: input.message,
+    sourceMessageId: input.sourceMessageId,
+  });
+  const now = new Date();
+  const [claimed] = await db.update(schema.aiConversations).set({
+    memory: memory as unknown as Record<string, unknown>,
+    lastProcessedMessageId: input.sourceMessageId ?? undefined,
+    lockVersion: sql`${schema.aiConversations.lockVersion} + 1`,
+    lastActivityAt: now,
+    updatedAt: now,
+  }).where(and(
+    eq(schema.aiConversations.id, input.conversationId),
+    eq(schema.aiConversations.tenantId, input.tenantId),
+    eq(schema.aiConversations.lockVersion, input.lockVersion),
+  )).returning({ id: schema.aiConversations.id });
+  if (!claimed) return "stale";
   await persistQualificationEvaluation({ tenantId: input.tenantId, leadId: input.leadId, conversationId: input.conversationId, actorUserId: null, policy: input.policy, memory });
-  const summary = describeQualificationCorrections(corrections);
+  const correctionSummary = describeQualificationCorrections(corrections);
+  const relationshipSummary = beneficiaryCapture?.status === "mapped" ? summarizeQualification(memory, ["age"]) : null;
+  const summary = [correctionSummary, relationshipSummary].filter(Boolean).join("; ");
   const systemUserId = await resolveSystemUserId(input.tenantId);
   await db.insert(schema.leadInteractions).values({
     id: randomUUID(), leadId: input.leadId, userId: systemUserId, tipo: "note",
@@ -1156,17 +1172,18 @@ async function applyCustomerCorrectionAfterHandoff(input: {
   });
   await sendAiOutbound({ tenantId: input.tenantId, phone: input.phone, body: reply, transport: input.transport, openWaSessionId: input.openWaSessionId, wahaRunId: input.wahaRunId })
     .catch((error) => console.error("[ai-wpp] correction_reply_failed", { tenantId: input.tenantId, leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" }));
-  return true;
+  return "applied";
 }
 
 async function captureOptionalBeneficiaryReply(input: {
   tenantId: string;
   leadId: string;
   conversationId: string;
+  lockVersion: number;
   memory: ConversationMemory;
   message: string;
   sourceMessageId?: string | null;
-}) {
+}): Promise<false | "captured" | "stale"> {
   if (!input.memory.relationAsked) return false;
   const ages = parseAgeValues(input.memory.age?.value);
   if (ages.length < 2 || input.memory.planType?.value === "empresarial") return false;
@@ -1187,12 +1204,18 @@ async function captureOptionalBeneficiaryReply(input: {
   };
   const db = getDatabase();
   const now = new Date();
-  await db.update(schema.aiConversations).set({
+  const [claimed] = await db.update(schema.aiConversations).set({
     memory: memory as unknown as Record<string, unknown>,
     lastProcessedMessageId: input.sourceMessageId ?? undefined,
+    lockVersion: sql`${schema.aiConversations.lockVersion} + 1`,
     lastActivityAt: now,
     updatedAt: now,
-  }).where(and(eq(schema.aiConversations.id, input.conversationId), eq(schema.aiConversations.tenantId, input.tenantId)));
+  }).where(and(
+    eq(schema.aiConversations.id, input.conversationId),
+    eq(schema.aiConversations.tenantId, input.tenantId),
+    eq(schema.aiConversations.lockVersion, input.lockVersion),
+  )).returning({ id: schema.aiConversations.id });
+  if (!claimed) return "stale";
 
   const [lead] = await db.select({ qualificationDetails: schema.leads.qualificationDetails })
     .from(schema.leads)
@@ -1223,7 +1246,7 @@ async function captureOptionalBeneficiaryReply(input: {
     tipo: "note",
     conteudo: `Parentescos opcionais informados na qualificação automática: ${captured.status}.`,
   }).catch((error) => console.warn("[qualification] beneficiary_relation_audit_failed", { leadId: input.leadId, error }));
-  return true;
+  return "captured";
 }
 
 /** Seconds the AI waits for the rest of a burst of customer messages before answering. */
@@ -1462,11 +1485,12 @@ export async function processInboundAiResponse({
 
   if (conversation.status === "CLOSED" || conversation.status === "FAILED") {
     const capturedRelation = await captureOptionalBeneficiaryReply({
-      tenantId, leadId, conversationId: conversation.id,
+      tenantId, leadId, conversationId: conversation.id, lockVersion: conversation.lockVersion,
       memory: (conversation.memory as ConversationMemory | null) ?? createEmptyMemory(),
       message: normalizedInboundMessage, sourceMessageId: sourceIdentifier,
     });
-    if (capturedRelation) return { status: "beneficiary_relation_captured" };
+    if (capturedRelation === "captured") return { status: "beneficiary_relation_captured" };
+    if (capturedRelation === "stale") return { status: "ignored_duplicate" };
     console.log(`[ai-agent] Conversa ${conversation.id} está ${conversation.status}. IA não responde.`);
     const postClosingResult = await handlePostClosingInboundMessage(tenantId, conversation.id);
     if (postClosingResult.noticeSent && postClosingResult.messageText) {
@@ -1505,19 +1529,22 @@ export async function processInboundAiResponse({
 
   // 4. Optimistic lock — claim this conversation using lockVersion
   if (conversation.status === "WAITING_HUMAN") {
-    const capturedRelation = await captureOptionalBeneficiaryReply({
-      tenantId, leadId, conversationId: conversation.id,
-      memory: (conversation.memory as ConversationMemory | null) ?? createEmptyMemory(),
-      message: normalizedInboundMessage, sourceMessageId: sourceIdentifier,
-    });
-    if (capturedRelation) return { status: "beneficiary_relation_captured" };
     const correction = await applyCustomerCorrectionAfterHandoff({
       tenantId, leadId, conversationId: conversation.id, phone, transport, openWaSessionId, wahaRunId,
+      lockVersion: conversation.lockVersion, sourceMessageId: sourceIdentifier,
       memory: (conversation.memory as ConversationMemory | null) ?? createEmptyMemory(),
       message: normalizedInboundMessage,
       policy: behavior.policy,
     });
-    if (correction) return { status: "correction_applied" as const };
+    if (correction === "applied") return { status: "correction_applied" as const };
+    if (correction === "stale") return { status: "ignored_duplicate" as const };
+    const capturedRelation = await captureOptionalBeneficiaryReply({
+      tenantId, leadId, conversationId: conversation.id, lockVersion: conversation.lockVersion,
+      memory: (conversation.memory as ConversationMemory | null) ?? createEmptyMemory(),
+      message: normalizedInboundMessage, sourceMessageId: sourceIdentifier,
+    });
+    if (capturedRelation === "captured") return { status: "beneficiary_relation_captured" };
+    if (capturedRelation === "stale") return { status: "ignored_duplicate" as const };
     console.info("[ai-wpp] inbound_ignored_waiting_human", { tenantId, leadId, conversationId: conversation.id });
     return { status: "ignored_waiting_human" };
   }

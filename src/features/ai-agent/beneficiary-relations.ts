@@ -80,6 +80,29 @@ function blankBeneficiaries(ages: number[], sourceMessageId?: string): Conversat
   return ages.map((age) => ({ age, relation: null, sourceMessageId }));
 }
 
+function orderMappingIsCoherent(ages: number[], mentions: RelationshipMention[]) {
+  const titularIndexes = mentions.flatMap((mention, index) => mention.relation === "titular" ? [index] : []);
+  if (titularIndexes.length > 1) return false;
+
+  for (const [index, mention] of mentions.entries()) {
+    if ((mention.relation === "titular" || mention.relation === "conjuge") && ages[index]! < 18) return false;
+  }
+
+  const titularIndex = titularIndexes[0];
+  const hasRelativeWithAgeConstraint = mentions.some((mention) =>
+    mention.relation === "filho" || mention.relation === "neto" || mention.relation === "pai_mae");
+  if (hasRelativeWithAgeConstraint && titularIndex === undefined) return false;
+  if (titularIndex === undefined) return true;
+
+  const titularAge = ages[titularIndex]!;
+  if (titularAge < 18) return false;
+  return mentions.every((mention, index) => {
+    if (mention.relation === "filho" || mention.relation === "neto") return ages[index]! < titularAge;
+    if (mention.relation === "pai_mae") return ages[index]! > titularAge;
+    return true;
+  });
+}
+
 /**
  * Links relationship words to already captured ages only when the customer makes the mapping
  * explicit by number, or supplies exactly one relationship for each age in the same order.
@@ -144,7 +167,7 @@ export function captureBeneficiaryRelations(input: {
     return { status: "ambiguous", beneficiaries: base, raw: input.message, relationAsked: true };
   }
 
-  if (mentions.length === ages.length && mentions.every((mention) => !mention.plural)) {
+  if (mentions.length === ages.length && mentions.every((mention) => !mention.plural) && orderMappingIsCoherent(ages, mentions)) {
     return {
       status: "mapped",
       beneficiaries: base.map((beneficiary, index) => {
