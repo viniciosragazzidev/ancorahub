@@ -12,6 +12,7 @@ import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag"
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { isDirectorF2DevPreview } from "@/components/light/director-f2-dev-preview";
 import { isDirectorShellRealDevPreview } from "@/components/light/director-shell-real-dev-preview";
+import { isNegotiationsDevPreview } from "@/components/light/negotiations-dev-preview";
 import "./globals.css";
 
 const jakartaSans = Plus_Jakarta_Sans({
@@ -108,7 +109,7 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
   const requestPath = process.env.NODE_ENV === "development" ? (await headers()).get("x-pathname") ?? "" : "";
-  const isDirectorDevPreview = isDirectorF2DevPreview(requestPath) || isDirectorShellRealDevPreview(requestPath);
+  const isDirectorDevPreview = isDirectorF2DevPreview(requestPath) || isDirectorShellRealDevPreview(requestPath) || isNegotiationsDevPreview(requestPath);
   let directorLiteEnabled = false;
 
   if (!isDirectorDevPreview) {

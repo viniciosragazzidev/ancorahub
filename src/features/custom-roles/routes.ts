@@ -30,6 +30,14 @@ export const routeCatalog: readonly RouteDefinition[] = [
     fallbackPermission: "acessar_conversas",
   },
   {
+    key: "negociacoes",
+    path: "/negociacoes",
+    label: "Negociações",
+    description: "Acompanhamento de negociações e sinais de atendimento da equipe.",
+    category: "Navegação principal",
+    fallbackPermission: "ver_dashboard_equipe",
+  },
+  {
     key: "leads",
     path: "/leads",
     label: "Leads",

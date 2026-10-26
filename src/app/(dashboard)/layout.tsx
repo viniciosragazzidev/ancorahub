@@ -75,6 +75,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const cleanUiPromise = isCleanUiOperationalEnabled(context.tenantId);
   // Visual Lite das telas internas: chave da empresa + modo normal (fora de um Lite próprio). Ver style-flag.ts.
   const directorLiteStylePromise = shouldUseDirectorLiteStyle(context).catch(() => false);
+  const negotiationsAreaPromise = context.role === "director" || context.role === "manager" || context.role === "supervisor"
+    ? getFeatureFlag(FEATURE_FLAGS.NEGOTIATIONS_AREA).catch(() => "false")
+    : Promise.resolve("false");
   const headersPromise = headers();
   // Tenant branding, the signed-in user and their membership in one round trip:
   // the layout renders on every navigation and every realtime refresh, and the
@@ -115,6 +118,18 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
       fallbackPermission: definition.fallbackPermission,
     });
   });
+  const negotiationsRouteAccessPromise = pathnamePromise.then(async (pathname) => {
+    if (context.role !== "director" && context.role !== "manager" && context.role !== "supervisor") return false;
+    if (pathname.split("?")[0] === "/negociacoes") return routeAccessPromise;
+    return hasEffectiveRouteAccess({
+      tenantId: context.tenantId,
+      role: context.role,
+      jobTitle: context.jobTitle,
+      customRoleId: context.customRoleId ?? null,
+      routeKey: "negociacoes",
+      fallbackPermission: "ver_dashboard_equipe",
+    }).catch(() => false);
+  });
   // Leads waiting for this broker to accept: badge on the Fila tab of the app shell.
   const queueBadgeCountPromise = context.role === "broker"
     ? experienceModePromise.then(async (mode) => mode !== "LIGHT" ? 0 : Number((await getDatabase()
@@ -132,6 +147,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const teamManagementPromise = context.role === "manager" ? isTeamManagementEnabled() : Promise.resolve(false);
   // Keep a rejected early start from surfacing as unhandled when a redirect ends the render first.
   routeAccessPromise.catch(() => undefined);
+  negotiationsRouteAccessPromise.catch(() => undefined);
   queueBadgeCountPromise.catch(() => undefined);
   realtimeSyncPromise.catch(() => undefined);
   teamManagementPromise.catch(() => undefined);
@@ -151,6 +167,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     whatsappPlantaoNoticeFlag,
     whatsappConnection,
     directorLiteStyleEnabled,
+    negotiationsAreaSetting,
+    negotiationsRouteAccess,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -166,6 +184,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     whatsappPlantaoNoticeFlagPromise,
     whatsappConnectionPromise,
     directorLiteStylePromise,
+    negotiationsAreaPromise,
+    negotiationsRouteAccessPromise,
   ]);
 
   // Flag criada no G0 (feature_team_management_enabled): só libera o item Gestão do gestor Lite.
@@ -225,6 +245,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         viewAs={viewAsState}
         cleanUiEnabled={cleanUiEnabled}
         directorLiteEnabled={directorLiteStyleEnabled}
+        negotiationsEnabled={negotiationsAreaSetting === "true" && negotiationsRouteAccess}
         isLightBroker={isLightBroker || isLightSupervisor || isLightManager}
         liteAudience={liteAudience}
         initialChatRail={initialChatRail}

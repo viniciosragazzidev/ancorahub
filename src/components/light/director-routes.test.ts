@@ -14,6 +14,11 @@ describe("resolveDirectorRoute", () => {
     expect(resolveDirectorRoute("/equipe")).toEqual({ title: "Equipe", parentHref: null });
   });
 
+  it("retorna de Negociações ao painel", () => {
+    expect(resolveDirectorRoute("/negociacoes")).toEqual({ title: "Negociações", parentHref: "/dashboard" });
+    expect(resolveDirectorRoute("/dev/negociacoes-preview")).toEqual({ title: "Negociações", parentHref: "/dashboard" });
+  });
+
   it("faz a volta de feedback para o lead de origem", () => {
     expect(resolveDirectorRoute("/leads/lead-42/feedback")).toEqual({
       title: "Atualização do lead",

@@ -30,6 +30,7 @@ export const LIGHT_ALLOWED_PREFIXES = [
 const ID = "[^/]+";
 export const LIGHT_SUPERVISOR_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/dashboard$/,
+  /^\/negociacoes$/,
   new RegExp(`^/dashboard/c/${ID}$`),
   /^\/leads$/,
   new RegExp(`^/leads/(?!dashboard$|arquivados$|distribuicao(?:/|$))${ID}$`),
@@ -56,6 +57,7 @@ export const LIGHT_SUPERVISOR_ALLOWED_ROUTES: readonly RegExp[] = [
 /** The manager Lite starts with the unit dashboard and lead work only. */
 export const LIGHT_MANAGER_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/dashboard$/,
+  /^\/negociacoes$/,
   /^\/leads$/,
   new RegExp(`^/leads/(?!dashboard$|arquivados$|distribuicao$)${ID}$`),
   /^\/notificacoes$/,
@@ -90,6 +92,7 @@ export function isLightRouteAllowed(pathname: string, audience: "broker" | "supe
 /** "Mais" of the supervisor. */
 export const LIGHT_SUPERVISOR_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/equipe/minha", label: "Minha equipe" },
+  { href: "/negociacoes", label: "Negociações da equipe", requires: "negotiations" },
   { href: "/equipe/desempenho", label: "Placar da equipe", requires: "teamRanking" },
   { href: "/equipe/transferencia", label: "Pedir corretor de outra equipe" },
   { href: "/relacionamento", label: "Central de relacionamento", requires: "relationshipCenter" },
@@ -101,6 +104,7 @@ export const LIGHT_SUPERVISOR_DESTINATIONS: readonly LightMoreDestination[] = [
 
 export const LIGHT_MANAGER_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/leads", label: "Leads da unidade" },
+  { href: "/negociacoes", label: "Negociações", requires: "negotiations" },
   { href: "/equipe", label: "Equipe" },
   { href: "/gestao", label: "Gestão", requires: "teamManagement" },
   { href: "/clientes", label: "Clientes" },
@@ -126,7 +130,7 @@ export type LightMoreDestination = {
   href: string;
   label: string;
   /** Hidden unless the matching capability is on. */
-  requires?: "quoteSimulator" | "dutyCalendar" | "relationshipCenter" | "journey" | "teamRanking" | "teamManagement";
+  requires?: "quoteSimulator" | "dutyCalendar" | "relationshipCenter" | "journey" | "teamRanking" | "teamManagement" | "negotiations";
 };
 
 export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
@@ -139,7 +143,7 @@ export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/settings", label: "Configurações" },
 ];
 
-export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean; journey?: boolean; teamRanking?: boolean; teamManagement?: boolean }, audience: "broker" | "supervisor" | "manager" = "broker") {
+export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean; journey?: boolean; teamRanking?: boolean; teamManagement?: boolean; negotiations?: boolean }, audience: "broker" | "supervisor" | "manager" = "broker") {
   const list = audience === "manager" ? LIGHT_MANAGER_DESTINATIONS : audience === "supervisor" ? LIGHT_SUPERVISOR_DESTINATIONS : LIGHT_MORE_DESTINATIONS;
   return list.filter((item) => !item.requires || capabilities[item.requires]);
 }
@@ -183,6 +187,7 @@ const SETTINGS_SECTIONS: Record<string, { title: string; hidesTabBar?: boolean }
 
 // Order matters: first match wins, most specific first.
 const RULES: readonly RouteRule[] = [
+  { test: exact("/negociacoes"), route: { title: "Negociações", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/jornada"), route: { title: "Minha jornada", tab: "mais", isRoot: false, parentHref: "/dashboard", hidesTabBar: true } },
   { test: exact("/agenda"), route: { title: "Agenda", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/desempenho"), route: { title: "Desempenho", tab: "mais", isRoot: false, parentHref: "/dashboard" } },

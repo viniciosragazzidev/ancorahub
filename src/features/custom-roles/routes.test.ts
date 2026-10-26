@@ -4,6 +4,8 @@ import { getRouteDefinition, isRoutePermission, routePermissionForPath, routePer
 describe("custom role route visibility", () => {
   it("maps nested URLs to the canonical route key", () => {
     expect(getRouteDefinition("/equipe/cargos")?.key).toBe("equipe");
+    expect(getRouteDefinition("/negociacoes")?.key).toBe("negociacoes");
+    expect(getRouteDefinition("/negociacoes")?.fallbackPermission).toBe("ver_dashboard_equipe");
     expect(routePermissionForPath("/marketing/campanhas/123")).toBe(routePermissionKey("campanhas"));
   });
 

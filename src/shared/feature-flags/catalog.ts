@@ -337,6 +337,15 @@ export const FEATURE_FLAGS = {
       "Habilita as análises da Central de Relatórios, incluindo qualidade/origem dos leads e drill-down explicável. Desativa as análises; a visão operacional do Dashboard permanece disponível.",
   },
 
+  NEGOTIATIONS_AREA: {
+    key: "feature_negotiations_area_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description:
+      "Libera a área de acompanhamento de negociações para diretor, gestor e supervisor, respeitando unidade e equipe.",
+  },
+
   BROKER_AVAILABILITY_ONBOARDING: {
     key: "feature_broker_availability_onboarding_enabled",
     scope: "global",

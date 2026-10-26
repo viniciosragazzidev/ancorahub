@@ -513,3 +513,7 @@ O topo global e o /dashboard agora seguem um container e ritmo Arc comum, com ca
 ## 2026-10-25 - Onda 5, distribuicao e plantoes no Lite
 
 Operação, filas, calendário, ocorrência, saúde da distribuição e dashboard mantêm consultas, ações e permissões existentes. /plantoes/agora também usa o gate Lite, preservando os checks atuais do corretor. Validação final: 18 arquivos e 86 testes Vitest aprovados, TypeScript sem erros, ESLint sem erros e 24 capturas reais sem rolagem horizontal. Execução: docs/implementations/active/2026-10-24-diretor-lite/onda5-execution.md.
+
+## 2026-10-26 - ?rea Negocia??es no Lite
+
+`/negociacoes` acompanha os n?veis de atendimento, leitura da IA, pend?ncia de resposta, hist?rico e estat?sticas calculados na consulta. Diretor filtra unidade; gestor fica na unidade autenticada; supervisor v? sua equipe. O super admin controla a flag global, sem migra??o. A pr?via com AppShell e fixtures foi capturada em 1440 e 390 px. Registro: `docs/implementations/completed/2026-10-26-negociacoes-area.md`.

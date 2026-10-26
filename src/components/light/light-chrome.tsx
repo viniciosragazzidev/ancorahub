@@ -42,6 +42,7 @@ export function LightChrome({
   showQuoteSimulator = false,
   showDutyCalendar = false,
   showRelationship = false,
+  showNegotiations = false,
   journeyEnabled = false,
   welcomeVideoEnabled = false,
   teamRankingEnabled = false,
@@ -58,6 +59,7 @@ export function LightChrome({
   showQuoteSimulator?: boolean;
   showDutyCalendar?: boolean;
   showRelationship?: boolean;
+  showNegotiations?: boolean;
   journeyEnabled?: boolean;
   welcomeVideoEnabled?: boolean;
   teamRankingEnabled?: boolean;
@@ -84,6 +86,7 @@ export function LightChrome({
       showQuoteSimulator={showQuoteSimulator}
       showDutyCalendar={showDutyCalendar}
       showRelationship={showRelationship}
+      showNegotiations={showNegotiations}
       journeyEnabled={journeyEnabled}
       viewAs={viewAs}
       teamRankingEnabled={teamRankingEnabled}

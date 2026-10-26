@@ -48,6 +48,7 @@ import {
   updateTeamInvitationResendSettingsAction,
   updateUserProfileSettingsAction,
   updateReportingCenterSettingsAction,
+  updateNegotiationsAreaSettingsAction,
   updateUnlinkedConversationDeletionSettingsAction,
   updateConversationMediaSettingsAction,
   updateColdLeadReactivationSettingsAction,
@@ -89,6 +90,7 @@ export default async function SuperAdminSettingsPage() {
     SYSTEM_REPORT_DESTINATION_KEY,
     "feature_meta_lead_ads_enabled",
     "feature_realtime_sync_enabled",
+    FEATURE_FLAGS.NEGOTIATIONS_AREA.key,
     META_LEAD_ADS_PLATFORM_SETTINGS.partnerName,
     META_LEAD_ADS_PLATFORM_SETTINGS.businessId,
     META_LEAD_ADS_PLATFORM_SETTINGS.supportWhatsApp,
@@ -179,6 +181,7 @@ export default async function SuperAdminSettingsPage() {
   const metaCloudWhatsAppEnabled = settingMap.get("feature_whatsapp_meta_cloud_enabled") === "true";
   const systemReportEnabled = settingMap.get(SYSTEM_REPORT_ENABLED_KEY) !== "false";
   const reportingCenterEnabled = settingMap.get("feature_reporting_center_enabled") !== "false";
+  const negotiationsAreaEnabled = (settingMap.get(FEATURE_FLAGS.NEGOTIATIONS_AREA.key) ?? FEATURE_FLAGS.NEGOTIATIONS_AREA.defaultValue) === "true";
   const conversationMediaEnabled = settingMap.get("feature_conversation_media_enabled") !== "false";
   const systemReportDestination = settingMap.get(SYSTEM_REPORT_DESTINATION_KEY) ?? "";
   const metaLeadAdsEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
@@ -462,6 +465,29 @@ export default async function SuperAdminSettingsPage() {
                 <Button render={<Link href="/super-admin/tenants" />} size="sm" variant="ghost">
                   Gerenciar piloto por empresa
                 </Button>
+              </CardContent>
+            </Card>
+
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Acompanhamento de negociações</CardTitle>
+                <CardDescription>
+                  Libera /negociacoes para diretor, gestor e supervisor. Cada papel mantém o próprio escopo de unidade ou equipe; a desativação oculta a área sem apagar registros.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateNegotiationsAreaSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="enabled" value="true" defaultChecked={negotiationsAreaEnabled} className="size-4" />
+                    <span>
+                      <span className="font-medium">Área de negociações habilitada</span>
+                      <span className="block text-xs text-muted-foreground">A alteração é registrada na auditoria da plataforma.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant={negotiationsAreaEnabled ? "outline" : "default"}>
+                    {negotiationsAreaEnabled ? "Salvar controle" : "Ativar área de negociações"}
+                  </Button>
+                </form>
               </CardContent>
             </Card>
 

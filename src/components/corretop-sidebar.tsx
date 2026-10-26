@@ -14,6 +14,7 @@ import {
   ChatCircleText,
   Lightbulb,
   PresentationChart,
+  ChartLineUp,
   CurrencyCircleDollar,
   UsersThree,
   WhatsappLogo,
@@ -99,6 +100,15 @@ const navigationItems: NavItemConfig[] = [
     permission: "acessar_conversas",
     section: "Principal",
     iconTone: "text-violet-600 dark:text-violet-300",
+  },
+  {
+    label: "Negociações",
+    fullLabel: "Acompanhamento de negociações",
+    icon: ChartLineUp,
+    url: "/negociacoes",
+    permission: "ver_dashboard_equipe",
+    section: "Principal",
+    iconTone: "text-teal-600 dark:text-teal-300",
   },
   {
     label: "Leads",
@@ -205,7 +215,7 @@ const navigationItems: NavItemConfig[] = [
   },
 ];
 
-export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initialOnDuty }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string; initialOnDuty?: boolean }) {
+export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initialOnDuty, negotiationsEnabled = false }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string; initialOnDuty?: boolean; negotiationsEnabled?: boolean }) {
   const currentPathname = usePathname();
   const pathname = initialPathname ?? currentPathname;
   const { isMobile, setOpenMobile } = useSidebar();
@@ -232,7 +242,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
     (pathname.startsWith("/distribuicao") && pathname.includes("view=plantao")) ||
     pathname.startsWith("/leads/distribuicao/plantao");
 
-  const visibleItems = navigationItems.filter((item) => canShowNavigationItem(item, user));
+  const visibleItems = navigationItems.filter((item) => (item.url !== "/negociacoes" || negotiationsEnabled) && canShowNavigationItem(item, user));
 
   async function handleLogout() {
     toast.info("Encerrando sua sessão...");

@@ -4,7 +4,7 @@ import { getLightMoreDestinations, isLightRouteAllowed, resolveLightRoute } from
 
 describe("supervisor Lite routes", () => {
   it("allows the team screens route by route", () => {
-    for (const path of ["/dashboard", "/dashboard/c/equipe", "/leads", "/leads/abc", "/clientes", "/equipe", "/equipe/minha", "/equipe/minha/configurar", "/equipe/desempenho", "/equipe/plantao", "/equipe/u1", "/equipe/transferencia", "/relacionamento", "/notificacoes", "/settings"]) {
+    for (const path of ["/dashboard", "/negociacoes", "/dashboard/c/equipe", "/leads", "/leads/abc", "/clientes", "/equipe", "/equipe/minha", "/equipe/minha/configurar", "/equipe/desempenho", "/equipe/plantao", "/equipe/u1", "/equipe/transferencia", "/relacionamento", "/notificacoes", "/settings"]) {
       expect(isLightRouteAllowed(path, "supervisor")).toBe(true);
     }
   });
@@ -19,7 +19,8 @@ describe("supervisor Lite routes", () => {
   });
 
   it("gives the supervisor their own Mais menu", () => {
-    expect(getLightMoreDestinations({ relationshipCenter: true }, "supervisor").map((item) => item.href)).toEqual(["/equipe/minha", "/equipe/transferencia", "/relacionamento", "/clientes", "/mensagens", "/notificacoes", "/settings"]);
+    expect(getLightMoreDestinations({ relationshipCenter: true, negotiations: true }, "supervisor").map((item) => item.href)).toEqual(["/equipe/minha", "/negociacoes", "/equipe/transferencia", "/relacionamento", "/clientes", "/mensagens", "/notificacoes", "/settings"]);
+    expect(getLightMoreDestinations({ relationshipCenter: true, negotiations: false }, "supervisor").map((item) => item.href)).not.toContain("/negociacoes");
     expect(isLightRouteAllowed("/mensagens", "supervisor")).toBe(true);
     expect(isLightRouteAllowed("/mensagens/lead-1", "supervisor")).toBe(true);
     expect(resolveLightRoute("/mensagens/lead-1")).toMatchObject({ title: "Conversa", parentHref: "/mensagens" });

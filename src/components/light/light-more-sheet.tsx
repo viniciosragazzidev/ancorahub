@@ -26,6 +26,7 @@ export function LightMoreSheet({
   showQuoteSimulator,
   showDutyCalendar,
   showRelationship = false,
+  showNegotiations = false,
   journeyEnabled = false,
   viewAs = { canViewAs: false, viewingAs: null },
   teamRankingEnabled = false,
@@ -41,6 +42,7 @@ export function LightMoreSheet({
   showQuoteSimulator: boolean;
   showDutyCalendar: boolean;
   showRelationship?: boolean;
+  showNegotiations?: boolean;
   journeyEnabled?: boolean;
   viewAs?: ViewAsState;
   teamRankingEnabled?: boolean;
@@ -50,7 +52,7 @@ export function LightMoreSheet({
   availabilityPending: boolean;
   onChangeAvailability: (next: "available" | "paused") => void;
 }) {
-  const destinations = getLightMoreDestinations({ quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship, journey: journeyEnabled, teamRanking: teamRankingEnabled, teamManagement: teamManagementEnabled }, audience);
+  const destinations = getLightMoreDestinations({ quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship, negotiations: showNegotiations, journey: journeyEnabled, teamRanking: teamRankingEnabled, teamManagement: teamManagementEnabled }, audience);
   // The supervisor does not receive leads: no availability, and the tour is the broker's.
   const isSupervisor = audience === "supervisor";
   const isManager = audience === "manager";

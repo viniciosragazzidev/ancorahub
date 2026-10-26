@@ -70,6 +70,7 @@ export function AppShell({
   cleanUiEnabled = false,
   queueBadgeCount = 0,
   directorLiteEnabled = false,
+  negotiationsEnabled = false,
   initialSidebarUser,
   initialSidebarPathname,
   initialSidebarOnDuty,
@@ -96,6 +97,7 @@ export function AppShell({
   /** Leads waiting for the broker to accept; shown as the badge on the Fila tab (Light only). */
   queueBadgeCount?: number;
   directorLiteEnabled?: boolean;
+  negotiationsEnabled?: boolean;
   /** Só usado pela prévia de desenvolvimento, sem consultar dados de usuário. */
   initialSidebarUser?: UserDisplayInfo | null;
   /** Só usado pela prévia de desenvolvimento para destacar a rota representada. */
@@ -216,6 +218,7 @@ export function AppShell({
           welcomeVideoEnabled={welcomeVideoEnabled}
           teamRankingEnabled={teamRankingEnabled}
           teamManagementEnabled={teamManagementEnabled}
+          showNegotiations={negotiationsEnabled}
           audience={liteAudience}
           initialChatRail={initialChatRail}
           showQuoteSimulator={showQuoteSimulator}
@@ -267,10 +270,10 @@ export function AppShell({
         {directorLiteEnabled ? <div className="arc-venancor director-view-as-banner" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}><ViewAsBanner viewingAs={viewAs.viewingAs} /></div> : <ViewAsBanner viewingAs={viewAs.viewingAs} />}
         {directorLiteEnabled ? (
           <div className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}>
-            <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} />
+            <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} />
           </div>
         ) : (
-          <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} />
+          <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} />
         )}
         {directorLiteEnabled ? <div id={DIRECTOR_LITE_PORTAL_ROOT_ID} className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }} /> : null}
         <SidebarInset

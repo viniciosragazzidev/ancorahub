@@ -23,6 +23,7 @@ describe("Light routes", () => {
     }
     expect(isLightRouteAllowed("/agenda", "supervisor")).toBe(false);
     expect(isLightRouteAllowed("/desempenho", "manager")).toBe(false);
+    expect(isLightRouteAllowed("/negociacoes", "broker")).toBe(false);
     for (const path of ["/equipe", "/relatorios", "/vendas", "/integrations/whatsapp"]) {
       expect(isLightRouteAllowed(path)).toBe(false);
     }
@@ -50,6 +51,7 @@ describe("Light routes", () => {
     expect(ficha).toMatchObject({ parentHref: "/leads/123", backToParent: true });
     expect(resolveLightRoute("/minha-fila").hidesTabBar).toBe(true);
     expect(resolveLightRoute("/clientes")).toMatchObject({ tab: "mais", parentHref: "/dashboard" });
+    expect(resolveLightRoute("/negociacoes")).toMatchObject({ title: "Negociações", tab: "mais", parentHref: "/dashboard" });
     expect(resolveLightRoute("/clientes/9")).toMatchObject({ parentHref: "/clientes" });
     expect(resolveLightRoute("/algo-desconhecido")).toMatchObject({ isRoot: false, parentHref: "/dashboard" });
   });

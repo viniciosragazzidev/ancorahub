@@ -41,6 +41,8 @@ const ROUTES: readonly RouteRule[] = [
   { test: exact("/equipe/transferencia"), route: { title: "Transferir corretor", parentHref: "/equipe" } },
   { test: exact("/equipe/minha"), route: { title: "Minha equipe", parentHref: "/equipe" } },
   { test: exact("/dashboard"), route: { title: "Início", parentHref: null } },
+  { test: exact("/negociacoes"), route: { title: "Negociações", parentHref: "/dashboard" } },
+  { test: exact("/dev/negociacoes-preview"), route: { title: "Negociações", parentHref: "/dashboard" } },
   { test: exact("/leads"), route: { title: "Leads", parentHref: null } },
   { test: exact("/conversas"), route: { title: "Conversas", parentHref: null } },
   { test: exact("/equipe"), route: { title: "Equipe", parentHref: null } },

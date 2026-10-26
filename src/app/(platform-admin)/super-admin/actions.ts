@@ -208,6 +208,24 @@ export async function updateReportingCenterSettingsAction(formData: FormData) {
   });
 }
 
+export async function updateNegotiationsAreaSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const rawEnabled = formData.get("enabled");
+  const enabled = rawEnabled === null ? "false" : z.enum(["true", "false"]).parse(rawEnabled);
+  const now = new Date();
+  await setSystemSetting(FEATURE_FLAGS.NEGOTIATIONS_AREA.key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "negotiations_area.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "negotiations_area",
+    metadata: { enabled },
+    createdAt: now,
+  });
+  revalidatePath("/negociacoes");
+}
+
 export async function updateCleanUiOperationalSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("cleanUiOperationalEnabled") === "true" ? "true" : "false";
