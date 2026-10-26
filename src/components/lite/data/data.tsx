@@ -4,7 +4,9 @@
  * Lista de registros no visual Lite (F3): `LiteDataTable` como tabela a partir de 768px e `LiteDataList` como cartões
  * abaixo disso. As mesmas linhas e as mesmas colunas alimentam as duas; só a apresentação muda.
  */
-import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
+import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+
+import { attachDragScroll } from "@/components/ui/drag-scroll-table";
 
 import styles from "./data.module.css";
 
@@ -81,9 +83,13 @@ function cellClass<T>(column: LiteColumn<T>) {
 }
 
 export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, empty, selection, rowTone }: LiteDataProps<T>) {
-  if (!rows.length) return <div className={styles.empty}>{empty}</div>;
+  // A mouse drag scrolls wide tables sideways, like the legacy tables (touch and trackpad stay native).
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const hasRows = rows.length > 0;
+  useEffect(() => (hasRows && wrapRef.current ? attachDragScroll(wrapRef.current) : undefined), [hasRows]);
+  if (!hasRows) return <div className={styles.empty}>{empty}</div>;
   return (
-    <div className={styles.tableWrap} data-lite="table">
+    <div ref={wrapRef} className={styles.tableWrap} data-lite="table">
       <table className={styles.table}>
         <caption className={styles.srOnly}>{caption}</caption>
         <thead>

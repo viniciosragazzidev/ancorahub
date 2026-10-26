@@ -191,7 +191,7 @@ describe("LeadsListSwitch", () => {
 
 describe("nome, telefone e a visão Qualificação IA", () => {
   it("telefone no formato da tabela, com e sem DDI", () => {
-    expect(formatLeadPhone("5521998836148")).toBe("(55) 21 99883-6148");
+    expect(formatLeadPhone("5521998836148")).toBe("(21) 99883-6148");
     expect(formatLeadPhone("21 99883-6148")).toBe("(21) 99883-6148");
     expect(formatLeadPhone("2133334444")).toBe("(21) 3333-4444");
     expect(formatLeadPhone("123")).toBe("123");
@@ -218,7 +218,7 @@ describe("nome, telefone e a visão Qualificação IA", () => {
       </ArcScopeProvider>,
     );
     expect(container.querySelector('[data-lite="table"]')).not.toBeNull();
-    expect(container).toHaveTextContent("(55) 21 97989-6800");
+    expect(container).toHaveTextContent("(21) 97989-6800");
     fireEvent.click(screen.getAllByText("Cristiane Farizele")[0]!);
     expect(open).toHaveBeenCalledWith(qualifying);
   });

@@ -25,6 +25,15 @@
   background: var(--surface);
 }
 
+.tableWrap[data-drag-scroll="idle"] {
+  cursor: grab;
+}
+
+.tableWrap[data-drag-scroll="dragging"] {
+  cursor: grabbing;
+  user-select: none;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

@@ -18,10 +18,11 @@ export function attachDragScroll(container: HTMLElement, options: { startOnInter
     container.dataset.dragScroll = container.scrollWidth > container.clientWidth ? "idle" : "off";
   };
   syncScrollable();
-  const resizeObserver = new ResizeObserver(syncScrollable);
-  resizeObserver.observe(container);
+  // Missing outside real browsers (jsdom); the drag still re-checks the width on each press.
+  const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(syncScrollable);
+  resizeObserver?.observe(container);
   // The content can grow without the container resizing (more tabs, columns).
-  if (container.firstElementChild) resizeObserver.observe(container.firstElementChild);
+  if (container.firstElementChild) resizeObserver?.observe(container.firstElementChild);
 
   let startX = 0;
   let startScroll = 0;
@@ -74,7 +75,7 @@ export function attachDragScroll(container: HTMLElement, options: { startOnInter
   container.addEventListener("pointercancel", endDrag);
   container.addEventListener("click", onClickCapture, true);
   return () => {
-    resizeObserver.disconnect();
+    resizeObserver?.disconnect();
     container.removeEventListener("pointerdown", onPointerDown);
     container.removeEventListener("pointermove", onPointerMove);
     container.removeEventListener("pointerup", endDrag);

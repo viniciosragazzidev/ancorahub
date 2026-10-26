@@ -225,6 +225,8 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
       if (kind === "lead_unworked" || kind === "lead_stalled") {
         for (const recipient of recipients) {
           if (recipient.role === "manager" && recipient.branchId !== lead.branchId) continue;
+          // Directors no longer get "Lead estagnado" (Vinicios, 26/10); the manager and the supervisor still do.
+          if (kind === "lead_stalled" && recipient.role === "director") continue;
           const key = `${recipient.userId}:${lead.id}:${kind}`;
           if (existingKeys.has(key)) continue;
           existingKeys.add(key);
