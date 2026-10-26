@@ -353,6 +353,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Exige confirmação do corretor antes de torná-lo elegível aos leads do plantão vigente.",
   },
+  HOT_LEAD_EARLY_DISTRIBUTION: {
+    key: "feature_hot_lead_early_distribution_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Lead de alta aptidão sai para o corretor no momento em que a IA o marca, sem esperar o fim da qualificação (DEC-153).",
+  },
   DUTY_OVERNIGHT_EXTRA_SHIFT: {
     key: "feature_duty_overnight_extra_shift_enabled",
     scope: "global",

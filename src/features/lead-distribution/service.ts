@@ -6,7 +6,8 @@ import { operationDayStart } from "./broker-day-history";
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
-import { automaticDistributionHoldReason, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, shouldHoldColdLead, type IntelligentDistributionPolicy } from "./domain";
+import { automaticDistributionHoldReason, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, isHeldByRunningQualification, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, shouldHoldColdLead, type IntelligentDistributionPolicy } from "./domain";
+import { isHotLeadEarlyDistributionEnabled } from "./qualification-hold";
 import type { AssignmentSource, DutyFallbackPolicy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { createLeadOffersForBrokers, loadBrokerPacingOffers } from "./offers";
@@ -805,7 +806,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     return { status: "conflict", leadId, reason: "Lead já possui corretor confirmado." };
   }
   const brokerToExclude = excludeBrokerId ?? (lead.assignmentSource === "automatic_offer" || lead.assignmentSource === "manual_offer" ? lead.corretorId : null);
-  if (lead.qualificationState === "IN_PROGRESS" || lead.qualificationStatus === "qualifying") {
+  if (isHeldByRunningQualification(lead.qualificationStatus, lead.qualificationState, await isHotLeadEarlyDistributionEnabled())) {
     return { status: "queued", leadId, reason: "O lead está em processo de qualificação por IA e aguarda a finalização ou tempo limite para ser distribuído." };
   }
   // Regra de DDD (Matriz de Roteamento): each situation — valid DDD, invalid

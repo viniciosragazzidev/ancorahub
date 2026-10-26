@@ -1,4 +1,4 @@
-import { automaticDistributionHoldReason } from "./domain";
+import { automaticDistributionHoldReason, isHeldByRunningQualification } from "./domain";
 
 export type BulkDistributionCandidate = {
   id: string;
@@ -21,12 +21,12 @@ const terminalLeadStatuses = new Set(["converted", "lost"]);
  */
 export function selectBulkDistributionCandidateIds(
   leads: BulkDistributionCandidate[],
+  earlyHot = true,
 ) {
   return leads
     .filter((lead) => recoverableDistributionStatuses.has(lead.distributionStatus))
     .filter((lead) => !terminalLeadStatuses.has(lead.status))
-    .filter((lead) => lead.qualificationState !== "IN_PROGRESS")
-    .filter((lead) => lead.qualificationStatus !== "qualifying")
+    .filter((lead) => !isHeldByRunningQualification(lead.qualificationStatus, lead.qualificationState, earlyHot))
     .filter((lead) => !automaticDistributionHoldReason(lead.qualificationStatus, lead.qualificationState))
     .map((lead) => lead.id);
 }

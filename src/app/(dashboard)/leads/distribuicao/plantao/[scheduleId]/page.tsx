@@ -17,7 +17,8 @@ import { getDutyOccurrenceHistory } from "@/features/lead-distribution/duty-occu
 import { firstValidShift, isSingleOccurrencePlantao } from "@/features/lead-distribution/monthly-duty-plan";
 import { getDutyWindowOnDate, getRelevantDutyWindow, isDutyWindowActive, listCompletedDutyWindows, parseDutyLeadsSince, type DutyLeadsSinceOption } from "@/features/lead-distribution/duty-presence-domain";
 import { getFeatureFlag, getSystemSetting, FEATURE_FLAGS } from "@/features/system-settings/queries";
-import { getDutyCoverage } from "@/features/lead-distribution/domain";
+import { getDutyCoverage, isHeldByRunningQualification } from "@/features/lead-distribution/domain";
+import { isHotLeadEarlyDistributionEnabled } from "@/features/lead-distribution/qualification-hold";
 import { leadDistributionStatusUi, QUALIFYING_LEAD_DISTRIBUTION_UI } from "@/features/lead-distribution/status-ui";
 import { getReturnedUnacceptedLeadIds } from "@/features/lead-distribution/returned-unaccepted";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -242,7 +243,10 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   // Not waiting for a broker either: Meta blocked the first message, or the
   // AI is still qualifying (the distribution holds those until it ends).
   const isMetaBlocked = (lead: (typeof allLeads)[number]) => lead.qualificationStatus === "meta_blocked";
-  const isQualifying = (lead: (typeof allLeads)[number]) => lead.qualificationStatus === "qualifying" || lead.qualificationState === "IN_PROGRESS";
+  // A hot lead (alta aptidão) is handed out while the AI still talks (DEC-153): listed as waiting,
+  // so the temperature order puts it on top.
+  const earlyHot = await isHotLeadEarlyDistributionEnabled();
+  const isQualifying = (lead: (typeof allLeads)[number]) => isHeldByRunningQualification(lead.qualificationStatus, lead.qualificationState, earlyHot);
   const isWaiting = (lead: (typeof allLeads)[number]) => !isAssigned(lead) && !isDisqualified(lead) && !isMetaBlocked(lead) && !isQualifying(lead);
   // Still being qualified by the AI: listed with a notice so it does not vanish (26/10), after the
   // ones that can be handed out. The distribution itself still holds it (service.ts).

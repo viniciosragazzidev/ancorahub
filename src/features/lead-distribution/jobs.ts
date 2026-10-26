@@ -11,6 +11,7 @@ import { processMetaOutboundBatch } from "@/features/communication-channels/outb
 import { getLocalDutyParts } from "@/features/leads/assignment";
 
 import { processQueuedLead } from "./service";
+import { isHotLeadEarlyDistributionEnabled, notHeldByRunningQualificationSql } from "./qualification-hold";
 import { expireOutdatedLeadOffers } from "./offers";
 import { automaticDistributionHoldReason, COLD_HELD_BY_QUEUE_REASON_PREFIX, HELD_DISTRIBUTION_RETRY_MS, distributionRetryDelayMilliseconds, isDeferredDistributionReason, isHeldDistributionReason } from "./domain";
 import { groupByTemperatureRank, type TemperatureRank } from "./temperature-priority";
@@ -205,6 +206,7 @@ export async function enqueueAndProcessLeadDistribution(input: {
 
 async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: string, leadId?: string) {
   const db = getDatabase();
+  const earlyHot = await isHotLeadEarlyDistributionEnabled();
   const queuedLeads = await db.select({ id: schema.leads.id, tenantId: schema.leads.tenantId })
     .from(schema.leads)
     .where(and(
@@ -231,8 +233,7 @@ async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: stri
       // Removed from distribution by a manager: never re-seeded.
       or(isNull(schema.leads.distributionRemovedAt), isNotNull(schema.leads.corretorId)),
       not(ilike(schema.leads.nome, "Lead WhatsApp (%)")),
-      or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
-      or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
+      notHeldByRunningQualificationSql(earlyHot),
       // A lead whose job is already pending/retrying is in the processor's
       // hands: re-selecting it only took a slot of the batch. With 25+ hot
       // leads held (queue in manual mode, arrived before the plantão), new hot
@@ -255,6 +256,7 @@ async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: stri
  * after the start time is not delayed by the old retry timestamp.
  */
 async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
+  const earlyHot = await isHotLeadEarlyDistributionEnabled();
   const db = getDatabase();
   const local = getLocalDutyParts(now);
   const rows = await db
@@ -283,8 +285,7 @@ async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
       ne(schema.leads.status, "lost"),
       or(isNull(schema.leads.distributionStatus), ne(schema.leads.distributionStatus, "manual_hold")),
       automaticQualificationFilter(),
-      or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
-      or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
+      notHeldByRunningQualificationSql(earlyHot),
       // A lead held by a lasting rule (before 02/10, manual queue, other unit, source not allowed)
       // keeps its 15-minute pause: waking it every tick put it back in every batch and starved
       // the leads that can be handed out (20/10). Only "arrived before the plantão" is woken here.
@@ -524,10 +525,20 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
   // DEC-097: ownership recovery runs 24/7 — no business-hours dead-end.
   // Outbound offer/notification delivery still follows the Meta window in the
   // outbox; only the assignment itself is never delayed by the clock.
-  await expireOutdatedLeadOffers(input.tenantId);
-  result.recoveredLeases = await recoverExpiredJobLeases(now, input.tenantId, input.leadId);
-  result.recoveredAssignments = await recoverStuckLeadAssignments(now, effectiveConfig, input.tenantId, input.leadId);
-  const awakenedDutyJobs = await wakeJobsForActiveDuty(now, input.tenantId);
+  // Slow steps are logged by name (26/10), to tell which one holds a run that does not end.
+  const step = async <T,>(name: string, work: () => Promise<T>) => {
+    const startedAt = Date.now();
+    try {
+      return await work();
+    } finally {
+      const ms = Date.now() - startedAt;
+      if (ms >= 5_000) console.warn("[lead-distribution] slow_step", { step: name, ms });
+    }
+  };
+  await step("expire_offers", () => expireOutdatedLeadOffers(input.tenantId));
+  result.recoveredLeases = await step("recover_leases", () => recoverExpiredJobLeases(now, input.tenantId, input.leadId));
+  result.recoveredAssignments = await step("recover_assignments", () => recoverStuckLeadAssignments(now, effectiveConfig, input.tenantId, input.leadId));
+  const awakenedDutyJobs = await step("wake_duty_jobs", () => wakeJobsForActiveDuty(now, input.tenantId));
   if (awakenedDutyJobs > 0) {
     console.info("[lead-distribution] active_duty_jobs_awakened", {
       tenantId: input.tenantId ?? "all",
@@ -536,7 +547,7 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
       time: getLocalDutyParts(now).time,
     });
   }
-  result.seeded = await seedQueuedLeadJobs(effectiveConfig, input.tenantId, input.leadId);
+  result.seeded = await step("seed_jobs", () => seedQueuedLeadJobs(effectiveConfig, input.tenantId, input.leadId));
   const workerId = `distribution:${randomUUID()}`;
 
   const claimedJobs: Array<{ job: typeof schema.leadDistributionJobs.$inferSelect; rank: TemperatureRank }> = [];
@@ -577,7 +588,7 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
         return;
       }
       try {
-        const distribution = await processQueuedLead(context, job.leadId);
+        const distribution = await step(`lead:${job.leadId}`, () => processQueuedLead(context, job.leadId));
         if (distribution.status === "assigned") {
           await completeJob(job.id);
           result.assigned += 1;

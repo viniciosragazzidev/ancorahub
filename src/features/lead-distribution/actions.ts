@@ -13,6 +13,7 @@ import {
   routeLeadToBranchAndAssignBroker,
 } from "./service";
 import { enqueueAndProcessLeadDistribution, enqueueLeadDistributionJob, runLeadDistributionProcessor, wakeLeadDistributionJob } from "./jobs";
+import { isHotLeadEarlyDistributionEnabled } from "./qualification-hold";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
 import { retryLeadEffectForTenant, runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
@@ -614,7 +615,7 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
           : undefined,
       ));
 
-    const candidateIds = selectBulkDistributionCandidateIds(unassignedLeads);
+    const candidateIds = selectBulkDistributionCandidateIds(unassignedLeads, await isHotLeadEarlyDistributionEnabled());
     if (!candidateIds.length) {
       return {
         success: true,

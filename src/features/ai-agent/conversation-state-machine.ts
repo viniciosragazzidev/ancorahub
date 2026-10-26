@@ -1076,6 +1076,20 @@ async function completeDeterministicQualificationTurn(input: {
     );
   }
 
+  // Alta aptidão (type, lives and ages give the quote) goes to the broker now, while the AI keeps
+  // collecting the rest (DEC-153). After the reply, so the customer is not kept waiting.
+  if (!isHandoff && persistedQualification.qualificationStatus === "hot" && persistedQualification.state === "IN_PROGRESS") {
+    const { isHotLeadEarlyDistributionEnabled } = await import("@/features/lead-distribution/qualification-hold");
+    if (await isHotLeadEarlyDistributionEnabled()) {
+      const { distributeQualifiedLead } = await import("@/features/lead-distribution/service");
+      distribution = await distributeQualifiedLead({ tenantId: input.tenantId, leadId: input.leadId, actorUserId: null })
+        .catch((error) => {
+          console.error("[qualification] early_hot_distribution_failed", { tenantId: input.tenantId, leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
+          return null;
+        });
+    }
+  }
+
   await db.insert(schema.aiAttendanceLogs).values({
     id: `log_qualification_${crypto.randomUUID()}`,
     tenantId: input.tenantId,

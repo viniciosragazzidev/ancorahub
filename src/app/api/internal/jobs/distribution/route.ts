@@ -12,7 +12,34 @@ export const maxDuration = 60;
 // a second and a third one stacked on top, all fighting for the same DB sockets.
 const RUNNING_KEY = Symbol.for("ancorahub.jobs.distribution.running");
 const processState = globalThis as typeof globalThis & { [RUNNING_KEY]?: number };
-const STALE_RUN_MS = 10 * 60_000;
+const STALE_RUN_MS = 4 * 60_000;
+
+// Each phase has a ceiling (26/10): a run hung for 10 minutes on an await that never returned and,
+// holding the guard above, every following run was skipped. Past the ceiling the run answers and
+// frees the guard; the hung work is left behind and the next run starts clean.
+const DUTY_PRESENCE_TIMEOUT_MS = 60_000;
+const DRAIN_TIMEOUT_MS = 150_000;
+
+class PhaseTimeoutError extends Error {
+  constructor(phase: string, ms: number) {
+    super(`${phase} passed ${ms} ms`);
+    this.name = "PhaseTimeoutError";
+  }
+}
+
+async function timedPhase<T>(phase: string, timeoutMs: number, work: () => Promise<T>): Promise<T> {
+  const startedAt = Date.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work(),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new PhaseTimeoutError(phase, timeoutMs)), timeoutMs); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+    console.info("[distribution-job] phase", { phase, ms: Date.now() - startedAt });
+  }
+}
 
 async function handle(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -38,7 +65,7 @@ async function runDistributionJob() {
   let dutyPresence: Awaited<ReturnType<typeof processDutyPresenceReminders>> | { enabled: boolean; error: true };
   let dutyPresenceFailed = false;
   try {
-    dutyPresence = await processDutyPresenceReminders();
+    dutyPresence = await timedPhase("duty_presence", DUTY_PRESENCE_TIMEOUT_MS, () => processDutyPresenceReminders());
   } catch (error) {
     dutyPresenceFailed = true;
     console.error("[duty-presence] reminder sweep failed", error instanceof Error ? { name: error.name, message: error.message } : { name: "UnknownError" });
@@ -47,7 +74,7 @@ async function runDistributionJob() {
   let result: Awaited<ReturnType<typeof drainLeadDistributionBacklog>> | null = null;
   let distributionFailed = false;
   try {
-    result = await drainLeadDistributionBacklog({ maxBatches: 4 });
+    result = await timedPhase("drain", DRAIN_TIMEOUT_MS, () => drainLeadDistributionBacklog({ maxBatches: 4 }));
   } catch (error) {
     distributionFailed = true;
     console.error("[distribution-job] backlog drain failed", error instanceof Error ? { name: error.name, message: error.message } : { name: "UnknownError" });

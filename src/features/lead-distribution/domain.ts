@@ -133,6 +133,19 @@ export function shouldHoldColdLead(qualificationStatus: string | null | undefine
   return holdColdLeads && qualificationStatus === "cold";
 }
 
+/**
+ * The AI is still qualifying: the lead waits for the end of the conversation or the timeout.
+ * A hot one (alta aptidão: type, lives and ages already give the quote) does not wait (DEC-153).
+ */
+export function isHeldByRunningQualification(
+  qualificationStatus: string | null | undefined,
+  qualificationState: string | null | undefined,
+  earlyHot: boolean,
+) {
+  if (earlyHot && qualificationStatus === "hot") return false;
+  return qualificationState === "IN_PROGRESS" || qualificationStatus === "qualifying";
+}
+
 /** Qualification states that must never enter automatic broker distribution. */
 export function automaticDistributionHoldReason(
   qualificationStatus: string | null | undefined,

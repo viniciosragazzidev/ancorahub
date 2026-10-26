@@ -16,6 +16,7 @@ import { dutyAttendanceOverrideProblem, getRelevantDutyWindow, parseDutyLeadsSin
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { brokerOccurrenceAssignmentBounds, getDutyWindowOnDate } from "./duty-presence-domain";
 import { assignLeadToBroker } from "./service";
+import { isHotLeadEarlyDistributionEnabled, notHeldByRunningQualificationSql } from "./qualification-hold";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 
@@ -677,15 +678,14 @@ export async function getBrokerOccurrenceLeadsAction(scheduleId: string, brokerI
   }
 }
 
-function availableDutyLeadConditions(context: Awaited<ReturnType<typeof getRequiredTenantContext>>, queueIds: string[]) {
+function availableDutyLeadConditions(context: Awaited<ReturnType<typeof getRequiredTenantContext>>, queueIds: string[], earlyHot: boolean) {
   return and(
     eq(schema.leads.tenantId, context.tenantId),
     inArray(schema.leads.queueId, queueIds),
     isNull(schema.leads.corretorId),
     inArray(schema.leads.distributionStatus, ["queued", "unassigned", "returned_to_queue"]),
     or(isNull(schema.leads.qualificationStatus), notInArray(schema.leads.qualificationStatus, ["disqualified", "not_qualified", "meta_blocked"])),
-    or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
-    or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
+    notHeldByRunningQualificationSql(earlyHot),
     or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "cold"), isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "PARTIAL")),
     isNull(schema.leads.distributionRemovedAt),
     isNull(schema.leads.deletedAt),
@@ -718,7 +718,7 @@ export async function getDutyAvailableLeadsAction(scheduleId: string, leadsSince
       createdAt: schema.leads.createdAt,
     }).from(schema.leads)
       .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, context.tenantId)))
-      .where(and(availableDutyLeadConditions(context, queueIds), sinceCondition))
+      .where(and(availableDutyLeadConditions(context, queueIds, await isHotLeadEarlyDistributionEnabled()), sinceCondition))
       .orderBy(asc(schema.leads.createdAt))
       .limit(100);
     return { ok: true, leads: rows.map((lead) => ({
@@ -749,7 +749,7 @@ export async function assignDutyLeadToBrokerAction(scheduleId: string, brokerId:
     const queueIds = profile.linkedQueues.map((queue) => queue.id);
     if (!queueIds.length) return { ok: false, reason: "Plantão sem fila vinculada." };
     const [lead] = await db.select({ id: schema.leads.id }).from(schema.leads)
-      .where(and(eq(schema.leads.id, parsed.data.leadId), availableDutyLeadConditions(context, queueIds)))
+      .where(and(eq(schema.leads.id, parsed.data.leadId), availableDutyLeadConditions(context, queueIds, await isHotLeadEarlyDistributionEnabled())))
       .limit(1);
     if (!lead) return { ok: false, reason: "Lead não está disponível neste plantão." };
     const result = await assignLeadToBroker(context, parsed.data.leadId, parsed.data.brokerId, undefined, "Atribuição manual no plantão", undefined, undefined, {
