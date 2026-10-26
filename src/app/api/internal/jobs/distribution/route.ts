@@ -8,12 +8,31 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+// One run at a time per process (26/10): Coolify fires every 2 minutes and a slow run used to get
+// a second and a third one stacked on top, all fighting for the same DB sockets.
+const RUNNING_KEY = Symbol.for("ancorahub.jobs.distribution.running");
+const processState = globalThis as typeof globalThis & { [RUNNING_KEY]?: number };
+const STALE_RUN_MS = 10 * 60_000;
+
 async function handle(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  const runningSince = processState[RUNNING_KEY];
+  if (runningSince && Date.now() - runningSince < STALE_RUN_MS) {
+    return NextResponse.json({ success: true, skipped: "previous_run_still_running", runningForMs: Date.now() - runningSince });
+  }
+  processState[RUNNING_KEY] = Date.now();
+  try {
+    return await runDistributionJob();
+  } finally {
+    processState[RUNNING_KEY] = undefined;
+  }
+}
+
+async function runDistributionJob() {
   // The plantão link goes first (26/10): with the drain first, a slow backlog held every
   // reminder of the afternoon presencial for over 30 minutes.
   let dutyPresence: Awaited<ReturnType<typeof processDutyPresenceReminders>> | { enabled: boolean; error: true };

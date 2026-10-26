@@ -596,20 +596,37 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
   return result;
 }
 
-export async function drainLeadDistributionBacklog(input: { tenantId?: string; maxBatches?: number } = {}) {
-  const aggregate: DistributionJobRunResult = { seeded: 0, claimed: 0, assigned: 0, offered: 0, outboundMessageIds: [], deferred: 0, failed: 0, skipped: 0, recoveredLeases: 0, recoveredAssignments: 0 };
+/**
+ * Time budget of one scheduled run (26/10). Sending each offer inline waits on the company number's
+ * spacing (up to 40 s for a critical notice) and on WAHA's humanized send (up to 30 s), so four
+ * batches went past Coolify's 300 s timeout and the next run started on top of it every 2 minutes.
+ * Past the budget no new batch starts and unsent offers stay queued for the WhatsApp outbox job,
+ * which runs every minute.
+ */
+export const DISTRIBUTION_DRAIN_BUDGET_MS = 90_000;
+
+export async function drainLeadDistributionBacklog(input: { tenantId?: string; maxBatches?: number; budgetMs?: number } = {}) {
+  const aggregate: DistributionJobRunResult & { stoppedByBudget: boolean } = { seeded: 0, claimed: 0, assigned: 0, offered: 0, outboundMessageIds: [], deferred: 0, failed: 0, skipped: 0, recoveredLeases: 0, recoveredAssignments: 0, stoppedByBudget: false };
   const maxBatches = Math.max(1, Math.min(input.maxBatches ?? 4, 10));
+  const deadline = Date.now() + (input.budgetMs ?? DISTRIBUTION_DRAIN_BUDGET_MS);
   for (let batch = 0; batch < maxBatches; batch += 1) {
+    if (Date.now() >= deadline) {
+      aggregate.stoppedByBudget = true;
+      break;
+    }
     const result = await runLeadDistributionProcessor({ tenantId: input.tenantId });
     for (const key of ["seeded", "claimed", "assigned", "offered", "deferred", "failed", "skipped", "recoveredLeases", "recoveredAssignments"] as const) {
       aggregate[key] += result[key];
     }
     aggregate.outboundMessageIds.push(...result.outboundMessageIds);
     await runWithConcurrency(result.outboundMessageIds, 3, async (outboundMessageId) => {
+      // Past the budget the message stays queued: the outbox job sends it within a minute.
+      if (Date.now() >= deadline) return;
       await processMetaOutboundBatch(1, input.tenantId, outboundMessageId);
     });
     if (result.claimed === 0) break;
   }
+  if (Date.now() >= deadline) aggregate.stoppedByBudget = true;
   return aggregate;
 }
 
