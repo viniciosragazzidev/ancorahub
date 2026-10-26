@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildPrivateQualificationContext, evaluateQualification, leadMatchesQualificationEntryRules, qualificationLeadColumns, resolveDeterministicQualificationTurn } from "./service";
+import { buildPrivateQualificationContext, evaluateQualification, leadMatchesQualificationEntryRules, qualificationLeadColumns, replaceHandoffTextPreservingExtension, resolveDeterministicQualificationTurn } from "./service";
 import { createEmptyMemory } from "@/features/ai-agent/memory";
 import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
+import { afterHoursText } from "./broker-window";
+import { AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, DEFAULT_QUALIFIED_HANDOFF_TEXT, effectiveHandoffText, renderConversationVariables } from "./reply-composer";
 
 const policy = {
   assistantName: "Ana", tone: "friendly", formOfAddress: "voce", objective: "qualify_and_handoff",
@@ -20,6 +22,26 @@ describe("scripted reply acknowledgement", () => {
   it("renders the name and the summary in the handoff text", () => {
     const done = { ...memory, city: { value: "Itaboraí", confidence: 1 as const }, collectedFields: ["customerName", "city"] };
     expect(resolveDeterministicQualificationTurn({ memory: done, policy, handoffMessage: "Obrigado, {{nome}}! ({{resumo}})" }).reply).toBe("Obrigado, Teste! (Itaboraí)");
+  });
+
+  it("keeps the optional relation invitation after switching a two-age handoff to the night text", () => {
+    const family = {
+      ...memory,
+      planType: { value: "familiar", confidence: 1 as const },
+      numberOfLives: { value: "2", confidence: 1 as const },
+      age: { value: "46, 10", confidence: 1 as const },
+      collectedFields: ["customerName", "city", "planType", "numberOfLives", "age"],
+    };
+    const turn = resolveDeterministicQualificationTurn({ memory: family, policy });
+    const daytimeHandoff = renderConversationVariables(effectiveHandoffText(null, DEFAULT_QUALIFIED_HANDOFF_TEXT), family);
+    const nightText = renderConversationVariables(
+      afterHoursText(null, DEFAULT_QUALIFIED_HANDOFF_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, new Date("2026-10-21T23:00:00.000Z")),
+      family,
+    );
+
+    expect(turn.beneficiaryInvitation).toBeTruthy();
+    const nightTurn = replaceHandoffTextPreservingExtension(turn, daytimeHandoff, nightText);
+    expect(nightTurn.reply).toBe(`${nightText} ${turn.beneficiaryInvitation}`);
   });
 });
 

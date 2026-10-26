@@ -39,6 +39,31 @@ function text(value: unknown): string | null {
 
 const firstText = (...values: unknown[]) => values.map(text).find((value) => value !== null) ?? null;
 
+export function formatLeadBeneficiaryDetails(detailsValue: unknown, agesFallback?: string | null) {
+  const details = asRecord(detailsValue);
+  const relationLabels: Record<string, string> = { titular: "Você", conjuge: "Cônjuge", filho: "Filho", pai_mae: "Pai/mãe", neto: "Neto", outro: "Outra pessoa" };
+  const beneficiaries = Array.isArray(details.beneficiarios) ? details.beneficiarios.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const record = item as Json;
+    const age = typeof record.idade === "number" && Number.isInteger(record.idade) ? record.idade : null;
+    const relation = typeof record.parentesco === "string" && relationLabels[record.parentesco] ? record.parentesco : null;
+    return [{ age, relation, text: text(record.texto) }];
+  }) : [];
+  const allRelationsConfirmed = beneficiaries.length > 1 && beneficiaries.every((person) => person.age !== null && person.relation !== null);
+  const persistedAges = beneficiaries.map((person) => person.age).filter((age): age is number => age !== null);
+  const ages = firstText(agesFallback, details.individualAges, details.idades, persistedAges.length ? persistedAges.join(" e ") : null);
+  const ageCount = (ages?.match(/\b\d{1,3}\b/g) ?? []).length;
+  const value = allRelationsConfirmed
+    ? beneficiaries.map((person) => `${person.relation === "outro" ? person.text || relationLabels.outro : relationLabels[person.relation!]} (${person.age})`).join(", ")
+    : ages && ageCount > 1
+      ? `${ages} (parentesco não informado)`
+      : ages;
+  const raw = allRelationsConfirmed
+    ? firstText(details.beneficiaryRaw, details.beneficiaryRelation)
+    : firstText(details.beneficiaryRaw, details.beneficiaryRelation, beneficiaries.map((person) => person.text).find(Boolean));
+  return { label: allRelationsConfirmed ? "Pessoas no plano" : "Idades", value, raw };
+}
+
 /** Values the AI kept in its memory, e.g. memory.intent.value. */
 function memoryValues(details: Json): Json {
   const context = asRecord(details.aiQualificationContext);
@@ -74,7 +99,7 @@ const MEMORY_LABELS: Record<string, string> = {
 /** Shown by the main fields, or not client information. */
 const MEMORY_SKIP = new Set(["age", "city", "email", "planType", "numberOfLives", "customerName", "customerFirstName", "collectedFields", "updatedAt",
   // The AI's own bookkeeping, not client data (18/10: "Last question asked" showed on the lead).
-  "lastQuestionAsked", "conversationSummary", "sourceMessageId", "confirmed"]);
+  "lastQuestionAsked", "conversationSummary", "sourceMessageId", "confirmed", "beneficiaries", "beneficiaryRaw", "relationAsked", "beneficiaryRelation"]);
 
 function readableKey(key: string) {
   const spaced = key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").trim().toLowerCase();
@@ -100,7 +125,9 @@ export function buildLeadClientInfo(input: LeadClientInfoInput): LeadClientInfoI
   push("lives", "Vidas", firstText(details.numberOfLives, details.qtdVidas, memory.numberOfLives, input.livesCount, form.qtdVidas, form.vidas));
   const ages = firstText(details.individualAges, details.idades, memory.age, form.idades);
   const averageAge = firstText(details.averageAge, details.mediaIdades, form.mediaIdades);
-  push("ages", "Idades", ages ?? (averageAge ? `média de ${averageAge} anos` : null));
+  const beneficiaryDetails = formatLeadBeneficiaryDetails(details, ages);
+  push("ages", beneficiaryDetails.label, beneficiaryDetails.value ?? (averageAge ? `média de ${averageAge} anos` : null));
+  push("beneficiaryRelation", "Parentesco informado", beneficiaryDetails.raw);
   push("city", "Cidade", firstText(details.city, details.cidade, memory.city, input.city, form.cidade, form.city));
   push("email", "E-mail", firstText(input.email, details.email, memory.email));
   push("tipoCnpj", "Tipo de CNPJ", firstText(meta.tipoCnpj, input.tipoCnpj, details.tipoCnpj));
@@ -144,10 +171,21 @@ export function buildLeadOfferSummary(input: LeadClientInfoInput, fallback: stri
   const items = buildLeadClientInfo(input);
   const get = (key: string) => items.find((item) => item.key === key)?.value ?? null;
   const lives = get("lives");
+  const details = asRecord(input.qualificationDetails);
+  const form = asRecord(input.formData);
+  const memory = memoryValues(details);
+  const storedBeneficiaryAges = Array.isArray(details.beneficiarios)
+    ? details.beneficiarios.flatMap((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+      const age = (item as Json).idade;
+      return typeof age === "number" && Number.isInteger(age) ? [age] : [];
+    }).join(" e ")
+    : null;
+  const ages = firstText(details.individualAges, details.idades, memory.age, form.idades, storedBeneficiaryAges);
   const parts = [
     get("planType") ?? fallback,
     lives ? `${lives} ${lives === "1" ? "vida" : "vidas"}` : null,
-    get("ages") ? `idades ${get("ages")}` : null,
+    ages ? `idades ${ages}` : null,
     get("city"),
     get("tipoCnpj") ? `CNPJ ${get("tipoCnpj")}` : null,
     get("memory:intent") ? `interesse: ${get("memory:intent")}` : null,

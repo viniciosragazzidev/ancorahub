@@ -52,7 +52,20 @@ export type DirectorLiteLeadDetailProps = {
     operadora: string | null;
     productLabel: string;
   };
-  qualification: Record<string, string | null>;
+  qualification: Partial<{
+    numberOfLives: string | null;
+    qtdVidas: string | null;
+    averageAge: string | null;
+    individualAges: string | null;
+    cidade: string | null;
+    neighborhood: string | null;
+    currentPlan: string | null;
+    resumoAtendimento: string | null;
+    resumoNecessidade: string | null;
+    urgenciaContratacao: string | null;
+    beneficiaries: Array<{ age: number | null; relation: string | null; text: string | null }>;
+    beneficiaryRaw: string | null;
+  }>;
   formData: Record<string, string | null>;
   canSeePersonalData: boolean;
   shouldMask: boolean;
@@ -117,6 +130,20 @@ export function DirectorLiteLeadDetail(props: DirectorLiteLeadDetailProps) {
       : "Lead encerrado sem venda";
   const lossBadge = lead.lossCategory === "unattended_sla" ? "Estouro de SLA" : lead.lossCategory === "response_delay" ? "Atraso no atendimento" : "Lead perdido";
   const showMeta = lead.origem === "webhook" || Boolean(lead.sourceCampaign) || Boolean(lead.metaCampaignId);
+  const beneficiaryNames: Record<string, string> = { titular: "você", conjuge: "cônjuge", filho: "filho", pai_mae: "pai/mãe", neto: "neto", outro: "outra pessoa" };
+  const beneficiaryEntries = qualification.beneficiaries ?? [];
+  const beneficiaryAges = beneficiaryEntries.map((beneficiary) => beneficiary.age).filter((age): age is number => age !== null);
+  const agesText = qualification.individualAges ?? beneficiaryAges.join(" e ");
+  const ageList = agesText.match(/\b\d{1,3}\b/g) ?? [];
+  const fullyMappedGroup = ageList.length > 1 && beneficiaryEntries.length === ageList.length
+    && beneficiaryEntries.every((beneficiary, index) => beneficiary.age === Number(ageList[index]) && beneficiary.relation !== null);
+  const peopleOnPlan = fullyMappedGroup
+    ? beneficiaryEntries.map((beneficiary) => {
+      const age = beneficiary.age === null ? "" : ` (${beneficiary.age})`;
+      const relation = beneficiary.relation === "outro" ? beneficiary.text || beneficiaryNames.outro : beneficiaryNames[beneficiary.relation!];
+      return `${relation}${age}`;
+    }).join(", ")
+    : ageList.length > 1 ? `${ageList.join(" e ")} (parentesco não informado)` : null;
 
   return (
     <div className={`arc-venancor ${styles.root}`} data-skin="diretor">
@@ -187,7 +214,8 @@ export function DirectorLiteLeadDetail(props: DirectorLiteLeadDetailProps) {
                     <Field label="Vidas">{qualification.numberOfLives ?? "Não informado"}</Field>
                     {lead.tipo === "PME"
                       ? <Field label="Média de idade do grupo">{qualification.averageAge ? `${qualification.averageAge} anos` : "Não informada"}</Field>
-                      : <Field label="Idades informadas">{qualification.individualAges ?? "Não informadas"}</Field>}
+                      : <Field label={fullyMappedGroup ? "Pessoas no plano" : "Idades informadas"}>{peopleOnPlan ?? (agesText || "Não informadas")}</Field>}
+                    {qualification.beneficiaryRaw ? <Field label="Resposta sobre parentesco">{qualification.beneficiaryRaw}</Field> : null}
                     <Field label="Tipo de atendimento">{meta.tipoPlanoStatus === "not_provided" ? "Não informado" : lead.tipo === "PME" ? "Empresa / PME" : lead.tipo === "PJ" ? "Pessoa jurídica" : "Pessoa física"}</Field>
                     {qualification.neighborhood ? <Field label="Bairro">{qualification.neighborhood}</Field> : null}
                     {qualification.currentPlan ? <Field label="Plano atual">{qualification.currentPlan}</Field> : null}

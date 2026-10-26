@@ -68,6 +68,17 @@ export type DeterministicQualificationTurn = {
   beneficiaryInvitation?: string;
 };
 
+/** Replaces just the handoff body and keeps any text appended to the turn, including the relation invitation. */
+export function replaceHandoffTextPreservingExtension(turn: DeterministicQualificationTurn, currentHandoff: string, replacementHandoff: string): DeterministicQualificationTurn {
+  const start = turn.reply.indexOf(currentHandoff);
+  if (start < 0) {
+    const invitation = turn.beneficiaryInvitation ? ` ${turn.beneficiaryInvitation}` : "";
+    return { ...turn, reply: `${replacementHandoff}${invitation}` };
+  }
+  const end = start + currentHandoff.length;
+  return { ...turn, reply: `${turn.reply.slice(0, start)}${replacementHandoff}${turn.reply.slice(end)}` };
+}
+
 /**
  * A lead that arrived while the assistant was paused must be eligible to enter
  * the qualification when it sends a new inbound WhatsApp message after the

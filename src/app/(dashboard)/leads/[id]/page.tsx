@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { LightPageSkeleton } from "@/components/light/light-page-skeleton";
-import { buildLeadClientInfo } from "@/features/leads/client-info";
+import { buildLeadClientInfo, formatLeadBeneficiaryDetails } from "@/features/leads/client-info";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -213,6 +213,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
   const metaFormName = metaForm[0]?.name ?? null;
   const metaLeadDetails = readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata);
   const qualificationDetails = readQualificationDetails(lead.qualificationDetails);
+  const beneficiaryDetails = formatLeadBeneficiaryDetails(lead.qualificationDetails, qualificationDetails.individualAges);
 
   // Only the Lite screen shows the redistribution notice: it loads with the rest of that screen.
   const redistributionNoticePromise = isLightBroker
@@ -299,8 +300,8 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       })),
       formData: lightFormData,
       consentimentoLgpd: lead.consentimentoLgpd,
-      aiIntelligence: qualificationDetails?.aiIntelligence || null,
-      aiPolicyResult: qualificationDetails?.aiPolicyResult || null,
+      aiIntelligence: (lead.qualificationDetails as Record<string, unknown> | null)?.aiIntelligence ?? null,
+      aiPolicyResult: (lead.qualificationDetails as Record<string, unknown> | null)?.aiPolicyResult ?? null,
       aiLastAutoMove: (lead.qualificationDetails as { aiLastAutoMove?: AiAutoMove } | null)?.aiLastAutoMove ?? null,
       clientInfo: (() => {
         const info = buildLeadClientInfo({
@@ -849,7 +850,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                   </CardHeader>
                 </Card>
 
-                {(qualificationDetails.numberOfLives || qualificationDetails.averageAge || qualificationDetails.individualAges) && (
+                {(qualificationDetails.numberOfLives || qualificationDetails.averageAge || qualificationDetails.individualAges || beneficiaryDetails.value) && (
                   <Card className="border-border/60 bg-card/80 shadow-none dark:border-border dark:bg-card">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm">Dados da qualificação</CardTitle>
@@ -860,8 +861,9 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                       {lead.tipo === "PME" ? (
                         <div><p className="text-xs text-muted-foreground">Média de idade do grupo</p><p className="mt-1 font-medium">{qualificationDetails.averageAge ? `${qualificationDetails.averageAge} anos` : "Não informada"}</p></div>
                       ) : (
-                        <div><p className="text-xs text-muted-foreground">Idades informadas</p><p className="mt-1 font-medium">{qualificationDetails.individualAges ?? "Não informadas"}</p></div>
+                        <div><p className="text-xs text-muted-foreground">{beneficiaryDetails.label}</p><p className="mt-1 font-medium">{beneficiaryDetails.value ?? qualificationDetails.individualAges ?? "Não informadas"}</p></div>
                       )}
+                      {lead.tipo !== "PME" && beneficiaryDetails.raw ? <div><p className="text-xs text-muted-foreground">Parentesco informado</p><p className="mt-1 font-medium">{beneficiaryDetails.raw}</p></div> : null}
                       <div><p className="text-xs text-muted-foreground">Tipo de atendimento</p><p className="mt-1 font-medium">{metaLeadDetails.tipoPlanoStatus === "not_provided" ? "Não informado" : lead.tipo === "PME" ? "Empresa / PME" : lead.tipo === "PJ" ? "Pessoa jurídica" : "Pessoa física"}</p></div>
                       {qualificationDetails.neighborhood ? <div><p className="text-xs text-muted-foreground">Bairro</p><p className="mt-1 font-medium">{qualificationDetails.neighborhood}</p></div> : null}
                       {qualificationDetails.currentPlan ? <div><p className="text-xs text-muted-foreground">Plano atual</p><p className="mt-1 font-medium">{qualificationDetails.currentPlan}</p></div> : null}
@@ -1066,9 +1068,18 @@ function maskEmail(email: string) {
 }
 
 function readQualificationDetails(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {} as Record<string, string | null>;
-  const details = value as Record<string, unknown>;
+  const details = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
   const read = (key: string) => typeof details[key] === "string" || typeof details[key] === "number" ? String(details[key]) : null;
+  const validRelations = new Set(["titular", "conjuge", "filho", "pai_mae", "neto", "outro"]);
+  const beneficiaries = Array.isArray(details.beneficiarios) ? details.beneficiarios.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const record = item as Record<string, unknown>;
+    const rawAge = record.idade;
+    const age = typeof rawAge === "number" && Number.isFinite(rawAge) ? rawAge : typeof rawAge === "string" && /^\d{1,3}$/.test(rawAge) ? Number(rawAge) : null;
+    const rawRelation = typeof record.parentesco === "string" && validRelations.has(record.parentesco) ? record.parentesco : null;
+    return [{ age, relation: rawRelation, text: typeof record.texto === "string" ? record.texto : null }];
+  }) : [];
+  const legacyRelation = typeof details.beneficiaryRelation === "string" ? details.beneficiaryRelation : null;
   return {
     numberOfLives: read("numberOfLives") ?? read("qtdVidas"),
     qtdVidas: read("qtdVidas") ?? read("numberOfLives"),
@@ -1080,6 +1091,8 @@ function readQualificationDetails(value: unknown) {
     resumoAtendimento: read("resumoAtendimento"),
     resumoNecessidade: read("resumoNecessidade"),
     urgenciaContratacao: read("urgenciaContratacao") ?? read("urgency"),
+    beneficiaries: beneficiaries.length || !legacyRelation ? beneficiaries : [{ age: null, relation: "outro", text: legacyRelation }],
+    beneficiaryRaw: typeof details.beneficiaryRaw === "string" ? details.beneficiaryRaw : null,
   };
 }
 

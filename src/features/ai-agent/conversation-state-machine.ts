@@ -12,6 +12,7 @@ import {
   type ConversationMemory,
 } from "./memory";
 import { createSafeFallbackResponse } from "./ai-response-schema";
+import { captureBeneficiaryRelations, parseAgeValues } from "./beneficiary-relations";
 import {
   createDefaultGuardrailPipeline,
   runGuardrailPipeline,
@@ -26,13 +27,13 @@ import { detectLateralSituation, quickReplyTuning } from "@/features/attendance-
 import { loadTenantSituations } from "@/features/attendance-situations/service";
 import { recordLearningEvent } from "@/features/situation-learning/service";
 import { loadQuickReplyTemplates, parseExplicitStop, parseOptOut, parseSoftDecline, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
-import { AFTER_HOURS_HUMAN_REQUEST_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, composeGreeting, DEFAULT_HUMAN_REQUEST_TEXT, DEFAULT_QUALIFIED_HANDOFF_TEXT, effectiveHandoffText, isAfterHoursInSaoPaulo, priceConcernLine, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
+import { AFTER_HOURS_HUMAN_REQUEST_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, composeGreeting, DEFAULT_HUMAN_REQUEST_TEXT, DEFAULT_QUALIFIED_HANDOFF_TEXT, effectiveHandoffText, isAfterHoursInSaoPaulo, priceConcernLine, renderConversationVariables, shouldAddPriceConcern, shouldUsePeriodGreeting, summarizeQualification, type QualificationFieldKey } from "@/features/qualification-engine/reply-composer";
 import { isAutomatedInboundMessage } from "./automated-inbound";
 import { afterHoursText } from "@/features/qualification-engine/broker-window";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
-import { evaluateQualification, persistQualificationEvaluation, getNextQualificationQuestion, resolveDeterministicQualificationTurn, type DeterministicQualificationTurn } from "@/features/qualification-engine/service";
+import { evaluateQualification, persistQualificationEvaluation, getNextQualificationQuestion, replaceHandoffTextPreservingExtension, resolveDeterministicQualificationTurn, type DeterministicQualificationTurn } from "@/features/qualification-engine/service";
 import { terminalReplyLeadDisposition } from "./quick-reply";
 import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 import { enqueueWahaAiReply } from "@/features/waha-cadence/service";
@@ -960,6 +961,10 @@ async function completeDeterministicQualificationTurn(input: {
   }
   const memory = {
     ...input.memory,
+    ...(input.turn.beneficiaryInvitation ? {
+      relationAsked: true,
+      beneficiaries: input.memory.beneficiaries?.length ? input.memory.beneficiaries : parseAgeValues(input.memory.age?.value).map((age) => ({ age, relation: null })),
+    } : {}),
     // Only the question: a lateral answer or greeting before it ("O valor
     // depende da idade...") would make the next answer be read as an age.
     lastQuestionAsked: isHandoff ? undefined : pendingQuestionOf(input.turn.reply),
@@ -1151,6 +1156,73 @@ async function applyCustomerCorrectionAfterHandoff(input: {
   });
   await sendAiOutbound({ tenantId: input.tenantId, phone: input.phone, body: reply, transport: input.transport, openWaSessionId: input.openWaSessionId, wahaRunId: input.wahaRunId })
     .catch((error) => console.error("[ai-wpp] correction_reply_failed", { tenantId: input.tenantId, leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" }));
+  return true;
+}
+
+async function captureOptionalBeneficiaryReply(input: {
+  tenantId: string;
+  leadId: string;
+  conversationId: string;
+  memory: ConversationMemory;
+  message: string;
+  sourceMessageId?: string | null;
+}) {
+  if (!input.memory.relationAsked) return false;
+  const ages = parseAgeValues(input.memory.age?.value);
+  if (ages.length < 2 || input.memory.planType?.value === "empresarial") return false;
+  const captured = captureBeneficiaryRelations({
+    message: input.message,
+    ages,
+    planType: input.memory.planType?.value,
+    sourceMessageId: input.sourceMessageId,
+    relationAsked: true,
+  });
+  if (captured.status === "unrecognized") return false;
+
+  const memory: ConversationMemory = {
+    ...input.memory,
+    beneficiaries: captured.beneficiaries,
+    relationAsked: true,
+    ...(captured.raw ? { beneficiaryRaw: captured.raw.slice(0, 2000) } : { beneficiaryRaw: undefined }),
+  };
+  const db = getDatabase();
+  const now = new Date();
+  await db.update(schema.aiConversations).set({
+    memory: memory as unknown as Record<string, unknown>,
+    lastProcessedMessageId: input.sourceMessageId ?? undefined,
+    lastActivityAt: now,
+    updatedAt: now,
+  }).where(and(eq(schema.aiConversations.id, input.conversationId), eq(schema.aiConversations.tenantId, input.tenantId)));
+
+  const [lead] = await db.select({ qualificationDetails: schema.leads.qualificationDetails })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
+    .limit(1);
+  const details = lead?.qualificationDetails && typeof lead.qualificationDetails === "object" && !Array.isArray(lead.qualificationDetails)
+    ? lead.qualificationDetails as Record<string, unknown>
+    : {};
+  await db.update(schema.leads).set({
+    qualificationDetails: {
+      ...details,
+      resumoAtendimento: summarizeQualification(memory) || details.resumoAtendimento || null,
+      beneficiarios: captured.beneficiaries.map((beneficiary) => ({
+        idade: beneficiary.age,
+        parentesco: beneficiary.relation,
+        texto: beneficiary.relationText ?? memory.beneficiaryRaw ?? null,
+      })),
+      beneficiaryRaw: memory.beneficiaryRaw ?? null,
+    },
+    updatedAt: now,
+  }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
+
+  const systemUserId = await resolveSystemUserId(input.tenantId);
+  await db.insert(schema.leadInteractions).values({
+    id: randomUUID(),
+    leadId: input.leadId,
+    userId: systemUserId,
+    tipo: "note",
+    conteudo: `Parentescos opcionais informados na qualificação automática: ${captured.status}.`,
+  }).catch((error) => console.warn("[qualification] beneficiary_relation_audit_failed", { leadId: input.leadId, error }));
   return true;
 }
 
@@ -1389,6 +1461,12 @@ export async function processInboundAiResponse({
   }
 
   if (conversation.status === "CLOSED" || conversation.status === "FAILED") {
+    const capturedRelation = await captureOptionalBeneficiaryReply({
+      tenantId, leadId, conversationId: conversation.id,
+      memory: (conversation.memory as ConversationMemory | null) ?? createEmptyMemory(),
+      message: normalizedInboundMessage, sourceMessageId: sourceIdentifier,
+    });
+    if (capturedRelation) return { status: "beneficiary_relation_captured" };
     console.log(`[ai-agent] Conversa ${conversation.id} está ${conversation.status}. IA não responde.`);
     const postClosingResult = await handlePostClosingInboundMessage(tenantId, conversation.id);
     if (postClosingResult.noticeSent && postClosingResult.messageText) {
@@ -1427,6 +1505,12 @@ export async function processInboundAiResponse({
 
   // 4. Optimistic lock — claim this conversation using lockVersion
   if (conversation.status === "WAITING_HUMAN") {
+    const capturedRelation = await captureOptionalBeneficiaryReply({
+      tenantId, leadId, conversationId: conversation.id,
+      memory: (conversation.memory as ConversationMemory | null) ?? createEmptyMemory(),
+      message: normalizedInboundMessage, sourceMessageId: sourceIdentifier,
+    });
+    if (capturedRelation) return { status: "beneficiary_relation_captured" };
     const correction = await applyCustomerCorrectionAfterHandoff({
       tenantId, leadId, conversationId: conversation.id, phone, transport, openWaSessionId, wahaRunId,
       memory: (conversation.memory as ConversationMemory | null) ?? createEmptyMemory(),
@@ -1707,7 +1791,7 @@ export async function processInboundAiResponse({
 
   // 6c. Buscar textos de mensagens enviadas para evitar repeticao de perguntas
   const allOutboundMsgs = await db
-    .select({ body: schema.whatsappMessages.body })
+    .select({ body: schema.whatsappMessages.body, sentAt: schema.whatsappMessages.sentAt, senderRole: schema.whatsappMessages.senderRole })
     .from(schema.whatsappMessages)
     .where(
       and(
@@ -1715,9 +1799,13 @@ export async function processInboundAiResponse({
         eq(schema.whatsappMessages.leadId, leadId),
         eq(schema.whatsappMessages.direction, "outbound")
       )
-    );
+    )
+    .orderBy(desc(schema.whatsappMessages.sentAt));
 
   const pastOutboundTexts = new Set(allOutboundMsgs.map((m) => m.body.trim().toLowerCase()));
+  const assistantReplies = allOutboundMsgs.filter((message) => message.senderRole === "assistant");
+  const recentReplies = assistantReplies.slice(0, 3).map((message) => message.body);
+  const latestOutboundAt = assistantReplies[0]?.sentAt ?? null;
 
   // 6d. Carregar config do tenant para usar mensagens configuráveis e checar flag enabled
   const tenantConfig = await loadTenantAiAgentConfig(tenantId);
@@ -1906,6 +1994,9 @@ export async function processInboundAiResponse({
   }
 
   const answeredNow = fieldsExtractedFromCurrentMessage.length > 0 || fallbackAppliedCount > 0 || answeredCurrentPlan;
+  const customerPriceConcern = !inboundIsAutomated && effectiveMessageKind === "text"
+    ? priceConcernLine(normalizedInboundMessage, { lives: Number.parseInt(updatedMemory.numberOfLives?.value ?? "", 10) || null, seed: conversation.id })
+    : null;
   // What this message filled, for the confirmation ("Itaboraí, ótimo."). The
   // lives implied by an individual plan were not said, so they are not echoed.
   const answeredFields = Array.from(new Set([...fieldsExtractedFromCurrentMessage, ...fallbackAppliedFields]))
@@ -1913,13 +2004,15 @@ export async function processInboundAiResponse({
   // First reply of the conversation (the customer wrote first): say hello by
   // name and who is talking before the first question.
   let greeting: string | null = null;
-  if (pastOutboundTexts.size === 0) {
+  const turnNow = new Date();
+  if (assistantReplies.length === 0) {
     const [tenantInfo] = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, tenantId)).limit(1);
     greeting = composeGreeting({
       name: updatedMemory.customerFirstName?.value ?? lead?.nome ?? null,
       assistantName: tenantConfig.assistantName,
       companyName: tenantInfo?.name ?? null,
       seed: conversation.id,
+      now: turnNow,
     });
   }
   const afterHours = isAfterHoursInSaoPaulo();
@@ -1928,10 +2021,14 @@ export async function processInboundAiResponse({
     policy: behavior.policy,
     handoffMessage: tenantConfig.handoffMessage,
     pastOutboundTexts,
-    answeredNow,
-    answered: answeredFields,
+    answeredNow: customerPriceConcern ? false : answeredNow,
+    answered: customerPriceConcern ? [] : answeredFields,
     // The greeting already used the name: the question must not repeat it.
     previousReply: greeting ?? currentMemory.lastQuestionAsked ?? null,
+    recentReplies,
+    greetingText: greeting,
+    periodGreeting: !greeting && shouldUsePeriodGreeting(latestOutboundAt, turnNow),
+    now: turnNow,
     seed: `${conversation.id}:${pastOutboundTexts.size}`,
   });
   // The customer asked something instead of answering. A registered situation
@@ -1939,7 +2036,7 @@ export async function processInboundAiResponse({
   // text, or the transfer when that is its action; anything else the lateral
   // answer guided by the roteiros. Then the pending question follows; on any
   // failure the scripted reply goes alone.
-  if (deterministicTurn.kind === "collecting" && !answeredNow && !inboundIsAutomated && effectiveMessageKind === "text") {
+  if (deterministicTurn.kind === "collecting" && !answeredNow && !customerPriceConcern && !inboundIsAutomated && effectiveMessageKind === "text") {
     const situation = detectLateralSituation(normalizedInboundMessage, tenantSituations);
     // Learning (Atendimento → Situações): every question asked here is recorded
     // with the situation that covered it; the uncovered ones become suggestions.
@@ -1969,17 +2066,17 @@ export async function processInboundAiResponse({
     // The tenant's handoff text wins (D1). Only the handoff sentence is swapped: whatever the turn appended after it
     // (an invitation, such as the optional relationship question) is kept as it was.
     const daytimeHandoff = renderConversationVariables(effectiveHandoffText(tenantConfig.handoffMessage, DEFAULT_QUALIFIED_HANDOFF_TEXT), updatedMemory);
-    const extension = deterministicTurn.reply.startsWith(daytimeHandoff) ? deterministicTurn.reply.slice(daytimeHandoff.length) : "";
     const handoffBody = handoffBodyFor(tenantConfig.handoffMessage, DEFAULT_QUALIFIED_HANDOFF_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT);
-    deterministicTurn = { ...deterministicTurn, reply: `${renderConversationVariables(handoffBody, updatedMemory, lead?.nome)}${extension}` };
+    const renderedHandoff = renderConversationVariables(handoffBody, updatedMemory, lead?.nome);
+    deterministicTurn = replaceHandoffTextPreservingExtension(deterministicTurn, daytimeHandoff, renderedHandoff);
   }
   // The customer said the current plan costs too much: show it was heard before the question.
   if (deterministicTurn.kind === "collecting" && !inboundIsAutomated) {
-    const concern = priceConcernLine(normalizedInboundMessage, { lives: Number.parseInt(updatedMemory.numberOfLives?.value ?? "", 10) || null, seed: conversation.id });
-    if (concern) deterministicTurn = { ...deterministicTurn, reply: `${concern}\n\n${deterministicTurn.reply}` };
-  }
-  if (deterministicTurn.kind === "collecting" && greeting) {
-    deterministicTurn = { ...deterministicTurn, reply: `${greeting}\n\n${deterministicTurn.reply}` };
+    const nextQuestionKey = deterministicTurn.nextQuestion?.key as QualificationFieldKey | undefined;
+    const customQuestionText = nextQuestionKey ? behavior.policy.questionTexts?.[nextQuestionKey] : null;
+    if (shouldAddPriceConcern(customerPriceConcern, customQuestionText)) {
+      deterministicTurn = { ...deterministicTurn, reply: `${customerPriceConcern}\n\n${deterministicTurn.reply}` };
+    }
   }
   return completeDeterministicQualificationTurn({
     tenantId,

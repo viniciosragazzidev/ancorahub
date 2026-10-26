@@ -24,7 +24,7 @@ describe("buildLeadClientInfo", () => {
       formData: { observacoes: observations, dependentes: 2 },
     });
     expect(items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: "Idades", value: "35, 32, 8" }),
+      expect.objectContaining({ label: "Idades", value: "35, 32, 8 (parentesco não informado)" }),
       expect.objectContaining({ label: "Tem CNPJ", value: "Não" }),
       expect.objectContaining({ label: "Observações", value: observations }),
       expect.objectContaining({ label: "Dependentes", value: "2" }),
@@ -45,11 +45,45 @@ describe("buildLeadClientInfo", () => {
     ]));
   });
 
+  it("shows confirmed family relationships and keeps ambiguous ones unconfirmed", () => {
+    const confirmed = buildLeadClientInfo({ qualificationDetails: {
+      individualAges: "46 e 10",
+      beneficiarios: [{ idade: 46, parentesco: "titular" }, { idade: 10, parentesco: "filho" }],
+    } });
+    expect(confirmed).toContainEqual({ key: "ages", label: "Pessoas no plano", value: "Você (46), Filho (10)" });
+
+    const ambiguous = buildLeadClientInfo({ qualificationDetails: {
+      individualAges: "46 e 10",
+      beneficiarios: [{ idade: 46, parentesco: null, texto: "filhos" }, { idade: 10, parentesco: null, texto: "filhos" }],
+      beneficiaryRaw: "filhos",
+    } });
+    expect(ambiguous).toContainEqual({ key: "ages", label: "Idades", value: "46 e 10 (parentesco não informado)" });
+    expect(ambiguous).toContainEqual({ key: "beneficiaryRelation", label: "Parentesco informado", value: "filhos" });
+
+    const otherRelation = buildLeadClientInfo({ qualificationDetails: {
+      beneficiarios: [{ idade: 28, parentesco: "outro", texto: "meu irmão" }, { idade: 31, parentesco: "titular", texto: "eu" }],
+    } });
+    expect(otherRelation).toContainEqual({ key: "ages", label: "Pessoas no plano", value: "meu irmão (28), Você (31)" });
+  });
+
+  it("does not claim an unknown relationship for a single age or legacy multi-age record", () => {
+    expect(buildLeadClientInfo({ qualificationDetails: { individualAges: "46" } }))
+      .toContainEqual({ key: "ages", label: "Idades", value: "46" });
+
+    expect(buildLeadClientInfo({ qualificationDetails: {
+      individualAges: "46 e 10",
+      beneficiaryRelation: "filhos",
+    } })).toEqual(expect.arrayContaining([
+      { key: "ages", label: "Idades", value: "46 e 10 (parentesco não informado)" },
+      { key: "beneficiaryRelation", label: "Parentesco informado", value: "filhos" },
+    ]));
+  });
+
   it("brings what the client said to the AI and filled in the form", () => {
     expect(buildLeadClientInfo(qualified).map((item) => `${item.label}: ${item.value}`)).toEqual([
       "Tipo de plano: Familiar",
       "Vidas: 3",
-      "Idades: 28, 26, 3",
+      "Idades: 28, 26, 3 (parentesco não informado)",
       "Cidade: Rio de janeiro",
       "E-mail: toni@example.test",
       "Interesse: cotação Smart Sênior",
