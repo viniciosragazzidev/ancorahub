@@ -149,11 +149,6 @@ const team: TeamMetricTeam = {
 
 const goal: TeamGoalView = { name: "Vendas da equipe em outubro", percentage: 62, currentValue: "18", targetValue: "29" };
 
-function Showcase() {
-  const view = useSearchParams().get("view") === "supervisor" ? "supervisor" : "gestor";
-  // Mesma referência da unidade nas duas telas: o score é o mesmo para gestor e supervisor.
-  const page = buildTeamPageView({
-
 export function gestaoOverviewFixture() {
   return buildUnitOverview({ ...identity, now: GESTAO_NOW, metrics });
 }

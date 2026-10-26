@@ -102,3 +102,10 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 24px;
 }
+
+/* Na moldura do diretor, o link da equipe tem área de 44px. */
+.embedded .openLink {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
