@@ -10,6 +10,12 @@ Regra de leitura: as 9 seções seguem a numeração do inventário. A seção 1
 
 ---
 
+## Status de implementação
+
+- **F3 e F4 (esta branch, feat/humanizacao-bot-handoff)**: entregues em parcial. Commits c1114066, 5ea43126 e o da correção de revisão. Horário e feriados em `broker-window.ts`; handoffs, encerramento, respostas rápidas, objeção e fallbacks; texto do tenant vence fora do horário; promessa de não repetir só com resumo.
+- **Faltam**: F5 (templates Meta, com reaprovação), F6 (medição), e a integração com `feat/humanizacao-bot-perguntas` (Cinzel) no handoff noturno. O `priceConcernLine` e as perguntas (F2) estão na branch do Cinzel.
+- Registro em `docs/features-log.md` (26/10/2026).
+
 ## 1. Princípios de tom (acolhimento e segurança)
 
 **Acolhimento**

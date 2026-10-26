@@ -133,3 +133,21 @@ export function brokerAvailability(now: Date = new Date()): BrokerAvailability {
 export function withBrokerReturnPhrase(text: string, now: Date = new Date()): string {
   return text.replaceAll(BROKER_RETURN_PHRASE_PLACEHOLDER, brokerAvailability(now).returnPhrase);
 }
+
+/** Sentence added after a tenant's own text outside working hours, when the text says nothing about time. */
+export const BROKER_RETURN_SENTENCE = "Um corretor continua a conversa por aqui {{quando}}.";
+
+/** A text that already talks about time (Vinicios' or the tenant's own words) is never changed. */
+const TIME_MENTION = /instante|amanha|hoje|segunda|dia util|horario|\b9h|minuto|breve|imediat|agora/;
+
+/**
+ * Outside working hours the handoff text is chosen by who wrote it (D1): the tenant's own text wins.
+ * The night text replaces only the default; a tenant text without time gets the return sentence after it.
+ */
+export function afterHoursText(configured: string | null | undefined, defaultText: string, afterHoursDefault: string, now: Date = new Date()): string {
+  const text = configured?.trim();
+  if (!text || text === defaultText.trim()) return withBrokerReturnPhrase(afterHoursDefault, now);
+  const normalized = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (TIME_MENTION.test(normalized)) return text;
+  return `${text} ${withBrokerReturnPhrase(BROKER_RETURN_SENTENCE, now)}`;
+}

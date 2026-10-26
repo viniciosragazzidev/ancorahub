@@ -26,9 +26,9 @@ import { detectLateralSituation, quickReplyTuning } from "@/features/attendance-
 import { loadTenantSituations } from "@/features/attendance-situations/service";
 import { recordLearningEvent } from "@/features/situation-learning/service";
 import { loadQuickReplyTemplates, parseExplicitStop, parseOptOut, parseSoftDecline, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
-import { AFTER_HOURS_HUMAN_REQUEST_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, composeGreeting, DEFAULT_HUMAN_REQUEST_TEXT, effectiveHandoffText, isAfterHoursInSaoPaulo, priceConcernLine, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
+import { AFTER_HOURS_HUMAN_REQUEST_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, composeGreeting, DEFAULT_HUMAN_REQUEST_TEXT, DEFAULT_QUALIFIED_HANDOFF_TEXT, effectiveHandoffText, isAfterHoursInSaoPaulo, priceConcernLine, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
 import { isAutomatedInboundMessage } from "./automated-inbound";
-import { withBrokerReturnPhrase } from "@/features/qualification-engine/broker-window";
+import { afterHoursText } from "@/features/qualification-engine/broker-window";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
@@ -1205,6 +1205,15 @@ async function reopenAfterSoftDecline(input: {
   return true;
 }
 
+/**
+ * Handoff text for this moment. The tenant's own text wins (D1). Outside working hours the night
+ * text replaces only the default one; a tenant text without time gets the return sentence after it.
+ */
+function handoffBodyFor(configured: string | null | undefined, defaultText: string, afterHoursDefault: string) {
+  const text = effectiveHandoffText(configured, defaultText);
+  return isAfterHoursInSaoPaulo() ? afterHoursText(text, defaultText, afterHoursDefault) : text;
+}
+
 export async function processInboundAiResponse({
   tenantId,
   leadId,
@@ -1545,7 +1554,7 @@ export async function processInboundAiResponse({
     const [leadForTemplate] = await db.select({ nome: schema.leads.nome }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId))).limit(1);
     // {{nome}} and {{resumo}}: never ask again what the customer already told.
     // At night the "talk to a person" reply promises the first available broker, not "em instantes".
-    const nightBody = rawTemplate && quickReply.templateKey === "human.requested" && isAfterHoursInSaoPaulo() ? withBrokerReturnPhrase(AFTER_HOURS_HUMAN_REQUEST_TEXT) : rawTemplate?.body;
+    const nightBody = rawTemplate && quickReply.templateKey === "human.requested" && isAfterHoursInSaoPaulo() ? afterHoursText(rawTemplate.body, DEFAULT_HUMAN_REQUEST_TEXT, AFTER_HOURS_HUMAN_REQUEST_TEXT) : rawTemplate?.body;
     const template = rawTemplate ? { ...rawTemplate, body: renderConversationVariables(nightBody ?? rawTemplate.body, currentMemory, leadForTemplate?.nome) } : undefined;
     const now = new Date();
     const suppressed = Boolean(quickReply.suppressReason);
@@ -1752,7 +1761,7 @@ export async function processInboundAiResponse({
 
   if (detectHumanTransferRequest(userMessageBody)) {
     return transferToHuman(
-      renderConversationVariables(isAfterHoursInSaoPaulo() ? withBrokerReturnPhrase(AFTER_HOURS_HUMAN_REQUEST_TEXT) : effectiveHandoffText(tenantConfig.handoffMessage, DEFAULT_HUMAN_REQUEST_TEXT), updatedMemory, lead?.nome),
+      renderConversationVariables(handoffBodyFor(tenantConfig.handoffMessage, DEFAULT_HUMAN_REQUEST_TEXT, AFTER_HOURS_HUMAN_REQUEST_TEXT), updatedMemory, lead?.nome),
       "Solicitação explícita de atendimento humano",
     );
   }
@@ -1957,7 +1966,12 @@ export async function processInboundAiResponse({
   // question again, without echoing it as if the person had answered.
   // At night no broker answers "em instantes": the first available one gets in touch.
   if (deterministicTurn.kind === "handoff" && afterHours) {
-    deterministicTurn = { ...deterministicTurn, reply: renderConversationVariables(withBrokerReturnPhrase(AFTER_HOURS_QUALIFIED_HANDOFF_TEXT), updatedMemory, lead?.nome) };
+    // The tenant's handoff text wins (D1). Only the handoff sentence is swapped: whatever the turn appended after it
+    // (an invitation, such as the optional relationship question) is kept as it was.
+    const daytimeHandoff = renderConversationVariables(effectiveHandoffText(tenantConfig.handoffMessage, DEFAULT_QUALIFIED_HANDOFF_TEXT), updatedMemory);
+    const extension = deterministicTurn.reply.startsWith(daytimeHandoff) ? deterministicTurn.reply.slice(daytimeHandoff.length) : "";
+    const handoffBody = handoffBodyFor(tenantConfig.handoffMessage, DEFAULT_QUALIFIED_HANDOFF_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT);
+    deterministicTurn = { ...deterministicTurn, reply: `${renderConversationVariables(handoffBody, updatedMemory, lead?.nome)}${extension}` };
   }
   // The customer said the current plan costs too much: show it was heard before the question.
   if (deterministicTurn.kind === "collecting" && !inboundIsAutomated) {

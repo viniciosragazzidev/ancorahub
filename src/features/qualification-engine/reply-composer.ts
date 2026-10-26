@@ -269,6 +269,7 @@ export function renderConversationVariables(text: string, memory: ConversationMe
   return result
     .replace(/\{\{\s*nome\s*\}\}/gi, name)
     .replace(/\{\{\s*resumo\s*\}\}/gi, summary)
+    .replace(/\{\{\s*semRepetir\s*\}\}/gi, summary ? ", sem você precisar repetir nada" : "")
     .replace(/\s+([!?.,])/g, "$1")
     .replace(/ {2,}/g, " ")
     .trim();
@@ -278,15 +279,15 @@ export function renderConversationVariables(text: string, memory: ConversationMe
  * Default text when a customer asks for a person, and when the qualification is complete. Written
  * for the working hours: a broker answers "em instantes". Vinicios, 26/10: no promise of privacy.
  */
-export const DEFAULT_HUMAN_REQUEST_TEXT = "Claro, {{nome}}, já passei seu atendimento para um corretor especialista, com tudo que você me contou ({{resumo}}). Ele continua por aqui em instantes, sem você precisar repetir nada.";
-export const DEFAULT_QUALIFIED_HANDOFF_TEXT = "Muito obrigado, {{nome}}! Já tenho o que preciso ({{resumo}}), então passei seu atendimento para um corretor especialista. Ele continua por aqui em instantes, sem você repetir nada.";
+export const DEFAULT_HUMAN_REQUEST_TEXT = "Claro, {{nome}}, já passei seu atendimento para um corretor especialista, com tudo que você me contou ({{resumo}}). Ele continua por aqui em instantes{{semRepetir}}.";
+export const DEFAULT_QUALIFIED_HANDOFF_TEXT = "Muito obrigado, {{nome}}! Já tenho o que preciso ({{resumo}}), então passei seu atendimento para um corretor especialista. Ele continua por aqui em instantes{{semRepetir}}.";
 
 /**
  * Outside the broker's working hours (Sunday, national holidays, 19h to 9h) the text says when the
  * next one answers: "{{quando}}" is filled by withBrokerReturnPhrase (broker-window.ts).
  */
 export const AFTER_HOURS_QUALIFIED_HANDOFF_TEXT = "Obrigado, {{nome}}! Com essas informações ({{resumo}}), seu atendimento já está com a nossa equipe. Um corretor fala com você por aqui {{quando}}.";
-export const AFTER_HOURS_HUMAN_REQUEST_TEXT = "Claro, {{nome}}, já deixei tudo com a nossa equipe ({{resumo}}). Um corretor continua a conversa por aqui {{quando}}, sem você precisar repetir nada.";
+export const AFTER_HOURS_HUMAN_REQUEST_TEXT = "Claro, {{nome}}, já deixei tudo com a nossa equipe ({{resumo}}). Um corretor continua a conversa por aqui {{quando}}{{semRepetir}}.";
 
 /** Outside working hours: Sunday, national holidays, 19h to 9h (São Paulo). */
 export function isAfterHoursInSaoPaulo(now: Date = new Date()) {

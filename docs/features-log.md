@@ -2,6 +2,15 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 26/10/2026 - Bot de qualificação humanizado: horário do corretor e handoffs (F3 e F4)
+
+- Horário do corretor (`src/features/qualification-engine/broker-window.ts`): segunda a sábado, das 9h às 19h, com feriados nacionais fixos e Sexta-feira Santa como dias sem atendimento. Carnaval e Corpus Christi são dias normais (confirmado pelo Vinicios).
+- Fora do horário, o texto diz quando o corretor volta: "amanhã, a partir das 9h", "hoje, a partir das 9h" ou "no próximo dia útil, a partir das 9h".
+- O texto do tenant vence: fora do horário, só o padrão é trocado pelo texto noturno; texto do tenant sem horário recebe a frase de retorno no fim, e a extensão do encerramento (convite de parentesco) é preservada.
+- Handoffs, encerramento, pós-encerramento e respostas rápidas com texto novo, sem promessa de não repetir os dados quando não há resumo. Textos antigos entram em `RETIRED_*`.
+- Objeção (instrução do modelo acolhe antes de perguntar), fallbacks e legado sem "Perfeito" nem "chamado(a)"; emoji removido do fallback de primeiro contato.
+- Plano: `docs/implementations/active/2026-10-26-humanizacao-bot-qualificacao.md`. Parcial: templates Meta (F5), medição (F6) e priceConcernLine/perguntas (branch `feat/humanizacao-bot-perguntas`, do Cinzel) ficam para a integração.
+
 ## 26/10/2026 - Um pool de banco por processo (fim das quedas por EMAXCONNSESSION)
 
 - O módulo do banco entrava em mais de um bundle e cada cópia abria o próprio pool: um container chegou a 18 conexões no pooler de sessão (limite de 30), e o deploy com dois containers derrubava todas as rotas.

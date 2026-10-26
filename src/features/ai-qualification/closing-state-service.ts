@@ -32,14 +32,6 @@ function fillFirstName(text: string, firstName: string | null) {
   return firstName ? text.replace("{{firstName}}", firstName) : text.replace(", {{firstName}}", "");
 }
 
-/**
- * Extension point: the closing message is the last thing the customer reads before the handoff.
- * Other parts can add a line here (for example, the optional invitation about who the plan is for).
- */
-function withClosingExtension(message: string) {
-  return message;
-}
-
 export type QualificationClosingStateRecord = {
   sessionId: string;
   tenantId: string;
@@ -118,7 +110,7 @@ export async function executeDeterministicClosing(
   // Outside the brokers' working hours (Sunday, national holidays, 19h to 9h) the closing says when the next one answers.
   const { isAfterHoursInSaoPaulo } = await import("@/features/qualification-engine/reply-composer");
   const template = isAfterHoursInSaoPaulo() ? CLOSING_AFTER_HOURS_TEXT : effectiveFinalMessage(settings?.finalMessage);
-  const closingMessage = withClosingExtension(withBrokerReturnPhrase(fillFirstName(template, firstName)));
+  const closingMessage = withBrokerReturnPhrase(fillFirstName(template, firstName));
 
   const now = new Date();
   const messageId = providerMessageId;
