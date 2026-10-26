@@ -162,15 +162,21 @@
   cursor: pointer;
 }
 
+/* Camada do portal: não ocupa espaço nem bloqueia cliques; só a lista recebe eventos. */
+.menuLayer {
+  display: contents;
+}
+
+/* Posição fixa (top/right vêm do componente): não fica presa em card ou tabela com overflow. */
 .menuList {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: 40;
+  position: fixed;
+  z-index: 60;
   display: grid;
   gap: 2px;
   min-width: 220px;
-  margin: 6px 0 0;
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  margin: 0;
   padding: 6px;
   border-radius: 16px;
   background: var(--surface-raised);
