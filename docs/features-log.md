@@ -2,6 +2,11 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 26/10/2026 - Visão da operação do Diretor no estilo do Desempenho Lite
+
+- A aba "Visão da operação" do `/dashboard` (Diretor Lite) troca a tabela por cartões com ícone (entraram, qualificados, em qualificação, frios), anel da taxa de qualificação, funil (entraram, qualificados, quentes) com requalificação, uma frase por regra fixa, leads por fila com barra, plantões agora e WhatsApp dos corretores.
+- Mesmos dados de `getEssentialDashboard`, sem dados de venda; período, unidade e abas continuam no cabeçalho. Entrada só com opacidade e respeita o movimento reduzido do sistema e do site.
+- Componente: `src/features/dashboard/components/director-lite/operation-view.tsx`.
 ## 26/10/2026 - Desempenho Lite do corretor
 
 - `/desempenho` ganha período (Hoje, 7 e 30 dias em `?periodo=`), quatro números com ícone e variação (leads, cotações, vendas e receita), anel da meta com quanto falta por dia útil, funil pessoal, uma frase de insight por regra fixa e vendas por operadora.

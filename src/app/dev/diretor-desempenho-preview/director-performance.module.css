@@ -1,6 +1,0 @@
-/* Só o que a prévia do Diretor acrescenta ao kit do Desempenho Lite. Tokens do escopo arc-venancor. */
-.eyebrow { margin: 0 0 4px; color: var(--text-muted); font-size: var(--text-sm); }
-.listRow { display: grid; gap: var(--space-2); }
-.stackedRow { display: grid; gap: 2px; min-width: 0; font-size: var(--text-sm); }
-.detail { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
-.warn { color: var(--warning); font-weight: 500; }

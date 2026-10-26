@@ -1,11 +1,11 @@
 "use client";
 
-/** Aba "Visão da operação" no visual Lite: painel essencial (plantões, leads por fila, WhatsApp dos corretores). */
+/** Aba "Visão da operação" no visual Lite: painel essencial no estilo do Desempenho Lite (2026-10-26). */
 import type { EssentialDashboard } from "@/features/dashboard/essential/essential-data";
 import type { OverviewPeriod } from "@/features/dashboard/overview-filter";
 
 import { DirectorLiteChrome, type DashboardBranch, type DirectorLiteTab } from "./director-lite-chrome";
-import { EssentialView } from "./essential-view";
+import { OperationView } from "./operation-view";
 
 export type { DashboardBranch };
 
@@ -23,7 +23,7 @@ export function DirectorLiteDashboard({ data, period, branchId, branches, now, a
 }) {
   return (
     <DirectorLiteChrome now={now} tab="overview" period={period} branchId={branchId} branches={branches} firstName={data.firstName} availableTabs={availableTabs}>
-      <EssentialView data={data} canOpenConversations={canOpenConversations} />
+      <OperationView data={data} canOpenConversations={canOpenConversations} />
     </DirectorLiteChrome>
   );
 }

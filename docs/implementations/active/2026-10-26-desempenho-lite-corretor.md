@@ -32,10 +32,15 @@ Status: em andamento na branch `feat/desempenho-lite` (base `feat/lite-listas`).
 ## Validação
 
 - Vitest: escopo broker, janelas (Hoje em São Paulo, 7 e 30 dias), domínio da tela (variação, ritmo da meta, insight, vazio); 29 arquivos e 151 testes nas áreas tocadas.
-- `npx tsc --noEmit -p .` sem erros.
+- `npx tsc --noEmit -p .` sem erros. `npm run build -- --webpack` passou (125 páginas); o junction de `node_modules` impede o Turbopack nesta worktree.
 - Prévia conferida a 375 e 390 px: seis blocos, sem rolagem horizontal, troca de período atualiza `?periodo=` e o texto de comparação ("vs ontem"), estado vazio, sem erro de hidratação. Sem `DATABASE_URL` local, o SQL do escopo broker não foi executado contra banco.
 
 ## Pendente
 
 - Rodar o SQL do motor (escopo broker, receita, janela Hoje) e o `/gestao` contra um banco de staging antes de ligar a flag.
-- `npm run build` (com `--webpack`, por causa do junction de `node_modules`).
+
+## Diretor: Visão da operação no mesmo estilo (2026-10-26)
+
+- A pedido do Vinicios, a aba "Visão da operação" do `/dashboard` do Diretor Lite usa o visual do Desempenho, com os dados atuais do painel essencial e sem dados de venda (`operation-view.tsx`, que substitui `EssentialView` no `DirectorLiteDashboard`).
+- Movimento no contrato do Diretor: só opacidade, `useReduce` (sistema ou preferência do site) e odômetro do `./motion`.
+- Testes do painel atualizados para os blocos novos (ordem, números sem venda, plantões com alerta, filas, vazio, WhatsApp); 7 arquivos e 70 testes passando. Conferido em `/dev/diretor-shell-real` com o shell real.
