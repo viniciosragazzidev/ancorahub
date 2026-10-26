@@ -12,6 +12,7 @@ import { getLocalDutyParts } from "@/features/leads/assignment";
 
 import { processQueuedLead } from "./service";
 import { isHotLeadEarlyDistributionEnabled, notHeldByRunningQualificationSql } from "./qualification-hold";
+import { clearLeadTrace, readLeadTrace } from "./distribution-trace";
 import { expireOutdatedLeadOffers } from "./offers";
 import { automaticDistributionHoldReason, COLD_HELD_BY_QUEUE_REASON_PREFIX, HELD_DISTRIBUTION_RETRY_MS, distributionRetryDelayMilliseconds, isDeferredDistributionReason, isHeldDistributionReason } from "./domain";
 import { groupByTemperatureRank, type TemperatureRank } from "./temperature-priority";
@@ -588,7 +589,19 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
         return;
       }
       try {
-        const distribution = await step(`lead:${job.leadId}`, () => processQueuedLead(context, job.leadId));
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const distribution = await Promise.race([
+          step(`lead:${job.leadId}`, () => processQueuedLead(context, job.leadId)),
+          new Promise<"timeout">((resolve) => { timer = setTimeout(() => resolve("timeout"), LEAD_PROCESSING_TIMEOUT_MS); }),
+        ]).finally(() => clearTimeout(timer));
+        if (distribution === "timeout") {
+          const trace = readLeadTrace(job.leadId);
+          console.error("[lead-distribution] lead_timeout", { leadId: job.leadId, step: trace?.step ?? "unknown", stepAgeMs: trace ? Date.now() - trace.at : null });
+          const failed = await deferOrFailJob(job, effectiveConfig, "LEAD_TIMEOUT", `O processamento passou de ${LEAD_PROCESSING_TIMEOUT_MS / 1000} s na etapa ${trace?.step ?? "desconhecida"}.`, true, new Date(Date.now() + 5 * 60_000));
+          if (failed) result.failed += 1; else result.deferred += 1;
+          return;
+        }
+        clearLeadTrace(job.leadId);
         if (distribution.status === "assigned") {
           await completeJob(job.id);
           result.assigned += 1;
@@ -638,6 +651,9 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
  * which runs every minute.
  */
 export const DISTRIBUTION_DRAIN_BUDGET_MS = 90_000;
+
+/** Ceiling for one lead inside the job (26/10): past it the lead waits 5 minutes and the others go on. */
+export const LEAD_PROCESSING_TIMEOUT_MS = 45_000;
 export const DISTRIBUTION_DRAIN_BATCH_LIMIT = 20;
 
 export async function drainLeadDistributionBacklog(input: { tenantId?: string; maxBatches?: number; budgetMs?: number } = {}) {

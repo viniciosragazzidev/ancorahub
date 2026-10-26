@@ -8,6 +8,7 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
 import { automaticDistributionHoldReason, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, isHeldByRunningQualification, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, shouldHoldColdLead, type IntelligentDistributionPolicy } from "./domain";
 import { isHotLeadEarlyDistributionEnabled } from "./qualification-hold";
+import { traceLeadStep } from "./distribution-trace";
 import type { AssignmentSource, DutyFallbackPolicy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { createLeadOffersForBrokers, loadBrokerPacingOffers } from "./offers";
@@ -722,6 +723,7 @@ async function getAutoDistributionStart(): Promise<Date | null> {
 export async function processQueuedLead(context: TenantContext, leadId: string, excludeBrokerId?: string | null, fallbackDepth = 0): Promise<LeadAssignmentResult> {
   if (!canManage(context)) throw new AuthorizationError("Você não pode executar a distribuição automática.");
   if (fallbackDepth > 3) return { status: "queued", leadId, reason: "O encadeamento de filas de contingência excedeu o limite seguro." };
+  traceLeadStep(leadId, `start:${fallbackDepth}`);
   const db = getDatabase();
   const [lead] = await db.select({
     id: schema.leads.id,
@@ -752,6 +754,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
   // Leads older than the cut-off stay for manual assignment; everything from
   // it on is handed out automatically (setting distribution_auto_min_created_at).
+  traceLeadStep(leadId, "load_lead");
   const autoFrom = await getAutoDistributionStart();
   if (autoFrom && lead.createdAt < autoFrom) {
     return { status: "queued", leadId, reason: `Lead anterior a ${AUTO_DISTRIBUTION_START_LABEL.format(autoFrom)}: fica para atribuição manual.` };
@@ -888,6 +891,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     if (lead.branchId && queue.branchId !== lead.branchId) return { status: "queued", leadId, reason: "A fila configurada pertence a outra unidade." };
     assertBranchScope(context, queue.branchId);
   }
+  traceLeadStep(leadId, "policy");
   const intelligentPolicy = await loadDistributionPolicy(context.tenantId, lead.queueId, lead.qualificationProfileKey);
   if (!intelligentPolicy.enabled) {
     return { status: "queued", leadId, reason: "A política de distribuição está pausada para esta fila." };
@@ -1015,6 +1019,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   let brokersStoppedByDutyCap = 0;
 
   const loadEligibleBrokers = async (branchIds: string[]) => {
+    traceLeadStep(leadId, "roster");
     const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId, exclusiveScheduleIds, (queue?.dutyFallbackPolicy as DutyFallbackPolicy | undefined) ?? (exclusiveScheduleIds?.length ? "wait_next_duty" : "unit_roster"), dutyLeadCaps, lead.createdAt)] as const));
     // A broker on the plantão receives its leads whatever unit their membership
     // is in (22/10, case Kelven: escalado e confirmado no PRESENCIAL TARDE de
@@ -1064,6 +1069,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     return { brokers: rosterBrokers, rosterByBranch, scheduleIdByBroker, hasActiveSelectedSchedule };
   };
 
+  traceLeadStep(leadId, "eligible_brokers");
   let { brokers, rosterByBranch, scheduleIdByBroker, hasActiveSelectedSchedule } = await loadEligibleBrokers(targetBranchIds);
   // Everyone on duty reached this plantão's cap: the lead waits (the queue's
   // "no broker" rules are for an empty roster, not for a full one).
@@ -1403,6 +1409,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const pacingDecisions = new Map<string, OfferPacingDecision>();
   if (pacing && lead.queueId && isOfferPacingEnabled(pacing)) {
     const pacingNow = new Date();
+    traceLeadStep(leadId, "pacing");
     const recentOffers = await loadBrokerPacingOffers(db, { tenantId: context.tenantId, queueId: lead.queueId, brokerIds: ids, intervalMinutes: pacing.intervalMinutes, now: pacingNow });
     const scheduleIds = [...new Set(scheduleIdByBroker.values())];
     const recentAssignments = await db.select({ brokerId: schema.leads.corretorId, dutyScheduleId: schema.leads.dutyScheduleId, queueId: schema.leads.queueId, assignedAt: schema.leads.assignedAt }).from(schema.leads).where(and(
@@ -1455,6 +1462,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   // one manual offers use — not a hard-coded default.
   const [tenantSla] = await db.select({ slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes })
     .from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
+  traceLeadStep(leadId, "create_offers");
   const offer = await createLeadOffersForBrokers({
     tenantId: context.tenantId,
     leadId,

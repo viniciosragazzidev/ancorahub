@@ -20,6 +20,7 @@ import { formatLeadTypeLabel, readSourcePlanType } from "./lead-type-label";
 import { buildLeadClientInfo, buildLeadOfferSummary } from "@/features/leads/client-info";
 import { getRelevantDutyWindow, isDutyWindowActive } from "./duty-presence-domain";
 import { postSaleTransferAuditAction } from "./post-sale-transfer";
+import { traceLeadStep } from "./distribution-trace";
 
 /**
  * Tenants without an official (Meta) WhatsApp channel cannot deliver offers by
@@ -189,6 +190,7 @@ export async function createLeadOffersForBrokers(input: {
   for (const broker of brokers) {
     const destinationPhone = broker.phone;
     const offerId = randomUUID();
+    traceLeadStep(input.leadId, `offer_claim:${broker.id}`);
     const claimStatus = await db.transaction(async (tx) => {
       // Serialize offer creation per lead. This is the final guard against two
       // workers creating simultaneous active offers for different brokers.
@@ -414,6 +416,7 @@ export async function createLeadOffersForBrokers(input: {
     // Pending offers use the same approved `new_lead_broker` contract as a
     // confirmed assignment. The lead phone is never included before acceptance;
     // only the dynamic CRM URL button carries the lead id.
+    traceLeadStep(input.leadId, `offer_enqueue:${broker.id}`);
     let outbound: Awaited<ReturnType<typeof enqueueMetaTemplateMessage>>;
     try {
       outbound = await enqueueMetaTemplateMessage({
@@ -486,7 +489,9 @@ export async function createLeadOffersForBrokers(input: {
       // Deliver the exact offer just created instead of waiting behind an
       // unrelated backlog. The durable outbox remains the source of truth and
       // the cron worker continues to recover transient provider failures.
+      traceLeadStep(input.leadId, `offer_send:${broker.id}`);
       const delivery = await processMetaOutboundBatch(1, input.tenantId, outbound.id);
+      traceLeadStep(input.leadId, `offer_sent:${broker.id}`);
       if (delivery.failed > 0 && delivery.retried === 0) {
         permanentDeliveryFailure = true;
         const failedAt = new Date();
