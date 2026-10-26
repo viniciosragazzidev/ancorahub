@@ -29,10 +29,10 @@ describe("flow chosen by the director (Atendimento > Fluxo)", () => {
     expect(resolveDeterministicQualificationTurn({ memory: createEmptyMemory(), policy: custom }).reply).toBe("De qual cidade você fala?");
   });
 
-  it("recognizes the director's text as already asked and rephrases it", () => {
+  it("keeps the director's saved text exact even when it was already asked", () => {
     const custom: AgentBehaviorPolicy = { ...policy, requiredFields: ["city", "customerName"], questionTexts: { city: "De qual cidade você fala?" } };
     const reply = resolveDeterministicQualificationTurn({ memory: createEmptyMemory(), policy: custom, pastOutboundTexts: new Set(["De qual cidade você fala?"]) }).reply;
-    expect(reply).toMatch(/: de qual cidade você fala\?$/);
+    expect(reply).toBe("De qual cidade você fala?");
   });
 });
 

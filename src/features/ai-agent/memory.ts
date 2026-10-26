@@ -25,6 +25,15 @@ export type MemoryField = {
   confirmed?: boolean;
 };
 
+export type BeneficiaryRelation = "titular" | "conjuge" | "filho" | "pai_mae" | "neto" | "outro";
+
+export type ConversationBeneficiary = {
+  age: number | null;
+  relation: BeneficiaryRelation | null;
+  relationText?: string;
+  sourceMessageId?: string;
+};
+
 export type ConversationMemory = {
   customerName?: MemoryField;
   customerFirstName?: MemoryField;
@@ -53,6 +62,10 @@ export type ConversationMemory = {
   objectionAttempts?: number;
   /** Who the plan is for when it is not the person talking ("filha", "pai"). */
   beneficiaryRelation?: string;
+  /** Optional relationship details, kept outside collectedFields so qualification never waits for them. */
+  beneficiaries?: ConversationBeneficiary[];
+  beneficiaryRaw?: string;
+  relationAsked?: boolean;
   /** Short free-text summary of the conversation so far */
   conversationSummary?: string;
   /** ISO timestamp of last update */

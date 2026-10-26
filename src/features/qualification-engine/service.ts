@@ -5,14 +5,17 @@ import { and, eq } from "drizzle-orm";
 
 import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
 import { asksCurrentPlan, hasCoreQuoteData, type ConversationMemory } from "@/features/ai-agent/memory";
+import { beneficiariesFromMemory, parseAgeValues } from "@/features/ai-agent/beneficiary-relations";
 import { deriveLeadQualificationStatus } from "@/features/leads/qualification-status";
 import { enqueueMetaQualificationConversion } from "@/features/meta-ads/meta-conversion-service";
 import { getDatabase, schema } from "@/shared/db";
 import {
   composeQuestionReply,
+  beneficiaryRelationInvitation,
   DEFAULT_QUALIFIED_HANDOFF_TEXT,
   effectiveHandoffText,
   renderConversationVariables,
+  summarizeQualification,
   wasQuestionAsked,
   type QualificationFieldKey,
 } from "./reply-composer";
@@ -61,6 +64,8 @@ export type DeterministicQualificationTurn = {
   reply: string;
   evaluation: QualificationEvaluation;
   nextQuestion: QualificationQuestionDefinition | null;
+  /** The optional relationship invitation appended to the completed handoff. */
+  beneficiaryInvitation?: string;
 };
 
 /**
@@ -190,18 +195,27 @@ export function resolveDeterministicQualificationTurn(input: {
   answered?: string[];
   /** The reply sent right before this one (to vary the opener and the name). */
   previousReply?: string | null;
+  /** The newest three replies, newest first. */
+  recentReplies?: readonly string[];
   /** Stable per turn so a retry keeps the same wording. */
   seed?: string;
+  /** First-reply introduction and a period greeting after six hours of silence. */
+  greetingText?: string | null;
+  periodGreeting?: boolean;
+  now?: Date;
 }): DeterministicQualificationTurn {
   const evaluation = evaluateQualification(input.memory, input.policy);
   const nextQuestion = getNextQualificationQuestion(input.memory, input.policy, input.pastOutboundTexts);
 
   if (!nextQuestion) {
+    const invitation = beneficiaryRelationInvitation(input.memory, input.seed ?? `handoff:${evaluation.completedFields.length}`);
+    const handoff = renderConversationVariables(effectiveHandoffText(input.handoffMessage, DEFAULT_QUALIFIED_HANDOFF_TEXT), input.memory);
     return {
       kind: "handoff",
-      reply: renderConversationVariables(effectiveHandoffText(input.handoffMessage, DEFAULT_QUALIFIED_HANDOFF_TEXT), input.memory),
+      reply: invitation ? `${handoff} ${invitation}` : handoff,
       evaluation,
       nextQuestion: null,
+      ...(invitation ? { beneficiaryInvitation: invitation } : {}),
     };
   }
 
@@ -219,6 +233,10 @@ export function resolveDeterministicQualificationTurn(input: {
       memory: input.memory,
       answered,
       previousReply: input.previousReply ?? input.memory.lastQuestionAsked ?? null,
+      recentReplies: input.recentReplies,
+      greetingText: input.greetingText,
+      periodGreeting: input.periodGreeting,
+      now: input.now,
       seed: input.seed ?? `${key}:${evaluation.completedFields.length}`,
       repeated,
       last: evaluation.missingFields.length === 1 && (input.policy.requiredFields?.length ?? 0) >= 3,
@@ -408,6 +426,9 @@ export async function persistQualificationEvaluation(input: {
       ? currentLead.qualificationDetails as Record<string, unknown>
       : {};
     const privateContext = buildPrivateQualificationContext(input.memory, now);
+    const beneficiaryAges = parseAgeValues(input.memory.age?.value);
+    const beneficiaries = beneficiariesFromMemory(input.memory, beneficiaryAges);
+    const handoffSummary = summarizeQualification(input.memory);
     const existingPrivateNotes = Array.isArray(existingDetails.privateNotes)
       ? existingDetails.privateNotes.filter((note): note is Record<string, unknown> => Boolean(note && typeof note === "object"))
       : [];
@@ -433,6 +454,13 @@ export async function persistQualificationEvaluation(input: {
         neighborhood: input.memory.neighborhood?.value ?? null,
         currentPlan: input.memory.currentPlan?.value ?? null,
         email: input.memory.email?.value ?? null,
+        resumoAtendimento: handoffSummary || existingDetails.resumoAtendimento || null,
+        beneficiarios: beneficiaries.map((beneficiary) => ({
+          idade: beneficiary.age,
+          parentesco: beneficiary.relation,
+          texto: beneficiary.relationText ?? (input.memory.beneficiaryRaw || null),
+        })),
+        ...(input.memory.beneficiaryRaw ? { beneficiaryRaw: input.memory.beneficiaryRaw } : {}),
         // Private, tenant-scoped context used by the broker and by the next
         // qualification turn. Keeping it nested avoids clobbering AI
         // intelligence, manual notes, or other lead details.

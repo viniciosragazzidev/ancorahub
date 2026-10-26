@@ -6,7 +6,7 @@ vi.mock("@/shared/db", () => ({ getDatabase: () => { throw new Error("no databas
 import { createEmptyMemory, EMAIL_DECLINED, extractFieldsFromMessage, type ConversationMemory } from "@/features/ai-agent/memory";
 import { getDefaultQuickReplyTemplates, isRetiredDefaultBody, matchFaqSituation, parseHumanRequest, resolveQuickReply } from "@/features/ai-agent/quick-reply";
 import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
-import { composeQuestionReply, priceConcernLine, questionVariants, renderConversationVariables, summarizeQualification } from "./reply-composer";
+import { beneficiaryRelationInvitation, composeQuestionReply, priceConcernLine, questionVariants, renderConversationVariables, summarizeQualification } from "./reply-composer";
 import { resolveDeterministicQualificationTurn } from "./service";
 
 const policy = {
@@ -27,9 +27,9 @@ const firstWord = (text: string) => text.normalize("NFD").replace(/[̀-ͯ]/g, ""
 describe("reply composer", () => {
   it("asks the age according to who enters the plan", () => {
     const base = createEmptyMemory();
-    expect(questionVariants("age", { ...base, planType: { value: "individual", confidence: 1 } })).toContain("E qual a idade de quem vai usar o plano?");
-    expect(questionVariants("age", { ...base, planType: { value: "familiar", confidence: 1 }, numberOfLives: { value: "3", confidence: 1 } })).toContain("Me passa a idade de cada uma das 3 pessoas?");
-    expect(questionVariants("age", { ...base, planType: { value: "empresarial", confidence: 1 } })).toContain("E qual é mais ou menos a média de idade do pessoal?");
+    expect(questionVariants("age", { ...base, planType: { value: "individual", confidence: 1 } }).join(" ")).toMatch(/idade de quem vai usar o plano/);
+    expect(questionVariants("age", { ...base, planType: { value: "familiar", confidence: 1 }, numberOfLives: { value: "3", confidence: 1 } }).join(" ")).toMatch(/idade de cada uma das 3 pessoas/);
+    expect(questionVariants("age", { ...base, planType: { value: "empresarial", confidence: 1 } }).join(" ")).toMatch(/média de idade do pessoal/);
     for (const text of [...questionVariants("age", base), ...questionVariants("age", { ...base, planType: { value: "individual", confidence: 1 } })]) {
       expect(text).not.toMatch(/benefici/i);
     }
@@ -50,8 +50,8 @@ describe("reply composer", () => {
   it("echoes the value just answered and gives the same text for the same seed", () => {
     const memory = { ...withName("Ana Souza"), city: { value: "Niterói", confidence: 1 as const } };
     const reply = composeQuestionReply({ key: "email", memory, answered: ["city"], seed: "c1:4", last: true });
-    expect(reply).toMatch(/Niterói|Perfeito, Ana\./);
-    expect(reply).toContain("Pra fechar: ");
+    expect(reply).toMatch(/Niterói|Perfeito, Ana,/);
+    expect(reply).toMatch(/Por último,|Pra fechar a cotação,/);
     expect(composeQuestionReply({ key: "email", memory, answered: ["city"], seed: "c1:4", last: true })).toBe(reply);
   });
 
@@ -68,12 +68,12 @@ describe("reply composer", () => {
   it("summarizes several answers given in one message", () => {
     const memory = extractFieldsFromMessage("É familiar, somos 3 pessoas", withName("Ana Souza"));
     const reply = composeQuestionReply({ key: "age", memory, answered: ["planType", "numberOfLives"], seed: "x" });
-    expect(reply).toMatch(/^(Perfeito, a|A)notei: familiar e 3 pessoas\. /);
+    expect(reply).toMatch(/^(Obrigado pelas respostas, anotei aqui|Perfeito, já registrei|Certo, anotei com cuidado): familiar e 3 pessoas\. /);
   });
 
   it("rephrases an unanswered question without a confirmation", () => {
     const reply = composeQuestionReply({ key: "city", memory: withName("Ana Souza"), answered: [], seed: "r", repeated: true });
-    expect(reply).toMatch(/^(Só pra eu anotar certinho|Pra eu seguir com a cotação|Me ajuda só com uma coisa): /);
+    expect(reply).toMatch(/^(Sem pressa, mas preciso desse detalhe pra seguir|Pra eu não errar nada, me ajuda com isso|Acho que não consegui entender direito, então pergunto de novo): /);
     expect(reply).toContain("cidade");
   });
 
@@ -84,6 +84,33 @@ describe("reply composer", () => {
     expect(summarizeQualification(memory)).toBe("individual, 40 anos e Itaboraí");
     expect(renderConversationVariables(text, memory)).toBe("Claro, Torquato, já passei seu atendimento para um corretor especialista, com tudo que você me contou (individual, 40 anos e Itaboraí). Ele continua por aqui em instantes, sem você precisar repetir nada.");
     expect(renderConversationVariables("Oi, {{nome}}!", createEmptyMemory(), "Lead WhatsApp (5521)")).toBe("Oi!");
+  });
+
+  it("summarizes age relationships only when each age has a safe mapping", () => {
+    const mapped: ConversationMemory = {
+      ...withName("Ana Souza"), planType: { value: "familiar", confidence: 1 }, numberOfLives: { value: "2", confidence: 1 },
+      age: { value: "46 e 10", confidence: 1 },
+      beneficiaries: [{ age: 46, relation: "titular" }, { age: 10, relation: "filho" }],
+    };
+    const ambiguous = { ...mapped, beneficiaries: [{ age: 46, relation: null }, { age: 10, relation: null }] };
+    expect(summarizeQualification(mapped)).toBe("familiar, você 46 e filho 10 anos");
+    expect(summarizeQualification(ambiguous)).toBe("familiar, 2 pessoas, 46 e 10 anos");
+    expect(summarizeQualification(mapped)).not.toContain("Ana");
+  });
+
+  it("keeps the optional relationship invitation out of qualification requirements", () => {
+    const family: ConversationMemory = {
+      ...withName("Ana Souza"), planType: { value: "familiar", confidence: 1 }, numberOfLives: { value: "2", confidence: 1 },
+      age: { value: "46 e 10", confidence: 1 }, city: { value: "Niterói", confidence: 1 }, email: { value: "ana@example.test", confidence: 1 },
+      collectedFields: ["customerName", "planType", "numberOfLives", "age", "city", "email"],
+    };
+    const turn = resolveDeterministicQualificationTurn({ memory: family, policy, seed: "optional-relationship" });
+    expect(turn.kind).toBe("handoff");
+    expect(turn.evaluation.missingFields).toEqual([]);
+    expect(turn.nextQuestion).toBeNull();
+    expect(turn.beneficiaryInvitation).toBeTruthy();
+    expect(turn.reply).toContain(turn.beneficiaryInvitation!);
+    expect(beneficiaryRelationInvitation({ ...family, relationAsked: true }, "already-asked")).toBeNull();
   });
 });
 
@@ -154,7 +181,7 @@ describe("the reported conversation (Torquato), end to end", () => {
 
     const age = answer("Individual", 2);
     expect(age.nextQuestion?.key).toBe("age");
-    expect(age.reply).toMatch(/^(Só pra você, entendi!|Plano individual, combinado\.|Beleza, Torquato, só pra você\.) (E qual a idade de quem vai usar o plano\?|Quantos anos tem quem vai usar o plano\?)$/);
+    expect(age.reply).toMatch(/E qual a idade de quem vai usar o plano|Quantos anos tem quem vai usar o plano/);
 
     const city = answer("40", 3);
     expect(memory.age?.value).toBe("40");
@@ -163,7 +190,7 @@ describe("the reported conversation (Torquato), end to end", () => {
     const email = answer("Itaboraí", 4);
     expect(memory.city?.value).toBe("Itaboraí");
     expect(email.nextQuestion?.key).toBe("email");
-    expect(email.reply).toContain("Pra fechar: ");
+    expect(email.reply).toMatch(/Por último,|Pra fechar a cotação,/);
 
     // No question about the number of people, no "beneficiários", no repeated opener or name.
     const questions = sent.slice(1);
