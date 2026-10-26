@@ -30,7 +30,7 @@ import {
 } from "./types";
 
 /** The gateway asks for plain JSON (no schema-guided generation), so the shape goes in the prompt. */
-const ASSESSMENT_JSON_INSTRUCTION = `Responda SOMENTE com um objeto JSON válido, sem texto antes ou depois, com estas chaves:
+const ASSESSMENT_JSON_INSTRUCTION = `Responda SOMENTE com um objeto JSON válido, sem texto antes ou depois, e seja conciso (cada lista com no máximo 3 itens curtos; summary com até 3 frases), com estas chaves:
 {
   "conversationStage": "INITIAL_CONTACT|DISCOVERY|QUALIFICATION|QUOTE_PREPARATION|QUOTE_PRESENTED|NEGOTIATION|DOCUMENT_COLLECTION|ANALYSIS|CLOSING|POST_SALE|UNKNOWN",
   "customerIntent": "VERY_HIGH|HIGH|MEDIUM|LOW|NONE|UNKNOWN",
@@ -194,7 +194,8 @@ Orientações:
     // The customer's conversation: only paid models that do not train on it (LGPD art. 11).
     sensitive: true,
     temperature: 0.2,
-    maxTokens: 1_500,
+    // 1.500 cut Claude Haiku mid-JSON (finish_reason length, 26/10): the full assessment needs room.
+    maxTokens: 4_000,
     timeoutMs: 45_000,
     schema: ConversationAssessmentSchema.refine(isUsableAssessment, "unusable_assessment"),
     messages: [
