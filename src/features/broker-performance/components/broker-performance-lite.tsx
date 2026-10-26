@@ -42,13 +42,14 @@ function ChangeLine({ card }: { card: BrokerMetricCard }) {
   );
 }
 
-function GoalRing({ percentage }: { percentage: number }) {
+/** Anel de progresso do kit de desempenho (também usado na prévia do Diretor). */
+export function GoalRing({ percentage, caption = "da meta" }: { percentage: number; caption?: string }) {
   const reduce = useReducedMotion();
   const radius = 42;
   const length = 2 * Math.PI * radius;
   const offset = length * (1 - percentage / 100);
   return (
-    <span className={styles.ring} role="img" aria-label={`${percentage}% da meta`}>
+    <span className={styles.ring} role="img" aria-label={`${percentage}% ${caption}`}>
       <svg viewBox="0 0 100 100" width="104" height="104" aria-hidden="true">
         <circle cx="50" cy="50" r={radius} className={styles.ringTrack} />
         <motion.circle
@@ -63,14 +64,14 @@ function GoalRing({ percentage }: { percentage: number }) {
       </svg>
       <span className={styles.ringCore} aria-hidden="true">
         <strong><LiteNumber value={percentage} format="percent" countFromZero /></strong>
-        <small>da meta</small>
+        <small>{caption}</small>
       </span>
     </span>
   );
 }
 
 /** Barra do funil: cresce da esquerda, cada etapa um passo depois da anterior. Largura (não scaleX) para manter a ponta arredondada; são só três barras. */
-function FunnelBar({ widthPercent, step }: { widthPercent: number; step: number }) {
+export function FunnelBar({ widthPercent, step }: { widthPercent: number; step: number }) {
   const reduce = useReducedMotion();
   const width = `${widthPercent}%`;
   return (
