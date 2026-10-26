@@ -2,10 +2,9 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
-import { generateObject } from "ai";
 
 import { getAiEngineSettings } from "@/features/ai/engine";
-import { getAiModelInstance } from "@/features/ai/providers";
+import { runGateway } from "@/features/ai-gateway/gateway";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -29,6 +28,29 @@ import {
   type LeadIntelligenceState,
   type PolicyExecutionResult,
 } from "./types";
+
+/** The gateway asks for plain JSON (no schema-guided generation), so the shape goes in the prompt. */
+const ASSESSMENT_JSON_INSTRUCTION = `Responda SOMENTE com um objeto JSON válido, sem texto antes ou depois, com estas chaves:
+{
+  "conversationStage": "INITIAL_CONTACT|DISCOVERY|QUALIFICATION|QUOTE_PREPARATION|QUOTE_PRESENTED|NEGOTIATION|DOCUMENT_COLLECTION|ANALYSIS|CLOSING|POST_SALE|UNKNOWN",
+  "customerIntent": "VERY_HIGH|HIGH|MEDIUM|LOW|NONE|UNKNOWN",
+  "engagement": "HIGH|MEDIUM|LOW",
+  "sentiment": "POSITIVE|NEUTRAL|NEGATIVE",
+  "objections": ["..."],
+  "buyingSignals": ["..."],
+  "pendingFrom": "BROKER|CUSTOMER|INTERNAL|NONE|UNKNOWN",
+  "nextBestAction": "próxima ação concreta para o corretor",
+  "suggestedLeadStatus": "distributed|in_contact|quote_sent|negotiation|documentation_pending|under_analysis|lost" ou null,
+  "statusConfidence": número de 0 a 1,
+  "statusReason": "uma ou duas frases" ou null,
+  "lossReasonCode": "${MOTIVOS_PERDA.join("|")}" ou null,
+  "evidence": ["trecho literal do cliente (no máximo 5)"],
+  "summary": "resumo executivo em português",
+  "risk": "texto" ou null,
+  "opportunity": "texto" ou null,
+  "facts": ["..."],
+  "inferences": ["..."]
+}`;
 
 export interface AnalyzeLeadConversationResult {
   analyzed: boolean;
@@ -135,46 +157,14 @@ export async function analyzeLeadConversation(
     maxRecentMessages: conversationIntelligenceDomainRoot.defaults.maxRecentMessagesInContext,
   });
 
-  // 5. Configurar IA e executar chamada estruturada
+  // 5. IA pelo gateway (26/10): mesma cadeia e mesmas chaves do resto do CRM (Claude Haiku
+  // direto primeiro, OpenRouter pago depois) e cada tentativa fica em ai_attendance_logs.
+  // A lista própria de modelos usava a chave do OpenRouter salva em Configurações, que deu
+  // 401 a partir de 21/10 e parou a análise sem deixar rastro.
   const aiSettings = await getAiEngineSettings();
   if (!aiSettings.enabled) {
     return { analyzed: false, reason: "Motor de IA desativado nas configurações do sistema." };
   }
-
-  const keys = {
-    groqKey: aiSettings.groqApiKey,
-    openaiKey: aiSettings.openaiApiKey,
-    googleKey: aiSettings.googleApiKey,
-    openrouterKey: aiSettings.openrouterApiKey,
-  };
-
-  // Paid models through OpenRouter first (decision of 2026-10-12): they do not train on the
-  // client's conversation (LGPD) and the free ones were retired. Then the Super-admin choice.
-  const candidateModels: Array<{ provider: any; model: string }> = [
-    ...(keys.openrouterKey ? [
-      { provider: "openrouter", model: process.env.AI_OPENROUTER_MODEL || "anthropic/claude-haiku-5.5" },
-      { provider: "openrouter", model: process.env.AI_OPENROUTER_FALLBACK_MODEL || "openai/gpt-oss-120b" },
-    ] : []),
-    { provider: aiSettings.primaryProvider, model: aiSettings.primaryModel },
-  ];
-
-  if (aiSettings.fallbackProvider && aiSettings.fallbackProvider !== "none" && aiSettings.fallbackModel) {
-    candidateModels.push({ provider: aiSettings.fallbackProvider, model: aiSettings.fallbackModel });
-  }
-
-  candidateModels.push(
-    // 2026-10-12: llama-3.3-70b-versatile and gemini-2.0-flash were retired (HTTP 404).
-    { provider: "openrouter", model: "meta-llama/llama-3.1-70b-instruct" },
-    { provider: "groq", model: "openai/gpt-oss-120b" },
-  );
-
-  const seenCandidates = new Set<string>();
-  const filteredCandidates = candidateModels.filter((c) => {
-    const key = `${c.provider}:${c.model}`;
-    if (seenCandidates.has(key)) return false;
-    seenCandidates.add(key);
-    return true;
-  });
 
   const systemPrompt = `Você é um analista sênior de inteligência comercial do CRM CorreTop / Âncora Saúde.
 Sua missão é analisar transcrições de conversas no WhatsApp entre clientes e corretores de planos de saúde/seguros e produzir um diagnóstico comercial acionável.
@@ -194,42 +184,36 @@ Orientações:
 
   const userPrompt = `Contexto do Lead:\n${compactContext.leadSummary}\n\nMemória Anterior:\n${compactContext.historicalMemory}\n\nTranscrição Recente:\n${compactContext.recentTranscript}`;
 
-  let assessment: ConversationAssessment | null = null;
-  let modelUsed = `${aiSettings.primaryProvider}/${aiSettings.primaryModel}`;
-  let lastError: unknown = null;
+  const result = await runGateway({
+    profile: "json-structured",
+    purpose: "conversation_intelligence",
+    tenantId: lead.tenantId,
+    // One limiter slot per lead: the 10-min job analyses up to 20 different leads in a row.
+    userId: `conversation-intelligence:${lead.id}`,
+    leadId: lead.id,
+    // The customer's conversation: only paid models that do not train on it (LGPD art. 11).
+    sensitive: true,
+    temperature: 0.2,
+    maxTokens: 1_500,
+    timeoutMs: 45_000,
+    schema: ConversationAssessmentSchema.refine(isUsableAssessment, "unusable_assessment"),
+    messages: [
+      { role: "system", content: `${systemPrompt}
 
-  for (const candidate of filteredCandidates) {
-    try {
-      const modelInstance = getAiModelInstance(candidate.provider, candidate.model, keys);
-      const aiResult = await generateObject({
-        model: modelInstance,
-        schema: ConversationAssessmentSchema,
-        system: systemPrompt,
-        prompt: userPrompt,
-        temperature: 0.2,
-      });
-      // A model that echoes enum values instead of analysing ("NEUTRAL" as the
-      // summary, "NONE" as the next action) must not overwrite the memory.
-      if (!isUsableAssessment(aiResult.object)) {
-        lastError = new Error(`Resposta vazia ou inválida de ${candidate.provider}/${candidate.model}`);
-        continue;
-      }
-      assessment = aiResult.object;
-      modelUsed = `${candidate.provider}/${candidate.model}`;
-      break;
-    } catch (err) {
-      lastError = err;
-      console.warn(`[conversation-intelligence] Fallback: falha com ${candidate.provider}/${candidate.model}, tentando próximo...`, err instanceof Error ? err.message : err);
-    }
-  }
+${ASSESSMENT_JSON_INSTRUCTION}` },
+      { role: "user", content: userPrompt },
+    ],
+  });
 
-  if (!assessment) {
-    console.error("[conversation-intelligence] Todas as tentativas de IA falharam:", lastError);
+  if (!result.ok) {
+    console.error("[conversation-intelligence] IA indisponível:", result.reason, result.lastError ?? "");
     return {
       analyzed: false,
-      reason: `Falha ao processar análise da IA: ${lastError instanceof Error ? lastError.message : "erro desconhecido"}`,
+      reason: `Falha ao processar análise da IA: ${result.reason}${result.lastError ? ` (${result.lastError})` : ""}`,
     };
   }
+  const assessment: ConversationAssessment = result.value;
+  const modelUsed = `${result.model.provider}/${result.model.model}`;
 
   // 6. Avaliar políticas determinísticas do Pipeline
   const mode = await getAiStageMode(lead.tenantId);

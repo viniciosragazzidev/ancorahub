@@ -64,6 +64,9 @@ export async function runConversationReconcileJob() {
   const modeByTenant = new Map<string, Awaited<ReturnType<typeof getAiStageMode>>>();
   let analyzed = 0;
   let moved = 0;
+  // AI failures show in the job answer (Coolify log), not only in the server console.
+  let failed = 0;
+  let lastFailure: string | undefined;
   for (const row of pending) {
     if (analyzed >= MAX_LEADS_PER_RUN || Date.now() - now > TIME_BUDGET_MS) break;
     if (!modeByTenant.has(row.tenantId)) modeByTenant.set(row.tenantId, await getAiStageMode(row.tenantId));
@@ -72,10 +75,11 @@ export async function runConversationReconcileJob() {
     try {
       const result = await analyzeLeadConversation(row.leadId!, row.tenantId);
       if (result.analyzed) analyzed += 1;
+      else if (result.reason?.startsWith("Falha")) { failed += 1; lastFailure = result.reason.slice(0, 200); }
       if (result.policyResult?.action === "AUTO_TRANSITION") moved += 1;
     } catch (error) {
       console.error("[conversation-reconcile] lead failed", row.leadId, error instanceof Error ? error.message.slice(0, 200) : error);
     }
   }
-  return { analyzed, moved, candidates: pending.length };
+  return { analyzed, moved, failed, candidates: pending.length, ...(lastFailure ? { lastFailure } : {}) };
 }
