@@ -169,7 +169,12 @@ export type ConversationItem = {
   /** Structured private context captured by the qualification assistant. */
   privateNotes?: string | null;
   latestMessage: Pick<ConversationMessage, "body" | "direction" | "sentAt"> | null;
+  /** Só as últimas da conversa na lista; o histórico completo vem quando ela é aberta (?leadId=). */
   messages: ConversationMessage[];
+  /** Total de mensagens da conversa, contado no servidor (a lista não carrega todas). */
+  messageCount?: number;
+  /** Se a conversa tem mensagem recebida (filtro Atendente Virtual), contado no servidor. */
+  hasIncoming?: boolean;
   documents: {
     id: string;
     filename: string;
@@ -290,7 +295,7 @@ export function ConversationsWorkspace({
             conversation.aiConversation?.status === "CLOSED" ||
             ["hot", "warm", "cold", "qualified", "disqualified"].includes(conversation.status)
           : filter === "ai_active"
-            ? Boolean(conversation.aiConversation) && conversation.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound"))
+            ? Boolean(conversation.aiConversation) && (conversation.hasIncoming ?? conversation.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound")))
             : filter === "human_active"
               ? conversation.aiConversation?.status === "HUMAN_ACTIVE" || conversation.aiConversation?.status === "WAITING_HUMAN"
               : filter === "with_messages"
@@ -391,7 +396,7 @@ export function ConversationsWorkspace({
       <div className="flex max-w-full items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar" data-conversations-part={directorSkinEnabled ? "filters" : undefined}>
         <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
         <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
-        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "ai_active"} count={conversations.filter((c) => Boolean(c.aiConversation) && c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound"))).length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
+        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "ai_active"} count={conversations.filter((c) => Boolean(c.aiConversation) && (c.hasIncoming ?? c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound")))).length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
         <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
       </div>
     </>
@@ -1722,7 +1727,7 @@ function getConversationStatusLabel(status: string, qualificationStatus?: string
 
 function ConversationRow({ active, conversation, onClick, directorSkinEnabled }: { active: boolean; conversation: ConversationItem; onClick: () => void; directorSkinEnabled: boolean }) {
   const hasHistory = conversation.messages.length > 0;
-  const visibleMessageCount = conversation.messages.filter((message) => !message.transition).length;
+  const visibleMessageCount = conversation.messageCount ?? conversation.messages.filter((message) => !message.transition).length;
   const preview = conversation.latestMessage?.body ?? "Nenhuma mensagem sincronizada.";
 
   return (

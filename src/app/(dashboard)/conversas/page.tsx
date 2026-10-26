@@ -29,6 +29,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { hasPermission } from "@/shared/auth/permissions";
 import { brokerWhatsAppMessageSourceCondition, isRecentWhatsAppReplyFilter } from "@/features/dashboard/whatsapp-activity-query";
 import { loadedLeadMessageScope } from "@/features/conversations/loaded-lead-message-scope";
+import { pickMessageIdsToLoad, summarizeIndexRows, type MessageIndexRow } from "@/features/conversations/message-window";
 
 // Não gerar estaticamente — a página depende de sessão e executa queries pesadas de AI
 export const dynamic = "force-dynamic";
@@ -209,25 +210,45 @@ export default async function ConversationsPage({
       .where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER)));
     const channelLabelOf = describeMessageChannel(officialChannels);
 
-    const loadMessages = (scopedToLoadedLeads: boolean, limit: number) => db
+    // Egress (26/10): a lista lê só este índice leve das mesmas mensagens; texto e mídia vêm depois,
+    // por id, só para as últimas de cada conversa e o histórico da conversa aberta (message-window.ts).
+    const fullMessageColumns = {
+      id: schema.whatsappMessages.id,
+      leadId: schema.whatsappMessages.leadId,
+      clientId: schema.whatsappMessages.clientId,
+      phone: schema.whatsappMessages.phone,
+      body: schema.whatsappMessages.body,
+      direction: schema.whatsappMessages.direction,
+      senderRole: schema.whatsappMessages.senderRole,
+      providerStatus: schema.whatsappMessages.providerStatus,
+      messageId: schema.whatsappMessages.messageId,
+      communicationChannelId: schema.whatsappMessages.communicationChannelId,
+      provider: schema.whatsappMessages.provider,
+      sentAt: schema.whatsappMessages.sentAt,
+      mediaKind: schema.whatsappMessages.mediaKind,
+      mediaMimeType: schema.whatsappMessages.mediaMimeType,
+      mediaFilename: schema.whatsappMessages.mediaFilename,
+      mediaSizeBytes: schema.whatsappMessages.mediaSizeBytes,
+      mediaStorageKey: schema.whatsappMessages.mediaStorageKey,
+    };
+    const loadMessagesById = async (ids: string[]) => {
+      const chunks: string[][] = [];
+      for (let start = 0; start < ids.length; start += 1000) chunks.push(ids.slice(start, start + 1000));
+      const rows = (await Promise.all(chunks.map((chunk) => db
+        .select(fullMessageColumns)
+        .from(schema.whatsappMessages)
+        .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), inArray(schema.whatsappMessages.id, chunk)))))).flat();
+      return rows.sort((a, b) => b.sentAt.getTime() - a.sentAt.getTime());
+    };
+    const loadMessageIndex = (scopedToLoadedLeads: boolean, limit: number) => db
             .select({
               id: schema.whatsappMessages.id,
               leadId: schema.whatsappMessages.leadId,
               clientId: schema.whatsappMessages.clientId,
               phone: schema.whatsappMessages.phone,
-              body: schema.whatsappMessages.body,
               direction: schema.whatsappMessages.direction,
-              senderRole: schema.whatsappMessages.senderRole,
-              providerStatus: schema.whatsappMessages.providerStatus,
-              messageId: schema.whatsappMessages.messageId,
-              communicationChannelId: schema.whatsappMessages.communicationChannelId,
-              provider: schema.whatsappMessages.provider,
               sentAt: schema.whatsappMessages.sentAt,
-              mediaKind: schema.whatsappMessages.mediaKind,
-              mediaMimeType: schema.whatsappMessages.mediaMimeType,
-              mediaFilename: schema.whatsappMessages.mediaFilename,
-              mediaSizeBytes: schema.whatsappMessages.mediaSizeBytes,
-              mediaStorageKey: schema.whatsappMessages.mediaStorageKey,
+              communicationChannelId: schema.whatsappMessages.communicationChannelId,
             })
             .from(schema.whatsappMessages)
             .where(and(
@@ -256,15 +277,15 @@ export default async function ConversationsPage({
             .orderBy(desc(schema.whatsappMessages.sentAt))
             .limit(limit);
 
-    const [messageRows, documentRows, aiConversationRows] = leadIds.length
+    const [indexRows, documentRows, aiConversationRows] = leadIds.length
       ? await Promise.all([
           // Filtered (one broker / replied): the newest 2000 of the visible leads only, still bounded.
           // Unfiltered, the newest 2000 of the company alone left out every lead whose last message
           // was older than them (22/10: qualified leads of the day before missing from the list), so
           // the loaded leads' own messages are read too and both are merged.
           scopeMessagesToLoadedLeads
-            ? loadMessages(true, 2000)
-            : Promise.all([loadMessages(false, 2000), loadMessages(true, 4000)]).then(([recent, ofLoadedLeads]) => {
+            ? loadMessageIndex(true, 2000)
+            : Promise.all([loadMessageIndex(false, 2000), loadMessageIndex(true, 4000)]).then(([recent, ofLoadedLeads]) => {
               const seen = new Set(recent.map((message) => message.id));
               return [...recent, ...ofLoadedLeads.filter((message) => !seen.has(message.id))];
             }),
@@ -309,6 +330,23 @@ export default async function ConversationsPage({
             ),
         ])
       : ([[], [], []] as const);
+
+    // Texto e mídia só do que a tela mostra: prévia de cada conversa e o histórico da aberta (?leadId=).
+    const openLead = leadId ? leads.find((lead) => lead.id === leadId) : undefined;
+    // Sem ?leadId, a tela abre a conversa da mensagem mais nova: o histórico dela também vem completo.
+    const newestIndexRow = (indexRows as MessageIndexRow[]).reduce<MessageIndexRow | null>(
+      (newest, row) => (!newest || row.sentAt > newest.sentAt ? row : newest),
+      null,
+    );
+    const openThread = leadId?.startsWith("unassigned-")
+      ? { leadId: null, phone: leadId.slice("unassigned-".length) }
+      : openLead
+        ? { leadId: openLead.id, phone: openLead.telefone }
+        : !leadId && newestIndexRow
+          ? { leadId: newestIndexRow.leadId, phone: newestIndexRow.phone }
+          : null;
+    const messageRows = await loadMessagesById(pickMessageIdsToLoad(indexRows as MessageIndexRow[], { openThread }));
+    const fullMessageById = new Map(messageRows.map((message) => [message.id, message]));
 
     const failedMessageEventKeys = isDirector
       ? Array.from(
@@ -360,15 +398,16 @@ export default async function ConversationsPage({
 
     // Indexed once by lead and by the last 8 digits of the phone: the list matches
     // hundreds of leads against thousands of messages.
-    type MessageRow = (typeof messageRows)[number];
+    type MessageRow = MessageIndexRow;
     const rowsByLeadId = new Map<string, MessageRow[]>();
     const rowsByPhoneSuffix = new Map<string, MessageRow[]>();
+    const statsByLead = new Map<string, ReturnType<typeof summarizeIndexRows>>();
     const addTo = (map: Map<string, MessageRow[]>, key: string, message: MessageRow) => {
       const list = map.get(key);
       if (list) list.push(message);
       else map.set(key, [message]);
     };
-    for (const message of messageRows) {
+    for (const message of indexRows as MessageIndexRow[]) {
       if (message.leadId) addTo(rowsByLeadId, message.leadId, message);
       const suffix = normalizePhone(message.phone ?? "").slice(-8);
       if (suffix.length === 8) addTo(rowsByPhoneSuffix, suffix, message);
@@ -378,12 +417,14 @@ export default async function ConversationsPage({
     for (const lead of leads) {
       const leadSuffix = normalizePhone(lead.telefone ?? "").slice(-8);
       const candidates = new Set([...(rowsByLeadId.get(lead.id) ?? []), ...(leadSuffix.length === 8 ? rowsByPhoneSuffix.get(leadSuffix) ?? [] : [])]);
-      const rawMatched = [...candidates]
-        .filter(
-          (msg) =>
-            msg.leadId === lead.id ||
-            (Boolean(msg.phone && lead.telefone) && samePhone(msg.phone, lead.telefone)),
-        )
+      const matchedIndex = [...candidates].filter(
+        (msg) =>
+          msg.leadId === lead.id ||
+          (Boolean(msg.phone && lead.telefone) && samePhone(msg.phone ?? "", lead.telefone)),
+      );
+      statsByLead.set(lead.id, summarizeIndexRows(matchedIndex));
+      const rawMatched = matchedIndex
+        .flatMap((row) => fullMessageById.get(row.id) ?? [])
         .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
 
       const seenIds = new Set<string>();
@@ -542,6 +583,18 @@ export default async function ConversationsPage({
       );
     });
 
+    // Conversas sem lead: total e mensagem recebida vêm do índice; o texto, só da prévia carregada.
+    const unlinkedStatsByPhone = new Map<string, ReturnType<typeof summarizeIndexRows>>();
+    {
+      const unlinkedIndexByPhone = new Map<string, MessageIndexRow[]>();
+      for (const row of indexRows as MessageIndexRow[]) {
+        if (!row.phone || !shouldCreateSyntheticCustomerConversation(row, leadPhones, brokerPhones)) continue;
+        const key = row.phone.replace(/\D/g, "");
+        unlinkedIndexByPhone.set(key, [...(unlinkedIndexByPhone.get(key) ?? []), row]);
+      }
+      for (const [phone, rows] of unlinkedIndexByPhone) unlinkedStatsByPhone.set(phone, summarizeIndexRows(rows));
+    }
+
     const unlinkedByPhone = new Map<string, typeof unlinkedMessages>();
     for (const msg of unlinkedMessages) {
       if (!msg.phone) continue;
@@ -600,6 +653,7 @@ export default async function ConversationsPage({
             : {}),
         })),
         documents: [],
+        ...(unlinkedStatsByPhone.get(phone) ?? {}),
         latestMessage: latest
           ? {
               body: snippet,
@@ -644,6 +698,7 @@ export default async function ConversationsPage({
           return typeof aiNote?.summary === "string" ? aiNote.summary : null;
         })(),
         messages,
+        ...(statsByLead.get(lead.id) ?? {}),
         documents,
         aiConversation,
         latestMessage: latestMessage
@@ -696,6 +751,8 @@ export default async function ConversationsPage({
               }
             : primary.latestMessage,
           aiConversation: primary.aiConversation || secondary.aiConversation,
+          messageCount: Math.max(primary.messageCount ?? 0, secondary.messageCount ?? 0) || undefined,
+          hasIncoming: Boolean(primary.hasIncoming || secondary.hasIncoming),
         });
       }
     }
@@ -718,7 +775,7 @@ export default async function ConversationsPage({
     // "WhatsApp coex": only the conversations that went through a coexistence number.
     if (coexTab) {
       const coexChannelIds = new Set(coexChannels.map((channel) => channel.id));
-      const coexMessages = messageRows.filter((message) => message.communicationChannelId && coexChannelIds.has(message.communicationChannelId));
+      const coexMessages = (indexRows as MessageIndexRow[]).filter((message) => message.communicationChannelId && coexChannelIds.has(message.communicationChannelId));
       const coexLeadIds = new Set(coexMessages.map((message) => message.leadId).filter((id): id is string => Boolean(id)));
       const phoneKey = (phone: string | null | undefined) => String(phone ?? "").replace(/\D/g, "").slice(-8);
       const coexPhones = new Set(coexMessages.map((message) => phoneKey(message.phone)).filter((key) => key.length === 8));
