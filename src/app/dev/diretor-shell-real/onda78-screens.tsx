@@ -25,6 +25,10 @@ import type { TenantOnboarding } from "@/features/onboarding/types/onboarding.ty
 import { MaterialsWorkspace } from "@/features/operator-catalog/components/materials-workspace";
 import type { CarrierOverview, MaterialRow } from "@/features/operator-catalog/queries";
 import type { AreaInfo } from "@/features/operator-catalog/components/labels";
+import { LiteUrlSelect } from "@/components/lite/controls";
+import { UnitOverviewView } from "@/features/team-management-ui/unit-overview";
+import { TeamPageViewComponent } from "@/features/team-management-ui/team-page-view";
+import { gestaoOverviewFixture, gestaoTeamFixture } from "./gestao-fixtures";
 
 const SYNC: MetaSyncInfo = { tone: "success", label: "Concluída", detail: "há 1 h · 342 itens", title: "Última sincronização: 25/10/2026, 10:40", errorDetails: null };
 
@@ -236,6 +240,33 @@ export function MateriaisShellScreen() {
           carrierOptions={CARRIERS.map((carrier) => ({ id: carrier.id, name: carrier.name }))}
           semanticSearch
         />
+      </main>
+    </>
+  );
+}
+
+// /gestao do diretor (unidade escolhida no seletor) e a equipe aberta a partir dela.
+export function GestaoShellScreen() {
+  return (
+    <>
+      <DashboardHeader breadcrumb="Gestão de equipe" title="Gestão da unidade" />
+      <main className={litePage.stack}>
+        <div className={litePage.toolbar}>
+          <LiteUrlSelect className={litePage.select} label="Unidade" param="unidade" value="branch-centro" defaultValue="branch-centro" options={[{ value: "branch-centro", label: "Centro" }, { value: "branch-barra", label: "Barra da Tijuca" }, { value: "branch-ni", label: "Niterói 1" }]} />
+        </div>
+        <UnitOverviewView overview={gestaoOverviewFixture()} embedded />
+      </main>
+    </>
+  );
+}
+
+export function GestaoEquipeShellScreen() {
+  const view = gestaoTeamFixture();
+  return (
+    <>
+      <DashboardHeader breadcrumb="Gestão de equipe" title={view.teamName} />
+      <main className={litePage.stack}>
+        <TeamPageViewComponent view={view} embedded />
       </main>
     </>
   );

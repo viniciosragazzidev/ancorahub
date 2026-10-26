@@ -10,8 +10,6 @@
   "/equipe/plantao",
   "/equipe/repassar",
   "/equipe/transferencia",
-  "/gestao",
-  "/gestao/equipes/[supervisorId]",
   "/internal/design-system",
   "/internal/design-system/motion",
   "/jornada",

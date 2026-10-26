@@ -70,14 +70,15 @@ function ManagerBlockView({ block }: { block: ManagerBlock }) {
   );
 }
 
-export function TeamPageViewComponent({ view }: { view: TeamPageView }) {
+/** `embedded`: dentro da moldura do diretor (container da moldura, o nome da equipe vira h2); o gestor e o supervisor Lite seguem iguais. */
+export function TeamPageViewComponent({ view, embedded = false }: { view: TeamPageView; embedded?: boolean }) {
   const maxLeads = Math.max(1, ...view.load.brokers.map((broker) => broker.activeLeads));
   return (
-    <div className={`arc-venancor ${styles.page}`}>
-      <div className={styles.inner}>
+    <div className={embedded ? styles.embedded : `arc-venancor ${styles.page}`}>
+      <div className={embedded ? styles.embeddedInner : styles.inner}>
         <section className={`${styles.card} ${styles.header}`} aria-labelledby="team-title">
           <div className={styles.identity}>
-            <h1 id="team-title">{view.teamName}</h1>
+            {embedded ? <h2 id="team-title" className={styles.embeddedTitle}>{view.teamName}</h2> : <h1 id="team-title">{view.teamName}</h1>}
             <p className={styles.muted}>{view.supervisorName} · {view.brokersCount} {view.brokersCount === 1 ? "corretor" : "corretores"}</p>
             {view.teamSummary ? <p className={styles.summary}>{view.teamSummary}</p> : null}
           </div>

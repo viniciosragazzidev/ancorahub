@@ -12,13 +12,19 @@ import { TeamPageViewComponent } from "@/features/team-management-ui/team-page-v
 import { TeamExtrasSection } from "@/features/team-management-extras/team-extras-section";
 import { UnitOverviewView } from "@/features/team-management-ui/unit-overview";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { DashboardHeader } from "@/components/dashboard-header";
+import { LiteUrlSelect } from "@/components/lite/controls";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { resolveDirectorUnit } from "@/features/team-management-ui/director-unit-context";
 
 export const dynamic = "force-dynamic";
 
-export default async function GestaoPage() {
+export default async function GestaoPage({ searchParams }: { searchParams: Promise<{ unidade?: string }> }) {
   const context = await getRequiredTenantContext();
   const audience = await getLiteAudience(context);
-  const decision = resolveGestaoAccess({ flagOn: await isTeamManagementEnabled(), role: context.role, audience });
+  const directorLite = context.role === "director" && await isDirectorLitePageOnServer(context, "/gestao");
+  const decision = resolveGestaoAccess({ flagOn: await isTeamManagementEnabled(), role: context.role, audience, directorLite });
   if (decision === "off") notFound();
   if (decision === "supervisor") {
     // Supervisor Lite: a própria equipe, a mesma tela do perfil da equipe (G2).
@@ -33,16 +39,21 @@ export default async function GestaoPage() {
   }
   if (decision === "denied") redirect("/access-denied");
 
+  // Diretor: escolhe a unidade (?unidade=, validada contra a empresa) e vê a mesma gestão do gestor dela.
+  const directorUnit = decision === "director" ? await resolveDirectorUnit(context, (await searchParams).unidade) : null;
+  if (decision === "director" && !directorUnit) redirect("/equipe");
+  const scopeContext = directorUnit?.unitContext ?? context;
+
   const now = new Date();
   const [identity, teamMetrics] = await Promise.all([
-    getManagerUnitIdentity(context),
-    getTeamMetrics(context, { window: 7, now }),
+    getManagerUnitIdentity(scopeContext),
+    getTeamMetrics(scopeContext, { window: 7, now }),
   ]);
   const overview = buildUnitOverview({
     ...identity,
     now,
     weeklySummary: teamMetrics.unit
-      ? (await getWeeklyTeamSummary({ context, window: teamMetrics.unit.current, brokers: teamMetrics.brokers, now })).summary
+      ? (await getWeeklyTeamSummary({ context: scopeContext, window: teamMetrics.unit.current, brokers: teamMetrics.brokers, now })).summary
       : null,
     metrics: {
       unit: teamMetrics.unit,
@@ -53,6 +64,22 @@ export default async function GestaoPage() {
       unassignedTeam: teamMetrics.teams.find((team) => team.supervisorId === null) ?? null,
     },
   });
+
+  if (directorUnit) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Gestão de equipe" title="Gestão da unidade" />
+        <main className={litePage.stack}>
+          {directorUnit.branches.length > 1 ? (
+            <div className={litePage.toolbar}>
+              <LiteUrlSelect className={litePage.select} label="Unidade" param="unidade" value={directorUnit.branchId} defaultValue={directorUnit.branches[0]!.id} options={directorUnit.branches.map((branch) => ({ value: branch.id, label: branch.name }))} />
+            </div>
+          ) : null}
+          <UnitOverviewView overview={overview} embedded />
+        </main>
+      </>
+    );
+  }
 
   return <UnitOverviewView overview={overview} />;
 }

@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import {
   AssinaturaShellScreen,
   BoasVindasShellScreen,
+  GestaoEquipeShellScreen,
+  GestaoShellScreen,
   CampanhaShellScreen,
   CampanhasShellScreen,
   GuiaShellScreen,
@@ -26,4 +28,6 @@ export const ONDA78_SCREENS: Record<string, { path: string; render: () => ReactN
   guia: { path: "/guia", render: () => <GuiaShellScreen /> },
   webhook: { path: "/guia/webhook", render: () => <WebhookShellScreen /> },
   "boas-vindas": { path: "/welcome", render: () => <BoasVindasShellScreen /> },
+  gestao: { path: "/gestao", render: () => <GestaoShellScreen /> },
+  "gestao-equipe": { path: "/gestao/equipes/sup-ana", render: () => <GestaoEquipeShellScreen /> },
 };

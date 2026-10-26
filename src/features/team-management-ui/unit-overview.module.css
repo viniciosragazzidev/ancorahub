@@ -91,3 +91,14 @@
 @media (prefers-reduced-motion: reduce) {
   .card { animation: none; }
 }
+
+/* Dentro da moldura do diretor: o container e o respiro vêm da moldura (contrato de espaçamento). */
+.embedded {
+  color: var(--foreground);
+}
+
+.embeddedInner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}

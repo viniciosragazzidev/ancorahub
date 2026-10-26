@@ -108,7 +108,8 @@ function SupervisorTable({ rows }: { rows: SupervisorRow[] }) {
   );
 }
 
-export function UnitOverviewView({ overview }: { overview: UnitOverview }) {
+/** `embedded`: dentro da moldura do diretor (o título vem do topo do app e o container da moldura); o gestor Lite segue igual. */
+export function UnitOverviewView({ overview, embedded = false }: { overview: UnitOverview; embedded?: boolean }) {
   const teams = sortTeamsByHealth(overview.teams);
   const baseException = exceptionPhrase(overview.teamsNeedingAttention, overview.metricsAvailable);
   const exception = overview.metricsAvailable && overview.unassignedNeedsAttention
@@ -117,10 +118,10 @@ export function UnitOverviewView({ overview }: { overview: UnitOverview }) {
       : "O grupo Sem equipe precisa de atenção."
     : baseException;
   return (
-    <div className={`arc-venancor ${styles.page}`}>
-      <div className={styles.inner}>
+    <div className={embedded ? styles.embedded : `arc-venancor ${styles.page}`}>
+      <div className={embedded ? styles.embeddedInner : styles.inner}>
         <header className={styles.heading}>
-          <h1>Gestão da unidade</h1>
+          {embedded ? null : <h1>Gestão da unidade</h1>}
           <p className={styles.exception} data-attention={overview.teamsNeedingAttention > 0 || overview.unassignedNeedsAttention}>
             {exception}
           </p>
