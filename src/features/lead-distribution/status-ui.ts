@@ -27,6 +27,12 @@ const LEAD_DISTRIBUTION: Record<LeadDistributionStatus, StatusUi> = {
   distribution_failed: { tone: "destructive", label: "Falha na distribuição" },
 };
 
+/**
+ * A lead the AI is still qualifying: shown on the plantão list so it does not vanish (26/10), but the
+ * distribution only hands it out when the qualification ends or times out.
+ */
+export const QUALIFYING_LEAD_DISTRIBUTION_UI: StatusUi = { tone: "info", label: "Em qualificação · aguardando" };
+
 export function leadDistributionStatusUi(status: string): StatusUi {
   return LEAD_DISTRIBUTION[status as LeadDistributionStatus] ?? { tone: "secondary", label: "Desconhecido" };
 }

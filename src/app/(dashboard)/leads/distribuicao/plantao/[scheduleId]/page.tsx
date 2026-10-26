@@ -18,7 +18,7 @@ import { firstValidShift, isSingleOccurrencePlantao } from "@/features/lead-dist
 import { getDutyWindowOnDate, getRelevantDutyWindow, isDutyWindowActive, listCompletedDutyWindows, parseDutyLeadsSince, type DutyLeadsSinceOption } from "@/features/lead-distribution/duty-presence-domain";
 import { getFeatureFlag, getSystemSetting, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { getDutyCoverage } from "@/features/lead-distribution/domain";
-import { leadDistributionStatusUi } from "@/features/lead-distribution/status-ui";
+import { leadDistributionStatusUi, QUALIFYING_LEAD_DISTRIBUTION_UI } from "@/features/lead-distribution/status-ui";
 import { getReturnedUnacceptedLeadIds } from "@/features/lead-distribution/returned-unaccepted";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasCapability } from "@/shared/auth/permissions";
@@ -244,7 +244,12 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   const isMetaBlocked = (lead: (typeof allLeads)[number]) => lead.qualificationStatus === "meta_blocked";
   const isQualifying = (lead: (typeof allLeads)[number]) => lead.qualificationStatus === "qualifying" || lead.qualificationState === "IN_PROGRESS";
   const isWaiting = (lead: (typeof allLeads)[number]) => !isAssigned(lead) && !isDisqualified(lead) && !isMetaBlocked(lead) && !isQualifying(lead);
-  const allWaitingLeads = allLeads.filter(isWaiting);
+  // Still being qualified by the AI: listed with a notice so it does not vanish (26/10), after the
+  // ones that can be handed out. The distribution itself still holds it (service.ts).
+  const isQualifyingUnassigned = (lead: (typeof allLeads)[number]) => !isAssigned(lead) && !isDisqualified(lead) && !isMetaBlocked(lead) && isQualifying(lead);
+  const isListedWaiting = (lead: (typeof allLeads)[number]) => isWaiting(lead) || isQualifyingUnassigned(lead);
+  const distributionUiOf = (lead: (typeof allLeads)[number]) => isQualifyingUnassigned(lead) ? QUALIFYING_LEAD_DISTRIBUTION_UI : leadDistributionStatusUi(lead.distributionStatus);
+  const allWaitingLeads = allLeads.filter(isListedWaiting);
   const queueTabs = getDutyLeadQueueTabs(
     [...linkedQueues].sort((first, second) => first.name.localeCompare(second.name, "pt-BR")),
     allWaitingLeads,
@@ -256,7 +261,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   const queueScopedLeads = selectDutyLeadsForQueue(allLeads, selectedQueueId, filter === "distribuidos");
   // The channel tabs count the situation on screen, so a lead handed out
   // leaves "Aguardando · WhatsApp" and joins "Distribuídos · WhatsApp".
-  const inSituation = queueScopedLeads.filter(filter === "distribuidos" ? isDistributed : isWaiting);
+  const inSituation = queueScopedLeads.filter(filter === "distribuidos" ? isDistributed : isListedWaiting);
   const whatsappInSituation = inSituation.filter((lead) => whatsappEntryOf(lead)).length;
   const channel = canal === "whatsapp" ? "whatsapp" : canal === "formulario" ? "formulario" : "todos";
   const channelLeads = channel === "todos" ? allLeads : allLeads.filter((lead) => (channel === "whatsapp") === Boolean(whatsappEntryOf(lead)));
@@ -268,7 +273,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   ] as const;
   // The plantão's leads: waiting for a broker plus handed out in this occurrence
   // (not disqualified/blocked/qualifying ones, nor the other plantão's).
-  const plantaoLeads = allLeads.filter((lead) => isWaiting(lead) || isDistributed(lead));
+  const plantaoLeads = allLeads.filter((lead) => isListedWaiting(lead) || isDistributed(lead));
   const whatsappLeadCount = plantaoLeads.filter((lead) => whatsappEntryOf(lead)).length;
   const leadsHref = (next: { situacao?: string; canal?: string; fila?: string; desde?: string }) => {
     const query = new URLSearchParams();
@@ -285,14 +290,17 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   };
 
   const distributedCount = channelLeads.filter(isDistributed).length;
-  const waitingLeads = leads.filter(isWaiting);
-  const waitingCount = selectDutyLeadsForQueue(channelLeads.filter(isWaiting), selectedQueueId, false).length;
+  const waitingLeads = leads.filter(isListedWaiting);
+  const waitingCount = selectDutyLeadsForQueue(channelLeads.filter(isListedWaiting), selectedQueueId, false).length;
   // Distributed rows read as the order leads were handed out (earliest
   // assignment first); the waiting list reads as the distribution order:
   // hot, then warm (or no temperature), then cold, oldest first in each.
   const visibleLeads = filter === "distribuidos"
     ? sortByAssignmentTime(leads.filter(isDistributed))
-    : sortByTemperaturePriority([...waitingLeads].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()));
+    : (() => {
+      const ordered = sortByTemperaturePriority([...waitingLeads].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()));
+      return [...ordered.filter((lead) => !isQualifyingUnassigned(lead)), ...ordered.filter(isQualifyingUnassigned)];
+    })();
   // Leads each broker received in this occurrence (not in the other plantão of the same queues).
   const shiftCountsByBroker = countBrokerLeadsByShift(allLeads.filter(isDistributed), schedule.shiftSplitAt);
   const brokerShiftCounts = (brokerId: string) => shiftCountsByBroker.get(brokerId) ?? { manha: 0, tarde: 0 };
@@ -308,7 +316,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     key: group.key,
     label: group.label,
     leads: group.leads.map((lead) => {
-      const distribution = leadDistributionStatusUi(lead.distributionStatus);
+      const distribution = distributionUiOf(lead);
       const whatsappEntry = whatsappEntryOf(lead);
       const drawerLead: LeadWorkspaceItem = {
         id: lead.id,
@@ -549,7 +557,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                           </TableRow>
                         ) : null}
                         {group.leads.map((lead) => {
-                          const distribution = leadDistributionStatusUi(lead.distributionStatus);
+                          const distribution = distributionUiOf(lead);
                           const whatsappEntry = whatsappEntryOf(lead);
                           const drawerLead: LeadWorkspaceItem = {
                             id: lead.id,
