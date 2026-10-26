@@ -2,6 +2,11 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 26/10/2026 - Um pool de banco por processo (fim das quedas por EMAXCONNSESSION)
+
+- O módulo do banco entrava em mais de um bundle e cada cópia abria o próprio pool: um container chegou a 18 conexões no pooler de sessão (limite de 30), e o deploy com dois containers derrubava todas as rotas.
+- Pools e escopo de jobs passam a ser um por processo (`globalThis`), no máximo 4 + 3 conexões por container.
+- Registro: `docs/implementations/completed/2026-10-26-db-pool-por-processo.md`.
 ## 26/10/2026 - Visão da operação do Diretor no estilo do Desempenho Lite
 
 - A aba "Visão da operação" do `/dashboard` (Diretor Lite) troca a tabela por cartões com ícone (entraram, qualificados, em qualificação, frios), anel da taxa de qualificação, funil (entraram, qualificados, quentes) com requalificação, uma frase por regra fixa, leads por fila com barra, plantões agora e WhatsApp dos corretores.

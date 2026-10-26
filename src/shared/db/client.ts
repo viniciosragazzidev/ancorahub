@@ -8,8 +8,17 @@ import { isInBackgroundPool } from "./background-pool";
 
 type Database = ReturnType<typeof drizzlePostgres<typeof schema>>;
 
-let database: Database | undefined;
-let backgroundDatabase: Database | undefined;
+/**
+ * Os pools moram no processo, não no módulo (26/10). O build de produção inclui este módulo em
+ * mais de um bundle (páginas, rotas de API, jobs); com `let` no módulo cada cópia abria o próprio
+ * pool de 4 + 3, e um só container chegou a 18 conexões no pooler de sessão (limite de 30 para o
+ * projeto). Com o deploy subindo um segundo container, o pooler estourava (EMAXCONNSESSION) e
+ * todas as rotas caíam. A chave global garante no máximo um pool de páginas e um de jobs por processo.
+ */
+type DatabasePools = { database?: Database; backgroundDatabase?: Database };
+const POOLS_KEY = Symbol.for("ancorahub.db.pools");
+const processPools = globalThis as typeof globalThis & { [POOLS_KEY]?: DatabasePools };
+const pools: DatabasePools = (processPools[POOLS_KEY] ??= {});
 
 /** Supavisor transaction mode (port 6543): many client sockets share few server connections. */
 export function isTransactionPooler(databaseUrl = process.env.SUPABASE_DB_URL?.trim() || process.env.DATABASE_URL?.trim() || "") {
@@ -157,13 +166,13 @@ export function getDatabase(): Database {
   const databaseUrl = getDatabaseUrl();
   // Jobs and webhooks (backgroundRoute) get their own pool; pages keep theirs.
   if (isInBackgroundPool() && usesPostgresJsDriver(databaseUrl)) {
-    backgroundDatabase ??= createPostgresDatabase(databaseUrl, backgroundConnectionLimit());
-    return backgroundDatabase;
+    pools.backgroundDatabase ??= createPostgresDatabase(databaseUrl, backgroundConnectionLimit());
+    return pools.backgroundDatabase;
   }
   if (usesPostgresJsDriver(databaseUrl)) {
-    database ??= createPostgresDatabase(databaseUrl);
+    pools.database ??= createPostgresDatabase(databaseUrl);
   } else {
-    database ??= drizzle(
+    pools.database ??= drizzle(
       new Pool({
         connectionString: databaseUrl,
         max: connectionLimit(),
@@ -174,7 +183,7 @@ export function getDatabase(): Database {
       { schema },
     ) as unknown as Database;
   }
-  return database;
+  return pools.database;
 }
 
 export { schema };
