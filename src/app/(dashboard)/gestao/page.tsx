@@ -42,8 +42,59 @@ export default async function GestaoPage({ searchParams }: { searchParams: Promi
   // Diretor: escolhe a unidade (?unidade=, validada contra a empresa) e vê a mesma gestão do gestor dela.
   const directorUnit = decision === "director" ? await resolveDirectorUnit(context, (await searchParams).unidade) : null;
   if (decision === "director" && !directorUnit) redirect("/equipe");
-  const scopeContext = directorUnit?.unitContext ?? context;
+  if (directorUnit) {
+    // Diretor: a carga da unidade é a mesma do gestor; se falhar, a tela mostra o motivo no lugar do erro genérico
+    // (o diretor é dono da empresa) e o log do servidor guarda o erro completo.
+    try {
+      return await renderDirectorUnit(directorUnit);
+    } catch (error) {
+      if (isNextControlFlow(error)) throw error;
+      console.error("[gestao:diretor] falha ao carregar a unidade", { branchId: directorUnit.branchId, error });
+      return (
+        <>
+          <DashboardHeader breadcrumb="Gestão de equipe" title="Gestão da unidade" />
+          <main className={litePage.stack}>
+            <section className={litePage.empty} role="alert">
+              <h2 className={litePage.emptyTitle}>Não foi possível carregar a gestão desta unidade</h2>
+              <p className={litePage.emptyText}>{error instanceof Error ? error.message : String(error)}</p>
+            </section>
+          </main>
+        </>
+      );
+    }
+  }
 
+  const now = new Date();
+  const [identity, teamMetrics] = await Promise.all([
+    getManagerUnitIdentity(context),
+    getTeamMetrics(context, { window: 7, now }),
+  ]);
+  const overview = buildUnitOverview({
+    ...identity,
+    now,
+    weeklySummary: teamMetrics.unit
+      ? (await getWeeklyTeamSummary({ context, window: teamMetrics.unit.current, brokers: teamMetrics.brokers, now })).summary
+      : null,
+    metrics: {
+      unit: teamMetrics.unit,
+      unitConversionRate: teamMetrics.unitConversionRate,
+      teamsBySupervisorId: new Map(teamMetrics.teams
+        .filter((team) => team.supervisorId !== null)
+        .map((team) => [team.supervisorId!, team])),
+      unassignedTeam: teamMetrics.teams.find((team) => team.supervisorId === null) ?? null,
+    },
+  });
+
+  return <UnitOverviewView overview={overview} />;
+}
+
+function isNextControlFlow(error: unknown) {
+  const digest = (error as { digest?: unknown } | null)?.digest;
+  return typeof digest === "string" && (digest.startsWith("NEXT_REDIRECT") || digest.startsWith("NEXT_NOT_FOUND") || digest === "DYNAMIC_SERVER_USAGE" || digest.startsWith("NEXT_HTTP_ERROR_FALLBACK"));
+}
+
+async function renderDirectorUnit(directorUnit: NonNullable<Awaited<ReturnType<typeof resolveDirectorUnit>>>) {
+  const scopeContext = directorUnit.unitContext;
   const now = new Date();
   const [identity, teamMetrics] = await Promise.all([
     getManagerUnitIdentity(scopeContext),
@@ -64,9 +115,7 @@ export default async function GestaoPage({ searchParams }: { searchParams: Promi
       unassignedTeam: teamMetrics.teams.find((team) => team.supervisorId === null) ?? null,
     },
   });
-
-  if (directorUnit) {
-    return (
+  return (
       <>
         <DashboardHeader breadcrumb="Gestão de equipe" title="Gestão da unidade" />
         <main className={litePage.stack}>
@@ -78,8 +127,5 @@ export default async function GestaoPage({ searchParams }: { searchParams: Promi
           <UnitOverviewView overview={overview} embedded />
         </main>
       </>
-    );
-  }
-
-  return <UnitOverviewView overview={overview} />;
+  );
 }

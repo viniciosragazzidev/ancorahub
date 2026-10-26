@@ -24,7 +24,24 @@ export default async function GestaoEquipePage({ params }: { params: Promise<{ s
     const branchId = await findSupervisorBranch(context, supervisorId);
     if (!branchId) notFound();
     const unitContext = deriveUnitContext(context, branchId);
-    const page = await loadTeamPage({ context: unitContext, audience: "manager", flagOn, requestedSupervisorId: supervisorId });
+    let page: Awaited<ReturnType<typeof loadTeamPage>>;
+    try {
+      page = await loadTeamPage({ context: unitContext, audience: "manager", flagOn, requestedSupervisorId: supervisorId });
+    } catch (error) {
+      // Mostra o motivo ao diretor no lugar do erro genérico; o log do servidor guarda o erro completo.
+      console.error("[gestao:diretor] falha ao carregar a equipe", { supervisorId, error });
+      return (
+        <>
+          <DashboardHeader breadcrumb="Gestão de equipe" title="Equipe" />
+          <main className={litePage.stack}>
+            <section className={litePage.empty} role="alert">
+              <h2 className={litePage.emptyTitle}>Não foi possível carregar esta equipe</h2>
+              <p className={litePage.emptyText}>{error instanceof Error ? error.message : String(error)}</p>
+            </section>
+          </main>
+        </>
+      );
+    }
     if (page.access !== "render" || !page.view) notFound();
     return (
       <>
