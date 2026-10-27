@@ -33,6 +33,7 @@ import { BrokerDailySummaryPanel } from "./_components/broker-daily-summary-pane
 import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-summary-service";
 import { DutyOperationsWorkspace } from "./plantao/_components/duty-operations-workspace";
 import { getDutyRosterSnapshot } from "@/features/lead-distribution/roster-queries";
+import { getDutyQueueOrderPreviews } from "@/features/lead-distribution/duty-queue-order-queries";
 import { BrokerAcceptanceSlaPanel } from "./_components/broker-acceptance-sla-panel";
 import { resolveDistributionView } from "@/features/lead-distribution/distribution-view-access";
 import { getHoldDisqualifiedLeads } from "@/features/lead-distribution/disqualified-routing-settings";
@@ -196,6 +197,7 @@ export default async function LeadDistributionPage({
     routingRules,
     brokerSummary,
     dutyRoster,
+    dutyQueueOrders,
     tenantSlaSettings,
     holdDisqualifiedLeads,
     dddRoutingSettings,
@@ -522,6 +524,7 @@ export default async function LeadDistributionPage({
       branchId: context.role === "manager" && context.branchId ? context.branchId : undefined,
     }),
     getDutyRosterSnapshot(context),
+    view === "plantao" ? getDutyQueueOrderPreviews(context) : Promise.resolve([]),
     db
       .select({
         slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes,
@@ -730,6 +733,7 @@ export default async function LeadDistributionPage({
             <section className={directorDistributionStyles.stack} aria-label="Gestão de plantões">
               <DutyOperationsWorkspace
                 snapshot={dutyRoster}
+                queueOrders={dutyQueueOrders}
                 monthlySchedulingEnabled={monthlyDutySchedulingEnabled}
                 canPlanMonthlySchedule={context.role === "director"}
                 initialMonthlyScheduleMonth={view === "plantao" && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.escalaMes ?? "") ? params.escalaMes : null}
@@ -904,6 +908,7 @@ export default async function LeadDistributionPage({
             plantaoContent={
               <DutyOperationsWorkspace
                 snapshot={dutyRoster}
+                queueOrders={dutyQueueOrders}
                 monthlySchedulingEnabled={monthlyDutySchedulingEnabled}
                 canPlanMonthlySchedule={context.role === "director"}
                 initialMonthlyScheduleMonth={view === "plantao" && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.escalaMes ?? "") ? params.escalaMes : null}

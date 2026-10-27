@@ -65,6 +65,8 @@ import { DutyMonthCalendar } from "./duty-month-calendar";
 import { MonthlyDutyPlanner, monthLabel, useMonthlyDutyPlans } from "./monthly-duty-planner";
 import { DutyTypeDialog, DutyTypesSheet, DutyTypeTag, MODALITY_LABEL, typeUnitsLabel } from "./duty-type-ui";
 import { getOperationalMonthKey } from "./duty-schedule-month-groups";
+import { DutyQueueOrderBoard } from "./duty-queue-order-board";
+import type { DutyQueueOrderPreview } from "@/features/lead-distribution/duty-queue-order-queries";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import directorLiteStyles from "./director-duty-operations.module.css";
 
@@ -1241,7 +1243,7 @@ function outsideLabel(schedule: Schedule, reason: "ends_before" | "starts_after"
   return "Não cai neste mês";
 }
 
-export function DutyOperationsWorkspace({ snapshot, queues = [], monthlySchedulingEnabled = false, canPlanMonthlySchedule = false, initialMonthlyScheduleMonth = null }: { snapshot: Snapshot; queues?: QueueOption[]; monthlySchedulingEnabled?: boolean; canPlanMonthlySchedule?: boolean; initialMonthlyScheduleMonth?: string | null }) {
+export function DutyOperationsWorkspace({ snapshot, queues = [], queueOrders = [], monthlySchedulingEnabled = false, canPlanMonthlySchedule = false, initialMonthlyScheduleMonth = null }: { snapshot: Snapshot; queues?: QueueOption[]; queueOrders?: DutyQueueOrderPreview[]; monthlySchedulingEnabled?: boolean; canPlanMonthlySchedule?: boolean; initialMonthlyScheduleMonth?: string | null }) {
   const router = useRouter();
   const directorLite = useDirectorLitePage();
   const currentMonthKey = getOperationalMonthKey();
@@ -1430,6 +1432,8 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
           valueClassName={gapCount ? "text-warning" : undefined}
         />
       </section>
+
+      <DutyQueueOrderBoard previews={queueOrders} canReorder={canPlanMonthlySchedule} />
 
       <Card variant="overview">
         <CardHeader className="gap-0 border-b border-border/50 p-4">

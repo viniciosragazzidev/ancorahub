@@ -31,7 +31,7 @@ export type DutyScheduleProfile = Awaited<ReturnType<typeof getDutyScheduleProfi
  * can be wired to a queue through any of the three), and the leads that
  * actually landed with one of its rostered brokers recently.
  */
-export async function getDutyScheduleProfile(context: TenantContext, scheduleId: string, options: { leadsSince?: DutyLeadsSinceOption } = {}) {
+export async function getDutyScheduleProfile(context: TenantContext, scheduleId: string, options: { leadsSince?: DutyLeadsSinceOption; branchScopeId?: string | null } = {}) {
   const db = getDatabase();
 
   const [schedule] = await db
@@ -73,7 +73,11 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       dutyDate: sql<string | null>`${schema.dutyRosterAssignments.dutyDate}::text`,
       brokerId: schema.dutyRosterAssignments.brokerId,
       brokerName: schema.user.name,
+      createdAt: schema.user.createdAt,
       branchName: schema.branches.name,
+      branchId: options.branchScopeId
+        ? sql<string | null>`coalesce(${schema.dutyRosterAssignments.branchId}, ${schema.tenantMemberships.branchId})`
+        : schema.dutyRosterAssignments.branchId,
       internalCode: schema.brokerProfiles.internalCode,
       phone: schema.brokerProfiles.phone,
       userActive: schema.user.active,
@@ -93,15 +97,27 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     .leftJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.userId, schema.user.id), eq(schema.brokerProfiles.tenantId, context.tenantId)))
     .leftJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.user.id), eq(schema.tenantMemberships.tenantId, context.tenantId)))
     .leftJoin(schema.branches, and(eq(schema.branches.id, schema.tenantMemberships.branchId), eq(schema.branches.tenantId, context.tenantId)))
-    .where(and(eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.scheduleId, scheduleId), eq(schema.dutyRosterAssignments.status, "active")))
+    .where(and(
+      eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+      eq(schema.dutyRosterAssignments.scheduleId, scheduleId),
+      eq(schema.dutyRosterAssignments.status, "active"),
+      options.branchScopeId
+        ? or(
+          eq(schema.dutyRosterAssignments.branchId, options.branchScopeId),
+          and(isNull(schema.dutyRosterAssignments.branchId), eq(schema.tenantMemberships.branchId, options.branchScopeId)),
+        )
+        : undefined,
+    ))
     .orderBy(asc(schema.user.name));
 
   const linkedQueues = await db
     .select({
       id: schema.leadQueues.id,
+      branchId: schema.leadQueues.branchId,
       name: schema.leadQueues.name,
       branchName: schema.branches.name,
       assignmentMode: schema.leadQueues.assignmentMode,
+      assignmentStrategy: schema.leadQueues.assignmentStrategy,
       capacityEnabled: schema.leadQueues.capacityEnabled,
       capacityPerBroker: schema.leadQueues.capacityPerBroker,
       offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes,
@@ -120,6 +136,9 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     .where(and(
       eq(schema.leadQueues.tenantId, context.tenantId),
       isNull(schema.leadQueues.deletedAt),
+      options.branchScopeId
+        ? or(isNull(schema.leadQueues.branchId), eq(schema.leadQueues.branchId, options.branchScopeId))
+        : undefined,
       or(
         eq(schema.leadQueues.exclusiveDutyScheduleId, scheduleId),
         sql`${schema.leadQueues.exclusiveDutyScheduleIds} @> ${JSON.stringify([scheduleId])}::jsonb`,
@@ -224,6 +243,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
       eq(schema.dutyRosterAssignments.status, "active"),
       inArray(schema.dutyRosterAssignments.scheduleId, attributionScheduleIds),
+      options.branchScopeId ? eq(schema.dutyRosterAssignments.branchId, options.branchScopeId) : undefined,
       or(isNull(schema.dutyRosterAssignments.dutyDate), eq(schema.dutyRosterAssignments.dutyDate, occurrenceDate)),
       lte(schema.dutyRosterAssignments.validFrom, occurrenceStart),
       or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, occurrenceStart)),
@@ -319,6 +339,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       .leftJoin(schema.leadQueues, eq(schema.leads.queueId, schema.leadQueues.id))
       .where(and(
         eq(schema.leads.tenantId, context.tenantId),
+        options.branchScopeId ? eq(schema.leads.branchId, options.branchScopeId) : undefined,
         or(
           and(
             queueIds.length ? inArray(schema.leads.queueId, queueIds) : sql`false`,
