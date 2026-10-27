@@ -1742,7 +1742,7 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled }:
       onClick={onClick}
       type="button"
     >
-      <ContactAvatar className="mt-0.5 shrink-0" name={conversation.nome} />
+      <ContactAvatar className="mt-0.5 shrink-0" name={conversation.nome} photoUrl={contactPhotoUrl(conversation)} photoWhenVisible />
       <span className="grid min-w-0 flex-1 gap-1">
         <span className="flex min-w-0 items-center justify-between gap-3">
           <span className="truncate text-sm font-medium">{conversation.nome}</span>
@@ -2081,11 +2081,11 @@ function ProfileTag({ label, tone, value }: { label: string; tone?: "success" | 
   return <div className="min-w-0 rounded-[var(--radius-card)] border border-border bg-muted/25 px-2.5 py-2"><dt className="truncate text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground">{label}</dt><dd className={cn("mt-1 truncate text-xs font-medium", tone === "success" && "text-success", tone === "warning" && "text-warning")}>{value}</dd></div>;
 }
 
-function ContactAvatar({ className, name, photoUrl }: { className?: string; name: string; photoUrl?: string | null }) {
-  return <UserAvatar seed={name} name={name} className={className} photoUrl={photoUrl} />;
+function ContactAvatar({ className, name, photoUrl, photoWhenVisible }: { className?: string; name: string; photoUrl?: string | null; photoWhenVisible?: boolean }) {
+  return <UserAvatar seed={name} name={name} className={className} photoUrl={photoUrl} photoWhenVisible={photoWhenVisible} />;
 }
 
-/** The contact's WhatsApp picture (read through the company number), for the open conversation only. */
+/** The contact's WhatsApp picture (read through the company number); the list asks for it only near the screen. */
 function contactPhotoUrl(conversation: Pick<ConversationItem, "id" | "telefone">) {
   if (!conversation.id.startsWith("unassigned-")) return `/api/contacts/avatar?lead=${encodeURIComponent(conversation.id)}`;
   const digits = conversation.telefone.replace(/\D/g, "");

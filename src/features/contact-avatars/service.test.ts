@@ -12,3 +12,20 @@ describe("contact avatar cache key", () => {
     expect(avatarPhoneKey("123")).toBe("");
   });
 });
+
+describe("new WhatsApp lookups per minute", () => {
+  it("allows 20 per tenant in a minute, then waits for the minute to pass", async () => {
+    const { takeAvatarLookupSlot } = await import("./service");
+    const start = 1_000_000;
+    for (let index = 0; index < 20; index += 1) expect(takeAvatarLookupSlot("tenant-slots", start + index)).toBe(true);
+    expect(takeAvatarLookupSlot("tenant-slots", start + 30_000)).toBe(false);
+    expect(takeAvatarLookupSlot("tenant-slots", start + 60_001)).toBe(true);
+  });
+
+  it("counts each tenant on its own", async () => {
+    const { takeAvatarLookupSlot } = await import("./service");
+    for (let index = 0; index < 20; index += 1) takeAvatarLookupSlot("tenant-full", 5_000);
+    expect(takeAvatarLookupSlot("tenant-full", 5_001)).toBe(false);
+    expect(takeAvatarLookupSlot("tenant-other", 5_001)).toBe(true);
+  });
+});
