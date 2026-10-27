@@ -57,11 +57,11 @@ export function withJobHeartbeat<Args extends unknown[]>(job: JobKey, handler: (
     try {
       const response = await handler(...args);
       if (response.status !== 401 && response.status !== 403) {
-        await recordJobHeartbeat(job, response.status >= 500 ? "erro" : "ok", Date.now() - startedAt);
+        void recordJobHeartbeat(job, response.status >= 500 ? "erro" : "ok", Date.now() - startedAt);
       }
       return response;
     } catch (error) {
-      await recordJobHeartbeat(job, "erro", Date.now() - startedAt);
+      void recordJobHeartbeat(job, "erro", Date.now() - startedAt);
       throw error;
     }
   };

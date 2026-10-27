@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const executed = vi.hoisted(() => ({ calls: [] as unknown[], fail: false }));
+const executed = vi.hoisted(() => ({ calls: [] as unknown[], fail: false, pending: null as Promise<void> | null }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/shared/db", () => ({
@@ -8,6 +8,7 @@ vi.mock("@/shared/db", () => ({
     execute: async (query: unknown) => {
       if (executed.fail) throw new Error("db down");
       executed.calls.push(query);
+      if (executed.pending) await executed.pending;
       return [];
     },
   }),
@@ -18,6 +19,7 @@ import { withJobHeartbeat } from "./heartbeat";
 beforeEach(() => {
   executed.calls = [];
   executed.fail = false;
+  executed.pending = null;
 });
 
 describe("withJobHeartbeat", () => {
@@ -26,6 +28,22 @@ describe("withJobHeartbeat", () => {
     const route = withJobHeartbeat("distribution", async () => response);
     expect(await route()).toBe(response);
     expect(executed.calls).toHaveLength(1);
+  });
+
+  it("devolve a resposta sem esperar o upsert do heartbeat", async () => {
+    let finishWrite!: () => void;
+    executed.pending = new Promise<void>((resolve) => { finishWrite = resolve; });
+    const response = new Response("{}", { status: 200 });
+    const route = withJobHeartbeat("distribution", async () => response);
+    const pendingResponse = route();
+    const result = await Promise.race([
+      pendingResponse,
+      new Promise<Response | null>((resolve) => setTimeout(() => resolve(null), 30)),
+    ]);
+    expect(result).toBe(response);
+    expect(executed.calls).toHaveLength(1);
+    finishWrite();
+    await Promise.resolve();
   });
 
   it("pedido sem a chave do cron não é rodada", async () => {
