@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { startAiQualificationForLead } from "@/features/ai-qualification/service";
 import { flowEffectHandlers } from "@/features/attendance-flows/handlers";
@@ -110,6 +110,8 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
 
   const normalizedName = normalizeLeadName(data.nome);
   const normalizedPhone = normalizeLeadPhone(data.telefone);
+  // The payload has at least 10 digits; samePhone matches on the last 8 at least.
+  const phoneKey = normalizedPhone.replace(/\D/g, "").slice(-8);
   const normalizedEmail = normalizeLeadEmail(data.email);
   const qualificationEngineEnabled = await getSystemSetting("feature_qualification_engine_enabled").then((value) => value === "true").catch(() => false);
   const bypassPlantao = input.bypassPlantao ?? (await getSystemSetting(`feature_${input.leadSource?.channel ?? "webhook"}_bypass_plantao`).then((v) => v === "true").catch(() => false));
@@ -134,6 +136,10 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
       if (existing?.payloadHash === payloadHash && existing.leadId) return { duplicate: true as const, leadId: existing.leadId };
       return { conflict: true as const };
     }
+    // Meta delivers each message of a contact on its own: two arriving together
+    // both read "no lead" and each created one. This phone's turn in the tenant
+    // lasts until the transaction ends, so the second one finds the first lead.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${tenantId}), hashtext(${phoneKey}))`);
     const existingLeads = await tx
       .select({
         id: schema.leads.id, status: schema.leads.status, telefone: schema.leads.telefone, sourceMetadata: schema.leads.sourceMetadata,
@@ -143,7 +149,11 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
         metaFormId: schema.leads.metaFormId, metaPageId: schema.leads.metaPageId, capturedAt: schema.leads.capturedAt,
       })
       .from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt)));
+      // Only this phone's candidates (same last 8 digits), not every lead of the tenant.
+      .where(and(
+        eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt),
+        sql`right(regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g'), 8) = ${phoneKey}`,
+      ));
 
     const existingLead = existingLeads.find((l) => l.telefone && samePhone(l.telefone, normalizedPhone));
 
