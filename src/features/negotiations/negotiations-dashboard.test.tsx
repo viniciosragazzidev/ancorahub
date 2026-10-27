@@ -29,6 +29,8 @@ describe("NegotiationsDashboard", () => {
     expect(screen.getByRole("heading", { name: "Negociações" })).toBeTruthy();
     expect(container.querySelector('.arc-venancor[data-skin="diretor"]')).toBeTruthy();
     expect(screen.getByRole("navigation", { name: "Visões de negociações" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Negociações agora" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Sem conversa no CRM/ })).toBeTruthy();
     expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(20);
     const firstRow = container.querySelector('[data-lite="table"] tbody tr') as HTMLElement;
     expect(within(firstRow).getByText("Aguardando resposta")).toBeTruthy();
@@ -36,6 +38,24 @@ describe("NegotiationsDashboard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
     await waitFor(() => expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(10));
+  });
+
+  it("filtra a lista pelas etapas do resumo e mostra o número que entrou hoje", () => {
+    const data = createNegotiationsFixture("director");
+    const now = new Date(data.generatedAt);
+    let advancedSeen = 0;
+    data.leads = data.leads.map((lead) => {
+      if (lead.level !== "advanced") return lead;
+      advancedSeen += 1;
+      return { ...lead, stageEnteredAt: advancedSeen <= 2 ? "2026-10-26T15:00:00.000Z" : "2026-10-25T15:00:00.000Z" };
+    });
+    const { container } = render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={now} />);
+
+    const advanced = screen.getByRole("button", { name: /Negociação avançada/ });
+    expect(advanced.textContent).toContain("2 entraram na etapa atual hoje");
+    fireEvent.click(advanced);
+    expect(advanced.getAttribute("aria-pressed")).toBe("true");
+    expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(data.counts.advanced);
   });
 
   it("filtra a lista pela busca e abre a aba de estatísticas", () => {

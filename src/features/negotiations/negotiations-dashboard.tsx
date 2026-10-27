@@ -17,8 +17,9 @@ import { intentLabel } from "@/features/conversation-intelligence/components/rad
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import type { NegotiationLevel } from "./negotiation-model";
 import { getNegotiationTimelineAction } from "./actions";
-import { createNegotiationLeadColumns, formatNegotiationMetric, KPI_ITEMS, LEVEL_LABELS, NegotiationStatsView } from "./negotiations-data-views";
+import { createNegotiationLeadColumns, formatNegotiationMetric, LEVEL_LABELS, NegotiationStatsView } from "./negotiations-data-views";
 import type { NegotiationLead, NegotiationTimelineEvent, NegotiationsDashboardData } from "./queries";
+import { NegotiationStageSummary } from "./negotiation-stage-summary";
 import styles from "./negotiations.module.css";
 
 type Filter = "all" | NegotiationLevel | "customers_waiting";
@@ -134,18 +135,12 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
             <NegotiationStatsView brokerStats={data.brokerStats} dailyStats={data.dailyStats} aiHealth={data.aiHealth} />
           ) : (
             <>
-              <section className={styles.kpis} aria-label="Filtrar por prioridade">
-                {KPI_ITEMS.map(({ id, label, icon: Icon }) => {
-                  const value = id === "customers_waiting" ? data.counts.customers_waiting : data.counts[id];
-                  const active = activeFilter === id;
-                  return (
-                    <button key={id} type="button" className={styles.kpi} data-active={active ? "true" : undefined} aria-pressed={active} onClick={() => setActiveFilter(active ? "all" : id)}>
-                      <span className={styles.kpiLabel}><Icon aria-hidden="true" size={16} /> {label}</span>
-                      <span className={styles.kpiValue}>{formatNegotiationMetric(value)}</span>
-                    </button>
-                  );
-                })}
-              </section>
+              <NegotiationStageSummary
+                data={data}
+                generatedAt={generatedAt}
+                activeFilter={activeFilter}
+                onFilter={(filter) => setActiveFilter(activeFilter === filter ? "all" : filter)}
+              />
 
               <section className={styles.list} aria-label="Lista de negociações">
                 <div className={styles.toolbar}>

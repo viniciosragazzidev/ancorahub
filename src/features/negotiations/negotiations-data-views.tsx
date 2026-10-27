@@ -1,7 +1,5 @@
 "use client";
 
-import { FileCheck2, MessageCircle, TrendingUp, UsersRound } from "lucide-react";
-
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import { stageLabel } from "@/features/conversation-intelligence/components/radar-model";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
@@ -16,15 +14,6 @@ const LEVEL_LABELS: Record<NegotiationLevel, string> = {
   cooling: "Esfriando",
   no_crm_conversation: "Sem conversa no CRM",
 };
-
-const KPI_ITEMS: Array<{ id: NegotiationLevel | "customers_waiting"; label: string; icon: typeof TrendingUp }> = [
-  { id: "closing", label: "Fechamento", icon: TrendingUp },
-  { id: "advanced", label: "Avançada", icon: MessageCircle },
-  { id: "in_conversation", label: "Em conversa", icon: UsersRound },
-  { id: "cooling", label: "Esfriando", icon: FileCheck2 },
-  { id: "no_crm_conversation", label: "Sem conversa no CRM", icon: FileCheck2 },
-  { id: "customers_waiting", label: "Aguardando resposta", icon: UsersRound },
-];
 
 function statusLabel(status: string) {
   return LEAD_STATUS_LABELS[status] ?? status;
@@ -137,4 +126,4 @@ export function NegotiationStatsView({ brokerStats, dailyStats, aiHealth }: { br
   );
 }
 
-export { KPI_ITEMS, LEVEL_LABELS };
+export { LEVEL_LABELS };

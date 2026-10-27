@@ -1864,3 +1864,7 @@ gestão.
 **Aprovada pelo Vinicios em 2026-10-27.** O job de distribuição existente procura ocorrências efetivas da escala semanal e do plano mensal publicado e envia o lembrete quando faltam de 24 a 2 horas para o início. A antecedência é fixa em 24 horas; escalados sem conta, pausados ou inválidos não recebem. O envio também acontece em fins de semana.
 
 O texto livre do evento `DUTY_SHIFT_REMINDER` é editável por empresa e sai exclusivamente pelo WAHA corporativo. Falta de telefone ou de WAHA conectado é registrada na outbox, sem fallback para Meta. A chave `feature_duty_reminder_24h_<tenantId>` é controlada pelo Super-admin, auditada e desligada por padrão. O mesmo job mantém a idempotência por ocorrência e corretor; nenhuma migration ou nova tarefa de agendamento é necessária. Registro: `docs/implementations/active/2026-10-27-lembrete-plantao-24h.md`.
+
+## DEC-159 - Apresentação da área de negociações no Lite
+
+**Aprovada pelo Vinicios em 2026-10-27.** `/negociacoes` mantém dados, consultas, regras e permissões atuais e reorganiza a apresentação em cards com alternância para tabela enxuta de aproximadamente seis colunas. O indicador "entrou hoje" usa `stageEnteredAt` em `America/Sao_Paulo`, sem nova consulta ou SQL, e representa a situação atual dos leads que entraram na etapa no dia, não transições históricas. "Aguardando resposta" e "Esfriando" são faixas de atenção fora da trilha comercial de três etapas. A área permanece clara; tema escuro fica fora de escopo. Registro: `docs/implementations/active/2026-10-27-negociacoes-redesign.md`.
