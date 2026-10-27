@@ -22,6 +22,8 @@ import { getRelevantDutyWindow, isDutyWindowActive } from "./duty-presence-domai
 import { postSaleTransferAuditAction } from "./post-sale-transfer";
 import { traceLeadStep } from "./distribution-trace";
 import { loadReceivedInDayByBroker, pickNextByReceivedInDay } from "./received-in-day";
+import { chooseManualQueuePick, parseManualQueueValue } from "./duty-queue-order";
+import { tryDistributionPickLock, tryDistributionPickLockOnce } from "./distribution-pick-lock";
 
 /**
  * Tenants without an official (Meta) WhatsApp channel cannot deliver offers by
@@ -73,20 +75,6 @@ export function leadHasBlockingOffer(offers: Array<{ status: string; offeredAt?:
 }
 
 type DatabaseLike = ReturnType<typeof getDatabase>;
-
-const PICK_LOCK_ATTEMPTS = 10;
-const PICK_LOCK_RETRY_SECONDS = 0.2;
-
-/** DEC-154: bounded wait for the per-tenant pick lock (released at commit). */
-async function tryPickLock(tx: { execute: DatabaseLike["execute"] }, tenantId: string) {
-  for (let attempt = 0; attempt < PICK_LOCK_ATTEMPTS; attempt += 1) {
-    const rows = await tx.execute(sql`select pg_try_advisory_xact_lock(hashtext(${tenantId}), hashtext('distribution-pick')) as locked`);
-    const first = (Array.isArray(rows) ? rows[0] : (rows as { rows?: unknown[] }).rows?.[0]) as { locked?: boolean } | undefined;
-    if (first?.locked) return true;
-    if (attempt < PICK_LOCK_ATTEMPTS - 1) await tx.execute(sql`select pg_sleep(${PICK_LOCK_RETRY_SECONDS})`);
-  }
-  return false;
-}
 
 /**
  * Offers a set of brokers received in a queue that matter for pacing: anything
@@ -147,6 +135,13 @@ export async function createLeadOffersForBrokers(input: {
    * brokerIds order is final.
    */
   fairPick?: { since: Date; tierByBroker?: Record<string, number>; branchIdByBroker?: Record<string, string>; scheduleIdByBroker?: Record<string, string> };
+  /** Read and rotate a live occurrence's director-managed queue under the same pick lock. */
+  manualPick?: {
+    dutyDateBySchedule: Record<string, string>;
+    scheduleIdByBroker: Record<string, string | null | undefined>;
+    rosterBrokerIdsBySchedule: Record<string, string[]>;
+    branchIdByBroker?: Record<string, string>;
+  };
 }) {
   const db = getDatabase();
   // Same bounds as the "SLA de Aceite" setting (1–1440 min).
@@ -208,6 +203,19 @@ export async function createLeadOffersForBrokers(input: {
     );
   const brokers = orderByPreference(fetchedBrokers, input.brokerIds);
 
+  // The pre-read only avoids querying active offers for an ordinary
+  // round_robin pick. Manual queue values are always read inside the pick
+  // transaction after acquiring the shared advisory lock.
+  const manualQueueKeys = input.manualPick
+    ? [...new Set(Object.values(input.manualPick.scheduleIdByBroker).filter((id): id is string => Boolean(id)))].flatMap((scheduleId) => {
+      const dutyDate = input.manualPick!.dutyDateBySchedule[scheduleId];
+      return dutyDate ? [`manual-queue:${scheduleId}:${dutyDate}`] : [];
+    })
+    : [];
+  const manualQueueMayBeActive = manualQueueKeys.length
+    ? (await db.select({ key: schema.systemSettings.key }).from(schema.systemSettings).where(inArray(schema.systemSettings.key, manualQueueKeys))).length > 0
+    : false;
+
   const createdOffers: Array<{ offerId: string; brokerId: string; whatsappMessageId?: string }> = [];
   const claimedBrokerIds: string[] = [];
   let capacityReached = false;
@@ -217,21 +225,24 @@ export async function createLeadOffersForBrokers(input: {
 
   // DEC-154: with the fair pick, a lead that already has an active offer is
   // left alone here, instead of taking the pick lock once per broker.
-  const leadOffers = input.fairPick
+  const leadOffers = input.fairPick || manualQueueMayBeActive
     ? await db
       .select({ status: schema.leadOffers.status, offeredAt: schema.leadOffers.offeredAt, expiresAt: schema.leadOffers.expiresAt, outboundMessageId: schema.leadOffers.outboundMessageId })
       .from(schema.leadOffers)
       .where(and(eq(schema.leadOffers.tenantId, input.tenantId), eq(schema.leadOffers.leadId, input.leadId), gt(schema.leadOffers.expiresAt, now)))
       .limit(50)
     : [];
-  const pending: typeof brokers = input.fairPick && leadHasBlockingOffer(leadOffers, now) ? [] : [...brokers];
+  const pending: typeof brokers = (input.fairPick || manualQueueMayBeActive) && leadHasBlockingOffer(leadOffers, now) ? [] : [...brokers];
   // Once the pick lock was busy for this lead, the remaining claims recount without it.
   let pickLockBusy = false;
   while (pending.length) {
     let broker = pending[0];
     let destinationPhone = broker.phone;
     const offerId = randomUUID();
+    let manualRotation: { key: string; nextOrder: string[] } | null = null;
     const claimStatus = await db.transaction(async (tx) => {
+      let pickLockAcquired = false;
+      let automaticBrokerId: string | null = pending[0]?.id ?? null;
       if (input.fairPick) {
         // DEC-154: read the counts, choose and record the offer under one
         // per-tenant lock, so the next pick sees this one. Held only for this
@@ -240,16 +251,47 @@ export async function createLeadOffersForBrokers(input: {
         // past the 45 s per-lead cap (27/10). Try for up to ~2 s, once per lead.
         // Busy lock: still recount fresh (only the tiny window between this read and
         // the commit stays unserialized), never fall back to the stale pre-read order.
-        if (pickLockBusy || !await tryPickLock(tx, input.tenantId)) pickLockBusy = true;
+        pickLockAcquired = !pickLockBusy && await tryDistributionPickLock(tx, input.tenantId);
+        if (!pickLockAcquired) pickLockBusy = true;
         const pendingIds = pending.map((candidate) => candidate.id);
         const received = await loadReceivedInDayByBroker(tx, input.tenantId, pendingIds, input.fairPick.since, input.fairPick.scheduleIdByBroker);
-        const nextId = pickNextByReceivedInDay(pendingIds, received, input.fairPick.tierByBroker);
-        broker = pending.find((candidate) => candidate.id === nextId) ?? broker;
+        automaticBrokerId = pickNextByReceivedInDay(pendingIds, received, input.fairPick.tierByBroker);
+        broker = pending.find((candidate) => candidate.id === automaticBrokerId) ?? broker;
         destinationPhone = broker.phone;
+      } else if (input.manualPick && !pickLockBusy) {
+        pickLockAcquired = await tryDistributionPickLockOnce(tx, input.tenantId);
+        if (!pickLockAcquired) pickLockBusy = true;
+      }
+
+      if (input.manualPick && pickLockAcquired) {
+        const settingRows = manualQueueKeys.length
+          ? await tx.select({ key: schema.systemSettings.key, value: schema.systemSettings.value }).from(schema.systemSettings).where(inArray(schema.systemSettings.key, manualQueueKeys))
+          : [];
+        const queueBySchedule: Record<string, readonly string[] | undefined> = {};
+        for (const row of settingRows) {
+          const scheduleId = Object.keys(input.manualPick.dutyDateBySchedule).find((id) => `manual-queue:${id}:${input.manualPick!.dutyDateBySchedule[id]}` === row.key);
+          const queue = parseManualQueueValue(row.value);
+          if (scheduleId && queue) queueBySchedule[scheduleId] = queue;
+        }
+        const scheduleIdByBroker = input.manualPick.scheduleIdByBroker;
+        const picked = chooseManualQueuePick({
+          lockAcquired: true,
+          automaticBrokerId,
+          pendingBrokerIds: pending.map((candidate) => candidate.id),
+          scheduleIdByBroker,
+          queueBySchedule,
+          rosterBrokerIdsBySchedule: input.manualPick.rosterBrokerIdsBySchedule,
+        });
+        if (picked.manual) {
+          broker = pending.find((candidate) => candidate.id === picked.brokerId) ?? broker;
+          destinationPhone = broker.phone;
+          const dutyDate = input.manualPick.dutyDateBySchedule[picked.scheduleId];
+          if (dutyDate) manualRotation = { key: `manual-queue:${picked.scheduleId}:${dutyDate}`, nextOrder: picked.nextOrder };
+        }
       }
       traceLeadStep(input.leadId, `offer_claim:${broker.id}`);
       // The locked pick may land on a broker of another unit (shared queues): the lead follows that broker's unit.
-      const brokerBranchId = input.fairPick?.branchIdByBroker?.[broker.id] ?? input.targetBranchId;
+      const brokerBranchId = input.fairPick?.branchIdByBroker?.[broker.id] ?? input.manualPick?.branchIdByBroker?.[broker.id] ?? input.targetBranchId;
       // Serialize offer creation per lead. This is the final guard against two
       // workers creating simultaneous active offers for different brokers.
       const [lockedLead] = await tx
@@ -411,6 +453,7 @@ export async function createLeadOffersForBrokers(input: {
       return destinationPhone ? "pending" as const : "unavailable" as const;
       };
 
+      let committedStatus: "pending" | "unavailable" | null;
       if (input.queueId && input.capacityPerBroker !== undefined && input.capacityPerBroker !== null) {
         const reservation = await reserveQueueCapacitySlot({
           capacity: input.capacityPerBroker,
@@ -440,10 +483,17 @@ export async function createLeadOffersForBrokers(input: {
           capacityReached = true;
           return null;
         }
-        return reservation.value;
+        committedStatus = reservation.value;
+      } else {
+        committedStatus = await commitOffer();
       }
-
-      return commitOffer();
+      if (manualRotation && committedStatus === "pending") {
+        await tx.insert(schema.systemSettings).values({ key: manualRotation.key, value: JSON.stringify(manualRotation.nextOrder), updatedAt: now }).onConflictDoUpdate({
+          target: schema.systemSettings.key,
+          set: { value: JSON.stringify(manualRotation.nextOrder), updatedAt: now },
+        });
+      }
+      return committedStatus;
     });
     pending.splice(pending.indexOf(broker), 1);
 
@@ -466,7 +516,7 @@ export async function createLeadOffersForBrokers(input: {
     if (!whatsappEnabled) {
       // In-app offer: no outbox row; the provisional ownership set above is what keeps the lead exclusive.
       createdOffers.push({ offerId, brokerId: broker.id });
-      if (input.fairPick) break;
+      if (input.fairPick || manualRotation) break;
       continue;
     }
 
@@ -603,7 +653,7 @@ export async function createLeadOffersForBrokers(input: {
     createdOffers.push({ offerId, brokerId: broker.id, whatsappMessageId: outbound.id });
     // The lead now has its active offer: further claims would only be blocked by
     // it, and each one would take the pick lock again.
-    if (input.fairPick) break;
+    if (input.fairPick || manualRotation) break;
   }
 
   // Delivery stays in the durable outbound queue. The scheduler owns retry and

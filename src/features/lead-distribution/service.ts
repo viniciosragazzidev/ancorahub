@@ -23,7 +23,7 @@ import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
 import { normalizeQueueSource } from "./routing-catalog";
 import { findBrokerRunningDutyScheduleId, getActiveQueueDutyRoster } from "./active-queue-duty-roster";
 import { countReceivedInDayByBroker, NON_COUNTING_OFFER_STATUS } from "./received-in-day";
-import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
+import { getSaoPauloDateKey, resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getOvernightExtraShiftSettings, getPresenceEligibleAssignments } from "./duty-presence";
 import { extraShiftWindow, findRunningDutySchedule, getRelevantDutyWindow, isExtraShiftRecord, isOvernightLead, MORNING_SHIFT_STARTS_BEFORE } from "./duty-presence-domain";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -48,6 +48,8 @@ type RosterResolution = {
   hasActiveSelectedSchedule: boolean;
   scheduleIdByBroker: Map<string, string>;
   brokersStoppedByDutyCap: number;
+  manualRosterBrokerIdsBySchedule?: Map<string, string[]>;
+  dutyDateBySchedule?: Map<string, string>;
 };
 
 async function getRosterBrokerIds(
@@ -123,6 +125,7 @@ async function getRosterBrokerIds(
     dayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
     startsAt: schema.dutyRosterAssignments.startsAt,
     endsAt: schema.dutyRosterAssignments.endsAt,
+    pausedAt: schema.dutyRosterAssignments.pausedAt,
     validFrom: schema.dutyRosterAssignments.validFrom,
     validUntil: schema.dutyRosterAssignments.validUntil,
     branchId: schema.dutyRosterAssignments.branchId,
@@ -135,9 +138,6 @@ async function getRosterBrokerIds(
       eq(schema.dutyRosterAssignments.branchId, branchId),
       eq(schema.dutyRosterAssignments.dayOfWeek, local.weekday),
       eq(schema.dutyRosterAssignments.status, "active"),
-      // Deliberately paused by a director/manager — stays visible on the
-      // roster but is excluded from automatic offers until resumed.
-      isNull(schema.dutyRosterAssignments.pausedAt),
       lte(schema.dutyRosterAssignments.startsAt, local.time),
       gt(schema.dutyRosterAssignments.endsAt, local.time),
       lte(schema.dutyRosterAssignments.validFrom, date),
@@ -146,41 +146,51 @@ async function getRosterBrokerIds(
     ));
 
   const effectiveAssignments = await resolveEffectiveDutyAssignments(tenantId, assignments, date);
+  const eligibleAssignments = effectiveAssignments.filter((assignment) => !assignment.pausedAt);
+  const manualRosterBrokerIdsBySchedule = new Map<string, string[]>();
+  for (const assignment of effectiveAssignments) {
+    const roster = manualRosterBrokerIdsBySchedule.get(assignment.scheduleId) ?? [];
+    if (!roster.includes(assignment.brokerId)) roster.push(assignment.brokerId);
+    manualRosterBrokerIdsBySchedule.set(assignment.scheduleId, roster);
+  }
+  const dutyDateBySchedule = new Map(scopedSchedules.map((schedule) => [
+    schedule.id,
+    findRunningDutySchedule([schedule], date)?.window.dutyDate ?? getSaoPauloDateKey(date),
+  ]));
 
   // A matching plantão without escalated brokers has no eligible broker. It must
   // remain queued instead of silently falling back to the whole unit roster.
   const presence = await getPresenceEligibleAssignments({
     tenantId,
-    assignments: effectiveAssignments,
+    assignments: eligibleAssignments,
     schedules: activeSchedules.filter((schedule) => matchingScheduleIds.includes(schedule.id)),
     now: date,
   });
-  const scheduleAssignments = effectiveAssignments.map((assignment) => ({ id: assignment.id, brokerId: assignment.brokerId, scheduleId: assignment.scheduleId }));
   const eligibleBeforeCap = new Set(presence.eligibleAssignmentIds);
   const eligibleAfterCap = new Set(presence.eligibleAssignmentIds);
   const receivedBySchedule = new Map<string, Map<string, number>>();
   await Promise.all([...(dutyLeadCaps?.values() ?? [])].map(async (cap) => {
-    const brokerIds = [...new Set(effectiveAssignments
+    const brokerIds = [...new Set(eligibleAssignments
       .filter((assignment) => assignment.scheduleId === cap.scheduleId && presence.eligibleAssignmentIds.has(assignment.id))
       .map((assignment) => assignment.brokerId))];
     if (brokerIds.length) receivedBySchedule.set(cap.scheduleId, await countLeadsReceivedInDuty(db, tenantId, cap, brokerIds));
   }));
   if (dutyLeadCaps?.size) {
-    for (const assignment of effectiveAssignments) {
+    for (const assignment of eligibleAssignments) {
       const cap = dutyLeadCaps.get(assignment.scheduleId);
       if (cap && (receivedBySchedule.get(cap.scheduleId)?.get(assignment.brokerId) ?? 0) >= cap.limit) eligibleAfterCap.delete(assignment.id);
     }
   }
-  const brokersBeforeCap = new Set(effectiveAssignments.filter((assignment) => eligibleBeforeCap.has(assignment.id)).map((assignment) => assignment.brokerId));
-  const brokersAfterCap = new Set(effectiveAssignments.filter((assignment) => eligibleAfterCap.has(assignment.id)).map((assignment) => assignment.brokerId));
+  const brokersBeforeCap = new Set(eligibleAssignments.filter((assignment) => eligibleBeforeCap.has(assignment.id)).map((assignment) => assignment.brokerId));
+  const brokersAfterCap = new Set(eligibleAssignments.filter((assignment) => eligibleAfterCap.has(assignment.id)).map((assignment) => assignment.brokerId));
   const brokersStoppedByDutyCap = [...brokersBeforeCap].filter((brokerId) => !brokersAfterCap.has(brokerId)).length;
   const scheduleIdByBroker = selectBrokerDutyScheduleIds(
-    scheduleAssignments,
+    eligibleAssignments.map((assignment) => ({ id: assignment.id, brokerId: assignment.brokerId, scheduleId: assignment.scheduleId })),
     new Set(matchingScheduleIds),
     eligibleAfterCap,
     presence.confirmedPresenceAssignmentIds,
   );
-  return { brokerIds: new Set(scheduleIdByBroker.keys()), hasActiveSelectedSchedule: true, scheduleIdByBroker, brokersStoppedByDutyCap };
+  return { brokerIds: new Set(scheduleIdByBroker.keys()), hasActiveSelectedSchedule: true, scheduleIdByBroker, brokersStoppedByDutyCap, manualRosterBrokerIdsBySchedule, dutyDateBySchedule };
 }
 
 /**
@@ -1059,6 +1069,16 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     const allBrokers = membershipBrokers.map((broker) => ({ ...broker, branchId: plantaoBranchOf.get(broker.id) ?? broker.branchId }));
     const rosterByBranch = new Map(rosterResults.map(([branchId, result]) => [branchId, result.brokerIds] as const));
     const scheduleIdByBroker = new Map(rosterResults.flatMap(([, result]) => [...result.scheduleIdByBroker]));
+    const manualRosterBrokerIdsBySchedule = new Map<string, string[]>();
+    const dutyDateBySchedule = new Map<string, string>();
+    for (const [, result] of rosterResults) {
+      for (const [scheduleId, brokerIds] of result.manualRosterBrokerIdsBySchedule ?? []) {
+        const roster = manualRosterBrokerIdsBySchedule.get(scheduleId) ?? [];
+        for (const brokerId of brokerIds) if (!roster.includes(brokerId)) roster.push(brokerId);
+        manualRosterBrokerIdsBySchedule.set(scheduleId, roster);
+      }
+      for (const [scheduleId, dutyDate] of result.dutyDateBySchedule ?? []) dutyDateBySchedule.set(scheduleId, dutyDate);
+    }
     const hasActiveSelectedSchedule = rosterResults.some(([, result]) => result.hasActiveSelectedSchedule);
     brokersStoppedByDutyCap = rosterResults.reduce((total, [, result]) => total + result.brokersStoppedByDutyCap, 0);
     const rosterBrokers = allBrokers.filter((broker) => {
@@ -1066,11 +1086,11 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       if (!rosterBrokerIds && broker.branchId && rosterOnlyBranchIds.has(broker.branchId)) return false;
       return (!rosterBrokerIds || rosterBrokerIds.has(broker.id)) && broker.id !== brokerToExclude && !intelligentPolicy.value.excludedBrokerIds.includes(broker.id) && (!allowedBrokerSet || allowedBrokerSet.has(broker.id));
     });
-    return { brokers: rosterBrokers, rosterByBranch, scheduleIdByBroker, hasActiveSelectedSchedule };
+    return { brokers: rosterBrokers, rosterByBranch, scheduleIdByBroker, manualRosterBrokerIdsBySchedule, dutyDateBySchedule, hasActiveSelectedSchedule };
   };
 
   traceLeadStep(leadId, "eligible_brokers");
-  let { brokers, rosterByBranch, scheduleIdByBroker, hasActiveSelectedSchedule } = await loadEligibleBrokers(targetBranchIds);
+  let { brokers, rosterByBranch, scheduleIdByBroker, manualRosterBrokerIdsBySchedule, dutyDateBySchedule, hasActiveSelectedSchedule } = await loadEligibleBrokers(targetBranchIds);
   // Everyone on duty reached this plantão's cap: the lead waits (the queue's
   // "no broker" rules are for an empty roster, not for a full one).
   if (!brokers.length && brokersStoppedByDutyCap > 0) {
@@ -1151,6 +1171,8 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
         brokers = fallback.brokers;
         rosterByBranch = fallback.rosterByBranch;
         scheduleIdByBroker = fallback.scheduleIdByBroker;
+        manualRosterBrokerIdsBySchedule = fallback.manualRosterBrokerIdsBySchedule;
+        dutyDateBySchedule = fallback.dutyDateBySchedule;
         hasActiveSelectedSchedule = fallback.hasActiveSelectedSchedule;
         fallbackUnitUsed = true;
       }
@@ -1491,6 +1513,12 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       branchIdByBroker: Object.fromEntries(remainingBrokers.flatMap((broker) => broker.branchId ? [[broker.id, broker.branchId]] : [])),
       scheduleIdByBroker: countingScheduleIdByBroker,
     },
+    manualPick: scheduleIdByBroker.size ? {
+      dutyDateBySchedule: Object.fromEntries([...new Set(scheduleIdByBroker.values())].map((scheduleId) => [scheduleId, dutyDateBySchedule.get(scheduleId) ?? getSaoPauloDateKey(new Date())])),
+      scheduleIdByBroker: Object.fromEntries(scheduleIdByBroker),
+      rosterBrokerIdsBySchedule: Object.fromEntries(manualRosterBrokerIdsBySchedule),
+      branchIdByBroker: Object.fromEntries(remainingBrokers.flatMap((broker) => broker.branchId ? [[broker.id, broker.branchId]] : [])),
+    } : undefined,
   });
   if (!offer.createdOffers.length) {
     if (offer.pacingBlocked && !offer.capacityReached) {

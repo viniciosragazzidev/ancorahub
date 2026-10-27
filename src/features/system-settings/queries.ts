@@ -27,9 +27,8 @@ async function loadAllSettings() {
   return settingsCache.getOrLoad("all", () => getDatabase()
     .select({ key: schema.systemSettings.key, value: schema.systemSettings.value })
     .from(schema.systemSettings)
-    // Job leases (shared/db/job-lease.ts) and job heartbeats (features/live-status/heartbeat.ts) live in this
-    // table but are not settings: a heartbeat changes every minute and must not churn this cache.
-    .where(sql`${schema.systemSettings.key} not like 'lease:%' and ${schema.systemSettings.key} not like 'heartbeat:%'`));
+    // Job leases, heartbeats and per-occurrence manual queues are runtime state, not settings.
+    .where(sql`${schema.systemSettings.key} not like 'lease:%' and ${schema.systemSettings.key} not like 'heartbeat:%' and ${schema.systemSettings.key} not like 'manual-queue:%'`));
 }
 
 export function invalidateSystemSettingsCache() {
