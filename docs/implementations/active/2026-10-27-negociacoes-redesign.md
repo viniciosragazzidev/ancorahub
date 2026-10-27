@@ -9,7 +9,7 @@
 | P2, trilha comercial | Concluído |
 | P3, cards e tabela | Concluído |
 | P4, painel lateral | Concluído |
-| P5, polimento e skin | Pendente |
+| P5, polimento e skin | Concluído |
 
 P1 substitui os seis KPIs equivalentes por três contadores da régua e um bloco de atenção para espera e esfriamento. O alerta "Sem conversa no CRM" fica fora da trilha. A contagem de entradas usa `stageEnteredAt` no dia de São Paulo. Testes focados: 2 arquivos, 8 testes aprovados; ESLint sem erros.
 
@@ -19,7 +19,11 @@ P3 troca a lista inicial por cartões `PeopleRow`, com etapa, responsável pela 
 
 P4 coloca a trilha mini e os sinais que explicam a situação antes do resumo e da linha do tempo. O histórico usa `LiteSkeletonToContent` com altura reservada e Skeleton do Arc; falha oferece nova tentativa. O carregamento continua limitado à abertura do painel e a lista permanece utilizável.
 
-Repo: C:/Users/kyper/Desktop/Kyper/Projects/ancorahub-lite-listas (somente leitura; nenhum codigo alterado).
+P5 revisa a troca entre cartões e tabela com `LiteSwap`, mantém movimentos do kit respeitando movimento reduzido, elimina o tique por cartão usando o horário do conjunto carregado e atualiza a fixture para mostrar entradas hoje nas três etapas. Auditoria Lite: zero desvio nos arquivos de tela tocados. A auditoria global continua listando desvios já existentes fora desta entrega.
+
+Verificação final: vitest focado em `src/features/negotiations`, 5 arquivos e 35 testes aprovados; `npx tsc --noEmit -p .` aprovado; ESLint dos arquivos TSX tocados aprovado; `npm run agent:docs` validou 18 referências. `/dev/negociacoes-preview` foi capturada com o shell real em 1440 e 390 px, sem erro de navegador e sem overflow horizontal. Imagens: `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/negociacoes-redesign-prints/negociacoes-1440.png` (194761 bytes) e `negociacoes-390.png` (83169 bytes), geradas em 27/10/2026 às 16:57.
+
+Repo: C:/Users/kyper/Desktop/Kyper/Projects/ancorahub-lite-listas, branch `feat/lite-listas`.
 Fontes lidas: src/app/(dashboard)/negociacoes/{page,loading,error}.tsx; src/features/negotiations/* (dashboard, data-views, model, queries, css, fixtures, actions); docs/implementations/completed/2026-10-26-negociacoes-area.md; src/app/dev/negociacoes-preview/page.tsx; docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md; docs/design-system/lite/2026-10-21-estudo-visor-animacoes.md; src/components/lite/motion/*; src/components/lite/status/*; referencias /leads e /leads/distribuicao (LightLeadsList, people-list, faixa de status vivos).
 
 Regra do pedido: nenhuma consulta nova (a area e leitura calculada; layout ja barrado pelo Vigia). Tudo abaixo reaproveita NegotiationsDashboardData (queries.ts:82-91). Sem SQL. Unico ponto que exigiria SQL esta sinalizado na decisao 2.
@@ -137,4 +141,4 @@ Recomendo comecar pelo version sem SQL (P1) e so adicionar transicoes reais se o
 3. Esfriando e Aguardando resposta entram no funil ou ficam como faixas de atencao transversais? E modo escuro?
 Recomendo faixas de atencao fora do funil (a regua comercial sao 3 etapas; esfriar e risco transverso) e modo escuro fora de escopo (o Lite e claro so).
 
-Fim do plano. Nenhum arquivo do repo foi alterado.
+Fim do plano. Implementação P1 a P5 registrada acima. P6 realtime não foi iniciado.

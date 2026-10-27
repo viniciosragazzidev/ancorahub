@@ -1,7 +1,7 @@
 import type { NegotiationBrokerStats, NegotiationDayStats, NegotiationLead, NegotiationsDashboardData, NegotiationsScope } from "./queries";
 import type { NegotiationLevel } from "./negotiation-model";
 
-const NOW = new Date("2026-10-26T15:00:00.000Z");
+const NOW = new Date("2026-10-27T15:00:00.000Z");
 const LEVELS: NegotiationLevel[] = ["closing", "advanced", "in_conversation", "cooling", "no_crm_conversation"];
 const BRANCHES = [
   { id: "branch-centro", name: "Unidade Centro" },
@@ -37,7 +37,7 @@ function newLead(index: number): NegotiationLead {
     id,
     name: ["Mariana Oliveira", "Rafael de Souza", "Juliana Ferreira", "Pedro Henrique", "Fernanda Costa", "Marcelo Augusto", "Beatriz Almeida", "Luiz Felipe", "Isabela Mendes", "Gustavo Rocha"][index % 10] + (index > 9 ? ` ${index + 1}` : ""),
     status,
-    stageEnteredAt: isoDaysAgo((index % 6) + 1),
+    stageEnteredAt: isoDaysAgo(index % 3 === 0 ? 0 : (index % 6) + 1),
     daysAtStage: (index % 6) + 1,
     assignedAt: isoDaysAgo(14),
     firstContactAt: isoDaysAgo(12),

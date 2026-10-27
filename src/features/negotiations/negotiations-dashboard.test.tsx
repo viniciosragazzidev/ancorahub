@@ -45,11 +45,12 @@ describe("NegotiationsDashboard", () => {
   it("filtra a lista pelas etapas do resumo e mostra o número que entrou hoje", () => {
     const data = createNegotiationsFixture("director");
     const now = new Date(data.generatedAt);
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
     let advancedSeen = 0;
     data.leads = data.leads.map((lead) => {
       if (lead.level !== "advanced") return lead;
       advancedSeen += 1;
-      return { ...lead, stageEnteredAt: advancedSeen <= 2 ? "2026-10-26T15:00:00.000Z" : "2026-10-25T15:00:00.000Z" };
+      return { ...lead, stageEnteredAt: advancedSeen <= 2 ? data.generatedAt : yesterday };
     });
     const { container } = render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={now} />);
 

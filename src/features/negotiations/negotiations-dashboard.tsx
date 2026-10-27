@@ -13,7 +13,7 @@ import { LiteDataTable } from "@/components/lite/data/data";
 import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import { formatLiteDate } from "@/components/lite/format/date";
-import { LiteSkeletonToContent } from "@/components/lite/motion";
+import { LiteSkeletonToContent, LiteSwap } from "@/components/lite/motion";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { intentLabel } from "@/features/conversation-intelligence/components/radar-model";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
@@ -124,7 +124,7 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
         <DashboardHeader breadcrumb="Equipe" title="Negociações" />
         <main className={`${litePage.stack} ${styles.root}`} aria-label="Negociações da equipe">
           <div className={styles.summaryLine}>
-            <p className={styles.summary}>{formatNegotiationMetric(data.leads.length)} atendimentos acompanhados · atualizado {formatLiteDate(generatedAt, { hour: "2-digit", minute: "2-digit" })}</p>
+            <p className={styles.summary}>{formatNegotiationMetric(data.leads.length)} atendimentos acompanhados · atualizado às {formatLiteDate(generatedAt, { hour: "2-digit", minute: "2-digit" })}</p>
             {data.scope.role === "director" && branchOptions.length > 1 ? <div className={styles.select}><LiteSelect label="Unidade" hideLabel value={branchFilter} options={branchOptions} onChange={setBranch} /></div> : null}
             <nav className={styles.tabs} aria-label="Visões de negociações">
               <Link href={data.scope.branchId ? `/negociacoes?unidade=${encodeURIComponent(data.scope.branchId)}` : "/negociacoes"} aria-current={activeTab === "negotiations" ? "page" : undefined} className={styles.tab}>Negociações</Link>
@@ -164,25 +164,27 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
                   <button type="button" className={styles.presentationButton} aria-pressed={listPresentation === "cards"} onClick={() => setListPresentation("cards")}>Cartões</button>
                   <button type="button" className={styles.presentationButton} aria-pressed={listPresentation === "table"} onClick={() => setListPresentation("table")}>Tabela</button>
                 </div>
-                {pageRows.length ? listPresentation === "cards" ? (
-                  <ul className={styles.leadCards} aria-label="Atendimentos em cartões" data-lite="negotiation-cards">
-                    {pageRows.map((lead, index) => <NegotiationLeadRow key={lead.id} lead={lead} index={index} generatedAt={generatedAt} onOpen={openLead} />)}
-                  </ul>
-                ) : (
-                  <LiteDataTable
-                    caption="Atendimentos ativos por nível de negociação"
-                    columns={columns}
-                    rows={pageRows}
-                    rowKey={(lead) => lead.id}
-                    onRowOpen={openLead}
-                    empty={<p>Nenhum atendimento neste filtro.</p>}
-                  />
-                ) : (
-                  <div className={styles.empty}>
-                    <h2 className={styles.emptyTitle}>{data.leads.length ? "Nenhum atendimento neste filtro" : "Nenhum atendimento ativo"}</h2>
-                    <p className={styles.emptyText}>{data.leads.length ? "Tente outro nível, corretor ou busca." : "Os atendimentos aparecem aqui quando há sinais de conversa ou uma etapa comercial ativa."}</p>
-                  </div>
-                )}
+                <LiteSwap swapKey={listPresentation}>
+                  {pageRows.length ? listPresentation === "cards" ? (
+                    <ul className={styles.leadCards} aria-label="Atendimentos em cartões" data-lite="negotiation-cards">
+                      {pageRows.map((lead, index) => <NegotiationLeadRow key={lead.id} lead={lead} index={index} generatedAt={generatedAt} onOpen={openLead} />)}
+                    </ul>
+                  ) : (
+                    <LiteDataTable
+                      caption="Atendimentos ativos por nível de negociação"
+                      columns={columns}
+                      rows={pageRows}
+                      rowKey={(lead) => lead.id}
+                      onRowOpen={openLead}
+                      empty={<p>Nenhum atendimento neste filtro.</p>}
+                    />
+                  ) : (
+                    <div className={styles.empty}>
+                      <h2 className={styles.emptyTitle}>{data.leads.length ? "Nenhum atendimento neste filtro" : "Nenhum atendimento ativo"}</h2>
+                      <p className={styles.emptyText}>{data.leads.length ? "Tente outro nível, corretor ou busca." : "Os atendimentos aparecem aqui quando há sinais de conversa ou uma etapa comercial ativa."}</p>
+                    </div>
+                  )}
+                </LiteSwap>
                 <LitePagination {...pagination} label="Páginas de negociações" />
               </section>
             </>

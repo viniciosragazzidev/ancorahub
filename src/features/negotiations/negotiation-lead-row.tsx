@@ -1,6 +1,5 @@
 "use client";
 
-import { useNowSeconds } from "@/components/lite/status/use-countdown";
 import { formatAgo } from "@/components/lite/status/format";
 import { PeopleRow } from "@/components/light/people-list/people-list";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
@@ -24,9 +23,8 @@ export function NegotiationLeadRow({ lead, index, generatedAt, onOpen }: {
   generatedAt: Date;
   onOpen: (lead: NegotiationLead) => void;
 }) {
-  const now = useNowSeconds() ?? generatedAt.getTime();
   const stoppedAt = lead.lastExchangeAt ? new Date(lead.lastExchangeAt).getTime() : null;
-  const stopped = stoppedAt !== null && Number.isFinite(stoppedAt) ? formatAgo(now - stoppedAt) : "Sem troca recente";
+  const stopped = stoppedAt !== null && Number.isFinite(stoppedAt) ? formatAgo(generatedAt.getTime() - stoppedAt) : "Sem troca recente";
   const signals = stageSignals(lead);
   const replyLabel = lead.replyOwedBy === "broker" ? "Aguardando o corretor" : lead.replyOwedBy === "customer" ? "Aguardando o cliente" : "Sem resposta pendente";
   const preview = [replyLabel, ...signals].join(" · ");
@@ -35,14 +33,13 @@ export function NegotiationLeadRow({ lead, index, generatedAt, onOpen }: {
   return (
     <PeopleRow
       name={lead.name}
-      seed={lead.brokerId}
       index={index}
       chip={<span className={styles.cardStage}><span className={styles.level} data-level={lead.level}>{LEVEL_LABELS[lead.level]}</span><span className={styles.cardStatus}>{stageStatus}</span></span>}
       preview={preview}
       previewTone={lead.customerWaiting ? "waiting" : lead.level === "cooling" || lead.level === "no_crm_conversation" ? "alert" : "muted"}
       meta={<span className={styles.cardStopped} aria-label={`Sem troca ${stopped}`}>{stopped}</span>}
       dot={lead.customerWaiting ? "waiting" : lead.level === "cooling" || lead.level === "no_crm_conversation" ? "alert" : null}
-      dotLabel={lead.customerWaiting ? "Cliente aguarda resposta" : lead.level === "cooling" ? "Atendimento esfriando" : undefined}
+      dotLabel={lead.customerWaiting ? "Cliente aguarda resposta" : lead.level === "cooling" ? "Atendimento esfriando" : lead.level === "no_crm_conversation" ? "Sem conversa no CRM" : undefined}
       action={<button type="button" className={styles.cardOpen} aria-label={`Ver detalhes de ${lead.name}`} onClick={() => onOpen(lead)}>Ver detalhes</button>}
     />
   );
