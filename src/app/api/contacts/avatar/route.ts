@@ -32,6 +32,8 @@ export async function GET(request: NextRequest) {
     if (!phone) return new NextResponse(null, { status: 404 });
 
     const avatar = await getContactAvatar(context.tenantId, phone);
+    // Too many new pictures this minute: not cached, the next visit asks again.
+    if (avatar === "busy") return new NextResponse(null, { status: 404, headers: { "Cache-Control": "no-store" } });
     if (!avatar) return new NextResponse(null, { status: 404, headers: { "Cache-Control": "private, max-age=3600" } });
     return new NextResponse(new Uint8Array(avatar.body), {
       headers: { "Content-Type": avatar.contentType, "Cache-Control": "private, max-age=86400" },

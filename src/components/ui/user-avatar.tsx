@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +22,12 @@ export interface UserAvatarProps {
   fallbackClassName?: string;
   /** A real photo (e.g. the contact's WhatsApp picture); the illustration stays when it does not load. */
   photoUrl?: string | null;
+  /**
+   * Asks for the photo only once the avatar is near the screen. A long list
+   * would otherwise ask for every photo at once (the image loads in script,
+   * so the browser's lazy loading does not apply).
+   */
+  photoWhenVisible?: boolean;
 }
 
 export function UserAvatar({
@@ -32,9 +38,25 @@ export function UserAvatar({
   pixelSize = 128,
   className,
   fallbackClassName,
-  photoUrl,
+  photoUrl: requestedPhoto,
+  photoWhenVisible = false,
 }: UserAvatarProps) {
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
+  const [nearScreen, setNearScreen] = useState(false);
+  const rootRef = useRef<HTMLSpanElement>(null);
+  const waitsForScreen = photoWhenVisible && Boolean(requestedPhoto) && !nearScreen;
+  useEffect(() => {
+    const node = rootRef.current;
+    if (!waitsForScreen || !node || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      setNearScreen(true);
+      observer.disconnect();
+    }, { rootMargin: "200px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [waitsForScreen]);
+  const photoUrl = waitsForScreen ? null : requestedPhoto;
   const avatarUrl = useMemo(() => {
     const cleanSeed = encodeURIComponent(seed || name || "CorreTop");
     return `https://api.dicebear.com/9.x/${style}/svg?seed=${cleanSeed}&size=${pixelSize}`;
@@ -51,7 +73,7 @@ export function UserAvatar({
   }, [name, seed]);
 
   return (
-    <Avatar size={size} className={cn("overflow-hidden border border-border/40 shadow-xs", className)}>
+    <Avatar ref={rootRef} size={size} className={cn("overflow-hidden border border-border/40 shadow-xs", className)}>
       <AvatarImage
         key={photoUrl && failedPhoto !== photoUrl ? photoUrl : avatarUrl}
         src={photoUrl && failedPhoto !== photoUrl ? photoUrl : avatarUrl}
