@@ -6,6 +6,7 @@ import { AtendimentoHeading } from "../_components/atendimento-heading";
 import { MessagesWorkspace } from "./_components/messages-workspace";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { isDutyShiftReminderEnabled } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import { AtendimentoHeadingLite } from "../_components/atendimento-heading-lite";
 import { MessagesWorkspaceLite } from "./_components/messages-workspace-lite";
 
@@ -23,7 +24,10 @@ export default async function AtendimentoMensagensPage() {
   if (context.role !== "director" && context.role !== "manager") {
     throw new AuthorizationError("Apenas Diretores e Gestores podem gerenciar as mensagens do atendimento.");
   }
-  const messages = await getMessageLibrary(context.tenantId);
+  const [messages, dutyReminderEnabled] = await Promise.all([
+    getMessageLibrary(context.tenantId),
+    isDutyShiftReminderEnabled(context.tenantId),
+  ]);
 
   // Chave do visual Lite: a mesma biblioteca e as mesmas ações, com a lista Lite.
   if (await isDirectorLitePageOnServer(context, "/atendimento/mensagens")) {
@@ -32,7 +36,7 @@ export default async function AtendimentoMensagensPage() {
         <DashboardHeader breadcrumb="Atendimento" title="Mensagens" />
         <main className={litePage.stack}>
           <AtendimentoHeadingLite active="mensagens" />
-          <MessagesWorkspaceLite messages={messages} />
+          <MessagesWorkspaceLite messages={messages} dutyReminderEnabled={dutyReminderEnabled} />
         </main>
       </>
     );
@@ -43,7 +47,7 @@ export default async function AtendimentoMensagensPage() {
       <DashboardHeader breadcrumb="Atendimento" title="Mensagens" />
       <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <AtendimentoHeading active="mensagens" />
-        <MessagesWorkspace messages={messages} />
+        <MessagesWorkspace messages={messages} dutyReminderEnabled={dutyReminderEnabled} />
       </main>
     </>
   );

@@ -90,7 +90,7 @@ const columns: ColumnDef<LibraryMessage>[] = [
  * is used and through which channel). "Nova mensagem" is the screen's single
  * primary action; syncing and the per-situation rules live in "Configurações".
  */
-export function MessagesWorkspace({ messages }: { messages: LibraryMessage[] }) {
+export function MessagesWorkspace({ messages, dutyReminderEnabled = false }: { messages: LibraryMessage[]; dutyReminderEnabled?: boolean }) {
   const router = useRouter();
   const [filter, setFilter] = useState<KindFilter>("all");
   const [target, setTarget] = useState<DrawerTarget>(null);
@@ -186,6 +186,7 @@ export function MessagesWorkspace({ messages }: { messages: LibraryMessage[] }) 
 
       <MessageDrawer
         target={drawerTarget}
+        dutyReminderEnabled={dutyReminderEnabled}
         onClose={() => setTarget(null)}
         onChanged={refresh}
         onUseInSituation={(templateId, eventKey) => {

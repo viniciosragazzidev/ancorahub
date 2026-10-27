@@ -1,7 +1,8 @@
 import { and, desc, eq } from "drizzle-orm";
 
 import { resolveNoticeTextVariants } from "@/features/communication-channels/outbound-service";
-import { TEAM_NOTICES } from "@/features/team-notices/catalog";
+import { isDutyShiftReminderEnabled } from "@/features/lead-distribution/duty-shift-reminder-flag";
+import { teamNoticesFor } from "@/features/team-notices/catalog";
 import { getTeamNoticeSettings } from "@/features/team-notices/service";
 import { getTenantChannel } from "@/features/waha-cadence/tenant-channel";
 import { getDatabase, schema } from "@/shared/db";
@@ -25,7 +26,7 @@ const PREVIEW_VARIABLES: Record<string, string[]> = {
 };
 
 export async function DirectorWhatsAppView({ context, lite = false }: { context: TenantContext; lite?: boolean }) {
-  const [channel, settings, freeMessages] = await Promise.all([
+  const [channel, settings, freeMessages, dutyReminderEnabled] = await Promise.all([
     getTenantChannel(context),
     getTeamNoticeSettings(context.tenantId),
     getDatabase()
@@ -33,9 +34,10 @@ export async function DirectorWhatsAppView({ context, lite = false }: { context:
       .from(schema.messageTemplates)
       .where(and(eq(schema.messageTemplates.tenantId, context.tenantId), eq(schema.messageTemplates.active, true)))
       .orderBy(desc(schema.messageTemplates.updatedAt)),
+    isDutyShiftReminderEnabled(context.tenantId),
   ]);
 
-  const notices: TeamNoticeRow[] = TEAM_NOTICES.map((notice) => {
+  const notices: TeamNoticeRow[] = teamNoticesFor(dutyReminderEnabled).map((notice) => {
     const setting = settings.get(notice.key)!;
     return {
       key: notice.key,

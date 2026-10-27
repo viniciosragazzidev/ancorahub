@@ -7,9 +7,10 @@ import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
+import { isDutyShiftReminderEnabled } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import {
-  MESSAGE_EVENT_CATALOG,
   MESSAGE_RESOURCE_KINDS,
+  messageEventsFor,
   buildAutomaticMetaVariableMappings,
   buildMetaProviderVariables,
   getFreeMessageUnknownVariables,
@@ -171,7 +172,7 @@ export async function listMessageEventPolicies(tenantId: string) {
     });
   }
 
-  const [metaTemplates, freeMessages, globallyEnabled] = await Promise.all([
+  const [metaTemplates, freeMessages, globallyEnabled, dutyReminderEnabled] = await Promise.all([
     // Reutiliza a mesma resolução tenant-safe usada pela lista oficial da WABA.
     // Isso evita que pequenas diferenças entre as duas consultas escondam os
     // templates aprovados no seletor de situações.
@@ -211,11 +212,12 @@ export async function listMessageEventPolicies(tenantId: string) {
         });
         return true;
       }),
+    isDutyShiftReminderEnabled(tenantId),
   ]);
 
   return {
     globallyEnabled,
-    events: MESSAGE_EVENT_CATALOG.map((event) => ({
+    events: messageEventsFor(dutyReminderEnabled).map((event) => ({
       ...event,
       variables: event.variables.map((variable) => ({ ...variable })),
       policy: policies.find((policy) => policy.eventKey === event.key) ?? null,

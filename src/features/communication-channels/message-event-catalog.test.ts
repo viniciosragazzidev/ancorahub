@@ -6,8 +6,19 @@ import {
   getFreeMessageUnknownVariables,
   getMessageEventByKey,
   getMessageEventByPurpose,
+  messageEventsFor,
   renderEventFreeMessage,
 } from "./message-event-catalog";
+
+describe("messageEventsFor", () => {
+  it("hides the 24 h duty reminder while the company flag is off and keeps every other situation", () => {
+    const off = messageEventsFor(false).map((event) => event.key);
+    expect(off).not.toContain("DUTY_SHIFT_REMINDER");
+    expect(off).toContain("FIRST_CONTACT");
+    expect(messageEventsFor(true).map((event) => event.key)).toContain("DUTY_SHIFT_REMINDER");
+    expect(messageEventsFor(true).length - off.length).toBe(1);
+  });
+});
 
 describe("message event catalog", () => {
   it("maps the real qualification and broker producers to registered events", () => {

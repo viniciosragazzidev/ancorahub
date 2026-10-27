@@ -11,7 +11,7 @@ import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHea
 import { toast } from "@/components/ui/sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteFreeMessageTemplateAction, saveFreeMessageTemplateAction } from "@/features/ai-qualification/actions";
-import { MESSAGE_EVENT_CATALOG } from "@/features/communication-channels/message-event-catalog";
+import { MESSAGE_EVENT_CATALOG, messageEventsFor } from "@/features/communication-channels/message-event-catalog";
 import { QUICK_REPLY_VARIABLES, USAGE_CHANNEL_LABEL } from "@/features/message-library/catalog";
 import { resetQuickReplyTextAction, saveQuickReplyTextAction, suggestMessageVariationsAction } from "@/features/message-library/actions";
 import type { LibraryMessage } from "@/features/message-library/service";
@@ -215,7 +215,7 @@ function FreeMessageBody({ message, onChanged, onClose }: { message: LibraryMess
   );
 }
 
-function MetaTemplateBody({ message, onChanged, onClose, onUseInSituation }: { message: LibraryMessage; onChanged: () => void; onClose: () => void; onUseInSituation: (templateId: string, eventKey: string) => void }) {
+function MetaTemplateBody({ message, onChanged, onClose, onUseInSituation, dutyReminderEnabled }: { message: LibraryMessage; onChanged: () => void; onClose: () => void; onUseInSituation: (templateId: string, eventKey: string) => void; dutyReminderEnabled: boolean }) {
   const meta = message.meta!;
   const [phone, setPhone] = useState("");
   const [situation, setSituation] = useState<string>(MESSAGE_EVENT_CATALOG[0]?.key ?? "FIRST_CONTACT");
@@ -251,7 +251,7 @@ function MetaTemplateBody({ message, onChanged, onClose, onUseInSituation }: { m
             <Select value={situation} onValueChange={(value) => value && setSituation(String(value))}>
               <SelectTrigger aria-label="Situação"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {MESSAGE_EVENT_CATALOG.map((event) => <SelectItem key={event.key} value={event.key}>{event.label}</SelectItem>)}
+                {messageEventsFor(dutyReminderEnabled).map((event) => <SelectItem key={event.key} value={event.key}>{event.label}</SelectItem>)}
               </SelectContent>
             </Select>
             <Button type="button" variant="outline" size="sm" className="justify-self-start" onClick={() => onUseInSituation(message.id, situation)}>Aplicar e abrir situações</Button>
@@ -271,11 +271,13 @@ function MetaTemplateBody({ message, onChanged, onClose, onUseInSituation }: { m
   );
 }
 
-export function MessageDrawer({ target, onClose, onChanged, onUseInSituation }: {
+export function MessageDrawer({ target, onClose, onChanged, onUseInSituation, dutyReminderEnabled = false }: {
   target: DrawerTarget;
   onClose: () => void;
   onChanged: () => void;
   onUseInSituation: (templateId: string, eventKey: string) => void;
+  /** Chave feature_duty_reminder_24h da empresa: sem ela, a situação do lembrete não aparece. */
+  dutyReminderEnabled?: boolean;
 }) {
   const message = target?.mode === "view" ? target.message : null;
   const title = target?.mode === "new_free" ? "Nova mensagem livre" : message?.name ?? "";
@@ -296,7 +298,7 @@ export function MessageDrawer({ target, onClose, onChanged, onUseInSituation }: 
               {target.mode === "new_free" ? <FreeMessageBody key="new" message={null} onChanged={onChanged} onClose={onClose} /> : null}
               {message?.kind === "free_message" ? <FreeMessageBody key={message.id} message={message} onChanged={onChanged} onClose={onClose} /> : null}
               {message?.kind === "quick_reply" ? <QuickReplyBody key={message.id} message={message} onChanged={onChanged} /> : null}
-              {message?.kind === "meta_template" ? <MetaTemplateBody key={message.id} message={message} onChanged={onChanged} onClose={onClose} onUseInSituation={onUseInSituation} /> : null}
+              {message?.kind === "meta_template" ? <MetaTemplateBody key={message.id} message={message} onChanged={onChanged} onClose={onClose} onUseInSituation={onUseInSituation} dutyReminderEnabled={dutyReminderEnabled} /> : null}
             </SheetBody>
           </>
         ) : null}

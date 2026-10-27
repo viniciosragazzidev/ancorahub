@@ -40,7 +40,7 @@ function normalize(text: string) {
   return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 }
 
-export function MessagesWorkspaceLite({ messages }: { messages: LibraryMessage[] }) {
+export function MessagesWorkspaceLite({ messages, dutyReminderEnabled = false }: { messages: LibraryMessage[]; dutyReminderEnabled?: boolean }) {
   const router = useRouter();
   const [filter, setFilter] = useState<KindFilter>("all");
   const [query, setQuery] = useState("");
@@ -125,6 +125,7 @@ export function MessagesWorkspaceLite({ messages }: { messages: LibraryMessage[]
 
       <MessageDrawer
         target={drawerTarget}
+        dutyReminderEnabled={dutyReminderEnabled}
         onClose={() => setTarget(null)}
         onChanged={refresh}
         onUseInSituation={(templateId, eventKey) => {

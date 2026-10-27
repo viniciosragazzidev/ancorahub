@@ -140,6 +140,11 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
 
 export const BROKER_CHAT_NOTICE = TEAM_NOTICES.find((notice) => notice.chat)!;
 
+/** Avisos mostrados à diretoria: o lembrete 24 h só aparece com a chave feature_duty_reminder_24h da empresa ligada. */
+export function teamNoticesFor(dutyReminderEnabled: boolean) {
+  return TEAM_NOTICES.filter((notice) => dutyReminderEnabled || notice.key !== "DUTY_SHIFT_REMINDER");
+}
+
 const byPurpose = new Map(TEAM_NOTICES.map((notice) => [notice.purpose, notice]));
 const byKey = new Map(TEAM_NOTICES.map((notice) => [notice.key, notice]));
 

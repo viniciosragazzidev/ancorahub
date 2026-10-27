@@ -251,6 +251,14 @@ export function getMessageEventByPurpose(purpose: string): MessageEventDefinitio
   return MESSAGE_EVENT_CATALOG.find((event) => event.purpose === purpose) ?? null;
 }
 
+/** Só o lembrete de plantão 24 h depende da chave feature_duty_reminder_24h da empresa. */
+const DUTY_REMINDER_EVENT_KEYS: readonly string[] = ["DUTY_SHIFT_REMINDER"];
+
+/** Situações mostradas à empresa: o lembrete 24 h só aparece com a chave ligada. */
+export function messageEventsFor(dutyReminderEnabled: boolean) {
+  return MESSAGE_EVENT_CATALOG.filter((event) => dutyReminderEnabled || !DUTY_REMINDER_EVENT_KEYS.includes(event.key));
+}
+
 function normalizedKey(value: string) {
   return value.trim().toLocaleLowerCase("pt-BR");
 }

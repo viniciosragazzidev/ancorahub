@@ -1009,6 +1009,19 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
       const viaTenantChannel = row.deliveryRoute === "waha_direct" && Boolean(row.wahaNumberId) && Boolean(row.renderedBody);
       // Rows queued before "Meta" became Meta only may still carry the company number as fallback.
       const companyFallback = row.deliveryRoute === "meta_then_waha" && Boolean(row.wahaNumberId) && Boolean(row.noticeKey);
+      // The shift reminder only leaves through the company number. Without it (e.g. the number was deleted and
+      // wahaNumberId was set to null), it fails here and never migrates to Meta.
+      if (row.purpose === "dutyShiftReminder" && !viaTenantChannel) {
+        const failure = dutyShiftReminderWahaFailure(true);
+        await db.update(schema.whatsappOutboundMessages).set({
+          status: "failed",
+          failedAt: new Date(),
+          providerErrorCode: failure.code,
+          providerErrorMessage: failure.message,
+          updatedAt: new Date(),
+        }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+        return;
+      }
       if (!viaTenantChannel && !companyFallback && (row.deliveryRoute !== "meta_only" || row.wahaNumberId)) {
         await db.update(schema.whatsappOutboundMessages).set({
           deliveryRoute: "meta_only",
