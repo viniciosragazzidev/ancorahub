@@ -1,7 +1,7 @@
 "use client";
 
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
-import { stageLabel } from "@/features/conversation-intelligence/components/radar-model";
+import { formatAgo } from "@/components/lite/status/format";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import type { NegotiationLevel } from "./negotiation-model";
 import type { NegotiationBrokerStats, NegotiationDayStats, NegotiationLead, NegotiationsDashboardData } from "./queries";
@@ -22,12 +22,6 @@ function statusLabel(status: string) {
 
 function formatWhen(value: string | null) {
   return value ? new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "Sem troca nos últimos 7 dias";
-}
-
-function formatAge(days: number | null) {
-  if (days === null) return "Sem data";
-  if (days === 0) return "Hoje";
-  return `${days} ${days === 1 ? "dia" : "dias"}`;
 }
 
 function formatDuration(seconds: number | null) {
@@ -62,18 +56,24 @@ function LevelBadge({ level, customerWaiting }: { level: NegotiationLevel; custo
   );
 }
 
-export function createNegotiationLeadColumns(): LiteColumn<NegotiationLead>[] {
+function signalText(lead: NegotiationLead) {
+  const signals = [
+    lead.customerSentPdf ? "PDF" : null,
+    lead.customerSentImage ? "Imagem" : null,
+    lead.status === "quote_sent" ? "Proposta enviada" : null,
+    lead.statusBehindAi ? "IA indica próxima etapa" : null,
+  ].filter((value): value is string => Boolean(value));
+  return signals.length ? signals.join(" · ") : lead.ai.buyingSignals.length ? "Sinal de compra" : "Sem sinal extra";
+}
+
+export function createNegotiationLeadColumns(reference: Date): LiteColumn<NegotiationLead>[] {
   return [
     { id: "lead", label: "Lead", primary: true, render: (lead) => <LeadCell lead={lead} /> },
     { id: "broker", label: "Corretor", secondary: true, nowrap: true, render: (lead) => <span title={lead.brokerName}>{lead.brokerName}</span> },
-    { id: "branch", label: "Unidade", nowrap: true, render: (lead) => lead.branchName ?? "Sem unidade" },
-    { id: "level", label: "Nível", render: (lead) => <LevelBadge level={lead.level} customerWaiting={lead.customerWaiting} /> },
-    { id: "stage", label: "Etapa", render: (lead) => <span className={styles.stageCell}><span>{statusLabel(lead.status)}</span><span className={styles.muted}>{stageLabel[lead.ai.conversationStage] ?? "Em andamento"}{lead.statusBehindAi ? " · IA à frente" : ""}</span></span> },
-    { id: "age", label: "Dias na etapa", numeric: true, render: (lead) => formatAge(lead.daysAtStage) },
+    { id: "stage", label: "Etapa e nível", render: (lead) => <span className={styles.stageCell}><LevelBadge level={lead.level} customerWaiting={lead.customerWaiting} /><span className={styles.muted}>{statusLabel(lead.status)}</span></span> },
+    { id: "stopped", label: "Parado há", numeric: true, render: (lead) => lead.lastExchangeAt ? formatAgo(reference.getTime() - new Date(lead.lastExchangeAt).getTime()) : "Sem troca" },
+    { id: "signals", label: "Sinais", render: (lead) => <span className={styles.tableText} title={signalText(lead)}>{signalText(lead)}</span> },
     { id: "last", label: "Última troca", nowrap: true, render: (lead) => <span className={styles.tableText} title={formatWhen(lead.lastExchangeAt)}>{formatWhen(lead.lastExchangeAt)}</span> },
-    { id: "reply", label: "Resposta de", render: (lead) => lead.replyOwedBy === "broker" ? "Corretor" : lead.replyOwedBy === "customer" ? "Cliente" : "Ninguém" },
-    { id: "files", label: "Anexos", render: (lead) => lead.customerSentPdf && lead.customerSentImage ? "PDF e imagem" : lead.customerSentPdf ? "PDF" : lead.customerSentImage ? "Imagem" : "Sem anexos" },
-    { id: "ai", label: "Leitura da IA", render: (lead) => <span className={styles.aiText}><strong title={lead.ai.summary ?? "Sem resumo da IA"}>{lead.ai.summary ?? "Sem resumo da IA"}</strong><span className={styles.muted} title={lead.ai.nextBestAction ?? "Sem próxima ação sugerida"}>{lead.ai.nextBestAction ?? "Sem próxima ação sugerida"}</span></span> },
   ];
 }
 

@@ -31,13 +31,14 @@ describe("NegotiationsDashboard", () => {
     expect(screen.getByRole("navigation", { name: "Visões de negociações" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Negociações agora" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Sem conversa no CRM/ })).toBeTruthy();
-    expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(20);
-    const firstRow = container.querySelector('[data-lite="table"] tbody tr') as HTMLElement;
-    expect(within(firstRow).getByText("Aguardando resposta")).toBeTruthy();
+    expect(container.querySelectorAll('[data-lite="negotiation-cards"] > li')).toHaveLength(20);
+    expect(container.querySelector('[data-lite="negotiation-cards"]')?.textContent).toContain("Aguardando o corretor");
     expect(screen.getByRole("button", { name: /Aguardando resposta/ }).textContent).toContain(String(data.counts.customers_waiting));
+    fireEvent.click(screen.getByRole("button", { name: `Ver detalhes de ${data.leads[0]!.name}` }));
+    expect(await screen.findByRole("heading", { name: "Linha do tempo" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
-    await waitFor(() => expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(10));
+    await waitFor(() => expect(container.querySelectorAll('[data-lite="negotiation-cards"] > li')).toHaveLength(10));
   });
 
   it("filtra a lista pelas etapas do resumo e mostra o número que entrou hoje", () => {
@@ -55,7 +56,7 @@ describe("NegotiationsDashboard", () => {
     expect(advanced.textContent).toContain("2 entraram na etapa atual hoje");
     fireEvent.click(advanced);
     expect(advanced.getAttribute("aria-pressed")).toBe("true");
-    expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(data.counts.advanced);
+    expect(container.querySelectorAll('[data-lite="negotiation-cards"] > li')).toHaveLength(data.counts.advanced);
   });
 
   it("a trilha mostra proporções e filtra a lista pela etapa escolhida", () => {
@@ -67,7 +68,7 @@ describe("NegotiationsDashboard", () => {
     expect(within(trail).getAllByRole("progressbar")).toHaveLength(3);
     fireEvent.click(close);
     expect(close.getAttribute("aria-pressed")).toBe("true");
-    expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(data.counts.closing);
+    expect(container.querySelectorAll('[data-lite="negotiation-cards"] > li')).toHaveLength(data.counts.closing);
   });
 
   it("filtra a lista pela busca e abre a aba de estatísticas", () => {
@@ -75,7 +76,7 @@ describe("NegotiationsDashboard", () => {
     const { container, rerender } = render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} />);
     const search = screen.getByRole("searchbox", { name: "Buscar nas negociações" });
     fireEvent.change(search, { target: { value: "Mariana Oliveira" } });
-    expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-lite="negotiation-cards"] > li')).toHaveLength(1);
 
     rerender(<NegotiationsDashboard data={data} activeTab="statistics" generatedAt={new Date(data.generatedAt)} />);
     expect(screen.getByRole("heading", { name: "Saúde da IA" })).toBeTruthy();
@@ -85,9 +86,19 @@ describe("NegotiationsDashboard", () => {
     expect(screen.getByRole("columnheader", { name: "Em fechamento (atual)" })).toBeTruthy();
   });
 
+  it("alterna para uma tabela enxuta de seis colunas sem perder o filtro", () => {
+    const data = createNegotiationsFixture("director");
+    const { container } = render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} />);
+    fireEvent.click(screen.getByRole("button", { name: "Tabela" }));
+    expect(container.querySelectorAll('[data-lite="table"] thead th')).toHaveLength(6);
+    expect(screen.getByRole("columnheader", { name: "Parado há" })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "Sinais" })).toBeTruthy();
+  });
+
   it("abre o painel lateral do lead ao selecionar uma linha", async () => {
     const data = createNegotiationsFixture("director");
     const { container } = render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} />);
+    fireEvent.click(screen.getByRole("button", { name: "Tabela" }));
 
     fireEvent.click(container.querySelector('[data-lite="table"] tbody tr')!);
     expect(await screen.findByRole("heading", { name: "Linha do tempo" })).toBeTruthy();

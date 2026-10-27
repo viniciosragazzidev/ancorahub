@@ -8,7 +8,7 @@ import { Search } from "lucide-react";
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { LiteSelect } from "@/components/lite/controls";
-import { LiteResponsiveData } from "@/components/lite/data/data";
+import { LiteDataTable } from "@/components/lite/data/data";
 import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import { formatLiteDate } from "@/components/lite/format/date";
@@ -21,6 +21,7 @@ import { createNegotiationLeadColumns, formatNegotiationMetric, LEVEL_LABELS, Ne
 import type { NegotiationLead, NegotiationTimelineEvent, NegotiationsDashboardData } from "./queries";
 import { NegotiationStageSummary } from "./negotiation-stage-summary";
 import { NegotiationStageTrail } from "./negotiation-stage-trail";
+import { NegotiationLeadRow } from "./negotiation-lead-row";
 import styles from "./negotiations.module.css";
 
 type Filter = "all" | NegotiationLevel | "customers_waiting";
@@ -40,6 +41,7 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
   const [activeFilter, setActiveFilter] = useState<Filter>("all");
   const [brokerFilter, setBrokerFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
+  const [listPresentation, setListPresentation] = useState<"cards" | "table">("cards");
   const [query, setQuery] = useState("");
   const [selectedLead, setSelectedLead] = useState<NegotiationLead | null>(null);
   const [timeline, setTimeline] = useState<NegotiationTimelineEvent[]>([]);
@@ -98,7 +100,7 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
     reset();
   }, [pageFilterKey, reset]);
 
-  const columns = useMemo(() => createNegotiationLeadColumns(), []);
+  const columns = useMemo(() => createNegotiationLeadColumns(generatedAt), [generatedAt]);
   const brokerOptions = useMemo(() => [{ value: "all", label: "Todos os corretores" }, ...data.brokers.map((broker) => ({ value: broker.id, label: broker.name }))], [data.brokers]);
   const levelOptions = useMemo(() => [{ value: "all", label: "Todos os níveis" }, ...Object.entries(LEVEL_LABELS).map(([value, label]) => ({ value, label }))], []);
   const branchOptions = useMemo(() => [{ value: "all", label: "Todas as unidades" }, ...data.scope.branches.map((branch) => ({ value: branch.id, label: branch.name }))], [data.scope.branches]);
@@ -155,19 +157,29 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
                   <button type="button" className={litePage.button} disabled={isRefreshing} onClick={() => startRefresh(() => router.refresh())}>{isRefreshing ? "Atualizando" : "Atualizar"}</button>
                   <p className={styles.resultCount} aria-live="polite">{filteredLeads.length} {filteredLeads.length === 1 ? "resultado" : "resultados"}</p>
                 </div>
-                <LiteResponsiveData
-                  caption="Atendimentos ativos por nível de negociação"
-                  columns={columns}
-                  rows={pageRows}
-                  rowKey={(lead) => lead.id}
-                  onRowOpen={openLead}
-                  empty={(
-                    <div className={styles.empty}>
-                      <h2 className={styles.emptyTitle}>{data.leads.length ? "Nenhum atendimento neste filtro" : "Nenhum atendimento ativo"}</h2>
-                      <p className={styles.emptyText}>{data.leads.length ? "Tente outro nível, corretor ou busca." : "Os atendimentos aparecem aqui quando há sinais de conversa ou uma etapa comercial ativa."}</p>
-                    </div>
-                  )}
-                />
+                <div className={styles.presentationControls} role="group" aria-label="Formato da lista">
+                  <button type="button" className={styles.presentationButton} aria-pressed={listPresentation === "cards"} onClick={() => setListPresentation("cards")}>Cartões</button>
+                  <button type="button" className={styles.presentationButton} aria-pressed={listPresentation === "table"} onClick={() => setListPresentation("table")}>Tabela</button>
+                </div>
+                {pageRows.length ? listPresentation === "cards" ? (
+                  <ul className={styles.leadCards} aria-label="Atendimentos em cartões" data-lite="negotiation-cards">
+                    {pageRows.map((lead, index) => <NegotiationLeadRow key={lead.id} lead={lead} index={index} generatedAt={generatedAt} onOpen={openLead} />)}
+                  </ul>
+                ) : (
+                  <LiteDataTable
+                    caption="Atendimentos ativos por nível de negociação"
+                    columns={columns}
+                    rows={pageRows}
+                    rowKey={(lead) => lead.id}
+                    onRowOpen={openLead}
+                    empty={<p>Nenhum atendimento neste filtro.</p>}
+                  />
+                ) : (
+                  <div className={styles.empty}>
+                    <h2 className={styles.emptyTitle}>{data.leads.length ? "Nenhum atendimento neste filtro" : "Nenhum atendimento ativo"}</h2>
+                    <p className={styles.emptyText}>{data.leads.length ? "Tente outro nível, corretor ou busca." : "Os atendimentos aparecem aqui quando há sinais de conversa ou uma etapa comercial ativa."}</p>
+                  </div>
+                )}
                 <LitePagination {...pagination} label="Páginas de negociações" />
               </section>
             </>

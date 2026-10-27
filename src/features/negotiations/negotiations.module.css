@@ -119,6 +119,18 @@
   min-width: 0;
 }
 
+.presentationControls { display: inline-flex; justify-self: end; gap: 4px; max-width: 100%; padding: 4px; border-radius: var(--radius-control); background: var(--surface-muted); }
+.presentationButton { min-width: 76px; min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--text-sm); cursor: pointer; }
+.presentationButton[aria-pressed="true"] { background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-resting); }
+.presentationButton:focus-visible,
+.cardOpen:focus-visible { outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary)); outline-offset: 2px; }
+.leadCards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.cardStage { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cardStatus { color: var(--text-muted); font-size: var(--text-xs); }
+.cardStopped { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cardOpen { min-height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-xs); font-weight: 500; cursor: pointer; }
+.cardOpen:hover { background: var(--surface-muted); }
+
 .search {
   position: relative;
   display: flex;
@@ -222,6 +234,8 @@
   .toolbar { display: grid; grid-template-columns: minmax(0, 1fr); }
   .search, .select { width: 100%; max-width: none; }
   .resultCount { margin-left: 0; }
+  .presentationControls { justify-self: start; }
+  .leadCards { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .healthRow { grid-template-columns: minmax(0, 1fr); }
   .timelineItem { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .timelineAt { white-space: normal; }
