@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createNegotiationsFixture } from "./fixtures";
+import { getNegotiationTimelineAction } from "./actions";
 import { NegotiationsDashboard } from "./negotiations-dashboard";
 
 const navigation = vi.hoisted(() => ({ search: "" }));
@@ -103,6 +104,29 @@ describe("NegotiationsDashboard", () => {
     fireEvent.click(container.querySelector('[data-lite="table"] tbody tr')!);
     expect(await screen.findByRole("heading", { name: "Linha do tempo" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Abrir conversa" }).getAttribute("href")).toBe(`/mensagens/${data.leads[0]!.id}`);
+  });
+
+  it("mostra skeleton no painel sem bloquear cartões enquanto a linha do tempo carrega", async () => {
+    const data = createNegotiationsFixture("director");
+    let finishRequest!: (result: { success: true; events: [] }) => void;
+    vi.mocked(getNegotiationTimelineAction).mockImplementationOnce(() => new Promise((resolve) => { finishRequest = resolve; }));
+    const { container } = render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} />);
+
+    fireEvent.click(screen.getByRole("button", { name: `Ver detalhes de ${data.leads[0]!.name}` }));
+    expect(await screen.findByRole("status", { name: "Carregando linha do tempo" })).toBeTruthy();
+    expect(container.querySelectorAll('[data-lite="negotiation-cards"] > li')).toHaveLength(20);
+    finishRequest({ success: true, events: [] });
+    expect(await screen.findByText("Sem eventos registrados para este atendimento.")).toBeTruthy();
+  });
+
+  it("mostra erro recuperável quando a linha do tempo falha", async () => {
+    const data = createNegotiationsFixture("director");
+    vi.mocked(getNegotiationTimelineAction).mockResolvedValueOnce({ success: false, error: "Falha temporária.", events: [] });
+    render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} />);
+
+    fireEvent.click(screen.getByRole("button", { name: `Ver detalhes de ${data.leads[0]!.name}` }));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Tentar novamente" })).toBeTruthy();
   });
 
   it("mantém a unidade escolhida no topo e ao alternar para estatísticas", () => {

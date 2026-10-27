@@ -6,12 +6,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
+import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { LiteSelect } from "@/components/lite/controls";
 import { LiteDataTable } from "@/components/lite/data/data";
 import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import { formatLiteDate } from "@/components/lite/format/date";
+import { LiteSkeletonToContent } from "@/components/lite/motion";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { intentLabel } from "@/features/conversation-intelligence/components/radar-model";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
@@ -22,6 +24,7 @@ import type { NegotiationLead, NegotiationTimelineEvent, NegotiationsDashboardDa
 import { NegotiationStageSummary } from "./negotiation-stage-summary";
 import { NegotiationStageTrail } from "./negotiation-stage-trail";
 import { NegotiationLeadRow } from "./negotiation-lead-row";
+import { NegotiationLeadSignals } from "./negotiation-lead-signals";
 import styles from "./negotiations.module.css";
 
 type Filter = "all" | NegotiationLevel | "customers_waiting";
@@ -189,6 +192,7 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
         <LiteSidePanel open={Boolean(selectedLead)} onOpenChange={(open) => { if (!open) closeLead(); }} title={selectedLead?.name ?? "Atendimento"} description={selectedLead ? `${LEVEL_LABELS[selectedLead.level]} · ${statusLabel(selectedLead.status)}` : undefined}>
           {selectedLead ? (
             <div className={styles.drawerStack}>
+              <NegotiationLeadSignals lead={selectedLead} />
               <section className={styles.drawerSection}>
                 <h3 className={styles.drawerTitle}>Resumo da IA</h3>
                 <p className={styles.drawerText}>{selectedLead.ai.summary ?? "A IA ainda não gerou um resumo para este atendimento."}</p>
@@ -198,32 +202,26 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
                 {selectedLead.statusBehindAi ? <p className={styles.statusBehind}>A IA indica uma etapa à frente do CRM. O status não foi alterado.</p> : null}
               </section>
 
-              {selectedLead.ai.objections.length || selectedLead.ai.buyingSignals.length ? (
-                <section className={styles.drawerSection}>
-                  <h3 className={styles.drawerTitle}>Sinais da conversa</h3>
-                  {selectedLead.ai.objections.length ? <div><p className={styles.muted}>Objeções</p><ul className={styles.signalList}>{selectedLead.ai.objections.map((item, index) => <li key={`objection-${index}`}>{item}</li>)}</ul></div> : null}
-                  {selectedLead.ai.buyingSignals.length ? <div><p className={styles.muted}>Sinais de compra</p><ul className={styles.signalList}>{selectedLead.ai.buyingSignals.map((item, index) => <li key={`signal-${index}`}>{item}</li>)}</ul></div> : null}
-                </section>
-              ) : null}
-
               <section className={styles.drawerSection}>
                 <h3 className={styles.drawerTitle}>Linha do tempo</h3>
-                {timelineLoading ? <p className={styles.loading} role="status">Carregando histórico…</p> : timelineError ? (
-                  <div className={styles.loading} role="alert">
-                    <p>{timelineError}</p>
-                    <button type="button" className={styles.textLink} onClick={() => { if (selectedLead) void loadTimeline(selectedLead.id); }}>Tentar novamente</button>
-                  </div>
-                ) : timeline.length ? (
-                  <ol className={styles.timeline}>
-                    {timeline.map((event) => (
-                      <li key={event.id} className={styles.timelineItem}>
-                        <p className={styles.timelineLabel}>{event.label}</p>
-                        <time className={styles.timelineAt} dateTime={event.at}>{formatLiteDate(event.at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</time>
-                        {event.detail ? <p className={styles.timelineDetail}>{event.detail}</p> : null}
-                      </li>
-                    ))}
-                  </ol>
-                ) : <p className={styles.loading}>Sem eventos registrados para este atendimento.</p>}
+                <LiteSkeletonToContent loading={timelineLoading} skeleton={<Skeleton label="Carregando linha do tempo" lines={5} />} minHeight={240} className={styles.timelineSkeleton}>
+                  {timelineError ? (
+                    <div className={styles.loading} role="alert">
+                      <p>{timelineError}</p>
+                      <button type="button" className={styles.textLink} onClick={() => { if (selectedLead) void loadTimeline(selectedLead.id); }}>Tentar novamente</button>
+                    </div>
+                  ) : timeline.length ? (
+                    <ol className={styles.timeline}>
+                      {timeline.map((event) => (
+                        <li key={event.id} className={styles.timelineItem}>
+                          <p className={styles.timelineLabel}>{event.label}</p>
+                          <time className={styles.timelineAt} dateTime={event.at}>{formatLiteDate(event.at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</time>
+                          {event.detail ? <p className={styles.timelineDetail}>{event.detail}</p> : null}
+                        </li>
+                      ))}
+                    </ol>
+                  ) : <p className={styles.loading}>Sem eventos registrados para este atendimento.</p>}
+                </LiteSkeletonToContent>
               </section>
 
               <div className={styles.linkRow}>

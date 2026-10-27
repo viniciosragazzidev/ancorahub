@@ -207,6 +207,13 @@
 .healthItem[data-tone="danger"] .healthValue { color: var(--danger); }
 .drawerStack { display: grid; gap: 24px; min-width: 0; }
 .drawerSection { display: grid; gap: 12px; min-width: 0; }
+.leadSignals { display: grid; gap: 16px; min-width: 0; }
+.miniTrail { display: grid; gap: 8px; }
+.miniTrail ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.miniTrail li { display: grid; min-width: 0; min-height: 36px; align-items: center; padding: 6px 8px; border-radius: var(--radius-control); background: var(--surface-muted); color: var(--text-muted); font-size: var(--text-xs); text-align: center; }
+.miniTrail li[data-current="true"] { background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
+.miniTrail p { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); }
+.timelineSkeleton { display: grid; align-content: start; min-height: 240px; }
 .drawerTitle { margin: 0; font-size: var(--text-sm); font-weight: 500; }
 .drawerText { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.5; overflow-wrap: anywhere; }
 .signalList { display: grid; gap: 8px; margin: 0; padding-left: 20px; color: var(--text-secondary); font-size: var(--text-sm); }
