@@ -1,7 +1,7 @@
 ﻿import { describe, expect, it } from "vitest";
 
 import { defaultIntelligentDistributionPolicy } from "./domain";
-import { chooseManualQueuePick, mergeEligibleOrderKeepingBlockedSlots, pickManualQueueBroker, previewQueueOrder, reconcileManualQueueOrder, rotateManualQueueAfterPick, type DutyQueueCandidate } from "./duty-queue-order";
+import { chooseManualQueuePick, dutyQueueHistorySince, mergeEligibleOrderKeepingBlockedSlots, manualQueueSettingKeyForBroker, pickManualQueueBroker, previewQueueOrder, reconcileManualQueueOrder, rotateManualQueueAfterPick, type DutyQueueCandidate } from "./duty-queue-order";
 
 function candidate(id: string, overrides: Partial<DutyQueueCandidate> = {}): DutyQueueCandidate {
   return {
@@ -22,6 +22,21 @@ function candidate(id: string, overrides: Partial<DutyQueueCandidate> = {}): Dut
 }
 
 describe("fila visual e rodízio por plantão", () => {
+  it("limita os desempates de histórico aos últimos 30 dias", () => {
+    const now = new Date("2026-10-27T18:00:00.000Z");
+    expect(dutyQueueHistorySince(now)).toEqual(new Date("2026-09-27T18:00:00.000Z"));
+  });
+
+  it("resolve a chave manual somente pela ocorrência do corretor escolhido", () => {
+    const scope = {
+      scheduleIdByBroker: { ana: "manha", bia: "tarde" },
+      dutyDateBySchedule: { manha: "2026-10-27", tarde: "2026-10-27" },
+    };
+    expect(manualQueueSettingKeyForBroker(scope, "ana")).toBe("manual-queue:manha:2026-10-27");
+    expect(manualQueueSettingKeyForBroker(scope, "bia")).toBe("manual-queue:tarde:2026-10-27");
+    expect(manualQueueSettingKeyForBroker(scope, null)).toBeNull();
+  });
+
   it("a prévia automática usa o mesmo resolver e aponta o selecionado", () => {
     const result = previewQueueOrder({
       candidates: [candidate("ana", { receivedInDuty: 3 }), candidate("bia", { receivedInDuty: 1 })],
@@ -137,6 +152,19 @@ describe("fila visual e rodízio por plantão", () => {
       rosterBrokerIdsBySchedule: { manha: ["ana", "bia"] },
     });
     expect(result).toEqual({ brokerId: "bia", scheduleId: null, nextOrder: null, manual: false });
+  });
+
+  it("uma fila manual salva também prevalece sobre round_robin no plantão escolhido", () => {
+    const result = chooseManualQueuePick({
+      lockAcquired: true,
+      automaticBrokerId: "mais-antigo",
+      pendingBrokerIds: ["mais-antigo", "mais-novo"],
+      scheduleIdByBroker: { "mais-antigo": "manha", "mais-novo": "manha" },
+      queueBySchedule: { manha: ["mais-novo", "mais-antigo"] },
+      rosterBrokerIdsBySchedule: { manha: ["mais-antigo", "mais-novo"] },
+    });
+    expect(result.brokerId).toBe("mais-novo");
+    expect(result.nextOrder).toEqual(["mais-antigo", "mais-novo"]);
   });
 
   it("um rodízio de manhã não altera a fila da tarde", () => {

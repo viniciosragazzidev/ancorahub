@@ -3,7 +3,7 @@ import { and, eq, gte, inArray, ne } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { countReceivedInDayByBroker, NON_COUNTING_OFFER_STATUS, type DutyScheduleIdByBroker } from "./received-in-day-core";
 
-export { countsAsReceived, countReceivedInDayByBroker, NON_COUNTING_OFFER_STATUS, pickNextByReceivedInDay } from "./received-in-day-core";
+export { countsAsReceived, countReceivedInDayByBroker, getDutyScheduleReceiptScope, NON_COUNTING_OFFER_STATUS, pickNextByReceivedInDay } from "./received-in-day-core";
 export type { DayReceipt, DutyScheduleIdByBroker } from "./received-in-day-core";
 
 type DatabaseLike = Pick<ReturnType<typeof getDatabase>, "select">;

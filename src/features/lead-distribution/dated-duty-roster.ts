@@ -5,6 +5,11 @@ import { getDatabase, schema } from "@/shared/db";
 
 type DutyRosterRow = { scheduleId: string; dutyDate: string | null; brokerId?: string };
 
+/** Exclude paused rows before monthly rows are resolved against the weekly roster. */
+export function filterPausedDutyAssignmentsBeforeResolution<T extends DutyRosterRow & { pausedAt?: Date | null }>(rows: readonly T[]): T[] {
+  return rows.filter((row) => !row.pausedAt);
+}
+
 function dateKey(date: Date) {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
   const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "00";

@@ -22,6 +22,14 @@ export function countsAsReceived(receipt: DayReceipt, since: Date) {
 
 export type DutyScheduleIdByBroker = Readonly<Record<string, string | null | undefined>>;
 
+/** The preview and the locked distribution use the same occurrence scope. */
+export function getDutyScheduleReceiptScope<T extends DutyScheduleIdByBroker>(
+  scheduleIdByBroker: T,
+  hasExplicitDutyScope: boolean,
+): T {
+  return hasExplicitDutyScope ? scheduleIdByBroker : {} as T;
+}
+
 /** Leads distintos recebidos por corretor no plantão desta escolha. */
 export function countReceivedInDayByBroker(
   receipts: readonly DayReceipt[],

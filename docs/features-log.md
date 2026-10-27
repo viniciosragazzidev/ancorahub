@@ -580,3 +580,7 @@ Os avisos de lead indisponível, oferta expirada e reatribuição incluem o nome
 ## 2026-10-27 - Fila visual do plantão com arrastar
 
 Na aba Plantão, a lista mostra a ordem automática prevista por ocorrência ativa, empates e bloqueios. Quando o diretor reordena, a ocorrência passa a rodízio manual; o primeiro elegível recebe e vai ao fim, enquanto bloqueados mantêm sua posição. A leitura e a gravação da ordem ficam sob a trava de escolha, com auditoria, e o gestor vê apenas a unidade autorizada. A data da chave segue a ocorrência em America/Sao_Paulo, inclusive em plantões noturnos. Sem migration. Registro: DEC-160 e `docs/implementations/active/2026-10-27-fila-visual-plantao.md`.
+
+## 2026-10-27 - Correções da revisão da fila visual do plantão
+
+O preview limita o histórico agregado de leads e tentativas a 30 dias e compartilha a regra de escopo de recebimentos com a escolha real. A distribuição remove atribuições pausadas antes de resolver a escala efetiva, preservando a linha semanal quando a linha publicada do mês está pausada. Em `round_robin`, o lock manual só é tentado se existir fila salva na ocorrência escolhida.

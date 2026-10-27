@@ -22,8 +22,8 @@ import { isCompanyLeadType } from "@/features/leads/company-lead-detection";
 import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
 import { normalizeQueueSource } from "./routing-catalog";
 import { findBrokerRunningDutyScheduleId, getActiveQueueDutyRoster } from "./active-queue-duty-roster";
-import { countReceivedInDayByBroker, NON_COUNTING_OFFER_STATUS } from "./received-in-day";
-import { getSaoPauloDateKey, resolveEffectiveDutyAssignments } from "./dated-duty-roster";
+import { countReceivedInDayByBroker, getDutyScheduleReceiptScope, NON_COUNTING_OFFER_STATUS } from "./received-in-day";
+import { filterPausedDutyAssignmentsBeforeResolution, getSaoPauloDateKey, resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getOvernightExtraShiftSettings, getPresenceEligibleAssignments } from "./duty-presence";
 import { extraShiftWindow, findRunningDutySchedule, getRelevantDutyWindow, isExtraShiftRecord, isOvernightLead, MORNING_SHIFT_STARTS_BEFORE } from "./duty-presence-domain";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -141,12 +141,12 @@ async function getRosterBrokerIds(
       lte(schema.dutyRosterAssignments.startsAt, local.time),
       gt(schema.dutyRosterAssignments.endsAt, local.time),
       lte(schema.dutyRosterAssignments.validFrom, date),
+      isNull(schema.dutyRosterAssignments.pausedAt),
       or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, date)),
       inArray(schema.dutyRosterAssignments.scheduleId, matchingScheduleIds),
     ));
 
-  const effectiveAssignments = await resolveEffectiveDutyAssignments(tenantId, assignments, date);
-  const eligibleAssignments = effectiveAssignments.filter((assignment) => !assignment.pausedAt);
+  const effectiveAssignments = await resolveEffectiveDutyAssignments(tenantId, filterPausedDutyAssignmentsBeforeResolution(assignments), date);
   const manualRosterBrokerIdsBySchedule = new Map<string, string[]>();
   for (const assignment of effectiveAssignments) {
     const roster = manualRosterBrokerIdsBySchedule.get(assignment.scheduleId) ?? [];
@@ -162,7 +162,7 @@ async function getRosterBrokerIds(
   // remain queued instead of silently falling back to the whole unit roster.
   const presence = await getPresenceEligibleAssignments({
     tenantId,
-    assignments: eligibleAssignments,
+    assignments: effectiveAssignments,
     schedules: activeSchedules.filter((schedule) => matchingScheduleIds.includes(schedule.id)),
     now: date,
   });
@@ -170,22 +170,22 @@ async function getRosterBrokerIds(
   const eligibleAfterCap = new Set(presence.eligibleAssignmentIds);
   const receivedBySchedule = new Map<string, Map<string, number>>();
   await Promise.all([...(dutyLeadCaps?.values() ?? [])].map(async (cap) => {
-    const brokerIds = [...new Set(eligibleAssignments
+    const brokerIds = [...new Set(effectiveAssignments
       .filter((assignment) => assignment.scheduleId === cap.scheduleId && presence.eligibleAssignmentIds.has(assignment.id))
       .map((assignment) => assignment.brokerId))];
     if (brokerIds.length) receivedBySchedule.set(cap.scheduleId, await countLeadsReceivedInDuty(db, tenantId, cap, brokerIds));
   }));
   if (dutyLeadCaps?.size) {
-    for (const assignment of eligibleAssignments) {
+    for (const assignment of effectiveAssignments) {
       const cap = dutyLeadCaps.get(assignment.scheduleId);
       if (cap && (receivedBySchedule.get(cap.scheduleId)?.get(assignment.brokerId) ?? 0) >= cap.limit) eligibleAfterCap.delete(assignment.id);
     }
   }
-  const brokersBeforeCap = new Set(eligibleAssignments.filter((assignment) => eligibleBeforeCap.has(assignment.id)).map((assignment) => assignment.brokerId));
-  const brokersAfterCap = new Set(eligibleAssignments.filter((assignment) => eligibleAfterCap.has(assignment.id)).map((assignment) => assignment.brokerId));
+  const brokersBeforeCap = new Set(effectiveAssignments.filter((assignment) => eligibleBeforeCap.has(assignment.id)).map((assignment) => assignment.brokerId));
+  const brokersAfterCap = new Set(effectiveAssignments.filter((assignment) => eligibleAfterCap.has(assignment.id)).map((assignment) => assignment.brokerId));
   const brokersStoppedByDutyCap = [...brokersBeforeCap].filter((brokerId) => !brokersAfterCap.has(brokerId)).length;
   const scheduleIdByBroker = selectBrokerDutyScheduleIds(
-    eligibleAssignments.map((assignment) => ({ id: assignment.id, brokerId: assignment.brokerId, scheduleId: assignment.scheduleId })),
+    effectiveAssignments.map((assignment) => ({ id: assignment.id, brokerId: assignment.brokerId, scheduleId: assignment.scheduleId })),
     new Set(matchingScheduleIds),
     eligibleAfterCap,
     presence.confirmedPresenceAssignmentIds,
@@ -1412,7 +1412,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   // count only assignments, attempts and offers that also have no plantão (DEC-154).
   // The plantão is only recorded on offers/attempts/leads of exclusive-plantão
   // queues (dutyScheduleIdByBroker below), so count with that same key.
-  const countingScheduleIdByBroker: Record<string, string> = exclusiveScheduleIds?.length ? Object.fromEntries(scheduleIdByBroker) : {};
+  const countingScheduleIdByBroker = getDutyScheduleReceiptScope(Object.fromEntries(scheduleIdByBroker), Boolean(exclusiveScheduleIds?.length));
   const receivedInDayByBroker = countReceivedInDayByBroker([
     ...brokerLeadHistory.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
     ...slaAttempts.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),

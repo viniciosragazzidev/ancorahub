@@ -9,7 +9,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { findRunningDutySchedule } from "./duty-presence-domain";
-import { reconcileManualQueueOrder } from "./duty-queue-order";
+import { manualQueueSettingKey, reconcileManualQueueOrder } from "./duty-queue-order";
 import { tryDistributionPickLock } from "./distribution-pick-lock";
 
 const inputSchema = z.object({
@@ -17,10 +17,6 @@ const inputSchema = z.object({
   dutyDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   brokerIds: z.array(z.string().uuid()).max(200),
 }).strict();
-
-function manualQueueKey(scheduleId: string, dutyDate: string) {
-  return `manual-queue:${scheduleId}:${dutyDate}`;
-}
 
 async function resolveLiveOccurrence(scheduleId: string, dutyDate: string) {
   const context = await getRequiredTenantContext();
@@ -41,7 +37,7 @@ export async function saveDutyManualQueueAction(rawInput: unknown): Promise<{ ok
     const rosterIds = profile.roster.map((entry) => entry.brokerId);
     if (brokerIds.some((brokerId) => !rosterIds.includes(brokerId))) return { ok: false, reason: "A escala mudou. Atualize a página e tente de novo." };
     const order = reconcileManualQueueOrder(brokerIds, rosterIds);
-    const key = manualQueueKey(scheduleId, dutyDate);
+    const key = manualQueueSettingKey(scheduleId, dutyDate);
     const saved = await db.transaction(async (tx) => {
       if (!await tryDistributionPickLock(tx, context.tenantId)) return false;
       await tx.insert(schema.systemSettings).values({ key, value: JSON.stringify(order), updatedAt: now }).onConflictDoUpdate({
@@ -72,7 +68,7 @@ export async function resetDutyManualQueueAction(rawInput: unknown): Promise<{ o
   try {
     const { scheduleId, dutyDate } = parsed.data;
     const { context, db, now } = await resolveLiveOccurrence(scheduleId, dutyDate);
-    const key = manualQueueKey(scheduleId, dutyDate);
+    const key = manualQueueSettingKey(scheduleId, dutyDate);
     const cleared = await db.transaction(async (tx) => {
       if (!await tryDistributionPickLock(tx, context.tenantId)) return false;
       await tx.delete(schema.systemSettings).where(eq(schema.systemSettings.key, key));

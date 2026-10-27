@@ -2,6 +2,28 @@ import { resolveDistributionCandidate, type IntelligentDistributionPolicy, type 
 import type { AssignmentStrategy } from "./types";
 import { pickNextByReceivedInDay } from "./received-in-day-core";
 
+export const DUTY_QUEUE_HISTORY_WINDOW_DAYS = 30;
+
+export function dutyQueueHistorySince(now: Date) {
+  return new Date(now.getTime() - DUTY_QUEUE_HISTORY_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+}
+
+export function manualQueueSettingKey(scheduleId: string, dutyDate: string) {
+  return `manual-queue:${scheduleId}:${dutyDate}`;
+}
+
+export function manualQueueSettingKeyForBroker(
+  scope: {
+    scheduleIdByBroker: Readonly<Record<string, string | null | undefined>>;
+    dutyDateBySchedule: Readonly<Record<string, string | null | undefined>>;
+  },
+  brokerId: string | null | undefined,
+) {
+  const scheduleId = brokerId ? scope.scheduleIdByBroker[brokerId] : null;
+  const dutyDate = scheduleId ? scope.dutyDateBySchedule[scheduleId] : null;
+  return scheduleId && dutyDate ? manualQueueSettingKey(scheduleId, dutyDate) : null;
+}
+
 export type DutyQueueCandidate = RankedBroker & { name: string; blockedReason?: string | null };
 
 export function reconcileManualQueueOrder(current: readonly string[], rosterBrokerIds: readonly string[]) {

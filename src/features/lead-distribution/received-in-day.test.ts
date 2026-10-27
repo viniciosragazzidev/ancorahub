@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { chooseBroker, defaultIntelligentDistributionPolicy, resolveDistributionCandidate, type RankedBroker } from "./domain";
-import { countReceivedInDayByBroker, pickNextByReceivedInDay, type DayReceipt } from "./received-in-day";
+import { countReceivedInDayByBroker, getDutyScheduleReceiptScope, pickNextByReceivedInDay, type DayReceipt } from "./received-in-day";
 
 const since = new Date("2026-10-26T22:00:00.000Z"); // 19:00 de 26/10 em São Paulo
 const at = (hhmm: string) => new Date(`2026-10-27T${hhmm}:00.000-03:00`);
@@ -119,6 +119,18 @@ describe("DEC-154: nivelamento pelo dia da operação", () => {
     ], since, {});
     expect(counts.get("fila")).toBe(1);
     expect(counts.has("colega")).toBe(false);
+  });
+
+  it("(c) a prévia de cada plantão usa o mesmo escopo de recebimentos da escolha", () => {
+    const receipts: DayReceipt[] = [
+      { brokerId: "duplo", leadId: "manha-1", dutyScheduleId: "manha", receivedAt: at("09:00") },
+      { brokerId: "duplo", leadId: "tarde-1", dutyScheduleId: "tarde", receivedAt: at("14:00") },
+      { brokerId: "colega", leadId: "tarde-2", dutyScheduleId: "tarde", receivedAt: at("14:05") },
+    ];
+    const scheduleScope = getDutyScheduleReceiptScope({ duplo: "tarde", colega: "tarde" }, true);
+    const previewCounts = countReceivedInDayByBroker(receipts, since, scheduleScope);
+    expect(previewCounts).toEqual(new Map([["duplo", 1], ["colega", 1]]));
+    expect(pickNextByReceivedInDay(["duplo", "colega"], previewCounts)).toBe("duplo");
   });
 
   it("(d) chooseBroker com ranking desligado respeita os recebidos no dia antes da carteira", () => {

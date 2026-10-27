@@ -22,7 +22,7 @@ import { getRelevantDutyWindow, isDutyWindowActive } from "./duty-presence-domai
 import { postSaleTransferAuditAction } from "./post-sale-transfer";
 import { traceLeadStep } from "./distribution-trace";
 import { loadReceivedInDayByBroker, pickNextByReceivedInDay } from "./received-in-day";
-import { chooseManualQueuePick, parseManualQueueValue } from "./duty-queue-order";
+import { chooseManualQueuePick, manualQueueSettingKey, manualQueueSettingKeyForBroker, parseManualQueueValue } from "./duty-queue-order";
 import { tryDistributionPickLock, tryDistributionPickLockOnce } from "./distribution-pick-lock";
 
 /**
@@ -209,11 +209,14 @@ export async function createLeadOffersForBrokers(input: {
   const manualQueueKeys = input.manualPick
     ? [...new Set(Object.values(input.manualPick.scheduleIdByBroker).filter((id): id is string => Boolean(id)))].flatMap((scheduleId) => {
       const dutyDate = input.manualPick!.dutyDateBySchedule[scheduleId];
-      return dutyDate ? [`manual-queue:${scheduleId}:${dutyDate}`] : [];
+      return dutyDate ? [manualQueueSettingKey(scheduleId, dutyDate)] : [];
     })
     : [];
-  const manualQueueMayBeActive = manualQueueKeys.length
-    ? (await db.select({ key: schema.systemSettings.key }).from(schema.systemSettings).where(inArray(schema.systemSettings.key, manualQueueKeys))).length > 0
+  const automaticScheduleQueueKey = input.manualPick
+    ? manualQueueSettingKeyForBroker(input.manualPick, brokers[0]?.id)
+    : null;
+  const manualQueueMayBeActive = automaticScheduleQueueKey
+    ? (await db.select({ key: schema.systemSettings.key }).from(schema.systemSettings).where(eq(schema.systemSettings.key, automaticScheduleQueueKey))).length > 0
     : false;
 
   const createdOffers: Array<{ offerId: string; brokerId: string; whatsappMessageId?: string }> = [];
@@ -258,7 +261,7 @@ export async function createLeadOffersForBrokers(input: {
         automaticBrokerId = pickNextByReceivedInDay(pendingIds, received, input.fairPick.tierByBroker);
         broker = pending.find((candidate) => candidate.id === automaticBrokerId) ?? broker;
         destinationPhone = broker.phone;
-      } else if (input.manualPick && !pickLockBusy) {
+      } else if (input.manualPick && manualQueueMayBeActive && !pickLockBusy) {
         pickLockAcquired = await tryDistributionPickLockOnce(tx, input.tenantId);
         if (!pickLockAcquired) pickLockBusy = true;
       }
@@ -269,7 +272,7 @@ export async function createLeadOffersForBrokers(input: {
           : [];
         const queueBySchedule: Record<string, readonly string[] | undefined> = {};
         for (const row of settingRows) {
-          const scheduleId = Object.keys(input.manualPick.dutyDateBySchedule).find((id) => `manual-queue:${id}:${input.manualPick!.dutyDateBySchedule[id]}` === row.key);
+          const scheduleId = Object.keys(input.manualPick.dutyDateBySchedule).find((id) => manualQueueSettingKey(id, input.manualPick!.dutyDateBySchedule[id]) === row.key);
           const queue = parseManualQueueValue(row.value);
           if (scheduleId && queue) queueBySchedule[scheduleId] = queue;
         }
@@ -286,7 +289,7 @@ export async function createLeadOffersForBrokers(input: {
           broker = pending.find((candidate) => candidate.id === picked.brokerId) ?? broker;
           destinationPhone = broker.phone;
           const dutyDate = input.manualPick.dutyDateBySchedule[picked.scheduleId];
-          if (dutyDate) manualRotation = { key: `manual-queue:${picked.scheduleId}:${dutyDate}`, nextOrder: picked.nextOrder };
+          if (dutyDate) manualRotation = { key: manualQueueSettingKey(picked.scheduleId, dutyDate), nextOrder: picked.nextOrder };
         }
       }
       traceLeadStep(input.leadId, `offer_claim:${broker.id}`);

@@ -8,8 +8,8 @@ import type { AssignmentStrategy } from "./types";
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { findRunningDutySchedule } from "./duty-presence-domain";
 import { operationDayStart } from "./broker-day-history";
-import { countReceivedInDayByBroker, NON_COUNTING_OFFER_STATUS, type DayReceipt } from "./received-in-day";
-import { parseManualQueueValue, previewQueueOrder, reconcileManualQueueOrder, type DutyQueueCandidate } from "./duty-queue-order";
+import { countReceivedInDayByBroker, getDutyScheduleReceiptScope, NON_COUNTING_OFFER_STATUS, type DayReceipt } from "./received-in-day";
+import { dutyQueueHistorySince, manualQueueSettingKey, parseManualQueueValue, previewQueueOrder, reconcileManualQueueOrder, type DutyQueueCandidate } from "./duty-queue-order";
 
 export type DutyQueueOrderPreview = {
   scheduleId: string;
@@ -115,6 +115,7 @@ export async function getDutyQueueOrderPreviews(context: TenantContext, now = ne
   }));
 
   const since = operationDayStart(now);
+  const historySince = dutyQueueHistorySince(now);
   const [leadReceipts, attempts, offers, leadHistory, slaAttempts] = await Promise.all([
     db.select({ brokerId: schema.leads.corretorId, leadId: schema.leads.id, receivedAt: schema.leads.assignedAt, dutyScheduleId: schema.leads.dutyScheduleId })
       .from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, brokerIds), gte(schema.leads.assignedAt, since))),
@@ -128,14 +129,14 @@ export async function getDutyQueueOrderPreviews(context: TenantContext, now = ne
       converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')`,
       unstarted: sql<number>`count(*) filter (where ${schema.leads.status} in ('distributed', 'new') or (${schema.leads.serviceStartedAt} is null and ${schema.leads.firstContactAt} is null))`,
       idleSince: sql<Date | null>`max(${schema.leads.assignedAt})`,
-    }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, brokerIds))).groupBy(schema.leads.corretorId),
+    }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, brokerIds), gte(schema.leads.assignedAt, historySince))).groupBy(schema.leads.corretorId),
     db.select({
       brokerId: schema.leadAssignmentAttempts.brokerId,
       total: count(schema.leadAssignmentAttempts.id),
       onTime: sql<number>`count(*) filter (where ${schema.leadAssignmentAttempts.firstContactAt} is not null and ${schema.leadAssignmentAttempts.firstContactAt} <= ${schema.leadAssignmentAttempts.feedbackDueAt})`,
       unstarted: sql<number>`count(*) filter (where ${schema.leadAssignmentAttempts.firstContactAt} is null)`,
       idleSince: sql<Date | null>`max(${schema.leadAssignmentAttempts.assignedAt})`,
-    }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, brokerIds))).groupBy(schema.leadAssignmentAttempts.brokerId),
+    }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, brokerIds), gte(schema.leadAssignmentAttempts.assignedAt, historySince))).groupBy(schema.leadAssignmentAttempts.brokerId),
   ]);
   const receipts = [...leadReceipts, ...attempts, ...offers] as DayReceipt[];
   const historyByBroker = summarizeBrokerHistory(brokerIds, leadHistory, slaAttempts);
@@ -145,7 +146,7 @@ export async function getDutyQueueOrderPreviews(context: TenantContext, now = ne
     .from(schema.leadDistributionPolicies).where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), inArray(schema.leadDistributionPolicies.queueId, queueIds), isNull(schema.leadDistributionPolicies.profileKey))).orderBy(asc(schema.leadDistributionPolicies.createdAt)) : [];
   const policiesByQueue = new Map<string, { policy: IntelligentDistributionPolicy; enabled: boolean }>();
   for (const row of policyRows) if (row.queueId && !policiesByQueue.has(row.queueId)) policiesByQueue.set(row.queueId, { policy: readDistributionPolicy(row.policy), enabled: row.enabled });
-  const manualScheduleByKey = new Map(running.map(({ schedule, dutyDate }) => [`manual-queue:${schedule.id}:${dutyDate}`, schedule.id]));
+  const manualScheduleByKey = new Map(running.map(({ schedule, dutyDate }) => [manualQueueSettingKey(schedule.id, dutyDate), schedule.id]));
   const manualKeys = [...manualScheduleByKey.keys()];
   const manualRows = await db.select({ key: schema.systemSettings.key, value: schema.systemSettings.value }).from(schema.systemSettings).where(inArray(schema.systemSettings.key, manualKeys));
   const manualBySchedule = new Map<string, string[]>();
@@ -159,15 +160,14 @@ export async function getDutyQueueOrderPreviews(context: TenantContext, now = ne
     const roster = allRoster.filter((entry) => entry.scheduleId === schedule.id);
     const scheduleBrokerIds = roster.map((entry) => entry.brokerId);
     const scheduleIdByBroker = Object.fromEntries(scheduleBrokerIds.map((brokerId) => [brokerId, schedule.id]));
-    const received = countReceivedInDayByBroker(receipts, since, scheduleIdByBroker);
     const accessibleQueues = linkedQueuesByProfile[index];
     const linked = accessibleQueues.filter((queue) => queue.assignmentMode === "automatic");
     const operatingQueue = linked[0] ?? null;
     const queuePolicy = operatingQueue ? policiesByQueue.get(operatingQueue.id) : null;
     const policy = queuePolicy?.policy ?? defaultIntelligentDistributionPolicy;
     const strategy = operatingQueue?.assignmentStrategy === "round_robin" ? "round_robin" : "capacity";
-    const usesScheduleReceiptScope = Boolean(operatingQueue && (operatingQueue.exclusiveDutyScheduleIds?.includes(schedule.id) || operatingQueue.exclusiveDutyScheduleId === schedule.id));
-    const countingScope = usesScheduleReceiptScope ? received : countReceivedInDayByBroker(receipts, since, {});
+    const hasExplicitDutyScope = Boolean(operatingQueue && (operatingQueue.exclusiveDutyScheduleIds?.includes(schedule.id) || operatingQueue.exclusiveDutyScheduleId === schedule.id));
+    const countingScope = countReceivedInDayByBroker(receipts, since, getDutyScheduleReceiptScope(scheduleIdByBroker, hasExplicitDutyScope));
     const pausedBrokerIds = new Set(roster.filter((entry) => entry.pausedAt).map((entry) => entry.brokerId));
     const candidates: DutyQueueCandidate[] = roster.map((entry) => {
       const history = historyByBroker.get(entry.brokerId);

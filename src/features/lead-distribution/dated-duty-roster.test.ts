@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectEffectiveDutyAssignments } from "./dated-duty-roster";
+import { filterPausedDutyAssignmentsBeforeResolution, selectEffectiveDutyAssignments } from "./dated-duty-roster";
 
 describe("selectEffectiveDutyAssignments", () => {
   const weekly = { id: "weekly", scheduleId: "shift-a", dutyDate: null, brokerId: "w1" };
@@ -25,5 +25,14 @@ describe("selectEffectiveDutyAssignments", () => {
     const minePublished = { id: "p-ana", scheduleId: "shift-a", dutyDate: "2026-09-28", brokerId: "ana" };
     const bruno = { id: "w-bruno", scheduleId: "shift-a", dutyDate: null, brokerId: "bruno" };
     expect(selectEffectiveDutyAssignments([mine, minePublished, bruno], "2026-09-28", new Set(["shift-a"]))).toEqual([minePublished, bruno]);
+  });
+
+  it("remove uma pausa datada antes de resolver e preserva a linha semanal", () => {
+    const weekly = { id: "weekly", scheduleId: "shift-a", dutyDate: null, brokerId: "ana", pausedAt: null };
+    const pausedPublished = { id: "published-paused", scheduleId: "shift-a", dutyDate: "2026-09-28", brokerId: "ana", pausedAt: new Date("2026-09-28T12:00:00.000Z") };
+
+    expect(selectEffectiveDutyAssignments([weekly, pausedPublished], "2026-09-28", new Set(["shift-a"]))[0]?.id).toBe("published-paused");
+    const unpausedBeforeResolve = filterPausedDutyAssignmentsBeforeResolution([weekly, pausedPublished]);
+    expect(selectEffectiveDutyAssignments(unpausedBeforeResolve, "2026-09-28", new Set(["shift-a"]))[0]?.id).toBe("weekly");
   });
 });

@@ -59,3 +59,7 @@ Pacotes entregues nesta implementação: P1 função pura e testes; P2 persistê
 - `node scripts/check-lite-skin.mjs`: concluído em modo relatório.
 - Capturas revisadas em 1440 e 390 px: `scratchpad/fila-plantao-prints/onda5-fila-plantao-1440.png` e `onda5-fila-plantao-390.png`. Sem rolagem horizontal; no celular a lista rola verticalmente.
 - Não foram executados testes de banco, migrations ou push.
+
+## Correções da revisão (27/10)
+
+As agregações de conversão e SLA do preview usam apenas atribuições dos últimos 30 dias. A escolha e o preview compartilham o seletor do escopo de recebimentos. A distribuição filtra pausas antes de resolver a escala efetiva, então uma linha publicada pausada não substitui a linha semanal. O caminho `round_robin` tenta a trava manual apenas quando há fila salva para o plantão/data escolhidos; quando salva, essa ordem explícita prevalece dentro do plantão selecionado. Os testes cobrem o corte de 30 dias, pausa publicada versus linha semanal, escopo do preview e `round_robin` manual.
