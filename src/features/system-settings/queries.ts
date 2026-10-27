@@ -27,8 +27,9 @@ async function loadAllSettings() {
   return settingsCache.getOrLoad("all", () => getDatabase()
     .select({ key: schema.systemSettings.key, value: schema.systemSettings.value })
     .from(schema.systemSettings)
-    // Job leases (shared/db/job-lease.ts) live in this table but are not settings.
-    .where(sql`${schema.systemSettings.key} not like 'lease:%'`));
+    // Job leases (shared/db/job-lease.ts) and job heartbeats (features/live-status/heartbeat.ts) live in this
+    // table but are not settings: a heartbeat changes every minute and must not churn this cache.
+    .where(sql`${schema.systemSettings.key} not like 'lease:%' and ${schema.systemSettings.key} not like 'heartbeat:%'`));
 }
 
 export function invalidateSystemSettingsCache() {

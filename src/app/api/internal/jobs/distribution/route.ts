@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { drainLeadDistributionBacklog } from "@/features/lead-distribution/jobs";
 import { processDutyPresenceReminders } from "@/features/lead-distribution/duty-presence";
 import { backgroundRoute } from "@/shared/db/background-pool";
+import { withJobHeartbeat } from "@/features/live-status/heartbeat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,5 +93,5 @@ async function handlePOST(request: NextRequest) {
 }
 
 // Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
-export const GET = backgroundRoute(handleGET);
-export const POST = backgroundRoute(handlePOST);
+export const GET = backgroundRoute(withJobHeartbeat("distribution", handleGET));
+export const POST = backgroundRoute(withJobHeartbeat("distribution", handlePOST));

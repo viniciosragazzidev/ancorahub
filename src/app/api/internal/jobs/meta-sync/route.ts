@@ -3,6 +3,7 @@ import { and, eq, lt } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { runMetaTenantSync } from "@/features/meta-ads/meta-sync-service";
 import { backgroundRoute } from "@/shared/db/background-pool";
+import { withJobHeartbeat } from "@/features/live-status/heartbeat";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -52,4 +53,4 @@ async function handleGET(request: Request) {
 }
 
 // Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
-export const GET = backgroundRoute(handleGET);
+export const GET = backgroundRoute(withJobHeartbeat("meta-sync", handleGET));

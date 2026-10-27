@@ -3,6 +3,7 @@ import { createLeadFeedbackReminders } from "@/features/leads/feedback-reminders
 import { createClientRenewalReminders } from "@/features/customers/renewal-reminders";
 import { runTaskOverdueSweep } from "@/features/leads/task-overdue-sweep";
 import { backgroundRoute } from "@/shared/db/background-pool";
+import { withJobHeartbeat } from "@/features/live-status/heartbeat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,4 +28,4 @@ async function handleGET(request: Request) {
 }
 
 // Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
-export const GET = backgroundRoute(handleGET);
+export const GET = backgroundRoute(withJobHeartbeat("reminders", handleGET));

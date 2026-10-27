@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { runSupervisorDigest } from "@/features/supervisor-workspace/digest";
 import { backgroundRoute } from "@/shared/db/background-pool";
+import { withJobHeartbeat } from "@/features/live-status/heartbeat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,5 +25,5 @@ async function handleGET(request: NextRequest) { return handle(request); }
 async function handlePOST(request: NextRequest) { return handle(request); }
 
 // Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
-export const GET = backgroundRoute(handleGET);
-export const POST = backgroundRoute(handlePOST);
+export const GET = backgroundRoute(withJobHeartbeat("supervisor-digest", handleGET));
+export const POST = backgroundRoute(withJobHeartbeat("supervisor-digest", handlePOST));

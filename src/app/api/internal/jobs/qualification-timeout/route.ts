@@ -6,6 +6,7 @@ import { runSlaSweep } from "@/features/leads/sla";
 import { flowEffectHandlers } from "@/features/attendance-flows/handlers";
 import { attendanceFlowsEnabled, wakeDueRuns } from "@/features/attendance-flows/runtime";
 import { backgroundRoute } from "@/shared/db/background-pool";
+import { withJobHeartbeat } from "@/features/live-status/heartbeat";
 
 /**
  * DEC-127: wakes attendance flow runs whose wait is over (only with the switch
@@ -54,5 +55,5 @@ async function handleGET(request: NextRequest) { return handle(request); }
 async function handlePOST(request: NextRequest) { return handle(request); }
 
 // Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
-export const GET = backgroundRoute(handleGET);
-export const POST = backgroundRoute(handlePOST);
+export const GET = backgroundRoute(withJobHeartbeat("qualification-timeout", handleGET));
+export const POST = backgroundRoute(withJobHeartbeat("qualification-timeout", handlePOST));

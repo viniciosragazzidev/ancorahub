@@ -33,6 +33,15 @@ demorada não trava a navegação de ninguém.
   transação aberta durante toda a execução.
 - `--max-time 280` só encerra o `curl`; a rodada no servidor termina pelo próprio orçamento de tempo.
 
+### Última rodada de cada tarefa (27/10/2026)
+
+Toda rota desta tabela grava, no fim de cada rodada autorizada, uma linha `heartbeat:<tarefa>` em
+`system_settings` com `<fim ISO>|<ok|erro>|<duração ms>` (`src/features/live-status/heartbeat.ts`). Um upsert
+por rodada, sem tabela nova e sem migration; os leitores de configuração pulam o prefixo `heartbeat:` como já
+pulam `lease:`. Os status vivos usam essa linha para dizer "última rodada há 40 s" e, quando passa de 3 ciclos
+sem rodar, avisar que o robô parou. Mudou o caminho ou a frequência aqui, mude também
+`src/features/live-status/job-schedule.ts` (o teste compara as duas tabelas).
+
 ## Tarefas
 
 | Caminho | Frequência | O que faz | Detalhes |

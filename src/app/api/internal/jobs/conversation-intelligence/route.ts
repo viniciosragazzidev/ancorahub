@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { runConversationReconcileJob } from "@/features/conversation-intelligence/reconcile-job";
 import { backgroundRoute } from "@/shared/db/background-pool";
+import { withJobHeartbeat } from "@/features/live-status/heartbeat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,5 +32,5 @@ async function handlePOST(request: NextRequest) {
 }
 
 // Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
-export const GET = backgroundRoute(handleGET);
-export const POST = backgroundRoute(handlePOST);
+export const GET = backgroundRoute(withJobHeartbeat("conversation-intelligence", handleGET));
+export const POST = backgroundRoute(withJobHeartbeat("conversation-intelligence", handlePOST));
