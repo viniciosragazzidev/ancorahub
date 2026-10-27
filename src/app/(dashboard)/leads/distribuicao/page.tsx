@@ -617,7 +617,7 @@ export default async function LeadDistributionPage({
     const manualAssignmentChoiceEnabled = view === "operar"
       ? (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false"
       : false;
-    const liveEnabled = await shouldShowLiveStatusStrip(context);
+    const liveEnabled = view === "resumo_dia" && await shouldShowLiveStatusStrip(context);
     const live = liveEnabled ? <LiveStatusBoundary context={context} enabled /> : null;
     return (
       <>
