@@ -203,8 +203,13 @@ export function hasCoreQuoteData(memory: ConversationMemory | null | undefined) 
 }
 
 export function readAgeList(message: string): number[] {
-  const normalized = normalizeForMatching(message);
-  if (!/\d\s*a?nos?\b|\banos?\b/.test(normalized)) return [];
+  // "17.16.49.48" (case Eliane, 27/10): short numbers joined by dots are a list, never money
+  // (money groups thousands in 3 digits: "4.500").
+  const normalized = normalizeForMatching(message).replace(/(\b\d{1,3})\.(?=\d{1,2}\b)/g, "$1, ");
+  // A message that is only a list of numbers ("17, 18, 49, 48", "as idades 30 e 25") is the ages,
+  // even without the word "anos": that is how people answer "Digite sua idade".
+  const onlyNumbers = /^(?:as\s+)?(?:idades?\s*:?\s*)?\d{1,3}(?:\s*(?:,|;|\/|\be\b)\s*\d{1,3}|\s+\d{1,3})+\s*[.!]?$/.test(normalized.trim());
+  if (!onlyNumbers && !/\d\s*a?nos?\b|\banos?\b|\bidades?\b/.test(normalized)) return [];
   const selfAge = readSelfOnlyAge(message);
   if (selfAge !== null) return [selfAge];
   const withoutPeople = normalized.replace(/\b\d{1,3}\s*(?:pessoas?|vidas?|familiares?|dependentes?|integrantes?|beneficiari[oa]s?)\b/g, " ");

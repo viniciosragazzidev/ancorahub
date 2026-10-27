@@ -283,3 +283,21 @@ describe("ages in a long message (case Maria Tereza, 23/10)", () => {
     expect(memory.age?.value).toBe("75, 71");
   });
 });
+
+describe("ages joined by dots or listed without 'anos' (case Eliane, 27/10)", () => {
+  it("reads the list", () => {
+    expect(readAgeList("17.16.49.48")).toEqual([17, 16, 49, 48]);
+    expect(readAgeList("As idades 17.18.49.48")).toEqual([17, 18, 49, 48]);
+    expect(readAgeList("30 e 25")).toEqual([30, 25]);
+    expect(readAgeList("pago 4.500 por mês")).toEqual([]);
+    expect(readAgeList("moro no 302")).toEqual([]);
+  });
+
+  it("fills four lives and the ages, and the average for a company plan", () => {
+    const first = extractFieldsFromMessage("17.16.49.48", createEmptyMemory(), "m1");
+    expect(first.numberOfLives?.value).toBe("4");
+    expect(first.age?.value).toBe("17, 16, 49, 48");
+    const company = extractFieldsFromMessage("As idades 17.18.49.48", { ...createEmptyMemory(), planType: { value: "empresarial", confidence: 1 }, lastQuestionAsked: "E quantas vidas entram no plano da empresa, contando os dependentes?" }, "m2");
+    expect(company.averageAge?.value).toBe("33");
+  });
+});
