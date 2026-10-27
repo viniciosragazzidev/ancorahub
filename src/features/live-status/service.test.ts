@@ -20,6 +20,7 @@ vi.mock("./loaders", () => {
     loadOffers: make("ofertas"),
     loadFirstContact: make("primeiro-contato"),
     loadDuty: make("plantao"),
+    loadDutyShiftReminders: make("duty-reminders"),
     loadWhatsAppQueue: make("whatsapp-fila"),
     loadDistributionEngineSeal: async () => ({ id: "motor-distribuicao", label: "Motor", severity: "ok", lastRunAt: null, nextRunAt: null, generatedAt: "2026-10-27T13:00:00.000Z" }),
   };
@@ -45,9 +46,9 @@ describe("getLiveStatuses", () => {
     expect(state.calls).toHaveLength(0);
   });
 
-  it("diretor: os 8 status na ordem e o selo", async () => {
+  it("diretor: os status na ordem e o selo", async () => {
     const payload = await getLiveStatuses(context());
-    expect(payload?.statuses.map((status) => status.id)).toEqual(["frios", "frios-recuperados", "qualificacao-ia", "aguardando-corretor", "ofertas", "primeiro-contato", "plantao", "whatsapp-fila"]);
+    expect(payload?.statuses.map((status) => status.id)).toEqual(["frios", "frios-recuperados", "qualificacao-ia", "aguardando-corretor", "ofertas", "primeiro-contato", "plantao", "whatsapp-fila", "duty-reminders"]);
     expect(payload?.seals).toHaveLength(1);
   });
 

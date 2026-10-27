@@ -10,6 +10,7 @@ export const LIVE_STATUS_ORDER: readonly LiveStatusId[] = [
   "primeiro-contato",
   "plantao",
   "whatsapp-fila",
+  "duty-reminders",
 ];
 
 /**
@@ -28,6 +29,7 @@ const ROLES: Record<LiveStatusId, readonly LiveRole[]> = {
   "primeiro-contato": ["director", "manager", "supervisor", "broker"],
   plantao: ["director", "manager", "supervisor", "broker"],
   "whatsapp-fila": ["director", "manager"],
+  "duty-reminders": ["director", "manager"],
 };
 
 export function visibleStatusIds(role: LiveRole): LiveStatusId[] {

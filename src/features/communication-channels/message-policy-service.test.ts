@@ -129,6 +129,22 @@ describe("qualification template cost policy", () => {
     expect(plan?.fallback).toBeNull();
   });
 
+  it("uses the tenant's free reminder text for WAHA even outside the Meta service window", async () => {
+    database.results.push(
+      [{ ...policy, eventKey: "DUTY_SHIFT_REMINDER", primaryKind: "free_message", freeMessageTemplateId: "duty-free" }],
+      [{ id: "duty-free", name: "Lembrete plantão", category: "internal", content: "Oi {{nome}}, plantão {{plantao}} em {{data}}.", variables: ["nome", "plantao", "data"] }],
+    );
+    const plan = await resolveEventMessagePlan({
+      tenantId: "tenant-test", recipientType: "user", recipientId: "broker-test", destinationPhone: "5521900000001",
+      purpose: "dutyShiftReminder", variables: ["Ana", "terça-feira", "27/10", "Presencial tarde", "10:00", "16:00", "online"], forceCompanyFreeText: true,
+    });
+    expect(plan).toMatchObject({
+      eventKey: "DUTY_SHIFT_REMINDER", policyId: "policy", policyVersion: 1, preferWahaDirect: true,
+      primary: { type: "text", renderedBody: "Oi Ana, plantão Presencial tarde em 27/10." },
+      fallback: null,
+    });
+  });
+
   it("does not change the template category policy of unrelated events", async () => {
     database.results.push(channel, [marketing]);
     const plan = await resolveApprovedMetaEventTemplate({ ...input, purpose: "clientNotice", templateName: marketing.name });

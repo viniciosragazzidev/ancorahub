@@ -43,6 +43,12 @@ describe("live status strip feature flag", () => {
       defaultValue: "false",
       allowedValues: ["true", "false"],
     });
+    expect(FEATURE_FLAGS.DUTY_SHIFT_REMINDER_24H).toMatchObject({
+      key: "feature_duty_reminder_24h",
+      scope: "tenant",
+      defaultValue: "false",
+      allowedValues: ["true", "false"],
+    });
   });
 });
 

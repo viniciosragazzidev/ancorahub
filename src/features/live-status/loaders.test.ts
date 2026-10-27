@@ -7,7 +7,7 @@ vi.mock("@/shared/db", async () => {
   return { getDatabase: vi.fn(), schema };
 });
 
-import { buildColdRecoveriesQuery, buildDistributionFailureQuery, buildFirstOfferAtSql, buildWhatsAppQueueQuery } from "./loaders";
+import { buildColdRecoveriesQuery, buildDistributionFailureQuery, buildDutyShiftReminderStatusQuery, buildFirstOfferAtSql, buildWhatsAppQueueQuery } from "./loaders";
 import type { LiveScope } from "./types";
 
 const dialect = new PgDialect();
@@ -66,5 +66,17 @@ describe("consultas da faixa viva", () => {
     expect(query.params).toContain("branch-a");
     expect(query.params).toContain("2026-09-27T13:00:00.000Z");
     expect(query.params).toContain("2026-10-26T13:00:00.000Z");
+  });
+
+  it("conta lembretes da ocorrência de amanhã com tenant e unidade, usando created_at indexado", () => {
+    const scope: LiveScope = { ...director, role: "manager", branchId: "branch-a" };
+    const query = dialect.sqlToQuery(buildDutyShiftReminderStatusQuery(scope, NOW));
+    expect(query.sql).toContain("duty-reminder-24h");
+    expect(query.sql).toContain("w.created_at >=");
+    expect(query.sql).toContain("w.variables->>1");
+    expect(query.sql).toContain("BROKER_PHONE_UNAVAILABLE");
+    expect(query.sql).toContain("tenant_memberships");
+    expect(query.params).toEqual(expect.arrayContaining(["tenant-a", "branch-a", "2026-10-28"]));
+    expect(query.params).toContain("2026-10-25T13:00:00.000Z");
   });
 });

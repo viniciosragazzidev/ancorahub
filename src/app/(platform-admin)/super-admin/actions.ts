@@ -36,6 +36,7 @@ import { SYSTEM_REPORT_DESTINATION_KEY, SYSTEM_REPORT_ENABLED_KEY } from "@/feat
 import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, META_OUTBOUND_STALE_AFTER_HOURS_SETTING } from "@/features/communication-channels/outbound-service";
 import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag";
 import { liveStatusSettingKey } from "@/features/live-status/flag";
+import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
 
 async function requirePlatformTenantTarget(tenantId: string) {
   const parsedTenantId = z.string().uuid().safeParse(tenantId);
@@ -396,6 +397,20 @@ export async function updateLiveStatusPilotAction(tenantId: string, formData: Fo
     targetId: targetTenantId,
     metadata: { enabled: input.enabled === "true" },
     createdAt: now,
+  });
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
+}
+
+/** Liga ou desliga, por empresa, o lembrete WAHA 24 h antes do plantão. */
+export async function updateDutyShiftReminderPilotAction(tenantId: string, formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
+  const now = new Date();
+  await setSystemSetting(dutyShiftReminderSettingKey(targetTenantId), input.enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "duty_shift_reminder_24h.tenant_pilot_updated",
+    targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now,
   });
   revalidatePath(`/super-admin/tenants/${targetTenantId}`);
 }

@@ -8,7 +8,7 @@
  * - informative: sent Mon–Fri 08:00–18:00, within per-person limits.
  * - reminder: informative rules plus at most 2 per person per day.
  */
-export type NoticeClass = "critical" | "informative" | "reminder";
+export type NoticeClass = "critical" | "informative" | "reminder" | "any_day";
 export type NoticeChannel = "company_number" | "meta";
 
 export type TeamNotice = {
@@ -114,6 +114,16 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     defaultEnabled: true,
     alwaysOn: true,
     defaultChannel: "meta",
+  },
+  {
+    key: "DUTY_SHIFT_REMINDER",
+    purpose: "dutyShiftReminder",
+    label: "Lembrete do plantão do dia seguinte",
+    description: "Lembrete pelo número corporativo, inclusive aos fins de semana.",
+    class: "any_day",
+    defaultEnabled: true,
+    alwaysOn: true,
+    defaultChannel: "company_number",
   },
   {
     key: "BROKER_CHAT",

@@ -53,6 +53,13 @@ describe("delivery guard", () => {
     expect(evaluateDeliveryGuard(input({ now: fridayEvening, createdAt: fridayEvening }))).toEqual({ kind: "hold", until: new Date("2026-10-05T11:00:00Z"), reason: "outside_business_hours" });
   });
 
+  it("allows an any-day reminder on weekends while keeping the company's hourly cap", () => {
+    const saturdayNight = new Date("2026-10-03T23:30:00Z");
+    expect(evaluateDeliveryGuard(input({ noticeClass: "any_day", now: saturdayNight, createdAt: saturdayNight }))).toEqual({ kind: "now" });
+    expect(evaluateDeliveryGuard(input({ noticeClass: "any_day", now: saturdayNight, createdAt: saturdayNight, number: { lastSentAt: null, sentLastHour: 40, sentToday: 40, connectedAt: null } })))
+      .toMatchObject({ kind: "hold", reason: "number_hourly_limit" });
+  });
+
   it("allows at most 2 reminders per person per day and drops stale or repeated ones", () => {
     expect(evaluateDeliveryGuard(input({ noticeClass: "reminder", recipient: { remindersToday: 2 } }))).toEqual({ kind: "drop", reason: "reminder_daily_limit" });
     expect(evaluateDeliveryGuard(input({ noticeClass: "reminder", recipient: { remindersToday: 1 } }))).toEqual({ kind: "now" });
@@ -131,5 +138,10 @@ describe("team notice decision", () => {
     const notice = teamNoticeByKey("DUTY_PRESENCE_CONFIRMATION")!;
     expect(effectiveNoticeSetting(notice, null)).toEqual({ enabled: true, channel: "meta", freeMessageIds: [] });
     expect(effectiveNoticeSetting(notice, { enabled: false, channel: "company_number" })).toEqual({ enabled: true, channel: "company_number", freeMessageIds: [] });
+  });
+
+  it("classifies shift reminders to avoid weekend holding", () => {
+    const notice = teamNoticeByKey("DUTY_SHIFT_REMINDER");
+    expect(notice).toMatchObject({ class: "any_day", defaultChannel: "company_number", alwaysOn: true });
   });
 });

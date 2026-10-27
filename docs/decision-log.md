@@ -1858,3 +1858,9 @@ gestão.
 ## DEC-157 - Corretor exclusivamente no Lite
 
 **Pedido explícito do Vinicios em 2026-10-27.** O modo normal fica aposentado para o papel autenticado broker. Cookie e preferência antiga NORMAL não reativam a experiência; o servidor resolve LIGHT antes dessas leituras, inclusive em Ver como corretor. A ação de trocar para NORMAL é negada e auditada, e o controle de alternância é removido da sidebar legada. Sem identidade confiável, o cookie não pode selecionar o shell normal. A autorização e a lista de rotas do Lite continuam sendo aplicadas no servidor. Outros papéis mantêm seus controles de experiência; esta decisão não cria uma chave que permita ao corretor reabrir o modo normal. Registro: `docs/implementations/active/2026-10-27-broker-lite-only.md`.
+
+## DEC-158 - Lembrete de plantão 24 horas antes
+
+**Aprovada pelo Vinicios em 2026-10-27.** O job de distribuição existente procura ocorrências efetivas da escala semanal e do plano mensal publicado e envia o lembrete quando faltam de 24 a 2 horas para o início. A antecedência é fixa em 24 horas; escalados sem conta, pausados ou inválidos não recebem. O envio também acontece em fins de semana.
+
+O texto livre do evento `DUTY_SHIFT_REMINDER` é editável por empresa e sai exclusivamente pelo WAHA corporativo. Falta de telefone ou de WAHA conectado é registrada na outbox, sem fallback para Meta. A chave `feature_duty_reminder_24h_<tenantId>` é controlada pelo Super-admin, auditada e desligada por padrão. O mesmo job mantém a idempotência por ocorrência e corretor; nenhuma migration ou nova tarefa de agendamento é necessária. Registro: `docs/implementations/active/2026-10-27-lembrete-plantao-24h.md`.

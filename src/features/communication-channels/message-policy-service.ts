@@ -439,10 +439,12 @@ export async function resolveEventMessagePlan(input: {
   destinationPhone: string;
   purpose: string;
   variables: string[];
+  /** Forces the event's governed free text for an explicit corporate-WAHA-only delivery. */
+  forceCompanyFreeText?: boolean;
 }) : Promise<ResolvedEventMessagePlan | null> {
   const event = getMessageEventByPurpose(input.purpose);
   if (!event) return null;
-  const serviceWindowOpen = await isCustomerServiceWindowOpen(input);
+  const serviceWindowOpen = input.forceCompanyFreeText ? false : await isCustomerServiceWindowOpen(input);
   const policiesEnabled = await getFeatureFlag(FEATURE_FLAGS.MESSAGE_EVENT_POLICIES)
     .then((value) => value !== "false")
     .catch(() => true);
@@ -457,6 +459,27 @@ export async function resolveEventMessagePlan(input: {
     } catch (error) {
       if (!isMissingMessagePolicyTable(error)) throw error;
     }
+  }
+
+  if (input.forceCompanyFreeText) {
+    const configuredFreeMessage = policy?.primaryKind === "free_message"
+      ? await loadFreeResource(input.tenantId, policy.freeMessageTemplateId)
+      : null;
+    const primary = configuredFreeMessage
+      ? makeFreeMessage(event, configuredFreeMessage, input.variables)
+      : event.defaultFreeMessage
+        ? { type: "text" as const, templateName: "__text__", templateLanguage: "pt_BR", renderedBody: renderEventFreeMessage(event, event.defaultFreeMessage, input.variables) }
+        : null;
+    if (!primary) return null;
+    return {
+      eventKey: event.key,
+      policyId: policy?.id ?? null,
+      policyVersion: policy?.version ?? null,
+      primary,
+      fallback: null,
+      preferWahaDirect: true,
+      serviceWindowOpen: false,
+    };
   }
 
   if (event.key === "FIRST_CONTACT") {

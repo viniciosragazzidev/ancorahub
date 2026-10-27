@@ -5,6 +5,7 @@ import {
   loadColdRecoveries,
   loadColdLeads,
   loadDuty,
+  loadDutyShiftReminders,
   loadFirstContact,
   loadOffers,
   loadWaitingBroker,
@@ -25,4 +26,5 @@ export const LIVE_PROVIDERS: Record<LiveStatusId, LiveProvider> = {
   "primeiro-contato": { id: "primeiro-contato", ttlMs: 20_000, load: loadFirstContact },
   plantao: { id: "plantao", ttlMs: 30_000, load: loadDuty },
   "whatsapp-fila": { id: "whatsapp-fila", ttlMs: 20_000, load: loadWhatsAppQueue },
+  "duty-reminders": { id: "duty-reminders", ttlMs: 60_000, load: loadDutyShiftReminders },
 };

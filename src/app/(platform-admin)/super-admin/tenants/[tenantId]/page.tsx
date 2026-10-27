@@ -10,6 +10,7 @@ import {
   updateCleanUiOperationalLegacyTenantAction,
   updateDirectorLiteStylePilotAction,
   updateLiveStatusPilotAction,
+  updateDutyShiftReminderPilotAction,
   updateMetaLeadAdsPilotAction,
   updateTenantCustomRolesPilotAction,
 } from "../../actions";
@@ -25,6 +26,7 @@ import { ArrowRight } from "@/components/huge-icons";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag";
 import { liveStatusSettingKey } from "@/features/live-status/flag";
+import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import { CLEAN_UI_FEATURE, getCleanUiOperationalLegacyTenantIds } from "@/features/clean-ui/feature";
 import { getMetaLeadAdsPilotTenantIds } from "@/features/communication-channels/meta-lead-ads-platform";
 import { getDatabase, schema } from "@/shared/db";
@@ -80,6 +82,7 @@ export default async function SuperAdminTenantDetailPage({
       "feature_custom_roles_enabled",
       directorLiteStyleSettingKey(tenantId.data),
       liveStatusSettingKey(tenantId.data),
+      dutyShiftReminderSettingKey(tenantId.data),
     ]),
     getMetaLeadAdsPilotTenantIds(),
     getCleanUiOperationalLegacyTenantIds(),
@@ -94,6 +97,7 @@ export default async function SuperAdminTenantDetailPage({
   const customRolesGlobalEnabled = settingMap.get("feature_custom_roles_enabled") === "true";
   const directorLiteEnabled = settingMap.get(directorLiteStyleSettingKey(tenant.id)) === "true";
   const liveStatusEnabled = settingMap.get(liveStatusSettingKey(tenant.id)) === "true";
+  const dutyShiftReminderEnabled = settingMap.get(dutyShiftReminderSettingKey(tenant.id)) === "true";
   const metaLeadAdsPilotEnabled = metaLeadAdsPilotTenantIds.includes(tenant.id);
   const usingLegacyLayout = cleanUiLegacyTenantIds.includes(tenant.id);
   const metaLeadAdsState = operationalState(metaLeadAdsGlobalEnabled, metaLeadAdsPilotEnabled);
@@ -103,6 +107,7 @@ export default async function SuperAdminTenantDetailPage({
   const customRolesAction = updateTenantCustomRolesPilotAction.bind(null, tenant.id);
   const directorLiteAction = updateDirectorLiteStylePilotAction.bind(null, tenant.id);
   const liveStatusAction = updateLiveStatusPilotAction.bind(null, tenant.id);
+  const dutyShiftReminderAction = updateDutyShiftReminderPilotAction.bind(null, tenant.id);
 
   return (
     <>
@@ -190,6 +195,21 @@ export default async function SuperAdminTenantDetailPage({
                   <input name="enabled" type="hidden" value={liveStatusEnabled ? "false" : "true"} />
                   <Button type="submit" variant={liveStatusEnabled ? "outline" : "default"}>
                     {liveStatusEnabled ? "Desligar" : "Ligar"}
+                  </Button>
+                </form>
+              </div>
+              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="max-w-2xl">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-medium">Lembrete de plantão 24 h antes</h3>
+                    <Badge variant={dutyShiftReminderEnabled ? "success" : "outline"}>{dutyShiftReminderEnabled ? "Ligado" : "Desligado"}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">Envia ao corretor com conta uma mensagem pelo WhatsApp corporativo. A confirmação de presença continua sendo enviada 30 min antes.</p>
+                </div>
+                <form action={dutyShiftReminderAction}>
+                  <input name="enabled" type="hidden" value={dutyShiftReminderEnabled ? "false" : "true"} />
+                  <Button type="submit" variant={dutyShiftReminderEnabled ? "outline" : "default"}>
+                    {dutyShiftReminderEnabled ? "Desligar" : "Ligar"}
                   </Button>
                 </form>
               </div>

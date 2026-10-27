@@ -214,6 +214,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Mostra a faixa \"Agora na operação\" (status vivos) no Painel e na Distribuição desta empresa. O Super-admin liga por empresa; a chave real é feature_live_status_strip_<tenantId>.",
   },
+  DUTY_SHIFT_REMINDER_24H: {
+    key: "feature_duty_reminder_24h",
+    scope: "tenant",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Envia pelo WhatsApp corporativo um lembrete 24 h antes do plantão. O Super-admin liga por empresa; desligado por padrão.",
+  },
   TEAM_MANAGEMENT: {
     key: "feature_team_management_enabled",
     scope: "global",

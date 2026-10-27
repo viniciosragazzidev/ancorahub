@@ -26,7 +26,8 @@ export type LiveStatusId =
   | "ofertas"
   | "primeiro-contato"
   | "plantao"
-  | "whatsapp-fila";
+  | "whatsapp-fila"
+  | "duty-reminders";
 
 export type LiveProvider = {
   id: LiveStatusId;

@@ -27,9 +27,10 @@ describe("escopo do status vivo", () => {
 });
 
 describe("quem vê o quê", () => {
-  it("diretor e gestor: os 8 status e o selo", () => {
-    expect(visibleStatusIds("director")).toHaveLength(8);
-    expect(visibleStatusIds("manager")).toHaveLength(8);
+  it("diretor e gestor: os status da operação e o selo", () => {
+    expect(visibleStatusIds("director")).toHaveLength(9);
+    expect(visibleStatusIds("manager")).toHaveLength(9);
+    expect(visibleStatusIds("director")).toContain("duty-reminders");
     expect(canSeeDistributionEngineSeal("director")).toBe(true);
     expect(canSeeDistributionEngineSeal("manager")).toBe(true);
   });

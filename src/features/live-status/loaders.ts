@@ -11,6 +11,7 @@ import { businessTurnStart } from "@/features/dashboard/essential/business-windo
 import { QUALIFICATION_TIMEOUT_SKIPPED_STATUSES } from "@/features/ai-agent/qualification-timeout-sweep";
 import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
 import { getSaoPauloDateKey } from "@/features/lead-distribution/dated-duty-roster";
+import { getDutyReminderDateKey } from "@/features/lead-distribution/duty-shift-reminder-domain";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { inSupervisorTeam } from "@/features/team/supervisor-scope";
 import { getDatabase, schema } from "@/shared/db";
@@ -22,6 +23,7 @@ import { buildColdLeadsStatus } from "./providers/cold-leads";
 import { buildColdRecoveriesStatus } from "./providers/cold-recoveries";
 import { buildDistributionEngineSeal } from "./providers/distribution-engine";
 import { buildDutyStatus } from "./providers/duty";
+import { buildDutyShiftReminderStatus } from "./providers/duty-shift-reminders";
 import { buildFirstContactStatus } from "./providers/first-contact";
 import { buildOffersStatus } from "./providers/offers";
 import { buildWaitingBrokerStatus } from "./providers/waiting-broker";
@@ -357,6 +359,37 @@ export async function loadDuty(scope: LiveScope, now: Date): Promise<LiveStatus>
     ))
     .limit(1000);
   return buildDutyStatus({ rows, now, scope });
+}
+
+export function buildDutyShiftReminderStatusQuery(scope: LiveScope, now: Date) {
+  const cutoff = new Date(now.getTime() - 48 * HOUR);
+  const dutyDate = getDutyReminderDateKey(now, "America/Sao_Paulo");
+  const branchScope = scope.role === "manager" && scope.branchId
+    ? sql`and exists (select 1 from tenant_memberships m where m.tenant_id = ${scope.tenantId} and m.user_id = w.recipient_id and m.branch_id = ${scope.branchId} and m.status = 'active')`
+    : sql``;
+  // variables[1] is the dated occurrence. A 48 h created_at bound uses the tenant index and covers late-night shifts.
+  return sql`
+    select
+      (count(*) filter (where w.status in ('sent', 'delivered', 'read') and w.sent_at is not null))::int as sent,
+      (count(*) filter (where w.status = 'failed' and w.provider_error_code = 'BROKER_PHONE_UNAVAILABLE'))::int as no_phone
+    from whatsapp_outbound_messages w
+    where w.tenant_id = ${scope.tenantId}
+      and w.purpose = 'dutyShiftReminder'
+      and w.notice_key = 'DUTY_SHIFT_REMINDER'
+      and w.idempotency_key like 'duty-reminder-24h:%'
+      and w.created_at >= ${iso(cutoff)}
+      and w.variables->>1 = ${dutyDate}${branchScope}
+  `;
+}
+
+export async function loadDutyShiftReminders(scope: LiveScope, now: Date): Promise<LiveStatus> {
+  const result = await getDatabase().execute(buildDutyShiftReminderStatusQuery(scope, now));
+  const rows = (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+  const row = rows[0] ?? {};
+  return buildDutyShiftReminderStatus({
+    aggregate: { sent: Number(row.sent ?? 0), noPhone: Number(row.no_phone ?? 0) },
+    now,
+  });
 }
 
 function outboxScope(scope: LiveScope) {

@@ -2,6 +2,13 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 27/10/2026 - Lembrete de plantão 24 h antes
+
+- O job existente de distribuição enfileira lembretes de ocorrência do dia seguinte entre 24 h e 2 h antes do início, respeitando a escala semanal e a mensal publicada. Escalados pausados, inválidos e convidados sem conta ficam de fora.
+- Texto livre configurável em Mensagens; envio exclusivo pelo WAHA corporativo, inclusive no fim de semana. Sem telefone ou WAHA, o outbox guarda o motivo e não usa Meta como contingência.
+- Controle por empresa `feature_duty_reminder_24h_<tenantId>`, desligado por padrão e auditado pelo Super-admin. Resumo na faixa da aba Distribuição.
+- Plano, decisão e validações: `docs/implementations/active/2026-10-27-lembrete-plantao-24h.md`.
+
 ## 27/10/2026 - Nivelamento de distribuição isolado por plantão
 
 - A prioridade por menor número de indicações considera atribuições, tentativas e ofertas distintas do plantão usado na escolha; fila sem plantão considera somente registros sem `duty_schedule_id`. `CANCELLED` continua fora da contagem.

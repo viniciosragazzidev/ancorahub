@@ -5,6 +5,7 @@ import { buildColdLeadsStatus } from "./cold-leads";
 import { buildColdRecoveriesStatus, coldRecoveryOperationDayStart } from "./cold-recoveries";
 import { buildDistributionEngineSeal } from "./distribution-engine";
 import { buildDutyStatus } from "./duty";
+import { buildDutyShiftReminderStatus } from "./duty-shift-reminders";
 import { buildFirstContactStatus } from "./first-contact";
 import { buildOffersStatus } from "./offers";
 import { buildWaitingBrokerStatus } from "./waiting-broker";
@@ -169,6 +170,21 @@ describe("plantão", () => {
   it("sem turno agora mostra o próximo", () => {
     const status = buildDutyStatus({ rows: [{ status: "pending", shiftStartsAt: minutes(60), shiftEndsAt: minutes(300) }], now: NOW, scope: director });
     expect(status).toMatchObject({ value: 0, emptyText: "Nenhum plantão acontecendo agora", nextEvent: { at: minutes(60).toISOString() } });
+  });
+});
+
+describe("lembretes de amanhã", () => {
+  it("destaca enviados e quem ficou sem telefone, com números pt-BR", () => {
+    expect(buildDutyShiftReminderStatus({ aggregate: { sent: 1200, noPhone: 3 }, now: NOW })).toMatchObject({
+      id: "duty-reminders", label: "Lembretes de amanhã", value: 1200, valueText: "1.200 enviados",
+      explanation: "3 sem telefone.", severity: "atencao", breakdown: [{ label: "sem telefone", value: 3 }],
+    });
+  });
+
+  it("mostra zero sem classificar como falha quando todos os corretores têm telefone", () => {
+    expect(buildDutyShiftReminderStatus({ aggregate: { sent: 0, noPhone: 0 }, now: NOW })).toMatchObject({
+      valueText: "0 enviados", emptyText: "Nenhum lembrete enviado ainda", severity: "ok", explanation: "0 sem telefone.",
+    });
   });
 });
 

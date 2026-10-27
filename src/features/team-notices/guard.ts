@@ -106,7 +106,7 @@ export function evaluateDeliveryGuard(input: GuardInput): GuardResult {
   if (input.recipient.duplicateRecently) return { kind: "drop", reason: "duplicate" };
   if (reminder && input.recipient.remindersToday >= DELIVERY_LIMITS.recipient.remindersPerDay) return { kind: "drop", reason: "reminder_daily_limit" };
 
-  if (!isBusinessHours(now)) return { kind: "hold", until: nextBusinessOpening(now), reason: "outside_business_hours" };
+  if (input.noticeClass !== "any_day" && !isBusinessHours(now)) return { kind: "hold", until: nextBusinessOpening(now), reason: "outside_business_hours" };
 
   const recipient = DELIVERY_LIMITS.recipient;
   if (input.recipient.sentToday >= recipient.perDay) {

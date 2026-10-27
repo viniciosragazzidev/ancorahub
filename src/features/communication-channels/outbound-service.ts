@@ -23,6 +23,7 @@ import { resolveNamedTemplateBodyParameters } from "./template-parameters";
 import { isEligibleColdLeadForReactivation } from "@/features/ai-qualification/cold-lead-reactivation-policy";
 import { COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX, isEligibleColdLeadForManualRequalification, isWithinRequalificationBusinessWindow, nextRequalificationBusinessWindowAt } from "@/features/ai-qualification/cold-lead-requalification-policy";
 import { readDistributionPolicy } from "@/features/lead-distribution/domain";
+import { dutyShiftReminderFailureCode, dutyShiftReminderWahaFailure } from "@/features/lead-distribution/duty-shift-reminder-domain";
 import { findConnectedTenantChannelId, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
 import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
 import { BROKER_CHAT_NOTICE, teamNoticeByKey, teamNoticeForPurpose } from "@/features/team-notices/catalog";
@@ -607,15 +608,79 @@ export async function enqueueMetaTextMessage(input: {
   idempotencyKey: string;
   scheduledAt?: Date;
   purpose?: string;
+  /** Only for the shift reminder: persist WAHA-direct without any Meta fallback. */
+  forceCompanyWahaOnly?: boolean;
+  messagePolicyId?: string | null;
+  messagePolicyVersion?: number | null;
+  dutyDate?: string;
 }) {
-  const requestedDestinationPhone = phoneSchema.parse(input.destinationPhone);
-  const destinationPhone = await resolveCanonicalWhatsAppDestination({
-    tenantId: input.tenantId,
-    phone: requestedDestinationPhone,
-    leadId: input.recipientType === "lead" ? input.recipientId : null,
-  }) ?? requestedDestinationPhone;
   const body = z.string().trim().min(1).max(4096).parse(input.body);
+  const dutyShiftReminder = input.forceCompanyWahaOnly === true;
+  if (dutyShiftReminder && (input.purpose !== "dutyShiftReminder" || input.recipientType !== "user")) {
+    throw new Error("A rota WAHA exclusiva está reservada ao lembrete de plantão.");
+  }
+  const parsedPhone = phoneSchema.safeParse(input.destinationPhone);
+  if (!dutyShiftReminder && !parsedPhone.success) phoneSchema.parse(input.destinationPhone);
+  const requestedDestinationPhone = parsedPhone.success ? parsedPhone.data : "";
+  const destinationPhone = requestedDestinationPhone
+    ? await resolveCanonicalWhatsAppDestination({
+      tenantId: input.tenantId,
+      phone: requestedDestinationPhone,
+      leadId: input.recipientType === "lead" ? input.recipientId : null,
+    }) ?? requestedDestinationPhone
+    : "";
   const db = getDatabase();
+  if (dutyShiftReminder) {
+    const idempotency = and(
+      eq(schema.whatsappOutboundMessages.tenantId, input.tenantId),
+      eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey),
+    );
+    const [existing] = await db.select({
+      id: schema.whatsappOutboundMessages.id,
+      status: schema.whatsappOutboundMessages.status,
+      providerErrorCode: schema.whatsappOutboundMessages.providerErrorCode,
+    }).from(schema.whatsappOutboundMessages).where(idempotency).limit(1);
+    const now = new Date();
+    const company = requestedDestinationPhone ? await usableCompanyNumber(input.tenantId) : { id: null, pausedUntil: null };
+    const errorCode = dutyShiftReminderFailureCode(requestedDestinationPhone, company.id);
+    const noticeKey = "DUTY_SHIFT_REMINDER";
+    if (existing) {
+      const canRetryConfigurationFailure = existing.status === "failed"
+        && !errorCode
+        && (existing.providerErrorCode === "COMPANY_NUMBER_UNAVAILABLE" || existing.providerErrorCode === "BROKER_PHONE_UNAVAILABLE");
+      if (canRetryConfigurationFailure) {
+        await db.update(schema.whatsappOutboundMessages).set({
+          deliveryRoute: "waha_direct", wahaNumberId: company.id, destinationPhone,
+          renderedBody: body, messagePolicyId: input.messagePolicyId ?? null, messagePolicyVersion: input.messagePolicyVersion ?? null,
+          status: "queued", providerErrorCode: null, providerErrorMessage: null, failedAt: null,
+          attempts: 0, nextAttemptAt: null, holdReason: null, queuedAt: now, updatedAt: now,
+        }).where(and(idempotency, eq(schema.whatsappOutboundMessages.status, "failed")));
+        return { id: existing.id, status: "queued" as const, duplicate: true };
+      }
+      return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
+    }
+    const id = randomUUID();
+    const [inserted] = await db.insert(schema.whatsappOutboundMessages).values({
+      id, tenantId: input.tenantId, channelId: null,
+      deliveryRoute: "waha_direct", wahaNumberId: errorCode ? null : company.id,
+      recipientType: "user", recipientId: input.recipientId ?? null, destinationPhone,
+      purpose: "dutyShiftReminder", messageType: "text", templateName: "__text__", templateLanguage: "pt_BR", variables: [body, input.dutyDate ?? ""],
+      renderedBody: body, messagePolicyId: input.messagePolicyId ?? null, messagePolicyVersion: input.messagePolicyVersion ?? null,
+      status: errorCode ? "failed" : input.scheduledAt && input.scheduledAt > now ? "pending" : "queued",
+      providerErrorCode: errorCode,
+      providerErrorMessage: errorCode === "BROKER_PHONE_UNAVAILABLE" ? "Corretor sem telefone cadastrado." : errorCode === "COMPANY_NUMBER_UNAVAILABLE" ? "Número corporativo WAHA indisponível." : null,
+      failedAt: errorCode ? now : null,
+      noticeKey, idempotencyKey: input.idempotencyKey,
+      scheduledAt: input.scheduledAt ?? null, queuedAt: now, requestedBy: input.requestedBy ?? null, createdAt: now, updatedAt: now,
+    }).onConflictDoNothing().returning({ id: schema.whatsappOutboundMessages.id });
+    if (!inserted) {
+      const [raced] = await db.select({ id: schema.whatsappOutboundMessages.id, status: schema.whatsappOutboundMessages.status })
+        .from(schema.whatsappOutboundMessages).where(idempotency).limit(1);
+      return { id: raced?.id ?? id, status: (raced?.status ?? (errorCode ? "failed" : "queued")) as WhatsAppOutboundStatus, duplicate: true };
+    }
+    return { id, status: (errorCode ? "failed" : "queued") as WhatsAppOutboundStatus, duplicate: false };
+  }
+
   const delivery = resolveInternalBrokerDeliveryRoute({
     tenantId: input.tenantId,
     recipientType: input.recipientType,
@@ -1081,6 +1146,17 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           return;
         } catch (wahaError) {
           await recordCompanyNumberFailure(row.wahaNumberId!).catch(() => undefined);
+          if (row.purpose === "dutyShiftReminder") {
+            const failure = dutyShiftReminderWahaFailure(Boolean(companyUnavailable));
+            await db.update(schema.whatsappOutboundMessages).set({
+              status: "failed",
+              failedAt: new Date(),
+              providerErrorCode: failure.code,
+              providerErrorMessage: failure.message,
+              updatedAt: new Date(),
+            }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+            return;
+          }
           if (!row.noticeKey && row.recipientType === "user" && !(await brokerMetaWindowOpen(row.tenantId, row.destinationPhone))) {
             await db.update(schema.whatsappOutboundMessages).set({
               status: "failed",
