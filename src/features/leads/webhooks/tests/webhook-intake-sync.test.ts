@@ -6,7 +6,9 @@ const state = vi.hoisted(() => {
   const updates: Array<{ table: symbol; values: Record<string, unknown> }> = [];
   let existingLeadRows: Array<Record<string, unknown>> = [];
   const createQueryMock = () => Object.assign(Promise.resolve(existingLeadRows), { limit: vi.fn(async () => existingLeadRows) });
-  const select = vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => createQueryMock()) })) }));
+  const calls: string[] = [];
+  const select = vi.fn(() => { calls.push("select"); return { from: vi.fn(() => ({ where: vi.fn(() => createQueryMock()) })) }; });
+  const execute = vi.fn(async (query: unknown) => { calls.push("execute"); return [query]; });
   const db = {
     insert: vi.fn((table: symbol) => ({ values: vi.fn((values: Record<string, unknown>) => {
       inserts.push({ table, values });
@@ -14,13 +16,17 @@ const state = vi.hoisted(() => {
     }) })),
     update: vi.fn((table: symbol) => ({ set: vi.fn((values: Record<string, unknown>) => ({ where: vi.fn(async () => { updates.push({ table, values }); }) })) })),
     select,
+    execute,
     transaction: vi.fn(async (callback: (tx: typeof db) => Promise<unknown>) => callback(db)),
   };
-  return { schema, inserts, updates, db, select, existingLeadRows: () => existingLeadRows, setExistingLeadRows: (rows: Array<Record<string, unknown>>) => { existingLeadRows = rows; }, resolveIdempotency: vi.fn(), resolveBranch: vi.fn(), enqueueTx: vi.fn(), enqueue: vi.fn() };
+  return { schema, inserts, updates, db, select, execute, calls, existingLeadRows: () => existingLeadRows, setExistingLeadRows: (rows: Array<Record<string, unknown>>) => { existingLeadRows = rows; }, resolveIdempotency: vi.fn(), resolveBranch: vi.fn(), enqueueTx: vi.fn(), enqueue: vi.fn() };
 });
 
 vi.mock("@/shared/db", () => ({ getDatabase: () => state.db, schema: state.schema }));
-vi.mock("drizzle-orm", () => ({ and: vi.fn(() => "and"), eq: vi.fn(() => "eq"), isNull: vi.fn(() => "isNull") }));
+vi.mock("drizzle-orm", () => ({
+  and: vi.fn(() => "and"), eq: vi.fn(() => "eq"), isNull: vi.fn(() => "isNull"),
+  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ text: strings.join("?"), values })),
+}));
 vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: vi.fn(async () => "false") }));
 vi.mock("@/features/ai-qualification/service", () => ({ startAiQualificationForLead: vi.fn() }));
 vi.mock("@/features/leads/webhooks/services/lead-effect-outbox", () => ({ enqueueLeadEffectTx: state.enqueueTx, enqueueLeadEffect: state.enqueue }));
@@ -35,7 +41,7 @@ const payload = { nome: " Maria da Silva ", telefone: "+55 (11) 99999-9999", ema
 function inserted(table: symbol) { return state.inserts.filter((item) => item.table === table).map((item) => item.values); }
 
 describe("createLeadFromWebhookSync", () => {
-  beforeEach(() => { vi.clearAllMocks(); state.inserts.length = 0; state.updates.length = 0; state.setExistingLeadRows([]); state.resolveIdempotency.mockResolvedValue({ status: "new" }); });
+  beforeEach(() => { vi.clearAllMocks(); state.inserts.length = 0; state.updates.length = 0; state.calls.length = 0; state.setExistingLeadRows([]); state.resolveIdempotency.mockResolvedValue({ status: "new" }); });
 
   it("commits lead, audit, timeline, distribution event and effects without calling providers", async () => {
     const result = await createLeadFromWebhookSync({ ...input, payload });
@@ -45,6 +51,14 @@ describe("createLeadFromWebhookSync", () => {
     expect(inserted(state.schema.leadInteractions)).toHaveLength(1);
     expect(inserted(state.schema.leadDistributionEvents)).toEqual([expect.objectContaining({ action: "queued", strategy: "outbox" })]);
     expect(state.enqueueTx).toHaveBeenCalledTimes(2);
+  });
+
+  it("takes this phone's turn in the tenant before looking for an existing lead", async () => {
+    await createLeadFromWebhookSync({ ...input, payload });
+    const [lock] = state.execute.mock.calls[0] as [{ text: string; values: unknown[] }];
+    expect(lock.text).toContain("pg_advisory_xact_lock");
+    expect(lock.values).toEqual(["tenant-a", "99999999"]);
+    expect(state.calls.indexOf("execute")).toBeLessThan(state.calls.indexOf("select"));
   });
 
   it("persists Meta source details with the lead", async () => {
