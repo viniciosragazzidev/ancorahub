@@ -1,3 +1,11 @@
+## 2026-10-27: corretor exclusivamente no Lite
+
+Papel: corretor. Objetivo: atender no Lite. Retirada da alternância para o modo
+normal aposentado; cookie/preferência antiga não selecionam o shell legado.
+Reutiliza navegação, estados e bloqueios de rota existentes. Sem novos tokens,
+primitives, variantes ou transições; não avança a etapa global do redesign.
+Registro: `docs/implementations/active/2026-10-27-broker-lite-only.md`.
+
 ## 2026-10-22: identificação de plantões simultâneos
 
 Papel: corretor em Início, conversa Plantão, link público de confirmação e

@@ -28,7 +28,6 @@ import {
   HandHeart,
   Toolbox,
 } from "@phosphor-icons/react";
-import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -547,14 +546,6 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
                   <SlidersHorizontal className="size-4 text-emerald-400" />
                   Configurações
                 </DropdownMenuItem>
-              ) : null}
-              {userRole === "broker" || roleKey === "broker" || user?.jobTitle === "broker" ? (
-                <>
-                  <DropdownMenuSeparator className="bg-border" />
-                  <div className="px-1 py-1">
-                    <ExperienceModeToggle variant="menu-item" />
-                  </div>
-                </>
               ) : null}
               <DropdownMenuSeparator className="bg-border" />
               <DropdownMenuItem

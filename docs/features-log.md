@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 27/10/2026 - Corretor exclusivamente no Lite
+
+- O papel broker usa Lite antes de ler cookies ou preferências antigas. A tentativa de ativar NORMAL é negada no servidor e auditada; a alternância sai do menu legado.
+- Inclui contexto implícito, Ver como corretor e fallback seguro sem identidade. Demais papéis preservam seus controles.
+- DEC-157. Registro e validações: `docs/implementations/active/2026-10-27-broker-lite-only.md`.
+
 ## 27/10/2026 - Status vivos: faixa "Agora na operação" (ondas 0 e 1, parcial)
 
 - Peça Lite única (`src/components/lite/status/`): `LiteLiveStatus` (rótulo, número, próximo evento com contagem, barra da janela, frase e ação), `LiteLiveStatusStrip` e `LiteLiveSeal`. Um relógio de 1 s por página (`useSyncExternalStore`, pausa com a aba oculta); o primeiro render mostra a hora absoluta em São Paulo e o cliente troca para a contagem. Ao chegar a zero: pulso único e troca do texto. Movimento reduzido respeitado. O `BrokerLiveStatus` do plantão passa a usar o mesmo relógio.

@@ -1853,3 +1853,8 @@ gestão.
 ## DEC-156 - Faixa de status vivos somente na Distribuição
 
 **Pedido do Vinicios em 2026-10-27.** A faixa "Agora na operação" aparece somente em `/leads/distribuicao`. Remover a faixa de todas as versões e papéis de `/dashboard`, mantendo o HTML anterior à faixa com a chave ligada ou desligada. A API, os provedores, os controles de visibilidade e a chave permanecem; a chave continua controlando a faixa na Distribuição. Registro: `docs/implementations/active/2026-10-27-status-vivos.md`.
+
+
+## DEC-157 - Corretor exclusivamente no Lite
+
+**Pedido explícito do Vinicios em 2026-10-27.** O modo normal fica aposentado para o papel autenticado broker. Cookie e preferência antiga NORMAL não reativam a experiência; o servidor resolve LIGHT antes dessas leituras, inclusive em Ver como corretor. A ação de trocar para NORMAL é negada e auditada, e o controle de alternância é removido da sidebar legada. Sem identidade confiável, o cookie não pode selecionar o shell normal. A autorização e a lista de rotas do Lite continuam sendo aplicadas no servidor. Outros papéis mantêm seus controles de experiência; esta decisão não cria uma chave que permita ao corretor reabrir o modo normal. Registro: `docs/implementations/active/2026-10-27-broker-lite-only.md`.

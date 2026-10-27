@@ -1,5 +1,9 @@
 # Contexto de domínio do CorreTop
 
+## Experiência de uso
+
+- **Experiência do corretor**: interface Lite obrigatória para o corretor; a antiga experiência normal está aposentada para esse papel.
+
 ## Atendimento e pós-venda
 
 - **Lead**: oportunidade comercial e unidade de atendimento; pode representar uma família.

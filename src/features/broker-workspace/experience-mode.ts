@@ -1,6 +1,7 @@
 "use server";
 
 import { cache } from "react";
+import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
 
@@ -32,27 +33,27 @@ const readPreferredExperienceMode = cache(async (tenantId: string, userId: strin
 /**
  * Resolves the active experience mode for the current request.
  * Priorities:
- * 1. Explicit cookie value ("LIGHT" or "NORMAL")
- * 2. Persisted tenantMembership setting in DB
- * 3. Default: "LIGHT" for brokers, "NORMAL" for non-brokers
+ * 1. Brokers always use LIGHT, regardless of old cookies or preferences.
+ * 2. Other roles retain their governed mode and cookie/DB preferences.
+ * 3. Without a trusted identity, never select the normal shell from a cookie.
  */
 export async function getExperienceMode(customContext?: TenantContext): Promise<ExperienceMode> {
   let context = customContext;
-  // Read the cookie first so a context failure cannot change prior behavior when the manager flag is off.
+  if (!context) {
+    try {
+      context = await getRequiredTenantContext();
+    } catch {
+      return "LIGHT";
+    }
+  }
+  if (context.role === "broker") return "LIGHT";
+
   let cookieVal: string | undefined;
   try {
     const cookieStore = await cookies();
     cookieVal = cookieStore.get(COOKIE_NAME)?.value;
   } catch {
     // If reading cookies fails outside request context, proceed to context check
-  }
-
-  if (!context) {
-    try {
-      context = await getRequiredTenantContext();
-    } catch {
-      return cookieVal === "LIGHT" || cookieVal === "NORMAL" ? cookieVal : "LIGHT";
-    }
   }
 
   if (context?.role === "manager") {
@@ -73,8 +74,8 @@ export async function getExperienceMode(customContext?: TenantContext): Promise<
     // Fallback if db column read fails
   }
 
-  // Default: LIGHT for broker role/jobTitle, NORMAL for others
-  const isBroker = context.role === "broker" || context.jobTitle === "broker";
+  // Brokers returned above; retain the historical title default for other roles.
+  const isBroker = context.jobTitle === "broker";
   if (isBroker) return "LIGHT";
   // Supervisor Lite (team scope + flag): the supervisor starts in the Lite too.
   const { isSupervisorLiteAvailable } = await import("./lite-audience");
@@ -90,6 +91,19 @@ export async function setExperienceModeAction(newMode: ExperienceMode): Promise<
   try {
     const context = await getRequiredTenantContext();
     const mode: ExperienceMode = newMode === "NORMAL" ? "NORMAL" : "LIGHT";
+
+    if (context.role === "broker" && mode === "NORMAL") {
+      try {
+        await getDatabase().insert(schema.auditLogs).values({
+          id: randomUUID(), userId: context.userId, entidade: "tenant_membership",
+          entidadeId: `${context.tenantId}:${context.userId}`,
+          acao: "experience_mode.normal_blocked_broker", createdAt: new Date(),
+        });
+      } catch {
+        console.warn("[broker-workspace] normal_mode_blocked_audit_unavailable", { tenantId: context.tenantId });
+      }
+      return { success: false, mode: "LIGHT", error: "O modo Lite é obrigatório para corretores. O modo normal foi desativado." };
+    }
 
     if (context.role === "manager" && mode === "NORMAL") {
       const { FEATURE_FLAGS, getFeatureFlag } = await import("@/features/system-settings/queries");
