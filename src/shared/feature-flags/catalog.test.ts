@@ -35,6 +35,17 @@ describe("director Lite visual feature flag", () => {
   });
 });
 
+describe("live status strip feature flag", () => {
+  it("is controlled per company and disabled by default", () => {
+    expect(FEATURE_FLAGS.LIVE_STATUS_STRIP).toMatchObject({
+      key: "feature_live_status_strip",
+      scope: "tenant",
+      defaultValue: "false",
+      allowedValues: ["true", "false"],
+    });
+  });
+});
+
 describe("team management feature flag", () => {
   it("is globally controlled and disabled by default", () => {
     expect(FEATURE_FLAGS.TEAM_MANAGEMENT).toMatchObject({

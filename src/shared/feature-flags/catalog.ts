@@ -207,6 +207,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Habilita o visual Lite somente para o Diretor desta empresa. O Super-admin controla cada piloto.",
   },
+  LIVE_STATUS_STRIP: {
+    key: "feature_live_status_strip",
+    scope: "tenant",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Mostra a faixa \"Agora na operação\" (status vivos) no Painel e na Distribuição desta empresa. O Super-admin liga por empresa; a chave real é feature_live_status_strip_<tenantId>.",
+  },
   TEAM_MANAGEMENT: {
     key: "feature_team_management_enabled",
     scope: "global",

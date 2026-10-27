@@ -21,7 +21,7 @@ vi.mock("@/shared/db", async (importOriginal) => {
   };
 });
 
-import { updateDirectorLiteStylePilotAction } from "./actions";
+import { updateDirectorLiteStylePilotAction, updateLiveStatusPilotAction } from "./actions";
 
 describe("piloto do visual Lite do Diretor no Super-admin", () => {
   beforeEach(() => {
@@ -53,6 +53,31 @@ describe("piloto do visual Lite do Diretor no Super-admin", () => {
     const form = new FormData();
     form.set("enabled", "yes");
     await expect(updateDirectorLiteStylePilotAction("123e4567-e89b-42d3-a456-426614174000", form)).rejects.toThrow();
+    expect(setSetting).not.toHaveBeenCalled();
+  });
+});
+
+describe("status vivos por empresa no Super-admin", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getAdmin.mockResolvedValue({ userId: "platform-admin-1" });
+    setSetting.mockResolvedValue(undefined);
+    insertAudit.mockResolvedValue(undefined);
+  });
+
+  it("liga a faixa só da empresa, com auditoria", async () => {
+    const tenantId = "123e4567-e89b-42d3-a456-426614174000";
+    const form = new FormData();
+    form.set("enabled", "false");
+    await updateLiveStatusPilotAction(tenantId, form);
+    expect(setSetting).toHaveBeenCalledWith(`feature_live_status_strip_${tenantId}`, "false", expect.any(Date));
+    expect(insertAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "live_status_strip.tenant_pilot_updated", targetId: tenantId, metadata: { enabled: false } }));
+  });
+
+  it("recusa valor fora do contrato", async () => {
+    const form = new FormData();
+    form.set("enabled", "sim");
+    await expect(updateLiveStatusPilotAction("123e4567-e89b-42d3-a456-426614174000", form)).rejects.toThrow();
     expect(setSetting).not.toHaveBeenCalled();
   });
 });

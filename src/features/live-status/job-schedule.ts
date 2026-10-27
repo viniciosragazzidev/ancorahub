@@ -87,8 +87,7 @@ export function nextJobRunAt(job: JobKey, now: Date): Date {
  * rodada a partir do instante. Instante já passado vira a próxima rodada.
  */
 export function alignToJobRun(job: JobKey, at: Date, now: Date): Date {
-  const from = at.getTime() > now.getTime() ? at : now;
-  // nextRunAt é estrito; um instante exatamente sobre o disparo conta como o próprio disparo.
-  const exact = new Date(from.getTime() - 1);
-  return nextRunAt(JOB_SCHEDULE[job].cron, exact);
+  if (at.getTime() <= now.getTime()) return nextRunAt(JOB_SCHEDULE[job].cron, now);
+  // nextRunAt é estrito; um instante futuro exatamente sobre o disparo conta como o próprio disparo.
+  return nextRunAt(JOB_SCHEDULE[job].cron, new Date(at.getTime() - 1));
 }

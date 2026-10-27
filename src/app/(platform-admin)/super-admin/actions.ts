@@ -35,6 +35,7 @@ import { REALTIME_SYNC_FEATURE } from "@/features/notifications/realtime-sync";
 import { SYSTEM_REPORT_DESTINATION_KEY, SYSTEM_REPORT_ENABLED_KEY } from "@/features/system-report/message";
 import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, META_OUTBOUND_STALE_AFTER_HOURS_SETTING } from "@/features/communication-channels/outbound-service";
 import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag";
+import { liveStatusSettingKey } from "@/features/live-status/flag";
 
 async function requirePlatformTenantTarget(tenantId: string) {
   const parsedTenantId = z.string().uuid().safeParse(tenantId);
@@ -371,6 +372,26 @@ export async function updateDirectorLiteStylePilotAction(tenantId: string, formD
     id: crypto.randomUUID(),
     actorUserId: admin.userId,
     action: "director_lite_style.tenant_pilot_updated",
+    targetType: "tenant",
+    targetId: targetTenantId,
+    metadata: { enabled: input.enabled === "true" },
+    createdAt: now,
+  });
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
+}
+
+/** Faixa "Agora na operação" (status vivos, 27/10): liga e desliga por empresa, com auditoria. */
+export async function updateLiveStatusPilotAction(tenantId: string, formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
+  const now = new Date();
+
+  await setSystemSetting(liveStatusSettingKey(targetTenantId), input.enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "live_status_strip.tenant_pilot_updated",
     targetType: "tenant",
     targetId: targetTenantId,
     metadata: { enabled: input.enabled === "true" },
