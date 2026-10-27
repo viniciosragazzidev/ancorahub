@@ -110,9 +110,8 @@ export function formatDutyShiftReminderVariables(input: DueDutyShiftReminder) {
   const shortDate = new Intl.DateTimeFormat("pt-BR", { timeZone: schedule.timezone, day: "2-digit", month: "2-digit" }).format(date);
   const time = (value: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: schedule.timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(value);
   const mode = assignment.attendanceMode ?? schedule.attendanceMode;
-  const modeLabel = mode === "presencial"
-    ? assignment.branchName ? `presencial na unidade ${assignment.branchName}` : "presencial"
-    : "online";
+  // The broker's own unit is not where the plantão happens: naming it confused the team (27/10).
+  const modeLabel = mode === "presencial" ? "Presencial" : "Online";
   return [assignment.brokerName, weekday, shortDate, schedule.name, time(window.startsAt), time(window.endsAt), modeLabel];
 }
 

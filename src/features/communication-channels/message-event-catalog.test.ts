@@ -135,9 +135,9 @@ describe("message event catalog", () => {
     const event = getMessageEventByPurpose("dutyShiftReminder");
     expect(event?.key).toBe("DUTY_SHIFT_REMINDER");
     expect(event?.windowRule).toBe("corporate_internal");
-    expect(event?.defaultFreeMessage).toContain("30 min antes chega o pedido de confirmação de presença");
+    expect(event?.defaultFreeMessage).toContain("30 minutos antes de começar, vai chegar aqui uma mensagem para você *confirmar sua presença*");
     expect(getFreeMessageUnknownVariables(event!, ["nome", "dia_semana", "data", "plantao", "hora_inicio", "hora_fim", "modo"])).toEqual([]);
-    expect(renderEventFreeMessage(event!, event!.defaultFreeMessage!, ["Ana", "terça-feira", "27/10", "Presencial tarde", "13:00", "18:00", "presencial na unidade Centro"])).toContain("amanhã, terça-feira 27/10");
+    expect(renderEventFreeMessage(event!, event!.defaultFreeMessage!, ["Ana", "terça-feira", "27/10", "Presencial tarde", "13:00", "18:00", "Presencial"])).toContain("Amanhã (terça-feira, 27/10)");
   });
 });
 

@@ -210,9 +210,9 @@ export const MESSAGE_EVENT_CATALOG = [
       { key: "plantao", label: "Nome do plantão", aliases: ["plantão", "schedule_name"], fallback: "plantão" },
       { key: "hora_inicio", label: "Horário de início", aliases: ["inicio", "start_time"], fallback: "--:--" },
       { key: "hora_fim", label: "Horário de término", aliases: ["fim", "end_time"], fallback: "--:--" },
-      { key: "modo", label: "Modo e unidade", aliases: ["attendance_mode", "unidade"], fallback: "online" },
+      { key: "modo", label: "Presencial ou online", aliases: ["attendance_mode", "unidade"], fallback: "Online" },
     ],
-    defaultFreeMessage: "Oi, {{nome}}! Lembrete: amanhã, {{dia_semana}} {{data}}, você está no plantão {{plantao}}, das {{hora_inicio}} às {{hora_fim}} ({{modo}}). 30 min antes chega o pedido de confirmação de presença. Não vai conseguir? Peça a troca pelo app.",
+    defaultFreeMessage: "📅 *Lembrete de plantão*\n\nOi, {{nome}}! Amanhã ({{dia_semana}}, {{data}}) você está escalado no plantão:\n\n*{{plantao}}*\n⏰ Das {{hora_inicio}} às {{hora_fim}}\n📍 {{modo}}\n\nNo dia, 30 minutos antes de começar, vai chegar aqui uma mensagem para você *confirmar sua presença*. Só recebe leads quem confirmar.\n\nNão vai conseguir ir? Avise seu gestor o quanto antes.",
   },
   {
     key: "TASK_REMINDER",

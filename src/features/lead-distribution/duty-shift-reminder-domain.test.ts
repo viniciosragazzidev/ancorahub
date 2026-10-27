@@ -41,7 +41,7 @@ describe("lembrete de plantão 24 h", () => {
     });
     expect(due).toHaveLength(1);
     expect(due[0]?.assignment.id).toBe("published-row");
-    expect(formatDutyShiftReminderVariables(due[0]!)).toEqual(["Ana", "quarta-feira", "28/10", "Presencial tarde", "10:00", "16:00", "presencial na unidade Centro"]);
+    expect(formatDutyShiftReminderVariables(due[0]!)).toEqual(["Ana", "quarta-feira", "28/10", "Presencial tarde", "10:00", "16:00", "Presencial"]);
   });
 
   it("não inclui pausados nem convidados sem conta", () => {
