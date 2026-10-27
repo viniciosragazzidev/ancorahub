@@ -1,6 +1,6 @@
 # Plano: redesign e refinamento da area /negociacoes (estilo Lite, com dinamica)
 
-**Status:** implementação em andamento, pacotes P1 a P5 autorizados. P6 realtime está fora do escopo.
+**Status:** P1 a P5 concluídos; refinamento de 27/10 aplicado e aguardando revisão. P6 realtime está fora do escopo.
 **Decisão:** DEC-159. As três decisões de produto estão aprovadas pelo Vinicios.
 
 | Pacote | Estado |
@@ -11,15 +11,15 @@
 | P4, painel lateral | Concluído |
 | P5, polimento e skin | Concluído |
 
-P1 substitui os seis KPIs equivalentes por três contadores da régua e um bloco de atenção para espera e esfriamento. O alerta "Sem conversa no CRM" fica fora da trilha. A contagem de entradas usa `stageEnteredAt` no dia de São Paulo. Testes focados: 2 arquivos, 8 testes aprovados; ESLint sem erros.
+P1 substitui os seis KPIs equivalentes por três contadores da régua e um bloco de atenção para espera e esfriamento. O alerta "Sem conversa no CRM" fica como terceira linha dentro de Atenção. Cada cartão da régua mostra sua proporção do total, sem repetir a trilha na aba Negociações. A contagem de entradas usa `stageEnteredAt` no dia de São Paulo. Testes focados: 2 arquivos, 8 testes aprovados; ESLint sem erros.
 
-P2 adiciona a trilha clicável dos três estágios comerciais. Os botões filtram a lista sem consulta adicional, mostram proporções com `LiteProgress` e passam a uma coluna em telas estreitas. Testes focados: 2 arquivos, 9 testes aprovados; ESLint sem erros.
+P2 adiciona a trilha clicável dos três estágios comerciais na aba Estatísticas. Os botões filtram a lista sem consulta adicional, mostram proporções do total com `LiteProgress` e passam a uma coluna em telas estreitas. A aba Negociações integra as barras proporcionais aos cartões da régua para evitar duplicidade. Testes focados: 2 arquivos, 9 testes aprovados; ESLint sem erros.
 
 P3 troca a lista inicial por cartões `PeopleRow`, com etapa, responsável pela resposta, tempo desde a última troca e sinais de documento, imagem, proposta e leitura da IA. O modo tabela é opcional e enxuto, com seis colunas; ambos abrem o mesmo painel lateral. Filtros e paginação continuam no estado local.
 
 P4 coloca a trilha mini e os sinais que explicam a situação antes do resumo e da linha do tempo. O histórico usa `LiteSkeletonToContent` com altura reservada e Skeleton do Arc; falha oferece nova tentativa. O carregamento continua limitado à abertura do painel e a lista permanece utilizável.
 
-P5 revisa a troca entre cartões e tabela com `LiteSwap`, mantém movimentos do kit respeitando movimento reduzido, elimina o tique por cartão usando o horário do conjunto carregado e atualiza a fixture para mostrar entradas hoje nas três etapas. Auditoria Lite: zero desvio nos arquivos de tela tocados. A auditoria global continua listando desvios já existentes fora desta entrega.
+P5 revisa a troca entre cartões e tabela com `LiteSwap`, mantém movimentos do kit respeitando movimento reduzido, elimina o tique por cartão usando o horário do conjunto carregado e atualiza a fixture para mostrar entradas hoje nas três etapas. Na rodada de refinamento, a lista de cartões passou a uma coluna, os cartões da régua e Atenção alinham sua altura por linha, e o tempo parado ficou como texto visível no `PeopleRow`, sem `aria-label` num `span` sem papel. Auditoria Lite: zero desvio nos arquivos de tela tocados. A auditoria global continua listando desvios já existentes fora desta entrega.
 
 Verificação final: vitest focado em `src/features/negotiations`, 5 arquivos e 35 testes aprovados; `npx tsc --noEmit -p .` aprovado; ESLint dos arquivos TSX tocados aprovado; `npm run agent:docs` validou 18 referências. `/dev/negociacoes-preview` foi capturada com o shell real em 1440 e 390 px, sem erro de navegador e sem overflow horizontal. Imagens: `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/negociacoes-redesign-prints/negociacoes-1440.png` (194761 bytes) e `negociacoes-390.png` (83169 bytes), geradas em 27/10/2026 às 16:57.
 
@@ -127,7 +127,7 @@ Cada pacote: nenhuma migration, nenhum SQL novo, nenhum teste de banco; verifica
 - Performance (regra dura): nada de consulta extra no layout (Vigia ja barra). Todo o topo, funil e cards derivam de NegotiationsDashboardData ja carregado; "entrou hoje" e calculo client puro sobre stageEnteredAt. Se o Vinicios quiser transicoes reais entre etapas (saiu de X, entrou em Y hoje), isso exige SQL novo ou agregacao: nao incluir sem decisao explicita (decisao 2).
 - Bundle: dashboard client tem 14,5 KB hoje (doc da entrega, linha 46); novos componentes sao client pequenos; manter secoes estaticas como server quando possivel.
 - Tela que mente: o countdown das 4 h e o prazo da regra, mas o reclassificamento so ocorre no proximo refresh (a area e leitura no momento da consulta). Mostrar "atualizado as HH:MM" (ja existe, dashboard:120) junto do countdown.
-- Ruido visual: teto de 4 cartoes no topo + 1 selo; gravidade ok neutra; chips de atencao so quando > 0.
+- Ruido visual: tres cartoes de etapa com barra proporcional e um painel Atencao; "Sem conversa no CRM" fica dentro desse painel e so aparece quando > 0.
 - Regra de negocio nao vai para a UI: a regra da regua continua em computeNegotiationLevel (model:74-121); a tela so presenta os niveis ja calculados; nunca copiar 4 h / 3 d como texto solto (importar NEGOTIATION_LIMITS).
 - Fuso: derivados de "hoje" e datas usam America/Sao_Paulo no client (mesmo padrao localDayKey, queries.ts:119-123; formatAgo/formatAbsoluteTime do kit status).
 - Acessibilidade: role="timer" com aria-live="off" no countdown; aria-live="polite" na mudanca do numero (padrao LiteNumber/LiveStatus); foco de teclado no painel lateral mantido.
@@ -142,3 +142,13 @@ Recomendo comecar pelo version sem SQL (P1) e so adicionar transicoes reais se o
 Recomendo faixas de atencao fora do funil (a regua comercial sao 3 etapas; esfriar e risco transverso) e modo escuro fora de escopo (o Lite e claro so).
 
 Fim do plano. Implementação P1 a P5 registrada acima. P6 realtime não foi iniciado.
+
+## Rodada de refinamento visual (27/10)
+
+- As barras proporcionais foram integradas aos três cartões clicáveis da régua na aba Negociações; a trilha separada não aparece mais nessa aba e continua na aba Estatísticas.
+- A grade superior usa quatro cartões em uma linha ampla e duas colunas em largura intermediária, com altura igual por linha; no celular vira coluna. A lista principal `PeopleRow` fica em uma coluna em todas as larguras.
+- "Sem conversa no CRM" agora é a terceira linha do painel Atenção. "Sem troca" permanece visível como metadado, sem `aria-label` em elemento sem papel.
+- Movimento reduzido foi exercitado no navegador com `prefers-reduced-motion: reduce`; os contadores iniciaram no valor final, as barras ficaram estáticas e as entradas terminaram com opacidade 1, sem deslocamento. Testes dos componentes Lite `attention`, `number`, `progress`, `stagger` e `swap` passaram.
+- Capturas do shell real em `/dev/negociacoes-preview`, com movimento reduzido ativo, sem erros de navegador ou rolagem horizontal. Desktop: quatro cartões com alturas iguais (271 px); celular: cartões empilhados (124 px cada, Atenção 225 px).
+- Vitest focado: 10 arquivos, 57 testes aprovados. `npx tsc --noEmit -p .`, ESLint dos TSX tocados e `npm run agent:docs` aprovados. `npm run check:lite-skin` concluiu; os seis arquivos desta alteração têm zero desvios no scanner direcionado, e o relatório global aponta desvios já existentes em outras áreas.
+- Capturas: `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/negociacoes-redesign-prints/negociacoes-1440-v2.png` (181217 bytes, 27/10/2026 17:26) e `negociacoes-390-v2.png` (83621 bytes, 27/10/2026 17:26).

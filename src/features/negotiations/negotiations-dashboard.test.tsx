@@ -30,10 +30,14 @@ describe("NegotiationsDashboard", () => {
     expect(screen.getByRole("heading", { name: "Negociações" })).toBeTruthy();
     expect(container.querySelector('.arc-venancor[data-skin="diretor"]')).toBeTruthy();
     expect(screen.getByRole("navigation", { name: "Visões de negociações" })).toBeTruthy();
-    expect(screen.getByRole("region", { name: "Negociações agora" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Sem conversa no CRM/ })).toBeTruthy();
+    const summary = screen.getByRole("region", { name: "Negociações agora" });
+    const attention = summary.querySelector('[aria-label="Faixas de atenção"]') as HTMLElement;
+    expect(within(attention).getByRole("button", { name: /Sem conversa no CRM/ })).toBeTruthy();
     expect(container.querySelectorAll('[data-lite="negotiation-cards"] > li')).toHaveLength(20);
     expect(container.querySelector('[data-lite="negotiation-cards"]')?.textContent).toContain("Aguardando o corretor");
+    const cardList = container.querySelector('[data-lite="negotiation-cards"]');
+    expect(cardList?.querySelector('[aria-label*="Sem troca"]')).toBeNull();
+    expect(cardList?.textContent).toContain("Sem troca");
     expect(screen.getByRole("button", { name: /Aguardando resposta/ }).textContent).toContain(String(data.counts.customers_waiting));
     fireEvent.click(screen.getByRole("button", { name: `Ver detalhes de ${data.leads[0]!.name}` }));
     expect(await screen.findByRole("heading", { name: "Linha do tempo" })).toBeTruthy();
@@ -61,13 +65,15 @@ describe("NegotiationsDashboard", () => {
     expect(container.querySelectorAll('[data-lite="negotiation-cards"] > li')).toHaveLength(data.counts.advanced);
   });
 
-  it("a trilha mostra proporções e filtra a lista pela etapa escolhida", () => {
+  it("a régua mostra proporções do total e filtra a lista pela etapa escolhida", () => {
     const data = createNegotiationsFixture("director");
     const { container } = render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} />);
-    const trail = screen.getByRole("region", { name: "Trilha de negociação" });
-    const close = within(trail).getByRole("button", { name: /Fechamento/ });
+    const summary = screen.getByRole("region", { name: "Negociações agora" });
+    const progressBars = within(summary).getAllByRole("progressbar");
+    const close = container.querySelector('button[data-level="closing"]') as HTMLButtonElement;
 
-    expect(within(trail).getAllByRole("progressbar")).toHaveLength(3);
+    expect(progressBars).toHaveLength(3);
+    expect(progressBars.map((bar) => bar.getAttribute("aria-valuenow"))).toEqual(["20", "20", "20"]);
     fireEvent.click(close);
     expect(close.getAttribute("aria-pressed")).toBe("true");
     expect(container.querySelectorAll('[data-lite="negotiation-cards"] > li')).toHaveLength(data.counts.closing);

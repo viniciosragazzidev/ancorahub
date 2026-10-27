@@ -22,7 +22,6 @@ import { getNegotiationTimelineAction } from "./actions";
 import { createNegotiationLeadColumns, formatNegotiationMetric, LEVEL_LABELS, NegotiationStatsView } from "./negotiations-data-views";
 import type { NegotiationLead, NegotiationTimelineEvent, NegotiationsDashboardData } from "./queries";
 import { NegotiationStageSummary } from "./negotiation-stage-summary";
-import { NegotiationStageTrail } from "./negotiation-stage-trail";
 import { NegotiationLeadRow } from "./negotiation-lead-row";
 import { NegotiationLeadSignals } from "./negotiation-lead-signals";
 import styles from "./negotiations.module.css";
@@ -147,8 +146,6 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
                 activeFilter={activeFilter}
                 onFilter={(filter) => setActiveFilter(activeFilter === filter ? "all" : filter)}
               />
-              <NegotiationStageTrail counts={data.counts} activeFilter={activeFilter} onFilter={(filter) => setActiveFilter(activeFilter === filter ? "all" : filter)} />
-
               <section className={styles.list} aria-label="Lista de negociações">
                 <div className={styles.toolbar}>
                   <label className={styles.search}>

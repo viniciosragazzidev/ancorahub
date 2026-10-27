@@ -19,7 +19,7 @@ export function NegotiationStageTrail({ counts, activeFilter = "all", onFilter }
   activeFilter?: "all" | NegotiationLevel | "customers_waiting";
   onFilter?: (level: TrailStage) => void;
 }) {
-  const max = Math.max(1, ...STAGES.map(({ id }) => counts[id]));
+  const total = Math.max(1, counts.closing + counts.advanced + counts.in_conversation + counts.cooling + counts.no_crm_conversation);
 
   return (
     <section className={styles.trailSection} aria-label="Trilha de negociação">
@@ -39,7 +39,7 @@ export function NegotiationStageTrail({ counts, activeFilter = "all", onFilter }
                   {node}
                 </button>
               ) : <div className={styles.trailStatic}>{node}</div>}
-              <LiteProgress value={(count / max) * 100} label={`${label}: proporção entre níveis`} className={styles.trailProgress} />
+              <LiteProgress value={(count / total) * 100} label={`${label}: proporção do total de atendimentos`} className={styles.trailProgress} />
             </li>
           );
         })}

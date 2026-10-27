@@ -57,17 +57,16 @@
 .tab:focus-visible,
 .stageCard:focus-visible,
 .attentionAction:focus-visible,
-.noCrmSeal:focus-visible,
 .textLink:focus-visible {
   outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
   outline-offset: 2px;
 }
 
 .stageSummary { display: grid; gap: 8px; min-width: 0; }
-.stageCards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; min-width: 0; }
+.stageCards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; gap: 12px; min-width: 0; }
 .stageCard,
-.attentionCard { min-width: 0; min-height: 112px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); color: var(--foreground); }
-.stageCard { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; align-items: center; gap: 8px 12px; font: inherit; text-align: left; cursor: pointer; }
+.attentionCard { min-width: 0; min-height: 168px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); color: var(--foreground); }
+.stageCard { display: grid; width: 100%; height: 100%; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto 1fr auto auto; align-items: center; gap: 8px 12px; font: inherit; text-align: left; cursor: pointer; }
 .stageCard:hover { background: var(--surface-muted); }
 .stageCard:active { transform: scale(.99); }
 .stageCard[data-active="true"] { border-color: var(--primary); background: var(--accent-subtle); }
@@ -77,6 +76,7 @@
 .stageCardTop { display: flex; min-width: 0; align-items: center; gap: 8px; font-size: var(--text-sm); font-weight: 600; }
 .stageCount { grid-column: 2; grid-row: 1 / span 2; font-size: var(--text-2xl); font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
 .stageDetail { grid-column: 1; color: var(--text-muted); font-size: var(--text-xs); line-height: 1.35; }
+.stageProgress { grid-column: 1 / -1; width: 100%; }
 .attentionCard { display: grid; align-content: start; gap: 8px; background: var(--warning-subtle); }
 .attentionTitle { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 600; }
 .attentionTitle svg { color: var(--warning); }
@@ -94,9 +94,6 @@
 .countdownPulse { flex: 0 0 auto; }
 .countdownDot { display: block; width: 8px; height: 8px; border-radius: 9999px; background: var(--warning); }
 .countdown { display: block; }
-.noCrmSeal { display: inline-flex; justify-self: start; min-height: 44px; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--warning); border-radius: var(--radius-control); background: var(--warning-subtle); color: var(--foreground); font: inherit; font-size: var(--text-xs); cursor: pointer; }
-.noCrmSeal svg { color: var(--warning); }
-.noCrmSeal[aria-pressed="true"] { outline: 2px solid var(--focus-outline, var(--primary)); outline-offset: 2px; }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
 .trailSection { min-width: 0; }
 .trail { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
@@ -124,7 +121,7 @@
 .presentationButton[aria-pressed="true"] { background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-resting); }
 .presentationButton:focus-visible,
 .cardOpen:focus-visible { outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary)); outline-offset: 2px; }
-.leadCards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.leadCards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 0; padding: 0; list-style: none; min-width: 0; }
 .cardStage { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .cardStatus { color: var(--text-muted); font-size: var(--text-xs); }
 .cardStopped { white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -234,15 +231,14 @@
 @media (max-width: 767px) {
   .root { gap: 16px; }
   .stageCards { grid-template-columns: minmax(0, 1fr); gap: 8px; }
-  .stageCard,
-  .attentionCard { min-height: 84px; padding: 12px; }
+  .stageCard { min-height: 124px; padding: 12px; }
+  .attentionCard { min-height: 0; padding: 12px; }
   .trail { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .trailItem { grid-template-columns: minmax(0, 1fr) minmax(72px, .65fr); align-items: center; gap: 12px; }
   .toolbar { display: grid; grid-template-columns: minmax(0, 1fr); }
   .search, .select { width: 100%; max-width: none; }
   .resultCount { margin-left: 0; }
   .presentationControls { justify-self: start; }
-  .leadCards { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .healthRow { grid-template-columns: minmax(0, 1fr); }
   .timelineItem { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .timelineAt { white-space: normal; }

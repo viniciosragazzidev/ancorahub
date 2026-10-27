@@ -24,7 +24,7 @@ export function NegotiationLeadRow({ lead, index, generatedAt, onOpen }: {
   onOpen: (lead: NegotiationLead) => void;
 }) {
   const stoppedAt = lead.lastExchangeAt ? new Date(lead.lastExchangeAt).getTime() : null;
-  const stopped = stoppedAt !== null && Number.isFinite(stoppedAt) ? formatAgo(generatedAt.getTime() - stoppedAt) : "Sem troca recente";
+  const stopped = stoppedAt !== null && Number.isFinite(stoppedAt) ? `Sem troca ${formatAgo(generatedAt.getTime() - stoppedAt)}` : "Sem troca recente";
   const signals = stageSignals(lead);
   const replyLabel = lead.replyOwedBy === "broker" ? "Aguardando o corretor" : lead.replyOwedBy === "customer" ? "Aguardando o cliente" : "Sem resposta pendente";
   const preview = [replyLabel, ...signals].join(" · ");
@@ -37,7 +37,7 @@ export function NegotiationLeadRow({ lead, index, generatedAt, onOpen }: {
       chip={<span className={styles.cardStage}><span className={styles.level} data-level={lead.level}>{LEVEL_LABELS[lead.level]}</span><span className={styles.cardStatus}>{stageStatus}</span></span>}
       preview={preview}
       previewTone={lead.customerWaiting ? "waiting" : lead.level === "cooling" || lead.level === "no_crm_conversation" ? "alert" : "muted"}
-      meta={<span className={styles.cardStopped} aria-label={`Sem troca ${stopped}`}>{stopped}</span>}
+      meta={<span className={styles.cardStopped}>{stopped}</span>}
       dot={lead.customerWaiting ? "waiting" : lead.level === "cooling" || lead.level === "no_crm_conversation" ? "alert" : null}
       dotLabel={lead.customerWaiting ? "Cliente aguarda resposta" : lead.level === "cooling" ? "Atendimento esfriando" : lead.level === "no_crm_conversation" ? "Sem conversa no CRM" : undefined}
       action={<button type="button" className={styles.cardOpen} aria-label={`Ver detalhes de ${lead.name}`} onClick={() => onOpen(lead)}>Ver detalhes</button>}

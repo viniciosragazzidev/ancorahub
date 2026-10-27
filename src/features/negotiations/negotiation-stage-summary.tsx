@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, MessageCircle, Timer } from "lucide-react";
 
-import { LiteAttention, LiteNumber, LiteStagger, LiteSwap } from "@/components/lite/motion";
+import { LiteAttention, LiteNumber, LiteProgress, LiteStagger, LiteSwap } from "@/components/lite/motion";
 import { formatAbsoluteTime, formatAgo, formatCountdown } from "@/components/lite/status/format";
 import { useCountdown, useNowSeconds } from "@/components/lite/status/use-countdown";
 
@@ -83,6 +83,7 @@ export function NegotiationStageSummary({ data, generatedAt, activeFilter, onFil
       <LiteStagger className={styles.stageCards}>
         {STAGES.map(({ id, label, detail, icon: Icon }) => {
           const count = countForLevel(data, id);
+          const proportion = data.leads.length ? (count / data.leads.length) * 100 : 0;
           const entered = enteredToday(data.leads, id, generatedAt);
           const isActive = activeFilter === id;
           return (
@@ -90,6 +91,7 @@ export function NegotiationStageSummary({ data, generatedAt, activeFilter, onFil
               <span className={styles.stageCardTop}><Icon aria-hidden="true" size={18} /><span>{label}</span></span>
               <LiteAttention pulseKey={countPulses[id] || undefined} className={styles.stageCount}><LiteNumber value={count} countFromZero live /></LiteAttention>
               <span className={styles.stageDetail}>{entered} {entered === 1 ? "entrou" : "entraram"} na etapa atual hoje</span>
+              <LiteProgress value={proportion} label={`${label}: proporção do total de atendimentos`} className={styles.stageProgress} />
               <span className={styles.srOnly}>{detail}</span>
             </button>
           );
@@ -119,16 +121,18 @@ export function NegotiationStageSummary({ data, generatedAt, activeFilter, onFil
                 {cooling ? <span className={styles.attentionHint}>Mais antigo parado {formatAgo(now - new Date(cooling.lastExchangeAt!).getTime())}</span> : <span className={styles.attentionHint}>{data.counts.cooling ? "Sem data da última troca" : "Nenhum parado"}</span>}
               </button>
             </div>
+            {data.counts.no_crm_conversation > 0 ? (
+              <div className={styles.attentionItem}>
+                <button type="button" className={styles.attentionAction} data-active={activeFilter === "no_crm_conversation" || undefined} aria-pressed={activeFilter === "no_crm_conversation"} onClick={() => onFilter("no_crm_conversation")}>
+                  <span className={styles.attentionLabel}>Sem conversa no CRM</span>
+                  <LiteAttention pulseKey={countPulses.no_crm_conversation || undefined} className={styles.attentionValue}><LiteNumber value={data.counts.no_crm_conversation} countFromZero live /></LiteAttention>
+                  <span className={styles.attentionHint}>Status avançado sem mensagem registrada</span>
+                </button>
+              </div>
+            ) : null}
           </div>
         </article>
       </LiteStagger>
-      {data.counts.no_crm_conversation > 0 ? (
-        <button type="button" className={styles.noCrmSeal} aria-pressed={activeFilter === "no_crm_conversation"} onClick={() => onFilter("no_crm_conversation")}>
-          <AlertTriangle aria-hidden="true" size={16} />
-          <span>Sem conversa no CRM</span>
-          <LiteAttention pulseKey={countPulses.no_crm_conversation || undefined} className={styles.sealCount}><LiteNumber value={data.counts.no_crm_conversation} countFromZero live /></LiteAttention>
-        </button>
-      ) : null}
     </section>
   );
 }
