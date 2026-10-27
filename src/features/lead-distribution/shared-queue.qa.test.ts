@@ -167,15 +167,14 @@ describe("fila compartilhada — ranking entre plantões (rankBrokers/resolveDis
     expect(ranked[0].id).toBe("a1");
   });
 
-  it("ACHADO: com ranking inteligente desligado, a estratégia capacity ignora receivedInDuty — fila compartilhada NÃO equilibra por carga do plantão (domain.ts:190-192)", () => {
-    // chooseBroker ordena só por activeLeads (carteira ativa): o corretor com
-    // menos carga do dia (receivedInDuty) não sobe. Na fila compartilhada,
-    // desligar o ranking desliga o balanceamento entre plantões.
+  it("com ranking inteligente desligado, a estratégia capacity também equilibra pelos recebidos no dia (DEC-154)", () => {
+    // Antes chooseBroker ordenava só por activeLeads (carteira ativa) e desligar o
+    // ranking desligava o balanceamento entre plantões. Agora segue a mesma ordem.
     const menosCargaNoDia = makeBroker("a1", { receivedInDuty: 0, activeLeads: 5 });
     const maisCargaNoDia = makeBroker("b1", { receivedInDuty: 4, activeLeads: 1 });
 
     const decision = resolveDistributionCandidate([menosCargaNoDia, maisCargaNoDia], policySemRanking, "capacity", fixedRandom);
 
-    expect(decision.selected?.id).toBe("b1");
+    expect(decision.selected?.id).toBe("a1");
   });
 });

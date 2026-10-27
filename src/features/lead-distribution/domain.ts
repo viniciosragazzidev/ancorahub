@@ -82,9 +82,11 @@ export type IntelligentDistributionPolicy = {
 export type RankedBroker = EligibleBroker & {
   onDuty: boolean;
   /**
-   * Leads offered or assigned to the broker in the current operation day (the
-   * plantão window: 19:00 of the day before, Friday 19:00 on Monday). This is
-   * the "menor carga" of the plantão; the portfolio counts below only break ties.
+   * Leads offered or assigned to the broker in the current operation day (19:00
+   * of the day before, Friday 19:00 on Monday), across every queue and plantão
+   * of the broker. Expired, declined and lost offers count; only CANCELLED ones
+   * do not (DEC-154, see received-in-day.ts). This is the "menor carga"; the
+   * portfolio counts below only break ties.
    */
   receivedInDuty?: number;
   conversionRate: number;
@@ -226,14 +228,21 @@ export function calculateBrokerRankingScore(input: Pick<RankedBroker, "conversio
   return Math.round(input.conversionRate * weights.conversionWeight + input.slaRate * weights.slaWeight + input.manualPriority * weights.manualPriorityWeight);
 }
 
-export function chooseBroker(brokers: EligibleBroker[], strategy: AssignmentStrategy, random: () => number = Math.random): EligibleBroker | null {
+export function chooseBroker<T extends EligibleBroker & { onDuty?: boolean; receivedInDuty?: number }>(brokers: T[], strategy: AssignmentStrategy, random: () => number = Math.random): T | null {
   const eligible = brokers.filter((broker) => broker.capacity === null || broker.activeLeads < broker.capacity);
   if (!eligible.length) return null;
   // round_robin's whole point is "oldest account goes first" (deliberately,
   // regardless of load) — that stays a real, deterministic criterion.
-  // capacity's tie-break (same active-lead count) has no such meaning, so it
-  // resolves from the pre-shuffled order instead of "oldest account wins".
-  return shuffle(eligible, random).sort((a, b) => strategy === "round_robin" ? a.createdAt.getTime() - b.createdAt.getTime() : a.activeLeads - b.activeLeads)[0] ?? null;
+  // capacity follows the same order as rankBrokers (DEC-154): plantão ativo,
+  // then fewest received in the operation day, and only then the portfolio
+  // (active leads). Ties resolve from the pre-shuffled order.
+  return shuffle(eligible, random).sort((a, b) => {
+    if (strategy === "round_robin") return a.createdAt.getTime() - b.createdAt.getTime();
+    if (Number(b.onDuty ?? false) !== Number(a.onDuty ?? false)) return Number(b.onDuty ?? false) - Number(a.onDuty ?? false);
+    const received = (a.receivedInDuty ?? 0) - (b.receivedInDuty ?? 0);
+    if (received !== 0) return received;
+    return a.activeLeads - b.activeLeads;
+  })[0] ?? null;
 }
 
 /** Shared final decision for automatic distribution and the dry-run simulator. */
