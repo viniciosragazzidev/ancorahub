@@ -66,6 +66,12 @@ describe("DEC-154: nivelamento pelo dia da operação", () => {
     expect(pickNextByReceivedInDay(["off", "on"], received, { on: 0, off: 1 })).toBe("on");
   });
 
+  it("(a) corretor fora do mapa de plantão conta como fora do plantão, não como ativo", () => {
+    // "solto" não está no mapa e tem 0 recebidos; "plantao" está no plantão com 3.
+    const received = new Map([["solto", 0], ["plantao", 3]]);
+    expect(pickNextByReceivedInDay(["solto", "plantao"], received, { plantao: 0 })).toBe("plantao");
+  });
+
   it("(b) oferta EXPIRED e DECLINED contam; CANCELLED não", () => {
     const receipts: DayReceipt[] = [
       { brokerId: "lento", leadId: "l1", receivedAt: at("09:01"), offerStatus: "EXPIRED" },

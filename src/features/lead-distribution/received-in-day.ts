@@ -55,7 +55,8 @@ export function pickNextByReceivedInDay(
   let bestTier = 0;
   let bestReceived = 0;
   for (const brokerId of orderedBrokerIds) {
-    const tier = tierByBroker[brokerId] ?? 0;
+    // Fora do mapa = fora do plantão ativo (tier 1), nunca o primeiro da fila.
+    const tier = tierByBroker[brokerId] ?? 1;
     const received = receivedByBroker.get(brokerId) ?? 0;
     if (best === null || tier < bestTier || (tier === bestTier && received < bestReceived)) {
       best = brokerId;
