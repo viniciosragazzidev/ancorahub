@@ -20,6 +20,7 @@ import { getNegotiationTimelineAction } from "./actions";
 import { createNegotiationLeadColumns, formatNegotiationMetric, LEVEL_LABELS, NegotiationStatsView } from "./negotiations-data-views";
 import type { NegotiationLead, NegotiationTimelineEvent, NegotiationsDashboardData } from "./queries";
 import { NegotiationStageSummary } from "./negotiation-stage-summary";
+import { NegotiationStageTrail } from "./negotiation-stage-trail";
 import styles from "./negotiations.module.css";
 
 type Filter = "all" | NegotiationLevel | "customers_waiting";
@@ -132,7 +133,7 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
               <p className={litePage.emptyText}>{data.scope.scopeMessage}</p>
             </section>
           ) : activeTab === "statistics" ? (
-            <NegotiationStatsView brokerStats={data.brokerStats} dailyStats={data.dailyStats} aiHealth={data.aiHealth} />
+            <NegotiationStatsView brokerStats={data.brokerStats} dailyStats={data.dailyStats} aiHealth={data.aiHealth} counts={data.counts} />
           ) : (
             <>
               <NegotiationStageSummary
@@ -141,6 +142,7 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
                 activeFilter={activeFilter}
                 onFilter={(filter) => setActiveFilter(activeFilter === filter ? "all" : filter)}
               />
+              <NegotiationStageTrail counts={data.counts} activeFilter={activeFilter} onFilter={(filter) => setActiveFilter(activeFilter === filter ? "all" : filter)} />
 
               <section className={styles.list} aria-label="Lista de negociações">
                 <div className={styles.toolbar}>

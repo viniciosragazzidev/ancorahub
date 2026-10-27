@@ -5,6 +5,7 @@ import { stageLabel } from "@/features/conversation-intelligence/components/rada
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import type { NegotiationLevel } from "./negotiation-model";
 import type { NegotiationBrokerStats, NegotiationDayStats, NegotiationLead, NegotiationsDashboardData } from "./queries";
+import { NegotiationStageTrail } from "./negotiation-stage-trail";
 import styles from "./negotiations.module.css";
 
 const LEVEL_LABELS: Record<NegotiationLevel, string> = {
@@ -76,7 +77,7 @@ export function createNegotiationLeadColumns(): LiteColumn<NegotiationLead>[] {
   ];
 }
 
-export function NegotiationStatsView({ brokerStats, dailyStats, aiHealth }: { brokerStats: NegotiationBrokerStats[]; dailyStats: NegotiationDayStats[]; aiHealth: NegotiationsDashboardData["aiHealth"] }) {
+export function NegotiationStatsView({ brokerStats, dailyStats, aiHealth, counts }: { brokerStats: NegotiationBrokerStats[]; dailyStats: NegotiationDayStats[]; aiHealth: NegotiationsDashboardData["aiHealth"]; counts: NegotiationsDashboardData["counts"] }) {
   const brokerColumns: LiteColumn<NegotiationBrokerStats>[] = [
     { id: "broker", label: "Corretor", primary: true, render: (row) => row.brokerName },
     { id: "total", label: "Leads ativos", numeric: true, render: (row) => formatNegotiationMetric(row.total) },
@@ -100,6 +101,7 @@ export function NegotiationStatsView({ brokerStats, dailyStats, aiHealth }: { br
 
   return (
     <div className={styles.statsBlock}>
+      <NegotiationStageTrail counts={counts} />
       <section className={styles.statsBlock} aria-labelledby="negotiations-brokers-title">
         <h2 className={styles.sectionTitle} id="negotiations-brokers-title">Por corretor</h2>
         <LiteResponsiveData caption="Estatísticas de negociações por corretor" columns={brokerColumns} rows={brokerStats} rowKey={(row) => row.brokerId} empty={<p className={styles.emptyText}>Ainda não há negociações ativas neste escopo.</p>} />

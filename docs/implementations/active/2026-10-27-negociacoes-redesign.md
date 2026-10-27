@@ -6,12 +6,14 @@
 | Pacote | Estado |
 |---|---|
 | P1, resumo por etapa | Concluído |
-| P2, trilha comercial | Pendente |
+| P2, trilha comercial | Concluído |
 | P3, cards e tabela | Pendente |
 | P4, painel lateral | Pendente |
 | P5, polimento e skin | Pendente |
 
 P1 substitui os seis KPIs equivalentes por três contadores da régua e um bloco de atenção para espera e esfriamento. O alerta "Sem conversa no CRM" fica fora da trilha. A contagem de entradas usa `stageEnteredAt` no dia de São Paulo. Testes focados: 2 arquivos, 8 testes aprovados; ESLint sem erros.
+
+P2 adiciona a trilha clicável dos três estágios comerciais. Os botões filtram a lista sem consulta adicional, mostram proporções com `LiteProgress` e passam a uma coluna em telas estreitas. Testes focados: 2 arquivos, 9 testes aprovados; ESLint sem erros.
 
 Repo: C:/Users/kyper/Desktop/Kyper/Projects/ancorahub-lite-listas (somente leitura; nenhum codigo alterado).
 Fontes lidas: src/app/(dashboard)/negociacoes/{page,loading,error}.tsx; src/features/negotiations/* (dashboard, data-views, model, queries, css, fixtures, actions); docs/implementations/completed/2026-10-26-negociacoes-area.md; src/app/dev/negociacoes-preview/page.tsx; docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md; docs/design-system/lite/2026-10-21-estudo-visor-animacoes.md; src/components/lite/motion/*; src/components/lite/status/*; referencias /leads e /leads/distribuicao (LightLeadsList, people-list, faixa de status vivos).

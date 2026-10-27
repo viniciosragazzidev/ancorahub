@@ -51,11 +51,23 @@ describe("NegotiationsDashboard", () => {
     });
     const { container } = render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={now} />);
 
-    const advanced = screen.getByRole("button", { name: /Negociação avançada/ });
+    const advanced = container.querySelector('button[data-level="advanced"]') as HTMLButtonElement;
     expect(advanced.textContent).toContain("2 entraram na etapa atual hoje");
     fireEvent.click(advanced);
     expect(advanced.getAttribute("aria-pressed")).toBe("true");
     expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(data.counts.advanced);
+  });
+
+  it("a trilha mostra proporções e filtra a lista pela etapa escolhida", () => {
+    const data = createNegotiationsFixture("director");
+    const { container } = render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} />);
+    const trail = screen.getByRole("region", { name: "Trilha de negociação" });
+    const close = within(trail).getByRole("button", { name: /Fechamento/ });
+
+    expect(within(trail).getAllByRole("progressbar")).toHaveLength(3);
+    fireEvent.click(close);
+    expect(close.getAttribute("aria-pressed")).toBe("true");
+    expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(data.counts.closing);
   });
 
   it("filtra a lista pela busca e abre a aba de estatísticas", () => {
@@ -67,6 +79,7 @@ describe("NegotiationsDashboard", () => {
 
     rerender(<NegotiationsDashboard data={data} activeTab="statistics" generatedAt={new Date(data.generatedAt)} />);
     expect(screen.getByRole("heading", { name: "Saúde da IA" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Trilha de negociação" })).toBeTruthy();
     expect(screen.getByText("Análises nas últimas 24 horas")).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: "Em avançada (atual)" })).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: "Em fechamento (atual)" })).toBeTruthy();

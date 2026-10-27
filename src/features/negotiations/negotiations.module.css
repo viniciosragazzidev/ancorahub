@@ -98,6 +98,18 @@
 .noCrmSeal svg { color: var(--warning); }
 .noCrmSeal[aria-pressed="true"] { outline: 2px solid var(--focus-outline, var(--primary)); outline-offset: 2px; }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+.trailSection { min-width: 0; }
+.trail { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.trailItem { display: grid; min-width: 0; gap: 8px; }
+.trailButton,
+.trailStatic { display: flex; width: 100%; min-width: 0; min-height: 44px; align-items: center; padding: 8px 12px; border: 0; border-radius: var(--radius-control); background: var(--surface-muted); color: var(--foreground); font: inherit; text-align: left; }
+.trailButton { cursor: pointer; }
+.trailButton:hover,
+.trailButton[aria-pressed="true"] { background: var(--accent-subtle); }
+.trailNode { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--text-sm); }
+.trailCount { flex: 0 0 auto; font-size: var(--text-base); font-weight: 600; font-variant-numeric: tabular-nums; }
+.trailProgress { width: 100%; }
+.trailButton:focus-visible { outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary)); outline-offset: 2px; }
 
 .toolbar {
   display: flex;
@@ -205,6 +217,8 @@
   .stageCards { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .stageCard,
   .attentionCard { min-height: 84px; padding: 12px; }
+  .trail { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .trailItem { grid-template-columns: minmax(0, 1fr) minmax(72px, .65fr); align-items: center; gap: 12px; }
   .toolbar { display: grid; grid-template-columns: minmax(0, 1fr); }
   .search, .select { width: 100%; max-width: none; }
   .resultCount { margin-left: 0; }
