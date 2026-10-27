@@ -97,18 +97,28 @@ describe("DEC-154: nivelamento pelo dia da operação", () => {
     expect(counts.size).toBe(1);
   });
 
-  it("(c) corretor que fez manhã e tarde soma o dia inteiro, em qualquer fila", () => {
+  it("(c) o recebimento de outro plantão não penaliza o corretor neste plantão", () => {
     const counts = countReceivedInDayByBroker([
-      // manhã, fila A (plantão da manhã)
-      { brokerId: "duplo", leadId: "m1", receivedAt: at("08:10") },
-      { brokerId: "duplo", leadId: "m2", receivedAt: at("10:30"), offerStatus: "EXPIRED" },
-      // tarde, fila B (outro plantão)
-      { brokerId: "duplo", leadId: "t1", receivedAt: at("14:00") },
-      { brokerId: "tarde", leadId: "t2", receivedAt: at("14:05") },
-    ], since);
-    expect(counts.get("duplo")).toBe(3);
-    // In the afternoon plantão, the broker with only the afternoon lead goes first.
-    expect(pickNextByReceivedInDay(["duplo", "tarde"], counts)).toBe("tarde");
+      { brokerId: "duplo", leadId: "m1", dutyScheduleId: "manha", receivedAt: at("08:10") },
+      { brokerId: "duplo", leadId: "m2", dutyScheduleId: "manha", receivedAt: at("10:30"), offerStatus: "EXPIRED" },
+      { brokerId: "duplo", leadId: "t1", dutyScheduleId: "tarde", receivedAt: at("14:00") },
+      { brokerId: "duplo", leadId: "t2", dutyScheduleId: "tarde", receivedAt: at("14:05") },
+      { brokerId: "colega", leadId: "c1", dutyScheduleId: "tarde", receivedAt: at("14:07") },
+      { brokerId: "colega", leadId: "c2", dutyScheduleId: "tarde", receivedAt: at("14:08") },
+    ], since, { duplo: "tarde", colega: "tarde" });
+    expect(counts.get("duplo")).toBe(2);
+    expect(counts.get("colega")).toBe(2);
+    expect(pickNextByReceivedInDay(["duplo", "colega"], counts)).toBe("duplo");
+  });
+
+  it("(c) a fila sem plantão ignora indicações vinculadas a plantões", () => {
+    const counts = countReceivedInDayByBroker([
+      { brokerId: "fila", leadId: "shifted", dutyScheduleId: "presencial", receivedAt: at("14:00") },
+      { brokerId: "fila", leadId: "unscoped", dutyScheduleId: null, receivedAt: at("14:05") },
+      { brokerId: "colega", leadId: "shifted-colleague", dutyScheduleId: "presencial", receivedAt: at("14:07") },
+    ], since, {});
+    expect(counts.get("fila")).toBe(1);
+    expect(counts.has("colega")).toBe(false);
   });
 
   it("(d) chooseBroker com ranking desligado respeita os recebidos no dia antes da carteira", () => {

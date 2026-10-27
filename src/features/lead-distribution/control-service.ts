@@ -731,9 +731,15 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
   const loads = await db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads)
     .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, paceableIds), inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]))).groupBy(schema.leads.corretorId);
   const loadByBroker = new Map(loads.map((row) => [row.brokerId, Number(row.total)]));
-  // Same "menor carga" as the real distribution (DEC-154): distinct leads assigned or offered
-  // to the broker in the operation day, in any queue or plantão; only CANCELLED offers do not count.
-  const receivedInDutyByBroker = await loadReceivedInDayByBroker(db, context.tenantId, paceableIds, operationDayStart(new Date()));
+  // Same "menor carga" as the real distribution (DEC-154): count only this
+  // broker's active plantão, or only unscoped assignments when no plantão applies.
+  const receivedInDutyByBroker = await loadReceivedInDayByBroker(
+    db,
+    context.tenantId,
+    paceableIds,
+    operationDayStart(new Date()),
+    Object.fromEntries(dutyScheduleIdByBroker),
+  );
   const candidates: RankedBroker[] = brokers.filter((broker) => paceableIds.includes(broker.id)).map((broker) => {
     const activeLeads = loadByBroker.get(broker.id) ?? 0;
     const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads, receivedInDuty: receivedInDutyByBroker.get(broker.id) ?? 0, capacity: effectiveQueue.capacityEnabled ? effectiveQueue.capacity : null, onDuty: false, conversionRate: 0, slaRate: 0, manualPriority: input.temperature === "hot" || input.score >= 80 ? 1 : 0, idleSince: null, rankingScore: 0 };

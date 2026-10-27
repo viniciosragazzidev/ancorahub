@@ -5,7 +5,8 @@ import { getDatabase, schema } from "@/shared/db";
 /**
  * Nivelamento do dia (DEC-154): a prioridade de quem recebe o próximo lead é
  * quem recebeu MENOS indicações no dia da operação (19:00 do dia útil anterior;
- * sexta 19:00 na segunda), somando todas as filas e todos os plantões do corretor.
+ * sexta 19:00 na segunda), dentro do plantão usado nesta escolha. Sem plantão,
+ * considera somente indicações sem plantão.
  *
  * Indicação recebida = lead atribuído, tentativa de atribuição ou qualquer oferta
  * feita ao corretor no dia, inclusive EXPIRED, DECLINED e LOST: quem demorou ou
@@ -16,6 +17,8 @@ export type DayReceipt = {
   brokerId: string | null;
   leadId: string;
   receivedAt: Date | null;
+  /** Plantão ao qual a indicação pertence; null para distribuição sem plantão. */
+  dutyScheduleId?: string | null;
   /** Só para ofertas: o status da oferta. */
   offerStatus?: string | null;
 };
@@ -29,11 +32,20 @@ export function countsAsReceived(receipt: DayReceipt, since: Date) {
     && receipt.offerStatus !== NON_COUNTING_OFFER_STATUS;
 }
 
-/** Leads distintos recebidos por corretor no dia da operação. */
-export function countReceivedInDayByBroker(receipts: readonly DayReceipt[], since: Date): Map<string, number> {
+/** A missing/null entry means this choice has no plantão for that broker. */
+export type DutyScheduleIdByBroker = Readonly<Record<string, string | null | undefined>>;
+
+/** Leads distintos recebidos por corretor no plantão desta escolha. */
+export function countReceivedInDayByBroker(
+  receipts: readonly DayReceipt[],
+  since: Date,
+  scheduleIdByBroker: DutyScheduleIdByBroker = {},
+): Map<string, number> {
   const leadsByBroker = new Map<string, Set<string>>();
   for (const receipt of receipts) {
     if (!countsAsReceived(receipt, since)) continue;
+    const expectedScheduleId = scheduleIdByBroker[receipt.brokerId!] ?? null;
+    if ((receipt.dutyScheduleId ?? null) !== expectedScheduleId) continue;
     const leads = leadsByBroker.get(receipt.brokerId!) ?? new Set<string>();
     leads.add(receipt.leadId);
     leadsByBroker.set(receipt.brokerId!, leads);
@@ -69,18 +81,24 @@ export function pickNextByReceivedInDay(
 
 type DatabaseLike = Pick<ReturnType<typeof getDatabase>, "select">;
 
-/** Lê as indicações do dia dos corretores (atribuições, tentativas e ofertas não canceladas). */
-export async function loadReceivedInDayByBroker(db: DatabaseLike, tenantId: string, brokerIds: readonly string[], since: Date) {
+/** Lê indicações do dia por corretor e pelo plantão usado nesta escolha. */
+export async function loadReceivedInDayByBroker(
+  db: DatabaseLike,
+  tenantId: string,
+  brokerIds: readonly string[],
+  since: Date,
+  scheduleIdByBroker: DutyScheduleIdByBroker = {},
+) {
   if (!brokerIds.length) return new Map<string, number>();
   const ids = [...brokerIds];
   // Em sequência: dentro da transação da trava a conexão é uma só.
-  const leads = await db.select({ brokerId: schema.leads.corretorId, leadId: schema.leads.id, receivedAt: schema.leads.assignedAt })
+  const leads = await db.select({ brokerId: schema.leads.corretorId, leadId: schema.leads.id, receivedAt: schema.leads.assignedAt, dutyScheduleId: schema.leads.dutyScheduleId })
     .from(schema.leads)
     .where(and(eq(schema.leads.tenantId, tenantId), inArray(schema.leads.corretorId, ids), gte(schema.leads.assignedAt, since)));
-  const attempts = await db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, leadId: schema.leadAssignmentAttempts.leadId, receivedAt: schema.leadAssignmentAttempts.assignedAt })
+  const attempts = await db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, leadId: schema.leadAssignmentAttempts.leadId, receivedAt: schema.leadAssignmentAttempts.assignedAt, dutyScheduleId: schema.leadAssignmentAttempts.dutyScheduleId })
     .from(schema.leadAssignmentAttempts)
     .where(and(eq(schema.leadAssignmentAttempts.tenantId, tenantId), inArray(schema.leadAssignmentAttempts.brokerId, ids), gte(schema.leadAssignmentAttempts.assignedAt, since)));
-  const offers = await db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId, receivedAt: schema.leadOffers.offeredAt, offerStatus: schema.leadOffers.status })
+  const offers = await db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId, receivedAt: schema.leadOffers.offeredAt, dutyScheduleId: schema.leadOffers.dutyScheduleId, offerStatus: schema.leadOffers.status })
     .from(schema.leadOffers)
     .where(and(
       eq(schema.leadOffers.tenantId, tenantId),
@@ -88,5 +106,5 @@ export async function loadReceivedInDayByBroker(db: DatabaseLike, tenantId: stri
       gte(schema.leadOffers.offeredAt, since),
       ne(schema.leadOffers.status, NON_COUNTING_OFFER_STATUS),
     ));
-  return countReceivedInDayByBroker([...leads, ...attempts, ...offers], since);
+  return countReceivedInDayByBroker([...leads, ...attempts, ...offers], since, scheduleIdByBroker);
 }

@@ -142,10 +142,11 @@ export async function createLeadOffersForBrokers(input: {
   /**
    * Automatic distribution only (DEC-154): each claim takes the per-tenant
    * `distribution-pick` lock, re-reads what every remaining broker received in
-   * the operation day and claims for the one with fewest (tier first: 0 = on the
-   * active plantão). brokerIds keeps breaking ties. Without it, brokerIds order is final.
+   * the operation day on that broker's active plantão (or without a plantão) and
+   * claims for the one with fewest. brokerIds keeps breaking ties. Without it,
+   * brokerIds order is final.
    */
-  fairPick?: { since: Date; tierByBroker?: Record<string, number>; branchIdByBroker?: Record<string, string> };
+  fairPick?: { since: Date; tierByBroker?: Record<string, number>; branchIdByBroker?: Record<string, string>; scheduleIdByBroker?: Record<string, string> };
 }) {
   const db = getDatabase();
   // Same bounds as the "SLA de Aceite" setting (1–1440 min).
@@ -241,7 +242,7 @@ export async function createLeadOffersForBrokers(input: {
         // the commit stays unserialized), never fall back to the stale pre-read order.
         if (pickLockBusy || !await tryPickLock(tx, input.tenantId)) pickLockBusy = true;
         const pendingIds = pending.map((candidate) => candidate.id);
-        const received = await loadReceivedInDayByBroker(tx, input.tenantId, pendingIds, input.fairPick.since);
+        const received = await loadReceivedInDayByBroker(tx, input.tenantId, pendingIds, input.fairPick.since, input.fairPick.scheduleIdByBroker);
         const nextId = pickNextByReceivedInDay(pendingIds, received, input.fairPick.tierByBroker);
         broker = pending.find((candidate) => candidate.id === nextId) ?? broker;
         destinationPhone = broker.phone;

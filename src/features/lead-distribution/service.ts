@@ -1378,7 +1378,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, leadId: schema.leadAssignmentAttempts.leadId, dutyScheduleId: schema.leadAssignmentAttempts.dutyScheduleId, assignedAt: schema.leadAssignmentAttempts.assignedAt, firstContactAt: schema.leadAssignmentAttempts.firstContactAt, feedbackDueAt: schema.leadAssignmentAttempts.feedbackDueAt }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, ids))),
     // DEC-154: every offer of the day counts (expired, declined and lost too: a broker who
     // let it lapse is not made up for); only one the system CANCELLED does not.
-    db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId, offeredAt: schema.leadOffers.offeredAt, status: schema.leadOffers.status }).from(schema.leadOffers).where(and(
+    db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId, dutyScheduleId: schema.leadOffers.dutyScheduleId, offeredAt: schema.leadOffers.offeredAt, status: schema.leadOffers.status }).from(schema.leadOffers).where(and(
       eq(schema.leadOffers.tenantId, context.tenantId),
       inArray(schema.leadOffers.brokerId, ids),
       gte(schema.leadOffers.offeredAt, dutySince),
@@ -1386,12 +1386,13 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     )),
   ]);
   const loadMap = new Map(loads.map((item) => [item.brokerId, Number(item.total)]));
-  // The whole operation day of the broker, across every queue and plantão (not per plantão).
+  // Counts stay within each broker's plantão for this choice; brokers without one
+  // count only assignments, attempts and offers that also have no plantão (DEC-154).
   const receivedInDayByBroker = countReceivedInDayByBroker([
-    ...brokerLeadHistory.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, receivedAt: item.assignedAt })),
-    ...slaAttempts.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, receivedAt: item.assignedAt })),
-    ...dutyOffers.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, receivedAt: item.offeredAt, offerStatus: item.status })),
-  ], dutySince);
+    ...brokerLeadHistory.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
+    ...slaAttempts.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
+    ...dutyOffers.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.offeredAt, offerStatus: item.status })),
+  ], dutySince, Object.fromEntries(scheduleIdByBroker));
   const candidates = remainingBrokers.map((broker) => {
     const history = brokerLeadHistory.filter((item) => item.brokerId === broker.id);
     const attempts = slaAttempts.filter((item) => item.brokerId === broker.id);
@@ -1485,6 +1486,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       since: dutySince,
       tierByBroker: Object.fromEntries(decision.eligible.map((candidate) => [candidate.id, candidate.onDuty ? 0 : 1])),
       branchIdByBroker: Object.fromEntries(remainingBrokers.flatMap((broker) => broker.branchId ? [[broker.id, broker.branchId]] : [])),
+      scheduleIdByBroker: Object.fromEntries(scheduleIdByBroker),
     },
   });
   if (!offer.createdOffers.length) {

@@ -83,8 +83,9 @@ export type RankedBroker = EligibleBroker & {
   onDuty: boolean;
   /**
    * Leads offered or assigned to the broker in the current operation day (19:00
-   * of the day before, Friday 19:00 on Monday), across every queue and plantão
-   * of the broker. Expired, declined and lost offers count; only CANCELLED ones
+   * of the day before, Friday 19:00 on Monday), within the plantão used in this
+   * choice across its queues; without a plantão, only unscoped indications count.
+   * Expired, declined and lost offers count; only CANCELLED ones
    * do not (DEC-154, see received-in-day.ts). This is the "menor carga"; the
    * portfolio counts below only break ties.
    */
@@ -191,7 +192,7 @@ export function rankBrokers(brokers: RankedBroker[], policy: IntelligentDistribu
       if (Number(b.onDuty) !== Number(a.onDuty)) return Number(b.onDuty) - Number(a.onDuty);
 
       // (A prioridade de 5 minutos sem lead saiu com o intervalo entre ofertas, DEC-151.)
-      // 2. Menor carga no plantão: quem recebeu menos indicações no dia da operação.
+      // 2. Menor carga no plantão: menos indicações no dia da operação e neste plantão.
       //    Antes a carga era a carteira inteira (leads ativos e não iniciados de
       //    qualquer data), e quem tinha leads antigos em aberto nunca recebia,
       //    mesmo com 0 leads no plantão.
@@ -234,7 +235,7 @@ export function chooseBroker<T extends EligibleBroker & { onDuty?: boolean; rece
   // round_robin's whole point is "oldest account goes first" (deliberately,
   // regardless of load) — that stays a real, deterministic criterion.
   // capacity uses rankBrokers' order for plantão ativo and fewest received in
-  // the operation day (DEC-154), then fewest active leads. Unlike rankBrokers,
+  // the operation day on this plantão (DEC-154), then fewest active leads. Unlike rankBrokers,
   // it skips the unstarted-leads, ranking and idle criteria. Ties resolve from
   // the pre-shuffled order.
   return shuffle(eligible, random).sort((a, b) => {

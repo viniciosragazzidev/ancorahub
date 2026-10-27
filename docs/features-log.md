@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 27/10/2026 - Nivelamento de distribuição isolado por plantão
+
+- A prioridade por menor número de indicações considera atribuições, tentativas e ofertas distintas do plantão usado na escolha; fila sem plantão considera somente registros sem `duty_schedule_id`. `CANCELLED` continua fora da contagem.
+- A regra se aplica à pré-leitura, à nova contagem sob a trava e à simulação, sem alterar tier, unidade ou trava não bloqueante.
+- DEC-154. Implementação e validações: `docs/implementations/completed/2026-10-27-nivelamento-por-plantao.md`.
+
 ## 27/10/2026 - Corretor exclusivamente no Lite
 
 - O papel broker usa Lite antes de ler cookies ou preferências antigas. A tentativa de ativar NORMAL é negada no servidor e auditada; a alternância sai do menu legado.
