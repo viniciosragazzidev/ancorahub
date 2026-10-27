@@ -1,0 +1,22 @@
+.titleSkeleton,
+.sealSkeleton,
+.lineSkeleton,
+.valueSkeleton,
+.copySkeleton {
+  display: block;
+  border-radius: 6px;
+  background: var(--surface-muted, var(--muted));
+}
+
+.titleSkeleton { width: 176px; height: 24px; }
+.sealSkeleton { width: 220px; height: 44px; border-radius: 9999px; }
+.lineSkeleton { width: 58%; height: 16px; }
+.valueSkeleton { width: 82px; height: 36px; }
+.copySkeleton { width: 92%; height: 48px; }
+.cardSkeleton { min-height: 248px; justify-content: start; align-content: start; }
+
+@media (max-width: 559px) {
+  .managementStrip { min-height: 1124px; }
+  .cardSkeleton { min-height: 126px; }
+  .copySkeleton { display: none; }
+}

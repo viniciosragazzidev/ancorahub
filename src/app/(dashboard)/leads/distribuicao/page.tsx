@@ -44,7 +44,8 @@ import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag"
 import { canViewDistributionQueues, DirectorDistributionTabs } from "./_components/director-distribution-tabs";
 import { DirectorDistributionHealth } from "./_components/director-distribution-health";
 import directorDistributionStyles from "./_components/director-distribution-page.module.css";
-import { loadLiveStatusSlot } from "@/features/live-status/components/live-status-slot";
+import { LiveStatusBoundary } from "@/features/live-status/components/live-status-slot";
+import { shouldShowLiveStatusStrip } from "@/features/live-status/flag";
 
 export const dynamic = "force-dynamic";
 
@@ -170,9 +171,6 @@ export default async function LeadDistributionPage({
       </>
     );
   }
-
-  // Faixa "Agora na operação" (status vivos): começa junto das outras leituras; com a chave desligada, null.
-  const livePromise = loadLiveStatusSlot(context);
 
   // Single consolidated Promise.all for fast TTFB
   const [
@@ -614,12 +612,13 @@ export default async function LeadDistributionPage({
     ? await getColdLeadRequalificationReview(context)
     : null;
 
-  const live = await livePromise;
   const directorLite = await isDirectorLitePageOnServer(context, "/leads/distribuicao");
   if (directorLite && ["resumo_dia", "roteamento", "operar", "filas", "plantao", "saude_historico"].includes(view)) {
     const manualAssignmentChoiceEnabled = view === "operar"
       ? (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false"
       : false;
+    const liveEnabled = await shouldShowLiveStatusStrip(context);
+    const live = liveEnabled ? <LiveStatusBoundary context={context} enabled /> : null;
     return (
       <>
         <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" />
@@ -776,7 +775,6 @@ export default async function LeadDistributionPage({
       />
       <main className="min-h-full px-4 py-5 lg:px-6 lg:py-7">
         <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6">
-          {live}
           <DistributionTabsContainer
             initialView={view}
             showQueueDefinition={context.role === "director"}
