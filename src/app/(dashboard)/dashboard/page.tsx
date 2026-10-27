@@ -28,6 +28,7 @@ import { renderDirectorLiteQuality } from "@/features/dashboard/director-lite-qu
 import { getDirectorLiteViewerFirstName } from "@/features/dashboard/director-lite-viewer";
 import { liteDashboardTabs } from "@/features/dashboard/director-lite-tabs";
 import { hasPermission } from "@/shared/auth/permissions";
+import { loadLiveStatusSlot } from "@/features/live-status/components/live-status-slot";
 
 type DashboardSearchParams = Record<string, string | string[] | undefined>;
 
@@ -129,24 +130,26 @@ export default async function DashboardPage({
       // Só as unidades autorizadas aparecem; sem permissão de comparar, o filtro some. Unidade fora do escopo cai em "Todas".
       const { canCompare, units } = await getDashboardUnitFilter(context);
       const branchId = canCompare ? resolveRequestedUnit(parseBranchIdParam(singleParam(resolvedSearchParams.unidade)), units) : null;
-      const [data, liteReporting] = await Promise.all([
+      const [data, liteReporting, live] = await Promise.all([
         getEssentialDashboard(context, { period, branchId }),
         canReadQuality ? getFeatureFlag(FEATURE_FLAGS.REPORTING_CENTER) : Promise.resolve("false"),
+        loadLiveStatusSlot(context),
       ]);
       // Abas como no legado: Qualidade e Funil só com a central de qualidade E a central de relatórios ligada.
       const showQualityTabs = canReadQuality && liteReporting !== "false";
       // Só as abas e os links que a tela de hoje já libera para o papel (o visual Lite vale para todo o modo normal).
       const canOpenConversations = hasPermission(context.role, "acessar_conversas") && context.jobTitle !== "marketing";
-      return <DirectorLiteDashboard data={data} period={period} branchId={branchId} branches={canCompare ? units : []} now={new Date()} availableTabs={liteDashboardTabs(context, showQualityTabs)} canOpenConversations={canOpenConversations} />;
+      return <DirectorLiteDashboard data={data} period={period} branchId={branchId} branches={canCompare ? units : []} now={new Date()} availableTabs={liteDashboardTabs(context, showQualityTabs)} canOpenConversations={canOpenConversations} live={live ?? undefined} />;
     }
 
-    const [data, reportingEnabled] = await Promise.all([
+    const [data, reportingEnabled, live] = await Promise.all([
       getCommandCenterData(context),
       canReadQuality ? getFeatureFlag(FEATURE_FLAGS.REPORTING_CENTER) : Promise.resolve("false"),
+      loadLiveStatusSlot(context),
     ]);
     const showQualityTab = canReadQuality && reportingEnabled !== "false";
     // The dashboard is the command center of the day; the period reports live in Relatórios.
-    return <CommandCenter data={data} showQualityTab={showQualityTab} canManage={context.role === "director" || context.role === "manager"} />;
+    return <CommandCenter data={data} showQualityTab={showQualityTab} canManage={context.role === "director" || context.role === "manager"} live={live ?? undefined} />;
   });
 
   return result;

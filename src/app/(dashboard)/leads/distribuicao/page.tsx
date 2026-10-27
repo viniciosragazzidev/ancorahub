@@ -44,6 +44,7 @@ import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag"
 import { canViewDistributionQueues, DirectorDistributionTabs } from "./_components/director-distribution-tabs";
 import { DirectorDistributionHealth } from "./_components/director-distribution-health";
 import directorDistributionStyles from "./_components/director-distribution-page.module.css";
+import { loadLiveStatusSlot } from "@/features/live-status/components/live-status-slot";
 
 export const dynamic = "force-dynamic";
 
@@ -169,6 +170,9 @@ export default async function LeadDistributionPage({
       </>
     );
   }
+
+  // Faixa "Agora na operação" (status vivos): começa junto das outras leituras; com a chave desligada, null.
+  const livePromise = loadLiveStatusSlot(context);
 
   // Single consolidated Promise.all for fast TTFB
   const [
@@ -610,6 +614,7 @@ export default async function LeadDistributionPage({
     ? await getColdLeadRequalificationReview(context)
     : null;
 
+  const live = await livePromise;
   const directorLite = await isDirectorLitePageOnServer(context, "/leads/distribuicao");
   if (directorLite && ["resumo_dia", "roteamento", "operar", "filas", "plantao", "saude_historico"].includes(view)) {
     const manualAssignmentChoiceEnabled = view === "operar"
@@ -625,6 +630,7 @@ export default async function LeadDistributionPage({
             status={params.status}
             escalaMes={params.escalaMes}
           />
+          {live}
           {view === "resumo_dia" ? (
             <section className={directorDistributionStyles.stack} aria-label="Resumo diário da distribuição">
               <BrokerDailySummaryPanel
@@ -770,6 +776,7 @@ export default async function LeadDistributionPage({
       />
       <main className="min-h-full px-4 py-5 lg:px-6 lg:py-7">
         <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6">
+          {live}
           <DistributionTabsContainer
             initialView={view}
             showQueueDefinition={context.role === "director"}

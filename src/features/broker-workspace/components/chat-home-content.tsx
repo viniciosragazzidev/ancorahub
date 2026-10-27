@@ -11,6 +11,7 @@ import { buildBrokerNowItems } from "@/features/broker-workspace/now-items";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import type { BrokerJourneyData } from "@/features/engagement/journey-types";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { loadLiveStatusSlot } from "@/features/live-status/components/live-status-slot";
 
 const TIME_ZONE = "America/Sao_Paulo";
 const time = (date: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
@@ -105,12 +106,13 @@ export async function ChatHomeContent() {
   // same tenant and user, both come from the authenticated context).
   const context = await getRequiredTenantContext().catch(() => null);
   if (!context) return <LightDashboardUnavailable />;
-  const [rail, data, highlights, journey, firstSteps] = await Promise.all([
+  const [rail, data, highlights, journey, firstSteps, live] = await Promise.all([
     getChatRailData(),
     getCachedBrokerWorkspaceData().catch(() => null),
     getBrokerHighlights(context.tenantId, context.userId).catch(() => null),
     getCachedBrokerJourneyData(context.tenantId, context.userId).catch(() => null),
     getFirstSteps(context.tenantId, context.userId).catch(() => null),
+    loadLiveStatusSlot(context),
   ]);
   if (!rail || !data) return <LightDashboardUnavailable />;
   return (
@@ -125,6 +127,7 @@ export async function ChatHomeContent() {
       presenceAsks={presenceAsksOf(data)}
       firstSteps={firstSteps}
       highlights={highlightsOf(highlights, journey)}
+      live={live}
     />
   );
 }

@@ -5,20 +5,22 @@ import { getManagerUnitScope } from "@/features/broker-workspace/manager-unit-sc
 import { LightDashboardUnavailable } from "@/features/broker-workspace/components/light-dashboard";
 import { loadNeedsYouIfEnabled } from "@/features/team-management-extras/needs-you-summary";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { loadLiveStatusSlot } from "@/features/live-status/components/live-status-slot";
 import { getBrokerWhatsAppStatusForContext } from "@/features/dashboard/today";
 
 export async function ManagerHomeContent() {
   const context = await getRequiredTenantContext();
   if (!getManagerUnitScope(context)) return <div className="arc-venancor p-6"><EmptyState title="Sua unidade ainda não está configurada" description="Peça ao administrador para vincular seu acesso a uma unidade. Os leads aparecerão aqui quando o vínculo estiver ativo." /></div>;
-  const [needs, rail, whatsapp] = await Promise.all([
+  const [needs, rail, whatsapp, live] = await Promise.all([
     loadNeedsYouIfEnabled(context),
     getChatRailData(),
     getBrokerWhatsAppStatusForContext(context).catch(() => null),
+    loadLiveStatusSlot(context),
   ]);
   const data = rail?.managerUnitSummary;
   if (!rail || !data) return <LightDashboardUnavailable />;
 
-  return <ChatHome viewerName={rail.viewerName} assistants={rail.assistants} leads={rail.leads} nowIso={rail.nowIso} canQuote={false} leadsBadgeCount={rail.leadsBadgeCount} whatsappActivity={whatsapp?.activity} summary={{
+  return <ChatHome viewerName={rail.viewerName} assistants={rail.assistants} leads={rail.leads} nowIso={rail.nowIso} canQuote={false} leadsBadgeCount={rail.leadsBadgeCount} whatsappActivity={whatsapp?.activity} live={live} summary={{
     receivedToday: 0,
     acceptedToday: 0,
     inServiceNow: data.inService,

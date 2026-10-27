@@ -244,7 +244,7 @@ function DutiesNow({ welcome }: { welcome: CommandCenterData["welcome"] }) {
  * and the shortcuts people use the most. Period reports (funnel, trends,
  * rankings) live in Relatórios.
  */
-export function CommandCenter({ data, showQualityTab = false, canManage = true }: { data: CommandCenterData; showQualityTab?: boolean; canManage?: boolean }) {
+export function CommandCenter({ data, showQualityTab = false, canManage = true, live }: { data: CommandCenterData; showQualityTab?: boolean; canManage?: boolean; /** Faixa "Agora na operação" (status vivos), quando ligada. */ live?: ReactNode }) {
   const now = new Date(data.generatedAt);
   const dateLabel = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "numeric", month: "long" }).format(now);
   const firstRunning = data.welcome.runningDuties?.[0] ?? null;
@@ -265,6 +265,7 @@ export function CommandCenter({ data, showQualityTab = false, canManage = true }
       <DashboardHeader breadcrumb={dateLabel.charAt(0).toLocaleUpperCase("pt-BR") + dateLabel.slice(1)} title={data.welcome.firstName ? `Olá, ${data.welcome.firstName}` : "Dashboard"} />
       <main className="mx-auto flex min-h-full w-full max-w-[1200px] flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8">
         {showQualityTab ? <DashboardSectionTabs active="overview" period={30} showQuality /> : null}
+        {live}
 
         <section aria-label="Buscar e criar" className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <LeadSearch />

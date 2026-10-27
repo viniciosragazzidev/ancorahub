@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -156,6 +156,7 @@ export function ChatHome({
   presence = null,
   presenceAsks = null,
   whatsappActivity = null,
+  live = null,
 }: {
   viewerName: string;
   assistants: ThreadSummary[];
@@ -174,6 +175,8 @@ export function ChatHome({
   presenceAsks?: PresenceAskView[] | null;
   /** Scoped team metric, passed only to manager and supervisor homes. */
   whatsappActivity?: WhatsAppActivitySummary | null;
+  /** Faixa "Agora na operação" (status vivos), já pronta no servidor; só no modo página. */
+  live?: ReactNode;
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const reduce = useReducedMotion();
@@ -245,6 +248,7 @@ export function ChatHome({
         </div>
       </header>
       {mode === "page" ? <PresenceCalloutList asks={currentPresenceAsks} /> : null}
+      {mode === "page" && live ? <div className="px-4 pb-4">{live}</div> : null}
       {mode === "page" && summary?.now ? <NowSection data={summary.now} mobile /> : null}
       {mode === "page" && whatsappActivity ? <div className="px-4 pb-4"><WhatsAppActivityCard activity={whatsappActivity} /></div> : null}
       {mode === "page" && firstSteps ? <FirstStepsCard steps={firstSteps} className={home.firstSteps} /> : null}
