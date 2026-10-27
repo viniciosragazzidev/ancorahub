@@ -50,9 +50,9 @@ export function buildWhatsAppQueueStatus(input: { aggregate: WhatsAppQueueAggreg
       : undefined;
   return {
     id: "whatsapp-fila",
-    label: "Mensagens na fila do WhatsApp",
+    label: "WhatsApp na fila, últimos 7 dias",
     value: aggregate.waiting,
-    emptyText: "Nenhuma mensagem esperando envio",
+    emptyText: "Nenhuma mensagem na fila nos últimos 7 dias",
     severity: stalled ? "critico" : aggregate.failedToday ? "atencao" : aggregate.waiting ? "info" : "ok",
     nextEvent,
     lastEvent: !nextEvent && input.heartbeat ? { at: input.heartbeat.finishedAt, label: "Última rodada" } : undefined,

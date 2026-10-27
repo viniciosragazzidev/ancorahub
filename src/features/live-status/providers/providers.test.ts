@@ -170,6 +170,12 @@ describe("plantão", () => {
 
 describe("fila do WhatsApp", () => {
   const empty = { waiting: 0, held: 0, heldUntil: null, nextFreeAt: null, failedToday: 0, topErrorCode: null };
+  it("deixa claro que a contagem e o estado vazio cobrem os últimos 7 dias", () => {
+    const status = buildWhatsAppQueueStatus({ aggregate: empty, heartbeat: null, now: NOW, scope: director });
+    expect(status.label).toContain("últimos 7 dias");
+    expect(status.emptyText).toContain("últimos 7 dias");
+  });
+
   it("seguradas saem na hora certa e falhas do dia com o motivo", () => {
     const status = buildWhatsAppQueueStatus({ aggregate: { ...empty, waiting: 14, held: 9, heldUntil: minutes(60), failedToday: 2, topErrorCode: "131026" }, heartbeat: null, now: NOW, scope: director });
     expect(status).toMatchObject({ value: 14, severity: "atencao", explanation: "2 falharam hoje: número sem WhatsApp." });

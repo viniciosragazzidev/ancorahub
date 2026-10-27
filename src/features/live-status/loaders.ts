@@ -347,12 +347,13 @@ export async function loadWhatsAppQueue(scope: LiveScope, now: Date): Promise<Li
 
 export function buildWhatsAppQueueQuery(scope: LiveScope, now: Date) {
   const dayStart = startOfDaySaoPaulo(now);
-  const waitingSince = new Date(now.getTime() - 48 * HOUR);
+  const waitingSince = new Date(now.getTime() - 7 * 24 * HOUR);
+  const failedCreatedSince = new Date(now.getTime() - 36 * HOUR);
   const waiting = sql.raw(`w.status in (${WAITING_OUTBOX.map((status) => `'${status}'`).join(", ")})`);
-  // O índice (tenant_id, created_at) limita a leitura das pendências; falhas mantêm a janela de hoje por failed_at.
+  // O índice (tenant_id, created_at) limita pendências a 7 dias e falhas a 36 h; failed_at define as falhas de hoje.
   const waitingRecent = sql`(${waiting} and w.created_at >= ${iso(waitingSince)})`;
   const held = sql`(w.hold_reason is not null or coalesce(w.next_attempt_at, w.scheduled_at) > ${iso(now)} + interval '1 minute')`;
-  const failedToday = sql`(w.status = 'failed' and w.created_at >= ${iso(dayStart)} and w.failed_at >= ${iso(dayStart)})`;
+  const failedToday = sql`(w.status = 'failed' and w.created_at >= ${iso(failedCreatedSince)} and w.failed_at >= ${iso(dayStart)})`;
   return sql`
     select
       (count(*) filter (where ${waitingRecent}))::int as waiting,
@@ -369,14 +370,16 @@ export function buildWhatsAppQueueQuery(scope: LiveScope, now: Date) {
 
 export function buildDistributionFailureQuery(scope: LiveScope, now: Date) {
   const since = new Date(now.getTime() - 24 * HOUR);
+  const createdSince = new Date(now.getTime() - 30 * 24 * HOUR);
   const branch = scope.role === "manager" && scope.branchId ? scope.branchId : null;
   const leadInBranch = (column: SQL) => (branch ? sql` and exists (select 1 from leads l where l.id = ${column} and l.tenant_id = ${scope.tenantId} and l.branch_id = ${branch})` : sql``);
+  // created_at conserva a leitura indexada em 30 dias; updated_at/failed_at marcam a falha real nas últimas 24 h.
   return sql`
     select
       (select count(*)::int from lead_distribution_jobs j
-        where j.status = 'failed' and j.tenant_id = ${scope.tenantId} and j.created_at >= ${iso(since)} and j.updated_at >= ${iso(since)}${leadInBranch(sql`j.lead_id`)}) as failed_jobs,
+        where j.status = 'failed' and j.tenant_id = ${scope.tenantId} and j.created_at >= ${iso(createdSince)} and j.updated_at >= ${iso(since)}${leadInBranch(sql`j.lead_id`)}) as failed_jobs,
       (select count(*)::int from lead_effect_outbox o
-        where o.status = 'failed' and o.tenant_id = ${scope.tenantId} and o.created_at >= ${iso(since)} and o.failed_at >= ${iso(since)}${leadInBranch(sql`o.lead_id`)}) as failed_effects
+        where o.status = 'failed' and o.tenant_id = ${scope.tenantId} and o.created_at >= ${iso(createdSince)} and o.failed_at >= ${iso(since)}${leadInBranch(sql`o.lead_id`)}) as failed_effects
   `;
 }
 

@@ -15,12 +15,13 @@ const NOW = new Date("2026-10-27T13:00:00.000Z");
 const director: LiveScope = { tenantId: "tenant-a", role: "director", branchId: null, userId: "director-a", key: "director-a", canOpenQualification: true };
 
 describe("consultas da faixa viva", () => {
-  it("limita o outbox por tenant e created_at indexado, com falhas do dia", () => {
+  it("limita a fila a 7 dias e detecta falhas de hoje mesmo quando a mensagem foi criada antes da meia-noite", () => {
     const query = dialect.sqlToQuery(buildWhatsAppQueueQuery(director, NOW));
     expect(query.sql).toContain("w.tenant_id");
     expect(query.sql).toContain("w.created_at >=");
     expect(query.sql).toContain("w.failed_at >=");
-    expect(query.params).toContain("2026-10-25T13:00:00.000Z");
+    expect(query.params).toContain("2026-10-20T13:00:00.000Z");
+    expect(query.params).toContain("2026-10-26T01:00:00.000Z");
     expect(query.params).toContain("2026-10-27T03:00:00.000Z");
   });
 
@@ -32,7 +33,7 @@ describe("consultas da faixa viva", () => {
     expect(query.params).toContain("tenant-a");
   });
 
-  it("restringe falhas do motor por tenant, unidade autorizada e janela de 24 h", () => {
+  it("usa o timestamp real de falha em 24 h e um limite indexado amplo de criação", () => {
     const scope: LiveScope = { ...director, role: "manager", branchId: "branch-a" };
     const query = dialect.sqlToQuery(buildDistributionFailureQuery(scope, NOW));
     expect(query.sql).toContain("j.tenant_id =");
@@ -44,5 +45,7 @@ describe("consultas da faixa viva", () => {
     expect(query.sql).toContain("l.branch_id =");
     expect(query.params).toContain("tenant-a");
     expect(query.params).toContain("branch-a");
+    expect(query.params).toContain("2026-09-27T13:00:00.000Z");
+    expect(query.params).toContain("2026-10-26T13:00:00.000Z");
   });
 });

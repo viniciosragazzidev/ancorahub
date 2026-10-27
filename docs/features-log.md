@@ -535,3 +535,7 @@ Operação, filas, calendário, ocorrência, saúde da distribuição e dashboar
 ## 2026-10-27 - Revisão da faixa de status vivos
 
 O heartbeat não segura mais a resposta dos robôs. A faixa operacional fica só no Lite, carrega em `Suspense` sem bloquear o conteúdo e não adiciona HTML quando desligada. As consultas agora têm janelas por `created_at`, a primeira oferta usa subconsulta limitada, contagens no teto mostram `500+` e mensagens internas de erro viram frases seguras. Registro: `docs/implementations/active/2026-10-27-status-vivos.md`.
+
+## 2026-10-27 - Ajuste das janelas do status vivo
+
+Falhas do WhatsApp usam `failed_at` do dia com guarda de criação de 36 h; falhas do motor usam `updated_at`/`failed_at` de 24 h com guarda indexada de criação de 30 dias. A fila exibe e conta os últimos 7 dias, também no estado vazio. Sem migration.

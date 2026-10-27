@@ -227,6 +227,13 @@ Critério de pronto de cada onda: anexo de movimento cumprido (vídeo normal e c
 
 - `withJobHeartbeat` agora dispara a gravação sem esperar o banco; erro de heartbeat continua absorvido pela função.
 - A faixa só é montada em telas Lite e para papéis com escopo. Os provedores rodam em Server Component dentro de `Suspense`; o fallback reserva o mesmo conjunto de cartões, e a flag desligada não emite markup novo.
-- O outbox do WhatsApp limita pendências a 48 h e falhas à data de hoje usando `tenant_id` e `created_at`; jobs e efeitos do selo também têm tenant e janelas de 24 h, com guarda por `created_at`.
+- O outbox do WhatsApp limita pendências a 7 dias e falhas à data de hoje usando `failed_at` com guarda de criação de 36 h; jobs e efeitos do selo usam `updated_at`/`failed_at` em 24 h com guarda de criação de 30 dias.
 - A primeira oferta vem de subconsulta ordenada por `expires_at` com `limit 1`. Limites de 500 mostram `500+`. A fila de distribuição usa frases por código, sem exibir `lastErrorMessage`.
 - Validação: 66 testes Vitest focados, `npx tsc --noEmit` e ESLint dos arquivos alterados passaram. Suite completa e build não foram rodados porque esta tarefa proíbe testes de banco e exige não ler `.env.local`.
+
+## Ajuste de janelas da revisão final (27/10)
+
+- Falhas do WhatsApp usam `failed_at` desde o início do dia em São Paulo, com guarda indexada de `created_at` de 36 h para incluir mensagens criadas antes da meia-noite.
+- Falhas de jobs e efeitos usam `updated_at`/`failed_at` nas últimas 24 h, com guarda ampla de `created_at` de 30 dias.
+- A fila do WhatsApp considera mensagens criadas nos últimos 7 dias e deixa esse recorte explícito no título e no estado vazio. Não há limite de agregação no provedor.
+- Testes focados: `npx vitest run src/features/live-status --maxWorkers=1`. Type-check: `npx tsc --noEmit`. Sem banco, migration ou build.
