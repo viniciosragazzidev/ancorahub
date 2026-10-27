@@ -321,6 +321,7 @@ export async function requalifyColdLeadsManually(context: TenantContext, input: 
           requestedBy: context.userId,
           idempotencyKey: `${REQUALIFICATION_PREFIX}manual:${lead.id}:${(historyByLead.get(leadId)?.length ?? 0) + 1}`,
           requireApprovedMetaTemplate: true,
+          templateName: "anc_t1_lembrete",
         });
         outgoing.push({ leadId, name: lead.nome, outboundId: queued.id });
       } catch (error) {
@@ -469,6 +470,7 @@ export async function runColdLeadRequalificationSweep(tenantIdFilter?: string, n
             tenantId, recipientType: "lead", recipientId: lead.id, destinationPhone: lead.telefone,
             purpose: "leadQualification", variables: [lead.nome || "Cliente", "Assistente Ancora Saude", "Ancora Saude"],
             idempotencyKey: `${REQUALIFICATION_PREFIX}auto:${lead.id}:${attempt}`, requireApprovedMetaTemplate: true,
+            templateName: "anc_t1_lembrete",
             scheduledAt: nextRequalificationBusinessWindowAt(now),
           });
           if (!queued.duplicate) queuedCount += 1;

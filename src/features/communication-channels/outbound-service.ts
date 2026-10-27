@@ -424,7 +424,10 @@ export async function enqueueMetaTemplateMessage(input: {
       variables,
     });
   if (input.requireApprovedMetaTemplate && messagePlan?.primary.type !== "template") {
-    throw outboundChannelError("FIRST_CONTACT_TEMPLATE_UNAVAILABLE", "Não existe template FIRST_CONTACT aprovado e vinculado à WABA ativa deste tenant.");
+    throw outboundChannelError("FIRST_CONTACT_TEMPLATE_UNAVAILABLE", "Não existe template elegível aprovado na WABA ativa. O atendimento e a requalificação exigem Utility.");
+  }
+  if (input.purpose === "leadQualification" && !messagePlan) {
+    throw outboundChannelError("FIRST_CONTACT_TEMPLATE_UNAVAILABLE", "Não existe template Utility aprovado para o atendimento na WABA ativa desta empresa.");
   }
   // Activation notices are allowed to use only the governed event plan or a
   // synchronized approved resource. Do not let the generic legacy resolver

@@ -153,6 +153,7 @@ export async function runColdLeadReactivationSweep(tenantIdFilter?: string): Pro
           idempotencyKey,
           scheduledAt,
           requireApprovedMetaTemplate: true,
+          templateName: "anc_t1_lembrete",
         });
         outboundId = queued.id;
         if (!queued.duplicate) result.queued += 1;

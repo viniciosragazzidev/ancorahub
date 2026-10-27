@@ -55,6 +55,7 @@ type MetaResource = {
   name: string;
   language: string;
   status: string;
+  category: string;
   bodyText: string | null;
   variables: string[];
 };
@@ -133,6 +134,7 @@ async function loadMetaResource(tenantId: string, templateId: string | null, req
     name: schema.metaWhatsAppTemplates.name,
     language: schema.metaWhatsAppTemplates.language,
     status: schema.metaWhatsAppTemplates.status,
+    category: schema.metaWhatsAppTemplates.category,
     bodyText: schema.metaWhatsAppTemplates.bodyText,
     variables: schema.metaWhatsAppTemplates.variablesJson,
   }).from(schema.metaWhatsAppTemplates).where(and(...conditions)).limit(1);
@@ -253,6 +255,9 @@ export async function saveMessageEventPolicy(tenantId: string, userId: string, i
   }
   if ((parsed.primaryKind === "meta_template" || parsed.fallbackKind === "meta_template") && !metaTemplate) {
     throw new Error("O template Meta precisa estar aprovado e pertencer à WABA ativa desta empresa.");
+  }
+  if (event.key === "FIRST_CONTACT" && metaTemplate && metaTemplate.category !== "UTILITY") {
+    throw new Error("O atendimento e a requalificação usam exclusivamente templates Meta aprovados como Utility.");
   }
   if ((parsed.primaryKind === "free_message" || parsed.fallbackKind === "free_message") && !freeMessage) {
     throw new Error("A mensagem livre precisa estar ativa e pertencer a esta empresa.");
@@ -403,6 +408,7 @@ async function resolveLegacyMetaResource(tenantId: string, eventKey: string, pur
       name: schema.metaWhatsAppTemplates.name,
       language: schema.metaWhatsAppTemplates.language,
       status: schema.metaWhatsAppTemplates.status,
+      category: schema.metaWhatsAppTemplates.category,
       bodyText: schema.metaWhatsAppTemplates.bodyText,
       variables: schema.metaWhatsAppTemplates.variablesJson,
     }).from(schema.metaWhatsAppTemplates).where(and(
@@ -423,7 +429,7 @@ async function resolveLegacyMetaResource(tenantId: string, eventKey: string, pur
   // without a synchronized Meta template the resolver uses the governed free
   // message default instead of sending a guaranteed provider rejection.
   if (purpose === "brokerAccountActivated") return null;
-  return { id: "legacy", name: fallback.name, language: fallback.language, status: "APPROVED", bodyText: null, variables: [] };
+  return { id: "legacy", name: fallback.name, language: fallback.language, status: "APPROVED", category: "UNKNOWN", bodyText: null, variables: [] };
 }
 
 export async function resolveEventMessagePlan(input: {
@@ -451,6 +457,23 @@ export async function resolveEventMessagePlan(input: {
     } catch (error) {
       if (!isMissingMessagePolicyTable(error)) throw error;
     }
+  }
+
+  if (event.key === "FIRST_CONTACT") {
+    // Prefer the eligible service message; a stale event binding must never
+    // move qualification to a more expensive Marketing template.
+    const free = serviceWindowOpen && policy?.freeMessageTemplateId
+      ? await loadFreeResource(input.tenantId, policy.freeMessageTemplateId)
+      : null;
+    if (free) {
+      return {
+        eventKey: event.key, policyId: policy?.id ?? null, policyVersion: policy?.version ?? null,
+        primary: makeFreeMessage(event, free, input.variables), fallback: null,
+        preferWahaDirect: false, serviceWindowOpen,
+      };
+    }
+    const plan = await resolveApprovedMetaEventTemplate(input);
+    return plan ? { ...plan, serviceWindowOpen } : null;
   }
 
   const legacyMeta = await resolveLegacyMetaResource(input.tenantId, event.key, input.purpose);
@@ -574,6 +597,7 @@ async function loadApprovedMetaResourceByName(tenantId: string, name: string): P
     name: schema.metaWhatsAppTemplates.name,
     language: schema.metaWhatsAppTemplates.language,
     status: schema.metaWhatsAppTemplates.status,
+    category: schema.metaWhatsAppTemplates.category,
     bodyText: schema.metaWhatsAppTemplates.bodyText,
     variables: schema.metaWhatsAppTemplates.variablesJson,
   }).from(schema.metaWhatsAppTemplates).where(and(
@@ -598,7 +622,7 @@ export async function resolveApprovedMetaEventTemplate(input: {
 
   if (input.templateName) {
     const named = await loadApprovedMetaResourceByName(input.tenantId, input.templateName);
-    if (!named) return null;
+    if (!named || (event.key === "FIRST_CONTACT" && named.category !== "UTILITY")) return null;
     const automatic = buildAutomaticMetaVariableMappings(event, named.variables);
     return {
       eventKey: event.key,
@@ -632,16 +656,21 @@ export async function resolveApprovedMetaEventTemplate(input: {
     resource = await loadMetaResource(input.tenantId, policy.metaTemplateId);
   }
   resource ??= await resolveLegacyMetaResource(input.tenantId, event.key, input.purpose);
+  if (event.key === "FIRST_CONTACT" && resource?.category !== "UTILITY") {
+    resource = await loadApprovedMetaResourceByName(input.tenantId, "anc_t0_assistente");
+    if (resource?.category !== "UTILITY") return null;
+  }
   if (!resource || resource.status !== "APPROVED") return null;
 
   const automatic = buildAutomaticMetaVariableMappings(event, resource.variables);
   const configuredMappings = policy?.metaTemplateId === resource.id
     ? asStringRecord(policy.metaVariableMappingsJson)
     : automatic.valid ? automatic.mappings : {};
+  const appliedPolicy = event.key !== "FIRST_CONTACT" || policy?.metaTemplateId === resource.id ? policy : null;
   return {
     eventKey: event.key,
-    policyId: policy?.id ?? null,
-    policyVersion: policy?.version ?? null,
+    policyId: appliedPolicy?.id ?? null,
+    policyVersion: appliedPolicy?.version ?? null,
     primary: makeMetaMessage(event, resource, configuredMappings, input.variables),
     fallback: null,
     preferWahaDirect: false,

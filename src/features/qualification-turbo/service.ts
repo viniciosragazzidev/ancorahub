@@ -55,7 +55,7 @@ export async function saveTurboSettings(tenantId: string, settings: TurboSetting
   await setSystemSetting(settingKey(tenantId), JSON.stringify(settings));
 }
 
-/** Names of the APPROVED templates of the tenant's active WABA (same WABA the sender resolves). */
+/** Eligible Utility templates of the active WABA; Marketing touches are skipped. */
 export async function listApprovedTemplateNames(tenantId: string) {
   const wabaId = await getActiveWabaId(tenantId);
   if (!wabaId) return new Set<string>();
@@ -65,6 +65,7 @@ export async function listApprovedTemplateNames(tenantId: string) {
       eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
       eq(schema.metaWhatsAppTemplates.wabaId, wabaId),
       eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
+      eq(schema.metaWhatsAppTemplates.category, "UTILITY"),
       isNull(schema.metaWhatsAppTemplates.deletedAt),
     ));
   return new Set(rows.map((row) => row.name));

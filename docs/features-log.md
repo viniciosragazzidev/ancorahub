@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 27/10/2026 - Correção isolada dos templates de qualificação
+
+- FIRST_CONTACT passa a exigir Utility aprovado na WABA ativa, inclusive nomes explícitos. Configuração antiga de Marketing usa o primeiro contato Utility existente; ausência ou reclassificação bloqueia envio sem fallback estático.
+- Requalificação manual/automática e reativação reutilizam anc_t1_lembrete; seleção automática ignora Marketing. Preservada mensagem livre configurada dentro da janela de atendimento.
+- Escopo aprovado: DEC-155. Plano e validações: `docs/implementations/active/2026-10-27-utility-first-contact.md`.
+
 ## 26/10/2026 - Bot de qualificação humanizado: horário do corretor e handoffs (F3 e F4)
 
 - Horário do corretor (`src/features/qualification-engine/broker-window.ts`): segunda a sábado, das 9h às 19h, com feriados nacionais fixos e Sexta-feira Santa como dias sem atendimento. Carnaval e Corpus Christi são dias normais (confirmado pelo Vinicios).
