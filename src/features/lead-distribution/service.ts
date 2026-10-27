@@ -1388,11 +1388,14 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const loadMap = new Map(loads.map((item) => [item.brokerId, Number(item.total)]));
   // Counts stay within each broker's plantão for this choice; brokers without one
   // count only assignments, attempts and offers that also have no plantão (DEC-154).
+  // The plantão is only recorded on offers/attempts/leads of exclusive-plantão
+  // queues (dutyScheduleIdByBroker below), so count with that same key.
+  const countingScheduleIdByBroker: Record<string, string> = exclusiveScheduleIds?.length ? Object.fromEntries(scheduleIdByBroker) : {};
   const receivedInDayByBroker = countReceivedInDayByBroker([
     ...brokerLeadHistory.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
     ...slaAttempts.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
     ...dutyOffers.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.offeredAt, offerStatus: item.status })),
-  ], dutySince, Object.fromEntries(scheduleIdByBroker));
+  ], dutySince, countingScheduleIdByBroker);
   const candidates = remainingBrokers.map((broker) => {
     const history = brokerLeadHistory.filter((item) => item.brokerId === broker.id);
     const attempts = slaAttempts.filter((item) => item.brokerId === broker.id);
@@ -1486,7 +1489,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       since: dutySince,
       tierByBroker: Object.fromEntries(decision.eligible.map((candidate) => [candidate.id, candidate.onDuty ? 0 : 1])),
       branchIdByBroker: Object.fromEntries(remainingBrokers.flatMap((broker) => broker.branchId ? [[broker.id, broker.branchId]] : [])),
-      scheduleIdByBroker: Object.fromEntries(scheduleIdByBroker),
+      scheduleIdByBroker: countingScheduleIdByBroker,
     },
   });
   if (!offer.createdOffers.length) {

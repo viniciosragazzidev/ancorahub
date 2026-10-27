@@ -676,9 +676,9 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
   }
   const db = getDatabase();
   const branchCond = input.branchId ? eq(schema.leadQueues.branchId, input.branchId) : undefined;
-  const [queue] = await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, strategy: schema.leadQueues.assignmentStrategy, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes, maxPendingOffers: schema.leadQueues.maxPendingOffersPerBroker, status: schema.leadQueues.status })
+  const [queue] = await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, strategy: schema.leadQueues.assignmentStrategy, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes, maxPendingOffers: schema.leadQueues.maxPendingOffersPerBroker, status: schema.leadQueues.status, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds })
     .from(schema.leadQueues).where(and(eq(schema.leadQueues.id, input.queueId ?? ""), eq(schema.leadQueues.tenantId, context.tenantId), branchCond)).limit(1);
-  const fallbackQueue = !queue ? await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, strategy: schema.leadQueues.assignmentStrategy, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes, maxPendingOffers: schema.leadQueues.maxPendingOffersPerBroker, status: schema.leadQueues.status })
+  const fallbackQueue = !queue ? await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, strategy: schema.leadQueues.assignmentStrategy, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes, maxPendingOffers: schema.leadQueues.maxPendingOffersPerBroker, status: schema.leadQueues.status, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds })
     .from(schema.leadQueues).where(and(eq(schema.leadQueues.tenantId, context.tenantId), branchCond, eq(schema.leadQueues.status, "active"))).orderBy(desc(schema.leadQueues.isDefault), asc(schema.leadQueues.createdAt)).limit(1) : [];
   const effectiveQueue = queue ?? fallbackQueue[0];
   if (!effectiveQueue || effectiveQueue.status !== "active") return { queue: null, eligible: [], selected: null, reason: "Não existe uma fila ativa para esta unidade." };
@@ -738,7 +738,8 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
     context.tenantId,
     paceableIds,
     operationDayStart(new Date()),
-    Object.fromEntries(dutyScheduleIdByBroker),
+    // Same key the real distribution records: only exclusive-plantão queues stamp the plantão.
+    effectiveQueue.exclusiveDutyScheduleIds?.length ? Object.fromEntries(dutyScheduleIdByBroker) : {},
   );
   const candidates: RankedBroker[] = brokers.filter((broker) => paceableIds.includes(broker.id)).map((broker) => {
     const activeLeads = loadByBroker.get(broker.id) ?? 0;
