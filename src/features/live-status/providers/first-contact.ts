@@ -28,7 +28,7 @@ export function buildFirstContactStatus(input: { assignedAt: readonly Date[]; se
       ? `Fale com o cliente em até ${settings.firstContactMinutes} min; depois de ${settings.graceMinutes} min de tolerância, a gestão recebe o alerta.`
       : `Prazo de ${settings.firstContactMinutes} min mais ${settings.graceMinutes} de tolerância. Depois disso, gestor e diretor recebem o alerta.`,
     breakdown: total ? [{ label: "no prazo", value: pending.length }, { label: "atrasados", value: late }] : undefined,
-    action: { href: own ? "/minha-fila" : "/leads", label: own ? "Responder" : "Ver leads" },
+    action: { href: own ? "/minha-fila" : "/leads", label: own ? "Responder" : "Leads" },
     generatedAt: now.toISOString(),
   };
   if (!total) return base;

@@ -29,7 +29,7 @@ export function buildOffersStatus(input: { aggregate: OffersAggregate; now: Date
       : aggregate.total
         ? "Se o corretor não aceitar, o lead vai para o próximo da fila."
         : "Quando o robô oferece um lead, o corretor tem um tempo para aceitar.",
-    action: href ? { href, label: own ? "Abrir" : "Ver plantão" } : undefined,
+    action: href ? { href, label: own ? "Abrir" : "Plantão" } : undefined,
     generatedAt: now.toISOString(),
   };
 }

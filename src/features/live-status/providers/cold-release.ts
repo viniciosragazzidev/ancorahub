@@ -40,7 +40,8 @@ export function buildColdReleaseStatus(input: { queues: readonly ColdReleaseQueu
       if (createdAt.getTime() < nextCutoff) releasing += 1;
     }
   }
-  const name = queues.length === 1 ? queues[0].name : "Filas de leads frios";
+  // "Fila Leads Frios": sem o "Fila", o cartão se confunde com o de leads frios ao lado.
+  const name = queues.length === 1 ? `Fila ${queues[0].name.replace(/^fila\s+/i, "")}` : "Filas de leads frios";
   return {
     id: "fila-frios",
     label: name,
@@ -50,7 +51,7 @@ export function buildColdReleaseStatus(input: { queues: readonly ColdReleaseQueu
     nextEvent: { at: nextRelease.toISOString(), label: releasing === 1 ? "Libera para corretores" : "Liberam para corretores", dueLabel: "Liberando agora" },
     explanation: "O lead frio só vai para corretor no dia em que completa 2 dias, às 9 h.",
     breakdown: held ? [{ label: "esperando liberação", value: held }] : undefined,
-    action: input.scope.role === "director" ? { href: "/leads/distribuicao?view=filas", label: "Ver fila" } : undefined,
+    action: input.scope.role === "director" ? { href: "/leads/distribuicao?view=filas", label: "Fila" } : undefined,
     generatedAt: now.toISOString(),
   };
 }

@@ -18,6 +18,8 @@
   display: grid;
   gap: 16px;
   min-width: 0;
+  /* Cor explícita: a faixa não herda a cor do body (no tema escuro com o visual Lite, que é só claro, ela sumia). */
+  color: var(--foreground);
 }
 
 .stripHead {
@@ -48,7 +50,7 @@
 
 /* Celular: lista, um status por linha. */
 @media (max-width: 559px) {
-  .grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 }
 
 .card {
@@ -76,19 +78,19 @@
 .card[data-severity="atencao"] { --live-tone: var(--warning); }
 .card[data-severity="critico"] { --live-tone: var(--danger, var(--destructive)); }
 
-@media (max-width: 559px) {
-  .card { padding: 16px; }
-}
+
 
 .head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-width: 0;
   min-height: 24px;
 }
 
-.dotWrap { border-radius: 9999px; flex-shrink: 0; }
+/* O ponto acompanha a primeira linha do rótulo (14px x 1.4 = ~20px de linha). */
+.dotWrap { border-radius: 9999px; flex-shrink: 0; margin-top: 6px; }
+.seal .dotWrap { margin-top: 0; }
 
 .dot {
   display: inline-block;
@@ -99,7 +101,9 @@
   transition: background-color var(--duration-instant, 120ms) var(--ease-standard, ease);
 }
 
+/* Rótulo inteiro em até 2 linhas: cortar "Aguardando corre..." esconde o que o cartão é. */
 .label {
+  display: -webkit-box;
   min-width: 0;
   flex: 1 1 auto;
   margin: 0;
@@ -108,8 +112,9 @@
   font-size: var(--text-sm, 0.875rem);
   font-weight: 500;
   line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .action {
@@ -235,3 +240,13 @@ a.seal:focus-visible { outline: 2px solid var(--ring, var(--primary)); outline-o
 :global(html[data-reduce-motion="1"]) .value,
 :global(html[data-reduce-motion="1"]) .action,
 :global(html[data-reduce-motion="1"]) .seal { transition: none; }
+
+/* No fim do arquivo: precisa vencer as regras de display das partes acima. */
+/* Celular: lista compacta. Fica o que responde "o que está rolando e quando": rótulo, número e contagem.
+   A frase do porquê e as quebras ficam para a tela grande. */
+@media (max-width: 559px) {
+  .card { gap: 4px; padding: 12px 16px; }
+  .value { font-size: var(--text-2xl, 1.5rem); }
+  .valueRow { min-height: 0; }
+  .explanation, .breakdown, .progress { display: none; }
+}

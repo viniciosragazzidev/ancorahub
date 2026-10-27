@@ -111,7 +111,8 @@ export function LiteLiveStatus({ status, onDue }: LiteLiveStatusProps) {
         <h3 id={`live-${status.id}`} className={styles.label}>{status.label}</h3>
         <span className={styles.srOnly}>{SEVERITY_LABEL[status.severity]}</span>
         {status.action ? (
-          <Link href={status.action.href} className={styles.action}>
+          // Rótulo curto na tela ("Plantão"); o nome acessível diz de qual cartão é ("Plantão: Ofertas aguardando aceite").
+          <Link href={status.action.href} className={styles.action} aria-label={`${status.action.label}: ${status.label}`}>
             {status.action.label}
             <span aria-hidden="true" className={styles.arrow}>→</span>
           </Link>

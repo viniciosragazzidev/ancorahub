@@ -67,7 +67,7 @@ export function buildWhatsAppQueueStatus(input: { aggregate: WhatsAppQueueAggreg
           { label: "falhas hoje", value: aggregate.failedToday },
         ]
       : undefined,
-    action: input.scope.role === "director" ? { href: "/integrations/whatsapp", label: "Abrir canal" } : undefined,
+    action: input.scope.role === "director" ? { href: "/integrations/whatsapp", label: "Canal" } : undefined,
     generatedAt: now.toISOString(),
   };
 }

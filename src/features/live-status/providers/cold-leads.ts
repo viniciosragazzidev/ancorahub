@@ -49,7 +49,7 @@ export function buildColdLeadsStatus(input: {
       : undefined,
     action: input.scope.role === "director"
       ? { href: "/leads/distribuicao?view=filas", label: "Revisar" }
-      : { href: "/leads/distribuicao?view=operar", label: "Ver fila" },
+      : { href: "/leads/distribuicao?view=operar", label: "Fila" },
     generatedAt: now.toISOString(),
   };
   if (!rows.length) return status;

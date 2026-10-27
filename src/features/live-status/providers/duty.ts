@@ -28,7 +28,7 @@ export function buildDutyStatus(input: { rows: readonly DutyPresenceRow[]; now: 
   const base = {
     id: "plantao",
     generatedAt: now.toISOString(),
-    action: href ? { href, label: own ? "Abrir" : "Ver plantão" } : undefined,
+    action: href ? { href, label: own ? "Abrir" : "Plantão" } : undefined,
   } as const;
 
   if (!running.length) {

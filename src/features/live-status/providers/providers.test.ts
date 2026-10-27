@@ -69,7 +69,7 @@ describe("fila de leads frios", () => {
       }],
       now: NOW, scope: director,
     });
-    expect(status).toMatchObject({ label: "Leads Frios", value: 1, breakdown: [{ label: "esperando liberação", value: 2 }] });
+    expect(status).toMatchObject({ label: "Fila Leads Frios", value: 1, breakdown: [{ label: "esperando liberação", value: 2 }] });
     expect(status?.nextEvent?.at).toBe("2026-10-28T12:00:00.000Z");
   });
 
