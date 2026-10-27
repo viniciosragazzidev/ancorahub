@@ -166,7 +166,7 @@ export function buildColdRecoveriesQuery(scope: LiveScope, since: Date, now: Dat
             and whatsapp_messages.direction in ('incoming', 'inbound')
             and whatsapp_messages.sent_at >= attempts.attempted_at
             and whatsapp_messages.sent_at <= audit_logs.created_at
-            and not (${notStatusBroadcastSql(schema.whatsappMessages.messageId)})
+            and ${notStatusBroadcastSql(schema.whatsappMessages.messageId)}
             and not (whatsapp_messages.media_kind is null and lower(trim(coalesce(whatsapp_messages.body, ''))) in ('', '[text]'))
         )
       order by attempts.lead_id, audit_logs.created_at asc

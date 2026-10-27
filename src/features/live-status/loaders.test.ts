@@ -26,6 +26,7 @@ describe("consultas da faixa viva", () => {
     expect(query.sql).toContain("qualification-turbo:%:t2:%");
     expect(query.sql).toContain("whatsapp_messages.direction in");
     expect(query.sql).toContain("not ilike");
+    expect(query.sql).not.toMatch(/and not \(coalesce\([^)]*message_id[^)]*\) not ilike/);
     expect(query.sql).toContain("\"leads\".\"branch_id\"");
     expect(query.params).toContain("tenant-a");
     expect(query.params).toContain("branch-a");

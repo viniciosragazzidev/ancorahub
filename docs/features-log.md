@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 27/10/2026 - Contagem correta dos frios recuperados
+
+- Corrigida a negação duplicada do filtro de Status do WhatsApp no contador. Respostas reais voltam a contar; Status continuam excluídos. Janela, deduplicação, auditoria de qualificação e escopo por papel permanecem.
+- Teste da consulta real com dados sintéticos em CTEs somente leitura, cobrindo empresa, unidade, respostas inválidas e duplicações.
+- Registro e validações: `docs/implementations/active/2026-10-27-cold-recovery-count.md`.
+
 ## 27/10/2026 - Lembrete de plantão 24 h antes
 
 - O job existente de distribuição enfileira lembretes de ocorrência do dia seguinte entre 24 h e 2 h antes do início, respeitando a escala semanal e a mensal publicada. Escalados pausados, inválidos e convidados sem conta ficam de fora.
