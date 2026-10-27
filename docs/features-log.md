@@ -576,3 +576,7 @@ A faixa "Agora na operação" saiu do `/dashboard` em todas as versões e papéi
 ## 2026-10-27 - Nome do lead nos avisos de oferta
 
 Os avisos de lead indisponível, oferta expirada e reatribuição incluem o nome do lead na mensagem livre enviada ao corretor. O template Meta preserva a quantidade de parâmetros da versão sincronizada e o `{{nome}}` aprovado continua recebendo o nome do corretor. Registro: `docs/implementations/completed/2026-10-27-nome-do-lead-em-avisos-de-oferta.md`.
+
+## 2026-10-27 - Fila visual do plantão com arrastar
+
+Na aba Plantão, a lista mostra a ordem automática prevista por ocorrência ativa, empates e bloqueios. Quando o diretor reordena, a ocorrência passa a rodízio manual; o primeiro elegível recebe e vai ao fim, enquanto bloqueados mantêm sua posição. A leitura e a gravação da ordem ficam sob a trava de escolha, com auditoria, e o gestor vê apenas a unidade autorizada. A data da chave segue a ocorrência em America/Sao_Paulo, inclusive em plantões noturnos. Sem migration. Registro: DEC-160 e `docs/implementations/active/2026-10-27-fila-visual-plantao.md`.
