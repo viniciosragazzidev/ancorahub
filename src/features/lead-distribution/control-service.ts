@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, gt, gte, inArray, isNull, lte, ne, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { operationDayStart } from "./broker-day-history";
 import { z } from "zod";
 
@@ -15,7 +15,7 @@ import { dutyFallbackPolicyValues, type DutyFallbackPolicy } from "./types";
 import { getLocalDutyParts } from "@/features/leads/assignment";
 import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
 import { getSystemSetting, setSystemSetting } from "@/features/system-settings/queries";
-import { countReceivedInDuty, type DutyReceipt } from "./duty-attribution";
+import { loadReceivedInDayByBroker } from "./received-in-day";
 import { loadBrokerPacingOffers } from "./offers";
 import { evaluateBrokerOfferPacing, isOfferPacingEnabled, normalizeOfferPacing, type PacingOffer } from "./offer-pacing";
 
@@ -731,27 +731,9 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
   const loads = await db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads)
     .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, paceableIds), inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]))).groupBy(schema.leads.corretorId);
   const loadByBroker = new Map(loads.map((row) => [row.brokerId, Number(row.total)]));
-  // Same "menor carga" of the plantão as the real distribution (service.ts): distinct leads
-  // assigned (automatically, by offer or manually) or offered (pending/accepted) in the operation day.
-  const dutySince = operationDayStart(new Date());
-  const [dutyAttempts, dutyOffers, dutyLeads] = paceableIds.length ? await Promise.all([
-    db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, leadId: schema.leadAssignmentAttempts.leadId, dutyScheduleId: schema.leadAssignmentAttempts.dutyScheduleId, assignedAt: schema.leadAssignmentAttempts.assignedAt }).from(schema.leadAssignmentAttempts)
-      .where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, paceableIds), gte(schema.leadAssignmentAttempts.assignedAt, dutySince))),
-    db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId, dutyScheduleId: schema.leadOffers.dutyScheduleId, offeredAt: schema.leadOffers.offeredAt }).from(schema.leadOffers)
-      .where(and(eq(schema.leadOffers.tenantId, context.tenantId), inArray(schema.leadOffers.brokerId, paceableIds), gte(schema.leadOffers.offeredAt, dutySince), inArray(schema.leadOffers.status, ["PENDING", "ACCEPTED"]))),
-    // Includes leads handed over manually.
-    db.select({ brokerId: schema.leads.corretorId, leadId: schema.leads.id, dutyScheduleId: schema.leads.dutyScheduleId, assignedAt: schema.leads.assignedAt }).from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, paceableIds), gte(schema.leads.assignedAt, dutySince))),
-  ]) : [[], [], []];
-  const dutyReceipts: DutyReceipt[] = [
-    ...dutyAttempts.map((row) => ({ brokerId: row.brokerId, leadId: row.leadId, dutyScheduleId: row.dutyScheduleId, receivedAt: row.assignedAt })),
-    ...dutyOffers.map((row) => ({ brokerId: row.brokerId, leadId: row.leadId, dutyScheduleId: row.dutyScheduleId, receivedAt: row.offeredAt })),
-    ...dutyLeads.map((row) => ({ brokerId: row.brokerId, leadId: row.leadId, dutyScheduleId: row.dutyScheduleId, receivedAt: row.assignedAt })),
-  ];
-  const receivedInDutyByBroker = new Map<string, number>();
-  for (const id of paceableIds) {
-    receivedInDutyByBroker.set(id, countReceivedInDuty({ brokerId: id, scheduleId: dutyScheduleIdByBroker.get(id), since: dutySince, receipts: dutyReceipts }));
-  }
+  // Same "menor carga" as the real distribution (DEC-154): distinct leads assigned or offered
+  // to the broker in the operation day, in any queue or plantão; only CANCELLED offers do not count.
+  const receivedInDutyByBroker = await loadReceivedInDayByBroker(db, context.tenantId, paceableIds, operationDayStart(new Date()));
   const candidates: RankedBroker[] = brokers.filter((broker) => paceableIds.includes(broker.id)).map((broker) => {
     const activeLeads = loadByBroker.get(broker.id) ?? 0;
     const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads, receivedInDuty: receivedInDutyByBroker.get(broker.id) ?? 0, capacity: effectiveQueue.capacityEnabled ? effectiveQueue.capacity : null, onDuty: false, conversionRate: 0, slaRate: 0, manualPriority: input.temperature === "hot" || input.score >= 80 ? 1 : 0, idleSince: null, rankingScore: 0 };

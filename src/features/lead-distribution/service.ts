@@ -22,7 +22,7 @@ import { isCompanyLeadType } from "@/features/leads/company-lead-detection";
 import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
 import { normalizeQueueSource } from "./routing-catalog";
 import { findBrokerRunningDutyScheduleId, getActiveQueueDutyRoster } from "./active-queue-duty-roster";
-import { countReceivedInDuty, type DutyReceipt } from "./duty-attribution";
+import { countReceivedInDayByBroker, NON_COUNTING_OFFER_STATUS } from "./received-in-day";
 import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getOvernightExtraShiftSettings, getPresenceEligibleAssignments } from "./duty-presence";
 import { extraShiftWindow, findRunningDutySchedule, getRelevantDutyWindow, isExtraShiftRecord, isOvernightLead, MORNING_SHIFT_STARTS_BEFORE } from "./duty-presence-domain";
@@ -1363,7 +1363,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   }
 
   const ids = remainingBrokers.map((broker) => broker.id);
-  // "Menor carga" do plantão: indicações do dia da operação (19:00 do dia anterior; sexta 19:00 na segunda).
+  // "Menor carga": indicações do dia da operação (19:00 do dia anterior; sexta 19:00 na segunda), DEC-154.
   const dutySince = operationDayStart(new Date());
   const [loads, brokerLeadHistory, slaAttempts, dutyOffers] = await Promise.all([
     db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads).where(and(
@@ -1376,28 +1376,29 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     )).groupBy(schema.leads.corretorId),
     db.select({ leadId: schema.leads.id, brokerId: schema.leads.corretorId, dutyScheduleId: schema.leads.dutyScheduleId, status: schema.leads.status, assignedAt: schema.leads.assignedAt, serviceStartedAt: schema.leads.serviceStartedAt, firstContactAt: schema.leads.firstContactAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids))),
     db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, leadId: schema.leadAssignmentAttempts.leadId, dutyScheduleId: schema.leadAssignmentAttempts.dutyScheduleId, assignedAt: schema.leadAssignmentAttempts.assignedAt, firstContactAt: schema.leadAssignmentAttempts.firstContactAt, feedbackDueAt: schema.leadAssignmentAttempts.feedbackDueAt }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, ids))),
-    // Pending or accepted offers count as load; declined/expired ones do not (or declining would pay off).
-    db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId, dutyScheduleId: schema.leadOffers.dutyScheduleId, offeredAt: schema.leadOffers.offeredAt }).from(schema.leadOffers).where(and(
+    // DEC-154: every offer of the day counts (expired, declined and lost too: a broker who
+    // let it lapse is not made up for); only one the system CANCELLED does not.
+    db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId, offeredAt: schema.leadOffers.offeredAt, status: schema.leadOffers.status }).from(schema.leadOffers).where(and(
       eq(schema.leadOffers.tenantId, context.tenantId),
       inArray(schema.leadOffers.brokerId, ids),
       gte(schema.leadOffers.offeredAt, dutySince),
-      inArray(schema.leadOffers.status, ["PENDING", "ACCEPTED"]),
+      ne(schema.leadOffers.status, NON_COUNTING_OFFER_STATUS),
     )),
   ]);
   const loadMap = new Map(loads.map((item) => [item.brokerId, Number(item.total)]));
-  const dutyReceipts: DutyReceipt[] = [
-    ...brokerLeadHistory.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
-    ...slaAttempts.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
-    ...dutyOffers.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.offeredAt })),
-  ];
+  // The whole operation day of the broker, across every queue and plantão (not per plantão).
+  const receivedInDayByBroker = countReceivedInDayByBroker([
+    ...brokerLeadHistory.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, receivedAt: item.assignedAt })),
+    ...slaAttempts.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, receivedAt: item.assignedAt })),
+    ...dutyOffers.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, receivedAt: item.offeredAt, offerStatus: item.status })),
+  ], dutySince);
   const candidates = remainingBrokers.map((broker) => {
     const history = brokerLeadHistory.filter((item) => item.brokerId === broker.id);
     const attempts = slaAttempts.filter((item) => item.brokerId === broker.id);
     const conversionRate = history.length ? history.filter((item) => item.status === "converted").length / history.length : 0;
     const slaRate = attempts.length ? attempts.filter((item) => item.firstContactAt && item.firstContactAt <= item.feedbackDueAt).length / attempts.length : 0;
     const idleSince = [...history.map((item) => item.assignedAt), ...attempts.map((item) => item.assignedAt)].reduce<Date | null>((newest, assignedAt) => !assignedAt ? newest : (!newest || assignedAt > newest ? assignedAt : newest), null);
-    // Null attribution retains the pre-migration operation-day + broker behavior.
-    const receivedInDuty = countReceivedInDuty({ brokerId: broker.id, scheduleId: scheduleIdByBroker.get(broker.id), since: dutySince, receipts: dutyReceipts });
+    const receivedInDuty = receivedInDayByBroker.get(broker.id) ?? 0;
     const unstartedLeads = history.filter((item) => item.status === "distributed" || item.status === "new" || (!item.serviceStartedAt && !item.firstContactAt)).length + attempts.filter((item) => !item.firstContactAt).length;
     const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads: loadMap.get(broker.id) ?? 0, unstartedLeads, receivedInDuty, lastAssignedAt: idleSince, capacity: queue?.capacityEnabled ? queue.capacity ?? null : null, onDuty: Boolean(broker.branchId && rosterByBranch.get(broker.branchId)?.has(broker.id)), conversionRate, slaRate, manualPriority: 0, idleSince, rankingScore: 0 };
     return { ...candidate, rankingScore: calculateBrokerRankingScore(candidate, intelligentPolicy.value) };
