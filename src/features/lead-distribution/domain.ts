@@ -233,9 +233,10 @@ export function chooseBroker<T extends EligibleBroker & { onDuty?: boolean; rece
   if (!eligible.length) return null;
   // round_robin's whole point is "oldest account goes first" (deliberately,
   // regardless of load) — that stays a real, deterministic criterion.
-  // capacity follows the same order as rankBrokers (DEC-154): plantão ativo,
-  // then fewest received in the operation day, and only then the portfolio
-  // (active leads). Ties resolve from the pre-shuffled order.
+  // capacity uses rankBrokers' order for plantão ativo and fewest received in
+  // the operation day (DEC-154), then fewest active leads. Unlike rankBrokers,
+  // it skips the unstarted-leads, ranking and idle criteria. Ties resolve from
+  // the pre-shuffled order.
   return shuffle(eligible, random).sort((a, b) => {
     if (strategy === "round_robin") return a.createdAt.getTime() - b.createdAt.getTime();
     if (Number(b.onDuty ?? false) !== Number(a.onDuty ?? false)) return Number(b.onDuty ?? false) - Number(a.onDuty ?? false);
