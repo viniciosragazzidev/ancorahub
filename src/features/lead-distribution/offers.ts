@@ -126,7 +126,7 @@ export async function createLeadOffersForBrokers(input: {
    * the operation day and claims for the one with fewest (tier first: 0 = on the
    * active plantão). brokerIds keeps breaking ties. Without it, brokerIds order is final.
    */
-  fairPick?: { since: Date; tierByBroker?: Record<string, number> };
+  fairPick?: { since: Date; tierByBroker?: Record<string, number>; branchIdByBroker?: Record<string, string> };
 }) {
   const db = getDatabase();
   // Same bounds as the "SLA de Aceite" setting (1–1440 min).
@@ -213,6 +213,8 @@ export async function createLeadOffersForBrokers(input: {
         destinationPhone = broker.phone;
       }
       traceLeadStep(input.leadId, `offer_claim:${broker.id}`);
+      // The locked pick may land on a broker of another unit (shared queues): the lead follows that broker's unit.
+      const brokerBranchId = input.fairPick?.branchIdByBroker?.[broker.id] ?? input.targetBranchId;
       // Serialize offer creation per lead. This is the final guard against two
       // workers creating simultaneous active offers for different brokers.
       const [lockedLead] = await tx
@@ -328,7 +330,7 @@ export async function createLeadOffersForBrokers(input: {
         // `automatic_offer`, allowing decline/expiration to release or rotate
         // this link without treating it as confirmed attendance.
         await tx.update(schema.leads).set({ ...buildPendingLeadOfferLeadUpdate({
-          targetBranchId: input.targetBranchId,
+          targetBranchId: brokerBranchId,
           brokerId: broker.id,
           now,
           assignmentSource: input.assignmentSource,
@@ -347,7 +349,7 @@ export async function createLeadOffersForBrokers(input: {
           tenantId: input.tenantId,
           leadId: input.leadId,
           fromBranchId: lead.branchId,
-          toBranchId: input.targetBranchId,
+          toBranchId: brokerBranchId,
           previousOwnerId: input.expectedCurrentBrokerId ?? null,
           newOwnerId: broker.id,
           action: "offer_sent",

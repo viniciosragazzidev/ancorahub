@@ -1484,6 +1484,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     fairPick: queue?.strategy === "round_robin" ? undefined : {
       since: dutySince,
       tierByBroker: Object.fromEntries(decision.eligible.map((candidate) => [candidate.id, candidate.onDuty ? 0 : 1])),
+      branchIdByBroker: Object.fromEntries(remainingBrokers.flatMap((broker) => broker.branchId ? [[broker.id, broker.branchId]] : [])),
     },
   });
   if (!offer.createdOffers.length) {
