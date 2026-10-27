@@ -2,6 +2,14 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 27/10/2026 - Status vivos: faixa "Agora na operação" (ondas 0 e 1, parcial)
+
+- Peça Lite única (`src/components/lite/status/`): `LiteLiveStatus` (rótulo, número, próximo evento com contagem, barra da janela, frase e ação), `LiteLiveStatusStrip` e `LiteLiveSeal`. Um relógio de 1 s por página (`useSyncExternalStore`, pausa com a aba oculta); o primeiro render mostra a hora absoluta em São Paulo e o cliente troca para a contagem. Ao chegar a zero: pulso único e troca do texto. Movimento reduzido respeitado. O `BrokerLiveStatus` do plantão passa a usar o mesmo relógio.
+- Camada de dados (`src/features/live-status/`): 8 status (frios e próxima requalificação, fila Leads Frios às 9 h, qualificação pela IA, aguardando corretor com motivo, ofertas aguardando aceite, sem primeiro contato, plantão confirmados e tolerância, fila do WhatsApp) e o selo do motor de distribuição. Escopo por papel igual ao das telas (NOC), uma consulta agregada por status, cache de 15 a 60 s compartilhado por escopo, orçamento de 2,5 s. `GET /api/live-status`.
+- Heartbeat das rotinas: cada rota agendada grava `heartbeat:<tarefa>` em `system_settings` (sem migration); "última rodada" e robô parado vêm daí.
+- Faixa no `/dashboard` de todos os papéis e no `/leads/distribuicao`, atrás de `feature_live_status_strip_<tenantId>` (desligada por padrão; liga e desliga auditado no Super-admin). Atualiza sem recarregar: a cada 60 s com a aba visível, 20 s depois de uma contagem chegar a zero e com o sinal do tempo real.
+- Plano: `docs/implementations/active/2026-10-27-status-vivos.md`. Parcial: sem `revalidateTag` nas ações (o cache curto cobre), alerta de silêncio da Meta fica para a onda 3, sem página no catálogo do kit e sem `EXPLAIN` com dados de produção.
+
 ## 27/10/2026 - Correção isolada dos templates de qualificação
 
 - FIRST_CONTACT passa a exigir Utility aprovado na WABA ativa, inclusive nomes explícitos. Configuração antiga de Marketing usa o primeiro contato Utility existente; ausência ou reclassificação bloqueia envio sem fallback estático.
