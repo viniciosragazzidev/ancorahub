@@ -1,0 +1,237 @@
+/*
+ * Status vivo (Lite). Tokens do visual Lite (director-skin.css); fora dele, os tokens da base (globals.css)
+ * entram como reserva, para a peça não quebrar numa tela que ainda não está no Lite.
+ * Grade de 4px; cards com borda de 1px e sem sombra; números tabulares; cor só no ponto e no número.
+ */
+
+.strip {
+  --live-surface: var(--surface, var(--card));
+  --live-border: var(--border);
+  --live-border-subtle: var(--border-subtle, var(--border));
+  --live-muted: var(--surface-muted, var(--muted));
+  --live-text-secondary: var(--text-secondary, var(--muted-foreground));
+  --live-text-muted: var(--text-muted, var(--muted-foreground));
+  --live-ok: var(--success);
+  --live-info: var(--info, var(--primary));
+  --live-warning: var(--warning);
+  --live-danger: var(--danger, var(--destructive));
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.stripHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-width: 0;
+}
+
+.stripTitle {
+  margin: 0;
+  font-size: var(--text-lg, 1.125rem);
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  align-items: stretch;
+  gap: 16px;
+  min-width: 0;
+}
+
+.grid > * { min-width: 0; display: flex; }
+
+/* Celular: lista, um status por linha. */
+@media (max-width: 559px) {
+  .grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+}
+
+.card {
+  /* As mesmas reservas da faixa: a peça também vive sozinha (catálogo, cartão do corretor). */
+  --live-surface: var(--surface, var(--card));
+  --live-border: var(--border);
+  --live-muted: var(--surface-muted, var(--muted));
+  --live-text-secondary: var(--text-secondary, var(--muted-foreground));
+  --live-text-muted: var(--text-muted, var(--muted-foreground));
+  --live-tone: var(--live-text-muted);
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--live-border);
+  border-radius: var(--radius-card, 12px);
+  background: var(--live-surface);
+  color: var(--foreground);
+}
+
+.card[data-severity="ok"] { --live-tone: var(--success); }
+.card[data-severity="info"] { --live-tone: var(--info, var(--primary)); }
+.card[data-severity="atencao"] { --live-tone: var(--warning); }
+.card[data-severity="critico"] { --live-tone: var(--danger, var(--destructive)); }
+
+@media (max-width: 559px) {
+  .card { padding: 16px; }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 24px;
+}
+
+.dotWrap { border-radius: 9999px; flex-shrink: 0; }
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--live-tone);
+  transition: background-color var(--duration-instant, 120ms) var(--ease-standard, ease);
+}
+
+.label {
+  min-width: 0;
+  flex: 1 1 auto;
+  margin: 0;
+  overflow: hidden;
+  color: var(--live-text-secondary);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  margin: -10px -8px -10px 0;
+  padding: 0 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  color: var(--accent-strong, var(--primary));
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color var(--duration-instant, 120ms) var(--ease-standard, ease);
+}
+
+.action:hover { background: var(--live-muted); }
+.action:focus-visible { outline: 2px solid var(--ring, var(--primary)); outline-offset: 2px; }
+.arrow { font-size: var(--text-xs, 0.75rem); }
+
+.valueRow { min-width: 0; min-height: 36px; display: flex; align-items: center; }
+
+.value {
+  font-size: var(--text-3xl, 1.875rem);
+  font-weight: 600;
+  letter-spacing: var(--tracking-display, -0.01em);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  transition: color var(--duration-instant, 120ms) var(--ease-standard, ease);
+}
+
+.card[data-severity="atencao"] .value,
+.card[data-severity="critico"] .value { color: var(--live-tone); }
+
+.empty {
+  margin: 0;
+  color: var(--live-text-secondary);
+  font-size: var(--text-base, 1rem);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.pulse { border-radius: 8px; max-width: 100%; }
+.swap { min-width: 0; }
+
+.next {
+  margin: 0;
+  min-width: 0;
+  color: var(--foreground);
+  font-size: var(--text-sm, 0.875rem);
+  line-height: 1.5;
+}
+
+.timer { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+.progress { margin: 4px 0; }
+
+.explanation {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--live-text-secondary);
+  font-size: var(--text-sm, 0.875rem);
+  line-height: 1.5;
+}
+
+.breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--border-subtle, var(--border));
+  list-style: none;
+  color: var(--live-text-muted);
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.breakdown strong { color: var(--foreground); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.staleNote { margin: 0; color: var(--live-text-muted); font-size: var(--text-xs, 0.75rem); }
+
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Selo: pílula pequena ao lado do título da faixa. */
+.seals { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+
+.seal {
+  --live-tone: var(--text-muted, var(--muted-foreground));
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--surface, var(--card));
+  color: var(--foreground);
+  font-size: var(--text-xs, 0.75rem);
+  text-decoration: none;
+  transition: background-color var(--duration-instant, 120ms) var(--ease-standard, ease);
+}
+
+a.seal:hover { background: var(--surface-muted, var(--muted)); }
+a.seal:focus-visible { outline: 2px solid var(--ring, var(--primary)); outline-offset: 2px; }
+.seal[data-severity="ok"] { --live-tone: var(--success); }
+.seal[data-severity="info"] { --live-tone: var(--info, var(--primary)); }
+.seal[data-severity="atencao"] { --live-tone: var(--warning); }
+.seal[data-severity="critico"] { --live-tone: var(--danger, var(--destructive)); }
+.seal .dot { background: var(--live-tone); }
+
+.sealText { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.sealLabel { font-weight: 500; }
+.sealText .timer { color: var(--text-secondary, var(--muted-foreground)); }
+.sealDetail { flex-basis: 100%; color: var(--live-tone); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dot, .value, .action, .seal { transition: none; }
+}
+:global(html[data-reduce-motion="1"]) .dot,
+:global(html[data-reduce-motion="1"]) .value,
+:global(html[data-reduce-motion="1"]) .action,
+:global(html[data-reduce-motion="1"]) .seal { transition: none; }

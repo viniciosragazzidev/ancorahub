@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { AnimatedBadge, type AnimatedBadgeStatus } from "@/components/motion/animated-badge";
+import { useCountdown } from "@/components/lite/status/use-countdown";
 import type { BrokerLiveOfferStatus } from "@/features/lead-distribution/duty-roster-live-status";
 
 const STATUS_UI: Record<BrokerLiveOfferStatus, { label: string; status: AnimatedBadgeStatus; pulse: boolean }> = {
@@ -24,22 +24,16 @@ function formatCountdown(ms: number) {
 /**
  * Live "can this broker receive the next automatic lead" indicator: a status
  * pill plus, for offer_pending/cooldown, a self-ticking mm:ss countdown to
- * the next state change. Ticks entirely client-side from the one timestamp
- * the server computed (`nextEventAt`) — no polling, no server round-trip.
+ * the next state change. Ticks client-side from the one timestamp the server
+ * computed (`nextEventAt`), on the page's single shared 1 s clock (status
+ * vivos, 27/10): before, each broker card ran its own setInterval. The clock
+ * is null on the server and during hydration, so the first HTML has no
+ * countdown, exactly as before.
  */
 export function BrokerLiveStatus({ status, nextEventAt }: { status: BrokerLiveOfferStatus; nextEventAt: string | null }) {
   const ui = STATUS_UI[status];
+  const remainingMs = useCountdown(nextEventAt);
   const target = nextEventAt ? new Date(nextEventAt).getTime() : null;
-  // Starts unset (SSR-safe — the server's Date.now() would not match the
-  // client's) and is filled in by the interval's own first tick, one second
-  // after mount, rather than a synchronous setState in the effect body.
-  const [remainingMs, setRemainingMs] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!target) return;
-    const id = setInterval(() => setRemainingMs(target - Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [target]);
 
   const countingDown = target !== null && remainingMs !== null && remainingMs > 0;
   const seconds = countingDown ? Math.round((remainingMs ?? 0) / 1000) : null;
