@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, getInvitationDeliveryFailureUpdate, parseMetaOutboundStaleAfterHours, resolveTemplateTextBody, selectInternalBrokerDeliveryRoute, whatsappOutboundStatusValues } from "./outbound-service";
+import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, getInvitationDeliveryFailureUpdate, parseMetaOutboundStaleAfterHours, resolveNoticeTextVariants, resolveTemplateTextBody, selectInternalBrokerDeliveryRoute, whatsappOutboundStatusValues } from "./outbound-service";
 
 vi.mock("server-only", () => ({}));
 
@@ -93,6 +93,17 @@ describe("outboundService", () => {
   it("formats the activation notice with the configured CRM login URL", () => {
     expect(resolveTemplateTextBody("brokerAccountActivated", ["Ana", "Âncora", "https://crm.ancorasaude.cloud/login"]))
       .toContain("https://crm.ancorasaude.cloud/login");
+  });
+
+  it.each([
+    ["leadAssignmentUnavailable", "o lead *Fulano de Tal* já foi atribuído"],
+    ["leadAssignmentExpired", "o prazo para aceitar o lead *Fulano de Tal*"],
+  ] as const)("includes the lead name in Meta text fallback and corporate-number variants for %s", (purpose, expected) => {
+    const variables = ["Ana", "Fulano de Tal", "+55 21 99999-0000"];
+    expect(resolveTemplateTextBody(purpose, variables)).toContain(expected);
+    expect(resolveNoticeTextVariants(purpose, variables, new Date("2026-10-27T12:00:00.000Z")))
+      .toEqual(expect.arrayContaining([expect.stringContaining("Fulano de Tal")]));
+    expect(resolveNoticeTextVariants(purpose, variables).join(" ")).not.toContain("+55 21 99999-0000");
   });
 
 });

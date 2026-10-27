@@ -37,6 +37,24 @@ const text = (value: string | undefined, fallback: string) => value?.trim() || f
  * (e.g. `lead_assignment_confirmed` → `lead_informations`) without code.
  */
 export function buildNamedTemplateValues(purpose: string, rawVariables: string[]): Record<string, string> {
+  if (purpose === "leadAssignmentUnavailable" || purpose === "leadAssignmentExpired") {
+    const broker = text(rawVariables[0], "Corretor(a)");
+    const lead = text(rawVariables[1], "seu lead");
+    return {
+      // Preserve the approved one-parameter template's {{nome}} contract.
+      nome: broker,
+      corretor: broker,
+      corretor_nome: broker,
+      nome_corretor: broker,
+      broker_name: broker,
+      lead_nome: lead,
+      nome_lead: lead,
+      nome_cliente: lead,
+      cliente_nome: lead,
+      customer_name: lead,
+    };
+  }
+
   if (purpose === "leadAssignmentConfirmed") {
     const [corretor, cliente, telefone, interesse, tipo, dependentes, cidade] = rawVariables;
     const values = {

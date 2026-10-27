@@ -38,6 +38,19 @@ const leadName = {
   fallback: "Cliente",
 } as const;
 
+// The existing approved LEAD_ASSIGNMENT_* templates use {{nome}} for the
+// broker. Keep that contract while making the lead available to free text.
+const assignmentNoticeBrokerName = {
+  ...brokerName,
+  aliases: [...brokerName.aliases, "nome"] as const,
+} as const;
+const assignmentNoticeLeadName = {
+  key: "lead_nome",
+  label: "Nome do lead",
+  aliases: ["nome_lead", "nome_cliente", "cliente_nome", "customer_name"],
+  fallback: "seu lead",
+} as const;
+
 const leadId = {
   key: "lead_id",
   label: "Identificador do lead",
@@ -120,7 +133,7 @@ export const MESSAGE_EVENT_CATALOG = [
     description: "Avisa que o lead já foi assumido ou não está mais disponível.",
     audience: "user",
     windowRule: "corporate_internal",
-    variables: [brokerName],
+    variables: [assignmentNoticeBrokerName, assignmentNoticeLeadName],
   },
   {
     key: "LEAD_ASSIGNMENT_EXPIRED",
@@ -129,7 +142,7 @@ export const MESSAGE_EVENT_CATALOG = [
     description: "Avisa o corretor quando o prazo de aceite termina.",
     audience: "user",
     windowRule: "corporate_internal",
-    variables: [brokerName],
+    variables: [assignmentNoticeBrokerName, assignmentNoticeLeadName],
   },
   {
     key: "LEAD_FEEDBACK_REMINDER",

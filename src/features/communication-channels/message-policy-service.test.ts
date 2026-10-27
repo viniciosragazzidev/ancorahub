@@ -94,6 +94,34 @@ describe("qualification template cost policy", () => {
     expect(plan?.fallback).toBeNull();
   });
 
+  it("uses only the synchronized one-parameter contract for a lost lead offer", async () => {
+    const lostOfferTemplate = {
+      id: "lost-offer-template",
+      name: "lead_assignment_expired",
+      language: "pt_BR",
+      status: "APPROVED",
+      category: "UTILITY",
+      bodyText: "Olá {{nome}}, o prazo do lead terminou.",
+      variables: ["nome"],
+    };
+    database.results.push([], channel, [], [lostOfferTemplate]);
+
+    const plan = await resolveEventMessagePlan({
+      tenantId: "tenant-test",
+      recipientType: "user",
+      recipientId: "broker-test",
+      destinationPhone: "5521999999999",
+      purpose: "leadAssignmentExpired",
+      variables: ["Ana", "Fulano de Tal"],
+    });
+
+    expect(plan?.primary).toMatchObject({
+      templateName: "lead_assignment_expired",
+      providerVariables: ["Ana"],
+      renderedBody: "Olá Ana, o prazo do lead terminou.",
+    });
+  });
+
   it("preserves the eligible free message inside the service window", async () => {
     database.results.push([{ sentAt: new Date() }], [{ ...policy, freeMessageTemplateId: "free-test" }], [{ id: "free-test", name: "free", content: "Olá, {{lead_nome}}.", variables: ["lead_nome"] }]);
     const plan = await resolveEventMessagePlan({ ...input, recipientType: "lead", recipientId: "lead-test", destinationPhone: "5521900000001" });

@@ -134,6 +134,20 @@ describe("Meta template parameters", () => {
     expect(buildMetaProviderVariables(event, ["Ana"], ["corretor"], {})).toEqual(["Ana"]);
     expect(buildMetaProviderVariables(event, ["Ana"], ["x"], { x: "corretor_nome" })).toEqual(["Ana"]);
   });
+
+  it("adds the lead to free-text variables without adding parameters to the approved one-parameter template", () => {
+    const event = getMessageEventByPurpose("leadAssignmentExpired")!;
+    const values = ["Ana Corretora", "Fulano de Tal", "+55 21 99999-0000"];
+
+    expect(event.variables.map((variable) => variable.key)).toEqual(["corretor_nome", "lead_nome"]);
+    expect(buildAutomaticMetaVariableMappings(event, ["nome"])).toEqual({
+      valid: true,
+      mappings: { nome: "corretor_nome" },
+    });
+    expect(buildMetaProviderVariables(event, values, ["nome"], {})).toEqual(["Ana Corretora"]);
+    expect(renderEventFreeMessage(event, "O lead {{lead_nome}} não está mais disponível.", values))
+      .toBe("O lead Fulano de Tal não está mais disponível.");
+  });
 });
 
 describe("account activated notice", () => {

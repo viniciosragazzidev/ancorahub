@@ -57,6 +57,27 @@ describe("resolveNamedTemplateBodyParameters", () => {
       .toEqual({ ok: true, variableNames: ["nome", "hora"], variables: ["Felipe", "09:00"] });
   });
 
+  it("keeps the existing one-parameter lost-offer template on the broker and supports an explicitly named lead parameter", () => {
+    const oneParameter = [{ type: "BODY", text: "Olá {{nome}}, o lead não está mais disponível." }];
+    const twoParameters = [{ type: "BODY", text: "Olá {{corretor_nome}}, o lead {{lead_nome}} foi repassado." }];
+    const variables = ["Ana", "Fulano de Tal"];
+
+    expect(resolveNamedTemplateBodyParameters({
+      purpose: "leadAssignmentUnavailable",
+      rawVariables: variables,
+      componentsJson: oneParameter,
+    })).toEqual({ ok: true, variableNames: ["nome"], variables: ["Ana"] });
+    expect(resolveNamedTemplateBodyParameters({
+      purpose: "leadAssignmentExpired",
+      rawVariables: variables,
+      componentsJson: twoParameters,
+    })).toEqual({
+      ok: true,
+      variableNames: ["corretor_nome", "lead_nome"],
+      variables: variables,
+    });
+  });
+
   it("reports parameters the CRM cannot fill instead of letting Meta reject the message", () => {
     const unknown = [{ type: "BODY", text: "Oi {{nome_corretor}}, cupom {{cupom}}" }];
     expect(resolveNamedTemplateBodyParameters({ purpose: "leadAssignmentConfirmed", rawVariables: accepted, componentsJson: unknown })).toEqual({ ok: false, missing: ["cupom"] });

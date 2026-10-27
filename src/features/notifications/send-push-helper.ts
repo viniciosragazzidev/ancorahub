@@ -416,7 +416,7 @@ export async function notifyLeadArrived(leadId: string, tenantId: string, branch
   );
 }
 
-async function sendBrokerReassignedOfficialMessage(tenantId: string, brokerId: string, leadId: string) {
+async function sendBrokerReassignedOfficialMessage(tenantId: string, brokerId: string, leadId: string, leadName: string) {
   try {
     const db = getDatabase();
     const [broker] = await db
@@ -443,7 +443,7 @@ async function sendBrokerReassignedOfficialMessage(tenantId: string, brokerId: s
       recipientId: brokerId,
       destinationPhone: brokerPhone,
       purpose: "leadAssignmentExpired",
-      variables: [broker?.name || "Corretor(a)"],
+      variables: [broker?.name || "Corretor(a)", leadName || "seu lead"],
       requestedBy: brokerId,
       // The reassignment event is retried asynchronously. Keep the key stable
       // so a retry cannot create another WhatsApp message for the same lead and
@@ -460,7 +460,7 @@ async function sendBrokerReassignedOfficialMessage(tenantId: string, brokerId: s
  * Notify the previous broker when a lead is reassigned.
  */
 export async function notifyLeadReassigned(leadId: string, tenantId: string, previousOwnerId: string, leadName: string) {
-  void sendBrokerReassignedOfficialMessage(tenantId, previousOwnerId, leadId).catch(console.error);
+  void sendBrokerReassignedOfficialMessage(tenantId, previousOwnerId, leadId, leadName).catch(console.error);
 
   if (!(await isNotificationCapabilityEnabled("lead_reassigned"))) return;
 

@@ -9,7 +9,7 @@
 export type NoticeFields =
   | { purpose: "brokerLeadNotification" | "newLeadAssignment"; broker: string; lead: string; product: string; link: string | null }
   | { purpose: "leadAssignmentConfirmed"; broker: string; lead: string; phone: string; interest: string; leadType: string; dependents: string; city: string; link: string | null }
-  | { purpose: "leadAssignmentUnavailable" | "leadAssignmentExpired"; broker: string }
+  | { purpose: "leadAssignmentUnavailable" | "leadAssignmentExpired"; broker: string; lead: string }
   | { purpose: "leadFeedbackReminder"; broker: string; lead: string }
   | { purpose: "taskReminder"; name: string; task: string; when: string }
   | { purpose: "brokerAccountActivated"; name: string; company: string; loginUrl: string }
@@ -76,21 +76,21 @@ export function builtInNoticeVariants(fields: NoticeFields, hour: number): strin
       ];
     }
     case "leadAssignmentUnavailable": {
-      const { broker } = fields;
+      const { broker, lead } = fields;
       return [
-        `ℹ️ *Aviso de Atribuição*\n\nOlá *${broker}*, este lead já foi atribuído a outro corretor ou expirou.`,
-        `Oi *${broker}*, esse lead já foi para outro corretor ou o prazo acabou.`,
-        `${hi}, *${broker}*. Esse lead não está mais disponível: outro corretor assumiu ou o tempo expirou.`,
-        `ℹ️ ${broker}, não deu tempo: o lead já foi atribuído a outra pessoa ou expirou.`,
+        `ℹ️ *Aviso de atribuição*\n\nOlá *${broker}*, o lead *${lead}* já foi atribuído a outro corretor ou expirou.`,
+        `Oi *${broker}*, o lead *${lead}* já foi para outro corretor ou o prazo acabou.`,
+        `${hi}, *${broker}*. O lead *${lead}* não está mais disponível: outra pessoa assumiu ou o tempo expirou.`,
+        `ℹ️ ${broker}, o lead *${lead}* já foi atribuído a outra pessoa ou expirou.`,
       ];
     }
     case "leadAssignmentExpired": {
-      const { broker } = fields;
+      const { broker, lead } = fields;
       return [
-        `⏳ *Tempo Expirado*\n\nOlá *${broker}*, o tempo para aceitar o lead expirou e a oportunidade foi repassada.`,
-        `Oi *${broker}*, o prazo para aceitar o lead acabou e ele foi repassado.`,
-        `${hi}, *${broker}*. A oferta de lead expirou e seguiu para o próximo corretor.`,
-        `⏳ ${broker}, o tempo de aceite terminou; o lead foi para outra pessoa.`,
+        `⏳ *Prazo expirado*\n\nOlá *${broker}*, o prazo para aceitar o lead *${lead}* terminou e a oportunidade foi repassada.`,
+        `Oi *${broker}*, o prazo do lead *${lead}* acabou e ele foi repassado.`,
+        `${hi}, *${broker}*. A oferta do lead *${lead}* expirou e seguiu para o próximo corretor.`,
+        `⏳ ${broker}, o prazo de aceite do lead *${lead}* terminou; ele foi para outra pessoa.`,
       ];
     }
     case "leadFeedbackReminder": {

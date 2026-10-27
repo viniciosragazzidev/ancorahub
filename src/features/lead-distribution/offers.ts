@@ -1024,7 +1024,7 @@ export async function handleLeadOfferWebhookResponse(input: {
           recipientId: losingBroker.id,
           destinationPhone: losingBroker.phone,
           purpose: "leadAssignmentUnavailable",
-          variables: [losingBroker.name || "Corretor(a)"],
+          variables: [losingBroker.name || "Corretor(a)", result.lead.nome || "seu lead"],
           requestedBy: broker.id,
           idempotencyKey: `lead-unavailable:${result.lead.id}:${losingBroker.id}`,
         });
@@ -1046,7 +1046,7 @@ export async function handleLeadOfferWebhookResponse(input: {
       recipientId: broker.id,
       destinationPhone: destPhone,
       purpose: result.reason === "expired" ? "leadAssignmentExpired" : "leadAssignmentUnavailable",
-      variables: [brokerName],
+      variables: [brokerName, result.lead?.nome || "seu lead"],
       requestedBy: broker.id,
       idempotencyKey: `lead-dispute-lost:${offer.id}:${Date.now()}`,
     });
@@ -1067,6 +1067,7 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
       leadId: schema.leadOffers.leadId,
       brokerId: schema.leadOffers.brokerId,
       outboundMessageId: schema.leadOffers.outboundMessageId,
+      leadName: schema.leads.nome,
       assignmentSource: schema.leads.assignmentSource,
       offeredAt: schema.leadOffers.offeredAt,
       leadCorretorId: schema.leads.corretorId,
@@ -1197,7 +1198,7 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
           recipientId: broker.id,
           destinationPhone: broker.phone,
           purpose: "leadAssignmentExpired",
-          variables: [broker.name || "Corretor(a)"],
+          variables: [broker.name || "Corretor(a)", offer.leadName || "seu lead"],
           requestedBy: null,
           idempotencyKey: `offer-expired:${offer.id}`,
         });

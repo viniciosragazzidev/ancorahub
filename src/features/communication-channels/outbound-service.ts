@@ -713,7 +713,11 @@ function noticeTextFields(purpose: string, rawVariables: string[], urlButtonPara
     return { purpose, name: rawVariables[0] || "Usuário", task: rawVariables[1] || "Tarefa agendada", when: rawVariables[2] || "Hoje" };
   }
   if (purpose === "leadAssignmentUnavailable" || purpose === "leadAssignmentExpired") {
-    return { purpose, broker: rawVariables[0] || "Corretor(a)" };
+    return {
+      purpose,
+      broker: rawVariables[0]?.trim() || "Corretor(a)",
+      lead: rawVariables[1]?.trim() || "seu lead",
+    };
   }
   if (purpose === "dutyPresenceConfirmation") {
     const confirmationId = urlButtonParameter || rawVariables[2]?.trim() || "";

@@ -553,3 +553,7 @@ O cartão da fila de frios foi trocado pela contagem de leads únicos que recebe
 ## 2026-10-27 - Faixa de status vivos somente na Distribuição
 
 A faixa "Agora na operação" saiu do `/dashboard` em todas as versões e papéis; fica somente em `/leads/distribuicao`. O HTML do painel volta ao estado anterior à faixa, com a chave ligada ou desligada. API, provedores, escopos e controle da chave permanecem. Registro: DEC-156 e `docs/implementations/active/2026-10-27-status-vivos.md`.
+
+## 2026-10-27 - Nome do lead nos avisos de oferta
+
+Os avisos de lead indisponível, oferta expirada e reatribuição incluem o nome do lead na mensagem livre enviada ao corretor. O template Meta preserva a quantidade de parâmetros da versão sincronizada e o `{{nome}}` aprovado continua recebendo o nome do corretor. Registro: `docs/implementations/completed/2026-10-27-nome-do-lead-em-avisos-de-oferta.md`.
