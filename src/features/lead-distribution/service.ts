@@ -1478,6 +1478,13 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     pacing,
     dutyScheduleIds: exclusiveScheduleIds ?? undefined,
     dutyScheduleIdByBroker: exclusiveScheduleIds?.length ? Object.fromEntries([...scheduleIdByBroker].filter(([brokerId]) => ids.includes(brokerId))) : undefined,
+    // DEC-154: the pick is redone under a per-tenant lock with fresh counts, so leads
+    // released together (e.g. the overnight backlog) do not all go to the same broker.
+    // round_robin is an explicit "oldest account first" strategy and keeps its order.
+    fairPick: queue?.strategy === "round_robin" ? undefined : {
+      since: dutySince,
+      tierByBroker: Object.fromEntries(decision.eligible.map((candidate) => [candidate.id, candidate.onDuty ? 0 : 1])),
+    },
   });
   if (!offer.createdOffers.length) {
     if (offer.pacingBlocked && !offer.capacityReached) {
@@ -1527,7 +1534,8 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   return {
     status: "offered",
     leadId,
-    brokerId: chosen.id,
+    // The broker actually offered: the locked pick may differ from the pre-read choice.
+    brokerId: offer.createdOffers[0]?.brokerId ?? chosen.id,
     expiresAt: offer.expiresAt,
     outboundMessageId: offer.createdOffers[0]?.whatsappMessageId,
     reason: fallbackUnitUsed

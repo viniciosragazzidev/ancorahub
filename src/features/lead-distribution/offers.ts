@@ -21,6 +21,7 @@ import { buildLeadClientInfo, buildLeadOfferSummary } from "@/features/leads/cli
 import { getRelevantDutyWindow, isDutyWindowActive } from "./duty-presence-domain";
 import { postSaleTransferAuditAction } from "./post-sale-transfer";
 import { traceLeadStep } from "./distribution-trace";
+import { loadReceivedInDayByBroker, pickNextByReceivedInDay } from "./received-in-day";
 
 /**
  * Tenants without an official (Meta) WhatsApp channel cannot deliver offers by
@@ -119,6 +120,13 @@ export async function createLeadOffersForBrokers(input: {
   postSaleExemptionQueueName?: string;
   dutyScheduleIds?: string[];
   dutyScheduleIdByBroker?: Record<string, string>;
+  /**
+   * Automatic distribution only (DEC-154): each claim takes the per-tenant
+   * `distribution-pick` lock, re-reads what every remaining broker received in
+   * the operation day and claims for the one with fewest (tier first: 0 = on the
+   * active plantão). brokerIds keeps breaking ties. Without it, brokerIds order is final.
+   */
+  fairPick?: { since: Date; tierByBroker?: Record<string, number> };
 }) {
   const db = getDatabase();
   // Same bounds as the "SLA de Aceite" setting (1–1440 min).
@@ -187,11 +195,24 @@ export async function createLeadOffersForBrokers(input: {
   let permanentDeliveryFailure = false;
   const whatsappEnabled = await tenantHasActiveMetaChannel(input.tenantId);
 
-  for (const broker of brokers) {
-    const destinationPhone = broker.phone;
+  const pending = [...brokers];
+  while (pending.length) {
+    let broker = pending[0];
+    let destinationPhone = broker.phone;
     const offerId = randomUUID();
-    traceLeadStep(input.leadId, `offer_claim:${broker.id}`);
     const claimStatus = await db.transaction(async (tx) => {
+      if (input.fairPick) {
+        // DEC-154: read the counts, choose and record the offer under one
+        // per-tenant lock, so the next pick sees this one. Held only for this
+        // DB-only transaction; WhatsApp is sent after the commit.
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.tenantId}), hashtext('distribution-pick'))`);
+        const pendingIds = pending.map((candidate) => candidate.id);
+        const received = await loadReceivedInDayByBroker(tx, input.tenantId, pendingIds, input.fairPick.since);
+        const nextId = pickNextByReceivedInDay(pendingIds, received, input.fairPick.tierByBroker);
+        broker = pending.find((candidate) => candidate.id === nextId) ?? broker;
+        destinationPhone = broker.phone;
+      }
+      traceLeadStep(input.leadId, `offer_claim:${broker.id}`);
       // Serialize offer creation per lead. This is the final guard against two
       // workers creating simultaneous active offers for different brokers.
       const [lockedLead] = await tx
@@ -387,6 +408,7 @@ export async function createLeadOffersForBrokers(input: {
 
       return commitOffer();
     });
+    pending.splice(pending.indexOf(broker), 1);
 
     if (!claimStatus) continue;
     claimedBrokerIds.push(broker.id);
@@ -407,6 +429,7 @@ export async function createLeadOffersForBrokers(input: {
     if (!whatsappEnabled) {
       // In-app offer: no outbox row; the provisional ownership set above is what keeps the lead exclusive.
       createdOffers.push({ offerId, brokerId: broker.id });
+      if (input.fairPick) break;
       continue;
     }
 
@@ -541,6 +564,9 @@ export async function createLeadOffersForBrokers(input: {
     }
 
     createdOffers.push({ offerId, brokerId: broker.id, whatsappMessageId: outbound.id });
+    // The lead now has its active offer: further claims would only be blocked by
+    // it, and each one would take the pick lock again.
+    if (input.fairPick) break;
   }
 
   // Delivery stays in the durable outbound queue. The scheduler owns retry and
