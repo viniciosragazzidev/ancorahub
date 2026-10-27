@@ -80,7 +80,8 @@ export function UserAvatar({
     return (
       <ArcAvatar
         name={name || seed || "Cliente"}
-        src={photoUrl ?? undefined}
+        // A real <img loading="lazy">: the browser already waits for it to near the screen.
+        src={requestedPhoto ?? undefined}
         size={arcSize}
         className={className}
       />
