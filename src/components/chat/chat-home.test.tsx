@@ -73,6 +73,21 @@ describe("ChatHome", () => {
     expect(screen.getByText("De plantão: PME")).toBeTruthy();
   });
 
+  it("page: não inclui a faixa de status vivos, que fica na Distribuição", () => {
+    navigation.pathname = "/dashboard";
+    const { container } = render(
+      <ChatHome
+        viewerName="Ana Lima"
+        assistants={assistants}
+        leads={leads}
+        nowIso="2026-10-10T12:00:00.000Z"
+        canQuote
+        summary={{ receivedToday: 4, acceptedToday: 3, inServiceNow: 2, slaAtRiskNow: 1, duty: null, goal: null }}
+      />,
+    );
+    expect(container.querySelector("[data-live-status-strip]")).toBeNull();
+  });
+
   it("shows the scoped WhatsApp activity on Lite team home and links to filtered conversations", () => {
     navigation.pathname = "/dashboard";
     render(

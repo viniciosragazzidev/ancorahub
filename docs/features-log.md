@@ -543,3 +543,7 @@ Falhas do WhatsApp usam `failed_at` do dia com guarda de criação de 36 h; falh
 ## 2026-10-27 - Recuperações de leads frios na faixa de status vivos
 
 O cartão da fila de frios foi trocado pela contagem de leads únicos que receberam tentativa manual, automática ou T2 da régua turbo no dia operacional e responderam, com requalificação para morno/quente. A consulta respeita tenant e unidade/equipe, exclui stories e mensagens vazias e informa tentados e horário da última recuperação. Não há link porque nenhuma lista existente representa esse recorte com exatidão. Sem migration.
+
+## 2026-10-27 - Faixa de status vivos somente na Distribuição
+
+A faixa "Agora na operação" saiu do `/dashboard` em todas as versões e papéis; fica somente em `/leads/distribuicao`. O HTML do painel volta ao estado anterior à faixa, com a chave ligada ou desligada. API, provedores, escopos e controle da chave permanecem. Registro: DEC-156 e `docs/implementations/active/2026-10-27-status-vivos.md`.

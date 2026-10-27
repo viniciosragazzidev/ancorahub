@@ -24,8 +24,6 @@ import { EquipeShellScreen } from "./onda4-screens";
 import { VendasShellScreen } from "./onda3-screens";
 import { SettingsShellScreen } from "./onda6-settings-screens";
 import AccessDeniedPage from "@/app/(auth)/access-denied/page";
-import { LiteLiveStatusStrip } from "@/components/lite/status/live-status";
-import { LIVE_STATUS_CASES, liveStatusCase, type LiveStatusCase } from "./status-vivos-fixtures";
 
 const permissions = [
   "acessar_dashboard",
@@ -213,9 +211,6 @@ export default async function DirectorShellRealPage({
   const dashboardCase = DASHBOARD_CASES.find((item) => item === params.caso) as DashboardCase | undefined;
   const firstName = name.split(" ")[0] ?? name;
   const caseNow = dashboardCase ? CASE_NOW[dashboardCase] : demoNow;
-  // ?tela=status-vivos&estado=normal|atencao|critico|vazio|zero: a faixa "Agora na operação" no topo do painel.
-  const liveCase = screen === "status-vivos" ? ((LIVE_STATUS_CASES as string[]).includes(String(params.estado)) ? (params.estado as LiveStatusCase) : "normal") : null;
-  const livePayload = liveCase ? liveStatusCase(liveCase) : null;
   const dashboard = tab === "qualidade" ? (
     <DirectorLiteChrome now={caseNow} tab="quality" period="today" branchId={null} branches={demoBranches} firstName={firstName}>
       <QualityToolbar legacyHref="/dashboard?tab=quality&period=today&legado=1" detailedHref="/dashboard?tab=quality&period=today&vista=detalhada&legado=1" />
@@ -232,7 +227,6 @@ export default async function DirectorShellRealPage({
       now={caseNow}
       availableTabs={papel?.tabs}
       canOpenConversations={papel?.canOpenConversations}
-      live={livePayload ? <LiteLiveStatusStrip statuses={livePayload.statuses} seals={livePayload.seals} /> : undefined}
     />
   );
   const previewUser: UserDisplayInfo = {

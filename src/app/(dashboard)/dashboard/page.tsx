@@ -28,8 +28,6 @@ import { renderDirectorLiteQuality } from "@/features/dashboard/director-lite-qu
 import { getDirectorLiteViewerFirstName } from "@/features/dashboard/director-lite-viewer";
 import { liteDashboardTabs } from "@/features/dashboard/director-lite-tabs";
 import { hasPermission } from "@/shared/auth/permissions";
-import { LiveStatusBoundary } from "@/features/live-status/components/live-status-slot";
-import { shouldShowLiveStatusStrip } from "@/features/live-status/flag";
 
 type DashboardSearchParams = Record<string, string | string[] | undefined>;
 
@@ -131,17 +129,15 @@ export default async function DashboardPage({
       // Só as unidades autorizadas aparecem; sem permissão de comparar, o filtro some. Unidade fora do escopo cai em "Todas".
       const { canCompare, units } = await getDashboardUnitFilter(context);
       const branchId = canCompare ? resolveRequestedUnit(parseBranchIdParam(singleParam(resolvedSearchParams.unidade)), units) : null;
-      const [data, liteReporting, liveEnabled] = await Promise.all([
+      const [data, liteReporting] = await Promise.all([
         getEssentialDashboard(context, { period, branchId }),
         canReadQuality ? getFeatureFlag(FEATURE_FLAGS.REPORTING_CENTER) : Promise.resolve("false"),
-        shouldShowLiveStatusStrip(context),
       ]);
       // Abas como no legado: Qualidade e Funil só com a central de qualidade E a central de relatórios ligada.
       const showQualityTabs = canReadQuality && liteReporting !== "false";
       // Só as abas e os links que a tela de hoje já libera para o papel (o visual Lite vale para todo o modo normal).
       const canOpenConversations = hasPermission(context.role, "acessar_conversas") && context.jobTitle !== "marketing";
-      const live = liveEnabled ? <LiveStatusBoundary context={context} enabled /> : undefined;
-      return <DirectorLiteDashboard data={data} period={period} branchId={branchId} branches={canCompare ? units : []} now={new Date()} availableTabs={liteDashboardTabs(context, showQualityTabs)} canOpenConversations={canOpenConversations} live={live} />;
+      return <DirectorLiteDashboard data={data} period={period} branchId={branchId} branches={canCompare ? units : []} now={new Date()} availableTabs={liteDashboardTabs(context, showQualityTabs)} canOpenConversations={canOpenConversations} />;
     }
 
     const [data, reportingEnabled] = await Promise.all([

@@ -58,6 +58,11 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     expect(screen.getByText("O per\u00edodo altera apenas os leads por fila.")).toBeInTheDocument();
   });
 
+  it("não inclui a faixa de status vivos no painel do diretor", () => {
+    const { container } = render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    expect(container.querySelector("[data-live-status-strip]")).toBeNull();
+  });
+
   it("mostra os blocos no estilo do Desempenho Lite, nesta ordem", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
     const blocks = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);

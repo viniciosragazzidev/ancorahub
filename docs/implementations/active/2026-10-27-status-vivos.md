@@ -168,7 +168,7 @@ Fora do escopo (só Super-admin): expurgo agendado (`platform_purge_jobs`), efei
 
 **Onda 0, fundação (M):** `LiteLiveStatus` + `LiteLiveStatusStrip` + `use-countdown` + catálogo; `features/live-status` (contrato, registro, serviço, rota `GET /api/live-status`, cache com tags); `job-schedule.ts` com `nextRunAt`; heartbeat dos jobs (seção 3.4). Testes: funções puras com `now` fixo, hidratação (padrão `number.hydration.test.tsx`), escopo por papel, movimento reduzido.
 
-**Onda 1, o "agora" da operação (M), faixa no topo do `/dashboard` e do `/leads/distribuicao`:**
+**Onda 1, o "agora" da operação (M), faixa no topo de `/leads/distribuicao`:**
 1. Leads frios + próxima requalificação automática (item 1).
 2. Liberação da fila de frios às 9 h (item 2).
 3. Em qualificação pela IA + próximo tempo limite (item 3).
@@ -201,7 +201,7 @@ Critério de pronto de cada onda: anexo de movimento cumprido (vídeo normal e c
 4. Qual o limite de silêncio da Meta para virar alerta (ex.: 2 h sem lead em horário comercial)?
 5. Ao chegar a zero, a contagem deve dar um pulso único chamando atenção, ou só trocar o texto em silêncio?
 
-**Respostas (27/10):** 1) sim, 1 gravação por rodada em `system_settings`, sem migration; 2) faixa no `/dashboard` de todos os papéis (e no `/leads/distribuicao`), cada papel vendo só o que já vê hoje; 3) selo do motor e fila do WhatsApp para diretor e gestor; 4) Meta sem lead: 2 h em horário comercial (entra na onda 3, item 20); 5) pulso único e troca do texto, respeitando o movimento reduzido.
+**Respostas (27/10):** 1) sim, 1 gravação por rodada em `system_settings`, sem migration; 2) decisão atualizada por Vinicios: faixa somente em `/leads/distribuicao`; removida de todas as versões de `/dashboard`, com ou sem a chave ligada; 3) selo do motor e fila do WhatsApp para diretor e gestor; 4) Meta sem lead: 2 h em horário comercial (entra na onda 3, item 20); 5) pulso único e troca do texto, respeitando o movimento reduzido. A faixa mantém API, provedores, escopo e regra da chave na Distribuição. Ver DEC-156.
 
 ## 8. Entrega das ondas 0 e 1 (27/10)
 
@@ -211,7 +211,7 @@ Critério de pronto de cada onda: anexo de movimento cumprido (vídeo normal e c
 - Atualização: `components/live-status-host.tsx` busca `GET /api/live-status` a cada 60 s com a aba visível, 20 s depois de uma contagem chegar a zero e 3 s depois de um `domain.invalidated` do tempo real (menos conversas e conexão do WhatsApp). Sem `router.refresh`.
 - Heartbeat: `heartbeat.ts` (`withJobHeartbeat` em todas as rotas do runbook) e `job-schedule.ts` (espelho do runbook, testado contra ele).
 - Chave: `feature_live_status_strip_<tenantId>` (catálogo `LIVE_STATUS_STRIP`, padrão desligado), liga e desliga auditado em Super-admin › Empresa › Pilotos.
-- Telas: `/dashboard` (Lite do diretor e de quem usa o visual Lite, painel do dia, início Lite do corretor, supervisor e gestor) e `/leads/distribuicao` (Lite e legado). Chave desligada: nenhum elemento novo (snapshots legados e HTML do painel conferidos).
+- Telas: `/leads/distribuicao` (Lite e legado). Após a decisão de 27/10, `/dashboard` e todas as homes por papel mantêm o HTML anterior à faixa, independentemente da chave; API e provedores permanecem disponíveis para a Distribuição.
 
 **Quem vê:** diretor e gestor (com unidade) os 8 status e o selo; supervisor (equipe) e corretor (o dele) ofertas, primeiro contato e plantão. Marketing e gestor sem unidade não veem a faixa. Aguardando corretor ficou só com diretor e gestor: o supervisor não vê leads sem corretor hoje.
 
@@ -247,3 +247,11 @@ Critério de pronto de cada onda: anexo de movimento cumprido (vídeo normal e c
 - Não existe uma lista que filtre exatamente leads warm/hot recuperados por requalificação neste dia operacional; o cartão não oferece link aproximado.
 - Fixture da rota `/dev/diretor-shell-real` atualizada. Cobertura unitária inclui agregação da consulta, resposta real, escopo de unidade, dia operacional, estado vazio e exibição do último evento.
 - Validação da alteração: 62 testes focados em `src/features/live-status` e `npx tsc --noEmit` passaram. Não foram executados testes de banco, migration nem build.
+
+## Retirada da faixa do dashboard (27/10, DEC-156)
+
+- `LiveStatusBoundary` permanece somente em `src/app/(dashboard)/leads/distribuicao/page.tsx`; dashboard Lite do diretor, início de corretor, gestor e supervisor não consultam a flag nem montam o slot.
+- Removida a fixture `status-vivos` de `/dev/diretor-shell-real`, pois representava o painel com uma faixa que agora é exclusiva da Distribuição. API e provedores permanecem.
+- Prova de paridade: as seis fontes alteradas do dashboard/home são idênticas às versões de `5f57f73d^`, o commit imediatamente anterior à inclusão da faixa; assim a chave ligada ou desligada não muda o HTML do painel.
+- Testes de ausência do slot adicionados para `ChatHome` e `DirectorLiteDashboard`.
+- Validação: Vitest focado, 93 testes em 11 arquivos; `npx tsc --noEmit`; ESLint dos arquivos alterados; todos passaram. Sem teste de banco, migration, leitura de `.env.local` ou build.

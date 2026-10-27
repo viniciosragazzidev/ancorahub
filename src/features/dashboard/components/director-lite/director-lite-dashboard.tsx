@@ -1,8 +1,6 @@
 "use client";
 
 /** Aba "Visão da operação" no visual Lite: painel essencial no estilo do Desempenho Lite (2026-10-26). */
-import type { ReactNode } from "react";
-
 import type { EssentialDashboard } from "@/features/dashboard/essential/essential-data";
 import type { OverviewPeriod } from "@/features/dashboard/overview-filter";
 
@@ -11,7 +9,7 @@ import { OperationView } from "./operation-view";
 
 export type { DashboardBranch };
 
-export function DirectorLiteDashboard({ data, period, branchId, branches, now, availableTabs, canOpenConversations = true, live }: {
+export function DirectorLiteDashboard({ data, period, branchId, branches, now, availableTabs, canOpenConversations = true }: {
   data: EssentialDashboard;
   period: OverviewPeriod;
   /** Unidade escolhida já validada contra as unidades do tenant; null = todas. */
@@ -22,12 +20,9 @@ export function DirectorLiteDashboard({ data, period, branchId, branches, now, a
   availableTabs?: readonly DirectorLiteTab[];
   /** Sem acesso às Conversas, os nomes dos corretores ficam sem link (a tela levaria a acesso negado). */
   canOpenConversations?: boolean;
-  /** Faixa "Agora na operação" (status vivos), já pronta no servidor. Sem ela, o painel fica como sempre. */
-  live?: ReactNode;
 }) {
   return (
     <DirectorLiteChrome now={now} tab="overview" period={period} branchId={branchId} branches={branches} firstName={data.firstName} availableTabs={availableTabs}>
-      {live}
       <OperationView data={data} canOpenConversations={canOpenConversations} />
     </DirectorLiteChrome>
   );
