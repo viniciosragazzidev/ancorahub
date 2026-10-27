@@ -67,6 +67,11 @@ export function selectUnambiguousActiveOffer<T extends { status: string }>(offer
   return active.length === 1 ? active[0] : null;
 }
 
+/** DEC-154: a lead with an active offer cannot take another one, whichever broker is picked. */
+export function leadHasBlockingOffer(offers: Array<{ status: string; offeredAt?: Date | null; expiresAt: Date; outboundMessageId?: string | null }>, now: Date) {
+  return offers.some((offer) => isBlockingActiveOffer(offer, now));
+}
+
 type DatabaseLike = ReturnType<typeof getDatabase>;
 
 /**
@@ -195,7 +200,16 @@ export async function createLeadOffersForBrokers(input: {
   let permanentDeliveryFailure = false;
   const whatsappEnabled = await tenantHasActiveMetaChannel(input.tenantId);
 
-  const pending = [...brokers];
+  // DEC-154: with the fair pick, a lead that already has an active offer is
+  // left alone here, instead of taking the pick lock once per broker.
+  const leadOffers = input.fairPick
+    ? await db
+      .select({ status: schema.leadOffers.status, offeredAt: schema.leadOffers.offeredAt, expiresAt: schema.leadOffers.expiresAt, outboundMessageId: schema.leadOffers.outboundMessageId })
+      .from(schema.leadOffers)
+      .where(and(eq(schema.leadOffers.tenantId, input.tenantId), eq(schema.leadOffers.leadId, input.leadId), gt(schema.leadOffers.expiresAt, now)))
+      .limit(50)
+    : [];
+  const pending: typeof brokers = input.fairPick && leadHasBlockingOffer(leadOffers, now) ? [] : [...brokers];
   while (pending.length) {
     let broker = pending[0];
     let destinationPhone = broker.phone;

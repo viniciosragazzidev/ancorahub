@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { orderByPreference, selectUnambiguousActiveOffer } from "./offers";
+import { leadHasBlockingOffer, orderByPreference, selectUnambiguousActiveOffer } from "./offers";
 
 describe("selectUnambiguousActiveOffer", () => {
   it("returns the only active offer", () => {
@@ -21,6 +21,31 @@ describe("selectUnambiguousActiveOffer", () => {
       { id: "offer-old", status: "EXPIRED" },
       offer,
     ])).toBe(offer);
+  });
+});
+
+describe("leadHasBlockingOffer (DEC-154: a lead with an active offer is not picked again)", () => {
+  const now = new Date("2026-10-27T13:00:00.000Z");
+  const later = new Date("2026-10-27T13:10:00.000Z");
+  const offer = (status: string, overrides: { expiresAt?: Date; outboundMessageId?: string | null } = {}) => ({
+    status,
+    offeredAt: new Date("2026-10-27T12:55:00.000Z"),
+    expiresAt: overrides.expiresAt ?? later,
+    outboundMessageId: overrides.outboundMessageId ?? "msg-1",
+  });
+
+  it("blocks while an offer with a linked message is still awaiting a response", () => {
+    expect(leadHasBlockingOffer([offer("PENDING")], now)).toBe(true);
+    expect(leadHasBlockingOffer([offer("READ")], now)).toBe(true);
+  });
+
+  it("does not block when the only offers are terminal or expired", () => {
+    expect(leadHasBlockingOffer([offer("EXPIRED"), offer("DECLINED"), offer("CANCELLED")], now)).toBe(false);
+    expect(leadHasBlockingOffer([offer("PENDING", { expiresAt: new Date("2026-10-27T12:59:00.000Z") })], now)).toBe(false);
+  });
+
+  it("does not block when there are no offers", () => {
+    expect(leadHasBlockingOffer([], now)).toBe(false);
   });
 });
 
