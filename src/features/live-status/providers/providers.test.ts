@@ -52,6 +52,12 @@ describe("leads frios", () => {
 });
 
 describe("fila de leads frios", () => {
+  it("mostra 500+ ao atingir o limite de leitura", () => {
+    const rows = Array.from({ length: 500 }, () => ({ coldSince: minutes(-30), attempts: 0 }));
+    const status = buildColdLeadsStatus({ rows, now: NOW, scope: director, automaticEnabled: true, turboCovers: false, truncated: true });
+    expect(status).toMatchObject({ value: 500, valueText: "500+" });
+  });
+
   it("próximas 9 h em São Paulo", () => {
     expect(nextColdReleaseAt(NOW).toISOString()).toBe("2026-10-28T12:00:00.000Z");
     expect(nextColdReleaseAt(new Date("2026-10-27T10:00:00.000Z")).toISOString()).toBe("2026-10-27T12:00:00.000Z");
@@ -88,18 +94,25 @@ describe("qualificação pela IA", () => {
 });
 
 describe("aguardando corretor", () => {
+  it("qualificação com limite atingido mostra 500+", () => {
+    const rows = Array.from({ length: 500 }, () => ({ lastActivityAt: minutes(-2) }));
+    const status = buildAiQualificationStatus({ rows, timeoutMinutes: 15, now: NOW, scope: { canOpenQualification: true }, truncated: true });
+    expect(status).toMatchObject({ value: 500, valueText: "500+" });
+  });
+
   it("tira os retidos por regra e mostra o motivo principal", () => {
     const status = buildWaitingBrokerStatus({
       groups: [
-        { reason: "Nenhum corretor de plantão nesta fila.", total: 4, nextRunAfter: minutes(1) },
-        { reason: null, total: 2, nextRunAfter: minutes(-1) },
-        { reason: "A fila está em modo manual", total: 20, nextRunAfter: minutes(10) },
+        { code: "PROCESSING_ERROR", holdReason: "stack trace confidencial", total: 4, nextRunAfter: minutes(1) },
+        { code: null, holdReason: null, total: 2, nextRunAfter: minutes(-1) },
+        { code: "HELD_BY_RULE", holdReason: "A fila está em modo manual", total: 20, nextRunAfter: minutes(10) },
       ],
       now: NOW,
     });
     expect(status.value).toBe(6);
     expect(status.severity).toBe("atencao");
-    expect(status.explanation).toBe("Motivo principal: nenhum corretor de plantão nesta fila.");
+    expect(status.explanation).toBe("Motivo principal: houve uma falha temporária no processamento.");
+    expect(status.explanation).not.toContain("stack trace confidencial");
     expect(status.breakdown).toEqual([{ label: "retidos por regra", value: 20 }]);
     expect(status.nextEvent?.at).toBe("2026-10-27T13:02:00.000Z");
   });

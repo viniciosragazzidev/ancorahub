@@ -61,8 +61,8 @@ export function liveStatusCase(kind: LiveStatusCase, now = new Date()): LiveStat
   const ai = buildAiQualificationStatus({ rows: Array.from({ length: 8 }, (_, index) => ({ lastActivityAt: at(-11 + index) })), timeoutMinutes: 15, now, scope: director });
   const waiting = buildWaitingBrokerStatus({
     groups: kind === "normal"
-      ? [{ reason: null, total: 2, nextRunAfter: at(1) }]
-      : [{ reason: "Nenhum corretor de plantão nesta fila.", total: 6, nextRunAfter: at(1.2) }, { reason: "A fila está em modo manual", total: 20, nextRunAfter: at(9) }],
+      ? [{ code: null, holdReason: null, total: 2, nextRunAfter: at(1) }]
+      : [{ code: "NO_AUTOMATION_ACTOR", holdReason: null, total: 6, nextRunAfter: at(1.2) }, { code: "HELD_BY_RULE", holdReason: "A fila está em modo manual", total: 20, nextRunAfter: at(9) }],
     now,
   });
   const offers = buildOffersStatus({

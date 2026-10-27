@@ -222,3 +222,11 @@ Critério de pronto de cada onda: anexo de movimento cumprido (vídeo normal e c
 - O visual Lite é só claro: no tema escuro a faixa segue os tokens do Lite, como o resto da moldura.
 
 **Falta (parcial):** `revalidateTag` nas ações que mudam estado (hoje o cache curto de 15 a 60 s cobre); página do status vivo no catálogo do kit Lite; vídeo do movimento normal e reduzido; `EXPLAIN` com dados de produção; ligar a chave no piloto e conferir a contagem contra as telas de ação; regra do tenant de reativação de frios (`getActiveTenantRule`) não é lida pelo status de frios.
+
+## Correções da revisão do Vigia (27/10)
+
+- `withJobHeartbeat` agora dispara a gravação sem esperar o banco; erro de heartbeat continua absorvido pela função.
+- A faixa só é montada em telas Lite e para papéis com escopo. Os provedores rodam em Server Component dentro de `Suspense`; o fallback reserva o mesmo conjunto de cartões, e a flag desligada não emite markup novo.
+- O outbox do WhatsApp limita pendências a 48 h e falhas à data de hoje usando `tenant_id` e `created_at`; jobs e efeitos do selo também têm tenant e janelas de 24 h, com guarda por `created_at`.
+- A primeira oferta vem de subconsulta ordenada por `expires_at` com `limit 1`. Limites de 500 mostram `500+`. A fila de distribuição usa frases por código, sem exibir `lastErrorMessage`.
+- Validação: 66 testes Vitest focados, `npx tsc --noEmit` e ESLint dos arquivos alterados passaram. Suite completa e build não foram rodados porque esta tarefa proíbe testes de banco e exige não ler `.env.local`.

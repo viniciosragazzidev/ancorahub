@@ -37,6 +37,7 @@ import type { LiveScope, LiveSeal, LiveStatus } from "./types";
  */
 
 const HOUR = 3_600_000;
+const LIVE_QUERY_LIMIT = 500;
 const LEGACY_REQUALIFICATION_PREFIX = "cold-lead-reactivation:";
 const WAITING_DISTRIBUTION = ["queued", "unassigned", "returned_to_queue"];
 const ACTIVE_OFFER = ["PENDING", "SENT", "DELIVERED", "READ"];
@@ -89,10 +90,15 @@ export async function loadColdLeads(scope: LiveScope, now: Date): Promise<LiveSt
         eq(schema.leads.qualificationStatus, "cold"),
         isNull(schema.leads.distributionRemovedAt),
         notInArray(schema.leads.status, ["lost", "converted", "under_analysis"]),
-        notInArray(schema.leads.distributionStatus, ["assigned", "held", "removed", "returned_to_queue"]),
+        isNotNull(schema.leads.queueId),
+        or(
+          isNull(schema.leads.distributionStatus),
+          notInArray(schema.leads.distributionStatus, ["assigned", "held", "removed", "returned_to_queue", "manual_hold"]),
+          and(eq(schema.leads.distributionStatus, "manual_hold"), eq(schema.leads.qualificationState, "PARTIAL"), isNull(schema.leads.qualificationCompletedAt)),
+        ),
         gte(schema.leads.createdAt, since),
       ))
-      .limit(500),
+      .limit(LIVE_QUERY_LIMIT),
     getFeatureFlag(FEATURE_FLAGS.COLD_LEAD_REACTIVATION).catch(() => "true"),
     import("@/features/qualification-turbo/cadence-job").then((module) => module.turboCadenceCoversRequalification(scope.tenantId)).catch(() => false),
   ]);
@@ -103,6 +109,7 @@ export async function loadColdLeads(scope: LiveScope, now: Date): Promise<LiveSt
     scope,
     automaticEnabled: automatic === "true",
     turboCovers,
+    truncated: eligible.length === LIVE_QUERY_LIMIT,
   });
 }
 
@@ -162,12 +169,13 @@ export async function loadAiQualification(scope: LiveScope, now: Date): Promise<
       notInArray(schema.leads.qualificationStatus, [...QUALIFICATION_TIMEOUT_SKIPPED_STATUSES]),
       gte(schema.leads.createdAt, new Date(now.getTime() - 48 * HOUR)),
     ))
-    .limit(500);
+    .limit(LIVE_QUERY_LIMIT);
   return buildAiQualificationStatus({
     rows: rows.map((row) => ({ lastActivityAt: new Date(row.lastActivityAt) })),
     timeoutMinutes: Number(rows[0]?.timeoutMinutes ?? 15),
     now,
     scope,
+    truncated: rows.length === LIVE_QUERY_LIMIT,
   });
 }
 
@@ -180,7 +188,8 @@ function branchLeadJoin(scope: LiveScope, leadId: SQL | typeof schema.leadDistri
 
 export async function loadWaitingBroker(scope: LiveScope, now: Date): Promise<LiveStatus> {
   const groups = await getDatabase().select({
-    reason: schema.leadDistributionJobs.lastErrorMessage,
+    code: schema.leadDistributionJobs.lastErrorCode,
+    holdReason: schema.leadDistributionJobs.lastErrorMessage,
     total: count(),
     nextRunAfter: sql<string | null>`min(${schema.leadDistributionJobs.runAfter})`,
   })
@@ -190,9 +199,9 @@ export async function loadWaitingBroker(scope: LiveScope, now: Date): Promise<Li
       eq(schema.leadDistributionJobs.tenantId, scope.tenantId),
       branchLeadJoin(scope, schema.leadDistributionJobs.leadId),
     ))
-    .groupBy(schema.leadDistributionJobs.lastErrorMessage);
+    .groupBy(schema.leadDistributionJobs.lastErrorCode, schema.leadDistributionJobs.lastErrorMessage);
   return buildWaitingBrokerStatus({
-    groups: groups.map((group) => ({ reason: group.reason, total: Number(group.total), nextRunAfter: toDate(group.nextRunAfter) })),
+    groups: groups.map((group) => ({ code: group.code, holdReason: group.holdReason, total: Number(group.total), nextRunAfter: toDate(group.nextRunAfter) })),
     now,
   });
 }
@@ -204,20 +213,34 @@ function offerScope(scope: LiveScope): SQL | undefined {
   return undefined;
 }
 
+function activeOfferFilters(scope: LiveScope, now: Date) {
+  return and(
+    eq(schema.leadOffers.tenantId, scope.tenantId),
+    gte(schema.leadOffers.offeredAt, new Date(now.getTime() - 24 * HOUR)),
+    inArray(schema.leadOffers.status, ACTIVE_OFFER),
+    gt(schema.leadOffers.expiresAt, now),
+    offerScope(scope),
+  );
+}
+
+export function buildFirstOfferAtSql(scope: LiveScope, now: Date) {
+  return sql<string | null>`(
+    select ${schema.leadOffers.offeredAt}
+    from ${schema.leadOffers}
+    where ${activeOfferFilters(scope, now)}
+    order by ${schema.leadOffers.expiresAt} asc
+    limit 1
+  )`;
+}
+
 export async function loadOffers(scope: LiveScope, now: Date): Promise<LiveStatus> {
   const [row] = await getDatabase().select({
     total: count(),
     firstExpiresAt: sql<string | null>`min(${schema.leadOffers.expiresAt})`,
-    firstOfferedAt: sql<string | null>`(array_agg(${schema.leadOffers.offeredAt} order by ${schema.leadOffers.expiresAt}))[1]`,
+    firstOfferedAt: buildFirstOfferAtSql(scope, now),
   })
     .from(schema.leadOffers)
-    .where(and(
-      eq(schema.leadOffers.tenantId, scope.tenantId),
-      gte(schema.leadOffers.offeredAt, new Date(now.getTime() - 24 * HOUR)),
-      inArray(schema.leadOffers.status, ACTIVE_OFFER),
-      gt(schema.leadOffers.expiresAt, now),
-      offerScope(scope),
-    ));
+    .where(activeOfferFilters(scope, now));
   return buildOffersStatus({
     aggregate: { total: Number(row?.total ?? 0), firstExpiresAt: toDate(row?.firstExpiresAt), firstOfferedAt: toDate(row?.firstOfferedAt) },
     now,
@@ -301,23 +324,8 @@ function startOfDaySaoPaulo(now: Date) {
 }
 
 export async function loadWhatsAppQueue(scope: LiveScope, now: Date): Promise<LiveStatus> {
-  const dayStart = startOfDaySaoPaulo(now);
-  const waiting = sql.raw(`w.status in (${WAITING_OUTBOX.map((status) => `'${status}'`).join(", ")})`);
-  const held = sql`(w.hold_reason is not null or coalesce(w.next_attempt_at, w.scheduled_at) > ${iso(now)} + interval '1 minute')`;
-  const failedToday = sql`(w.status = 'failed' and w.failed_at >= ${iso(dayStart)})`;
   const [result, heartbeats] = await Promise.all([
-    getDatabase().execute(sql`
-      select
-        (count(*) filter (where ${waiting}))::int as waiting,
-        (count(*) filter (where ${waiting} and ${held}))::int as held,
-        min(coalesce(w.next_attempt_at, w.scheduled_at)) filter (where ${waiting} and ${held}) as held_until,
-        min(coalesce(w.next_attempt_at, w.scheduled_at, w.created_at)) filter (where ${waiting} and not ${held}) as next_free_at,
-        (count(*) filter (where ${failedToday}))::int as failed_today,
-        mode() within group (order by w.provider_error_code) filter (where ${failedToday}) as top_error_code
-      from whatsapp_outbound_messages w
-      where w.tenant_id = ${scope.tenantId}
-        and (${waiting} or ${failedToday})${outboxScope(scope)}
-    `),
+    getDatabase().execute(buildWhatsAppQueueQuery(scope, now)),
     readJobHeartbeats().catch(() => new Map()),
   ]);
   const list = (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
@@ -337,18 +345,44 @@ export async function loadWhatsAppQueue(scope: LiveScope, now: Date): Promise<Li
   });
 }
 
-export async function loadDistributionEngineSeal(scope: LiveScope, now: Date): Promise<LiveSeal> {
+export function buildWhatsAppQueueQuery(scope: LiveScope, now: Date) {
+  const dayStart = startOfDaySaoPaulo(now);
+  const waitingSince = new Date(now.getTime() - 48 * HOUR);
+  const waiting = sql.raw(`w.status in (${WAITING_OUTBOX.map((status) => `'${status}'`).join(", ")})`);
+  // O índice (tenant_id, created_at) limita a leitura das pendências; falhas mantêm a janela de hoje por failed_at.
+  const waitingRecent = sql`(${waiting} and w.created_at >= ${iso(waitingSince)})`;
+  const held = sql`(w.hold_reason is not null or coalesce(w.next_attempt_at, w.scheduled_at) > ${iso(now)} + interval '1 minute')`;
+  const failedToday = sql`(w.status = 'failed' and w.created_at >= ${iso(dayStart)} and w.failed_at >= ${iso(dayStart)})`;
+  return sql`
+    select
+      (count(*) filter (where ${waitingRecent}))::int as waiting,
+      (count(*) filter (where ${waitingRecent} and ${held}))::int as held,
+      min(coalesce(w.next_attempt_at, w.scheduled_at)) filter (where ${waitingRecent} and ${held}) as held_until,
+      min(coalesce(w.next_attempt_at, w.scheduled_at, w.created_at)) filter (where ${waitingRecent} and not ${held}) as next_free_at,
+      (count(*) filter (where ${failedToday}))::int as failed_today,
+      mode() within group (order by w.provider_error_code) filter (where ${failedToday}) as top_error_code
+    from whatsapp_outbound_messages w
+    where w.tenant_id = ${scope.tenantId}
+      and (${waitingRecent} or ${failedToday})${outboxScope(scope)}
+  `;
+}
+
+export function buildDistributionFailureQuery(scope: LiveScope, now: Date) {
   const since = new Date(now.getTime() - 24 * HOUR);
   const branch = scope.role === "manager" && scope.branchId ? scope.branchId : null;
   const leadInBranch = (column: SQL) => (branch ? sql` and exists (select 1 from leads l where l.id = ${column} and l.tenant_id = ${scope.tenantId} and l.branch_id = ${branch})` : sql``);
+  return sql`
+    select
+      (select count(*)::int from lead_distribution_jobs j
+        where j.status = 'failed' and j.tenant_id = ${scope.tenantId} and j.created_at >= ${iso(since)} and j.updated_at >= ${iso(since)}${leadInBranch(sql`j.lead_id`)}) as failed_jobs,
+      (select count(*)::int from lead_effect_outbox o
+        where o.status = 'failed' and o.tenant_id = ${scope.tenantId} and o.created_at >= ${iso(since)} and o.failed_at >= ${iso(since)}${leadInBranch(sql`o.lead_id`)}) as failed_effects
+  `;
+}
+
+export async function loadDistributionEngineSeal(scope: LiveScope, now: Date): Promise<LiveSeal> {
   const [result, heartbeats] = await Promise.all([
-    getDatabase().execute(sql`
-      select
-        (select count(*)::int from lead_distribution_jobs j
-          where j.status = 'failed' and j.tenant_id = ${scope.tenantId} and j.updated_at >= ${iso(since)}${leadInBranch(sql`j.lead_id`)}) as failed_jobs,
-        (select count(*)::int from lead_effect_outbox o
-          where o.status = 'failed' and o.tenant_id = ${scope.tenantId} and o.failed_at >= ${iso(since)}${leadInBranch(sql`o.lead_id`)}) as failed_effects
-    `),
+    getDatabase().execute(buildDistributionFailureQuery(scope, now)),
     readJobHeartbeats().catch(() => new Map()),
   ]);
   const list = (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;

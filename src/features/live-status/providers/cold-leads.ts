@@ -22,6 +22,7 @@ export function buildColdLeadsStatus(input: {
   scope: Pick<LiveScope, "role">;
   automaticEnabled: boolean;
   turboCovers: boolean;
+  truncated?: boolean;
 }): LiveStatus {
   const { rows, now } = input;
   const interval = AUTOMATIC_COLD_LEAD_REQUALIFICATION.intervalMinutes * 60_000;
@@ -35,12 +36,15 @@ export function buildColdLeadsStatus(input: {
     id: "frios",
     label: "Leads frios",
     value: rows.length,
+    valueText: input.truncated ? "500+" : undefined,
     emptyText: "Nenhum lead frio agora",
     severity: rows.length ? "info" : "ok",
     explanation: rows.length
-      ? `${attempted === 1 ? "1 já recebeu" : `${attempted} já receberam`} a tentativa; ${eligible.length === 1 ? "1 espera" : `${eligible.length} esperam`} completar 3 h frio.`
+      ? input.truncated
+        ? "A faixa atingiu o limite de contagem; consulte a fila para ver a lista completa."
+        : `${attempted === 1 ? "1 já recebeu" : `${attempted} já receberam`} a tentativa; ${eligible.length === 1 ? "1 espera" : `${eligible.length} esperam`} completar 3 h frio.`
       : "Lead que esfria sem corretor aparece aqui e recebe uma tentativa automática depois de 3 h.",
-    breakdown: rows.length
+    breakdown: rows.length && !input.truncated
       ? [
           { label: "já tentados", value: attempted },
           { label: "esperando as 3 h", value: eligible.length },

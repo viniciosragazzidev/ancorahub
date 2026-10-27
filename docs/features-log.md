@@ -531,3 +531,7 @@ Operação, filas, calendário, ocorrência, saúde da distribuição e dashboar
 ## 2026-10-26 - ?rea Negocia??es no Lite
 
 `/negociacoes` acompanha os n?veis de atendimento, leitura da IA, pend?ncia de resposta, hist?rico e estat?sticas calculados na consulta. Diretor filtra unidade; gestor fica na unidade autenticada; supervisor v? sua equipe. O super admin controla a flag global, sem migra??o. A pr?via com AppShell e fixtures foi capturada em 1440 e 390 px. Registro: `docs/implementations/completed/2026-10-26-negociacoes-area.md`.
+
+## 2026-10-27 - Revisão da faixa de status vivos
+
+O heartbeat não segura mais a resposta dos robôs. A faixa operacional fica só no Lite, carrega em `Suspense` sem bloquear o conteúdo e não adiciona HTML quando desligada. As consultas agora têm janelas por `created_at`, a primeira oferta usa subconsulta limitada, contagens no teto mostram `500+` e mensagens internas de erro viram frases seguras. Registro: `docs/implementations/active/2026-10-27-status-vivos.md`.
