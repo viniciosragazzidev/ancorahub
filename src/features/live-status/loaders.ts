@@ -7,9 +7,9 @@ import {
   isEligibleColdLeadForManualRequalification,
   coldSinceAt,
 } from "@/features/ai-qualification/cold-lead-requalification-policy";
+import { businessTurnStart } from "@/features/dashboard/essential/business-window";
 import { QUALIFICATION_TIMEOUT_SKIPPED_STATUSES } from "@/features/ai-agent/qualification-timeout-sweep";
-import { readColdAgeRelease } from "@/features/lead-distribution/cold-age-release";
-import { todayKeyInSaoPaulo } from "@/features/lead-distribution/cold-age-release-rules";
+import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
 import { getSaoPauloDateKey } from "@/features/lead-distribution/dated-duty-roster";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { inSupervisorTeam } from "@/features/team/supervisor-scope";
@@ -19,7 +19,7 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { readJobHeartbeats } from "./heartbeat";
 import { buildAiQualificationStatus } from "./providers/ai-qualification";
 import { buildColdLeadsStatus } from "./providers/cold-leads";
-import { buildColdReleaseStatus } from "./providers/cold-release";
+import { buildColdRecoveriesStatus } from "./providers/cold-recoveries";
 import { buildDistributionEngineSeal } from "./providers/distribution-engine";
 import { buildDutyStatus } from "./providers/duty";
 import { buildFirstContactStatus } from "./providers/first-contact";
@@ -37,9 +37,9 @@ import type { LiveScope, LiveSeal, LiveStatus } from "./types";
  */
 
 const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
 const LIVE_QUERY_LIMIT = 500;
 const LEGACY_REQUALIFICATION_PREFIX = "cold-lead-reactivation:";
-const WAITING_DISTRIBUTION = ["queued", "unassigned", "returned_to_queue"];
 const ACTIVE_OFFER = ["PENDING", "SENT", "DELIVERED", "READ"];
 const WAITING_OUTBOX = ["pending", "queued", "processing"];
 
@@ -113,37 +113,85 @@ export async function loadColdLeads(scope: LiveScope, now: Date): Promise<LiveSt
   });
 }
 
-export async function loadColdRelease(scope: LiveScope, now: Date): Promise<LiveStatus | null> {
-  const db = getDatabase();
-  const queues = await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name })
-    .from(schema.leadQueues)
-    .where(and(eq(schema.leadQueues.tenantId, scope.tenantId), isNull(schema.leadQueues.deletedAt), eq(schema.leadQueues.status, "active")));
-  // A configuração de cada fila mora em system_settings, lida do cache de configurações (sem ida ao banco por fila).
-  const configs = await Promise.all(queues.map(async (queue) => ({ queue, config: await readColdAgeRelease(queue.id, queue.name) })));
-  const enabled = configs.filter((item) => item.config.enabled);
-  if (!enabled.length) return null;
-  const leads = await db.select({ queueId: schema.leads.queueId, createdAt: schema.leads.createdAt })
-    .from(schema.leads)
-    .where(and(
-      liveLeadScope(scope),
-      alive(),
-      isNull(schema.leads.corretorId),
-      isNull(schema.leads.distributionRemovedAt),
-      inArray(schema.leads.queueId, enabled.map((item) => item.queue.id)),
-      inArray(schema.leads.distributionStatus, WAITING_DISTRIBUTION),
-      gte(schema.leads.createdAt, new Date(now.getTime() - 5 * 24 * HOUR)),
-    ))
-    .limit(2000);
-  const today = todayKeyInSaoPaulo(now);
-  return buildColdReleaseStatus({
-    queues: enabled.map(({ queue, config }) => ({
-      queueId: queue.id,
-      name: queue.name,
-      releasedEarlyToday: config.releasedEarlyOn === today,
-      waitingCreatedAt: leads.filter((lead) => lead.queueId === queue.id).map((lead) => lead.createdAt),
-    })),
+export function buildColdRecoveriesQuery(scope: LiveScope, since: Date, now: Date) {
+  // A fila pode programar um reenvio antes do dia em que ele sai; a guarda ampla mantém o índice tenant_created_at.
+  const createdSince = new Date(since.getTime() - 7 * DAY);
+  const requalificationKey = sql`(
+    o.idempotency_key like ${`${COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX}%`}
+    or o.idempotency_key like 'cold-lead-reactivation:%'
+    or o.idempotency_key like 'qualification-turbo:%:t2:%'
+  )`;
+  const liveScope = liveLeadScope(scope);
+  const warmOrHotAudit = sql`(
+    audit_logs.acao like 'qualification.%:warm'
+    or audit_logs.acao like 'qualification.%:hot'
+  )`;
+  return sql`
+    with attempts as (
+      select o.recipient_id as lead_id, o.sent_at as attempted_at
+      from whatsapp_outbound_messages o
+      inner join leads on leads.id = o.recipient_id and leads.tenant_id = o.tenant_id
+      where o.tenant_id = ${scope.tenantId}
+        and o.recipient_type = 'lead'
+        and o.created_at >= ${iso(createdSince)}
+        and o.sent_at >= ${iso(since)}
+        and o.sent_at <= ${iso(now)}
+        and o.sent_at is not null
+        and ${requalificationKey}
+        and ${liveScope}
+    ), recoveries as (
+      select distinct on (attempts.lead_id)
+        attempts.lead_id,
+        audit_logs.created_at as recovered_at,
+        leads.qualification_status
+      from attempts
+      inner join leads on leads.id = attempts.lead_id and leads.tenant_id = ${scope.tenantId}
+      inner join audit_logs on audit_logs.entidade = 'lead_qualification'
+        and audit_logs.entidade_id = attempts.lead_id
+        and audit_logs.created_at >= attempts.attempted_at
+        and audit_logs.created_at >= ${iso(since)}
+        and audit_logs.created_at <= ${iso(now)}
+        and ${warmOrHotAudit}
+      where leads.qualification_status in ('warm', 'hot')
+        and leads.status not in ('lost', 'converted', 'under_analysis')
+        and leads.deleted_at is null
+        and leads.archived_at is null
+        and ${liveScope}
+        and exists (
+          select 1 from whatsapp_messages
+          where whatsapp_messages.tenant_id = ${scope.tenantId}
+            and whatsapp_messages.lead_id = attempts.lead_id
+            and whatsapp_messages.direction in ('incoming', 'inbound')
+            and whatsapp_messages.sent_at >= attempts.attempted_at
+            and whatsapp_messages.sent_at <= audit_logs.created_at
+            and not (${notStatusBroadcastSql(schema.whatsappMessages.messageId)})
+            and not (whatsapp_messages.media_kind is null and lower(trim(coalesce(whatsapp_messages.body, ''))) in ('', '[text]'))
+        )
+      order by attempts.lead_id, audit_logs.created_at asc
+    )
+    select
+      (select count(distinct lead_id)::int from attempts) as attempted,
+      (select count(*)::int from recoveries) as recovered,
+      (select count(*)::int from recoveries where qualification_status = 'warm') as warm,
+      (select count(*)::int from recoveries where qualification_status = 'hot') as hot,
+      (select max(recovered_at) from recoveries) as last_recovered_at
+  `;
+}
+
+export async function loadColdRecoveries(scope: LiveScope, now: Date): Promise<LiveStatus> {
+  const since = businessTurnStart(now);
+  const result = await getDatabase().execute(buildColdRecoveriesQuery(scope, since, now));
+  const rows = (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as Array<Record<string, unknown>>;
+  const row = rows[0] ?? {};
+  return buildColdRecoveriesStatus({
+    aggregate: {
+      attempted: Number(row.attempted ?? 0),
+      recovered: Number(row.recovered ?? 0),
+      warm: Number(row.warm ?? 0),
+      hot: Number(row.hot ?? 0),
+      lastRecoveredAt: toDate(row.last_recovered_at),
+    },
     now,
-    scope,
   });
 }
 

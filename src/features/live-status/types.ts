@@ -20,7 +20,7 @@ export type LiveScope = {
 
 export type LiveStatusId =
   | "frios"
-  | "fila-frios"
+  | "frios-recuperados"
   | "qualificacao-ia"
   | "aguardando-corretor"
   | "ofertas"

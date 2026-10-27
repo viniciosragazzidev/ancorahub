@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildAiQualificationStatus } from "./ai-qualification";
 import { buildColdLeadsStatus } from "./cold-leads";
-import { buildColdReleaseStatus, nextColdReleaseAt } from "./cold-release";
+import { buildColdRecoveriesStatus, coldRecoveryOperationDayStart } from "./cold-recoveries";
 import { buildDistributionEngineSeal } from "./distribution-engine";
 import { buildDutyStatus } from "./duty";
 import { buildFirstContactStatus } from "./first-contact";
@@ -49,41 +49,45 @@ describe("leads frios", () => {
     expect(status).toMatchObject({ value: 0, severity: "ok", emptyText: "Nenhum lead frio agora" });
     expect(status.action?.href).toBe("/leads/distribuicao?view=operar");
   });
-});
 
-describe("fila de leads frios", () => {
-  it("mostra 500+ ao atingir o limite de leitura", () => {
-    const rows = Array.from({ length: 500 }, () => ({ coldSince: minutes(-30), attempts: 0 }));
+  it("mostra 500+ quando a consulta limitada atinge o teto", () => {
+    const rows = Array.from({ length: 500 }, (_, index) => ({ coldSince: minutes(-index), attempts: 0 }));
     const status = buildColdLeadsStatus({ rows, now: NOW, scope: director, automaticEnabled: true, turboCovers: false, truncated: true });
     expect(status).toMatchObject({ value: 500, valueText: "500+" });
   });
-
-  it("próximas 9 h em São Paulo", () => {
-    expect(nextColdReleaseAt(NOW).toISOString()).toBe("2026-10-28T12:00:00.000Z");
-    expect(nextColdReleaseAt(new Date("2026-10-27T10:00:00.000Z")).toISOString()).toBe("2026-10-27T12:00:00.000Z");
-  });
-
-  it("conta quem sai na próxima liberação; quem já saiu fica de fora", () => {
-    const status = buildColdReleaseStatus({
-      queues: [{
-        queueId: "q", name: "Leads Frios", releasedEarlyToday: false,
-        waitingCreatedAt: [
-          new Date("2026-10-24T15:00:00.000Z"), // já liberado
-          new Date("2026-10-26T15:00:00.000Z"), // segunda: sai amanhã às 9 h
-          new Date("2026-10-27T12:30:00.000Z"), // hoje: sai depois de amanhã
-        ],
-      }],
-      now: NOW, scope: director,
-    });
-    expect(status).toMatchObject({ label: "Fila Leads Frios", value: 1, breakdown: [{ label: "esperando liberação", value: 2 }] });
-    expect(status?.nextEvent?.at).toBe("2026-10-28T12:00:00.000Z");
-  });
-
-  it("sem fila com a regra ligada, não aparece", () => {
-    expect(buildColdReleaseStatus({ queues: [], now: NOW, scope: director })).toBeNull();
-  });
 });
 
+describe("recuperação de frios", () => {
+  it("mostra recuperações, tentados e a última recuperação sem inventar próximo evento", () => {
+    const recoveredAt = minutes(-18);
+    const status = buildColdRecoveriesStatus({
+      aggregate: { attempted: 42, recovered: 7, warm: 4, hot: 3, lastRecoveredAt: recoveredAt },
+      now: NOW,
+    });
+    expect(status).toMatchObject({
+      id: "frios-recuperados",
+      label: "Frios recuperados",
+      value: 7,
+      explanation: "Pela qualificação, de 42 frios tentados hoje.",
+      lastEvent: { at: recoveredAt.toISOString(), label: "Última recuperação" },
+    });
+    expect(status.nextEvent).toBeUndefined();
+    expect(status.action).toBeUndefined();
+  });
+
+  it("zero informa que nenhuma recuperação ocorreu no dia", () => {
+    const status = buildColdRecoveriesStatus({
+      aggregate: { attempted: 0, recovered: 0, warm: 0, hot: 0, lastRecoveredAt: null },
+      now: NOW,
+    });
+    expect(status).toMatchObject({ value: 0, emptyText: "Nenhum frio recuperado hoje", explanation: "Pela qualificação, de 0 frios tentados hoje.", severity: "ok" });
+    expect(status.lastEvent).toBeUndefined();
+  });
+
+  it("usa a sexta às 19h como início do dia operacional da segunda", () => {
+    expect(coldRecoveryOperationDayStart(new Date("2026-10-26T13:00:00.000Z")).toISOString()).toBe("2026-10-23T22:00:00.000Z");
+  });
+});
 describe("qualificação pela IA", () => {
   it("próximo tempo limite pela atividade mais antiga, alinhado ao robô", () => {
     const status = buildAiQualificationStatus({ rows: [{ lastActivityAt: minutes(-11) }, { lastActivityAt: minutes(-2) }], timeoutMinutes: 15, now: NOW, scope: { canOpenQualification: true } });

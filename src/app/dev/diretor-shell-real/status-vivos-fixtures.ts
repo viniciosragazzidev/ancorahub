@@ -5,7 +5,7 @@
  */
 import { buildAiQualificationStatus } from "@/features/live-status/providers/ai-qualification";
 import { buildColdLeadsStatus } from "@/features/live-status/providers/cold-leads";
-import { buildColdReleaseStatus } from "@/features/live-status/providers/cold-release";
+import { buildColdRecoveriesStatus } from "@/features/live-status/providers/cold-recoveries";
 import { buildDistributionEngineSeal } from "@/features/live-status/providers/distribution-engine";
 import { buildDutyStatus } from "@/features/live-status/providers/duty";
 import { buildFirstContactStatus } from "@/features/live-status/providers/first-contact";
@@ -32,6 +32,7 @@ export function liveStatusCase(kind: LiveStatusCase, now = new Date()): LiveStat
     return {
       statuses: [
         buildColdLeadsStatus({ rows: [], now, scope: director, automaticEnabled: true, turboCovers: false }),
+        buildColdRecoveriesStatus({ aggregate: { attempted: 0, recovered: 0, warm: 0, hot: 0, lastRecoveredAt: null }, now }),
         buildAiQualificationStatus({ rows: [], timeoutMinutes: 15, now, scope: director }),
         buildWaitingBrokerStatus({ groups: [], now }),
         buildOffersStatus({ aggregate: { total: 0, firstExpiresAt: null, firstOfferedAt: null }, now, scope: director }),
@@ -48,15 +49,15 @@ export function liveStatusCase(kind: LiveStatusCase, now = new Date()): LiveStat
     ...Array.from({ length: 38 }, (_, index) => ({ coldSince: at(-164 - index * 2), attempts: 0 })),
   ];
   const cold = buildColdLeadsStatus({ rows: coldRows, now, scope: director, automaticEnabled: true, turboCovers: false });
-  const release = buildColdReleaseStatus({
-    queues: [{
-      queueId: "q-frios", name: "Leads Frios", releasedEarlyToday: false,
-      waitingCreatedAt: [
-        ...Array.from({ length: 23 }, () => new Date(now.getTime() - 30 * 3_600_000)),
-        ...Array.from({ length: 9 }, () => new Date(now.getTime() - 2 * 3_600_000)),
-      ],
-    }],
-    now, scope: director,
+  const coldRecoveries = buildColdRecoveriesStatus({
+    aggregate: {
+      attempted: 42,
+      recovered: kind === "zero" ? 0 : 7,
+      warm: kind === "zero" ? 0 : 4,
+      hot: kind === "zero" ? 0 : 3,
+      lastRecoveredAt: kind === "zero" ? null : at(-18),
+    },
+    now,
   });
   const ai = buildAiQualificationStatus({ rows: Array.from({ length: 8 }, (_, index) => ({ lastActivityAt: at(-11 + index) })), timeoutMinutes: 15, now, scope: director });
   const waiting = buildWaitingBrokerStatus({
@@ -98,6 +99,6 @@ export function liveStatusCase(kind: LiveStatusCase, now = new Date()): LiveStat
     failedEffects: 0,
     now, scope: director,
   });
-  const statuses: LiveStatus[] = [cold, ...(release ? [release] : []), ai, waiting, offers, firstContact, duty, whatsapp];
+  const statuses: LiveStatus[] = [cold, coldRecoveries, ai, waiting, offers, firstContact, duty, whatsapp];
   return { statuses, seals: [seal] };
 }

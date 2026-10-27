@@ -539,3 +539,7 @@ O heartbeat não segura mais a resposta dos robôs. A faixa operacional fica só
 ## 2026-10-27 - Ajuste das janelas do status vivo
 
 Falhas do WhatsApp usam `failed_at` do dia com guarda de criação de 36 h; falhas do motor usam `updated_at`/`failed_at` de 24 h com guarda indexada de criação de 30 dias. A fila exibe e conta os últimos 7 dias, também no estado vazio. Sem migration.
+
+## 2026-10-27 - Recuperações de leads frios na faixa de status vivos
+
+O cartão da fila de frios foi trocado pela contagem de leads únicos que receberam tentativa manual, automática ou T2 da régua turbo no dia operacional e responderam, com requalificação para morno/quente. A consulta respeita tenant e unidade/equipe, exclui stories e mensagens vazias e informa tentados e horário da última recuperação. Não há link porque nenhuma lista existente representa esse recorte com exatidão. Sem migration.

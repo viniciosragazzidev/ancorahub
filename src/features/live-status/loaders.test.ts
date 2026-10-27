@@ -7,7 +7,7 @@ vi.mock("@/shared/db", async () => {
   return { getDatabase: vi.fn(), schema };
 });
 
-import { buildDistributionFailureQuery, buildFirstOfferAtSql, buildWhatsAppQueueQuery } from "./loaders";
+import { buildColdRecoveriesQuery, buildDistributionFailureQuery, buildFirstOfferAtSql, buildWhatsAppQueueQuery } from "./loaders";
 import type { LiveScope } from "./types";
 
 const dialect = new PgDialect();
@@ -15,6 +15,25 @@ const NOW = new Date("2026-10-27T13:00:00.000Z");
 const director: LiveScope = { tenantId: "tenant-a", role: "director", branchId: null, userId: "director-a", key: "director-a", canOpenQualification: true };
 
 describe("consultas da faixa viva", () => {
+  it("agrega tentativas e recuperações com escopo tenant/unidade e evidência de resposta real", () => {
+    const scope: LiveScope = { ...director, role: "manager", branchId: "branch-a" };
+    const since = new Date("2026-10-23T22:00:00.000Z");
+    const query = dialect.sqlToQuery(buildColdRecoveriesQuery(scope, since, NOW));
+    expect(query.sql).toContain("whatsapp_outbound_messages");
+    expect(query.sql).toContain("audit_logs");
+    expect(query.sql).toContain("whatsapp_messages");
+    expect(query.sql).toContain("recipient_type = 'lead'");
+    expect(query.sql).toContain("qualification-turbo:%:t2:%");
+    expect(query.sql).toContain("whatsapp_messages.direction in");
+    expect(query.sql).toContain("not ilike");
+    expect(query.sql).toContain("\"leads\".\"branch_id\"");
+    expect(query.params).toContain("tenant-a");
+    expect(query.params).toContain("branch-a");
+    expect(query.params).toContain("2026-10-16T22:00:00.000Z");
+    expect(query.params).toContain("2026-10-23T22:00:00.000Z");
+    expect(query.params).toContain("%status@broadcast%");
+  });
+
   it("limita a fila a 7 dias e detecta falhas de hoje mesmo quando a mensagem foi criada antes da meia-noite", () => {
     const query = dialect.sqlToQuery(buildWhatsAppQueueQuery(director, NOW));
     expect(query.sql).toContain("w.tenant_id");

@@ -237,3 +237,13 @@ Critério de pronto de cada onda: anexo de movimento cumprido (vídeo normal e c
 - Falhas de jobs e efeitos usam `updated_at`/`failed_at` nas últimas 24 h, com guarda ampla de `created_at` de 30 dias.
 - A fila do WhatsApp considera mensagens criadas nos últimos 7 dias e deixa esse recorte explícito no título e no estado vazio. Não há limite de agregação no provedor.
 - Testes focados: `npx vitest run src/features/live-status --maxWorkers=1`. Type-check: `npx tsc --noEmit`. Sem banco, migration ou build.
+
+## Substituição da fila de frios por recuperações da qualificação (27/10)
+
+- O cartão `Fila Leads Frios` foi substituído por `Frios recuperados`; o cartão distinto de leads frios que aguardam requalificação permanece.
+- A agregação conta leads únicos com tentativa enviada no dia operacional: saídas manuais/automáticas de `cold-lead-requalification`, a chave legada `cold-lead-reactivation` e o T2 da `qualification-turbo` (que substitui a tentativa automática antiga).
+- Recuperação exige resposta inbound real após uma dessas tentativas e auditoria `lead_qualification` warm/hot no mesmo dia, além da classificação atual warm/hot. Stories e mensagens vazias `[text]` são excluídos. A consulta aplica tenant e unidade/equipe via `liveLeadScope`, usa `created_at` indexado como guarda ampla e índices existentes para mensagens/auditoria; sem migration.
+- O dia usa `businessTurnStart` em `America/Sao_Paulo` (19h; sexta-feira às 19h antes da virada operacional de segunda). A linha de apoio informa tentados; se não houver evento futuro, o componente mostra a hora relativa da última recuperação.
+- Não existe uma lista que filtre exatamente leads warm/hot recuperados por requalificação neste dia operacional; o cartão não oferece link aproximado.
+- Fixture da rota `/dev/diretor-shell-real` atualizada. Cobertura unitária inclui agregação da consulta, resposta real, escopo de unidade, dia operacional, estado vazio e exibição do último evento.
+- Validação da alteração: 62 testes focados em `src/features/live-status` e `npx tsc --noEmit` passaram. Não foram executados testes de banco, migration nem build.

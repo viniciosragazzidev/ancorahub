@@ -14,7 +14,7 @@ vi.mock("./loaders", () => {
   };
   return {
     loadColdLeads: make("frios"),
-    loadColdRelease: make("fila-frios"),
+    loadColdRecoveries: make("frios-recuperados"),
     loadAiQualification: make("qualificacao-ia"),
     loadWaitingBroker: make("aguardando-corretor"),
     loadOffers: make("ofertas"),
@@ -47,7 +47,7 @@ describe("getLiveStatuses", () => {
 
   it("diretor: os 8 status na ordem e o selo", async () => {
     const payload = await getLiveStatuses(context());
-    expect(payload?.statuses.map((status) => status.id)).toEqual(["frios", "fila-frios", "qualificacao-ia", "aguardando-corretor", "ofertas", "primeiro-contato", "plantao", "whatsapp-fila"]);
+    expect(payload?.statuses.map((status) => status.id)).toEqual(["frios", "frios-recuperados", "qualificacao-ia", "aguardando-corretor", "ofertas", "primeiro-contato", "plantao", "whatsapp-fila"]);
     expect(payload?.seals).toHaveLength(1);
   });
 

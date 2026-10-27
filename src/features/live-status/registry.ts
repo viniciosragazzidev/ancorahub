@@ -2,8 +2,8 @@ import "server-only";
 
 import {
   loadAiQualification,
+  loadColdRecoveries,
   loadColdLeads,
-  loadColdRelease,
   loadDuty,
   loadFirstContact,
   loadOffers,
@@ -18,7 +18,7 @@ import type { LiveProvider, LiveStatusId } from "./types";
  */
 export const LIVE_PROVIDERS: Record<LiveStatusId, LiveProvider> = {
   frios: { id: "frios", ttlMs: 30_000, load: loadColdLeads },
-  "fila-frios": { id: "fila-frios", ttlMs: 60_000, load: loadColdRelease },
+  "frios-recuperados": { id: "frios-recuperados", ttlMs: 60_000, load: loadColdRecoveries },
   "qualificacao-ia": { id: "qualificacao-ia", ttlMs: 20_000, load: loadAiQualification },
   "aguardando-corretor": { id: "aguardando-corretor", ttlMs: 20_000, load: loadWaitingBroker },
   ofertas: { id: "ofertas", ttlMs: 15_000, load: loadOffers },
