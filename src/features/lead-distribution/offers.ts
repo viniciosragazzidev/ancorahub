@@ -74,6 +74,20 @@ export function leadHasBlockingOffer(offers: Array<{ status: string; offeredAt?:
 
 type DatabaseLike = ReturnType<typeof getDatabase>;
 
+const PICK_LOCK_ATTEMPTS = 10;
+const PICK_LOCK_RETRY_SECONDS = 0.2;
+
+/** DEC-154: bounded wait for the per-tenant pick lock (released at commit). */
+async function tryPickLock(tx: { execute: DatabaseLike["execute"] }, tenantId: string) {
+  for (let attempt = 0; attempt < PICK_LOCK_ATTEMPTS; attempt += 1) {
+    const rows = await tx.execute(sql`select pg_try_advisory_xact_lock(hashtext(${tenantId}), hashtext('distribution-pick')) as locked`);
+    const first = (Array.isArray(rows) ? rows[0] : (rows as { rows?: unknown[] }).rows?.[0]) as { locked?: boolean } | undefined;
+    if (first?.locked) return true;
+    if (attempt < PICK_LOCK_ATTEMPTS - 1) await tx.execute(sql`select pg_sleep(${PICK_LOCK_RETRY_SECONDS})`);
+  }
+  return false;
+}
+
 /**
  * Offers a set of brokers received in a queue that matter for pacing: anything
  * inside the interval window plus offers still awaiting a response.
@@ -210,6 +224,8 @@ export async function createLeadOffersForBrokers(input: {
       .limit(50)
     : [];
   const pending: typeof brokers = input.fairPick && leadHasBlockingOffer(leadOffers, now) ? [] : [...brokers];
+  // Once the pick lock was busy for this lead, the remaining claims recount without it.
+  let pickLockBusy = false;
   while (pending.length) {
     let broker = pending[0];
     let destinationPhone = broker.phone;
@@ -219,7 +235,11 @@ export async function createLeadOffersForBrokers(input: {
         // DEC-154: read the counts, choose and record the offer under one
         // per-tenant lock, so the next pick sees this one. Held only for this
         // DB-only transaction; WhatsApp is sent after the commit.
-        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.tenantId}), hashtext('distribution-pick'))`);
+        // Never wait long for it: a claim queued behind other jobs pushed whole runs
+        // past the 45 s per-lead cap (27/10). Try for up to ~2 s, once per lead.
+        // Busy lock: still recount fresh (only the tiny window between this read and
+        // the commit stays unserialized), never fall back to the stale pre-read order.
+        if (pickLockBusy || !await tryPickLock(tx, input.tenantId)) pickLockBusy = true;
         const pendingIds = pending.map((candidate) => candidate.id);
         const received = await loadReceivedInDayByBroker(tx, input.tenantId, pendingIds, input.fairPick.since);
         const nextId = pickNextByReceivedInDay(pendingIds, received, input.fairPick.tierByBroker);
