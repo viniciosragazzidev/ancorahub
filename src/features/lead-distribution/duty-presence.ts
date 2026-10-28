@@ -5,7 +5,7 @@ import { and, eq, gt, inArray, isNull, lte, lt, ne, or, sql } from "drizzle-orm"
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
-import { DEFAULT_EXTRA_SHIFT_STARTS_AT, effectiveAttendanceMode, extraShiftWindow, findDutyOccurrenceConfirmation, formatDutyPresenceHourLabel, getRelevantDutyWindow, getSelfDutyConfirmationWindowState, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
+import { DEFAULT_EXTRA_SHIFT_STARTS_AT, effectiveAttendanceMode, extendedShiftHourLabel, extraShiftWindow, findDutyOccurrenceConfirmation, formatDutyPresenceHourLabel, getRelevantDutyWindow, getSelfDutyConfirmationWindowState, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
 import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "./dated-duty-roster";
 
 export { SELF_CONFIRM_LATE_MESSAGE, SELF_CONFIRM_OPENS_MINUTES, SELF_CONFIRM_TOLERANCE_MINUTES } from "./duty-presence-domain";
@@ -128,6 +128,7 @@ export async function processDutyPresenceReminders(now = new Date()) {
     validFrom: schema.dutyRosterAssignments.validFrom,
     validUntil: schema.dutyRosterAssignments.validUntil,
     dutyDate: schema.dutyRosterAssignments.dutyDate,
+    attendanceMode: schema.dutyRosterAssignments.attendanceMode,
   }).from(schema.dutyRosterAssignments)
     .innerJoin(schema.user, eq(schema.user.id, schema.dutyRosterAssignments.brokerId))
     .innerJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.dutyRosterAssignments.brokerId), eq(schema.tenantMemberships.tenantId, schema.dutyRosterAssignments.tenantId)))
@@ -166,7 +167,7 @@ export async function processDutyPresenceReminders(now = new Date()) {
   };
 
   /** One idempotent confirmation per occurrence (normal or extra) and its WhatsApp link. */
-  const remind = async (assignment: Assignment, schedule: Schedule, window: DutyWindow, labelName: string) => {
+  const remind = async (assignment: Assignment, schedule: Schedule, window: DutyWindow, hourLabel: string) => {
     considered += 1;
     const confirmationId = randomUUID();
     const [inserted] = await db.insert(schema.dutyPresenceConfirmations).values({
@@ -210,7 +211,7 @@ export async function processDutyPresenceReminders(now = new Date()) {
         recipientId: assignment.brokerId,
         destinationPhone: assignment.phone,
         purpose: "dutyPresenceConfirmation",
-        variables: [assignment.brokerName, formatDutyPresenceHourLabel(window.startsAt, schedule.timezone, labelName), record.id],
+        variables: [assignment.brokerName, hourLabel, record.id],
         requestedBy: null,
         idempotencyKey: `duty-presence:${record.id}`,
       });
@@ -247,7 +248,8 @@ export async function processDutyPresenceReminders(now = new Date()) {
       const valid = upcoming && upcoming.startsAt >= assignment.validFrom && (!assignment.validUntil || upcoming.startsAt < assignment.validUntil);
       if (upcoming && extra && valid && now >= extra.startsAt && now < extra.endsAt
         && await isEffectiveOn(assignment, getSaoPauloDateKey(upcoming.startsAt))) {
-        await remind(assignment, schedule, extra, `extra da noite · ${schedule.name}`);
+        const presencial = effectiveAttendanceMode(assignment.attendanceMode, schedule.attendanceMode) === "presencial";
+        await remind(assignment, schedule, extra, extendedShiftHourLabel(extra.startsAt, schedule.timezone, schedule.name, presencial));
       }
     }
 
@@ -257,7 +259,7 @@ export async function processDutyPresenceReminders(now = new Date()) {
     const reminderOpensAt = new Date(window.startsAt.getTime() - 30 * 60_000);
     if (now < reminderOpensAt || now >= window.endsAt) continue;
     if (!(await isEffectiveOn(assignment, getSaoPauloDateKey(window.startsAt)))) continue;
-    await remind(assignment, schedule, window, schedule.name);
+    await remind(assignment, schedule, window, formatDutyPresenceHourLabel(window.startsAt, schedule.timezone, schedule.name));
   }
   return { enabled: true, considered, queued, failed, expired: expiredRows.length };
 }

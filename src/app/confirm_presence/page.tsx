@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { effectiveAttendanceMode, getExtraShiftConfirmationWindowState, getSelfDutyConfirmationWindowState, isExtraShiftRecord } from "@/features/lead-distribution/duty-presence-domain";
+import { effectiveAttendanceMode, EXTENDED_SHIFT_EXPLANATION, EXTENDED_SHIFT_NAME, EXTENDED_SHIFT_ONLINE_NOTE, getExtraShiftConfirmationWindowState, getSelfDutyConfirmationWindowState, isExtraShiftRecord } from "@/features/lead-distribution/duty-presence-domain";
 import { getDatabase, schema } from "@/shared/db";
 import { ConfirmPresenceView } from "./confirm-presence-view";
 
@@ -49,6 +49,9 @@ export default async function ConfirmPresencePage({ searchParams }: { searchPara
   const active = windowState === "available";
   const late = windowState === "late";
   const confirmed = record?.status === "confirmed";
-  const presencial = record && !extra ? effectiveAttendanceMode(record.assignmentAttendanceMode, record.attendanceMode) === "presencial" : false;
-  return <ConfirmPresenceView valid={Boolean(confirmationId && record)} record={record ? { id: record.id, assignmentId: record.assignmentId, brokerName: record.brokerName, scheduleName: extra ? `extra da noite · ${record.scheduleName}` : record.scheduleName, branchName: record.branchName, timezone: record.timezone, shiftStartsAt: record.shiftStartsAt } : null} confirmed={confirmed} late={late} active={active} presencial={presencial} notOpen={windowState === "not_open"} />;
+  const presencialShift = record ? effectiveAttendanceMode(record.assignmentAttendanceMode, record.attendanceMode) === "presencial" : false;
+  // The Horário Estendido is always online, with one tap (28/10).
+  const presencial = presencialShift && !extra;
+  const extendedNote = extra ? `${EXTENDED_SHIFT_EXPLANATION}${presencialShift ? ` ${EXTENDED_SHIFT_ONLINE_NOTE}` : ""}` : undefined;
+  return <ConfirmPresenceView valid={Boolean(confirmationId && record)} record={record ? { id: record.id, assignmentId: record.assignmentId, brokerName: record.brokerName, scheduleName: extra ? `${record.scheduleName} ${EXTENDED_SHIFT_NAME}` : record.scheduleName, branchName: record.branchName, timezone: record.timezone, shiftStartsAt: record.shiftStartsAt } : null} confirmed={confirmed} late={late} active={active} presencial={presencial} extendedNote={extendedNote} notOpen={windowState === "not_open"} />;
 }

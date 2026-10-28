@@ -373,6 +373,19 @@ export function formatDutyStartHour(date: Date, timezone: string) {
 }
 
 /** The approved reminder template keeps its hour variable, so include the schedule there. */
+/**
+ * The night extra is the broker's own plantão of the day, opened a little earlier (28/10): it is called
+ * "(plantão) Horário Estendido" and the invite says so. Always online, even when the plantão is presencial.
+ */
+export const EXTENDED_SHIFT_NAME = "Horário Estendido";
+export const EXTENDED_SHIFT_EXPLANATION = "É o mesmo plantão que você tem hoje, só que um pouquinho mais cedo, para aproveitar os leads que chegaram cedo.";
+export const EXTENDED_SHIFT_ONLINE_NOTE = "Este horário é online, mesmo com o seu plantão presencial.";
+
+export function extendedShiftHourLabel(date: Date, timezone: string, scheduleName: string | null | undefined, presencial: boolean) {
+  const label = `${formatDutyPresenceHourLabel(date, timezone, scheduleName)} ${EXTENDED_SHIFT_NAME}. ${EXTENDED_SHIFT_EXPLANATION}`;
+  return presencial ? `${label} ${EXTENDED_SHIFT_ONLINE_NOTE}` : label;
+}
+
 export function formatDutyPresenceHourLabel(date: Date, timezone: string, scheduleName?: string | null) {
   const name = scheduleName
     ?.replace(/[\u0000-\u001f\u007f]+/g, " ")

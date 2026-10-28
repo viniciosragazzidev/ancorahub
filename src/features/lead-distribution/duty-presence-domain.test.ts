@@ -10,6 +10,7 @@ import {
   isDutyBrokerEligible,
   parseDutyLeadsSince,
   formatDutyStartHour,
+  extendedShiftHourLabel,
   formatDutyPresenceHourLabel,
   getDutyOccurrenceLeadWindow,
   getDutyWindowOnDate,
@@ -91,6 +92,14 @@ describe("duty presence occurrence windows", () => {
     expect(window?.startsAt.toISOString()).toBe("2026-09-23T13:00:00.000Z");
     expect(formatDutyStartHour(window!.startsAt, shift.timezone)).toBe("10:00");
     expect(isDutyWindowActive(window, now)).toBe(false);
+  });
+
+  it("calls the night extra the plantão's Horário Estendido and says it is online on a presencial plantão", () => {
+    const startsAt = new Date("2026-09-23T10:00:00.000Z");
+    expect(extendedShiftHourLabel(startsAt, shift.timezone, "PME", false)).toBe("07:00 · Plantão PME Horário Estendido. É o mesmo plantão que você tem hoje, só que um pouquinho mais cedo, para aproveitar os leads que chegaram cedo.");
+    expect(extendedShiftHourLabel(startsAt, shift.timezone, "PME", true)).toMatch(/Este horário é online, mesmo com o seu plantão presencial\.$/);
+    expect(extendedShiftHourLabel(startsAt, shift.timezone, "PME", true)).not.toMatch(/[
+	]/);
   });
 
   it("labels the approved reminder hour with a concise schedule name", () => {
