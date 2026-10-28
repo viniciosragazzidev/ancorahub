@@ -1243,7 +1243,7 @@ function outsideLabel(schedule: Schedule, reason: "ends_before" | "starts_after"
   return "Não cai neste mês";
 }
 
-export function DutyOperationsWorkspace({ snapshot, queues = [], queueOrders = [], monthlySchedulingEnabled = false, canPlanMonthlySchedule = false, initialMonthlyScheduleMonth = null }: { snapshot: Snapshot; queues?: QueueOption[]; queueOrders?: DutyQueueOrderPreview[]; monthlySchedulingEnabled?: boolean; canPlanMonthlySchedule?: boolean; initialMonthlyScheduleMonth?: string | null }) {
+export function DutyOperationsWorkspace({ snapshot, queues = [], queueOrders = [], monthlySchedulingEnabled = false, canPlanMonthlySchedule = false, initialMonthlyScheduleMonth = null }: { snapshot: Snapshot; queues?: QueueOption[]; queueOrders?: DutyQueueOrderPreview[] | null; monthlySchedulingEnabled?: boolean; canPlanMonthlySchedule?: boolean; initialMonthlyScheduleMonth?: string | null }) {
   const router = useRouter();
   const directorLite = useDirectorLitePage();
   const currentMonthKey = getOperationalMonthKey();

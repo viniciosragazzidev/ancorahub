@@ -108,7 +108,7 @@ function orderSignature(preview: DutyQueueOrderPreview) {
   return preview.savedBrokerIds.join("\u0000");
 }
 
-export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQueueOrderPreview[]; canReorder: boolean }) {
+export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQueueOrderPreview[] | null; canReorder: boolean }) {
   const router = useRouter();
   const reduceMotion = useReduceMotionPreference();
   const [orders, setOrders] = useState<Record<string, { source: string; order: string[] }>>({});
@@ -202,7 +202,7 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
         <h2 id="duty-queue-order-title">Quem recebe o próximo lead</h2>
         <p>Prévia da fila de cada plantão em andamento. A escolha final é recalculada quando o lead chega.</p>
       </div>
-      {!previews.length ? <p className={styles.empty}>Nenhum plantão está em andamento agora.</p> : (
+      {previews === null ? <p className={styles.empty}>Não foi possível montar a prévia da fila agora. A distribuição dos leads segue normal.</p> : !previews.length ? <p className={styles.empty}>Nenhum plantão está em andamento agora.</p> : (
         <div className={styles.cards}>
           {previews.map((preview) => {
             const localOrder = orders[preview.scheduleId];

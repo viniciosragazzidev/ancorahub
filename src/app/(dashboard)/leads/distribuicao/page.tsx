@@ -524,7 +524,13 @@ export default async function LeadDistributionPage({
       branchId: context.role === "manager" && context.branchId ? context.branchId : undefined,
     }),
     getDutyRosterSnapshot(context),
-    view === "plantao" ? getDutyQueueOrderPreviews(context) : Promise.resolve([]),
+    // The queue preview is a side panel: if it fails, the Plantão tab still loads (null = "could not build").
+    view === "plantao"
+      ? getDutyQueueOrderPreviews(context).catch((error: unknown) => {
+        console.error("[distribuicao] duty_queue_order_failed", { tenantId: context.tenantId, error: error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 400) : String(error).slice(0, 400), stack: error instanceof Error ? error.stack?.split("\n").slice(0, 6).join(" | ") : undefined });
+        return null;
+      })
+      : Promise.resolve([]),
     db
       .select({
         slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes,
