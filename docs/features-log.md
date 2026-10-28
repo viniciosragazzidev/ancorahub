@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 28/10/2026 - Aba Distribuídos e responsável na central de conversas
+
+- Adicionada a aba Distribuídos para Diretor e Gestor com unidade. O servidor filtra leads com corretor responsável, aplica o escopo existente e conta somente as conversas exibidas.
+- A lista e a conversa aberta mostram o nome do corretor em texto secundário. Leads sem nome de corretor e contatos sem lead não recebem um rótulo de atribuição.
+- Registro e validações: `docs/implementations/completed/2026-10-28-conversas-distribuidos.md`.
+
 ## 28/10/2026 - Altura total para a central de conversas
 
 - A conversa aberta agora ocupa a altura disponivel entre o cabecalho e o fim da tela. Historico e lista mantem rolagem propria, e o campo de mensagem permanece no rodape do painel.

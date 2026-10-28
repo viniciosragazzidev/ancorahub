@@ -23,6 +23,7 @@ export function ConversationsFrame({
   canSeeBrokerTab,
   currentTab,
   leadsCount,
+  distributedCount,
   coexLabel,
   officialBrokerTab,
 }: {
@@ -38,8 +39,9 @@ export function ConversationsFrame({
   officialBrokerDeliveryChannel: "meta" | "waha_direct";
   officialBrokerConversations: OfficialBrokerConversation[];
   canSeeBrokerTab: boolean;
-  currentTab: "leads" | "corretores" | "coex";
+  currentTab: "leads" | "distribuidos" | "corretores" | "coex";
   leadsCount?: number;
+  distributedCount?: number;
   coexLabel?: string | null;
   officialBrokerTab: boolean;
 }) {
@@ -47,7 +49,7 @@ export function ConversationsFrame({
   const pageActions = canSeeBrokerTab ? (
     <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
       <ConversationsBulkQualificationAction />
-      <ConversasHeaderNav currentTab={currentTab} leadsCount={leadsCount} coexLabel={coexLabel} />
+      <ConversasHeaderNav currentTab={currentTab} leadsCount={leadsCount} distributedCount={distributedCount} coexLabel={coexLabel} />
     </nav>
   ) : null;
   const header = (

@@ -72,7 +72,7 @@ function renderLegacyWorkspaceSnapshot() {
   );
 }
 
-function renderSelectedConversation() {
+function renderSelectedConversation(corretorNome: string | null = "Marina Exemplo") {
   navigation.pathname = "/dev/diretor-shell-real";
   const conversation: ConversationItem = {
     id: "lead-fixture-ana",
@@ -84,8 +84,8 @@ function renderSelectedConversation() {
     origem: "Meta Ads",
     branchId: "branch-centro",
     queueName: "PF",
-    corretorId: "fixture-director",
-    corretorNome: "Marina Exemplo",
+    corretorId: corretorNome ? "fixture-director" : null,
+    corretorNome,
     branchName: "Centro",
     consentimentoLgpd: true,
     createdAt: "2026-10-24T12:10:00.000Z",
@@ -172,6 +172,26 @@ describe("pele da central de conversas", () => {
     expect(html).not.toContain("Sem tags");
     expect(html).toContain('aria-label="Ações do atendimento"');
     expect(html).toContain('data-variant="outline"');
+    expect(html).toContain('data-conversations-part="row-owner-name"');
+    expect(html).toContain('data-conversations-part="header-owner-name"');
+    expect(html).toContain("Marina Exemplo");
+  });
+
+  it("omite o nome do corretor quando o lead nao esta atribuido", () => {
+    const html = renderSelectedConversation(null);
+    expect(html).not.toContain('data-conversations-part="row-owner-name"');
+    expect(html).not.toContain('data-conversations-part="header-owner-name"');
+  });
+
+  it("mostra a aba Distribuídos e sua contagem da lista ativa", () => {
+    const html = renderToStaticMarkup(
+      <ArcScopeProvider enabled>
+        <ConversasHeaderNav currentTab="distribuidos" distributedCount={12} />
+      </ArcScopeProvider>,
+    );
+    expect(html).toContain('href="/conversas?tab=distribuidos"');
+    expect(html).toContain(">Distribuídos</span>");
+    expect(html).toContain(">12</span>");
   });
 
   it("mantem a pele desligada enquanto a rota continua no opt-out", () => {

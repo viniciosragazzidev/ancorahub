@@ -30,6 +30,7 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { brokerWhatsAppMessageSourceCondition, isRecentWhatsAppReplyFilter } from "@/features/dashboard/whatsapp-activity-query";
 import { loadedLeadMessageScope } from "@/features/conversations/loaded-lead-message-scope";
 import { pickMessageIdsToLoad, summarizeIndexRows, type MessageIndexRow } from "@/features/conversations/message-window";
+import { resolveConversationTab } from "@/features/conversations/conversation-tab";
 
 // Não gerar estaticamente — a página depende de sessão e executa queries pesadas de AI
 export const dynamic = "force-dynamic";
@@ -83,7 +84,6 @@ export default async function ConversationsPage({
 
   const isDirector = context.role === "director";
   const canSeeBrokerTab = isDirector || (context.role === "manager" && Boolean(context.branchId));
-  const officialBrokerTab = canSeeBrokerTab && tab === "corretores";
   // Numbers connected in coexistence (the WhatsApp Business app and the CRM
   // on the same number): their conversations get a tab of their own.
   const coexChannels = canSeeBrokerTab
@@ -91,7 +91,10 @@ export default async function ConversationsPage({
       .from(schema.communicationChannels)
       .where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.onboardingMode, "coexistence")))
     : [];
-  const coexTab = !officialBrokerTab && coexChannels.length > 0 && tab === "coex";
+  const currentTab = resolveConversationTab(tab, canSeeBrokerTab, coexChannels.length > 0);
+  const officialBrokerTab = currentTab === "corretores";
+  const distributedLeadsTab = currentTab === "distribuidos";
+  const coexTab = currentTab === "coex";
   const leadTags = officialBrokerTab ? [] : await listLeadTags(context.tenantId);
   const coexLabel = coexChannels.length
     ? `WhatsApp coex · ${coexChannels.map((channel) => String(channel.displayPhoneNumber ?? "").replace(/\D/g, "").slice(-4)).filter(Boolean).join(", ")}`
@@ -158,6 +161,7 @@ export default async function ConversationsPage({
             isNull(schema.leads.deletedAt),
             isNull(schema.leads.archivedAt),
             ...(scope ? [scope] : []),
+            ...(distributedLeadsTab ? [isNotNull(schema.leads.corretorId)] : []),
             ...(invalidBrokerId || invalidReplyFilter ? [sql`false`] : brokerId ? [eq(schema.leads.corretorId, brokerId)] : []),
             ...(repliedLast7Days ? [exists(db.select({ value: sql`1` }).from(schema.whatsappMessages).where(and(
               eq(schema.whatsappMessages.tenantId, context.tenantId),
@@ -200,7 +204,7 @@ export default async function ConversationsPage({
 
     branches = branchRows;
     const leadIds = leads.map((lead) => lead.id);
-    const scopeMessagesToLoadedLeads = Boolean(brokerId || repliedLast7Days);
+    const scopeMessagesToLoadedLeads = Boolean(brokerId || repliedLast7Days || distributedLeadsTab);
 
     // With more than one official number, every message says which number
     // received or sent it (the reply goes out on the number the customer wrote to).
@@ -714,7 +718,7 @@ export default async function ConversationsPage({
     // A conversation only exists once at least one WhatsApp message is
     // persisted. Leads without history stay in Leads/Distribuição and must
     // not appear as empty rows in the Conversations workspace.
-    const allConversations = [...mappedLeadConversations, ...syntheticLeadConversations]
+    const allConversations = [...mappedLeadConversations, ...(distributedLeadsTab ? [] : syntheticLeadConversations)]
       .filter((conversation) => conversation.messages.length > 0);
     const uniqueConversationsByPhone = new Map<string, ConversationItem>();
 
@@ -1127,8 +1131,9 @@ export default async function ConversationsPage({
       officialBrokerDeliveryChannel={internalBrokerDeliveryChannel}
       officialBrokerConversations={officialBrokerConversations}
       canSeeBrokerTab={canSeeBrokerTab}
-      currentTab={officialBrokerTab ? "corretores" : coexTab ? "coex" : "leads"}
-      leadsCount={!officialBrokerTab ? finalConversations.length : undefined}
+      currentTab={currentTab}
+      leadsCount={!officialBrokerTab && !distributedLeadsTab ? finalConversations.length : undefined}
+      distributedCount={distributedLeadsTab ? finalConversations.length : undefined}
       coexLabel={coexLabel}
       officialBrokerTab={officialBrokerTab}
     />

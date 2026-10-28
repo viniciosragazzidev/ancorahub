@@ -216,7 +216,7 @@ export function ConversationsWorkspace({
   /** Directors and managers create, rename and recolor tags. */
   canManageTags?: boolean;
   canSeeBrokerTab?: boolean;
-  currentTab?: "leads" | "corretores" | "coex";
+  currentTab?: "leads" | "distribuidos" | "corretores" | "coex";
   coexLabel?: string | null;
 }) {
   const directorSkinEnabled = useDirectorLitePage();
@@ -417,12 +417,13 @@ export function ConversationsWorkspace({
   ) : null;
   const directorActions = canSeeBrokerTab ? (
     <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
-      <ConversationsBulkQualificationAction />
       <ConversasHeaderNav
         currentTab={currentTab}
-        leadsCount={currentTab === "corretores" ? undefined : conversations.length}
+        leadsCount={currentTab === "corretores" || currentTab === "distribuidos" ? undefined : conversations.length}
+        distributedCount={currentTab === "distribuidos" ? conversations.length : undefined}
         coexLabel={coexLabel}
       />
+      <ConversationsBulkQualificationAction />
     </nav>
   ) : null;
 
@@ -466,10 +467,10 @@ export function ConversationsWorkspace({
               role="group"
               className="flex min-w-0 items-center gap-2 overflow-x-auto border-b border-border px-3 py-1"
             >
+              {directorActions ? <div data-conversations-part="inline-actions">{directorActions}</div> : null}
               <div data-conversations-part="filter-controls" className="flex min-w-0 items-center gap-2">
                 {filterContent}
               </div>
-              {directorActions ? <div data-conversations-part="inline-actions">{directorActions}</div> : null}
             </div>
           ) : null}
           <div data-conversations-part={directorSkinEnabled ? "search-header" : undefined} className="border-b border-border px-3 py-2.5">
@@ -647,6 +648,7 @@ function ConversationHeader({
   const isAssignedToMe = client.aiConversation?.assignedUserId === userId;
   const canDeleteHistory =
     role === "director" || (role === "manager" && client.id.startsWith("unassigned-"));
+  const displayBrokerName = brokerDisplayName(client.corretorNome);
 
   async function handleDeleteConversationHistory() {
     setIsPending(true);
@@ -801,7 +803,14 @@ function ConversationHeader({
           <ContactAvatar name={client.nome} className={cn("shrink-0", directorSkinEnabled && "max-[559px]:hidden")} photoUrl={contactPhotoUrl(client)} />
           <div data-conversations-part={directorSkinEnabled ? "chat-header-details" : undefined} className="min-w-0 flex-1">
             <div data-conversations-part={directorSkinEnabled ? "chat-header-title" : undefined} className="flex items-center gap-2 min-w-0">
-              <h2 className="text-sm font-semibold tracking-tight text-foreground truncate" title={client.nome}>{client.nome}</h2>
+              <h2 className="flex min-w-0 items-baseline gap-1 text-sm font-semibold tracking-tight text-foreground" title={displayBrokerName ? `${client.nome} · ${displayBrokerName}` : client.nome}>
+                <span className="min-w-0 truncate">{client.nome}</span>
+                {displayBrokerName ? (
+                  <span data-conversations-part={directorSkinEnabled ? "header-owner-name" : undefined} className="min-w-0 max-w-32 truncate text-xs font-normal text-muted-foreground">
+                    · {displayBrokerName}
+                  </span>
+                ) : null}
+              </h2>
               <Badge className="hidden shrink-0 md:inline-flex" variant="outline">
                 {directorSkinEnabled
                   ? getConversationStatusLabel(client.status, client.qualificationStatus)
@@ -1800,6 +1809,8 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled }:
   const hasHistory = conversation.messages.length > 0;
   const visibleMessageCount = conversation.messageCount ?? conversation.messages.filter((message) => !message.transition).length;
   const preview = conversation.latestMessage?.body ?? "Nenhuma mensagem sincronizada.";
+  const displayBrokerName = brokerDisplayName(conversation.corretorNome);
+  const title = displayBrokerName ? `${conversation.nome} · ${displayBrokerName}` : conversation.nome;
 
   return (
     <button
@@ -1815,8 +1826,15 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled }:
     >
       <ContactAvatar className="mt-0.5 shrink-0" name={conversation.nome} photoUrl={contactPhotoUrl(conversation)} photoWhenVisible />
       <span className="grid min-w-0 flex-1 gap-1">
-        <span className="flex min-w-0 items-center justify-between gap-3">
-          <span className="truncate text-sm font-medium">{conversation.nome}</span>
+        <span className="flex min-w-0 items-center justify-between gap-3" title={title}>
+          <span className="flex min-w-0 flex-1 items-center gap-1.5">
+            <span className="min-w-0 truncate text-sm font-medium">{conversation.nome}</span>
+            {displayBrokerName ? (
+              <span data-conversations-part={directorSkinEnabled ? "row-owner-name" : undefined} className="min-w-0 max-w-32 truncate text-xs text-muted-foreground">
+                · {displayBrokerName}
+              </span>
+            ) : null}
+          </span>
           <span data-conversations-part={directorSkinEnabled ? "row-time" : undefined} className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
             {formatRelative(conversation.latestMessage?.sentAt ?? conversation.stageEnteredAt)}
           </span>

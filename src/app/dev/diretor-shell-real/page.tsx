@@ -222,6 +222,10 @@ export default async function DirectorShellRealPage({
   const isBrokerConversationPreview = params.view === "conversas" && params.papel === "corretor";
   const papel = params.papel === "marketing" || params.papel === "personalizado" ? PAPEIS[params.papel] : null;
   const showConversations = params.view === "conversas";
+  const showDistributedConversations = showConversations && params.tab === "distribuidos";
+  const previewConversations = showDistributedConversations
+    ? conversationFixtures.filter((conversation) => Boolean(conversation.corretorId && conversation.corretorNome))
+    : conversationFixtures;
   // ?tela=dashboard (padrão), leads, kanban, qualificacao, sem-atribuicao, radar ou lead: a mesma moldura real com cada tela.
   const screen = typeof params.tela === "string" ? params.tela : "dashboard";
   const leadsViews: Record<string, "list" | "kanban" | "qualificacoes" | "sem-atribuicao" | "radar"> = { leads: "list", kanban: "kanban", qualificacao: "qualificacoes", "sem-atribuicao": "sem-atribuicao", radar: "radar" };
@@ -298,8 +302,8 @@ export default async function DirectorShellRealPage({
         ) : <ConversationsFrame
           role={papel?.roleKey ?? "director"}
           branches={papel ? [] : demoBranches}
-          conversations={conversationFixtures}
-          initialLeadId="lead-fixture-ana"
+          conversations={previewConversations}
+          initialLeadId={previewConversations.find((conversation) => conversation.id === "lead-fixture-ana")?.id ?? previewConversations[0]?.id}
           userId="fixture-director"
           tenantId="fixture-tenant"
           leadTags={[]}
@@ -308,8 +312,9 @@ export default async function DirectorShellRealPage({
           officialBrokerDeliveryChannel="meta"
           officialBrokerConversations={[]}
           canSeeBrokerTab
-          currentTab="leads"
-          leadsCount={conversationFixtures.length}
+          currentTab={showDistributedConversations ? "distribuidos" : "leads"}
+          leadsCount={showDistributedConversations ? undefined : previewConversations.length}
+          distributedCount={showDistributedConversations ? previewConversations.length : undefined}
           officialBrokerTab={false}
         />
       ) : onda5 ? onda5.render({ role: previewUser.roleKey ?? "director", jobTitle: previewUser.jobTitle, branchId: null }) : onda3 ? onda3.render() : leadsView ? (
