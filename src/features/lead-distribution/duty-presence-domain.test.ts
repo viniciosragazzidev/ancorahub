@@ -98,8 +98,7 @@ describe("duty presence occurrence windows", () => {
     const startsAt = new Date("2026-09-23T10:00:00.000Z");
     expect(extendedShiftHourLabel(startsAt, shift.timezone, "PME", false)).toBe("07:00 · Plantão PME Horário Estendido. É o mesmo plantão que você tem hoje, só que um pouquinho mais cedo, para aproveitar os leads que chegaram cedo.");
     expect(extendedShiftHourLabel(startsAt, shift.timezone, "PME", true)).toMatch(/Este horário é online, mesmo com o seu plantão presencial\.$/);
-    expect(extendedShiftHourLabel(startsAt, shift.timezone, "PME", true)).not.toMatch(/[
-	]/);
+    expect(extendedShiftHourLabel(startsAt, shift.timezone, "PME", true)).not.toContain(String.fromCharCode(10));
   });
 
   it("labels the approved reminder hour with a concise schedule name", () => {
