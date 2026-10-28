@@ -3,6 +3,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence/trigger";
 
 import {
   getPreferredMetaCloudChannel,
@@ -371,6 +372,7 @@ export async function sendLeadMessageAction(
         });
       await pauseAiForTeamReply(context.tenantId, lead.id, context.userId);
       synchronizeConversationWorkspace(context.tenantId, [context.userId]);
+      scheduleLeadConversationAnalysis(lead.id, context.tenantId);
       return { success: true, message: { id, body: text, direction: "outgoing", sentAt } };
     }
 
@@ -495,6 +497,7 @@ export async function sendLeadMessageAction(
 
     await pauseAiForTeamReply(context.tenantId, lead.id, context.userId);
     synchronizeConversationWorkspace(context.tenantId, [context.userId]);
+    scheduleLeadConversationAnalysis(lead.id, context.tenantId);
     return { success: true, message: { id, body: text, direction: "outgoing", sentAt } };
   } catch (error) {
     return {

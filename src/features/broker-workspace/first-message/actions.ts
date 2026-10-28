@@ -3,6 +3,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { and, count, eq, gte, inArray, isNull, or } from "drizzle-orm";
+import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence/trigger";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -158,6 +159,7 @@ export async function sendFirstMessageAction(raw: { leadId: string; text: string
     // The first real message starts the service (distributed -> in contact), as when it is sent from the phone.
     await startServiceOnFirstMessage({ tenantId: context.tenantId, leadId: lead.id, brokerId: context.userId, branchId: lead.branchId, trigger: "first_message" }).catch(() => false);
     revalidatePath(`/leads/${lead.id}`);
+    scheduleLeadConversationAnalysis(lead.id, context.tenantId);
     return { ok: true, webUrl: buildWhatsAppWebUrl(digits) };
   } catch (error) {
     console.error("[first-message] send failed", error instanceof Error ? error.message : "unknown_error");

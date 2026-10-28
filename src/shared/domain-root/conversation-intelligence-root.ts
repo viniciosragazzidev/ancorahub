@@ -5,6 +5,7 @@ export interface ConversationIntelligenceConfig extends Record<string, unknown> 
   analysisDebounceSeconds: number;
   periodicReconciliationMinutes: number;
   confidenceThresholdAuto: number;
+  confidenceThresholdAutoOneStep: number;
   confidenceThresholdSuggest: number;
   maxRecentMessagesInContext: number;
   autoAllowedTransitions: string[];
@@ -23,6 +24,9 @@ export const conversationIntelligenceDomainRoot = createDomainRoot<ConversationI
     analysisDebounceSeconds: 60,
     periodicReconciliationMinutes: 120,
     confidenceThresholdAuto: 0.90,
+    // 28/10 (Vinicios): one stage forward is automatic from 75%; skipping stages keeps 90%.
+    // A move of several stages at 75%+ advances one stage (the rest follows on later analyses).
+    confidenceThresholdAutoOneStep: 0.75,
     confidenceThresholdSuggest: 0.70,
     maxRecentMessagesInContext: 30,
     // Decided 25/09: the IA moves the attendance by itself, always writing the
@@ -76,6 +80,15 @@ export const conversationIntelligenceDomainRoot = createDomainRoot<ConversationI
       validator: (val: unknown) => ({
         valid: typeof val === "number" && val >= 0.85 && val <= 1.0,
         error: "confidenceThresholdAuto deve ser entre 0.85 e 1.0",
+      }),
+    },
+    confidenceThresholdAutoOneStep: {
+      key: "confidenceThresholdAutoOneStep",
+      resolutionStrategy: "RESTRICTIVE_INTERSECTION",
+      overrideAllowedAt: ["TENANT"],
+      validator: (val: unknown) => ({
+        valid: typeof val === "number" && val >= 0.70 && val <= 1.0,
+        error: "confidenceThresholdAutoOneStep deve ser entre 0.70 e 1.0",
       }),
     },
     confidenceThresholdSuggest: {

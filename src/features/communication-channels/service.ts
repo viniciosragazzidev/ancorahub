@@ -26,6 +26,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { COEXISTENCE_WEBHOOK_FIELDS } from "./meta-coexistence-events";
 import type { MetaWebhookPayload, MetaWebhookStatus } from "./types";
 import { shouldStartOrResumeAiQualification } from "@/features/qualification-engine/service";
+import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence/trigger";
 
 export async function isMetaCloudWhatsAppEnabled() {
   const [row] = await getDatabase()
@@ -386,6 +387,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           ...(mediaColumns ? { mediaKind: mediaColumns.kind, mediaMimeType: mediaColumns.mimeType, mediaFilename: mediaColumns.filename, mediaSizeBytes: mediaColumns.sizeBytes, mediaStorageKey: mediaColumns.storageKey, mediaProviderId: inboundMediaId } : {}),
           sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
         }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
+        if (activeLeadId) scheduleLeadConversationAnalysis(activeLeadId, channel.tenantId);
         void publishConversationInvalidation({
           tenantId: channel.tenantId,
           participantUserIds: [lead?.corretorId],

@@ -10,6 +10,16 @@ function isForwardMove(from: string, to: string) {
   return FORWARD_STAGES.has(from) && FORWARD_STAGES.has(to)
     && (LEAD_STATUS_ORDER[to] ?? -1) > (LEAD_STATUS_ORDER[from] ?? Number.POSITIVE_INFINITY);
 }
+
+function forwardSteps(from: string, to: string) {
+  return (LEAD_STATUS_ORDER[to] ?? 0) - (LEAD_STATUS_ORDER[from] ?? 0);
+}
+
+/** The funnel stage right after `from` (Novo → Distribuído → Em contato → Cotação enviada → …). */
+function nextForwardStage(from: string) {
+  const order = (LEAD_STATUS_ORDER[from] ?? -1) + 1;
+  return [...FORWARD_STAGES].find((stage) => LEAD_STATUS_ORDER[stage] === order) ?? null;
+}
 import type { ConversationIntelligenceConfig } from "@/shared/domain-root/conversation-intelligence-root";
 
 export interface PolicyEvaluationInput {
@@ -28,6 +38,7 @@ export interface PolicyEvaluationInput {
   config: Pick<
     ConversationIntelligenceConfig,
     | "confidenceThresholdAuto"
+    | "confidenceThresholdAutoOneStep"
     | "confidenceThresholdSuggest"
     | "autoAllowedTransitions"
     | "suggestOnlyTransitions"
@@ -98,11 +109,19 @@ export function evaluateAssessmentPolicy(
     config.suggestOnlyTransitions.includes(transitionPair) ||
     config.suggestOnlyTransitions.includes(genericWildcardPair);
 
+  // 28/10: one stage forward needs the one-step threshold (75%); skipping stages keeps 90%.
+  // Seen several stages ahead at 75%+, the lead advances one stage: each later stage
+  // implies the next one happened (e.g. negotiating implies the quote was sent).
+  const forward = config.autoAllowedTransitions.includes("forward") && isForwardMove(currentLeadStatus, suggestedStatus);
+  const steps = forward ? forwardSteps(currentLeadStatus, suggestedStatus) : 0;
+  const partial = forward && steps >= 2 && confidence < config.confidenceThresholdAuto && confidence >= config.confidenceThresholdAutoOneStep;
+  const target = partial ? nextForwardStage(currentLeadStatus) ?? suggestedStatus : suggestedStatus;
+  const threshold = forward && (steps === 1 || partial) ? config.confidenceThresholdAutoOneStep : config.confidenceThresholdAuto;
   const isAutoEligible =
-    confidence >= config.confidenceThresholdAuto &&
+    confidence >= threshold &&
     (config.autoAllowedTransitions.includes(transitionPair) ||
       config.autoAllowedTransitions.includes(genericWildcardPair) ||
-      (config.autoAllowedTransitions.includes("forward") && isForwardMove(currentLeadStatus, suggestedStatus))) &&
+      forward) &&
     !isExplicitSuggestOnly;
 
   // An automatic move rests on what the customer said; leaving Novo/Distribuído
@@ -177,9 +196,11 @@ export function evaluateAssessmentPolicy(
       action: "AUTO_TRANSITION",
       transitionAllowed: true,
       fromStatus: currentLeadStatus,
-      targetStatus: suggestedStatus,
+      targetStatus: target,
       confidence,
-      reason: `Confiança alta (${(confidence * 100).toFixed(0)}%) e regra de transição '${transitionPair}' autorizada para automação segura.`,
+      reason: partial
+        ? `A IA vê o lead em '${suggestedStatus}' (${(confidence * 100).toFixed(0)}%): avança uma etapa, até '${target}'; as próximas seguem nas próximas análises.`
+        : `Confiança alta (${(confidence * 100).toFixed(0)}%) e regra de transição '${transitionPair}' autorizada para automação segura.`,
       aiFeedbackPayload: buildAIFeedbackPayload(assessment),
     };
   }
@@ -227,4 +248,29 @@ export function isUsableAssessment(assessment: ConversationAssessment): boolean 
     && !PLACEHOLDER_VALUES.has(summary.toUpperCase())
     && nextAction.length >= 4
     && !PLACEHOLDER_VALUES.has(nextAction.toUpperCase());
+}
+
+/** A note of the analysis on the lead's timeline at least this often, even with nothing new. */
+const FEEDBACK_NOTE_EVERY_MS = 6 * 60 * 60_000;
+
+/**
+ * What is new in an analysis. It runs 1 minute after every message (28/10): the broker is
+ * notified and the timeline gets a note only on a move, a suggestion different from the last
+ * one, or the first diagnosis; the note also repeats every 6 hours to keep the summary current.
+ */
+export function analysisNews(input: {
+  autoMoved: boolean;
+  action: PolicyExecutionResult["action"];
+  targetStatus: string | null;
+  previous: { action?: string | null; targetStatus?: string | null } | null;
+  lastNoteAt: string | null;
+  now: Date;
+}) {
+  const firstDiagnosis = !input.previous;
+  const newSuggestion = input.action === "SUGGEST"
+    && (input.previous?.action !== "SUGGEST" || (input.previous?.targetStatus ?? null) !== input.targetStatus);
+  const news = input.autoMoved || newSuggestion || firstDiagnosis;
+  const lastNote = input.lastNoteAt ? Date.parse(input.lastNoteAt) : Number.NaN;
+  const noteDue = Number.isNaN(lastNote) || input.now.getTime() - lastNote >= FEEDBACK_NOTE_EVERY_MS;
+  return { notify: news, writeNote: news || noteDue };
 }

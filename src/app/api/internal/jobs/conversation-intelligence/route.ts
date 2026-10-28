@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-/** Conversation analysis and automatic lead stage (Coolify, every 10 minutes): see docs/runbooks/coolify-scheduled-tasks.md. */
+/** Conversation analysis and automatic lead stage (Coolify, every minute since 28/10): see docs/runbooks/coolify-scheduled-tasks.md. */
 async function handle(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {

@@ -15,7 +15,7 @@ export const JOB_SCHEDULE = {
   "meta-conversions": { path: "/api/internal/jobs/meta-conversions", cron: "*/5 * * * *", label: "Conversões para a Meta" },
   "meta-sync": { path: "/api/internal/jobs/meta-sync", cron: "0 * * * *", label: "Sincronização com a Meta" },
   "qualification-cadence": { path: "/api/internal/jobs/qualification-cadence", cron: "*/2 * * * *", label: "Régua de lembretes" },
-  "conversation-intelligence": { path: "/api/internal/jobs/conversation-intelligence", cron: "*/10 * * * *", label: "Etapa automática" },
+  "conversation-intelligence": { path: "/api/internal/jobs/conversation-intelligence", cron: "* * * * *", label: "Etapa automática" },
   "situation-learning": { path: "/api/internal/jobs/situation-learning", cron: "*/30 * * * *", label: "Aprendizado de situações" },
   "waha-cadence": { path: "/api/internal/jobs/waha-cadence", cron: "*/5 * * * *", label: "Cadências WAHA" },
   engagement: { path: "/api/internal/jobs/engagement", cron: "*/2 * * * *", label: "Jornada do corretor" },

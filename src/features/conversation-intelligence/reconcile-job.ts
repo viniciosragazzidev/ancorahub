@@ -5,17 +5,21 @@ import { and, desc, gt, inArray, isNotNull, max, notInArray, sql } from "drizzle
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
+import { withJobLease } from "@/shared/db/job-lease";
 
 import { analyzeLeadConversation } from "./analyzer";
 import { getAiStageMode } from "./stage-mode";
 
-/** Leads analysed per run (every 10 min): bounds the AI bill and the run time. */
-const MAX_LEADS_PER_RUN = 20;
-/** Same wait as the webhook debounce: the customer may still be typing. */
-const QUIET_MS = 2 * 60_000;
+/** Leads analysed per run (every minute since 28/10): bounds the AI bill and the run time. */
+const MAX_LEADS_PER_RUN = 40;
+/** Analyses at the same time inside one run. */
+const CONCURRENCY = 3;
+/** 1 minute after the last message (Vinicios, 28/10), the same wait as the webhook debounce. */
+const QUIET_MS = 60_000;
 /** Only recent conversations; older ones are analysed when someone opens the lead. */
 const LOOKBACK_MS = 3 * 24 * 60 * 60_000;
-const TIME_BUDGET_MS = 100_000;
+/** The job runs every minute: a run ends before the next one starts. */
+const TIME_BUDGET_MS = 50_000;
 
 /**
  * Durable trigger of the conversation analysis (Coolify, every 10 minutes):
@@ -27,6 +31,12 @@ export async function runConversationReconcileJob() {
   if ((await getSystemSetting(FEATURE_FLAGS.CONVERSATION_INTELLIGENCE.key)) === "false") {
     return { skipped: "disabled" as const };
   }
+  // One run at a time: a slow run (AI timeouts) must not overlap the next one.
+  const lease = await withJobLease("conversation-intelligence", TIME_BUDGET_MS + 60_000, runReconcile);
+  return lease.acquired ? lease.value : { skipped: "running" as const };
+}
+
+async function runReconcile() {
 
   const db = getDatabase();
   const now = Date.now();
@@ -67,11 +77,14 @@ export async function runConversationReconcileJob() {
   // AI failures show in the job answer (Coolify log), not only in the server console.
   let failed = 0;
   let lastFailure: string | undefined;
+  const queue: typeof pending = [];
   for (const row of pending) {
-    if (analyzed >= MAX_LEADS_PER_RUN || Date.now() - now > TIME_BUDGET_MS) break;
+    if (queue.length >= MAX_LEADS_PER_RUN) break;
     if (!modeByTenant.has(row.tenantId)) modeByTenant.set(row.tenantId, await getAiStageMode(row.tenantId));
     // A company that turned the stage IA off still gets the diagnosis when the lead is opened.
-    if (modeByTenant.get(row.tenantId) === "off") continue;
+    if (modeByTenant.get(row.tenantId) !== "off") queue.push(row);
+  }
+  const analyzeOne = async (row: (typeof pending)[number]) => {
     try {
       const result = await analyzeLeadConversation(row.leadId!, row.tenantId);
       if (result.analyzed) analyzed += 1;
@@ -80,6 +93,10 @@ export async function runConversationReconcileJob() {
     } catch (error) {
       console.error("[conversation-reconcile] lead failed", row.leadId, error instanceof Error ? error.message.slice(0, 200) : error);
     }
+  };
+  for (let index = 0; index < queue.length; index += CONCURRENCY) {
+    if (Date.now() - now > TIME_BUDGET_MS) break;
+    await Promise.all(queue.slice(index, index + CONCURRENCY).map(analyzeOne));
   }
   return { analyzed, moved, failed, candidates: pending.length, ...(lastFailure ? { lastFailure } : {}) };
 }

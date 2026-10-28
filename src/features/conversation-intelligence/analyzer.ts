@@ -16,12 +16,13 @@ import {
   buildConversationIntelligenceContext,
   type ContextBuilderMessage,
 } from "./context-builder";
-import { evaluateAssessmentPolicy, isUsableAssessment } from "./policy-executor";
+import { analysisNews, evaluateAssessmentPolicy, isUsableAssessment } from "./policy-executor";
 import { getTenantPlaybooks } from "@/features/ai-qualification/playbooks-storage";
 import { MOTIVOS_PERDA, LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { changeLeadStatus } from "@/features/leads/change-lead-status";
 import type { TenantContext } from "@/shared/auth/types";
 import { getAiStageMode } from "./stage-mode";
+import { conversationMessageBody } from "@/features/conversations/message-media-text";
 import {
   ConversationAssessmentSchema,
   type ConversationAssessment,
@@ -61,10 +62,26 @@ export interface AnalyzeLeadConversationResult {
 }
 
 /**
+ * Leads being analysed in this process. The analysis runs 1 minute after the last message
+ * (webhook debounce) and the 1-minute job is the safety net: both may reach the same lead.
+ */
+const analysesInFlight = new Set<string>();
+
+/**
  * Analisa a conversa de WhatsApp de um lead, gera percepção comercial estruturada via IA,
  * aplica a política de segurança determinística e registra feedback e transições no CRM.
  */
-export async function analyzeLeadConversation(
+export async function analyzeLeadConversation(leadId: string, tenantId: string): Promise<AnalyzeLeadConversationResult> {
+  if (analysesInFlight.has(leadId)) return { analyzed: false, reason: "Análise deste lead já em andamento." };
+  analysesInFlight.add(leadId);
+  try {
+    return await runLeadConversationAnalysis(leadId, tenantId);
+  } finally {
+    analysesInFlight.delete(leadId);
+  }
+}
+
+async function runLeadConversationAnalysis(
   leadId: string,
   tenantId: string,
 ): Promise<AnalyzeLeadConversationResult> {
@@ -106,6 +123,8 @@ export async function analyzeLeadConversation(
       body: schema.whatsappMessages.body,
       sentAt: schema.whatsappMessages.sentAt,
       senderRole: schema.whatsappMessages.senderRole,
+      mediaKind: schema.whatsappMessages.mediaKind,
+      mediaFilename: schema.whatsappMessages.mediaFilename,
     })
     .from(schema.whatsappMessages)
     .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.leadId, leadId)))
@@ -124,7 +143,8 @@ export async function analyzeLeadConversation(
   const contextMessages: ContextBuilderMessage[] = chronological.map((m) => ({
     id: m.id,
     sender: senderOf(m),
-    content: m.body,
+    // A quote sent as "Calculo.pdf" reached the AI as "[document]" (28/10, Magma): the file name tells what it was.
+    content: conversationMessageBody(m),
     timestamp: m.sentAt,
   }));
   const customerMessageCount = contextMessages.filter((m) => m.sender === "customer").length;
@@ -180,7 +200,8 @@ Orientações:
 8. Produza um resumo executivo objetivo em português do Brasil sem jargões desnecessários.
 9. Sempre que sugerir um status, explique em statusReason o motivo em uma ou duas frases, e cite em evidence trechos literais das mensagens do cliente que justificam a mudança.
 10. Sugira "lost" somente quando o CLIENTE deixar claro que desistiu, já contratou com outra empresa, não tem interesse ou pediu para não ser mais contatado. Nesse caso preencha lossReasonCode com um destes códigos: ${MOTIVOS_PERDA.join(", ")}. Silêncio do cliente ou mensagens só do corretor NÃO bastam para "lost".
-11. Nunca invente falas do cliente; se a transcrição não trouxer mensagens do cliente, declare isso no resumo.${await buildPlaybookRules(lead.tenantId)}`;
+11. Nunca invente falas do cliente; se a transcrição não trouxer mensagens do cliente, declare isso no resumo.
+12. Arquivos aparecem como "[documento: nome do arquivo]", "[imagem]", "[áudio]". Um arquivo enviado pelo corretor com nome de cotação, cálculo, proposta, simulação ou tabela de preços conta como cotação apresentada (quote_sent), mesmo sem fala do cliente; nesse caso cite em evidence o nome do arquivo. Documentos pessoais enviados pelo cliente (RG, CPF, comprovante, carteirinha) depois da cotação indicam documentação.${await buildPlaybookRules(lead.tenantId)}`;
 
   const userPrompt = `Contexto do Lead:\n${compactContext.leadSummary}\n\nMemória Anterior:\n${compactContext.historicalMemory}\n\nTranscrição Recente:\n${compactContext.recentTranscript}`;
 
@@ -284,6 +305,15 @@ ${ASSESSMENT_JSON_INSTRUCTION}` },
     }
   }
 
+  const news = analysisNews({
+    autoMoved: Boolean(autoMove),
+    action: policyResult.action,
+    targetStatus: policyResult.targetStatus,
+    previous: (qualDetails.aiPolicyResult as { action?: string | null; targetStatus?: string | null } | undefined) ?? null,
+    lastNoteAt: typeof qualDetails.aiLastFeedbackNoteAt === "string" ? qualDetails.aiLastFeedbackNoteAt : null,
+    now,
+  });
+
   await db.transaction(async (tx) => {
     // 7.2 Atualizar qualificationDetails com o estado mais recente de IA
     const updatedQualDetails = {
@@ -299,6 +329,7 @@ ${ASSESSMENT_JSON_INSTRUCTION}` },
       aiLastAnalyzedAt: now.toISOString(),
       // What "Desfazer" reverts (24h, see actions.ts). An analysis without a move keeps the last one.
       ...(autoMove ? { aiLastAutoMove: autoMove } : {}),
+      ...(news.writeNote ? { aiLastFeedbackNoteAt: now.toISOString() } : {}),
     };
 
     await tx
@@ -309,8 +340,8 @@ ${ASSESSMENT_JSON_INSTRUCTION}` },
       })
       .where(eq(schema.leads.id, lead.id));
 
-    // 7.3 Inserir feedback estruturado na timeline do lead
-    await tx.insert(schema.leadInteractions).values({
+    // 7.3 Feedback na timeline: só com novidade (ou a cada 6h), já que a análise roda a cada conversa.
+    if (news.writeNote) await tx.insert(schema.leadInteractions).values({
       id: randomUUID(),
       leadId: lead.id,
       userId: actorUserId,
@@ -339,8 +370,8 @@ ${ASSESSMENT_JSON_INSTRUCTION}` },
     });
   });
 
-  // 8. Notificar o corretor responsável com push + toast
-  if (lead.corretorId) {
+  // 8. Notificar o corretor responsável com push + toast, só quando há novidade
+  if (lead.corretorId && news.notify) {
     const targetLabel = policyResult.targetStatus ? LEAD_STATUS_LABELS[policyResult.targetStatus] ?? policyResult.targetStatus : "";
     const notifTitle = autoMove
       ? `IA moveu ${lead.nome} para ${targetLabel}`

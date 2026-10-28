@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence/trigger";
 
 import { and, eq } from "drizzle-orm";
 
@@ -176,6 +177,7 @@ export async function sendLeadMediaAction(
     });
 
     revalidatePath("/conversas");
+    scheduleLeadConversationAnalysis(lead.id, context.tenantId);
     void publishConversationInvalidation({ tenantId: context.tenantId, participantUserIds: [context.userId] }).catch(
       () => undefined,
     );
