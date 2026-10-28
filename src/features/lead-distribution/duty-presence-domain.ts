@@ -454,6 +454,16 @@ export function isOvernightLead(createdAt: Date, dutyDate: string, timezone: str
   return createdAt >= window.since && createdAt < window.until;
 }
 
+/**
+ * Key of one occurrence's confirmation. The night extra has the same
+ * assignment and day as the morning shift (it ends when the shift starts):
+ * keyed by day only, one row overwrote the other and the plantão screen showed
+ * the extra's status for the shift.
+ */
+export function presenceOccurrenceKey(assignmentId: string, occurrence: { dutyDate: string; startsAt: Date; endsAt: Date }) {
+  return `${assignmentId}:${occurrence.dutyDate}:${occurrence.startsAt.getTime()}:${occurrence.endsAt.getTime()}`;
+}
+
 /** Confirmação do extra: termina na hora em que o plantão normal do corretor começa. */
 export function isExtraShiftRecord(input: { shiftEndsAt: Date; assignmentStartsAt: string | null | undefined; timezone: string }) {
   return Boolean(input.assignmentStartsAt) && localClock(input.shiftEndsAt, input.timezone) === input.assignmentStartsAt;

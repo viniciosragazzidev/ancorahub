@@ -6,7 +6,7 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { selectEffectiveDutyAssignments } from "./dated-duty-roster";
-import { dutyLeadsSinceStart, effectiveAttendanceMode, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, resolveDutyLeadWindowBounds, type DutyLeadsSinceOption } from "./duty-presence-domain";
+import { dutyLeadsSinceStart, effectiveAttendanceMode, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, presenceOccurrenceKey, resolveDutyLeadWindowBounds, type DutyLeadsSinceOption } from "./duty-presence-domain";
 import { getSaoPauloDateKey } from "./dated-duty-roster";
 import { firstValidShift } from "./monthly-duty-plan";
 import { normalizeOfferPacing } from "./offer-pacing";
@@ -412,6 +412,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     ? await db.select({
       assignmentId: schema.dutyPresenceConfirmations.assignmentId,
       dutyDate: schema.dutyPresenceConfirmations.dutyDate,
+      shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt,
+      shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt,
       status: schema.dutyPresenceConfirmations.status,
       confirmedBy: schema.dutyPresenceConfirmations.confirmedBy,
       confirmedAt: schema.dutyPresenceConfirmations.confirmedAt,
@@ -428,7 +430,10 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       inArray(schema.dutyPresenceConfirmations.dutyDate, dutyDates),
     ))
     : [];
-  const presenceByAssignment = new Map(presenceRows.map((row) => [`${row.assignmentId}:${row.dutyDate}`, row]));
+  // The shift's own row, never the night extra's (same assignment and day).
+  const presenceByAssignment = new Map(presenceRows.map((row) => [
+    presenceOccurrenceKey(row.assignmentId, { dutyDate: row.dutyDate, startsAt: row.shiftStartsAt, endsAt: row.shiftEndsAt }), row,
+  ]));
 
   // Live offer status: offers in the pacing lookback window. The capacity
   // counter uses the leads each broker received in this plantão (see above).
@@ -517,7 +522,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       // Which shift this broker works (morning, afternoon, whole day) on a split plantão.
       const shift = assignmentShift(schedule, { startsAt, endsAt });
       const occurrence = occurrenceByAssignment.get(entry.id);
-      const presence = occurrence ? presenceByAssignment.get(`${entry.id}:${occurrence.dutyDate}`) : null;
+      const presence = occurrence ? presenceByAssignment.get(presenceOccurrenceKey(entry.id, occurrence)) : null;
       // Same prerequisites the distribution engine applies before offering a lead.
       const blockedReason = presence?.status === "absent" ? "Falta registrada neste plantão" : !userActive || membershipStatus !== "active" ? "Conta inativa" : !phone ? "Sem telefone cadastrado (não recebe ofertas)" : attendanceMode === "presencial" && (!presence || presence.status !== "confirmed" || !presence.confirmedBy) ? "Aguardando presença na unidade" : presenceEnabled && occurrence && presence?.status !== "confirmed" ? "Aguardando confirmação do plantão" : null;
       const absent = presence?.status === "absent";

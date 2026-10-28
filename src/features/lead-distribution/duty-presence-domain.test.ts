@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   dutyAttendanceOverrideProblem,
+  extraShiftWindow,
+  presenceOccurrenceKey,
   dutyLeadsSinceStart,
   effectiveAttendanceMode,
   findRunningDutySchedule,
@@ -308,5 +310,15 @@ describe("modo do corretor no plantão (online dentro do presencial)", () => {
     expect(dutyAttendanceOverrideProblem({ role: "director", scheduleMode: "online", mode: null })).toBeNull();
     expect(dutyAttendanceOverrideProblem({ role: "manager", scheduleMode: "presencial", mode: "online" })).toMatch(/Diretor/);
     expect(dutyAttendanceOverrideProblem({ role: "director", scheduleMode: "online", mode: "online" })).toMatch(/já é online/);
+  });
+});
+
+describe("presence key of one occurrence", () => {
+  it("keeps the night extra apart from the shift it precedes (same assignment and day)", () => {
+    const shift = { dutyDate: "2026-10-28", startsAt: new Date("2026-10-28T12:00:00.000Z"), endsAt: new Date("2026-10-28T16:30:00.000Z") };
+    const extra = extraShiftWindow(shift, "America/Sao_Paulo", "07:00");
+    expect(extra?.dutyDate).toBe(shift.dutyDate);
+    expect(presenceOccurrenceKey("assignment-1", extra!)).not.toBe(presenceOccurrenceKey("assignment-1", shift));
+    expect(presenceOccurrenceKey("assignment-1", { ...shift })).toBe(presenceOccurrenceKey("assignment-1", shift));
   });
 });
