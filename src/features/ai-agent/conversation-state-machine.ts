@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, count, desc, eq, gt, inArray, isNull, ne, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, ne, notInArray, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { generateAiResponse, detectLanguage, detectHumanTransferRequest } from "./service";
 import { loadTenantAiAgentConfig } from "./tenant-config";
@@ -8,6 +8,7 @@ import {
   buildMemoryContext,
   COLLECTIBLE_FIELDS,
   createEmptyMemory,
+  extractUnansweredMessages,
   pendingQuestionOf,
   pendingQuestionsOf,
   type ConversationMemory,
@@ -986,7 +987,7 @@ async function completeDeterministicQualificationTurn(input: {
     // Only the question: a lateral answer or greeting before it ("O valor
     // depende da idade...") would make the next answer be read as an age.
     lastQuestionAsked: isHandoff ? undefined : pendingQuestionOf(input.turn.reply),
-    // Every question of the reply: the city may be asked before the last paragraph (28/10).
+    // Every question of the reply, so a question asked before the last paragraph still counts (28/10).
     lastQuestionsAsked: isHandoff ? undefined : pendingQuestionsOf(input.turn.reply),
     updatedAt: now.toISOString(),
   };
@@ -1890,7 +1891,7 @@ export async function processInboundAiResponse({
       )
     );
 
-  // Older messages are read without the question being asked now: "Faz uma
+  // Messages from before the AI's last reply are read without the question being asked now: "Faz uma
   // coisa", said before the city question, is not a city.
   const questionNow = updatedMemory.lastQuestionAsked;
   const questionsNow = updatedMemory.lastQuestionsAsked;
@@ -1900,6 +1901,36 @@ export async function processInboundAiResponse({
     }
   }
   updatedMemory = { ...updatedMemory, lastQuestionAsked: questionNow, lastQuestionsAsked: questionsNow };
+
+  // Every customer message sent after the AI's last reply is an answer to its last question: read them
+  // all, oldest first, each with that question (28/10). Before, only the last message of a batch was
+  // read with it, so a city sent just before "Não tenho plano" was lost.
+  const [lastAiReply] = await db
+    .select({ sentAt: schema.whatsappMessages.sentAt })
+    .from(schema.whatsappMessages)
+    .where(and(
+      eq(schema.whatsappMessages.tenantId, tenantId),
+      eq(schema.whatsappMessages.conversationId, conversation.id),
+      or(eq(schema.whatsappMessages.direction, "outbound"), eq(schema.whatsappMessages.senderRole, "assistant")),
+    ))
+    .orderBy(desc(schema.whatsappMessages.sentAt))
+    .limit(1);
+  const unansweredIncoming = await db
+    .select({ messageId: schema.whatsappMessages.messageId, body: schema.whatsappMessages.body })
+    .from(schema.whatsappMessages)
+    .where(and(
+      eq(schema.whatsappMessages.tenantId, tenantId),
+      eq(schema.whatsappMessages.conversationId, conversation.id),
+      inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
+      lastAiReply?.sentAt ? gt(schema.whatsappMessages.sentAt, lastAiReply.sentAt) : undefined,
+    ))
+    .orderBy(asc(schema.whatsappMessages.sentAt))
+    .limit(50);
+  // The message this turn already reads (step 6) is left out.
+  updatedMemory = extractUnansweredMessages(
+    updatedMemory,
+    unansweredIncoming.filter((message) => message.messageId !== sourceIdentifier && message.body && !isAutomatedInboundMessage(message.body)),
+  );
 
   // 6c. Buscar textos de mensagens enviadas para evitar repeticao de perguntas
   const allOutboundMsgs = await db

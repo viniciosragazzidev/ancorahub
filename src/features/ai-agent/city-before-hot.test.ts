@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { evaluateQualification } from "@/features/qualification-engine/service";
 
-import { createEmptyMemory, extractFieldsFromMessage, hasQuoteReadyData, pendingQuestionsOf, type ConversationMemory, type MemoryField } from "./memory";
+import { createEmptyMemory, extractFieldsFromMessage, extractUnansweredMessages, hasQuoteReadyData, pendingQuestionsOf, type ConversationMemory, type MemoryField } from "./memory";
 
 const field = (value: string): MemoryField => ({ value, confidence: 1, sourceMessageId: "m1" });
 const CITY_THEN_PLAN = "Em qual cidade e bairro você mora?\n\nE hoje você tem algum plano de saúde?";
@@ -68,5 +68,36 @@ describe("city answer read when the city question is not the last paragraph (28/
   it("does not read a city out of a reply that asked no city", () => {
     const memory = { ...createEmptyMemory(), lastQuestionAsked: PLAN_ONLY, lastQuestionsAsked: PLAN_ONLY };
     expect(extractFieldsFromMessage("Petrópolis/RJ", memory, "m2").city).toBeUndefined();
+  });
+});
+
+describe("a batch of messages after the AI's last question is read in order (28/10)", () => {
+  // The real reply of 28/10 (Mary, fe76a774): one paragraph asking the city and the current plan.
+  const CITY_AND_PLAN = "Ótimo, então é pra família! Pra fechar a cotação, em qual cidade e bairro você mora? Se vocês já têm plano de saúde hoje, me conta qual, que eu comparo pra vocês.";
+
+  it("reads the city and the plan from two messages sent before the reply", () => {
+    const memory = { ...createEmptyMemory(), lastQuestionAsked: CITY_AND_PLAN, lastQuestionsAsked: CITY_AND_PLAN };
+    const next = extractUnansweredMessages(memory, [
+      { body: "Petrópolis,Duarte da Silveira", messageId: "m1" },
+      { body: "Não tenho plano de saúde", messageId: "m2" },
+    ]);
+    expect(next.city?.value).toBe("Petrópolis");
+    expect(next.neighborhood?.value).toBe("Duarte da Silveira");
+    expect(next.currentPlan).toBeDefined();
+    expect(next.lastQuestionAsked).toBe(CITY_AND_PLAN);
+  });
+
+  it("the city stays lost when the batch is read without the question (the old behaviour)", () => {
+    const memory = { ...createEmptyMemory(), lastQuestionAsked: undefined, lastQuestionsAsked: undefined };
+    expect(extractFieldsFromMessage("Petrópolis,Duarte da Silveira", memory, "m1").city).toBeUndefined();
+  });
+
+  it("keeps the first city when a later message repeats another place", () => {
+    const memory = { ...createEmptyMemory(), lastQuestionAsked: CITY_AND_PLAN, lastQuestionsAsked: CITY_AND_PLAN };
+    const next = extractUnansweredMessages(memory, [
+      { body: "Petrópolis, RJ", messageId: "m1" },
+      { body: "moro em Niterói", messageId: "m2" },
+    ]);
+    expect(next.city?.value).toBe("Petrópolis");
   });
 });

@@ -58,7 +58,7 @@ export type ConversationMemory = {
   collectedFields: string[];
   /** The last question the AI asked, verbatim */
   lastQuestionAsked?: string;
-  /** Every question paragraph of the last reply (28/10): "cidade" can be asked before the last question. */
+  /** Every question paragraph of the last reply, so a question asked earlier in the reply still counts (28/10). */
   lastQuestionsAsked?: string;
   /** Objection recoveries already tried (one, then a second refusal closes politely). */
   objectionAttempts?: number;
@@ -296,9 +296,8 @@ export function pendingQuestionOf(reply: string) {
 }
 
 /**
- * Every question paragraph of a reply (28/10). A reply can ask the city and then the plan in two
- * paragraphs: only the last one would be "the question", so the city answer was never read.
- * Lateral paragraphs without "?" stay out, as in pendingQuestionOf.
+ * Every question paragraph of a reply (28/10), so a question asked in an earlier paragraph still
+ * counts as asked. Lateral paragraphs without "?" stay out, as in pendingQuestionOf.
  */
 export function pendingQuestionsOf(reply: string) {
   const questions = reply.split(/\n\s*\n/).map((part) => part.trim()).filter((part) => part.includes("?"));
@@ -308,6 +307,26 @@ export function pendingQuestionsOf(reply: string) {
 /** The text of the question(s) the AI asked last: the last one plus every question of the last reply. */
 function pendingQuestionsText(memory: ConversationMemory) {
   return `${memory.lastQuestionAsked ?? ""} ${memory.lastQuestionsAsked ?? ""}`;
+}
+
+/**
+ * The customer's messages sent after the AI's last reply, read in order (28/10). A batch of
+ * messages ("Petrópolis,Duarte da Silveira" then "Não tenho plano") is all answers to the question
+ * the AI asked last, so each one keeps that question: the city in an earlier message is not lost.
+ * Callers pass the messages oldest first and without the one the turn already reads.
+ */
+export function extractUnansweredMessages(
+  memory: ConversationMemory,
+  messages: ReadonlyArray<{ body: string | null | undefined; messageId?: string | null }>,
+): ConversationMemory {
+  const questionNow = memory.lastQuestionAsked;
+  const questionsNow = memory.lastQuestionsAsked;
+  let next = memory;
+  for (const message of messages) {
+    if (!message.body) continue;
+    next = extractFieldsFromMessage(message.body, { ...next, lastQuestionAsked: questionNow, lastQuestionsAsked: questionsNow }, message.messageId ?? undefined);
+  }
+  return { ...next, lastQuestionAsked: questionNow, lastQuestionsAsked: questionsNow };
 }
 
 /**
