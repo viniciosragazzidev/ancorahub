@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 
 import { Avatar } from "@/components/arc/avatar/avatar";
@@ -53,6 +53,8 @@ const stepTone: Record<NextStep["tone"], string> = {
  */
 export function NextStepCard({ step, action }: { step: NextStep; action?: ReactNode }) {
   const reduce = useReducedMotion() ?? false;
+  // On the phone the layout clamps a long AI suggestion to two lines; one tap shows it whole (28/10).
+  const [expanded, setExpanded] = useState(false);
   // Keyed by the step: when the next step changes, the card moves into its new state (transform only).
   return (
     <motion.section
@@ -63,7 +65,7 @@ export function NextStepCard({ step, action }: { step: NextStep; action?: ReactN
       transition={{ duration: motionTokens.duration.standard, ease: motionTokens.ease.enter }}
       className={cn("arc-venancor flex flex-col gap-3 rounded-3xl p-4 shadow-(--shadow-resting)", stepTone[step.tone])}
     >
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1" data-next-step-text data-expanded={expanded || undefined} onClick={() => setExpanded((open) => !open)}>
         <h2 className="text-base font-semibold text-(--foreground)">{step.title}</h2>
         <p className="text-sm text-(--text-secondary)">{step.detail}</p>
       </div>

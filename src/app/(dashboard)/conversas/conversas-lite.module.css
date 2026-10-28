@@ -113,46 +113,28 @@
 .root[data-skin="diretor"] [data-conversations-part="director-list-controls"] {
   flex: 0 0 auto;
   min-height: var(--control-height-sm);
-  /* The tabs and filters scroll sideways: a thin visible bar shows there is more (28/10, the hidden one cut the tabs). */
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
-  overscroll-behavior-x: contain;
-  white-space: nowrap;
 }
 
-.root[data-skin="diretor"] [data-conversations-part="director-list-controls"]::-webkit-scrollbar {
-  height: 6px;
-}
-
-.root[data-skin="diretor"] [data-conversations-part="director-list-controls"]::-webkit-scrollbar-thumb {
-  border-radius: var(--radius-control);
-  background: var(--border-strong);
-}
-
-.root[data-skin="diretor"] [data-conversations-part="filter-controls"] {
-  flex: 0 0 auto;
-  width: max-content;
-  min-width: max-content;
-  flex-wrap: nowrap;
-  gap: 8px;
-  white-space: nowrap;
-}
-
-.root[data-skin="diretor"] [data-conversations-part="filter-controls"] [data-conversations-part="filters"] {
-  width: max-content;
-  max-width: none;
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
-  overflow: visible;
-}
-
+/* Tabs on one line, filters below: both wrap instead of scrolling sideways (28/10, the scroll felt like too much for one strip). */
 .root[data-skin="diretor"] [data-conversations-part="director-list-controls"] [data-conversations-part="inline-actions"] {
   flex: 0 0 auto;
+  min-width: 0;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="director-list-controls"] [data-conversations-part="inline-actions"] > nav {
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .root[data-skin="diretor"] [data-conversations-part="director-list-controls"] [data-conversations-nav] {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  max-width: 100%;
   white-space: nowrap;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="filter-controls"] {
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .root[data-skin="diretor"] [data-conversations-part="search-header"] {

@@ -342,6 +342,13 @@ export function ConversationsWorkspace({
     );
   }
 
+  const statusFilters: { value: ViewFilter; label: string; count: number }[] = [
+    { value: "all", label: "Todos", count: conversations.length },
+    { value: "qualified", label: "Qualificados", count: conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length },
+    { value: "ai_active", label: "Atendente Virtual", count: conversations.filter((c) => Boolean(c.aiConversation) && (c.hasIncoming ?? c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound")))).length },
+    { value: "human_active", label: "Atendimento Humano", count: conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length },
+  ];
+
   const filterContent = (
     <>
       <h2 className="sr-only">Filtros dos atendimentos</h2>
@@ -393,12 +400,37 @@ export function ConversationsWorkspace({
         </Select>
       ) : null}
 
-      <div className="flex max-w-full items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar" data-conversations-part={directorSkinEnabled ? "filters" : undefined}>
-        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
-        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
-        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "ai_active"} count={conversations.filter((c) => Boolean(c.aiConversation) && (c.hasIncoming ?? c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound")))).length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
-        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
-      </div>
+      {directorSkinEnabled ? (
+        // Lite: the four status chips become one compact select, so the filters fit the list width (28/10).
+        <Select
+          className="w-auto shrink-0"
+          labels={Object.fromEntries(statusFilters.map((option) => [option.value, option.label]))}
+          onValueChange={(value) => setFilter((value as ViewFilter | null) ?? "all")}
+          value={filter}
+        >
+          <SelectTrigger aria-label="Filtrar atendimentos por situação" className="w-auto min-w-28 shrink-0" data-conversations-part="filters" size="sm">
+            <SelectValue>
+              {(value) => {
+                const option = statusFilters.find((item) => item.value === value) ?? statusFilters[0];
+                return `${option.label} · ${option.count}`;
+              }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {statusFilters.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label} · {option.count}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <div className="flex max-w-full items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
+          {statusFilters.map((option) => (
+            <FilterChip key={option.value} directorSkinEnabled={directorSkinEnabled} active={filter === option.value} count={option.count} label={option.label} onClick={() => setFilter(option.value)} />
+          ))}
+        </div>
+      )}
     </>
   );
 
@@ -465,10 +497,10 @@ export function ConversationsWorkspace({
               aria-label="Abas e filtros da lista"
               data-conversations-part="director-list-controls"
               role="group"
-              className="flex min-w-0 items-center gap-2 overflow-x-auto border-b border-border px-3 py-1"
+              className="flex min-w-0 flex-col gap-2 border-b border-border px-3 py-2"
             >
               {directorActions ? <div data-conversations-part="inline-actions">{directorActions}</div> : null}
-              <div data-conversations-part="filter-controls" className="flex min-w-0 items-center gap-2">
+              <div data-conversations-part="filter-controls" className="flex min-w-0 flex-wrap items-center gap-2">
                 {filterContent}
               </div>
             </div>
