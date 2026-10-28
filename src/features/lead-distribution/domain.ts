@@ -457,6 +457,20 @@ export function resolveDistributionPolicyScope(
 }
 
 /** A distribution hub (Matriz) receives leads for human redistribution only. */
+/**
+ * A unit that takes part in a plantão-exclusive queue only through its escalados: automatic
+ * distribution off, not taking leads, or the distribution hub (28/10: Aryana escalada e confirmada
+ * no PRESENCIAL TARDE pela Central, the hub, never got the plantão's leads).
+ */
+export function isPlantaoOnlyBranch(branch: {
+  status: "active" | "inactive";
+  acceptingLeads: boolean;
+  autoDistribute: boolean;
+  isDistributionHub: boolean;
+}) {
+  return branch.status === "active" && !isAutomaticDistributionBranch(branch);
+}
+
 export function isAutomaticDistributionBranch(branch: {
   status: "active" | "inactive";
   acceptingLeads: boolean;

@@ -6,7 +6,7 @@ import { operationDayStart } from "./broker-day-history";
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
-import { automaticDistributionHoldReason, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, isHeldByRunningQualification, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, shouldHoldColdLead, type IntelligentDistributionPolicy } from "./domain";
+import { automaticDistributionHoldReason, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, isHeldByRunningQualification, isPlantaoOnlyBranch, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, shouldHoldColdLead, type IntelligentDistributionPolicy } from "./domain";
 import { isHotLeadEarlyDistributionEnabled } from "./qualification-hold";
 import { traceLeadStep } from "./distribution-trace";
 import type { AssignmentSource, DutyFallbackPolicy, LeadAssignmentResult, LeadRoutingResult } from "./types";
@@ -945,9 +945,10 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       .where(and(
         eq(schema.branches.tenantId, context.tenantId),
         eq(schema.branches.status, "active"),
-        eq(schema.branches.acceptingLeads, true),
+        // Plantão-exclusive: every active unit, the ones off automatic distribution only through their escalados.
+        dutyExclusiveQueue ? undefined : eq(schema.branches.acceptingLeads, true),
         dutyExclusiveQueue ? undefined : eq(schema.branches.autoDistribute, true),
-        eq(schema.branches.isDistributionHub, false),
+        dutyExclusiveQueue ? undefined : eq(schema.branches.isDistributionHub, false),
         intelligentPolicy.value.excludedBranchIds.length
           ? not(inArray(schema.branches.id, intelligentPolicy.value.excludedBranchIds))
           : undefined,
@@ -969,12 +970,12 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     branchToActivate.autoDistribute = true;
   }
   let targetBranchIds = activeBranches
-    .filter((branch) => isAutomaticDistributionBranch(dutyExclusiveQueue ? { ...branch, autoDistribute: true } : branch))
+    .filter((branch) => isAutomaticDistributionBranch(branch) || (dutyExclusiveQueue && isPlantaoOnlyBranch(branch)))
     .map((branch) => branch.id);
-  // Units with automatic distribution off only take part through the plantão:
-  // there, just the escalados of a running plantão are eligible (never the
+  // Units off automatic distribution (switch off, not taking leads, or the hub) only take part
+  // through the plantão: there, just the escalados of a running plantão are eligible (never the
   // whole unit, e.g. when no plantão is running and the unit roster applies).
-  const rosterOnlyBranchIds = new Set(dutyExclusiveQueue ? activeBranches.filter((branch) => !branch.autoDistribute).map((branch) => branch.id) : []);
+  const rosterOnlyBranchIds = new Set(dutyExclusiveQueue ? activeBranches.filter(isPlantaoOnlyBranch).map((branch) => branch.id) : []);
   if (!targetBranchIds.length) {
     return { status: "queued", leadId, reason: "Nenhuma unidade elegível está ativa para esta fila." };
   }

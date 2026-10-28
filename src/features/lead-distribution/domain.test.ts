@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { automaticDistributionHoldReason, buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, chooseBroker, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, getDutyCoverage, isAcceptedOfferAssignment, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isHeldDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, readDistributionPolicy, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, selectDistributionBranch, shouldHoldColdLead, shouldReleaseUnacceptedProvisionalOwner, shuffle } from "./domain";
+import { automaticDistributionHoldReason, buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, chooseBroker, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, getDutyCoverage, isAcceptedOfferAssignment, isAutomaticDistributionBranch, isBlockingActiveOffer, isPlantaoOnlyBranch, isDeferredDistributionReason, isHeldDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, readDistributionPolicy, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, selectDistributionBranch, shouldHoldColdLead, shouldReleaseUnacceptedProvisionalOwner, shuffle } from "./domain";
 
 describe("provisional assignment rotation guard", () => {
   it("does not rotate a lead after the broker has started or contacted the customer", () => {
@@ -655,6 +655,14 @@ describe("lead distribution domain", () => {
   it("keeps the Matriz available for human redistribution but out of automatic distribution", () => {
     expect(isAutomaticDistributionBranch({ status: "active", acceptingLeads: true, autoDistribute: true, isDistributionHub: true })).toBe(false);
     expect(isAutomaticDistributionBranch({ status: "active", acceptingLeads: true, autoDistribute: true, isDistributionHub: false })).toBe(true);
+  });
+
+  it("lets the hub and units off automatic distribution take part in a plantão only through their escalados", () => {
+    const branch = { status: "active" as const, acceptingLeads: true, autoDistribute: true, isDistributionHub: false };
+    expect(isPlantaoOnlyBranch({ ...branch, acceptingLeads: false, autoDistribute: false, isDistributionHub: true })).toBe(true);
+    expect(isPlantaoOnlyBranch({ ...branch, autoDistribute: false })).toBe(true);
+    expect(isPlantaoOnlyBranch(branch)).toBe(false);
+    expect(isPlantaoOnlyBranch({ ...branch, status: "inactive", isDistributionHub: true })).toBe(false);
   });
 
   it("keeps the automatic policy lookup inside the exact queue and profile scope", () => {
