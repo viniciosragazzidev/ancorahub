@@ -23,7 +23,7 @@ import { resolveNamedTemplateBodyParameters } from "./template-parameters";
 import { isEligibleColdLeadForReactivation } from "@/features/ai-qualification/cold-lead-reactivation-policy";
 import { COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX, isEligibleColdLeadForManualRequalification, isWithinRequalificationBusinessWindow, nextRequalificationBusinessWindowAt } from "@/features/ai-qualification/cold-lead-requalification-policy";
 import { readDistributionPolicy } from "@/features/lead-distribution/domain";
-import { dutyShiftReminderFailureCode, dutyShiftReminderWahaFailure } from "@/features/lead-distribution/duty-shift-reminder-domain";
+import { dutyShiftReminderFailureCode, dutyShiftReminderWahaFailure, isDutyShiftReminderStale } from "@/features/lead-distribution/duty-shift-reminder-domain";
 import { findConnectedTenantChannelId, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
 import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
 import { BROKER_CHAT_NOTICE, teamNoticeByKey, teamNoticeForPurpose } from "@/features/team-notices/catalog";
@@ -1004,6 +1004,16 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
     const [claimed] = await db.update(schema.whatsappOutboundMessages).set({ status: "processing", attempts: row.attempts + 1, updatedAt: new Date() }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), or(eq(schema.whatsappOutboundMessages.status, "queued"), eq(schema.whatsappOutboundMessages.status, "pending")))).returning({ id: schema.whatsappOutboundMessages.id });
     if (!claimed) return;
     try {
+      // The eve-of-shift reminder that is still queued when the plantão day arrives would say "amanhã" on the day itself.
+      if (row.purpose === "dutyShiftReminder" && isDutyShiftReminderStale(row.variables, new Date())) {
+        await db.update(schema.whatsappOutboundMessages).set({
+          status: "cancelled",
+          providerErrorCode: "DUTY_SHIFT_REMINDER_STALE",
+          providerErrorMessage: "O dia do plantão chegou antes do envio; o lembrete da véspera foi descartado.",
+          updatedAt: new Date(),
+        }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+        return;
+      }
       // A notice routed to the company number (WhatsApp da diretoria) keeps
       // its WAHA route; every other non-Meta row is legacy and migrates.
       const viaTenantChannel = row.deliveryRoute === "waha_direct" && Boolean(row.wahaNumberId) && Boolean(row.renderedBody);

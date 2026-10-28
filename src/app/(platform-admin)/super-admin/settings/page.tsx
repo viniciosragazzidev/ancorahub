@@ -1434,7 +1434,7 @@ export default async function SuperAdminSettingsPage() {
               <CardHeader>
                 <CardTitle>Plantão extra dos leads da noite</CardTitle>
                 <CardDescription>
-                  Os leads que chegaram das 19h do dia útil anterior (sexta, na segunda) até as 8h vão para os escalados dos plantões da manhã da fila do lead, a partir do horário abaixo. No início do extra cada escalado recebe o link avisando que é um plantão extra; quem confirma entra na divisão, sem foto, mesmo no presencial. O presencial continua recebendo o link normal 30 minutos antes do próprio plantão.
+                  Os leads que chegaram das 19h do dia útil anterior (sexta, na segunda) até as 8h vão para os escalados dos plantões da manhã da fila do lead, a partir do horário abaixo. No início do extra cada escalado recebe o link avisando que é um plantão extra; quem confirma entra na divisão, sem foto, mesmo no presencial. O extra termina às 8h; o que sobrar espera o plantão normal. O presencial continua recebendo o link normal 30 minutos antes do próprio plantão.
                 </CardDescription>
               </CardHeader>
               <CardContent>

@@ -7,6 +7,7 @@ import {
   formatDutyShiftReminderVariables,
   getDutyReminderDateKey,
   isDutyShiftReminderDue,
+  isDutyShiftReminderStale,
   selectDueDutyShiftReminders,
   type DutyReminderAssignment,
   type DutyReminderSchedule,
@@ -70,5 +71,19 @@ describe("lembrete de plantão 24 h", () => {
     expect(dutyShiftReminderFailureCode("5521999999999", "waha-a")).toBeNull();
     expect(dutyShiftReminderWahaFailure(true)).toMatchObject({ code: "COMPANY_NUMBER_UNAVAILABLE", retryableOnNextSweep: true });
     expect(dutyShiftReminderWahaFailure(false)).toMatchObject({ code: "COMPANY_NUMBER_SEND_FAILED", retryableOnNextSweep: false });
+  });
+});
+
+describe("eve-of-shift reminder that reaches the plantão day", () => {
+  it("is stale from 00:00 of the plantão day in São Paulo, not before", () => {
+    const row = ["Lembrete…", "2026-10-28"];
+    expect(isDutyShiftReminderStale(row, new Date("2026-10-27T23:59:00-03:00"))).toBe(false);
+    expect(isDutyShiftReminderStale(row, new Date("2026-10-28T00:00:00-03:00"))).toBe(true);
+    expect(isDutyShiftReminderStale(row, new Date("2026-10-28T08:50:00-03:00"))).toBe(true);
+  });
+
+  it("never drops a row without a plantão date", () => {
+    expect(isDutyShiftReminderStale(["Lembrete…", ""], new Date("2026-10-28T08:50:00-03:00"))).toBe(false);
+    expect(isDutyShiftReminderStale(null, new Date("2026-10-28T08:50:00-03:00"))).toBe(false);
   });
 });

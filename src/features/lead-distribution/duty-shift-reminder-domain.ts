@@ -126,6 +126,16 @@ export function dutyShiftReminderFailureCode(phone: string | null | undefined, c
   return null;
 }
 
+/**
+ * The reminder says "amanhã": it only holds the day before. Held by the company number's limits until
+ * the plantão day itself (28/10, it reached brokers that morning), it is dropped instead of sent.
+ * `variables` is the outbox row's [body, dutyDate].
+ */
+export function isDutyShiftReminderStale(variables: unknown, now: Date, timezone = "America/Sao_Paulo") {
+  const dutyDate = Array.isArray(variables) && typeof variables[1] === "string" ? variables[1] : "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(dutyDate) && dateKeyInTimezone(now, timezone) >= dutyDate;
+}
+
 export function dutyShiftReminderWahaFailure(companyUnavailable: boolean) {
   return companyUnavailable
     ? { retryableOnNextSweep: true, code: "COMPANY_NUMBER_UNAVAILABLE", message: "Número corporativo WAHA indisponível." } as const

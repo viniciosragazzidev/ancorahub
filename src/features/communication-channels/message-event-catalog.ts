@@ -212,7 +212,7 @@ export const MESSAGE_EVENT_CATALOG = [
       { key: "hora_fim", label: "Horário de término", aliases: ["fim", "end_time"], fallback: "--:--" },
       { key: "modo", label: "Presencial ou online", aliases: ["attendance_mode", "unidade"], fallback: "Online" },
     ],
-    defaultFreeMessage: "📅 *Lembrete de plantão*\n\nOi, {{nome}}! Amanhã ({{dia_semana}}, {{data}}) você está escalado no plantão:\n\n*{{plantao}}*\n⏰ Das {{hora_inicio}} às {{hora_fim}}\n📍 {{modo}}\n\nNo dia, 30 minutos antes de começar, vai chegar aqui uma mensagem para você *confirmar sua presença*. Só recebe leads quem confirmar.\n\nNão vai conseguir ir? Avise seu gestor o quanto antes.",
+    defaultFreeMessage: "📅 *Lembrete de plantão*\n\nOi, {{nome}}! Amanhã ({{dia_semana}}, {{data}}) você está escalado no plantão:\n\n*{{plantao}}*\n⏰ Das {{hora_inicio}} às {{hora_fim}}\n📍 {{modo}}\n\nNo dia, 30 minutos antes de começar, vai chegar aqui uma mensagem para você *confirmar sua presença*. Só recebe leads quem confirmar.\n\nNão vai conseguir ir? Avise seu supervisor o quanto antes.",
   },
   {
     key: "TASK_REMINDER",

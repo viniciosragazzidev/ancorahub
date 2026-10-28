@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     .leftJoin(schema.dutyRosterAssignments, and(eq(schema.dutyRosterAssignments.id, schema.dutyPresenceConfirmations.assignmentId), eq(schema.dutyRosterAssignments.tenantId, schema.dutyPresenceConfirmations.tenantId)))
     .where(eq(schema.dutyPresenceConfirmations.id, parsed.data.id)).limit(1);
   const now = new Date();
-  // Plantão extra dos leads da noite (DEC-152): confirma com um toque, sem foto e sem tolerância, até o plantão normal começar.
+  // Plantão extra dos leads da noite (DEC-152): confirma com um toque, sem foto e sem tolerância, até as 08:00.
   const isExtra = Boolean(mode && isExtraShiftRecord({ shiftEndsAt: mode.shiftEndsAt, assignmentStartsAt: mode.assignmentStartsAt, timezone: mode.timezone }));
   const windowState = mode
     ? isExtra

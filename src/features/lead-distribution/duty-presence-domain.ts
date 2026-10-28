@@ -431,14 +431,18 @@ export function localClock(date: Date, timezone: string) {
 }
 
 /**
- * Janela do plantão extra de uma ocorrência normal: do horário do extra até o início do plantão, no mesmo
- * dia. Null quando o plantão não é da manhã ou começa antes do extra.
+ * Janela do plantão extra de uma ocorrência normal: do horário do extra até as 08:00 (ou até o plantão
+ * começar, se for antes), no mesmo dia. Null quando o plantão não é da manhã, começa antes do extra ou
+ * o extra não chega a abrir.
  */
 export function extraShiftWindow(occurrence: DutyWindow, timezone: string, extraStartsAt = DEFAULT_EXTRA_SHIFT_STARTS_AT): DutyWindow | null {
   const start = clockMinutes(localClock(occurrence.startsAt, timezone));
   if (start >= clockMinutes(MORNING_SHIFT_STARTS_BEFORE) || start <= clockMinutes(extraStartsAt)) return null;
   const startsAt = localTimeToUtc(occurrence.dutyDate, extraStartsAt, timezone);
-  return { dutyDate: occurrence.dutyDate, startsAt, endsAt: occurrence.startsAt };
+  // Revisto em 28/10: o extra termina às 08:00, com os leads da noite; o que sobrar espera o plantão normal.
+  const overnightEnds = localTimeToUtc(occurrence.dutyDate, OVERNIGHT_LEADS_UNTIL, timezone);
+  const endsAt = occurrence.startsAt < overnightEnds ? occurrence.startsAt : overnightEnds;
+  return startsAt < endsAt ? { dutyDate: occurrence.dutyDate, startsAt, endsAt } : null;
 }
 
 /** Leads da noite de um dia de plantão: das 19:00 do dia útil anterior (sexta, na segunda) até as 08:00. */
@@ -464,9 +468,16 @@ export function presenceOccurrenceKey(assignmentId: string, occurrence: { dutyDa
   return `${assignmentId}:${occurrence.dutyDate}:${occurrence.startsAt.getTime()}:${occurrence.endsAt.getTime()}`;
 }
 
-/** Confirmação do extra: termina na hora em que o plantão normal do corretor começa. */
+/**
+ * Confirmação do extra: termina às 08:00 num plantão da manhã que começa depois disso, ou (registros até
+ * 28/10, e plantão que começa antes das 08:00) na hora em que o plantão normal do corretor começa.
+ */
 export function isExtraShiftRecord(input: { shiftEndsAt: Date; assignmentStartsAt: string | null | undefined; timezone: string }) {
-  return Boolean(input.assignmentStartsAt) && localClock(input.shiftEndsAt, input.timezone) === input.assignmentStartsAt;
+  if (!input.assignmentStartsAt) return false;
+  const endsAt = localClock(input.shiftEndsAt, input.timezone);
+  if (endsAt === input.assignmentStartsAt) return true;
+  const start = clockMinutes(input.assignmentStartsAt);
+  return endsAt === OVERNIGHT_LEADS_UNTIL && start > clockMinutes(OVERNIGHT_LEADS_UNTIL) && start < clockMinutes(MORNING_SHIFT_STARTS_BEFORE);
 }
 
 /** O extra não tem tolerância nem foto: dá para confirmar do início da janela até o plantão normal começar. */
