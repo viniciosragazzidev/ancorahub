@@ -113,12 +113,20 @@
 .root[data-skin="diretor"] [data-conversations-part="director-list-controls"] {
   flex: 0 0 auto;
   min-height: var(--control-height-sm);
-  scrollbar-width: none;
+  /* The tabs and filters scroll sideways: a thin visible bar shows there is more (28/10, the hidden one cut the tabs). */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  overscroll-behavior-x: contain;
   white-space: nowrap;
 }
 
 .root[data-skin="diretor"] [data-conversations-part="director-list-controls"]::-webkit-scrollbar {
-  display: none;
+  height: 6px;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="director-list-controls"]::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-control);
+  background: var(--border-strong);
 }
 
 .root[data-skin="diretor"] [data-conversations-part="filter-controls"] {
