@@ -10,7 +10,7 @@ import { dateTimeLabel } from "@/features/lead-distribution/report-pdf-kit";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 
-import { conversationChannelLabel, conversationMessageBody, conversationSenderLabel, type ConversationExportInput, type ConversationExportRow } from "./conversation-export-pdf";
+import { conversationChannelLabel, conversationMessageBody, conversationMessageTone, conversationSenderLabel, type ConversationExportInput, type ConversationExportRow } from "./conversation-export-pdf";
 
 /** The roles that export: each one inside its own scope (company, unit, team). */
 export const CONVERSATION_EXPORT_ROLES = ["director", "manager", "supervisor"] as const;
@@ -79,13 +79,10 @@ export async function getConversationExportData(context: TenantContext, leadId: 
   ]);
 
   const qualification = lead.qualificationStatus ? (LEAD_QUALIFICATION_LABELS as Record<string, string>)[lead.qualificationStatus] ?? null : null;
+  const temperatureTone = lead.qualificationStatus === "hot" || lead.qualificationStatus === "warm" || lead.qualificationStatus === "cold" ? lead.qualificationStatus : null;
+  // Status and temperature go to the header pills; unit and arrival under the card's title.
   const leadRows: ConversationExportRow[] = [
-    { label: "Nome", value: lead.nome },
-    { label: "Status", value: LEAD_STATUS_LABELS[lead.status ?? ""] ?? lead.status ?? "" },
-    { label: "Temperatura", value: qualification ?? "" },
-    { label: "Unidade", value: branch?.name ?? "" },
     { label: "Campanha", value: lead.sourceCampaign ?? "" },
-    { label: "Chegou em", value: lead.createdAt ? dateTimeLabel(lead.createdAt) : "" },
     ...buildLeadClientInfo({
       telefone: lead.telefone,
       email: lead.email,
@@ -97,18 +94,20 @@ export async function getConversationExportData(context: TenantContext, leadId: 
     }).map((item) => ({ label: item.label.replace(/:$/, ""), value: item.value })),
   ].filter((row) => row.value.trim());
 
-  const brokerRows: ConversationExportRow[] | null = broker ? [
-    { label: "Nome", value: broker.name ?? "" },
-    { label: "Telefone", value: broker.phone ?? "" },
-    { label: "E-mail", value: broker.email ?? "" },
-    { label: "Recebeu o lead em", value: lead.assignedAt ? dateTimeLabel(lead.assignedAt) : "" },
-  ].filter((row) => row.value.trim()) : null;
+  const brokerCard = broker ? {
+    name: broker.name ?? "Corretor",
+    subtitle: lead.assignedAt ? `Corretor · recebeu em ${dateTimeLabel(lead.assignedAt)}` : "Corretor",
+    rows: [
+      { label: "Telefone", value: broker.phone ?? "" },
+      { label: "E-mail", value: broker.email ?? "" },
+    ].filter((row) => row.value.trim()),
+  } : null;
 
   const messages = recentMessages.reverse().map((message) => ({
     sentAt: message.sentAt,
     sender: conversationSenderLabel(message.direction, message.senderRole),
     channel: conversationChannelLabel(message.provider),
-    side: message.direction === "outgoing" || message.direction === "outbound" ? "out" as const : "in" as const,
+    tone: conversationMessageTone(message.direction, message.senderRole),
     body: conversationMessageBody(message),
   }));
 
@@ -118,8 +117,11 @@ export async function getConversationExportData(context: TenantContext, leadId: 
     generatedAt: now,
     generatedBy: exporter?.name ?? "usuário",
     leadName: lead.nome,
+    status: lead.status ? LEAD_STATUS_LABELS[lead.status] ?? lead.status : null,
+    temperature: qualification ? { label: qualification, tone: temperatureTone } : null,
+    leadSubtitle: [branch?.name, lead.createdAt ? `chegou em ${dateTimeLabel(lead.createdAt)}` : null].filter(Boolean).join(" · ") || null,
     lead: leadRows,
-    broker: brokerRows,
+    broker: brokerCard,
     messages,
     truncatedFrom: total > messages.length ? total : null,
   };

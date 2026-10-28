@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   conversationChannelLabel,
   conversationMessageBody,
+  conversationMessageTone,
   conversationSenderLabel,
   encodeConversationExportPdf,
   pdfSafeText,
@@ -21,6 +22,10 @@ describe("conversation export", () => {
     expect(conversationChannelLabel("meta_cloud")).toBe("WhatsApp oficial");
     expect(conversationChannelLabel("waha")).toBe("WhatsApp (WAHA)");
     expect(conversationChannelLabel(null)).toBeNull();
+    expect(conversationMessageTone("incoming", null)).toBe("client");
+    expect(conversationMessageTone("outgoing", "assistant")).toBe("ai");
+    expect(conversationMessageTone("outgoing", "user")).toBe("human");
+    expect(conversationMessageTone("outgoing", "system")).toBe("system");
   });
 
   it("shows media as a tag, with the caption when there is one", () => {
@@ -48,13 +53,16 @@ describe("conversation export", () => {
       generatedAt: new Date("2026-10-28T12:00:00Z"),
       generatedBy: "Vinicios Ragazzi",
       leadName: "Amandão do povo 🤩",
-      lead: [{ label: "Nome", value: "Amandão do povo" }, { label: "Telefone / WhatsApp", value: "(21) 97508-1425" }],
-      broker: [{ label: "Nome", value: "Lilian Martins" }],
+      status: "Em contato",
+      temperature: { label: "Quente", tone: "hot" },
+      leadSubtitle: "Matriz 7º Andar · chegou em 27/10/2026 12:24",
+      lead: [{ label: "Telefone / WhatsApp", value: "(21) 97508-1425" }, { label: "Vidas", value: "3" }, { label: "Idades", value: "34, 32 e 5" }],
+      broker: { name: "Lilian Martins", subtitle: "Corretor · recebeu em 27/10/2026 12:30", rows: [{ label: "Telefone", value: "(21) 99999-0000" }] },
       messages: Array.from({ length: 120 }, (_, index) => ({
         sentAt: new Date(Date.UTC(2026, 9, 27, 15, index)),
         sender: index % 2 ? "IA Assistente" : "Cliente",
         channel: "WhatsApp oficial",
-        side: index % 2 ? "out" as const : "in" as const,
+        tone: index % 3 === 0 ? "client" as const : index % 3 === 1 ? "ai" as const : "human" as const,
         body: `Mensagem ${index + 1} ${"com bastante texto ".repeat(index % 7)}`,
       })),
       truncatedFrom: null,
@@ -67,7 +75,8 @@ describe("conversation export", () => {
   it("builds a PDF for a lead with no broker and no messages", async () => {
     const bytes = await encodeConversationExportPdf({
       tenantName: "Âncora", logoUrl: null, generatedAt: new Date(), generatedBy: "Diretor", leadName: "Lead WhatsApp (1425)",
-      lead: [{ label: "Nome", value: "Lead WhatsApp (1425)" }], broker: null, messages: [], truncatedFrom: null,
+      status: null, temperature: null, leadSubtitle: null,
+      lead: [], broker: null, messages: [], truncatedFrom: null,
     });
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
   });
