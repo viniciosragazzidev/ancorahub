@@ -23,6 +23,7 @@ import { AppSelect } from "@/components/ui/select";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { OwnershipContext } from "@/components/ownership-context";
 import { VoxelIllustration } from "@/components/illustrations/voxel-illustration";
+import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
 import {
   Table,
   TableBody,
@@ -448,7 +449,7 @@ export function DocumentsWorkspace({
             emptyState={
               filteredDocs.length === 0 ? (
                 <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
-                  <VoxelIllustration className="size-20" name="document-review" />
+                  <ContextualIllustration name="documents" size="lg" fallback={<VoxelIllustration className="size-20" name="document-review" />} />
                   <div className="max-w-sm space-y-1.5">
                     <p className="text-sm font-semibold text-foreground">Tudo em dia!</p>
                     <p className="text-xs leading-relaxed text-muted-foreground">

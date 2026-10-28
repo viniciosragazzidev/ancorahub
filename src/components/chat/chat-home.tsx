@@ -28,6 +28,7 @@ import { WeekRanking, type HomeHighlights } from "./week-ranking";
 import type { HomeNowItem, PresenceAskView, ThreadSummary } from "./types";
 import type { WhatsAppActivitySummary } from "@/features/dashboard/whatsapp-activity";
 import { WhatsAppActivityCard } from "@/features/dashboard/components/whatsapp-activity-card";
+import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
 
 type Tab = "assistentes" | "leads";
 
@@ -84,7 +85,7 @@ function NowSection({ data, mobile = false }: { data: NonNullable<HomeSummary["n
             </motion.li>
           ))}
         </ul>
-      ) : <p className={home.nowEmpty}>{data.emptyText}</p>}
+      ) : <div className="flex items-center gap-3"><ContextualIllustration name="checklist" size="sm" /><p className={home.nowEmpty}>{data.emptyText}</p></div>}
     </motion.section>
   );
 }
@@ -290,7 +291,7 @@ export function ChatHome({
 
       <section className={home.center} aria-label="Seu dia">
         <motion.div initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }} className={home.centerInner}>
-          <AssistantAvatar shape="logo" hue={null} size={56} />
+          <ContextualIllustration name="guidance" size="lg" fallback={<AssistantAvatar shape="logo" hue={null} size={56} />} />
           <h2 className={home.centerTitle}>{greeting(now)}, {firstName}</h2>
           {hasNowItems ? <p className={home.centerSubtitle}>Veja o que precisa da sua atenção agora.</p> : next ? (
             <p className={home.centerSubtitle}>
@@ -336,7 +337,7 @@ export function ChatHome({
             <div className={home.cards}>
               {summary.duty ? (
                 <Link href={summary.duty.href} className={home.card}>
-                  <AssistantAvatar shape="onigiri" hue={28} size={40} />
+                  <ContextualIllustration name="calendar" size="sm" fallback={<AssistantAvatar shape="onigiri" hue={28} size={40} />} />
                   <span className={home.cardName}>{summary.duty.title}</span>
                   <span className={home.cardPreview}>{summary.duty.detail}</span>
                 </Link>

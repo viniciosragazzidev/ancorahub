@@ -29,6 +29,13 @@ export type FeatureFlagDefinition<T extends string = string> = {
 // ─── Feature Flags Globais (Super-admin) ─────────────────────────────────────
 
 export const FEATURE_FLAGS = {
+  UI_CONTEXTUAL_ILLUSTRATIONS: {
+    key: "feature_ui_contextual_illustrations",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Mostra ilustrações contextuais no Diretor Lite e Corretor Lite. Desligar restaura os ícones e estados anteriores.",
+  },
   WHATSAPP_PLANTAO_NOTICE: {
     key: "feature_whatsapp_plantao_notice_enabled",
     scope: "global",

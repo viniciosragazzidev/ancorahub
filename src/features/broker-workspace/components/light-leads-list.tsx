@@ -13,6 +13,7 @@ import { LightAvailabilityBanner } from "@/features/broker-workspace/components/
 import { AcceptLeadButton } from "@/features/broker-workspace/components/accept-lead-button";
 import { formatBrokerArrival, groupByArrivalDay, isBrokerArrivalToday } from "@/features/broker-workspace/arrival";
 import styles from "./light-leads-list.module.css";
+import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
 
 export type LightLeadItem = {
   id: string;
@@ -309,6 +310,7 @@ export function LightLeadsList({
 
         {visible.length === 0 ? (
           <PeopleEmpty
+            illustration={searching ? undefined : <ContextualIllustration name={filter === "returns" ? "calendar" : filter === "active" ? "conversation" : "checklist"} size="lg" />}
             title={searching ? `Não encontramos nenhum lead com "${searchQuery.trim()}"` : EMPTY_COPY[filter].title}
             description={searching ? "Confira o nome ou telefone, ou limpe a busca para ver sua lista." : EMPTY_COPY[filter].description}
             action={

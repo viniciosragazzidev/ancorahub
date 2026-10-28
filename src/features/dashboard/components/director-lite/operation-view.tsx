@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { ArrowRight } from "lucide-react";
+import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
 
 import { motionTokens as m } from "@/components/arc/motion-tokens";
 import { ArrowsClockwise, CalendarCheck, Clock, Sparkle, UserCheck, Users, WhatsappLogo } from "@/components/huge-icons";
@@ -168,7 +169,10 @@ export function OperationView({ data, canOpenConversations = true }: { data: Ess
 
       <LiteItem index={7}>
         <section className={kit.panel} aria-labelledby="operation-queues-title">
-          <h2 id="operation-queues-title" className={kit.sectionTitle}>Leads por fila</h2>
+          <div className={kit.cardTop}>
+            <h2 id="operation-queues-title" className={kit.sectionTitle}>Leads por fila</h2>
+            <ContextualIllustration name="connections" size="sm" />
+          </div>
           {empty ? (
             <p className={kit.empty}>Nenhum lead entrou {label}. Quando um lead entrar, ele aparece aqui, separado por fila.</p>
           ) : (
@@ -194,7 +198,7 @@ export function OperationView({ data, canOpenConversations = true }: { data: Ess
               <h2 id="operation-duties-title" className={kit.sectionTitle}>Plantões acontecendo agora</h2>
               <p className={kit.note}>{duties.running.length ? `${plural(duties.running.length, "plantão ativo", "plantões ativos")} neste momento.` : "Nenhum plantão ativo neste momento."}</p>
             </div>
-            <CalendarCheck size={20} className={kit.cardIcon} aria-hidden="true" />
+            <ContextualIllustration name="calendar" size="sm" fallback={<CalendarCheck size={20} className={kit.cardIcon} aria-hidden="true" />} />
           </div>
           {duties.running.length ? (
             <ul className={kit.carrierList}>
@@ -233,7 +237,7 @@ export function OperationView({ data, canOpenConversations = true }: { data: Ess
                   : `${n(whatsapp.connected)} de ${n(whatsapp.total)} ${whatsapp.total === 1 ? "corretor conectou" : "corretores conectaram"} o WhatsApp pessoal, ${whatsapp.label}.`}
               </p>
             </div>
-            <WhatsappLogo size={20} className={kit.cardIcon} aria-hidden="true" />
+            <ContextualIllustration name="conversation" size="sm" fallback={<WhatsappLogo size={20} className={kit.cardIcon} aria-hidden="true" />} />
           </div>
           {whatsapp.connected > 0 ? (
             <>

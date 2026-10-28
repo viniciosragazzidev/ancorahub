@@ -73,11 +73,13 @@ import { Input } from "@/components/ui/input";
 import { AppSelect } from "@/components/ui/select";
 import { SuperAdminSettingsTabs } from "./super-admin-settings-tabs";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { updateContextualIllustrationsAction } from "../illustration-actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function SuperAdminSettingsPage() {
   const settings = await getSystemSettings([
+    FEATURE_FLAGS.UI_CONTEXTUAL_ILLUSTRATIONS.key,
     "feature_central_atencao_enabled",
     "feature_central_atencao_stagnant_days",
     "feature_global_search_enabled",
@@ -182,6 +184,7 @@ export default async function SuperAdminSettingsPage() {
     settingMap.get("feature_workflow_automation_enabled") === "true";
   const cleanUiOperationalEnabled = settingMap.get(CLEAN_UI_FEATURE) !== "false";
   const interfaceMotionEnabled = settingMap.get("feature_interface_motion_enabled") !== "false";
+  const contextualIllustrationsEnabled = (settingMap.get(FEATURE_FLAGS.UI_CONTEXTUAL_ILLUSTRATIONS.key) ?? FEATURE_FLAGS.UI_CONTEXTUAL_ILLUSTRATIONS.defaultValue) === "true";
   const r2StorageEnabled = settingMap.get("feature_r2_storage_enabled") !== "false";
   const routeOnboardingEnabled = settingMap.get("feature_route_onboarding_enabled") !== "false";
   const metaCloudWhatsAppEnabled = settingMap.get("feature_whatsapp_meta_cloud_enabled") === "true";
@@ -1172,6 +1175,23 @@ export default async function SuperAdminSettingsPage() {
                   <Button type="submit" variant="outline">
                     Salvar busca
                   </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Ilustrações contextuais</CardTitle>
+                <CardDescription>Imagens pequenas de orientação, atendimento e organização no Diretor Lite e Corretor Lite.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateContextualIllustrationsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox name="contextualIllustrationsEnabled" value="true" defaultChecked={contextualIllustrationsEnabled} />
+                    <span>Mostrar ilustrações contextuais</span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar ilustrações</Button>
+                  <p className="w-full text-xs text-muted-foreground">Desativar restaura a apresentação anterior. Alterações ficam na auditoria da plataforma.</p>
                 </form>
               </CardContent>
             </Card>

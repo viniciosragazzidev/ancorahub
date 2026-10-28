@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 28/10/2026 - Ilustrações contextuais no Diretor e Corretor
+
+- Sete assets 3D da Âncora aplicados no início, plantões, filas, atendimento, clientes, cotação e documentos, com arquivos WebP pequenos e transparência. Textos, ações, dados e permissões preservados.
+- Componente compartilhado decorativo, fallback por falha e controle editável/auditado no Super-admin. Exposição visual restrita no servidor ao Diretor Lite e Corretor Lite.
+- Plano, mapa de aplicação e evidências: `docs/implementations/active/2026-10-28-contextual-illustrations.md`.
+
 ## 28/10/2026 - Aba Distribuídos e responsável na central de conversas
 
 - Adicionada a aba Distribuídos para Diretor e Gestor com unidade. O servidor filtra leads com corretor responsável, aplica o escopo existente e conta somente as conversas exibidas.
@@ -14,6 +20,7 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 - Abas e filtros ficaram em uma linha rolavel no topo da lista. O composer do visual Lite cresce com o texto ate cinco linhas; Enter envia e Shift+Enter cria uma linha.
 - O HTML da rota quando a chave Lite esta desligada permanece coberto pelo snapshot legado. Sem mudancas em permissoes, filtros, PDF ou links de WhatsApp.
 - Registro e validacoes: `docs/implementations/completed/2026-10-28-conversas-layout.md`.
+
 ## 27/10/2026 - Contagem correta dos frios recuperados
 
 - Corrigida a negação duplicada do filtro de Status do WhatsApp no contador. Respostas reais voltam a contar; Status continuam excluídos. Janela, deduplicação, auditoria de qualificação e escopo por papel permanecem.

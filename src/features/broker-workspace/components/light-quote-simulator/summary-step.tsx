@@ -6,6 +6,8 @@ import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { Input } from "@/components/arc/input/input";
 import { SearchField } from "@/components/arc/search-field/search-field";
 import { MOCK_LEADS } from "@/features/broker-workspace/quote-simulator/mock-data";
+import { Folder } from "lucide-react";
+import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
 
 import { COVERAGE_LABEL, money, PROFILE_LABEL, REGION_LABEL } from "./constants";
 import type { QuoteSimulator } from "./use-quote-simulator";
@@ -19,6 +21,7 @@ export function SummaryStep({ q }: { q: QuoteSimulator }) {
   if (!chosenResult) {
     return (
       <EmptyState
+        icon={<ContextualIllustration name="comparison" size="sm" fallback={<Folder width={24} height={24} strokeWidth={1.5} />} />}
         title="Nenhum plano escolhido"
         description="Você ainda não escolheu um plano. Volte para a lista e toque em um plano para comparar aqui."
         action={<Button variant="secondary" onClick={() => q.goToStep(2)}>Ver planos</Button>}

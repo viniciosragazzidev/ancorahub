@@ -703,3 +703,14 @@ The 9999px radius is deployed 367 times — the second most common radius token.
 ## Exceção: modo diretor com a chave ligada
 
 O modo diretor segue o sistema visual Lite descrito em `docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md` somente quando a flag por empresa `feature_director_lite_style` está ativa. A flag nasce desligada e pode ser controlada pelo Super-admin na empresa correspondente. Com a flag desligada, o modo diretor mantém o sistema descrito neste documento. A exceção não altera o visual dos modos Lite de corretor, gestor ou supervisor, nem as regras, rotas, permissões ou dados das telas.
+
+## Assets contextuais de interface · 28/10/2026
+
+Usos permitidos aprovados por Vinicios: apoio decorativo pequeno nas seções e vazios
+do Diretor Lite e Corretor Lite. A exceção permite os objetos 3D navy/mint do estúdio
+Âncora nesses pontos específicos; não autoriza uma nova linguagem para botões,
+indicadores, tabelas, avatares pessoais ou demais telas. Dimensões usam a escala
+existente (48/64/80 px), sem novo token. Arquivos WebP com alpha de até 16 KB cada;
+sem movimento novo, prioridade de rede ou consulta de dados própria. O controle
+feature_ui_contextual_illustrations no Super-admin restaura a apresentação anterior.
+Mapa e verificação: docs/implementations/active/2026-10-28-contextual-illustrations.md.

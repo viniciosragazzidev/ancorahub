@@ -4,6 +4,7 @@ import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import { AuthorizationError, AuthenticationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AppShell } from "@/components/app-shell";
+import { ContextualIllustrationsProvider } from "@/components/illustrations/contextual-illustration";
 import { isLightRouteAllowed } from "@/components/light/light-routes";
 import { getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { getDatabase, schema } from "@/shared/db";
@@ -50,6 +51,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   // is resolved. Starting them together keeps client-side route transitions from
   // serializing the shell, preference, branding and pathname lookups.
   const experienceModePromise = getExperienceMode(context);
+  const illustrationsPromise = context.role === "director" || context.role === "broker"
+    ? getFeatureFlag(FEATURE_FLAGS.UI_CONTEXTUAL_ILLUSTRATIONS).catch(() => "false")
+    : Promise.resolve("false");
   const brokerDutyCalendarFlagPromise = context.role === "broker"
     ? getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR)
     : Promise.resolve("false");
@@ -173,6 +177,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     directorLiteStyleEnabled,
     negotiationsAreaSetting,
     negotiationsRouteAccess,
+    illustrationsSetting,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -190,6 +195,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     directorLiteStylePromise,
     negotiationsAreaPromise,
     negotiationsRouteAccessPromise,
+    illustrationsPromise,
   ]);
 
   // Flag criada no G0 (feature_team_management_enabled): só libera o item Gestão do gestor Lite.
@@ -245,6 +251,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
 
   return (
     <AgentDrawerProvider>
+      <ContextualIllustrationsProvider enabled={illustrationsSetting === "true" && (isLightBroker || (context.role === "director" && directorLiteStyleEnabled))}>
       <AppShell
         viewAs={viewAsState}
         cleanUiEnabled={cleanUiEnabled}
@@ -302,6 +309,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           </NotificationCountProvider>
         </RealtimeSyncProvider>
       </AppShell>
+      </ContextualIllustrationsProvider>
     </AgentDrawerProvider>
   );
 }

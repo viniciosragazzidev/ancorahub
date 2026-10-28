@@ -470,3 +470,16 @@ Papeis e rotas: gestor em `/gestao` (unidade) e supervisor em `/gestao` (equipe 
 
 
 Registro de tela: `/conversas` recebeu a pele Arc sob a chave do Diretor e foi validada no AppShell real com fixtures. A acao principal segue consultar e responder conversas; os estados e o disclosure de lista, conversa e perfil permanecem. Sem token ou primitiva nova. A rota continua em opt-out ate a base ter `useDirectorLitePage`; este trabalho nao avanca UX-M1. Evidencia: `docs/implementations/active/2026-10-25-diretor-lite-conversas.md`.
+
+## 2026-10-28: ilustrações contextuais no Diretor e Corretor
+
+Pedido de Vinicios: aplicar os assets da Âncora em locais estratégicos. Diretor no
+visual Lite reconhece filas, plantões e conversas; Corretor Lite recebe apoio no
+Início, no estado sem pendência e nos vazios da fila, clientes e cotação. Documentos
+reutiliza a ilustração vazia existente. Busca sem resultado não recebe celebração.
+Ações e estados continuam em texto, com os mesmos destinos e permissões. PeopleEmpty
+recebe apenas um slot opcional de ilustração; tamanhos da escala existente 48/64/80,
+sem novo token, primitive de layout ou movimento. Componente decorativo compartilhado
+com alpha, dimensões reservadas e fallback. Controle global editável e auditado no
+Super-admin, exposição visual limitada pelo papel e modo no servidor. Não avança o
+gate global do redesign. Registro: docs/implementations/active/2026-10-28-contextual-illustrations.md.

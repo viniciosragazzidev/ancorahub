@@ -142,9 +142,10 @@ export function PeopleRow({ name, href, seed, avatar, chip, preview, previewTone
   );
 }
 
-export function PeopleEmpty({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+export function PeopleEmpty({ title, description, action, illustration }: { title: string; description?: string; action?: ReactNode; illustration?: ReactNode }) {
   return (
     <div className={`${styles.empty} ${styles.enter}`}>
+      {illustration}
       <h2>{title}</h2>
       {description ? <p>{description}</p> : null}
       {action}

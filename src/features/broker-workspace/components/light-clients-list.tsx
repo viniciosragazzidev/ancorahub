@@ -6,6 +6,7 @@ import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { PeopleEmpty, PeopleFilters, PeoplePage, PeopleRow, PeopleSection, PeopleStats } from "@/components/light/people-list/people-list";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
+import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
 
 export type LightClientItem = {
   id: string;
@@ -131,6 +132,7 @@ export function LightClientsList({ clients, management = false }: { clients: Lig
         )
       ) : (
         <PeopleEmpty
+          illustration={searching ? undefined : <ContextualIllustration name="connections" size="lg" />}
           title={searching ? `Nenhum resultado para "${searchQuery.trim()}"` : "Nenhum cliente ainda"}
           description={searching ? "Tente outro nome ou telefone." : "Quando você concluir uma venda, o cliente aparece aqui."}
           action={searching ? <Button variant="secondary" onClick={() => setSearchQuery("")}>Limpar busca</Button> : undefined}
