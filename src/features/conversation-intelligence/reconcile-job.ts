@@ -6,6 +6,7 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 import { withJobLease } from "@/shared/db/job-lease";
+import { getAiBudgetState, notifyAiBudgetLevel } from "@/features/ai-gateway/anthropic-budget";
 
 import { analyzeLeadConversation } from "./analyzer";
 import { getAiStageMode } from "./stage-mode";
@@ -20,9 +21,11 @@ const QUIET_MS = 60_000;
 const LOOKBACK_MS = 3 * 24 * 60 * 60_000;
 /** The job runs every minute: a run ends before the next one starts. */
 const TIME_BUDGET_MS = 50_000;
+/** Over the monthly AI budget (Super-admin, 28/10): the pace before 28/10, every 10 minutes. */
+const ECONOMY_PACE = { everyMinutes: 10, maxLeads: 20, quietMs: 2 * 60_000 } as const;
 
 /**
- * Durable trigger of the conversation analysis (Coolify, every 10 minutes):
+ * Durable trigger of the conversation analysis (Coolify, every minute):
  * leads with WhatsApp messages newer than their last analysis. Covers every
  * message source (WAHA, Meta, OpenWA, sent from the CRM) and the in-memory
  * debounce lost on a deploy or restart.
@@ -37,6 +40,12 @@ export async function runConversationReconcileJob() {
 }
 
 async function runReconcile() {
+  const budget = await getAiBudgetState().catch(() => null);
+  if (budget) void notifyAiBudgetLevel(budget).catch(() => undefined);
+  const economy = budget?.level === "exceeded";
+  if (economy && new Date().getMinutes() % ECONOMY_PACE.everyMinutes !== 0) return { skipped: "budget_economy" as const };
+  const maxLeads = economy ? ECONOMY_PACE.maxLeads : MAX_LEADS_PER_RUN;
+  const quietMs = economy ? ECONOMY_PACE.quietMs : QUIET_MS;
 
   const db = getDatabase();
   const now = Date.now();
@@ -46,7 +55,7 @@ async function runReconcile() {
     .from(schema.whatsappMessages)
     .where(and(isNotNull(schema.whatsappMessages.leadId), gt(schema.whatsappMessages.sentAt, new Date(now - LOOKBACK_MS))))
     .groupBy(schema.whatsappMessages.leadId, schema.whatsappMessages.tenantId)
-    .having(sql`max(${schema.whatsappMessages.sentAt}) < ${new Date(now - QUIET_MS).toISOString()}::timestamptz`)
+    .having(sql`max(${schema.whatsappMessages.sentAt}) < ${new Date(now - quietMs).toISOString()}::timestamptz`)
     .orderBy(desc(lastMessageAt))
     .limit(400);
   if (!recent.length) return { analyzed: 0, moved: 0, candidates: 0 };
@@ -79,7 +88,7 @@ async function runReconcile() {
   let lastFailure: string | undefined;
   const queue: typeof pending = [];
   for (const row of pending) {
-    if (queue.length >= MAX_LEADS_PER_RUN) break;
+    if (queue.length >= maxLeads) break;
     if (!modeByTenant.has(row.tenantId)) modeByTenant.set(row.tenantId, await getAiStageMode(row.tenantId));
     // A company that turned the stage IA off still gets the diagnosis when the lead is opened.
     if (modeByTenant.get(row.tenantId) !== "off") queue.push(row);
@@ -98,5 +107,5 @@ async function runReconcile() {
     if (Date.now() - now > TIME_BUDGET_MS) break;
     await Promise.all(queue.slice(index, index + CONCURRENCY).map(analyzeOne));
   }
-  return { analyzed, moved, failed, candidates: pending.length, ...(lastFailure ? { lastFailure } : {}) };
+  return { analyzed, moved, failed, candidates: pending.length, ...(lastFailure ? { lastFailure } : {}), ...(economy ? { economy: true } : {}), ...(budget ? { budgetUsedPercent: Math.round(budget.ratio * 100) } : {}) };
 }

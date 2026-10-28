@@ -20,6 +20,7 @@ import {
   updateNotificationCapabilityAction,
   updateRealtimeSyncSettingsAction,
   updateAiSettingsAction,
+  updateAiBudgetSettingsAction,
   updateAiWhatsAppQualificationSettingsAction,
   updateQuickReplySettingsAction,
   updateAiMemoryResetSettingsAction,
@@ -63,6 +64,8 @@ import {
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { getAiBudgetState } from "@/features/ai-gateway/anthropic-budget";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -160,7 +163,10 @@ export default async function SuperAdminSettingsPage() {
     "ai_google_api_key",
     "ai_openrouter_api_key",
   ]);
-  const [notificationCapabilities] = await Promise.all([getNotificationCapabilityStates()]);
+  const [notificationCapabilities, aiBudget] = await Promise.all([
+    getNotificationCapabilityStates(),
+    getAiBudgetState(new Date(), { fresh: true }).catch(() => null),
+  ]);
   const settingMap = new Map(settings.map((setting) => [setting.key, setting.value]));
   // The Central and the journey need the 0188 tables (scripts/apply-0188-engagement-relationship.mjs).
   const engagementTablesReady = await getDatabase()
@@ -1690,6 +1696,47 @@ export default async function SuperAdminSettingsPage() {
                   <div className="flex justify-end pt-2 border-t">
                     <Button type="submit">Salvar Configurações de IA</Button>
                   </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card data-settings-tab="intelligence" className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Orçamento de IA (crédito da Anthropic)</CardTitle>
+                <CardDescription>
+                  Gasto estimado do mês pelos tokens de cada chamada ao Claude, a preço de tabela. A fatura do Console da Anthropic é a referência final.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {aiBudget ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <p className="text-sm">
+                        <span className="font-semibold tabular-nums">US$ {aiBudget.spentUsd.toFixed(2)}</span> de US$ {aiBudget.budgetUsd.toFixed(0)} neste mês
+                      </p>
+                      <span className="text-xs tabular-nums text-muted-foreground">{Math.round(aiBudget.ratio * 100)}%</span>
+                    </div>
+                    <Progress value={Math.min(100, aiBudget.ratio * 100)} aria-label="Gasto do orçamento de IA no mês" />
+                    <p className="text-xs text-muted-foreground">
+                      {aiBudget.level === "exceeded"
+                        ? "Orçamento esgotado: a análise das conversas está no ritmo econômico (a cada 10 minutos) até o mês virar ou o orçamento subir."
+                        : aiBudget.level === "warning"
+                          ? "Passou de 80% do orçamento: os diretores foram avisados."
+                          : "Dentro do orçamento."}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Não foi possível calcular o gasto agora.</p>
+                )}
+                <form action={updateAiBudgetSettingsAction} className="flex flex-wrap items-end justify-between gap-4 border-t border-border pt-4">
+                  <div className="space-y-2">
+                    <label htmlFor="aiBudgetUsd" className="text-sm font-semibold">Orçamento mensal (US$)</label>
+                    <Input id="aiBudgetUsd" name="aiBudgetUsd" type="number" min="1" step="1" defaultValue={aiBudget?.budgetUsd ?? 100} className="max-w-40" />
+                    <p className="max-w-xl text-xs text-muted-foreground">
+                      Em 80% os diretores recebem um aviso. Em 100%, a análise das conversas volta ao ritmo econômico; o robô de qualificação e o Jack continuam.
+                    </p>
+                  </div>
+                  <Button type="submit" variant="outline">Salvar orçamento</Button>
                 </form>
               </CardContent>
             </Card>

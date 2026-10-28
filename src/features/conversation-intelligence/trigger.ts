@@ -1,6 +1,7 @@
 import "server-only";
 
 import { analyzeLeadConversation } from "./analyzer";
+import { isAiBudgetExceeded } from "@/features/ai-gateway/anthropic-budget";
 import { conversationIntelligenceDomainRoot } from "@/shared/domain-root/conversation-intelligence-root";
 
 // Mapa de debouncing em memória por leadId
@@ -28,6 +29,8 @@ export function scheduleLeadConversationAnalysis(
   const timer = setTimeout(async () => {
     pendingTimers.delete(leadId);
     try {
+      // Over the monthly AI budget the 10-minute economy job analyses it instead.
+      if (await isAiBudgetExceeded()) return;
       await analyzeLeadConversation(leadId, tenantId);
     } catch (error) {
       console.error("[conversation-intelligence] Erro no job debounced do lead:", leadId, error);

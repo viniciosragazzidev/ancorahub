@@ -26,6 +26,7 @@ export const notificationCapabilities = [
   { id: "supervisor_transfer", label: "Pedido de transferência entre equipes", description: "Avisa os gestores sobre pedidos de transferência de corretores entre equipes de supervisão.", channels: "Toast + push" },
   { id: "supervisor_team_invite", label: "Convite para equipe do supervisor", description: "Avisa o corretor quando um supervisor da unidade convida para a equipe e informa o resultado ao supervisor.", channels: "Toast + push" },
   { id: "relationship_message", label: "Mensagens da Central de relacionamento", description: "Avisos, reconhecimentos e pedidos de confirmação que a direção envia aos corretores.", channels: "Toast + push" },
+  { id: "ai_budget", label: "Orçamento de IA", description: "Avisa os diretores quando o gasto do mês com a IA chega a 80% e a 100% do orçamento definido no Super-admin.", channels: "Toast + push" },
   { id: "lead_ai_insight", label: "Insight e Diagnóstico de IA na Conversa", description: "Notifica o corretor e a gestão quando a IA identifica sinais de compra, objeções críticas ou sugere avanço no funil.", channels: "Toast + push" },
 ] as const;
 

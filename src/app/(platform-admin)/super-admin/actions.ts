@@ -22,6 +22,8 @@ import { sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getRequiredPlatformAdmin } from "@/shared/auth/platform-admin";
 import { getSystemSetting, setSystemSetting } from "@/features/system-settings/queries";
+import { saveAiBudgetUsd } from "@/features/ai-gateway/anthropic-budget";
+import { AI_BUDGET_SETTING } from "@/features/ai-gateway/anthropic-budget-domain";
 import { z } from "zod";
 import { provisionDefaultMarketingRole } from "@/features/custom-roles/service";
 import { notificationCapabilities, notificationCapabilitySettingKey } from "@/features/notifications/catalog";
@@ -919,6 +921,23 @@ export async function updateDutyOvernightExtraSettingsAction(formData: FormData)
     action: "duty_overnight_extra_shift.settings_updated",
     targetType: "system_settings", targetId: FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_SHIFT.key,
     metadata: { enabled: enabled === "true", startsAt: startsAtRaw }, createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+}
+
+/** Monthly budget of the Anthropic credit (28/10): 80% warns the directors, 100% slows the conversation analysis. */
+export async function updateAiBudgetSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const value = Number(String(formData.get("aiBudgetUsd") ?? "").replace(",", "."));
+  if (!Number.isFinite(value) || value < 1 || value > 100_000) throw new Error("Informe um orçamento entre US$ 1 e US$ 100.000.");
+  const budgetUsd = Math.round(value * 100) / 100;
+  const now = new Date();
+  await saveAiBudgetUsd(budgetUsd, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId,
+    action: "ai_budget.settings_updated",
+    targetType: "system_settings", targetId: AI_BUDGET_SETTING,
+    metadata: { budgetUsd }, createdAt: now,
   });
   revalidatePath("/super-admin/settings");
 }
