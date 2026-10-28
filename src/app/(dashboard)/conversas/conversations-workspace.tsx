@@ -62,6 +62,7 @@ import {
   Check,
   CheckCircle,
   Clock,
+  FileArrowDown,
   FileText,
   Flame,
   LinkSimple,
@@ -758,6 +759,35 @@ function ConversationHeader({
     window.location.assign(`tel:${client.telefone.replace(/\D/g, "")}`);
   }
 
+  // Leads only (a contact without a lead has nothing to export); the server re-checks role and scope.
+  const canExportThisConversation = (role === "director" || role === "manager" || role === "supervisor") && !client.id.startsWith("unassigned-");
+  const [isExporting, setIsExporting] = useState(false);
+
+  async function handleExportConversation() {
+    setIsExporting(true);
+    const toastId = toast.loading("Gerando o PDF da conversa...");
+    try {
+      const response = await fetch(`/api/conversations/${encodeURIComponent(client.id)}/export`, { cache: "no-store" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: string } | null;
+        toast.error(payload?.error ?? "Não foi possível gerar o arquivo da conversa.", { id: toastId });
+        return;
+      }
+      const fileName = response.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] ?? "conversa.pdf";
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success("Conversa exportada.", { id: toastId });
+    } catch {
+      toast.error("Não foi possível gerar o arquivo da conversa.", { id: toastId });
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   return (
     <header data-conversations-part={directorSkinEnabled ? "chat-header" : undefined} className="shrink-0 border-b border-border bg-card px-4 py-3 sm:px-5">
       <div data-conversations-part={directorSkinEnabled ? "chat-header-layout" : undefined} className="flex items-center justify-between gap-3">
@@ -883,6 +913,20 @@ function ConversationHeader({
                     <span>Ligar para cliente</span>
                   </DropdownMenuItem>
                 </>
+              ) : null}
+
+              {canExportThisConversation ? (
+                <DropdownMenuItem
+                  onClick={() => void handleExportConversation()}
+                  disabled={isExporting}
+                  className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
+                >
+                  <FileArrowDown className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <span className="flex flex-col gap-0.5">
+                    <span>Exportar conversa</span>
+                    <span className="text-[10px] text-muted-foreground">PDF com mensagens, lead e corretor</span>
+                  </span>
+                </DropdownMenuItem>
               ) : null}
 
               {/* RESETAR CHAT IA (DIRETORES) */}
