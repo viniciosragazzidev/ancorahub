@@ -451,6 +451,13 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     } catch {
       console.warn("[waha-cadence] outgoing_lead_service_start_failed");
     }
+    // The broker took over from the phone: an AI still asking goes quiet (28/10).
+    try {
+      const { pauseAiAfterBrokerMessage } = await import("@/features/ai-agent/conversation-state-machine");
+      await pauseAiAfterBrokerMessage({ tenantId, leadId, brokerId: source.connection.userId });
+    } catch {
+      console.warn("[waha-cadence] outgoing_lead_ai_pause_failed");
+    }
   }
   metrics.persistMs = Date.now() - persistStart;
 

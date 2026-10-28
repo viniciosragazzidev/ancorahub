@@ -26,6 +26,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { COEXISTENCE_WEBHOOK_FIELDS } from "./meta-coexistence-events";
 import type { MetaWebhookPayload, MetaWebhookStatus } from "./types";
 import { shouldStartOrResumeAiQualification } from "@/features/qualification-engine/service";
+import { isDistributedPartialQualification } from "@/features/ai-agent/distributed-resume";
 import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence/trigger";
 
 export async function isMetaCloudWhatsAppEnabled() {
@@ -339,7 +340,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           .filter((s) => s.length >= 8)
           .map((s) => sql`regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g') LIKE ${'%' + s}`);
         const leads = phoneConditions.length
-          ? await db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, corretorId: schema.leads.corretorId })
+          ? await db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, qualificationState: schema.leads.qualificationState, corretorId: schema.leads.corretorId })
               .from(schema.leads)
               .where(and(eq(schema.leads.tenantId, channel.tenantId), isNull(schema.leads.deletedAt), or(...phoneConditions)))
           : [];
@@ -448,7 +449,8 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           } catch {
             // Fallback: non-blocking execution outside a Next.js request context.
           }
-        } else if (activeLeadId && shouldStartOrResumeAiQualification(lead?.qualificationStatus ?? "pending")) {
+        } else if (activeLeadId && (shouldStartOrResumeAiQualification(lead?.qualificationStatus ?? "pending") || isDistributedPartialQualification(lead))) {
+          // Also a lead distributed by the time limit with the flow unfinished: the AI decides whether to resume it (28/10).
           const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
           const aiPromise = processInboundAiResponse({
             tenantId: channel.tenantId,

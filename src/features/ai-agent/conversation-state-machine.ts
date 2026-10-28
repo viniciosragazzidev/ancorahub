@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray, isNull, ne, notInArray, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { generateAiResponse, detectLanguage, detectHumanTransferRequest } from "./service";
 import { loadTenantAiAgentConfig } from "./tenant-config";
@@ -44,6 +44,7 @@ import { applyAiMemoryUpdates, buildQualificationFallbackPrompt, shouldUseQualif
 import { interpretQualificationTurn, shouldVerifyExtraction, VERIFIABLE_FIELDS, verifyExtractedFacts, type InterpreterResult, type VerifiableField } from "./qualification-interpreter";
 import { applyQualificationCorrectionsToMemory, describeQualificationCorrections, detectQualificationCorrections } from "./qualification-corrections";
 import { generateLateralAnswer, isCustomerQuestion } from "./lateral-answer";
+import { canResumeDistributedQualification, distributedHandoffText } from "./distributed-resume";
 
 
 export type ConversationStatus =
@@ -812,6 +813,22 @@ export async function startQualificationConversationForLead(
   return { started: true as const, conversationId: conversation.id };
 }
 
+/**
+ * The broker wrote to the customer from their own WhatsApp: an AI still asking (e.g. a
+ * qualification resumed after the time limit) goes quiet, as when the team answers in the CRM.
+ */
+export async function pauseAiAfterBrokerMessage(input: { tenantId: string; leadId: string; brokerId: string }) {
+  const [conversation] = await getDatabase().select({ id: schema.aiConversations.id, status: schema.aiConversations.status })
+    .from(schema.aiConversations)
+    .where(and(eq(schema.aiConversations.tenantId, input.tenantId), eq(schema.aiConversations.leadId, input.leadId)))
+    .limit(1);
+  if (!conversation || !["AI_ACTIVE", "WAITING_CUSTOMER"].includes(conversation.status)) return;
+  await transitionConversationState({
+    tenantId: input.tenantId, conversationId: conversation.id, newStatus: "HUMAN_ACTIVE",
+    reason: "O corretor respondeu pelo próprio WhatsApp; a IA parou.", assignedUserId: input.brokerId, pausedByUserId: input.brokerId,
+  });
+}
+
 export async function transitionConversationState({
   tenantId,
   conversationId,
@@ -1315,6 +1332,51 @@ async function reopenAfterSoftDecline(input: {
 }
 
 /**
+ * The lead went to a broker by the time limit with the qualification unfinished (PARTIAL) and
+ * the customer answered afterwards: the AI finishes the flow while the broker has not written
+ * yet (28/10). The broker keeps the lead; the end of the flow names them (distributedHandoffText).
+ */
+async function reopenDistributedQualification(input: {
+  tenantId: string;
+  leadId: string;
+  conversation: { id: string; status: string };
+}) {
+  if (input.conversation.status !== "CLOSED") return false;
+  const db = getDatabase();
+  const [lead] = await db.select({
+    corretorId: schema.leads.corretorId,
+    qualificationState: schema.leads.qualificationState,
+    status: schema.leads.status,
+    assignedAt: schema.leads.assignedAt,
+  }).from(schema.leads).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId))).limit(1);
+  if (!lead?.corretorId || lead.qualificationState !== "PARTIAL") return false;
+  // The broker's own messages (sent from the CRM or the phone) carry no bot role.
+  const [brokerMessages] = await db.select({ total: count() }).from(schema.whatsappMessages).where(and(
+    eq(schema.whatsappMessages.tenantId, input.tenantId),
+    eq(schema.whatsappMessages.leadId, input.leadId),
+    inArray(schema.whatsappMessages.direction, ["outgoing", "outbound"]),
+    or(isNull(schema.whatsappMessages.senderRole), notInArray(schema.whatsappMessages.senderRole, ["assistant", "system", "agent"])),
+    lead.assignedAt ? gt(schema.whatsappMessages.sentAt, lead.assignedAt) : undefined,
+  ));
+  if (!canResumeDistributedQualification({
+    conversationStatus: input.conversation.status,
+    corretorId: lead.corretorId,
+    qualificationState: lead.qualificationState,
+    leadStatus: lead.status,
+    brokerMessagesSinceAssignment: Number(brokerMessages?.total ?? 0),
+  })) return false;
+  const now = new Date();
+  await db.update(schema.aiConversations).set({ status: "WAITING_CUSTOMER", automationState: "AI_ACTIVE", updatedAt: now })
+    .where(and(eq(schema.aiConversations.id, input.conversation.id), eq(schema.aiConversations.tenantId, input.tenantId), eq(schema.aiConversations.status, "CLOSED")));
+  await db.insert(schema.aiQuickReplyEvents).values({
+    id: crypto.randomUUID(), tenantId: input.tenantId, conversationId: input.conversation.id, leadId: input.leadId, sourceMessageId: null,
+    intent: "GREETING", ruleKey: "reopened_after_distribution", templateKey: null, outcome: "reopened", estimatedTokensSaved: 0, notifiedUserId: null,
+  });
+  console.info("[qualification] reopened_after_distribution", { tenantId: input.tenantId, leadId: input.leadId, conversationId: input.conversation.id });
+  return true;
+}
+
+/**
  * Handoff text for this moment. The tenant's own text wins (D1). Outside working hours the night
  * text replaces only the default one; a tenant text without time gets the return sentence after it.
  */
@@ -1495,6 +1557,11 @@ export async function processInboundAiResponse({
   if (conversation.status === "HUMAN_ACTIVE") {
     console.log(`[ai-agent] Conversa ${conversation.id} está em HUMAN_ACTIVE. Atendimento assumido por humano. IA em silêncio.`);
     return { status: "ignored_human_active" };
+  }
+
+  // Distributed by the time limit with the flow unfinished: the customer's answer resumes it.
+  if (conversation.status === "CLOSED" && await reopenDistributedQualification({ tenantId, leadId, conversation })) {
+    return processInboundAiResponse({ tenantId, leadId, phone, userMessageBody, messageKind, communicationChannelId, providerMessageId, whatsappMessageId, transport, openWaSessionId, wahaRunId, skipDebounce: true, correctionOnly });
   }
 
   if (conversation.status === "CLOSED" || conversation.status === "FAILED") {
@@ -1737,7 +1804,7 @@ export async function processInboundAiResponse({
 
   // Buscar dados do lead para contextualizar a IA
   const [lead] = await db
-    .select({ nome: schema.leads.nome, tipo: schema.leads.tipo })
+    .select({ nome: schema.leads.nome, tipo: schema.leads.tipo, corretorId: schema.leads.corretorId })
     .from(schema.leads)
     .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)))
     .limit(1);
@@ -2110,6 +2177,18 @@ export async function processInboundAiResponse({
     const handoffBody = handoffBodyFor(tenantConfig.handoffMessage, DEFAULT_QUALIFIED_HANDOFF_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT);
     const renderedHandoff = renderConversationVariables(handoffBody, updatedMemory, lead?.nome);
     deterministicTurn = replaceHandoffTextPreservingExtension(deterministicTurn, daytimeHandoff, renderedHandoff);
+  }
+  // The lead already has a broker (resumed after the time limit, or a hot lead sent early):
+  // the end says who continues, by first name (28/10).
+  if (deterministicTurn.kind === "handoff" && lead?.corretorId) {
+    const [broker] = await db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, lead.corretorId)).limit(1);
+    const brokerHandoff = distributedHandoffText(broker?.name);
+    if (brokerHandoff) {
+      const currentHandoff = afterHours
+        ? renderConversationVariables(handoffBodyFor(tenantConfig.handoffMessage, DEFAULT_QUALIFIED_HANDOFF_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT), updatedMemory, lead?.nome)
+        : renderConversationVariables(effectiveHandoffText(tenantConfig.handoffMessage, DEFAULT_QUALIFIED_HANDOFF_TEXT), updatedMemory);
+      deterministicTurn = replaceHandoffTextPreservingExtension(deterministicTurn, currentHandoff, brokerHandoff);
+    }
   }
   // The customer said the current plan costs too much: show it was heard before the question.
   if (deterministicTurn.kind === "collecting" && !inboundIsAutomated) {
