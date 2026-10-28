@@ -22,10 +22,10 @@ import { isCompanyLeadType } from "@/features/leads/company-lead-detection";
 import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
 import { normalizeQueueSource } from "./routing-catalog";
 import { findBrokerRunningDutyScheduleId, getActiveQueueDutyRoster } from "./active-queue-duty-roster";
-import { countReceivedInDayByBroker, getDutyScheduleReceiptScope, NON_COUNTING_OFFER_STATUS } from "./received-in-day";
+import { countReceivedInDayByBroker, getDutyScheduleReceiptScope, NON_COUNTING_OFFER_STATUS, overnightExtraReceiptGap } from "./received-in-day";
 import { filterPausedDutyAssignmentsBeforeResolution, getSaoPauloDateKey, resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getOvernightExtraShiftSettings, getPresenceEligibleAssignments } from "./duty-presence";
-import { extraShiftWindow, findRunningDutySchedule, getRelevantDutyWindow, isExtraShiftRecord, isOvernightLead, MORNING_SHIFT_STARTS_BEFORE } from "./duty-presence-domain";
+import { extraShiftWindow, findRunningDutySchedule, getRelevantDutyWindow, isExtraShiftRecord, isOvernightLead, MORNING_SHIFT_STARTS_BEFORE, OVERNIGHT_LEADS_UNTIL } from "./duty-presence-domain";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { countLeadsReceivedInDuty, type DutyLeadCap } from "./duty-lead-cap";
 import { selectBrokerDutyScheduleIds } from "./shared-duty-roster";
@@ -1387,6 +1387,9 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const ids = remainingBrokers.map((broker) => broker.id);
   // "Menor carga": indicações do dia da operação (19:00 do dia anterior; sexta 19:00 na segunda), DEC-154.
   const dutySince = operationDayStart(new Date());
+  // The night extra's leads stay with the extra: once it closes they do not level the regular plantão.
+  const extraSettings = await getOvernightExtraShiftSettings();
+  const extraGap = extraSettings.enabled ? overnightExtraReceiptGap(new Date(), extraSettings.startsAt, OVERNIGHT_LEADS_UNTIL) : null;
   const [loads, brokerLeadHistory, slaAttempts, dutyOffers] = await Promise.all([
     db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads).where(and(
       eq(schema.leads.tenantId, context.tenantId),
@@ -1417,7 +1420,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     ...brokerLeadHistory.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
     ...slaAttempts.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
     ...dutyOffers.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.offeredAt, offerStatus: item.status })),
-  ], dutySince, countingScheduleIdByBroker);
+  ], dutySince, countingScheduleIdByBroker, extraGap);
   const candidates = remainingBrokers.map((broker) => {
     const history = brokerLeadHistory.filter((item) => item.brokerId === broker.id);
     const attempts = slaAttempts.filter((item) => item.brokerId === broker.id);
@@ -1509,6 +1512,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     // round_robin is an explicit "oldest account first" strategy and keeps its order.
     fairPick: queue?.strategy === "round_robin" ? undefined : {
       since: dutySince,
+      gap: extraGap,
       tierByBroker: Object.fromEntries(decision.eligible.map((candidate) => [candidate.id, candidate.onDuty ? 0 : 1])),
       branchIdByBroker: Object.fromEntries(remainingBrokers.flatMap((broker) => broker.branchId ? [[broker.id, broker.branchId]] : [])),
       scheduleIdByBroker: countingScheduleIdByBroker,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { chooseBroker, defaultIntelligentDistributionPolicy, resolveDistributionCandidate, type RankedBroker } from "./domain";
-import { countReceivedInDayByBroker, getDutyScheduleReceiptScope, pickNextByReceivedInDay, type DayReceipt } from "./received-in-day";
+import { countReceivedInDayByBroker, getDutyScheduleReceiptScope, overnightExtraReceiptGap, pickNextByReceivedInDay, type DayReceipt } from "./received-in-day";
 
 const since = new Date("2026-10-26T22:00:00.000Z"); // 19:00 de 26/10 em São Paulo
 const at = (hhmm: string) => new Date(`2026-10-27T${hhmm}:00.000-03:00`);
@@ -157,5 +157,27 @@ describe("DEC-154: nivelamento pelo dia da operação", () => {
       { id: "nova", createdAt: new Date("2026-05-01"), activeLeads: 0, capacity: null, receivedInDuty: 0 },
       { id: "antiga", createdAt: new Date("2026-01-01"), activeLeads: 0, capacity: null, receivedInDuty: 7 },
     ], "round_robin")?.id).toBe("antiga");
+  });
+});
+
+describe("leads of the night extra and the regular plantão (28/10)", () => {
+  const receipts: DayReceipt[] = [
+    ...Array.from({ length: 7 }, (_, index) => ({ brokerId: "extra", leadId: `x${index}`, receivedAt: at(`07:${String(10 + index).padStart(2, "0")}`), dutyScheduleId: "morning" })),
+    { brokerId: "extra", leadId: "m1", receivedAt: at("09:00"), dutyScheduleId: "morning" },
+    { brokerId: "regular", leadId: "m2", receivedAt: at("09:05"), dutyScheduleId: "morning" },
+  ];
+  const scope = { extra: "morning", regular: "morning" };
+
+  it("drops the extra's leads from the leveling once the extra closed", () => {
+    const gap = overnightExtraReceiptGap(at("09:30"), "07:00", "08:00");
+    expect(gap).toEqual({ from: at("07:00"), until: at("08:00") });
+    const counts = countReceivedInDayByBroker(receipts, since, scope, gap);
+    expect(counts.get("extra")).toBe(1);
+    expect(counts.get("regular")).toBe(1);
+  });
+
+  it("keeps leveling the extra among its own brokers while it runs", () => {
+    expect(overnightExtraReceiptGap(at("07:40"), "07:00", "08:00")).toBeNull();
+    expect(countReceivedInDayByBroker(receipts, since, scope, null).get("extra")).toBe(8);
   });
 });

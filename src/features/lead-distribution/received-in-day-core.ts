@@ -20,6 +20,25 @@ export function countsAsReceived(receipt: DayReceipt, since: Date) {
     && receipt.offerStatus !== NON_COUNTING_OFFER_STATUS;
 }
 
+/** A stretch of the day whose receipts do not level the plantão. */
+export type ReceiptGap = { from: Date; until: Date };
+
+/**
+ * The night extra (DEC-152) of today, once it has closed: what the extra brokers got there does not
+ * level the regular plantão (28/10: brokers with 7 extra leads waited while the others caught up).
+ * While the extra runs, null: its receipts level the extra itself. São Paulo is UTC-3 all year.
+ */
+export function overnightExtraReceiptGap(now: Date, extraStartsAt: string, extraEndsAt: string): ReceiptGap | null {
+  const local = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+  const at = (clock: string) => {
+    const [hour, minute] = clock.split(":").map(Number);
+    return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), hour + 3, minute));
+  };
+  const from = at(extraStartsAt);
+  const until = at(extraEndsAt);
+  return from < until && now >= until ? { from, until } : null;
+}
+
 export type DutyScheduleIdByBroker = Readonly<Record<string, string | null | undefined>>;
 
 /** The preview and the locked distribution use the same occurrence scope. */
@@ -35,10 +54,12 @@ export function countReceivedInDayByBroker(
   receipts: readonly DayReceipt[],
   since: Date,
   scheduleIdByBroker: DutyScheduleIdByBroker = {},
+  gap: ReceiptGap | null = null,
 ): Map<string, number> {
   const leadsByBroker = new Map<string, Set<string>>();
   for (const receipt of receipts) {
     if (!countsAsReceived(receipt, since)) continue;
+    if (gap && receipt.receivedAt! >= gap.from && receipt.receivedAt! < gap.until) continue;
     const expectedScheduleId = scheduleIdByBroker[receipt.brokerId!] ?? null;
     if ((receipt.dutyScheduleId ?? null) !== expectedScheduleId) continue;
     const leads = leadsByBroker.get(receipt.brokerId!) ?? new Set<string>();

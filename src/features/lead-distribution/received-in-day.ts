@@ -1,10 +1,10 @@
 import { and, eq, gte, inArray, ne } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
-import { countReceivedInDayByBroker, NON_COUNTING_OFFER_STATUS, type DutyScheduleIdByBroker } from "./received-in-day-core";
+import { countReceivedInDayByBroker, NON_COUNTING_OFFER_STATUS, type DutyScheduleIdByBroker, type ReceiptGap } from "./received-in-day-core";
 
-export { countsAsReceived, countReceivedInDayByBroker, getDutyScheduleReceiptScope, NON_COUNTING_OFFER_STATUS, pickNextByReceivedInDay } from "./received-in-day-core";
-export type { DayReceipt, DutyScheduleIdByBroker } from "./received-in-day-core";
+export { countsAsReceived, countReceivedInDayByBroker, getDutyScheduleReceiptScope, NON_COUNTING_OFFER_STATUS, overnightExtraReceiptGap, pickNextByReceivedInDay } from "./received-in-day-core";
+export type { DayReceipt, DutyScheduleIdByBroker, ReceiptGap } from "./received-in-day-core";
 
 type DatabaseLike = Pick<ReturnType<typeof getDatabase>, "select">;
 
@@ -15,6 +15,7 @@ export async function loadReceivedInDayByBroker(
   brokerIds: readonly string[],
   since: Date,
   scheduleIdByBroker: DutyScheduleIdByBroker = {},
+  gap: ReceiptGap | null = null,
 ) {
   if (!brokerIds.length) return new Map<string, number>();
   const ids = [...brokerIds];
@@ -32,5 +33,5 @@ export async function loadReceivedInDayByBroker(
       gte(schema.leadOffers.offeredAt, since),
       ne(schema.leadOffers.status, NON_COUNTING_OFFER_STATUS),
     ));
-  return countReceivedInDayByBroker([...leads, ...attempts, ...offers], since, scheduleIdByBroker);
+  return countReceivedInDayByBroker([...leads, ...attempts, ...offers], since, scheduleIdByBroker, gap);
 }

@@ -21,7 +21,7 @@ import { buildLeadClientInfo, buildLeadOfferSummary } from "@/features/leads/cli
 import { getRelevantDutyWindow, isDutyWindowActive } from "./duty-presence-domain";
 import { postSaleTransferAuditAction } from "./post-sale-transfer";
 import { traceLeadStep } from "./distribution-trace";
-import { loadReceivedInDayByBroker, pickNextByReceivedInDay } from "./received-in-day";
+import { loadReceivedInDayByBroker, pickNextByReceivedInDay, type ReceiptGap } from "./received-in-day";
 import { chooseManualQueuePick, manualQueueSettingKey, manualQueueSettingKeyForBroker, parseManualQueueValue } from "./duty-queue-order";
 import { tryDistributionPickLock, tryDistributionPickLockOnce } from "./distribution-pick-lock";
 
@@ -134,7 +134,7 @@ export async function createLeadOffersForBrokers(input: {
    * claims for the one with fewest. brokerIds keeps breaking ties. Without it,
    * brokerIds order is final.
    */
-  fairPick?: { since: Date; tierByBroker?: Record<string, number>; branchIdByBroker?: Record<string, string>; scheduleIdByBroker?: Record<string, string> };
+  fairPick?: { since: Date; gap?: ReceiptGap | null; tierByBroker?: Record<string, number>; branchIdByBroker?: Record<string, string>; scheduleIdByBroker?: Record<string, string> };
   /** Read and rotate a live occurrence's director-managed queue under the same pick lock. */
   manualPick?: {
     dutyDateBySchedule: Record<string, string>;
@@ -257,7 +257,7 @@ export async function createLeadOffersForBrokers(input: {
         pickLockAcquired = !pickLockBusy && await tryDistributionPickLock(tx, input.tenantId);
         if (!pickLockAcquired) pickLockBusy = true;
         const pendingIds = pending.map((candidate) => candidate.id);
-        const received = await loadReceivedInDayByBroker(tx, input.tenantId, pendingIds, input.fairPick.since, input.fairPick.scheduleIdByBroker);
+        const received = await loadReceivedInDayByBroker(tx, input.tenantId, pendingIds, input.fairPick.since, input.fairPick.scheduleIdByBroker, input.fairPick.gap);
         automaticBrokerId = pickNextByReceivedInDay(pendingIds, received, input.fairPick.tierByBroker);
         broker = pending.find((candidate) => candidate.id === automaticBrokerId) ?? broker;
         destinationPhone = broker.phone;

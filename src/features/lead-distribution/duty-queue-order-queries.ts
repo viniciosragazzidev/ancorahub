@@ -6,9 +6,10 @@ import { getDatabase, schema } from "@/shared/db";
 import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, readDistributionPolicy, type IntelligentDistributionPolicy } from "./domain";
 import type { AssignmentStrategy } from "./types";
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
-import { findRunningDutySchedule } from "./duty-presence-domain";
+import { findRunningDutySchedule, OVERNIGHT_LEADS_UNTIL } from "./duty-presence-domain";
 import { operationDayStart } from "./broker-day-history";
-import { countReceivedInDayByBroker, getDutyScheduleReceiptScope, NON_COUNTING_OFFER_STATUS, type DayReceipt } from "./received-in-day";
+import { countReceivedInDayByBroker, getDutyScheduleReceiptScope, NON_COUNTING_OFFER_STATUS, overnightExtraReceiptGap, type DayReceipt } from "./received-in-day";
+import { getOvernightExtraShiftSettings } from "./duty-presence";
 import { dutyQueueHistorySince, manualQueueSettingKey, parseManualQueueValue, previewQueueOrder, reconcileManualQueueOrder, type DutyQueueCandidate } from "./duty-queue-order";
 
 export type DutyQueueOrderPreview = {
@@ -115,6 +116,9 @@ export async function getDutyQueueOrderPreviews(context: TenantContext, now = ne
   }));
 
   const since = operationDayStart(now);
+  // Same rule as the distribution: the closed night extra's leads do not level the regular plantão.
+  const extraSettings = await getOvernightExtraShiftSettings();
+  const extraGap = extraSettings.enabled ? overnightExtraReceiptGap(now, extraSettings.startsAt, OVERNIGHT_LEADS_UNTIL) : null;
   const historySince = dutyQueueHistorySince(now);
   const [leadReceipts, attempts, offers, leadHistory, slaAttempts] = await Promise.all([
     db.select({ brokerId: schema.leads.corretorId, leadId: schema.leads.id, receivedAt: schema.leads.assignedAt, dutyScheduleId: schema.leads.dutyScheduleId })
@@ -167,7 +171,7 @@ export async function getDutyQueueOrderPreviews(context: TenantContext, now = ne
     const policy = queuePolicy?.policy ?? defaultIntelligentDistributionPolicy;
     const strategy = operatingQueue?.assignmentStrategy === "round_robin" ? "round_robin" : "capacity";
     const hasExplicitDutyScope = Boolean(operatingQueue && (operatingQueue.exclusiveDutyScheduleIds?.includes(schedule.id) || operatingQueue.exclusiveDutyScheduleId === schedule.id));
-    const countingScope = countReceivedInDayByBroker(receipts, since, getDutyScheduleReceiptScope(scheduleIdByBroker, hasExplicitDutyScope));
+    const countingScope = countReceivedInDayByBroker(receipts, since, getDutyScheduleReceiptScope(scheduleIdByBroker, hasExplicitDutyScope), extraGap);
     const pausedBrokerIds = new Set(roster.filter((entry) => entry.pausedAt).map((entry) => entry.brokerId));
     const candidates: DutyQueueCandidate[] = roster.map((entry) => {
       const history = historyByBroker.get(entry.brokerId);
