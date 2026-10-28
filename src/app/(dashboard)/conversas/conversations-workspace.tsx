@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 import { motion, useReducedMotion } from "motion/react";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
@@ -21,6 +21,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ContextNote } from "@/components/ui/context-note";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { brokerDisplayName, CONTACT_SHORTCUT, contactShortcutMessage, isContactShortcut, isValidContactName } from "./_components/contact-shortcut";
 import { LeadTagChips } from "@/features/lead-tags/components/lead-tag-chip";
@@ -82,7 +83,7 @@ import {
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
-import { Sparkles, RefreshCw, PanelRightClose, PanelRightOpen, ChevronDown, UserCheck, Bot, SlidersHorizontal } from "lucide-react";
+import { Sparkles, RefreshCw, PanelRightClose, PanelRightOpen, ChevronDown, UserCheck, Bot } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -270,8 +271,6 @@ export function ConversationsWorkspace({
   const [filter, setFilter] = useState<ViewFilter>("all");
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [profileOpen, setProfileOpen] = useState(true);
-  // Director Lite: below desktop the filters and tabs live behind one toggle so they never clip.
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
   const reduceMotion = useReducedMotion();
 
@@ -435,41 +434,24 @@ export function ConversationsWorkspace({
       data-conversations-part={directorSkinEnabled ? "workspace" : undefined}
       className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card"
     >
-      <FilterToolbar
-        data-lite={directorSkinEnabled ? undefined : "toolbar"}
-        data-conversations-part={directorSkinEnabled ? "toolbar" : undefined}
-        aria-label="Filtros dos atendimentos"
-        className="shrink-0 rounded-none border-x-0 border-t-0 px-4 py-2.5 sm:px-5"
-        filters={directorSkinEnabled ? (
-          <div data-conversations-part="filter-shell" className="flex min-w-0 flex-1 flex-col gap-2">
-            <button
-              type="button"
-              data-conversations-part="filter-toggle"
-              aria-expanded={filtersOpen}
-              aria-controls="conversas-filter-controls"
-              onClick={() => setFiltersOpen((open) => !open)}
-            >
-              <SlidersHorizontal aria-hidden="true" className="size-4" />
-              <span>Filtros</span>
-              <ChevronDown aria-hidden="true" className="size-4" data-conversations-part="filter-toggle-chevron" />
-            </button>
-            <div id="conversas-filter-controls" data-conversations-part="filter-controls" data-open={filtersOpen ? "true" : "false"} className="flex min-w-0 flex-1 items-center gap-2">
-              {filterContent}
-              {directorActions ? <div data-conversations-part="inline-actions">{directorActions}</div> : null}
-            </div>
-          </div>
-        ) : filterContent}
-        results={directorSkinEnabled ? undefined : `${filtered.length} de ${conversations.length} atendimentos`}
-      />
+      {!directorSkinEnabled ? (
+        <FilterToolbar
+          data-lite="toolbar"
+          aria-label="Filtros dos atendimentos"
+          className="shrink-0 rounded-none border-x-0 border-t-0 px-4 py-2.5 sm:px-5"
+          filters={filterContent}
+          results={`${filtered.length} de ${conversations.length} atendimentos`}
+        />
+      ) : null}
 
       <div
-          data-lite={directorSkinEnabled ? undefined : "panes"}
-          data-conversations-part={directorSkinEnabled ? "panes" : undefined}
-          data-profile-open={directorSkinEnabled ? String(profileOpen) : undefined}
-          className={cn(
-            "grid min-h-0 flex-1 grid-cols-1 grid-rows-1 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)]",
-            profileOpen && "lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]",
-          )}
+        data-lite={directorSkinEnabled ? undefined : "panes"}
+        data-conversations-part={directorSkinEnabled ? "panes" : undefined}
+        data-profile-open={directorSkinEnabled ? String(profileOpen) : undefined}
+        className={cn(
+          "grid min-h-0 flex-1 grid-cols-1 grid-rows-1 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)]",
+          profileOpen && "lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]",
+        )}
       >
         <section
           aria-label="Lista de atendimentos"
@@ -477,7 +459,20 @@ export function ConversationsWorkspace({
           data-conversations-part={directorSkinEnabled ? "pane" : undefined}
           className={cn("flex min-h-0 flex-col border-r border-border bg-card", mobileView === "chat" && selected && "max-lg:hidden")}
         >
-          <div className="border-b border-border px-3 py-2.5">
+          {directorSkinEnabled ? (
+            <div
+              aria-label="Abas e filtros da lista"
+              data-conversations-part="director-list-controls"
+              role="group"
+              className="flex min-w-0 items-center gap-2 overflow-x-auto border-b border-border px-3 py-1"
+            >
+              <div data-conversations-part="filter-controls" className="flex min-w-0 items-center gap-2">
+                {filterContent}
+              </div>
+              {directorActions ? <div data-conversations-part="inline-actions">{directorActions}</div> : null}
+            </div>
+          ) : null}
+          <div data-conversations-part={directorSkinEnabled ? "search-header" : undefined} className="border-b border-border px-3 py-2.5">
             <div className="relative" data-lite={directorSkinEnabled ? undefined : "search"} data-conversations-part={directorSkinEnabled ? "search" : undefined}>
               <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -1110,7 +1105,11 @@ function ConversationHistory({ client, directorSkinEnabled }: { client: Conversa
   };
 
   return (
-    <ScrollArea className="min-h-0 flex-1" viewportRef={viewportRef}>
+    <ScrollArea
+      data-conversations-part={directorSkinEnabled ? "message-history" : undefined}
+      className="min-h-0 flex-1"
+      viewportRef={viewportRef}
+    >
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6">
         {messagesByDate.map(([dateLabel, msgs], dateIdx) => {
           const grouped = msgs.reduce<{ type: "system" | "client" | "transition"; messages: ConversationMessage[] }[]>(
@@ -1201,6 +1200,15 @@ function ChatInput({
   const [error, setError] = useState<string | null>(null);
   const [contactOpen, setContactOpen] = useState(false);
   const [contactName, setContactName] = useState("");
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    if (!directorSkinEnabled) return;
+    const input = messageInputRef.current;
+    if (!input) return;
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 112)}px`;
+  }, [directorSkinEnabled, text]);
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
@@ -1264,18 +1272,37 @@ function ChatInput({
           Abrir no WhatsApp
         </a>
       ) : null}
-      <form onSubmit={handleSend} className="flex gap-2 items-center">
+      <form onSubmit={handleSend} className={cn("flex gap-2 items-center", directorSkinEnabled && "items-end")}>
         <MediaAttachButton leadId={leadId} onMediaSent={onMediaSent} />
         <QuickResponsesPopover onSelectResponse={handleAppendQuickResponse} />
         <div className="relative flex-1">
-          <Input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={directorSkinEnabled ? "Escreva uma mensagem" : `Digite sua mensagem para o cliente (ou ${CONTACT_SHORTCUT} para avisar quem vai ligar)...`}
-            aria-label={directorSkinEnabled ? "Escreva uma mensagem" : undefined}
-            disabled={isPending}
-            className={directorSkinEnabled ? "h-10 min-w-0 text-sm" : "h-10 text-sm"}
-          />
+          {directorSkinEnabled ? (
+            <Textarea
+              ref={messageInputRef}
+              data-conversations-part="composer-input"
+              rows={1}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.metaKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+              placeholder="Mensagem"
+              aria-label="Escreva uma mensagem"
+              disabled={isPending}
+              className="min-h-11 max-h-28 min-w-0 flex-1 resize-none overflow-y-auto text-sm leading-5"
+            />
+          ) : (
+            <Input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={`Digite sua mensagem para o cliente (ou ${CONTACT_SHORTCUT} para avisar quem vai ligar)...`}
+              disabled={isPending}
+              className="h-10 text-sm"
+            />
+          )}
           {error && (
             <p className="absolute -top-6 left-1 text-[11px] font-medium text-destructive truncate max-w-full">
               {error}

@@ -153,15 +153,20 @@ describe("pele da central de conversas", () => {
     expect(html).toContain('data-conversations-part="frame"');
     expect(html).toContain('data-conversations-part="workspace"');
     expect(html).toContain('data-conversations-part="filter-controls"');
+    expect(html).toContain('data-conversations-part="director-list-controls"');
     expect(html).toContain('data-conversations-part="inline-actions"');
     expect(html).not.toContain('data-conversations-part="page-actions"');
     expect(html).not.toContain('data-lite=');
+    expect(html).not.toContain('data-slot="filter-toolbar"');
   });
 
   it("mantém rótulos e controles do Diretor em português e sem linha de tags vazia", () => {
     const html = renderSelectedConversation();
     expect(html).toContain('placeholder="Buscar conversa"');
-    expect(html).toContain('placeholder="Escreva uma mensagem"');
+    expect(html).toContain('placeholder="Mensagem"');
+    expect(html).toContain('data-conversations-part="message-history"');
+    expect(html).toContain('data-conversations-part="composer-input"');
+    expect(html).toContain('<textarea');
     expect(html).toContain(">Qualificado</span>");
     expect(html).not.toMatch(/>qualified<\/span>/i);
     expect(html).not.toContain("Sem tags");

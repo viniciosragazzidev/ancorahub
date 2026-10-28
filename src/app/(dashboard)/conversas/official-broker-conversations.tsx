@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState, useEffect } from "react";
+import { Fragment, useLayoutEffect, useMemo, useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
@@ -133,6 +133,15 @@ export function OfficialBrokerConversations({
   // Input individual chat
   const [directMessageText, setDirectMessageText] = useState("");
   const [isSendingDirect, setIsSendingDirect] = useState(false);
+  const directMessageInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    if (!directorSkinEnabled) return;
+    const input = directMessageInputRef.current;
+    if (!input) return;
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 112)}px`;
+  }, [directMessageText, directorSkinEnabled]);
 
   // Dialogs State
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -614,15 +623,35 @@ export function OfficialBrokerConversations({
               </ScrollArea>
 
               {/* Input Footer para envio de mensagem rápida ao corretor */}
-              <footer className="border-t border-border bg-card p-3 lg:px-4">
-                <form onSubmit={handleSendDirectMessage} className="flex items-center gap-2">
-                  <Input
-                    value={directMessageText}
-                    onChange={(e) => setDirectMessageText(e.target.value)}
-                    placeholder={`Enviar mensagem no WhatsApp para ${selected.name}...`}
-                    className="flex-1 text-xs"
-                    disabled={isSendingDirect}
-                  />
+              <footer data-conversations-part={directorSkinEnabled ? "chat-input" : undefined} className="border-t border-border bg-card p-3 lg:px-4">
+                <form onSubmit={handleSendDirectMessage} className={cn("flex items-center gap-2", directorSkinEnabled && "items-end")}>
+                  {directorSkinEnabled ? (
+                    <Textarea
+                      ref={directMessageInputRef}
+                      data-conversations-part="composer-input"
+                      rows={1}
+                      value={directMessageText}
+                      onChange={(e) => setDirectMessageText(e.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey && !event.altKey && !event.metaKey && !event.nativeEvent.isComposing) {
+                          event.preventDefault();
+                          event.currentTarget.form?.requestSubmit();
+                        }
+                      }}
+                      placeholder="Mensagem"
+                      aria-label="Mensagem"
+                      className="min-h-11 max-h-28 min-w-0 flex-1 resize-none overflow-y-auto text-sm leading-5"
+                      disabled={isSendingDirect}
+                    />
+                  ) : (
+                    <Input
+                      value={directMessageText}
+                      onChange={(e) => setDirectMessageText(e.target.value)}
+                      placeholder={`Enviar mensagem no WhatsApp para ${selected.name}...`}
+                      className="flex-1 text-xs"
+                      disabled={isSendingDirect}
+                    />
+                  )}
                   <Button
                     type="button"
                     variant="ghost"

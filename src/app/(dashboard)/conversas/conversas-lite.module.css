@@ -93,6 +93,12 @@
   padding: 24px clamp(16px, 4vw, 32px) 16px;
 }
 
+/* Conversas ocupa a area livre entre o cabecalho e o fim da viewport. O main
+   generico do shell reserva 96px para paginas rolaveis, o que encolhia a thread. */
+.root.root[data-skin="diretor"] [data-conversations-part="content"] {
+  padding: 12px clamp(16px, 4vw, 32px) 12px;
+}
+
 .root[data-skin="diretor"] [data-conversations-part="frame"],
 .root[data-skin="diretor"] [data-conversations-part="workspace"] {
   min-width: 0;
@@ -104,38 +110,46 @@
   --radius-control: calc(var(--radius-panel) - 12px);
 }
 
-.root[data-skin="diretor"] [data-conversations-part="toolbar"] {
-  align-items: center;
-  gap: 16px;
-  padding: 0 0 16px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.root[data-skin="diretor"] [data-conversations-part="toolbar"] > div:first-child {
-  min-width: 0;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.root[data-skin="diretor"] [data-conversations-part="filter-controls"] {
-  min-width: 0;
-  width: 100%;
-  flex-wrap: wrap;
-  row-gap: 8px;
+.root[data-skin="diretor"] [data-conversations-part="director-list-controls"] {
+  flex: 0 0 auto;
+  min-height: var(--control-height-sm);
+  scrollbar-width: none;
   white-space: nowrap;
 }
 
-.root[data-skin="diretor"] [data-conversations-part="filter-controls"]::-webkit-scrollbar {
+.root[data-skin="diretor"] [data-conversations-part="director-list-controls"]::-webkit-scrollbar {
   display: none;
 }
 
-.root[data-skin="diretor"] [data-conversations-part="filter-controls"] > [data-conversations-part="filters"] {
-  max-width: 100%;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
+.root[data-skin="diretor"] [data-conversations-part="filter-controls"] {
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: max-content;
+  flex-wrap: nowrap;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="filter-controls"] [data-conversations-part="filters"] {
+  width: max-content;
+  max-width: none;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   overflow: visible;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="director-list-controls"] [data-conversations-part="inline-actions"] {
+  flex: 0 0 auto;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="director-list-controls"] [data-conversations-nav] {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="search-header"] {
+  border-bottom: 0;
+  padding-block: 8px;
 }
 
 .root[data-skin="diretor"] [data-conversations-part="inline-actions"] {
@@ -147,10 +161,6 @@
   flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
-}
-
-.root[data-skin="diretor"] [data-conversations-part="toolbar"] > div:last-child:empty {
-  display: none;
 }
 
 .root[data-skin="diretor"] [data-conversations-part="page-actions"] {
@@ -187,15 +197,37 @@
 }
 
 .root[data-skin="diretor"] [data-conversations-part="panes"] {
+  min-height: 0;
   gap: 16px;
   padding: 0;
 }
 
 .root[data-skin="diretor"] [data-conversations-part="pane"] {
+  min-width: 0;
+  min-height: 0;
   border: 1px solid var(--border-subtle) !important;
   border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: none;
+  overflow: hidden;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="message-history"] {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="chat-input"] {
+  flex: 0 0 auto;
+  padding-block: 8px;
+}
+
+.root[data-skin="diretor"] [data-conversations-part="composer-input"] {
+  max-height: 7rem;
+  min-height: var(--control-height-sm);
+  resize: none;
+  overflow-y: auto;
+  line-height: 1.35;
 }
 
 .root[data-skin="diretor"] [data-conversations-part="pane"] > header,
@@ -534,35 +566,6 @@
   color: var(--text-secondary);
 }
 
-@media (max-width: 767px) {
-  .root[data-skin="diretor"] [data-conversations-part="content"] {
-    gap: 0;
-    padding-top: 16px;
-  }
-
-  .root[data-skin="diretor"] [data-conversations-part="toolbar"] {
-    align-items: stretch;
-    gap: 12px;
-    padding-bottom: 12px;
-  }
-
-  .root[data-skin="diretor"] [data-conversations-part="toolbar"] > div:first-child {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .root[data-skin="diretor"] [data-conversations-part="filter-controls"] {
-    flex-direction: row;
-    align-items: center;
-  }
-
-  .root[data-skin="diretor"] [data-conversations-part="filters"] {
-    max-width: 100%;
-    overflow-x: auto;
-    padding-bottom: 2px;
-  }
-}
-
 @media (min-width: 768px) and (max-width: 1023px) {
   .root[data-skin="diretor"] [data-conversations-part="panes"] {
     grid-template-columns: minmax(0, 1fr);
@@ -641,61 +644,4 @@
 :global(html[data-reduce-motion="1"]) .root[data-skin="diretor"] [data-conversations-part="row"],
 :global(html[data-reduce-motion="1"]) .root[data-skin="diretor"] [data-conversations-nav] > a {
   transition: none;
-}
-
-
-/* Filters toggle: desktop shows the filters inline; below 1024px they open and close from one button. */
-.root[data-skin="diretor"] [data-conversations-part="filter-toggle"] {
-  display: none;
-}
-
-@media (max-width: 1023px) {
-  .root[data-skin="diretor"] [data-conversations-part="filter-toggle"] {
-    display: inline-flex;
-    align-self: flex-start;
-    align-items: center;
-    gap: 8px;
-    min-height: var(--control-height-md);
-    padding-inline: 16px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-control);
-    background: var(--surface);
-    color: var(--foreground);
-    font: inherit;
-    font-size: var(--text-sm);
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  .root[data-skin="diretor"] [data-conversations-part="filter-toggle"][aria-expanded="true"] {
-    background: var(--accent-subtle);
-    color: var(--accent-strong);
-  }
-
-  .root[data-skin="diretor"] [data-conversations-part="filter-toggle-chevron"] {
-    transition: transform var(--duration-fast) var(--ease-in-out);
-  }
-
-  .root[data-skin="diretor"] [data-conversations-part="filter-toggle"][aria-expanded="true"] [data-conversations-part="filter-toggle-chevron"] {
-    transform: rotate(180deg);
-  }
-
-  .root[data-skin="diretor"] [data-conversations-part="filter-controls"][data-open="false"] {
-    display: none;
-  }
-
-  .root[data-skin="diretor"] [data-conversations-part="filter-controls"][data-open="true"] {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
-:global(html[data-reduce-motion="1"]) .root[data-skin="diretor"] [data-conversations-part="filter-toggle-chevron"] {
-  transition: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .root[data-skin="diretor"] [data-conversations-part="filter-toggle-chevron"] {
-    transition: none;
-  }
 }

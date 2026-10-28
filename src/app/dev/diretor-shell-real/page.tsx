@@ -9,6 +9,7 @@ import liteStyles from "@/app/(dashboard)/leads/leads-lite-page.module.css";
 import { LeadDetailFixture } from "@/app/dev/diretor-lead-real/lead-detail-fixture";
 import { ConversationsFrame } from "@/app/(dashboard)/conversas/conversations-frame";
 import type { ConversationItem } from "@/app/(dashboard)/conversas/conversations-workspace";
+import { LightConversationsView, type BrokerConversationInsight } from "@/features/broker-workspace/components/light-conversations-view";
 
 import { DirectorLiteChrome } from "@/features/dashboard/components/director-lite/director-lite-chrome";
 import { DirectorLiteQualificationFunnelPage } from "@/features/dashboard/components/director-lite/qualification-funnel-page";
@@ -188,6 +189,28 @@ const additionalConversationFixtures: ConversationItem[] = Array.from({ length: 
 });
 conversationFixtures.push(...additionalConversationFixtures);
 
+const brokerConversationFixtures: BrokerConversationInsight[] = conversationFixtures.map((conversation) => {
+  const mapMessage = ({ id, body, direction, sentAt, providerStatus }: ConversationItem["messages"][number]) => ({ id, body, direction, sentAt, providerStatus });
+  const latestMessage = conversation.messages.at(-1);
+  return {
+    id: conversation.id,
+    kind: "lead",
+    name: conversation.nome,
+    phone: conversation.telefone,
+    status: conversation.status,
+    href: `/leads/${conversation.id}`,
+    latestMessage: latestMessage ? mapMessage(latestMessage) : null,
+    messages: conversation.messages.map(mapMessage),
+    intelligence: {
+      summary: "A pessoa busca cobertura para a família e pediu informações sobre a rede de atendimento e os valores.",
+      nextBestAction: "Responder pelo WhatsApp com opções da região e confirmar a faixa de investimento.",
+      pendingFrom: "BROKER",
+      sentiment: "POSITIVE",
+      customerIntent: "HIGH",
+    },
+  };
+});
+
 export default async function DirectorShellRealPage({
   searchParams,
 }: {
@@ -196,6 +219,7 @@ export default async function DirectorShellRealPage({
   if (process.env.NODE_ENV !== "development") notFound();
   const params = await searchParams;
   const isSuperAdminViewingDirector = params.case === "super-admin";
+  const isBrokerConversationPreview = params.view === "conversas" && params.papel === "corretor";
   const papel = params.papel === "marketing" || params.papel === "personalizado" ? PAPEIS[params.papel] : null;
   const showConversations = params.view === "conversas";
   // ?tela=dashboard (padrão), leads, kanban, qualificacao, sem-atribuicao, radar ou lead: a mesma moldura real com cada tela.
@@ -231,10 +255,10 @@ export default async function DirectorShellRealPage({
   );
   const previewUser: UserDisplayInfo = {
     name,
-    role: papel?.label ?? "Diretor",
-    roleKey: papel?.roleKey ?? "director",
-    jobTitle: papel?.jobTitle ?? "director",
-    permissions: papel?.permissions ?? permissions,
+    role: isBrokerConversationPreview ? "Corretor" : papel?.label ?? "Diretor",
+    roleKey: isBrokerConversationPreview ? "broker" : papel?.roleKey ?? "director",
+    jobTitle: isBrokerConversationPreview ? "broker" : papel?.jobTitle ?? "director",
+    permissions: isBrokerConversationPreview ? ["acessar_conversas", "acessar_dashboard", "acessar_leads"] : papel?.permissions ?? permissions,
     redirectLogout: "/dashboard",
     isPlatformAdmin: isSuperAdminViewingDirector,
     activeRoleOverride: isSuperAdminViewingDirector ? "director" : null,
@@ -253,7 +277,9 @@ export default async function DirectorShellRealPage({
 
   return (
     <AppShell
-      directorLiteEnabled
+      isLightBroker={isBrokerConversationPreview}
+      initialChatRail={isBrokerConversationPreview ? { viewerName: name, assistants: [], leads: [], nowIso: demoNow.toISOString(), canQuote: false } : null}
+      directorLiteEnabled={!isBrokerConversationPreview}
       initialSidebarUser={previewUser}
       initialSidebarPathname={pathname}
       initialSidebarOnDuty={isSuperAdminViewingDirector}
@@ -262,7 +288,14 @@ export default async function DirectorShellRealPage({
       viewAs={{ canViewAs: isSuperAdminViewingDirector, viewingAs: null }}
     >
       {papelScreen ?? (showConversations ? (
-        <ConversationsFrame
+        isBrokerConversationPreview ? (
+          <LightConversationsView
+            insights={brokerConversationFixtures}
+            initialLeadId="lead-fixture-ana"
+            whatsappConnected
+            connectionStatus="ready"
+          />
+        ) : <ConversationsFrame
           role={papel?.roleKey ?? "director"}
           branches={papel ? [] : demoBranches}
           conversations={conversationFixtures}

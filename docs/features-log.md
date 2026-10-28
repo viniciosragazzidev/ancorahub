@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 28/10/2026 - Altura total para a central de conversas
+
+- A conversa aberta agora ocupa a altura disponivel entre o cabecalho e o fim da tela. Historico e lista mantem rolagem propria, e o campo de mensagem permanece no rodape do painel.
+- Abas e filtros ficaram em uma linha rolavel no topo da lista. O composer do visual Lite cresce com o texto ate cinco linhas; Enter envia e Shift+Enter cria uma linha.
+- O HTML da rota quando a chave Lite esta desligada permanece coberto pelo snapshot legado. Sem mudancas em permissoes, filtros, PDF ou links de WhatsApp.
+- Registro e validacoes: `docs/implementations/completed/2026-10-28-conversas-layout.md`.
 ## 27/10/2026 - Contagem correta dos frios recuperados
 
 - Corrigida a negação duplicada do filtro de Status do WhatsApp no contador. Respostas reais voltam a contar; Status continuam excluídos. Janela, deduplicação, auditoria de qualificação e escopo por papel permanecem.
