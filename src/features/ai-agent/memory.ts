@@ -58,6 +58,8 @@ export type ConversationMemory = {
   collectedFields: string[];
   /** The last question the AI asked, verbatim */
   lastQuestionAsked?: string;
+  /** Every question paragraph of the last reply (28/10): "cidade" can be asked before the last question. */
+  lastQuestionsAsked?: string;
   /** Objection recoveries already tried (one, then a second refusal closes politely). */
   objectionAttempts?: number;
   /** Who the plan is for when it is not the person talking ("filha", "pai"). */
@@ -202,6 +204,15 @@ export function hasCoreQuoteData(memory: ConversationMemory | null | undefined) 
   return hasLives && hasAges;
 }
 
+/**
+ * Hot needs the quote data AND the city (28/10, Vinicios): the broker gets the lead with the
+ * location already known. The timeout uses the same criterion, so a lead that stops still
+ * goes to the queue, only as warm.
+ */
+export function hasQuoteReadyData(memory: ConversationMemory | null | undefined) {
+  return hasCoreQuoteData(memory) && Boolean(memory?.city?.value?.trim());
+}
+
 export function readAgeList(message: string): number[] {
   // "17.16.49.48" (case Eliane, 27/10): short numbers joined by dots are a list, never money
   // (money groups thousands in 3 digits: "4.500").
@@ -282,6 +293,21 @@ function livesNumberToken(token: string): number | undefined {
 export function pendingQuestionOf(reply: string) {
   const paragraphs = reply.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
   return paragraphs[paragraphs.length - 1] ?? reply.trim();
+}
+
+/**
+ * Every question paragraph of a reply (28/10). A reply can ask the city and then the plan in two
+ * paragraphs: only the last one would be "the question", so the city answer was never read.
+ * Lateral paragraphs without "?" stay out, as in pendingQuestionOf.
+ */
+export function pendingQuestionsOf(reply: string) {
+  const questions = reply.split(/\n\s*\n/).map((part) => part.trim()).filter((part) => part.includes("?"));
+  return questions.length ? questions.join("\n") : pendingQuestionOf(reply);
+}
+
+/** The text of the question(s) the AI asked last: the last one plus every question of the last reply. */
+function pendingQuestionsText(memory: ConversationMemory) {
+  return `${memory.lastQuestionAsked ?? ""} ${memory.lastQuestionsAsked ?? ""}`;
 }
 
 /**
@@ -461,10 +487,10 @@ export function extractFieldsFromMessage(
       }
     }
 
-    const asksForCity = normalizeForMatching(memory.lastQuestionAsked ?? "").includes("cidade");
-    // A city answer may include a neighbourhood/region after a comma
-    // ("Rio de Janeiro, centro"). Keep the city segment only.
-    const bareCity = trimmed.split(",")[0]?.trim() ?? "";
+    const asksForCity = normalizeForMatching(pendingQuestionsText(memory)).includes("cidade");
+    // A city answer may include a neighbourhood/region after a comma, slash or dash
+    // ("Rio de Janeiro, centro", "Petrópolis/RJ", "Petrópolis - RJ"). Keep the city segment only.
+    const bareCity = trimmed.split(/[,;/]|\s[-–]\s/)[0]?.trim() ?? "";
     if (!memory.city && asksForCity && isLikelyCityAnswer(bareCity)) {
       memory.city = { value: bareCity, confidence: 1, sourceMessageId };
       addCollectedField(memory, "city");
@@ -472,7 +498,7 @@ export function extractFieldsFromMessage(
   }
 
   // The city question also asks the neighbourhood (23/10): "Niterói, Icaraí" or "bairro Icaraí".
-  if (!memory.neighborhood && memory.city?.value && normalizeForMatching(memory.lastQuestionAsked ?? "").includes("bairro")) {
+  if (!memory.neighborhood && memory.city?.value && normalizeForMatching(pendingQuestionsText(memory)).includes("bairro")) {
     const neighborhood = readNeighborhood(trimmed, memory.city.value);
     if (neighborhood) memory.neighborhood = { value: neighborhood, confidence: 1, sourceMessageId };
   }

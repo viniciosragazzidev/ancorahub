@@ -52,8 +52,10 @@ describe("hot once it can be quoted (23/10)", () => {
     expect(hasCoreQuoteData({ ...base, planType: { value: "empresarial", confidence: 1 }, numberOfLives: { value: "5", confidence: 1 }, averageAge: { value: "35", confidence: 1 } })).toBe(true);
   });
 
-  it("a conversation that stops after that point stays hot, not cold", () => {
-    const memory = { ...createEmptyMemory(), planType: { value: "individual", confidence: 1 as const }, age: { value: "40", confidence: 1 as const } };
+  it("a conversation that stops after that point, with the city, stays hot, not cold (28/10: the city is needed)", () => {
+    const memory = { ...createEmptyMemory(), planType: { value: "individual", confidence: 1 as const }, age: { value: "40", confidence: 1 as const }, city: { value: "Petrópolis", confidence: 1 as const } };
     expect(qualificationTimeoutOutcome(memory, []).qualificationStatus).toBe("hot");
+    const withoutCity = { ...memory, city: undefined };
+    expect(qualificationTimeoutOutcome(withoutCity, []).qualificationStatus).not.toBe("hot");
   });
 });

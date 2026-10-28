@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
-import { asksCurrentPlan, hasCoreQuoteData, type ConversationMemory } from "@/features/ai-agent/memory";
+import { asksCurrentPlan, hasQuoteReadyData, type ConversationMemory } from "@/features/ai-agent/memory";
 import { beneficiariesFromMemory, parseAgeValues } from "@/features/ai-agent/beneficiary-relations";
 import { deriveLeadQualificationStatus } from "@/features/leads/qualification-status";
 import { enqueueMetaQualificationConversion } from "@/features/meta-ads/meta-conversion-service";
@@ -329,18 +329,18 @@ export function evaluateQualification(
       reasons.push("Score baixo (< 50) ou pesquisa sem prazo definido");
     }
   } else if (reason === "human_requested") {
-    qualificationStatus = hasCoreQuoteData(memory) ? "hot" : "warm";
+    qualificationStatus = hasQuoteReadyData(memory) ? "hot" : "warm";
     classification = qualificationStatus;
     reasons.push("Transferência solicitada pelo cliente antes de concluir todas as perguntas");
-  } else if (hasCoreQuoteData(memory)) {
-    // Tipo, vidas e idades já dão a cotação: quente desde aqui, mesmo antes do fim (Vinicios, 23/10).
-    // The state stays IN_PROGRESS, so distribution still waits for the end of the conversation.
+  } else if (hasQuoteReadyData(memory)) {
+    // Tipo, vidas, idades e cidade já dão a cotação: quente desde aqui, mesmo antes do fim (Vinicios, 23/10; cidade, 28/10).
+    // Hot before the end of the conversation sends the lead out early (DEC-153, qualification-hold).
     qualificationStatus = "hot";
     classification = "hot";
-    reasons.push("Já informou tipo de plano, vidas e idades: dá para cotar");
+    reasons.push("Já informou tipo de plano, vidas, idades e cidade: dá para cotar");
   }
   // The same point also makes a finished qualification hot, whatever the score.
-  if (state === "QUALIFIED" && hasCoreQuoteData(memory) && qualificationStatus !== "hot") {
+  if (state === "QUALIFIED" && hasQuoteReadyData(memory) && qualificationStatus !== "hot") {
     qualificationStatus = "hot";
     classification = "hot";
     reasons.push("Tipo de plano, vidas e idades informados");

@@ -9,6 +9,7 @@ import {
   COLLECTIBLE_FIELDS,
   createEmptyMemory,
   pendingQuestionOf,
+  pendingQuestionsOf,
   type ConversationMemory,
 } from "./memory";
 import { createSafeFallbackResponse } from "./ai-response-schema";
@@ -985,6 +986,8 @@ async function completeDeterministicQualificationTurn(input: {
     // Only the question: a lateral answer or greeting before it ("O valor
     // depende da idade...") would make the next answer be read as an age.
     lastQuestionAsked: isHandoff ? undefined : pendingQuestionOf(input.turn.reply),
+    // Every question of the reply: the city may be asked before the last paragraph (28/10).
+    lastQuestionsAsked: isHandoff ? undefined : pendingQuestionsOf(input.turn.reply),
     updatedAt: now.toISOString(),
   };
 
@@ -1890,12 +1893,13 @@ export async function processInboundAiResponse({
   // Older messages are read without the question being asked now: "Faz uma
   // coisa", said before the city question, is not a city.
   const questionNow = updatedMemory.lastQuestionAsked;
+  const questionsNow = updatedMemory.lastQuestionsAsked;
   for (const inc of allIncomingMsgs) {
     if (inc.body && !isAutomatedInboundMessage(inc.body)) {
-      updatedMemory = extractFieldsFromMessage(inc.body, { ...updatedMemory, lastQuestionAsked: undefined });
+      updatedMemory = extractFieldsFromMessage(inc.body, { ...updatedMemory, lastQuestionAsked: undefined, lastQuestionsAsked: undefined });
     }
   }
-  updatedMemory = { ...updatedMemory, lastQuestionAsked: questionNow };
+  updatedMemory = { ...updatedMemory, lastQuestionAsked: questionNow, lastQuestionsAsked: questionsNow };
 
   // 6c. Buscar textos de mensagens enviadas para evitar repeticao de perguntas
   const allOutboundMsgs = await db
