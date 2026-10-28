@@ -29,7 +29,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { hasPermission } from "@/shared/auth/permissions";
 import { brokerWhatsAppMessageSourceCondition, isRecentWhatsAppReplyFilter } from "@/features/dashboard/whatsapp-activity-query";
 import { loadedLeadMessageScope } from "@/features/conversations/loaded-lead-message-scope";
-import { pickMessageIdsToLoad, summarizeIndexRows, type MessageIndexRow } from "@/features/conversations/message-window";
+import { OPEN_THREAD_MESSAGE_LIMIT, pickMessageIdsToLoad, summarizeIndexRows, type MessageIndexRow } from "@/features/conversations/message-window";
 import { resolveConversationTab } from "@/features/conversations/conversation-tab";
 
 // Não gerar estaticamente — a página depende de sessão e executa queries pesadas de AI
@@ -244,7 +244,7 @@ export default async function ConversationsPage({
         .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), inArray(schema.whatsappMessages.id, chunk)))))).flat();
       return rows.sort((a, b) => b.sentAt.getTime() - a.sentAt.getTime());
     };
-    const loadMessageIndex = (scopedToLoadedLeads: boolean, limit: number) => db
+    const loadMessageIndex = (scope: ReturnType<typeof loadedLeadMessageScope> | undefined, limit: number) => db
             .select({
               id: schema.whatsappMessages.id,
               leadId: schema.whatsappMessages.leadId,
@@ -257,10 +257,7 @@ export default async function ConversationsPage({
             .from(schema.whatsappMessages)
             .where(and(
               eq(schema.whatsappMessages.tenantId, context.tenantId),
-              ...(scopedToLoadedLeads ? [loadedLeadMessageScope({
-                message: schema.whatsappMessages,
-                leads: leads.map((lead) => ({ id: lead.id, phone: lead.telefone })),
-              })] : []),
+              ...(scope ? [scope] : []),
               // WhatsApp Status/stories (status@broadcast) are nobody writing to the company.
               notStatusBroadcastSql(schema.whatsappMessages.messageId),
               // Contentless "[text]" rows are WhatsApp protocol events (deleted message, reaction,
@@ -281,15 +278,19 @@ export default async function ConversationsPage({
             .orderBy(desc(schema.whatsappMessages.sentAt))
             .limit(limit);
 
-    const [indexRows, documentRows, aiConversationRows] = leadIds.length
+    const loadedLeadsScope = loadedLeadMessageScope({
+      message: schema.whatsappMessages,
+      leads: leads.map((lead) => ({ id: lead.id, phone: lead.telefone })),
+    });
+    const [listIndexRows, documentRows, aiConversationRows] = leadIds.length
       ? await Promise.all([
           // Filtered (one broker / replied): the newest 2000 of the visible leads only, still bounded.
           // Unfiltered, the newest 2000 of the company alone left out every lead whose last message
           // was older than them (22/10: qualified leads of the day before missing from the list), so
           // the loaded leads' own messages are read too and both are merged.
           scopeMessagesToLoadedLeads
-            ? loadMessageIndex(true, 2000)
-            : Promise.all([loadMessageIndex(false, 2000), loadMessageIndex(true, 4000)]).then(([recent, ofLoadedLeads]) => {
+            ? loadMessageIndex(loadedLeadsScope, 2000)
+            : Promise.all([loadMessageIndex(undefined, 2000), loadMessageIndex(loadedLeadsScope, 4000)]).then(([recent, ofLoadedLeads]) => {
               const seen = new Set(recent.map((message) => message.id));
               return [...recent, ...ofLoadedLeads.filter((message) => !seen.has(message.id))];
             }),
@@ -338,7 +339,7 @@ export default async function ConversationsPage({
     // Texto e mídia só do que a tela mostra: prévia de cada conversa e o histórico da aberta (?leadId=).
     const openLead = leadId ? leads.find((lead) => lead.id === leadId) : undefined;
     // Sem ?leadId, a tela abre a conversa da mensagem mais nova: o histórico dela também vem completo.
-    const newestIndexRow = (indexRows as MessageIndexRow[]).reduce<MessageIndexRow | null>(
+    const newestIndexRow = (listIndexRows as MessageIndexRow[]).reduce<MessageIndexRow | null>(
       (newest, row) => (!newest || row.sentAt > newest.sentAt ? row : newest),
       null,
     );
@@ -349,7 +350,22 @@ export default async function ConversationsPage({
         : !leadId && newestIndexRow
           ? { leadId: newestIndexRow.leadId, phone: newestIndexRow.phone }
           : null;
-    const messageRows = await loadMessagesById(pickMessageIdsToLoad(indexRows as MessageIndexRow[], { openThread }));
+    // The open conversation reads its own index (28/10): the shared one keeps only the newest
+    // messages of the company, so an older lead showed just its last messages.
+    const openThreadIndexRows = openThread
+      ? await loadMessageIndex(
+          openThread.leadId
+            ? loadedLeadMessageScope({ message: schema.whatsappMessages, leads: [{ id: openThread.leadId, phone: openThread.phone }] })
+            : and(
+                isNull(schema.whatsappMessages.leadId),
+                sql`right(regexp_replace(coalesce(${schema.whatsappMessages.phone}, ''), '[^0-9]', '', 'g'), 8) = ${String(openThread.phone ?? "").replace(/\D/g, "").slice(-8)}`,
+              ),
+          OPEN_THREAD_MESSAGE_LIMIT,
+        )
+      : [];
+    const listIndexIds = new Set((listIndexRows as MessageIndexRow[]).map((row) => row.id));
+    const indexRows = [...(listIndexRows as MessageIndexRow[]), ...openThreadIndexRows.filter((row) => !listIndexIds.has(row.id))];
+    const messageRows = await loadMessagesById(pickMessageIdsToLoad(indexRows, { openThread }));
     const fullMessageById = new Map(messageRows.map((message) => [message.id, message]));
 
     const failedMessageEventKeys = isDirector
