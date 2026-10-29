@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
+import { applyDutySkipPolicy } from "@/features/lead-distribution/duty-skips";
 import { buildDeclinedLeadReleaseUpdate } from "./decline-policy";
 
 export type DeclineLeadState = { success?: boolean; error?: string };
@@ -41,6 +42,7 @@ export async function declineLeadAction(leadId: string, reason: string): Promise
 
     const now = new Date();
 
+    let declinedScheduleId: string | null = null;
     const result = await db.transaction(async (tx) => {
       const updated = await tx
         .update(schema.leads)
@@ -56,7 +58,7 @@ export async function declineLeadAction(leadId: string, reason: string): Promise
 
       if (!updated.length) return false;
 
-      await tx.update(schema.leadOffers).set({
+      const declinedOffers = await tx.update(schema.leadOffers).set({
         status: "DECLINED",
         declinedAt: now,
         updatedAt: now,
@@ -64,7 +66,8 @@ export async function declineLeadAction(leadId: string, reason: string): Promise
         eq(schema.leadOffers.tenantId, context.tenantId),
         eq(schema.leadOffers.leadId, lead.id),
         eq(schema.leadOffers.brokerId, context.userId),
-      ));
+      )).returning({ dutyScheduleId: schema.leadOffers.dutyScheduleId });
+      declinedScheduleId = declinedOffers.find((offer) => offer.dutyScheduleId)?.dutyScheduleId ?? null;
 
       // 2. Mark assignment attempt as released/declined
       await tx
@@ -106,6 +109,8 @@ export async function declineLeadAction(leadId: string, reason: string): Promise
       return { error: "Não foi possível recusar o lead. Verifique se o estado já foi alterado." };
     }
 
+    // Rotation (29/10): declining spends the turn and counts as a skip.
+    await applyDutySkipPolicy({ tenantId: context.tenantId, brokerId: context.userId, dutyScheduleId: declinedScheduleId });
     await enqueueAndProcessLeadDistribution({ tenantId: context.tenantId, leadId: lead.id, source: "offer_declined" });
 
 

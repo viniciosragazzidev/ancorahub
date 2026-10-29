@@ -19,6 +19,7 @@ export const notificationCapabilities = [
   { id: "quick_reply_human", label: "Quick Reply e atendimento humano", description: "Aviso ao corretor quando uma mensagem foi resolvida automaticamente ou solicita atendimento humano.", channels: "Toast + push" },
   { id: "duty_assignment", label: "Escala de plantão", description: "Avisa o corretor quando a gestão o coloca em um plantão.", channels: "Toast + push" },
   { id: "duty_absence", label: "Falta no plantão", description: "Avisa o corretor quando a gestão marca ou desfaz uma falta dele em um plantão.", channels: "Toast + push" },
+  { id: "duty_skip_pause", label: "Pausa por pulos no plantão", description: "No 3º lead sem atender no mesmo plantão, o corretor entra em pausa e o supervisor (ou o gerente da unidade) é avisado para conversar e despausar.", channels: "Toast + push" },
   { id: "duty_presence_photo", label: "Foto do plantão presencial", description: "Avisa o diretor e o gerente do plantão quando o corretor envia a foto do local, para validar e liberar.", channels: "Toast + push" },
   { id: "supervisor_digest", label: "Resumo do dia para o supervisor", description: "Às 19h, o dia da equipe do supervisor em poucas linhas (leads, atrasos, destaque e meta).", channels: "Toast + push" },
   { id: "team_weekly_summary", label: "Resumo semanal da equipe", description: "Na segunda de manha, resume leads, SLA, aceite e conversao da unidade ou equipe no Lite.", channels: "In-app" },

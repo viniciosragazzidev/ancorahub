@@ -928,9 +928,14 @@ export function QueueControlCenter({
                     ]}
                   />
                 </div>
-                {form.assignmentMode === "automatic" ? (
+                {form.assignmentMode === "automatic" && form.exclusiveDutyScheduleIds.length && form.dutyFallbackPolicy !== "unit_roster" ? (
+                  // Plantão queue (29/10): the order is the plantão rotation, by arrival; no strategy to choose.
+                  <p className="self-end rounded-[var(--radius-card)] border border-border px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+                    Nos plantões, cada corretor tem sua vez, na ordem em que confirmou presença. Lead expirado ou recusado gasta a vez.
+                  </p>
+                ) : form.assignmentMode === "automatic" ? (
                   <div className="grid gap-1.5 text-sm font-medium">
-                    <span>Estratégia</span>
+                    <span>{form.exclusiveDutyScheduleIds.length ? "Estratégia fora do plantão" : "Estratégia"}</span>
                     <AppSelect
                       aria-label="Estratégia de atribuição"
                       value={form.assignmentStrategy}

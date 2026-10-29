@@ -119,19 +119,22 @@ export function chooseManualQueuePick(input: {
   scheduleIdByBroker: Readonly<Record<string, string | null | undefined>>;
   queueBySchedule: Readonly<Record<string, readonly string[] | undefined>>;
   rosterBrokerIdsBySchedule: Readonly<Record<string, readonly string[] | undefined>>;
+  /** Plantão rotation (29/10): with no saved queue yet, it starts from the roster (arrival order). */
+  seedMissing?: boolean;
 }): ManualQueuePick {
   const automatic = input.automaticBrokerId;
   const scheduleId = automatic ? input.scheduleIdByBroker[automatic] ?? null : null;
-  const stored = scheduleId ? input.queueBySchedule[scheduleId] : undefined;
+  const stored = scheduleId ? input.queueBySchedule[scheduleId] ?? (input.seedMissing ? [] : undefined) : undefined;
   if (!input.lockAcquired || !automatic || !scheduleId || !stored) {
     return { brokerId: automatic, scheduleId: null, nextOrder: null, manual: false };
   }
 
   // Keep stored IDs in place while temporarily blocked. Current candidates
   // append new brokers; an explicit reorder action cleans up removed roster IDs.
-  const rosterIds = [...new Set([...stored, ...(input.rosterBrokerIdsBySchedule[scheduleId] ?? [])])];
-  const reconciled = reconcileManualQueueOrder(stored, rosterIds);
+  // In the rotation, an eligible broker missing from the roster still gets a slot (at the end).
   const groupEligibleIds = input.pendingBrokerIds.filter((id) => input.scheduleIdByBroker[id] === scheduleId);
+  const rosterIds = [...new Set([...stored, ...(input.rosterBrokerIdsBySchedule[scheduleId] ?? []), ...(input.seedMissing ? groupEligibleIds : [])])];
+  const reconciled = reconcileManualQueueOrder(stored, rosterIds);
   const selected = pickManualQueueBroker(reconciled, groupEligibleIds);
   if (!selected) return { brokerId: automatic, scheduleId: null, nextOrder: null, manual: false };
   const groupEligible = new Set(groupEligibleIds);

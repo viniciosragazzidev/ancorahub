@@ -383,6 +383,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Exige confirmação do corretor antes de torná-lo elegível aos leads do plantão vigente.",
   },
+  DUTY_ROTATION: {
+    key: "feature_duty_rotation_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Rodízio no plantão: cada corretor tem sua vez, na ordem em que confirmou presença; quem chega depois entra no fim. Oferta expirada ou recusada gasta a vez e conta como pulo; no 3º pulo o corretor é pausado e o supervisor avisado. Desligado, volta o nivelamento por leads recebidos.",
+  },
   HOT_LEAD_EARLY_DISTRIBUTION: {
     key: "feature_hot_lead_early_distribution_enabled",
     scope: "global",

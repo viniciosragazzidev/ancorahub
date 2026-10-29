@@ -18,6 +18,11 @@ export async function isDutyPresenceConfirmationEnabled() {
   return (await getFeatureFlag(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION)) === "true";
 }
 
+/** Plantão rotation (29/10): off, the plantão goes back to the DEC-154 leveling. */
+export async function isDutyRotationEnabled() {
+  return (await getFeatureFlag(FEATURE_FLAGS.DUTY_ROTATION).catch(() => "true")) === "true";
+}
+
 /** Plantão extra dos leads da noite (DEC-152): ligado pelo Super-admin, com horário de início. */
 export async function getOvernightExtraShiftSettings(): Promise<{ enabled: boolean; startsAt: string }> {
   const [enabled, startsAt] = await Promise.all([
@@ -41,7 +46,7 @@ export async function getPresenceEligibleAssignments(input: {
   schedules: PresenceSchedule[];
   now: Date;
 }) {
-  if (!input.assignments.length) return { eligibleAssignmentIds: new Set<string>(), confirmedPresenceAssignmentIds: new Set<string>() };
+  if (!input.assignments.length) return { eligibleAssignmentIds: new Set<string>(), confirmedPresenceAssignmentIds: new Set<string>(), arrivedAtByAssignment: new Map<string, Date>() };
   const presenceRequired = await isDutyPresenceConfirmationEnabled();
 
   const scheduleById = new Map(input.schedules.map((schedule) => [schedule.id, schedule]));
@@ -51,7 +56,7 @@ export async function getPresenceEligibleAssignments(input: {
     const window = getWindow({ ...schedule, dayOfWeek: assignment.dayOfWeek, startsAt: assignment.startsAt, endsAt: assignment.endsAt, validFrom: assignment.validFrom, validUntil: assignment.validUntil }, input.now);
     return window && isDutyWindowActive(window, input.now) ? [{ assignment, schedule, window }] : [];
   });
-  if (!occurrences.length) return { eligibleAssignmentIds: new Set<string>(), confirmedPresenceAssignmentIds: new Set<string>() };
+  if (!occurrences.length) return { eligibleAssignmentIds: new Set<string>(), confirmedPresenceAssignmentIds: new Set<string>(), arrivedAtByAssignment: new Map<string, Date>() };
 
   const confirmationRows = await getDatabase()
     .select({
@@ -63,6 +68,7 @@ export async function getPresenceEligibleAssignments(input: {
       shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt,
       status: schema.dutyPresenceConfirmations.status,
       confirmedBy: schema.dutyPresenceConfirmations.confirmedBy,
+      confirmedAt: schema.dutyPresenceConfirmations.confirmedAt,
     })
     .from(schema.dutyPresenceConfirmations)
     .where(and(
@@ -81,6 +87,11 @@ export async function getPresenceEligibleAssignments(input: {
     confirmedPresenceAssignmentIds: new Set(eligible.flatMap(({ assignment, window }) => {
       const confirmation = findDutyOccurrenceConfirmation({ confirmations: confirmationRows, assignment, window, now: input.now });
       return confirmation?.status === "confirmed" && confirmation.confirmedBy ? [assignment.id] : [];
+    })),
+    // Rotation (29/10): when each eligible broker arrived, the confirmation time or, without one, the shift start.
+    arrivedAtByAssignment: new Map(eligible.map(({ assignment, window }) => {
+      const confirmation = findDutyOccurrenceConfirmation({ confirmations: confirmationRows, assignment, window, now: input.now });
+      return [assignment.id, confirmation?.status === "confirmed" && confirmation.confirmedAt ? confirmation.confirmedAt : window.startsAt] as const;
     })),
   };
 }

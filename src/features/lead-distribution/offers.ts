@@ -141,6 +141,8 @@ export async function createLeadOffersForBrokers(input: {
     scheduleIdByBroker: Record<string, string | null | undefined>;
     rosterBrokerIdsBySchedule: Record<string, string[]>;
     branchIdByBroker?: Record<string, string>;
+    /** Plantão rotation (29/10): the queue exists for every occurrence, created from the arrival order. */
+    rotation?: boolean;
   };
 }) {
   const db = getDatabase();
@@ -215,7 +217,7 @@ export async function createLeadOffersForBrokers(input: {
   const automaticScheduleQueueKey = input.manualPick
     ? manualQueueSettingKeyForBroker(input.manualPick, brokers[0]?.id)
     : null;
-  const manualQueueMayBeActive = automaticScheduleQueueKey
+  const manualQueueMayBeActive = input.manualPick?.rotation && automaticScheduleQueueKey ? true : automaticScheduleQueueKey
     ? (await db.select({ key: schema.systemSettings.key }).from(schema.systemSettings).where(eq(schema.systemSettings.key, automaticScheduleQueueKey))).length > 0
     : false;
 
@@ -262,7 +264,8 @@ export async function createLeadOffersForBrokers(input: {
         broker = pending.find((candidate) => candidate.id === automaticBrokerId) ?? broker;
         destinationPhone = broker.phone;
       } else if (input.manualPick && manualQueueMayBeActive && !pickLockBusy) {
-        pickLockAcquired = await tryDistributionPickLockOnce(tx, input.tenantId);
+        // The rotation is the only order of the plantão: worth the short wait for the lock.
+        pickLockAcquired = input.manualPick.rotation ? await tryDistributionPickLock(tx, input.tenantId) : await tryDistributionPickLockOnce(tx, input.tenantId);
         if (!pickLockAcquired) pickLockBusy = true;
       }
 
@@ -284,6 +287,7 @@ export async function createLeadOffersForBrokers(input: {
           scheduleIdByBroker,
           queueBySchedule,
           rosterBrokerIdsBySchedule: input.manualPick.rosterBrokerIdsBySchedule,
+          seedMissing: input.manualPick.rotation,
         });
         if (picked.manual) {
           broker = pending.find((candidate) => candidate.id === picked.brokerId) ?? broker;
@@ -848,6 +852,9 @@ export async function handleLeadOfferWebhookResponse(input: {
       entidadeId: offer.id,
       acao: "lead_offer_declined",
     });
+    // Rotation (29/10): declining spends the turn and counts as a skip.
+    const { applyDutySkipPolicy } = await import("./duty-skips");
+    await applyDutySkipPolicy({ tenantId: input.tenantId, brokerId: broker.id, dutyScheduleId: offer.dutyScheduleId });
 
     const { enqueueAndProcessLeadDistribution } = await import("./jobs");
     await enqueueAndProcessLeadDistribution({
@@ -1120,6 +1127,7 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
       tenantId: schema.leadOffers.tenantId,
       leadId: schema.leadOffers.leadId,
       brokerId: schema.leadOffers.brokerId,
+      dutyScheduleId: schema.leadOffers.dutyScheduleId,
       outboundMessageId: schema.leadOffers.outboundMessageId,
       leadName: schema.leads.nome,
       assignmentSource: schema.leads.assignmentSource,
@@ -1267,6 +1275,9 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
         entidadeId: offer.id,
         acao: "lead_offer_expired",
       });
+      // Rotation (29/10): the lapsed offer is a skip; the 3rd of the day in the plantão pauses the broker.
+      const { applyDutySkipPolicy } = await import("./duty-skips");
+      await applyDutySkipPolicy({ tenantId: offer.tenantId, brokerId: offer.brokerId, dutyScheduleId: offer.dutyScheduleId });
 
       if (releasedManualOffer.length) {
         const { enqueueAndProcessLeadDistribution } = await import("./jobs");

@@ -887,10 +887,18 @@ export async function toggleDutyRosterPauseAction(scheduleId: string, assignment
   try {
     const { context, db } = await findScheduleForMutation(scheduleId);
     const now = new Date();
+    // A pause for skips (29/10) stops the weekly and the published row of the day together, with
+    // the same time: resuming one row resumes its siblings of that same pause.
+    const [target] = paused ? [] : await db.select({ brokerId: schema.dutyRosterAssignments.brokerId, pausedAt: schema.dutyRosterAssignments.pausedAt })
+      .from(schema.dutyRosterAssignments)
+      .where(and(eq(schema.dutyRosterAssignments.id, assignmentId), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.scheduleId, scheduleId)))
+      .limit(1);
     const updated = await db.update(schema.dutyRosterAssignments)
       .set({ pausedAt: paused ? now : null, pausedBy: paused ? context.userId : null, updatedBy: context.userId, updatedAt: now })
       .where(and(
-        eq(schema.dutyRosterAssignments.id, assignmentId),
+        target?.pausedAt
+          ? or(eq(schema.dutyRosterAssignments.id, assignmentId), and(eq(schema.dutyRosterAssignments.brokerId, target.brokerId), eq(schema.dutyRosterAssignments.pausedAt, target.pausedAt)))
+          : eq(schema.dutyRosterAssignments.id, assignmentId),
         eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
         eq(schema.dutyRosterAssignments.scheduleId, scheduleId),
         eq(schema.dutyRosterAssignments.status, "active"),

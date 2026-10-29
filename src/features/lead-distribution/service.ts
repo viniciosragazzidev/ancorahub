@@ -24,7 +24,8 @@ import { normalizeQueueSource } from "./routing-catalog";
 import { findBrokerRunningDutyScheduleId, getActiveQueueDutyRoster } from "./active-queue-duty-roster";
 import { countReceivedInDayByBroker, getDutyScheduleReceiptScope, NON_COUNTING_OFFER_STATUS, overnightExtraReceiptGap } from "./received-in-day";
 import { filterPausedDutyAssignmentsBeforeResolution, getSaoPauloDateKey, resolveEffectiveDutyAssignments } from "./dated-duty-roster";
-import { getOvernightExtraShiftSettings, getPresenceEligibleAssignments } from "./duty-presence";
+import { getOvernightExtraShiftSettings, getPresenceEligibleAssignments, isDutyRotationEnabled } from "./duty-presence";
+import { rotationArrivalOrder } from "./duty-rotation";
 import { extraShiftWindow, findRunningDutySchedule, getRelevantDutyWindow, isExtraShiftRecord, isOvernightLead, MORNING_SHIFT_STARTS_BEFORE, OVERNIGHT_LEADS_UNTIL } from "./duty-presence-domain";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { countLeadsReceivedInDuty, type DutyLeadCap } from "./duty-lead-cap";
@@ -49,6 +50,8 @@ type RosterResolution = {
   scheduleIdByBroker: Map<string, string>;
   brokersStoppedByDutyCap: number;
   manualRosterBrokerIdsBySchedule?: Map<string, string[]>;
+  /** Rotation (29/10): eligible escalados of each plantão in order of arrival (presence confirmation). */
+  rotationRosterBrokerIdsBySchedule?: Map<string, string[]>;
   dutyDateBySchedule?: Map<string, string>;
 };
 
@@ -181,6 +184,12 @@ async function getRosterBrokerIds(
       if (cap && (receivedBySchedule.get(cap.scheduleId)?.get(assignment.brokerId) ?? 0) >= cap.limit) eligibleAfterCap.delete(assignment.id);
     }
   }
+  const rotationRosterBrokerIdsBySchedule = new Map<string, string[]>();
+  for (const scheduleId of new Set(effectiveAssignments.map((assignment) => assignment.scheduleId))) {
+    rotationRosterBrokerIdsBySchedule.set(scheduleId, rotationArrivalOrder(effectiveAssignments
+      .filter((assignment) => assignment.scheduleId === scheduleId && eligibleBeforeCap.has(assignment.id))
+      .map((assignment) => ({ brokerId: assignment.brokerId, arrivedAt: presence.arrivedAtByAssignment.get(assignment.id) ?? null }))));
+  }
   const brokersBeforeCap = new Set(effectiveAssignments.filter((assignment) => eligibleBeforeCap.has(assignment.id)).map((assignment) => assignment.brokerId));
   const brokersAfterCap = new Set(effectiveAssignments.filter((assignment) => eligibleAfterCap.has(assignment.id)).map((assignment) => assignment.brokerId));
   const brokersStoppedByDutyCap = [...brokersBeforeCap].filter((brokerId) => !brokersAfterCap.has(brokerId)).length;
@@ -190,7 +199,7 @@ async function getRosterBrokerIds(
     eligibleAfterCap,
     presence.confirmedPresenceAssignmentIds,
   );
-  return { brokerIds: new Set(scheduleIdByBroker.keys()), hasActiveSelectedSchedule: true, scheduleIdByBroker, brokersStoppedByDutyCap, manualRosterBrokerIdsBySchedule, dutyDateBySchedule };
+  return { brokerIds: new Set(scheduleIdByBroker.keys()), hasActiveSelectedSchedule: true, scheduleIdByBroker, brokersStoppedByDutyCap, manualRosterBrokerIdsBySchedule, rotationRosterBrokerIdsBySchedule, dutyDateBySchedule };
 }
 
 /**
@@ -1071,12 +1080,18 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     const rosterByBranch = new Map(rosterResults.map(([branchId, result]) => [branchId, result.brokerIds] as const));
     const scheduleIdByBroker = new Map(rosterResults.flatMap(([, result]) => [...result.scheduleIdByBroker]));
     const manualRosterBrokerIdsBySchedule = new Map<string, string[]>();
+    const rotationRosterBrokerIdsBySchedule = new Map<string, string[]>();
     const dutyDateBySchedule = new Map<string, string>();
     for (const [, result] of rosterResults) {
       for (const [scheduleId, brokerIds] of result.manualRosterBrokerIdsBySchedule ?? []) {
         const roster = manualRosterBrokerIdsBySchedule.get(scheduleId) ?? [];
         for (const brokerId of brokerIds) if (!roster.includes(brokerId)) roster.push(brokerId);
         manualRosterBrokerIdsBySchedule.set(scheduleId, roster);
+      }
+      for (const [scheduleId, brokerIds] of result.rotationRosterBrokerIdsBySchedule ?? []) {
+        const roster = rotationRosterBrokerIdsBySchedule.get(scheduleId) ?? [];
+        for (const brokerId of brokerIds) if (!roster.includes(brokerId)) roster.push(brokerId);
+        rotationRosterBrokerIdsBySchedule.set(scheduleId, roster);
       }
       for (const [scheduleId, dutyDate] of result.dutyDateBySchedule ?? []) dutyDateBySchedule.set(scheduleId, dutyDate);
     }
@@ -1087,11 +1102,11 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       if (!rosterBrokerIds && broker.branchId && rosterOnlyBranchIds.has(broker.branchId)) return false;
       return (!rosterBrokerIds || rosterBrokerIds.has(broker.id)) && broker.id !== brokerToExclude && !intelligentPolicy.value.excludedBrokerIds.includes(broker.id) && (!allowedBrokerSet || allowedBrokerSet.has(broker.id));
     });
-    return { brokers: rosterBrokers, rosterByBranch, scheduleIdByBroker, manualRosterBrokerIdsBySchedule, dutyDateBySchedule, hasActiveSelectedSchedule };
+    return { brokers: rosterBrokers, rosterByBranch, scheduleIdByBroker, manualRosterBrokerIdsBySchedule, rotationRosterBrokerIdsBySchedule, dutyDateBySchedule, hasActiveSelectedSchedule };
   };
 
   traceLeadStep(leadId, "eligible_brokers");
-  let { brokers, rosterByBranch, scheduleIdByBroker, manualRosterBrokerIdsBySchedule, dutyDateBySchedule, hasActiveSelectedSchedule } = await loadEligibleBrokers(targetBranchIds);
+  let { brokers, rosterByBranch, scheduleIdByBroker, manualRosterBrokerIdsBySchedule, rotationRosterBrokerIdsBySchedule, dutyDateBySchedule, hasActiveSelectedSchedule } = await loadEligibleBrokers(targetBranchIds);
   // Everyone on duty reached this plantão's cap: the lead waits (the queue's
   // "no broker" rules are for an empty roster, not for a full one).
   if (!brokers.length && brokersStoppedByDutyCap > 0) {
@@ -1173,6 +1188,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
         rosterByBranch = fallback.rosterByBranch;
         scheduleIdByBroker = fallback.scheduleIdByBroker;
         manualRosterBrokerIdsBySchedule = fallback.manualRosterBrokerIdsBySchedule;
+        rotationRosterBrokerIdsBySchedule = fallback.rotationRosterBrokerIdsBySchedule;
         dutyDateBySchedule = fallback.dutyDateBySchedule;
         hasActiveSelectedSchedule = fallback.hasActiveSelectedSchedule;
         fallbackUnitUsed = true;
@@ -1493,6 +1509,8 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   // one manual offers use — not a hard-coded default.
   const [tenantSla] = await db.select({ slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes })
     .from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
+  // Rotation (29/10): inside a plantão everyone has their turn, in order of arrival; no leveling.
+  const dutyRotation = scheduleIdByBroker.size > 0 && Boolean(exclusiveScheduleIds?.length) && await isDutyRotationEnabled();
   traceLeadStep(leadId, "create_offers");
   const offer = await createLeadOffersForBrokers({
     tenantId: context.tenantId,
@@ -1511,7 +1529,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     // DEC-154: the pick is redone under a per-tenant lock with fresh counts, so leads
     // released together (e.g. the overnight backlog) do not all go to the same broker.
     // round_robin is an explicit "oldest account first" strategy and keeps its order.
-    fairPick: queue?.strategy === "round_robin" ? undefined : {
+    fairPick: queue?.strategy === "round_robin" || dutyRotation ? undefined : {
       since: dutySince,
       gap: extraGap,
       tierByBroker: Object.fromEntries(decision.eligible.map((candidate) => [candidate.id, candidate.onDuty ? 0 : 1])),
@@ -1521,7 +1539,8 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     manualPick: scheduleIdByBroker.size ? {
       dutyDateBySchedule: Object.fromEntries([...new Set(scheduleIdByBroker.values())].map((scheduleId) => [scheduleId, dutyDateBySchedule.get(scheduleId) ?? getSaoPauloDateKey(new Date())])),
       scheduleIdByBroker: Object.fromEntries(scheduleIdByBroker),
-      rosterBrokerIdsBySchedule: Object.fromEntries(manualRosterBrokerIdsBySchedule),
+      rosterBrokerIdsBySchedule: Object.fromEntries(dutyRotation ? rotationRosterBrokerIdsBySchedule : manualRosterBrokerIdsBySchedule),
+      rotation: dutyRotation,
       branchIdByBroker: Object.fromEntries(remainingBrokers.flatMap((broker) => broker.branchId ? [[broker.id, broker.branchId]] : [])),
     } : undefined,
   });
