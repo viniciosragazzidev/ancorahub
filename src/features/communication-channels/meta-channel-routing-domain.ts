@@ -13,9 +13,37 @@ export type MetaChannelRoutingCandidate = {
 
 export type MetaOutboundRecipientType = "lead" | "client" | "user";
 
+export type MetaChannelBlock = {
+  blocked: true;
+  reason: "META_SOURCE_CHANNEL_UNAVAILABLE";
+  channelLabel: string;
+  message: string;
+};
+
+export type MetaInboundLookup =
+  | { kind: "lead"; id: string; since: Date }
+  | { kind: "client"; id: string; since: Date }
+  | { kind: "phone"; suffix: string; since: Date }
+  | null;
+
+export const META_INBOUND_LOOKBACK_DAYS = 30;
+
+export function resolveMetaInboundLookup(input: {
+  leadId?: string | null;
+  clientId?: string | null;
+  customerPhone?: string | null;
+  now?: Date;
+}): MetaInboundLookup {
+  const since = new Date((input.now ?? new Date()).getTime() - META_INBOUND_LOOKBACK_DAYS * 86_400_000);
+  if (input.leadId?.trim()) return { kind: "lead", id: input.leadId.trim(), since };
+  if (input.clientId?.trim()) return { kind: "client", id: input.clientId.trim(), since };
+  const suffix = input.customerPhone?.replace(/\D/g, "").slice(-8) ?? "";
+  return suffix.length === 8 ? { kind: "phone", suffix, since } : null;
+}
+
 export type MetaChannelSelection =
   | { kind: "selected"; channel: MetaChannelRoutingCandidate; source: "inbound" | "pinned" | "official" }
-  | { kind: "blocked"; code: "META_SOURCE_CHANNEL_UNAVAILABLE"; message: string }
+  | ({ kind: "blocked" } & MetaChannelBlock)
   | { kind: "none" };
 
 function isUsable(channel: MetaChannelRoutingCandidate) {
@@ -37,9 +65,14 @@ function officialCandidates(channels: MetaChannelRoutingCandidate[], corporateOn
     });
 }
 
-function sourceChannelUnavailableMessage(channel?: { displayPhoneNumber: string | null }) {
-  const number = channel?.displayPhoneNumber?.trim() || "usado na última mensagem";
-  return `O número ${number} está desconectado; reconecte em Configurações > WhatsApp.`;
+function sourceChannelBlock(channel?: { displayPhoneNumber: string | null }): MetaChannelBlock {
+  const channelLabel = channel?.displayPhoneNumber?.trim() || "usado na última mensagem";
+  return {
+    blocked: true,
+    reason: "META_SOURCE_CHANNEL_UNAVAILABLE",
+    channelLabel,
+    message: `O número ${channelLabel} está desconectado; reconecte em Configurações > WhatsApp.`,
+  };
 }
 
 /**
@@ -60,7 +93,7 @@ export function selectMetaOutboundChannel(input: {
     const source = input.channels.find((channel) => channel.id === input.latestInboundChannelId);
     return source && isUsable(source)
       ? { kind: "selected", channel: source, source: "inbound" }
-      : { kind: "blocked", code: "META_SOURCE_CHANNEL_UNAVAILABLE", message: sourceChannelUnavailableMessage(source) };
+      : { kind: "blocked", ...sourceChannelBlock(source) };
   }
 
   // Internal notices have no customer source to preserve. They always use the
@@ -71,7 +104,7 @@ export function selectMetaOutboundChannel(input: {
     if (pinned && pinned.onboardingMode !== "coexistence" && (!input.corporateOnly || pinned.branchId === null) && isUsable(pinned)) {
       return { kind: "selected", channel: pinned, source: "pinned" };
     }
-    return { kind: "blocked", code: "META_SOURCE_CHANNEL_UNAVAILABLE", message: sourceChannelUnavailableMessage(pinned) };
+    return { kind: "blocked", ...sourceChannelBlock(pinned) };
   }
 
   const official = officialCandidates(input.channels, input.corporateOnly ?? false)[0];
@@ -79,5 +112,5 @@ export function selectMetaOutboundChannel(input: {
 }
 
 export function formatMetaSourceChannelUnavailableMessage(channel: { displayPhoneNumber?: string | null } | null | undefined) {
-  return sourceChannelUnavailableMessage(channel ? { displayPhoneNumber: channel.displayPhoneNumber ?? null } : undefined);
+  return sourceChannelBlock(channel ? { displayPhoneNumber: channel.displayPhoneNumber ?? null } : undefined).message;
 }

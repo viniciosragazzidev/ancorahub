@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatMetaSourceChannelUnavailableMessage,
+  resolveMetaInboundLookup,
   selectMetaOutboundChannel,
   type MetaChannelRoutingCandidate,
 } from "./meta-channel-routing-domain";
@@ -46,7 +47,9 @@ describe("Coex multi-number decisions", () => {
       channels: [official, disconnected], recipientType: "lead", latestInboundChannelId: "coex-b",
     })).toEqual({
       kind: "blocked",
-      code: "META_SOURCE_CHANNEL_UNAVAILABLE",
+      blocked: true,
+      reason: "META_SOURCE_CHANNEL_UNAVAILABLE",
+      channelLabel: "+55 21 97350-7276",
       message: "O número +55 21 97350-7276 está desconectado; reconecte em Configurações > WhatsApp.",
     });
     expect(formatMetaSourceChannelUnavailableMessage(null)).toBe("O número usado na última mensagem está desconectado; reconecte em Configurações > WhatsApp.");
@@ -96,5 +99,21 @@ describe("Coex multi-number decisions", () => {
   it("never makes a Coex number the default internal sender, even when a legacy row requested it", () => {
     const coex = channel({ id: "coex", onboardingMode: "coexistence", isDefault: true });
     expect(selectMetaOutboundChannel({ channels: [coex], recipientType: "user" })).toEqual({ kind: "none" });
+  });
+
+  it("prefers a tenant record ID and limits source history to 30 days", () => {
+    const now = new Date("2026-10-29T12:00:00.000Z");
+    const since = new Date("2026-09-29T12:00:00.000Z");
+    expect(resolveMetaInboundLookup({ leadId: "lead-1", customerPhone: "+55 21 97350-7276", now }))
+      .toEqual({ kind: "lead", id: "lead-1", since });
+    expect(resolveMetaInboundLookup({ clientId: "client-1", customerPhone: "+55 21 97350-7276", now }))
+      .toEqual({ kind: "client", id: "client-1", since });
+  });
+
+  it("uses a normalized phone suffix only for unlinked conversations, within 30 days", () => {
+    const now = new Date("2026-10-29T12:00:00.000Z");
+    expect(resolveMetaInboundLookup({ customerPhone: "+55 (21) 97350-7276", now }))
+      .toEqual({ kind: "phone", suffix: "73507276", since: new Date("2026-09-29T12:00:00.000Z") });
+    expect(resolveMetaInboundLookup({ customerPhone: "123", now })).toBeNull();
   });
 });

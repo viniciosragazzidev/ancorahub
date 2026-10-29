@@ -12,6 +12,7 @@ import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables } from "./templates";
 import { META_CLOUD_PROVIDER } from "./types";
 import { resolveMetaOutboundChannel as resolveMetaChannel } from "./meta-channel-router";
+import type { MetaChannelBlock } from "./meta-channel-routing-domain";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
 import { WhatsAppTemplateResolver } from "./template-sync-service";
 import { isCustomerServiceWindowOpen, resolveApprovedMetaEventTemplate, resolveEventMessagePlan } from "./message-policy-service";
@@ -138,6 +139,7 @@ export function getInvitationDeliveryFailureUpdate(input: { shouldRetry: boolean
 
 /** Configuration problems a retry cannot fix: the template must be approved/linked on the sending number first. */
 const terminalTemplateErrorCodes = new Set(["TEMPLATE_NOT_IN_WABA", "TEMPLATE_PARAMETERS_UNAVAILABLE"]);
+const terminalRoutingErrorCodes = new Set(["META_SOURCE_CHANNEL_UNAVAILABLE"]);
 
 const terminalBrokerInvitationErrorCodes = new Set([
   "BROKER_INVITATION_NOT_FOUND",
@@ -163,6 +165,13 @@ function outboundChannelError(code: string, message: string) {
   return error;
 }
 
+function assertMetaChannelAvailable(
+  selection: Awaited<ReturnType<typeof resolveMetaChannel>>,
+): Exclude<Awaited<ReturnType<typeof resolveMetaChannel>>, MetaChannelBlock> {
+  if (selection && "blocked" in selection) throw outboundChannelError(selection.reason, selection.message);
+  return selection;
+}
+
 async function resolveMetaOutboundChannel(row: OutboundRow) {
   if (row.recipientType !== "lead" && row.recipientType !== "client" && row.recipientType !== "user") {
     throw outboundChannelError("META_RECIPIENT_TYPE_UNSUPPORTED", "O destinatário desta mensagem não é compatível com o canal Meta.");
@@ -177,9 +186,18 @@ async function resolveMetaOutboundChannel(row: OutboundRow) {
   const channel = await resolveMetaChannel({
     tenantId: row.tenantId,
     recipientType: row.recipientType,
+    recipientId: row.recipientId,
     customerPhone: row.destinationPhone,
     pinnedChannelId: row.channelId,
   });
+  if (channel && "blocked" in channel) {
+    console.warn("[meta-outbox] customer_source_channel_unavailable", {
+      tenantId: row.tenantId,
+      outboundMessageId: row.id,
+      reason: channel.reason,
+    });
+    throw outboundChannelError(channel.reason, channel.message);
+  }
   if (row.purpose === "brokerAccountActivated" && channel?.id !== row.channelId) {
     throw outboundChannelError(
       "BROKER_ACTIVATION_CHANNEL_UNAVAILABLE",
@@ -392,13 +410,14 @@ export async function enqueueMetaTemplateMessage(input: {
     }) ?? requestedDestinationPhone;
   const variables = variablesSchema.parse(input.variables ?? []);
   // Resolved up front: a template only exists inside the selected number's WABA.
-  const channel = await resolveMetaChannel({
+  const channel = assertMetaChannelAvailable(await resolveMetaChannel({
     tenantId: input.tenantId,
     recipientType: input.recipientType,
+    recipientId: input.recipientId,
     customerPhone: destinationPhone,
     pinnedChannelId: input.channelId,
     corporateOnly: input.requireApprovedMetaTemplate,
-  });
+  }));
   if (input.requireApprovedMetaTemplate && !channel) {
     throw outboundChannelError("META_CHANNEL_UNAVAILABLE", "Não existe um canal oficial da Meta ativo para este tenant.");
   }
@@ -677,12 +696,13 @@ export async function enqueueMetaTextMessage(input: {
     recipientType: input.recipientType,
     purpose: input.purpose ?? "directText",
   });
-  const channel = await resolveMetaChannel({
+  const channel = assertMetaChannelAvailable(await resolveMetaChannel({
     tenantId: input.tenantId,
     recipientType: input.recipientType,
+    recipientId: input.recipientId,
     customerPhone: destinationPhone,
     pinnedChannelId: input.channelId,
-  });
+  }));
   // Free text to a broker follows the "Mensagens do chat" choice: the company
   // WhatsApp when it is connected (Meta otherwise), or the official Meta only.
   const chatSetting = input.recipientType === "user" ? await getTeamNoticeSetting(input.tenantId, BROKER_CHAT_NOTICE).catch(() => null) : null;
@@ -1412,22 +1432,23 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
       }
       sent += 1;
     } catch (error) {
-      // Meta could not send a team notice (template missing, number without the
-      // template, provider error): the company number carries it right away.
-      if (row.deliveryRoute === "meta_then_waha" && row.wahaNumberId && row.noticeKey && await sendNoticeByCompanyNumber(row, error, Boolean(outboundId))) {
-        sent += 1;
-        return;
-      }
-      const message = error instanceof Error ? error.message : "Falha no envio via Meta Cloud API.";
       const code = error instanceof MetaCloudApiError
         ? String(error.code ?? error.status)
         : typeof error === "object" && error !== null && "code" in error
           ? String((error as { code?: unknown }).code ?? "META_OUTBOUND_FAILED")
           : "META_OUTBOUND_FAILED";
+      // Meta could not send a team notice (template missing, number without the
+      // template, provider error): the company number carries it right away.
+      if (code !== "META_SOURCE_CHANNEL_UNAVAILABLE" && row.deliveryRoute === "meta_then_waha" && row.wahaNumberId && row.noticeKey && await sendNoticeByCompanyNumber(row, error, Boolean(outboundId))) {
+        sent += 1;
+        return;
+      }
+      const message = error instanceof Error ? error.message : "Falha no envio via Meta Cloud API.";
       const terminalInvitationFailure = row.purpose === "brokerInvitation" && terminalBrokerInvitationErrorCodes.has(code);
       const terminalTemplateFailure = terminalTemplateErrorCodes.has(code);
+      const terminalRoutingFailure = terminalRoutingErrorCodes.has(code);
 
-      const nextAttemptAt = !terminalInvitationFailure && !terminalTemplateFailure && row.attempts < 3
+      const nextAttemptAt = !terminalInvitationFailure && !terminalTemplateFailure && !terminalRoutingFailure && row.attempts < 3
         ? new Date(Date.now() + Math.pow(2, row.attempts) * 60 * 1000)
         : null;
       const finalStatus: WhatsAppOutboundStatus = nextAttemptAt ? "pending" : "failed";

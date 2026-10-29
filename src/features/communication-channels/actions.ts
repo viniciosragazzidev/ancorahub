@@ -154,6 +154,8 @@ export async function completeMetaEmbeddedSignupAction(rawInput: MetaEmbeddedSig
   // A coexistence number joins as an additional number; the default one keeps
   // the notices and templates. A new standard number still replaces nothing.
   if (!coexistence && currentDefault && currentDefault.id !== existing?.id) throw new Error("Esta corretora já possui um canal oficial ativo. Desconecte-o antes de trocar o número.");
+  // Reconnecting an official channel restores it as default only when the tenant
+  // has no other official default. Coex stays additional even in that case.
   const isDefault = resolveMetaChannelDefault({
     coexistence,
     existingIsDefault: existing?.isDefault ?? false,

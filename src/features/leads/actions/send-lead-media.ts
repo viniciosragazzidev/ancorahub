@@ -17,6 +17,7 @@ import {
 import {
   getPreferredMetaCloudChannel,
 } from "@/features/communication-channels/service";
+import type { MetaChannelBlock } from "@/features/communication-channels/meta-channel-routing-domain";
 import { formatE164Phone } from "@/features/communication-channels/meta-cloud-client";
 import { decryptChannelSecret } from "@/features/communication-channels/secret-crypto";
 import { getMetaCloudServerConfig } from "@/features/communication-channels/meta-cloud-config";
@@ -112,8 +113,12 @@ export async function sendLeadMediaAction(
     const channel = await getPreferredMetaCloudChannel({
       tenantId: context.tenantId,
       userId: context.userId,
+      leadId: lead.id,
       customerPhone: lead.telefone,
     });
+    if (channel && "blocked" in channel) {
+      return { success: false, error: channel.message };
+    }
     if (!channel) {
       return { success: false, error: "Nenhum canal oficial da Meta está ativo para envio de mídia." };
     }
@@ -210,7 +215,7 @@ export async function sendLeadMediaAction(
 }
 
 async function sendMetaCloudMediaMessage(input: {
-  channel: Awaited<ReturnType<typeof getPreferredMetaCloudChannel>>;
+  channel: Exclude<Awaited<ReturnType<typeof getPreferredMetaCloudChannel>>, null | MetaChannelBlock>;
   to: string;
   kind: ConversationMediaKind;
   providerMediaId: string;

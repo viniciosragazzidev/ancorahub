@@ -6,7 +6,7 @@
  */
 export type ChannelLeadIntake = {
   enabled: boolean;
-  /** Queue the lead goes to; null = the tenant's regular routing. */
+  /** Dedicated queue for new contacts; null disables lead creation from this channel. */
   queueId: string | null;
   /** Origin shown on the lead, e.g. "Anúncios CA1 - Ancora Corretora". */
   label: string | null;

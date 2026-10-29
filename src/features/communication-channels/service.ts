@@ -44,10 +44,21 @@ export async function isMetaCloudWhatsAppEnabled() {
  * number the customer last wrote to: only that number has the customer's
  * 24h window. Otherwise the default number.
  */
-export async function getPreferredMetaCloudChannel(input: { tenantId: string; branchId?: string | null; userId?: string | null; customerPhone?: string | null }) {
+export async function getPreferredMetaCloudChannel(input: {
+  tenantId: string;
+  branchId?: string | null;
+  userId?: string | null;
+  leadId?: string | null;
+  clientId?: string | null;
+  customerPhone?: string | null;
+}) {
+  const recipientType = input.leadId ? "lead" : input.clientId ? "client" : input.userId ? "user" : "lead";
   return resolveMetaOutboundChannel({
     tenantId: input.tenantId,
-    recipientType: "lead",
+    recipientType,
+    recipientId: input.leadId ?? input.clientId ?? input.userId,
+    leadId: input.leadId,
+    clientId: input.clientId,
     customerPhone: input.customerPhone,
   });
 }

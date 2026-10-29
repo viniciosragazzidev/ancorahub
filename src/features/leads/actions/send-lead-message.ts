@@ -345,8 +345,12 @@ export async function sendLeadMessageAction(
       tenantId: context.tenantId,
       branchId: lead.branchId,
       userId: context.userId,
+      leadId: lead.id,
       customerPhone: lead.telefone,
     });
+    if (officialChannel && "blocked" in officialChannel) {
+      return { success: false, error: officialChannel.message };
+    }
     if (officialChannel) {
       const sent = await sendMetaCloudChannelText({
         channel: officialChannel,

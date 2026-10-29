@@ -199,6 +199,8 @@ export async function handleInitialMessageFailure({
 
 export async function sendAiOutbound(input: {
   tenantId: string;
+  leadId?: string;
+  clientId?: string;
   phone: string;
   body: string;
   transport?: AiTransport;
@@ -266,7 +268,18 @@ export async function sendAiOutbound(input: {
     }
   }
 
-  const channel = await getPreferredMetaCloudChannel({ tenantId: input.tenantId, customerPhone: input.phone });
+  const channel = await getPreferredMetaCloudChannel({
+    tenantId: input.tenantId,
+    leadId: input.leadId,
+    clientId: input.clientId,
+    customerPhone: input.phone,
+  });
+  if (channel && "blocked" in channel) {
+    console.warn("[sendAiOutbound] source channel unavailable; skipping alternate sender", {
+      reason: channel.reason,
+    });
+    return { status: "blocked_source_channel" as const, messageId: null, reason: channel.reason, channelLabel: channel.channelLabel };
+  }
   if (channel) {
     try {
       const sent = await sendMetaCloudChannelText({ channel, to: deliveryPhone ?? input.phone, body: input.body });
@@ -1055,6 +1068,7 @@ async function completeDeterministicQualificationTurn(input: {
   try {
     const sent = await sendAiOutbound({
       tenantId: input.tenantId,
+      leadId: input.leadId,
       phone: input.phone,
       body: input.turn.reply,
       transport: input.transport,
@@ -1205,7 +1219,7 @@ async function applyCustomerCorrectionAfterHandoff(input: {
     id: `ai_msg_correction_${crypto.randomUUID()}`, tenantId: input.tenantId, leadId: input.leadId, conversationId: input.conversationId,
     senderRole: "assistant", provider: input.transport, phone: input.phone, direction: "outbound", body: reply, sentAt: new Date(),
   });
-  await sendAiOutbound({ tenantId: input.tenantId, phone: input.phone, body: reply, transport: input.transport, openWaSessionId: input.openWaSessionId, wahaRunId: input.wahaRunId })
+  await sendAiOutbound({ tenantId: input.tenantId, leadId: input.leadId, phone: input.phone, body: reply, transport: input.transport, openWaSessionId: input.openWaSessionId, wahaRunId: input.wahaRunId })
     .catch((error) => console.error("[ai-wpp] correction_reply_failed", { tenantId: input.tenantId, leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" }));
   return "applied";
 }
@@ -1579,15 +1593,24 @@ export async function processInboundAiResponse({
     console.log(`[ai-agent] Conversa ${conversation.id} está ${conversation.status}. IA não responde.`);
     const postClosingResult = await handlePostClosingInboundMessage(tenantId, conversation.id);
     if (postClosingResult.noticeSent && postClosingResult.messageText) {
-      await sendAiOutbound({
+      const delivery = await sendAiOutbound({
         tenantId,
+        leadId,
         phone,
         body: postClosingResult.messageText,
         transport,
         openWaSessionId,
         wahaRunId,
+      }).catch((error) => {
+        console.warn("[ai-agent] post-closing notice delivery failed", {
+          reason: error instanceof Error && "code" in error ? String((error as Error & { code?: unknown }).code) : "delivery_failed",
+        });
+        return null;
       });
-      return { status: "sent_post_closing_notice" };
+      if (delivery?.status === "blocked_source_channel") {
+        return { status: "blocked_post_closing_notice", reason: delivery.reason };
+      }
+      return { status: delivery?.status === "sent" ? "sent_post_closing_notice" : "post_closing_notice_not_sent" };
     }
     return { status: `ignored_${conversation.status}` };
   }
@@ -1760,7 +1783,7 @@ export async function processInboundAiResponse({
       messageId = `quick_reply_${crypto.randomUUID()}`;
       await db.insert(schema.whatsappMessages).values({ id: messageId, tenantId, leadId, communicationChannelId: communicationChannelId ?? null, conversationId: conversation.id, senderRole: "assistant", provider: transport, phone, direction: "outbound", body: template.body, sentAt: now });
       try {
-        const sent = await sendAiOutbound({ tenantId, phone, body: template.body, transport, openWaSessionId, wahaRunId, currentMessageId: messageId });
+        const sent = await sendAiOutbound({ tenantId, leadId, phone, body: template.body, transport, openWaSessionId, wahaRunId, currentMessageId: messageId });
         deliveryStatus = sent.status;
         if (sent.messageId) await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
       } catch (error) {
@@ -1971,7 +1994,7 @@ export async function processInboundAiResponse({
     });
     let deliveryStatus = "failed";
     try {
-      const sent = await sendAiOutbound({ tenantId, phone, body: handoffMessage, transport, openWaSessionId, wahaRunId, currentMessageId: messageId });
+      const sent = await sendAiOutbound({ tenantId, leadId, phone, body: handoffMessage, transport, openWaSessionId, wahaRunId, currentMessageId: messageId });
       deliveryStatus = sent.status;
       if (sent.messageId) {
         await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId })
@@ -2107,7 +2130,7 @@ export async function processInboundAiResponse({
     await db.insert(schema.whatsappMessages).values({ id: replyId, tenantId, leadId, communicationChannelId: communicationChannelId ?? null, conversationId: conversation.id, senderRole: "assistant", provider: transport, phone, direction: "outbound", body: text, sentAt: now });
     let deliveryStatus = "failed";
     try {
-      const sent = await sendAiOutbound({ tenantId, phone, body: text, transport, openWaSessionId, wahaRunId, currentMessageId: replyId });
+      const sent = await sendAiOutbound({ tenantId, leadId, phone, body: text, transport, openWaSessionId, wahaRunId, currentMessageId: replyId });
       deliveryStatus = sent.status;
       if (sent.messageId) await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId }).where(and(eq(schema.whatsappMessages.id, replyId), eq(schema.whatsappMessages.tenantId, tenantId)));
     } catch (error) {
@@ -2320,7 +2343,7 @@ export async function processInboundAiResponse({
 
     // 2. Send fallback message to WhatsApp
     try {
-      const sent = await sendAiOutbound({ tenantId, phone, body: fallbackMessage, transport, openWaSessionId, wahaRunId, currentMessageId: fallbackMsgId });
+      const sent = await sendAiOutbound({ tenantId, leadId, phone, body: fallbackMessage, transport, openWaSessionId, wahaRunId, currentMessageId: fallbackMsgId });
       if (sent.status === "sent") {
         console.info("[ai-wpp] fallback.sent", { tenantId, leadId, phone });
       } else {
@@ -2397,7 +2420,7 @@ export async function processInboundAiResponse({
 
     let fallbackDeliveryStatus = "failed";
     try {
-      const sent = await sendAiOutbound({ tenantId, phone, body: safeFallback.message, transport, openWaSessionId, wahaRunId, currentMessageId: fallbackMessageId });
+      const sent = await sendAiOutbound({ tenantId, leadId, phone, body: safeFallback.message, transport, openWaSessionId, wahaRunId, currentMessageId: fallbackMessageId });
       if (sent.status === "sent") {
         await db.update(schema.whatsappMessages)
           .set({ providerStatus: "sent", messageId: sent.messageId ?? undefined })
@@ -2641,7 +2664,7 @@ export async function processInboundAiResponse({
   let deliveryStatus = "failed";
   let providerMessageId: string | null = null;
   try {
-    const sent = await sendAiOutbound({ tenantId, phone, body: aiResult.content, transport, openWaSessionId, wahaRunId, currentMessageId: messageId });
+    const sent = await sendAiOutbound({ tenantId, leadId, phone, body: aiResult.content, transport, openWaSessionId, wahaRunId, currentMessageId: messageId });
     if (sent.status === "sent") {
       await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId ?? undefined }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
       deliveryStatus = "sent";

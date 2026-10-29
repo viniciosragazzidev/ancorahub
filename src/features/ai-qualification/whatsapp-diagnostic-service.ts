@@ -227,7 +227,9 @@ export async function sendWhatsAppTestMessage(
   // 1. Tenta envio pelo canal oficial Meta Cloud API
   try {
     const officialChannel = await getPreferredMetaCloudChannel({ tenantId, userId: actorUserId });
-    if (officialChannel) {
+    if (officialChannel && "blocked" in officialChannel) {
+      errorReason = officialChannel.message;
+    } else if (officialChannel) {
       const sent = await sendMetaCloudChannelText({
         channel: officialChannel,
         to: normalizedNumber,

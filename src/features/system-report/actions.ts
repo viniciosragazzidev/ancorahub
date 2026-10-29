@@ -54,6 +54,7 @@ export async function sendSystemReportAction(_: SystemReportActionState, formDat
   }
 
   const channel = await getPreferredMetaCloudChannel({ tenantId: context.tenantId, userId: context.userId });
+  if (channel && "blocked" in channel) return { error: channel.message };
   if (!channel) {
     return { error: "Esta corretora ainda não possui um número oficial da Meta Cloud ativo." };
   }

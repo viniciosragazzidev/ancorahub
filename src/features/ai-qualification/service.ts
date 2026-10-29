@@ -87,7 +87,17 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
   }
   const [lead] = await db.select({ id: schema.leads.id, phone: schema.leads.telefone, nome: schema.leads.nome }).from(schema.leads).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId))).limit(1);
   if (!lead?.phone) return { started: false, reason: "missing_phone" as const };
-  const channel = await getPreferredMetaCloudChannel({ tenantId: input.tenantId, customerPhone: lead.phone });
+  let channel: Awaited<ReturnType<typeof getPreferredMetaCloudChannel>>;
+  try {
+    channel = await getPreferredMetaCloudChannel({ tenantId: input.tenantId, leadId: lead.id, customerPhone: lead.phone });
+  } catch {
+    console.warn("[startAiQualificationForLead] channel lookup failed", { tenantId: input.tenantId });
+    return { started: false as const, reason: "channel_lookup_failed" as const };
+  }
+  if (channel && "blocked" in channel) {
+    console.warn("[startAiQualificationForLead] source channel unavailable", { tenantId: input.tenantId, reason: channel.reason });
+    return { started: false as const, reason: "source_channel_unavailable" as const };
+  }
   if (!channel) return { started: false, reason: "missing_channel" as const };
   const existing = await db.select({ id: schema.aiQualificationSessions.id, status: schema.aiQualificationSessions.status }).from(schema.aiQualificationSessions).where(and(eq(schema.aiQualificationSessions.tenantId, input.tenantId), eq(schema.aiQualificationSessions.leadId, input.leadId))).limit(1);
   if (!input.force && existing[0] && !["failed", "expired", "handed_off"].includes(existing[0].status)) return { started: false, reason: "already_started" as const };
@@ -444,24 +454,39 @@ export async function handleColdLeadInbound(input: {
 }
 
 async function queueReply(input: { tenantId: string; leadId: string; phone: string; actorUserId: string }, sessionId: string, body: string, version: number) {
-  const db = getDatabase();
-  const channel = await getPreferredMetaCloudChannel({ tenantId: input.tenantId, customerPhone: input.phone });
-  if (!channel) return;
-  await enqueueMetaTextMessage({ tenantId: input.tenantId, channelId: channel.id, recipientType: "lead", recipientId: input.leadId, destinationPhone: input.phone, body, requestedBy: input.actorUserId, idempotencyKey: `ai-qualification:${sessionId}:reply:${version}:${body.slice(0, 24)}` });
-  await db.insert(schema.whatsappMessages).values({
-    id: `ai_msg_reply_${randomUUID()}`,
-    tenantId: input.tenantId,
-    leadId: input.leadId,
-    communicationChannelId: channel.id,
-    senderRole: "assistant",
-    provider: META_CLOUD_PROVIDER,
-    phone: input.phone,
-    direction: "outbound",
-    body,
-    providerStatus: "sent",
-    sentAt: new Date(),
-  }).onConflictDoNothing();
-  await processMetaOutboundBatch(1, input.tenantId).catch((error) => console.error("[ai-qualification] reply delivery deferred", error));
+  try {
+    const channel = await getPreferredMetaCloudChannel({ tenantId: input.tenantId, leadId: input.leadId, customerPhone: input.phone });
+    if (channel && "blocked" in channel) {
+      console.warn("[ai-qualification] reply blocked by source channel", { tenantId: input.tenantId, leadId: input.leadId, reason: channel.reason });
+      return;
+    }
+    if (!channel) {
+      console.warn("[ai-qualification] reply skipped without an available channel", { tenantId: input.tenantId, leadId: input.leadId });
+      return;
+    }
+    const db = getDatabase();
+    await enqueueMetaTextMessage({ tenantId: input.tenantId, channelId: channel.id, recipientType: "lead", recipientId: input.leadId, destinationPhone: input.phone, body, requestedBy: input.actorUserId, idempotencyKey: `ai-qualification:${sessionId}:reply:${version}:${body.slice(0, 24)}` });
+    await db.insert(schema.whatsappMessages).values({
+      id: `ai_msg_reply_${randomUUID()}`,
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      communicationChannelId: channel.id,
+      senderRole: "assistant",
+      provider: META_CLOUD_PROVIDER,
+      phone: input.phone,
+      direction: "outbound",
+      body,
+      providerStatus: "sent",
+      sentAt: new Date(),
+    }).onConflictDoNothing();
+    await processMetaOutboundBatch(1, input.tenantId).catch((error) => console.error("[ai-qualification] reply delivery deferred", error));
+  } catch (error) {
+    console.warn("[ai-qualification] reply enqueue failed", {
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      reason: error instanceof Error && "code" in error ? String((error as Error & { code?: unknown }).code) : "enqueue_failed",
+    });
+  }
 }
 
 export async function handoffAiQualification(input: { tenantId: string; leadId: string; actorUserId: string; reason: string }) {

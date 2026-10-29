@@ -12,6 +12,10 @@ Ondas 1 e 2 concluídas em 2026-10-29. Pedido aprovado por Vinicios. Não inclui
 - `PARTNER_REMOVED` desativa somente o canal correspondente a `phone_number_id`, ou ao sufixo único de oito dígitos do telefone quando o ID não vier. Sem correspondência, registra log e não altera canais.
 - Respostas ao cliente usam o canal da mensagem inbound mais recente. Se a origem estiver indisponível ou sem credencial, o envio falha sem fallback e a conversa orienta a reconexão.
 - Sem canal de origem associado, o seletor escolhe fallback oficial pela prioridade de padrão, criação mais antiga e ID.
+- O resolvedor devolve bloqueio tipado para origem indisponível. A conversa mostra a orientação de reconexão; IA e outbox registram o bloqueio sem trocar de número nem derrubar o fluxo.
+- A busca da origem inbound usa leadId/clientId quando disponível e limita toda consulta a 30 dias; só conversas sem vínculo usam correspondência de telefone, também limitada.
+- Ao reconectar um canal oficial não padrão, ele se torna padrão quando o tenant não tem outro canal oficial padrão. Essa restauração é intencional; Coex continua fora do padrão.
+- Tenant com somente canais Coex permanece sem canal oficial para avisos internos. Não usar Coex como fallback é intencional; é preciso conectar um canal oficial para reativar esses envios.
 
 ## Entregue
 
@@ -28,6 +32,7 @@ Ondas 1 e 2 concluídas em 2026-10-29. Pedido aprovado por Vinicios. Não inclui
 - Resolvedor tenant-scoped compartilhado por envio direto, enqueue de template/texto e worker de outbox.
 - Avisos internos sempre ignoram canais Coex e usam o fallback oficial determinístico.
 - A ausência ou indisponibilidade da origem inbound bloqueia resposta automática e manual ao cliente, com orientação exibida na conversa. O envio de mídia segue a mesma validação no servidor.
+- O roteador usa leadId/clientId para conversas vinculadas, reduzindo a busca histórica por telefone. Consultas sem vínculo também têm janela de 30 dias e usam o índice de tenant/data existente.
 
 ## Arquivos e fluxos principais
 
@@ -48,11 +53,9 @@ Ondas 1 e 2 concluídas em 2026-10-29. Pedido aprovado por Vinicios. Não inclui
 
 ## Validação
 
-- Testes unitários puros cobrem intake por número, dedupe de lead conhecido, seleção de canal, bloqueio por origem inativa/sem token, fallback estável, Coex fora de `isDefault`, `PARTNER_REMOVED` e ausência de número novo.
-- Vitest focado: 4 arquivos e 20 testes aprovados; `npx tsc --noEmit -p .` aprovado; ESLint sem erros, com 13 avisos preexistentes em `conversations-workspace.tsx`.
+- Vitest nas áreas `communication-channels`, `ai-qualification`, `ai-agent` e `conversas`: 61 arquivos e 452 testes aprovados com `--maxWorkers=1`; `npx tsc --noEmit -p .` aprovado; ESLint sem erros, com 11 avisos preexistentes fora do escopo.
 - `npm run agent:docs` aprovado com 18 referências verificadas. O relatório está em `reports/agent/verification/2026-10-29-whatsapp-coex.md`.
-- Testes de banco, migrations e validação manual M1 a M4 na Meta não fazem parte da validação executada. M1 a M4 seguem pendentes e requerem número de teste autorizado.
-- Validação manual M1 a M4 na Meta permanece pendente e requer número de teste autorizado.
+- Nenhum teste `*.db.test.ts`, migration, build ou acesso ao banco foi executado. M1 a M4 na Meta permanecem pendentes e requerem número de teste autorizado.
 
 ## Fora de escopo e riscos
 

@@ -19,6 +19,11 @@ vi.mock("./message-policy-service", () => ({
   isCustomerServiceWindowOpen: async () => false,
 }));
 vi.mock("./template-sync-service", () => ({ WhatsAppTemplateResolver: { resolveTemplateForEvent: state.legacyResolver } }));
+// This suite validates the qualification template guard, not the database-backed
+// sender selection. The route resolver has its own domain tests.
+vi.mock("./meta-channel-router", () => ({
+  resolveMetaOutboundChannel: async () => ({ id: "channel-test", wabaId: "waba-test" }),
+}));
 
 import { enqueueMetaTemplateMessage } from "./outbound-service";
 
