@@ -34,8 +34,9 @@ import { getCachedLeadsBranches, getCachedLeadsBrokers, getCachedSlaSettings } f
 import { DutyLeadDetailsTrigger } from "../_components/duty-lead-details-trigger";
 import { BrokerDayHistoryTrigger } from "../_components/broker-day-history-trigger";
 import { BrokerOccurrenceCard, type BrokerTurn } from "../_components/broker-occurrence-card";
-import { getDutyQueueOrderPreviews } from "@/features/lead-distribution/duty-queue-order-queries";
+import { getDutyTurnState } from "@/features/lead-distribution/duty-turn";
 import { DutyTurnAutoRefresh } from "../_components/duty-turn-auto-refresh";
+import { DutyTurnStrip } from "../_components/duty-turn-strip";
 import { BrokerPresenceInviteButton } from "../_components/broker-presence-invite-button";
 import { BrokerPresenceReleaseButton } from "../_components/broker-presence-release-button";
 import { BrokerPauseButton } from "../_components/broker-pause-button";
@@ -218,30 +219,19 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   ]);
   const drawerContextRole = managementActionsSetting !== "false" ? context.role : "broker";
   // Rotation (29/10): who is receiving now, who is next and who received last, on the broker cards.
-  // The same preview as the Plantão tab; if it fails the cards just show without the turn.
-  const turnPreview = directorLite && schedule.status === "active" && isDutyWindowActive(liveWindow, now)
-    ? (await getDutyQueueOrderPreviews(context, now).catch((error: unknown) => {
-      console.error("[plantao] duty_turn_preview_failed", { scheduleId: schedule.id, error: error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 400) : "UnknownError" });
-      return [];
-    })).find((preview) => preview.scheduleId === schedule.id && preview.rotation) ?? null
+  // Only this plantão's saved turn and today's offers; on any failure the cards show without it.
+  const turnState = schedule.status === "active" && liveWindow && isDutyWindowActive(liveWindow, now)
+    ? await getDutyTurnState({
+      tenantId: context.tenantId,
+      scheduleId: schedule.id,
+      dutyDate: liveWindow.dutyDate,
+      roster: roster.filter((entry) => !entry.absent).map((entry) => ({ brokerId: entry.brokerId, confirmedAt: entry.confirmedAt ?? null, canReceive: entry.liveStatus === "ready" && !entry.pausedAt })),
+      now,
+    })
     : null;
-  const turnOf = (brokerId: string): BrokerTurn | null => {
-    if (!turnPreview) return null;
-    const position = turnPreview.order.findIndex((item) => item.id === brokerId);
-    const skips = [...turnPreview.order, ...turnPreview.blocked].find((item) => item.id === brokerId)?.skips ?? 0;
-    const role = turnPreview.current?.id === brokerId ? "current"
-      : position === 0 ? "next"
-        : turnPreview.previous?.id === brokerId ? "previous" : null;
-    return { role, position: position >= 0 ? position + 1 : null, outcome: role === "previous" ? turnPreview.previous?.outcome ?? null : null, skips };
-  };
+  const turnOf = (brokerId: string): BrokerTurn | null => turnState?.byBroker[brokerId] ?? null;
   // Cards in the order of the turn: receiving now, then the queue (next first), then who cannot receive now.
-  const turnRank = (brokerId: string) => {
-    if (!turnPreview) return 0;
-    if (turnPreview.current?.id === brokerId) return -1;
-    const position = turnPreview.order.findIndex((item) => item.id === brokerId);
-    return position >= 0 ? position : turnPreview.order.length + 1;
-  };
-  const byTurn = <T extends { brokerId: string }>(entries: T[]) => turnPreview ? [...entries].sort((left, right) => turnRank(left.brokerId) - turnRank(right.brokerId)) : entries;
+  const byTurn = <T extends { brokerId: string }>(entries: T[]) => turnState ? [...entries].sort((left, right) => (turnState.rank[left.brokerId] ?? 999) - (turnState.rank[right.brokerId] ?? 999)) : entries;
   const returnedUnaccepted = await getReturnedUnacceptedLeadIds(context.tenantId, allLeads.map((lead) => lead.id));
   const canExportReport = hasCapability(context.role, "exportar_relatorios_operacionais", context.jobTitle);
 
@@ -668,8 +658,18 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
               : presenceEnabled ? "Acompanhe quem confirmou presença neste turno." : "Quem está na escala ativa deste plantão agora."}
           />
           <CardContent className="space-y-3" role={presenceEnabled ? "group" : undefined} aria-label={presenceEnabled ? "Status de confirmação dos corretores escalados" : undefined}>
-            {turnPreview ? <DutyTurnAutoRefresh /> : null}
-            {turnPreview ? <p className="text-xs text-muted-foreground">Rodízio: cada um tem sua vez, na ordem em que chegou. Quem recebe vai para o fim; lead expirado ou recusado gasta a vez e conta como pulo.</p> : null}
+            {turnState ? <DutyTurnAutoRefresh /> : null}
+            {turnState ? (() => {
+              const nameOf = (brokerId: string | null | undefined) => roster.find((entry) => entry.brokerId === brokerId)?.brokerName ?? "Corretor";
+              return <DutyTurnStrip
+                scheduleName={schedule.name}
+                previous={turnState.previous ? { id: turnState.previous.brokerId, name: nameOf(turnState.previous.brokerId), offeredAt: turnState.previous.offeredAt, outcome: turnState.previous.outcome } : null}
+                current={turnState.current ? { id: turnState.current.brokerId, name: nameOf(turnState.current.brokerId), offeredAt: turnState.current.offeredAt } : null}
+                nextId={turnState.nextBrokerId}
+                nextName={turnState.nextBrokerId ? nameOf(turnState.nextBrokerId) : null}
+              />;
+            })() : null}
+            {turnState ? <p className="text-xs text-muted-foreground">Rodízio: cada um tem sua vez, na ordem em que chegou. Quem recebe vai para o fim; lead expirado ou recusado gasta a vez e conta como pulo.</p> : null}
             {/* Escalar alguém neste plantão sem sair da página (mesma regra da Escala publicada). */}
             {context.role === "director" ? (
               <ScheduleEscalarButton

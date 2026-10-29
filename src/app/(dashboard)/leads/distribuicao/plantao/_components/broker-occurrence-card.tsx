@@ -203,8 +203,9 @@ export function BrokerOccurrenceCard({ children, directorLite = false, summary, 
     });
   }
 
-  // The turn shows only in the Director Lite (29/10); the legacy card keeps its exact markup.
-  const showTurn = directorLite && Boolean(turn);
+  // The plantão page is outside the Lite visual: the turn shows on this card whenever the rotation
+  // gives one (29/10); without it the card keeps its exact markup.
+  const showTurn = Boolean(turn);
   const cardBody = <>
       <button type="button" onClick={show} className="absolute inset-0 rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Abrir detalhes de ${brokerName} neste plantão`} />
       <div className="pointer-events-none relative z-10 flex w-full items-center justify-between gap-3 [&_a]:pointer-events-auto [&_button]:pointer-events-auto">

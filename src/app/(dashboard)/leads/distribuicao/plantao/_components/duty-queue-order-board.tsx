@@ -74,7 +74,7 @@ const OUTCOME_LABEL = { accepted: "Aceitou", skip: "Pulou a vez", waiting: "Agua
  * Anterior, atual and próximo of the rotation. Each slot is keyed by the broker, so when the turn
  * moves the names slide one step to the left; the current one keeps a slow pulse while waiting.
  */
-function TurnStrip({ preview, nextId, nextName, reduceMotion }: { preview: DutyQueueOrderPreview; nextId: string | null; nextName: string | null; reduceMotion: boolean }) {
+export function TurnStrip({ preview, nextId, nextName, reduceMotion }: { preview: Pick<DutyQueueOrderPreview, "scheduleName" | "previous" | "current">; nextId: string | null; nextName: string | null; reduceMotion: boolean }) {
   const slots = [
     { role: "previous", label: "Anterior", id: preview.previous?.id ?? null, name: preview.previous?.name ?? null, detail: preview.previous ? `${OUTCOME_LABEL[preview.previous.outcome]} · ${clock.format(new Date(preview.previous.offeredAt))}` : "Ninguém ainda" },
     { role: "current", label: "Recebendo agora", id: preview.current?.id ?? null, name: preview.current?.name ?? null, detail: preview.current ? `Aguardando aceite desde ${clock.format(new Date(preview.current.offeredAt))}` : "Nenhum lead em oferta" },
