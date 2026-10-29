@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { AI_SEND_FAILED_SKIP_LABEL, decideAiSendFailedCandidate, type AiSendFailedLeadFacts } from "./ai-send-failed-candidates";
+import {
+  AI_RESTART_SKIP_LABEL,
+  AI_SEND_FAILED_SKIP_LABEL,
+  decideAiRestartDispatch,
+  decideAiSendFailedCandidate,
+  type AiSendFailedLeadFacts,
+} from "./ai-send-failed-candidates";
 
 const now = new Date("2026-10-28T15:00:00.000Z");
 const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 60 * 60 * 1000);
@@ -69,5 +75,30 @@ describe("candidatos a reabrir quando a mensagem da IA falhou", () => {
       expect(label.length).toBeGreaterThan(5);
       expect(label).not.toMatch(/[—–]/);
     }
+  });
+});
+
+describe("disparo da primeira mensagem da IA depois da reabertura", () => {
+  const windowEndsAt = new Date("2026-10-28T20:00:00.000Z");
+
+  it("dispara dentro da janela, sem envio entregue depois da falha", () => {
+    expect(decideAiRestartDispatch({ windowEndsAt, now: new Date("2026-10-28T19:00:00.000Z"), deliveredAfterLastAi: false })).toEqual({ send: true });
+  });
+
+  it("não dispara quando a janela já fechou (no instante do fim também)", () => {
+    expect(decideAiRestartDispatch({ windowEndsAt, now: new Date("2026-10-28T20:01:00.000Z"), deliveredAfterLastAi: false }))
+      .toEqual({ send: false, reason: "window_closed" });
+    expect(decideAiRestartDispatch({ windowEndsAt, now: windowEndsAt, deliveredAfterLastAi: false }))
+      .toEqual({ send: false, reason: "window_closed" });
+  });
+
+  it("não dispara de novo quando já houve envio entregue depois da falha", () => {
+    expect(decideAiRestartDispatch({ windowEndsAt, now: new Date("2026-10-28T19:00:00.000Z"), deliveredAfterLastAi: true }))
+      .toEqual({ send: false, reason: "already_delivered" });
+  });
+
+  it("tem motivo legível para cada recusa do disparo", () => {
+    expect(Object.keys(AI_RESTART_SKIP_LABEL)).toEqual(["window_closed", "already_delivered"]);
+    for (const label of Object.values(AI_RESTART_SKIP_LABEL)) expect(label).not.toMatch(/[—–]/);
   });
 });

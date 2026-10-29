@@ -52,6 +52,32 @@ export const AI_SEND_FAILED_SKIP_LABEL: Record<Extract<AiSendFailedDecision, { e
   already_qualifying: "já está em qualificação",
 };
 
+/** Reasons startAiQualificationForLead gives when it does not send (plain Portuguese for the team). */
+export const AI_START_SKIP_LABEL: Record<string, string> = {
+  already_started: "já existe uma qualificação em andamento",
+  missing_channel: "não há canal ativo para enviar",
+  source_channel_unavailable: "o canal que o cliente usa está desconectado",
+  channel_lookup_failed: "não foi possível escolher o canal",
+  missing_phone: "o lead não tem telefone",
+};
+
+export type AiRestartDecision = { send: true } | { send: false; reason: "window_closed" | "already_delivered" };
+
+export const AI_RESTART_SKIP_LABEL: Record<Extract<AiRestartDecision, { send: false }>["reason"], string> = {
+  window_closed: "janela de 24 h fechada: reaberto sem mensagem",
+  already_delivered: "já houve envio entregue depois da falha",
+};
+
+/**
+ * Whether the AI should send its first message again right after the reopen: only inside the customer's
+ * window (the Meta refuses free text after it) and only if nothing was delivered after the failure.
+ */
+export function decideAiRestartDispatch(input: { windowEndsAt: Date; now: Date; deliveredAfterLastAi: boolean }): AiRestartDecision {
+  if (input.deliveredAfterLastAi) return { send: false, reason: "already_delivered" };
+  if (input.now.getTime() >= input.windowEndsAt.getTime()) return { send: false, reason: "window_closed" };
+  return { send: true };
+}
+
 /** Whether a lead can be reopened because the AI's first message was refused and the customer's window is still open. */
 export function decideAiSendFailedCandidate(facts: AiSendFailedLeadFacts, now: Date): AiSendFailedDecision {
   if (facts.corretorId) return { eligible: false, reason: "has_broker" };

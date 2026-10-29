@@ -11,9 +11,12 @@ import { INITIAL_MESSAGE_FAILURE_NOTE_PREFIX } from "@/features/communication-ch
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { startAiQualificationForLead } from "./service";
 import {
+  AI_RESTART_SKIP_LABEL,
+  AI_START_SKIP_LABEL,
   AI_SEND_FAILED_LOOKBACK_MS,
   AI_SEND_FAILED_SKIP_LABEL,
   CUSTOMER_WINDOW_MS,
+  decideAiRestartDispatch,
   decideAiSendFailedCandidate,
   type AiSendFailedDecision,
   type AiSendFailedLeadFacts,
@@ -318,13 +321,32 @@ async function reopenAiSendFailedLeads(context: BulkContext, requestedIds: strin
   }
 
   let reopened = 0;
+  let sent = 0;
   for (const leadId of targets) {
     try {
       const result = await manuallyChangeQualificationStageAction({ leadId, targetStage: "qualificacoes" });
-      if (result.success) reopened++;
-      else count(result.error ?? "erro ao reabrir");
+      if (!result.success) {
+        count(result.error ?? "erro ao reabrir");
+        continue;
+      }
+      reopened++;
+      // The window and the delivery were checked above; the window is checked again now, at the send.
+      const eligible = decisions.get(leadId)?.decision;
+      if (!eligible?.eligible) continue;
+      const dispatch = decideAiRestartDispatch({ windowEndsAt: eligible.windowEndsAt, now: new Date(), deliveredAfterLastAi: false });
+      if (!dispatch.send) {
+        count(AI_RESTART_SKIP_LABEL[dispatch.reason]);
+        continue;
+      }
+      // Without force: an active qualification blocks a second first message (idempotent per lead).
+      const started = await startAiQualificationForLead({ tenantId: context.tenantId, leadId, actorUserId: context.userId });
+      if (started.started) sent++;
+      else {
+        const reason = (started as { reason?: string }).reason ?? "desconhecido";
+        count(AI_START_SKIP_LABEL[reason] ?? `não enviado (${reason})`);
+      }
     } catch {
-      count("erro ao reabrir");
+      count("erro ao enviar a primeira mensagem");
     }
   }
 
@@ -343,6 +365,7 @@ async function reopenAiSendFailedLeads(context: BulkContext, requestedIds: strin
     successCount: reopened,
     failedCount: ignoredCount,
     reopenedCount: reopened,
+    sentCount: sent,
     ignoredCount,
     ignoredReasons: Object.entries(ignored).map(([reason, count]) => ({ reason, count })),
   };

@@ -73,7 +73,7 @@ export function BulkQualificationDialog({ trigger, onSuccess }: BulkQualificatio
         const reasons = res.ignoredReasons.map((item) => `${item.reason} (${item.count})`).join("; ");
         setResultMessage({
           type: "success",
-          text: `${res.reopenedCount} lead(s) reaberto(s) para a qualificação por IA; ${res.ignoredCount} ignorado(s)${reasons ? `: ${reasons}` : ""}.`,
+          text: `${res.reopenedCount} reaberto(s); ${res.sentCount} com a primeira mensagem da IA enviada; ${res.ignoredCount} ignorado(s)${reasons ? `: ${reasons}` : ""}.`,
         });
         if (onSuccess) onSuccess();
       } else if (res.success) {
@@ -131,7 +131,7 @@ export function BulkQualificationDialog({ trigger, onSuccess }: BulkQualificatio
                 <SelectItem value="new_leads">Apenas Leads Novos Sem Atendimento</SelectItem>
                 <SelectItem value="unresponsive_24h">Leads Sem Resposta Há Mais de 24 Horas</SelectItem>
                 <SelectItem value="first_message_failed">1ª mensagem não enviada por erro do sistema</SelectItem>
-                <SelectItem value="ai_send_failed">Falha de envio da IA: reabrir qualificação</SelectItem>
+                <SelectItem value="ai_send_failed">Falha de envio da IA: reabrir e a IA manda a primeira mensagem de novo</SelectItem>
               </SelectContent>
             </Select>
           </div>
