@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/sonner";
 import { getMonthlyDutyPlanAction, type MonthlyDutyPlanView } from "@/features/lead-distribution/monthly-duty-actions";
 
@@ -19,17 +18,17 @@ function previousMonth(monthKey: string) {
 }
 
 /**
- * "Escalar corretor" inside the plantão page: pick the day (the current or next turn by default),
- * then the same sheet and actions as the escala (published escala only), without leaving the page.
+ * "Escalar corretor" inside the plantão page: the same sheet and actions as the escala (published
+ * escala only) for the day of this plantão (the running turn, or the next one), without leaving the
+ * page. No day field (29/10): it showed today even on a plantão days ahead.
  */
-export function ScheduleEscalarButton({ scheduleId, scheduleName, defaultDate, brokers }: {
+export function ScheduleEscalarButton({ scheduleId, scheduleName, date, brokers }: {
   scheduleId: string;
   scheduleName: string;
-  defaultDate: string;
+  date: string;
   brokers: Broker[];
 }) {
   const router = useRouter();
-  const [date, setDate] = useState(defaultDate);
   const [found, setFound] = useState<{ occurrence: PlanOccurrence } | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -43,7 +42,7 @@ export function ScheduleEscalarButton({ scheduleId, scheduleName, defaultDate, b
       const plans: Record<string, MonthlyDutyPlanView | null> = { [monthKey]: current, [previousMonth(monthKey)]: previous };
       const result = findPublishedOccurrence(plans, scheduleId, date);
       if (!result) {
-        toast.error("Este plantão não está numa escala publicada nessa data. Escolha outro dia ou escale pela Escala do mês.");
+        toast.error("Este plantão não está numa escala publicada nesse dia. Escale pela Escala do mês.");
         return;
       }
       setFound({ occurrence: result.occurrence });
@@ -52,11 +51,7 @@ export function ScheduleEscalarButton({ scheduleId, scheduleName, defaultDate, b
 
   return (
     <div className="flex flex-wrap items-end gap-2">
-      <label className="text-xs text-muted-foreground">
-        Dia
-        <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 w-auto" aria-label="Dia do plantão para escalar" />
-      </label>
-      <Button type="button" size="sm" onClick={open} disabled={pending || !date}>{pending ? "Abrindo..." : "Escalar corretor"}</Button>
+      <Button type="button" size="sm" onClick={open} disabled={pending}>{pending ? "Abrindo..." : "Escalar corretor"}</Button>
       {found ? (
         <PlantaoOccurrenceSheet
           open

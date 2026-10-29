@@ -58,6 +58,11 @@ import {
   moveRosterAssignmentAction,
   removeRosterAssignmentAction,
 } from "@/features/lead-distribution/roster-actions";
+import {
+  addPendingRosterEntryAction,
+  listPendingRosterForScheduleAction,
+  removePendingRosterEntryAction,
+} from "@/features/lead-distribution/duty-roster-pending-actions";
 import { cn } from "@/lib/utils";
 import { getDutyCoverage } from "@/features/lead-distribution/domain";
 import { monthCoverage, monthShiftProgress, summarizeDutyDays } from "@/features/lead-distribution/monthly-duty-plan";
@@ -185,6 +190,8 @@ function StatusBadge({ status }: { status: string }) {
   if (status === "archived") return <Badge variant="outline">Arquivado</Badge>;
   return <Badge variant="secondary">Inativo</Badge>;
 }
+
+type PendingPerson = { id: string; name: string; internalCode: string | null; branchName: string | null };
 
 function DutyFormSheet({
   open,
@@ -737,6 +744,55 @@ function DutyInspector({
   const history = schedule
     ? snapshot.history.filter((event) => event.scheduleId === schedule.id).slice(0, 6)
     : [];
+  // Invited brokers who have not created the account yet (29/10): found by the same search and put
+  // on the plantão as "Convite pendente"; they join the roster on their own when they accept.
+  const [invites, setInvites] = useState<{ scheduleId: string; entries: Array<PendingPerson & { entryId: string }>; candidates: PendingPerson[] } | null>(null);
+  const [invitesVersion, setInvitesVersion] = useState(0);
+  const scheduleId = schedule?.id ?? null;
+  useEffect(() => {
+    if (!open || !scheduleId) return;
+    let cancelled = false;
+    void listPendingRosterForScheduleAction({ scheduleId }).then((result) => {
+      if (!cancelled && result.success) setInvites({ scheduleId, entries: result.entries, candidates: result.candidates });
+    });
+    return () => { cancelled = true; };
+  }, [open, scheduleId, invitesVersion]);
+  const pendingInvites = invites && invites.scheduleId === scheduleId ? invites : null;
+  const filteredInvited = (pendingInvites?.candidates ?? []).filter((person) => {
+    const query = brokerSearch.trim().toLocaleLowerCase("pt-BR");
+    return Boolean(query) && `${person.name} ${person.internalCode ?? ""}`.toLocaleLowerCase("pt-BR").includes(query);
+  });
+
+  function addInvited(person: PendingPerson) {
+    if (!schedule) return;
+    setAddingBrokerId(person.id);
+    startTransition(async () => {
+      const result = await addPendingRosterEntryAction({ scheduleId: schedule.id, brokerProfileId: person.id });
+      setAddingBrokerId(null);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      setBrokerSearch("");
+      toast.success(`${person.name} escalado. Entra no plantão quando criar a conta.`);
+      setInvitesVersion((value) => value + 1);
+      router.refresh();
+    });
+  }
+
+  function removeInvited(entry: PendingPerson & { entryId: string }) {
+    if (!schedule) return;
+    startTransition(async () => {
+      const result = await removePendingRosterEntryAction({ scheduleId: schedule.id, entryId: entry.entryId });
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`${entry.name} saiu do plantão.`);
+      setInvitesVersion((value) => value + 1);
+      router.refresh();
+    });
+  }
 
   useEffect(() => {
     // Nothing to flag once the query is empty — the results panel itself is
@@ -969,8 +1025,32 @@ function DutyInspector({
                               <Loader2Icon className="size-3.5 animate-spin" />
                               Buscando corretores…
                             </p>
-                          ) : filteredEligibleBrokers.length ? (
+                          ) : filteredEligibleBrokers.length || filteredInvited.length ? (
                             <div className="max-h-52 divide-y divide-border/60 overflow-y-auto">
+                              {filteredInvited.map((person) => (
+                                <div key={`invite:${person.id}`} className="flex items-center justify-between gap-2 px-3 py-2">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-medium">{person.name}</p>
+                                    <p className="truncate text-[11px] text-muted-foreground">
+                                      {person.internalCode ? `${person.internalCode} · ` : ""}
+                                      {person.branchName ? `${person.branchName} · ` : ""}
+                                      <span className="text-warning">Ainda sem conta: entra com convite pendente</span>
+                                    </p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    size="icon-sm"
+                                    variant="outline"
+                                    className="shrink-0"
+                                    aria-label={`Adicionar ${person.name} a este plantão com convite pendente`}
+                                    title={`Adicionar ${person.name}`}
+                                    disabled={pending}
+                                    onClick={() => addInvited(person)}
+                                  >
+                                    {addingBrokerId === person.id ? <Loader2Icon className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                                  </Button>
+                                </div>
+                              ))}
                               {filteredEligibleBrokers.map((broker) => (
                                 <div
                                   key={broker.id}
@@ -1060,6 +1140,31 @@ function DutyInspector({
                       )}
                     </div>
                     ))}
+                    {pendingInvites?.entries.length ? (
+                      <div className="grid gap-2">
+                        <p className="text-xs font-semibold text-muted-foreground">Convite pendente · {pendingInvites.entries.length}</p>
+                        {pendingInvites.entries.map((entry) => (
+                          <div key={entry.entryId} className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-dashed border-border px-3 py-2">
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-medium">{entry.name}</span>
+                              <span className="block text-xs text-muted-foreground">Ainda sem conta: não recebe leads até aceitar o convite.</span>
+                            </span>
+                            <span className="flex shrink-0 items-center gap-1">
+                              <Badge variant="warning">Convite pendente</Badge>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                aria-label={`Remover ${entry.name} do plantão`}
+                                onClick={() => removeInvited(entry)}
+                                disabled={pending}
+                              >
+                                <Trash className="size-4" />
+                              </Button>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 </SheetSection>
                 <SheetSection>

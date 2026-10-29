@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { listInvitedBrokers, listPendingRosterEntries } from "./duty-roster-pending";
 
 type Result = { success: true } | { success: false; error: string };
 
@@ -69,5 +70,32 @@ export async function removePendingRosterEntryAction(input: { scheduleId: string
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível remover." };
+  }
+}
+
+type PendingPerson = { id: string; name: string; internalCode: string | null; branchName: string | null };
+
+/**
+ * For the plantão drawer in Distribuição › Plantão (29/10): who is on it with "Convite pendente" and
+ * the invited brokers (no account yet) the viewer may still put on it (a manager: only of their unit).
+ */
+export async function listPendingRosterForScheduleAction(input: { scheduleId: string }): Promise<
+  { success: true; entries: Array<PendingPerson & { entryId: string }>; candidates: PendingPerson[] } | { success: false; error: string }
+> {
+  try {
+    const parsed = z.object({ scheduleId: z.string().uuid() }).safeParse(input);
+    if (!parsed.success) return { success: false, error: "Plantão inválido." };
+    const { context, schedule } = await scheduleInScope(parsed.data.scheduleId);
+    const [entries, invited] = await Promise.all([
+      listPendingRosterEntries(context.tenantId, schedule.id),
+      listInvitedBrokers(context.tenantId, context.role === "manager" ? context.branchId ?? null : schedule.branchId ?? null),
+    ]);
+    return {
+      success: true,
+      entries: entries.map((entry) => ({ entryId: entry.id, id: entry.brokerProfileId, name: entry.name, internalCode: entry.internalCode, branchName: entry.branchName })),
+      candidates: invited.filter((person) => !entries.some((entry) => entry.brokerProfileId === person.id)),
+    };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível carregar os convidados." };
   }
 }

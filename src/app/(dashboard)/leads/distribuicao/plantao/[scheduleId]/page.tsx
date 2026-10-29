@@ -230,6 +230,12 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
       now,
     })
     : null;
+  // The day "Escalar corretor" opens (29/10): the running turn, else this plantão's next one (a
+  // dated plantão days ahead, or the weekly one in the coming week). Never today by default.
+  const escalarDate = liveWindow && isDutyWindowActive(liveWindow, now) ? liveWindow.dutyDate
+    : leadsUpcomingStartsAt ? dayKey.format(leadsUpcomingStartsAt)
+      : Array.from({ length: 8 }, (_, offset) => dayKey.format(new Date(now.getTime() + offset * 86_400_000)))
+        .find((date) => { const turn = getDutyWindowOnDate(schedule, date); return Boolean(turn && turn.endsAt > now); }) ?? null;
   const turnOf = (brokerId: string): BrokerTurn | null => turnState?.byBroker[brokerId] ?? null;
   // Cards in the order of the turn: receiving now, then the queue (next first), then who cannot receive now.
   const byTurn = <T extends { brokerId: string }>(entries: T[]) => turnState ? [...entries].sort((left, right) => (turnState.rank[left.brokerId] ?? 999) - (turnState.rank[right.brokerId] ?? 999)) : entries;
@@ -672,11 +678,11 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
             })() : null}
             {turnState ? <p className="text-xs text-muted-foreground">Rodízio: cada um tem sua vez, na ordem em que chegou. Quem recebe vai para o fim; lead expirado ou recusado gasta a vez e conta como pulo.{context.role === "director" ? " Para passar alguém na frente, arraste o card pelo ícone de arrastar até a posição desejada." : ""}</p> : null}
             {/* Escalar alguém neste plantão sem sair da página (mesma regra da Escala publicada). */}
-            {context.role === "director" ? (
+            {context.role === "director" && escalarDate ? (
               <ScheduleEscalarButton
                 scheduleId={schedule.id}
                 scheduleName={schedule.name}
-                defaultDate={liveWindow?.dutyDate ?? dayKey.format(now)}
+                date={escalarDate}
                 brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name, internalCode: null, branchId: broker.branchId ?? null }))}
               />
             ) : null}
