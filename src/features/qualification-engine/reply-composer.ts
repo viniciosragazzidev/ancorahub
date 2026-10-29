@@ -129,6 +129,14 @@ const planLabel: Record<string, string> = { individual: "individual", familiar: 
 export function questionVariants(key: QualificationFieldKey, memory: ConversationMemory): string[] {
   const plan = memory.planType?.value;
   const count = lives(memory);
+  // The customer said there is no CNPJ: the plan question offers only individual or family (28/10).
+  if (key === "planType" && memory.companyHasCnpj?.value === "false") {
+    return [
+      "Entendi, sem CNPJ. O plano é pra você ou pra sua família?",
+      "Beleza, então é um plano pessoal. Ele é só pra você ou pra sua família?",
+      "Pra eu montar as opções certas: é um plano só seu ou pra família?",
+    ];
+  }
   switch (key) {
     // WhatsApp tone (Vinicios, 23/10): short, warm, "pra" and "tá", like a person writes.
     case "customerName":

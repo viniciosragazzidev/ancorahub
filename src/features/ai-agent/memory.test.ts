@@ -42,9 +42,9 @@ describe("conversation memory", () => {
   it("does not infer a business plan or positive CNPJ from a denial", () => {
     const updated = extractFieldsFromMessage("Não tenho CNPJ", createEmptyMemory(), "msg-no-cnpj");
 
-    expect(updated.companyHasCnpj).toBeUndefined();
+    expect(updated.companyHasCnpj).toMatchObject({ value: "false", sourceMessageId: "msg-no-cnpj" });
     expect(updated.planType).toBeUndefined();
-    expect(updated.collectedFields).not.toContain("companyHasCnpj");
+    expect(updated.collectedFields).toContain("companyHasCnpj");
   });
 
   it("classifies an MEI mention as a business plan", () => {

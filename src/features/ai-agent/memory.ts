@@ -391,6 +391,13 @@ export function hasPositiveCnpjEvidence(message: string): boolean {
   );
 }
 
+/** A denial of company or CNPJ: "não tenho CNPJ", "sem cnpj", "não sou empresa", "pessoa física" (28/10). */
+export function isCompanyDenial(message: string): boolean {
+  const normalized = normalizeForMatching(message);
+  return /\b(?:nao|sem|nenhum|nenhuma)\b.{0,12}\b(?:cnpj|pj|empresa|mei)\b/.test(normalized)
+    || /\bpessoa fisica\b/.test(normalized);
+}
+
 const INTENT_PATTERNS = [
   /(?:gostaria|gostaríamos|queremos|quero|busco|procuro)\s+(?:de\s+)?(?:ver|conhecer|receber|encontrar)\s+([^.!?\n]+)/i,
   /(?:quero|gostaria|preciso de|estou atrás de|busco|procuro)\s+(?:um|uma|de|contratar|saber)\s+([^,.!?]+)/i,
@@ -559,6 +566,20 @@ export function extractFieldsFromMessage(
     }
   }
 
+  // A denial of company or CNPJ is not a company plan (28/10): the answer is kept as "sem CNPJ", a company
+  // plan read earlier from it is dropped, and the plan question is asked again with individual or family only.
+  const companyDenied = isCompanyDenial(trimmed);
+  if (companyDenied) {
+    if (memory.companyHasCnpj?.value !== "true") {
+      memory.companyHasCnpj = { value: "false", confidence: 1, sourceMessageId };
+      addCollectedField(memory, "companyHasCnpj");
+    }
+    if (memory.planType?.value === "empresarial" && memory.companyHasCnpj?.value !== "true") {
+      delete memory.planType;
+      memory.collectedFields = memory.collectedFields.filter((field) => field !== "planType");
+    }
+  }
+
   // Plan type extraction
   if (!memory.planType) {
     const normalizedPlanMessage = normalizeForMatching(trimmed);
@@ -574,6 +595,8 @@ export function extractFieldsFromMessage(
               : /familiar|familia|para minha familia/i.test(normalizedPlanMessage)
                 ? "familiar"
                 : "empresarial";
+        // "não sou empresa" names no company plan: the loose "empresa" match must not make one.
+        if (companyDenied && value === "empresarial") break;
         memory.planType = { value, confidence: 1, sourceMessageId };
         addCollectedField(memory, "planType");
         break;
