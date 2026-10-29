@@ -504,7 +504,9 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
   const isBrokerRole = context.role === "broker";
   const shouldMask = isMarketing && lead.branchId !== context.branchId;
 
-  const canSeePersonalData = (context.role !== "broker" || lead.corretorId !== context.userId || lead.status !== "distributed") && !shouldMask;
+  // A broker sees contact data only as the current owner, after starting the attendance ("distributed"
+  // means not started yet). A former owner or a pending offer opens the lead without phone or e-mail.
+  const canSeePersonalData = (context.role !== "broker" || (lead.corretorId === context.userId && lead.status !== "distributed")) && !shouldMask;
   const maskedPhone = maskPhone(lead.telefone);
   const maskedEmail = lead.email ? maskEmail(lead.email) : "Não informado";
   const stageRank = LEAD_STATUS_ORDER[lead.status] ?? 0;
