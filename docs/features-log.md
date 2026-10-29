@@ -2,6 +2,15 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 29/10/2026 - Retorno seguro para oferta de lead expirada
+
+- O link do template `new_lead_broker` continua abrindo `/lead/<id>` e, depois,
+  `/leads/<id>`. Quando o corretor não é o responsável atual e a oferta mais recente
+  dele expirou sem aceite, a página mostra um aviso sem dados do cliente.
+- A contagem regressiva vai de 10 a 0 e permite voltar imediatamente para `/minha-fila`.
+  Status `REPLACED` fica fora porque não informa se a causa foi atraso.
+- Implementação e validações: `docs/implementations/completed/2026-10-29-lead-offer-expired-landing.md`.
+
 ## 28/10/2026 - Ilustrações contextuais no Diretor e Corretor
 
 - Sete assets 3D da Âncora aplicados no início, plantões, filas, atendimento, clientes, cotação e documentos, com arquivos WebP pequenos e transparência. Textos, ações, dados e permissões preservados.

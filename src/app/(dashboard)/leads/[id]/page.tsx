@@ -66,6 +66,8 @@ import {
   NextBestActionCard,
   type LeadActionContext,
 } from "@/features/next-best-action";
+import { shouldShowExpiredOfferLanding } from "@/features/lead-distribution/expired-offer-landing";
+import { ExpiredOfferLandingScreen } from "@/features/lead-distribution/components/expired-offer-landing-screen";
 
 function getCurrentTimestamp() {
   return Date.now();
@@ -74,6 +76,42 @@ function getCurrentTimestamp() {
 export default async function LeadDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ficha?: string }> }) {
   const [{ id }, { ficha }] = await Promise.all([params, searchParams]);
   const context = await getRequiredTenantContext();
+  if (context.role === "broker") {
+    const db = getDatabase();
+    const [leadAccess] = await db
+      .select({ ownerId: schema.leads.corretorId })
+      .from(schema.leads)
+      .where(and(
+        eq(schema.leads.id, id),
+        eq(schema.leads.tenantId, context.tenantId),
+        isNull(schema.leads.deletedAt),
+      ))
+      .limit(1);
+
+    if (!leadAccess) notFound();
+    if (leadAccess.ownerId !== context.userId) {
+      const [latestOffer] = await db
+        .select({ brokerId: schema.leadOffers.brokerId, status: schema.leadOffers.status, acceptedAt: schema.leadOffers.acceptedAt })
+        .from(schema.leadOffers)
+        .where(and(
+          eq(schema.leadOffers.tenantId, context.tenantId),
+          eq(schema.leadOffers.leadId, id),
+          eq(schema.leadOffers.brokerId, context.userId),
+        ))
+        .orderBy(desc(schema.leadOffers.offeredAt), desc(schema.leadOffers.createdAt))
+        .limit(1);
+
+      if (shouldShowExpiredOfferLanding({
+        role: context.role,
+        brokerId: context.userId,
+        currentLeadOwnerId: leadAccess.ownerId,
+        latestOffer: latestOffer ?? null,
+      })) {
+        return <ExpiredOfferLandingScreen />;
+      }
+      notFound();
+    }
+  }
   if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
     return <ManagerLiteLeadDetailPage leadId={id} />;
   }
