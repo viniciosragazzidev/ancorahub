@@ -108,11 +108,17 @@ const CITY_PATTERNS = [
   /cidade\s*(?:é|:)?\s*([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)?)/i,
 ];
 
+/** An individual plan in the customer's words, on the accent-free text. */
+const INDIVIDUAL_PLAN_ANSWER = /\b(?:individual|pf|sou eu|(?:pra|para|pro) mim|(?:so|apenas|somente|plano) meu|meu mesmo)\b/i;
+
 const PLAN_TYPE_PATTERNS = [
   /\bpessoa\s+f(?:ísica|fisica)\b/i,
   /\bpessoa\s+j(?:urídica|uridica)\b/i,
   /\b(?:individual|PF|para mim|sou eu|só para mim)\b/i,
   /\b(?:familiar|para família|para minha família)\b/i,
+  // Short answers to "só seu, família ou empresa?" (29/10, Paula: "Só meu", "Apenas pra mim" were ignored).
+  INDIVIDUAL_PLAN_ANSWER,
+  /\b(?:pra|para) (?:a )?(?:minha )?familia\b/i,
   /\b(?:empresarial|PME|PJ|MEI|para empresa|para minha empresa|coletivo)\b/i,
 ];
 
@@ -592,7 +598,8 @@ export function extractFieldsFromMessage(
             ? "individual"
             : /pessoa\s+j(?:uridica)/i.test(normalizedPlanMessage)
               ? "empresarial"
-              : /individual|\bpf\b|para mim|sou eu|so para mim/i.test(normalizedPlanMessage)
+              // A family or company word wins over "pra mim" ("pra mim e minha família").
+              : INDIVIDUAL_PLAN_ANSWER.test(normalizedPlanMessage) && !/familia|familiar|empresa|cnpj|\bpj\b|\bmei\b/i.test(normalizedPlanMessage)
                 ? "individual"
               : /familiar|familia|para minha familia/i.test(normalizedPlanMessage)
                 ? "familiar"
