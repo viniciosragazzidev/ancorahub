@@ -383,6 +383,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Exige confirmação do corretor antes de torná-lo elegível aos leads do plantão vigente.",
   },
+  LEAD_BROKER_INTRO: {
+    key: "feature_lead_broker_intro_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Quando o corretor aceita o lead, o lead recebe no número oficial o nome e o número do corretor, com uma mensagem de boas-vindas. Texto livre só dentro da janela de 24 h; fora dela, só com modelo aprovado da Meta configurado no evento.",
+  },
   DUTY_ROTATION: {
     key: "feature_duty_rotation_enabled",
     scope: "global",

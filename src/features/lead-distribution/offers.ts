@@ -1054,6 +1054,18 @@ export async function handleLeadOfferWebhookResponse(input: {
       await processMetaOutboundBatch(1, input.tenantId, confirmationOutbound.id);
     }
 
+    // The lead learns who will take care of them and the broker's number (29/10). Never blocks the accept.
+    const { sendLeadBrokerIntro } = await import("@/features/leads/lead-broker-intro");
+    await sendLeadBrokerIntro({
+      tenantId: input.tenantId,
+      leadId: result.lead.id,
+      leadName: result.lead.nome,
+      leadPhone: result.lead.telefone,
+      brokerId: result.broker.id,
+      brokerName: result.broker.name,
+      brokerPhone: result.broker.phone,
+    });
+
     // Notify other candidate brokers that lead was assigned to someone else
     const losingOffers = await db
       .select({ brokerId: schema.leadOffers.brokerId })

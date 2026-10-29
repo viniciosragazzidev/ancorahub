@@ -1,3 +1,5 @@
+import { LEAD_BROKER_INTRO_DEFAULT_MESSAGE } from "@/features/leads/lead-broker-intro-core";
+
 export const MESSAGE_RESOURCE_KINDS = ["meta_template", "free_message"] as const;
 export type MessageResourceKind = (typeof MESSAGE_RESOURCE_KINDS)[number];
 
@@ -64,6 +66,21 @@ const leadId = {
  * producer that emits the matching purpose with variables in this exact order.
  */
 export const MESSAGE_EVENT_CATALOG = [
+  {
+    key: "LEAD_BROKER_INTRODUCTION",
+    purpose: "leadBrokerIntroduction",
+    label: "Apresentação do corretor ao lead",
+    description: "Quando o corretor aceita o lead, o lead recebe no número oficial quem vai atendê-lo e o número do corretor. Fora da janela de 24 h, só sai com modelo aprovado da Meta.",
+    audience: "lead",
+    windowRule: "meta_required_without_window",
+    variables: [
+      { key: "lead_nome", label: "Nome do lead", aliases: ["nome_lead", "nome_cliente", "cliente_nome", "customer_name", "nome"], fallback: "tudo bem" },
+      { key: "corretor_nome", label: "Nome do corretor", aliases: ["corretor", "nome_corretor", "broker_name"], fallback: "Seu especialista" },
+      { key: "corretor_telefone", label: "Número do corretor", aliases: ["telefone_corretor", "broker_phone", "numero_corretor"], fallback: "" },
+      { key: "empresa", label: "Nome da empresa", aliases: ["company"], fallback: "nossa corretora" },
+    ],
+    defaultFreeMessage: LEAD_BROKER_INTRO_DEFAULT_MESSAGE,
+  },
   {
     key: "FIRST_CONTACT",
     purpose: "leadQualification",
