@@ -87,6 +87,15 @@ export function countStateSyncContacts(value: { state_sync?: Array<{ type?: stri
 }
 
 /** The business disconnected the CRM from inside the WhatsApp Business app. */
-export function readPartnerRemoved(value: { event?: string; phone_number?: string } | undefined) {
-  return value?.event === "PARTNER_REMOVED" ? { phone: digits(value.phone_number) } : null;
+export function readPartnerRemoved(value: {
+  event?: string;
+  phone_number?: string;
+  phone_number_id?: string;
+  metadata?: { phone_number_id?: string };
+} | undefined) {
+  if (value?.event !== "PARTNER_REMOVED") return null;
+  return {
+    phone: digits(value.phone_number),
+    phoneNumberId: value.phone_number_id?.trim() || value.metadata?.phone_number_id?.trim() || null,
+  };
 }

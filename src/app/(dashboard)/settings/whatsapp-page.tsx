@@ -71,7 +71,7 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
     official.embeddedSignupConfigId &&
     (!official.companyAccount?.hasCredentials || official.companyAccount.status !== "active");
 
-  const coexistenceChannels = official.channels.filter((channel) => channel.onboardingMode === "coexistence" && channel.id !== official.companyAccount?.id);
+  const coexistenceChannels = official.channels.filter((channel) => channel.onboardingMode === "coexistence");
   const canConnectCoexistence = Boolean(official.canConfigure && official.enabled && official.configured && official.appId && official.embeddedSignupConfigId);
 
   return (

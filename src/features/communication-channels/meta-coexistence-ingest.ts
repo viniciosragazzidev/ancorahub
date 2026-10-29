@@ -14,6 +14,7 @@ import {
   readPartnerRemoved,
   type CoexistenceMessage,
 } from "./meta-coexistence-events";
+import { selectPartnerRemovedChannels } from "./meta-coexistence-domain";
 import { META_CLOUD_PROVIDER } from "./types";
 
 type ChangeValue = Record<string, unknown> & { metadata?: { phone_number_id?: string; display_phone_number?: string } };
@@ -70,14 +71,20 @@ export async function ingestCoexistenceChange(input: { wabaId: string | undefine
   const db = getDatabase();
 
   if (input.field === "account_update") {
-    const removed = readPartnerRemoved(input.value as { event?: string; phone_number?: string } | undefined);
+    const removed = readPartnerRemoved(input.value as { event?: string; phone_number?: string; phone_number_id?: string; metadata?: { phone_number_id?: string } } | undefined);
     if (!removed || !input.wabaId) return { processed: 0, ignored: 1 };
-    const channels = await db.select({ id: schema.communicationChannels.id, displayPhoneNumber: schema.communicationChannels.displayPhoneNumber, createdBy: schema.communicationChannels.createdBy })
+    const channels = await db.select({ id: schema.communicationChannels.id, phoneNumberId: schema.communicationChannels.phoneNumberId, displayPhoneNumber: schema.communicationChannels.displayPhoneNumber, createdBy: schema.communicationChannels.createdBy })
       .from(schema.communicationChannels)
       .where(and(eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.wabaId, input.wabaId), eq(schema.communicationChannels.onboardingMode, "coexistence")));
-    const targets = removed.phone
-      ? channels.filter((channel) => (channel.displayPhoneNumber ?? "").replace(/\D/g, "").endsWith(removed.phone.slice(-8)))
-      : channels;
+    const targets = selectPartnerRemovedChannels({ channels, phoneNumberId: removed.phoneNumberId, phone: removed.phone });
+    if (!targets.length) {
+      console.warn("[whatsapp/coexistence] partner_removed_unmatched", {
+        wabaId: input.wabaId,
+        matchedByPhoneNumberId: Boolean(removed.phoneNumberId),
+        hasPhone: Boolean(removed.phone),
+      });
+      return { processed: 0, ignored: 1 };
+    }
     for (const channel of targets) {
       // Sending stops; the history and audit stay.
       await db.update(schema.communicationChannels).set({ status: "inactive", syncError: "Desconectado pelo aplicativo WhatsApp Business.", updatedAt: new Date() }).where(eq(schema.communicationChannels.id, channel.id));

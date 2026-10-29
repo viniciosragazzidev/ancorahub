@@ -40,7 +40,9 @@ describe("WhatsApp Business app coexistence events", () => {
 
   it("counts contacts and reads a disconnection from the app", () => {
     expect(countStateSyncContacts({ state_sync: [{ type: "contact" }, { type: "contact" }, { type: "other" }] })).toBe(2);
-    expect(readPartnerRemoved({ event: "PARTNER_REMOVED", phone_number: "+55 21 97350-7276" })).toEqual({ phone: "5521973507276" });
+    expect(readPartnerRemoved({ event: "PARTNER_REMOVED", phone_number: "+55 21 97350-7276" })).toEqual({ phone: "5521973507276", phoneNumberId: null });
+    expect(readPartnerRemoved({ event: "PARTNER_REMOVED", phone_number: "+55 21 97350-7276", metadata: { phone_number_id: "1234" } }))
+      .toEqual({ phone: "5521973507276", phoneNumberId: "1234" });
     expect(readPartnerRemoved({ event: "VERIFIED_ACCOUNT" })).toBeNull();
   });
 });

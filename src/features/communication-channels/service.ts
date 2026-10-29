@@ -21,7 +21,7 @@ import {
 import { META_CLOUD_PROVIDER } from "./types";
 import { describeUnsupportedMessage } from "./meta-unsupported-message";
 import { readCtwaAdReferral } from "./meta-ctwa-referral";
-import { channelLeadIntakeKey, parseChannelLeadIntake } from "./channel-lead-intake";
+import { channelLeadIntakeKey, parseChannelLeadIntake, resolveChannelLeadIntakeRoute } from "./channel-lead-intake";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { COEXISTENCE_WEBHOOK_FIELDS } from "./meta-coexistence-events";
 import type { MetaWebhookPayload, MetaWebhookStatus } from "./types";
@@ -340,7 +340,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           .filter((s) => s.length >= 8)
           .map((s) => sql`regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g') LIKE ${'%' + s}`);
         const leads = phoneConditions.length
-          ? await db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, qualificationState: schema.leads.qualificationState, corretorId: schema.leads.corretorId })
+        ? await db.select({ id: schema.leads.id, phone: schema.leads.telefone, queueId: schema.leads.queueId, status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, qualificationState: schema.leads.qualificationState, corretorId: schema.leads.corretorId })
               .from(schema.leads)
               .where(and(eq(schema.leads.tenantId, channel.tenantId), isNull(schema.leads.deletedAt), or(...phoneConditions)))
           : [];
@@ -368,6 +368,12 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         const channelIntake = unknownContact || coexistence
           ? parseChannelLeadIntake(await getSystemSetting(channelLeadIntakeKey(channel.id)).catch(() => null))
           : null;
+        const intakeRoute = resolveChannelLeadIntakeRoute({
+          knownLeadOrClient: !unknownContact,
+          existingLeadId: lead?.id,
+          existingLeadQueueId: lead?.queueId,
+          intake: channelIntake,
+        });
         // A number kept in the WhatsApp Business app (coexistence) has its own
         // automation there: its leads and messages are only received, the AI
         // never talks to them, unless the director turned the AI on for it.
@@ -394,12 +400,12 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           participantUserIds: [lead?.corretorId],
         }).catch(() => undefined);
 
-        if (ctwaReferral || (unknownContact && channelIntake?.enabled)) {
+        if (ctwaReferral || intakeRoute.kind === "create_lead") {
           const profileName = change.value?.contacts?.find((contact) => contact.wa_id === message.from)?.profile?.name ?? change.value?.contacts?.[0]?.profile?.name;
           const receivedAt = message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date();
           const ctwaPromise = import("./meta-ctwa-intake").then(({ ingestCtwaLead, ingestChannelLead }) => ctwaReferral
             ? ingestCtwaLead({ tenantId: channel.tenantId, phone, profileName, referral: ctwaReferral, providerMessageId: message.id, receivedAt, channelIntake, skipAiQualification })
-            : ingestChannelLead({ tenantId: channel.tenantId, channelId: channel.id, phone, profileName, providerMessageId: message.id, receivedAt, intake: channelIntake!, skipAiQualification }),
+            : ingestChannelLead({ tenantId: channel.tenantId, channelId: channel.id, phone, profileName, providerMessageId: message.id, receivedAt, intake: intakeRoute.kind === "create_lead" ? intakeRoute.intake : channelIntake!, skipAiQualification }),
           ).then(async (result) => {
             if (result.status !== "ignored") {
               await db.update(schema.whatsappMessages).set({ leadId: result.leadId })

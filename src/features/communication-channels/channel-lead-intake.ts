@@ -20,6 +20,27 @@ export type ChannelLeadIntake = {
 
 export const CHANNEL_LEAD_INTAKE_OFF: ChannelLeadIntake = { enabled: false, queueId: null, label: null, aiQualification: false };
 
+export type ChannelLeadIntakeRoute =
+  | { kind: "existing_contact"; existingLeadId: string | null; existingQueueId: string | null }
+  | { kind: "create_lead"; intake: ChannelLeadIntake }
+  | { kind: "history_only" };
+
+/** A channel's intake only creates a lead for a genuinely new contact. */
+export function resolveChannelLeadIntakeRoute(input: {
+  knownLeadOrClient: boolean;
+  existingLeadId?: string | null;
+  existingLeadQueueId?: string | null;
+  intake: ChannelLeadIntake | null;
+}): ChannelLeadIntakeRoute {
+  if (input.knownLeadOrClient) return {
+    kind: "existing_contact",
+    existingLeadId: input.existingLeadId ?? null,
+    existingQueueId: input.existingLeadQueueId ?? null,
+  };
+  if (!input.intake?.enabled || !input.intake.queueId) return { kind: "history_only" };
+  return { kind: "create_lead", intake: input.intake };
+}
+
 export function channelLeadIntakeKey(channelId: string) {
   return `channel_lead_intake_${channelId}`;
 }

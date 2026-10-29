@@ -73,7 +73,8 @@ export default async function WhatsAppIntegrationPage({ searchParams }: { search
       : Promise.resolve([] as { id: string; name: string }[]),
   ]);
 
-  const companyAccount = channels.find((channel) => channel.branchId === null && channel.isDefault) ?? channels.find((channel) => channel.branchId === null) ?? null;
+  const officialChannels = channels.filter((channel) => channel.onboardingMode !== "coexistence");
+  const companyAccount = officialChannels.find((channel) => channel.branchId === null && channel.isDefault) ?? officialChannels.find((channel) => channel.branchId === null) ?? null;
   // Lead intake of the numbers dedicated to ads (the coexistence numbers), with the queues and ad accounts to pick from.
   const [intakeRows, queues, adAccounts] = context.role === "director" ? await Promise.all([
     getSystemSettings(channels.map((channel) => channelLeadIntakeKey(channel.id))).catch(() => []),

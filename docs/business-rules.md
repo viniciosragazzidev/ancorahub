@@ -39,6 +39,7 @@ rastreabilidade. PendÃªncias que impedem uma implementaÃ§Ã£o definitiva fi
 | ID | Regra | Gatilho â†’ resultado | Origem |
 |---|---|---|---|
 | BR-020 | Lead pode entrar manualmente ou por canal autenticado do tenant. | Entrada vÃ¡lida â†’ lead, origem e evento de timeline sÃ£o criados. | RF010â€“012, RF015 |
+| BR-020A | A entrada configurada por número vale somente para contatos novos. | Contato conhecido que escreve por outro número mantém o lead e a fila atuais; contato novo entra na fila configurada no canal de origem. | DEC-161 |
 | BR-021 | O funil tem etapas ordenadas e terminais. | MudanÃ§a de etapa â†’ respeita transiÃ§Ã£o permitida e entra na timeline. | RF013 |
 | BR-022 | Perda exige motivo. | TransiÃ§Ã£o para `perdido` sem motivo â†’ recusada. | RF014 |
 | BR-023 | Novo lead elegÃ­vel entra em um ciclo sequencial de ofertas entre corretores elegÃ­veis da fila/unidade. | Lead recebido â†’ um Ãºnico corretor recebe a oferta e vira owner provisÃ³rio para enxergar o lead na carteira. Aceite (botÃ£o do WhatsApp, link da mensagem ou "Aceitar lead" no CRM Lite) confirma a titularidade: nenhum fluxo automÃ¡tico (worker, SLA de primeiro contato ou exclusÃ£o do owner) retira o lead do corretor que aceitou; o SLA apenas alerta corretor e gestÃ£o. Recusa/expiraÃ§Ã£o libera ou transfere atomicamente ao prÃ³ximo ainda nÃ£o tentado. | RF020â€“021, RF102, DEC-049, DEC-104 |

@@ -1,7 +1,7 @@
 "use server";
 
 import { randomInt, randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -23,6 +23,7 @@ import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { isMetaCloudWhatsAppEnabled } from "./service";
 import { getMetaCloudChannelActivationError } from "./channel-lifecycle";
 import { channelLeadIntakeKey } from "./channel-lead-intake";
+import { resolveMetaChannelDefault, selectUnconnectedCoexistencePhoneId } from "./meta-coexistence-domain";
 import { META_CLOUD_PROVIDER, type MetaEmbeddedSignupPayload } from "./types";
 
 const signupInput = z.object({
@@ -112,13 +113,25 @@ export async function completeMetaEmbeddedSignupAction(rawInput: MetaEmbeddedSig
   let wabaId = input.wabaId;
   let phoneNumberId = input.phoneNumberId;
 
-  if (coexistence && wabaId && !phoneNumberId) {
+  if (coexistence && !phoneNumberId) {
+    if (!wabaId) {
+      const discovered = await discoverMetaWabaAndPhone(accessToken);
+      businessId = businessId || discovered.businessId;
+      wabaId = wabaId || discovered.wabaId;
+    }
+    if (!wabaId) throw new Error("A Meta não retornou a conta WhatsApp Business. Refaça o cadastro.");
     // The coexistence finish event carries only the WABA: take its number
     // that is kept in the app and not connected yet, never the first listed.
-    const connected = await db.select({ phoneNumberId: schema.communicationChannels.phoneNumberId }).from(schema.communicationChannels).where(eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER));
-    const connectedIds = new Set(connected.map((row) => row.phoneNumberId));
+    const connected = await db.select({ phoneNumberId: schema.communicationChannels.phoneNumberId }).from(schema.communicationChannels)
+      .where(inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api"]));
+    const connectedIds = new Set(connected.map((row) => row.phoneNumberId).filter((id): id is string => Boolean(id)));
     const candidates = await listMetaWabaCoexistencePhones(wabaId, accessToken);
-    phoneNumberId = (candidates.find((phone) => !connectedIds.has(phone.id)) ?? candidates[0])?.id;
+    phoneNumberId = selectUnconnectedCoexistencePhoneId({ candidates, connectedPhoneNumberIds: connectedIds }) ?? undefined;
+    if (!phoneNumberId) {
+      throw new Error(candidates.length
+        ? "Todos os números desta conta já estão conectados."
+        : "A Meta não encontrou números do aplicativo WhatsApp Business nesta conta.");
+    }
   }
   if (!wabaId || !phoneNumberId || !businessId) {
     const discovered = await discoverMetaWabaAndPhone(accessToken);
@@ -135,13 +148,17 @@ export async function completeMetaEmbeddedSignupAction(rawInput: MetaEmbeddedSig
   }
   await subscribeWabaToApp(wabaId, accessToken);
 
-  const [existing] = await db.select().from(schema.communicationChannels).where(and(eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.phoneNumberId, phoneNumberId))).limit(1);
+  const [existing] = await db.select().from(schema.communicationChannels).where(and(inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api"]), eq(schema.communicationChannels.phoneNumberId, phoneNumberId))).limit(1);
   if (existing && existing.tenantId !== context.tenantId) throw new Error("Este número oficial já está vinculado a outra corretora.");
-  const [currentDefault] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true))).limit(1);
+  const [currentDefault] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, context.tenantId), inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api"]), isNull(schema.communicationChannels.branchId), ne(schema.communicationChannels.onboardingMode, "coexistence"), eq(schema.communicationChannels.isDefault, true))).limit(1);
   // A coexistence number joins as an additional number; the default one keeps
   // the notices and templates. A new standard number still replaces nothing.
   if (!coexistence && currentDefault && currentDefault.id !== existing?.id) throw new Error("Esta corretora já possui um canal oficial ativo. Desconecte-o antes de trocar o número.");
-  const isDefault = existing ? existing.isDefault : !currentDefault;
+  const isDefault = resolveMetaChannelDefault({
+    coexistence,
+    existingIsDefault: existing?.isDefault ?? false,
+    currentDefaultExists: Boolean(currentDefault),
+  });
   const config = getMetaCloudServerConfig();
   const now = new Date();
   const common = { tenantId: context.tenantId, branchId: null, ownerUserId: null, provider: META_CLOUD_PROVIDER, channelType: "shared", businessId, wabaId, phoneNumberId, displayPhoneNumber: phone.display_phone_number ?? null, verifiedName: phone.verified_name ?? null, qualityRating: phone.quality_rating ?? null, messagingLimit: phone.messaging_limit_tier ?? null, registrationErrorCode: null, accessTokenCiphertext: encryptChannelSecret(accessToken, config.tokenEncryptionKey), tokenKeyVersion: "v1", tokenExpiresAt: token.expires_in ? new Date(now.getTime() + token.expires_in * 1000) : null, updatedAt: now };
