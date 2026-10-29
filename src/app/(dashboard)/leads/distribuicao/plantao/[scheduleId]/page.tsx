@@ -33,7 +33,9 @@ import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { getCachedLeadsBranches, getCachedLeadsBrokers, getCachedSlaSettings } from "@/features/leads/reference-data";
 import { DutyLeadDetailsTrigger } from "../_components/duty-lead-details-trigger";
 import { BrokerDayHistoryTrigger } from "../_components/broker-day-history-trigger";
-import { BrokerOccurrenceCard } from "../_components/broker-occurrence-card";
+import { BrokerOccurrenceCard, type BrokerTurn } from "../_components/broker-occurrence-card";
+import { getDutyQueueOrderPreviews } from "@/features/lead-distribution/duty-queue-order-queries";
+import { DutyTurnAutoRefresh } from "../_components/duty-turn-auto-refresh";
 import { BrokerPresenceInviteButton } from "../_components/broker-presence-invite-button";
 import { BrokerPresenceReleaseButton } from "../_components/broker-presence-release-button";
 import { BrokerPauseButton } from "../_components/broker-pause-button";
@@ -215,6 +217,31 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled"),
   ]);
   const drawerContextRole = managementActionsSetting !== "false" ? context.role : "broker";
+  // Rotation (29/10): who is receiving now, who is next and who received last, on the broker cards.
+  // The same preview as the Plantão tab; if it fails the cards just show without the turn.
+  const turnPreview = directorLite && schedule.status === "active" && isDutyWindowActive(liveWindow, now)
+    ? (await getDutyQueueOrderPreviews(context, now).catch((error: unknown) => {
+      console.error("[plantao] duty_turn_preview_failed", { scheduleId: schedule.id, error: error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 400) : "UnknownError" });
+      return [];
+    })).find((preview) => preview.scheduleId === schedule.id && preview.rotation) ?? null
+    : null;
+  const turnOf = (brokerId: string): BrokerTurn | null => {
+    if (!turnPreview) return null;
+    const position = turnPreview.order.findIndex((item) => item.id === brokerId);
+    const skips = [...turnPreview.order, ...turnPreview.blocked].find((item) => item.id === brokerId)?.skips ?? 0;
+    const role = turnPreview.current?.id === brokerId ? "current"
+      : position === 0 ? "next"
+        : turnPreview.previous?.id === brokerId ? "previous" : null;
+    return { role, position: position >= 0 ? position + 1 : null, outcome: role === "previous" ? turnPreview.previous?.outcome ?? null : null, skips };
+  };
+  // Cards in the order of the turn: receiving now, then the queue (next first), then who cannot receive now.
+  const turnRank = (brokerId: string) => {
+    if (!turnPreview) return 0;
+    if (turnPreview.current?.id === brokerId) return -1;
+    const position = turnPreview.order.findIndex((item) => item.id === brokerId);
+    return position >= 0 ? position : turnPreview.order.length + 1;
+  };
+  const byTurn = <T extends { brokerId: string }>(entries: T[]) => turnPreview ? [...entries].sort((left, right) => turnRank(left.brokerId) - turnRank(right.brokerId)) : entries;
   const returnedUnaccepted = await getReturnedUnacceptedLeadIds(context.tenantId, allLeads.map((lead) => lead.id));
   const canExportReport = hasCapability(context.role, "exportar_relatorios_operacionais", context.jobTitle);
 
@@ -641,6 +668,8 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
               : presenceEnabled ? "Acompanhe quem confirmou presença neste turno." : "Quem está na escala ativa deste plantão agora."}
           />
           <CardContent className="space-y-3" role={presenceEnabled ? "group" : undefined} aria-label={presenceEnabled ? "Status de confirmação dos corretores escalados" : undefined}>
+            {turnPreview ? <DutyTurnAutoRefresh /> : null}
+            {turnPreview ? <p className="text-xs text-muted-foreground">Rodízio: cada um tem sua vez, na ordem em que chegou. Quem recebe vai para o fim; lead expirado ou recusado gasta a vez e conta como pulo.</p> : null}
             {/* Escalar alguém neste plantão sem sair da página (mesma regra da Escala publicada). */}
             {context.role === "director" ? (
               <ScheduleEscalarButton
@@ -664,7 +693,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   </h3>
                 ) : null}
                 {section.entries.length ? ([
-                  { key: "active", label: "Ativos", entries: section.entries.filter((entry) => !entry.absent) },
+                  { key: "active", label: "Ativos", entries: byTurn(section.entries.filter((entry) => !entry.absent)) },
                   { key: "absent", label: "Faltaram", entries: section.entries.filter((entry) => entry.absent) },
                 ]).map((group) => <section key={group.key} aria-label={group.label} className="space-y-2">
                   <h4 className="text-xs font-semibold text-muted-foreground">{group.label} <Badge variant="outline">{group.entries.length}</Badge></h4>
@@ -672,6 +701,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
               <BrokerOccurrenceCard
                 key={`${section.key}:${entry.id}`}
                 directorLite={directorLite}
+                turn={entry.absent ? null : turnOf(entry.brokerId)}
                 scheduleId={schedule.id}
                 leadsSince={leadsSinceOption}
                 assignmentId={entry.id}

@@ -1,0 +1,79 @@
+/* Turn of the plantão rotation on the broker cards (29/10). Blue is the only accent. */
+.card {
+  transition: border-color var(--duration-fast, 160ms) var(--ease-standard, ease), background-color var(--duration-fast, 160ms) var(--ease-standard, ease);
+}
+
+.card[data-turn="current"] {
+  border-color: var(--primary);
+  animation: turnPulse 2.4s var(--ease-standard, ease-in-out) infinite;
+}
+
+.card[data-turn="next"] {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 4%, var(--card, var(--background)));
+}
+
+.card[data-turn="previous"] {
+  background: var(--surface-muted, var(--muted));
+}
+
+.turnBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 1.5rem;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+  background: var(--card, var(--background));
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.turnBadge[data-turn="current"] {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.turnBadge[data-turn="next"] {
+  border-color: var(--primary);
+  color: var(--primary-foreground, white);
+  background: var(--primary);
+}
+
+.liveDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--primary);
+  animation: liveDot 1.2s var(--ease-standard, ease-in-out) infinite;
+}
+
+.skips {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+@keyframes turnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 26%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--primary) 0%, transparent); }
+}
+
+@keyframes liveDot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+html[data-reduce-motion="1"] .card,
+html[data-reduce-motion="1"] .liveDot {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .liveDot {
+    animation: none;
+  }
+}

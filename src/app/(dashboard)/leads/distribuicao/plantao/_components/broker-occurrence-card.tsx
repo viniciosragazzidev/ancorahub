@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, type ReactNode } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Clock3 } from "lucide-react";
@@ -19,6 +20,8 @@ import { BrokerCapacityBar, BrokerLiveStatus } from "./broker-live-status";
 import { DutySwapDoneNotice, DutySwapPicker } from "./duty-swap-picker";
 import { swapNoticeText, whatsappStatusLabel, type SwapNotice } from "@/features/lead-distribution/duty-swap";
 import type { DutySwapResult } from "@/features/lead-distribution/duty-swap-actions";
+import { motionTokens } from "@/components/arc/motion-tokens";
+import turnStyles from "./broker-turn.module.css";
 
 const dateTime = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
 const LITE_NO_RECORD_LABEL = "Sem registro";
@@ -42,10 +45,24 @@ export type BrokerOccurrenceSummary = {
   leadsAfternoon: number;
 };
 
-export function BrokerOccurrenceCard({ children, directorLite = false, summary, scheduleId, leadsSince = "plantao", assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null, onSiteReleaseOpen = onSitePending, presenceReleaseNote = null, scheduleAttendanceMode = attendanceMode, canSetAttendanceMode = false, canSwap = false, swapNotice = null }: {
+/** Rotation (29/10): where this broker stands in the plantão's turn right now. */
+export type BrokerTurn = {
+  role: "current" | "next" | "previous" | null;
+  /** Place in the queue among those who can receive now (1 = next). */
+  position: number | null;
+  /** Previous turn: accepted or skipped. */
+  outcome?: "accepted" | "skip" | "waiting" | null;
+  skips?: number;
+};
+
+const TURN_LABEL = { current: "Recebendo agora", next: "Próximo", previous: "Recebeu por último" } as const;
+const OUTCOME_LABEL = { accepted: "aceitou", skip: "pulou a vez", waiting: "aguardando" } as const;
+
+export function BrokerOccurrenceCard({ children, directorLite = false, summary, turn = null, scheduleId, leadsSince = "plantao", assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null, onSiteReleaseOpen = onSitePending, presenceReleaseNote = null, scheduleAttendanceMode = attendanceMode, canSetAttendanceMode = false, canSwap = false, swapNotice = null }: {
   children?: ReactNode;
   directorLite?: boolean;
   summary?: BrokerOccurrenceSummary;
+  turn?: BrokerTurn | null;
   scheduleId: string;
   /** The page's "considerar leads a partir de" choice. */
   leadsSince?: string;
@@ -80,6 +97,7 @@ export function BrokerOccurrenceCard({ children, directorLite = false, summary, 
   swapNotice?: SwapNotice | null;
 }) {
   const [open, setOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
   const [leads, setLeads] = useState<LeadResult["leads"] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, startLoading] = useTransition();
@@ -185,8 +203,9 @@ export function BrokerOccurrenceCard({ children, directorLite = false, summary, 
     });
   }
 
-  return <>
-    <div className="relative flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border/70 px-3 py-2.5">
+  // The turn shows only in the Director Lite (29/10); the legacy card keeps its exact markup.
+  const showTurn = directorLite && Boolean(turn);
+  const cardBody = <>
       <button type="button" onClick={show} className="absolute inset-0 rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Abrir detalhes de ${brokerName} neste plantão`} />
       <div className="pointer-events-none relative z-10 flex w-full items-center justify-between gap-3 [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
         {directorLite && summary ? (
@@ -214,7 +233,41 @@ export function BrokerOccurrenceCard({ children, directorLite = false, summary, 
           </div>
         ) : children}
     </div>
+  </>;
+  const turnRole = turn?.role ?? null;
+  return <>
+    {/* layout: when the turn moves, the cards slide to their new place in the queue (29/10). */}
+    {showTurn ? (
+    <motion.div
+      layout={reduceMotion ? false : "position"}
+      transition={reduceMotion ? { duration: 0 } : motionTokens.spring.smooth}
+      data-turn={turnRole ?? undefined}
+      className={cn("relative flex flex-col gap-2 rounded-[var(--radius-card)] border border-border/70 px-3 py-2.5", turnStyles.card)}
+    >
+      {turn && (turnRole || turn.position) ? (
+        <div className="pointer-events-none relative z-10 flex items-center gap-2">
+          <motion.span
+            key={`${turnRole ?? "queue"}:${turn.position ?? ""}`}
+            className={turnStyles.turnBadge}
+            data-turn={turnRole ?? "queue"}
+            initial={reduceMotion ? false : { opacity: 0, y: -4, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={reduceMotion ? { duration: 0 } : motionTokens.spring.snappy}
+          >
+            {turnRole === "current" ? <span className={turnStyles.liveDot} aria-hidden="true" /> : null}
+            {turnRole ? TURN_LABEL[turnRole] : `${turn.position}º na vez`}
+            {turnRole === "previous" && turn.outcome ? ` · ${OUTCOME_LABEL[turn.outcome]}` : null}
+          </motion.span>
+          {turn.skips ? <span className={turnStyles.skips}>{turn.skips} {turn.skips === 1 ? "pulo" : "pulos"} hoje</span> : null}
+        </div>
+      ) : null}
+      {cardBody}
+    </motion.div>
+    ) : (
+    <div className="relative flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border/70 px-3 py-2.5">
+      {cardBody}
     </div>
+    )}
     <DetailDrawer open={open} onOpenChange={setOpen} size="lg" title={brokerName} description={`${branchName ?? "Sem unidade"} · corretor nesta ocorrência do plantão`} summary={<div className="flex flex-wrap gap-2">
       <Badge variant={absent ? "destructive" : presenceStatus === "confirmed" ? "success" : "warning"}>{absent ? "Faltou" : presenceStatus === "confirmed" ? "Presença confirmada" : "Aguardando presença"}</Badge>
       <Badge variant="outline">{paused || onSitePending ? "Pausado" : "Ativo"}</Badge>
