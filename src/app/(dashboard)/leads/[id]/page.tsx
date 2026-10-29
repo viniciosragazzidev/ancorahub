@@ -109,7 +109,9 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
       })) {
         return <ExpiredOfferLandingScreen />;
       }
-      // Any other access by a non-owner keeps the page's existing rules (e.g. a pending offer).
+      // A non-owner broker only reaches a lead through an offer still open (PENDING) or as its former
+      // owner (ACCEPTED, for the redistributed notice). Anyone else would see personal data by id.
+      if (latestOffer?.status !== "PENDING" && latestOffer?.status !== "ACCEPTED") notFound();
     }
   }
   if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
