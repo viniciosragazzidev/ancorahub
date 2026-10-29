@@ -5,7 +5,7 @@ import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { ArrowsClockwise } from "@/components/huge-icons";
 import { GripVertical } from "lucide-react";
@@ -16,7 +16,7 @@ import { motionTokens } from "@/components/arc/motion-tokens";
 import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
 import { mergeEligibleOrderKeepingBlockedSlots } from "@/features/lead-distribution/duty-queue-order";
 import { resetDutyManualQueueAction, saveDutyManualQueueAction } from "@/features/lead-distribution/duty-queue-order-actions";
-import type { DutyQueueOrderPreview } from "@/features/lead-distribution/duty-queue-order-queries";
+import type { DutyBrokerTurnStats, DutyQueueOrderPreview } from "@/features/lead-distribution/duty-queue-order-queries";
 import { cn } from "@/lib/utils";
 
 import styles from "./duty-queue-order-board.module.css";
@@ -50,18 +50,74 @@ function dateLabel(value: string) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", timeZone }).format(date);
 }
 
+const clock = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone });
+
+function acceptLabel(seconds: number | null) {
+  if (seconds === null) return null;
+  if (seconds < 60) return `aceita em ${seconds}s`;
+  return `aceita em ~${Math.round(seconds / 60)} min`;
+}
+
+/** Rotation line of a broker: turns, skips, how fast they accept and when they arrived. */
+function turnStatsLine(stats: DutyBrokerTurnStats) {
+  return [
+    `${stats.turns} ${stats.turns === 1 ? "vez" : "vezes"}`,
+    stats.skips ? `${stats.skips} ${stats.skips === 1 ? "pulo" : "pulos"}` : null,
+    acceptLabel(stats.avgAcceptSeconds),
+    stats.arrivedAt ? `chegou ${clock.format(new Date(stats.arrivedAt))}` : null,
+  ].filter(Boolean).join(" · ");
+}
+
+const OUTCOME_LABEL = { accepted: "Aceitou", skip: "Pulou a vez", waiting: "Aguardando" } as const;
+
+/**
+ * Anterior, atual and próximo of the rotation. Each slot is keyed by the broker, so when the turn
+ * moves the names slide one step to the left; the current one keeps a slow pulse while waiting.
+ */
+function TurnStrip({ preview, nextId, nextName, reduceMotion }: { preview: DutyQueueOrderPreview; nextId: string | null; nextName: string | null; reduceMotion: boolean }) {
+  const slots = [
+    { role: "previous", label: "Anterior", id: preview.previous?.id ?? null, name: preview.previous?.name ?? null, detail: preview.previous ? `${OUTCOME_LABEL[preview.previous.outcome]} · ${clock.format(new Date(preview.previous.offeredAt))}` : "Ninguém ainda" },
+    { role: "current", label: "Recebendo agora", id: preview.current?.id ?? null, name: preview.current?.name ?? null, detail: preview.current ? `Aguardando aceite desde ${clock.format(new Date(preview.current.offeredAt))}` : "Nenhum lead em oferta" },
+    { role: "next", label: "Próximo", id: nextId, name: nextName, detail: nextId ? "Recebe o próximo lead" : "Ninguém disponível" },
+  ] as const;
+  return (
+    <div className={styles.turnStrip} role="group" aria-label={`Vez no ${preview.scheduleName}`}>
+      {slots.map((slot) => (
+        <div key={slot.role} className={styles.turnSlot} data-turn={slot.role} data-empty={slot.id ? undefined : "true"}>
+          <span className={styles.turnLabel}>{slot.label}</span>
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span
+              key={slot.id ?? "empty"}
+              className={styles.turnPerson}
+              initial={reduceMotion ? false : { opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -16 }}
+              transition={reduceMotion ? { duration: 0 } : motionTokens.spring.smooth}
+            >
+              <span className={styles.turnName}>{slot.name ?? "Sem corretor"}</span>
+              <span className={styles.turnDetail}>{slot.detail}</span>
+            </motion.span>
+          </AnimatePresence>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SortableBrokerRow({
   preview,
   position,
   canReorder,
   tied,
   reduceMotion,
+  rotation,
 }: {
   preview: DutyQueueOrderPreview["order"][number];
   position: number;
   canReorder: boolean;
   tied: boolean;
   reduceMotion: boolean;
+  rotation: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: preview.id, disabled: !canReorder });
   return (
@@ -96,7 +152,9 @@ function SortableBrokerRow({
           {tied ? <span className={styles.tieBadge}>Empate no sorteio</span> : null}
         </span>
         <span className={styles.meta}>
-          {preview.receivedInDuty} {preview.receivedInDuty === 1 ? "indicação" : "indicações"} na operação · {preview.activeLeads} {preview.activeLeads === 1 ? "lead" : "leads"} no plantão
+          {rotation
+            ? turnStatsLine(preview)
+            : `${preview.receivedInDuty} ${preview.receivedInDuty === 1 ? "indicação" : "indicações"} na operação · ${preview.activeLeads} ${preview.activeLeads === 1 ? "lead" : "leads"} no plantão`}
         </span>
       </span>
       {canReorder ? <span className={styles.position} aria-hidden="true">{position}º</span> : null}
@@ -171,7 +229,7 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
       toast.error(result.reason);
       return;
     }
-    toast.success("Fila voltou ao automático.");
+    toast.success(preview.rotation ? "Fila voltou à ordem de chegada." : "Fila voltou ao automático.");
     router.refresh();
   }
 
@@ -215,6 +273,8 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
             });
             const tieIds = new Set(preview.order.filter((item) => item.tie).map((item) => item.id));
             const isSaving = savingScheduleId === preview.scheduleId;
+            // In the rotation the broker receiving now is already shown in the turn strip.
+            const blockedRows = preview.rotation && preview.current ? preview.blocked.filter((entry) => entry.id !== preview.current!.id) : preview.blocked;
             return (
               <Card key={preview.scheduleId} variant="overview" className={styles.card}>
                 <CardHeader className={styles.cardHeader}>
@@ -223,17 +283,24 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
                     <p className={styles.queueName}>{preview.queueName}</p>
                   </div>
                   <div className={styles.headerActions}>
-                    {preview.manual ? <span className={styles.manualState}>Fila manual</span> : null}
-                    {canReorder && preview.manual ? (
+                    {preview.rotation ? <span className={styles.manualState}>Rodízio</span> : preview.manual ? <span className={styles.manualState}>Fila manual</span> : null}
+                    {canReorder && (preview.manual || preview.rotation) ? (
                       <Button type="button" size="sm" variant="outline" disabled={isSaving} onClick={() => { void resetOrder(preview); }} className={styles.resetButton}>
                         <ArrowsClockwise className="size-4" aria-hidden="true" />
-                        Voltar ao automático
+                        {preview.rotation ? "Restaurar ordem de chegada" : "Voltar ao automático"}
                       </Button>
                     ) : null}
                   </div>
                 </CardHeader>
                 <CardContent className={styles.body}>
-                  <p className={styles.note}>{isSaving ? "Salvando a ordem…" : preview.manual ? "O corretor disponível no início da fila recebe e vai para o fim." : "Ordem automática, com indicação quando houver empate."}</p>
+                  {preview.rotation ? (
+                    <TurnStrip preview={preview} nextId={orderedRows[0]?.id ?? null} nextName={orderedRows[0]?.name ?? null} reduceMotion={reduceMotion} />
+                  ) : null}
+                  <p className={styles.note}>{isSaving
+                    ? "Salvando a ordem…"
+                    : preview.rotation
+                      ? "Cada um tem sua vez, na ordem em que chegou: quem recebe vai para o fim. Lead expirado ou recusado gasta a vez e conta como pulo; no 3º pulo o corretor entra em pausa."
+                      : preview.manual ? "O corretor disponível no início da fila recebe e vai para o fim." : "Ordem automática, com indicação quando houver empate."}</p>
                   {orderedRows.length ? (
                     <DndContext
                       id={`duty-queue-${preview.scheduleId}`}
@@ -247,24 +314,25 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
                           {orderedRows.map((item, index) => (
                             <SortableBrokerRow
                               key={item.id}
-                              preview={{ ...item, isNext: preview.manual ? index === 0 : item.isNext }}
+                              preview={{ ...item, isNext: preview.manual || preview.rotation ? index === 0 : item.isNext }}
                               position={index + 1}
                               canReorder={canReorder && !isSaving}
-                              tied={!preview.manual && tieIds.has(item.id)}
+                              tied={!preview.manual && !preview.rotation && tieIds.has(item.id)}
                               reduceMotion={reduceMotion}
+                              rotation={preview.rotation}
                             />
                           ))}
                         </ol>
                       </SortableContext>
                     </DndContext>
                   ) : <p className={styles.empty}>Ninguém está disponível para receber agora.</p>}
-                  {preview.blocked.length ? (
+                  {blockedRows.length ? (
                     <div className={styles.blocked}>
                       <p className={styles.blockedTitle}>Bloqueados nesta rodada</p>
-                      {preview.blocked.map((entry) => (
+                      {blockedRows.map((entry) => (
                         <div key={entry.id} className={styles.blockedRow}>
                           <span className={styles.blockedName}>{entry.name}</span>
-                          <span className={styles.blockedReason}>{entry.reason}</span>
+                          <span className={styles.blockedReason}>{preview.rotation && entry.skips ? `${entry.reason} · ${entry.skips} ${entry.skips === 1 ? "pulo" : "pulos"}` : entry.reason}</span>
                         </div>
                       ))}
                     </div>

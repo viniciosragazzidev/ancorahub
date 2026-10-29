@@ -9,7 +9,9 @@ import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { findRunningDutySchedule, OVERNIGHT_LEADS_UNTIL } from "./duty-presence-domain";
 import { operationDayStart } from "./broker-day-history";
 import { countReceivedInDayByBroker, getDutyScheduleReceiptScope, NON_COUNTING_OFFER_STATUS, overnightExtraReceiptGap, type DayReceipt } from "./received-in-day";
-import { getOvernightExtraShiftSettings } from "./duty-presence";
+import { getOvernightExtraShiftSettings, isDutyRotationEnabled } from "./duty-presence";
+import { getSaoPauloDateKey } from "./dated-duty-roster";
+import { isSkipOfferStatus, rotationArrivalOrder } from "./duty-rotation";
 import { dutyQueueHistorySince, manualQueueSettingKey, parseManualQueueValue, previewQueueOrder, reconcileManualQueueOrder, type DutyQueueCandidate } from "./duty-queue-order";
 
 export type DutyQueueOrderPreview = {
@@ -18,11 +20,28 @@ export type DutyQueueOrderPreview = {
   scheduleName: string;
   queueName: string;
   strategy: AssignmentStrategy;
-  order: Array<{ id: string; name: string; receivedInDuty: number; activeLeads: number; position: number; isNext: boolean; tie: boolean }>;
-  blocked: Array<{ id: string; name: string; reason: string }>;
+  order: Array<{ id: string; name: string; receivedInDuty: number; activeLeads: number; position: number; isNext: boolean; tie: boolean } & DutyBrokerTurnStats>;
+  blocked: Array<{ id: string; name: string; reason: string } & DutyBrokerTurnStats>;
   savedBrokerIds: string[];
   manual: boolean;
+  /** Rotation by arrival (29/10): the queue always rotates; "manual" then only means the director reordered it. */
+  rotation: boolean;
+  /** Offer of this plantão awaiting acceptance right now. */
+  current: { id: string; name: string; offeredAt: string } | null;
+  /** Last turn of this plantão before the current one. */
+  previous: { id: string; name: string; offeredAt: string; outcome: "accepted" | "skip" | "waiting" } | null;
 };
+
+/** Today in this plantão, per broker: turns, skips and how fast they accept. */
+export type DutyBrokerTurnStats = {
+  turns: number;
+  skips: number;
+  accepted: number;
+  avgAcceptSeconds: number | null;
+  arrivedAt: string | null;
+};
+
+const ACTIVE_OFFER = new Set(["PENDING", "SENT", "DELIVERED", "READ"]);
 
 function getBlockedReason(status: string, reason: string | null, availability: string | null) {
   if (availability && availability !== "available") return "Indisponível na equipe";
@@ -113,9 +132,22 @@ export async function getDutyQueueOrderPreviews(context: TenantContext, now = ne
     blocked: [],
     savedBrokerIds: [],
     manual: false,
+    rotation: false,
+    current: null,
+    previous: null,
   }));
 
   const since = operationDayStart(now);
+  const rotationEnabled = await isDutyRotationEnabled();
+  const todayStart = new Date(`${getSaoPauloDateKey(now)}T00:00:00-03:00`);
+  const runningIds = running.map(({ schedule }) => schedule.id);
+  const [turnOffers, arrivals] = await Promise.all([
+    db.select({ brokerId: schema.leadOffers.brokerId, scheduleId: schema.leadOffers.dutyScheduleId, status: schema.leadOffers.status, offeredAt: schema.leadOffers.offeredAt, acceptedAt: schema.leadOffers.acceptedAt, expiresAt: schema.leadOffers.expiresAt })
+      .from(schema.leadOffers).where(and(eq(schema.leadOffers.tenantId, context.tenantId), inArray(schema.leadOffers.dutyScheduleId, runningIds), gte(schema.leadOffers.offeredAt, todayStart), ne(schema.leadOffers.status, NON_COUNTING_OFFER_STATUS)))
+      .orderBy(asc(schema.leadOffers.offeredAt)),
+    db.select({ brokerId: schema.dutyPresenceConfirmations.brokerId, scheduleId: schema.dutyPresenceConfirmations.scheduleId, dutyDate: schema.dutyPresenceConfirmations.dutyDate, confirmedAt: schema.dutyPresenceConfirmations.confirmedAt })
+      .from(schema.dutyPresenceConfirmations).where(and(eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId), inArray(schema.dutyPresenceConfirmations.scheduleId, runningIds), eq(schema.dutyPresenceConfirmations.status, "confirmed"))),
+  ]);
   // Same rule as the distribution: the closed night extra's leads do not level the regular plantão.
   const extraSettings = await getOvernightExtraShiftSettings();
   const extraGap = extraSettings.enabled ? overnightExtraReceiptGap(now, extraSettings.startsAt, OVERNIGHT_LEADS_UNTIL) : null;
@@ -162,6 +194,24 @@ export async function getDutyQueueOrderPreviews(context: TenantContext, now = ne
 
   return running.map(({ schedule, dutyDate: occurrenceDate }, index) => {
     const roster = allRoster.filter((entry) => entry.scheduleId === schedule.id);
+    const scheduleOffers = turnOffers.filter((offer) => offer.scheduleId === schedule.id);
+    const arrivedAtByBroker = new Map(arrivals
+      .filter((arrival) => arrival.scheduleId === schedule.id && arrival.dutyDate === occurrenceDate && arrival.confirmedAt)
+      .map((arrival) => [arrival.brokerId, arrival.confirmedAt!] as const));
+    const statsOf = (brokerId: string): DutyBrokerTurnStats => {
+      const offersOfBroker = scheduleOffers.filter((offer) => offer.brokerId === brokerId);
+      const acceptSeconds = offersOfBroker.flatMap((offer) => offer.acceptedAt ? [(offer.acceptedAt.getTime() - offer.offeredAt.getTime()) / 1000] : []);
+      return {
+        turns: offersOfBroker.length,
+        skips: offersOfBroker.filter((offer) => isSkipOfferStatus(offer.status)).length,
+        accepted: offersOfBroker.filter((offer) => offer.status === "ACCEPTED").length,
+        avgAcceptSeconds: acceptSeconds.length ? Math.round(acceptSeconds.reduce((total, value) => total + value, 0) / acceptSeconds.length) : null,
+        arrivedAt: arrivedAtByBroker.get(brokerId)?.toISOString() ?? null,
+      };
+    };
+    const nameOf = (brokerId: string) => roster.find((entry) => entry.brokerId === brokerId)?.brokerName ?? "Corretor";
+    const activeOffer = [...scheduleOffers].reverse().find((offer) => ACTIVE_OFFER.has(offer.status) && offer.expiresAt > now) ?? null;
+    const lastTurn = [...scheduleOffers].reverse().find((offer) => offer !== activeOffer) ?? null;
     const scheduleBrokerIds = roster.map((entry) => entry.brokerId);
     const scheduleIdByBroker = Object.fromEntries(scheduleBrokerIds.map((brokerId) => [brokerId, schedule.id]));
     const accessibleQueues = linkedQueuesByProfile[index];
@@ -200,13 +250,17 @@ export async function getDutyQueueOrderPreviews(context: TenantContext, now = ne
       if (policy.allowedBrokerIds?.length && !policy.allowedBrokerIds.includes(candidate.id)) return { ...candidate, blockedReason: "Fora da política da fila" };
       return candidate;
     });
+    // Rotation: the saved queue or, before the first lead, the order of arrival; late arrivals go to the end.
+    const rotation = rotationEnabled && hasExplicitDutyScope;
+    const arrivalOrder = rotationArrivalOrder(roster.map((entry) => ({ brokerId: entry.brokerId, arrivedAt: arrivedAtByBroker.get(entry.brokerId) ?? null })));
+    const rotationOrder = rotation ? reconcileManualQueueOrder(manualBySchedule.get(schedule.id) ?? [], arrivalOrder) : null;
     const preview = previewQueueOrder({
       candidates,
       policy,
       strategy,
       receivedByBroker: countingScope,
       tierByBroker: Object.fromEntries(scheduleBrokerIds.map((brokerId) => [brokerId, 0])),
-      manualBrokerIds: manualBySchedule.get(schedule.id),
+      manualBrokerIds: rotationOrder ?? manualBySchedule.get(schedule.id),
     });
     const savedBrokerIds = reconcileManualQueueOrder(
       manualBySchedule.get(schedule.id) ?? [...preview.order.map((candidate) => candidate.id), ...preview.blocked.map((candidate) => candidate.id)],
@@ -219,10 +273,18 @@ export async function getDutyQueueOrderPreviews(context: TenantContext, now = ne
       scheduleName: schedule.name,
       queueName: linked.map((queue) => queue.name).join(", ") || accessibleQueues.map((queue) => queue.name).join(", ") || "Fila geral",
       strategy,
-      order: preview.order.map((candidate, position) => ({ id: candidate.id, name: candidate.name, receivedInDuty: candidate.receivedInDuty ?? 0, activeLeads: candidate.activeLeads, position: position + 1, isNext: candidate.id === preview.nextBrokerId, tie: tied.has(candidate.id) })),
-      blocked: preview.blocked.map((candidate) => ({ id: candidate.id, name: candidate.name, reason: candidate.blockedReason })),
+      order: preview.order.map((candidate, position) => ({ id: candidate.id, name: candidate.name, receivedInDuty: candidate.receivedInDuty ?? 0, activeLeads: candidate.activeLeads, position: position + 1, isNext: candidate.id === preview.nextBrokerId, tie: tied.has(candidate.id), ...statsOf(candidate.id) })),
+      blocked: preview.blocked.map((candidate) => ({ id: candidate.id, name: candidate.name, reason: candidate.blockedReason, ...statsOf(candidate.id) })),
       savedBrokerIds,
-      manual: preview.manual,
+      manual: rotation ? false : preview.manual,
+      rotation,
+      current: activeOffer ? { id: activeOffer.brokerId, name: nameOf(activeOffer.brokerId), offeredAt: activeOffer.offeredAt.toISOString() } : null,
+      previous: lastTurn ? {
+        id: lastTurn.brokerId,
+        name: nameOf(lastTurn.brokerId),
+        offeredAt: lastTurn.offeredAt.toISOString(),
+        outcome: lastTurn.status === "ACCEPTED" ? "accepted" : isSkipOfferStatus(lastTurn.status) ? "skip" : "waiting",
+      } : null,
     };
   });
 }
