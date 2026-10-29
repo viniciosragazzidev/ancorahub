@@ -202,6 +202,15 @@
   overflow: hidden;
 }
 
+/* The client profile column scrolls on its own (29/10): the pane rule above hides overflow for the
+   rounded corners, which cut the profile with no way to reach its bottom. */
+.root [data-lite="pane"][aria-label="Perfil do cliente"],
+.root[data-skin="diretor"] [data-conversations-part="pane"][aria-label="Perfil do cliente"] {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .root[data-skin="diretor"] [data-conversations-part="message-history"] {
   flex: 1 1 0%;
   min-height: 0;
