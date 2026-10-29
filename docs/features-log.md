@@ -606,4 +606,4 @@ O preview limita o histórico agregado de leads e tentativas a 30 dias e compart
 
 ## 2026-10-29 - Coexistência de vários números WhatsApp
 
-Cada número Coex pode direcionar novos contatos para sua própria fila, sem deslocar leads conhecidos. O cadastro não reutiliza números já conectados; eventos de remoção da Meta só desligam o canal identificado. Respostas a clientes usam o número da mensagem inbound mais recente e ficam bloqueadas com orientação de reconexão se esse canal estiver indisponível. Avisos internos usam o canal oficial padrão. Registro: DEC-161 e `docs/implementations/active/2026-10-29-segundo-whatsapp-coex.md`.
+Cada número Coex pode direcionar novos contatos para sua própria fila, sem deslocar leads conhecidos. O cadastro não reutiliza números já conectados; eventos de remoção da Meta só desligam o canal identificado. Respostas a clientes usam o número da mensagem inbound mais recente e ficam bloqueadas com orientação de reconexão se esse canal estiver indisponível. Avisos internos usam o canal oficial padrão. Registro: DEC-162 e `docs/implementations/active/2026-10-29-segundo-whatsapp-coex.md`.
