@@ -68,6 +68,7 @@ import {
 } from "@/features/next-best-action";
 import { shouldShowExpiredOfferLanding } from "@/features/lead-distribution/expired-offer-landing";
 import { ExpiredOfferLandingScreen } from "@/features/lead-distribution/components/expired-offer-landing-screen";
+import { UnavailableLeadView } from "@/features/broker-workspace/components/light-lead-detail/unavailable-view";
 
 function getCurrentTimestamp() {
   return Date.now();
@@ -109,11 +110,13 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
       })) {
         return <ExpiredOfferLandingScreen />;
       }
-      // A non-owner broker only reaches a lead through an offer still open (PENDING), or as its former
-      // owner (ACCEPTED) in the Light app, which shows only the redistributed notice. The Full page
-      // renders name, history, tasks and documents, so anyone else gets a 404.
-      const formerOwnerInLight = latestOffer?.status === "ACCEPTED" && (await getExperienceMode(context)) === "LIGHT";
-      if (latestOffer?.status !== "PENDING" && !formerOwnerInLight) notFound();
+      // A non-owner broker only opens a lead through an offer still open (PENDING). A former owner
+      // (ACCEPTED) in the Light app gets the redistributed notice straight from the server, before any
+      // lead data (name, messages, history) is loaded; anyone else gets a 404.
+      if (latestOffer?.status === "ACCEPTED" && (await getExperienceMode(context)) === "LIGHT") {
+        return <UnavailableLeadView availabilityStatus="available" />;
+      }
+      if (latestOffer?.status !== "PENDING") notFound();
     }
   }
   if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
