@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { brokerGreeting, greetingFactsFromQualification } from "./broker-greeting";
+import { brokerGreeting, greetingFactsFromLead, greetingFactsFromQualification } from "./broker-greeting";
 
 describe("broker first message (29/10)", () => {
   it("introduces the broker and the brokerage, answers right away and ends with one question", () => {
@@ -36,5 +36,30 @@ describe("broker first message (29/10)", () => {
   it("reads lives and city from the qualification", () => {
     expect(greetingFactsFromQualification({ qtdVidas: "2", cidade: "Rio de Janeiro" })).toEqual({ livesCount: 2, city: "Rio de Janeiro" });
     expect(greetingFactsFromQualification(null)).toEqual({ livesCount: null, city: null });
+  });
+});
+
+describe("broker first message uses what the lead already told (29/10)", () => {
+  it("does not greet a WhatsApp nickname as a name", () => {
+    expect(brokerGreeting({ leadName: "valcoelho1959", brokerName: "Ana", companyName: "Âncora Saúde" })).toMatch(/^Oi, tudo bem\? Aqui é Ana, da Âncora Saúde\./);
+    expect(brokerGreeting({ leadName: "Val Coelho", brokerName: "Ana" })).toMatch(/^Oi, Val, tudo bem\?/);
+  });
+
+  it("shows the plan, lives, ages and city and asks the hospital instead of the ages", () => {
+    const text = brokerGreeting({ leadName: "valcoelho1959", brokerName: "Ana", companyName: "Âncora Saúde", tipo: "PF", planType: "Familiar", livesCount: 2, ages: "67, 65", city: "Macaé" });
+    expect(text).toContain("Vi aqui que você procura um plano familiar para 2 pessoas (idades: 67, 65) em Macaé.");
+    expect(text).toContain("tem algum hospital ou laboratório de preferência em Macaé?");
+    expect(text).not.toContain("qual a idade");
+  });
+
+  it("with everything known it offers to send the options", () => {
+    const text = brokerGreeting({ leadName: "Val", livesCount: 2, ages: "67, 65", city: "Macaé", hospital: "Unimed Macaé" });
+    expect(text).toContain("Posso te mandar as opções por aqui ainda hoje?");
+  });
+
+  it("reads the facts from the AI memory and the form", () => {
+    const facts = greetingFactsFromLead({ qualificationDetails: { planType: "familiar", qtdVidas: "2", idades: "67, 65", cidade: "Macaé" } });
+    expect(facts).toMatchObject({ planType: "Familiar", livesCount: 2, city: "Macaé" });
+    expect(facts.ages).toContain("67");
   });
 });

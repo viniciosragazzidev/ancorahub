@@ -165,6 +165,12 @@ export async function startServiceOnFirstMessage(input: {
 
   if (updated) {
     await signalLeadOwnershipChange({ tenantId: input.tenantId, leadId: input.leadId, brokerIds: [input.brokerId, input.actorId] });
+    // The broker took the lead (29/10): the lead learns who will call and from which number. Not on
+    // the first chat message, when the broker is already talking to the client.
+    if (input.trigger === "button" || input.trigger === "director" || input.trigger === "offer_accepted") {
+      const { sendLeadBrokerIntroForLead } = await import("./lead-broker-intro");
+      await sendLeadBrokerIntroForLead({ tenantId: input.tenantId, leadId: input.leadId, brokerId: input.brokerId });
+    }
   }
   return updated;
 }

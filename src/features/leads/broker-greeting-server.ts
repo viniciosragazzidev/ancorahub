@@ -3,13 +3,16 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
-import { brokerGreeting, greetingFactsFromQualification } from "./broker-greeting";
+import { brokerGreeting, greetingFactsFromLead } from "./broker-greeting";
 
 /** The broker's first WhatsApp message for this lead, with the broker's and the brokerage's names. */
 export async function loadBrokerGreeting(input: { tenantId: string; leadId: string; brokerUserId: string }) {
   const db = getDatabase();
   const [[lead], [broker], [tenant]] = await Promise.all([
-    db.select({ nome: schema.leads.nome, tipo: schema.leads.tipo, qualificationDetails: schema.leads.qualificationDetails, planName: schema.carrierPlans.name })
+    db.select({
+      nome: schema.leads.nome, tipo: schema.leads.tipo, qualificationDetails: schema.leads.qualificationDetails, planName: schema.carrierPlans.name,
+      formData: schema.leads.formData, sourceChannel: schema.leads.sourceChannel, sourceMetadata: schema.leads.sourceMetadata,
+    })
       .from(schema.leads)
       .leftJoin(schema.carrierPlans, eq(schema.leads.planId, schema.carrierPlans.id))
       .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
@@ -23,6 +26,6 @@ export async function loadBrokerGreeting(input: { tenantId: string; leadId: stri
     companyName: tenant?.name,
     tipo: lead?.tipo,
     planName: lead?.planName,
-    ...greetingFactsFromQualification(lead?.qualificationDetails),
+    ...(lead ? greetingFactsFromLead(lead) : {}),
   });
 }

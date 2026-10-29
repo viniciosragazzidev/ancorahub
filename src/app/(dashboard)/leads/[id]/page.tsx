@@ -22,7 +22,7 @@ import { getLeadProductLabel, readMetaLeadDisplayDetails } from "@/features/lead
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
 import { getDatabase, schema } from "@/shared/db";
-import { brokerGreeting, greetingFactsFromQualification } from "@/features/leads/broker-greeting";
+import { brokerGreeting, greetingFactsFromLead } from "@/features/leads/broker-greeting";
 import { StartServiceButton } from "./start-service-button";
 import { MarkLeadInServiceButton } from "@/features/leads/components/mark-lead-in-service-button";
 import { canDirectorMarkLeadInService } from "@/features/leads/director-service-start";
@@ -272,7 +272,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       companyName,
       tipo: lead.tipo,
       planName: lead.productName,
-      ...greetingFactsFromQualification(lead.qualificationDetails),
+      ...greetingFactsFromLead({ tipo: lead.tipo, sourceChannel: lead.sourceChannel, sourceMetadata: lead.sourceMetadata, qualificationDetails: lead.qualificationDetails, formData: lead.formData }),
     });
 
     const lightLead: LightLeadDetailData = {

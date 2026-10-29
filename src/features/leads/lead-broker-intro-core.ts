@@ -1,3 +1,5 @@
+import { looksLikePersonName } from "./broker-greeting";
+
 /**
  * "Seu atendimento tem um especialista" (29/10): the message the lead receives on the company's
  * official number when a broker accepts them, with the broker's name and number. Pure, no I/O.
@@ -27,7 +29,8 @@ export function formatBrokerPhone(phone: string | null | undefined) {
 export function leadBrokerIntroVariables(input: { leadName: string | null; brokerName: string | null; brokerPhone: string; companyName: string | null }) {
   const first = (value: string | null) => (value ?? "").trim().split(/\s+/)[0] ?? "";
   return [
-    first(input.leadName) || "tudo bem",
+    // A WhatsApp nickname ("valcoelho1959") is not a name: "Oi, tudo bem!" instead.
+    (looksLikePersonName(input.leadName) ? first(input.leadName) : "") || "tudo bem",
     (input.brokerName ?? "").trim().split(/\s+/).slice(0, 2).join(" ") || "Seu especialista",
     input.brokerPhone,
     (input.companyName ?? "").trim() || "nossa corretora",
