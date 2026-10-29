@@ -65,12 +65,12 @@ describe("candidatos a reabrir quando a mensagem da IA falhou", () => {
     expect(decideAiSendFailedCandidate({ ...failedLead, lastCustomerInboundAt: hoursAgo(24) }, now)).toEqual({ eligible: false, reason: "window_closed" });
   });
 
-  it("não reabre de novo um lead que já está em qualificação (reexecução idempotente)", () => {
-    expect(decideAiSendFailedCandidate({ ...failedLead, qualificationStatus: "qualifying" }, now)).toEqual({ eligible: false, reason: "already_qualifying" });
+  it("reabre o lead travado em qualificação: a mensagem da IA nunca saiu", () => {
+    expect(decideAiSendFailedCandidate({ ...failedLead, qualificationStatus: "qualifying" }, now)).toMatchObject({ eligible: true });
   });
 
   it("tem um motivo legível para cada recusa", () => {
-    expect(Object.keys(AI_SEND_FAILED_SKIP_LABEL)).toHaveLength(7);
+    expect(Object.keys(AI_SEND_FAILED_SKIP_LABEL)).toHaveLength(6);
     for (const label of Object.values(AI_SEND_FAILED_SKIP_LABEL)) {
       expect(label.length).toBeGreaterThan(5);
       expect(label).not.toMatch(/[—–]/);

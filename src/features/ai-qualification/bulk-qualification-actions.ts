@@ -15,7 +15,6 @@ import {
   AI_START_SKIP_LABEL,
   AI_SEND_FAILED_LOOKBACK_MS,
   AI_SEND_FAILED_SKIP_LABEL,
-  CUSTOMER_WINDOW_MS,
   decideAiRestartDispatch,
   decideAiSendFailedCandidate,
   type AiSendFailedDecision,
@@ -338,8 +337,9 @@ async function reopenAiSendFailedLeads(context: BulkContext, requestedIds: strin
         count(AI_RESTART_SKIP_LABEL[dispatch.reason]);
         continue;
       }
-      // Without force: an active qualification blocks a second first message (idempotent per lead).
-      const started = await startAiQualificationForLead({ tenantId: context.tenantId, leadId, actorUserId: context.userId });
+      // Force: the stuck conversation is still "active" and would block the resend. The eligibility above
+      // (last AI message failed, nothing delivered after, no broker) keeps it to the leads whose message never left.
+      const started = await startAiQualificationForLead({ tenantId: context.tenantId, leadId, actorUserId: context.userId, force: true });
       if (started.started) sent++;
       else {
         const reason = (started as { reason?: string }).reason ?? "desconhecido";

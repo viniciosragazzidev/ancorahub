@@ -38,8 +38,7 @@ export type AiSendFailedDecision =
       | "no_failed_ai_message"
       | "delivered_after_failure"
       | "no_customer_message"
-      | "window_closed"
-      | "already_qualifying";
+      | "window_closed";
   };
 
 export const AI_SEND_FAILED_SKIP_LABEL: Record<Extract<AiSendFailedDecision, { eligible: false }>["reason"], string> = {
@@ -49,7 +48,6 @@ export const AI_SEND_FAILED_SKIP_LABEL: Record<Extract<AiSendFailedDecision, { e
   delivered_after_failure: "já houve envio entregue depois da falha",
   no_customer_message: "sem mensagem do cliente",
   window_closed: "a janela de 24 h já fechou",
-  already_qualifying: "já está em qualificação",
 };
 
 /** Reasons startAiQualificationForLead gives when it does not send (plain Portuguese for the team). */
@@ -87,7 +85,7 @@ export function decideAiSendFailedCandidate(facts: AiSendFailedLeadFacts, now: D
   if (!facts.lastCustomerInboundAt) return { eligible: false, reason: "no_customer_message" };
   const windowEndsAt = new Date(facts.lastCustomerInboundAt.getTime() + CUSTOMER_WINDOW_MS);
   if (now.getTime() >= windowEndsAt.getTime()) return { eligible: false, reason: "window_closed" };
-  // Already reopened: a second run must not reopen the same lead again.
-  if (facts.qualificationStatus === "qualifying") return { eligible: false, reason: "already_qualifying" };
+  // A lead stuck in "qualifying" is the main case (the AI started, its message never left), so it stays
+  // eligible; a second run is idempotent because a delivered resend makes the last AI message not failed.
   return { eligible: true, failedAt: facts.lastAiSentAt, windowEndsAt };
 }
