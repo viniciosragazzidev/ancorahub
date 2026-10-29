@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
@@ -97,6 +97,8 @@ async function findLatestInboundBy(tenantId: string, lookup: NonNullable<MetaInb
       notStatusBroadcastSql(schema.whatsappMessages.messageId),
       sql`not (${schema.whatsappMessages.mediaKind} is null and lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) in ('', '[text]'))`,
       gte(schema.whatsappMessages.sentAt, lookup.since),
+      // A legacy inbound without a channel says nothing about the number to answer from.
+      isNotNull(schema.whatsappMessages.communicationChannelId),
       identity,
     ))
     .orderBy(desc(schema.whatsappMessages.sentAt), desc(schema.whatsappMessages.id))
