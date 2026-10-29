@@ -6,6 +6,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
 import { META_CLOUD_PROVIDER } from "./types";
 import {
+  pickLatestInbound,
   resolveMetaInboundLookup,
   selectMetaOutboundChannel,
   type MetaChannelBlock,
@@ -68,14 +69,18 @@ export async function resolveMetaOutboundChannel(input: {
 
 async function findLatestInboundChannelId(tenantId: string, lookup: MetaInboundLookup) {
   if (!lookup) return null;
-  const linked = await findLatestInboundChannelIdBy(tenantId, lookup);
-  if (linked || lookup.kind === "phone" || !lookup.phoneSuffix) return linked;
-  // Without a linked inbound (e.g. a lead ads lead whose first WhatsApp message is not linked yet),
-  // the official number would answer a customer who wrote to a coex number: Meta refuses it (131047).
-  return findLatestInboundChannelIdBy(tenantId, { kind: "phone", suffix: lookup.phoneSuffix, since: lookup.since });
+  if (lookup.kind === "phone" || !lookup.phoneSuffix) return (await findLatestInboundBy(tenantId, lookup))?.channelId ?? null;
+  // The customer may write to a coex number before that message is linked to the lead (a lead ads
+  // lead's first message) or after an older linked one on another number: the most recent wins,
+  // otherwise the reply leaves from a number the customer never wrote to and Meta refuses it (131047).
+  const [linked, byPhone] = await Promise.all([
+    findLatestInboundBy(tenantId, lookup),
+    findLatestInboundBy(tenantId, { kind: "phone", suffix: lookup.phoneSuffix, since: lookup.since }),
+  ]);
+  return pickLatestInbound(linked, byPhone)?.channelId ?? null;
 }
 
-async function findLatestInboundChannelIdBy(tenantId: string, lookup: NonNullable<MetaInboundLookup>) {
+async function findLatestInboundBy(tenantId: string, lookup: NonNullable<MetaInboundLookup>) {
   const identity = lookup.kind === "lead"
     ? eq(schema.whatsappMessages.leadId, lookup.id)
     : lookup.kind === "client"
@@ -83,7 +88,7 @@ async function findLatestInboundChannelIdBy(tenantId: string, lookup: NonNullabl
       : sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${lookup.suffix}`;
 
   const [lastInbound] = await getDatabase()
-    .select({ channelId: schema.whatsappMessages.communicationChannelId })
+    .select({ channelId: schema.whatsappMessages.communicationChannelId, sentAt: schema.whatsappMessages.sentAt })
     .from(schema.whatsappMessages)
     .where(and(
       eq(schema.whatsappMessages.tenantId, tenantId),
@@ -96,5 +101,5 @@ async function findLatestInboundChannelIdBy(tenantId: string, lookup: NonNullabl
     ))
     .orderBy(desc(schema.whatsappMessages.sentAt), desc(schema.whatsappMessages.id))
     .limit(1);
-  return lastInbound?.channelId ?? null;
+  return lastInbound ?? null;
 }

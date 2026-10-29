@@ -43,6 +43,15 @@ export function resolveMetaInboundLookup(input: {
   return phoneSuffix ? { kind: "phone", suffix: phoneSuffix, since } : null;
 }
 
+export type MetaInboundHit = { channelId: string | null; sentAt: Date | string | null };
+
+/** The most recent of the lead-linked and the phone inbound; a tie keeps the linked one. Pure. */
+export function pickLatestInbound<T extends MetaInboundHit>(linked: T | null, byPhone: T | null): T | null {
+  if (!linked || !byPhone) return linked ?? byPhone;
+  const time = (hit: T) => (hit.sentAt ? new Date(hit.sentAt).getTime() : Number.NEGATIVE_INFINITY);
+  return time(byPhone) > time(linked) ? byPhone : linked;
+}
+
 export type MetaChannelSelection =
   | { kind: "selected"; channel: MetaChannelRoutingCandidate; source: "inbound" | "pinned" | "official" }
   | ({ kind: "blocked" } & MetaChannelBlock)

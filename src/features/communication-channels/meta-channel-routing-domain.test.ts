@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatMetaSourceChannelUnavailableMessage,
+  pickLatestInbound,
   resolveMetaInboundLookup,
   selectMetaOutboundChannel,
   type MetaChannelRoutingCandidate,
@@ -117,5 +118,25 @@ describe("Coex multi-number decisions", () => {
     expect(resolveMetaInboundLookup({ customerPhone: "+55 (21) 97350-7276", now }))
       .toEqual({ kind: "phone", suffix: "73507276", since: new Date("2026-09-29T12:00:00.000Z") });
     expect(resolveMetaInboundLookup({ customerPhone: "123", now })).toBeNull();
+  });
+});
+
+describe("pickLatestInbound", () => {
+  const official = { channelId: "official-1142", sentAt: new Date("2026-10-20T10:00:00.000Z") };
+  const coex = { channelId: "coex-7276", sentAt: new Date("2026-10-29T16:02:26.000Z") };
+
+  it("uses the phone inbound when nothing is linked to the lead yet", () => {
+    expect(pickLatestInbound(null, coex)).toBe(coex);
+  });
+
+  it("prefers a newer phone inbound over an older linked one on another number", () => {
+    expect(pickLatestInbound(official, coex)).toBe(coex);
+  });
+
+  it("keeps the linked inbound when it is newer or tied", () => {
+    expect(pickLatestInbound(coex, official)).toBe(coex);
+    const tied = { channelId: "official-1142", sentAt: coex.sentAt };
+    expect(pickLatestInbound(tied, coex)).toBe(tied);
+    expect(pickLatestInbound(null, null)).toBeNull();
   });
 });
