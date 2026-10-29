@@ -2,7 +2,7 @@
 
 ## Estado
 
-Onda 1 entregue; onda 2 em implementação. Pedido aprovado por Vinicios em 2026-10-29. Não inclui mudança de schema ou migration.
+Ondas 1 e 2 concluídas em 2026-10-29. Pedido aprovado por Vinicios. Não inclui mudança de schema ou migration.
 
 ## Decisões e escopo
 
@@ -23,7 +23,7 @@ Onda 1 entregue; onda 2 em implementação. Pedido aprovado por Vinicios em 2026
 - O intake roteia contatos novos por canal e preserva lead/fila de contato conhecido.
 - `PARTNER_REMOVED` não desativa canais sem correspondência; registra evento não associado.
 
-### Onda 2 em implementação
+### Onda 2 entregue
 
 - Resolvedor tenant-scoped compartilhado por envio direto, enqueue de template/texto e worker de outbox.
 - Avisos internos sempre ignoram canais Coex e usam o fallback oficial determinístico.
@@ -49,7 +49,9 @@ Onda 1 entregue; onda 2 em implementação. Pedido aprovado por Vinicios em 2026
 ## Validação
 
 - Testes unitários puros cobrem intake por número, dedupe de lead conhecido, seleção de canal, bloqueio por origem inativa/sem token, fallback estável, Coex fora de `isDefault`, `PARTNER_REMOVED` e ausência de número novo.
-- Vitest focado, `tsc --noEmit` e ESLint serão registrados após execução. Testes de banco e migrations não fazem parte da validação.
+- Vitest focado: 4 arquivos e 20 testes aprovados; `npx tsc --noEmit -p .` aprovado; ESLint sem erros, com 13 avisos preexistentes em `conversations-workspace.tsx`.
+- `npm run agent:docs` aprovado com 18 referências verificadas. O relatório está em `reports/agent/verification/2026-10-29-whatsapp-coex.md`.
+- Testes de banco, migrations e validação manual M1 a M4 na Meta não fazem parte da validação executada. M1 a M4 seguem pendentes e requerem número de teste autorizado.
 - Validação manual M1 a M4 na Meta permanece pendente e requer número de teste autorizado.
 
 ## Fora de escopo e riscos

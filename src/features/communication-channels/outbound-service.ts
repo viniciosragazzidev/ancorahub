@@ -11,6 +11,7 @@ import { companyChatSendFailedMessage, companyChatUnavailableMessage } from "./m
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables } from "./templates";
 import { META_CLOUD_PROVIDER } from "./types";
+import { resolveMetaOutboundChannel as resolveMetaChannel } from "./meta-channel-router";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
 import { WhatsAppTemplateResolver } from "./template-sync-service";
 import { isCustomerServiceWindowOpen, resolveApprovedMetaEventTemplate, resolveEventMessagePlan } from "./message-policy-service";
@@ -20,9 +21,7 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { resolveCanonicalWhatsAppDestination } from "./phone-resolution";
 import { resolveNamedTemplateBodyParameters } from "./template-parameters";
-import { isEligibleColdLeadForReactivation } from "@/features/ai-qualification/cold-lead-reactivation-policy";
 import { COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX, isEligibleColdLeadForManualRequalification, isWithinRequalificationBusinessWindow, nextRequalificationBusinessWindowAt } from "@/features/ai-qualification/cold-lead-requalification-policy";
-import { readDistributionPolicy } from "@/features/lead-distribution/domain";
 import { dutyShiftReminderFailureCode, dutyShiftReminderWahaFailure, isDutyShiftReminderStale } from "@/features/lead-distribution/duty-shift-reminder-domain";
 import { findConnectedTenantChannelId, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
 import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
@@ -164,40 +163,30 @@ function outboundChannelError(code: string, message: string) {
   return error;
 }
 
-async function resolveMetaOutboundChannel(row: {
-  tenantId: string;
-  channelId: string | null;
-  purpose: string;
-}) {
-  const db = getDatabase();
-  const providerFilter = inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]);
-  if (row.channelId) {
-    const [boundChannel] = await db.select().from(schema.communicationChannels).where(and(
-      eq(schema.communicationChannels.id, row.channelId),
-      eq(schema.communicationChannels.tenantId, row.tenantId),
-      providerFilter,
-      eq(schema.communicationChannels.status, "active"),
-    )).limit(1);
-    if (boundChannel) return boundChannel;
-    if (row.purpose === "brokerAccountActivated") {
-      throw outboundChannelError(
-        "BROKER_ACTIVATION_CHANNEL_UNAVAILABLE",
-        "O canal usado no convite não está mais disponível; o aviso de ativação não será enviado por outro número.",
-      );
-    }
-  } else if (row.purpose === "brokerAccountActivated") {
+async function resolveMetaOutboundChannel(row: OutboundRow) {
+  if (row.recipientType !== "lead" && row.recipientType !== "client" && row.recipientType !== "user") {
+    throw outboundChannelError("META_RECIPIENT_TYPE_UNSUPPORTED", "O destinatário desta mensagem não é compatível com o canal Meta.");
+  }
+  if (row.purpose === "brokerAccountActivated" && !row.channelId) {
     throw outboundChannelError(
       "BROKER_ACTIVATION_CHANNEL_UNAVAILABLE",
       "O convite original não possui um canal corporativo vinculado; o aviso de ativação não será enviado por outro número.",
     );
   }
 
-  const [fallbackChannel] = await db.select().from(schema.communicationChannels).where(and(
-    eq(schema.communicationChannels.tenantId, row.tenantId),
-    providerFilter,
-    eq(schema.communicationChannels.status, "active"),
-  )).orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt)).limit(1);
-  return fallbackChannel ?? null;
+  const channel = await resolveMetaChannel({
+    tenantId: row.tenantId,
+    recipientType: row.recipientType,
+    customerPhone: row.destinationPhone,
+    pinnedChannelId: row.channelId,
+  });
+  if (row.purpose === "brokerAccountActivated" && channel?.id !== row.channelId) {
+    throw outboundChannelError(
+      "BROKER_ACTIVATION_CHANNEL_UNAVAILABLE",
+      "O canal usado no convite não está mais disponível; o aviso de ativação não será enviado por outro número.",
+    );
+  }
+  return channel;
 }
 
 async function isCurrentBrokerLeadNotification(row: {
@@ -402,20 +391,14 @@ export async function enqueueMetaTemplateMessage(input: {
       leadId: input.recipientType === "lead" ? input.recipientId : null,
     }) ?? requestedDestinationPhone;
   const variables = variablesSchema.parse(input.variables ?? []);
-  // Resolved up front: a template only exists inside the sending number's
-  // WhatsApp Business Account, so the lookup below is scoped to its WABA.
-  const channelQuery = and(
-    input.channelId ? eq(schema.communicationChannels.id, input.channelId) : undefined,
-    eq(schema.communicationChannels.tenantId, input.tenantId),
-    inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
-    eq(schema.communicationChannels.status, "active"),
-    input.requireApprovedMetaTemplate ? isNull(schema.communicationChannels.branchId) : undefined,
-  );
-  const [channel] = await getDatabase().select({ id: schema.communicationChannels.id, wabaId: schema.communicationChannels.wabaId })
-    .from(schema.communicationChannels)
-    .where(channelQuery)
-    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
-    .limit(1);
+  // Resolved up front: a template only exists inside the selected number's WABA.
+  const channel = await resolveMetaChannel({
+    tenantId: input.tenantId,
+    recipientType: input.recipientType,
+    customerPhone: destinationPhone,
+    pinnedChannelId: input.channelId,
+    corporateOnly: input.requireApprovedMetaTemplate,
+  });
   if (input.requireApprovedMetaTemplate && !channel) {
     throw outboundChannelError("META_CHANNEL_UNAVAILABLE", "Não existe um canal oficial da Meta ativo para este tenant.");
   }
@@ -694,17 +677,12 @@ export async function enqueueMetaTextMessage(input: {
     recipientType: input.recipientType,
     purpose: input.purpose ?? "directText",
   });
-  const channelQuery = and(
-    input.channelId ? eq(schema.communicationChannels.id, input.channelId) : undefined,
-    eq(schema.communicationChannels.tenantId, input.tenantId),
-    inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
-    eq(schema.communicationChannels.status, "active"),
-  );
-  const [channel] = await db.select({ id: schema.communicationChannels.id })
-    .from(schema.communicationChannels)
-    .where(channelQuery)
-    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
-    .limit(1);
+  const channel = await resolveMetaChannel({
+    tenantId: input.tenantId,
+    recipientType: input.recipientType,
+    customerPhone: destinationPhone,
+    pinnedChannelId: input.channelId,
+  });
   // Free text to a broker follows the "Mensagens do chat" choice: the company
   // WhatsApp when it is connected (Meta otherwise), or the official Meta only.
   const chatSetting = input.recipientType === "user" ? await getTeamNoticeSetting(input.tenantId, BROKER_CHAT_NOTICE).catch(() => null) : null;

@@ -170,6 +170,8 @@ export type ConversationItem = {
   carrierName: string | null;
   /** Structured private context captured by the qualification assistant. */
   privateNotes?: string | null;
+  /** The customer's latest inbound number is offline, so the CRM cannot safely reply. */
+  replyBlockedMessage?: string | null;
   latestMessage: Pick<ConversationMessage, "body" | "direction" | "sentAt"> | null;
   /** Só as últimas da conversa na lista; o histórico completo vem quando ela é aberta (?leadId=). */
   messages: ConversationMessage[];
@@ -573,6 +575,7 @@ export function ConversationsWorkspace({
                 leadId={selected.id}
                 brokerName={brokerDisplayName(selected.corretorNome)}
                 phone={selected.telefone}
+                replyBlockedMessage={selected.replyBlockedMessage}
                 onMediaSent={(msg) => {
                   setConversations((prev) =>
                     prev.map((item) =>
@@ -1218,6 +1221,7 @@ function ChatInput({
   leadId,
   brokerName,
   phone,
+  replyBlockedMessage,
   onMessageSent,
   onMediaSent,
 }: {
@@ -1226,6 +1230,7 @@ function ChatInput({
   phone?: string | null;
   /** The lead's broker, suggested in the /contato shortcut. */
   brokerName?: string;
+  replyBlockedMessage?: string | null;
   onMessageSent: (msg: ConversationMessage) => void;
   onMediaSent?: (msg: {
     id: string;
@@ -1236,6 +1241,7 @@ function ChatInput({
   }) => void;
 }) {
   const directorSkinEnabled = useDirectorLitePage();
+  const replyBlocked = Boolean(replyBlockedMessage);
   const [text, setText] = useState("");
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1254,7 +1260,7 @@ function ChatInput({
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = text.trim();
-    if (!trimmed || isPending) return;
+    if (!trimmed || isPending || replyBlocked) return;
     // "/contato": asks which broker will call, then sends the message with the name.
     if (isContactShortcut(trimmed)) {
       setContactName(brokerName ?? "");
@@ -1266,12 +1272,16 @@ function ChatInput({
 
   async function handleSendContact(e: React.FormEvent) {
     e.preventDefault();
-    if (!isValidContactName(contactName) || isPending) return;
+    if (!isValidContactName(contactName) || isPending || replyBlocked) return;
     const sent = await sendText(contactShortcutMessage(contactName));
     if (sent) setContactOpen(false);
   }
 
   async function sendText(trimmed: string) {
+    if (replyBlocked) {
+      setError(replyBlockedMessage ?? "O canal de origem está desconectado.");
+      return false;
+    }
     setIsPending(true);
     setError(null);
     try {
@@ -1302,6 +1312,7 @@ function ChatInput({
 
   return (
     <div data-conversations-part={directorSkinEnabled ? "chat-input" : undefined} className="border-t border-border bg-card px-4 py-3 sm:px-5">
+      {replyBlockedMessage ? <p role="alert" className="mb-2 text-sm text-destructive">{replyBlockedMessage}</p> : null}
       {phone ? (
         <a
           href={getWhatsAppUrl(phone)}
@@ -1314,7 +1325,7 @@ function ChatInput({
         </a>
       ) : null}
       <form onSubmit={handleSend} className={cn("flex gap-2 items-center", directorSkinEnabled && "items-end")}>
-        <MediaAttachButton leadId={leadId} onMediaSent={onMediaSent} />
+        <MediaAttachButton leadId={leadId} onMediaSent={onMediaSent} disabled={replyBlocked || isPending} />
         <QuickResponsesPopover onSelectResponse={handleAppendQuickResponse} />
         <div className="relative flex-1">
           {directorSkinEnabled ? (
@@ -1332,7 +1343,7 @@ function ChatInput({
               }}
               placeholder="Mensagem"
               aria-label="Escreva uma mensagem"
-              disabled={isPending}
+              disabled={isPending || replyBlocked}
               className="min-h-11 max-h-28 min-w-0 flex-1 resize-none overflow-y-auto text-sm leading-5"
             />
           ) : (
@@ -1340,7 +1351,7 @@ function ChatInput({
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={`Digite sua mensagem para o cliente (ou ${CONTACT_SHORTCUT} para avisar quem vai ligar)...`}
-              disabled={isPending}
+              disabled={isPending || replyBlocked}
               className="h-10 text-sm"
             />
           )}
@@ -1352,7 +1363,7 @@ function ChatInput({
         </div>
         <Button
           type="submit"
-          disabled={isPending || !text.trim()}
+          disabled={isPending || replyBlocked || !text.trim()}
           size="icon-sm"
           className="h-10 w-10 shrink-0"
         >

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { after } from "next/server";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -11,7 +11,6 @@ import { decryptChannelSecret } from "./secret-crypto";
 import { sendMetaCloudText } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import {
-  CONVERSATION_MEDIA_KINDS,
   downloadMetaMediaObject,
   isConversationMediaEnabled,
   normalizeMediaKind,
@@ -28,6 +27,7 @@ import type { MetaWebhookPayload, MetaWebhookStatus } from "./types";
 import { shouldStartOrResumeAiQualification } from "@/features/qualification-engine/service";
 import { isDistributedPartialQualification } from "@/features/ai-agent/distributed-resume";
 import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence/trigger";
+import { resolveMetaOutboundChannel } from "./meta-channel-router";
 
 export async function isMetaCloudWhatsAppEnabled() {
   const [row] = await getDatabase()
@@ -45,43 +45,11 @@ export async function isMetaCloudWhatsAppEnabled() {
  * 24h window. Otherwise the default number.
  */
 export async function getPreferredMetaCloudChannel(input: { tenantId: string; branchId?: string | null; userId?: string | null; customerPhone?: string | null }) {
-  const db = getDatabase();
-  const usable = and(
-    eq(schema.communicationChannels.tenantId, input.tenantId),
-    eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
-    eq(schema.communicationChannels.status, "active"),
-    eq(schema.communicationChannels.registrationStatus, "registered"),
-    isNotNull(schema.communicationChannels.phoneNumberId),
-    isNotNull(schema.communicationChannels.accessTokenCiphertext),
-  );
-  const suffix = input.customerPhone?.replace(/\D/g, "").slice(-8) ?? "";
-  if (suffix.length === 8) {
-    const [lastInbound] = await db
-      .select({ channelId: schema.whatsappMessages.communicationChannelId })
-      .from(schema.whatsappMessages)
-      .where(and(
-        eq(schema.whatsappMessages.tenantId, input.tenantId),
-        eq(schema.whatsappMessages.provider, META_CLOUD_PROVIDER),
-        inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
-        isNotNull(schema.whatsappMessages.communicationChannelId),
-        sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${suffix}`,
-      ))
-      .orderBy(desc(schema.whatsappMessages.sentAt))
-      .limit(1);
-    if (lastInbound?.channelId) {
-      const [conversationChannel] = await db.select().from(schema.communicationChannels)
-        .where(and(usable, eq(schema.communicationChannels.id, lastInbound.channelId)))
-        .limit(1);
-      if (conversationChannel) return conversationChannel;
-    }
-  }
-  const [channel] = await db
-    .select()
-    .from(schema.communicationChannels)
-    .where(usable)
-    .orderBy(desc(schema.communicationChannels.isDefault), asc(schema.communicationChannels.createdAt))
-    .limit(1);
-  return channel ?? null;
+  return resolveMetaOutboundChannel({
+    tenantId: input.tenantId,
+    recipientType: "lead",
+    customerPhone: input.customerPhone,
+  });
 }
 
 export async function sendMetaCloudChannelText(input: { channel: typeof schema.communicationChannels.$inferSelect; to: string; body: string }) {

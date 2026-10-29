@@ -10,6 +10,7 @@ import type { OfficialBrokerConversation, OfficialBrokerMessage } from "./offici
 import { getLeadTagsByLead, listLeadTags } from "@/features/lead-tags/service";
 import { canManageLeadTags } from "@/features/lead-tags/rules";
 import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
+import { formatMetaSourceChannelUnavailableMessage } from "@/features/communication-channels/meta-channel-routing-domain";
 import { isMediaKindSupported } from "@/features/conversations/media-kinds";
 import { buildConversationLeadScope } from "@/features/conversations/lead-scope";
 import { shouldCreateSyntheticCustomerConversation } from "@/features/communication-channels/conversation-classification";
@@ -209,10 +210,28 @@ export default async function ConversationsPage({
     // With more than one official number, every message says which number
     // received or sent it (the reply goes out on the number the customer wrote to).
     const officialChannels = await db
-      .select({ id: schema.communicationChannels.id, displayPhoneNumber: schema.communicationChannels.displayPhoneNumber })
+      .select({
+        id: schema.communicationChannels.id,
+        displayPhoneNumber: schema.communicationChannels.displayPhoneNumber,
+        status: schema.communicationChannels.status,
+        registrationStatus: schema.communicationChannels.registrationStatus,
+        phoneNumberId: schema.communicationChannels.phoneNumberId,
+        hasCredentials: sql<boolean>`${schema.communicationChannels.accessTokenCiphertext} is not null`.as("has_credentials"),
+      })
       .from(schema.communicationChannels)
-      .where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER)));
+      .where(and(eq(schema.communicationChannels.tenantId, context.tenantId), inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api"])));
     const channelLabelOf = describeMessageChannel(officialChannels);
+    const channelById = new Map(officialChannels.map((channel) => [channel.id, channel]));
+    const sourceChannelFailure = (channelId: string | null | undefined) => {
+      if (!channelId) return null;
+      const channel = channelById.get(channelId);
+      if (channel && channel.status === "active" && channel.registrationStatus === "registered" && channel.phoneNumberId && channel.hasCredentials) return null;
+      return {
+        code: "META_SOURCE_CHANNEL_UNAVAILABLE",
+        title: "Número de WhatsApp desconectado",
+        message: formatMetaSourceChannelUnavailableMessage(channel),
+      };
+    };
 
     // Egress (26/10): a lista lê só este índice leve das mesmas mensagens; texto e mídia vêm depois,
     // por id, só para as últimas de cada conversa e o histórico da conversa aberta (message-window.ts).
@@ -434,6 +453,7 @@ export default async function ConversationsPage({
     }
 
     const messagesByLead = new Map<string, ConversationMessage[]>();
+    const replyBlockedByLead = new Map<string, string | null>();
     for (const lead of leads) {
       const leadSuffix = normalizePhone(lead.telefone ?? "").slice(-8);
       const candidates = new Set([...(rowsByLeadId.get(lead.id) ?? []), ...(leadSuffix.length === 8 ? rowsByPhoneSuffix.get(leadSuffix) ?? [] : [])]);
@@ -446,6 +466,11 @@ export default async function ConversationsPage({
       const rawMatched = matchedIndex
         .flatMap((row) => fullMessageById.get(row.id) ?? [])
         .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
+      const latestInbound = [...rawMatched].reverse().find((message) =>
+        ["incoming", "inbound"].includes(message.direction)
+        && [META_CLOUD_PROVIDER, "meta_cloud_api"].includes(message.provider ?? ""),
+      );
+      replyBlockedByLead.set(lead.id, sourceChannelFailure(latestInbound?.communicationChannelId)?.message ?? null);
 
       const seenIds = new Set<string>();
       const seenContentKeys = new Set<string>();
@@ -464,9 +489,8 @@ export default async function ConversationsPage({
         }
         seenContentKeys.add(contentKey);
 
-        const providerFailure = msg.messageId
-          ? failureByProviderMessageId.get(msg.messageId) ?? null
-          : null;
+        const providerFailure = (msg.messageId ? failureByProviderMessageId.get(msg.messageId) : null)
+          ?? (msg.providerStatus === "failed" ? sourceChannelFailure(msg.communicationChannelId) : null);
 
         deduplicated.push({
           id: msg.id,
@@ -628,6 +652,10 @@ export default async function ConversationsPage({
     for (const [phone, msgs] of unlinkedByPhone.entries()) {
       msgs.sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
       const latest = msgs[msgs.length - 1];
+      const latestInbound = [...msgs].reverse().find((message) =>
+        ["incoming", "inbound"].includes(message.direction)
+        && [META_CLOUD_PROVIDER, "meta_cloud_api"].includes(message.provider ?? ""),
+      );
       const rawBody = latest?.body || "Conversa iniciada pelo WhatsApp";
       const snippet = rawBody.length > 80 ? `${rawBody.slice(0, 80)}...` : rawBody;
       const syntheticId = `unassigned-${phone}`;
@@ -657,7 +685,8 @@ export default async function ConversationsPage({
           direction: m.direction,
           senderRole: m.senderRole,
           providerStatus: m.providerStatus,
-          providerFailure: m.messageId ? failureByProviderMessageId.get(m.messageId) ?? null : null,
+          providerFailure: (m.messageId ? failureByProviderMessageId.get(m.messageId) : null)
+            ?? (m.providerStatus === "failed" ? sourceChannelFailure(m.communicationChannelId) : null),
           channelLabel: channelLabelOf(m),
           sentAt: m.sentAt.toISOString(),
           ...(m.mediaKind && m.mediaStorageKey
@@ -673,6 +702,7 @@ export default async function ConversationsPage({
             : {}),
         })),
         documents: [],
+        replyBlockedMessage: sourceChannelFailure(latestInbound?.communicationChannelId)?.message ?? null,
         ...(unlinkedStatsByPhone.get(phone) ?? {}),
         latestMessage: latest
           ? {
@@ -717,6 +747,7 @@ export default async function ConversationsPage({
           const aiNote = notes.find((note) => note && typeof note === "object" && (note as Record<string, unknown>).source === "ai_qualification") as Record<string, unknown> | undefined;
           return typeof aiNote?.summary === "string" ? aiNote.summary : null;
         })(),
+        replyBlockedMessage: replyBlockedByLead.get(lead.id) ?? null,
         messages,
         ...(statsByLead.get(lead.id) ?? {}),
         documents,

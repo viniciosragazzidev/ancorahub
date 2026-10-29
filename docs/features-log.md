@@ -603,3 +603,7 @@ Na aba Plantão, a lista mostra a ordem automática prevista por ocorrência ati
 ## 2026-10-27 - Correções da revisão da fila visual do plantão
 
 O preview limita o histórico agregado de leads e tentativas a 30 dias e compartilha a regra de escopo de recebimentos com a escolha real. A distribuição remove atribuições pausadas antes de resolver a escala efetiva, preservando a linha semanal quando a linha publicada do mês está pausada. Em `round_robin`, o lock manual só é tentado se existir fila salva na ocorrência escolhida.
+
+## 2026-10-29 - Coexistência de vários números WhatsApp
+
+Cada número Coex pode direcionar novos contatos para sua própria fila, sem deslocar leads conhecidos. O cadastro não reutiliza números já conectados; eventos de remoção da Meta só desligam o canal identificado. Respostas a clientes usam o número da mensagem inbound mais recente e ficam bloqueadas com orientação de reconexão se esse canal estiver indisponível. Avisos internos usam o canal oficial padrão. Registro: DEC-161 e `docs/implementations/active/2026-10-29-segundo-whatsapp-coex.md`.
