@@ -11,6 +11,7 @@ export type NoticeFields =
   | { purpose: "leadAssignmentConfirmed"; broker: string; lead: string; phone: string; interest: string; leadType: string; dependents: string; city: string; link: string | null }
   | { purpose: "leadAssignmentUnavailable" | "leadAssignmentExpired"; broker: string; lead: string }
   | { purpose: "leadFeedbackReminder"; broker: string; lead: string }
+  | { purpose: "leadClientReturned"; broker: string; lead: string; since: string; link: string | null }
   | { purpose: "taskReminder"; name: string; task: string; when: string }
   | { purpose: "brokerAccountActivated"; name: string; company: string; loginUrl: string }
   | { purpose: "dutyPresenceConfirmation"; broker: string; hour: string; link: string | null }
@@ -100,6 +101,15 @@ export function builtInNoticeVariants(fields: NoticeFields, hour: number): strin
         `Oi *${broker}*! Consegue registrar no CRM como foi o atendimento de *${lead}*?`,
         `${hi}, *${broker}*. Ficou pendente o feedback de *${lead}* no CRM.`,
         `📝 ${broker}, lembrete: o atendimento de *${lead}* ainda está sem feedback no CRM.`,
+      ];
+    }
+    case "leadClientReturned": {
+      const { broker, lead, since, link } = fields;
+      return [
+        `🔔 *Cliente voltou a chamar*\n\nOlá *${broker}*, *${lead}* mandou mensagem agora. O lead está com você desde ${since}: responda enquanto o interesse está quente.${tail(link, "👉 *Abrir no CRM:* ")}`,
+        `${hi}, *${broker}*! *${lead}* acabou de mandar mensagem. Está com você desde ${since}, vale responder logo.${tail(link, "Abrir no CRM: ")}`,
+        `Oi *${broker}*, *${lead}* voltou a falar no WhatsApp. Lead seu desde ${since}.${tail(link, "👉 ")}`,
+        `🔔 ${broker}, mensagem nova de *${lead}* (com você desde ${since}). Responda enquanto está quente.${tail(link, "Conversa: ")}`,
       ];
     }
     case "taskReminder": {

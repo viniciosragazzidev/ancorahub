@@ -72,6 +72,16 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     defaultEnabled: false,
   },
   {
+    key: "LEAD_CLIENT_RETURNED",
+    purpose: "leadClientReturned",
+    label: "Cliente voltou a chamar",
+    description: "Avisa o corretor quando um lead dele manda mensagem 24 h ou mais depois da distribuição. Uma vez por lead.",
+    // The client is writing now: goes out at once, any day, like the lead notices.
+    class: "critical",
+    defaultEnabled: true,
+    defaultChannel: "company_number",
+  },
+  {
     key: "LEAD_FEEDBACK_REMINDER",
     purpose: "leadFeedbackReminder",
     label: "Lembrete de feedback",
