@@ -12,7 +12,7 @@ import { toast } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
 
 import { retryCoexistenceSyncAction, saveChannelLeadIntakeAction } from "../actions";
-import type { ChannelLeadIntake } from "../channel-lead-intake";
+import { defaultChannelLeadLabel, type ChannelLeadIntake } from "../channel-lead-intake";
 import { MetaEmbeddedSignupCard } from "./meta-embedded-signup-card";
 
 export type CoexistenceChannel = {
@@ -47,14 +47,19 @@ function LeadIntakeSheet({ channel, queues, adAccountNames, onClose }: { channel
   const current = channel.leadIntake;
   const [enabled, setEnabled] = useState(current?.enabled ?? false);
   const [queueId, setQueueId] = useState(current?.queueId ?? "");
-  // No default account: the origin is chosen explicitly, never guessed.
-  const [label, setLabel] = useState(current?.label ?? "");
+  // The number itself is the default origin, so a number without ads has one to save; ad accounts are options.
+  const defaultLabel = defaultChannelLeadLabel(channel.displayPhoneNumber);
+  const [label, setLabel] = useState(current?.label ?? defaultLabel);
   const [aiQualification, setAiQualification] = useState(current?.aiQualification ?? false);
   const [pending, startTransition] = useTransition();
-  const labels = Array.from(new Set([...(current?.label ? [current.label] : []), ...adAccountNames.map((name) => `Anúncios ${name}`)]));
+  const labels = Array.from(new Set([defaultLabel, ...(current?.label ? [current.label] : []), ...adAccountNames.map((name) => `Anúncios ${name}`)]));
   const save = () => startTransition(async () => {
     try {
-      await saveChannelLeadIntakeAction({ channelId: channel.id, enabled, queueId: queueId || null, label: label || null, aiQualification });
+      const result = await saveChannelLeadIntakeAction({ channelId: channel.id, enabled, queueId: queueId || null, label: label || null, aiQualification });
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
       toast.success(enabled ? "Contatos novos deste número passam a entrar como lead." : "Entrada de leads desligada para este número.");
       router.refresh();
       onClose();
@@ -66,7 +71,7 @@ function LeadIntakeSheet({ channel, queues, adAccountNames, onClose }: { channel
     <>
       <SheetBody contentClassName="grid grid-cols-[minmax(0,1fr)] gap-4">
         <p className="rounded-lg border border-border bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">
-          Para um número usado nos anúncios de WhatsApp. Quem clica no anúncio já vira lead pela campanha. Com esta opção, também vira lead quem escreve sem o clique (a Meta só identifica o anúncio na primeira mensagem) e quem vem de uma campanha sem regra de fila. Contatos que já conversavam com o número antes da conexão, corretores e clientes não viram lead.
+          Para o número que recebe contatos novos, com ou sem anúncios. Quem escreve pela primeira vez vira lead nesta fila, com a origem abaixo. Se o número divulga anúncios, quem clica na campanha entra pela regra dela. Quem já conversava com o número antes da conexão, corretores e clientes não viram lead.
         </p>
         <label className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
           <span>Contatos novos viram lead</span>
@@ -89,7 +94,7 @@ function LeadIntakeSheet({ channel, queues, adAccountNames, onClose }: { channel
         <div className="grid gap-1.5">
           <p className="text-sm font-medium">Origem no lead</p>
           <Select value={label} onValueChange={(value) => setLabel((value as string) ?? "")}>
-            <SelectTrigger aria-label="Origem"><SelectValue>{label || "Escolha a conta de anúncios"}</SelectValue></SelectTrigger>
+            <SelectTrigger aria-label="Origem"><SelectValue>{label || "Escolha a origem"}</SelectValue></SelectTrigger>
             <SelectContent>{labels.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
           </Select>
         </div>

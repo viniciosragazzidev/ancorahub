@@ -1,6 +1,6 @@
 /**
- * Lead intake of an official number dedicated to ads (e.g. the WhatsApp
- * number of the CA1 click-to-WhatsApp ads): a new contact that writes to it
+ * Lead intake of an official number that receives new contacts, with or
+ * without ads (e.g. the WhatsApp number of the CA1 click-to-WhatsApp ads): a new contact that writes to it
  * becomes a lead with this origin, in this queue, even without the ad's
  * referral (Meta only sends it on the first message after the click). Pure.
  */
@@ -19,6 +19,15 @@ export type ChannelLeadIntake = {
 };
 
 export const CHANNEL_LEAD_INTAKE_OFF: ChannelLeadIntake = { enabled: false, queueId: null, label: null, aiQualification: false };
+
+/**
+ * Origem padrão do lead de um número: "WhatsApp" com os últimos 4 dígitos. Serve para número sem
+ * anúncio, que não tem conta de anúncios para escolher. Pura.
+ */
+export function defaultChannelLeadLabel(displayPhoneNumber: string | null | undefined): string {
+  const digits = (displayPhoneNumber ?? "").replace(/\D/g, "");
+  return digits.length >= 4 ? `WhatsApp ${digits.slice(-4)}` : "WhatsApp";
+}
 
 export type ChannelLeadIntakeRoute =
   | { kind: "existing_contact"; existingLeadId: string | null; existingQueueId: string | null }
