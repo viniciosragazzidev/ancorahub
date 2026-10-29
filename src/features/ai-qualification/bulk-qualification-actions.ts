@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
+import { withJobLease } from "@/shared/db/job-lease";
 import { INITIAL_MESSAGE_FAILURE_NOTE_PREFIX } from "@/features/communication-channels/meta-delivery-failure";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { startAiQualificationForLead } from "./service";
@@ -204,6 +205,7 @@ async function loadAiSendFailedDecisions(context: BulkContext, now: Date) {
       qualificationStatus: schema.leads.qualificationStatus,
       branchId: schema.leads.branchId,
       queueName: schema.leadQueues.name,
+      queueAiEnabled: schema.leadQueues.aiQualificationEnabled,
     })
     .from(schema.leads)
     .leftJoin(schema.leadQueues, eq(schema.leadQueues.id, schema.leads.queueId))
@@ -262,6 +264,7 @@ async function loadAiSendFailedDecisions(context: BulkContext, now: Date) {
       status: lead.status,
       corretorId: lead.corretorId,
       qualificationStatus: lead.qualificationStatus,
+      queueAiEnabled: lead.queueAiEnabled ?? null,
       lastAiSentAt: lastAi?.sentAt ?? null,
       lastAiFailed: lastAi?.providerStatus === "failed",
       deliveredAfterLastAi,
@@ -281,6 +284,7 @@ type LeadRowForBulk = {
   qualificationStatus: string | null;
   branchId: string | null;
   queueName: string | null;
+  queueAiEnabled: boolean | null;
 };
 
 /** The list shown before confirming: only the leads the reopen would take. */
@@ -304,6 +308,14 @@ async function loadAiSendFailedCandidates(context: BulkContext) {
  * The eligibility is recomputed here: a client-sent id that no longer qualifies is only counted as ignored.
  */
 async function reopenAiSendFailedLeads(context: BulkContext, requestedIds: string[]) {
+  // One run per tenant: a double click or a second tab would pass the eligibility before any send
+  // and, with force, send the first message twice.
+  const run = await withJobLease(`ai-send-failed-reopen:${context.tenantId}`, 10 * 60_000, () => runAiSendFailedReopen(context, requestedIds));
+  if (!run.acquired) return { success: false as const, error: "Já há uma reabertura em andamento. Aguarde terminar." };
+  return run.value;
+}
+
+async function runAiSendFailedReopen(context: BulkContext, requestedIds: string[]) {
   const now = new Date();
   const decisions = await loadAiSendFailedDecisions(context, now);
   const requested = requestedIds.length ? new Set(requestedIds) : null;

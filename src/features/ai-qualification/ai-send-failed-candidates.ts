@@ -14,11 +14,20 @@ export const AI_SEND_FAILED_LOOKBACK_MS = 3 * 24 * HOUR_MS;
 /** Statuses that a reopen must never touch: the lead is already closed or in a broker's hands. */
 const CLOSED_LEAD_STATUSES = new Set(["converted", "lost", "distributed"]);
 
+/**
+ * Qualification statuses a reopen may restart: not qualified yet, stuck in qualification, or
+ * disqualified (what the failed send leads to). A qualified lead (hot, warm, cold, qualified)
+ * would lose its stage, so it stays out.
+ */
+const REOPENABLE_QUALIFICATION_STATUSES = new Set(["", "pending", "qualifying", "disqualified", "not_qualified"]);
+
 export type AiSendFailedLeadFacts = {
   leadId: string;
   status: string;
   corretorId: string | null;
   qualificationStatus: string | null;
+  /** The queue's AI switch; false keeps the AI from talking to the lead (null: no queue). */
+  queueAiEnabled: boolean | null;
   /** The AI's most recent message to the lead, if any. */
   lastAiSentAt: Date | null;
   lastAiFailed: boolean;
@@ -35,6 +44,8 @@ export type AiSendFailedDecision =
     reason:
       | "has_broker"
       | "closed_status"
+      | "queue_ai_disabled"
+      | "already_qualified"
       | "no_failed_ai_message"
       | "delivered_after_failure"
       | "no_customer_message"
@@ -44,6 +55,8 @@ export type AiSendFailedDecision =
 export const AI_SEND_FAILED_SKIP_LABEL: Record<Extract<AiSendFailedDecision, { eligible: false }>["reason"], string> = {
   has_broker: "já tem corretor",
   closed_status: "lead fechado ou distribuído",
+  queue_ai_disabled: "a fila está com a IA desligada",
+  already_qualified: "já foi qualificado",
   no_failed_ai_message: "a última mensagem da IA não falhou",
   delivered_after_failure: "já houve envio entregue depois da falha",
   no_customer_message: "sem mensagem do cliente",
@@ -80,6 +93,8 @@ export function decideAiRestartDispatch(input: { windowEndsAt: Date; now: Date; 
 export function decideAiSendFailedCandidate(facts: AiSendFailedLeadFacts, now: Date): AiSendFailedDecision {
   if (facts.corretorId) return { eligible: false, reason: "has_broker" };
   if (CLOSED_LEAD_STATUSES.has(facts.status)) return { eligible: false, reason: "closed_status" };
+  if (facts.queueAiEnabled === false) return { eligible: false, reason: "queue_ai_disabled" };
+  if (!REOPENABLE_QUALIFICATION_STATUSES.has(facts.qualificationStatus ?? "")) return { eligible: false, reason: "already_qualified" };
   if (!facts.lastAiFailed || !facts.lastAiSentAt) return { eligible: false, reason: "no_failed_ai_message" };
   if (facts.deliveredAfterLastAi) return { eligible: false, reason: "delivered_after_failure" };
   if (!facts.lastCustomerInboundAt) return { eligible: false, reason: "no_customer_message" };

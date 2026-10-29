@@ -16,6 +16,7 @@ const failedLead: AiSendFailedLeadFacts = {
   status: "new",
   corretorId: null,
   qualificationStatus: "pending",
+  queueAiEnabled: true,
   lastAiSentAt: hoursAgo(2),
   lastAiFailed: true,
   deliveredAfterLastAi: false,
@@ -69,8 +70,20 @@ describe("candidatos a reabrir quando a mensagem da IA falhou", () => {
     expect(decideAiSendFailedCandidate({ ...failedLead, qualificationStatus: "qualifying" }, now)).toMatchObject({ eligible: true });
   });
 
+  it("não reabre lead de fila com a IA desligada", () => {
+    expect(decideAiSendFailedCandidate({ ...failedLead, queueAiEnabled: false }, now)).toEqual({ eligible: false, reason: "queue_ai_disabled" });
+    expect(decideAiSendFailedCandidate({ ...failedLead, queueAiEnabled: null }, now).eligible).toBe(true);
+  });
+
+  it("não reabre lead já qualificado: a reabertura apagaria o estágio", () => {
+    for (const qualificationStatus of ["hot", "warm", "cold", "qualified"]) {
+      expect(decideAiSendFailedCandidate({ ...failedLead, qualificationStatus }, now)).toEqual({ eligible: false, reason: "already_qualified" });
+    }
+    expect(decideAiSendFailedCandidate({ ...failedLead, qualificationStatus: null }, now).eligible).toBe(true);
+  });
+
   it("tem um motivo legível para cada recusa", () => {
-    expect(Object.keys(AI_SEND_FAILED_SKIP_LABEL)).toHaveLength(6);
+    expect(Object.keys(AI_SEND_FAILED_SKIP_LABEL)).toHaveLength(8);
     for (const label of Object.values(AI_SEND_FAILED_SKIP_LABEL)) {
       expect(label.length).toBeGreaterThan(5);
       expect(label).not.toMatch(/[—–]/);
