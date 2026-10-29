@@ -1254,7 +1254,9 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
         .limit(1);
 
       if (broker && broker.phone && await tenantHasActiveMetaChannel(offer.tenantId)) {
-        const expiredOutbound = await enqueueMetaTemplateMessage({
+        // Only queued (29/10): the outbox job sends it within a minute. Sending inline waited on the
+        // number's spacing (up to 40 s each) and held the distribution job behind expired offers.
+        await enqueueMetaTemplateMessage({
           tenantId: offer.tenantId,
           recipientType: "user",
           recipientId: broker.id,
@@ -1264,7 +1266,6 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
           requestedBy: null,
           idempotencyKey: `offer-expired:${offer.id}`,
         });
-        await processMetaOutboundBatch(1, offer.tenantId, expiredOutbound.id);
       }
 
       const systemUserId = await resolveSystemUserId(offer.tenantId);

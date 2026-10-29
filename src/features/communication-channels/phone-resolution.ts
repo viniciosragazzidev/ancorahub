@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { normalizeWhatsAppDestination } from "@/lib/whatsapp-url";
@@ -12,6 +12,8 @@ import { phoneSubscriberSuffix } from "@/features/waha-cadence/phone-matching";
  * international number is preferred so a stale DDD cannot break delivery.
  * Ambiguous matches deliberately fall back to the stored value.
  */
+const HISTORY_WITHOUT_LEAD_DAYS = 30;
+
 export async function resolveCanonicalWhatsAppDestination(input: {
   tenantId: string;
   phone: string;
@@ -30,7 +32,8 @@ export async function resolveCanonicalWhatsAppDestination(input: {
           eq(schema.whatsappMessages.tenantId, input.tenantId),
           isNotNull(schema.whatsappMessages.phone),
           sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 9) = ${suffix}`,
-          input.leadId ? eq(schema.whatsappMessages.leadId, input.leadId) : undefined,
+          // Without the lead, only recent history: a number with no match used to scan every message of the tenant.
+          input.leadId ? eq(schema.whatsappMessages.leadId, input.leadId) : gte(schema.whatsappMessages.sentAt, new Date(Date.now() - HISTORY_WITHOUT_LEAD_DAYS * 86_400_000)),
         ),
       )
       .orderBy(desc(schema.whatsappMessages.sentAt))

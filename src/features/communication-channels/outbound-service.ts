@@ -391,11 +391,16 @@ export async function enqueueMetaTemplateMessage(input: {
   templateName?: string;
 }) {
   const requestedDestinationPhone = phoneSchema.parse(input.destinationPhone);
-  const destinationPhone = await resolveCanonicalWhatsAppDestination({
-    tenantId: input.tenantId,
-    phone: requestedDestinationPhone,
-    leadId: input.recipientType === "lead" ? input.recipientId : null,
-  }) ?? requestedDestinationPhone;
+  // A team member's number comes from their profile. The message-history lookup is for leads only:
+  // for a broker it found no match and scanned the whole tenant history on every notice (29/10,
+  // offers, presence links and expiry notices each took seconds and held the distribution job).
+  const destinationPhone = input.recipientType === "user"
+    ? requestedDestinationPhone
+    : await resolveCanonicalWhatsAppDestination({
+      tenantId: input.tenantId,
+      phone: requestedDestinationPhone,
+      leadId: input.recipientType === "lead" ? input.recipientId : null,
+    }) ?? requestedDestinationPhone;
   const variables = variablesSchema.parse(input.variables ?? []);
   // Resolved up front: a template only exists inside the sending number's
   // WhatsApp Business Account, so the lookup below is scoped to its WABA.
@@ -622,7 +627,10 @@ export async function enqueueMetaTextMessage(input: {
   const parsedPhone = phoneSchema.safeParse(input.destinationPhone);
   if (!dutyShiftReminder && !parsedPhone.success) phoneSchema.parse(input.destinationPhone);
   const requestedDestinationPhone = parsedPhone.success ? parsedPhone.data : "";
-  const destinationPhone = requestedDestinationPhone
+  // Team member: the profile number as is (see enqueueMetaTemplateMessage).
+  const destinationPhone = requestedDestinationPhone && input.recipientType === "user"
+    ? requestedDestinationPhone
+    : requestedDestinationPhone
     ? await resolveCanonicalWhatsAppDestination({
       tenantId: input.tenantId,
       phone: requestedDestinationPhone,
