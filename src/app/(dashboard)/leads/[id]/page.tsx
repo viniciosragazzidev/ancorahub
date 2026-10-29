@@ -109,9 +109,11 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
       })) {
         return <ExpiredOfferLandingScreen />;
       }
-      // A non-owner broker only reaches a lead through an offer still open (PENDING) or as its former
-      // owner (ACCEPTED, for the redistributed notice). Anyone else would see personal data by id.
-      if (latestOffer?.status !== "PENDING" && latestOffer?.status !== "ACCEPTED") notFound();
+      // A non-owner broker only reaches a lead through an offer still open (PENDING), or as its former
+      // owner (ACCEPTED) in the Light app, which shows only the redistributed notice. The Full page
+      // renders name, history, tasks and documents, so anyone else gets a 404.
+      const formerOwnerInLight = latestOffer?.status === "ACCEPTED" && (await getExperienceMode(context)) === "LIGHT";
+      if (latestOffer?.status !== "PENDING" && !formerOwnerInLight) notFound();
     }
   }
   if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
