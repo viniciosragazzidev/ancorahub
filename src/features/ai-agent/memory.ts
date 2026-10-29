@@ -394,7 +394,9 @@ export function hasPositiveCnpjEvidence(message: string): boolean {
 /** A denial of company or CNPJ: "não tenho CNPJ", "sem cnpj", "não sou empresa", "pessoa física" (28/10). */
 export function isCompanyDenial(message: string): boolean {
   const normalized = normalizeForMatching(message);
-  return /\b(?:nao|sem|nenhum|nenhuma)\b.{0,12}\b(?:cnpj|pj|empresa|mei)\b/.test(normalized)
+  // The negation must reach the term directly ("não tenho CNPJ", "sem cnpj"): "não, tenho CNPJ" answers
+  // another question and is a company.
+  return /\b(?:nao|sem|nenhum|nenhuma)\s+(?:(?:tenho|tem|possuo|possui|sou|e|eh)\s+)?(?:(?:um|uma)\s+)?(?:cnpj|pj|empresa|mei)\b/.test(normalized)
     || /\bpessoa fisica\b/.test(normalized);
 }
 

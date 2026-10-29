@@ -68,3 +68,12 @@ describe("negação de CNPJ ou empresa (28/10)", () => {
     }
   });
 });
+
+describe("negação de CNPJ não pega resposta positiva", () => {
+  it("\"Não, tenho CNPJ\" não é negação", () => {
+    expect(isCompanyDenial("Não, tenho CNPJ")).toBe(false);
+    expect(isCompanyDenial("Não tenho CNPj")).toBe(true);
+    expect(isCompanyDenial("sem cnpj")).toBe(true);
+    expect(isCompanyDenial("não sou empresa")).toBe(true);
+  });
+});
