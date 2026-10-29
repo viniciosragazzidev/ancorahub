@@ -68,7 +68,14 @@ export async function resolveMetaOutboundChannel(input: {
 
 async function findLatestInboundChannelId(tenantId: string, lookup: MetaInboundLookup) {
   if (!lookup) return null;
+  const linked = await findLatestInboundChannelIdBy(tenantId, lookup);
+  if (linked || lookup.kind === "phone" || !lookup.phoneSuffix) return linked;
+  // Without a linked inbound (e.g. a lead ads lead whose first WhatsApp message is not linked yet),
+  // the official number would answer a customer who wrote to a coex number: Meta refuses it (131047).
+  return findLatestInboundChannelIdBy(tenantId, { kind: "phone", suffix: lookup.phoneSuffix, since: lookup.since });
+}
 
+async function findLatestInboundChannelIdBy(tenantId: string, lookup: NonNullable<MetaInboundLookup>) {
   const identity = lookup.kind === "lead"
     ? eq(schema.whatsappMessages.leadId, lookup.id)
     : lookup.kind === "client"

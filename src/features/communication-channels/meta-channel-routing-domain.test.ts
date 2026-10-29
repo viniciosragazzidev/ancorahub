@@ -105,12 +105,14 @@ describe("Coex multi-number decisions", () => {
     const now = new Date("2026-10-29T12:00:00.000Z");
     const since = new Date("2026-09-29T12:00:00.000Z");
     expect(resolveMetaInboundLookup({ leadId: "lead-1", customerPhone: "+55 21 97350-7276", now }))
-      .toEqual({ kind: "lead", id: "lead-1", since });
+      .toEqual({ kind: "lead", id: "lead-1", since, phoneSuffix: "73507276" });
     expect(resolveMetaInboundLookup({ clientId: "client-1", customerPhone: "+55 21 97350-7276", now }))
-      .toEqual({ kind: "client", id: "client-1", since });
+      .toEqual({ kind: "client", id: "client-1", since, phoneSuffix: "73507276" });
+    expect(resolveMetaInboundLookup({ leadId: "lead-1", customerPhone: "12", now }))
+      .toEqual({ kind: "lead", id: "lead-1", since, phoneSuffix: null });
   });
 
-  it("uses a normalized phone suffix only for unlinked conversations, within 30 days", () => {
+  it("uses a normalized phone suffix for unlinked conversations and as the fallback of linked ones, within 30 days", () => {
     const now = new Date("2026-10-29T12:00:00.000Z");
     expect(resolveMetaInboundLookup({ customerPhone: "+55 (21) 97350-7276", now }))
       .toEqual({ kind: "phone", suffix: "73507276", since: new Date("2026-09-29T12:00:00.000Z") });

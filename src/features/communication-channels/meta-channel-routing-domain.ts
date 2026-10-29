@@ -21,8 +21,8 @@ export type MetaChannelBlock = {
 };
 
 export type MetaInboundLookup =
-  | { kind: "lead"; id: string; since: Date }
-  | { kind: "client"; id: string; since: Date }
+  | { kind: "lead"; id: string; since: Date; phoneSuffix: string | null }
+  | { kind: "client"; id: string; since: Date; phoneSuffix: string | null }
   | { kind: "phone"; suffix: string; since: Date }
   | null;
 
@@ -35,10 +35,12 @@ export function resolveMetaInboundLookup(input: {
   now?: Date;
 }): MetaInboundLookup {
   const since = new Date((input.now ?? new Date()).getTime() - META_INBOUND_LOOKBACK_DAYS * 86_400_000);
-  if (input.leadId?.trim()) return { kind: "lead", id: input.leadId.trim(), since };
-  if (input.clientId?.trim()) return { kind: "client", id: input.clientId.trim(), since };
   const suffix = input.customerPhone?.replace(/\D/g, "").slice(-8) ?? "";
-  return suffix.length === 8 ? { kind: "phone", suffix, since } : null;
+  // A new lead's first message may not be linked to it yet: the phone is the fallback, inside the same window.
+  const phoneSuffix = suffix.length === 8 ? suffix : null;
+  if (input.leadId?.trim()) return { kind: "lead", id: input.leadId.trim(), since, phoneSuffix };
+  if (input.clientId?.trim()) return { kind: "client", id: input.clientId.trim(), since, phoneSuffix };
+  return phoneSuffix ? { kind: "phone", suffix: phoneSuffix, since } : null;
 }
 
 export type MetaChannelSelection =
