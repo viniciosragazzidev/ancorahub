@@ -18,6 +18,9 @@ export type DutyTurnState = {
   current: { brokerId: string; offeredAt: string } | null;
   previous: { brokerId: string; offeredAt: string; outcome: "accepted" | "skip" | "waiting" } | null;
   nextBrokerId: string | null;
+  /** Whole saved turn (blocked keep their slots) and who can be moved in it now (29/10). */
+  order: string[];
+  queue: string[];
 };
 
 const ACTIVE_OFFER = new Set(["PENDING", "SENT", "DELIVERED", "READ"]);
@@ -54,5 +57,22 @@ export function resolveDutyTurns(input: { stored: readonly string[] | null; rost
     current: current ? { brokerId: current.brokerId, offeredAt: current.offeredAt.toISOString() } : null,
     previous: previous ? { brokerId: previous.brokerId, offeredAt: previous.offeredAt.toISOString(), outcome: previous.status === "ACCEPTED" ? "accepted" : isSkipOfferStatus(previous.status) ? "skip" : "waiting" } : null,
     nextBrokerId: queue[0] ?? null,
+    order,
+    queue,
   };
+}
+
+/**
+ * The director drags a broker in front of another on the plantão cards (29/10): only who can
+ * receive now moves; whoever is receiving or blocked keeps the slot. Null when the move is invalid.
+ */
+export function moveDutyTurn(state: Pick<DutyTurnState, "order" | "queue">, activeId: string, overId: string): string[] | null {
+  const from = state.queue.indexOf(activeId);
+  const to = state.queue.indexOf(overId);
+  if (from < 0 || to < 0 || from === to) return null;
+  const queue = [...state.queue];
+  queue.splice(to, 0, ...queue.splice(from, 1));
+  const movable = new Set(state.queue);
+  let cursor = 0;
+  return state.order.map((brokerId) => movable.has(brokerId) ? queue[cursor++] : brokerId);
 }

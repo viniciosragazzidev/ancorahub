@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveDutyTurns } from "./duty-turn-core";
+import { moveDutyTurn, resolveDutyTurns } from "./duty-turn-core";
 
 const at = (clock: string) => new Date(`2026-10-29T${clock}:00-03:00`);
 const roster = [
@@ -32,5 +32,20 @@ describe("turn on the plantão cards (29/10)", () => {
     expect(state.byBroker.ana).toMatchObject({ role: "next", position: 1 });
     expect(state.byBroker.caio.position).toBe(2);
     expect(state.byBroker.bia.position).toBeNull();
+  });
+});
+
+describe("director drags a broker in the turn (29/10)", () => {
+  it("puts the dragged broker in front and keeps receiving and blocked brokers in their slots", () => {
+    const state = { order: ["ana", "bia", "caio", "duda", "eva"], queue: ["ana", "caio", "duda", "eva"] };
+    expect(moveDutyTurn(state, "eva", "ana")).toEqual(["eva", "bia", "ana", "caio", "duda"]);
+    expect(moveDutyTurn(state, "ana", "duda")).toEqual(["caio", "bia", "duda", "ana", "eva"]);
+  });
+
+  it("ignores moves onto or from someone who cannot receive now", () => {
+    const state = { order: ["ana", "bia", "caio"], queue: ["ana", "caio"] };
+    expect(moveDutyTurn(state, "caio", "bia")).toBeNull();
+    expect(moveDutyTurn(state, "bia", "ana")).toBeNull();
+    expect(moveDutyTurn(state, "ana", "ana")).toBeNull();
   });
 });

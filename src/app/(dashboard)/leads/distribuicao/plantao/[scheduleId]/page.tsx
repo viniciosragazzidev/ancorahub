@@ -37,6 +37,7 @@ import { BrokerOccurrenceCard, type BrokerTurn } from "../_components/broker-occ
 import { getDutyTurnState } from "@/features/lead-distribution/duty-turn";
 import { DutyTurnAutoRefresh } from "../_components/duty-turn-auto-refresh";
 import { DutyTurnStrip } from "../_components/duty-turn-strip";
+import { DutyTurnSortableGrid } from "../_components/duty-turn-sortable-grid";
 import { BrokerPresenceInviteButton } from "../_components/broker-presence-invite-button";
 import { BrokerPresenceReleaseButton } from "../_components/broker-presence-release-button";
 import { BrokerPauseButton } from "../_components/broker-pause-button";
@@ -669,7 +670,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                 nextName={turnState.nextBrokerId ? nameOf(turnState.nextBrokerId) : null}
               />;
             })() : null}
-            {turnState ? <p className="text-xs text-muted-foreground">Rodízio: cada um tem sua vez, na ordem em que chegou. Quem recebe vai para o fim; lead expirado ou recusado gasta a vez e conta como pulo.</p> : null}
+            {turnState ? <p className="text-xs text-muted-foreground">Rodízio: cada um tem sua vez, na ordem em que chegou. Quem recebe vai para o fim; lead expirado ou recusado gasta a vez e conta como pulo.{context.role === "director" ? " Para passar alguém na frente, arraste o card pelo ícone de arrastar até a posição desejada." : ""}</p> : null}
             {/* Escalar alguém neste plantão sem sair da página (mesma regra da Escala publicada). */}
             {context.role === "director" ? (
               <ScheduleEscalarButton
@@ -697,7 +698,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   { key: "absent", label: "Faltaram", entries: section.entries.filter((entry) => entry.absent) },
                 ]).map((group) => <section key={group.key} aria-label={group.label} className="space-y-2">
                   <h4 className="text-xs font-semibold text-muted-foreground">{group.label} <Badge variant="outline">{group.entries.length}</Badge></h4>
-                  {group.entries.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{group.entries.map((entry) => (
+                  {group.entries.length ? (() => { const cards = group.entries.map((entry) => ({ key: `${section.key}:${entry.id}`, id: entry.brokerId, name: entry.brokerName, node: (
               <BrokerOccurrenceCard
                 key={`${section.key}:${entry.id}`}
                 directorLite={directorLite}
@@ -765,7 +766,12 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   <Badge variant="destructive" title="Leads recebidos à tarde neste plantão">Tarde {brokerShiftCounts(entry.brokerId).tarde}</Badge>
                 </div> : <Badge variant="outline" title="Leads recebidos neste plantão">{brokerShiftCounts(entry.brokerId).manha + brokerShiftCounts(entry.brokerId).tarde} leads</Badge>}
               </BrokerOccurrenceCard>
-            ))}</div> : <p className="text-sm text-muted-foreground">Nenhum corretor nesta seção.</p>}
+            ) }));
+                  // The director drags the active cards to change who receives first (29/10).
+                  return turnState && liveWindow && context.role === "director" && group.key === "active"
+                    ? <DutyTurnSortableGrid scheduleId={schedule.id} dutyDate={liveWindow.dutyDate} order={turnState.order} queue={turnState.queue} items={cards} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" />
+                    : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{cards.map((card) => card.node)}</div>;
+                  })() : <p className="text-sm text-muted-foreground">Nenhum corretor nesta seção.</p>}
                 </section>) : <p className="text-sm text-muted-foreground">Ninguém escalado neste turno.</p>}
               </section>
             )) : <p className="text-sm text-muted-foreground">Nenhum corretor escalado neste plantão.</p>}

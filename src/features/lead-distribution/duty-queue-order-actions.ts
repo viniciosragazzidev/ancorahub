@@ -56,6 +56,7 @@ export async function saveDutyManualQueueAction(rawInput: unknown): Promise<{ ok
     });
     if (!saved) return { ok: false, reason: "A distribuição está escolhendo um corretor. Tente novamente em instantes." };
     revalidatePath("/leads/distribuicao");
+    revalidatePath(`/leads/distribuicao/plantao/${scheduleId}`);
     return { ok: true };
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível salvar a fila." };
