@@ -4,20 +4,15 @@
  * lead and with an hourly cap; the conversation then continues on the phone.
  */
 
+import { brokerGreeting } from "@/features/leads/broker-greeting";
+
 export const FIRST_MESSAGE_MAX_LENGTH = 1_000;
 /** First messages a broker may send through the system per hour (the number's safety). */
 export const FIRST_MESSAGES_PER_HOUR = 20;
 
-const firstName = (name: string | null | undefined) => (name ?? "").trim().split(/\s+/)[0] ?? "";
-
-/** "Olá, Maria! Aqui é o Carlos, da Âncora Saúde..." (no dash, editable by the broker). */
+/** The broker's first message (one text for every path since 29/10, see broker-greeting). */
 export function buildFirstMessage(input: { leadName: string | null; brokerName: string | null; companyName: string | null }) {
-  const lead = firstName(input.leadName);
-  const broker = firstName(input.brokerName);
-  const company = (input.companyName ?? "").trim();
-  const greeting = lead ? `Olá, ${lead}!` : "Olá!";
-  const intro = broker ? ` Aqui é ${broker}${company ? `, da ${company}` : ""}.` : company ? ` Aqui é da ${company}.` : "";
-  return `${greeting}${intro} Recebi seu pedido sobre plano de saúde e vou te ajudar a encontrar a melhor opção. Podemos conversar por aqui?`;
+  return brokerGreeting(input);
 }
 
 /** WhatsApp Web with the number and the text already written (the broker only presses Enter). */

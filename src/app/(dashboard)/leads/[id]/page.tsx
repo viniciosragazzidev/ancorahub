@@ -22,6 +22,7 @@ import { getLeadProductLabel, readMetaLeadDisplayDetails } from "@/features/lead
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
 import { getDatabase, schema } from "@/shared/db";
+import { brokerGreeting, greetingFactsFromQualification } from "@/features/leads/broker-greeting";
 import { StartServiceButton } from "./start-service-button";
 import { MarkLeadInServiceButton } from "@/features/leads/components/mark-lead-in-service-button";
 import { canDirectorMarkLeadInService } from "@/features/leads/director-service-start";
@@ -264,6 +265,15 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
     const [brokerUser] = brokerUserRows;
 
     const lightFormData = readFormData(lead.formData);
+    const companyName = (await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1))[0]?.name ?? null;
+    const greeting = brokerGreeting({
+      leadName: lead.nome,
+      brokerName: lead.corretorNome,
+      companyName,
+      tipo: lead.tipo,
+      planName: lead.productName,
+      ...greetingFactsFromQualification(lead.qualificationDetails),
+    });
 
     const lightLead: LightLeadDetailData = {
       id: lead.id,
@@ -275,6 +285,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       qualificationState: lead.qualificationState,
       corretorId: lead.corretorId,
       corretorNome: lead.corretorNome,
+      brokerGreeting: greeting,
       branchName: lead.branchNome,
       summary: qualificationDetails?.resumoAtendimento || qualificationDetails?.resumoNecessidade || null,
       planName: lead.productName,
@@ -356,7 +367,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
         // The columns beside the chat show the data, the next step and the AI suggestion (no repeats).
         panel: true,
         now,
-        whatsappUrl: buildWhatsAppUrl(lightContact.telefone, `Olá, ${lead.nome.split(" ")[0] || lead.nome}! Sou seu corretor e vou seguir com seu atendimento por aqui.`),
+        whatsappUrl: buildWhatsAppUrl(lightContact.telefone, greeting),
         // Voice notes have no text: they stay in the history as a player.
         messages: waMessages.filter((message) => (message.body || message.mediaKind === "audio") && message.sentAt).map((message) => ({ id: message.id, body: message.body ?? "", direction: message.direction, sentAt: new Date(message.sentAt as Date | string), senderRole: message.senderRole, mediaKind: message.mediaKind })),
         advice: lightContact.reveal ? { nextBestAction: intelligence.nextBestAction, pendingFrom: intelligence.pendingFrom } : null,

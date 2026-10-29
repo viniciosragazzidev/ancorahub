@@ -7,7 +7,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-message";
-import { brokerGreeting } from "@/features/leads/broker-greeting";
+import { loadBrokerGreeting } from "@/features/leads/broker-greeting-server";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 
 export type StartLeadServiceState = { success?: boolean; error?: string; whatsappUrl?: string };
@@ -119,7 +119,7 @@ export async function startLeadServiceAction(_prev: StartLeadServiceState, formD
 
 
     // WhatsApp Web straight in the chat with the greeting written (the click handler swaps it for the app on a phone).
-    return { success: true, whatsappUrl: buildWhatsAppUrl(lead.telefone, brokerGreeting(lead.nome)) ?? undefined };
+    return { success: true, whatsappUrl: buildWhatsAppUrl(lead.telefone, await loadBrokerGreeting({ tenantId: context.tenantId, leadId: lead.id, brokerUserId: context.userId })) ?? undefined };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível iniciar o atendimento." };
   }

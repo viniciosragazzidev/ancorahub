@@ -16,7 +16,8 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
 import { canRevealLightContact } from "../lead-contact-privacy";
-import { buildFirstMessage, buildWhatsAppWebUrl, FIRST_MESSAGE_MAX_LENGTH, FIRST_MESSAGES_PER_HOUR } from "./first-message";
+import { buildWhatsAppWebUrl, FIRST_MESSAGE_MAX_LENGTH, FIRST_MESSAGES_PER_HOUR } from "./first-message";
+import { loadBrokerGreeting } from "@/features/leads/broker-greeting-server";
 
 const OUTBOUND = ["outgoing", "outbound"];
 const AUDIT_ENTITY = "lead_first_message";
@@ -83,14 +84,12 @@ export async function getFirstMessageContextAction(leadId: string): Promise<Firs
   try {
     const { context, lead } = await loadOwnLead(String(leadId).slice(0, 80));
     if (!lead) return { ok: false, error: "Este lead não está mais com você. Volte para a fila para ver os seus." };
-    const db = getDatabase();
-    const [[broker], [tenant], connection, alreadySent] = await Promise.all([
-      db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1),
-      db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1),
+    // The same first message as the "Iniciar atendimento" link (29/10): broker, brokerage, plan and lives.
+    const [message, connection, alreadySent] = await Promise.all([
+      loadBrokerGreeting({ tenantId: context.tenantId, leadId: lead.id, brokerUserId: context.userId }),
       connectionOf(context.tenantId, context.userId),
       brokerAlreadyWrote(context.tenantId, lead.id, lead.assignedAt),
     ]);
-    const message = buildFirstMessage({ leadName: lead.nome, brokerName: broker?.name ?? null, companyName: tenant?.name ?? null });
     const reveal = canRevealLightContact({ status: lead.status, isCurrentBroker: true });
     const digits = reveal ? normalizeWhatsAppDestination(lead.telefone) : null;
     return {

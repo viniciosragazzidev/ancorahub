@@ -21,6 +21,8 @@ export type LightLeadDetailData = {
   qualificationState?: string | null;
   corretorId?: string | null;
   corretorNome?: string | null;
+  /** First WhatsApp message of the broker, with the broker's and the brokerage's names (29/10). */
+  brokerGreeting?: string | null;
   branchName?: string | null;
   planName?: string | null;
   carrierName?: string | null;

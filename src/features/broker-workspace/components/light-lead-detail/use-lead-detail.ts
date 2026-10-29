@@ -11,6 +11,7 @@ import { isAiPotentialSale } from "@/features/leads/ai-potential-sale";
 import { LEAD_STATUS_ORDER } from "@/features/leads/lead-status-constants";
 import { confirmDocumentUploadAction } from "@/features/documents/actions";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
+import { brokerGreeting } from "@/features/leads/broker-greeting";
 import { openWhatsApp, prepareWhatsAppWindow } from "@/lib/whatsapp-open";
 import { quickReminderAction } from "@/features/leads/reminder-actions";
 import { buildFollowUpWhen, type FollowUpOptionValue } from "@/features/broker-workspace/follow-up-options";
@@ -98,7 +99,7 @@ export function useLeadDetail({
 
     const [whatsappOpenedAt, setWhatsappOpenedAt] = useState<string | null>(null);
     const [requestingSale, startRequestSaleTransition] = useTransition();
-    const brokerIntro = `Olá, ${lead.nome.split(" ")[0] || lead.nome}! Sou seu corretor e vou seguir com seu atendimento por aqui.`;
+    const brokerIntro = lead.brokerGreeting || brokerGreeting({ leadName: lead.nome, brokerName: lead.corretorNome, tipo: lead.tipo, planName: lead.planName, livesCount: lead.livesCount, city: lead.city });
     const externalWhatsAppUrl = buildWhatsAppUrl(lead.telefone, brokerIntro);
 
     const [saleDocOpen, setSaleDocOpen] = useState(false);

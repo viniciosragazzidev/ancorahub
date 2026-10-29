@@ -18,9 +18,9 @@ const context = (overrides = {}) => ({ ok: true, leadFirstName: "Maria", message
 describe("first message text", () => {
   it("greets the client by first name and introduces the broker and company, without a dash", () => {
     const text = buildFirstMessage({ leadName: "Maria Souza", brokerName: "Carlos Lima", companyName: "Âncora Saúde" });
-    expect(text.startsWith("Olá, Maria! Aqui é Carlos, da Âncora Saúde.")).toBe(true);
+    expect(text.startsWith("Oi, Maria, tudo bem? Aqui é Carlos, da Âncora Saúde.")).toBe(true);
     expect(text).not.toContain("—");
-    expect(buildFirstMessage({ leadName: null, brokerName: null, companyName: null }).startsWith("Olá! Recebi")).toBe(true);
+    expect(buildFirstMessage({ leadName: null, brokerName: null, companyName: null }).startsWith("Oi, tudo bem? Acabei de receber")).toBe(true);
     expect(buildWhatsAppWebUrl("5521999998888", "Oi tudo bem")).toBe("https://web.whatsapp.com/send?phone=5521999998888&text=Oi%20tudo%20bem");
   });
 });
