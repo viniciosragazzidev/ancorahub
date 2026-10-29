@@ -75,7 +75,7 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     key: "LEAD_CLIENT_RETURNED",
     purpose: "leadClientReturned",
     label: "Cliente voltou a chamar",
-    description: "Avisa o corretor quando um lead dele manda mensagem 24 h ou mais depois da distribuição. Uma vez por lead.",
+    description: "Avisa o corretor quando um lead dele manda mensagem no número oficial da empresa 24 h ou mais depois da distribuição. Mensagem no WhatsApp do próprio corretor não conta. Uma vez por lead.",
     // The client is writing now: goes out at once, any day, like the lead notices.
     class: "critical",
     defaultEnabled: true,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assignedDayLabel, shouldNotifyClientReturned } from "./client-returned-core";
+import { assignedDayLabel, isOfficialNumberInbound, shouldNotifyClientReturned } from "./client-returned-core";
 import { builtInNoticeVariants } from "@/features/team-notices/variants";
 import { teamNoticeForPurpose } from "@/features/team-notices/catalog";
 
@@ -18,6 +18,16 @@ describe("cliente voltou a chamar (29/10)", () => {
     expect(shouldNotifyClientReturned({ leadId: "l1", brokerId: "b1", assignedAt: at("2026-10-20T10:00:00"), messageAt, alreadyNotified: true })).toBe(false);
     expect(shouldNotifyClientReturned({ leadId: "l1", brokerId: null, assignedAt: at("2026-10-20T10:00:00"), messageAt, alreadyNotified: false })).toBe(false);
     expect(shouldNotifyClientReturned({ leadId: "l1", brokerId: "b1", assignedAt: null, messageAt, alreadyNotified: false })).toBe(false);
+  });
+
+  it("only counts a message on the company's official number, never on the broker's own WhatsApp", () => {
+    const official = { provider: "meta_cloud", channelId: "c1", channelProvider: "meta_cloud", channelType: "shared", channelOwnerUserId: null, whatsappConnectionId: null };
+    expect(isOfficialNumberInbound(official)).toBe(true);
+    expect(isOfficialNumberInbound({ ...official, provider: "waha", channelId: null, channelProvider: null, channelType: null })).toBe(false);
+    expect(isOfficialNumberInbound({ ...official, whatsappConnectionId: "broker-connection" })).toBe(false);
+    expect(isOfficialNumberInbound({ ...official, channelOwnerUserId: "broker-1" })).toBe(false);
+    expect(isOfficialNumberInbound({ ...official, channelType: "broker" })).toBe(false);
+    expect(isOfficialNumberInbound({ ...official, provider: "openwa_legacy" })).toBe(false);
   });
 
   it("is a team notice with texts for the company number, without a dash", () => {

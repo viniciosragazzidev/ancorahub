@@ -18,6 +18,19 @@ export type ClientReturnedCandidate = {
   alreadyNotified: boolean;
 };
 
+/**
+ * Only a message that reached the company's official number (29/10): the Meta channel shared by
+ * the company, never the broker's own WhatsApp (WAHA connection) nor a channel owned by someone.
+ */
+export function isOfficialNumberInbound(message: { provider: string | null; channelId: string | null; channelProvider: string | null; channelType: string | null; channelOwnerUserId: string | null; whatsappConnectionId: string | null }) {
+  return message.provider === "meta_cloud"
+    && Boolean(message.channelId)
+    && message.channelProvider === "meta_cloud"
+    && message.channelType === "shared"
+    && !message.channelOwnerUserId
+    && !message.whatsappConnectionId;
+}
+
 /** One notice per lead, ever, and only when the message came long enough after the distribution. */
 export function shouldNotifyClientReturned(candidate: ClientReturnedCandidate, afterHours = CLIENT_RETURNED_AFTER_HOURS) {
   if (!candidate.brokerId || !candidate.assignedAt || candidate.alreadyNotified) return false;

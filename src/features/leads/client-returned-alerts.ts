@@ -13,13 +13,15 @@ import {
   CLIENT_RETURNED_AUDIT_ACTION,
   CLIENT_RETURNED_LOOKBACK_MINUTES,
   INBOUND_DIRECTIONS,
+  isOfficialNumberInbound,
   shouldNotifyClientReturned,
 } from "./client-returned-core";
 
 export type ClientReturnedResult = { checked: number; notified: number; failed: number };
 
 /**
- * Tells the broker when a lead distributed to them more than 24 h ago writes again (29/10): a
+ * Tells the broker when a lead distributed to them more than 24 h ago writes again on the company's
+ * official number, never on the broker's own WhatsApp (29/10): a
  * WhatsApp notice ("Cliente voltou a chamar", channel chosen in Avisos da equipe) plus the in-app
  * notice. Once per lead, ever. Runs in the reminders job; never throws.
  */
@@ -37,10 +39,24 @@ export async function runClientReturnedAlerts(now = new Date()): Promise<ClientR
         brokerId: schema.leads.corretorId,
         assignedAt: schema.leads.assignedAt,
         messageAt: schema.whatsappMessages.sentAt,
+        provider: schema.whatsappMessages.provider,
+        channelId: schema.communicationChannels.id,
+        channelProvider: schema.communicationChannels.provider,
+        channelType: schema.communicationChannels.channelType,
+        channelOwnerUserId: schema.communicationChannels.ownerUserId,
+        whatsappConnectionId: schema.whatsappMessages.whatsappConnectionId,
       })
       .from(schema.whatsappMessages)
       .innerJoin(schema.leads, and(eq(schema.leads.id, schema.whatsappMessages.leadId), eq(schema.leads.tenantId, schema.whatsappMessages.tenantId)))
+      // Only the company's official number (29/10): the client writing on the broker's own WhatsApp
+      // is already in front of the broker.
+      .innerJoin(schema.communicationChannels, and(eq(schema.communicationChannels.id, schema.whatsappMessages.communicationChannelId), eq(schema.communicationChannels.tenantId, schema.whatsappMessages.tenantId)))
       .where(and(
+        eq(schema.whatsappMessages.provider, "meta_cloud"),
+        eq(schema.communicationChannels.provider, "meta_cloud"),
+        eq(schema.communicationChannels.channelType, "shared"),
+        isNull(schema.communicationChannels.ownerUserId),
+        isNull(schema.whatsappMessages.whatsappConnectionId),
         gte(schema.whatsappMessages.sentAt, since),
         inArray(schema.whatsappMessages.direction, [...INBOUND_DIRECTIONS]),
         isNotNull(schema.leads.corretorId),
@@ -49,9 +65,9 @@ export async function runClientReturnedAlerts(now = new Date()): Promise<ClientR
       ))
       .orderBy(desc(schema.whatsappMessages.sentAt))
       .limit(300);
-    // The newest message of each lead.
+    // The newest official-number message of each lead (re-checked here on top of the query).
     const byLead = new Map<string, (typeof rows)[number]>();
-    for (const row of rows) if (row.messageAt && !byLead.has(row.leadId)) byLead.set(row.leadId, row);
+    for (const row of rows) if (row.messageAt && isOfficialNumberInbound(row) && !byLead.has(row.leadId)) byLead.set(row.leadId, row);
     const leads = [...byLead.values()].filter((row) => shouldNotifyClientReturned({ ...row, messageAt: row.messageAt!, alreadyNotified: false }));
     result.checked = leads.length;
     if (!leads.length) return result;
