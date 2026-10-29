@@ -1,17 +1,26 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gte, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { INITIAL_MESSAGE_FAILURE_NOTE_PREFIX } from "@/features/communication-channels/meta-delivery-failure";
+import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { startAiQualificationForLead } from "./service";
+import {
+  AI_SEND_FAILED_LOOKBACK_MS,
+  AI_SEND_FAILED_SKIP_LABEL,
+  CUSTOMER_WINDOW_MS,
+  decideAiSendFailedCandidate,
+  type AiSendFailedDecision,
+  type AiSendFailedLeadFacts,
+} from "./ai-send-failed-candidates";
 
 const bulkFilterSchema = z.object({
-  filterType: z.enum(["all_unqualified", "new_leads", "unresponsive_24h", "first_message_failed", "custom_selection"]).default("all_unqualified"),
+  filterType: z.enum(["all_unqualified", "new_leads", "unresponsive_24h", "first_message_failed", "ai_send_failed", "custom_selection"]).default("all_unqualified"),
   leadIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -24,6 +33,7 @@ export async function getCandidateLeadsForBulkQualification(filterType: string =
   if (context.role !== "director" && context.role !== "manager") {
     throw new AuthorizationError("Apenas diretores e gestores podem realizar disparos em massa.");
   }
+  if (filterType === "ai_send_failed") return loadAiSendFailedCandidates(context);
   const db = getDatabase();
   const now = new Date();
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -96,6 +106,7 @@ export async function triggerBulkQualificationAction(input: BulkQualificationFil
     }
 
     const parsed = bulkFilterSchema.parse(input);
+    if (parsed.filterType === "ai_send_failed") return reopenAiSendFailedLeads(context, parsed.leadIds ?? []);
     const db = getDatabase();
 
     let targetLeadIds: string[] = [];
@@ -156,4 +167,183 @@ export async function triggerBulkQualificationAction(input: BulkQualificationFil
       error: error instanceof Error ? error.message : "Erro ao disparar qualificação em massa.",
     };
   }
+}
+
+type BulkContext = Awaited<ReturnType<typeof getRequiredTenantContext>>;
+
+const AI_SEND_FAILED_MAX_LEADS = 500;
+const DELIVERED_STATUSES = ["sent", "delivered", "read"];
+
+/** Facts per lead, read from the messages of the lookback; the rule itself is decideAiSendFailedCandidate. */
+async function loadAiSendFailedDecisions(context: BulkContext, now: Date) {
+  const db = getDatabase();
+  const since = new Date(now.getTime() - AI_SEND_FAILED_LOOKBACK_MS);
+  const failedRows = await db
+    .selectDistinct({ leadId: schema.whatsappMessages.leadId })
+    .from(schema.whatsappMessages)
+    .where(and(
+      eq(schema.whatsappMessages.tenantId, context.tenantId),
+      eq(schema.whatsappMessages.senderRole, "assistant"),
+      eq(schema.whatsappMessages.providerStatus, "failed"),
+      gte(schema.whatsappMessages.sentAt, since),
+      isNotNull(schema.whatsappMessages.leadId),
+    ))
+    .limit(AI_SEND_FAILED_MAX_LEADS);
+  const leadIds = failedRows.map((row) => row.leadId).filter((id): id is string => Boolean(id));
+  if (!leadIds.length) return new Map<string, { decision: AiSendFailedDecision; lead: LeadRowForBulk }>();
+
+  const leadRows = await db
+    .select({
+      id: schema.leads.id,
+      nome: schema.leads.nome,
+      telefone: schema.leads.telefone,
+      status: schema.leads.status,
+      corretorId: schema.leads.corretorId,
+      qualificationStatus: schema.leads.qualificationStatus,
+      branchId: schema.leads.branchId,
+      queueName: schema.leadQueues.name,
+    })
+    .from(schema.leads)
+    .leftJoin(schema.leadQueues, eq(schema.leadQueues.id, schema.leads.queueId))
+    .where(and(
+      eq(schema.leads.tenantId, context.tenantId),
+      isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
+      inArray(schema.leads.id, leadIds),
+      context.role === "director" ? undefined : eq(schema.leads.branchId, context.branchId ?? ""),
+    ))
+    .limit(AI_SEND_FAILED_MAX_LEADS);
+  const scopedIds = leadRows.map((lead) => lead.id);
+  if (!scopedIds.length) return new Map<string, { decision: AiSendFailedDecision; lead: LeadRowForBulk }>();
+
+  const outbound = await db
+    .select({ leadId: schema.whatsappMessages.leadId, sentAt: schema.whatsappMessages.sentAt, providerStatus: schema.whatsappMessages.providerStatus, senderRole: schema.whatsappMessages.senderRole })
+    .from(schema.whatsappMessages)
+    .where(and(
+      eq(schema.whatsappMessages.tenantId, context.tenantId),
+      inArray(schema.whatsappMessages.leadId, scopedIds),
+      inArray(schema.whatsappMessages.direction, ["outbound", "outgoing"]),
+      gte(schema.whatsappMessages.sentAt, since),
+    ));
+  const inbound = await db
+    .select({ leadId: schema.whatsappMessages.leadId, sentAt: schema.whatsappMessages.sentAt })
+    .from(schema.whatsappMessages)
+    .where(and(
+      eq(schema.whatsappMessages.tenantId, context.tenantId),
+      inArray(schema.whatsappMessages.leadId, scopedIds),
+      inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
+      gte(schema.whatsappMessages.sentAt, since),
+    ));
+
+  const lastInboundByLead = new Map<string, Date>();
+  for (const row of inbound) {
+    if (!row.leadId || !row.sentAt) continue;
+    const current = lastInboundByLead.get(row.leadId);
+    if (!current || row.sentAt > current) lastInboundByLead.set(row.leadId, row.sentAt);
+  }
+  const outboundByLead = new Map<string, typeof outbound>();
+  for (const row of outbound) {
+    if (!row.leadId) continue;
+    outboundByLead.set(row.leadId, [...(outboundByLead.get(row.leadId) ?? []), row]);
+  }
+
+  const result = new Map<string, { decision: AiSendFailedDecision; lead: LeadRowForBulk }>();
+  for (const lead of leadRows) {
+    const messages = outboundByLead.get(lead.id) ?? [];
+    const aiMessages = messages.filter((message) => message.senderRole === "assistant" && message.sentAt);
+    const lastAi = aiMessages.sort((a, b) => (a.sentAt!.getTime() - b.sentAt!.getTime()))[aiMessages.length - 1];
+    const deliveredAfterLastAi = lastAi?.sentAt
+      ? messages.some((message) => message.sentAt && message.sentAt > lastAi.sentAt! && DELIVERED_STATUSES.includes(message.providerStatus ?? ""))
+      : false;
+    const facts: AiSendFailedLeadFacts = {
+      leadId: lead.id,
+      status: lead.status,
+      corretorId: lead.corretorId,
+      qualificationStatus: lead.qualificationStatus,
+      lastAiSentAt: lastAi?.sentAt ?? null,
+      lastAiFailed: lastAi?.providerStatus === "failed",
+      deliveredAfterLastAi,
+      lastCustomerInboundAt: lastInboundByLead.get(lead.id) ?? null,
+    };
+    result.set(lead.id, { decision: decideAiSendFailedCandidate(facts, now), lead });
+  }
+  return result;
+}
+
+type LeadRowForBulk = {
+  id: string;
+  nome: string;
+  telefone: string;
+  status: string;
+  corretorId: string | null;
+  qualificationStatus: string | null;
+  branchId: string | null;
+  queueName: string | null;
+};
+
+/** The list shown before confirming: only the leads the reopen would take. */
+async function loadAiSendFailedCandidates(context: BulkContext) {
+  const decisions = await loadAiSendFailedDecisions(context, new Date());
+  return [...decisions.values()].flatMap(({ decision, lead }) => decision.eligible
+    ? [{
+      id: lead.id,
+      nome: lead.nome,
+      telefone: lead.telefone,
+      status: lead.status,
+      queueName: lead.queueName,
+      failedAt: decision.failedAt.toISOString(),
+      windowEndsAt: decision.windowEndsAt.toISOString(),
+    }]
+    : []);
+}
+
+/**
+ * Reopens with the same action as the individual button ("Reabrir Qualificação por IA"), one by one.
+ * The eligibility is recomputed here: a client-sent id that no longer qualifies is only counted as ignored.
+ */
+async function reopenAiSendFailedLeads(context: BulkContext, requestedIds: string[]) {
+  const now = new Date();
+  const decisions = await loadAiSendFailedDecisions(context, now);
+  const requested = requestedIds.length ? new Set(requestedIds) : null;
+  const ignored: Record<string, number> = {};
+  const count = (reason: string) => { ignored[reason] = (ignored[reason] ?? 0) + 1; };
+  const targets: string[] = [];
+  for (const [leadId, { decision }] of decisions) {
+    if (requested && !requested.has(leadId)) continue;
+    if (decision.eligible) targets.push(leadId);
+    else count(AI_SEND_FAILED_SKIP_LABEL[decision.reason]);
+  }
+  if (requested) {
+    for (const leadId of requested) if (!decisions.has(leadId)) count("fora do filtro ou sem falha da IA");
+  }
+
+  let reopened = 0;
+  for (const leadId of targets) {
+    try {
+      const result = await manuallyChangeQualificationStageAction({ leadId, targetStage: "qualificacoes" });
+      if (result.success) reopened++;
+      else count(result.error ?? "erro ao reabrir");
+    } catch {
+      count("erro ao reabrir");
+    }
+  }
+
+  const ignoredCount = Object.values(ignored).reduce((total, value) => total + value, 0);
+  await getDatabase().insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "ai_qualification_bulk",
+    entidadeId: context.tenantId,
+    acao: "ai_qualification.bulk_reopened_ai_send_failed",
+  });
+
+  return {
+    success: true as const,
+    totalProcessed: targets.length + ignoredCount,
+    successCount: reopened,
+    failedCount: ignoredCount,
+    reopenedCount: reopened,
+    ignoredCount,
+    ignoredReasons: Object.entries(ignored).map(([reason, count]) => ({ reason, count })),
+  };
 }

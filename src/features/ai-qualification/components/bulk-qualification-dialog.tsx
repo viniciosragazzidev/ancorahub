@@ -29,7 +29,11 @@ export function BulkQualificationDialog({ trigger, onSuccess }: BulkQualificatio
   const [open, setOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>("all_unqualified");
   const [loadingPreview, setLoadingPreview] = useState(false);
-  const [candidates, setCandidates] = useState<Array<{ id: string; nome: string; telefone: string; status: string }>>([]);
+  const [candidates, setCandidates] = useState<Array<{ id: string; nome: string; telefone: string; status: string; queueName?: string | null; failedAt?: string; windowEndsAt?: string }>>([]);
+  const isReopen = filterType === "ai_send_failed";
+  const shortDateTime = (value?: string) => (value
+    ? new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(value))
+    : "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resultMessage, setResultMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -65,7 +69,14 @@ export function BulkQualificationDialog({ trigger, onSuccess }: BulkQualificatio
         leadIds: candidates.map((c) => c.id),
       });
 
-      if (res.success) {
+      if (res.success && "reopenedCount" in res) {
+        const reasons = res.ignoredReasons.map((item) => `${item.reason} (${item.count})`).join("; ");
+        setResultMessage({
+          type: "success",
+          text: `${res.reopenedCount} lead(s) reaberto(s) para a qualificação por IA; ${res.ignoredCount} ignorado(s)${reasons ? `: ${reasons}` : ""}.`,
+        });
+        if (onSuccess) onSuccess();
+      } else if (res.success) {
         setResultMessage({
           type: "success",
           text: `Sucesso! Mensagens de qualificação disparadas para ${res.successCount} lead(s).`,
@@ -120,6 +131,7 @@ export function BulkQualificationDialog({ trigger, onSuccess }: BulkQualificatio
                 <SelectItem value="new_leads">Apenas Leads Novos Sem Atendimento</SelectItem>
                 <SelectItem value="unresponsive_24h">Leads Sem Resposta Há Mais de 24 Horas</SelectItem>
                 <SelectItem value="first_message_failed">1ª mensagem não enviada por erro do sistema</SelectItem>
+                <SelectItem value="ai_send_failed">Falha de envio da IA: reabrir qualificação</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -141,9 +153,18 @@ export function BulkQualificationDialog({ trigger, onSuccess }: BulkQualificatio
             {candidates.length > 0 ? (
               <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
                 {candidates.slice(0, 10).map((c) => (
-                  <div key={c.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-card border border-border/50">
-                    <span className="font-medium truncate max-w-[200px]">{c.nome}</span>
-                    <span className="text-[11px] text-muted-foreground font-mono">{c.telefone}</span>
+                  <div key={c.id} className="flex items-center justify-between gap-2 text-xs py-1 px-2 rounded bg-card border border-border/50">
+                    {isReopen ? (
+                      <span className="min-w-0 grid gap-0.5">
+                        <span className="font-medium truncate">{c.nome}</span>
+                        <span className="text-[11px] text-muted-foreground truncate">
+                          {c.queueName ?? "Sem fila"} · falhou {shortDateTime(c.failedAt)} · prazo {shortDateTime(c.windowEndsAt)}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="font-medium truncate max-w-[200px]">{c.nome}</span>
+                    )}
+                    <span className="text-[11px] text-muted-foreground font-mono shrink-0">{c.telefone}</span>
                   </div>
                 ))}
                 {candidates.length > 10 && (
@@ -189,7 +210,7 @@ export function BulkQualificationDialog({ trigger, onSuccess }: BulkQualificatio
             ) : (
               <>
                 <Send className="size-3.5" />
-                Confirmar Disparo em Massa
+                {isReopen ? "Reabrir qualificação" : "Confirmar Disparo em Massa"}
               </>
             )}
           </Button>
