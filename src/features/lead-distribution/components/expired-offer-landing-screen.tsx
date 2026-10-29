@@ -27,18 +27,17 @@ export function ExpiredOfferLandingScreen() {
     <div className="arc-venancor mx-auto w-full max-w-2xl px-4 py-6 sm:px-6 sm:py-10">
       <section
         aria-labelledby="expired-offer-title"
-        className="rounded-3xl border border-(--border) bg-(--surface) p-6 shadow-(--shadow-resting) sm:p-8"
+        className="rounded-3xl border border-(--border) bg-(--surface) p-6 sm:p-8"
       >
         <div className="mx-auto flex max-w-lg flex-col items-center text-center">
           <div aria-hidden="true" className="mb-5 grid size-12 place-items-center rounded-2xl bg-(--surface-muted) text-(--text-secondary)">
             <Clock3 className="size-6" />
           </div>
-          <p className="text-sm font-medium text-(--text-secondary)">Oferta encerrada</p>
-          <h1 id="expired-offer-title" className="mt-2 text-2xl font-semibold tracking-tight text-(--foreground) sm:text-3xl">
-            O prazo de aceite terminou
+          <h1 id="expired-offer-title" className="text-2xl font-semibold tracking-tight text-(--foreground) sm:text-3xl">
+            Você perdeu este lead por demora no aceite
           </h1>
           <p className="mt-3 text-base leading-7 text-(--text-secondary)">
-            Este lead foi redistribuído para outro corretor.
+            O prazo para aceitar terminou e o lead seguiu na distribuição.
           </p>
           <p className="mt-5 text-sm text-(--text-secondary)" role="timer" aria-label={`Redirecionando em ${secondsRemaining} segundos`}>
             Redirecionando para Meus leads em <span className="font-semibold tabular-nums text-(--foreground)">{secondsRemaining}</span>s

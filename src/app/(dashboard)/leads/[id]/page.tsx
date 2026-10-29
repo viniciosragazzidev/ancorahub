@@ -109,7 +109,7 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
       })) {
         return <ExpiredOfferLandingScreen />;
       }
-      notFound();
+      // Any other access by a non-owner keeps the page's existing rules (e.g. a pending offer).
     }
   }
   if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
