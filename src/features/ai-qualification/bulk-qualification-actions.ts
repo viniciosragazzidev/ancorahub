@@ -175,6 +175,7 @@ export async function triggerBulkQualificationAction(input: BulkQualificationFil
 type BulkContext = Awaited<ReturnType<typeof getRequiredTenantContext>>;
 
 const AI_SEND_FAILED_MAX_LEADS = 500;
+const AI_SEND_FAILED_BATCH = 20;
 const DELIVERED_STATUSES = ["sent", "delivered", "read"];
 
 /** Facts per lead, read from the messages of the lookback; the rule itself is decideAiSendFailedCandidate. */
@@ -331,9 +332,13 @@ async function runAiSendFailedReopen(context: BulkContext, requestedIds: string[
     for (const leadId of requested) if (!decisions.has(leadId)) count("fora do filtro ou sem falha da IA");
   }
 
+  // A batch that fits well inside the 10-minute lease: a longer run could outlive it and a second
+  // run would resend (eligibility only blocks after the delivery). The rest goes in the next click.
+  const batch = targets.slice(0, AI_SEND_FAILED_BATCH);
+  for (let index = batch.length; index < targets.length; index++) count("fica para a próxima reabertura (lote de 20)");
   let reopened = 0;
   let sent = 0;
-  for (const leadId of targets) {
+  for (const leadId of batch) {
     try {
       const result = await manuallyChangeQualificationStageAction({ leadId, targetStage: "qualificacoes" });
       if (!result.success) {
@@ -373,7 +378,7 @@ async function runAiSendFailedReopen(context: BulkContext, requestedIds: string[
 
   return {
     success: true as const,
-    totalProcessed: targets.length + ignoredCount,
+    totalProcessed: batch.length + ignoredCount,
     successCount: reopened,
     failedCount: ignoredCount,
     reopenedCount: reopened,
