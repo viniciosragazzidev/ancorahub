@@ -40,6 +40,10 @@ export type AiRouterCall = {
   prefer?: { provider: AiProviderId; model: string };
   /** Per-attempt timeout (default 12s); background jobs may allow more. */
   timeoutMs?: number;
+  /** Optional total deadline across provider/model fallbacks. */
+  overallTimeoutMs?: number;
+  /** Caller cancellation, used by latency-bounded qualification analysis. */
+  signal?: AbortSignal;
 };
 
 export type AiRouterResult = {
@@ -172,50 +176,71 @@ export async function createAiRouter(tenantId: string): Promise<AiRouter> {
     }
 
     const lastError = { status: 502, errText: "" };
+    const overallController = new AbortController();
+    const abortForCaller = () => overallController.abort(input.signal?.reason);
+    if (input.signal?.aborted) overallController.abort(input.signal.reason);
+    else input.signal?.addEventListener("abort", abortForCaller, { once: true });
+    const overallTimer = input.overallTimeoutMs
+      ? setTimeout(() => overallController.abort(new Error("overall_timeout")), input.overallTimeoutMs)
+      : undefined;
 
-    for (const pair of pairs) {
-      try {
-        const response = await fetch(pair.endpoint, {
-          method: "POST",
-          signal: AbortSignal.timeout(input.timeoutMs ?? 12000),
-          headers: {
-            "Authorization": `Bearer ${pair.apiKey}`,
-            "Content-Type": "application/json",
-            ...pair.extraHeaders,
-          },
-          body: JSON.stringify({
+    try {
+      for (const pair of pairs) {
+        if (overallController.signal.aborted) break;
+        const attemptController = new AbortController();
+        const abortForOverall = () => attemptController.abort(overallController.signal.reason);
+        overallController.signal.addEventListener("abort", abortForOverall, { once: true });
+        const attemptTimer = setTimeout(() => attemptController.abort(new Error("attempt_timeout")), input.timeoutMs ?? 12000);
+        try {
+          const response = await fetch(pair.endpoint, {
+            method: "POST",
+            signal: attemptController.signal,
+            headers: {
+              "Authorization": `Bearer ${pair.apiKey}`,
+              "Content-Type": "application/json",
+              ...pair.extraHeaders,
+            },
+            body: JSON.stringify({
+              model: pair.model,
+              messages: input.messages,
+              temperature: input.temperature ?? 0.3,
+              max_tokens: input.maxTokens ?? 400,
+              ...(input.responseFormat ? { response_format: input.responseFormat } : {}),
+            }),
+          });
+
+          if (response.ok) {
+            console.info("[ai-router] provider_ok", { provider: pair.provider, model: pair.model });
+            return { response, model: pair.model, provider: pair.provider };
+          }
+
+          lastError.status = response.status;
+          lastError.errText = (await response.text().catch(() => "")).slice(0, 300);
+          console.warn("[ai-router] provider_failed", {
+            provider: pair.provider,
             model: pair.model,
-            messages: input.messages,
-            temperature: input.temperature ?? 0.3,
-            max_tokens: input.maxTokens ?? 400,
-            ...(input.responseFormat ? { response_format: input.responseFormat } : {}),
-          }),
-        });
-
-        if (response.ok) {
-          console.info("[ai-router] provider_ok", { provider: pair.provider, model: pair.model });
-          return { response, model: pair.model, provider: pair.provider };
+            status: response.status,
+            errText: lastError.errText.slice(0, 200),
+          });
+        } catch (fetchError) {
+          lastError.status = 502;
+          lastError.errText = fetchError instanceof Error ? fetchError.message : String(fetchError);
+          console.warn("[ai-router] provider_error", {
+            provider: pair.provider,
+            model: pair.model,
+            error: lastError.errText.slice(0, 200),
+          });
+        } finally {
+          clearTimeout(attemptTimer);
+          overallController.signal.removeEventListener("abort", abortForOverall);
         }
-
-        lastError.status = response.status;
-        lastError.errText = (await response.text().catch(() => "")).slice(0, 300);
-        console.warn("[ai-router] provider_failed", {
-          provider: pair.provider,
-          model: pair.model,
-          status: response.status,
-          errText: lastError.errText.slice(0, 200),
-        });
-      } catch (fetchError) {
-        lastError.status = 502;
-        lastError.errText = fetchError instanceof Error ? fetchError.message : String(fetchError);
-        console.warn("[ai-router] provider_error", {
-          provider: pair.provider,
-          model: pair.model,
-          error: lastError.errText.slice(0, 200),
-        });
       }
+    } finally {
+      if (overallTimer) clearTimeout(overallTimer);
+      input.signal?.removeEventListener("abort", abortForCaller);
     }
 
+    if (overallController.signal.aborted) lastError.errText = "Tempo limite total da análise de contexto.";
     throw { status: lastError.status, errText: lastError.errText || "Todos os provedores de IA falharam." };
   }
 

@@ -26,6 +26,8 @@ export async function logAiUsage(input: {
    */
   status?: "success" | "failed" | "fallback";
   error?: string | null;
+  /** Safe, value-free summary for structured qualification analysis. */
+  summary?: string | null;
   sourceMessageId?: string | null;
   conversationId?: string | null;
   leadId?: string | null;
@@ -44,7 +46,7 @@ export async function logAiUsage(input: {
       estimatedCost: typeof input.usage?.cost === "number" ? String(input.usage.cost) : "0",
       latencyMs: Math.max(0, Date.now() - input.startedAt),
       status: input.status ?? (input.success ? "success" : "failed"),
-      errorMessage: input.error?.slice(0, 240) ?? null,
+      errorMessage: (input.summary ?? input.error)?.slice(0, 240) ?? null,
       // Not written to source_message_id: (tenant, conversation, source_message_id) is unique and
       // belongs to the turn's own attendance log. Each attempt and the fallback row would collide.
     });

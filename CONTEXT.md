@@ -88,3 +88,5 @@
 - **Engineering Harness**: contrato versionado que orienta descoberta de contexto, execução limitada, verificação e registro de evidências para mudanças no CorreTop.
 - **Gate de aceite**: conjunto proporcional de verificações objetivas que precisa passar antes de uma mudança ser considerada concluída.
 - **Registro de implementação**: evidência durável que relaciona objetivo, escopo, decisões, validações, riscos e rollback de uma entrega técnica.
+
+- **Análise contextual da qualificação**: leitura auxiliar do histórico que propõe campos e correções explicitamente declarados; não escolhe etapa, ordem de pergunta, temperatura, distribuição, handoff ou texto da resposta. Em falha, o extrator determinístico segue sem espera prolongada.

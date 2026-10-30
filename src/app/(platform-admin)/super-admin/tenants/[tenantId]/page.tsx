@@ -11,6 +11,8 @@ import {
   updateDirectorLiteStylePilotAction,
   updateLiveStatusPilotAction,
   updateDutyShiftReminderPilotAction,
+  updateQualificationContextAnalysisTenantAction,
+  updateQualificationContextAnalysisQueueAction,
   updateMetaLeadAdsPilotAction,
   updateTenantCustomRolesPilotAction,
 } from "../../actions";
@@ -27,6 +29,7 @@ import { getSystemSettings } from "@/features/system-settings/queries";
 import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag";
 import { liveStatusSettingKey } from "@/features/live-status/flag";
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
+import { qualificationContextAnalysisSettingKeys } from "@/features/ai-agent/qualification-context-analysis-settings";
 import { CLEAN_UI_FEATURE, getCleanUiOperationalLegacyTenantIds } from "@/features/clean-ui/feature";
 import { getMetaLeadAdsPilotTenantIds } from "@/features/communication-channels/meta-lead-ads-platform";
 import { getDatabase, schema } from "@/shared/db";
@@ -72,7 +75,7 @@ export default async function SuperAdminTenantDetailPage({
   const tenantId = z.string().uuid().safeParse(rawTenantId);
   if (!tenantId.success) notFound();
 
-  const [tenant, members, branches, settings, metaLeadAdsPilotTenantIds, cleanUiLegacyTenantIds, customRolesPilot] = await Promise.all([
+  const [tenant, members, branches, settings, metaLeadAdsPilotTenantIds, cleanUiLegacyTenantIds, customRolesPilot, queues] = await Promise.all([
     getPlatformTenant(tenantId.data),
     getTenantMembers(tenantId.data),
     getTenantBranches(tenantId.data),
@@ -83,21 +86,28 @@ export default async function SuperAdminTenantDetailPage({
       directorLiteStyleSettingKey(tenantId.data),
       liveStatusSettingKey(tenantId.data),
       dutyShiftReminderSettingKey(tenantId.data),
+      qualificationContextAnalysisSettingKeys(tenantId.data).tenant,
     ]),
     getMetaLeadAdsPilotTenantIds(),
     getCleanUiOperationalLegacyTenantIds(),
     getCustomRolesPilotState(tenantId.data),
+    getDatabase().select({ id: schema.leadQueues.id, name: schema.leadQueues.name, aiQualificationEnabled: schema.leadQueues.aiQualificationEnabled })
+      .from(schema.leadQueues).where(eq(schema.leadQueues.tenantId, tenantId.data)),
   ]);
 
   if (!tenant) notFound();
 
-  const settingMap = new Map(settings.map((setting) => [setting.key, setting.value]));
+  const queueSettingKeys = queues.map((queue) => qualificationContextAnalysisSettingKeys(tenant.id, queue.id).queue!).filter(Boolean);
+  const queueSettings = queueSettingKeys.length ? await getSystemSettings(queueSettingKeys) : [];
+  const settingMap = new Map([...settings, ...queueSettings].map((setting) => [setting.key, setting.value]));
   const metaLeadAdsGlobalEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
   const cleanUiGlobalEnabled = settingMap.get(CLEAN_UI_FEATURE) !== "false";
   const customRolesGlobalEnabled = settingMap.get("feature_custom_roles_enabled") === "true";
   const directorLiteEnabled = settingMap.get(directorLiteStyleSettingKey(tenant.id)) === "true";
   const liveStatusEnabled = settingMap.get(liveStatusSettingKey(tenant.id)) === "true";
   const dutyShiftReminderEnabled = settingMap.get(dutyShiftReminderSettingKey(tenant.id)) === "true";
+  const contextAnalysisTenantKey = qualificationContextAnalysisSettingKeys(tenant.id).tenant;
+  const contextAnalysisTenantEnabled = settingMap.get(contextAnalysisTenantKey) !== "false";
   const metaLeadAdsPilotEnabled = metaLeadAdsPilotTenantIds.includes(tenant.id);
   const usingLegacyLayout = cleanUiLegacyTenantIds.includes(tenant.id);
   const metaLeadAdsState = operationalState(metaLeadAdsGlobalEnabled, metaLeadAdsPilotEnabled);
@@ -108,6 +118,7 @@ export default async function SuperAdminTenantDetailPage({
   const directorLiteAction = updateDirectorLiteStylePilotAction.bind(null, tenant.id);
   const liveStatusAction = updateLiveStatusPilotAction.bind(null, tenant.id);
   const dutyShiftReminderAction = updateDutyShiftReminderPilotAction.bind(null, tenant.id);
+  const contextAnalysisTenantAction = updateQualificationContextAnalysisTenantAction.bind(null, tenant.id);
 
   return (
     <>
@@ -212,6 +223,45 @@ export default async function SuperAdminTenantDetailPage({
                     {dutyShiftReminderEnabled ? "Desligar" : "Ligar"}
                   </Button>
                 </form>
+              </div>
+              <div className="flex flex-col gap-4 p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="max-w-2xl">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-medium">Análise contextual da qualificação</h3>
+                      <Badge variant={contextAnalysisTenantEnabled ? "success" : "outline"}>{contextAnalysisTenantEnabled ? "Ligada" : "Desligada"}</Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">O interpretador auxilia a leitura das respostas, mantendo perguntas e textos determinísticos. Desligar aqui prevalece sobre as filas.</p>
+                  </div>
+                  <form action={contextAnalysisTenantAction}>
+                    <input name="enabled" type="hidden" value={contextAnalysisTenantEnabled ? "false" : "true"} />
+                    <Button type="submit" variant={contextAnalysisTenantEnabled ? "outline" : "default"}>
+                      {contextAnalysisTenantEnabled ? "Desligar para a empresa" : "Ligar para a empresa"}
+                    </Button>
+                  </form>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {queues.map((queue) => {
+                    const queueSettingKey = qualificationContextAnalysisSettingKeys(tenant.id, queue.id).queue!;
+                    const queueEnabled = settingMap.get(queueSettingKey) !== "false";
+                    const queueAction = updateQualificationContextAnalysisQueueAction.bind(null, tenant.id, queue.id);
+                    return (
+                      <div key={queue.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 p-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{queue.name}</p>
+                          <p className="text-xs text-muted-foreground">{!contextAnalysisTenantEnabled ? "Desligada pela empresa" : queue.aiQualificationEnabled === false ? "Qualificação por IA pausada nesta fila" : queueEnabled ? "Análise contextual ligada" : "Análise contextual desligada"}</p>
+                        </div>
+                        <form action={queueAction}>
+                          <input name="enabled" type="hidden" value={queueEnabled ? "false" : "true"} />
+                          <Button className="min-h-11 shrink-0" type="submit" size="sm" variant={queueEnabled ? "outline" : "default"}>
+                            {queueEnabled ? "Desligar" : "Ligar"}
+                          </Button>
+                        </form>
+                      </div>
+                    );
+                  })}
+                  {queues.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma fila cadastrada.</p>}
+                </div>
               </div>
               <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-2xl">

@@ -108,4 +108,20 @@ describe("model-router", () => {
     await expect(router.call({ messages: [{ role: "user", content: "Olá" }] }))
       .rejects.toMatchObject({ status: 503 });
   });
+
+  it("aborts provider fallbacks when the overall deadline expires", async () => {
+    process.env.GROQ_API_KEY = "groq-key";
+    process.env.OPENROUTER_API_KEY = "openrouter-key";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+    }));
+    const router = await createAiRouter("tenant-test");
+
+    await expect(router.call({
+      messages: [{ role: "user", content: "Responda em JSON" }],
+      timeoutMs: 1_000,
+      overallTimeoutMs: 20,
+    })).rejects.toMatchObject({ errText: "Tempo limite total da análise de contexto." });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

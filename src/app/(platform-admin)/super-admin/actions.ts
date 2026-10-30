@@ -16,7 +16,7 @@ import { startPurgeJob, processPurgeJob } from "@/features/platform-admin/purge-
 
 export type TenantCreateActionState = { error?: string };
 import { getDatabase, schema } from "@/shared/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { runSlaSweep } from "@/features/leads/sla";
 import { sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -39,6 +39,7 @@ import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, META_OUTBOUND_STALE_AFTER_HOUR
 import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag";
 import { liveStatusSettingKey } from "@/features/live-status/flag";
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
+import { qualificationContextAnalysisSettingKeys } from "@/features/ai-agent/qualification-context-analysis-settings";
 
 async function requirePlatformTenantTarget(tenantId: string) {
   const parsedTenantId = z.string().uuid().safeParse(tenantId);
@@ -413,6 +414,42 @@ export async function updateDutyShiftReminderPilotAction(tenantId: string, formD
   await getDatabase().insert(schema.platformAuditLogs).values({
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "duty_shift_reminder_24h.tenant_pilot_updated",
     targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now,
+  });
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
+}
+
+/** Super-admin kill switches for contextual qualification analysis, by tenant and queue. */
+export async function updateQualificationContextAnalysisTenantAction(tenantId: string, formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
+  const now = new Date();
+  const key = qualificationContextAnalysisSettingKeys(targetTenantId).tenant;
+  await setSystemSetting(key, input.enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "qualification_context_analysis.tenant_updated",
+    targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now,
+  });
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
+}
+
+export async function updateQualificationContextAnalysisQueueAction(tenantId: string, queueId: string, formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
+  const parsedQueueId = z.string().trim().min(1).max(200).safeParse(queueId);
+  if (!parsedQueueId.success) throw new Error("Fila inválida.");
+  const [queue] = await getDatabase().select({ id: schema.leadQueues.id })
+    .from(schema.leadQueues)
+    .where(and(eq(schema.leadQueues.id, parsedQueueId.data), eq(schema.leadQueues.tenantId, targetTenantId)))
+    .limit(1);
+  if (!queue) throw new Error("Fila não encontrada para esta empresa.");
+  const now = new Date();
+  const key = qualificationContextAnalysisSettingKeys(targetTenantId, queue.id).queue!;
+  await setSystemSetting(key, input.enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "qualification_context_analysis.queue_updated",
+    targetType: "lead_queue", targetId: queue.id, metadata: { tenantId: targetTenantId, enabled: input.enabled === "true" }, createdAt: now,
   });
   revalidatePath(`/super-admin/tenants/${targetTenantId}`);
 }

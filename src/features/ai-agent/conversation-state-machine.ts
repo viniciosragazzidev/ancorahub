@@ -32,7 +32,7 @@ import { loadQuickReplyTemplates, parseExplicitStop, parseOptOut, parseSoftDecli
 import { AFTER_HOURS_HUMAN_REQUEST_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, composeGreeting, DEFAULT_HUMAN_REQUEST_TEXT, DEFAULT_QUALIFIED_HANDOFF_TEXT, effectiveHandoffText, isAfterHoursInSaoPaulo, priceConcernLine, renderConversationVariables, shouldAddPriceConcern, shouldUsePeriodGreeting, summarizeQualification, type QualificationFieldKey } from "@/features/qualification-engine/reply-composer";
 import { isAutomatedInboundMessage } from "./automated-inbound";
 import { afterHoursText } from "@/features/qualification-engine/broker-window";
-import { getSystemSetting } from "@/features/system-settings/queries";
+import { getSystemSetting, getSystemSettings } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
 import { evaluateQualification, persistQualificationEvaluation, getNextQualificationQuestion, replaceHandoffTextPreservingExtension, resolveDeterministicQualificationTurn, type DeterministicQualificationTurn } from "@/features/qualification-engine/service";
@@ -47,6 +47,7 @@ import { interpretQualificationTurn, shouldVerifyExtraction, VERIFIABLE_FIELDS, 
 import { applyQualificationCorrectionsToMemory, describeQualificationCorrections, detectQualificationCorrections } from "./qualification-corrections";
 import { generateLateralAnswer, isCustomerQuestion } from "./lateral-answer";
 import { canResumeDistributedQualification, distributedHandoffText } from "./distributed-resume";
+import { analyzeAndMergeQualificationContext, isQualificationContextAnalysisEnabled, qualificationContextAnalysisSettingKeys, type ContextAnalysisOutcome } from "./context-analysis";
 
 
 export type ConversationStatus =
@@ -1702,7 +1703,7 @@ export async function processInboundAiResponse({
       ),
     )
     .orderBy(desc(schema.whatsappMessages.sentAt))
-    .limit(10);
+    .limit(12);
 
   const formattedHistory = pastMessages.reverse().map((m) => ({
     role: (m.senderRole === "assistant" || m.direction === "outbound" ? "assistant" : "user") as "user" | "assistant",
@@ -1831,8 +1832,18 @@ export async function processInboundAiResponse({
 
   // Buscar dados do lead para contextualizar a IA
   const [lead] = await db
-    .select({ nome: schema.leads.nome, tipo: schema.leads.tipo, corretorId: schema.leads.corretorId })
+    .select({
+      nome: schema.leads.nome,
+      tipo: schema.leads.tipo,
+      corretorId: schema.leads.corretorId,
+      queueId: schema.leads.queueId,
+      aiQualificationEnabled: schema.leadQueues.aiQualificationEnabled,
+    })
     .from(schema.leads)
+    .leftJoin(schema.leadQueues, and(
+      eq(schema.leadQueues.id, schema.leads.queueId),
+      eq(schema.leadQueues.tenantId, tenantId),
+    ))
     .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)))
     .limit(1);
 
@@ -2025,6 +2036,38 @@ export async function processInboundAiResponse({
   if (!tenantConfig.enabled) {
     console.info("[ai-wpp] ai_disabled_by_tenant", { tenantId, leadId });
     return { status: "ignored_ai_disabled" };
+  }
+
+  // Interpret the customer context once before choosing the next deterministic turn.
+  // The queue flag is still an absolute gate: a queue with qualification AI off never calls a model.
+  let contextAnalysis: ContextAnalysisOutcome | null = null;
+  if (!inboundIsAutomated && effectiveMessageKind === "text" && lead?.aiQualificationEnabled !== false) {
+    const settingKeys = qualificationContextAnalysisSettingKeys(tenantId, lead?.queueId);
+    const settingRows = await getSystemSettings([settingKeys.tenant, ...(settingKeys.queue ? [settingKeys.queue] : [])]);
+    const settings = new Map(settingRows.map((row) => [row.key, row.value]));
+    const enabled = isQualificationContextAnalysisEnabled({
+      tenantSetting: settings.get(settingKeys.tenant),
+      queueSetting: settingKeys.queue ? settings.get(settingKeys.queue) : undefined,
+      aiQualificationEnabled: lead?.aiQualificationEnabled,
+    });
+    if (enabled) {
+      contextAnalysis = await analyzeAndMergeQualificationContext({
+        tenantId,
+        conversationId: conversation.id,
+        leadId,
+        sourceMessageId: sourceIdentifier,
+        currentMessage: normalizedInboundMessage,
+        previousQuestion: currentMemory.lastQuestionAsked ?? "",
+        messages: pastMessages.map((message) => ({
+          role: (message.senderRole === "assistant" || message.direction === "outbound" ? "assistant" : "user") as "user" | "assistant",
+          content: message.body ?? "",
+        })),
+        memory: updatedMemory,
+        baseMemory: currentMemory,
+      });
+      updatedMemory = contextAnalysis.memory;
+      fieldsExtractedFromCurrentMessage = updatedMemory.collectedFields.filter((field) => !fieldsBeforeMessage.has(field));
+    }
   }
 
   // A resposta pode estar correta, mas fora do vocabulário das regras (por
