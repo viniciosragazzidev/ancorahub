@@ -6,6 +6,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { createLeadFromWebhookSync } from "@/features/leads/webhooks/services/create-lead-from-webhook-sync";
 import { resolveMetaCapturePolicy, type MetaCaptureMode } from "@/features/meta-ads/meta-capture-policy";
 import { resolveMetaCampaignQueueRoute } from "@/features/meta-ads/campaign-route-resolver";
+import { shouldUseChannelIntakeForCtwa } from "./ctwa-channel-intake-fallback";
 import { decryptMetaToken } from "@/features/meta-ads/meta-oauth";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
@@ -105,9 +106,10 @@ export async function ingestCtwaLead(input: {
   const hierarchy = await resolveAdHierarchy(input.tenantId, input.referral.adId);
   const capture = await resolveCapture(input.tenantId, hierarchy.campaignId);
   let decision: { action: "capture"; queueId: string | null } | { action: "ignore"; queueId: null } = capture.decision;
-  // An attributed campaign owns routing. A channel-level default is allowed
-  // only for referrals whose campaign could not be identified.
-  if (decision.action === "ignore" && capture.globalMode !== "disabled" && !hierarchy.campaignId && input.channelIntake?.enabled) {
+  // A campaign with a rule owns routing (a rule turned off still ignores). A campaign without any
+  // rule, or one that could not be identified, falls to the number's own intake (30/10: an ad on the
+  // 3232 whose campaign had no rule was ignored and the contact never became a lead).
+  if (shouldUseChannelIntakeForCtwa({ decisionAction: decision.action, globalMode: capture.globalMode, hasCampaignRule: Boolean(capture.campaignRoute), channelIntakeEnabled: Boolean(input.channelIntake?.enabled) }) && input.channelIntake) {
     decision = { action: "capture", queueId: input.channelIntake.queueId };
   }
   if (decision.action === "ignore") {
