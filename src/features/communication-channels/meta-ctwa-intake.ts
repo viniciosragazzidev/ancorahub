@@ -109,7 +109,7 @@ export async function ingestCtwaLead(input: {
   // A campaign with a rule owns routing (a rule turned off still ignores). A campaign without any
   // rule, or one that could not be identified, falls to the number's own intake (30/10: an ad on the
   // 3232 whose campaign had no rule was ignored and the contact never became a lead).
-  if (shouldUseChannelIntakeForCtwa({ decisionAction: decision.action, globalMode: capture.globalMode, hasCampaignRule: Boolean(capture.campaignRoute), channelIntakeEnabled: Boolean(input.channelIntake?.enabled) }) && input.channelIntake) {
+  if (shouldUseChannelIntakeForCtwa({ decisionAction: decision.action, globalMode: capture.globalMode, campaignRoute: capture.campaignRoute, channelIntakeEnabled: Boolean(input.channelIntake?.enabled) }) && input.channelIntake) {
     decision = { action: "capture", queueId: input.channelIntake.queueId };
   }
   if (decision.action === "ignore") {
