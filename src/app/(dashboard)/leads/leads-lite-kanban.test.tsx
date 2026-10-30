@@ -66,6 +66,20 @@ describe("kanban Lite de /leads", () => {
     expect(screen.getByRole("link", { name: "Abrir WhatsApp de Maria Nova" })).toHaveAttribute("href", "https://wa.me/5521900000101");
   });
 
+  it("mostra totais da coluna e abre a cotação a partir do cartão", () => {
+    const onQuote = vi.fn();
+    const lead = { ...maria, monthlyValue: "1234.56", livesCount: 2 };
+    renderKanban({
+      groupedLeads: { new: [lead], in_contact: [], quote_sent: [] },
+      commercialValuesEnabled: true,
+      onQuote,
+    });
+
+    expect(screen.getByText((text) => text.includes("1.234,56") && text.includes("2 vidas"))).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Fazer cotação" }));
+    expect(onQuote).toHaveBeenCalledWith(lead);
+  });
+
   it("cartão abre o drawer e a caixa seleciona para o lote", () => {
     const props = renderKanban();
     fireEvent.click(screen.getByRole("button", { name: "Maria Nova" }));

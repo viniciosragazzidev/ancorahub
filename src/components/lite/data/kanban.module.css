@@ -163,6 +163,15 @@
   text-align: center;
 }
 
+.footer {
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .column {
     transition: none;

@@ -1904,3 +1904,7 @@ O gateway escolhe Groq ou OpenRouter pelas chaves, ordem e modelo configurados p
 Antes do envio, telefone, e-mail, CPF, CNPJ, nome completo/primeiro nome do lead, endereço em rua, avenida, alameda, travessa, estrada, praça, rodovia, largo, beco, viela ou servidão (incluindo r., av., al., tv., est., pc. e rod.), com ou sem número, e CEP são substituídos por [TELEFONE], [E-MAIL], [CPF], [CNPJ], [NOME], [ENDEREÇO] e [CEP]. Cidade e bairro permanecem para qualificação. Nomes de terceiros, como marido e filhos, não são redigidos. O corpo dos prompts não inclui IDs internos do lead ou da conversa; esses IDs podem seguir como metadados operacionais do gateway. Base legal/contrato com provedores: (a confirmar).
 
 Efeito colateral aceito: um valor gravado em turno anterior, mesmo se a regra tiver lido errado, só muda quando o cliente usa um termo de correção explícito (por exemplo "na verdade"). Um "Não," isolado não conta como correção.
+
+## DEC-165 - Precedência de valor e vidas no lead
+
+**Aprovada pelo Vinicios em 2026-10-30.** Para exibir valor mensal e vidas no Kanban e na ficha, a fonte é a venda ativa mais recente; sem venda, usa-se a proposta ativa mais recente; sem ambas, usa-se o snapshot do lead preenchido manualmente ou por cotação. Venda e proposta continuam em seus próprios registros. Enquanto houver uma fonte formal ativa, a edição manual é bloqueada e salvar cotação não substitui o snapshot. Registro: docs/implementations/completed/2026-10-30-valor-vidas-funil.md.

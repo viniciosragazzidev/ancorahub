@@ -14,6 +14,12 @@ export type LeadWorkspaceItem = {
   /** Tags the team put on this lead's conversation. */
   tags?: { id: string; name: string; colorHue: number }[];
   tipo: string;
+  /** Valor mensal em reais mostrado no funil. */
+  monthlyValue?: string | number | null;
+  /** Quantidade de vidas associada ao valor mensal atual. */
+  livesCount?: number | null;
+  /** Fonte formal impede a edição do snapshot por cima da proposta/venda vigente. */
+  commercialValueSource?: "sale" | "proposal" | "lead" | null;
   createdAt: string;
   assignedAt: string | null;
   stageEnteredAt: string | null;

@@ -50,6 +50,7 @@ import {
   updateUserProfileSettingsAction,
   updateReportingCenterSettingsAction,
   updateNegotiationsAreaSettingsAction,
+  updateLeadCommercialValuesSettingsAction,
   updateUnlinkedConversationDeletionSettingsAction,
   updateConversationMediaSettingsAction,
   updateColdLeadReactivationSettingsAction,
@@ -96,6 +97,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_meta_lead_ads_enabled",
     "feature_realtime_sync_enabled",
     FEATURE_FLAGS.NEGOTIATIONS_AREA.key,
+    FEATURE_FLAGS.LEAD_COMMERCIAL_VALUES.key,
     META_LEAD_ADS_PLATFORM_SETTINGS.partnerName,
     META_LEAD_ADS_PLATFORM_SETTINGS.businessId,
     META_LEAD_ADS_PLATFORM_SETTINGS.supportWhatsApp,
@@ -191,6 +193,7 @@ export default async function SuperAdminSettingsPage() {
   const systemReportEnabled = settingMap.get(SYSTEM_REPORT_ENABLED_KEY) !== "false";
   const reportingCenterEnabled = settingMap.get("feature_reporting_center_enabled") !== "false";
   const negotiationsAreaEnabled = (settingMap.get(FEATURE_FLAGS.NEGOTIATIONS_AREA.key) ?? FEATURE_FLAGS.NEGOTIATIONS_AREA.defaultValue) === "true";
+  const leadCommercialValuesEnabled = (settingMap.get(FEATURE_FLAGS.LEAD_COMMERCIAL_VALUES.key) ?? FEATURE_FLAGS.LEAD_COMMERCIAL_VALUES.defaultValue) === "true";
   const conversationMediaEnabled = settingMap.get("feature_conversation_media_enabled") !== "false";
   const systemReportDestination = settingMap.get(SYSTEM_REPORT_DESTINATION_KEY) ?? "";
   const metaLeadAdsEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
@@ -495,6 +498,29 @@ export default async function SuperAdminSettingsPage() {
                   </label>
                   <Button type="submit" variant={negotiationsAreaEnabled ? "outline" : "default"}>
                     {negotiationsAreaEnabled ? "Salvar controle" : "Ativar área de negociações"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Valor e vidas no funil</CardTitle>
+                <CardDescription>
+                  Controla o resumo mensal nos leads, a edição manual e a criação de cotações vinculadas. Desligar oculta os novos controles sem apagar os valores já registrados.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateLeadCommercialValuesSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="enabled" value="true" defaultChecked={leadCommercialValuesEnabled} className="size-4" />
+                    <span>
+                      <span className="font-medium">Valor mensal e vidas habilitados</span>
+                      <span className="block text-xs text-muted-foreground">A alteração fica registrada na auditoria da plataforma.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant={leadCommercialValuesEnabled ? "outline" : "default"}>
+                    {leadCommercialValuesEnabled ? "Salvar controle" : "Ativar valor e vidas"}
                   </Button>
                 </form>
               </CardContent>

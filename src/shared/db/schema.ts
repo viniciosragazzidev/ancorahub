@@ -390,6 +390,8 @@ export const leads = pgTable(
     qualificationState: text("qualification_state").notNull().default("NOT_STARTED"),
     qualificationScore: integer("qualification_score").notNull().default(0),
     qualificationDetails: jsonb("qualification_details").notNull().default({}),
+    monthlyValue: numeric("monthly_value", { precision: 12, scale: 2 }),
+    livesCount: integer("lives_count"),
     qualificationProfileKey: text("qualification_profile_key"),
     qualificationCompletedAt: timestamp("qualification_completed_at", { withTimezone: true }),
     version: integer("version").notNull().default(1),

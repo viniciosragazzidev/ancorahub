@@ -366,6 +366,14 @@ export const FEATURE_FLAGS = {
     description:
       "Libera a área de acompanhamento de negociações para diretor, gestor e supervisor, respeitando unidade e equipe.",
   },
+  LEAD_COMMERCIAL_VALUES: {
+    key: "feature_lead_commercial_values_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description:
+      "Habilita o valor mensal e as vidas no funil de leads, a edição na ficha e as cotações vinculadas. O Super-admin pode desligar a experiência sem apagar os dados.",
+  },
 
   BROKER_AVAILABILITY_ONBOARDING: {
     key: "feature_broker_availability_onboarding_enabled",

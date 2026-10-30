@@ -23,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, ArrowUpRight, ArrowsClockwise, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, Sparkle, SquaresFour, Target, UserList, UserSwitch, WhatsappLogo, X, XCircle } from "@/components/huge-icons";
+import { ArrowLeft, ArrowUpRight, ArrowsClockwise, Calculator, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, Sparkle, SquaresFour, Target, UserList, UserSwitch, WhatsappLogo, X, XCircle } from "@/components/huge-icons";
 import { NegotiationsRadarTab } from "@/features/conversation-intelligence/components/negotiations-radar-tab";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -85,6 +85,7 @@ import { MarkLeadInServiceButton } from "@/features/leads/components/mark-lead-i
 import { canDirectorMarkLeadInService } from "@/features/leads/director-service-start";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { LeadDetailsDrawer } from "@/features/leads/components/lead-details-drawer";
+import { formatLeadCommercialTotals, sumLeadCommercialValues } from "@/features/leads/commercial-values";
 export type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 
 export type QualifyingLeadItem = {
@@ -206,6 +207,8 @@ export function LeadsWorkspace({
   brokers = [],
   branches = [],
   manualAssignmentChoiceEnabled = true,
+  commercialValuesEnabled = false,
+  quotePlans = [],
   pageSize = 20,
   pagination,
   unassignedLeads = [],
@@ -226,6 +229,8 @@ export function LeadsWorkspace({
   brokers?: Array<{ id: string; name: string; branchId: string | null }>;
   branches?: Array<{ id: string; name: string; status?: string; acceptingLeads?: boolean; isDistributionHub?: boolean }>;
   manualAssignmentChoiceEnabled?: boolean;
+  commercialValuesEnabled?: boolean;
+  quotePlans?: Array<{ id: string; name: string }>;
   pageSize?: number;
   pagination?: {
     currentPage: number;
@@ -256,6 +261,11 @@ export function LeadsWorkspace({
   const directorLite = useDirectorLitePage();
   const [workspaceLeads, setWorkspaceLeads] = useState<LeadWorkspaceItem[]>(leads);
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
+  const [quoteLeadId, setQuoteLeadId] = useState<string | null>(null);
+  const openQuoteForLead = useCallback((lead: LeadWorkspaceItem) => {
+    setQuoteLeadId(lead.id);
+    setSelectedLead(lead);
+  }, []);
   const selectedMetaDetails = selectedLead
     ? readMetaLeadDisplayDetails(selectedLead.sourceChannel, selectedLead.sourceMetadata)
     : null;
@@ -744,6 +754,8 @@ export function LeadsWorkspace({
               groupedLeads={groupedLeads}
               onMoveColumn={moveKanbanColumn}
               onOpen={setSelectedLead}
+              onQuote={openQuoteForLead}
+              commercialValuesEnabled={commercialValuesEnabled}
               isSelected={multiSelect.isSelected}
               onToggle={multiSelect.toggle}
               selectedIds={multiSelect.selectedIds}
@@ -786,6 +798,8 @@ export function LeadsWorkspace({
                       status={status}
                       leads={groupedLeads[status] ?? []}
                       onOpen={setSelectedLead}
+                      onQuote={openQuoteForLead}
+                      commercialValuesEnabled={commercialValuesEnabled}
                       isSelected={multiSelect.isSelected}
                       onToggle={multiSelect.toggle}
                       slaFirstContactMinutes={slaFirstContactMinutes}
@@ -804,6 +818,8 @@ export function LeadsWorkspace({
                   status={activeDragId}
                   leads={groupedLeads[activeDragId] ?? []}
                   onOpen={() => {}}
+                  onQuote={() => {}}
+                  commercialValuesEnabled={false}
                   isSelected={() => false}
                   onToggle={() => {}}
                   slaFirstContactMinutes={slaFirstContactMinutes}
@@ -966,9 +982,17 @@ export function LeadsWorkspace({
         brokers={brokers}
         branches={branches}
         manualAssignmentChoiceEnabled={manualAssignmentChoiceEnabled}
+        commercialValuesEnabled={commercialValuesEnabled}
+        quotePlans={quotePlans}
+        initialQuoteOpen={quoteLeadId === selectedLead.id}
         slaFirstContactMinutes={slaFirstContactMinutes}
         slaStagnantDays={slaStagnantDays}
-        onOpenChange={(open) => !open && setSelectedLead(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedLead(null);
+            setQuoteLeadId(null);
+          }
+        }}
         onManagementCommitted={handleDrawerManagementCommitted}
         onReassignOptimistic={handleDrawerReassignOptimistic}
         onReassignRollback={handleDrawerReassignRollback}
@@ -983,6 +1007,8 @@ function SortableKanbanColumn({
   status,
   leads,
   onOpen,
+  onQuote,
+  commercialValuesEnabled,
   isSelected,
   onToggle,
   slaFirstContactMinutes = 15,
@@ -991,6 +1017,8 @@ function SortableKanbanColumn({
   status: string;
   leads: LeadWorkspaceItem[];
   onOpen: (lead: LeadWorkspaceItem) => void;
+  onQuote: (lead: LeadWorkspaceItem) => void;
+  commercialValuesEnabled: boolean;
   isSelected: (id: string) => boolean;
   onToggle: (id: string) => void;
   slaFirstContactMinutes?: number;
@@ -1012,6 +1040,8 @@ function SortableKanbanColumn({
       <KanbanColumn
         leads={leads}
         onOpen={onOpen}
+        onQuote={onQuote}
+        commercialValuesEnabled={commercialValuesEnabled}
         status={status}
         isSelected={isSelected}
         onToggle={onToggle}
@@ -1025,6 +1055,8 @@ function SortableKanbanColumn({
 function KanbanColumn({
   leads,
   onOpen,
+  onQuote,
+  commercialValuesEnabled,
   status,
   isSelected,
   onToggle,
@@ -1033,6 +1065,8 @@ function KanbanColumn({
 }: {
   leads: LeadWorkspaceItem[];
   onOpen: (lead: LeadWorkspaceItem) => void;
+  onQuote: (lead: LeadWorkspaceItem) => void;
+  commercialValuesEnabled: boolean;
   status: string;
   isSelected: (id: string) => boolean;
   onToggle: (id: string) => void;
@@ -1061,7 +1095,7 @@ function KanbanColumn({
 
       <div className="mt-3 space-y-3 overflow-y-auto" style={{ maxHeight: "calc(80vh - 7rem)" }}>
         {leads.map((lead) => (
-          <KanbanLeadCard key={lead.id} lead={lead} onOpen={onOpen} isSelected={isSelected} onToggle={onToggle} slaFirstContactMinutes={slaFirstContactMinutes} slaStagnantDays={slaStagnantDays} />
+          <KanbanLeadCard key={lead.id} lead={lead} onOpen={onOpen} onQuote={onQuote} commercialValuesEnabled={commercialValuesEnabled} isSelected={isSelected} onToggle={onToggle} slaFirstContactMinutes={slaFirstContactMinutes} slaStagnantDays={slaStagnantDays} />
         ))}
         {!leads.length ? (
           <div className="rounded-[var(--radius-card)] border border-dashed border-border bg-background/40 px-4 py-8 text-center">
@@ -1070,6 +1104,7 @@ function KanbanColumn({
           </div>
         ) : null}
       </div>
+      {commercialValuesEnabled ? <footer className="mt-3 border-t border-border/70 pt-3 text-xs font-medium tabular-nums text-muted-foreground">{formatLeadCommercialTotals(sumLeadCommercialValues(leads))}</footer> : null}
     </section>
   );
 }
@@ -1077,6 +1112,8 @@ function KanbanColumn({
 function KanbanLeadCard({
   lead,
   onOpen,
+  onQuote,
+  commercialValuesEnabled,
   isSelected,
   onToggle,
   slaFirstContactMinutes = 15,
@@ -1084,6 +1121,8 @@ function KanbanLeadCard({
 }: {
   lead: LeadWorkspaceItem;
   onOpen: (lead: LeadWorkspaceItem) => void;
+  onQuote: (lead: LeadWorkspaceItem) => void;
+  commercialValuesEnabled: boolean;
   isSelected: (id: string) => boolean;
   onToggle: (id: string) => void;
   slaFirstContactMinutes?: number;
@@ -1176,6 +1215,11 @@ function KanbanLeadCard({
           {hideArrival ? null : <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>}
         </div>
       </button>
+      {commercialValuesEnabled ? (
+        <Button type="button" variant="outline" className="mx-3 mb-3 min-h-11 w-[calc(100%-1.5rem)] justify-center gap-2" onClick={() => onQuote(lead)}>
+          <Calculator aria-hidden="true" /> Fazer cotação
+        </Button>
+      ) : null}
     </Card>
   );
 }

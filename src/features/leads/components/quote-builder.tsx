@@ -41,21 +41,26 @@ type QuoteLineItem = {
 type QuoteBuilderProps = {
   leadId: string;
   leadName: string;
-  leadPhone?: string | null;
+  beneficiaryCount?: number | null;
   beneficiaries?: Array<{ id: string; name: string; age?: number }>;
   plans?: Array<{ id: string; name: string; monthlyPrice?: number }>;
+  initialOpen?: boolean;
+  onCreated?: () => void;
 };
 
 export function QuoteBuilder({
   leadId,
   leadName,
-  leadPhone,
+  beneficiaryCount,
   beneficiaries = [],
   plans = [],
+  initialOpen = false,
+  onCreated,
 }: QuoteBuilderProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [lineItems, setLineItems] = useState<QuoteLineItem[]>([]);
+  const [quoteBeneficiaryCount, setQuoteBeneficiaryCount] = useState(beneficiaryCount ?? 1);
   const [notes, setNotes] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -73,11 +78,19 @@ export function QuoteBuilder({
       // eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors lead-quick-note.tsx pattern
       setOpen(false);
       formRef.current?.reset();
+      setItems([]);
+      setLineItems([]);
+      setNotes("");
+      setQuoteBeneficiaryCount(beneficiaryCount ?? 1);
+      onCreated?.();
     }
-  }, [state.error, justCreated]);
+  }, [state.error, justCreated, onCreated, beneficiaryCount]);
 
   const totalMonthly = items.reduce((acc, item) => acc + item.monthlyPrice, 0)
     + lineItems.reduce((acc, item) => acc + item.calculatedValue, 0);
+  const quotedBeneficiaryCount = lineItems.length > 0
+    ? new Set(lineItems.map((item) => item.beneficiaryId)).size
+    : quoteBeneficiaryCount;
 
   function addItem() {
     setItems([
@@ -147,14 +160,15 @@ export function QuoteBuilder({
     setLineItems(next);
   }
 
-  const hasData = items.length > 0 || lineItems.length > 0;
+  const hasData = items.some((item) => item.planId && item.monthlyPrice > 0)
+    || lineItems.some((item) => item.planId && item.calculatedValue > 0);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
         render={
-          <Button className="h-8 px-2.5 text-xs" size="sm" variant="outline">
-            <Calculator /> Montar cotação
+          <Button className="min-h-11 px-3 text-xs" variant="outline">
+            <Calculator /> Fazer cotação
           </Button>
         }
       />
@@ -170,21 +184,19 @@ export function QuoteBuilder({
         <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
           <form ref={formRef} id="quote-builder-form" action={action} className="space-y-5">
             <input type="hidden" name="leadId" value={leadId} />
-            <input type="hidden" name="leadName" value={leadName} />
-            {leadPhone && <input type="hidden" name="leadPhone" value={leadPhone} />}
             <input type="hidden" name="totalMonthly" value={totalMonthly} />
-            <input type="hidden" name="beneficiaryCount" value={lineItems.length || items.length} />
+            <input type="hidden" name="beneficiaryCount" value={quotedBeneficiaryCount} />
             <input type="hidden" name="items" value={JSON.stringify(items.filter(i => i.planId))} />
             <input type="hidden" name="lineItems" value={JSON.stringify(lineItems.filter(i => i.planId))} />
 
             {/* Plan Items */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Label className="text-xs font-semibold text-muted-foreground">
                   Planos
                 </Label>
-                <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={addItem}>
-                  <Plus className="size-3" /> Adicionar
+                <Button type="button" variant="ghost" className="min-h-11 px-3 text-xs" onClick={addItem}>
+                  <Plus className="size-4" /> Adicionar
                 </Button>
               </div>
 
@@ -198,12 +210,12 @@ export function QuoteBuilder({
                 <div key={index} className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-muted-foreground">Plano {index + 1}</span>
-                    <Button type="button" size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => removeItem(index)}>
-                      <Trash className="size-3" />
+                    <Button type="button" variant="ghost" className="min-h-11 min-w-11 px-2 text-xs" onClick={() => removeItem(index)} aria-label={`Remover plano ${index + 1}`}>
+                      <Trash className="size-4" />
                     </Button>
                   </div>
                   <select
-                    className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs"
+                    className="min-h-11 w-full rounded-md border border-border bg-background px-2.5 text-xs"
                     value={item.planId}
                     onChange={(e) => updateItem(index, "planId", e.target.value)}
                   >
@@ -216,9 +228,9 @@ export function QuoteBuilder({
                   </select>
                   <div className="flex gap-2">
                     <div className="flex-1">
-                      <Label className="text-[10px] text-muted-foreground">Valor mensal</Label>
+                      <Label className="text-xs text-muted-foreground">Valor mensal</Label>
                       <CurrencyInput
-                        className="h-8 text-xs"
+                        className="min-h-11 text-xs"
                         value={String(item.monthlyPrice || "")}
                         onChange={(v) => updateItem(index, "monthlyPrice", parseFloat(v) || 0)}
                         placeholder="0,00"
@@ -244,11 +256,11 @@ export function QuoteBuilder({
             {beneficiaries.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <Label className="text-xs font-semibold text-muted-foreground">
                     Por beneficiário
                   </Label>
-                  <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={addLineItem}>
-                    <Plus className="size-3" /> Adicionar
+                  <Button type="button" variant="ghost" className="min-h-11 px-3 text-xs" onClick={addLineItem}>
+                    <Plus className="size-4" /> Adicionar
                   </Button>
                 </div>
 
@@ -256,12 +268,12 @@ export function QuoteBuilder({
                   <div key={index} className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium text-muted-foreground">{item.beneficiaryName || `Beneficiário ${index + 1}`}</span>
-                      <Button type="button" size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => removeLineItem(index)}>
-                        <Trash className="size-3" />
+                      <Button type="button" variant="ghost" className="min-h-11 min-w-11 px-2 text-xs" onClick={() => removeLineItem(index)} aria-label={`Remover beneficiário ${index + 1}`}>
+                        <Trash className="size-4" />
                       </Button>
                     </div>
                     <select
-                      className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs"
+                      className="min-h-11 w-full rounded-md border border-border bg-background px-2.5 text-xs"
                       value={item.beneficiaryId}
                       onChange={(e) => updateLineItem(index, "beneficiaryId", e.target.value)}
                     >
@@ -270,7 +282,7 @@ export function QuoteBuilder({
                       ))}
                     </select>
                     <select
-                      className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs"
+                      className="min-h-11 w-full rounded-md border border-border bg-background px-2.5 text-xs"
                       value={item.planId}
                       onChange={(e) => updateLineItem(index, "planId", e.target.value)}
                     >
@@ -281,20 +293,20 @@ export function QuoteBuilder({
                     </select>
                     <div className="flex gap-2">
                       <div className="flex-1">
-                        <Label className="text-[10px] text-muted-foreground">Valor mensal</Label>
+                        <Label className="text-xs text-muted-foreground">Valor mensal</Label>
                         <CurrencyInput
-                          className="h-8 text-xs"
+                          className="min-h-11 text-xs"
                           value={String(item.calculatedValue || "")}
                           onChange={(v) => updateLineItem(index, "calculatedValue", parseFloat(v) || 0)}
                           placeholder="0,00"
                         />
                       </div>
                       <div className="w-20">
-                        <Label className="text-[10px] text-muted-foreground">Idade</Label>
+                        <Label className="text-xs text-muted-foreground">Idade</Label>
                         <Input
                           type="number"
                           min="0"
-                          className="h-8 text-xs"
+                          className="min-h-11 text-xs"
                           value={item.ageAtQuote || ""}
                           onChange={(e) => updateLineItem(index, "ageAtQuote", parseInt(e.target.value) || 0)}
                         />
@@ -305,9 +317,27 @@ export function QuoteBuilder({
               </div>
             )}
 
+            <div className="space-y-1.5">
+              <Label htmlFor="quote-beneficiary-count" className="text-xs font-semibold text-muted-foreground">Vidas nesta cotação</Label>
+              <Input
+                id="quote-beneficiary-count"
+                type="number"
+                min="1"
+                max="100"
+                step="1"
+                inputMode="numeric"
+                value={quotedBeneficiaryCount}
+                onChange={(event) => setQuoteBeneficiaryCount(Math.max(1, Math.min(100, Number(event.target.value) || 1)))}
+                disabled={lineItems.length > 0}
+                className="min-h-11"
+                aria-describedby={lineItems.length > 0 ? "quote-beneficiary-count-help" : undefined}
+              />
+              {lineItems.length > 0 ? <p id="quote-beneficiary-count-help" className="text-xs text-muted-foreground">Calculado pelos beneficiários selecionados.</p> : null}
+            </div>
+
             {/* Notes */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <Label className="text-xs font-semibold text-muted-foreground">
                 Observações
               </Label>
               <Textarea
@@ -332,7 +362,7 @@ export function QuoteBuilder({
 
         <SheetFooter>
           <Button
-            className="w-full"
+            className="min-h-11 w-full"
             disabled={pending || !hasData}
             form="quote-builder-form"
             type="submit"
@@ -341,7 +371,7 @@ export function QuoteBuilder({
           </Button>
           <SheetClose
             render={
-              <Button className="w-full" variant="ghost" disabled={pending}>
+              <Button className="min-h-11 w-full" variant="ghost" disabled={pending}>
                 Cancelar
               </Button>
             }

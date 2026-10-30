@@ -231,6 +231,26 @@ export async function updateNegotiationsAreaSettingsAction(formData: FormData) {
   revalidatePath("/negociacoes");
 }
 
+export async function updateLeadCommercialValuesSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const rawEnabled = formData.get("enabled");
+  const enabled = rawEnabled === null ? "false" : z.enum(["true", "false"]).parse(rawEnabled);
+  const now = new Date();
+  const key = FEATURE_FLAGS.LEAD_COMMERCIAL_VALUES.key;
+  await setSystemSetting(key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "lead_commercial_values.global_feature_updated",
+    targetType: "system_settings",
+    targetId: key,
+    metadata: { enabled },
+    createdAt: now,
+  });
+  revalidatePath("/leads");
+  revalidatePath("/super-admin/settings");
+}
+
 export async function updateCleanUiOperationalSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("cleanUiOperationalEnabled") === "true" ? "true" : "false";

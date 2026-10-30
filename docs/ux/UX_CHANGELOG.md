@@ -806,3 +806,8 @@ Papel: supervisor no Lite. Objetivo: montar a equipe, editar seu perfil e enviar
 ## 2026-10-17 - Navegacao direta no Lite (Frente A)
 
 Papeis: corretor e supervisor. Acao: abrir o destino de trabalho direto pelos atalhos de assistente; no plantao, pausar/retomar recebimento; na agenda, concluir, cancelar/desfazer e reagendar retornos. Jack continua com divulgacao em conversa; paginas mostram dados e acoes no contexto da tarefa. Estados de lista vazia, carregamento/erro, operacao pendente, sucesso e undo ficam legiveis e acionaveis. Reutiliza Arc, TeamOnDutyList e tokens existentes; sem primitive, token, borda ou movimento novo. A validacao global de UX-M1.10 permanece pendente.
+
+
+## 2026-10-30 - Valor mensal e vidas no Kanban de leads
+
+O Kanban Full e Lite mostra no rodapé de cada coluna o total mensal e a soma de vidas dos leads já carregados, respeitando os filtros atuais. A ficha e o drawer permitem editar o snapshot e criar cotações vinculadas; com venda ou proposta ativa, o valor formal prevalece e a edição manual fica bloqueada. Reutiliza controles Arc/Lite e não introduz tokens ou primitives. Registro: docs/implementations/completed/2026-10-30-valor-vidas-funil.md.

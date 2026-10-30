@@ -83,6 +83,7 @@ export type DirectorLiteLeadDetailProps = {
     nextBestAction: ReactNode;
     supervision: ReactNode;
     insight: ReactNode;
+    commercial: ReactNode;
     startQualification: ReactNode;
     person: ReactNode;
     beneficiaries: ReactNode;
@@ -204,6 +205,7 @@ export function DirectorLiteLeadDetail(props: DirectorLiteLeadDetailProps) {
             <TabsContent value="service" className={styles.tabPanel}>
               {slots.supervision}
               {slots.insight}
+              {slots.commercial}
               <Section title="Qualificação por agente de IA" description="Ideal para leads antigos ou importados. Dispara o template oficial de qualificação no WhatsApp.">
                 <div className={styles.cardAction}>{slots.startQualification}</div>
               </Section>

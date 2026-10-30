@@ -1,32 +1,106 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import { AuthorizationService } from "@/shared/auth/authorization-service";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { buildLeadResourceScope, toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
+import { quoteCommercialValues } from "@/features/leads/commercial-values";
+import { getCachedLegacyPlans } from "@/features/leads/reference-data";
+import { getSystemSetting } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { getDatabase, schema } from "@/shared/db";
 
 export type QuoteActionState = { success?: boolean; error?: string; token?: string };
 
+export type LeadQuoteListState = {
+  quotes: Array<{
+    id: string;
+    status: string;
+    totalMonthly: string | null;
+    beneficiaryCount: number | null;
+    publicToken: string;
+    sharedAt: Date | null;
+    createdAt: Date;
+  }>;
+  error?: string;
+};
+
+export async function listLeadQuotesAction(leadId: string): Promise<LeadQuoteListState> {
+  const parsedLeadId = z.string().uuid().safeParse(leadId);
+  if (!parsedLeadId.success) return { quotes: [], error: "Lead inválido." };
+
+  try {
+    if ((await getSystemSetting(FEATURE_FLAGS.LEAD_COMMERCIAL_VALUES.key)) === "false") return { quotes: [] };
+    const context = await getRequiredTenantContext();
+    const db = getDatabase();
+    const [lead] = await db
+      .select({ id: schema.leads.id, tenantId: schema.leads.tenantId, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId })
+      .from(schema.leads)
+      .where(and(
+        eq(schema.leads.id, parsedLeadId.data),
+        eq(schema.leads.tenantId, context.tenantId),
+        isNull(schema.leads.deletedAt),
+      ))
+      .limit(1);
+
+    if (!lead) return { quotes: [], error: "Lead não encontrado." };
+    const accessContext = toEffectiveLeadAccessContext(context);
+    if (!AuthorizationService.can(accessContext, "acessar_leads", buildLeadResourceScope(lead))) {
+      return { quotes: [], error: "Você não tem acesso às cotações deste lead." };
+    }
+
+    const quotes = await db
+      .select({
+        id: schema.quotes.id,
+        status: schema.quotes.status,
+        totalMonthly: schema.quotes.totalMonthly,
+        beneficiaryCount: schema.quotes.beneficiaryCount,
+        publicToken: schema.quotes.publicToken,
+        sharedAt: schema.quotes.sharedAt,
+        createdAt: schema.quotes.createdAt,
+      })
+      .from(schema.quotes)
+      .where(and(
+        eq(schema.quotes.tenantId, context.tenantId),
+        eq(schema.quotes.leadId, lead.id),
+      ))
+      .orderBy(desc(schema.quotes.createdAt))
+      .limit(10);
+
+    return { quotes };
+  } catch {
+    return { quotes: [], error: "Não foi possível carregar as cotações agora." };
+  }
+}
+
 const createQuoteSchema = z.object({
   leadId: z.string().uuid(),
-  leadName: z.string().trim().min(1).max(200),
-  leadPhone: z.string().trim().max(30).optional(),
   notes: z.string().trim().max(2000).optional(),
-  totalMonthly: z.coerce.number().positive().optional(),
-  beneficiaryCount: z.coerce.number().int().positive().optional(),
+  beneficiaryCount: z.coerce.number().int().min(1).max(100),
   items: z.string().optional(),
   lineItems: z.string().optional(),
+});
+
+const quoteItemSchema = z.object({
+  planId: z.string().trim().min(1).max(100),
+  monthlyPrice: z.coerce.number().positive().max(9999999999.99),
+  recommended: z.boolean().optional().default(false),
+});
+const quoteLineItemSchema = z.object({
+  beneficiaryId: z.string().uuid(),
+  planId: z.string().trim().min(1).max(100),
+  calculatedValue: z.coerce.number().positive().max(9999999999.99),
+  ageAtQuote: z.coerce.number().int().min(0).max(130),
 });
 
 export async function createQuoteAction(_previous: QuoteActionState, formData: FormData): Promise<QuoteActionState> {
   const parsed = createQuoteSchema.safeParse({
     leadId: formData.get("leadId"),
-    leadName: formData.get("leadName"),
-    leadPhone: formData.get("leadPhone") || undefined,
     notes: formData.get("notes") || undefined,
-    totalMonthly: formData.get("totalMonthly") || undefined,
     beneficiaryCount: formData.get("beneficiaryCount") || undefined,
     items: formData.get("items") || undefined,
     lineItems: formData.get("lineItems") || undefined,
@@ -37,19 +111,72 @@ export async function createQuoteAction(_previous: QuoteActionState, formData: F
   }
 
   try {
+    if ((await getSystemSetting(FEATURE_FLAGS.LEAD_COMMERCIAL_VALUES.key)) === "false") {
+      return { error: "A criação de cotações está desativada." };
+    }
     const context = await getRequiredTenantContext();
     const db = getDatabase();
 
     const [lead] = await db
-      .select({ id: schema.leads.id, tenantId: schema.leads.tenantId, corretorId: schema.leads.corretorId })
+      .select({ id: schema.leads.id, tenantId: schema.leads.tenantId, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, nome: schema.leads.nome, telefone: schema.leads.telefone })
       .from(schema.leads)
-      .where(and(eq(schema.leads.id, parsed.data.leadId), eq(schema.leads.tenantId, context.tenantId)))
+      .where(and(eq(schema.leads.id, parsed.data.leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt)))
       .limit(1);
 
     if (!lead) return { error: "Lead não encontrado." };
-    if (context.role === "broker" && lead.corretorId !== context.userId) {
-      return { error: "Você só pode gerar cotação para seus próprios leads." };
+    const accessContext = toEffectiveLeadAccessContext(context);
+    if (!AuthorizationService.can(accessContext, "acessar_leads", buildLeadResourceScope(lead))) {
+      return { error: "Você não tem permissão para gerar cotação para este lead." };
     }
+
+    let rawItems: unknown = [];
+    let rawLineItems: unknown = [];
+    try {
+      rawItems = parsed.data.items ? JSON.parse(parsed.data.items) : [];
+      rawLineItems = parsed.data.lineItems ? JSON.parse(parsed.data.lineItems) : [];
+    } catch {
+      return { error: "Confira os planos e valores da cotação." };
+    }
+    const itemsResult = z.array(quoteItemSchema).max(30).safeParse(rawItems);
+    const lineItemsResult = z.array(quoteLineItemSchema).max(100).safeParse(rawLineItems);
+    if (!itemsResult.success || !lineItemsResult.success) return { error: "Confira os planos e valores da cotação." };
+    const quoteItems = itemsResult.data;
+    const quoteLineItems = lineItemsResult.data;
+    if (!quoteItems.length && !quoteLineItems.length) return { error: "Adicione ao menos um plano com valor mensal." };
+
+    const [availablePlans, legacyPlans] = await Promise.all([
+      listAvailableCatalogPlans(context),
+      getCachedLegacyPlans(context.tenantId),
+    ]);
+    const planNames = new Map<string, string>([
+      ...availablePlans.map((plan) => [plan.planId, plan.planName] as const),
+      ...legacyPlans.map((plan) => [plan.id, plan.name] as const),
+    ]);
+    const selectedPlanIds = new Set([...quoteItems, ...quoteLineItems].map((item) => item.planId));
+    if ([...selectedPlanIds].some((planId) => !planNames.has(planId))) {
+      return { error: "Um dos planos não está mais disponível para este acesso." };
+    }
+
+    const beneficiaryIds = [...new Set(quoteLineItems.map((item) => item.beneficiaryId))];
+    if (beneficiaryIds.length) {
+      const beneficiaries = await db.select({ id: schema.leadBeneficiaries.id })
+        .from(schema.leadBeneficiaries)
+        .where(and(
+          eq(schema.leadBeneficiaries.tenantId, context.tenantId),
+          eq(schema.leadBeneficiaries.leadId, lead.id),
+          inArray(schema.leadBeneficiaries.id, beneficiaryIds),
+        ));
+      if (beneficiaries.length !== beneficiaryIds.length) return { error: "Revise os beneficiários selecionados." };
+    }
+
+    const totalCents = [...quoteItems.map((item) => item.monthlyPrice), ...quoteLineItems.map((item) => item.calculatedValue)]
+      .reduce((total, amount) => total + Math.round(amount * 100), 0);
+    if (totalCents <= 0 || totalCents > 999999999999) return { error: "O total mensal da cotação está fora do limite permitido." };
+    const totalMonthly = (totalCents / 100).toFixed(2);
+    const beneficiaryCount = quoteLineItems.length
+      ? new Set(quoteLineItems.map((item) => item.beneficiaryId)).size
+      : parsed.data.beneficiaryCount;
+    const commercialValues = quoteCommercialValues({ totalMonthly, beneficiaryCount });
 
     const token = randomUUID().replace(/-/g, "").slice(0, 16);
     const quoteId = randomUUID();
@@ -62,45 +189,59 @@ export async function createQuoteAction(_previous: QuoteActionState, formData: F
         createdBy: context.userId,
         status: "draft",
         publicToken: token,
-        leadName: parsed.data.leadName,
-        leadPhone: parsed.data.leadPhone,
-        totalMonthly: parsed.data.totalMonthly?.toString(),
-        beneficiaryCount: parsed.data.beneficiaryCount,
+        leadName: lead.nome,
+        leadPhone: lead.telefone,
+        totalMonthly,
+        beneficiaryCount,
         notes: parsed.data.notes,
       });
 
-      if (parsed.data.items) {
-        const items = JSON.parse(parsed.data.items) as Array<{ planId: string; monthlyPrice: number; recommended: boolean; snapshot?: Record<string, unknown> }>;
-        if (items.length > 0) {
+      if (quoteItems.length > 0) {
           await tx.insert(schema.quoteItems).values(
-            items.map((item) => ({
+            quoteItems.map((item) => ({
               id: randomUUID(),
               quoteId,
               planId: item.planId,
-              monthlyPrice: item.monthlyPrice.toString(),
+              monthlyPrice: item.monthlyPrice.toFixed(2),
               recommended: item.recommended,
-              snapshot: item.snapshot ?? {},
+              snapshot: { planName: planNames.get(item.planId) },
             })),
           );
-        }
       }
 
-      if (parsed.data.lineItems) {
-        const lineItems = JSON.parse(parsed.data.lineItems) as Array<{ beneficiaryId: string; planId: string; calculatedValue: number; ageAtQuote: number; snapshot?: Record<string, unknown> }>;
-        if (lineItems.length > 0) {
+      if (quoteLineItems.length > 0) {
           await tx.insert(schema.quoteLineItems).values(
-            lineItems.map((item) => ({
+            quoteLineItems.map((item) => ({
               id: randomUUID(),
               tenantId: context.tenantId,
               quoteId,
               beneficiaryId: item.beneficiaryId,
               planId: item.planId,
-              calculatedValue: item.calculatedValue.toString(),
+              calculatedValue: item.calculatedValue.toFixed(2),
               ageAtQuote: item.ageAtQuote,
-              snapshot: item.snapshot ?? {},
+              snapshot: { planName: planNames.get(item.planId) },
             })),
           );
-        }
+      }
+
+      const [activeSale] = await tx.select({ id: schema.sales.id }).from(schema.sales).where(and(
+        eq(schema.sales.tenantId, context.tenantId), eq(schema.sales.leadId, lead.id), eq(schema.sales.status, "active"),
+      )).limit(1);
+      const [activeProposal] = await tx.select({ id: schema.proposals.id }).from(schema.proposals).where(and(
+        eq(schema.proposals.tenantId, context.tenantId),
+        eq(schema.proposals.leadId, lead.id),
+        inArray(schema.proposals.status, ["rascunho", "em_revisao", "enviada", "visualizada", "negociacao", "aprovada"]),
+      )).limit(1);
+      if (!activeSale && !activeProposal) {
+        await tx.update(schema.leads).set({
+          monthlyValue: commercialValues.monthlyValue,
+          livesCount: commercialValues.livesCount,
+          updatedAt: new Date(),
+        }).where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id,
+          acao: "lead.commercial_values_updated_from_quote",
+        });
       }
 
       await tx.insert(schema.leadInteractions).values({
@@ -108,7 +249,7 @@ export async function createQuoteAction(_previous: QuoteActionState, formData: F
         leadId: lead.id,
         userId: context.userId,
         tipo: "quote_generated",
-        conteudo: `Cotação "${parsed.data.leadName}" criada com ${parsed.data.beneficiaryCount ?? "?"} beneficiários. Valor mensal: R$ ${parsed.data.totalMonthly?.toFixed(2) ?? "?"}.`,
+        conteudo: `Cotação criada com ${beneficiaryCount} beneficiários. Valor mensal: R$ ${totalMonthly}.`,
       });
 
       await tx.insert(schema.auditLogs).values({
@@ -121,8 +262,7 @@ export async function createQuoteAction(_previous: QuoteActionState, formData: F
     });
 
     return { success: true, token };
-  } catch (error) {
-    console.error("Error creating quote:", error);
+  } catch {
     return { error: "Erro ao criar cotação. Tente novamente." };
   }
 }
@@ -144,8 +284,11 @@ export async function shareQuoteAction(_previous: QuoteActionState, formData: Fo
 
     if (!quote) return { error: "Cotação não encontrada." };
 
-    if (context.role === "broker" && quote.leadCorretorId !== context.userId) return { error: "Voce so pode compartilhar cotacoes dos seus proprios leads." };
-    if (context.role === "manager" && (!context.branchId || quote.leadBranchId !== context.branchId)) return { error: "Esta cotacao nao pertence a sua filial." };
+    if (!AuthorizationService.can(
+      toEffectiveLeadAccessContext(context),
+      "acessar_leads",
+      buildLeadResourceScope({ tenantId: context.tenantId, branchId: quote.leadBranchId, corretorId: quote.leadCorretorId }),
+    )) return { error: "Você não tem acesso a esta cotação." };
 
     const now = new Date();
     const followUpDueAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
@@ -194,20 +337,43 @@ export async function deleteQuoteAction(_previous: QuoteActionState, formData: F
     const db = getDatabase();
 
     const [quote] = await db
-      .select({ id: schema.quotes.id, tenantId: schema.quotes.tenantId, leadId: schema.quotes.leadId })
+      .select({
+        id: schema.quotes.id,
+        tenantId: schema.quotes.tenantId,
+        leadId: schema.quotes.leadId,
+        leadBranchId: schema.leads.branchId,
+        leadCorretorId: schema.leads.corretorId,
+      })
       .from(schema.quotes)
-      .where(and(eq(schema.quotes.id, quoteId), eq(schema.quotes.tenantId, context.tenantId)))
+      .innerJoin(schema.leads, eq(schema.leads.id, schema.quotes.leadId))
+      .where(and(
+        eq(schema.quotes.id, quoteId),
+        eq(schema.quotes.tenantId, context.tenantId),
+        eq(schema.leads.tenantId, context.tenantId),
+        isNull(schema.leads.deletedAt),
+      ))
       .limit(1);
 
     if (!quote) return { error: "Cotação não encontrada." };
     if (context.role === "broker") {
       return { error: "Corretores não podem excluir cotações." };
     }
+    if (!AuthorizationService.can(
+      toEffectiveLeadAccessContext(context),
+      "acessar_leads",
+      buildLeadResourceScope({ tenantId: context.tenantId, branchId: quote.leadBranchId, corretorId: quote.leadCorretorId }),
+    )) return { error: "Você não tem permissão para excluir esta cotação." };
 
     await db.transaction(async (tx) => {
-      await tx.delete(schema.quoteLineItems).where(eq(schema.quoteLineItems.quoteId, quoteId));
+      await tx.delete(schema.quoteLineItems).where(and(
+        eq(schema.quoteLineItems.quoteId, quoteId),
+        eq(schema.quoteLineItems.tenantId, context.tenantId),
+      ));
       await tx.delete(schema.quoteItems).where(eq(schema.quoteItems.quoteId, quoteId));
-      await tx.delete(schema.quotes).where(eq(schema.quotes.id, quoteId));
+      await tx.delete(schema.quotes).where(and(eq(schema.quotes.id, quoteId), eq(schema.quotes.tenantId, context.tenantId)));
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(), userId: context.userId, entidade: "quote", entidadeId: quoteId, acao: "excluiu",
+      });
     });
 
     return { success: true };

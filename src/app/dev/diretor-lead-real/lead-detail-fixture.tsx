@@ -70,6 +70,7 @@ export function LeadDetailFixture() {
           />
         ),
         insight: <AiConversationInsightCard leadId={LEAD_ID} leadStatus="in_contact" canManage />,
+        commercial: null,
         startQualification: <StartQualificationButton leadId={LEAD_ID} leadName="Maria Nova" variant="default" size="sm" />,
         person: <PersonRecordDetails kind="lead" hideRegistrationDate={false} createdAt={createdAt} consentimentoLgpd dependents={[]} documentCount={0} formData={formData} />,
         beneficiaries: <BeneficiariesSection leadId={LEAD_ID} contactName="Maria Nova" initialBeneficiaries={[]} />,

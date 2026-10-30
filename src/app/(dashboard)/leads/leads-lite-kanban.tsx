@@ -6,13 +6,14 @@
  * drawer, seleciona para o lote e abre o WhatsApp. Cartões não mudam de etapa por arrastar, como hoje.
  */
 import { useMemo } from "react";
-import { MessageCircle } from "lucide-react";
+import { Calculator, MessageCircle } from "lucide-react";
 
 import { LiteKanban } from "@/components/lite/data/kanban";
 import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
 import { computeLeadHealth, type LeadHealth } from "@/features/leads/components/lead-health-badge";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { formatDate } from "@/features/quotes/utils";
+import { formatLeadCommercialTotals, sumLeadCommercialValues } from "@/features/leads/commercial-values";
 
 import { computeSlaInfo, type SlaInfo } from "./lead-sla";
 import { LeadsLiteBulk, type LeadsLiteBulkConfig } from "./leads-lite-bulk";
@@ -24,6 +25,8 @@ export type LeadsLiteKanbanProps = {
   groupedLeads: Record<string, LeadWorkspaceItem[]>;
   onMoveColumn: (activeId: string, overId: string) => void;
   onOpen: (lead: LeadWorkspaceItem) => void;
+  onQuote?: (lead: LeadWorkspaceItem) => void;
+  commercialValuesEnabled?: boolean;
   isSelected: (id: string) => boolean;
   onToggle: (id: string) => void;
   selectedIds: string[];
@@ -36,7 +39,7 @@ export type LeadsLiteKanbanProps = {
 };
 
 export function LeadsLiteKanban({
-  statuses, groupedLeads, onMoveColumn, onOpen, isSelected, onToggle, selectedIds, onClearSelection, bulk,
+  statuses, groupedLeads, onMoveColumn, onOpen, onQuote, commercialValuesEnabled = false, isSelected, onToggle, selectedIds, onClearSelection, bulk,
   hideArrival = false, slaFirstContactMinutes = 15, slaStagnantDays = 3,
 }: LeadsLiteKanbanProps) {
   const columns = useMemo(
@@ -50,12 +53,17 @@ export function LeadsLiteKanban({
         columns={columns}
         itemKey={(lead) => lead.id}
         onMoveColumn={onMoveColumn}
+        renderFooter={(column) => commercialValuesEnabled
+          ? formatLeadCommercialTotals(sumLeadCommercialValues(column.items))
+          : null}
         renderCard={(lead) => (
           <LeadKanbanCard
             lead={lead}
             selected={isSelected(lead.id)}
             onToggle={onToggle}
             onOpen={onOpen}
+            onQuote={onQuote}
+            commercialValuesEnabled={commercialValuesEnabled}
             hideArrival={hideArrival}
             slaFirstContactMinutes={slaFirstContactMinutes}
             slaStagnantDays={slaStagnantDays}
@@ -82,11 +90,13 @@ function healthTone(health: LeadHealth) {
   return "neutral";
 }
 
-function LeadKanbanCard({ lead, selected, onToggle, onOpen, hideArrival, slaFirstContactMinutes, slaStagnantDays }: {
+function LeadKanbanCard({ lead, selected, onToggle, onOpen, onQuote, commercialValuesEnabled, hideArrival, slaFirstContactMinutes, slaStagnantDays }: {
   lead: LeadWorkspaceItem;
   selected: boolean;
   onToggle: (id: string) => void;
   onOpen: (lead: LeadWorkspaceItem) => void;
+  onQuote?: (lead: LeadWorkspaceItem) => void;
+  commercialValuesEnabled: boolean;
   hideArrival: boolean;
   slaFirstContactMinutes: number;
   slaStagnantDays: number;
@@ -134,6 +144,11 @@ function LeadKanbanCard({ lead, selected, onToggle, onOpen, hideArrival, slaFirs
           {hideArrival ? null : <span className={styles.arrival}>{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>}
         </span>
       </button>
+      {commercialValuesEnabled && onQuote ? (
+        <button type="button" className={styles.quoteButton} onClick={() => onQuote(lead)}>
+          <Calculator aria-hidden="true" size={16} /> Fazer cotação
+        </button>
+      ) : null}
     </article>
   );
 }

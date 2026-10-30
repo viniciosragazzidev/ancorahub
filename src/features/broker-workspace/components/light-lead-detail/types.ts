@@ -27,6 +27,8 @@ export type LightLeadDetailData = {
   planName?: string | null;
   carrierName?: string | null;
   livesCount?: number | null;
+  monthlyValue?: string | null;
+  commercialValueSource?: "sale" | "proposal" | "lead" | null;
   city?: string | null;
   urgency?: string | null;
   summary?: string | null;

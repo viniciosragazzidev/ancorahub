@@ -7,6 +7,7 @@ import { LeadHeaderBar, NextStepCard } from "@/features/broker-workspace/chat/le
 import { arrivalView, nextStepFor } from "@/features/broker-workspace/chat/lead-arrival";
 import { LeadSocialLayout } from "@/features/broker-workspace/chat/lead-social-layout";
 import { RegisterSalePanel } from "@/app/(dashboard)/leads/[id]/register-sale-panel";
+import { LeadQuotesSection } from "@/features/leads/components/lead-quotes-section";
 
 import { LeadActionBar } from "./action-bar";
 import { DeclineSheet } from "./decline-sheet";
@@ -43,6 +44,8 @@ export function LightLeadDetail({
   variant = "page",
   activity,
   conversation,
+  commercialValuesEnabled = false,
+  quotePlans = [],
 }: {
   lead: LightLeadDetailData;
   /** Kept for the page contract; the responsible broker is no longer printed on this screen. */
@@ -56,6 +59,8 @@ export function LightLeadDetail({
   activity?: LeadActivity;
   /** The chat, shown beside the profile in the panel. */
   conversation?: ReactNode;
+  commercialValuesEnabled?: boolean;
+  quotePlans?: Array<{ id: string; name: string }>;
 }) {
   const isManagement = mode === "management";
   const c = useLeadDetail({ lead, requirements, documents, initialDetailsExpanded: isManagement });
@@ -70,6 +75,7 @@ export function LightLeadDetail({
       <div className="arc-venancor flex w-full flex-col gap-4 text-foreground">
         <ClientInfoCard lead={lead} c={c} mode="management" />
         <SaleSection c={c} mode="management" />
+        {commercialValuesEnabled ? <LeadQuotesSection key={lead.id} leadId={lead.id} leadName={lead.nome} leadPhone={lead.telefone} beneficiaryCount={lead.livesCount} plans={quotePlans} monthlyValue={lead.monthlyValue} livesCount={lead.livesCount} commercialValueSource={lead.commercialValueSource} canDeleteQuotes={isManagement} /> : null}
         <DetailsZone lead={lead} c={c} showAiInsight={false} />
       </div>
     );
@@ -101,6 +107,7 @@ export function LightLeadDetail({
               <ClientInfoCard lead={lead} c={c} withSummary />
               <PeopleDataSection lead={lead} c={c} showRecordDetails={false} />
               <SaleSection c={c} />
+              {commercialValuesEnabled ? <LeadQuotesSection key={lead.id} leadId={lead.id} leadName={lead.nome} leadPhone={lead.telefone} beneficiaryCount={lead.livesCount} plans={quotePlans} monthlyValue={lead.monthlyValue} livesCount={lead.livesCount} commercialValueSource={lead.commercialValueSource} canDeleteQuotes={isManagement} /> : null}
             </div>
           }
           conversation={conversation}
@@ -128,6 +135,7 @@ export function LightLeadDetail({
           <IdentityHeader lead={lead} c={c} mode="management" />
           <ClientInfoCard lead={lead} c={c} mode="management" />
           <SaleSection c={c} mode="management" />
+          {commercialValuesEnabled ? <LeadQuotesSection key={lead.id} leadId={lead.id} leadName={lead.nome} leadPhone={lead.telefone} beneficiaryCount={lead.livesCount} plans={quotePlans} monthlyValue={lead.monthlyValue} livesCount={lead.livesCount} commercialValueSource={lead.commercialValueSource} canDeleteQuotes={isManagement} /> : null}
           <DetailsZone lead={lead} c={c} showAiInsight={false} />
         </div>
       </div>
@@ -145,6 +153,7 @@ export function LightLeadDetail({
         <SaleSection c={c} />
         <DetailsZone lead={lead} c={c} />
         <PeopleDataSection lead={lead} c={c} />
+        {commercialValuesEnabled ? <LeadQuotesSection key={lead.id} leadId={lead.id} leadName={lead.nome} leadPhone={lead.telefone} beneficiaryCount={lead.livesCount} plans={quotePlans} monthlyValue={lead.monthlyValue} livesCount={lead.livesCount} commercialValueSource={lead.commercialValueSource} canDeleteQuotes={isManagement} /> : null}
       </div>
 
       <LeadActionBar lead={lead} c={c} />

@@ -24,6 +24,8 @@ import { NextUrgentLeadButton } from "@/components/next-urgent-lead-button";
 import { getUrgentLeadForUser } from "@/features/leads/queries";
 import { ContextNote } from "@/components/ui/context-note";
 import { getSystemSettings } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { legacyLeadLivesCount, resolveLeadCommercialValues } from "@/features/leads/commercial-values";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
@@ -244,6 +246,7 @@ async function LeadsPageContent({
   const period = parsePeriod(filters.period);
   const eligibleCampaignsOnly = filters.eligibleCampaigns === "1";
   const systemSettingsPromise = getSystemSettings([
+        FEATURE_FLAGS.LEAD_COMMERCIAL_VALUES.key,
         "feature_central_atencao_stagnant_days",
         "feature_lead_management_actions_enabled",
         "feature_manual_lead_assignment_offer_choice_enabled",
@@ -530,6 +533,11 @@ async function LeadsPageContent({
         branchId: schema.leads.branchId,
         branchName: schema.branches.name,
         qualificationDetails: schema.leads.qualificationDetails,
+        monthlyValue: schema.leads.monthlyValue,
+        livesCount: schema.leads.livesCount,
+        proposalMonthlyValue: sql<string | null>`(select ${schema.proposals.totalMonthly} from ${schema.proposals} where ${schema.proposals.tenantId} = ${schema.leads.tenantId} and ${schema.proposals.leadId} = ${schema.leads.id} and ${schema.proposals.status} in ('rascunho', 'em_revisao', 'enviada', 'visualizada', 'negociacao', 'aprovada') order by ${schema.proposals.createdAt} desc limit 1)`,
+        proposalLivesCount: sql<number | null>`(select ${schema.proposals.beneficiaryCount} from ${schema.proposals} where ${schema.proposals.tenantId} = ${schema.leads.tenantId} and ${schema.proposals.leadId} = ${schema.leads.id} and ${schema.proposals.status} in ('rascunho', 'em_revisao', 'enviada', 'visualizada', 'negociacao', 'aprovada') order by ${schema.proposals.createdAt} desc limit 1)`.mapWith(schema.proposals.beneficiaryCount),
+        activeSaleMonthlyValue: sql<string | null>`(select coalesce(nullif(${schema.sales.approvedValue}, 0), ${schema.sales.saleValue}) from ${schema.sales} where ${schema.sales.tenantId} = ${schema.leads.tenantId} and ${schema.sales.leadId} = ${schema.leads.id} and ${schema.sales.status} = 'active' order by ${schema.sales.createdAt} desc limit 1)`,
         queueId: schema.leads.queueId,
         queueName: schema.leadQueues.name,
         queueColorHue: schema.leadQueues.colorHue,
@@ -628,6 +636,11 @@ async function LeadsPageContent({
           branchId: schema.leads.branchId,
           branchName: schema.branches.name,
           qualificationDetails: schema.leads.qualificationDetails,
+          monthlyValue: schema.leads.monthlyValue,
+          livesCount: schema.leads.livesCount,
+          proposalMonthlyValue: sql<string | null>`(select ${schema.proposals.totalMonthly} from ${schema.proposals} where ${schema.proposals.tenantId} = ${schema.leads.tenantId} and ${schema.proposals.leadId} = ${schema.leads.id} and ${schema.proposals.status} in ('rascunho', 'em_revisao', 'enviada', 'visualizada', 'negociacao', 'aprovada') order by ${schema.proposals.createdAt} desc limit 1)`,
+          proposalLivesCount: sql<number | null>`(select ${schema.proposals.beneficiaryCount} from ${schema.proposals} where ${schema.proposals.tenantId} = ${schema.leads.tenantId} and ${schema.proposals.leadId} = ${schema.leads.id} and ${schema.proposals.status} in ('rascunho', 'em_revisao', 'enviada', 'visualizada', 'negociacao', 'aprovada') order by ${schema.proposals.createdAt} desc limit 1)`.mapWith(schema.proposals.beneficiaryCount),
+          activeSaleMonthlyValue: sql<string | null>`(select coalesce(nullif(${schema.sales.approvedValue}, 0), ${schema.sales.saleValue}) from ${schema.sales} where ${schema.sales.tenantId} = ${schema.leads.tenantId} and ${schema.sales.leadId} = ${schema.leads.id} and ${schema.sales.status} = 'active' order by ${schema.sales.createdAt} desc limit 1)`,
           queueId: schema.leads.queueId,
           queueName: schema.leadQueues.name,
           queueColorHue: schema.leadQueues.colorHue,
@@ -714,6 +727,7 @@ async function LeadsPageContent({
   const slaFirstContactMinutes = Number(slaSettings.slaFirstContactMinutes);
   const slaStagnantDays = Number(slaSettings.slaStagnantDays);
   const leadManagementActionsEnabled = systemSettings.get("feature_lead_management_actions_enabled") !== "false";
+  const leadCommercialValuesEnabled = systemSettings.get(FEATURE_FLAGS.LEAD_COMMERCIAL_VALUES.key) !== "false";
   // RCD: detect if any filter is active to switch empty state copy
   // Queue tabs: in the workspace, right under the view tabs (and above the empty state).
   const queueTabs = (
@@ -830,6 +844,12 @@ async function LeadsPageContent({
                 serviceStartedAt: lead.serviceStartedAt?.toISOString() ?? null,
                 firstContactAt: lead.firstContactAt?.toISOString() ?? null,
                 qualificationDetails: (lead.qualificationDetails as Record<string, unknown>) ?? null,
+                ...resolveLeadCommercialValues({
+                  lead: { monthlyValue: lead.monthlyValue, livesCount: lead.livesCount ?? legacyLeadLivesCount(lead.qualificationDetails) },
+                  proposalMonthlyValue: lead.proposalMonthlyValue,
+                  proposalLivesCount: lead.proposalLivesCount,
+                  activeSaleMonthlyValue: lead.activeSaleMonthlyValue,
+                }),
               })))}
               qualifyingLeads={stripLeadOriginForRole(context.role, qualifyingLeads.map((lead) => ({
                 ...lead,
@@ -844,6 +864,8 @@ async function LeadsPageContent({
               contextBranchId={context.branchId}
               slaFirstContactMinutes={slaFirstContactMinutes}
               slaStagnantDays={slaStagnantDays}
+              commercialValuesEnabled={leadCommercialValuesEnabled}
+              quotePlans={plans.map((plan) => ({ id: plan.id, name: plan.name }))}
               brokers={brokers}
               branches={branches.filter((branch) => (context.role === "director" || branch.id === context.branchId) && branch.status === "active" && branch.acceptingLeads && !branch.isDistributionHub)}
               manualAssignmentChoiceEnabled={systemSettings.get("feature_manual_lead_assignment_offer_choice_enabled") !== "false"}
@@ -861,6 +883,12 @@ async function LeadsPageContent({
                 serviceStartedAt: lead.serviceStartedAt?.toISOString() ?? null,
                 firstContactAt: lead.firstContactAt?.toISOString() ?? null,
                 qualificationDetails: (lead.qualificationDetails as Record<string, unknown>) ?? null,
+                ...resolveLeadCommercialValues({
+                  lead: { monthlyValue: lead.monthlyValue, livesCount: lead.livesCount ?? legacyLeadLivesCount(lead.qualificationDetails) },
+                  proposalMonthlyValue: lead.proposalMonthlyValue,
+                  proposalLivesCount: lead.proposalLivesCount,
+                  activeSaleMonthlyValue: lead.activeSaleMonthlyValue,
+                }),
               }))}
               pagination={{
                 currentPage: page,

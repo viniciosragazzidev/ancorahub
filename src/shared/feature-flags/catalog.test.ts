@@ -62,3 +62,14 @@ describe("team management feature flag", () => {
     });
   });
 });
+
+describe("lead commercial values feature flag", () => {
+  it("is globally controlled, enabled by default and reversible by Super-admin", () => {
+    expect(FEATURE_FLAGS.LEAD_COMMERCIAL_VALUES).toMatchObject({
+      key: "feature_lead_commercial_values_enabled",
+      scope: "global",
+      defaultValue: "true",
+      allowedValues: ["true", "false"],
+    });
+  });
+});

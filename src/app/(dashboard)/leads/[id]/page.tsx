@@ -52,6 +52,11 @@ import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } fr
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
 import { LeadActionHub } from "@/features/leads/components/lead-action-hub";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
+import { getCachedLegacyPlans } from "@/features/leads/reference-data";
+import { LeadQuotesSection } from "@/features/leads/components/lead-quotes-section";
+import { legacyLeadLivesCount, resolveLeadCommercialValues } from "@/features/leads/commercial-values";
 
 import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 import { BeneficiariesSection } from "./beneficiaries-section";
@@ -170,6 +175,11 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       qualificationState: schema.leads.qualificationState,
       formData: schema.leads.formData,
       qualificationDetails: schema.leads.qualificationDetails,
+      monthlyValue: schema.leads.monthlyValue,
+      livesCount: schema.leads.livesCount,
+      proposalMonthlyValue: sql<string | null>`(select ${schema.proposals.totalMonthly} from ${schema.proposals} where ${schema.proposals.tenantId} = ${schema.leads.tenantId} and ${schema.proposals.leadId} = ${schema.leads.id} and ${schema.proposals.status} in ('rascunho', 'em_revisao', 'enviada', 'visualizada', 'negociacao', 'aprovada') order by ${schema.proposals.createdAt} desc limit 1)`,
+      proposalLivesCount: sql<number | null>`(select ${schema.proposals.beneficiaryCount} from ${schema.proposals} where ${schema.proposals.tenantId} = ${schema.leads.tenantId} and ${schema.proposals.leadId} = ${schema.leads.id} and ${schema.proposals.status} in ('rascunho', 'em_revisao', 'enviada', 'visualizada', 'negociacao', 'aprovada') order by ${schema.proposals.createdAt} desc limit 1)`.mapWith(schema.proposals.beneficiaryCount),
+      activeSaleMonthlyValue: sql<string | null>`(select coalesce(nullif(${schema.sales.approvedValue}, 0), ${schema.sales.saleValue}) from ${schema.sales} where ${schema.sales.tenantId} = ${schema.leads.tenantId} and ${schema.sales.leadId} = ${schema.leads.id} and ${schema.sales.status} = 'active' order by ${schema.sales.createdAt} desc limit 1)`,
       corretorId: schema.leads.corretorId,
       branchId: schema.leads.branchId,
       planId: schema.leads.planId,
@@ -243,6 +253,19 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       now={new Date().toISOString()}
     />;
   }
+  const commercialValuesEnabled = (await getSystemSetting(FEATURE_FLAGS.LEAD_COMMERCIAL_VALUES.key)) !== "false";
+  const quotePlans = commercialValuesEnabled
+    ? await Promise.all([listAvailableCatalogPlans(context), getCachedLegacyPlans(context.tenantId)]).then(([available, legacy]) => [
+        ...available.map((plan) => ({ id: plan.planId, name: plan.planName })),
+        ...legacy.map((plan) => ({ id: plan.id, name: plan.name })),
+      ])
+    : [];
+  const commercialValues = resolveLeadCommercialValues({
+    lead: { monthlyValue: lead.monthlyValue, livesCount: lead.livesCount ?? legacyLeadLivesCount(lead.qualificationDetails) },
+    proposalMonthlyValue: lead.proposalMonthlyValue,
+    proposalLivesCount: lead.proposalLivesCount,
+    activeSaleMonthlyValue: lead.activeSaleMonthlyValue,
+  });
   // Lite broker: resolved once per request (cached); the Meta names below only feed the full screen.
   const isLightBroker = context.role === "broker" && (await getExperienceMode(context)) === "LIGHT";
   const [metaCampaign, metaAd, metaForm] = isLightBroker ? [[], [], []] : await Promise.all([
@@ -339,7 +362,9 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       branchName: lead.branchNome,
       summary: qualificationDetails?.resumoAtendimento || qualificationDetails?.resumoNecessidade || null,
       planName: lead.productName,
-      livesCount: qualificationDetails?.qtdVidas ? Number(qualificationDetails.qtdVidas) : null,
+      livesCount: commercialValues.livesCount,
+      monthlyValue: commercialValues.monthlyValue == null ? null : String(commercialValues.monthlyValue),
+      commercialValueSource: commercialValues.source,
       urgency: qualificationDetails?.urgenciaContratacao || null,
       city: qualificationDetails?.cidade || (typeof (lead.qualificationDetails as Record<string, unknown> | null)?.city === "string" ? String((lead.qualificationDetails as Record<string, unknown>).city) : null),
       // The creation date is when it reached the brokerage; the broker only gets the assignment.
@@ -446,6 +471,8 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
             now,
           }}
           conversation={<LeadConversation leadId={lead.id} name={lead.nome} initials={leadInitials} canWrite={lightLead.isCurrentBroker} script={script} />}
+          commercialValuesEnabled={commercialValuesEnabled}
+          quotePlans={quotePlans}
         />
       );
     }
@@ -467,6 +494,8 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
           status: doc.status,
         }))}
         carriers={lightCarriers}
+        commercialValuesEnabled={commercialValuesEnabled}
+        quotePlans={quotePlans}
       />
     );
   }
@@ -655,6 +684,19 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                   canManage={context.role !== "broker" || lead.corretorId === context.userId}
                 />
               ),
+              commercial: commercialValuesEnabled && !shouldMask ? (
+                <LeadQuotesSection
+                  leadId={lead.id}
+                  leadName={lead.nome}
+                  leadPhone={canSeePersonalData ? lead.telefone : null}
+                  beneficiaryCount={commercialValues.livesCount}
+                  plans={quotePlans}
+                  monthlyValue={commercialValues.monthlyValue == null ? null : String(commercialValues.monthlyValue)}
+                  livesCount={commercialValues.livesCount}
+                  commercialValueSource={commercialValues.source}
+                  canDeleteQuotes={context.role !== "broker"}
+                />
+              ) : null,
               startQualification: <StartQualificationButton leadId={lead.id} leadName={lead.nome} variant="default" size="sm" />,
               person: <PersonRecordDetails kind="lead" hideRegistrationDate={false} createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} formData={formData} />,
               beneficiaries: <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />,
@@ -998,6 +1040,20 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                   <PersonRecordDetails kind="lead" hideRegistrationDate={isBrokerRole} createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} formData={formData} />
                   <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />
                 </div>
+
+                {commercialValuesEnabled && !shouldMask ? (
+                  <LeadQuotesSection
+                    leadId={lead.id}
+                    leadName={lead.nome}
+                    leadPhone={canSeePersonalData ? lead.telefone : null}
+                    beneficiaryCount={commercialValues.livesCount}
+                    plans={quotePlans}
+                    monthlyValue={commercialValues.monthlyValue == null ? null : String(commercialValues.monthlyValue)}
+                    livesCount={commercialValues.livesCount}
+                    commercialValueSource={commercialValues.source}
+                    canDeleteQuotes={context.role !== "broker"}
+                  />
+                ) : null}
 
                 {hasPermission(context.role, "acessar_conversas") ? (
                   <LeadChat leadId={lead.id} phone={canSeePersonalData ? lead.telefone : null} />
