@@ -1329,6 +1329,7 @@ export const auditLogs = pgTable(
     entidade: text("entidade").notNull(),
     entidadeId: text("entidade_id").notNull(),
     acao: text("acao").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     createdAt,
   },
   (table) => [

@@ -11,6 +11,7 @@ import { buildLeadResourceScope, toEffectiveLeadAccessContext } from "@/features
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getDatabase, schema } from "@/shared/db";
+import { commercialValuesAuditMetadata } from "./commercial-values";
 
 export type CommercialValuesActionState = {
   success?: boolean;
@@ -74,24 +75,36 @@ export async function updateLeadCommercialValuesAction(
       return { error: "Você não tem permissão para editar este lead." };
     }
 
-    const [activeSale, activeProposal] = await Promise.all([
-      db.select({ id: schema.sales.id }).from(schema.sales).where(and(
-        eq(schema.sales.tenantId, context.tenantId), eq(schema.sales.leadId, lead.id), eq(schema.sales.status, "active"),
-      )).limit(1),
-      db.select({ id: schema.proposals.id }).from(schema.proposals).where(and(
-        eq(schema.proposals.tenantId, context.tenantId),
-        eq(schema.proposals.leadId, lead.id),
-        inArray(schema.proposals.status, ["rascunho", "em_revisao", "enviada", "visualizada", "negociacao", "aprovada"]),
-      )).limit(1),
-    ]);
-    if (activeSale.length || activeProposal.length) {
-      return { error: "O valor vem de uma venda ou proposta ativa. Edite o registro de origem." };
-    }
-
     const now = new Date();
-    await db.transaction(async (tx) => {
+    const updateResult = await db.transaction(async (tx) => {
+      const [lockedLead] = await tx.select({
+        monthlyValue: schema.leads.monthlyValue,
+        livesCount: schema.leads.livesCount,
+      }).from(schema.leads).where(and(
+        eq(schema.leads.id, lead.id),
+        eq(schema.leads.tenantId, context.tenantId),
+        isNull(schema.leads.deletedAt),
+      )).for("update").limit(1);
+      if (!lockedLead) return "missing" as const;
+
+      const [activeSale, activeProposal] = await Promise.all([
+        tx.select({ id: schema.sales.id }).from(schema.sales).where(and(
+          eq(schema.sales.tenantId, context.tenantId), eq(schema.sales.leadId, lead.id), eq(schema.sales.status, "active"),
+        )).limit(1),
+        tx.select({ id: schema.proposals.id }).from(schema.proposals).where(and(
+          eq(schema.proposals.tenantId, context.tenantId),
+          eq(schema.proposals.leadId, lead.id),
+          inArray(schema.proposals.status, ["rascunho", "em_revisao", "enviada", "visualizada", "negociacao", "aprovada"]),
+        )).limit(1),
+      ]);
+      if (activeSale.length || activeProposal.length) return "protected" as const;
+
+      const nextValues = {
+        monthlyValue: monthlyValue === null ? null : monthlyValue.toFixed(2),
+        livesCount,
+      };
       await tx.update(schema.leads)
-        .set({ monthlyValue: monthlyValue === null ? null : monthlyValue.toFixed(2), livesCount, updatedAt: now })
+        .set({ ...nextValues, updatedAt: now })
         .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(),
@@ -99,9 +112,16 @@ export async function updateLeadCommercialValuesAction(
         entidade: "lead",
         entidadeId: lead.id,
         acao: "lead.commercial_values_updated",
+        metadata: commercialValuesAuditMetadata({ source: "manual", previous: lockedLead, next: nextValues }),
         createdAt: now,
       });
+      return "updated" as const;
     });
+
+    if (updateResult === "protected") {
+      return { error: "O valor vem de uma venda ou proposta ativa. Edite o registro de origem." };
+    }
+    if (updateResult === "missing") return { error: "Lead não encontrado." };
 
     revalidatePath("/leads");
     revalidatePath(`/leads/${lead.id}`);

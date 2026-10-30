@@ -8,6 +8,40 @@ export type CommercialTotals = {
   livesCount: number;
 };
 
+export type CommercialValuesAuditMetadata = {
+  source: "manual" | "quote";
+  changes: {
+    monthly_value: { from: string | null; to: string | null };
+    lives_count: { from: number | null; to: number | null };
+  };
+};
+
+function auditMonthlyValue(value: string | number | null | undefined): string | null {
+  if (value == null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toFixed(2) : null;
+}
+
+export function commercialValuesAuditMetadata(input: {
+  source: CommercialValuesAuditMetadata["source"];
+  previous: LeadCommercialValues;
+  next: LeadCommercialValues;
+}): CommercialValuesAuditMetadata {
+  return {
+    source: input.source,
+    changes: {
+      monthly_value: {
+        from: auditMonthlyValue(input.previous.monthlyValue),
+        to: auditMonthlyValue(input.next.monthlyValue),
+      },
+      lives_count: {
+        from: input.previous.livesCount ?? null,
+        to: input.next.livesCount ?? null,
+      },
+    },
+  };
+}
+
 export function legacyLeadLivesCount(details: unknown): number | null {
   if (!details || typeof details !== "object" || Array.isArray(details)) return null;
   const values = details as Record<string, unknown>;

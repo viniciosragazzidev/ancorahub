@@ -72,18 +72,20 @@ fica visível no drawer do lead.
 
 Vinicios confirmou em 2026-10-30: venda ativa prevalece sobre a proposta ativa mais
 recente, que prevalece sobre o snapshot do lead preenchido manualmente ou por cotação.
-Quando há venda ou proposta ativa, a edição manual fica bloqueada e salvar uma cotação
-não substitui o snapshot nem altera esses registros formais. As linhas de proposta e
-venda permanecem intactas.
+Sem venda ou proposta ativa, uma cotação vinculada sobrescreve o snapshot manual
+anterior. Com fonte formal ativa, edição manual fica bloqueada e salvar uma cotação
+não altera o snapshot nem os registros formais. As linhas de proposta e venda ficam
+intactas.
 
 ## Entrega e validação
 
-- Migration aditiva `0215` pronta para aplicação pelo Vinicios antes do deploy; não
-  foi executada. O código pressupõe que as colunas estejam disponíveis no deploy.
+- Migration aditiva `0215` pronta para aplicação pelo Vinicios antes do deploy; inclui
+  `leads.monthly_value`, `leads.lives_count` e `audit_logs.metadata`. Não foi executada.
+  `/leads` e a ficha selecionam as colunas novas mesmo com a flag desligada.
 - A feature flag global `feature_lead_commercial_values_enabled` nasce ligada e pode
   ser desligada pelo Super-admin; a alteração é auditada.
 - Registros complementares: DEC-165, BR-088 e `docs/ux/UX_CHANGELOG.md`.
-- Vitest focado aprovado: 3 arquivos e 18 testes. `npx tsc --noEmit -p .` aprovado.
+- Vitest focado aprovado: 3 arquivos e 19 testes. `npx tsc --noEmit -p .` aprovado.
   ESLint dirigido terminou sem erros, com avisos existentes em arquivos grandes.
 - `npm run check:lite-skin` aprovado em modo relatório; Kanban Lite, editor comercial
   e seção de cotações não apresentam desvios. `QuoteBuilder` e `QuoteCard` reaproveitam
@@ -98,8 +100,10 @@ venda permanecem intactas.
 
 - Domínio, validação e auditoria: `commercial-values.ts` e `commercial-values-actions.ts`;
   `quotes/actions.ts` deriva o lead da sessão/tenant e grava a cotação e o snapshot
-  na mesma transação quando não há fonte formal ativa.
-- Dados: `leads.monthly_value`, `leads.lives_count`, schema Drizzle e SQL 0215.
+  na mesma transação quando não há fonte formal ativa. O metadata de auditoria guarda
+  `monthly_value` e `lives_count` anteriores e novos, sem dados pessoais.
+- Dados: `leads.monthly_value`, `leads.lives_count`, `audit_logs.metadata`, schema
+  Drizzle e SQL 0215.
 - Interface: rodapés dos Kanbans Lite/Full, CTA por cartão, drawer e ficha com seção
   de cotações, editor manual e atualização otimista do lead.
 - Governança: flag global no catálogo e painel Super-admin, DEC-165, BR-088,
@@ -108,7 +112,8 @@ venda permanecem intactas.
 ## Riscos e reversão
 
 - Antes do deploy, o Vinicios precisa aplicar o SQL idempotente de
-  `docs/sql/2026-10-30-valor-vidas-funil.sql`; as telas consultam os campos novos.
+  `docs/sql/2026-10-30-valor-vidas-funil.sql`; `/leads` e a ficha leem os campos de
+  valor/vidas mesmo com a flag desligada. O SQL também adiciona `audit_logs.metadata`.
 - O Super-admin pode desligar a flag para esconder os novos controles e bloquear as
   ações. Para reverter o código, faça rollback da aplicação; as colunas aditivas
   podem permanecer sem afetar os leads existentes.

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { AuthorizationService } from "@/shared/auth/authorization-service";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { buildLeadResourceScope, toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
-import { quoteCommercialValues } from "@/features/leads/commercial-values";
+import { commercialValuesAuditMetadata, quoteCommercialValues } from "@/features/leads/commercial-values";
 import { getCachedLegacyPlans } from "@/features/leads/reference-data";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
@@ -182,6 +182,16 @@ export async function createQuoteAction(_previous: QuoteActionState, formData: F
     const quoteId = randomUUID();
 
     await db.transaction(async (tx) => {
+      const [currentLeadValues] = await tx.select({
+        monthlyValue: schema.leads.monthlyValue,
+        livesCount: schema.leads.livesCount,
+      }).from(schema.leads).where(and(
+        eq(schema.leads.id, lead.id),
+        eq(schema.leads.tenantId, context.tenantId),
+        isNull(schema.leads.deletedAt),
+      )).for("update").limit(1);
+      if (!currentLeadValues) throw new Error("lead_not_found");
+
       await tx.insert(schema.quotes).values({
         id: quoteId,
         tenantId: context.tenantId,
@@ -241,6 +251,11 @@ export async function createQuoteAction(_previous: QuoteActionState, formData: F
         await tx.insert(schema.auditLogs).values({
           id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id,
           acao: "lead.commercial_values_updated_from_quote",
+          metadata: commercialValuesAuditMetadata({
+            source: "quote",
+            previous: currentLeadValues,
+            next: commercialValues,
+          }),
         });
       }
 

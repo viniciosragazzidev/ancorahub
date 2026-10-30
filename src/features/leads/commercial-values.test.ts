@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  commercialValuesAuditMetadata,
   formatLeadCommercialTotals,
   legacyLeadLivesCount,
   quoteCommercialValues,
@@ -9,6 +10,24 @@ import {
 } from "./commercial-values";
 
 describe("lead commercial values", () => {
+  it("records old and new monthly value and lives without lead details", () => {
+    const previous = { monthlyValue: "500.5", livesCount: 2 };
+    const next = { monthlyValue: "650.00", livesCount: 3 };
+    const changes = {
+      monthly_value: { from: "500.50", to: "650.00" },
+      lives_count: { from: 2, to: 3 },
+    };
+
+    expect(commercialValuesAuditMetadata({ source: "manual", previous, next })).toEqual({
+      source: "manual",
+      changes,
+    });
+    expect(commercialValuesAuditMetadata({ source: "quote", previous, next })).toEqual({
+      source: "quote",
+      changes,
+    });
+  });
+
   it("fills the lead snapshot from the persisted quote summary", () => {
     expect(quoteCommercialValues({ totalMonthly: "1299.90", beneficiaryCount: 3 })).toEqual({
       monthlyValue: "1299.90",
