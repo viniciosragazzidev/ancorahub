@@ -225,6 +225,10 @@ export async function createLeadOffersForBrokers(input: {
   const claimedBrokerIds: string[] = [];
   let capacityReached = false;
   let pacingBlocked = false;
+  // Rotation (30/10): the turn is only decided under the pick lock. Busy lock: the lead waits a few
+  // seconds instead of going to the automatic first broker (Stephanie, PREMIUM 30/10, got 6 leads
+  // out of turn that way while two leads were picked at the same time).
+  let rotationBusy = false;
   let permanentDeliveryFailure = false;
   const whatsappEnabled = await tenantHasActiveMetaChannel(input.tenantId);
 
@@ -267,6 +271,10 @@ export async function createLeadOffersForBrokers(input: {
         // The rotation is the only order of the plantão: worth the short wait for the lock.
         pickLockAcquired = input.manualPick.rotation ? await tryDistributionPickLock(tx, input.tenantId) : await tryDistributionPickLockOnce(tx, input.tenantId);
         if (!pickLockAcquired) pickLockBusy = true;
+      }
+      if (input.manualPick?.rotation && manualQueueMayBeActive && !pickLockAcquired) {
+        rotationBusy = true;
+        return null;
       }
 
       if (input.manualPick && pickLockAcquired) {
@@ -504,6 +512,7 @@ export async function createLeadOffersForBrokers(input: {
     });
     pending.splice(pending.indexOf(broker), 1);
 
+    if (rotationBusy) break;
     if (!claimStatus) continue;
     claimedBrokerIds.push(broker.id);
     if (claimStatus === "unavailable" || !destinationPhone) {
@@ -674,7 +683,7 @@ export async function createLeadOffersForBrokers(input: {
     });
   }
 
-  return { created: createdOffers.length, expiresAt, createdOffers, capacityReached, pacingBlocked, permanentDeliveryFailure };
+  return { created: createdOffers.length, expiresAt, createdOffers, capacityReached, pacingBlocked, permanentDeliveryFailure, rotationBusy };
 }
 
 export async function handleLeadOfferWebhookResponse(input: {

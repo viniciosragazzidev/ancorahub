@@ -1545,6 +1545,9 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     } : undefined,
   });
   if (!offer.createdOffers.length) {
+    if (offer.rotationBusy) {
+      return { status: "queued", leadId, reason: "Aguardando a vez do rodízio do plantão: outro lead estava sendo distribuído no mesmo instante.", retryAt: new Date(Date.now() + 10_000) };
+    }
     if (offer.pacingBlocked && !offer.capacityReached) {
       return { status: "queued", leadId, reason: "Aguardando intervalo entre ofertas: outro processo acabou de ofertar um lead ao corretor.", retryAt: new Date(Date.now() + 30_000) };
     }

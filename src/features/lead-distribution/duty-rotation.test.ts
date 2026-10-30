@@ -72,3 +72,31 @@ describe("plantão rotation (29/10)", () => {
     expect([1, 2, 3, 4, 5, 6].map(skipReachesPauseLimit)).toEqual([false, false, true, false, false, true]);
   });
 });
+
+describe("rotation never skips the turn because of who the resolver ranked first (30/10)", () => {
+  it("takes the plantão group from the first candidate on the plantão", () => {
+    const picked = chooseManualQueuePick({
+      lockAcquired: true,
+      automaticBrokerId: "outsider",
+      pendingBrokerIds: ["outsider", "stephanie", "renata"],
+      scheduleIdByBroker: { stephanie: "premium", renata: "premium" },
+      queueBySchedule: {},
+      rosterBrokerIdsBySchedule: { premium: ["renata", "stephanie"] },
+      seedMissing: true,
+    });
+    expect(picked).toMatchObject({ manual: true, brokerId: "renata", nextOrder: ["stephanie", "renata"] });
+  });
+
+  it("the last to arrive is last on the first lead of the day", () => {
+    const picked = chooseManualQueuePick({
+      lockAcquired: true,
+      automaticBrokerId: "stephanie",
+      pendingBrokerIds: ["stephanie", "renata", "jorge", "vitor"],
+      scheduleIdByBroker: { stephanie: "premium", renata: "premium", jorge: "premium", vitor: "premium" },
+      queueBySchedule: {},
+      rosterBrokerIdsBySchedule: { premium: ["renata", "jorge", "vitor", "stephanie"] },
+      seedMissing: true,
+    });
+    expect(picked).toMatchObject({ manual: true, brokerId: "renata" });
+  });
+});

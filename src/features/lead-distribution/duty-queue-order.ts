@@ -122,7 +122,11 @@ export function chooseManualQueuePick(input: {
   /** Plantão rotation (29/10): with no saved queue yet, it starts from the roster (arrival order). */
   seedMissing?: boolean;
 }): ManualQueuePick {
-  const automatic = input.automaticBrokerId;
+  // Rotation (30/10): when the automatic first is not on a plantão, the group comes from the first
+  // candidate who is, so the lead never skips the turn just because of who the resolver ranked first.
+  const automatic = input.automaticBrokerId && (input.scheduleIdByBroker[input.automaticBrokerId] || !input.seedMissing)
+    ? input.automaticBrokerId
+    : input.pendingBrokerIds.find((id) => input.scheduleIdByBroker[id]) ?? input.automaticBrokerId;
   const scheduleId = automatic ? input.scheduleIdByBroker[automatic] ?? null : null;
   const stored = scheduleId ? input.queueBySchedule[scheduleId] ?? (input.seedMissing ? [] : undefined) : undefined;
   if (!input.lockAcquired || !automatic || !scheduleId || !stored) {
