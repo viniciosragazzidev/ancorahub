@@ -23,6 +23,7 @@ import { postSaleTransferAuditAction } from "./post-sale-transfer";
 import { traceLeadStep } from "./distribution-trace";
 import { loadReceivedInDayByBroker, pickNextByReceivedInDay, type ReceiptGap } from "./received-in-day";
 import { chooseManualQueuePick, manualQueueSettingKey, manualQueueSettingKeyForBroker, parseManualQueueValue } from "./duty-queue-order";
+import { parseTurnCredit, turnCreditSettingKey } from "./duty-approval-catchup";
 import { tryDistributionPickLock, tryDistributionPickLockOnce } from "./distribution-pick-lock";
 
 /**
@@ -248,7 +249,7 @@ export async function createLeadOffersForBrokers(input: {
     let broker = pending[0];
     let destinationPhone = broker.phone;
     const offerId = randomUUID();
-    let manualRotation: { key: string; nextOrder: string[] } | null = null;
+    let manualRotation: { key: string; nextOrder: string[]; credit?: { key: string; value: Record<string, number> } } | null = null;
     const claimStatus = await db.transaction(async (tx) => {
       let pickLockAcquired = false;
       let automaticBrokerId: string | null = pending[0]?.id ?? null;
@@ -278,11 +279,20 @@ export async function createLeadOffersForBrokers(input: {
       }
 
       if (input.manualPick && pickLockAcquired) {
+        const creditKeys = input.manualPick.rotation
+          ? Object.entries(input.manualPick.dutyDateBySchedule).map(([id, dutyDate]) => turnCreditSettingKey(id, dutyDate))
+          : [];
         const settingRows = manualQueueKeys.length
-          ? await tx.select({ key: schema.systemSettings.key, value: schema.systemSettings.value }).from(schema.systemSettings).where(inArray(schema.systemSettings.key, manualQueueKeys))
+          ? await tx.select({ key: schema.systemSettings.key, value: schema.systemSettings.value }).from(schema.systemSettings).where(inArray(schema.systemSettings.key, [...manualQueueKeys, ...creditKeys]))
           : [];
         const queueBySchedule: Record<string, readonly string[] | undefined> = {};
+        const creditBySchedule: Record<string, Record<string, number>> = {};
         for (const row of settingRows) {
+          const creditSchedule = Object.keys(input.manualPick.dutyDateBySchedule).find((id) => turnCreditSettingKey(id, input.manualPick!.dutyDateBySchedule[id]) === row.key);
+          if (creditSchedule) {
+            creditBySchedule[creditSchedule] = parseTurnCredit(row.value);
+            continue;
+          }
           const scheduleId = Object.keys(input.manualPick.dutyDateBySchedule).find((id) => manualQueueSettingKey(id, input.manualPick!.dutyDateBySchedule[id]) === row.key);
           const queue = parseManualQueueValue(row.value);
           if (scheduleId && queue) queueBySchedule[scheduleId] = queue;
@@ -296,12 +306,21 @@ export async function createLeadOffersForBrokers(input: {
           queueBySchedule,
           rosterBrokerIdsBySchedule: input.manualPick.rosterBrokerIdsBySchedule,
           seedMissing: input.manualPick.rotation,
+          creditBySchedule,
         });
         if (picked.manual) {
           broker = pending.find((candidate) => candidate.id === picked.brokerId) ?? broker;
           destinationPhone = broker.phone;
           const dutyDate = input.manualPick.dutyDateBySchedule[picked.scheduleId];
-          if (dutyDate) manualRotation = { key: manualQueueSettingKey(picked.scheduleId, dutyDate), nextOrder: picked.nextOrder };
+          if (dutyDate) {
+            const credit = picked.creditUsed ? { ...(creditBySchedule[picked.scheduleId] ?? {}) } : null;
+            if (credit) credit[picked.brokerId] = Math.max(0, (credit[picked.brokerId] ?? 0) - 1);
+            manualRotation = {
+              key: manualQueueSettingKey(picked.scheduleId, dutyDate),
+              nextOrder: picked.nextOrder,
+              ...(credit ? { credit: { key: turnCreditSettingKey(picked.scheduleId, dutyDate), value: credit } } : {}),
+            };
+          }
         }
       }
       traceLeadStep(input.leadId, `offer_claim:${broker.id}`);
@@ -507,6 +526,13 @@ export async function createLeadOffersForBrokers(input: {
           target: schema.systemSettings.key,
           set: { value: JSON.stringify(manualRotation.nextOrder), updatedAt: now },
         });
+        if (manualRotation.credit) {
+          const value = JSON.stringify(manualRotation.credit.value);
+          await tx.insert(schema.systemSettings).values({ key: manualRotation.credit.key, value, updatedAt: now }).onConflictDoUpdate({
+            target: schema.systemSettings.key,
+            set: { value, updatedAt: now },
+          });
+        }
       }
       return committedStatus;
     });

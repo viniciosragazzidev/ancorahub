@@ -69,6 +69,7 @@ export async function getPresenceEligibleAssignments(input: {
       status: schema.dutyPresenceConfirmations.status,
       confirmedBy: schema.dutyPresenceConfirmations.confirmedBy,
       confirmedAt: schema.dutyPresenceConfirmations.confirmedAt,
+      photoTakenAt: schema.dutyPresenceConfirmations.photoTakenAt,
     })
     .from(schema.dutyPresenceConfirmations)
     .where(and(
@@ -89,9 +90,11 @@ export async function getPresenceEligibleAssignments(input: {
       return confirmation?.status === "confirmed" && confirmation.confirmedBy ? [assignment.id] : [];
     })),
     // Rotation (29/10): when each eligible broker arrived, the confirmation time or, without one, the shift start.
+    // Presencial (30/10): the photo time, not the approval: the wait for the approver is not the broker's.
     arrivedAtByAssignment: new Map(eligible.map(({ assignment, window }) => {
       const confirmation = findDutyOccurrenceConfirmation({ confirmations: confirmationRows, assignment, window, now: input.now });
-      return [assignment.id, confirmation?.status === "confirmed" && confirmation.confirmedAt ? confirmation.confirmedAt : window.startsAt] as const;
+      const arrivedAt = confirmation?.status === "confirmed" ? confirmation.photoTakenAt ?? confirmation.confirmedAt : null;
+      return [assignment.id, arrivedAt ?? window.startsAt] as const;
     })),
   };
 }
@@ -314,7 +317,7 @@ export async function releaseDutyPresenceManually(input: { tenantId: string; ass
   );
   const presencial = effectiveAttendanceMode(assignment.assignmentAttendanceMode, assignment.attendanceMode) === "presencial";
   const [current] = presencial
-    ? await db.select({ hasPhoto: sql<boolean>`${schema.dutyPresenceConfirmations.photoStorageKey} is not null` }).from(schema.dutyPresenceConfirmations).where(occurrence).limit(1)
+    ? await db.select({ hasPhoto: sql<boolean>`${schema.dutyPresenceConfirmations.photoStorageKey} is not null`, photoTakenAt: schema.dutyPresenceConfirmations.photoTakenAt }).from(schema.dutyPresenceConfirmations).where(occurrence).limit(1)
     : [];
   const withPhoto = Boolean(current?.hasPhoto);
   const note = input.note?.trim() ?? "";
@@ -334,6 +337,11 @@ export async function releaseDutyPresenceManually(input: { tenantId: string; ass
     return true;
   });
   if (!released) return { ok: false, reason: "Corretor já liberado ou com falta registrada." };
+  // The photo came on time (30/10): the broker takes the place in the rotation of an instant approval.
+  if (withPhoto && current?.photoTakenAt && await isDutyRotationEnabled()) {
+    const { applyApprovalDelayCatchup } = await import("./duty-approval-catchup-server");
+    await applyApprovalDelayCatchup({ tenantId: input.tenantId, scheduleId: assignment.scheduleId, dutyDate: window.dutyDate, brokerId: assignment.brokerId, photoTakenAt: current.photoTakenAt, releasedBy: input.releasedBy, now });
+  }
   // Leads waiting for an eligible broker get their turn now.
   const { wakeLeadsAwaitingEligibleBroker } = await import("./jobs");
   await wakeLeadsAwaitingEligibleBroker(input.tenantId).catch(() => 0);

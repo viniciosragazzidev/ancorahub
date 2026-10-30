@@ -226,7 +226,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
       tenantId: context.tenantId,
       scheduleId: schedule.id,
       dutyDate: liveWindow.dutyDate,
-      roster: roster.filter((entry) => !entry.absent).map((entry) => ({ brokerId: entry.brokerId, confirmedAt: entry.confirmedAt ?? null, canReceive: entry.liveStatus === "ready" && !entry.pausedAt })),
+      roster: roster.filter((entry) => !entry.absent).map((entry) => ({ brokerId: entry.brokerId, confirmedAt: entry.confirmedAt ? entry.photoTakenAt ?? entry.confirmedAt : null, canReceive: entry.liveStatus === "ready" && !entry.pausedAt })),
       now,
     })
     : null;
@@ -755,7 +755,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                     {presenceEnabled && entry.presenceStatus === "pending" ? <Badge variant="warning" aria-label="Aguardando confirmação" title={entry.notificationErrorCode ? "Não foi possível enviar o lembrete" : "Aguardando confirmação"}><Clock3 className="size-3.5" aria-hidden="true" /></Badge> : null}
                     {presenceEnabled && entry.attendanceMode !== "presencial" && !entry.absent ? <BrokerPresenceInviteButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} /> : null}
                     {/* Presencial with a photo: release only from the drawer, where the photo is (validation is mandatory). */}
-                    {entry.attendanceMode === "presencial" && entry.presencePhotoId && entry.onSitePending && !entry.absent ? <Badge variant="warning">Foto para validar</Badge> : null}
+                    {entry.attendanceMode === "presencial" && entry.presencePhotoId && entry.onSitePending && !entry.absent ? <Badge variant="warning" title="O corretor guarda o lugar na vez pela hora da foto">{entry.photoTakenAt ? `Foto para validar · há ${Math.max(0, Math.round((now.getTime() - entry.photoTakenAt.getTime()) / 60_000))} min` : "Foto para validar"}</Badge> : null}
                     {(presenceEnabled || entry.attendanceMode === "presencial") && entry.presenceStatus === "pending" && !entry.absent && !(entry.attendanceMode === "presencial" && entry.presencePhotoId) ? <BrokerPresenceReleaseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} inUnit={entry.attendanceMode === "presencial"} /> : null}
                     {!entry.absent && !entry.onSitePending ? <BrokerPauseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} paused={Boolean(entry.pausedAt)} /> : null}
                   </div>

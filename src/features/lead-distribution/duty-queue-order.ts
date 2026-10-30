@@ -43,8 +43,11 @@ export function reconcileManualQueueOrder(current: readonly string[], rosterBrok
   return next;
 }
 
-export function rotateManualQueueAfterPick(order: readonly string[], brokerId: string) {
-  return [...order.filter((id) => id !== brokerId), brokerId];
+/** The picked broker goes to the end, or to `reinsertAt` when they still have turns to make up. */
+export function rotateManualQueueAfterPick(order: readonly string[], brokerId: string, reinsertAt?: number) {
+  const rest = order.filter((id) => id !== brokerId);
+  if (reinsertAt === undefined || reinsertAt >= rest.length) return [...rest, brokerId];
+  return [...rest.slice(0, reinsertAt), brokerId, ...rest.slice(reinsertAt)];
 }
 
 export function rotateManualQueueKeepingBlockedSlots(
@@ -52,13 +55,14 @@ export function rotateManualQueueKeepingBlockedSlots(
   rosterBrokerIds: readonly string[],
   brokerId: string,
   blockedBrokerIds: readonly string[],
+  reinsertAt?: number,
 ) {
   const blocked = new Set(blockedBrokerIds);
   const movableOrder = order.filter((id) => !blocked.has(id));
   return mergeEligibleOrderKeepingBlockedSlots(
     order,
     rosterBrokerIds,
-    rotateManualQueueAfterPick(movableOrder, brokerId),
+    rotateManualQueueAfterPick(movableOrder, brokerId, reinsertAt),
     blockedBrokerIds,
   );
 }
@@ -104,6 +108,8 @@ export type ManualQueuePick = {
   scheduleId: string;
   nextOrder: string[];
   manual: true;
+  /** The broker used one make-up turn (approval delay, 30/10). */
+  creditUsed?: boolean;
 } | {
   brokerId: string | null;
   scheduleId: null;
@@ -121,6 +127,8 @@ export function chooseManualQueuePick(input: {
   rosterBrokerIdsBySchedule: Readonly<Record<string, readonly string[] | undefined>>;
   /** Plantão rotation (29/10): with no saved queue yet, it starts from the roster (arrival order). */
   seedMissing?: boolean;
+  /** Make-up turns per schedule and broker (approval delay of the presencial photo, 30/10). */
+  creditBySchedule?: Readonly<Record<string, Readonly<Record<string, number>> | undefined>>;
 }): ManualQueuePick {
   // Rotation (30/10): when the automatic first is not on a plantão, the group comes from the first
   // candidate who is, so the lead never skips the turn just because of who the resolver ranked first.
@@ -143,11 +151,14 @@ export function chooseManualQueuePick(input: {
   if (!selected) return { brokerId: automatic, scheduleId: null, nextOrder: null, manual: false };
   const groupEligible = new Set(groupEligibleIds);
   const blockedIds = rosterIds.filter((id) => !groupEligible.has(id));
+  // A make-up turn: back right after the next broker instead of the end (one every other lead).
+  const creditUsed = (input.creditBySchedule?.[scheduleId]?.[selected] ?? 0) > 0;
   return {
     brokerId: selected,
     scheduleId,
-    nextOrder: rotateManualQueueKeepingBlockedSlots(reconciled, rosterIds, selected, blockedIds),
+    nextOrder: rotateManualQueueKeepingBlockedSlots(reconciled, rosterIds, selected, blockedIds, creditUsed ? 1 : undefined),
     manual: true,
+    ...(creditUsed ? { creditUsed: true } : {}),
   };
 }
 

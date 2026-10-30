@@ -420,6 +420,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       releasedByName: sql<string | null>`(select u.name from "user" u where u.id = ${schema.dutyPresenceConfirmations.confirmedBy})`,
       confirmationId: schema.dutyPresenceConfirmations.id,
       hasPhoto: sql<boolean>`${schema.dutyPresenceConfirmations.photoStorageKey} is not null`,
+      photoTakenAt: schema.dutyPresenceConfirmations.photoTakenAt,
       releaseNote: schema.dutyPresenceConfirmations.releaseNote,
       notificationStatus: schema.dutyPresenceConfirmations.notificationStatus,
       notificationErrorCode: schema.dutyPresenceConfirmations.notificationErrorCode,
@@ -562,6 +563,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       onSiteReleaseOpen,
       presenceStatus: absent ? "absent" as const : !occurrence || (!presenceEnabled && attendanceMode !== "presencial") ? "not_requested" as const : presence?.status === "confirmed" && !onSitePending ? "confirmed" as const : "pending" as const,
       confirmedAt: presence?.confirmedAt ?? null,
+      /** When the presencial photo was sent: the arrival for the rotation and the wait for approval (30/10). */
+      photoTakenAt: presence?.hasPhoto ? presence.photoTakenAt ?? null : null,
       /** Released by a director/manager (not the broker's own click). */
       releasedByName: presence?.releasedByName ?? null,
       notificationStatus: presence?.notificationStatus ?? null,

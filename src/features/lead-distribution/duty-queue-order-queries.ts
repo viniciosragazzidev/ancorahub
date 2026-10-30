@@ -145,7 +145,7 @@ export async function getDutyQueueOrderPreviews(context: TenantContext, now = ne
     db.select({ brokerId: schema.leadOffers.brokerId, scheduleId: schema.leadOffers.dutyScheduleId, status: schema.leadOffers.status, offeredAt: schema.leadOffers.offeredAt, acceptedAt: schema.leadOffers.acceptedAt, expiresAt: schema.leadOffers.expiresAt })
       .from(schema.leadOffers).where(and(eq(schema.leadOffers.tenantId, context.tenantId), inArray(schema.leadOffers.dutyScheduleId, runningIds), gte(schema.leadOffers.offeredAt, todayStart), ne(schema.leadOffers.status, NON_COUNTING_OFFER_STATUS)))
       .orderBy(asc(schema.leadOffers.offeredAt)),
-    db.select({ brokerId: schema.dutyPresenceConfirmations.brokerId, scheduleId: schema.dutyPresenceConfirmations.scheduleId, dutyDate: schema.dutyPresenceConfirmations.dutyDate, confirmedAt: schema.dutyPresenceConfirmations.confirmedAt })
+    db.select({ brokerId: schema.dutyPresenceConfirmations.brokerId, scheduleId: schema.dutyPresenceConfirmations.scheduleId, dutyDate: schema.dutyPresenceConfirmations.dutyDate, confirmedAt: schema.dutyPresenceConfirmations.confirmedAt, photoTakenAt: schema.dutyPresenceConfirmations.photoTakenAt })
       .from(schema.dutyPresenceConfirmations).where(and(eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId), inArray(schema.dutyPresenceConfirmations.scheduleId, runningIds), eq(schema.dutyPresenceConfirmations.status, "confirmed"))),
   ]);
   // Same rule as the distribution: the closed night extra's leads do not level the regular plantão.
@@ -197,7 +197,8 @@ export async function getDutyQueueOrderPreviews(context: TenantContext, now = ne
     const scheduleOffers = turnOffers.filter((offer) => offer.scheduleId === schedule.id);
     const arrivedAtByBroker = new Map(arrivals
       .filter((arrival) => arrival.scheduleId === schedule.id && arrival.dutyDate === occurrenceDate && arrival.confirmedAt)
-      .map((arrival) => [arrival.brokerId, arrival.confirmedAt!] as const));
+      // Presencial (30/10): the photo time is the arrival, not the approval.
+      .map((arrival) => [arrival.brokerId, arrival.photoTakenAt ?? arrival.confirmedAt!] as const));
     const statsOf = (brokerId: string): DutyBrokerTurnStats => {
       const offersOfBroker = scheduleOffers.filter((offer) => offer.brokerId === brokerId);
       const acceptSeconds = offersOfBroker.flatMap((offer) => offer.acceptedAt ? [(offer.acceptedAt.getTime() - offer.offeredAt.getTime()) / 1000] : []);

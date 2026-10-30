@@ -96,7 +96,7 @@ async function notifyPhotoReviewers(input: { tenantId: string; brokerId: string;
     recipientUserId,
     type: "duty_presence_photo",
     title: `${firstName} enviou a foto do plantão presencial`,
-    message: `Valide a foto e libere ${firstName} no ${scheduleName ?? "plantão"}. Até lá ele fica pausado.`,
+    message: `Valide a foto e libere ${firstName} no ${scheduleName ?? "plantão"}. A vez é guardada pela hora da foto, mas até a liberação não sai lead.`,
     pushTitle: "Foto do plantão para validar",
     pushBody: `${firstName} está esperando você liberar no ${scheduleName ?? "plantão"}.`,
     url: `/leads/distribuicao/plantao/${input.scheduleId}`,
