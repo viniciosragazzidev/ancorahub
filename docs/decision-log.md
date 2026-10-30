@@ -1902,3 +1902,5 @@ O gateway escolhe Groq ou OpenRouter pelas chaves, ordem e modelo configurados p
 - **Resposta lateral:** pergunta atual redigida, instruções fixas e contexto comercial/roteiros configurados pelo tenant; o campo de nome do cliente é omitido ou enviado como [NOME].
 
 Antes do envio, telefone, e-mail, CPF, CNPJ, nome completo/primeiro nome do lead, endereço em rua, avenida, alameda, travessa, estrada, praça, rodovia, largo, beco, viela ou servidão (incluindo r., av., al., tv., est., pc. e rod.), com ou sem número, e CEP são substituídos por [TELEFONE], [E-MAIL], [CPF], [CNPJ], [NOME], [ENDEREÇO] e [CEP]. Cidade e bairro permanecem para qualificação. Nomes de terceiros, como marido e filhos, não são redigidos. O corpo dos prompts não inclui IDs internos do lead ou da conversa; esses IDs podem seguir como metadados operacionais do gateway. Base legal/contrato com provedores: (a confirmar).
+
+Efeito colateral aceito: um valor gravado em turno anterior, mesmo se a regra tiver lido errado, só muda quando o cliente usa um termo de correção explícito (por exemplo "na verdade"). Um "Não," isolado não conta como correção.
