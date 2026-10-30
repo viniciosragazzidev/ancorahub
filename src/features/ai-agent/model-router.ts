@@ -210,8 +210,16 @@ export async function createAiRouter(tenantId: string): Promise<AiRouter> {
           });
 
           if (response.ok) {
+            // Read the successful body before clearing the deadline. `fetch` resolves at headers,
+            // but providers can stall while streaming the JSON response.
+            const body = await response.arrayBuffer();
+            const bufferedResponse = new Response(body.byteLength ? body : null, {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers,
+            });
             console.info("[ai-router] provider_ok", { provider: pair.provider, model: pair.model });
-            return { response, model: pair.model, provider: pair.provider };
+            return { response: bufferedResponse, model: pair.model, provider: pair.provider };
           }
 
           lastError.status = response.status;

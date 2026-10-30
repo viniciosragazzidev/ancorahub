@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { redactQualificationContextText } from "./context-analysis";
+
 /**
  * Lateral answer for the qualification engine (fase 5): when the customer asks
  * something instead of answering the pending question, the agent answers in
@@ -81,11 +83,13 @@ export async function generateLateralAnswer(input: { tenantId: string; question:
       getTenantPlaybooks(input.tenantId).catch(() => []),
     ]);
     const assistantName = settings?.assistantName?.trim() || "Ana";
+    const leadName = input.customerFirstName ?? null;
+    const redactedFirstName = leadName ? redactQualificationContextText(leadName, leadName) : "";
     const system = buildLateralAnswerPrompt({
       assistantName,
       companyName: "Âncora Saúde",
       businessContext: settings?.businessContext?.trim() || DEFAULT_CONTEXT,
-      situational: buildSituationalPromptSection({ playbooks, variables: { assistente_nome: assistantName, corretora_nome: "Âncora Saúde", cliente_nome: input.customerFirstName ?? "" } }),
+      situational: buildSituationalPromptSection({ playbooks, variables: { assistente_nome: assistantName, corretora_nome: "Âncora Saúde", cliente_nome: redactedFirstName } }),
       customInstructions: settings?.customInstructions?.trim() ?? "",
     });
     const result = await runGateway({
@@ -102,9 +106,9 @@ export async function generateLateralAnswer(input: { tenantId: string; question:
       timeoutMs: LATERAL_TIMEOUT_MS,
       maxAttempts: LATERAL_MAX_ATTEMPTS,
       schema: lateralAnswerOutputSchema,
-      messages: [{ role: "system", content: `${system}
+      messages: [{ role: "system", content: redactQualificationContextText(`${system}
 
-${LATERAL_JSON_INSTRUCTION}` }, { role: "user", content: input.question }],
+${LATERAL_JSON_INSTRUCTION}`, leadName) }, { role: "user", content: redactQualificationContextText(input.question, leadName) }],
     });
     if (!result.ok) return giveUp([result.reason, result.lastError].filter(Boolean).join(": "));
     const answer = sanitizeLateralAnswer(result.value.answer);

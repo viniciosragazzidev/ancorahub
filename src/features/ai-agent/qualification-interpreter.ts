@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { MemoryUpdateSchema, type AiMemoryUpdate } from "./ai-response-schema";
+import { redactQualificationContextText } from "./context-analysis";
 
 /**
  * The LLM interpreter of a qualification turn (purpose "qualification_fallback").
@@ -45,15 +46,17 @@ export function buildInterpreterMessages(input: {
   leadType?: string | null;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
 }) {
+  const redact = (value: string) => redactQualificationContextText(value, input.leadName);
+  const redactedName = input.leadName ? redactQualificationContextText(input.leadName, input.leadName) : null;
   const system = [
-    input.prompt,
-    input.memoryContext ?? "",
-    `Contexto do Lead: Nome: ${input.leadName || "Não informado"}, Tipo: ${input.leadType || "Não definido"}.`,
+    redact(input.prompt),
+    redact(input.memoryContext ?? ""),
+    `Contexto do Lead: Nome: ${redactedName || "Não informado"}, Tipo: ${input.leadType || "Não definido"}.`,
     OUTPUT_INSTRUCTION,
   ].filter(Boolean).join("\n\n");
   return [
     { role: "system" as const, content: system },
-    ...input.messages.slice(-12).map((message) => ({ role: message.role, content: message.content })),
+    ...input.messages.slice(-12).map((message) => ({ role: message.role, content: redact(message.content) })),
   ];
 }
 
@@ -168,6 +171,7 @@ export async function verifyExtractedFacts(input: {
   sourceMessageId?: string | null;
   message: string;
   lastQuestion?: string | null;
+  leadName?: string | null;
   facts: Partial<Record<VerifiableField, string>>;
 }): Promise<{ ok: boolean; corrections: Array<{ field: VerifiableField; value: string | null }>; model: string }> {
   const { runGateway } = await import("@/features/ai-gateway/gateway");
@@ -180,10 +184,11 @@ export async function verifyExtractedFacts(input: {
     "Use value null para remover um fato que a mensagem não informa. Não invente dados.",
     'Responda APENAS com JSON: {"correct": true, "corrections": []} ou {"correct": false, "corrections": [{"field": "numberOfLives", "value": "1"}]}',
   ].join("\n");
+  const redact = (value: string) => redactQualificationContextText(value, input.leadName);
   const user = [
-    input.lastQuestion ? `Pergunta feita ao cliente: "${input.lastQuestion}"` : "",
-    `Mensagem do cliente: "${input.message.slice(0, 600)}"`,
-    `Fatos lidos pelas regras: ${JSON.stringify(input.facts)}`,
+    input.lastQuestion ? `Pergunta feita ao cliente: "${redact(input.lastQuestion)}"` : "",
+    `Mensagem do cliente: "${redact(input.message).slice(0, 600)}"`,
+    `Fatos lidos pelas regras: ${redact(JSON.stringify(input.facts))}`,
   ].filter(Boolean).join("\n");
   try {
     const result = await runGateway({

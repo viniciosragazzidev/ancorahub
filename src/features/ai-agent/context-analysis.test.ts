@@ -3,10 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import { createEmptyMemory, extractFieldsFromMessage, type ConversationMemory } from "./memory";
 import {
   analyzeAndMergeQualificationContext,
+  buildQualificationContextPrompt,
   isQualificationContextAnalysisEnabled,
   mergeQualificationContextAnalysis,
   parseQualificationContextResponse,
   qualificationContextAnalysisSettingKeys,
+  redactQualificationContextText,
   type QualificationContextAnalysis,
 } from "./context-analysis";
 
@@ -67,6 +69,44 @@ async function mockedAnalysis(input: {
 }
 
 describe("qualification context analysis", () => {
+  it("redacts formatted and unformatted CPF and CNPJ before provider input", () => {
+    const redacted = redactQualificationContextText("CPF 123.456.789-01 e 12345678901; CNPJ 12345678000199 e 12.345.678/0001-99");
+    expect(redacted).toBe("CPF [CPF] e [CPF]; CNPJ [CNPJ] e [CNPJ]");
+    expect(redacted).not.toMatch(/123[.\d/-]{8,}/);
+  });
+
+  it("redacts the full lead name and first name regardless of case or accents", () => {
+    const redacted = redactQualificationContextText("João da Silva respondeu. JOAO confirmou. JOÃO DA SILVA também.", "João da Silva");
+    expect(redacted).toBe("[NOME] respondeu. [NOME] confirmou. [NOME] também.");
+    expect(redacted).not.toMatch(/jo[aã]o|silva/i);
+  });
+
+  it("redacts street addresses and CEP while preserving neighborhood and city", () => {
+    const redacted = redactQualificationContextText("Rua das Flores, 123, Centro, Campinas; CEP 13050-123");
+    expect(redacted).toBe("[ENDEREÇO], Centro, Campinas; CEP [CEP]");
+  });
+
+  it("redacts messages, pending question, and textual qualification memory in the prompt", () => {
+    const memory = createEmptyMemory();
+    memory.city = { value: "Campinas", confidence: 1 };
+    memory.currentPlan = { value: "Plano de João da Silva", confidence: 1 };
+    memory.lastQuestionAsked = "João, qual seu CPF 12345678901?";
+    const prompt = buildQualificationContextPrompt({
+      messages: [{ role: "assistant", content: "João, qual seu CEP?" }],
+      currentMessage: "João da Silva mora na Avenida Brasil, 45, Centro, Campinas. Telefone (11) 98765-4321. E-mail joao@example.com",
+      previousQuestion: "João, qual seu CPF 12345678901?",
+      memory,
+      leadName: "João da Silva",
+    });
+    const serialized = prompt.map((message) => message.content).join("\n");
+    expect(serialized).toContain("[NOME]");
+    expect(serialized).toContain("[ENDEREÇO]");
+    expect(serialized).toContain("[CPF]");
+    expect(serialized).toContain("[TELEFONE]");
+    expect(serialized).toContain("[E-MAIL]");
+    expect(serialized).not.toMatch(/jo[aã]o|silva|12345678901|98765-4321|joao@example\.com/i);
+  });
+
   it("validates a JSON response and rejects invalid shapes", () => {
     expect(parseQualificationContextResponse(JSON.stringify(result({ planType: "familiar" })))).toMatchObject({
       planType: "familiar",
@@ -87,7 +127,7 @@ describe("qualification context analysis", () => {
     expect(isQualificationContextAnalysisEnabled({ aiQualificationEnabled: false })).toBe(false);
   });
 
-  it("merges new facts, keeps confirmed values without explicit correction, and applies a stated correction", () => {
+  it("requires a correction term or a new grounded value for an existing field", () => {
     const current = createEmptyMemory();
     current.city = { value: "Niterói", confidence: 1, sourceMessageId: "older" };
     current.collectedFields.push("city");
@@ -100,12 +140,22 @@ describe("qualification context analysis", () => {
     const deniedCorrection = mergeQualificationContextAnalysis({
       memory: current,
       analysis: proposed,
-      currentMessage: "Minha cidade é Itaboraí",
+      currentMessage: "Não,",
       previousQuestion: "Qual é a sua cidade?",
       sourceMessageId: "msg-current",
       baseMemory: current,
     });
     expect(deniedCorrection.memory.city?.value).toBe("Niterói");
+
+    const groundedNewValue = mergeQualificationContextAnalysis({
+      memory: current,
+      analysis: proposed,
+      currentMessage: "Minha cidade é Itaboraí",
+      previousQuestion: "Qual é a sua cidade?",
+      sourceMessageId: "msg-current",
+      baseMemory: current,
+    });
+    expect(groundedNewValue.memory.city?.value).toBe("Itaboraí");
 
     const appliedCorrection = mergeQualificationContextAnalysis({
       memory: current,

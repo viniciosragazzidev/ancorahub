@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ runGateway: vi.fn(), logAiUsage: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  runGateway: vi.fn(),
+  logAiUsage: vi.fn(),
+  buildSituationalPromptSection: vi.fn(({ variables }: { variables: { cliente_nome: string } }) => `Cliente: ${variables.cliente_nome}`),
+}));
 vi.mock("@/features/ai-gateway/gateway", () => ({ runGateway: mocks.runGateway }));
 vi.mock("./ai-usage-log", () => ({ logAiUsage: mocks.logAiUsage }));
 vi.mock("@/features/ai-qualification/tenant-settings-service", () => ({ getQualificationTenantSettings: vi.fn(async () => null) }));
 vi.mock("@/features/ai-qualification/playbooks-storage", () => ({ getTenantPlaybooks: vi.fn(async () => []) }));
-vi.mock("@/features/ai-qualification/situational-response-engine", () => ({ buildSituationalPromptSection: vi.fn(() => "") }));
+vi.mock("@/features/ai-qualification/situational-response-engine", () => ({ buildSituationalPromptSection: mocks.buildSituationalPromptSection }));
 
 import { buildLateralAnswerPrompt, generateLateralAnswer, isCustomerQuestion, sanitizeLateralAnswer } from "./lateral-answer";
 
@@ -55,6 +59,22 @@ describe("generateLateralAnswer through the AI gateway", () => {
     expect(await generateLateralAnswer(input)).toBe("Sim, atendemos toda a Baixada.");
     expect(mocks.runGateway).toHaveBeenCalledWith(expect.objectContaining({ profile: "interpreter", purpose: "lateral_answer", sensitive: true, maxAttempts: 2, conversationId: "c1" }));
     expect(mocks.logAiUsage).not.toHaveBeenCalled();
+  });
+
+  it("redacts the lead name and personal details before the provider call", async () => {
+    mocks.runGateway.mockResolvedValue({ ok: true, value: { answer: "Sim, atendemos em Campinas." }, text: "", model: { provider: "openrouter", model: "mock" }, attempts: 1 });
+    await generateLateralAnswer({
+      ...input,
+      customerFirstName: "João da Silva",
+      question: "João, meu CPF é 12345678901. Moro na Rua das Flores, 123, Centro, Campinas, CEP 13050-123. Meu e-mail é joao@example.com.",
+    });
+    const serialized = JSON.stringify(mocks.runGateway.mock.calls[0]?.[0]?.messages);
+    expect(serialized).toContain("[NOME]");
+    expect(serialized).toContain("[CPF]");
+    expect(serialized).toContain("[ENDEREÇO]");
+    expect(serialized).toContain("[CEP]");
+    expect(serialized).toContain("[E-MAIL]");
+    expect(serialized).not.toMatch(/João|12345678901|Rua das Flores|13050-123|joao@example\.com/i);
   });
 
   it("logs status fallback with the reason when every model fails (21/10: OpenRouter 401)", async () => {

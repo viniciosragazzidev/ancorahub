@@ -68,6 +68,7 @@ export type QualificationContextInput = {
   sourceMessageId?: string | null;
   currentMessage: string;
   previousQuestion: string;
+  leadName?: string | null;
   messages: ContextConversationMessage[];
   /** Memory after the current turn's deterministic extractor has run. */
   memory: ConversationMemory;
@@ -95,11 +96,7 @@ function normalized(value: string) {
 }
 
 function explicitCorrectionIn(message: string) {
-  return /\b(?:na verdade|na real|corrig(?:i|indo)|errei|estava errado|me confundi|me enganei|quis dizer|queria dizer|ops)\b|^\s*n[aã]o\s*[,!]/i.test(message);
-}
-
-function correctionIsExplicit(message: string, field: QualificationContextAnalysis["corrections"][number]) {
-  return explicitCorrectionIn(message) || (field === "companyHasCnpj" && isCompanyDenial(message));
+  return /\b(?:na verdade|na real|corrig(?:i|indo)|errei|estava errado|me confundi|me enganei|quis dizer|queria dizer|ops)\b/i.test(message);
 }
 
 function hasPositiveCnpjEvidence(message: string) {
@@ -169,6 +166,7 @@ function canApplyField(input: {
   baseMemory: ConversationMemory;
   sourceMessageId?: string | null;
   allowReplaceImpliedLives?: boolean;
+  newValueGrounded?: boolean;
 }) {
   if (input.confidence < CONFIDENCE_THRESHOLD) return false;
   const present = currentField(input.memory, input.field);
@@ -178,7 +176,9 @@ function canApplyField(input: {
     const isImpliedLives = input.allowReplaceImpliedLives
       && (present?.confidence === 0 || prior?.confidence === 0)
       && !present?.confirmed && !prior?.confirmed;
-    if (!isImpliedLives && (!input.analysis.corrections.includes(input.correctionField) || !correctionIsExplicit(input.message, input.correctionField))) return false;
+    const correctionDeclared = input.analysis.corrections.includes(input.correctionField);
+    const correctionSignal = explicitCorrectionIn(input.message) || input.newValueGrounded === true;
+    if (!isImpliedLives && (!correctionDeclared || !correctionSignal)) return false;
   }
   return true;
 }
@@ -201,7 +201,7 @@ export function mergeQualificationContextAnalysis(input: {
 
   const proposedPlan = input.analysis.planType;
   if (proposedPlan && isGrounded("planType", proposedPlan, { message: input.currentMessage, previousQuestion: input.previousQuestion, ages: input.analysis.ages })) {
-    if (canApplyField({ field: "planType", correctionField: "planType", value: proposedPlan, confidence: input.analysis.confidence.planType, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId })) {
+    if (canApplyField({ field: "planType", correctionField: "planType", value: proposedPlan, confidence: input.analysis.confidence.planType, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, newValueGrounded: true })) {
       memory.planType = { value: proposedPlan, confidence: 1, sourceMessageId };
       addCollected(memory, "planType");
       applied.add("planType");
@@ -210,7 +210,7 @@ export function mergeQualificationContextAnalysis(input: {
 
   const cnpjValue = input.analysis.companyHasCnpj;
   if (cnpjValue !== null && isGrounded("companyHasCnpj", cnpjValue, { message: input.currentMessage, previousQuestion: input.previousQuestion, ages: input.analysis.ages })) {
-    if (canApplyField({ field: "companyHasCnpj", correctionField: "companyHasCnpj", value: String(cnpjValue), confidence: input.analysis.confidence.companyHasCnpj, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId })) {
+    if (canApplyField({ field: "companyHasCnpj", correctionField: "companyHasCnpj", value: String(cnpjValue), confidence: input.analysis.confidence.companyHasCnpj, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, newValueGrounded: true })) {
       memory.companyHasCnpj = { value: String(cnpjValue), confidence: 1, sourceMessageId };
       addCollected(memory, "companyHasCnpj");
       applied.add("companyHasCnpj");
@@ -225,11 +225,11 @@ export function mergeQualificationContextAnalysis(input: {
   const groundedAges = agesAreGrounded ? input.analysis.ages : [];
   if (groundedAges.length > 0) {
     const ageValue = groundedAges.join(", ");
-    const canApplyAges = canApplyField({ field: "age", correctionField: "ages", value: ageValue, confidence: input.analysis.confidence.ages, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId });
+    const canApplyAges = canApplyField({ field: "age", correctionField: "ages", value: ageValue, confidence: input.analysis.confidence.ages, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, newValueGrounded: true });
     const businessPlan = memory.planType?.value === "empresarial";
     const averageValue = String(Math.round(groundedAges.reduce((total, age) => total + age, 0) / groundedAges.length));
     const currentAverage = memory.averageAge?.value;
-    const canApplyAverage = !businessPlan || currentAverage === averageValue || !currentAverage || canApplyField({ field: "averageAge", correctionField: "ages", value: averageValue, confidence: input.analysis.confidence.ages, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId });
+    const canApplyAverage = !businessPlan || currentAverage === averageValue || !currentAverage || canApplyField({ field: "averageAge", correctionField: "ages", value: averageValue, confidence: input.analysis.confidence.ages, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, newValueGrounded: true });
     if (canApplyAges && canApplyAverage) {
       memory.age = { value: ageValue, confidence: 1, sourceMessageId };
       if (businessPlan) memory.averageAge = { value: averageValue, confidence: 1, sourceMessageId };
@@ -243,7 +243,7 @@ export function mergeQualificationContextAnalysis(input: {
   const proposedLives = input.analysis.numberOfLives ?? (groundedAges.length >= 2 ? groundedAges.length : null);
   if (proposedLives !== null && isGrounded("numberOfLives", proposedLives, { message: input.currentMessage, previousQuestion: input.previousQuestion, ages: groundedAges })) {
     const confidence = input.analysis.numberOfLives === null ? input.analysis.confidence.ages : input.analysis.confidence.numberOfLives;
-    if (canApplyField({ field: "numberOfLives", correctionField: "numberOfLives", value: String(proposedLives), confidence, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, allowReplaceImpliedLives: true })) {
+    if (canApplyField({ field: "numberOfLives", correctionField: "numberOfLives", value: String(proposedLives), confidence, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, allowReplaceImpliedLives: true, newValueGrounded: true })) {
       memory.numberOfLives = { value: String(proposedLives), confidence: 1, sourceMessageId };
       addCollected(memory, "numberOfLives");
       applied.add("numberOfLives");
@@ -251,7 +251,7 @@ export function mergeQualificationContextAnalysis(input: {
   }
 
   if (input.analysis.city && isGrounded("city", input.analysis.city, { message: input.currentMessage, previousQuestion: input.previousQuestion, ages: groundedAges })) {
-    if (canApplyField({ field: "city", correctionField: "city", value: input.analysis.city, confidence: input.analysis.confidence.city, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId })) {
+    if (canApplyField({ field: "city", correctionField: "city", value: input.analysis.city, confidence: input.analysis.confidence.city, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, newValueGrounded: true })) {
       memory.city = { value: input.analysis.city, confidence: 1, sourceMessageId };
       addCollected(memory, "city");
       applied.add("city");
@@ -259,7 +259,7 @@ export function mergeQualificationContextAnalysis(input: {
   }
 
   if (input.analysis.currentPlan && isGrounded("currentPlan", input.analysis.currentPlan, { message: input.currentMessage, previousQuestion: input.previousQuestion, ages: groundedAges })) {
-    if (canApplyField({ field: "currentPlan", correctionField: "currentPlan", value: input.analysis.currentPlan, confidence: input.analysis.confidence.currentPlan, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId })) {
+    if (canApplyField({ field: "currentPlan", correctionField: "currentPlan", value: input.analysis.currentPlan, confidence: input.analysis.confidence.currentPlan, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, newValueGrounded: true })) {
       memory.currentPlan = { value: input.analysis.currentPlan, confidence: 1, sourceMessageId };
       applied.add("currentPlan");
     }
@@ -269,36 +269,79 @@ export function mergeQualificationContextAnalysis(input: {
   return { memory, appliedFields: [...applied] };
 }
 
-function redactContactDetails(value: string) {
-  return value
-    .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[e-mail omitido]")
-    .replace(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?\d{4,5}[-\s]?\d{4}\b/g, "[telefone omitido]")
-    .replace(/\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b/g, "CNPJ");
+const NAME_ACCENT_VARIANTS: Record<string, string> = {
+  a: "aàáâãä",
+  c: "cç",
+  e: "eèéêë",
+  i: "iìíîï",
+  n: "nñ",
+  o: "oòóôõö",
+  u: "uùúûü",
+  y: "yýÿ",
+};
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function promptMemory(memory: ConversationMemory) {
+function leadNamePattern(name: string) {
+  return [...name.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-BR")].map((character) => {
+    if (/\s/u.test(character)) return "\\s+";
+    const variants = NAME_ACCENT_VARIANTS[character];
+    return variants ? `[${variants}]` : escapeRegExp(character);
+  }).join("");
+}
+
+function redactLeadName(value: string, leadName?: string | null) {
+  const normalizedName = leadName?.trim().replace(/\s+/g, " ");
+  if (!normalizedName) return value;
+  const names = [...new Set([normalizedName, normalizedName.split(" ")[0]].filter((name) => name.length >= 2))]
+    .sort((left, right) => right.length - left.length);
+  return names.reduce((text, name) => {
+    const pattern = leadNamePattern(name);
+    const expression = new RegExp(`(^|[^\\p{L}\\p{M}\\p{N}])(${pattern})(?=$|[^\\p{L}\\p{M}\\p{N}])`, "giu");
+    return text.replace(expression, (_match, boundary: string) => `${boundary}[NOME]`);
+  }, value);
+}
+
+/** Pure scrubber for personal identifiers and direct address details before provider input. */
+export function redactQualificationContextText(value: string, leadName?: string | null) {
+  const redactedDetails = value
+    .replace(/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/g, "[CNPJ]")
+    .replace(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, "[CPF]")
+    .replace(/\b\d{5}-?\d{3}\b/g, "[CEP]")
+    .replace(/(?:\b(?:rua|avenida)\b|\br\.|\bav\.?)\s+[^,\n;]{1,100}(?:,\s*|\s+)(?:n[º°o.]?\s*)?\d{1,6}\b/giu, "[ENDEREÇO]")
+    .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[E-MAIL]")
+    .replace(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?\d{4,5}[-\s]?\d{4}\b/g, "[TELEFONE]");
+  return redactLeadName(redactedDetails, leadName);
+}
+
+function promptMemory(memory: ConversationMemory, leadName?: string | null) {
+  const redact = (value?: string) => value ? redactQualificationContextText(value, leadName) : null;
   return {
     planType: memory.planType?.value ?? null,
     companyHasCnpj: memory.companyHasCnpj?.value === "true" ? true : memory.companyHasCnpj?.value === "false" ? false : null,
-    numberOfLives: memory.numberOfLives?.value ?? null,
-    ages: memory.age?.value ?? memory.averageAge?.value ?? null,
-    city: memory.city?.value ?? null,
-    currentPlan: memory.currentPlan?.value ?? null,
-    lastQuestionAsked: memory.lastQuestionAsked ?? null,
+    numberOfLives: redact(memory.numberOfLives?.value),
+    ages: redact(memory.age?.value ?? memory.averageAge?.value),
+    city: redact(memory.city?.value),
+    currentPlan: redact(memory.currentPlan?.value),
+    lastQuestionAsked: redact(memory.lastQuestionAsked),
     collectedFields: memory.collectedFields,
   };
 }
 
-export function buildQualificationContextPrompt(input: Pick<QualificationContextInput, "messages" | "currentMessage" | "previousQuestion" | "memory">): ContextConversationMessage[] {
-  const recent = input.messages.slice(-12).map((message) => ({ role: message.role, content: redactContactDetails(message.content).slice(0, 1_200) }));
-  const currentAlreadyLast = recent.at(-1)?.role === "user" && recent.at(-1)?.content === redactContactDetails(input.currentMessage).slice(0, 1_200);
+export function buildQualificationContextPrompt(input: Pick<QualificationContextInput, "messages" | "currentMessage" | "previousQuestion" | "memory" | "leadName">): ContextConversationMessage[] {
+  const redact = (value: string) => redactQualificationContextText(value, input.leadName);
+  const redactedCurrentMessage = redact(input.currentMessage).slice(0, 1_200);
+  const recent = input.messages.slice(-12).map((message) => ({ role: message.role, content: redact(message.content).slice(0, 1_200) }));
+  const currentAlreadyLast = recent.at(-1)?.role === "user" && recent.at(-1)?.content === redactedCurrentMessage;
   const chronological = currentAlreadyLast
     ? recent
-    : [...recent, { role: "user" as const, content: redactContactDetails(input.currentMessage).slice(0, 1_200) }].slice(-12);
+    : [...recent, { role: "user" as const, content: redactedCurrentMessage }].slice(-12);
   const system = [
     "Você interpreta respostas da qualificação de planos de saúde. Não escreva nem sugira uma resposta ao cliente.",
     "Use apenas fatos que o cliente afirmou nas mensagens. A memória e perguntas anteriores são contexto, não prova de um fato novo.",
-    "Marque uma correção somente se a mensagem atual disser explicitamente que o dado anterior estava errado ou mudou.",
+    "Marque uma correção se houver termo de correção ou um novo valor explícito para o mesmo campo. Um 'Não,' isolado não é correção.",
     "Uma negação como 'Não tenho CNPJ' significa companyHasCnpj=false e nunca plano empresarial. 'Só meu' ou 'Apenas pra mim' significa plano individual.",
     "Exemplo: 'CNPJ / Pra mim 70 / E meu marido 76' pode indicar empresarial, 2 vidas e idades [70,76].",
     "Responda somente com JSON válido, sem markdown. Valores desconhecidos devem ser null, ages deve ser [].",
@@ -307,8 +350,8 @@ export function buildQualificationContextPrompt(input: Pick<QualificationContext
   ].join("\n");
   const context = {
     messages: chronological,
-    lastQuestionAsked: input.previousQuestion || input.memory.lastQuestionAsked || null,
-    memory: promptMemory(input.memory),
+    lastQuestionAsked: redact(input.previousQuestion || input.memory.lastQuestionAsked || "") || null,
+    memory: promptMemory(input.memory, input.leadName),
   };
   return [
     { role: "system", content: system },

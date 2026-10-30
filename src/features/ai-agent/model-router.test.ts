@@ -45,6 +45,7 @@ describe("model-router", () => {
     const result = await router.call({ messages: [{ role: "user", content: "Olá" }] });
     expect(result.provider).toBe("openrouter");
     expect(result.model).toBe(DEFAULT_OPENROUTER_MODEL);
+    await expect(result.response.json()).resolves.toMatchObject({ choices: [{ message: { content: "ok" } }] });
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     // Groq tentado primeiro
@@ -123,5 +124,25 @@ describe("model-router", () => {
       overallTimeoutMs: 20,
     })).rejects.toMatchObject({ errText: "Tempo limite total da análise de contexto." });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts a successful response whose body stalls past the overall deadline", async () => {
+    process.env.GROQ_API_KEY = "groq-key";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          init?.signal?.addEventListener("abort", () => controller.error(new Error("body aborted")), { once: true });
+        },
+      });
+      return new Response(body, { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    const router = await createAiRouter("tenant-test");
+
+    await expect(router.call({
+      messages: [{ role: "user", content: "Responda em JSON" }],
+      timeoutMs: 1_000,
+      overallTimeoutMs: 20,
+    })).rejects.toMatchObject({ errText: "Tempo limite total da análise de contexto." });
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 });

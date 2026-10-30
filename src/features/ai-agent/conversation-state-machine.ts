@@ -1877,7 +1877,7 @@ export async function processInboundAiResponse({
     for (const field of factsToVerify) facts[field] = (updatedMemory[field] as { value?: string } | undefined)?.value ?? "";
     const verification = await verifyExtractedFacts({
       tenantId, conversationId: conversation.id, leadId, sourceMessageId: sourceIdentifier ?? null,
-      message: userMessageBody, lastQuestion: currentMemory.lastQuestionAsked ?? null, facts,
+      message: userMessageBody, lastQuestion: currentMemory.lastQuestionAsked ?? null, leadName: lead?.nome ?? null, facts,
     });
     const applied: string[] = [];
     for (const correction of verification.corrections) {
@@ -2058,6 +2058,7 @@ export async function processInboundAiResponse({
         sourceMessageId: sourceIdentifier,
         currentMessage: normalizedInboundMessage,
         previousQuestion: currentMemory.lastQuestionAsked ?? "",
+        leadName: lead?.nome ?? null,
         messages: pastMessages.map((message) => ({
           role: (message.senderRole === "assistant" || message.direction === "outbound" ? "assistant" : "user") as "user" | "assistant",
           content: message.body ?? "",
@@ -2262,7 +2263,7 @@ export async function processInboundAiResponse({
       const situationText = situation.kind === "custom" ? situation.response : (await loadQuickReplyTemplates(tenantId))[situation.key]?.body;
       if (situationText) deterministicTurn = { ...deterministicTurn, reply: `${renderConversationVariables(situationText, updatedMemory, lead?.nome)}\n\n${deterministicTurn.reply}` };
     } else if (isCustomerQuestion(normalizedInboundMessage)) {
-      const lateral = await generateLateralAnswer({ tenantId, question: normalizedInboundMessage, customerFirstName: updatedMemory.customerFirstName?.value ?? null, conversationId: conversation.id, leadId });
+      const lateral = await generateLateralAnswer({ tenantId, question: normalizedInboundMessage, customerFirstName: lead?.nome ?? updatedMemory.customerFirstName?.value ?? null, conversationId: conversation.id, leadId });
       learn(null, lateral);
       if (lateral) deterministicTurn = { ...deterministicTurn, reply: `${lateral}\n\n${deterministicTurn.reply}` };
     }
