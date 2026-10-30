@@ -166,7 +166,6 @@ function canApplyField(input: {
   baseMemory: ConversationMemory;
   sourceMessageId?: string | null;
   allowReplaceImpliedLives?: boolean;
-  newValueGrounded?: boolean;
 }) {
   if (input.confidence < CONFIDENCE_THRESHOLD) return false;
   const present = currentField(input.memory, input.field);
@@ -177,7 +176,8 @@ function canApplyField(input: {
       && (present?.confidence === 0 || prior?.confidence === 0)
       && !present?.confirmed && !prior?.confirmed;
     const correctionDeclared = input.analysis.corrections.includes(input.correctionField);
-    const correctionSignal = explicitCorrectionIn(input.message) || input.newValueGrounded === true;
+    const hasConfirmedValue = Boolean(present?.confirmed || prior?.confirmed);
+    const correctionSignal = !hasConfirmedValue || explicitCorrectionIn(input.message);
     if (!isImpliedLives && (!correctionDeclared || !correctionSignal)) return false;
   }
   return true;
@@ -201,7 +201,7 @@ export function mergeQualificationContextAnalysis(input: {
 
   const proposedPlan = input.analysis.planType;
   if (proposedPlan && isGrounded("planType", proposedPlan, { message: input.currentMessage, previousQuestion: input.previousQuestion, ages: input.analysis.ages })) {
-    if (canApplyField({ field: "planType", correctionField: "planType", value: proposedPlan, confidence: input.analysis.confidence.planType, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, newValueGrounded: true })) {
+    if (canApplyField({ field: "planType", correctionField: "planType", value: proposedPlan, confidence: input.analysis.confidence.planType, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId })) {
       memory.planType = { value: proposedPlan, confidence: 1, sourceMessageId };
       addCollected(memory, "planType");
       applied.add("planType");
@@ -210,7 +210,7 @@ export function mergeQualificationContextAnalysis(input: {
 
   const cnpjValue = input.analysis.companyHasCnpj;
   if (cnpjValue !== null && isGrounded("companyHasCnpj", cnpjValue, { message: input.currentMessage, previousQuestion: input.previousQuestion, ages: input.analysis.ages })) {
-    if (canApplyField({ field: "companyHasCnpj", correctionField: "companyHasCnpj", value: String(cnpjValue), confidence: input.analysis.confidence.companyHasCnpj, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, newValueGrounded: true })) {
+    if (canApplyField({ field: "companyHasCnpj", correctionField: "companyHasCnpj", value: String(cnpjValue), confidence: input.analysis.confidence.companyHasCnpj, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId })) {
       memory.companyHasCnpj = { value: String(cnpjValue), confidence: 1, sourceMessageId };
       addCollected(memory, "companyHasCnpj");
       applied.add("companyHasCnpj");
@@ -225,11 +225,11 @@ export function mergeQualificationContextAnalysis(input: {
   const groundedAges = agesAreGrounded ? input.analysis.ages : [];
   if (groundedAges.length > 0) {
     const ageValue = groundedAges.join(", ");
-    const canApplyAges = canApplyField({ field: "age", correctionField: "ages", value: ageValue, confidence: input.analysis.confidence.ages, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, newValueGrounded: true });
+    const canApplyAges = canApplyField({ field: "age", correctionField: "ages", value: ageValue, confidence: input.analysis.confidence.ages, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId });
     const businessPlan = memory.planType?.value === "empresarial";
     const averageValue = String(Math.round(groundedAges.reduce((total, age) => total + age, 0) / groundedAges.length));
     const currentAverage = memory.averageAge?.value;
-    const canApplyAverage = !businessPlan || currentAverage === averageValue || !currentAverage || canApplyField({ field: "averageAge", correctionField: "ages", value: averageValue, confidence: input.analysis.confidence.ages, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, newValueGrounded: true });
+    const canApplyAverage = !businessPlan || currentAverage === averageValue || !currentAverage || canApplyField({ field: "averageAge", correctionField: "ages", value: averageValue, confidence: input.analysis.confidence.ages, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId });
     if (canApplyAges && canApplyAverage) {
       memory.age = { value: ageValue, confidence: 1, sourceMessageId };
       if (businessPlan) memory.averageAge = { value: averageValue, confidence: 1, sourceMessageId };
@@ -243,7 +243,7 @@ export function mergeQualificationContextAnalysis(input: {
   const proposedLives = input.analysis.numberOfLives ?? (groundedAges.length >= 2 ? groundedAges.length : null);
   if (proposedLives !== null && isGrounded("numberOfLives", proposedLives, { message: input.currentMessage, previousQuestion: input.previousQuestion, ages: groundedAges })) {
     const confidence = input.analysis.numberOfLives === null ? input.analysis.confidence.ages : input.analysis.confidence.numberOfLives;
-    if (canApplyField({ field: "numberOfLives", correctionField: "numberOfLives", value: String(proposedLives), confidence, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, allowReplaceImpliedLives: true, newValueGrounded: true })) {
+    if (canApplyField({ field: "numberOfLives", correctionField: "numberOfLives", value: String(proposedLives), confidence, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, allowReplaceImpliedLives: true })) {
       memory.numberOfLives = { value: String(proposedLives), confidence: 1, sourceMessageId };
       addCollected(memory, "numberOfLives");
       applied.add("numberOfLives");
@@ -251,7 +251,7 @@ export function mergeQualificationContextAnalysis(input: {
   }
 
   if (input.analysis.city && isGrounded("city", input.analysis.city, { message: input.currentMessage, previousQuestion: input.previousQuestion, ages: groundedAges })) {
-    if (canApplyField({ field: "city", correctionField: "city", value: input.analysis.city, confidence: input.analysis.confidence.city, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, newValueGrounded: true })) {
+    if (canApplyField({ field: "city", correctionField: "city", value: input.analysis.city, confidence: input.analysis.confidence.city, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId })) {
       memory.city = { value: input.analysis.city, confidence: 1, sourceMessageId };
       addCollected(memory, "city");
       applied.add("city");
@@ -259,7 +259,7 @@ export function mergeQualificationContextAnalysis(input: {
   }
 
   if (input.analysis.currentPlan && isGrounded("currentPlan", input.analysis.currentPlan, { message: input.currentMessage, previousQuestion: input.previousQuestion, ages: groundedAges })) {
-    if (canApplyField({ field: "currentPlan", correctionField: "currentPlan", value: input.analysis.currentPlan, confidence: input.analysis.confidence.currentPlan, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId, newValueGrounded: true })) {
+    if (canApplyField({ field: "currentPlan", correctionField: "currentPlan", value: input.analysis.currentPlan, confidence: input.analysis.confidence.currentPlan, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId })) {
       memory.currentPlan = { value: input.analysis.currentPlan, confidence: 1, sourceMessageId };
       applied.add("currentPlan");
     }
@@ -310,7 +310,7 @@ export function redactQualificationContextText(value: string, leadName?: string 
     .replace(/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/g, "[CNPJ]")
     .replace(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, "[CPF]")
     .replace(/\b\d{5}-?\d{3}\b/g, "[CEP]")
-    .replace(/(?:\b(?:rua|avenida)\b|\br\.|\bav\.?)\s+[^,\n;]{1,100}(?:,\s*|\s+)(?:n[º°o.]?\s*)?\d{1,6}\b/giu, "[ENDEREÇO]")
+    .replace(/(?:\b(?:rua|avenida|alameda|travessa|estrada|pra[cç]a|rodovia|largo|beco|viela|servid[aã]o)\b|\b(?:r|av|al|tv|est|pc|rod)\.?)\s+[^,\n;]{1,100}(?:,\s*(?:n[º°o.]?\s*)?\d{1,6}\b)?/giu, "[ENDEREÇO]")
     .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[E-MAIL]")
     .replace(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?\d{4,5}[-\s]?\d{4}\b/g, "[TELEFONE]");
   return redactLeadName(redactedDetails, leadName);

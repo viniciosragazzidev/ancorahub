@@ -84,6 +84,30 @@ describe("qualification context analysis", () => {
   it("redacts street addresses and CEP while preserving neighborhood and city", () => {
     const redacted = redactQualificationContextText("Rua das Flores, 123, Centro, Campinas; CEP 13050-123");
     expect(redacted).toBe("[ENDEREÇO], Centro, Campinas; CEP [CEP]");
+    expect(redactQualificationContextText("Moro na rua X, Centro, Campinas")).toBe("Moro na [ENDEREÇO], Centro, Campinas");
+    for (const street of [
+      "Alameda dos Anjos, 10",
+      "Travessa do Sol, 11",
+      "Estrada das Pedras, 12",
+      "Praça Central, 13",
+      "Rodovia Norte, 14",
+      "Largo da Igreja, 15",
+      "Beco Azul, 16",
+      "Viela Verde, 17",
+      "Servidão Um, 18",
+      "Rod. Norte, 19",
+      "Al. dos Anjos, 20",
+      "Tv. do Sol, 21",
+      "Est. das Pedras, 22",
+      "Pc. Central, 23",
+    ]) {
+      expect(redactQualificationContextText(`${street}, Centro, Campinas`)).toBe("[ENDEREÇO], Centro, Campinas");
+    }
+  });
+
+  it("redacts the lead name without redacting names of third parties", () => {
+    expect(redactQualificationContextText("Ana Silva fala do marido João e do filho Pedro.", "Ana Silva"))
+      .toBe("[NOME] fala do marido João e do filho Pedro.");
   });
 
   it("redacts messages, pending question, and textual qualification memory in the prompt", () => {
@@ -127,45 +151,47 @@ describe("qualification context analysis", () => {
     expect(isQualificationContextAnalysisEnabled({ aiQualificationEnabled: false })).toBe(false);
   });
 
-  it("requires a correction term or a new grounded value for an existing field", () => {
+  it("requires an explicit correction term to replace a confirmed field", () => {
     const current = createEmptyMemory();
-    current.city = { value: "Niterói", confidence: 1, sourceMessageId: "older" };
+    current.city = { value: "São Paulo", confidence: 1, confirmed: true, sourceMessageId: "older" };
     current.collectedFields.push("city");
     const proposed = result({
-      city: "Itaboraí",
+      city: "Campinas",
       corrections: ["city"],
       answeredLastQuestion: true,
     });
 
-    const deniedCorrection = mergeQualificationContextAnalysis({
+    const deniedNewValue = mergeQualificationContextAnalysis({
       memory: current,
       analysis: proposed,
-      currentMessage: "Não,",
+      currentMessage: "Sou de Campinas",
       previousQuestion: "Qual é a sua cidade?",
       sourceMessageId: "msg-current",
       baseMemory: current,
     });
-    expect(deniedCorrection.memory.city?.value).toBe("Niterói");
-
-    const groundedNewValue = mergeQualificationContextAnalysis({
-      memory: current,
-      analysis: proposed,
-      currentMessage: "Minha cidade é Itaboraí",
-      previousQuestion: "Qual é a sua cidade?",
-      sourceMessageId: "msg-current",
-      baseMemory: current,
-    });
-    expect(groundedNewValue.memory.city?.value).toBe("Itaboraí");
+    expect(deniedNewValue.memory.city?.value).toBe("São Paulo");
 
     const appliedCorrection = mergeQualificationContextAnalysis({
       memory: current,
       analysis: proposed,
-      currentMessage: "Na verdade, minha cidade é Itaboraí",
+      currentMessage: "Na verdade sou de Campinas",
       previousQuestion: "Qual é a sua cidade?",
       sourceMessageId: "msg-current",
       baseMemory: current,
     });
-    expect(appliedCorrection.memory.city).toMatchObject({ value: "Itaboraí", confidence: 1, sourceMessageId: "msg-current" });
+    expect(appliedCorrection.memory.city).toMatchObject({ value: "Campinas", confidence: 1, sourceMessageId: "msg-current" });
+
+    const unconfirmed = createEmptyMemory();
+    unconfirmed.city = { value: "São Paulo", confidence: 1, confirmed: false, sourceMessageId: "older" };
+    const groundedValue = mergeQualificationContextAnalysis({
+      memory: unconfirmed,
+      baseMemory: unconfirmed,
+      analysis: proposed,
+      currentMessage: "Sou de Campinas",
+      previousQuestion: "Qual é a sua cidade?",
+      sourceMessageId: "msg-current",
+    });
+    expect(groundedValue.memory.city?.value).toBe("Campinas");
   });
 
   it("does not erase a confirmed value when the model returns no value", () => {
@@ -248,19 +274,30 @@ describe("qualification context analysis", () => {
     expect(analyzed.memory.planType).toBeUndefined();
   });
 
-  it("accepts a direct CNPJ denial as an explicit correction to a previous positive value", () => {
+  it("requires a correction term to replace a previous positive CNPJ value", () => {
     const previous = createEmptyMemory();
-    previous.companyHasCnpj = { value: "true", confidence: 1, sourceMessageId: "older" };
+    previous.companyHasCnpj = { value: "true", confidence: 1, confirmed: true, sourceMessageId: "older" };
     previous.collectedFields.push("companyHasCnpj");
-    const merged = mergeQualificationContextAnalysis({
+    const analysis = result({ companyHasCnpj: false, corrections: ["companyHasCnpj"] });
+    const deniedWithoutCorrectionTerm = mergeQualificationContextAnalysis({
       memory: previous,
       baseMemory: previous,
-      analysis: result({ companyHasCnpj: false, corrections: ["companyHasCnpj"] }),
+      analysis,
       currentMessage: "Não tenho CNPJ",
       previousQuestion: "Sua empresa possui CNPJ?",
       sourceMessageId: "msg-current",
     });
-    expect(merged.memory.companyHasCnpj?.value).toBe("false");
+    expect(deniedWithoutCorrectionTerm.memory.companyHasCnpj?.value).toBe("true");
+
+    const corrected = mergeQualificationContextAnalysis({
+      memory: previous,
+      baseMemory: previous,
+      analysis,
+      currentMessage: "Na verdade, não tenho CNPJ",
+      previousQuestion: "Sua empresa possui CNPJ?",
+      sourceMessageId: "msg-current",
+    });
+    expect(corrected.memory.companyHasCnpj).toMatchObject({ value: "false", sourceMessageId: "msg-current" });
   });
 
   it("does not accept a family plan inferred from a denied family reference", () => {
