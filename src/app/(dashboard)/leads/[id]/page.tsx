@@ -114,7 +114,12 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
       // (ACCEPTED) in the Light app gets the redistributed notice straight from the server, before any
       // lead data (name, messages, history) is loaded; anyone else gets a 404.
       if (latestOffer?.status === "ACCEPTED" && (await getExperienceMode(context)) === "LIGHT") {
-        return <UnavailableLeadView availabilityStatus="available" />;
+        const [membership] = await db
+          .select({ availabilityStatus: schema.tenantMemberships.availabilityStatus })
+          .from(schema.tenantMemberships)
+          .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, context.userId)))
+          .limit(1);
+        return <UnavailableLeadView availabilityStatus={membership?.availabilityStatus ?? "available"} />;
       }
       if (latestOffer?.status !== "PENDING") notFound();
     }
