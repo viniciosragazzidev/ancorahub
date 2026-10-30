@@ -382,6 +382,101 @@ export async function removeLeadFromDistributionAction(_prev: ManagementActionSt
   });
 }
 
+/**
+ * Resend the same lead to the same broker (30/10): the broker missed the offer or the accept
+ * failed. Takes it off the broker, cancels the open offer and its message, and offers it again to
+ * the same broker at once (new notice, new acceptance window). Only before the service starts; if
+ * the new offer cannot go out, the broker keeps the lead as it was.
+ */
+export async function resendLeadToSameBrokerAction(_prev: ManagementActionState, formData: FormData): Promise<ManagementActionState> {
+  return withServerActionTiming("/leads", "leads.resend_same_broker", async () => {
+    const mutationId = randomUUID();
+    try {
+      const leadId = z.string().uuid().parse(formData.get("leadId"));
+      const { context, db, lead } = await getManagedLead(leadId);
+      if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") throw new Error("As ações de gestão de leads estão desativadas pelo Super-admin.");
+      if (context.role !== "director" && context.role !== "manager") throw new AuthorizationError("Apenas gestores e diretores podem reenviar o lead.");
+      const brokerId = lead.corretorId;
+      if (!brokerId) throw new Error("Este lead não está com nenhum corretor. Atualize a página.");
+      if (lead.archivedAt || lead.deletedAt) throw new Error("Não é possível reenviar um lead arquivado ou excluído.");
+      if (lead.firstContactAt || lead.serviceStartedAt || !["new", "distributed"].includes(lead.status)) {
+        throw new Error("O corretor já começou o atendimento. Para trocar de corretor, use o repasse.");
+      }
+      if (!lead.branchId || !lead.queueId) throw new Error("O lead está sem unidade ou fila. Envie para uma unidade antes de reenviar.");
+      const [current] = await db.select({ dutyScheduleId: schema.leads.dutyScheduleId, assignedAt: schema.leads.assignedAt, assignmentSource: schema.leads.assignmentSource })
+        .from(schema.leads).where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId))).limit(1);
+
+      const now = new Date();
+      const released = await db.transaction(async (tx) => {
+        const updated = await tx.update(schema.leads).set({
+          corretorId: null,
+          distributionStatus: "manual_hold",
+          distributionUpdatedAt: now,
+          updatedAt: now,
+        }).where(and(
+          eq(schema.leads.id, lead.id),
+          eq(schema.leads.tenantId, context.tenantId),
+          eq(schema.leads.corretorId, brokerId),
+          inArray(schema.leads.status, ["new", "distributed"]),
+          isNull(schema.leads.firstContactAt),
+          isNull(schema.leads.serviceStartedAt),
+        )).returning({ id: schema.leads.id });
+        if (!updated.length) return false;
+        const activeOffers = await tx.select({ outboundMessageId: schema.leadOffers.outboundMessageId }).from(schema.leadOffers).where(and(
+          eq(schema.leadOffers.tenantId, context.tenantId),
+          eq(schema.leadOffers.leadId, lead.id),
+          inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+        ));
+        await tx.update(schema.leadOffers).set({ status: "CANCELLED", updatedAt: now }).where(and(
+          eq(schema.leadOffers.tenantId, context.tenantId),
+          eq(schema.leadOffers.leadId, lead.id),
+          inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+        ));
+        const outboundIds = activeOffers.map((offer) => offer.outboundMessageId).filter((id): id is string => Boolean(id));
+        if (outboundIds.length) {
+          await tx.update(schema.whatsappOutboundMessages).set({
+            status: "cancelled",
+            providerErrorCode: "LEAD_OFFER_RESENT",
+            providerErrorMessage: "Oferta substituída pelo reenvio ao mesmo corretor.",
+            failedAt: now,
+            updatedAt: now,
+          }).where(and(
+            eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
+            inArray(schema.whatsappOutboundMessages.id, outboundIds),
+            inArray(schema.whatsappOutboundMessages.status, ["queued", "pending"]),
+          ));
+        }
+        await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: `lead.resent_to_same_broker:${brokerId}`, createdAt: now });
+        return true;
+      });
+      if (!released) throw new Error("O estado do lead mudou. Atualize a página antes de tentar novamente.");
+
+      const target = { targetBranchId: lead.branchId, targetQueueId: lead.queueId };
+      // The plantão the lead came from, while it is still running; otherwise the broker's own running plantão.
+      let offered = current?.dutyScheduleId
+        ? await offerLeadToBrokerManually(context, lead.id, brokerId, { ...target, dutyScheduleId: current.dutyScheduleId })
+        : null;
+      if (!offered || offered.status === "conflict") offered = await offerLeadToBrokerManually(context, lead.id, brokerId, target);
+      if (offered.status !== "offered") {
+        // The new offer could not go out: the broker keeps the lead exactly as before.
+        await db.update(schema.leads).set({ corretorId: brokerId, distributionStatus: "assigned", distributionUpdatedAt: new Date(), updatedAt: new Date() })
+          .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.corretorId)));
+        throw new Error(`Não deu para reenviar: ${offered.reason} O lead continua com o mesmo corretor.`);
+      }
+      await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: lead.id, runAfter: offered.expiresAt });
+      void publishLeadInvalidation({ tenantId: context.tenantId, actorId: context.userId, branchIds: [lead.branchId], brokerIds: [brokerId] }).catch(() => undefined);
+      return {
+        success: true,
+        message: "Lead reenviado ao mesmo corretor, com novo aviso e novo prazo de aceite.",
+        mutationId,
+        entity: { leadId: lead.id, branchId: lead.branchId, corretorId: brokerId, status: "distributed", distributionStatus: "assigned" },
+      };
+    } catch (error) {
+      return { mutationId, error: error instanceof Error ? error.message : "Não foi possível reenviar o lead." };
+    }
+  });
+}
+
 export async function reassignLeadAction(_prev: ManagementActionState, formData: FormData): Promise<ManagementActionState> {
   return withServerActionTiming("/leads", "leads.reassign", async () => {
     const mutationId = randomUUID();

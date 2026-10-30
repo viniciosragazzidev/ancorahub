@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/foundations/confirm-dialog";
 import { Dialog, DialogClose, DialogDescription, DialogPopup, DialogTitle } from "@/components/ui/dialog";
-import { getLeadDutyReassignmentOptions, reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction, removeLeadAssignmentAction } from "@/features/leads/management-actions";
+import { getLeadDutyReassignmentOptions, reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction, removeLeadAssignmentAction, resendLeadToSameBrokerAction } from "@/features/leads/management-actions";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 import { ManualQualificationDialog } from "./manual-qualification-dialog";
@@ -151,6 +151,24 @@ export function LeadDrawerManagementActions({
   const [reassignState, reassign, reassignPending] = useActionState(reassignLeadAction, {});
   const [assumeState, assume, assumePending] = useActionState(assumeLeadForInvestigationAction, {});
   const [removeAssignmentState, removeAssignment, removeAssignmentPending] = useActionState(removeLeadAssignmentAction, {});
+  const [resendState, resend, resendPending] = useActionState(resendLeadToSameBrokerAction, {});
+  const [resendDialogOpen, setResendDialogOpen] = useState(false);
+  const handleResendSuccess = useCallback((result: typeof resendState) => {
+    setResendDialogOpen(false);
+    toast.success(result.message ?? "Lead reenviado ao mesmo corretor.");
+    onSuccess?.(result);
+  }, [onSuccess]);
+  const handleResendError = useCallback((result: typeof resendState) => {
+    setResendDialogOpen(false);
+    if (result.error) toast.error(result.error);
+    router.refresh();
+  }, [router]);
+  useActionDialogLifecycle({
+    state: resendState,
+    pending: resendPending,
+    onSuccess: handleResendSuccess,
+    onError: handleResendError,
+  });
 
   const handleReassignSuccess = useCallback((result: typeof reassignState) => {
     toast.success(result.message ?? "Lead atribuído e aviso enviado ao corretor.");
@@ -225,6 +243,14 @@ export function LeadDrawerManagementActions({
   const canRemoveAssignment = isDirectorOrManager && Boolean(currentOwner) && currentDistributionStatus === "assigned" &&
     currentStatus !== "lost" && currentStatus !== "converted";
 
+  // Resend to the same broker (30/10): only while the broker has not started the service.
+  const canResend = canRemoveAssignment && (currentStatus === "new" || currentStatus === "distributed");
+  function confirmResend() {
+    const data = new FormData();
+    data.set("leadId", leadId);
+    resend(data);
+  }
+
   function confirmRemoveAssignment() {
     const data = new FormData();
     data.set("leadId", leadId);
@@ -288,15 +314,38 @@ export function LeadDrawerManagementActions({
           <p className="text-xs leading-normal text-muted-foreground">
             Retira o responsável atual sem apagar a etapa nem os horários do atendimento. O lead aguardará uma nova ação manual.
           </p>
+          {canResend ? (
+            <Button
+              className="w-full justify-center gap-2 text-xs"
+              disabled={resendPending || removeAssignmentPending}
+              onClick={() => setResendDialogOpen(true)}
+              type="button"
+              variant="outline"
+            >
+              <RotateCcw className="size-3.5" aria-hidden="true" />
+              Reenviar para {currentOwner}
+            </Button>
+          ) : null}
           <Button
             className="w-full justify-center gap-2 text-xs"
-            disabled={removeAssignmentPending}
+            disabled={removeAssignmentPending || resendPending}
             onClick={() => setRemoveAssignmentDialogOpen(true)}
             type="button"
             variant="outline"
           >
             Remover atribuição
           </Button>
+          {canResend ? (
+            <ConfirmDialog
+              open={resendDialogOpen}
+              onOpenChange={setResendDialogOpen}
+              title={`Reenviar o lead para ${currentOwner}?`}
+              description="O lead sai da carteira e volta na mesma hora para a mesma pessoa, com um aviso novo e um novo prazo de aceite. A oferta anterior é cancelada."
+              confirmLabel="Reenviar"
+              loading={resendPending}
+              onConfirm={confirmResend}
+            />
+          ) : null}
           <ConfirmDialog
             open={removeAssignmentDialogOpen}
             onOpenChange={setRemoveAssignmentDialogOpen}

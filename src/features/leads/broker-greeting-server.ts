@@ -5,6 +5,19 @@ import { and, eq } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { brokerGreeting, greetingFactsFromLead } from "./broker-greeting";
 
+/**
+ * Same as loadBrokerGreeting, but never throws (30/10): it runs after the accept is recorded, so a
+ * failure here falls back to the simple greeting instead of reporting a failed accept.
+ */
+export async function loadBrokerGreetingSafe(input: { tenantId: string; leadId: string; brokerUserId: string; leadName: string | null }) {
+  try {
+    return await loadBrokerGreeting(input);
+  } catch (error) {
+    console.error("[broker-greeting] failed", { leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
+    return brokerGreeting(input.leadName);
+  }
+}
+
 /** The broker's first WhatsApp message for this lead, with the broker's and the brokerage's names. */
 export async function loadBrokerGreeting(input: { tenantId: string; leadId: string; brokerUserId: string }) {
   const db = getDatabase();

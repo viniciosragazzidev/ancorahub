@@ -152,7 +152,9 @@ export function useLeadDetail({
 
         if (!res?.success) {
           whatsapp.cancel();
-          toast.error("Não deu para aceitar agora. Tente de novo; se o lead sumir, outro corretor já pegou.");
+          toast.error(res?.error ?? "Não deu para aceitar agora. Tente de novo; se o lead sumir, outro corretor já pegou.");
+          // The accept may have been recorded before the failure: the refresh shows the real state.
+          router.refresh();
           return;
         }
 

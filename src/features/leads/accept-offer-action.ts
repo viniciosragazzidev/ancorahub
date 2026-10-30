@@ -9,7 +9,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { resolveLeadAcceptOutcome } from "./accept-offer-outcome";
-import { loadBrokerGreeting } from "./broker-greeting-server";
+import { loadBrokerGreetingSafe } from "./broker-greeting-server";
 
 const leadId = z.string().uuid();
 
@@ -46,7 +46,7 @@ export async function acceptLeadOfferAction(inputLeadId: string): Promise<Accept
     revalidatePath("/minha-fila");
     if (!outcome.ok) return { success: false, error: outcome.error };
     // Accepting already started the service (offer_accepted): the phone is the broker's now.
-    const whatsappUrl = lead?.corretorId === context.userId ? buildWhatsAppUrl(lead.telefone, await loadBrokerGreeting({ tenantId: context.tenantId, leadId: parsed.data, brokerUserId: context.userId })) : null;
+    const whatsappUrl = lead?.corretorId === context.userId ? buildWhatsAppUrl(lead.telefone, await loadBrokerGreetingSafe({ tenantId: context.tenantId, leadId: parsed.data, brokerUserId: context.userId, leadName: lead.nome })) : null;
     return whatsappUrl ? { success: true, whatsappUrl } : { success: true };
   } catch {
     return { success: false, error: "Não foi possível aceitar o lead agora." };

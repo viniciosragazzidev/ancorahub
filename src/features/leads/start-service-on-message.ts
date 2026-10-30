@@ -167,9 +167,12 @@ export async function startServiceOnFirstMessage(input: {
     await signalLeadOwnershipChange({ tenantId: input.tenantId, leadId: input.leadId, brokerIds: [input.brokerId, input.actorId] });
     // The broker took the lead (29/10): the lead learns who will call and from which number. Not on
     // the first chat message, when the broker is already talking to the client.
+    // Never awaited (30/10): sending it to Meta inline held the broker's "Aceitar" until the phone
+    // gave up and showed an error for an accept that had worked.
     if (input.trigger === "button" || input.trigger === "director" || input.trigger === "offer_accepted") {
-      const { sendLeadBrokerIntroForLead } = await import("./lead-broker-intro");
-      await sendLeadBrokerIntroForLead({ tenantId: input.tenantId, leadId: input.leadId, brokerId: input.brokerId });
+      void import("./lead-broker-intro")
+        .then(({ sendLeadBrokerIntroForLead }) => sendLeadBrokerIntroForLead({ tenantId: input.tenantId, leadId: input.leadId, brokerId: input.brokerId }))
+        .catch(() => undefined);
     }
   }
   return updated;
