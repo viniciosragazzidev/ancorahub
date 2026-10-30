@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gte, inArray, isNotNull, isNull, notInArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -11,9 +11,9 @@ import { withJobLease } from "@/shared/db/job-lease";
 import { INITIAL_MESSAGE_FAILURE_NOTE_PREFIX } from "@/features/communication-channels/meta-delivery-failure";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { startAiQualificationForLead } from "./service";
+import { sendAiOutbound } from "@/features/ai-agent/conversation-state-machine";
 import {
   AI_RESTART_SKIP_LABEL,
-  AI_START_SKIP_LABEL,
   AI_SEND_FAILED_LOOKBACK_MS,
   AI_SEND_FAILED_SKIP_LABEL,
   decideAiRestartDispatch,
@@ -316,6 +316,36 @@ async function reopenAiSendFailedLeads(context: BulkContext, requestedIds: strin
   return run.value;
 }
 
+const AI_RESEND_SKIP_LABEL = {
+  no_failed_message: "a mensagem da IA que falhou não foi encontrada",
+  missing_phone: "o lead não tem telefone",
+  not_sent: "o reenvio em texto não foi aceito pelo WhatsApp",
+} as const;
+
+/** Sends the AI's last failed message again, as free text, and marks that same message as sent. */
+async function resendFailedAiMessage(tenantId: string, leadId: string): Promise<{ sent: true } | { sent: false; reason: keyof typeof AI_RESEND_SKIP_LABEL }> {
+  const db = getDatabase();
+  const [failed] = await db.select({ id: schema.whatsappMessages.id, body: schema.whatsappMessages.body, phone: schema.whatsappMessages.phone })
+    .from(schema.whatsappMessages)
+    .where(and(
+      eq(schema.whatsappMessages.tenantId, tenantId),
+      eq(schema.whatsappMessages.leadId, leadId),
+      eq(schema.whatsappMessages.senderRole, "assistant"),
+      eq(schema.whatsappMessages.providerStatus, "failed"),
+      gte(schema.whatsappMessages.sentAt, new Date(Date.now() - AI_SEND_FAILED_LOOKBACK_MS)),
+    ))
+    .orderBy(desc(schema.whatsappMessages.sentAt))
+    .limit(1);
+  if (!failed?.body) return { sent: false, reason: "no_failed_message" };
+  if (!failed.phone) return { sent: false, reason: "missing_phone" };
+  const result = await sendAiOutbound({ tenantId, leadId, phone: failed.phone, body: failed.body, transport: "meta", currentMessageId: failed.id });
+  if (result.status !== "sent" || !result.messageId) return { sent: false, reason: "not_sent" };
+  await db.update(schema.whatsappMessages)
+    .set({ providerStatus: "sent", messageId: result.messageId, sentAt: new Date() })
+    .where(and(eq(schema.whatsappMessages.id, failed.id), eq(schema.whatsappMessages.tenantId, tenantId)));
+  return { sent: true };
+}
+
 async function runAiSendFailedReopen(context: BulkContext, requestedIds: string[]) {
   const now = new Date();
   const decisions = await loadAiSendFailedDecisions(context, now);
@@ -354,14 +384,12 @@ async function runAiSendFailedReopen(context: BulkContext, requestedIds: string[
         count(AI_RESTART_SKIP_LABEL[dispatch.reason]);
         continue;
       }
-      // Force: the stuck conversation is still "active" and would block the resend. The eligibility above
-      // (last AI message failed, nothing delivered after, no broker) keeps it to the leads whose message never left.
-      const started = await startAiQualificationForLead({ tenantId: context.tenantId, leadId, actorUserId: context.userId, force: true });
-      if (started.started) sent++;
-      else {
-        const reason = (started as { reason?: string }).reason ?? "desconhecido";
-        count(AI_START_SKIP_LABEL[reason] ?? `não enviado (${reason})`);
-      }
+      // The window is open, so the AI's own failed message goes again as free text through the number the
+      // customer wrote to. The first-contact template is not used here: a coex number may not have it (132001)
+      // and the conversation is already waiting for the answer to this exact question.
+      const resent = await resendFailedAiMessage(context.tenantId, leadId);
+      if (resent.sent) sent++;
+      else count(AI_RESEND_SKIP_LABEL[resent.reason]);
     } catch {
       count("erro ao enviar a primeira mensagem");
     }
