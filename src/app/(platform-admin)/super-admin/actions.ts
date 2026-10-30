@@ -647,7 +647,14 @@ export async function runDbQueryAction(tableName: string, limit: number = 20) {
         result = await db.select().from(schema.leads).limit(limit);
         break;
       case "auditLogs":
-        result = await db.select().from(schema.auditLogs).limit(limit);
+        result = await db.select({
+          id: schema.auditLogs.id,
+          userId: schema.auditLogs.userId,
+          entidade: schema.auditLogs.entidade,
+          entidadeId: schema.auditLogs.entidadeId,
+          acao: schema.auditLogs.acao,
+          createdAt: schema.auditLogs.createdAt,
+        }).from(schema.auditLogs).limit(limit);
         break;
       case "platformAuditLogs":
         result = await db.select().from(schema.platformAuditLogs).limit(limit);
