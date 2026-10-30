@@ -15,6 +15,7 @@ describe("anúncio (CTWA) cai na fila do número quando a campanha não tem regr
 
   it("padrão da conta com a fila inativa: cai na fila do número em vez de perder o lead", () => {
     expect(shouldUseChannelIntakeForCtwa({ ...base, campaignRoute: { enabled: true, queueStatus: "inactive" } })).toBe(true);
+    expect(shouldUseChannelIntakeForCtwa({ ...base, campaignRoute: { enabled: true, queueStatus: null } })).toBe(true);
   });
 
   it("regra desligada de propósito continua ignorando", () => {

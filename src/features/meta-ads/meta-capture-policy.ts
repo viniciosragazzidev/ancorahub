@@ -34,8 +34,9 @@ export function resolveMetaCapturePolicy(input: {
     if (input.campaignRoute.queueId && input.campaignRoute.queueStatus === "active") {
       return { action: "capture" as const, queueId: input.campaignRoute.queueId };
     }
-    // A campaign without an active destination must never fall through to
-    // direct intake or create an unqueued lead.
+    // A campaign without an active destination never creates an unqueued lead here. A WhatsApp ad
+    // (CTWA) on a number with its own lead intake may still go to that number's queue (DEC-163,
+    // ctwa-channel-intake-fallback.ts).
     return { action: "ignore" as const, queueId: null };
   }
 
