@@ -176,7 +176,9 @@ function canApplyField(input: {
       && (present?.confidence === 0 || prior?.confidence === 0)
       && !present?.confirmed && !prior?.confirmed;
     const correctionDeclared = input.analysis.corrections.includes(input.correctionField);
-    const hasConfirmedValue = Boolean(present?.confirmed || prior?.confirmed);
+    // Nothing in production sets `confirmed`: a value kept from an earlier turn counts as confirmed
+    // (implied lives, confidence 0, excepted). A value read by the rules in this same message is not.
+    const hasConfirmedValue = Boolean(present?.confirmed || prior?.confirmed || (prior?.value && prior.confidence !== 0));
     const correctionSignal = !hasConfirmedValue || explicitCorrectionIn(input.message);
     if (!isImpliedLives && (!correctionDeclared || !correctionSignal)) return false;
   }

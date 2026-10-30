@@ -181,11 +181,26 @@ describe("qualification context analysis", () => {
     });
     expect(appliedCorrection.memory.city).toMatchObject({ value: "Campinas", confidence: 1, sourceMessageId: "msg-current" });
 
+    // A value from an earlier turn, as production stores it (no `confirmed` flag), is protected too.
+    const earlierTurn = createEmptyMemory();
+    earlierTurn.city = { value: "São Paulo", confidence: 1, sourceMessageId: "older" };
+    earlierTurn.collectedFields.push("city");
+    const fromEarlierTurn = mergeQualificationContextAnalysis({
+      memory: earlierTurn,
+      baseMemory: earlierTurn,
+      analysis: proposed,
+      currentMessage: "Sou de Campinas",
+      previousQuestion: "Qual é a sua cidade?",
+      sourceMessageId: "msg-current",
+    });
+    expect(fromEarlierTurn.memory.city?.value).toBe("São Paulo");
+
+    // A value the rules read from this same message can still be fixed by the model.
     const unconfirmed = createEmptyMemory();
-    unconfirmed.city = { value: "São Paulo", confidence: 1, confirmed: false, sourceMessageId: "older" };
+    unconfirmed.city = { value: "São Paulo", confidence: 1, confirmed: false, sourceMessageId: "msg-current" };
     const groundedValue = mergeQualificationContextAnalysis({
       memory: unconfirmed,
-      baseMemory: unconfirmed,
+      baseMemory: createEmptyMemory(),
       analysis: proposed,
       currentMessage: "Sou de Campinas",
       previousQuestion: "Qual é a sua cidade?",
