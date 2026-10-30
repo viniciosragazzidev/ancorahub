@@ -5,7 +5,7 @@ import { startTransition, useActionState, useCallback, useEffect, useId, useRef,
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { useSuccessOverlay } from "@/components/motion/success-overlay";
-import { Clock, UserPlus, ListChecks, ArrowRight, ChatCircleText, UserSwitch } from "@/components/huge-icons";
+import { Clock, UserPlus, ListChecks, ArrowRight, ChatCircleText, UserSwitch, RotateCcw } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/foundations/confirm-dialog";
 import { LeadAssignedNotificationButton } from "@/components/plugins/lead-assigned-notification-button";
-import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction, removeLeadAssignmentAction } from "@/features/leads/management-actions";
+import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction, removeLeadAssignmentAction, resendLeadToSameBrokerAction } from "@/features/leads/management-actions";
 import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import lite from "./supervision-panel-lite.module.css";
@@ -153,6 +153,31 @@ export function SupervisionPanel({
     onSuccess: handleRemoveAssignmentSuccess,
     onError: handleRemoveAssignmentError,
   });
+  // Resend to the same broker (30/10): new offer, new notice, before the service starts.
+  const [resendDialogOpen, setResendDialogOpen] = useState(false);
+  const [resendState, resend, resendPending] = useActionState(resendLeadToSameBrokerAction, {});
+  const handleResendSuccess = useCallback((result: typeof resendState) => {
+    setResendDialogOpen(false);
+    toast.success(result.message ?? "Lead reenviado ao mesmo corretor.");
+    startTransition(() => router.refresh());
+  }, [router]);
+  const handleResendError = useCallback((result: typeof resendState) => {
+    setResendDialogOpen(false);
+    if (result.error) toast.error(result.error);
+    startTransition(() => router.refresh());
+  }, [router]);
+  useActionDialogLifecycle({
+    state: resendState,
+    pending: resendPending,
+    onSuccess: handleResendSuccess,
+    onError: handleResendError,
+  });
+  const confirmResend = () => {
+    const formData = new FormData();
+    formData.set("leadId", leadId);
+    resend(formData);
+  };
+
   const confirmRemoveAssignment = () => {
     const formData = new FormData();
     formData.set("leadId", leadId);
@@ -206,6 +231,7 @@ export function SupervisionPanel({
   // Chave do diretor: mesmo painel e mesmas ações, só com o visual Lite (sem caixa alta, tokens, raios concêntricos).
   const litePage = useDirectorLitePage();
   const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(displayedAssignment.status);
+  const canResend = Boolean(displayedAssignment.ownerId) && !serviceStartedAt && ["new", "distributed"].includes(displayedAssignment.status);
 
   return (
     <>
@@ -325,15 +351,38 @@ export function SupervisionPanel({
             <p className="text-xs leading-normal text-muted-foreground">
               Retira o responsável atual sem apagar a etapa nem os horários do atendimento. O lead aguardará uma nova ação manual.
             </p>
+            {canResend ? (
+              <Button
+                className="w-full justify-center gap-2 text-xs"
+                disabled={resendPending || removeAssignmentPending}
+                onClick={() => setResendDialogOpen(true)}
+                type="button"
+                variant="outline"
+              >
+                <RotateCcw className="size-3.5" aria-hidden="true" />
+                Reenviar para {displayedAssignment.ownerName}
+              </Button>
+            ) : null}
             <Button
               className="w-full justify-center gap-2 text-xs"
-              disabled={removeAssignmentPending}
+              disabled={removeAssignmentPending || resendPending}
               onClick={() => setRemoveAssignmentDialogOpen(true)}
               type="button"
               variant="outline"
             >
               Remover atribuição
             </Button>
+            {canResend ? (
+              <ConfirmDialog
+                open={resendDialogOpen}
+                onOpenChange={setResendDialogOpen}
+                title={`Reenviar o lead para ${displayedAssignment.ownerName}?`}
+                description="O lead sai da carteira e volta na mesma hora para a mesma pessoa, com um aviso novo e um novo prazo de aceite. A oferta anterior é cancelada."
+                confirmLabel="Reenviar"
+                loading={resendPending}
+                onConfirm={confirmResend}
+              />
+            ) : null}
             <ConfirmDialog
               open={removeAssignmentDialogOpen}
               onOpenChange={setRemoveAssignmentDialogOpen}
