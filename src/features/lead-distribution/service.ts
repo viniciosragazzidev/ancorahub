@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, not, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, max, ne, not, or, sql } from "drizzle-orm";
 import { operationDayStart } from "./broker-day-history";
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
@@ -1407,7 +1407,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   // The night extra's leads stay with the extra: once it closes they do not level the regular plantão.
   const extraSettings = await getOvernightExtraShiftSettings();
   const extraGap = extraSettings.enabled ? overnightExtraReceiptGap(new Date(), extraSettings.startsAt, OVERNIGHT_LEADS_UNTIL) : null;
-  const [loads, brokerLeadHistory, slaAttempts, dutyOffers] = await Promise.all([
+  const [loads, [brokerHistoryStats, brokerDayLeads], slaAttempts, dutyOffers] = await Promise.all([
     db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads).where(and(
       eq(schema.leads.tenantId, context.tenantId),
       inArray(schema.leads.corretorId, ids),
@@ -1416,7 +1416,18 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       isNull(schema.leads.deletedAt),
       isNull(schema.leads.archivedAt),
     )).groupBy(schema.leads.corretorId),
-    db.select({ leadId: schema.leads.id, brokerId: schema.leads.corretorId, dutyScheduleId: schema.leads.dutyScheduleId, status: schema.leads.status, assignedAt: schema.leads.assignedAt, serviceStartedAt: schema.leads.serviceStartedAt, firstContactAt: schema.leads.firstContactAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids))),
+    // Egress (02/11): every lead the brokers ever had came back on each choice (~140 thousand reads a
+    // week); the database now sums the history and returns only the leads of the operation day.
+    Promise.all([
+      db.select({
+        brokerId: schema.leads.corretorId,
+        total: count(schema.leads.id),
+        converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')`.mapWith(Number),
+        unstarted: sql<number>`count(*) filter (where ${schema.leads.status} in ('distributed', 'new') or (${schema.leads.serviceStartedAt} is null and ${schema.leads.firstContactAt} is null))`.mapWith(Number),
+        lastAssignedAt: max(schema.leads.assignedAt),
+      }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids))).groupBy(schema.leads.corretorId),
+      db.select({ leadId: schema.leads.id, brokerId: schema.leads.corretorId, dutyScheduleId: schema.leads.dutyScheduleId, assignedAt: schema.leads.assignedAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids), gte(schema.leads.assignedAt, dutySince))),
+    ]),
     db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, leadId: schema.leadAssignmentAttempts.leadId, dutyScheduleId: schema.leadAssignmentAttempts.dutyScheduleId, assignedAt: schema.leadAssignmentAttempts.assignedAt, firstContactAt: schema.leadAssignmentAttempts.firstContactAt, feedbackDueAt: schema.leadAssignmentAttempts.feedbackDueAt }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, ids))),
     // DEC-154: every offer of the day counts (expired, declined and lost too: a broker who
     // let it lapse is not made up for); only one the system CANCELLED does not.
@@ -1434,18 +1445,20 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   // queues (dutyScheduleIdByBroker below), so count with that same key.
   const countingScheduleIdByBroker = getDutyScheduleReceiptScope(Object.fromEntries(scheduleIdByBroker), Boolean(exclusiveScheduleIds?.length));
   const receivedInDayByBroker = countReceivedInDayByBroker([
-    ...brokerLeadHistory.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
+    ...brokerDayLeads.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
     ...slaAttempts.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
     ...dutyOffers.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.offeredAt, offerStatus: item.status })),
   ], dutySince, countingScheduleIdByBroker, extraGap);
+  const historyStatsByBroker = new Map(brokerHistoryStats.map((item) => [item.brokerId, item]));
   const candidates = remainingBrokers.map((broker) => {
-    const history = brokerLeadHistory.filter((item) => item.brokerId === broker.id);
+    const history = historyStatsByBroker.get(broker.id);
+    const historyTotal = Number(history?.total ?? 0);
     const attempts = slaAttempts.filter((item) => item.brokerId === broker.id);
-    const conversionRate = history.length ? history.filter((item) => item.status === "converted").length / history.length : 0;
+    const conversionRate = historyTotal ? (history?.converted ?? 0) / historyTotal : 0;
     const slaRate = attempts.length ? attempts.filter((item) => item.firstContactAt && item.firstContactAt <= item.feedbackDueAt).length / attempts.length : 0;
-    const idleSince = [...history.map((item) => item.assignedAt), ...attempts.map((item) => item.assignedAt)].reduce<Date | null>((newest, assignedAt) => !assignedAt ? newest : (!newest || assignedAt > newest ? assignedAt : newest), null);
+    const idleSince = [history?.lastAssignedAt ?? null, ...attempts.map((item) => item.assignedAt)].reduce<Date | null>((newest, assignedAt) => !assignedAt ? newest : (!newest || assignedAt > newest ? assignedAt : newest), null);
     const receivedInDuty = receivedInDayByBroker.get(broker.id) ?? 0;
-    const unstartedLeads = history.filter((item) => item.status === "distributed" || item.status === "new" || (!item.serviceStartedAt && !item.firstContactAt)).length + attempts.filter((item) => !item.firstContactAt).length;
+    const unstartedLeads = (history?.unstarted ?? 0) + attempts.filter((item) => !item.firstContactAt).length;
     const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads: loadMap.get(broker.id) ?? 0, unstartedLeads, receivedInDuty, lastAssignedAt: idleSince, capacity: queue?.capacityEnabled ? queue.capacity ?? null : null, onDuty: Boolean(broker.branchId && rosterByBranch.get(broker.branchId)?.has(broker.id)), conversionRate, slaRate, manualPriority: 0, idleSince, rankingScore: 0 };
     return { ...candidate, rankingScore: calculateBrokerRankingScore(candidate, intelligentPolicy.value) };
   });

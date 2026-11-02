@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, notExists, or, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -62,7 +62,17 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
           isNull(schema.leads.deletedAt),
           or(
             and(eq(schema.leads.status, "distributed"), lt(schema.leads.assignedAt, warningCutoff)),
-            and(inArray(schema.leads.status, activeStatuses), lt(schema.leads.stageEnteredAt, stagnantCutoff))
+            and(
+              inArray(schema.leads.status, activeStatuses),
+              lt(schema.leads.stageEnteredAt, stagnantCutoff),
+              // Egress (02/11): ~3.5 thousand stalled leads and their notifications were re-read on every
+              // sweep only to find the alert already sent; a lead alerted in the last 24 h is skipped here.
+              notExists(db.select({ value: sql`1` }).from(schema.notifications).where(and(
+                eq(schema.notifications.leadId, schema.leads.id),
+                eq(schema.notifications.type, "lead_stalled"),
+                gte(schema.notifications.createdAt, new Date(now - 24 * 60 * 60 * 1000)),
+              ))),
+            )
           )
         )
       );
