@@ -8,10 +8,8 @@ import { motion, useReducedMotion } from "motion/react";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
 
-import {
-  REALTIME_SYNC_BROWSER_EVENT,
-  type RealtimeSyncBrowserDetail,
-} from "@/components/providers/realtime-events";
+import type { RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
+import { useVisibleRealtimeRefresh, type VisibleRefreshTiming } from "@/components/providers/use-visible-realtime-refresh";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Message, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader } from "@/components/ui/message";
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
@@ -194,6 +192,10 @@ export type ConversationItem = {
 
 type ViewFilter = "all" | "qualified" | "ai_active" | "human_active" | "with_messages" | "without_messages";
 
+const CONVERSATIONS_REFRESH_TIMING: VisibleRefreshTiming = { coalesceMs: 3_000, maxWaitMs: 10_000, minGapMs: 15_000 };
+const isConversationInvalidation = (detail: RealtimeSyncBrowserDetail | undefined) =>
+  detail?.kind === "domain.invalidated" && detail.domain === "conversations";
+
 export function ConversationsWorkspace({
   role,
   branches,
@@ -248,26 +250,8 @@ export function ConversationsWorkspace({
   // Lite. The resulting refresh re-runs server-side tenant and lead scoping.
   // 24/10: one refresh per message re-sent the whole workspace (hundreds of leads and their
   // messages) and froze clicks. Signals are gathered for 3 s (10 s at most) into one refresh.
-  useEffect(() => {
-    let timer: number | null = null;
-    let firstAt = 0;
-    const onConversationInvalidated = (event: Event) => {
-      const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
-      if (detail?.kind !== "domain.invalidated" || detail.domain !== "conversations") return;
-      const now = Date.now();
-      if (timer === null) firstAt = now;
-      else window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        timer = null;
-        router.refresh();
-      }, Math.max(0, Math.min(3_000, firstAt + 10_000 - now)));
-    };
-    window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
-    return () => {
-      window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, [router]);
+  // 02/11 (egress): only while the tab is visible, and at most one refresh every 15 s.
+  useVisibleRealtimeRefresh(isConversationInvalidation, CONVERSATIONS_REFRESH_TIMING);
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ViewFilter>("all");

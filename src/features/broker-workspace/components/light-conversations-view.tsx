@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -10,7 +10,8 @@ import { PeopleEmpty, PeopleFilters, PeoplePage, PeopleRow, PeopleSection, Peopl
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { recordWhatsAppOpenedAction } from "@/features/leads/whatsapp-open-action";
 import { cn } from "@/lib/utils";
-import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
+import type { RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
+import { useVisibleRealtimeRefresh, type VisibleRefreshTiming } from "@/components/providers/use-visible-realtime-refresh";
 
 export type BrokerInsightMessage = { id: string; body: string; direction: string; sentAt: string; providerStatus?: string | null };
 export type BrokerConversationInsight = {
@@ -20,8 +21,10 @@ export type BrokerConversationInsight = {
   intelligence?: { summary?: string | null; nextBestAction?: string | null; pendingFrom?: string | null; sentiment?: string | null; customerIntent?: string | null; risk?: string | null; lastAnalyzedAt?: string | null; conversationStage?: string | null; engagement?: string | null; opportunity?: string | null; objections?: string[]; buyingSignals?: string[] } | null;
 };
 
-/** Refresh after realtime events at most once every 2s, grouped (trailing). */
-const REFRESH_DEBOUNCE_MS = 2000;
+/** Refresh after realtime events grouped for 2s (trailing), at most once every 5s, only with the tab visible. */
+const LIGHT_REFRESH_TIMING: VisibleRefreshTiming = { coalesceMs: 2_000, maxWaitMs: 2_000, minGapMs: 5_000 };
+const isLightConversationSignal = (detail: RealtimeSyncBrowserDetail | undefined) =>
+  detail?.domain === "conversations" || detail?.domain === "whatsapp_connection";
 
 const primaryAction =
   "inline-flex h-11 flex-1 items-center justify-center rounded-full bg-(--accent) px-4 text-sm font-semibold text-(--accent-foreground)";
@@ -95,24 +98,8 @@ export function LightConversationsView({
   // The open conversation follows ?leadId (each row is a link to it; the app header back button clears it).
   const selectedId = searchParams.get("leadId") ?? initialLeadId ?? null;
 
-  // Realtime: agrupa os eventos e atualiza a lista no máximo uma vez a cada 2s.
-  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    const onRealtime = (event: Event) => {
-      const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
-      if (detail?.domain !== "conversations" && detail?.domain !== "whatsapp_connection") return;
-      if (refreshTimer.current) clearTimeout(refreshTimer.current);
-      refreshTimer.current = setTimeout(() => {
-        refreshTimer.current = null;
-        router.refresh();
-      }, REFRESH_DEBOUNCE_MS);
-    };
-    window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
-    return () => {
-      window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
-      if (refreshTimer.current) clearTimeout(refreshTimer.current);
-    };
-  }, [router]);
+  // Realtime: agrupa os eventos (2s) e atualiza a lista só com a aba visível, no máximo a cada 5s.
+  useVisibleRealtimeRefresh(isLightConversationSignal, LIGHT_REFRESH_TIMING);
 
   // Prioridade de atenção primeiro (exige atenção, sua ação, bom avanço, acompanhar), depois a mais recente.
   const ordered = useMemo(
