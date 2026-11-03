@@ -7,7 +7,8 @@ const feedbackSchema = z.object({ useful: z.boolean(), inserted: z.boolean().opt
 export async function POST(request: Request, { params }: { params: Promise<{ suggestionId: string }> }) {
   try {
     const { session } = await requireExtensionAccess(request, "GENERATE_REPLY");
-    const { suggestionId } = await params;
+    // Id de sugestão só em UUID: o que não for UUID não vira entidade da auditoria.
+    const suggestionId = z.string().uuid().parse((await params).suggestionId);
     const input = feedbackSchema.parse(await request.json());
     await recordExtensionAudit(input.useful ? "extension.suggestion.useful" : "extension.suggestion.not_useful", session, { entityId: suggestionId });
     return NextResponse.json({ success: true });
