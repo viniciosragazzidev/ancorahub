@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { APPROACHES, isNightInSaoPaulo, qualificationTemplateVariables, requestedOperator, resolveApproach } from "./approaches";
+import { APPROACHES, isNightInSaoPaulo, qualificationTemplateVariables, REQUESTED_OPERATOR_METADATA_KEYS, requestedOperator, resolveApproach } from "./approaches";
 import { CADENCE, decideNextTouch, type CadenceInput, type TurboState } from "./cadence";
 import { assignVariant, MIN_SENDS_BEFORE_LEARNING, replyRate, stableHash } from "./experiments";
 import { RECOMMENDED_TEMPLATES, templateVariableOrder, toMetaTemplatePayload } from "./templates-pack";
@@ -246,5 +246,21 @@ describe("qualificationTemplateVariables", () => {
   it("keeps the operator when the campaign names one", () => {
     expect(qualificationTemplateVariables("Ana", "Assistente", "Âncora Saúde", "Amil")).toEqual(["Ana", "Assistente", "Âncora Saúde", "Amil"]);
     expect(qualificationTemplateVariables("", "", "", "  ")).toEqual(["Cliente", "Assistente", "Âncora Saúde"]);
+  });
+});
+
+describe("cadência lê só as chaves da operadora (egress, 03/11)", () => {
+  it("gives the same operator from the slim metadata the job selects", () => {
+    const pick = (metadata: Record<string, unknown>) => Object.fromEntries(REQUESTED_OPERATOR_METADATA_KEYS.filter((key) => key in metadata).map((key) => [key, metadata[key]]));
+    const cases: Array<{ sourceCampaign?: string; sourceMetadata: Record<string, unknown> }> = [
+      { sourceMetadata: { operadora: "Amil", aiIntelligence: { big: "x".repeat(500) }, formAnswers: { a: 1 } } },
+      { sourceMetadata: { campaignName: "[AMIL] Família RJ", leadgenId: "1", rawPayload: { x: 1 } } },
+      { sourceMetadata: { adHeadline: "Plano Bradesco empresarial", tipoCnpj: "sim" } },
+      { sourceCampaign: "SulAmérica PME", sourceMetadata: { other: "x" } },
+      { sourceMetadata: {} },
+    ];
+    for (const lead of cases) {
+      expect(requestedOperator({ ...lead, sourceMetadata: pick(lead.sourceMetadata) })).toBe(requestedOperator(lead));
+    }
   });
 });

@@ -7,7 +7,7 @@ import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features
 import { getDatabase, schema } from "@/shared/db";
 import { withJobLease } from "@/shared/db/job-lease";
 
-import { qualificationTemplateVariables, requestedOperator } from "./approaches";
+import { qualificationTemplateVariables, REQUESTED_OPERATOR_METADATA_KEYS, requestedOperator } from "./approaches";
 import { decideNextTouch, type TurboState, type TurboTouchRecord } from "./cadence";
 import { companyNameFor, getTurboSettings, listApprovedTemplateNames, readTurboState, writeTurboState } from "./service";
 
@@ -81,10 +81,15 @@ async function runCadence(now: Date): Promise<CadenceRunResult> {
     status: schema.leads.status,
     corretorId: schema.leads.corretorId,
     qualificationStatus: schema.leads.qualificationStatus,
-    qualificationDetails: schema.leads.qualificationDetails,
+    // Only what the run reads (egress, 03/11): 720 runs a day re-read the same
+    // leads, and the full jsonb carries the AI record (several KB per lead).
+    qualificationDetails: sql<unknown>`jsonb_build_object('turbo', ${schema.leads.qualificationDetails}->'turbo')`,
     tipo: schema.leads.tipo,
     sourceCampaign: schema.leads.sourceCampaign,
-    sourceMetadata: schema.leads.sourceMetadata,
+    sourceMetadata: sql<unknown>`jsonb_strip_nulls(jsonb_build_object(${sql.join(
+      REQUESTED_OPERATOR_METADATA_KEYS.map((key) => sql`${key}::text, ${schema.leads.sourceMetadata}->${key}::text`),
+      sql`, `,
+    )}))`,
   }).from(schema.leads).where(and(
     gt(schema.leads.createdAt, new Date(now.getTime() - LOOKBACK_MS)),
     isNull(schema.leads.deletedAt),
