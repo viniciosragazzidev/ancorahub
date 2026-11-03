@@ -82,6 +82,16 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     defaultChannel: "company_number",
   },
   {
+    key: "LEAD_CLOSING_STAGE",
+    purpose: "leadClosingStage",
+    label: "Lead na etapa de fechamento",
+    description: "Parabeniza o corretor quando um lead dele entra em Documentação ou Em análise e lembra de registrar no CRM valor, vidas, operadora/plano, documentos e data. Uma vez por lead.",
+    // The broker is closing now: goes out at once, any day, like the lead notices.
+    class: "critical",
+    defaultEnabled: true,
+    defaultChannel: "company_number",
+  },
+  {
     key: "LEAD_FEEDBACK_REMINDER",
     purpose: "leadFeedbackReminder",
     label: "Lembrete de feedback",
