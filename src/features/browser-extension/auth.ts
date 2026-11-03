@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { and, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, or } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError, AuthenticationError } from "@/shared/auth/errors";

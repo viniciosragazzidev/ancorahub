@@ -54,7 +54,7 @@ export function AcoesLead({ lead, acao }: { lead: LeadAmpliado; acao(pedido: Ped
   }
 
   return (
-    <section className="secao acoes" aria-label="Ações do lead">
+    <section className="secao bloco-acoes" aria-label="Ações do lead">
       <h2>Ações</h2>
 
       <div className="campo-acao">
