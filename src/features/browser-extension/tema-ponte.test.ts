@@ -22,3 +22,4 @@ describe("ponte de tema", () => {
     expect(Object.keys(variaveisDoTema("escuro"))).toEqual(Object.keys(variaveisDoTema("claro")));
   });
 });
+

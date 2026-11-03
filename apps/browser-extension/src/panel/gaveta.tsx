@@ -148,6 +148,8 @@ function Conteudo({ estado, acoes }: { estado: EstadoGaveta; acoes: AcoesGaveta 
       );
     case "desligada":
       return <p className="aviso">Este recurso está desligado para a sua empresa.</p>;
+    case "indisponivel":
+      return <p className="aviso" role="status">A extensão não está disponível para a sua conta agora. Fale com o seu gestor.</p>;
     case "lead":
       return <VisaoLead lead={estado.lead} acoes={acoes} />;
   }

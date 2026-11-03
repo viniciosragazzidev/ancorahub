@@ -33,5 +33,6 @@ export type EstadoGaveta =
   | { tipo: "sem-lead" }
   | { tipo: "sem-conexao" }
   | { tipo: "erro" }
+  | { tipo: "indisponivel" }
   | { tipo: "desligada" }
   | { tipo: "lead"; lead: LeadAmpliado };
