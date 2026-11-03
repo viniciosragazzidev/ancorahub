@@ -718,6 +718,9 @@ export async function handleLeadOfferWebhookResponse(input: {
   /** CRM-link acceptance: the authenticated broker is already known, so phone matching is skipped. */
   brokerId?: string;
   leadId?: string;
+  /** Exact authenticated offer; never falls back to another offer for this lead. */
+  offerId?: string;
+  audit?: { action: string; metadata: Record<string, unknown> };
   buttonText?: string;
   buttonPayload?: string;
   providerMessageId?: string;
@@ -759,7 +762,16 @@ export async function handleLeadOfferWebhookResponse(input: {
   // 2. Find matching offer for this broker
   let offer: (typeof schema.leadOffers.$inferSelect) | undefined;
 
-  if (input.providerMessageId) {
+  if (input.offerId) {
+    const [exactOffer] = await db.select().from(schema.leadOffers).where(and(
+      eq(schema.leadOffers.id, input.offerId), eq(schema.leadOffers.tenantId, input.tenantId),
+      eq(schema.leadOffers.brokerId, broker.id),
+    )).limit(1);
+    if (!exactOffer) return { processed: false, reason: "offer_not_found" };
+    offer = exactOffer;
+  }
+
+  if (!offer && input.providerMessageId) {
     const [matchedByMsg] = await db
       .select()
       .from(schema.leadOffers)
@@ -837,6 +849,10 @@ export async function handleLeadOfferWebhookResponse(input: {
   // Handle DECLINE
   if (isDecline) {
     const declinedAt = new Date();
+    // Terminal responses are not successful declines. An already-declined offer is safe to retry,
+    // but must not spend another turn. Expiration is still handled by expireOutdatedLeadOffers.
+    if (!ACTIVE_OFFER_STATUSES.some((status) => status === offer.status)) return { processed: false, reason: "already_resolved" };
+    if (offer.expiresAt <= declinedAt) return { processed: false, reason: "expired" };
     const declined = await db.transaction(async (tx) => {
       const [updatedOffer] = await tx
         .update(schema.leadOffers)
@@ -846,6 +862,7 @@ export async function handleLeadOfferWebhookResponse(input: {
             eq(schema.leadOffers.id, offer.id),
             eq(schema.leadOffers.tenantId, input.tenantId),
             inArray(schema.leadOffers.status, ACTIVE_OFFER_STATUSES),
+            gt(schema.leadOffers.expiresAt, declinedAt),
           ),
         )
         .returning({ id: schema.leadOffers.id });
@@ -877,7 +894,7 @@ export async function handleLeadOfferWebhookResponse(input: {
       return true;
     });
 
-    if (!declined) return { processed: true, action: "declined", leadId: offer.leadId };
+    if (!declined) return { processed: false, reason: "already_resolved" };
     await signalLeadOwnershipChange({ tenantId: input.tenantId, leadId: offer.leadId, brokerIds: [broker.id] });
 
     await db.insert(schema.auditLogs).values({
@@ -885,7 +902,8 @@ export async function handleLeadOfferWebhookResponse(input: {
       userId: broker.id,
       entidade: "lead_offer",
       entidadeId: offer.id,
-      acao: "lead_offer_declined",
+      acao: input.audit?.action ?? "lead_offer_declined",
+      ...(input.audit ? { metadata: input.audit.metadata } : {}),
     });
     // Rotation (29/10): declining spends the turn and counts as a skip.
     const { applyDutySkipPolicy } = await import("./duty-skips");
@@ -1022,7 +1040,8 @@ export async function handleLeadOfferWebhookResponse(input: {
       userId: broker.id,
       entidade: "lead_offer",
       entidadeId: offer.id,
-      acao: "lead_offer_accepted",
+      acao: input.audit?.action ?? "lead_offer_accepted",
+      ...(input.audit ? { metadata: input.audit.metadata } : {}),
     });
     await enqueueLeadEffectTx(tx, {
       tenantId: input.tenantId,
