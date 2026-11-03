@@ -105,6 +105,8 @@ function escreverBusca(campo: HTMLElement, texto: string) {
   }
   // Campo editável do WhatsApp (editor próprio): escrever pelo execCommand, como um digitar de verdade.
   // textContent + InputEvent sintético não passa pelo editor e pode duplicar ou não buscar.
+  // Sem foco no campo, o selectAll pegaria a página inteira: não escreve.
+  if (document.activeElement !== campo && !campo.contains(document.activeElement)) return;
   document.execCommand("selectAll", false);
   document.execCommand("insertText", false, texto);
 }
