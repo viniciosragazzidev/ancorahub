@@ -22,8 +22,8 @@ export function temaPelaCor(cor: string): Tema {
 
 export function variaveisDoTema(tema: Tema): Record<string, string> {
   return tema === "escuro"
-    ? { "--ct-bg": "#111b21", "--ct-fg": "#e9edef", "--ct-muted": "#8696a0", "--ct-surface": "#202c33" }
-    : { "--ct-bg": "#ffffff", "--ct-fg": "#111b21", "--ct-muted": "#667781", "--ct-surface": "#f0f2f5" };
+    ? { "--ct-bg": "#111b21", "--ct-fg": "#e9edef", "--ct-muted": "#8696a0", "--ct-surface": "#202c33", "--ct-line": "#2a3942" }
+    : { "--ct-bg": "#ffffff", "--ct-fg": "#111b21", "--ct-muted": "#667781", "--ct-surface": "#f0f2f5", "--ct-line": "#e9edef" };
 }
 
 export function aplicarTema(host: HTMLElement, tema: Tema) {

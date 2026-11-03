@@ -79,7 +79,7 @@ describe("gaveta: estados", () => {
   it("fechar chama a ação de fechar", () => {
     const acoes = acoesFalsas();
     render(<Gaveta estado={{ tipo: "carregando" }} acoes={acoes} />);
-    fireEvent.click(screen.getByRole("button", { name: "Fechar resumo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fechar dados do lead" }));
     expect(acoes.fechar).toHaveBeenCalledOnce();
   });
 });
@@ -91,7 +91,7 @@ describe("gaveta: lead", () => {
     render(<Gaveta estado={{ tipo: "lead", lead: LEAD }} acoes={acoesFalsas()} />);
     expect(screen.getByText("Cliente Exemplo")).toBeTruthy();
     expect(screen.getByText("Quente")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "Temperatura: Quente" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: /Temperatura: Quente/ })).toBeTruthy();
     expect(screen.getByText("Plano Falso Bronze")).toBeTruthy();
     expect(screen.getByText("R$ 218,00")).toBeTruthy();
     expect(screen.getByText("Enviar cotação")).toBeTruthy();
@@ -102,12 +102,12 @@ describe("gaveta: lead", () => {
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(3);
     expect(screen.getByText("Sem ação pendente")).toBeTruthy();
     expect(screen.getByText("Sem interações registradas.")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "Temperatura: Sem dados" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: /Temperatura: Sem dados/ })).toBeTruthy();
   });
 
   it("mostra no histórico no máximo cinco itens, só tipo e data", () => {
     const { container } = render(<Gaveta estado={{ tipo: "lead", lead: LEAD }} acoes={acoesFalsas()} />);
-    const itens = container.querySelectorAll(".bloco ul li");
+    const itens = container.querySelectorAll(".secao ul li");
     expect(itens.length).toBe(5);
     expect(container.textContent).not.toMatch(/CPF|comiss|observa/i);
   });

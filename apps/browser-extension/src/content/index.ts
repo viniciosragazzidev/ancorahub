@@ -20,8 +20,15 @@ async function estadoSessao() {
 
 async function atualizarAvisoConexao() {
   const estado = await estadoSessao();
-  if (estado === "sem-sessao") {
+  // Com a gaveta aberta, ela mesma mostra "Conectar ao CRM"; o aviso discreto só aparece com a gaveta fechada.
+  const gavetaAberta = (await painelPronto)?.aberta() ?? false;
+  if (estado === "sem-sessao" && !gavetaAberta) {
     removerAviso ??= mostrarAvisoConexao(() => chrome.runtime.sendMessage({ type: "OPEN_CRM_CONNECT" }, () => void chrome.runtime.lastError));
+    return;
+  }
+  if (estado === "sem-sessao") {
+    removerAviso?.();
+    removerAviso = null;
     return;
   }
   if (estado === "ativa") {

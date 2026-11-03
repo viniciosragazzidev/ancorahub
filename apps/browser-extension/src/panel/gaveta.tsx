@@ -13,19 +13,32 @@ export type AcoesGaveta = {
   fechar(): void;
 };
 
-// Arco do anel por temperatura: fração do círculo preenchida (sem dados = só o trilho).
+// Anel do avatar: fração do círculo preenchida por temperatura (sem dados = só o trilho).
 const FRACAO: Record<Temperatura, number> = { quente: 1, morno: 0.6, frio: 0.3, "sem-dados": 0 };
-const RAIO = 24;
+const RAIO = 52;
 const PERIMETRO = 2 * Math.PI * RAIO;
 
-function Anel({ temperatura }: { temperatura?: Temperatura }) {
+/** Avatar com as iniciais dentro do anel de temperatura, como o avatar do Lite. */
+function AvatarComAnel({ nome, temperatura }: { nome: string; temperatura?: Temperatura }) {
   const t = temperatura ?? "sem-dados";
   const arco = PERIMETRO * FRACAO[t];
   return (
-    <svg className="anel" viewBox="0 0 56 56" role="img" aria-label={`Temperatura: ${rotuloTemperatura(t)}`} data-t={t}>
-      <circle className="trilho" cx="28" cy="28" r={RAIO} />
-      <circle className="arco" cx="28" cy="28" r={RAIO} strokeLinecap="round" strokeDasharray={`${arco} ${PERIMETRO}`} transform="rotate(-90 28 28)" />
-    </svg>
+    <div className="avatar-grande" role="img" aria-label={`${nome}. Temperatura: ${rotuloTemperatura(t)}`} data-t={t}>
+      <svg viewBox="0 0 112 112" aria-hidden="true">
+        <circle className="trilho" cx="56" cy="56" r={RAIO} />
+        <circle className="arco" cx="56" cy="56" r={RAIO} strokeLinecap="round" strokeDasharray={`${arco} ${PERIMETRO}`} transform="rotate(-90 56 56)" />
+      </svg>
+      <span className="iniciais" aria-hidden="true">{iniciais(nome)}</span>
+    </div>
+  );
+}
+
+function Campo({ rotulo, valor }: { rotulo: string; valor: string }) {
+  return (
+    <div className="campo">
+      <dt>{rotulo}</dt>
+      <dd>{valor}</dd>
+    </div>
   );
 }
 
@@ -43,38 +56,31 @@ function VisaoLead({ lead, acoes }: { lead: LeadAmpliado; acoes: AcoesGaveta }) 
   return (
     <>
       <section className="identidade" aria-label="Lead">
-        <span className="avatar" aria-hidden="true">{iniciais(lead.name)}</span>
-        <div>
-          <strong>{lead.name}</strong>
-          <span>{lead.phoneMasked}</span>
-        </div>
+        <AvatarComAnel nome={lead.name} temperatura={lead.temperatura} />
+        <strong>{lead.name}</strong>
+        <span>{lead.phoneMasked}</span>
       </section>
 
-      <section className="temperatura">
-        <Anel temperatura={lead.temperatura} />
-        <div>
-          <span className="rotulo">Temperatura</span>
-          <strong>{rotuloTemperatura(lead.temperatura)}</strong>
-          <span className="muted">{lead.etapa}</span>
-        </div>
+      <section className="secao" aria-label="Situação">
+        <dl className="campos">
+          <Campo rotulo="Temperatura" valor={rotuloTemperatura(lead.temperatura)} />
+          <Campo rotulo="Etapa" valor={lead.etapa} />
+          <Campo rotulo="Plano" valor={lead.plano ?? "—"} />
+          <Campo rotulo="Vidas" valor={lead.vidas !== undefined ? String(lead.vidas) : "—"} />
+          <Campo rotulo="Valor mensal" valor={formatarValor(lead.valorMensal)} />
+          <Campo rotulo="Fila" valor={lead.fila ?? "—"} />
+          <Campo rotulo="Plantão" valor={lead.plantao ?? "—"} />
+          <Campo rotulo="Chegou" valor={chegadaTexto(lead.chegouEm)} />
+        </dl>
       </section>
 
-      <dl className="grade">
-        <div><dt>Plano</dt><dd>{lead.plano ?? "—"}</dd></div>
-        <div><dt>Vidas</dt><dd>{lead.vidas ?? "—"}</dd></div>
-        <div><dt>Valor mensal</dt><dd>{formatarValor(lead.valorMensal)}</dd></div>
-        <div><dt>Fila</dt><dd>{lead.fila ?? "—"}</dd></div>
-        <div><dt>Plantão</dt><dd>{lead.plantao ?? "—"}</dd></div>
-        <div><dt>Chegou</dt><dd>{chegadaTexto(lead.chegouEm)}</dd></div>
-      </dl>
-
-      <section className="bloco" aria-label="Próximo passo">
+      <section className="secao" aria-label="Próximo passo">
         <h2>Próximo passo</h2>
-        <p>{lead.proximoPasso?.titulo ?? "Sem ação pendente"}</p>
+        <p className="valor">{lead.proximoPasso?.titulo ?? "Sem ação pendente"}</p>
         {prazo ? <span className="muted">{dataCurta(prazo)}</span> : null}
       </section>
 
-      <section className="bloco" aria-label="Histórico">
+      <section className="secao" aria-label="Histórico">
         <h2>Histórico</h2>
         {lead.historico?.length ? (
           <ul>
@@ -87,7 +93,7 @@ function VisaoLead({ lead, acoes }: { lead: LeadAmpliado; acoes: AcoesGaveta }) 
         )}
       </section>
 
-      <section className="bloco" aria-label="Respostas rápidas">
+      <section className="secao" aria-label="Respostas rápidas">
         <h2>Respostas rápidas</h2>
         <div className="acoes">
           <button className="seco" type="button" disabled={ocupado} onClick={() => sugerir("ASK_MISSING_FIELD")}>Pedir dado</button>
@@ -107,8 +113,10 @@ function VisaoLead({ lead, acoes }: { lead: LeadAmpliado; acoes: AcoesGaveta }) 
         <p className="dica">As sugestões só preenchem a mensagem. Você revisa e envia.</p>
       </section>
 
-      <button className="primario" type="button" onClick={() => acoes.abrirNoCrm(lead.id)}>Abrir no CRM</button>
-      <p className="dica">Nenhuma mensagem é enviada automaticamente.</p>
+      <div className="rodape">
+        <button className="primario" type="button" onClick={() => acoes.abrirNoCrm(lead.id)}>Abrir no CRM</button>
+        <p className="dica">Nenhuma mensagem é enviada automaticamente.</p>
+      </div>
     </>
   );
 }
@@ -126,17 +134,17 @@ function Conteudo({ estado, acoes }: { estado: EstadoGaveta; acoes: AcoesGaveta 
       return <p className="aviso">Este contato não está entre os seus leads.</p>;
     case "sem-conexao":
       return (
-        <>
+        <div className="bloco-aviso">
           <p className="aviso">Conecte a extensão ao CRM para ver o contexto do lead.</p>
           <button className="primario" type="button" onClick={acoes.conectar}>Conectar ao CRM</button>
-        </>
+        </div>
       );
     case "erro":
       return (
-        <>
+        <div className="bloco-aviso">
           <p className="aviso" role="alert">Não foi possível carregar agora.</p>
           <button className="seco" type="button" onClick={acoes.tentarNovamente}>Tentar de novo</button>
-        </>
+        </div>
       );
     case "desligada":
       return <p className="aviso">Este recurso está desligado para a sua empresa.</p>;
@@ -145,17 +153,13 @@ function Conteudo({ estado, acoes }: { estado: EstadoGaveta; acoes: AcoesGaveta 
   }
 }
 
-/** Gaveta direita no estilo "Dados do contato", com o Lite do corretor. Não envia nada sozinha. */
+/** Coluna "Dados do lead" no padrão do WhatsApp Web. Não envia nada sozinha. */
 export function Gaveta({ estado, acoes }: { estado: EstadoGaveta; acoes: AcoesGaveta }) {
   return (
-    <aside className="gaveta" aria-label="Resumo do lead">
+    <aside className="gaveta" aria-label="Dados do lead">
       <header className="cabeca">
-        <span className="marca" aria-hidden="true">A</span>
-        <div className="titulo">
-          <strong>AncoraHub</strong>
-          <span>Contexto do atendimento</span>
-        </div>
-        <button className="fechar" type="button" aria-label="Fechar resumo" onClick={acoes.fechar}>×</button>
+        <button className="fechar" type="button" aria-label="Fechar dados do lead" onClick={acoes.fechar}>×</button>
+        <strong>Dados do lead</strong>
       </header>
       <div className="corpo">
         <Conteudo estado={estado} acoes={acoes} />
