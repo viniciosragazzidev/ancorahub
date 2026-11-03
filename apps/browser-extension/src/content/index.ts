@@ -1,7 +1,8 @@
 import { DefaultWhatsAppWebAdapter } from "./whatsapp-adapter";
-import { mountPanel, type MountedPanel } from "./panel-mount";
+import { criarPainelWhatsApp, type PainelWhatsApp, type SeloCabecalho } from "./painel";
 import { mostrarAvisoConexao } from "./aviso-conexao";
-import type { ResolveState } from "../shared/types";
+import { estadoDoResolve } from "../shared/lead-ampliado";
+import type { EstadoGaveta, LeadAmpliado } from "../shared/types";
 
 // A checagem de sessão é cacheada: não chama a API a cada conversa (o sync roda a cada 1,5 s).
 const INTERVALO_SESSAO_MS = 5 * 60_000;
@@ -75,43 +76,55 @@ function openLeadInCrm(leadId: string) {
   }
 }
 
-let panel: MountedPanel | null = null;
-let lastPhone = "";
-let lastResolved: ResolveState | null = null;
-let requestVersion = 0;
-
-async function quickReplies(leadId: string, version: number, goal: "ASK_MISSING_FIELD" | "CONTINUE_ATTENDANCE") {
-  const result = await request(`/api/extension/leads/${encodeURIComponent(leadId)}/reply-suggestions`, "POST", { goal, expectedLeadVersion: version, optionalContext: "" });
+async function quickReplies(lead: LeadAmpliado, goal: "ASK_MISSING_FIELD" | "CONTINUE_ATTENDANCE") {
+  const result = await request(`/api/extension/leads/${encodeURIComponent(lead.id)}/reply-suggestions`, "POST", { goal, expectedLeadVersion: lead.version, optionalContext: "" });
   if (!result.ok || !Array.isArray(result.body.suggestions)) return [];
   return result.body.suggestions.flatMap((suggestion) => typeof suggestion === "object" && suggestion && typeof (suggestion as Record<string, unknown>).text === "string" ? [(suggestion as Record<string, string>).text] : []);
 }
 
-function getPanel() {
-  if (panel && !panel.isMounted()) panel = null;
-  panel ??= mountPanel(
-    (leadId) => openLeadInCrm(leadId),
-    quickReplies,
-    async (text) => { await adapter.insertComposerText(text); },
-  );
-  return panel;
+let painelPronto: Promise<PainelWhatsApp | null> | null = null;
+let lastPhone = "";
+let lastEstado: { estado: EstadoGaveta; selo: SeloCabecalho | null } | null = null;
+let requestVersion = 0;
+
+function garantirPainel() {
+  painelPronto ??= criarPainelWhatsApp({
+    abrirNoCrm: (leadId) => openLeadInCrm(leadId),
+    respostas: (lead, objetivo) => quickReplies(lead, objetivo),
+    inserir: (texto) => { void adapter.insertComposerText(texto); },
+    conectar: () => chrome.runtime.sendMessage({ type: "OPEN_CRM_CONNECT" }, () => void chrome.runtime.lastError),
+    tentarNovamente: () => { lastPhone = ""; safeSync(); },
+  });
+  return painelPronto;
 }
 
-function hidePanel() { getPanel()?.hide(); }
+function mostrar(estado: EstadoGaveta, selo: SeloCabecalho | null) {
+  lastEstado = { estado, selo };
+  void garantirPainel().then((controle) => controle?.mostrar(estado, selo));
+}
+
+function ocultar() {
+  lastEstado = null;
+  void garantirPainel().then((controle) => controle?.ocultar());
+}
 
 async function sync() {
-  if (!adapter.isReady()) { lastPhone = ""; lastResolved = null; return hidePanel(); }
+  if (!adapter.isReady()) { lastPhone = ""; lastEstado = null; return ocultar(); }
   void atualizarAvisoConexao();
   const conversation = await adapter.getActiveConversation();
-  if (!conversation?.phone) { lastPhone = ""; lastResolved = null; return hidePanel(); }
-  if (conversation.phone === lastPhone) { if (lastResolved) getPanel()?.renderLead(lastResolved); return; }
+  if (!conversation?.phone) { lastPhone = ""; lastEstado = null; return ocultar(); }
+  if (conversation.phone === lastPhone) { if (lastEstado) mostrar(lastEstado.estado, lastEstado.selo); return; }
   lastPhone = conversation.phone;
   const version = ++requestVersion;
+  mostrar({ tipo: "carregando" }, null);
   const result = await request("/api/extension/leads/resolve", "POST", { phone: conversation.phone });
   if (version !== requestVersion || conversation.phone !== lastPhone) return;
-  const state = result.body as ResolveState;
-  if (!result.ok || state.status !== "FOUND" || !state.lead) { lastResolved = null; return hidePanel(); }
-  lastResolved = state;
-  getPanel()?.renderLead(state);
+  const estado = !result.ok && result.status === 401
+    ? ({ tipo: "sem-conexao" } as const)
+    : estadoDoResolve(result.ok ? (result.body as { status: string; lead?: Record<string, unknown> }) : { status: "OFFLINE" });
+  if (!estado) { lastEstado = null; return ocultar(); }
+  const selo = estado.tipo === "lead" ? { etapa: estado.lead.etapa, temperatura: estado.lead.temperatura } : null;
+  mostrar(estado, selo);
 }
 
 // Garante que falhas internas (ex.: adapter lendo React interno do WhatsApp)

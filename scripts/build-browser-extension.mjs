@@ -1,11 +1,14 @@
 import { build } from "esbuild";
+import { readFileSync } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const root = new URL("../apps/browser-extension/", import.meta.url);
 const distPath = fileURLToPath(new URL("./dist/", root));
 const producao = process.env.NODE_ENV !== "development";
-const crmBase = normalizarCrmBase(process.env.CRM_BASE ?? "https://crm.ancorasaude.cloud");
+// Padrão do CRM vem de crm.json, a mesma fonte que o código usa (sem duplicar o endereço).
+const crmPadrao = JSON.parse(readFileSync(fileURLToPath(new URL("./crm.json", root)), "utf8")).base;
+const crmBase = normalizarCrmBase(process.env.CRM_BASE ?? crmPadrao);
 
 // O endereço do CRM vai para o código e para o manifest (host_permissions). Só https, ou localhost em dev.
 function normalizarCrmBase(valor) {
@@ -35,9 +38,11 @@ await mkdir(fileURLToPath(new URL("./dist/panel/", root)), { recursive: true });
 await build({ ...comum, entryPoints: [fonte("./src/background/service-worker.ts")], outfile: `${distPath}background-service-worker.js` });
 await build({ ...comum, entryPoints: [fonte("./src/content/index.ts")], outfile: `${distPath}content-index.js` });
 await build({ ...comum, entryPoints: [fonte("./src/popup/index.ts")], outfile: `${distPath}popup/popup.js` });
-// Quarta entrada: painel React. Não entra no script de conteúdo, para o bundle inicial continuar pequeno.
+// Quarta entrada: painel React em ESM. Não entra no script de conteúdo, para o bundle inicial continuar pequeno.
+// O script de conteúdo carrega este arquivo com import() (recurso acessível pela web, declarado no manifest).
 await build({
   ...comum,
+  format: "esm",
   entryPoints: [fonte("./src/panel/main.tsx")],
   outfile: `${distPath}panel/panel.js`,
   jsx: "automatic",
@@ -50,4 +55,6 @@ const manifest = JSON.parse(await readFile(fonte("./manifest.json"), "utf8"));
 manifest.host_permissions = ["https://web.whatsapp.com/*", `${crmBase}/*`];
 // Só a página de conexão do CRM pode mandar mensagem para a extensão (mesmo host do CRM_BASE, caminho fixo).
 manifest.externally_connectable = { matches: [`${crmBase}/extensao/conectar*`] };
+// O painel React é carregado pelo script de conteúdo no WhatsApp Web; só esse arquivo fica acessível.
+manifest.web_accessible_resources = [{ resources: ["panel/panel.js"], matches: ["https://web.whatsapp.com/*"] }];
 await writeFile(fileURLToPath(new URL("./dist/manifest.json", root)), `${JSON.stringify(manifest, null, 2)}\n`);

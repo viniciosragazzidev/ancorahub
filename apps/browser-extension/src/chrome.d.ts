@@ -7,6 +7,7 @@ declare const chrome: {
     id: string;
     lastError?: { message?: string };
     getManifest: () => { version: string };
+    getURL: (caminho: string) => string;
     onMessage: { addListener: (listener: (message: Mensagem, sender: Sender, sendResponse: (value: unknown) => void) => boolean | void) => void };
     onMessageExternal: { addListener: (listener: (message: Mensagem, sender: Sender, sendResponse: (value: unknown) => void) => boolean | void) => void };
     sendMessage: {
