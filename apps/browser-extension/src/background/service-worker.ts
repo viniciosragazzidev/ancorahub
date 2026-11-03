@@ -1,9 +1,10 @@
 import { CRM_BASE } from "../config";
 import { mensagemConectarValida, remetenteConfiavel } from "./conexao";
-import { chamarApiReal } from "./api";
+import { chamarApiReal, credencialStore } from "./api";
 import { avisarAbasWhatsApp } from "./abas";
+import { desconectarNoWorker, trocarCodigoNoWorker } from "./troca";
 import { obterDeviceId } from "../shared/dispositivo";
-import { trocarCodigo } from "../shared/sessao";
+import type { Metodo } from "./sessao-token";
 
 const API_BASE = CRM_BASE;
 
@@ -27,17 +28,41 @@ function createResponder(sendResponse: (value: unknown) => void) {
   };
 }
 
+/** Método preservado como veio (GET, POST ou PATCH); qualquer outro valor vira GET. */
+function metodoDoPedido(valor: unknown): Metodo {
+  return valor === "POST" || valor === "PATCH" ? valor : "GET";
+}
+
 chrome.runtime.onMessage.addListener((message: { type?: string; payload?: Record<string, unknown> }, _sender, sendResponse) => {
   const respond = createResponder(sendResponse);
   if (message.type === "API_REQUEST") {
-    const metodo = String(message.payload?.method ?? "GET") === "POST" ? "POST" : "GET";
-    void chamarApiReal(String(message.payload?.path ?? ""), metodo, message.payload?.body)
-      .then((resposta) => respond({ ok: resposta.ok, status: resposta.status, body: resposta.body, retryAfter: resposta.retryAfter }))
-      .catch(() => respond({ ok: false, status: 0, body: { error: "OFFLINE" } }));
+    void chamarApiReal(String(message.payload?.path ?? ""), metodoDoPedido(message.payload?.method), message.payload?.body)
+      .then((resposta) => respond({ ok: resposta.ok, status: resposta.status, body: resposta.body, retryAfter: resposta.retryAfter, geracao: resposta.geracao }))
+      .catch(() => respond({ ok: false, status: 0, body: { error: "OFFLINE" }, geracao: null }));
+    return true;
+  }
+  if (message.type === "TROCAR_CODIGO") {
+    const perfil = message.payload?.perfil as { nome?: unknown; unidade?: unknown } | undefined;
+    const perfilValido = typeof perfil?.nome === "string" && typeof perfil?.unidade === "string" ? { nome: perfil.nome, unidade: perfil.unidade } : undefined;
+    void trocarCodigoNoWorker(String(message.payload?.code ?? ""), perfilValido)
+      .then((resultado) => respond(resultado))
+      .catch(() => respond({ ok: false }));
+    return true;
+  }
+  if (message.type === "LER_CREDENCIAL") {
+    void credencialStore.ler()
+      .then((credencial) => respond(credencial ? { geracao: credencial.geracao, perfil: credencial.perfil } : null))
+      .catch(() => respond(null));
+    return true;
+  }
+  if (message.type === "DESCONECTAR") {
+    void desconectarNoWorker(String(message.payload?.geracao ?? ""))
+      .then((resultado) => respond(resultado))
+      .catch(() => respond({ revogado: false, removido: false }));
     return true;
   }
   if (message.type === "SESSAO_MUDOU") {
-    // Pedido de popup ou página: avisa as abas do WhatsApp Web para refazerem a consulta.
+    // Pedido de popup ou página: avisa as abas do WhatsApp Web para descartarem a tela.
     void avisarAbasWhatsApp();
     respond({ ok: true });
     return false;
@@ -77,8 +102,8 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
     respond({ ok: false, reason: "BAD_MESSAGE" });
     return false;
   }
-  void trocarCodigo(valida.code, valida.perfil)
-    .then((ok) => respond({ ok, reason: ok ? undefined : "INVALID_CODE" }))
+  void trocarCodigoNoWorker(valida.code, valida.perfil)
+    .then((resultado) => respond({ ok: resultado.ok, reason: resultado.ok ? undefined : "INVALID_CODE" }))
     .catch(() => respond({ ok: false, reason: "OFFLINE" }));
   return true;
 });

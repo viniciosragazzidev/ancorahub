@@ -1,27 +1,16 @@
 import { CRM_BASE } from "../config";
-import { chamarApi, type Armazem, type Dependencias, type Rede, type RespostaApi } from "./sessao-token";
+import { armazenamentoDeSessao, criarCredencialStore } from "./credencial";
+import { avisarAbasWhatsApp } from "./abas";
+import { chamarApi, type Dependencias, type Metodo, type Rede, type RespostaApi } from "./sessao-token";
 
 const TIMEOUT_MS = 15000;
 
-// Credencial guardada só na sessão do navegador (chrome.storage.session), nunca no conteúdo da página.
-export const armazemSessao: Armazem = {
-  async ler() {
-    const token = (await chrome.storage.session.get("token")).token;
-    const tokenEm = (await chrome.storage.session.get("tokenEm")).tokenEm;
-    return {
-      token: typeof token === "string" ? token : undefined,
-      tokenEm: typeof tokenEm === "number" ? tokenEm : undefined,
-    };
-  },
-  async gravar({ token, tokenEm }) {
-    await chrome.storage.session.set({ token, tokenEm });
-  },
-  async limpar() {
-    await chrome.storage.session.remove(["token", "tokenEm"]);
-  },
-};
+// Fonte única da credencial no worker. Toda mudança avisa as abas do WhatsApp para descartarem a tela.
+export const credencialStore = criarCredencialStore(armazenamentoDeSessao(), () => {
+  void avisarAbasWhatsApp();
+});
 
-export const redeReal: Rede = async (path, method, token, body): Promise<RespostaApi> => {
+export const redeReal: Rede = async (path, method: Metodo, token, body): Promise<RespostaApi> => {
   try {
     const response = await fetch(`${CRM_BASE}${path}`, {
       method,
@@ -41,9 +30,9 @@ export const redeReal: Rede = async (path, method, token, body): Promise<Respost
   }
 };
 
-export const dependenciasReais: Dependencias = { armazem: armazemSessao, rede: redeReal, agora: () => Date.now() };
+export const dependenciasReais: Dependencias = { store: credencialStore, rede: redeReal, agora: () => Date.now() };
 
-/** Chamada à API pelo service worker: rotaciona o token quando preciso e limpa a credencial em 401. */
-export function chamarApiReal(path: string, method: "GET" | "POST", body?: unknown) {
+/** Chamada à API pelo worker: a sessão e a rotação ficam no worker; a resposta traz a geração usada. */
+export function chamarApiReal(path: string, method: Metodo, body?: unknown) {
   return chamarApi(dependenciasReais, path, method, body);
 }

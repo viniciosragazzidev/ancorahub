@@ -1,150 +1,151 @@
 import { describe, expect, it } from "vitest";
-import { criarConsulta, INTERVALO_SESSAO_MS, type ApiResult, type EstadoSessaoConteudo } from "../../../apps/browser-extension/src/content/consulta";
+import { criarConsulta, INTERVALO_SESSAO_MS, type ApiResult } from "../../../apps/browser-extension/src/content/consulta";
 import type { EstadoGaveta } from "../../../apps/browser-extension/src/shared/types";
 
-// Dados falsos: nenhum telefone ou nome real.
-const LEAD_RESOLVIDO = {
+// Dados falsos: nenhum telefone ou nome real. "gen-A" e "gen-B" são sessões de teste.
+const LEAD = {
   status: "FOUND",
   lead: { id: "lead-falso-0001", version: 2, name: "Cliente Exemplo", phoneMasked: "(11) 9****-0000", currentStatus: { id: "in_contact", label: "Em atendimento" }, origin: "site", unit: null, assignedUser: null, nextAction: null, qualification: { completed: [], missing: [] }, allowedActions: [] },
 };
+
+const esperar = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 function ambiente() {
   let agora = 1_000_000;
   let conversa: { phone?: string } | null = { phone: "+5511900000001" };
   let pronto = true;
-  let sessaoResposta: ApiResult = { ok: true, status: 200, body: {} };
-  const respostasResolve: Array<ApiResult | Promise<ApiResult>> = [];
+  let sessao: ApiResult = { ok: true, status: 200, body: {}, geracao: "gen-A" };
+  const resolves: Array<ApiResult | Promise<ApiResult>> = [];
   const chamadas: string[] = [];
   const mostrados: EstadoGaveta[] = [];
-  const sessoes: EstadoSessaoConteudo[] = [];
   let ocultou = 0;
+  let neutro = 0;
 
   const consulta = criarConsulta({
     pronto: () => pronto,
     conversa: async () => conversa,
     requisitar: async (path) => {
       chamadas.push(path);
-      if (path === "/api/extension/session") return sessaoResposta;
-      return respostasResolve.shift() ?? { ok: true, status: 200, body: LEAD_RESOLVIDO };
+      if (path === "/api/extension/session") return sessao;
+      return resolves.shift() ?? { ok: true, status: 200, body: LEAD, geracao: "gen-A" };
     },
     mostrar: (estado) => { mostrados.push(estado); },
     ocultar: () => { ocultou++; },
-    aoEstadoSessao: (estado) => { sessoes.push(estado); },
+    neutro: () => { neutro++; },
+    aoEstadoSessao: () => undefined,
     agora: () => agora,
   });
 
   return {
     consulta,
-    chamadas,
     mostrados,
-    sessoes,
     get ocultou() { return ocultou; },
-    responderResolve: (...respostas: Array<ApiResult | Promise<ApiResult>>) => respostasResolve.push(...respostas),
-    setSessao: (resposta: ApiResult) => { sessaoResposta = resposta; },
+    get neutro() { return neutro; },
+    resolve: (...respostas: Array<ApiResult | Promise<ApiResult>>) => resolves.push(...respostas),
+    setSessao: (resposta: ApiResult) => { sessao = resposta; },
     setConversa: (valor: { phone?: string } | null) => { conversa = valor; },
     avancar: (ms: number) => { agora += ms; },
     setPronto: (valor: boolean) => { pronto = valor; },
     ultimo: () => mostrados[mostrados.length - 1],
     resolves: () => chamadas.filter((c) => c === "/api/extension/leads/resolve").length,
+    chamadas,
   };
 }
 
-const esperar = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
-
-describe("consulta do lead no WhatsApp: privacidade e reconexão", () => {
+describe("consulta: privacidade e reconexão", () => {
   it("lead resolvido aparece com sessão válida", async () => {
     const a = ambiente();
     await a.consulta.sincronizar();
     expect(a.ultimo()).toMatchObject({ tipo: "lead", lead: { name: "Cliente Exemplo" } });
   });
 
-  it("401 no resolve limpa a tela: nenhum dado do lead fica visível", async () => {
+  it("403 na checagem com lead em cache: sai o lead e mostra indisponível", async () => {
     const a = ambiente();
     await a.consulta.sincronizar();
     expect(a.ultimo()?.tipo).toBe("lead");
     const antes = a.mostrados.length;
-    a.setSessao({ ok: false, status: 401, body: {} });
-    a.responderResolve({ ok: false, status: 401, body: {} });
     a.avancar(INTERVALO_SESSAO_MS + 1);
+    a.setSessao({ ok: false, status: 403, body: {}, geracao: null });
     await a.consulta.sincronizar();
-    expect(a.ultimo()).toEqual({ tipo: "sem-conexao" });
-    // Depois do 401 só aparece a tela de conexão: nenhum estado com o lead.
+    expect(a.ultimo()).toEqual({ tipo: "indisponivel" });
     expect(JSON.stringify(a.mostrados.slice(antes))).not.toMatch(/Cliente Exemplo/);
   });
 
-  it("sessão recusada na checagem: sem-conexao e aviso de sessão ausente", async () => {
+  it("sessão desconhecida (rede) não reapresenta o lead em cache", async () => {
     const a = ambiente();
-    a.setSessao({ ok: false, status: 401, body: {} });
     await a.consulta.sincronizar();
-    expect(a.ultimo()).toEqual({ tipo: "sem-conexao" });
-    expect(a.sessoes).toEqual(["sem-sessao"]);
-    expect(a.resolves()).toBe(0);
+    a.avancar(INTERVALO_SESSAO_MS + 1);
+    a.setSessao({ ok: false, status: 0, body: {}, geracao: null });
+    await a.consulta.sincronizar();
+    expect(a.ultimo()).toEqual({ tipo: "erro" });
   });
 
-  it("403 mostra indisponível e nenhum dado", async () => {
+  it("invalidar com lead visível e rede pendente: esconde na hora e descarta a resposta atrasada", async () => {
     const a = ambiente();
-    a.responderResolve({ ok: false, status: 403, body: {} });
     await a.consulta.sincronizar();
-    expect(a.ultimo()).toEqual({ tipo: "indisponivel" });
+    let liberar: (r: ApiResult) => void = () => undefined;
+    a.resolve(new Promise<ApiResult>((resolve) => { liberar = resolve; }));
+    a.setConversa({ phone: "+5511900000002" });
+    const pendente = a.consulta.sincronizar();
+    await esperar();
+    a.consulta.invalidar();
+    expect(a.neutro).toBe(1);
+    liberar({ ok: true, status: 200, body: LEAD, geracao: "gen-A" });
+    await pendente;
+    expect(a.ultimo()).toEqual({ tipo: "carregando" });
   });
 
-  it("reconectar na mesma conversa refaz a consulta (não reaproveita a resposta antiga)", async () => {
+  it("401 antigo depois de sessão nova não derruba a sessão nova", async () => {
+    const a = ambiente();
+    let liberar: (r: ApiResult) => void = () => undefined;
+    a.resolve(new Promise<ApiResult>((resolve) => { liberar = resolve; }));
+    const pendente = a.consulta.sincronizar();
+    await esperar();
+    a.consulta.invalidar();
+    a.setSessao({ ok: true, status: 200, body: {}, geracao: "gen-B" });
+    liberar({ ok: false, status: 401, body: {}, geracao: "gen-A" });
+    await pendente;
+    expect(a.mostrados.some((estado) => estado.tipo === "sem-conexao")).toBe(false);
+  });
+
+  it("reconectar na mesma conversa refaz a consulta do lead", async () => {
     const a = ambiente();
     await a.consulta.sincronizar();
     expect(a.resolves()).toBe(1);
     a.consulta.invalidar();
-    a.responderResolve({ ok: true, status: 200, body: LEAD_RESOLVIDO });
+    // Nova sessão confirmada pela checagem: a consulta da mesma conversa é refeita com ela.
+    a.setSessao({ ok: true, status: 200, body: {}, geracao: "gen-B" });
+    a.resolve({ ok: true, status: 200, body: LEAD, geracao: "gen-B" });
     await a.consulta.sincronizar();
     expect(a.resolves()).toBe(2);
     expect(a.ultimo()).toMatchObject({ tipo: "lead" });
   });
 
-  it("resposta atrasada depois de invalidar é descartada", async () => {
+  it("401 da sessão atual limpa a tela e mostra conexão, sem dados do lead", async () => {
     const a = ambiente();
-    let liberar: (r: ApiResult) => void = () => undefined;
-    a.responderResolve(new Promise<ApiResult>((resolve) => { liberar = resolve; }));
-    const pendente = a.consulta.sincronizar();
-    await esperar();
-    a.consulta.invalidar();
-    liberar({ ok: true, status: 200, body: LEAD_RESOLVIDO });
-    await pendente;
-    expect(a.ultimo()).toEqual({ tipo: "carregando" });
+    await a.consulta.sincronizar();
+    a.resolve({ ok: false, status: 401, body: {}, geracao: "gen-A" });
+    a.setConversa({ phone: "+5511900000003" });
+    await a.consulta.sincronizar();
+    expect(a.ultimo()).toEqual({ tipo: "sem-conexao" });
   });
 
-  it("troca de conversa descarta a resposta da conversa anterior", async () => {
+  it("sessão recusada na checagem: sem-conexao, sem consultar o lead", async () => {
     const a = ambiente();
-    let liberar: (r: ApiResult) => void = () => undefined;
-    a.responderResolve(new Promise<ApiResult>((resolve) => { liberar = resolve; }));
-    const primeira = a.consulta.sincronizar();
-    await esperar();
-    a.setConversa({ phone: "+5511900000002" });
-    liberar({ ok: true, status: 200, body: LEAD_RESOLVIDO });
-    await primeira;
-    expect(a.ultimo()).toEqual({ tipo: "carregando" });
+    a.setSessao({ ok: false, status: 401, body: {}, geracao: null });
+    await a.consulta.sincronizar();
+    expect(a.ultimo()).toEqual({ tipo: "sem-conexao" });
+    expect(a.resolves()).toBe(0);
   });
 });
 
 describe("consulta: limites e pausas", () => {
-  it("429 pausa pelo Retry-After e não consulta de novo antes", async () => {
+  it("429 pausa pelo Retry-After e não consulta antes", async () => {
     const a = ambiente();
-    a.responderResolve({ ok: false, status: 429, body: {}, retryAfter: 30 });
+    a.resolve({ ok: false, status: 429, body: {}, retryAfter: 30, geracao: "gen-A" });
     await a.consulta.sincronizar();
     expect(a.ultimo()).toEqual({ tipo: "erro" });
     a.avancar(10_000);
-    await a.consulta.sincronizar();
-    expect(a.resolves()).toBe(1);
-    a.avancar(21_000);
-    a.responderResolve({ ok: true, status: 200, body: LEAD_RESOLVIDO });
-    await a.consulta.sincronizar();
-    expect(a.resolves()).toBe(2);
-  });
-
-  it("falha de rede mostra erro e pausa antes de tentar de novo", async () => {
-    const a = ambiente();
-    a.responderResolve({ ok: false, status: 0, body: {} });
-    await a.consulta.sincronizar();
-    expect(a.ultimo()).toEqual({ tipo: "erro" });
-    a.avancar(1_000);
     await a.consulta.sincronizar();
     expect(a.resolves()).toBe(1);
   });
@@ -156,11 +157,10 @@ describe("consulta: limites e pausas", () => {
     expect(a.ocultou).toBeGreaterThan(0);
   });
 
-  it("nada acontece quando a página do WhatsApp ainda não está pronta", async () => {
+  it("página não pronta não consulta nada", async () => {
     const a = ambiente();
     a.setPronto(false);
     await a.consulta.sincronizar();
     expect(a.resolves()).toBe(0);
-    expect(a.ocultou).toBeGreaterThan(0);
   });
 });

@@ -11,7 +11,7 @@ const adapter = new DefaultWhatsAppWebAdapter();
 // (ex.: aba fechada) e o callback de sendMessage não chega a ser invocado.
 const REQUEST_TIMEOUT_MS = 15000;
 
-const requisitar = (path: string, method: "POST" | "GET", body?: unknown) =>
+const requisitar = (path: string, method: "POST" | "GET" | "PATCH", body?: unknown) =>
   new Promise<ApiResult>((resolve) => {
     let settled = false;
     let timer: number | undefined;
@@ -56,6 +56,7 @@ async function quickReplies(lead: LeadAmpliado, goal: "ASK_MISSING_FIELD" | "CON
 
 let removerAviso: (() => void) | null = null;
 let painelPronto: Promise<PainelWhatsApp | null> | null = null;
+let painelInstancia: PainelWhatsApp | null = null;
 
 function garantirPainel() {
   painelPronto ??= criarPainelWhatsApp({
@@ -64,6 +65,9 @@ function garantirPainel() {
     inserir: (texto) => { void adapter.insertComposerText(texto); },
     conectar: () => chrome.runtime.sendMessage({ type: "OPEN_CRM_CONNECT" }, () => void chrome.runtime.lastError),
     tentarNovamente: () => { consulta.invalidar(); safeSync(); },
+  }).then((criado) => {
+    painelInstancia = criado;
+    return criado;
   });
   return painelPronto;
 }
@@ -81,12 +85,26 @@ async function aoEstadoSessao(estado: EstadoSessaoConteudo) {
   }
 }
 
+// Época de renderização: ao esconder por troca de sessão, renderizações que ainda estavam na fila perdem o efeito.
+let epocaRender = 0;
+
 const consulta = criarConsulta({
   pronto: () => adapter.isReady(),
   conversa: () => adapter.getActiveConversation(),
   requisitar,
-  mostrar: (estado: EstadoGaveta, selo: SeloCabecalho | null) => { void garantirPainel().then((controle) => controle?.mostrar(estado, selo)); },
-  ocultar: () => { void garantirPainel().then((controle) => controle?.ocultar()); },
+  mostrar: (estado: EstadoGaveta, selo: SeloCabecalho | null) => {
+    const epoca = epocaRender;
+    void garantirPainel().then((controle) => { if (epoca === epocaRender) controle?.mostrar(estado, selo); });
+  },
+  ocultar: () => {
+    const epoca = epocaRender;
+    void garantirPainel().then((controle) => { if (epoca === epocaRender) controle?.ocultar(); });
+  },
+  neutro: () => {
+    epocaRender++;
+    // Só esconde o que já existe; a tela nova aparece quando a sessão nova for confirmada.
+    painelInstancia?.ocultar();
+  },
   aoEstadoSessao: (estado) => { void aoEstadoSessao(estado); },
   agora: () => Date.now(),
 });

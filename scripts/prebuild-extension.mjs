@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { rename, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { removerTemporario } from "./limpeza-temporario.mjs";
 
 // Empacotar a extensão não pode derrubar o build do Next.
 // O zip é gerado num arquivo temporário e só substitui o anterior por rename (atômico no mesmo volume).
@@ -15,12 +16,16 @@ function rodar(script, ambiente = {}) {
 
 let publicado = false;
 try {
-  publicado = rodar("./build-browser-extension.mjs") && rodar("./package-browser-extension.mjs", { ZIP_SAIDA: novo });
-  if (publicado) await rename(novo, zip);
+  const geradoOk = rodar("./build-browser-extension.mjs") && rodar("./package-browser-extension.mjs", { ZIP_SAIDA: novo });
+  if (geradoOk) {
+    await rename(novo, zip);
+    // Só agora o zip novo está publicado.
+    publicado = true;
+  }
 } catch (erro) {
   console.warn("[extensão] Erro ao publicar o zip:", erro?.message ?? erro);
 } finally {
-  await rm(novo, { force: true });
+  await removerTemporario(novo, (caminho) => rm(caminho, { force: true }));
 }
 
 if (!publicado) {
