@@ -1,15 +1,18 @@
 import type { AcoesGaveta } from "../panel/gaveta";
 import type { EstadoGaveta, Temperatura } from "../shared/types";
+import type { AvisoInboxExtensao } from "../shared/types";
 import { localizarTodas } from "./detectors";
 import { aplicarTema, observarTema } from "./tema";
 
 // Contrato do módulo do painel (panel/panel.js, carregado como recurso acessível pela web).
 export type SeloCabecalho = { etapa: string; temperatura?: Temperatura };
-type ControleGaveta = { atualizar(estado: EstadoGaveta): void; desmontar(): void };
+type ControleGaveta = { atualizar(estado: EstadoGaveta): void; atualizarOfertas(offerId?: string): void; definirAberta(aberta: boolean): void; desmontar(): void };
 type ControleSelo = { atualizar(selo: SeloCabecalho | null): void; desmontar(): void };
+type ControleAvisoInbox = { atualizar(aviso: AvisoInboxExtensao | null): void; desmontar(): void };
 type ModuloPainel = {
   montarPainel(shadow: ShadowRoot, acoes: AcoesGaveta, estado?: EstadoGaveta): ControleGaveta;
   montarSelo(shadow: ShadowRoot, onAbrir: () => void): ControleSelo;
+  montarAvisoInbox(shadow: ShadowRoot, onAbrir: (aviso: AvisoInboxExtensao) => void): ControleAvisoInbox;
 };
 
 let modulo: Promise<ModuloPainel> | null = null;
@@ -33,6 +36,8 @@ type Acoes = Omit<AcoesGaveta, "fechar">;
 export type PainelWhatsApp = {
   mostrar(estado: EstadoGaveta, selo: SeloCabecalho | null): void;
   ocultar(): void;
+  mostrarAviso(aviso: AvisoInboxExtensao): void;
+  abrirOfertas(offerId?: string): void;
   /** A gaveta está aberta agora (o aviso de conexão só aparece com ela fechada). */
   aberta(): boolean;
 };
@@ -68,12 +73,16 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
   let ultimoSelo: SeloCabecalho | null = null;
   let seloHost: Hospedeiro | null = null;
   let controleSelo: ControleSelo | null = null;
+  let avisoHost: Hospedeiro | null = null;
+  let controleAviso: ControleAvisoInbox | null = null;
   let botao: HTMLElement | null = null;
   // Conversa empurrada: guarda a margem original do WhatsApp para devolver ao fechar.
   let conversaEmpurrada: { elemento: HTMLElement; margemAnterior: string } | null = null;
 
   const gaveta = criarHospedeiro("ancorahub-gaveta", "", "position:fixed;top:0;right:0;height:100%;width:" + LARGURA_GAVETA + "px;max-width:40vw;border-left:1px solid var(--ct-line,#e9edef);z-index:2147483640;display:none;");
   document.body.append(gaveta.host);
+  avisoHost = criarHospedeiro("ancorahub-inbox-aviso", "", "position:fixed;inset:0;z-index:2147483647;pointer-events:none;");
+  document.body.append(avisoHost.host);
 
   // Âncora confiável: a área da conversa identificada pelo adaptador. Sem ela, a gaveta só sobrepõe.
   function ancoraConversa(): HTMLElement | null {
@@ -107,6 +116,7 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
 
   const alternarGaveta = (abrir?: boolean) => {
     gavetaAberta = abrir ?? !gavetaAberta;
+    controleGaveta.definirAberta(gavetaAberta);
     gaveta.host.style.display = gavetaAberta ? "block" : "none";
     if (gavetaAberta) posicionar();
     else devolverConversa();
@@ -115,6 +125,13 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
   window.addEventListener("resize", () => { if (gavetaAberta) posicionar(); });
 
   const controleGaveta = modulos.montarPainel(gaveta.shadow, { ...acoes, fechar: () => alternarGaveta(false) });
+  controleAviso = modulos.montarAvisoInbox(avisoHost.shadow, (aviso) => {
+    if (aviso.tipo === "update") { acoes.abrirNotificacoes(); return; }
+    gavetaAberta = true;
+    gaveta.host.style.display = "block";
+    controleGaveta.atualizarOfertas(aviso.offerId);
+    posicionar();
+  });
 
   // Vive junto com o painel: não é cancelado no ocultar, senão o tema para de acompanhar o WhatsApp.
   observarTema((tema) => {
@@ -157,7 +174,11 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
     control.setAttribute("aria-label", "AncoraHub Assistant");
     control.title = "AncoraHub Assistant";
     control.innerHTML = '<span class="marca" aria-hidden="true">A</span>';
-    control.addEventListener("click", () => alternarGaveta());
+    control.addEventListener("click", () => {
+      const abrir = !gavetaAberta;
+      alternarGaveta(abrir);
+      if (abrir) controleGaveta.atualizarOfertas();
+    });
     shadow.append(control);
     barra.elemento.append(host);
     botao = host;
@@ -182,6 +203,11 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
       botao?.remove();
       botao = null;
       controleGaveta.atualizar({ tipo: "sem-lead" });
+    },
+    mostrarAviso(aviso) { controleAviso?.atualizar(aviso); },
+    abrirOfertas(offerId) {
+      alternarGaveta(true);
+      controleGaveta.atualizarOfertas(offerId);
     },
     aberta: () => gavetaAberta,
   };

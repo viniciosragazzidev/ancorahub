@@ -35,10 +35,18 @@ const LEAD: LeadAmpliado = {
 
 function acoesFalsas(): AcoesGaveta & Record<"abrirNoCrm" | "respostas" | "inserir" | "conectar" | "tentarNovamente" | "fechar", ReturnType<typeof vi.fn>> {
   return {
+    carregar: vi.fn(async () => ({ ok: true as const, ofertas: [] })),
+    aceitar: vi.fn(async () => ({ ok: false as const, error: "OFFLINE", message: "indisponível" })),
+    recusar: vi.fn(async () => ({ ok: false as const, error: "OFFLINE", message: "indisponível" })),
+    abrirConversa: vi.fn(async () => ({ ok: false as const, reason: "NOT_READY" })),
+    abrirReserva: vi.fn(),
+    lerSom: vi.fn(async () => false),
+    definirSom: vi.fn(),
     abrirNoCrm: vi.fn(),
     respostas: vi.fn(async () => ["Olá, posso te ajudar com a cotação?"]),
     inserir: vi.fn(),
     conectar: vi.fn(),
+    abrirNotificacoes: vi.fn(),
     tentarNovamente: vi.fn(),
     fechar: vi.fn(),
   } as never;
@@ -103,6 +111,12 @@ describe("gaveta: lead", () => {
     expect(screen.getByText("Sem ação pendente")).toBeTruthy();
     expect(screen.getByText("Sem interações registradas.")).toBeTruthy();
     expect(screen.getByRole("img", { name: /Temperatura: Sem dados/ })).toBeTruthy();
+  });
+
+  it("usa nextAction só como fallback quando proximoPasso não veio", () => {
+    const lead = { ...LEAD, proximoPasso: undefined, nextAction: "Retornar amanhã" } as LeadAmpliado & { nextAction: string };
+    render(<Gaveta estado={{ tipo: "lead", lead }} acoes={acoesFalsas()} />);
+    expect(screen.getByText("Retornar amanhã")).toBeTruthy();
   });
 
   it("mostra no histórico no máximo cinco itens, só tipo e data", () => {

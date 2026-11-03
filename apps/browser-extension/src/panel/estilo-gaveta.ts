@@ -52,7 +52,35 @@ button:disabled{opacity:.55;cursor:default}
 .aviso{margin:0;padding:16px;color:var(--ct-muted)}
 .bloco-aviso{display:grid;gap:12px;padding:16px}
 .esqueleto{height:112px;margin:16px;border-radius:999px;background:linear-gradient(90deg,var(--ct-surface),var(--ct-line),var(--ct-surface));background-size:200% 100%;animation:pulsar 1.4s ease-in-out infinite}
+.secao-ofertas{padding:14px 12px;border-bottom:8px solid var(--ct-surface)}
+.cabeca-ofertas,.linha-ofertas,.oferta-cabeca{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cabeca-ofertas h2{margin:0;color:var(--ct-fg);font-size:14px;font-weight:600}
+.contagem-ofertas{display:grid;place-items:center;min-width:24px;height:24px;padding:0 7px;border-radius:999px;background:var(--ct-action);color:#fff;font-size:12px;font-weight:700}
+.linha-ofertas{align-items:flex-start;margin-top:5px}
+.linha-ofertas .muted{margin:0;max-width:220px;line-height:1.4}
+.som-ofertas{flex:none;padding:5px 8px;border:1px solid var(--ct-line);border-radius:999px;background:transparent;color:var(--ct-muted);font-size:11px}
+.estado-ofertas{display:grid;gap:8px;margin:10px 0 0;color:var(--ct-muted);font-size:12px}
+.lista-ofertas{display:grid;gap:8px;margin:10px 0 0;padding:0;list-style:none}
+.oferta{display:grid;gap:4px;padding:12px;border:1px solid var(--ct-line);border-radius:18px;background:var(--ct-bg)}
+.secao li.oferta{display:grid;justify-content:stretch;gap:4px}
+.oferta-cabeca strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.temperatura-oferta{flex:none;padding:3px 8px;border-radius:999px;background:var(--ct-surface);color:var(--ct-muted);font-size:11px}
+.temperatura-oferta[data-t="quente"]{color:var(--ct-quente)}
+.temperatura-oferta[data-t="morno"]{color:var(--ct-morno)}
+.temperatura-oferta[data-t="frio"]{color:var(--ct-frio)}
+.oferta-contato,.oferta-contexto{margin:0;color:var(--ct-muted);font-size:12px}
+.prazo-oferta{margin:4px 0;color:var(--ct-muted);font-size:12px;font-variant-numeric:tabular-nums}
+.prazo-oferta.urgente{color:var(--ct-morno);font-weight:600}
+.aviso-plantao,.confirmar-recusa p,.retentar-abertura p{margin:4px 0;color:var(--ct-morno);font-size:12px;line-height:1.45}
+.acoes-oferta{display:flex;flex-wrap:wrap;gap:8px;margin-top:7px}
+.acoes-oferta button{min-height:44px}
+.acoes-oferta .primario{flex:1;padding:0 14px}
+.perigo-oferta{padding:0 14px;border:1px solid var(--ct-line);border-radius:999px;background:transparent;color:var(--ct-quente);font-size:13px;font-weight:600}
+.retentar-abertura{display:grid;gap:8px;margin-top:10px;padding:12px;border-radius:16px;background:var(--ct-surface)}
+.retentar-abertura p{margin:0;color:var(--ct-fg)}
+.link-reserva{justify-self:start;padding:4px 0;border:0;background:none;color:var(--ct-action);font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px}
 @keyframes pulsar{0%{background-position:100% 0}100%{background-position:-100% 0}}
 :focus-visible{outline:2px solid var(--ct-action);outline-offset:2px}
+@media (max-width:360px){.acoes-oferta .primario{flex-basis:100%}.linha-ofertas{align-items:center}}
 @media (prefers-reduced-motion: reduce){.avatar-grande .arco{transition:none}.esqueleto{animation:none}}
 `;

@@ -38,3 +38,15 @@ export type EstadoGaveta =
   | { tipo: "indisponivel" }
   | { tipo: "desligada" }
   | { tipo: "lead"; lead: LeadAmpliado };
+
+export type OfertaExtensao = {
+  id: string;
+  expiresAt: string;
+  plantao: string | null;
+  temperatura: Temperatura;
+  primeiroNome: string;
+  phoneMasked: string;
+  foraDoPlantao: boolean;
+};
+
+export type AvisoInboxExtensao = { id: string; tipo: "offer" | "last-minute" | "update"; offerId?: string };

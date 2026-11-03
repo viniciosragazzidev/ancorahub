@@ -48,8 +48,8 @@ export function corEfetiva(elemento: Element | null): string | null {
 
 export function variaveisDoTema(tema: Tema): Record<string, string> {
   return tema === "escuro"
-    ? { "--ct-bg": "#111b21", "--ct-fg": "#e9edef", "--ct-muted": "#8696a0", "--ct-surface": "#202c33", "--ct-line": "#2a3942" }
-    : { "--ct-bg": "#ffffff", "--ct-fg": "#111b21", "--ct-muted": "#667781", "--ct-surface": "#f0f2f5", "--ct-line": "#e9edef" };
+    ? { "--ct-bg": "#111b21", "--ct-fg": "#e9edef", "--ct-muted": "#8696a0", "--ct-surface": "#202c33", "--ct-line": "#2a3942", "--ct-action": "oklch(70% .17 255)", "--ct-warning": "oklch(78% .13 75)", "--ct-danger": "oklch(72% .17 25)" }
+    : { "--ct-bg": "#ffffff", "--ct-fg": "#111b21", "--ct-muted": "#667781", "--ct-surface": "#f0f2f5", "--ct-line": "#e9edef", "--ct-action": "oklch(62% .2 255)", "--ct-warning": "#a15c00", "--ct-danger": "#d4263a" };
 }
 
 export function aplicarTema(host: HTMLElement, tema: Tema) {

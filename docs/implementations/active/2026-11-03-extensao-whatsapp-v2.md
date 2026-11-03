@@ -200,8 +200,8 @@ Execução em worktrees próprias, a partir de `feat/extensao-v2`.
 | E0b Build e base da interface | React e CSS no shadow, endereço do CRM por variável, stubs removidos, prebuild que não quebra o build do Next, minificação em produção; registro de detectores e ponte de tema | Cinzel | Vigia | Bundle inicial abaixo de 30 KB gzip e painel com React abaixo de 200 KB gzip; extensão carrega igual à v1; build do Next passa mesmo com falha do esbuild |
 | E1 Conexão 1 clique | `externally_connectable` com host exato, `/extensao/conectar`, cartão no Lite do corretor, popup novo no Lite, aviso no WhatsApp | Vigia | Cinzel | Conectar sem digitar código; recusa de remetente estranho testada; desconectar dos dois lados; prints claro e escuro |
 | E2 Gaveta Lite | `lead-context` ampliado (temperatura, fila, idade, plano, vidas, valor, próximo passo, histórico) dentro da allowlist; gaveta direita, selo no cabeçalho, botão na barra | Vigia | Cinzel | Prints claro e escuro ao lado do WhatsApp nativo; teste da allowlist passa com os campos novos |
-| E3 Aceite e abrir conversa | `POST /api/extension/offers/[id]/accept` e `/decline` (reaproveita `handleLeadOfferWebhookResponse`, idempotente); lista de ofertas com contador; abrir conversa e preencher a saudação. DEC-166 restringe ofertas de plantão ao plantão efetivo exato; fora do plantão só há aviso na lista | Cinzel | Vigia | Testes de aceite: vencido, já aceito, outro corretor, papel errado, repetido, fora/no plantão e sem `dutyScheduleId`; abrir com e sem contato salvo |
-| E4 Alertas e sincronização | `/api/extension/inbox` (304, só id/tipo/horário), notificações, selo no ícone, aviso, som; aviso de tarefa vencendo no sweep | Cinzel | Vigia | **Servidor do inbox entregue** (`2026-11-03-extensao-whatsapp-v2-e4-servidor.md`); alarmes e alertas da extensão ainda pendentes. Sem alerta duplicado; retomada depois de dormir; inbox com no máximo 200 pedidos por hora por corretor com a aba aberta (limite próprio, separado de resolve e aceite), e 304 sem corpo quando nada mudou, medido antes de liberar |
+| E3 Aceite e abrir conversa | `POST /api/extension/offers/[id]/accept` e `/decline` (reaproveita `handleLeadOfferWebhookResponse`, idempotente); lista de ofertas com contador; abrir conversa e preencher a saudação. DEC-166 restringe ofertas de plantão ao plantão efetivo exato | Cinzel | Vigia | Servidor e interface integrados; testes cobrem erros de aceite/recusa, confirmação exata do telefone e abertura com contato salvo e não salvo. Falha ao abrir mantém o aceite e oferece retry/link reserva |
+| E4 Alertas e sincronização | `/api/extension/inbox` (304, só id/tipo/horário), notificações, selo no ícone, aviso e som opcional | Cinzel | Vigia | Servidor e cliente implementados: porta com pulso de 20 s no WhatsApp aberto, alarme de 1 min sem aba, 304/Retry-After, deduplicação e aviso de último minuto. Revisão e QA manual ainda precisam confirmar retomada após suspensão e contagem real abaixo de 200 pedidos/hora |
 | E5 Ações rápidas | Etapa e status (transições válidas e motivo de perda), nota, tarefa e lembrete, sugestões pelo composer (só preenchem) | Vigia | Cinzel | Cada ação passa pelo serviço do CRM; 409 tratado; auditoria gravada |
 | E6 Publicar | Telemetria de seletor sem dados pessoais, desligamento por capacidade, lista de teste (PT/EN, claro/escuro, zoom, grupo, lista longa), troca de versão sem perder rascunho, Web Store não listada | Lince (QA) e Maestro | Vigia | Piloto inicial restrito a Vinicios por 5 dias úteis; qualquer segundo corretor exige aprovação e inclusão explícita na allowlist. Validar: conectar em 1 clique; aceitar e abrir conversa (contato salvo e não salvo); alerta de oferta e de último minuto; nenhum alerta duplicado; WhatsApp em PT e EN, claro e escuro, zoom 80% a 125%; grupo aberto sem painel; troca de versão sem perder rascunho; zero erro de detector na telemetria por 2 dias seguidos |
 
@@ -220,12 +220,12 @@ Validações: typecheck e testes focados com mocks; detalhes e limites no regist
 
 ## Entrega E3 e servidor E2 (03/11/2026)
 
-Servidor implementado em `feat/ext-v2-e3`, base `3a0b0b6b`; aguardando revisão do Vigia.
+Servidor implementado em `feat/ext-v2-e3` e integrado na worktree `feat/ext-v2-ui` pelo merge `107d90f3`.
 Contexto ampliado dentro da allowlist, listagem minimizada e resposta exata por `offerId` usando o serviço do CRM.
 A recusa canônica vencida/sem alteração foi corrigida por decisão explícita do Maestro. DEC-166 exige plantão efetivo exato para aceitar oferta vinculada; oferta sem plantão e retry já aceito preservam o comportamento anterior.
 Novas sessões recebem `ACCEPT_LEAD`; sessões antigas reconectam para obter a permissão, sem promoção na renovação.
 Contrato, evidências e limites: [E3 e servidor E2](2026-11-03-extensao-whatsapp-v2-e3-servidor.md).
-A interface de ofertas e a abertura de conversa permanecem pendentes após as correções da E1 pelo Vigia.
+Interface de ofertas, confirmação de identidade no WhatsApp e preenchimento manual da saudação entregues em `2026-11-03-extensao-whatsapp-v2-e3-e4-cliente.md`.
 
 ## Piloto e distribuição do pacote (03/11/2026)
 

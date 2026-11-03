@@ -2,16 +2,18 @@ import { useState } from "react";
 import type { EstadoGaveta, LeadAmpliado, Temperatura } from "../shared/types";
 import { chegadaTexto, dataCurta, formatarValor, iniciais, rotuloTemperatura } from "./formatos";
 import { AcoesLead, type PedidoAcao, type ResultadoAcao } from "./acoes-lead";
+import { OfertasPendentes, type AcoesOfertas } from "./ofertas";
 
 export type Objetivo = "ASK_MISSING_FIELD" | "CONTINUE_ATTENDANCE";
 
-export type AcoesGaveta = {
+export type AcoesGaveta = AcoesOfertas & {
   abrirNoCrm(leadId: string): void;
   respostas(lead: LeadAmpliado, objetivo: Objetivo): Promise<string[]>;
   inserir(texto: string): void;
   /** Envia uma ação ao CRM (etapa, nota, tarefa, lembrete). Devolve conflito quando a versão mudou. */
   acao(lead: LeadAmpliado, pedido: PedidoAcao): Promise<ResultadoAcao>;
   conectar(): void;
+  abrirNotificacoes(): void;
   tentarNovamente(): void;
   fechar(): void;
 };
@@ -55,7 +57,13 @@ function VisaoLead({ lead, acoes }: { lead: LeadAmpliado; acoes: AcoesGaveta }) 
     setOcupado(false);
   }
 
-  const prazo = lead.proximoPasso?.prazo;
+  const nextAction = (lead as LeadAmpliado & { nextAction?: unknown }).nextAction;
+  const proximoPasso = lead.proximoPasso ?? (typeof nextAction === "string"
+    ? { titulo: nextAction, prazo: null }
+    : nextAction && typeof nextAction === "object" && typeof (nextAction as Record<string, unknown>).title === "string"
+      ? { titulo: (nextAction as Record<string, string>).title, prazo: typeof (nextAction as Record<string, unknown>).dueAt === "string" ? (nextAction as Record<string, string>).dueAt : null }
+      : null);
+  const prazo = proximoPasso?.prazo;
   return (
     <>
       <section className="identidade" aria-label="Lead">
@@ -79,7 +87,7 @@ function VisaoLead({ lead, acoes }: { lead: LeadAmpliado; acoes: AcoesGaveta }) 
 
       <section className="secao" aria-label="Próximo passo">
         <h2>Próximo passo</h2>
-        <p className="valor">{lead.proximoPasso?.titulo ?? "Sem ação pendente"}</p>
+        <p className="valor">{proximoPasso?.titulo ?? "Sem ação pendente"}</p>
         {prazo ? <span className="muted">{dataCurta(prazo)}</span> : null}
       </section>
 
@@ -161,7 +169,7 @@ function Conteudo({ estado, acoes }: { estado: EstadoGaveta; acoes: AcoesGaveta 
 }
 
 /** Coluna "Dados do lead" no padrão do WhatsApp Web. Não envia nada sozinha. */
-export function Gaveta({ estado, acoes }: { estado: EstadoGaveta; acoes: AcoesGaveta }) {
+export function Gaveta({ estado, acoes, refreshKey = 0, destacarOfferId = null, ativa = false }: { estado: EstadoGaveta; acoes: AcoesGaveta; refreshKey?: number; destacarOfferId?: string | null; ativa?: boolean }) {
   return (
     <aside className="gaveta" aria-label="Dados do lead">
       <header className="cabeca">
@@ -169,6 +177,7 @@ export function Gaveta({ estado, acoes }: { estado: EstadoGaveta; acoes: AcoesGa
         <strong>Dados do lead</strong>
       </header>
       <div className="corpo">
+        <OfertasPendentes acoes={acoes} refreshKey={refreshKey} destacarOfferId={destacarOfferId} ativa={ativa} />
         <Conteudo estado={estado} acoes={acoes} />
       </div>
     </aside>

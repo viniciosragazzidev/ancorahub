@@ -2,9 +2,12 @@ import { DefaultWhatsAppWebAdapter } from "./whatsapp-adapter";
 import { criarPainelWhatsApp, type PainelWhatsApp, type SeloCabecalho } from "./painel";
 import { mostrarAvisoConexao } from "./aviso-conexao";
 import { criarConsulta, type ApiResult, type EstadoSessaoConteudo } from "./consulta";
-import type { EstadoGaveta, LeadAmpliado } from "../shared/types";
+import type { AvisoInboxExtensao, EstadoGaveta, LeadAmpliado, OfertaExtensao } from "../shared/types";
+import type { AcoesGaveta } from "../panel/gaveta";
 import type { PedidoAcao, ResultadoAcao } from "../panel/acoes-lead";
+import type { ResultadoAceiteOferta, ResultadoListaOfertas, ResultadoRecusaOferta } from "../panel/ofertas";
 import { requisicaoDaAcao, resultadoDaAcao } from "./acoes";
+import { INBOX_POLL_MS, INBOX_PORT_NAME } from "../background/inbox-state";
 
 const adapter = new DefaultWhatsAppWebAdapter();
 
@@ -40,6 +43,59 @@ const requisitar = (path: string, method: "POST" | "GET" | "PATCH", body?: unkno
     }
   });
 
+function mensagemWorker<T>(type: string, payload?: Record<string, unknown>): Promise<T | null> {
+  return new Promise((resolve) => {
+    try {
+      chrome.runtime.sendMessage({ type, payload }, (response) => resolve(chrome.runtime.lastError ? null : response as T));
+    } catch { resolve(null); }
+  });
+}
+
+function ofertaValida(value: unknown): OfertaExtensao | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  if (typeof item.id !== "string" || typeof item.expiresAt !== "string" || !Number.isFinite(Date.parse(item.expiresAt))
+    || typeof item.primeiroNome !== "string" || typeof item.phoneMasked !== "string"
+    || typeof item.foraDoPlantao !== "boolean" || (item.plantao !== null && typeof item.plantao !== "string")) return null;
+  const temperatura = ["quente", "morno", "frio", "sem-dados"].includes(String(item.temperatura)) ? item.temperatura as OfertaExtensao["temperatura"] : "sem-dados";
+  return { id: item.id, expiresAt: item.expiresAt, plantao: item.plantao as string | null, temperatura,
+    primeiroNome: item.primeiroNome, phoneMasked: item.phoneMasked, foraDoPlantao: item.foraDoPlantao };
+}
+
+function falhaApi(result: ApiResult) {
+  return {
+    ok: false as const,
+    error: typeof result.body.error === "string" ? result.body.error : String(result.status || "OFFLINE"),
+    message: typeof result.body.message === "string" ? result.body.message : "Não foi possível concluir agora. Tente de novo em instantes.",
+    retryAfter: result.retryAfter,
+  };
+}
+
+async function carregarOfertas(): Promise<ResultadoListaOfertas> {
+  const result = await requisitar("/api/extension/offers", "GET");
+  const offers = result.body.offers;
+  if (!result.ok || !Array.isArray(offers)) return { ok: false, retryAfter: result.retryAfter };
+  return { ok: true, ofertas: offers.map(ofertaValida).filter((item): item is OfertaExtensao => item !== null) };
+}
+
+async function aceitarOferta(offerId: string): Promise<ResultadoAceiteOferta> {
+  const result = await requisitar(`/api/extension/offers/${encodeURIComponent(offerId)}/accept`, "POST");
+  if (!result.ok || result.body.success !== true || typeof result.body.phone !== "string"
+    || typeof result.body.greeting !== "string" || typeof result.body.whatsappUrl !== "string") return falhaApi(result);
+  return { ok: true, phone: result.body.phone, greeting: result.body.greeting, whatsappUrl: result.body.whatsappUrl };
+}
+
+async function recusarOferta(offerId: string): Promise<ResultadoRecusaOferta> {
+  const result = await requisitar(`/api/extension/offers/${encodeURIComponent(offerId)}/decline`, "POST");
+  if (!result.ok || result.body.success !== true) return falhaApi(result);
+  return { ok: true, alreadyDeclined: result.body.alreadyDeclined === true, contaComoPulo: result.body.contaComoPulo === true,
+    message: typeof result.body.message === "string" ? result.body.message : "Oferta recusada." };
+}
+
+function abrirReservaWhatsApp(url: string) {
+  chrome.runtime.sendMessage({ type: "OPEN_WHATSAPP_FALLBACK", payload: { url } }, () => void chrome.runtime.lastError);
+}
+
 function openLeadInCrm(leadId: string) {
   try {
     chrome.runtime.sendMessage({ type: "OPEN_CRM_LEAD", payload: { leadId } }, () => {
@@ -65,6 +121,17 @@ function garantirPainel() {
     abrirNoCrm: (leadId) => openLeadInCrm(leadId),
     respostas: (lead, objetivo) => quickReplies(lead, objetivo),
     inserir: (texto) => { void adapter.insertComposerText(texto); },
+    carregar: carregarOfertas,
+    aceitar: aceitarOferta,
+    recusar: recusarOferta,
+    abrirConversa: async (input) => {
+      const result = await adapter.openNewConversation(input.phone, input.greeting);
+      return result.success ? { ok: true as const } : { ok: false as const, reason: result.reason ?? "OPEN_FAILED" };
+    },
+    abrirReserva: abrirReservaWhatsApp,
+    lerSom: async () => (await mensagemWorker<{ enabled?: boolean }>("LER_SOM_ALERTAS"))?.enabled === true,
+    definirSom: (enabled) => { void mensagemWorker("DEFINIR_SOM_ALERTAS", { enabled }); },
+    abrirNotificacoes: () => { void mensagemWorker("OPEN_CRM_NOTIFICATIONS"); },
     conectar: () => chrome.runtime.sendMessage({ type: "OPEN_CRM_CONNECT" }, () => void chrome.runtime.lastError),
     tentarNovamente: () => { consulta.invalidar(); safeSync(); },
     acao: (lead, pedido) => executarAcao(lead, pedido),
@@ -141,13 +208,70 @@ const consulta = criarConsulta({
 // não virem rejeições não tratadas no console da página.
 const safeSync = () => { void consulta.sincronizar().catch(() => undefined); };
 
-// O worker avisa quando a sessão muda (troca de conta, revogação, expiração): descarta a tela e consulta de novo.
-chrome.runtime.onMessage.addListener((message: { type?: string }) => {
+function avisoValido(value: unknown): AvisoInboxExtensao | null {
+  if (!value || typeof value !== "object") return null;
+  const aviso = value as Record<string, unknown>;
+  if (typeof aviso.id !== "string" || !["offer", "last-minute", "update"].includes(String(aviso.tipo))) return null;
+  return { id: aviso.id, tipo: aviso.tipo as AvisoInboxExtensao["tipo"], ...(typeof aviso.offerId === "string" ? { offerId: aviso.offerId } : {}) };
+}
+
+async function executarAcaoWorker(message: { type?: string; payload?: Record<string, unknown> }) {
+  if (message.type === "OPEN_EXTENSION_OFFERS") {
+    const controle = await garantirPainel();
+    controle?.abrirOfertas(typeof message.payload?.offerId === "string" ? message.payload.offerId : undefined);
+    return Boolean(controle);
+  }
+  if (message.type === "SHOW_INBOX_NOTICE") {
+    const aviso = avisoValido(message.payload?.aviso);
+    if (!aviso) return false;
+    const controle = await garantirPainel();
+    controle?.mostrarAviso(aviso);
+    return Boolean(controle);
+  }
+  return false;
+}
+
+// O worker invalida o painel ao trocar a sessão e envia alertas já minimizados, sem texto do cliente.
+chrome.runtime.onMessage.addListener((message: { type?: string; payload?: Record<string, unknown> }, _sender, sendResponse) => {
   if (message?.type === "SESSAO_MUDOU") {
     consulta.invalidar();
     safeSync();
+    sendResponse({ ok: true });
+    return false;
   }
+  if (message?.type === "OPEN_EXTENSION_OFFERS" || message?.type === "SHOW_INBOX_NOTICE") {
+    void executarAcaoWorker(message).then((ok) => sendResponse({ ok })).catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+  return false;
 });
+
+// A porta indica que há ao menos uma aba do WhatsApp ativa; o worker usa esse sinal para o ciclo de 20 s.
+let inboxPort: ChromePort | null = null;
+let reconectarInbox: number | undefined;
+let pollInbox: number | undefined;
+function conectarInbox() {
+  if (inboxPort) return;
+  try {
+    inboxPort = chrome.runtime.connect({ name: INBOX_PORT_NAME });
+    pollInbox = window.setInterval(() => {
+      try { inboxPort?.postMessage({ type: "POLL_INBOX" }); } catch { /* onDisconnect agenda reconexão */ }
+    }, INBOX_POLL_MS);
+    inboxPort.onDisconnect.addListener(() => {
+      inboxPort = null;
+      window.clearInterval(pollInbox);
+      pollInbox = undefined;
+      window.clearTimeout(reconectarInbox);
+      reconectarInbox = window.setTimeout(conectarInbox, 2000);
+    });
+  } catch {
+    reconectarInbox = window.setTimeout(conectarInbox, 5000);
+  }
+}
+conectarInbox();
+void mensagemWorker<{ type?: string; payload?: Record<string, unknown> }>("WHATSAPP_READY")
+  .then((pending) => pending && executarAcaoWorker(pending))
+  .catch(() => undefined);
 
 void safeSync();
 adapter.observeConversationChange(safeSync);

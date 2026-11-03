@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="claro">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fixture sintético do WhatsApp Web</title>
+    <style>
+      *{box-sizing:border-box}body{margin:0;font:14px/1.4 Inter,system-ui,sans-serif;color:#111b21;background:#f0f2f5}
+      .wa{display:grid;grid-template-columns:64px 340px minmax(0,1fr);height:100vh;background:#fff}
+      .nav{display:grid;align-content:start;justify-items:center;gap:18px;padding:20px 0;background:#f0f2f5;color:#54656f}
+      .nav span{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#fff;font-weight:700}
+      .chats{border-right:1px solid #e9edef}.chats header{padding:24px 18px;font-size:20px;font-weight:600}.chat{padding:14px 18px;border-top:1px solid #f3f4f5}.chat strong,.chat small{display:block}.chat small{margin-top:4px;color:#667781}
+      .conversation{position:relative;display:flex;flex-direction:column;background:#efeae2}.conversation header{height:64px;padding:20px;background:#f0f2f5;border-bottom:1px solid #e9edef}.conversation footer{height:64px;margin-top:auto;padding:12px 18px;background:#f0f2f5}.bubble{max-width:55%;margin:32px 20px;padding:12px 16px;border-radius:14px;background:#fff}
+      html[data-theme="escuro"] body{color:#e9edef;background:#0b141a}.escuro .wa{background:#111b21}.escuro .nav,.escuro .conversation header,.escuro .conversation footer{background:#202c33;color:#e9edef}.escuro .nav span{background:#2a3942}.escuro .chats{border-color:#2a3942;background:#111b21;color:#e9edef}.escuro .chat{border-color:#202c33;color:#e9edef}.escuro .chat small{color:#8696a0}.escuro .conversation{background:#0b141a}.escuro .bubble{background:#202c33}
+    </style>
+  </head>
+  <body>
+    <div class="wa" id="wa-shell">
+      <nav class="nav" aria-label="Navegação"><span>◉</span><span>◎</span><span>✉</span></nav>
+      <aside class="chats"><header>WhatsApp</header><div class="chat"><strong>Contato de teste</strong><small>Conversa sintética</small></div><div class="chat"><strong>Outro contato</strong><small>Sem dados reais</small></div></aside>
+      <main class="conversation"><header>Contato de teste</header><div class="bubble">Prévia visual com conteúdo fictício.</div><footer>Digite uma mensagem</footer></main>
+    </div>
+  </body>
+</html>

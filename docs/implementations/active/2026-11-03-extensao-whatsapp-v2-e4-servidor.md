@@ -22,4 +22,4 @@ Mapa: `mapa-ext-e2-e4.md`, trecho E4.
 - Vitest mockado: 21 testes em `inbox-route-contract.test.ts`, `offers-route-contract.test.ts` e `payload-security.test.ts` passaram.
 - `npx tsc --noEmit`: passou.
 - Sem build, migração, acesso a banco ou mudanças em `apps/browser-extension`.
-- Alarmes, notificações Chrome, selo, som e aviso no WhatsApp permanecem na parte cliente da E4.
+- Alarmes, notificações Chrome, selo, som e aviso no WhatsApp foram implementados na parte cliente da E4 em `2026-11-03-extensao-whatsapp-v2-e3-e4-cliente.md`.

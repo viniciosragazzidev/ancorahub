@@ -1,10 +1,11 @@
 import { createRoot, type Root } from "react-dom/client";
 import tokensAtivos from "../../../../src/components/arc/venancor-scope.css";
 import tokensBase from "../../../../src/components/arc/foundation.css";
-import type { EstadoGaveta, Temperatura } from "../shared/types";
+import type { AvisoInboxExtensao, EstadoGaveta, Temperatura } from "../shared/types";
 import { Gaveta, type AcoesGaveta } from "./gaveta";
 import { ESTILO_GAVETA } from "./estilo-gaveta";
 import { rotuloTemperatura } from "./formatos";
+import { AvisoInbox } from "./aviso-inbox";
 
 // Os tokens do Arc declaram :root, que não existe dentro de um shadow root. Viram :host.
 const noShadow = (css: string) => css.replaceAll(":root", ":host");
@@ -29,17 +30,33 @@ function montarRaiz(shadow: ShadowRoot, css: string): Root {
   return createRoot(ponto);
 }
 
-export type ControleGaveta = { atualizar(estado: EstadoGaveta): void; desmontar(): void };
+export type ControleGaveta = { atualizar(estado: EstadoGaveta): void; atualizarOfertas(offerId?: string): void; definirAberta(aberta: boolean): void; desmontar(): void };
 
 /** Monta a gaveta no shadow root e devolve o controle para o script de conteúdo trocar o estado. */
 export function montarPainel(shadow: ShadowRoot, acoes: AcoesGaveta, estadoInicial: EstadoGaveta = { tipo: "carregando" }): ControleGaveta {
   const raiz = montarRaiz(shadow, `${noShadow(tokensBase)}\n${tokensAtivos}\n${ESTILO_GAVETA}`);
-  const desenhar = (estado: EstadoGaveta) => raiz.render(<Gaveta estado={estado} acoes={acoes} />);
-  desenhar(estadoInicial);
+  let estado = estadoInicial;
+  let ativa = false;
+  let refreshKey = 0;
+  let destacarOfferId: string | null = null;
+  const desenhar = () => raiz.render(<Gaveta estado={estado} acoes={acoes} refreshKey={refreshKey} destacarOfferId={destacarOfferId} ativa={ativa} />);
+  desenhar();
   return {
-    atualizar: desenhar,
+    atualizar(novoEstado) { estado = novoEstado; desenhar(); },
+    atualizarOfertas(offerId) { destacarOfferId = offerId ?? null; refreshKey += 1; desenhar(); },
+    definirAberta(aberta) { ativa = aberta; desenhar(); },
     desmontar: () => raiz.unmount(),
   };
+}
+
+export type ControleAvisoInbox = { atualizar(aviso: AvisoInboxExtensao | null): void; desmontar(): void };
+
+export function montarAvisoInbox(shadow: ShadowRoot, onAbrir: (aviso: AvisoInboxExtensao) => void): ControleAvisoInbox {
+  const raiz = montarRaiz(shadow, "*{box-sizing:border-box}");
+  let aviso: AvisoInboxExtensao | null = null;
+  const desenhar = () => raiz.render(<AvisoInbox aviso={aviso} onAbrir={onAbrir} onFechar={() => { aviso = null; desenhar(); }} />);
+  desenhar();
+  return { atualizar(novoAviso) { aviso = novoAviso; desenhar(); }, desmontar: () => raiz.unmount() };
 }
 
 export type SeloCabecalho = { etapa: string; temperatura?: Temperatura };

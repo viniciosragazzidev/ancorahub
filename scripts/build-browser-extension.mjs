@@ -2,6 +2,7 @@ import { build } from "esbuild";
 import { readFileSync } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import sharp from "sharp";
 
 const root = new URL("../apps/browser-extension/", import.meta.url);
 const distPath = fileURLToPath(new URL("./dist/", root));
@@ -34,10 +35,13 @@ const fonte = (caminho) => fileURLToPath(new URL(caminho, root));
 await rm(distPath, { recursive: true, force: true });
 await mkdir(fileURLToPath(new URL("./dist/popup/", root)), { recursive: true });
 await mkdir(fileURLToPath(new URL("./dist/panel/", root)), { recursive: true });
+await mkdir(fileURLToPath(new URL("./dist/icons/", root)), { recursive: true });
+await mkdir(fileURLToPath(new URL("./dist/offscreen/", root)), { recursive: true });
 
 await build({ ...comum, entryPoints: [fonte("./src/background/service-worker.ts")], outfile: `${distPath}background-service-worker.js` });
 await build({ ...comum, entryPoints: [fonte("./src/content/index.ts")], outfile: `${distPath}content-index.js` });
 await build({ ...comum, entryPoints: [fonte("./src/popup/index.ts")], outfile: `${distPath}popup/popup.js` });
+await build({ ...comum, entryPoints: [fonte("./src/background/offscreen-audio.ts")], outfile: `${distPath}offscreen/audio.js` });
 // Quarta entrada: painel React em ESM. Não entra no script de conteúdo, para o bundle inicial continuar pequeno.
 // O script de conteúdo carrega este arquivo com import() (recurso acessível pela web, declarado no manifest).
 await build({
@@ -51,6 +55,13 @@ await build({
 });
 
 await cp(fonte("./src/popup/index.html"), fileURLToPath(new URL("./dist/popup/index.html", root)));
+await cp(fonte("./src/background/audio.html"), fileURLToPath(new URL("./dist/offscreen/audio.html", root)));
+for (const size of [16, 32, 48, 128]) {
+  await sharp(fonte("./assets/notification-icon.svg"))
+    .resize(size, size)
+    .png()
+    .toFile(`${distPath}icons/ancorahub-${size}.png`);
+}
 const manifest = JSON.parse(await readFile(fonte("./manifest.json"), "utf8"));
 manifest.host_permissions = ["https://web.whatsapp.com/*", `${crmBase}/*`];
 // Só a página de conexão do CRM pode mandar mensagem para a extensão (mesmo host do CRM_BASE, caminho fixo).
