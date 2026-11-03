@@ -72,9 +72,14 @@ export function drawBadge(page: PDFPage, text: string, x: number, y: number, max
 export async function embedTenantLogo(pdf: PDFDocument, logoUrl: string | null | undefined): Promise<PDFImage | null> {
   if (!logoUrl) return null;
   try {
-    const response = await fetch(logoUrl);
-    if (!response.ok) return null;
-    const bytes = new Uint8Array(await response.arrayBuffer());
+    // A logo guardada no R2 tem endereço relativo (logo-file.ts): o servidor lê direto do R2.
+    const { readStoredTenantLogo } = await import("@/features/tenant-branding/logo-storage");
+    let bytes = await readStoredTenantLogo(logoUrl);
+    if (!bytes) {
+      const response = await fetch(logoUrl);
+      if (!response.ok) return null;
+      bytes = new Uint8Array(await response.arrayBuffer());
+    }
     const sharp = (await import("sharp")).default;
     const pngBytes = await sharp(bytes).png().toBuffer();
     return await pdf.embedPng(pngBytes);
