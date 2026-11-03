@@ -13,7 +13,8 @@ import { useLightAvailability, type LightAvailability } from "@/components/light
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatHome } from "@/components/chat/chat-home";
 import type { ChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
-import { REALTIME_SYNC_BROWSER_EVENT } from "@/components/providers/realtime-events";
+import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
+import { railLoadDelay, railRealtimeDecision } from "./chat-rail-refresh";
 
 import { A11yPrefsProvider } from "@/features/assist/a11y-prefs";
 import { AssistHelpButton, AssistLayer } from "@/features/assist/components/assist-layer";
@@ -98,7 +99,7 @@ export function LightChrome({
     />
   );
 
-  const chatRail = useDesktopChatRail(true, initialChatRail);
+  const chatRail = useDesktopChatRail(true, initialChatRail, pathname);
   // Broker assistance ("Onde fica?" and the "?" of each screen) over the whole Lite.
   const withAssist = (content: ReactNode) => <A11yPrefsProvider>{audience === "broker"
     ? <AssistLayer pathname={pathname} capabilities={{ journey: journeyEnabled, quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship }}>{content}</AssistLayer>
@@ -181,27 +182,31 @@ export function LightChrome({
 }
 
 const DESKTOP_QUERY = "(min-width: 1024px)";
-const RAIL_REFRESH_MS = 3000;
 
 /**
  * The rail's list, loaded in the browser and only on computers (phones never
- * show it). Refreshed when realtime says something changed, at most every 3s.
+ * show it). Refreshed when realtime says something changed, at most every
+ * RAIL_REFRESH_MS, never while the tab is hidden (the load waits for the tab to
+ * come back), and not when the layout already brings it (manager Lite).
  */
-function useDesktopChatRail(enabled: boolean, initialData: ChatRailData | null) {
+function useDesktopChatRail(enabled: boolean, initialData: ChatRailData | null, pathname: string) {
   const [rail, setRail] = useState<ChatRailData | null>(initialData);
   const [previousInitialData, setPreviousInitialData] = useState(initialData);
   if (initialData !== previousInitialData) {
     setPreviousInitialData(initialData);
     setRail(initialData);
   }
+  const serverRendersRail = initialData !== null;
   useEffect(() => {
     if (!enabled || typeof window === "undefined" || !window.matchMedia) return;
     const media = window.matchMedia(DESKTOP_QUERY);
     let alive = true;
     let timer = 0;
     let lastLoad = 0;
+    let pending = false;
     const load = () => {
       if (!media.matches) return;
+      pending = false;
       lastLoad = Date.now();
       // A GET route, not a server action: "Ver como" refuses POSTs and the rail stayed a skeleton.
       void fetch("/api/chat/rail", { cache: "no-store" })
@@ -209,13 +214,27 @@ function useDesktopChatRail(enabled: boolean, initialData: ChatRailData | null) 
         .then((body) => { if (alive && body) setRail(body.rail ?? null); })
         .catch(() => undefined);
     };
-    const onRealtime = () => {
+    const onRealtime = (event: Event) => {
+      const decision = railRealtimeDecision({
+        detail: (event as CustomEvent<RealtimeSyncBrowserDetail>).detail ?? null,
+        pathname,
+        serverRendersRail,
+        visible: document.visibilityState === "visible",
+      });
+      if (decision === "skip") return;
+      if (decision === "defer") { pending = true; return; }
       window.clearTimeout(timer);
-      timer = window.setTimeout(load, Math.max(0, RAIL_REFRESH_MS - (Date.now() - lastLoad)));
+      timer = window.setTimeout(load, railLoadDelay(lastLoad, Date.now()));
     };
-    if (!initialData) load();
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible" || !pending) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(load, railLoadDelay(lastLoad, Date.now()));
+    };
+    if (!serverRendersRail) load();
     media.addEventListener("change", load);
     window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
+    document.addEventListener("visibilitychange", onVisibility);
     // Something was just seen (Âncora, Jornada): the blue dot leaves the list right away.
     window.addEventListener(CHAT_RAIL_REFRESH_EVENT, load);
     return () => {
@@ -223,8 +242,9 @@ function useDesktopChatRail(enabled: boolean, initialData: ChatRailData | null) 
       window.clearTimeout(timer);
       media.removeEventListener("change", load);
       window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener(CHAT_RAIL_REFRESH_EVENT, load);
     };
-  }, [enabled, initialData]);
+  }, [enabled, serverRendersRail, pathname]);
   return rail;
 }
