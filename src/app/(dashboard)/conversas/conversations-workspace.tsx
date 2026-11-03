@@ -559,7 +559,7 @@ export function ConversationsWorkspace({
               {selected.id === initialLeadId ? (
                 <ConversationHistory client={selected} directorSkinEnabled={directorSkinEnabled} />
               ) : (
-                <ConversationHistoryLoading />
+                <ConversationHistoryLoading key={selected.id} onRetry={() => updateSelectedLeadInUrl(selected.id)} />
               )}
               <ChatInput
                 leadId={selected.id}
@@ -1755,7 +1755,26 @@ function EmptyConversationList({ hasQuery }: { hasQuery: boolean }) {
   );
 }
 
-function ConversationHistoryLoading() {
+function ConversationHistoryLoading({ onRetry }: { onRetry: () => void }) {
+  // Se o servidor não responder em 15 s, troca o carregamento por um aviso com "Tentar de novo".
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (slow) return;
+    const timer = window.setTimeout(() => setSlow(true), 15_000);
+    return () => window.clearTimeout(timer);
+  }, [slow]);
+
+  if (slow) {
+    return (
+      <div role="alert" className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-sm text-muted-foreground">Não foi possível carregar a conversa agora.</p>
+        <Button type="button" variant="outline" size="sm" onClick={() => { setSlow(false); onRetry(); }}>
+          Tentar de novo
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div role="status" aria-live="polite" aria-label="Carregando a conversa" className="flex min-h-0 flex-1 flex-col justify-end gap-3 overflow-hidden p-4">
       <Skeleton className="h-14 w-3/5 self-start rounded-2xl" />
