@@ -73,6 +73,9 @@ describe("seção de ações da gaveta", () => {
   });
 });
 
+// Só o ramo de erro tem mensagem; o teste usa esta leitura explícita.
+const mensagemDe = (resultado: ReturnType<typeof resultadoDaAcao>) => (resultado.ok ? "" : resultado.mensagem);
+
 describe("tradução dos pedidos e dos resultados", () => {
   it("mudança de etapa usa PATCH com a versão mostrada na tela e o motivo", () => {
     expect(requisicaoDaAcao(LEAD, { tipo: "etapa", statusId: "lost", motivoPerda: "preco" })).toEqual({
@@ -89,9 +92,9 @@ describe("tradução dos pedidos e dos resultados", () => {
   it("resultado: 409 pede recarga; erros não mostram detalhe técnico", () => {
     expect(resultadoDaAcao(200)).toEqual({ ok: true });
     expect(resultadoDaAcao(409)).toMatchObject({ ok: false, conflito: true });
-    expect(resultadoDaAcao(403).mensagem).toMatch(/permissão/);
-    expect(resultadoDaAcao(404).mensagem).toMatch(/não está disponível/);
-    expect(resultadoDaAcao(0).mensagem).toMatch(/Sem conexão/);
-    expect(resultadoDaAcao(500).mensagem).not.toMatch(/Error|stack|SQL/);
+    expect(mensagemDe(resultadoDaAcao(403))).toMatch(/permissão/);
+    expect(mensagemDe(resultadoDaAcao(404))).toMatch(/não está disponível/);
+    expect(mensagemDe(resultadoDaAcao(0))).toMatch(/Sem conexão/);
+    expect(mensagemDe(resultadoDaAcao(500))).not.toMatch(/Error|stack|SQL/);
   });
 });
