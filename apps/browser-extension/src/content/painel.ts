@@ -167,7 +167,8 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
     if (cabecalho.estado !== "ok" || !cabecalho.elemento.parentElement) return false;
     if (historicoHost && historicoHost.host.parentElement === cabecalho.elemento.parentElement) return true;
     removerHistorico();
-    historicoHost = criarHospedeiro("ancorahub-historico", "", "display:block;width:100%;flex:none;");
+    // position/z-index: a lista aberta desce POR CIMA das mensagens (a área de mensagens vem depois no DOM e a cobria).
+    historicoHost = criarHospedeiro("ancorahub-historico", "", "display:block;width:100%;flex:none;position:relative;z-index:200;");
     cabecalho.elemento.parentElement.insertBefore(historicoHost.host, cabecalho.elemento.nextSibling);
     if (temaAtual) aplicarTema(historicoHost.host, temaAtual);
     controleHistorico = modulos.montarHistorico(historicoHost.shadow);

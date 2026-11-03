@@ -103,8 +103,10 @@ function escreverBusca(campo: HTMLElement, texto: string) {
     campo.dispatchEvent(new Event("change", { bubbles: true }));
     return;
   }
-  campo.textContent = texto;
-  campo.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: texto }));
+  // Campo editável do WhatsApp (editor próprio): escrever pelo execCommand, como um digitar de verdade.
+  // textContent + InputEvent sintético não passa pelo editor e pode duplicar ou não buscar.
+  document.execCommand("selectAll", false);
+  document.execCommand("insertText", false, texto);
 }
 
 function resultadosPorTelefone(phone: string) {
@@ -175,7 +177,9 @@ export class DefaultWhatsAppWebAdapter implements WhatsAppWebAdapter {
   async insertComposerText(text: string) {
     const composer = document.querySelector('[data-testid="conversation-compose-box-input"]') as HTMLElement | null;
     if (!composer) return { success: false, reason: "COMPOSER_NOT_FOUND" };
-    focarSemRolar(composer); document.execCommand("insertText", false, text); composer.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+    // Só o execCommand: ele já dispara o input nativo. Um InputEvent extra fazia o editor do WhatsApp
+    // inserir o texto de novo (texto duplicado no piloto de 03/11).
+    focarSemRolar(composer); document.execCommand("insertText", false, text);
     return { success: true };
   }
 
