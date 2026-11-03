@@ -7,6 +7,7 @@ import { AuthorizationError, AuthenticationError } from "@/shared/auth/errors";
 import { extensionCodeBindingSchema, type ExtensionCodeBinding, type ExtensionDeviceInput, type ExtensionSession } from "./schemas";
 import { recordExtensionAudit } from "./audit";
 import { condicaoSessaoAtiva, sessaoAtivaEm, SESSION_MAX_MS } from "./sessao-ativa";
+import { janelaTokenAnterior } from "./token-anterior";
 
 export { SESSION_IDLE_MS, SESSION_MAX_MS } from "./sessao-ativa";
 export const SESSION_PERMISSIONS = ["VIEW_LEAD", "ACCEPT_LEAD", "CHANGE_STATUS", "REGISTER_FEEDBACK", "CREATE_TASK", "GENERATE_REPLY"];
@@ -37,14 +38,26 @@ export async function authenticateExtensionRequest(request: Request): Promise<Ex
   if (!token) throw new AuthenticationError("Sessão da extensão ausente.");
   const now = new Date();
   // The token hash is the initial capability; tenant is taken from this row, never from the request.
-  const [session] = await getDatabase().select().from(schema.extensionSessions).where(and(
-    eq(schema.extensionSessions.tokenHash, hash(token)), condicaoSessaoAtiva(now),
+  const tokenHash = hash(token);
+  const [atual] = await getDatabase().select().from(schema.extensionSessions).where(and(
+    eq(schema.extensionSessions.tokenHash, tokenHash), condicaoSessaoAtiva(now),
   )).limit(1);
+  const session = atual ?? await sessaoDoTokenAnterior(tokenHash, now);
   if (!session || !sessaoAtivaEm(session, now)) {
     throw new AuthenticationError("Sessão da extensão expirada ou revogada.");
   }
   return { ...session, permissions: Array.isArray(session.permissions)
     ? session.permissions.filter((value): value is string => typeof value === "string") : [] };
+}
+
+/** Token trocado há pouco (janela de ROTATION_GRACE_MS): devolve a sessão dona dele, ainda ativa. */
+async function sessaoDoTokenAnterior(tokenHash: string, now: Date) {
+  const sessionId = janelaTokenAnterior.sessaoDoTokenAnterior(tokenHash, now.getTime());
+  if (!sessionId) return undefined;
+  const [session] = await getDatabase().select().from(schema.extensionSessions).where(and(
+    eq(schema.extensionSessions.id, sessionId), condicaoSessaoAtiva(now),
+  )).limit(1);
+  return session;
 }
 
 export async function touchExtensionSession(session: ExtensionPrincipal) {
@@ -105,6 +118,7 @@ export async function renewExtensionSession(session: ExtensionPrincipal) {
     if (!updated) throw new AuthenticationError("Sessão expirada ou já renovada.");
     await recordExtensionAudit("extension.session.renewed", session, {}, tx);
   });
+  janelaTokenAnterior.registrar(session.tokenHash, session.id, now.getTime());
   // expiresAt is immutable: rotation never extends the 30-day cap.
   return { token, session: { userId: session.userId, tenantId: session.tenantId, deviceId: session.deviceId,
     sessionId: session.id, expiresAt: session.expiresAt.toISOString(), permissions: session.permissions } satisfies ExtensionSession };
