@@ -4,31 +4,10 @@ import { useEffect, useState } from "react";
 
 import page from "@/components/lite/page/lite-page.module.css";
 import { descreverAparelho } from "@/features/browser-extension/aparelho";
+import { enviarParaExtensao } from "@/features/browser-extension/enviar-extensao";
 import styles from "@/components/lite/page/lite-sections.module.css";
 import { gerarCodigoConexaoAction } from "@/features/browser-extension/conexao-actions";
 import type { ConexaoParams } from "@/features/browser-extension/conexao-schemas";
-
-type ChromeExterno = {
-  runtime?: {
-    lastError?: unknown;
-    sendMessage?: (extensionId: string, message: unknown, callback: (response: unknown) => void) => void;
-  };
-};
-
-/** Envia a mensagem para a extensão pelo id recebido na URL. Sem extensão instalada, devolve null. */
-function enviarParaExtensao(extensionId: string, message: unknown): Promise<{ ok: boolean } | null> {
-  const chromeApi = (globalThis as unknown as { chrome?: ChromeExterno }).chrome;
-  if (!chromeApi?.runtime?.sendMessage) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    try {
-      chromeApi.runtime!.sendMessage!(extensionId, message, (response) => {
-        resolve(chromeApi.runtime?.lastError ? null : (response as { ok: boolean }));
-      });
-    } catch {
-      resolve(null);
-    }
-  });
-}
 
 export function ConectarExtensao({ nome, unidade, params }: { nome: string; unidade: string; params: ConexaoParams | null }) {
   const [estado, setEstado] = useState<"parado" | "gerando" | "conectada" | "sem-extensao" | "recusada">("parado");

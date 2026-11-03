@@ -1,32 +1,29 @@
 import { spawnSync } from "node:child_process";
-import { access, copyFile, rm } from "node:fs/promises";
+import { rename, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-// Empacotar a extensão não pode derrubar o build do Next. Em falha, o zip anterior continua no lugar.
+// Empacotar a extensão não pode derrubar o build do Next.
+// O zip é gerado num arquivo temporário e só substitui o anterior por rename (atômico no mesmo volume).
+// Em qualquer falha, o zip anterior fica intacto e o script sai com 0 avisando.
 const zip = fileURLToPath(new URL("../public/downloads/ancorahub-assistant.zip", import.meta.url));
-const copia = `${zip}.anterior`;
+const novo = `${zip}.novo`;
 
-const existe = async (caminho) => access(caminho).then(() => true, () => false);
-
-function rodar(script) {
-  const resultado = spawnSync(process.execPath, [fileURLToPath(new URL(script, import.meta.url))], { stdio: "inherit" });
+function rodar(script, ambiente = {}) {
+  const resultado = spawnSync(process.execPath, [fileURLToPath(new URL(script, import.meta.url))], { stdio: "inherit", env: { ...process.env, ...ambiente } });
   return resultado.status === 0;
 }
 
-const temAnterior = await existe(zip);
-if (temAnterior) await copyFile(zip, copia);
-
-if (rodar("./build-browser-extension.mjs") && rodar("./package-browser-extension.mjs")) {
-  await rm(copia, { force: true });
-  process.exit(0);
+let publicado = false;
+try {
+  publicado = rodar("./build-browser-extension.mjs") && rodar("./package-browser-extension.mjs", { ZIP_SAIDA: novo });
+  if (publicado) await rename(novo, zip);
+} catch (erro) {
+  console.warn("[extensão] Erro ao publicar o zip:", erro?.message ?? erro);
+} finally {
+  await rm(novo, { force: true });
 }
 
-if (temAnterior) await copyFile(copia, zip);
-else await rm(zip, { force: true });
-await rm(copia, { force: true });
-console.warn(
-  temAnterior
-    ? "[extensão] Falhou ao gerar o zip. Mantido o zip anterior; o build do site segue."
-    : "[extensão] Falhou ao gerar o zip e não havia um anterior; o build do site segue sem o download.",
-);
+if (!publicado) {
+  console.warn("[extensão] Falhou ao gerar o zip. Mantido o zip anterior (ou sem download, se não havia); o build do site segue.");
+}
 process.exit(0);

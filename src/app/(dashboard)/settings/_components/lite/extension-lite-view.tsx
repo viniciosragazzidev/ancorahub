@@ -39,11 +39,11 @@ export function ExtensionLiteView({ data }: { data: ExtensionLiteData }) {
       <div className={styles.row}>
         <div className={styles.rowText}>
           <p className={styles.rowTitle}>{data.conectada ? "Extensão conectada" : "Conectar extensão"}</p>
-          <p className={styles.rowDescription}>{data.conectada ? "Este navegador está conectado à sua conta." : "No navegador, clique no ícone da extensão e em Conectar ao CRM."}</p>
+          <p className={styles.rowDescription}>{data.conectada ? "Há um aparelho conectado à sua conta." : "No navegador, clique no ícone da extensão e em Conectar ao CRM."}</p>
         </div>
         {data.conectada ? (
           <form action={desconectarExtensaoAction}>
-            <button type="submit" className={page.button}>Desconectar</button>
+            <button type="submit" className={page.button}>Desconectar todos os aparelhos</button>
           </form>
         ) : null}
       </div>
