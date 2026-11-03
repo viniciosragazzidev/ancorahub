@@ -33,6 +33,14 @@ export const ESTILO_GAVETA = `
 .secao li{display:flex;justify-content:space-between;gap:8px}
 .secao time,.dica,.muted{color:var(--ct-muted);font-size:12px}
 .acoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.campo-acao{display:grid;gap:6px;margin-top:12px}
+.campo-acao .rotulo{margin:0}
+.campo-acao select,.campo-acao textarea,.campo-acao input{box-sizing:border-box;width:100%;padding:8px 10px;border:1px solid var(--ct-line);border-radius:12px;background:var(--ct-bg);color:var(--ct-fg);font:inherit;font-size:13px}
+.campo-acao textarea{min-height:72px;resize:vertical}
+.campo-acao .seco{justify-self:start}
+.aviso-ok,.aviso-erro{margin:10px 0 0;font-size:12px}
+.aviso-ok{color:var(--ct-muted)}
+.aviso-erro{color:var(--ct-quente)}
 button{font:inherit;cursor:pointer}
 .seco{height:32px;padding:0 14px;border:1px solid var(--ct-line);border-radius:999px;background:transparent;color:var(--ct-fg);font-size:13px;font-weight:500}
 .primario{height:40px;border:0;border-radius:999px;background:var(--ct-action);color:#fff;font-size:14px;font-weight:600}
