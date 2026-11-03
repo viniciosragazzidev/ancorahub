@@ -1,11 +1,12 @@
 /** Corpo da seção "Extensão" no visual Lite, a partir dos dados já carregados (sem acesso ao banco aqui). */
 import page from "@/components/lite/page/lite-page.module.css";
 import { updateExtensionSettingsAction } from "@/features/browser-extension/actions";
+import { desconectarExtensaoAction } from "@/features/browser-extension/conexao-actions";
 
 import { ExtensionConnectLite, ExtensionHelpLite } from "./extension-lite-parts";
 import styles from "@/components/lite/page/lite-sections.module.css";
 
-export type ExtensionLiteData = { enabled: boolean; minimumVersion: string; canConfigure: boolean };
+export type ExtensionLiteData = { enabled: boolean; minimumVersion: string; canConfigure: boolean; conectada: boolean };
 
 export function ExtensionLiteView({ data }: { data: ExtensionLiteData }) {
   return (
@@ -34,6 +35,17 @@ export function ExtensionLiteView({ data }: { data: ExtensionLiteData }) {
         ) : (
           <p className={styles.note}>A disponibilidade é definida pelo Diretor. Quando habilitada, você pode instalar e conectar o seu navegador nesta tela.</p>
         )}
+      </div>
+      <div className={styles.row}>
+        <div className={styles.rowText}>
+          <p className={styles.rowTitle}>{data.conectada ? "Extensão conectada" : "Conectar extensão"}</p>
+          <p className={styles.rowDescription}>{data.conectada ? "Este navegador está conectado à sua conta." : "No navegador, clique no ícone da extensão e em Conectar ao CRM."}</p>
+        </div>
+        {data.conectada ? (
+          <form action={desconectarExtensaoAction}>
+            <button type="submit" className={page.button}>Desconectar</button>
+          </form>
+        ) : null}
       </div>
       <ExtensionConnectLite />
       <div className={styles.row}>

@@ -1,4 +1,7 @@
 import { CRM_BASE } from "../config";
+import { mensagemConectarValida, remetenteConfiavel } from "./conexao";
+import { obterDeviceId } from "../shared/dispositivo";
+import { trocarCodigo } from "../shared/sessao";
 
 const API_BASE = CRM_BASE;
 
@@ -48,5 +51,31 @@ chrome.runtime.onMessage.addListener((message: { type?: string; payload?: Record
     respond({ ok: true });
     return false;
   }
+  if (message.type === "OPEN_CRM_CONNECT") {
+    void (async () => {
+      const deviceId = await obterDeviceId();
+      chrome.tabs.create({ url: `${API_BASE}/extensao/conectar?ext=${encodeURIComponent(chrome.runtime.id)}&device=${encodeURIComponent(deviceId)}` });
+    })();
+    respond({ ok: true });
+    return false;
+  }
   return false;
+});
+
+// Só a página de conexão do CRM fala por aqui. Remetente ou formato fora do esperado é recusado sem trocar nada.
+chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+  const respond = createResponder(sendResponse);
+  if (!remetenteConfiavel(sender, API_BASE)) {
+    respond({ ok: false, reason: "SENDER_REFUSED" });
+    return false;
+  }
+  const valida = mensagemConectarValida(message);
+  if (!valida) {
+    respond({ ok: false, reason: "BAD_MESSAGE" });
+    return false;
+  }
+  void trocarCodigo(valida.code)
+    .then((ok) => respond({ ok, reason: ok ? undefined : "INVALID_CODE" }))
+    .catch(() => respond({ ok: false, reason: "OFFLINE" }));
+  return true;
 });

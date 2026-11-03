@@ -21,6 +21,7 @@ export const LIGHT_ALLOWED_PREFIXES = [
   "/notificacoes",
   "/relacionamento",
   "/primeiro-acesso",
+  "/extensao",
 ] as const;
 
 /**
@@ -264,6 +265,7 @@ const RULES: readonly RouteRule[] = [
         : { title: "Configurações", tab: "mais", isRoot: false, parentHref: "/dashboard" };
     },
   },
+  { test: exact("/extensao/conectar"), route: { title: "Conectar extensão", tab: "mais", isRoot: false, parentHref: "/settings", backToParent: true } },
   { test: under("/settings"), route: { title: "Configurações", tab: "mais", isRoot: false, parentHref: "/settings" } },
   { test: exact("/notificacoes"), route: { title: "Notificações", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   // Onboarding: a single guided screen, no tabs and nowhere to go back to.

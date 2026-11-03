@@ -121,7 +121,7 @@ export function ExtensaoShellScreen() {
   return (
     <>
       <DashboardHeader breadcrumb="Configurações / Integrações" title="AncoraHub Assistant" />
-      <main className={litePage.stack}><ExtensionLiteView data={{ enabled: true, minimumVersion: "0.4.2", canConfigure: true }} /></main>
+      <main className={litePage.stack}><ExtensionLiteView data={{ enabled: true, minimumVersion: "0.4.2", canConfigure: true, conectada: false }} /></main>
     </>
   );
 }

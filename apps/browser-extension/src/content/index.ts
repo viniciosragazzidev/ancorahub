@@ -1,6 +1,33 @@
 import { DefaultWhatsAppWebAdapter } from "./whatsapp-adapter";
 import { mountPanel, type MountedPanel } from "./panel-mount";
+import { mostrarAvisoConexao } from "./aviso-conexao";
 import type { ResolveState } from "../shared/types";
+
+// A checagem de sessão é cacheada: não chama a API a cada conversa (o sync roda a cada 1,5 s).
+const INTERVALO_SESSAO_MS = 5 * 60_000;
+let sessao: { estado: "ativa" | "sem-sessao" | "desconhecida"; em: number } | null = null;
+let removerAviso: (() => void) | null = null;
+
+async function estadoSessao() {
+  if (sessao && Date.now() - sessao.em < INTERVALO_SESSAO_MS) return sessao.estado;
+  const result = await request("/api/extension/session", "GET");
+  // 401 = sem sessão válida. Erro de rede (status 0) não avisa ninguém: o estado fica desconhecido.
+  const estado = result.ok ? "ativa" : result.status === 401 ? "sem-sessao" : "desconhecida";
+  sessao = { estado, em: Date.now() };
+  return estado;
+}
+
+async function atualizarAvisoConexao() {
+  const estado = await estadoSessao();
+  if (estado === "sem-sessao") {
+    removerAviso ??= mostrarAvisoConexao(() => chrome.runtime.sendMessage({ type: "OPEN_CRM_CONNECT" }, () => void chrome.runtime.lastError));
+    return;
+  }
+  if (estado === "ativa") {
+    removerAviso?.();
+    removerAviso = null;
+  }
+}
 
 type ApiResult = { ok: boolean; status: number; body: Record<string, unknown> };
 
@@ -73,6 +100,7 @@ function hidePanel() { getPanel()?.hide(); }
 
 async function sync() {
   if (!adapter.isReady()) { lastPhone = ""; lastResolved = null; return hidePanel(); }
+  void atualizarAvisoConexao();
   const conversation = await adapter.getActiveConversation();
   if (!conversation?.phone) { lastPhone = ""; lastResolved = null; return hidePanel(); }
   if (conversation.phone === lastPhone) { if (lastResolved) getPanel()?.renderLead(lastResolved); return; }

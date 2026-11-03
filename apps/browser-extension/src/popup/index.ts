@@ -1,4 +1,4 @@
-import { CRM_BASE } from "../config";
+import { trocarCodigo } from "../shared/sessao";
 
 type ApiResult = { ok: boolean; status: number; body: Record<string, unknown> };
 
@@ -55,17 +55,18 @@ async function showConnected() {
 }
 
 function showDisconnected(message?: string) {
-  render(`<div class="heading"><span class="mark">A</span><h1>AncoraHub Assistant</h1></div><p class="muted">Conecte usando o código temporário gerado no CRM.</p><input id="code" placeholder="Código temporário" autocomplete="one-time-code"><button id="connect">Conectar</button><p class="muted" id="status">${message ?? ""}</p>`);
+  render(`<div class="heading"><span class="mark">A</span><h1>AncoraHub Assistant</h1></div><p class="muted">Conecte com um clique. A página do CRM confirma quem está conectando.</p><button id="conectar-crm">Conectar ao CRM</button><p class="muted">Sem essa opção? Use o código temporário gerado no CRM.</p><input id="code" placeholder="Código temporário" autocomplete="one-time-code"><button id="connect" class="secondary">Conectar com código</button><p class="muted" id="status">${message ?? ""}</p>`);
+  document.querySelector("#conectar-crm")!.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "OPEN_CRM_CONNECT" }, () => void chrome.runtime.lastError);
+    window.close();
+  });
   document.querySelector("#connect")!.addEventListener("click", async () => {
     const status = document.querySelector("#status")!;
     const code = (document.querySelector("#code") as HTMLInputElement).value.trim();
     if (!code) { status.textContent = "Informe o código gerado no CRM."; return; }
     status.textContent = "Conectando…";
     try {
-      const response = await fetch(`${CRM_BASE}/api/extension/auth/exchange`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, deviceId: crypto.randomUUID(), extensionVersion: "0.1.2" }) });
-      const body = await response.json();
-      if (!response.ok || typeof body.token !== "string") throw new Error("INVALID_CODE");
-      await chrome.storage.session.set({ token: body.token });
+      if (!(await trocarCodigo(code))) throw new Error("INVALID_CODE");
       await showConnected();
     } catch {
       status.textContent = "Não foi possível conectar. Gere um novo código no CRM.";

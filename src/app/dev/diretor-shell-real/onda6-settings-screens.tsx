@@ -56,7 +56,7 @@ export function SettingsShellScreen({ variant = "director" }: { variant?: "direc
     { id: "whatsapp", title: "WhatsApp", description: "O número que você usa no atendimento", node: <WhatsappLite /> },
     { id: "integracoes", title: "Integrações", description: "Fontes de captura, webhooks e pixels", node: <IntegrationsLite integrations={INTEGRATIONS} branches={BRANCHES} /> },
     { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityLite enabled={false} email="marina.albuquerque@ancora.example" /> },
-    { id: "extensao", title: "Extensão", description: "Atendimento contextual no WhatsApp Web", node: <ExtensionLiteView data={{ enabled: true, minimumVersion: "0.4.2", canConfigure: isDirector }} /> },
+    { id: "extensao", title: "Extensão", description: "Atendimento contextual no WhatsApp Web", node: <ExtensionLiteView data={{ enabled: true, minimumVersion: "0.4.2", canConfigure: isDirector, conectada: false }} /> },
   ];
   const sections = SETTINGS_TABS[variant].map((id) => all.find((section) => section.id === id)).filter((section): section is SettingsLiteSection => Boolean(section));
   return (

@@ -1,0 +1,78 @@
+"use client";
+
+import { useState } from "react";
+
+import page from "@/components/lite/page/lite-page.module.css";
+import styles from "@/components/lite/page/lite-sections.module.css";
+import { gerarCodigoConexaoAction } from "@/features/browser-extension/conexao-actions";
+import type { ConexaoParams } from "@/features/browser-extension/conexao-schemas";
+
+type ChromeExterno = {
+  runtime?: {
+    lastError?: unknown;
+    sendMessage?: (extensionId: string, message: unknown, callback: (response: unknown) => void) => void;
+  };
+};
+
+/** Envia a mensagem para a extensão pelo id recebido na URL. Sem extensão instalada, devolve null. */
+function enviarParaExtensao(extensionId: string, message: unknown): Promise<{ ok: boolean } | null> {
+  const chromeApi = (globalThis as unknown as { chrome?: ChromeExterno }).chrome;
+  if (!chromeApi?.runtime?.sendMessage) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    try {
+      chromeApi.runtime!.sendMessage!(extensionId, message, (response) => {
+        resolve(chromeApi.runtime?.lastError ? null : (response as { ok: boolean }));
+      });
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+export function ConectarExtensao({ nome, unidade, params }: { nome: string; unidade: string; params: ConexaoParams | null }) {
+  const [estado, setEstado] = useState<"parado" | "gerando" | "conectada" | "sem-extensao" | "recusada">("parado");
+
+  if (!params) {
+    return (
+      <div className={styles.notice} role="alert">
+        <p className={styles.note}>Este link não é válido. Abra a conexão pelo ícone da extensão no navegador.</p>
+      </div>
+    );
+  }
+
+  const dados: ConexaoParams = params;
+
+  async function conectar() {
+    setEstado("gerando");
+    try {
+      const { code } = await gerarCodigoConexaoAction(dados);
+      const resposta = await enviarParaExtensao(dados.ext, { type: "CONECTAR_EXTENSAO", code });
+      if (resposta === null) return setEstado("sem-extensao");
+      setEstado(resposta.ok ? "conectada" : "recusada");
+    } catch {
+      setEstado("recusada");
+    }
+  }
+
+  return (
+    <div className={styles.formBody}>
+      <p className={styles.note}>Conectando como <strong>{nome}</strong> · {unidade}</p>
+      <p className={styles.note}>Aparelho: navegador {dados.device.slice(0, 8)}</p>
+      {estado === "conectada" ? (
+        <div className={styles.notice} role="status">
+          <p className={styles.note}>Extensão conectada. Pode fechar esta aba.</p>
+        </div>
+      ) : (
+        <button type="button" className={page.primaryButton} disabled={estado === "gerando"} onClick={conectar}>
+          {estado === "gerando" ? "Conectando…" : "Conectar"}
+        </button>
+      )}
+      {estado === "sem-extensao" ? (
+        <p className={styles.note} role="alert">Não encontramos a extensão neste navegador. Confira se ela está instalada e tente de novo.</p>
+      ) : null}
+      {estado === "recusada" ? (
+        <p className={styles.note} role="alert">Não foi possível conectar agora. Tente de novo em instantes.</p>
+      ) : null}
+    </div>
+  );
+}

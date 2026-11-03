@@ -48,4 +48,6 @@ await build({
 await cp(fonte("./src/popup/index.html"), fileURLToPath(new URL("./dist/popup/index.html", root)));
 const manifest = JSON.parse(await readFile(fonte("./manifest.json"), "utf8"));
 manifest.host_permissions = ["https://web.whatsapp.com/*", `${crmBase}/*`];
+// Só a página de conexão do CRM pode mandar mensagem para a extensão (mesmo host do CRM_BASE, caminho fixo).
+manifest.externally_connectable = { matches: [`${crmBase}/extensao/conectar*`] };
 await writeFile(fileURLToPath(new URL("./dist/manifest.json", root)), `${JSON.stringify(manifest, null, 2)}\n`);
