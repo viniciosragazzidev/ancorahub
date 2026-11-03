@@ -6,6 +6,8 @@ import type { AvisoInboxExtensao, EstadoGaveta, LeadAmpliado, OfertaExtensao } f
 import type { AcoesGaveta } from "../panel/gaveta";
 import type { PedidoAcao, ResultadoAcao } from "../panel/acoes-lead";
 import type { ResultadoAceiteOferta, ResultadoListaOfertas, ResultadoRecusaOferta } from "../panel/ofertas";
+import type { LeadAguardandoInicio, ResultadoInicioLead, ResultadoListaAguardando } from "../panel/aguardando-inicio";
+import type { DadosHistorico, MensagemQualificacao } from "../panel/historico-qualificacao";
 import { requisicaoDaAcao, resultadoDaAcao } from "./acoes";
 import { INBOX_POLL_MS, INBOX_PORT_NAME } from "../background/inbox-state";
 
@@ -92,6 +94,29 @@ async function recusarOferta(offerId: string): Promise<ResultadoRecusaOferta> {
     message: typeof result.body.message === "string" ? result.body.message : "Oferta recusada." };
 }
 
+function leadAguardandoValido(value: unknown): LeadAguardandoInicio | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  if (typeof item.id !== "string" || typeof item.primeiroNome !== "string" || typeof item.phoneMasked !== "string"
+    || (item.atribuidoEm !== null && typeof item.atribuidoEm !== "string")) return null;
+  const temperatura = ["quente", "morno", "frio", "sem-dados"].includes(String(item.temperatura)) ? item.temperatura as LeadAguardandoInicio["temperatura"] : "sem-dados";
+  return { id: item.id, primeiroNome: item.primeiroNome, phoneMasked: item.phoneMasked, temperatura, atribuidoEm: item.atribuidoEm as string | null };
+}
+
+async function carregarAguardandoInicio(): Promise<ResultadoListaAguardando> {
+  const result = await requisitar("/api/extension/leads/aguardando-inicio", "GET");
+  const leads = result.body.leads;
+  if (!result.ok || !Array.isArray(leads)) return { ok: false, retryAfter: result.retryAfter };
+  return { ok: true, leads: leads.map(leadAguardandoValido).filter((item): item is LeadAguardandoInicio => item !== null) };
+}
+
+async function iniciarLeadAguardando(leadId: string): Promise<ResultadoInicioLead> {
+  const result = await requisitar(`/api/extension/leads/${encodeURIComponent(leadId)}/start`, "POST");
+  if (!result.ok || result.body.success !== true || typeof result.body.phone !== "string"
+    || typeof result.body.greeting !== "string" || typeof result.body.whatsappUrl !== "string") return { ok: false, message: falhaApi(result).message };
+  return { ok: true, phone: result.body.phone, greeting: result.body.greeting, whatsappUrl: result.body.whatsappUrl };
+}
+
 function abrirReservaWhatsApp(url: string) {
   chrome.runtime.sendMessage({ type: "OPEN_WHATSAPP_FALLBACK", payload: { url } }, () => void chrome.runtime.lastError);
 }
@@ -124,6 +149,8 @@ function garantirPainel() {
     carregar: carregarOfertas,
     aceitar: aceitarOferta,
     recusar: recusarOferta,
+    carregarAguardando: carregarAguardandoInicio,
+    iniciarLead: iniciarLeadAguardando,
     abrirConversa: async (input) => {
       const result = await adapter.openNewConversation(input.phone, input.greeting);
       return result.success ? { ok: true as const } : { ok: false as const, reason: result.reason ?? "OPEN_FAILED" };
@@ -183,13 +210,47 @@ async function executarAcao(lead: LeadAmpliado, pedido: PedidoAcao): Promise<Res
 // Época de renderização: ao esconder por troca de sessão, renderizações que ainda estavam na fila perdem o efeito.
 let epocaRender = 0;
 
+// Histórico da qualificação na conversa do lead. Só lê (GET), nunca grava nem envia. Cache por lead na sessão atual.
+let leadDaConversa: string | null = null;
+let historicoDoLead: { leadId: string; dados: DadosHistorico | null } | null = null;
+
+function historicoValido(body: Record<string, unknown>): DadosHistorico | null {
+  if (typeof body.total !== "number" || !Array.isArray(body.mensagens)) return null;
+  const mensagens = body.mensagens.flatMap((item): MensagemQualificacao[] => {
+    if (!item || typeof item !== "object") return [];
+    const m = item as Record<string, unknown>;
+    if ((m.de !== "cliente" && m.de !== "qualificacao") || typeof m.texto !== "string" || typeof m.horario !== "string") return [];
+    return [{ de: m.de, texto: m.texto, horario: m.horario }];
+  });
+  return { total: body.total, mensagens };
+}
+
+async function mostrarHistoricoDoLead(leadId: string, controle: PainelWhatsApp, epoca: number) {
+  let cache = historicoDoLead;
+  if (cache?.leadId !== leadId) {
+    const result = await requisitar(`/api/extension/leads/${encodeURIComponent(leadId)}/qualification-thread`, "GET");
+    cache = { leadId, dados: result.ok ? historicoValido(result.body) : null };
+    historicoDoLead = cache;
+  }
+  // Se a conversa mudou enquanto lia, não mostra o histórico de outro lead.
+  if (epoca !== epocaRender || leadDaConversa !== leadId) return;
+  const dados = cache.dados;
+  controle.mostrarHistorico(dados && dados.total > 0 ? dados : null);
+}
+
 const consulta = criarConsulta({
   pronto: () => adapter.isReady(),
   conversa: () => adapter.getActiveConversation(),
   requisitar,
   mostrar: (estado: EstadoGaveta, selo: SeloCabecalho | null) => {
     const epoca = epocaRender;
-    void garantirPainel().then((controle) => { if (epoca === epocaRender) controle?.mostrar(ajustarVersao(estado), selo); });
+    leadDaConversa = estado.tipo === "lead" ? estado.lead.id : null;
+    void garantirPainel().then((controle) => {
+      if (epoca !== epocaRender) return;
+      controle?.mostrar(ajustarVersao(estado), selo);
+      if (estado.tipo === "lead" && controle) void mostrarHistoricoDoLead(estado.lead.id, controle, epoca);
+      else controle?.mostrarHistorico(null);
+    });
   },
   ocultar: () => {
     const epoca = epocaRender;
@@ -197,6 +258,8 @@ const consulta = criarConsulta({
   },
   neutro: () => {
     epocaRender++;
+    historicoDoLead = null;
+    leadDaConversa = null;
     // Só esconde o que já existe; a tela nova aparece quando a sessão nova for confirmada.
     painelInstancia?.limpar();
   },

@@ -3,10 +3,11 @@ import type { EstadoGaveta, LeadAmpliado, Temperatura } from "../shared/types";
 import { chegadaTexto, dataCurta, formatarValor, iniciais, rotuloTemperatura } from "./formatos";
 import { AcoesLead, type PedidoAcao, type ResultadoAcao } from "./acoes-lead";
 import { OfertasPendentes, type AcoesOfertas } from "./ofertas";
+import { AguardandoInicio, type AcoesAguardando } from "./aguardando-inicio";
 
 export type Objetivo = "ASK_MISSING_FIELD" | "CONTINUE_ATTENDANCE";
 
-export type AcoesGaveta = AcoesOfertas & {
+export type AcoesGaveta = AcoesOfertas & AcoesAguardando & {
   abrirNoCrm(leadId: string): void;
   respostas(lead: LeadAmpliado, objetivo: Objetivo): Promise<string[]>;
   inserir(texto: string): void;
@@ -178,6 +179,7 @@ export function Gaveta({ estado, acoes, refreshKey = 0, destacarOfferId = null, 
       </header>
       <div className="corpo">
         <OfertasPendentes acoes={acoes} refreshKey={refreshKey} destacarOfferId={destacarOfferId} ativa={ativa} />
+        <AguardandoInicio acoes={acoes} refreshKey={refreshKey} ativa={ativa} />
         <Conteudo estado={estado} acoes={acoes} />
       </div>
     </aside>

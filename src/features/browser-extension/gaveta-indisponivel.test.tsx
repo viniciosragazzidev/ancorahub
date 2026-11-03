@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Gaveta, type AcoesGaveta } from "../../../apps/browser-extension/src/panel/gaveta";
 
 const acoes = (): AcoesGaveta => ({
+  carregarAguardando: vi.fn(async () => ({ ok: true as const, leads: [] })), iniciarLead: vi.fn(async () => ({ ok: false as const, message: "indisponível" })),
   carregar: vi.fn(async () => ({ ok: true as const, ofertas: [] })), aceitar: vi.fn(async () => ({ ok: false as const, error: "OFFLINE", message: "indisponível" })),
   recusar: vi.fn(async () => ({ ok: false as const, error: "OFFLINE", message: "indisponível" })), abrirConversa: vi.fn(async () => ({ ok: false as const, reason: "NOT_READY" })),
   abrirReserva: vi.fn(), lerSom: vi.fn(async () => false), definirSom: vi.fn(), abrirNotificacoes: vi.fn(),

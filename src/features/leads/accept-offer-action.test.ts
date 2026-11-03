@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   lead: null as null | { corretorId: string; assignmentSource: string; nome: string; telefone: string; status: string },
-  startLeadServiceAction: vi.fn(async () => ({ success: true, whatsappUrl: "https://wa.me/5561999999999" })),
+  startLeadServiceAction: vi.fn(async (_prev: unknown, _form: FormData): Promise<{ success?: boolean; error?: string; whatsappUrl?: string }> => ({ success: true, whatsappUrl: "https://wa.me/5561999999999" })),
   handleLeadOfferWebhookResponse: vi.fn(async () => ({ processed: false, reason: "no_offer" })),
 }));
 

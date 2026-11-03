@@ -3,6 +3,7 @@ import type { EstadoGaveta, Temperatura } from "../shared/types";
 import type { AvisoInboxExtensao } from "../shared/types";
 import { localizarTodas } from "./detectors";
 import { cabeNaSecao } from "./rolagem";
+import type { DadosHistorico } from "../panel/historico-qualificacao";
 import { aplicarTema, observarTema } from "./tema";
 
 // Contrato do módulo do painel (panel/panel.js, carregado como recurso acessível pela web).
@@ -14,7 +15,9 @@ type ModuloPainel = {
   montarPainel(shadow: ShadowRoot, acoes: AcoesGaveta, estado?: EstadoGaveta): ControleGaveta;
   montarSelo(shadow: ShadowRoot, onAbrir: () => void): ControleSelo;
   montarAvisoInbox(shadow: ShadowRoot, onAbrir: (aviso: AvisoInboxExtensao) => void): ControleAvisoInbox;
+  montarHistorico(shadow: ShadowRoot): ControleHistorico;
 };
+type ControleHistorico = { atualizar(historico: DadosHistorico | null): void; desmontar(): void };
 
 let modulo: Promise<ModuloPainel> | null = null;
 /** Carrega o painel React sob demanda. Sem o módulo, o WhatsApp segue intacto e nada aparece. */
@@ -42,6 +45,8 @@ export type PainelWhatsApp = {
   limpar(): void;
   mostrarAviso(aviso: AvisoInboxExtensao): void;
   abrirOfertas(offerId?: string): void;
+  /** Histórico da qualificação no topo da conversa do lead. `null` tira (outra conversa, sem lead, troca de sessão). */
+  mostrarHistorico(historico: DadosHistorico | null): void;
   /** A gaveta está aberta agora (o aviso de conexão só aparece com ela fechada). */
   aberta(): boolean;
 };
@@ -80,6 +85,9 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
   let avisoHost: Hospedeiro | null = null;
   let controleAviso: ControleAvisoInbox | null = null;
   let botao: HTMLElement | null = null;
+  let historicoHost: Hospedeiro | null = null;
+  let controleHistorico: ControleHistorico | null = null;
+  let temaAtual: Parameters<typeof aplicarTema>[1] | null = null;
   // Conversa empurrada: guarda a margem original do WhatsApp para devolver ao fechar.
   let conversaEmpurrada: { elemento: HTMLElement; margemAnterior: string } | null = null;
 
@@ -139,10 +147,32 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
 
   // Vive junto com o painel: não é cancelado no ocultar, senão o tema para de acompanhar o WhatsApp.
   observarTema((tema) => {
+    temaAtual = tema;
     aplicarTema(gaveta.host, tema);
     if (seloHost) aplicarTema(seloHost.host, tema);
     if (botao) aplicarTema(botao, tema);
+    if (historicoHost) aplicarTema(historicoHost.host, tema);
   });
+
+  // Histórico da qualificação: entra logo abaixo do cabeçalho da conversa, como faixa recolhida. Só existe com o lead visível.
+  function removerHistorico() {
+    historicoHost?.host.remove();
+    historicoHost = null;
+    controleHistorico?.desmontar();
+    controleHistorico = null;
+  }
+
+  function garantirHistorico(): boolean {
+    const cabecalho = localizarTodas(document).cabecalho;
+    if (cabecalho.estado !== "ok" || !cabecalho.elemento.parentElement) return false;
+    if (historicoHost && historicoHost.host.parentElement === cabecalho.elemento.parentElement) return true;
+    removerHistorico();
+    historicoHost = criarHospedeiro("ancorahub-historico", "", "display:block;width:100%;flex:none;");
+    cabecalho.elemento.parentElement.insertBefore(historicoHost.host, cabecalho.elemento.nextSibling);
+    if (temaAtual) aplicarTema(historicoHost.host, temaAtual);
+    controleHistorico = modulos.montarHistorico(historicoHost.shadow);
+    return true;
+  }
 
   function garantirSelo() {
     const cabecalho = localizarTodas(document).cabecalho;
@@ -211,6 +241,7 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
       seloHost = null;
       controleSelo?.desmontar();
       controleSelo = null;
+      removerHistorico();
       controleGaveta.atualizar({ tipo: "sem-lead" });
       garantirBotao();
     },
@@ -221,6 +252,7 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
       seloHost = null;
       controleSelo?.desmontar();
       controleSelo = null;
+      removerHistorico();
       botao?.remove();
       botao = null;
       controleGaveta.atualizar({ tipo: "sem-lead" });
@@ -229,6 +261,14 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
     abrirOfertas(offerId) {
       alternarGaveta(true);
       controleGaveta.atualizarOfertas(offerId);
+    },
+    mostrarHistorico(historico) {
+      if (!historico) {
+        removerHistorico();
+        return;
+      }
+      if (!garantirHistorico()) return;
+      controleHistorico?.atualizar(historico);
     },
     aberta: () => gavetaAberta,
   };

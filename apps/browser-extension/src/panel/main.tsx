@@ -6,6 +6,7 @@ import { Gaveta, type AcoesGaveta } from "./gaveta";
 import { ESTILO_GAVETA } from "./estilo-gaveta";
 import { rotuloTemperatura } from "./formatos";
 import { AvisoInbox } from "./aviso-inbox";
+import { ESTILO_HISTORICO, HistoricoQualificacao, type DadosHistorico } from "./historico-qualificacao";
 
 // Os tokens do Arc declaram :root, que não existe dentro de um shadow root. Viram :host.
 const noShadow = (css: string) => css.replaceAll(":root", ":host");
@@ -78,6 +79,16 @@ function Selo({ selo, onAbrir }: { selo: SeloCabecalho; onAbrir(): void }) {
 export function montarSelo(shadow: ShadowRoot, onAbrir: () => void): ControleSelo {
   const raiz = montarRaiz(shadow, ESTILO_SELO);
   const desenhar = (selo: SeloCabecalho | null) => raiz.render(selo ? <Selo selo={selo} onAbrir={onAbrir} /> : null);
+  desenhar(null);
+  return { atualizar: desenhar, desmontar: () => raiz.unmount() };
+}
+
+export type ControleHistorico = { atualizar(historico: DadosHistorico | null): void; desmontar(): void };
+
+/** Histórico da qualificação, dentro da conversa do lead. `null` tira tudo (outra conversa ou sem lead). */
+export function montarHistorico(shadow: ShadowRoot): ControleHistorico {
+  const raiz = montarRaiz(shadow, ESTILO_HISTORICO);
+  const desenhar = (historico: DadosHistorico | null) => raiz.render(historico ? <HistoricoQualificacao historico={historico} /> : null);
   desenhar(null);
   return { atualizar: desenhar, desmontar: () => raiz.unmount() };
 }
