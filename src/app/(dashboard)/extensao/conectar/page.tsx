@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { conexaoParamsSchema } from "@/features/browser-extension/conexao-schemas";
+import { unidadeDoCorretor } from "@/features/browser-extension/conexao-status";
 
 import { ConectarExtensao } from "./conectar-extensao";
 
@@ -22,9 +23,8 @@ export default async function ExtensaoConectarPage({
   });
   const db = getDatabase();
   const [usuario] = await db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1);
-  const [unidade] = context.branchId
-    ? await db.select({ name: schema.branches.name }).from(schema.branches).where(eq(schema.branches.id, context.branchId)).limit(1)
-    : [];
+  // Unidade só dentro da própria empresa (B5): a busca é por id e tenant.
+  const unidade = context.branchId ? await unidadeDoCorretor(context.tenantId, context.branchId) : null;
   return (
     <div>
       <ConectarExtensao nome={usuario?.name ?? "Corretor"} unidade={unidade?.name ?? "Sem unidade"} params={parsed.success ? parsed.data : null} />
