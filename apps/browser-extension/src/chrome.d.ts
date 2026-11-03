@@ -16,7 +16,7 @@ declare const chrome: {
   };
   storage: {
     session: { get: (key: string) => Promise<Record<string, string>>; set: (value: Record<string, string>) => Promise<void>; remove: (key: string) => Promise<void> };
-    local: { get: (key: string) => Promise<Record<string, unknown>>; set: (value: Record<string, unknown>) => Promise<void> };
+    local: { get: (key: string) => Promise<Record<string, unknown>>; set: (value: Record<string, unknown>) => Promise<void>; remove: (key: string) => Promise<void> };
   };
   tabs: { create: (options: { url: string }) => void };
 };

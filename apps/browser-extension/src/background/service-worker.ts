@@ -74,7 +74,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
     respond({ ok: false, reason: "BAD_MESSAGE" });
     return false;
   }
-  void trocarCodigo(valida.code)
+  void trocarCodigo(valida.code, valida.perfil)
     .then((ok) => respond({ ok, reason: ok ? undefined : "INVALID_CODE" }))
     .catch(() => respond({ ok: false, reason: "OFFLINE" }));
   return true;

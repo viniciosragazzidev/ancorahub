@@ -46,3 +46,17 @@ describe("formato da mensagem de conexão", () => {
     expect(mensagemConectarValida(null)).toBeNull();
   });
 });
+
+describe("perfil para exibição", () => {
+  it("devolve nome e unidade quando vêm na mensagem", () => {
+    expect(mensagemConectarValida({ type: "CONECTAR_EXTENSAO", code: "Abc123_-xyz9", nome: " Corretor Exemplo ", unidade: "Unidade Centro" })).toEqual({
+      code: "Abc123_-xyz9",
+      perfil: { nome: "Corretor Exemplo", unidade: "Unidade Centro" },
+    });
+  });
+
+  it("ignora perfil com caractere de controle ou acima de 120 caracteres", () => {
+    expect(mensagemConectarValida({ type: "CONECTAR_EXTENSAO", code: "Abc123_-xyz9", nome: "Nome\u0007", unidade: "U" })).toEqual({ code: "Abc123_-xyz9" });
+    expect(mensagemConectarValida({ type: "CONECTAR_EXTENSAO", code: "Abc123_-xyz9", nome: "x".repeat(121), unidade: "U" })).toEqual({ code: "Abc123_-xyz9" });
+  });
+});

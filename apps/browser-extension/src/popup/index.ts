@@ -1,13 +1,20 @@
 import { trocarCodigo } from "../shared/sessao";
+import { descreverAparelho } from "../../../../src/features/browser-extension/aparelho";
+import { ESTILO } from "./estilo";
 
 type ApiResult = { ok: boolean; status: number; body: Record<string, unknown> };
+type Perfil = { nome: string; unidade: string };
 
 const root = document.querySelector("#root")!;
+const aparelho = descreverAparelho(navigator.userAgent);
+const escapar = (valor: string) => valor.replace(/[&<>"']/g, (caractere) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[caractere] ?? caractere);
 
-function render(content: string) {
-  root.innerHTML = `<style>
-    :root{color:#e9edef;background:#111b21;font:14px Inter,system-ui,sans-serif}body{margin:0;min-width:300px;background:#111b21}main{padding:18px}.mark{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#123d35;color:#1fbf91;font-weight:800}.heading{display:flex;align-items:center;gap:10px}.heading h1{margin:0;font-size:16px}.muted{margin:8px 0 0;color:#aebac1;font-size:12px;line-height:1.45}input,button{width:100%;box-sizing:border-box;margin-top:12px;padding:10px;border-radius:8px;font:inherit}input{border:1px solid #3b4a54;background:#202c33;color:#e9edef}button{border:0;background:#176b5d;color:#fff;font-weight:700;cursor:pointer}button.secondary{border:1px solid #3b4a54;background:transparent;color:#e9edef}.status{margin-top:14px;padding:10px;border:1px solid #28584d;border-radius:8px;background:#122f29;color:#b9f6e4;font-size:12px;line-height:1.45}</style><main>${content}</main>`;
+function render(corpo: string) {
+  root.innerHTML = `<style>${ESTILO}</style><main class="painel">${corpo}</main>`;
 }
+
+const cabecalho = (selo: string) =>
+  `<header class="topo"><span class="marca" aria-hidden="true">A</span><div><h1>AncoraHub Assistant</h1>${selo}</div></header>`;
 
 const REQUEST_TIMEOUT_MS = 15000;
 
@@ -37,25 +44,56 @@ function request(path: string, method = "GET", body?: unknown) {
   });
 }
 
-async function showConnected() {
-  render(`<div class="heading"><span class="mark">A</span><h1>AncoraHub Assistant</h1></div><p class="status">Conectada neste navegador.</p><p class="muted">O painel só aparece em conversas de leads atribuídos a você e à sua unidade.</p><button class="secondary" id="disconnect">Desconectar extensão</button>`);
-  document.querySelector("#disconnect")!.addEventListener("click", async () => {
-    const button = document.querySelector<HTMLButtonElement>("#disconnect")!;
+async function lerPerfil(): Promise<Perfil | null> {
+  const { perfil } = await chrome.storage.local.get("perfil");
+  if (!perfil || typeof perfil !== "object") return null;
+  const { nome, unidade } = perfil as Record<string, unknown>;
+  return typeof nome === "string" && typeof unidade === "string" ? { nome, unidade } : null;
+}
+
+function showConectada(perfil: Perfil | null) {
+  render(`${cabecalho('<span class="selo ok">Conectada</span>')}
+    <section class="bloco">
+      <p class="rotulo">Conta</p>
+      <p class="valor">${escapar(perfil?.nome ?? "Conta conectada")}</p>
+      ${perfil ? `<p class="secundario">${escapar(perfil.unidade)}</p>` : ""}
+      <p class="secundario">Aparelho: ${escapar(aparelho)}</p>
+    </section>
+    <p class="secundario">O painel aparece só em conversas de leads atribuídos a você e à sua unidade.</p>
+    <button id="desconectar" class="seco" type="button">Desconectar</button>
+    <p class="status" id="status" role="status"></p>`);
+  document.querySelector("#desconectar")!.addEventListener("click", async () => {
+    const button = document.querySelector<HTMLButtonElement>("#desconectar")!;
+    const status = document.querySelector("#status")!;
     button.disabled = true;
     button.textContent = "Desconectando…";
     const result = await request("/api/extension/auth/revoke", "POST");
     if (!result.ok) {
       button.disabled = false;
-      button.textContent = "Não foi possível desconectar. Tente novamente.";
+      button.textContent = "Desconectar";
+      status.textContent = "Não foi possível desconectar. Tente de novo.";
       return;
     }
     await chrome.storage.session.remove("token").catch(() => undefined);
-    void showDisconnected();
+    await chrome.storage.local.remove("perfil").catch(() => undefined);
+    showSemSessao("desconectada");
   });
 }
 
-function showDisconnected(message?: string) {
-  render(`<div class="heading"><span class="mark">A</span><h1>AncoraHub Assistant</h1></div><p class="muted">Conecte com um clique. A página do CRM confirma quem está conectando.</p><button id="conectar-crm">Conectar ao CRM</button><p class="muted">Sem essa opção? Use o código temporário gerado no CRM.</p><input id="code" placeholder="Código temporário" autocomplete="one-time-code"><button id="connect" class="secondary">Conectar com código</button><p class="muted" id="status">${message ?? ""}</p>`);
+// Sem sessão: "desconectada" (primeira vez ou após desconectar) ou "expirada" (token antigo recusado pelo CRM).
+function showSemSessao(estado: "desconectada" | "expirada", perfil: Perfil | null = null, message = "") {
+  const selo = estado === "expirada" ? '<span class="selo aviso">Sessão expirada</span>' : '<span class="selo">Desconectada</span>';
+  const texto = estado === "expirada"
+    ? "Sua conexão com o CRM expirou. Conecte de novo para continuar."
+    : "Conecte este navegador à sua conta para ver o contexto do lead no WhatsApp Web.";
+  render(`${cabecalho(selo)}
+    <p class="texto">${texto}</p>
+    ${estado === "expirada" && perfil ? `<p class="secundario">${escapar(perfil.nome)} · ${escapar(perfil.unidade)}</p>` : ""}
+    <button id="conectar-crm" class="primario" type="button">Conectar ao CRM</button>
+    <div class="separador"><span>ou use o código</span></div>
+    <input id="code" placeholder="Código temporário" autocomplete="one-time-code" aria-label="Código temporário">
+    <button id="connect" class="seco" type="button">Conectar com código</button>
+    <p class="status" id="status" role="status">${escapar(message)}</p>`);
   document.querySelector("#conectar-crm")!.addEventListener("click", () => {
     chrome.runtime.sendMessage({ type: "OPEN_CRM_CONNECT" }, () => void chrome.runtime.lastError);
     window.close();
@@ -67,7 +105,7 @@ function showDisconnected(message?: string) {
     status.textContent = "Conectando…";
     try {
       if (!(await trocarCodigo(code))) throw new Error("INVALID_CODE");
-      await showConnected();
+      showConectada(await lerPerfil());
     } catch {
       status.textContent = "Não foi possível conectar. Gere um novo código no CRM.";
     }
@@ -76,9 +114,10 @@ function showDisconnected(message?: string) {
 
 void (async () => {
   const { token } = await chrome.storage.session.get("token");
-  if (!token) return showDisconnected();
+  const perfil = await lerPerfil();
+  if (!token) return showSemSessao("desconectada");
   const session = await request("/api/extension/session");
-  if (session.ok || session.status !== 401) return showConnected();
+  if (session.ok || session.status !== 401) return showConectada(perfil);
   await chrome.storage.session.remove("token").catch(() => undefined);
-  showDisconnected("A sessão expirou. Gere um novo código no CRM.");
-})().catch(() => showDisconnected());
+  showSemSessao("expirada", perfil);
+})().catch(() => showSemSessao("desconectada"));

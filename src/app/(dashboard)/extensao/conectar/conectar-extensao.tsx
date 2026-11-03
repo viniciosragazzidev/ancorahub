@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import page from "@/components/lite/page/lite-page.module.css";
+import { descreverAparelho } from "@/features/browser-extension/aparelho";
 import styles from "@/components/lite/page/lite-sections.module.css";
 import { gerarCodigoConexaoAction } from "@/features/browser-extension/conexao-actions";
 import type { ConexaoParams } from "@/features/browser-extension/conexao-schemas";
@@ -31,6 +32,9 @@ function enviarParaExtensao(extensionId: string, message: unknown): Promise<{ ok
 
 export function ConectarExtensao({ nome, unidade, params }: { nome: string; unidade: string; params: ConexaoParams | null }) {
   const [estado, setEstado] = useState<"parado" | "gerando" | "conectada" | "sem-extensao" | "recusada">("parado");
+  // O user agent só existe no navegador: a descrição entra depois da primeira renderização.
+  const [aparelho, setAparelho] = useState("este navegador");
+  useEffect(() => setAparelho(descreverAparelho(navigator.userAgent)), []);
 
   if (!params) {
     return (
@@ -46,7 +50,8 @@ export function ConectarExtensao({ nome, unidade, params }: { nome: string; unid
     setEstado("gerando");
     try {
       const { code } = await gerarCodigoConexaoAction(dados);
-      const resposta = await enviarParaExtensao(dados.ext, { type: "CONECTAR_EXTENSAO", code });
+      // nome e unidade são só para a extensão mostrar a conta conectada; o servidor já validou quem está conectando.
+      const resposta = await enviarParaExtensao(dados.ext, { type: "CONECTAR_EXTENSAO", code, nome, unidade });
       if (resposta === null) return setEstado("sem-extensao");
       setEstado(resposta.ok ? "conectada" : "recusada");
     } catch {
@@ -57,7 +62,7 @@ export function ConectarExtensao({ nome, unidade, params }: { nome: string; unid
   return (
     <div className={styles.formBody}>
       <p className={styles.note}>Conectando como <strong>{nome}</strong> · {unidade}</p>
-      <p className={styles.note}>Aparelho: navegador {dados.device.slice(0, 8)}</p>
+      <p className={styles.note}>Aparelho: {aparelho}</p>
       {estado === "conectada" ? (
         <div className={styles.notice} role="status">
           <p className={styles.note}>Extensão conectada. Pode fechar esta aba.</p>

@@ -17,10 +17,19 @@ export function remetenteConfiavel(sender: { id?: string; url?: string }, crmBas
   return url.origin === new URL(crmBase).origin && url.pathname === CAMINHO_CONEXAO;
 }
 
-/** Mensagem válida: tipo exato e código com formato esperado. Qualquer outra coisa é recusada. */
-export function mensagemConectarValida(mensagem: unknown): { code: string } | null {
+export type Perfil = { nome: string; unidade: string };
+
+// Texto de exibição: sem caracteres de controle e com tamanho limitado.
+const SEM_CONTROLE = /[\u0000-\u001f\u007f]/;
+const textoExibicao = (valor: unknown) =>
+  typeof valor === "string" && valor.trim() && valor.length <= 120 && !SEM_CONTROLE.test(valor) ? valor.trim() : null;
+
+/** Mensagem válida: tipo exato e código com formato esperado. Perfil é só para exibir no popup. Qualquer outra coisa é recusada. */
+export function mensagemConectarValida(mensagem: unknown): { code: string; perfil?: Perfil } | null {
   if (!mensagem || typeof mensagem !== "object") return null;
-  const { type, code } = mensagem as Record<string, unknown>;
+  const { type, code, nome, unidade } = mensagem as Record<string, unknown>;
   if (type !== MENSAGEM_CONECTAR || typeof code !== "string" || !FORMATO_CODIGO.test(code)) return null;
-  return { code };
+  const nomeLimpo = textoExibicao(nome);
+  const unidadeLimpa = textoExibicao(unidade);
+  return nomeLimpo && unidadeLimpa ? { code, perfil: { nome: nomeLimpo, unidade: unidadeLimpa } } : { code };
 }
