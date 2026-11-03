@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { OfertaExtensao, Temperatura } from "../shared/types";
+import { centralizarNaLista } from "../content/rolagem";
 
 export type ResultadoListaOfertas = { ok: true; ofertas: OfertaExtensao[] } | { ok: false; retryAfter?: number };
 export type ResultadoAceiteOferta =
@@ -82,7 +83,9 @@ export function OfertasPendentes({ acoes, refreshKey, destacarOfferId, ativa }: 
   useEffect(() => {
     if (!destacarOfferId) return;
     const item = listaRef.current?.querySelector<HTMLElement>(`[data-offer-id="${CSS.escape(destacarOfferId)}"]`);
-    item?.scrollIntoView({ block: "center" });
+    // Rola só a lista da gaveta: rolar o item até a tela também moveria a página do WhatsApp.
+    const rolavel = item?.closest<HTMLElement>(".corpo");
+    if (item && rolavel) centralizarNaLista(rolavel, item);
   }, [destacarOfferId, ofertas]);
 
   async function abrir(offerId: string, dados: TentativaAbertura) {

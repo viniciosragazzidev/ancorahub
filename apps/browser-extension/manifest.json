@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AncoraHub Assistant",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Painel contextual do AncoraHub para o WhatsApp Web.",
   "permissions": ["storage", "tabs", "alarms", "notifications", "offscreen"],
   "host_permissions": ["https://web.whatsapp.com/*", "https://crm.ancorasaude.cloud/*"],

@@ -22,10 +22,12 @@ const ESTILO_SELO = `
 @media (prefers-reduced-motion: reduce){.selo{transition:none}}
 `;
 
-function montarRaiz(shadow: ShadowRoot, css: string): Root {
+/** `altura`: a raiz ocupa a altura do hospedeiro, para a coluna da gaveta rolar só dentro de si. */
+function montarRaiz(shadow: ShadowRoot, css: string, altura = false): Root {
   const estilo = document.createElement("style");
   estilo.textContent = css;
   const ponto = document.createElement("div");
+  if (altura) ponto.style.height = "100%";
   shadow.append(estilo, ponto);
   return createRoot(ponto);
 }
@@ -34,7 +36,7 @@ export type ControleGaveta = { atualizar(estado: EstadoGaveta): void; atualizarO
 
 /** Monta a gaveta no shadow root e devolve o controle para o script de conteúdo trocar o estado. */
 export function montarPainel(shadow: ShadowRoot, acoes: AcoesGaveta, estadoInicial: EstadoGaveta = { tipo: "carregando" }): ControleGaveta {
-  const raiz = montarRaiz(shadow, `${noShadow(tokensBase)}\n${tokensAtivos}\n${ESTILO_GAVETA}`);
+  const raiz = montarRaiz(shadow, `${noShadow(tokensBase)}\n${tokensAtivos}\n${ESTILO_GAVETA}`, true);
   let estado = estadoInicial;
   let ativa = false;
   let refreshKey = 0;

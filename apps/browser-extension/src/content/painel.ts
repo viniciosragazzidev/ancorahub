@@ -2,6 +2,7 @@ import type { AcoesGaveta } from "../panel/gaveta";
 import type { EstadoGaveta, Temperatura } from "../shared/types";
 import type { AvisoInboxExtensao } from "../shared/types";
 import { localizarTodas } from "./detectors";
+import { cabeNaSecao } from "./rolagem";
 import { aplicarTema, observarTema } from "./tema";
 
 // Contrato do módulo do painel (panel/panel.js, carregado como recurso acessível pela web).
@@ -25,8 +26,9 @@ function carregarModulo(): Promise<ModuloPainel> {
 // Largura da coluna nativa "Dados do contato" no WhatsApp Web (desktop).
 const LARGURA_GAVETA = 415;
 
-const ESTILO_BOTAO = `:host{display:inline-flex}
-button{display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:999px;background:transparent;color:var(--ct-fg,#111b21);cursor:pointer}
+// Tamanho fixo igual ao dos vizinhos da barra, sem margem: um botão maior estoura a seção e rola a página.
+const ESTILO_BOTAO = `:host{display:inline-flex;flex:0 0 36px;width:36px;height:36px;margin:0;padding:0;overflow:hidden}
+button{display:grid;place-items:center;width:36px;height:36px;margin:0;padding:0;border:0;border-radius:999px;background:transparent;color:var(--ct-fg,#111b21);cursor:pointer}
 button:hover,button:focus-visible{background:var(--ct-hover,#f0f2f5);outline:0}
 .marca{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;background:oklch(62% .2 255);color:#fff;font:700 12px/1 "Inter Variable",Inter,system-ui,sans-serif}
 @media (prefers-reduced-motion: reduce){button{transition:none}}`;
@@ -170,7 +172,7 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
     }
     if (botao && botao.parentElement === barra.elemento) return;
     botao?.remove();
-    const { host, shadow } = criarHospedeiro("ancorahub-botao", ESTILO_BOTAO, "display:inline-flex;");
+    const { host, shadow } = criarHospedeiro("ancorahub-botao", ESTILO_BOTAO, "display:inline-flex;width:36px;height:36px;margin:0;padding:0;flex:0 0 36px;");
     const control = document.createElement("button");
     control.type = "button";
     control.setAttribute("aria-label", "AncoraHub Assistant");
@@ -183,6 +185,12 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
     });
     shadow.append(control);
     barra.elemento.append(host);
+    // Não cabe na seção da barra: não fica. Assim o botão nunca estoura e rola a página do WhatsApp.
+    if (!cabeNaSecao(barra.elemento)) {
+      host.remove();
+      botao = null;
+      return;
+    }
     botao = host;
   }
 

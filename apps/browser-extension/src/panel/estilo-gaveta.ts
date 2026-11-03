@@ -7,7 +7,7 @@ export const ESTILO_GAVETA = `
 .cabeca{display:flex;align-items:center;gap:18px;height:60px;flex:none;padding:0 16px;border-bottom:1px solid var(--ct-line)}
 .cabeca strong{font-size:16px;font-weight:600}
 .fechar{display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:999px;background:transparent;color:var(--ct-muted);font-size:22px;line-height:1;cursor:pointer}
-.corpo{flex:1;overflow:auto;min-height:0}
+.corpo{flex:1;overflow-y:auto;min-height:0;overscroll-behavior:contain}
 .identidade{display:flex;flex-direction:column;align-items:center;gap:4px;padding:24px 16px 20px;border-bottom:8px solid var(--ct-surface)}
 .identidade strong{margin-top:10px;font-size:18px;font-weight:600;text-align:center}
 .identidade span{color:var(--ct-muted);font-size:14px}

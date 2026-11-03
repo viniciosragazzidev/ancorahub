@@ -1,4 +1,5 @@
 import type { ConversationIdentity } from "../shared/types";
+import { focarSemRolar } from "./rolagem";
 
 export interface WhatsAppWebAdapter {
   isReady(): boolean;
@@ -95,7 +96,7 @@ function acharCampoBuscaNovoChat() {
 }
 
 function escreverBusca(campo: HTMLElement, texto: string) {
-  campo.focus();
+  focarSemRolar(campo);
   if (campo instanceof HTMLInputElement) {
     campo.value = texto;
     campo.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: texto }));
@@ -174,7 +175,7 @@ export class DefaultWhatsAppWebAdapter implements WhatsAppWebAdapter {
   async insertComposerText(text: string) {
     const composer = document.querySelector('[data-testid="conversation-compose-box-input"]') as HTMLElement | null;
     if (!composer) return { success: false, reason: "COMPOSER_NOT_FOUND" };
-    composer.focus(); document.execCommand("insertText", false, text); composer.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+    focarSemRolar(composer); document.execCommand("insertText", false, text); composer.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
     return { success: true };
   }
 
