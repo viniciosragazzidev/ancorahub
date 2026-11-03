@@ -357,18 +357,14 @@ export default async function ConversationsPage({
 
     // Texto e mídia só do que a tela mostra: prévia de cada conversa e o histórico da aberta (?leadId=).
     const openLead = leadId ? leads.find((lead) => lead.id === leadId) : undefined;
-    // Sem ?leadId, a tela abre a conversa da mensagem mais nova: o histórico dela também vem completo.
-    const newestIndexRow = (listIndexRows as MessageIndexRow[]).reduce<MessageIndexRow | null>(
-      (newest, row) => (!newest || row.sentAt > newest.sentAt ? row : newest),
-      null,
-    );
+    // 03/11 (egress): sem ?leadId nenhuma conversa abre sozinha. O histórico completo só vem
+    // para a conversa que a pessoa clicou; antes, toda entrada e toda recarga traziam as 300
+    // mensagens da conversa mais nova mesmo sem ninguém olhar para ela.
     const openThread = leadId?.startsWith("unassigned-")
       ? { leadId: null, phone: leadId.slice("unassigned-".length) }
       : openLead
         ? { leadId: openLead.id, phone: openLead.telefone }
-        : !leadId && newestIndexRow
-          ? { leadId: newestIndexRow.leadId, phone: newestIndexRow.phone }
-          : null;
+        : null;
     // The open conversation reads its own index (28/10): the shared one keeps only the newest
     // messages of the company, so an older lead showed just its last messages.
     const openThreadIndexRows = openThread

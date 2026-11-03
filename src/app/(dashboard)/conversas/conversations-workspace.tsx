@@ -29,6 +29,7 @@ import { LEAD_QUALIFICATION_LABELS, metaBlockedQualificationLabel, type LeadQual
 import type { LeadTag } from "@/features/lead-tags/rules";
 import { FilterToolbar } from "@/components/ui/filter-toolbar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -231,9 +232,8 @@ export function ConversationsWorkspace({
   const searchParams = useSearchParams();
   const [conversations, setConversations] = useState(initialConversations);
   const [selectedId, setSelectedId] = useState<string | null>(
-    initialLeadId && initialConversations.some((item) => item.id === initialLeadId)
-      ? initialLeadId
-      : initialConversations.find((item) => item.messages.length > 0)?.id ?? initialConversations[0]?.id ?? null,
+    // 03/11 (egress): só abre a conversa pedida na URL. Sem ela, a tela espera o clique.
+    initialLeadId && initialConversations.some((item) => item.id === initialLeadId) ? initialLeadId : null,
   );
   const [mobileView, setMobileView] = useState<"list" | "chat">(
     initialLeadId ? "chat" : "list",
@@ -554,7 +554,13 @@ export function ConversationsWorkspace({
                   {selectedTagPicker}
                 </div>
               ) : null}
-              <ConversationHistory client={selected} directorSkinEnabled={directorSkinEnabled} />
+              {/* O servidor só manda o histórico completo da conversa da URL (?leadId=). Até ele
+                  chegar, a lista tem só a prévia: mostra o carregamento em vez de meia conversa. */}
+              {selected.id === initialLeadId ? (
+                <ConversationHistory client={selected} directorSkinEnabled={directorSkinEnabled} />
+              ) : (
+                <ConversationHistoryLoading />
+              )}
               <ChatInput
                 leadId={selected.id}
                 brokerName={brokerDisplayName(selected.corretorNome)}
@@ -1746,6 +1752,21 @@ function EmptyConversationList({ hasQuery }: { hasQuery: boolean }) {
       description={hasQuery ? "Ajuste a busca ou os filtros para encontrar outro atendimento." : "Os atendimentos disponíveis no seu escopo aparecerão aqui."}
       className="px-5 py-12"
     />
+  );
+}
+
+function ConversationHistoryLoading() {
+  return (
+    <div role="status" aria-live="polite" aria-label="Carregando a conversa" className="flex min-h-0 flex-1 flex-col justify-end gap-3 overflow-hidden p-4">
+      <Skeleton className="h-14 w-3/5 self-start rounded-2xl" />
+      <Skeleton className="h-10 w-2/5 self-end rounded-2xl" />
+      <Skeleton className="h-20 w-2/3 self-start rounded-2xl" />
+      <Skeleton className="h-12 w-1/2 self-end rounded-2xl" />
+      <p className="flex items-center justify-center gap-2 pt-2 text-xs text-muted-foreground">
+        <RefreshCw className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        Carregando a conversa
+      </p>
+    </div>
   );
 }
 
