@@ -65,7 +65,7 @@ Cada etapa só sai se passar por esta lista. A referência é o código na base
 | O2 | Prazo e tolerância | `offers.ts:148-153`, `domain.ts:422-424` | Contador só exibe; o servidor decide e devolve `expired` |
 | O3 | Uma aceitação só, com lock do lead | `offers.ts:~945-960` | Idempotência por `offerId`; `already_accepted` vira mensagem clara |
 | O4 | Ação só "aceitar" ou "recusar" | `offers.ts:~830-835` | Texto do botão fixo; nunca texto livre |
-| O5 | Recusa conta como pulo do plantão | `offers.ts:~855-863` | Avisar antes de recusar |
+| O5 | Recusa válida conta como pulo do plantão; vencida ou já resolvida não gera novo pulo por esse caminho | `offers.ts`, correção canônica aprovada na E3 | Avisar antes de recusar; respeitar `expired`/`already_resolved` |
 | O6 | Nivelamento, corte do dia, frios liberados às 9h do 2º dia | `received-in-day-core.ts`, `broker-day-history.ts:46-52`, `cold-age-release.ts:30,43` | A extensão não mexe; só mostra o que o servidor ofereceu |
 | S1 | Transições válidas | `lead-status-constants.ts:15-27`, `change-lead-status.ts:208-214` | Só mostra as opções válidas; o servidor valida de novo |
 | S2 | Perdido exige motivo da lista | `lead-status-constants.ts:39`, `change-lead-status.ts:226-232` | Seletor de motivos vindo do CRM (motivos editáveis da Onda 1) |
@@ -75,7 +75,7 @@ Cada etapa só sai se passar por esta lista. A referência é o código na base
 | L1 | Telefone mascarado | `browser-extension/schemas.ts:45-48` | Número inteiro só depois do aceite, para abrir a conversa |
 | L2 | Dados que não saem do CRM (CPF, comissão, observações internas) | `lead-context.ts:21-48` | O payload novo usa lista fechada de campos (allowlist), revisada pelo Vigia |
 | M1 | Anti-bloqueio do envio | `outbound-service.ts:908-917`, `team-notices/guard.ts:14-16` | Essas travas só cobrem envios do CRM; o envio manual no WhatsApp Web não passa por elas. Por isso a extensão nunca envia nem automatiza envio: sugestões e saudação só preenchem o texto |
-| P1 | Plantão no aceite (regra 16 do inventário, ainda não confirmada no código) | `processQueuedLead` (`candidate.onDuty`) | Confirmar no mapa da E3 se o aceite checa o plantão; se não checar, só avisar e anotar como pendência para o Vinicios, sem regra nova |
+| P1 | Plantão no aceite: apenas aviso, confirmado na E3 | `handleLeadOfferWebhookResponse`, `findBrokerRunningDutyScheduleId` e `pickBrokerRunningDutyScheduleId` | Não bloquear aceite; devolver `foraDoPlantao` como aviso, sem regra nova |
 | A1 | Auditoria | `change-lead-status.ts:~346`, `auth.ts:53-58` | Ação `extension.*` com metadados `{source:"extension", deviceId, sessionId}` |
 
 Reforços que a extensão traz, sempre com a checagem também no servidor:
@@ -217,6 +217,15 @@ O plano B manual continua sem vínculo; E1 pode emitir código com `{extensionId
 A unidade/membership é conferida em cada chamada. Renovação explícita: `POST /api/extension/session`;
 `GET` permanece compatível e não rotaciona. SQL manual: `drizzle/0216_extension_auth_code_binding.sql`.
 Validações: typecheck e testes focados com mocks; detalhes e limites no registro da E0a.
+
+## Entrega E3 e servidor E2 (03/11/2026)
+
+Servidor implementado em `feat/ext-v2-e3`, base `3a0b0b6b`; aguardando revisão do Vigia.
+Contexto ampliado dentro da allowlist, listagem minimizada e resposta exata por `offerId` usando o serviço do CRM.
+A recusa canônica vencida/sem alteração foi corrigida por decisão explícita do Maestro; P1 continua somente aviso.
+Novas sessões recebem `ACCEPT_LEAD`; sessões antigas reconectam para obter a permissão, sem promoção na renovação.
+Contrato, evidências e limites: [E3 e servidor E2](2026-11-03-extensao-whatsapp-v2-e3-servidor.md).
+A interface de ofertas e a abertura de conversa permanecem pendentes após as correções da E1 pelo Vigia.
 
 ## Pendente com o Vinicios
 

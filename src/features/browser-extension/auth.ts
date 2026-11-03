@@ -7,7 +7,7 @@ import { AuthorizationError, AuthenticationError } from "@/shared/auth/errors";
 import { extensionCodeBindingSchema, type ExtensionCodeBinding, type ExtensionDeviceInput, type ExtensionSession } from "./schemas";
 import { recordExtensionAudit } from "./audit";
 
-export const SESSION_PERMISSIONS = ["VIEW_LEAD", "CHANGE_STATUS", "REGISTER_FEEDBACK", "CREATE_TASK", "GENERATE_REPLY"];
+export const SESSION_PERMISSIONS = ["VIEW_LEAD", "ACCEPT_LEAD", "CHANGE_STATUS", "REGISTER_FEEDBACK", "CREATE_TASK", "GENERATE_REPLY"];
 export const SESSION_IDLE_MS = 7 * 24 * 60 * 60_000;
 export const SESSION_MAX_MS = 30 * 24 * 60 * 60_000;
 export const SESSION_TOUCH_MS = 5 * 60_000;

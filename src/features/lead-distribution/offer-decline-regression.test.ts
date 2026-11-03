@@ -78,6 +78,13 @@ describe("recusa canônica, sem banco", () => {
     expect(await decline()).toEqual({ processed: false, reason: "already_resolved" });
     expect(state.skip).toHaveBeenCalledTimes(1); expect(state.jobs).toHaveBeenCalledTimes(1);
   });
+  it("a auditoria da extensão usa a mesma operação canônica e metadata confiável", async () => {
+    const metadata = { source: "extension", tenantId: "tenant-a", sessionId: "session-a", deviceId: "device-a", extensionVersion: "0.2.0" };
+    await handleLeadOfferWebhookResponse({ tenantId: "tenant-a", brokerId: broker.id, offerId: offer.id, buttonText: "recusar",
+      audit: { action: "extension.offer.declined", metadata } });
+    expect(state.values).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ acao: "extension.offer.declined", metadata }));
+    expect(state.skip).toHaveBeenCalledTimes(1);
+  });
   it("aceite repetido por offerId preserva already_accepted sem novos efeitos", async () => {
     for (let i = 0; i < 2; i++) {
       const accepted = { ...offer, status: "ACCEPTED" };

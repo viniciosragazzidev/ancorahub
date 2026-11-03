@@ -8,7 +8,7 @@ import { getExtensionTenantContext } from "./context";
 import { extensionDeviceSchema } from "./schemas";
 import { enforceExtensionRateLimit, extensionRouteKey } from "./rate-limit";
 
-export type ExtensionPermission = "VIEW_LEAD" | "CHANGE_STATUS" | "REGISTER_FEEDBACK" | "CREATE_TASK" | "GENERATE_REPLY" | "EXCHANGE_CODE";
+export type ExtensionPermission = "VIEW_LEAD" | "ACCEPT_LEAD" | "CHANGE_STATUS" | "REGISTER_FEEDBACK" | "CREATE_TASK" | "GENERATE_REPLY" | "EXCHANGE_CODE";
 
 export async function requireExtensionAccess(request: Request, permission: ExtensionPermission) {
   // Exchange authenticates the short-lived CRM grant, because a session does not exist yet.

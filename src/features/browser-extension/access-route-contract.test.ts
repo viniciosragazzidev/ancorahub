@@ -18,6 +18,9 @@ vi.mock("./lead-context", () => ({ resolveLeadForExtension: state.resolve, getLe
 vi.mock("./audit", () => ({ recordExtensionAudit: state.audit,
   extensionAuditMetadata: () => ({ source: "extension" }) }));
 vi.mock("@/features/leads/change-lead-status", () => ({ changeLeadStatus: state.changeStatus }));
+vi.mock("./offers", () => ({ listExtensionOffers: vi.fn(async () => []),
+  extensionOfferIdSchema: { parse: (value: string) => value },
+  respondToExtensionOffer: vi.fn(async () => ({ status: 200, body: { success: true } })) }));
 
 import { POST as resolve } from "@/app/api/extension/leads/resolve/route";
 import { GET as config } from "@/app/api/extension/config/route";
@@ -29,9 +32,12 @@ import { PATCH as status } from "@/app/api/extension/leads/[leadId]/status/route
 import { POST as reply } from "@/app/api/extension/leads/[leadId]/reply-suggestions/route";
 import { POST as suggestionFeedback } from "@/app/api/extension/suggestions/[suggestionId]/feedback/route";
 import { POST as telemetry } from "@/app/api/extension/telemetry/route";
+import { GET as offers } from "@/app/api/extension/offers/route";
+import { POST as acceptOffer } from "@/app/api/extension/offers/[offerId]/accept/route";
+import { POST as declineOffer } from "@/app/api/extension/offers/[offerId]/decline/route";
 import { AuthenticationError } from "@/shared/auth/errors";
 
-const permissions = ["VIEW_LEAD", "CHANGE_STATUS", "REGISTER_FEEDBACK", "CREATE_TASK", "GENERATE_REPLY"];
+const permissions = ["VIEW_LEAD", "ACCEPT_LEAD", "CHANGE_STATUS", "REGISTER_FEEDBACK", "CREATE_TASK", "GENERATE_REPLY"];
 let counter = 0;
 const routes = [
   ["leads/resolve", (r: Request) => resolve(r)], ["config", (r: Request) => config(r)],
@@ -42,6 +48,9 @@ const routes = [
   ["leads/lead-a/reply-suggestions", (r: Request) => reply(r, { params: Promise.resolve({ leadId: "lead-a" }) })],
   ["suggestions/s1/feedback", (r: Request) => suggestionFeedback(r, { params: Promise.resolve({ suggestionId: "s1" }) })],
   ["telemetry", (r: Request) => telemetry(r)],
+  ["offers", (r: Request) => offers(r)],
+  ["offers/offer-a/accept", (r: Request) => acceptOffer(r, { params: Promise.resolve({ offerId: "offer-a" }) })],
+  ["offers/offer-a/decline", (r: Request) => declineOffer(r, { params: Promise.resolve({ offerId: "offer-a" }) })],
 ] as const;
 function request(route: string, body: unknown = {}) {
   return new Request("https://crm.test/api/extension/" + route, { method: "POST", body: JSON.stringify(body) });
@@ -109,6 +118,15 @@ describe("gateway de todas as rotas da extensão, sem banco", () => {
     expect(await response.json()).toEqual({ error: "RATE_LIMITED" });
     expect(Number(response.headers.get("Retry-After"))).toBeGreaterThan(0);
     expect((await config(request("config"))).status).toBe(200);
+  });
+
+  it("aceite usa 10/min e não consome o limite de resolve", async () => {
+    const params = { params: Promise.resolve({ offerId: "offer-a" }) };
+    for (let i = 0; i < 10; i++) expect((await acceptOffer(request("offers/offer-a/accept"), params)).status).toBe(200);
+    const response = await acceptOffer(request("offers/offer-b/accept"), params);
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: "RATE_LIMITED" });
+    expect((await resolve(request("leads/resolve", { phone: "+5511999990000" }))).status).toBe(200);
   });
 
   it("propaga sessão vencida como 401 em vez de acessar recursos", async () => {
