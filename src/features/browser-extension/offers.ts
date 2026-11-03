@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, gt, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import type { TenantContext } from "@/shared/auth/types";
@@ -20,6 +20,11 @@ export const extensionOfferPayloadSchema = z.object({
 }).strict();
 const ACTIVE = ["PENDING", "SENT", "DELIVERED", "READ"];
 
+/** V1: oferta só aparece e responde para o lead da unidade do corretor (sem unidade, nada). */
+function leadDaUnidade(context: TenantContext) {
+  return context.branchId ? eq(schema.leads.branchId, context.branchId) : sql`false`;
+}
+
 export async function listExtensionOffers(context: TenantContext) {
   const rows = await getDatabase().select({
     id: schema.leadOffers.id, expiresAt: schema.leadOffers.expiresAt, dutyScheduleId: schema.leadOffers.dutyScheduleId,
@@ -30,7 +35,7 @@ export async function listExtensionOffers(context: TenantContext) {
     .leftJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.leadOffers.dutyScheduleId), eq(schema.unitDutySchedules.tenantId, context.tenantId)))
     .where(and(eq(schema.leadOffers.tenantId, context.tenantId), eq(schema.leadOffers.brokerId, context.userId),
       inArray(schema.leadOffers.status, ACTIVE), gt(schema.leadOffers.expiresAt, new Date()),
-      isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
+      isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), leadDaUnidade(context)))
     .orderBy(asc(schema.leadOffers.expiresAt));
   const dutyStatus = new Map(await Promise.all([...new Set(rows.flatMap((row) => row.dutyScheduleId ? [row.dutyScheduleId] : []))]
     // This field is advisory; a lookup failure must not hide offers or claim the broker is off duty.
@@ -48,8 +53,10 @@ export async function listExtensionOffers(context: TenantContext) {
 async function findOwnOffer(context: TenantContext, offerId: string) {
   const [offer] = await getDatabase().select({
     id: schema.leadOffers.id, leadId: schema.leadOffers.leadId, status: schema.leadOffers.status,
-  }).from(schema.leadOffers).where(and(eq(schema.leadOffers.id, offerId), eq(schema.leadOffers.tenantId, context.tenantId),
-    eq(schema.leadOffers.brokerId, context.userId))).limit(1);
+  }).from(schema.leadOffers)
+    .innerJoin(schema.leads, and(eq(schema.leads.id, schema.leadOffers.leadId), eq(schema.leads.tenantId, context.tenantId), leadDaUnidade(context)))
+    .where(and(eq(schema.leadOffers.id, offerId), eq(schema.leadOffers.tenantId, context.tenantId),
+      eq(schema.leadOffers.brokerId, context.userId))).limit(1);
   return offer;
 }
 
@@ -84,7 +91,7 @@ export async function respondToExtensionOffer(context: TenantContext, session: E
     eq(schema.leadOffers.tenantId, context.tenantId), eq(schema.leadOffers.id, offerId),
     eq(schema.leadOffers.brokerId, context.userId), eq(schema.leadOffers.status, "ACCEPTED")))
     .where(and(eq(schema.leads.id, offer.leadId), eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, context.userId),
-      isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))).limit(1);
+      leadDaUnidade(context), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))).limit(1);
   if (!winner) return { status: 409, body: { success: false, error: "UNAVAILABLE", message: "Este lead não está mais disponível para você." } };
   const greeting = await loadBrokerGreetingSafe({ tenantId: context.tenantId, leadId: winner.id, brokerUserId: context.userId, leadName: winner.nome });
   return { status: 200, body: { success: true, offerId, leadId: winner.id, action: "accepted", alreadyAccepted: result.reason === "already_accepted",
