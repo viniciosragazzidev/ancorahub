@@ -5,12 +5,14 @@ const state = vi.hoisted(() => ({
   revogadas: [] as Array<{ id: string; userId: string; tenantId: string; deviceId: string; extensionVersion: string }>,
   auditorias: [] as Array<{ userId: string; entidadeId: string; acao: string; metadata: Record<string, unknown> }>,
   falharAuditoria: false,
+  piloto: true,
   criarCodigo: vi.fn(async () => ({ code: "codigo-falso-1234", expiresInSeconds: 300 })),
 }));
 
 vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: async () => state.contexto }));
 vi.mock("@/shared/auth/authorization", () => ({ requireAnyRole: (context: unknown) => context }));
 vi.mock("./actions", () => ({ createExtensionCodeAction: state.criarCodigo }));
+vi.mock("./pilot", () => ({ isExtensionPilotUser: async () => state.piloto }));
 vi.mock("@/shared/db", async () => ({
   schema: await import("@/shared/db/schema"),
   getDatabase: () => ({
@@ -72,6 +74,14 @@ describe("desconectar pelo CRM", () => {
 describe("gerar código de conexão amarrado", () => {
   beforeEach(() => {
     state.criarCodigo.mockClear();
+    state.piloto = true;
+  });
+
+  it("piloto desligado para o corretor: não cria código e não diz que existe piloto", async () => {
+    state.piloto = false;
+    await expect(gerarCodigoConexaoAction({ ext: "abcdefghijklmnopabcdefghijklmnop", device: "1f2e3d4c-0000-4000-8000-000000000000" }))
+      .rejects.toThrow("Extensão desativada.");
+    expect(state.criarCodigo).not.toHaveBeenCalled();
   });
 
   it("chama a criação do código com extensão e aparelho, sem cast", async () => {
