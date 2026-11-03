@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { drainLeadDistributionBacklog } from "@/features/lead-distribution/jobs";
+import { drainLeadDistributionBacklog, runPriorityLeadDistribution } from "@/features/lead-distribution/jobs";
 import { processDutyPresenceReminders } from "@/features/lead-distribution/duty-presence";
 import { processDutyShiftReminders } from "@/features/lead-distribution/duty-shift-reminders";
 import { backgroundRoute } from "@/shared/db/background-pool";
@@ -22,6 +22,8 @@ const STALE_RUN_MS = 4 * 60_000;
 const DUTY_PRESENCE_TIMEOUT_MS = 60_000;
 const DUTY_SHIFT_REMINDER_TIMEOUT_MS = 15_000;
 const DRAIN_TIMEOUT_MS = 150_000;
+// Recently qualified hot/warm leads without a broker (03/11): its own budget is 25 s, the ceiling 30 s.
+const PRIORITY_TIMEOUT_MS = 30_000;
 
 class PhaseTimeoutError extends Error {
   constructor(phase: string, ms: number) {
@@ -69,7 +71,18 @@ async function handle(request: NextRequest) {
 async function runDistributionJob() {
   const phaseMs: PhaseTimes = {};
   const errors: Record<string, string> = {};
-  // The plantão link goes first (26/10): with the drain first, a slow backlog held every
+  // Hot and warm leads qualified in the last hours go before everything (03/11): they must have a
+  // broker within 3 minutes, and behind the plantão phases and the backlog one waited 30 minutes.
+  let priority: Awaited<ReturnType<typeof runPriorityLeadDistribution>> | null = null;
+  let priorityFailed = false;
+  try {
+    priority = await timedPhase("priority", PRIORITY_TIMEOUT_MS, () => runPriorityLeadDistribution(), phaseMs);
+  } catch (error) {
+    priorityFailed = true;
+    errors.priority = describeError(error);
+    console.error("[distribution-job] priority pass failed", error instanceof Error ? { name: error.name, message: error.message } : { name: "UnknownError" });
+  }
+  // The plantão link goes next (26/10): with the drain first, a slow backlog held every
   // reminder of the afternoon presencial for over 30 minutes.
   let dutyPresence: Awaited<ReturnType<typeof processDutyPresenceReminders>> | { enabled: boolean; error: true };
   let dutyPresenceFailed = false;
@@ -100,8 +113,8 @@ async function runDistributionJob() {
     errors.drain = describeError(error);
     console.error("[distribution-job] backlog drain failed", error instanceof Error ? { name: error.name, message: error.message } : { name: "UnknownError" });
   }
-  const success = !distributionFailed && !dutyPresenceFailed && !dutyShiftReminderFailed;
-  return NextResponse.json({ success, result, dutyPresence, dutyShiftReminder, phaseMs, ...(Object.keys(errors).length ? { errors } : {}) }, { status: success ? 200 : 500 });
+  const success = !distributionFailed && !dutyPresenceFailed && !dutyShiftReminderFailed && !priorityFailed;
+  return NextResponse.json({ success, priority, result, dutyPresence, dutyShiftReminder, phaseMs, ...(Object.keys(errors).length ? { errors } : {}) }, { status: success ? 200 : 500 });
 }
 
 /** Name and a short message only: never a stack or data. */

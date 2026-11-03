@@ -1805,6 +1805,12 @@ export async function distributeQualifiedLead(input: {
       leadId: input.leadId,
       reason: routedAssignment.reason,
     });
+    // Hot and warm leads get a broker within 3 minutes (03/11): try again in this process
+    // instead of waiting for the scheduler's turn behind the backlog.
+    if (classification === "hot" || classification === "warm") {
+      const { schedulePriorityDistributionRetries } = await import("./jobs");
+      schedulePriorityDistributionRetries(input.tenantId, input.leadId);
+    }
   }
   return {
     distributed: routedAssignment.status === "assigned" || routedAssignment.status === "offered",
