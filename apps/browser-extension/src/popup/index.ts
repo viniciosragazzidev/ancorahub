@@ -1,81 +1,169 @@
-type ApiResult = { ok: boolean; status: number; body: Record<string, unknown> };
+import { estadoPorStatus } from "../shared/estado-sessao";
+import { descreverAparelho } from "../../../../src/features/browser-extension/aparelho";
+import { ESTILO } from "./estilo";
+
+// O popup não toca na credencial: lê, troca e desconecta sempre pelo worker (dona da sessão).
+type ApiResult = { ok: boolean; status: number; body: Record<string, unknown>; retryAfter?: number; geracao?: string | null };
+type Perfil = { nome: string; unidade: string; userId: string; sessionId: string };
+type Credencial = { geracao: string; perfil: Perfil | null };
 
 const root = document.querySelector("#root")!;
+const aparelho = descreverAparelho(navigator.userAgent);
+const escapar = (valor: string) => valor.replace(/[&<>"']/g, (caractere) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[caractere] ?? caractere);
 
-function render(content: string) {
-  root.innerHTML = `<style>
-    :root{color:#e9edef;background:#111b21;font:14px Inter,system-ui,sans-serif}body{margin:0;min-width:300px;background:#111b21}main{padding:18px}.mark{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#123d35;color:#1fbf91;font-weight:800}.heading{display:flex;align-items:center;gap:10px}.heading h1{margin:0;font-size:16px}.muted{margin:8px 0 0;color:#aebac1;font-size:12px;line-height:1.45}input,button{width:100%;box-sizing:border-box;margin-top:12px;padding:10px;border-radius:8px;font:inherit}input{border:1px solid #3b4a54;background:#202c33;color:#e9edef}button{border:0;background:#176b5d;color:#fff;font-weight:700;cursor:pointer}button.secondary{border:1px solid #3b4a54;background:transparent;color:#e9edef}.status{margin-top:14px;padding:10px;border:1px solid #28584d;border-radius:8px;background:#122f29;color:#b9f6e4;font-size:12px;line-height:1.45}</style><main>${content}</main>`;
+function render(corpo: string) {
+  root.innerHTML = `<style>${ESTILO}</style><main class="painel">${corpo}</main>`;
 }
+
+const cabecalho = (selo: string) =>
+  `<header class="topo"><span class="marca" aria-hidden="true">A</span><div><h1>AncoraHub Assistant</h1>${selo}</div></header>`;
 
 const REQUEST_TIMEOUT_MS = 15000;
 
-function request(path: string, method = "GET", body?: unknown) {
-  return new Promise<ApiResult>((resolve) => {
-    let settled = false;
-    let timer: number | undefined;
-    const finish = (result: ApiResult) => {
-      if (!settled) {
-        settled = true;
-        window.clearTimeout(timer);
-        resolve(result);
+function mensagem<T>(tipo: string, payload?: Record<string, unknown>): Promise<T | null> {
+  return new Promise((resolve) => {
+    let concluido = false;
+    const concluir = (valor: T | null) => {
+      if (!concluido) {
+        concluido = true;
+        window.clearTimeout(limite);
+        resolve(valor);
       }
     };
+    const limite = window.setTimeout(() => concluir(null), REQUEST_TIMEOUT_MS);
     try {
-      chrome.runtime.sendMessage({ type: "API_REQUEST", payload: { path, method, body } }, (response) => {
-        if (chrome.runtime.lastError || !response || typeof response !== "object" || !("ok" in response)) {
-          finish({ ok: false, status: 0, body: {} });
-          return;
-        }
-        finish(response);
-      });
-      timer = window.setTimeout(() => finish({ ok: false, status: 0, body: {} }), REQUEST_TIMEOUT_MS);
+      chrome.runtime.sendMessage({ type: tipo, payload }, (resposta) => concluir(chrome.runtime.lastError ? null : (resposta as T | null)));
     } catch {
-      finish({ ok: false, status: 0, body: {} });
+      concluir(null);
     }
   });
 }
 
-async function showConnected() {
-  render(`<div class="heading"><span class="mark">A</span><h1>AncoraHub Assistant</h1></div><p class="status">Conectada neste navegador.</p><p class="muted">O painel só aparece em conversas de leads atribuídos a você e à sua unidade.</p><button class="secondary" id="disconnect">Desconectar extensão</button>`);
-  document.querySelector("#disconnect")!.addEventListener("click", async () => {
-    const button = document.querySelector<HTMLButtonElement>("#disconnect")!;
-    button.disabled = true;
-    button.textContent = "Desconectando…";
-    const result = await request("/api/extension/auth/revoke", "POST");
-    if (!result.ok) {
-      button.disabled = false;
-      button.textContent = "Não foi possível desconectar. Tente novamente.";
-      return;
-    }
-    await chrome.storage.session.remove("token").catch(() => undefined);
-    void showDisconnected();
-  });
+function request(path: string, method = "GET", body?: unknown) {
+  return mensagem<ApiResult>("API_REQUEST", { path, method, body }).then((resposta) => resposta ?? { ok: false, status: 0, body: {} });
 }
 
-function showDisconnected(message?: string) {
-  render(`<div class="heading"><span class="mark">A</span><h1>AncoraHub Assistant</h1></div><p class="muted">Conecte usando o código temporário gerado no CRM.</p><input id="code" placeholder="Código temporário" autocomplete="one-time-code"><button id="connect">Conectar</button><p class="muted" id="status">${message ?? ""}</p>`);
+function botaoDesconectar(credencial: Credencial | null) {
+  return credencial ? `<button id="desconectar" class="seco" type="button">Desconectar</button>` : "";
+}
+
+/** Desconecta a sessão desta tela: o worker revoga e remove só essa sessão, mesmo se o CRM não responder. */
+async function desconectar(credencial: Credencial) {
+  const status = document.querySelector("#status");
+  const botao = document.querySelector<HTMLButtonElement>("#desconectar");
+  if (botao) { botao.disabled = true; botao.textContent = "Desconectando…"; }
+  const resultado = await mensagem<{ revogado: boolean; removido: boolean }>("DESCONECTAR", { geracao: credencial.geracao });
+  if (resultado && !resultado.revogado && status) status.textContent = "Desconectado neste navegador. Não foi possível revogar no CRM agora; a sessão expira sozinha.";
+  showSemSessao("desconectada", resultado && !resultado.revogado ? "Desconectado neste navegador. Não foi possível revogar no CRM agora; a sessão expira sozinha." : "");
+}
+
+function ligarDesconectar(credencial: Credencial | null) {
+  if (!credencial) return;
+  document.querySelector("#desconectar")?.addEventListener("click", () => void desconectar(credencial));
+}
+
+function showConectada(credencial: Credencial, perfil: Perfil | null) {
+  render(`${cabecalho('<span class="selo ok">Conectada</span>')}
+    <section class="bloco">
+      <p class="rotulo">Conta</p>
+      <p class="valor">${escapar(perfil?.nome ?? "Conta conectada")}</p>
+      ${perfil ? `<p class="secundario">${escapar(perfil.unidade)}</p>` : ""}
+      <p class="secundario">Aparelho: ${escapar(aparelho)}</p>
+    </section>
+    <p class="secundario">O painel aparece só em conversas de leads atribuídos a você e à sua unidade.</p>
+    ${botaoDesconectar(credencial)}
+    <p class="status" id="status" role="status"></p>`);
+  ligarDesconectar(credencial);
+}
+
+/**
+ * Sem credencial: "desconectada" (primeira vez ou após desconectar) ou "expirada" (CRM recusou a sessão).
+ * Não recebe o perfil: a tela expirada não mostra o nome nem a unidade da conta anterior.
+ */
+function showSemSessao(estado: "desconectada" | "expirada", message = "") {
+  const selo = estado === "expirada" ? '<span class="selo aviso">Sessão expirada</span>' : '<span class="selo">Desconectada</span>';
+  const texto = estado === "expirada"
+    ? "Sua conexão com o CRM expirou. Conecte de novo para continuar."
+    : "Conecte este navegador à sua conta para ver o contexto do lead no WhatsApp Web.";
+  render(`${cabecalho(selo)}
+    <p class="texto">${texto}</p>
+    <button id="conectar-crm" class="primario" type="button">Conectar ao CRM</button>
+    <div class="separador"><span>ou use o código</span></div>
+    <input id="code" placeholder="Código temporário" autocomplete="one-time-code" aria-label="Código temporário">
+    <button id="connect" class="seco" type="button">Conectar com código</button>
+    <p class="status" id="status" role="status">${escapar(message)}</p>`);
+  document.querySelector("#conectar-crm")!.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "OPEN_CRM_CONNECT" }, () => void chrome.runtime.lastError);
+    window.close();
+  });
   document.querySelector("#connect")!.addEventListener("click", async () => {
     const status = document.querySelector("#status")!;
     const code = (document.querySelector("#code") as HTMLInputElement).value.trim();
     if (!code) { status.textContent = "Informe o código gerado no CRM."; return; }
     status.textContent = "Conectando…";
-    try {
-      const response = await fetch("https://crm.ancorasaude.cloud/api/extension/auth/exchange", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, deviceId: crypto.randomUUID(), extensionVersion: "0.1.2" }) });
-      const body = await response.json();
-      if (!response.ok || typeof body.token !== "string") throw new Error("INVALID_CODE");
-      await chrome.storage.session.set({ token: body.token });
-      await showConnected();
-    } catch {
-      status.textContent = "Não foi possível conectar. Gere um novo código no CRM.";
-    }
+    const troca = await mensagem<{ ok: boolean }>("TROCAR_CODIGO", { code });
+    if (troca?.ok) return verificar();
+    status.textContent = "Não foi possível conectar. Gere um novo código no CRM.";
   });
 }
 
-void (async () => {
-  const { token } = await chrome.storage.session.get("token");
-  if (!token) return showDisconnected();
-  const session = await request("/api/extension/session");
-  if (session.ok || session.status !== 401) return showConnected();
-  await chrome.storage.session.remove("token").catch(() => undefined);
-  showDisconnected("A sessão expirou. Gere um novo código no CRM.");
-})().catch(() => showDisconnected());
+/** Sem acesso no momento: não mostra nome nem dados; mantém a sessão e deixa desconectar. */
+function showIndisponivel(credencial: Credencial) {
+  render(`${cabecalho('<span class="selo aviso">Indisponível</span>')}
+    <p class="texto">A extensão não está disponível para a sua conta agora. Fale com o seu gestor.</p>
+    <button id="tentar" class="seco" type="button">Verificar de novo</button>
+    ${botaoDesconectar(credencial)}
+    <p class="status" id="status" role="status"></p>`);
+  document.querySelector("#tentar")!.addEventListener("click", () => verificar());
+  ligarDesconectar(credencial);
+}
+
+function showLimitada(credencial: Credencial, esperaSegundos: number) {
+  render(`${cabecalho('<span class="selo aviso">Muitas consultas</span>')}
+    <p class="texto">Aguarde ${esperaSegundos} segundos e tente de novo.</p>
+    <button id="tentar" class="seco" type="button">Verificar de novo</button>
+    ${botaoDesconectar(credencial)}
+    <p class="status" id="status" role="status"></p>`);
+  document.querySelector("#tentar")!.addEventListener("click", () => verificar());
+  ligarDesconectar(credencial);
+}
+
+/** Não afirma nada sobre a conexão: sem rede ou com erro do servidor. Deixa desconectar. */
+function showFalha(credencial: Credencial) {
+  render(`${cabecalho('<span class="selo aviso">Sem verificação</span>')}
+    <p class="texto">Não foi possível verificar a conexão agora. Tente de novo em instantes.</p>
+    <button id="tentar" class="seco" type="button">Verificar de novo</button>
+    ${botaoDesconectar(credencial)}
+    <p class="status" id="status" role="status"></p>`);
+  document.querySelector("#tentar")!.addEventListener("click", () => verificar());
+  ligarDesconectar(credencial);
+}
+
+/** Verifica a sessão pelo worker. Só mostra "conectada" com 200 da mesma sessão que o worker tem agora. */
+async function verificar(): Promise<void> {
+  const credencial = await mensagem<Credencial>("LER_CREDENCIAL");
+  if (!credencial) return showSemSessao("desconectada");
+  const resposta = await request("/api/extension/session");
+  // Se o worker trocou de sessão no meio, a verificação vale de novo, para a sessão atual.
+  if (resposta.geracao && resposta.geracao !== credencial.geracao) return verificar();
+  const estado = estadoPorStatus(resposta.status, resposta.retryAfter);
+  switch (estado.tipo) {
+    case "conectada": {
+      // O nome só aparece se for da mesma conta e sessão de agora (troca de conta não reaproveita).
+      const perfil = credencial.perfil;
+      const mesmaSessao = perfil && perfil.userId === resposta.body.userId && perfil.sessionId === resposta.body.sessionId;
+      return showConectada(credencial, mesmaSessao ? perfil : null);
+    }
+    case "expirada":
+      // O worker já descartou a sessão ao receber 401. Sem perfil: a conta anterior não aparece.
+      return showSemSessao("expirada");
+    case "indisponivel":
+      return showIndisponivel(credencial);
+    case "limitada":
+      return showLimitada(credencial, estado.esperaSegundos);
+    case "falha":
+      return showFalha(credencial);
+  }
+}
+
+void verificar().catch(() => showSemSessao("desconectada"));

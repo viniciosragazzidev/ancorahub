@@ -5,6 +5,7 @@ export interface WhatsAppWebAdapter {
   getActiveConversation(): Promise<ConversationIdentity | null>;
   observeConversationChange(callback: () => void): () => void;
   insertComposerText(text: string): Promise<{ success: boolean; reason?: string }>;
+  openNewConversation(phone: string, greeting: string): Promise<{ success: boolean; reason?: string }>;
 }
 
 const normalize = (value: string) => value.replace(/\D/g, "");
@@ -45,13 +46,96 @@ function phoneFromReactState(element: Element | null) {
 function phoneFromElement(element: Element | null) {
   if (!element) return undefined;
   const explicit = element.querySelector<HTMLElement>("[data-phone], [data-jid], a[href^='tel:']");
-  const candidate = explicit?.getAttribute("data-phone")
+  const candidate = element.getAttribute("data-phone")
+    ?? element.getAttribute("data-jid")
+    ?? explicit?.getAttribute("data-phone")
     ?? explicit?.getAttribute("data-jid")
     ?? explicit?.getAttribute("href")?.replace(/^tel:/, "")
     ?? [...element.querySelectorAll<HTMLElement>("[title]")].map((item) => item.getAttribute("title") ?? "").find((value) => phonePattern.test(value))
     ?? element.textContent?.match(phonePattern)?.[0];
   const digits = candidate ? normalize(candidate) : "";
   return digits.length >= 8 ? `+${digits}` : undefined;
+}
+
+function visivel(elemento: Element): elemento is HTMLElement {
+  return elemento instanceof HTMLElement && elemento.getClientRects().length > 0 && getComputedStyle(elemento).visibility !== "hidden";
+}
+
+function acharBotaoNovaConversa() {
+  const seletores = [
+    'button[aria-label="Nova conversa"]', 'button[aria-label="Novo chat"]',
+    'button[aria-label="New chat"]', 'button[title="Nova conversa"]', 'button[title="New chat"]',
+    '[data-testid="new-chat"]', '[data-testid="chat-list-header"] button',
+  ];
+  for (const seletor of seletores) {
+    const alvos = [...document.querySelectorAll(seletor)].filter(visivel);
+    if (alvos.length === 1) return alvos[0];
+    if (alvos.length > 1) return null;
+  }
+  const icones = [...document.querySelectorAll<HTMLElement>('[data-icon="new-chat-outline"], [data-icon="new-chat"]')]
+    .map((element) => element.closest<HTMLElement>('button,[role="button"]'))
+    .filter((element): element is HTMLElement => element !== null && visivel(element));
+  const unicos = [...new Set(icones)];
+  return unicos.length === 1 ? unicos[0] : null;
+}
+
+function acharCampoBuscaNovoChat() {
+  const seletores = [
+    '[data-testid="chatlist-search"] input', 'input[data-testid="chatlist-search"]',
+    '[data-testid="new-chat-search"]',
+    'input[aria-label="Pesquisar nome ou número"]', 'input[aria-label="Search name or number"]',
+    'input[placeholder="Pesquisar nome ou número"]', 'input[placeholder="Search name or number"]',
+  ];
+  for (const seletor of seletores) {
+    const alvos = [...document.querySelectorAll(seletor)].filter(visivel);
+    if (alvos.length === 1) return alvos[0];
+    if (alvos.length > 1) return null;
+  }
+  return null;
+}
+
+function escreverBusca(campo: HTMLElement, texto: string) {
+  campo.focus();
+  if (campo instanceof HTMLInputElement) {
+    campo.value = texto;
+    campo.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: texto }));
+    campo.dispatchEvent(new Event("change", { bubbles: true }));
+    return;
+  }
+  campo.textContent = texto;
+  campo.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: texto }));
+}
+
+function resultadosPorTelefone(phone: string) {
+  const rows = [...document.querySelectorAll<HTMLElement>('[data-testid="cell-frame-container"], [role="listitem"], [role="option"]')].filter(visivel);
+  const correspondencias = rows.filter((row) => {
+    const visivelPhone = phoneFromElement(row)?.replace(/\D/g, "");
+    const textDigits = normalize(`${row.textContent ?? ""} ${row.getAttribute("aria-label") ?? ""} ${row.getAttribute("title") ?? ""}`);
+    return visivelPhone === phone || textDigits.includes(phone);
+  });
+  return [...new Set(correspondencias)];
+}
+
+function esperar<T>(encontrar: () => T | null, tentativas = 24): Promise<T | null> {
+  return new Promise((resolve) => {
+    let restantes = tentativas;
+    const procurar = () => {
+      const encontrado = encontrar();
+      if (encontrado || restantes <= 0) { resolve(encontrado); return; }
+      restantes -= 1;
+      window.setTimeout(procurar, 250);
+    };
+    procurar();
+  });
+}
+
+async function esperarAsync<T>(encontrar: () => Promise<T | null>, tentativas = 24): Promise<T | null> {
+  for (let tentativa = 0; tentativa < tentativas; tentativa += 1) {
+    const encontrado = await encontrar();
+    if (encontrado) return encontrado;
+    await new Promise((resolve) => window.setTimeout(resolve, 250));
+  }
+  return null;
 }
 
 function phoneFromContactSidebar(displayName?: string) {
@@ -92,5 +176,31 @@ export class DefaultWhatsAppWebAdapter implements WhatsAppWebAdapter {
     if (!composer) return { success: false, reason: "COMPOSER_NOT_FOUND" };
     composer.focus(); document.execCommand("insertText", false, text); composer.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
     return { success: true };
+  }
+
+  async openNewConversation(phone: string, greeting: string) {
+    const digits = normalize(phone);
+    if (digits.length < 8 || !greeting.trim()) return { success: false, reason: "INVALID_ACCEPTED_LEAD" };
+    const novoChat = acharBotaoNovaConversa();
+    if (!novoChat) return { success: false, reason: "NEW_CHAT_NOT_FOUND" };
+    novoChat.click();
+    const campo = await esperar(acharCampoBuscaNovoChat);
+    if (!campo) return { success: false, reason: "SEARCH_NOT_FOUND" };
+    escreverBusca(campo, digits);
+    const resultado = await esperar(() => {
+      const rows = resultadosPorTelefone(digits);
+      return rows.length === 1 ? rows[0] : null;
+    });
+    if (!resultado) return { success: false, reason: "PHONE_RESULT_NOT_UNIQUE" };
+    resultado.click();
+    const conversa = await esperarAsync(async () => {
+      const atual = await this.getActiveConversation();
+      return atual?.phone && normalize(atual.phone) === digits ? true : null;
+    });
+    if (!conversa) return { success: false, reason: "IDENTITY_NOT_CONFIRMED" };
+    const composer = document.querySelector<HTMLElement>('[data-testid="conversation-compose-box-input"]');
+    if (!composer) return { success: false, reason: "COMPOSER_NOT_FOUND" };
+    if ((composer.innerText ?? composer.textContent ?? "").trim()) return { success: false, reason: "COMPOSER_NOT_EMPTY" };
+    return this.insertComposerText(greeting);
   }
 }

@@ -149,6 +149,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_ai_quick_reply_enabled",
     "ai_memory_reset_mode",
     "feature_browser_extension_enabled",
+    "feature_browser_extension_pilot_users",
     "feature_agent_training_center_enabled",
     "feature_custom_roles_enabled",
     "feature_performance_ranking_enabled",
@@ -271,6 +272,7 @@ export default async function SuperAdminSettingsPage() {
   const aiQuickReplyEnabled = settingMap.get("feature_ai_quick_reply_enabled") !== "false";
   const aiMemoryResetMode = settingMap.get("ai_memory_reset_mode") ?? "before_each_session";
   const browserExtensionEnabled = settingMap.get("feature_browser_extension_enabled") !== "false";
+  const browserExtensionPilotUsers = settingMap.get("feature_browser_extension_pilot_users") ?? "";
   const agentTrainingCenterEnabled =
     settingMap.get("feature_agent_training_center_enabled") === "true";
   const customRolesEnabled = settingMap.get("feature_custom_roles_enabled") === "true";
@@ -2025,6 +2027,21 @@ export default async function SuperAdminSettingsPage() {
                       <span className="block text-xs text-muted-foreground">
                         O Diretor ainda controla a ativação por tenant.
                       </span>
+                    </span>
+                  </label>
+                  <label className="grid w-full gap-2 text-sm">
+                    <span className="font-medium">Usuários do piloto da extensão</span>
+                    <textarea
+                      name="extensionPilotUsers"
+                      rows={3}
+                      maxLength={13_000}
+                      defaultValue={browserExtensionPilotUsers}
+                      placeholder="ID do usuário, ID do usuário"
+                      className="min-h-20 rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
+                      aria-describedby="extension-pilot-users-help"
+                    />
+                    <span id="extension-pilot-users-help" className="text-xs text-muted-foreground">
+                      IDs separados por vírgula. A lista vazia fecha o piloto para todos; no máximo 100 usuários.
                     </span>
                   </label>
                   <Button type="submit">Salvar extensão</Button>

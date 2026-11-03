@@ -9,6 +9,7 @@ const state = vi.hoisted(() => {
     auditLogs: Symbol("auditLogs"),
     user: Symbol("user"),
     session: Symbol("session"),
+    extensionSessions: Symbol("extensionSessions"),
     tenantMemberships: Symbol("tenantMemberships"),
     customRoles: Symbol("customRoles"),
     branches: Symbol("branches"),
@@ -26,7 +27,7 @@ const state = vi.hoisted(() => {
   };
 
   const inserts: Array<{ table: symbol; values: Record<string, unknown> }> = [];
-  const updates: Array<{ table: symbol; values: Record<string, unknown> }> = [];
+  const updates: Array<{ table: symbol; values: Record<string, unknown>; condition?: unknown }> = [];
   const deletes: Array<{ table: symbol }> = [];
 
   // ── Helper: builds a flexible chain of query methods ────────────────
@@ -51,8 +52,8 @@ const state = vi.hoisted(() => {
     })),
     update: vi.fn((table: symbol) => ({
       set: vi.fn((values: Record<string, unknown>) => ({
-        where: vi.fn(async () => {
-          updates.push({ table, values });
+        where: vi.fn(async (condition: unknown) => {
+          updates.push({ table, values, condition });
         }),
       })),
     })),
@@ -143,6 +144,8 @@ vi.mock("@/features/team/supervised-brokers", () => ({
 
 vi.mock("drizzle-orm", () => ({
   and: vi.fn((...args: unknown[]) => args),
+  isNull: vi.fn((field: unknown) => ({ field, isNull: true })),
+  inArray: vi.fn((field: unknown, values: unknown[]) => ({ field, values })),
   eq: vi.fn((a: unknown, b: unknown) => ({ field: a, value: b })),
   ne: vi.fn((a: unknown, b: unknown) => ({ field: a, value: b })),
   or: vi.fn((...args: unknown[]) => args),
@@ -152,7 +155,7 @@ vi.mock("drizzle-orm", () => ({
 const resend = vi.hoisted(() => vi.fn<(id: unknown) => Promise<{ token: string; whatsappStatus: string }>>(async () => ({ token: "token-1", whatsappStatus: "queued" })));
 vi.mock("@/features/team/resend-invitation", () => ({ resendTeamInvitation: (id: unknown) => resend(id) }));
 
-import { deleteTeamMemberAction, resendInviteAction, revokeInviteAction, updateTeamMemberAction } from "./actions";
+import { deleteTeamMemberAction, resendInviteAction, revokeInviteAction, updateTeamMemberAction, toggleTeamMemberStatusAction, bulkToggleTeamMemberStatusAction } from "./actions";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 function inserted(table: symbol) {
@@ -228,6 +231,9 @@ describe("updateTeamMemberAction", () => {
       }),
     );
     expect(deleted(state.schema.session)).toHaveLength(1);
+    expect(updated(state.schema.extensionSessions)).toEqual([{ revokedAt: expect.any(Date) }]);
+    const revocation = state.updates.find((item) => item.table === state.schema.extensionSessions);
+    expect(revocation?.condition).toEqual(expect.arrayContaining([expect.objectContaining({ value: "broker-test" }), expect.objectContaining({ value: "tenant-test" })]));
     expect(inserted(state.schema.auditLogs)).toContainEqual(
       expect.objectContaining({
         entidade: "tenant_membership",
@@ -486,5 +492,37 @@ describe("deleteTeamMemberAction", () => {
     expect(result).toEqual({ success: false, error: "Membro não encontrado." });
     expect(state.inserts).toHaveLength(0);
     expect(state.deletes).toHaveLength(0);
+  });
+});
+
+describe("revogação de extensão ao desativar membros", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.updates.length = 0; state.inserts.length = 0; state.deletes.length = 0;
+    Object.assign(state.mockTenantContext, { tenantId: "tenant-test", userId: "director-test", role: "director", branchId: "branch-test" });
+    state.setSelectResult("member", [{ membershipId: "membership-test", userId: "broker-test", role: "broker", branchId: "branch-test", status: "active" }]);
+  });
+  it("toggle desativa e revoga extensão somente do membro e tenant", async () => {
+    const result = await toggleTeamMemberStatusAction({}, makeFormData());
+    expect(result.success).toBe(true);
+    expect(updated(state.schema.extensionSessions)).toEqual([{ revokedAt: expect.any(Date) }]);
+    expect(state.updates.find((item) => item.table === state.schema.extensionSessions)?.condition).toEqual(expect.arrayContaining([
+      expect.objectContaining({ value: "broker-test" }), expect.objectContaining({ value: "tenant-test" }),
+    ]));
+  });
+  it("bulk desativa e revoga extensão junto com a sessão web", async () => {
+    const form = new FormData(); form.append("memberIds", "membership-test"); form.set("targetStatus", "disabled");
+    const result = await bulkToggleTeamMemberStatusAction({}, form);
+    expect(result.success).toBe(true);
+    expect(deleted(state.schema.session)).toHaveLength(1);
+    expect(updated(state.schema.extensionSessions)).toEqual([{ revokedAt: expect.any(Date) }]);
+    expect(state.updates.find((item) => item.table === state.schema.extensionSessions)?.condition).toEqual(expect.arrayContaining([
+      expect.objectContaining({ value: "broker-test" }), expect.objectContaining({ value: "tenant-test" }),
+    ]));
+  });
+  it("reativar membro não reativa tokens revogados nem revoga novas sessões", async () => {
+    state.setSelectResult("member", [{ membershipId: "membership-test", userId: "broker-test", role: "broker", branchId: "branch-test", status: "disabled" }]);
+    expect((await toggleTeamMemberStatusAction({}, makeFormData())).success).toBe(true);
+    expect(updated(state.schema.extensionSessions)).toHaveLength(0);
   });
 });

@@ -65,7 +65,7 @@ Cada etapa só sai se passar por esta lista. A referência é o código na base
 | O2 | Prazo e tolerância | `offers.ts:148-153`, `domain.ts:422-424` | Contador só exibe; o servidor decide e devolve `expired` |
 | O3 | Uma aceitação só, com lock do lead | `offers.ts:~945-960` | Idempotência por `offerId`; `already_accepted` vira mensagem clara |
 | O4 | Ação só "aceitar" ou "recusar" | `offers.ts:~830-835` | Texto do botão fixo; nunca texto livre |
-| O5 | Recusa conta como pulo do plantão | `offers.ts:~855-863` | Avisar antes de recusar |
+| O5 | Recusa válida conta como pulo do plantão; vencida ou já resolvida não gera novo pulo por esse caminho | `offers.ts`, correção canônica aprovada na E3 | Avisar antes de recusar; respeitar `expired`/`already_resolved` |
 | O6 | Nivelamento, corte do dia, frios liberados às 9h do 2º dia | `received-in-day-core.ts`, `broker-day-history.ts:46-52`, `cold-age-release.ts:30,43` | A extensão não mexe; só mostra o que o servidor ofereceu |
 | S1 | Transições válidas | `lead-status-constants.ts:15-27`, `change-lead-status.ts:208-214` | Só mostra as opções válidas; o servidor valida de novo |
 | S2 | Perdido exige motivo da lista | `lead-status-constants.ts:39`, `change-lead-status.ts:226-232` | Seletor de motivos vindo do CRM (motivos editáveis da Onda 1) |
@@ -75,7 +75,7 @@ Cada etapa só sai se passar por esta lista. A referência é o código na base
 | L1 | Telefone mascarado | `browser-extension/schemas.ts:45-48` | Número inteiro só depois do aceite, para abrir a conversa |
 | L2 | Dados que não saem do CRM (CPF, comissão, observações internas) | `lead-context.ts:21-48` | O payload novo usa lista fechada de campos (allowlist), revisada pelo Vigia |
 | M1 | Anti-bloqueio do envio | `outbound-service.ts:908-917`, `team-notices/guard.ts:14-16` | Essas travas só cobrem envios do CRM; o envio manual no WhatsApp Web não passa por elas. Por isso a extensão nunca envia nem automatiza envio: sugestões e saudação só preenchem o texto |
-| P1 | Plantão no aceite (regra 16 do inventário, ainda não confirmada no código) | `processQueuedLead` (`candidate.onDuty`) | Confirmar no mapa da E3 se o aceite checa o plantão; se não checar, só avisar e anotar como pendência para o Vinicios, sem regra nova |
+| P1 | Plantão no aceite: apenas aviso, confirmado na E3 | `handleLeadOfferWebhookResponse`, `findBrokerRunningDutyScheduleId` e `pickBrokerRunningDutyScheduleId` | Não bloquear aceite; devolver `foraDoPlantao` como aviso, sem regra nova |
 | A1 | Auditoria | `change-lead-status.ts:~346`, `auth.ts:53-58` | Ação `extension.*` com metadados `{source:"extension", deviceId, sessionId}` |
 
 Reforços que a extensão traz, sempre com a checagem também no servidor:
@@ -200,17 +200,40 @@ Execução em worktrees próprias, a partir de `feat/extensao-v2`.
 | E0b Build e base da interface | React e CSS no shadow, endereço do CRM por variável, stubs removidos, prebuild que não quebra o build do Next, minificação em produção; registro de detectores e ponte de tema | Cinzel | Vigia | Bundle inicial abaixo de 30 KB gzip e painel com React abaixo de 200 KB gzip; extensão carrega igual à v1; build do Next passa mesmo com falha do esbuild |
 | E1 Conexão 1 clique | `externally_connectable` com host exato, `/extensao/conectar`, cartão no Lite do corretor, popup novo no Lite, aviso no WhatsApp | Vigia | Cinzel | Conectar sem digitar código; recusa de remetente estranho testada; desconectar dos dois lados; prints claro e escuro |
 | E2 Gaveta Lite | `lead-context` ampliado (temperatura, fila, idade, plano, vidas, valor, próximo passo, histórico) dentro da allowlist; gaveta direita, selo no cabeçalho, botão na barra | Vigia | Cinzel | Prints claro e escuro ao lado do WhatsApp nativo; teste da allowlist passa com os campos novos |
-| E3 Aceite e abrir conversa | `POST /api/extension/offers/[id]/accept` e `/decline` (reaproveita `handleLeadOfferWebhookResponse`, idempotente); lista de ofertas com contador; abrir conversa e preencher a saudação. Antes: confirmar a regra P1 (plantão no aceite) | Cinzel | Vigia | Testes de aceite: vencido, já aceito, outro corretor, papel errado, repetido; abrir com e sem contato salvo |
-| E4 Alertas e sincronização | `/api/extension/inbox` (304, só id/tipo/horário), notificações, selo no ícone, aviso, som; aviso de tarefa vencendo no sweep | Cinzel | Vigia | Sem alerta duplicado; retomada depois de dormir; inbox com no máximo 200 pedidos por hora por corretor com a aba aberta (limite próprio, separado de resolve e aceite), e 304 sem corpo quando nada mudou, medido antes de liberar |
+| E3 Aceite e abrir conversa | `POST /api/extension/offers/[id]/accept` e `/decline` (reaproveita `handleLeadOfferWebhookResponse`, idempotente); lista de ofertas com contador; abrir conversa e preencher a saudação. DEC-166 restringe ofertas de plantão ao plantão efetivo exato | Cinzel | Vigia | Servidor e interface integrados; testes cobrem erros de aceite/recusa, confirmação exata do telefone e abertura com contato salvo e não salvo. Falha ao abrir mantém o aceite e oferece retry/link reserva |
+| E4 Alertas e sincronização | `/api/extension/inbox` (304, só id/tipo/horário), notificações, selo no ícone, aviso e som opcional | Cinzel | Vigia | Servidor e cliente implementados: porta com pulso de 20 s no WhatsApp aberto, alarme de 1 min sem aba, 304/Retry-After, deduplicação e aviso de último minuto. Revisão e QA manual ainda precisam confirmar retomada após suspensão e contagem real abaixo de 200 pedidos/hora |
 | E5 Ações rápidas | Etapa e status (transições válidas e motivo de perda), nota, tarefa e lembrete, sugestões pelo composer (só preenchem) | Vigia | Cinzel | Cada ação passa pelo serviço do CRM; 409 tratado; auditoria gravada |
-| E6 Publicar | Telemetria de seletor sem dados pessoais, desligamento por capacidade, lista de teste (PT/EN, claro/escuro, zoom, grupo, lista longa), troca de versão sem perder rascunho, Web Store não listada | Lince (QA) e Maestro | Vigia | Piloto com 2 corretores, 5 dias úteis, com: conectar em 1 clique; aceitar e abrir conversa (contato salvo e não salvo); alerta de oferta e de último minuto; nenhum alerta duplicado; WhatsApp em PT e EN, claro e escuro, zoom 80% a 125%; grupo aberto sem painel; troca de versão sem perder rascunho; zero erro de detector na telemetria por 2 dias seguidos |
+| E6 Publicar | Telemetria de seletor sem dados pessoais, desligamento por capacidade, lista de teste (PT/EN, claro/escuro, zoom, grupo, lista longa), troca de versão sem perder rascunho, Web Store não listada | Lince (QA) e Maestro | Vigia | Piloto inicial restrito a Vinicios por 5 dias úteis; qualquer segundo corretor exige aprovação e inclusão explícita na allowlist. Validar: conectar em 1 clique; aceitar e abrir conversa (contato salvo e não salvo); alerta de oferta e de último minuto; nenhum alerta duplicado; WhatsApp em PT e EN, claro e escuro, zoom 80% a 125%; grupo aberto sem painel; troca de versão sem perder rascunho; zero erro de detector na telemetria por 2 dias seguidos |
 
 O Lince mapeia a próxima etapa enquanto a atual é executada e faz o QA de cada
 entrega.
 
+## Entrega E0a (03/11/2026)
+
+Status: implementada em `feat/ext-v2-e0a`, aguardando revisão cruzada do Vigia e QA do Lince.
+Registro: [E0a segurança e rotas](2026-11-03-extensao-whatsapp-v2-e0a.md).
+Todas as rotas usam `requireExtensionAccess`, inclusive exchange autenticado pelo grant de uso único.
+O plano B manual continua sem vínculo; E1 pode emitir código com `{extensionId, deviceId}`.
+A unidade/membership é conferida em cada chamada. Renovação explícita: `POST /api/extension/session`;
+`GET` permanece compatível e não rotaciona. SQL manual: `drizzle/0216_extension_auth_code_binding.sql`.
+Validações: typecheck e testes focados com mocks; detalhes e limites no registro da E0a.
+
+## Entrega E3 e servidor E2 (03/11/2026)
+
+Servidor implementado em `feat/ext-v2-e3` e integrado na worktree `feat/ext-v2-ui` pelo merge `107d90f3`.
+Contexto ampliado dentro da allowlist, listagem minimizada e resposta exata por `offerId` usando o serviço do CRM.
+A recusa canônica vencida/sem alteração foi corrigida por decisão explícita do Maestro. DEC-166 exige plantão efetivo exato para aceitar oferta vinculada; oferta sem plantão e retry já aceito preservam o comportamento anterior.
+Novas sessões recebem `ACCEPT_LEAD`; sessões antigas reconectam para obter a permissão, sem promoção na renovação.
+Contrato, evidências e limites: [E3 e servidor E2](2026-11-03-extensao-whatsapp-v2-e3-servidor.md).
+Interface de ofertas, confirmação de identidade no WhatsApp e preenchimento manual da saudação entregues em `2026-11-03-extensao-whatsapp-v2-e3-e4-cliente.md`.
+
+## Piloto e distribuição do pacote (03/11/2026)
+
+DEC-166: a allowlist global `feature_browser_extension_pilot_users` é fechada por padrão e controlada pelo Super-admin; o ID do Vinicios precisa ser adicionado explicitamente antes do uso. A UI e os endpoints compartilham o mesmo gate. As telas mostram a versão real do pacote, instruem instalação manual e atualização a cada ZIP novo. Não há SQL novo.
+
 ## Pendente com o Vinicios
 
 - Conta de desenvolvedor da Chrome Web Store (E6).
-- Escolher os 2 corretores do piloto.
+- Adicionar explicitamente o ID do Vinicios à allowlist antes do piloto; a lista vazia bloqueia todos. Expandir o grupo de teste depende de nova autorização.
 - SQL, se a sessão deslizante ou a chave por capacidade precisarem de coluna
   nova. Vai na área de transferência antes do push.

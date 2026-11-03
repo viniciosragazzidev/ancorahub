@@ -2,6 +2,28 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 03/11/2026 - Extensão v2, servidor E2/E3
+
+- Contexto comercial ampliado em allowlist estrita, com histórico só de tipo/data e contato mascarado antes do aceite.
+- Listagem de ofertas próprias e aceite/recusa pelo serviço canônico, com permissão, limite, auditoria e resposta idempotente por oferta. Contato completo só para vencedor confirmado; fora do plantão é aviso.
+- Correção canônica aprovada: recusa vencida não consome pulo, e oferta já resolvida não informa sucesso falso. Interface de ofertas ainda pendente.
+- Registro: [E3 e servidor E2](implementations/active/2026-11-03-extensao-whatsapp-v2-e3-servidor.md).
+
+## 03/11/2026 - Extensão v2, piloto, download e aceite no plantão
+
+- DEC-166: acesso fechado por allowlist global de usuários, editável e auditada pelo Super-admin; UI, páginas e ações verificam o mesmo gate.
+- O CRM oferece ZIP com versão do manifest e instruções de instalação manual/atualização por versão.
+- Oferta vinculada a plantão só aceita dentro da escala efetiva exata. Fora dela não há efeitos; listagem mantém apenas o aviso. Oferta sem plantão e retry já aceito preservam a regra anterior.
+- Registro: [Extensão v2](implementations/active/2026-11-03-extensao-whatsapp-v2.md), [servidor E3](implementations/active/2026-11-03-extensao-whatsapp-v2-e3-servidor.md).
+
+## 03/11/2026 - Extensão v2, E0a: segurança do gateway
+
+- Gate único de conta, tenant, unidade, flags e permissão nas rotas; limites isolados e resposta uniforme contra enumeração.
+- Sessões com ociosidade de 7 dias, teto de 30, rotação explícita e revogação nas alterações de equipe; auditoria e payload fechado.
+- Código opcionalmente vinculado à extensão e ao dispositivo, mantendo o plano B manual por decisão do Maestro.
+- Implementação aguardando revisão; SQL 0216 entregue para aplicação manual, sem execução pelo agente.
+- Registro e validações: [E0a](implementations/active/2026-11-03-extensao-whatsapp-v2-e0a.md).
+
 ## 29/10/2026 - Retorno seguro para oferta de lead expirada
 
 - O link do template `new_lead_broker` continua abrindo `/lead/<id>` e, depois,

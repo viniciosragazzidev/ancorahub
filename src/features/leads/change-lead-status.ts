@@ -168,6 +168,7 @@ export async function changeLeadStatus(
   rawInput: ChangeLeadStatusInput,
   contextOverride?: TenantContext,
   system?: SystemStatusChange,
+  audit?: { action: string; metadata: Record<string, unknown> },
 ): Promise<ChangeLeadStatusResult> {
   const input = changeStatusInput.parse(rawInput);
   const context = contextOverride ?? await getRequiredTenantContext();
@@ -332,7 +333,7 @@ export async function changeLeadStatus(
     }
 
     // Criar auditoria
-    const auditAction = system?.auditAction ?? (isReopening
+    const auditAction = system?.auditAction ?? audit?.action ?? (isReopening
       ? "reabriu"
       : newStatus === "lost"
         ? "perdeu"
@@ -344,6 +345,7 @@ export async function changeLeadStatus(
       entidade: "lead",
       entidadeId: lead.id,
       acao: auditAction,
+      ...(audit ? { metadata: audit.metadata } : {}),
     });
   });
 

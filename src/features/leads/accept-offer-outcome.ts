@@ -19,6 +19,7 @@ export function resolveLeadAcceptOutcome(
   brokerId: string,
 ): LeadAcceptOutcome {
   if (response.won || response.reason === "already_accepted") return { ok: true };
+  if (response.reason === "outside_duty") return { ok: false, error: "Você não está no plantão desta fila agora." };
 
   const ownsLead = lead?.corretorId === brokerId;
   if (ownsLead && !PROVISIONAL_SOURCES.has(lead?.assignmentSource ?? "")) return { ok: true };
