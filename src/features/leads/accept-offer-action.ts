@@ -8,6 +8,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
+import { startLeadServiceAction } from "@/app/(dashboard)/leads/[id]/service-action";
 import { resolveLeadAcceptOutcome } from "./accept-offer-outcome";
 import { loadBrokerGreetingSafe } from "./broker-greeting-server";
 
@@ -37,7 +38,7 @@ export async function acceptLeadOfferAction(inputLeadId: string): Promise<Accept
     });
 
     const [lead] = await getDatabase()
-      .select({ corretorId: schema.leads.corretorId, assignmentSource: schema.leads.assignmentSource, nome: schema.leads.nome, telefone: schema.leads.telefone })
+      .select({ corretorId: schema.leads.corretorId, assignmentSource: schema.leads.assignmentSource, nome: schema.leads.nome, telefone: schema.leads.telefone, status: schema.leads.status })
       .from(schema.leads)
       .where(and(eq(schema.leads.id, parsed.data), eq(schema.leads.tenantId, context.tenantId)))
       .limit(1);
@@ -45,6 +46,14 @@ export async function acceptLeadOfferAction(inputLeadId: string): Promise<Accept
     const outcome = resolveLeadAcceptOutcome(response, lead ?? null, context.userId);
     revalidatePath("/minha-fila");
     if (!outcome.ok) return { success: false, error: outcome.error };
+    // Lead sem oferta (transferência do Pós-venda): a resposta dizia aceito, mas nada iniciava o atendimento,
+    // e a ficha seguia em "aceitar". Aqui usa o mesmo início do botão do CRM (piloto 03/11).
+    if (lead?.corretorId === context.userId && lead.status === "distributed") {
+      const inicio = new FormData();
+      inicio.append("leadId", parsed.data);
+      const started = await startLeadServiceAction({}, inicio);
+      if (!started.success) return { success: false, error: started.error ?? "Não foi possível iniciar o atendimento agora." };
+    }
     // Accepting already started the service (offer_accepted): the phone is the broker's now.
     const whatsappUrl = lead?.corretorId === context.userId ? buildWhatsAppUrl(lead.telefone, await loadBrokerGreetingSafe({ tenantId: context.tenantId, leadId: parsed.data, brokerUserId: context.userId, leadName: lead.nome })) : null;
     return whatsappUrl ? { success: true, whatsappUrl } : { success: true };
