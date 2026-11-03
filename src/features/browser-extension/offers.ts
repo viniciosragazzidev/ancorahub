@@ -60,7 +60,7 @@ export async function respondToExtensionOffer(context: TenantContext, session: E
     if (declined || repeated) {
       const dutyId = await findBrokerRunningDutyScheduleId({ tenantId: context.tenantId, brokerId: context.userId }).catch(() => undefined);
       return { status: 200, body: { success: true, offerId, action: "declined", alreadyDeclined: Boolean(repeated), foraDoPlantao: dutyId === null,
-        contaComoPulo: true, message: "Oferta recusada. A recusa conta como pulo do plantão." } };
+        contaComoPulo: !repeated, message: repeated ? "Esta oferta já foi recusada." : "Oferta recusada. A recusa conta como pulo do plantão." } };
     }
     return { status: 409, body: { success: false, error: result.reason ?? "UNAVAILABLE", message: result.reason === "expired"
       ? "O prazo para aceitar este lead terminou." : "Esta oferta já foi respondida ou não está mais disponível." } };

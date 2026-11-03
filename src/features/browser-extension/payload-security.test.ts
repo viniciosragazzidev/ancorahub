@@ -38,6 +38,7 @@ describe("contrato fechado do lead e enumeração", () => {
     const result = await resolveLeadForExtension(context, row.telefone);
     expect(result.status).toBe("FOUND");
     if (result.status !== "FOUND") throw new Error("Lead autorizado não retornou");
+    // Compile-time contract: the server payload remains assignable to the extension's shared type.
     const clientContract: LeadAmpliado = result.lead;
     expect(clientContract.etapa).toBe(result.lead.currentStatus.label);
     expect(Object.keys(result.lead).sort()).toEqual(["id", "version", "name", "phoneMasked", "currentStatus", "origin", "sourceCampaign", "unit", "assignedUser", "nextAction", "qualification", "allowedActions",

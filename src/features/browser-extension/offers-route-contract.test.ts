@@ -92,7 +92,9 @@ describe("ofertas da extensão, somente mocks", () => {
     expect(state.canonical).toHaveBeenCalledWith(expect.objectContaining({ buttonText: "recusar", audit: expect.objectContaining({ action: "extension.offer.declined" }) }));
     state.rows = [[{ ...offer, status: "DECLINED" }], [{ ...offer, status: "DECLINED" }]];
     state.canonical.mockResolvedValue({ processed: false, reason: "already_resolved" });
-    expect(await (await decline(request("decline"), params)).json()).toMatchObject({ success: true, alreadyDeclined: true });
+    const repeated = await (await decline(request("decline"), params)).json();
+    expect(repeated).toMatchObject({ success: true, alreadyDeclined: true, contaComoPulo: false });
+    expect(repeated.message).not.toMatch(/conta como pulo/i);
   });
   it("recusa de oferta aceita não se apresenta como recusa bem-sucedida", async () => {
     state.rows = [[{ ...offer, status: "ACCEPTED" }], [{ ...offer, status: "ACCEPTED" }]];
