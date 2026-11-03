@@ -46,6 +46,9 @@ function titleCase(value: string) {
 }
 
 /** The operator the person asked for: the form answer first, then a tag or name in the campaign. */
+/** The only source-metadata keys requestedOperator reads: the cadence job selects just these (egress, 03/11). */
+export const REQUESTED_OPERATOR_METADATA_KEYS = ["operadora", "campaignName", "adHeadline"] as const;
+
 export function requestedOperator(input: ApproachInput): string | null {
   const metadata = input.sourceMetadata ?? {};
   const fromForm = text(metadata.operadora).trim();
