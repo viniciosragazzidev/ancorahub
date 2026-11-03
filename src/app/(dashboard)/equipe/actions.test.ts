@@ -149,7 +149,10 @@ vi.mock("drizzle-orm", () => ({
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ sql: strings.join("?"), values })),
 }));
 
-import { deleteTeamMemberAction, revokeInviteAction, updateTeamMemberAction } from "./actions";
+const resend = vi.hoisted(() => vi.fn<(id: unknown) => Promise<{ token: string; whatsappStatus: string }>>(async () => ({ token: "token-1", whatsappStatus: "queued" })));
+vi.mock("@/features/team/resend-invitation", () => ({ resendTeamInvitation: (id: unknown) => resend(id) }));
+
+import { deleteTeamMemberAction, resendInviteAction, revokeInviteAction, updateTeamMemberAction } from "./actions";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 function inserted(table: symbol) {
@@ -299,6 +302,52 @@ describe("revokeInviteAction scope", () => {
     const result = await revokeInviteAction({}, form);
     expect(result).toEqual({ success: true });
     expect(updated(state.schema.brokerInvitations)).toContainEqual(expect.objectContaining({ status: "REVOKED" }));
+  });
+});
+
+describe("resendInviteAction from the Lite team list (membership id)", () => {
+  // Each select answers in order: pending invitation, then membership, then profile.
+  const selects = (...results: unknown[][]) => {
+    for (const rows of results) state.db.select.mockImplementationOnce(() => state.queryChain({ rows, useLimit: true }));
+  };
+  const resendWith = (memberId: string) => {
+    const form = new FormData(); form.set("memberId", memberId);
+    return resendInviteAction({}, form);
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.db.select.mockReset();
+    state.db.select.mockImplementation(() => state.queryChain({ rows: [] }));
+    Object.assign(state.mockTenantContext, { tenantId: "tenant-test", userId: "director-test", role: "director", branchId: "branch-test" });
+  });
+
+  it("resends a pending invitation found through the member id", async () => {
+    selects([{ id: "invite-1", status: "PENDING", userId: "user-1", role: "broker", branchId: "branch-test", supervisorId: null, membershipRole: "broker", memberBranchId: "branch-test" }]);
+    const result = await resendWith("membership-1");
+    expect(result).toEqual({ success: true, token: "token-1", whatsappStatus: "queued" });
+    expect(resend).toHaveBeenCalledWith("membership-1");
+  });
+
+  it("resends for a member whose invitation expired (no pending one)", async () => {
+    selects([], [{ userId: "user-1", role: "broker", branchId: "branch-test", supervisorId: null }]);
+    const result = await resendWith("membership-1");
+    expect(result.success).toBe(true);
+    expect(resend).toHaveBeenCalledWith("membership-1");
+  });
+
+  it("keeps the scope error for a member outside the supervisor's team", async () => {
+    Object.assign(state.mockTenantContext, { userId: "supervisor-test", role: "supervisor", branchId: "branch-test" });
+    selects([], [{ userId: "user-1", role: "broker", branchId: "branch-test", supervisorId: "other-supervisor" }]);
+    const result = await resendWith("membership-1");
+    expect(result).toEqual({ success: false, error: "Este convite está fora do seu escopo de gestão." });
+    expect(resend).not.toHaveBeenCalled();
+  });
+
+  it("says not found instead of out of scope when nothing matches", async () => {
+    const result = await resendWith("missing-id");
+    expect(result).toEqual({ success: false, error: "Convite ou membro não encontrado." });
+    expect(resend).not.toHaveBeenCalled();
   });
 });
 
