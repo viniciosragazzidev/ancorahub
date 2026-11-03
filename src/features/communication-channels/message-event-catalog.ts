@@ -171,6 +171,15 @@ export const MESSAGE_EVENT_CATALOG = [
     variables: [brokerName, leadName],
   },
   {
+    key: "LEAD_CLOSING_STAGE",
+    purpose: "leadClosingStage",
+    label: "Lead na etapa de fechamento",
+    description: "Parabeniza o corretor quando o lead entra em Documentação ou Em análise e lembra de registrar valor, vidas, operadora/plano, documentos e data.",
+    audience: "user",
+    windowRule: "corporate_internal",
+    variables: [brokerName, leadName, leadId],
+  },
+  {
     key: "BROKER_WELCOME",
     purpose: "brokerInvitation",
     label: "Primeiro acesso do corretor",

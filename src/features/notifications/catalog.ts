@@ -9,6 +9,7 @@ export const notificationCapabilities = [
   { id: "client_renewal", label: "Renovação de cliente", description: "Lembretes de aniversário e renovação contratual.", channels: "Toast/in-app" },
   { id: "lead_reengagement", label: "Reengajamento de lead", description: "Avisos de oportunidades de reengajamento.", channels: "Toast/in-app" },
   { id: "lead_converted", label: "Lead convertido", description: "Aviso de mudança do lead para convertido.", channels: "Toast + push" },
+  { id: "lead_closing_stage", label: "Lead na etapa de fechamento", description: "Parabeniza o corretor quando um lead dele entra em Documentação ou Em análise e lembra de registrar no CRM valor, vidas, operadora/plano, documentos e data. Uma vez por lead; o WhatsApp tem o canal escolhido em Avisos da equipe.", channels: "Toast + push + WhatsApp" },
   { id: "lead_lost", label: "Lead perdido", description: "Aviso ao corretor e gestão quando um lead é marcado como perdido.", channels: "Toast + push" },
   { id: "document_reviewed", label: "Documento revisado", description: "Notifica o corretor quando um documento é aprovado ou rejeitado.", channels: "Toast + push" },
   { id: "lead_arrived", label: "Lead chegou", description: "Aviso aos gestores e diretores quando um novo lead chega no sistema, antes da distribuição.", channels: "Toast + push" },

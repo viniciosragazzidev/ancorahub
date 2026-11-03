@@ -802,6 +802,15 @@ function noticeTextFields(purpose: string, rawVariables: string[], urlButtonPara
   if (purpose === "leadFeedbackReminder") {
     return { purpose, broker: rawVariables[0]?.trim() || "Corretor(a)", lead: rawVariables[1]?.trim() || "seu lead" };
   }
+  if (purpose === "leadClosingStage") {
+    const leadId = rawVariables[2]?.trim();
+    return {
+      purpose,
+      broker: rawVariables[0]?.trim() || "Corretor(a)",
+      lead: rawVariables[1]?.trim() || "Seu cliente",
+      link: leadId ? `${baseUrl}/leads/${leadId}` : null,
+    };
+  }
   if (purpose === "leadClientReturned") {
     const leadId = rawVariables[3]?.trim();
     return {

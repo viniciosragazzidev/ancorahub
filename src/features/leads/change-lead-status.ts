@@ -473,6 +473,17 @@ export async function changeLeadStatus(
     );
   }
 
+  // Entering the closing stage: congratulations and the registration checklist to the broker, once per lead.
+  const { notifyBrokerClosingStage } = await import("./closing-stage-notice");
+  void notifyBrokerClosingStage({
+    tenantId: lead.tenantId,
+    leadId: lead.id,
+    leadName: lead.nome,
+    brokerId: lead.corretorId,
+    previousStatus,
+    newStatus,
+  });
+
   if (newStatus === "lost") {
     const { triggerInstantAutomation } = await import("@/features/automations/engine");
     void triggerInstantAutomation(lead.tenantId, lead.id, "lead_perdido").catch(console.error);
