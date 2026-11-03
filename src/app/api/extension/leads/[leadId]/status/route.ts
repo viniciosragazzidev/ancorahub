@@ -14,9 +14,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ le
     const lead = await getLeadForExtension(context, leadId);
     if (!lead) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     if (lead.version !== input.expectedVersion) return NextResponse.json({ error: "CONFLICT", message: "Este lead foi atualizado em outro local." }, { status: 409 });
-    const result = await changeLeadStatus({ leadId, newStatus: input.statusId, expectedVersion: input.expectedVersion }, context, undefined, { action: "extension.status.changed", metadata: extensionAuditMetadata(session) });
+    // Transições válidas e motivo de perda são validados pelo serviço (o mesmo da tela do CRM).
+    const result = await changeLeadStatus({ leadId, newStatus: input.statusId, expectedVersion: input.expectedVersion, motivoPerda: input.motivoPerda }, context, undefined, { action: "extension.status.changed", metadata: extensionAuditMetadata(session) });
     return NextResponse.json({ ...result, version: input.expectedVersion + 1 });
   } catch (error) {
+    // Versão mudou entre a checagem e a gravação: conflito, a gaveta recarrega.
+    if (error instanceof Error && error.message === "CONFLICT_VERSION") return NextResponse.json({ error: "CONFLICT", message: "Este lead foi atualizado em outro local." }, { status: 409 });
     return extensionErrorResponse(error);
   }
 }

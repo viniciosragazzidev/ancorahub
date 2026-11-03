@@ -3,11 +3,12 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { criarTarefaDoLead } from "./tarefa-servico";
 
 export type LeadTaskState = { success?: boolean; error?: string };
 
@@ -19,17 +20,6 @@ const taskInput = z.object({
   priority: z.enum(["low", "normal", "urgent"]).default("normal"),
   assigneeIds: z.array(z.string().min(1)).max(12).default([]),
 });
-
-async function authorizeLeadTask(leadId: string) {
-  const context = await getRequiredTenantContext();
-  const db = getDatabase();
-  const [lead] = await db.select({ id: schema.leads.id, corretorId: schema.leads.corretorId, branchId: schema.leads.branchId })
-    .from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
-  if (!lead) throw new Error("Lead não encontrado.");
-  if (context.role === "broker" && lead.corretorId !== context.userId) throw new Error("Você só pode gerenciar tarefas dos seus leads.");
-  if (context.role === "manager" && (!context.branchId || lead.branchId !== context.branchId)) throw new Error("Este lead não pertence à sua filial.");
-  return { context, db, lead };
-}
 
 export async function createLeadTaskAction(_previous: LeadTaskState, formData: FormData): Promise<LeadTaskState> {
   const parsed = taskInput.safeParse({
@@ -43,31 +33,7 @@ export async function createLeadTaskAction(_previous: LeadTaskState, formData: F
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
 
   try {
-    const { context, db, lead } = await authorizeLeadTask(parsed.data.leadId);
-    const assigneeIds = [...new Set(parsed.data.assigneeIds.length ? parsed.data.assigneeIds : [lead.corretorId ?? context.userId])];
-    if (parsed.data.priority !== "urgent" && assigneeIds.length > 1) return { error: "Apenas tarefas urgentes podem ter mais de um responsável." };
-    if (context.role === "broker" && (assigneeIds.length !== 1 || assigneeIds[0] !== context.userId)) return { error: "Você só pode atribuir tarefas a si mesmo." };
-    const eligibleAssignees = await db.select({ userId: schema.tenantMemberships.userId })
-      .from(schema.tenantMemberships)
-      .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), inArray(schema.tenantMemberships.userId, assigneeIds), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), ...(lead.branchId ? [eq(schema.tenantMemberships.branchId, lead.branchId)] : [])));
-    if (eligibleAssignees.length !== assigneeIds.length) return { error: "Um ou mais responsáveis não estão ativos nesta filial." };
-    const taskId = randomUUID();
-    await db.transaction(async (tx) => {
-      await tx.insert(schema.leadTasks).values({
-        id: taskId,
-        tenantId: context.tenantId,
-        leadId: lead.id,
-        assignedTo: lead.corretorId ?? context.userId,
-        createdBy: context.userId,
-        title: parsed.data.title,
-        description: parsed.data.description || null,
-        priority: parsed.data.priority,
-        dueAt: parsed.data.dueAt ? new Date(parsed.data.dueAt) : null,
-      });
-      await tx.insert(schema.leadTaskAssignees).values(assigneeIds.map((userId) => ({ id: randomUUID(), tenantId: context.tenantId, taskId, userId })));
-      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_task", entidadeId: taskId, acao: "criou" });
-    });
+    await criarTarefaDoLead(await getRequiredTenantContext(), parsed.data);
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível criar a tarefa." };

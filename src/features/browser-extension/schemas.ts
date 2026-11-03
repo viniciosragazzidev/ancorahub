@@ -16,6 +16,25 @@ export const resolveLeadSchema = z.object({ phone: phoneSchema });
 export const statusPatchSchema = z.object({
   statusId: z.string().trim().min(1).max(64),
   expectedVersion: z.number().int().positive(),
+  /** Obrigatório quando a etapa é "lost"; a lista válida é MOTIVOS_PERDA (validada no serviço). */
+  motivoPerda: z.string().trim().max(120).optional(),
+});
+/** Nota interna do corretor no lead. Nunca volta para a extensão (a gaveta só escreve). */
+export const notaSchema = z.object({
+  conteudo: z.string().trim().min(1, "Escreva a nota.").max(1000),
+  expectedVersion: z.number().int().positive(),
+});
+/** Tarefa rápida do corretor: título e prazo opcional. Responsável é sempre o próprio corretor. */
+export const tarefaSchema = z.object({
+  title: z.string().trim().min(3, "Informe um título com ao menos 3 caracteres.").max(160),
+  dueAt: z.string().datetime().optional(),
+  expectedVersion: z.number().int().positive(),
+});
+/** Lembrete de retorno: preset ("today", "tomorrow", "in_2_days", "in_3_days") ou data ISO. */
+export const lembreteSchema = z.object({
+  when: z.string().trim().min(1).max(40),
+  replaceTaskId: z.string().uuid().optional(),
+  expectedVersion: z.number().int().positive(),
 });
 export const suggestionSchema = z.object({
   goal: z.enum(["CONTINUE_ATTENDANCE", "ASK_MISSING_FIELD", "HANDLE_OBJECTION", "REQUEST_DATA", "FOLLOW_UP", "SCHEDULE_CALLBACK", "SEND_QUOTE", "CLOSE_POLITELY"]),
