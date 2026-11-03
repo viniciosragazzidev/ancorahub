@@ -978,22 +978,77 @@ export async function getPendingInvitesAction() {
     .orderBy(schema.brokerInvitations.createdAt);
 }
 
+type InvitationTarget = Parameters<typeof canRevokeTeamInvitation>[1];
+
+/**
+ * The invitation behind an id from any team screen: the invitation itself, or
+ * the member's profile, membership or user (the Lite team list sends the
+ * membership id). A member id only matches a pending invitation; an exact
+ * invitation id matches whatever its status, so the caller can say it is no
+ * longer pending.
+ */
+async function findTeamInvitation(tenantId: string, identifier: string) {
+  const [invitation] = await getDatabase().select({
+    id: schema.brokerInvitations.id,
+    status: schema.brokerInvitations.status,
+    userId: schema.brokerProfiles.userId,
+    role: schema.brokerInvitations.role,
+    branchId: schema.brokerInvitations.branchId,
+    supervisorId: sql<string | null>`coalesce(${schema.tenantMemberships.supervisorId}, ${schema.brokerInvitations.supervisorId})`,
+    membershipRole: schema.tenantMemberships.role,
+    memberBranchId: schema.tenantMemberships.branchId,
+  }).from(schema.brokerInvitations)
+    .innerJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.id, schema.brokerInvitations.brokerProfileId), eq(schema.brokerProfiles.tenantId, tenantId)))
+    .leftJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId), eq(schema.tenantMemberships.tenantId, tenantId)))
+    .where(and(
+      eq(schema.brokerInvitations.tenantId, tenantId),
+      or(
+        eq(schema.brokerInvitations.id, identifier),
+        and(
+          eq(schema.brokerInvitations.status, "PENDING"),
+          or(eq(schema.brokerInvitations.brokerProfileId, identifier), eq(schema.brokerProfiles.userId, identifier), eq(schema.tenantMemberships.id, identifier)),
+        ),
+      ),
+    ))
+    .limit(1);
+  if (!invitation) return null;
+  const target: InvitationTarget = {
+    userId: invitation.userId,
+    role: invitation.membershipRole ?? invitation.role,
+    branchId: invitation.memberBranchId ?? invitation.branchId,
+    supervisorId: invitation.supervisorId,
+  };
+  return { id: invitation.id, status: invitation.status, target };
+}
+
+/** A member without a pending invitation (expired or never sent): resending creates a new one. */
+async function findInvitationMember(tenantId: string, identifier: string): Promise<InvitationTarget | null> {
+  const db = getDatabase();
+  const [membership] = await db.select({
+    userId: schema.tenantMemberships.userId,
+    role: schema.tenantMemberships.role,
+    branchId: schema.tenantMemberships.branchId,
+    supervisorId: schema.tenantMemberships.supervisorId,
+  }).from(schema.tenantMemberships)
+    .where(and(eq(schema.tenantMemberships.tenantId, tenantId), or(eq(schema.tenantMemberships.id, identifier), eq(schema.tenantMemberships.userId, identifier))))
+    .limit(1);
+  if (membership) return membership;
+  const [profile] = await db.select({ userId: schema.brokerProfiles.userId, branchId: schema.brokerProfiles.branchId })
+    .from(schema.brokerProfiles)
+    .where(and(eq(schema.brokerProfiles.tenantId, tenantId), eq(schema.brokerProfiles.id, identifier)))
+    .limit(1);
+  return profile ? { userId: profile.userId, role: "broker", branchId: profile.branchId, supervisorId: null } : null;
+}
+
 export async function resendInviteAction(_prev: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
     const identifier = String(formData.get("memberId") ?? formData.get("invitationId") ?? "").trim();
     const context = await getRequiredTenantContext();
-    const [invitation] = await getDatabase().select({
-      id: schema.brokerInvitations.id, userId: schema.brokerProfiles.userId,
-      role: schema.brokerInvitations.role, branchId: schema.brokerInvitations.branchId,
-      supervisorId: sql<string | null>`coalesce(${schema.tenantMemberships.supervisorId}, ${schema.brokerInvitations.supervisorId})`, membershipRole: schema.tenantMemberships.role, memberBranchId: schema.tenantMemberships.branchId,
-    }).from(schema.brokerInvitations)
-      .innerJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.id, schema.brokerInvitations.brokerProfileId), eq(schema.brokerProfiles.tenantId, context.tenantId)))
-      .leftJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId), eq(schema.tenantMemberships.tenantId, context.tenantId)))
-      .where(and(or(eq(schema.brokerInvitations.id, identifier), eq(schema.brokerInvitations.brokerProfileId, identifier)), eq(schema.brokerInvitations.tenantId, context.tenantId), eq(schema.brokerInvitations.status, "PENDING")))
-      .limit(1);
-    if (!invitation || !canRevokeTeamInvitation(context, { userId: invitation.userId, role: invitation.membershipRole ?? invitation.role, branchId: invitation.memberBranchId ?? invitation.branchId, supervisorId: invitation.supervisorId })) {
-      throw new Error("Este convite está fora do seu escopo de gestão.");
-    }
+    const invitation = await findTeamInvitation(context.tenantId, identifier);
+    // An expired invitation is renewed too: its member decides the scope.
+    const target = invitation?.target ?? await findInvitationMember(context.tenantId, identifier);
+    if (!target) throw new Error("Convite ou membro não encontrado.");
+    if (!canRevokeTeamInvitation(context, target)) throw new Error("Este convite está fora do seu escopo de gestão.");
     const result = await resendTeamInvitation(identifier);
     invalidateTenantContextCache(); // role/unit/status changes apply at once
     return { success: true, ...result };
@@ -1008,31 +1063,10 @@ export async function revokeInviteAction(_prev: TeamActionState, formData: FormD
     const context = await getRequiredTenantContext();
     const db = getDatabase();
 
-    const [invitation] = await db
-      .select({
-        id: schema.brokerInvitations.id,
-        status: schema.brokerInvitations.status,
-        userId: schema.brokerProfiles.userId,
-        role: schema.brokerInvitations.role,
-        branchId: schema.brokerInvitations.branchId,
-        supervisorId: sql<string | null>`coalesce(${schema.tenantMemberships.supervisorId}, ${schema.brokerInvitations.supervisorId})`,
-        membershipRole: schema.tenantMemberships.role,
-        memberBranchId: schema.tenantMemberships.branchId,
-      })
-      .from(schema.brokerInvitations)
-      .innerJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.id, schema.brokerInvitations.brokerProfileId), eq(schema.brokerProfiles.tenantId, context.tenantId)))
-      .leftJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId), eq(schema.tenantMemberships.tenantId, context.tenantId)))
-      .where(and(or(eq(schema.brokerInvitations.id, invitationId), eq(schema.brokerInvitations.brokerProfileId, invitationId)), eq(schema.brokerInvitations.tenantId, context.tenantId)))
-      .limit(1);
-
+    const invitation = await findTeamInvitation(context.tenantId, invitationId);
     if (!invitation) throw new Error("Convite não encontrado.");
     if (invitation.status !== "PENDING") throw new Error("Este convite não está mais pendente.");
-    if (!canRevokeTeamInvitation(context, {
-      userId: invitation.userId,
-      role: invitation.membershipRole ?? invitation.role,
-      branchId: invitation.memberBranchId ?? invitation.branchId,
-      supervisorId: invitation.supervisorId,
-    })) throw new Error("Este convite está fora do seu escopo de gestão.");
+    if (!canRevokeTeamInvitation(context, invitation.target)) throw new Error("Este convite está fora do seu escopo de gestão.");
 
     await db
       .update(schema.brokerInvitations)
