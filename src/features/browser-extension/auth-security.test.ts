@@ -92,6 +92,24 @@ describe("sessões limitadas, tokens e códigos, somente mocks", () => {
     expect(state.insert).not.toHaveBeenCalled();
   });
 
+  it("aceita o token trocado por 60 s, sem estender expiresAt, e recusa depois da janela", async () => {
+    await renewExtensionSession(principal());
+    const atual = { ...principal(), tokenHash: "hash-novo" };
+    // Primeira consulta (token atual) não acha nada; a segunda (sessão dona do token trocado) acha a sessão.
+    let consulta = 0;
+    state.select.mockImplementation(() => ({ from: () => ({ where: (condition: unknown) => {
+      state.where(condition); consulta += 1;
+      return { limit: async () => (consulta === 1 ? [] : [atual]) };
+    } }) }));
+    const dentro = await authenticateExtensionRequest(request());
+    expect(dentro.id).toBe("session-a");
+    expect(dentro.expiresAt).toBe(atual.expiresAt);
+
+    vi.setSystemTime(new Date(now.getTime() + 60_000));
+    consulta = 0;
+    await expect(authenticateExtensionRequest(request())).rejects.toThrow();
+  });
+
   it("vincula extensionId e deviceId ao hash sem salvar o código bruto", async () => {
     const code = await createExtensionAuthorizationCode(binding);
     expect(state.values).toHaveBeenCalledWith(expect.objectContaining({ extensionId: binding.extensionId,

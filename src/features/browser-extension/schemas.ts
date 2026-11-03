@@ -46,6 +46,8 @@ export const feedbackSchema = z.object({
   nextAction: z.string().trim().max(160).optional(),
   nextActionAt: z.string().datetime().optional(),
   statusId: z.string().trim().max(64).optional(),
+  /** Obrigatório quando statusId é "lost"; a lista válida é validada no serviço de status. */
+  motivoPerda: z.string().trim().max(120).optional(),
   expectedVersion: z.number().int().positive(),
   note: z.string().trim().max(1000).optional(),
 });

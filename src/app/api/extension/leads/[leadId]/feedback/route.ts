@@ -20,6 +20,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ lea
     if (lead.version !== input.expectedVersion) return NextResponse.json({ error: "CONFLICT" }, { status: 409 });
     if (input.statusId && !session.permissions.includes("CHANGE_STATUS")) throw new AuthorizationError("Permissão insuficiente.");
     if (input.nextAction && !session.permissions.includes("CREATE_TASK")) throw new AuthorizationError("Permissão insuficiente.");
+    // Status primeiro: se o serviço recusar (transição, motivo de perda ou versão), nem nota nem tarefa são gravadas.
+    if (input.statusId) {
+      await changeLeadStatus({ leadId, newStatus: input.statusId, expectedVersion: input.expectedVersion, motivoPerda: input.motivoPerda }, context, undefined, { action: "extension.status.changed", metadata: extensionAuditMetadata(session) });
+    }
     const db = getDatabase();
     const now = new Date();
     let taskId: string | null = null;
@@ -34,9 +38,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ lea
       }
       await recordExtensionAudit("extension.feedback.registered", session, { leadId }, tx);
     });
-    if (input.statusId) await changeLeadStatus({ leadId, newStatus: input.statusId, expectedVersion: input.expectedVersion }, context, undefined, { action: "extension.status.changed", metadata: extensionAuditMetadata(session) });
     return NextResponse.json({ success: true, taskId, version: input.statusId ? input.expectedVersion + 1 : input.expectedVersion });
   } catch (error) {
+    // Versão mudou entre a checagem e a gravação do status: conflito, a gaveta recarrega (igual à rota de status).
+    if (error instanceof Error && error.message === "CONFLICT_VERSION") return NextResponse.json({ error: "CONFLICT", message: "Este lead foi atualizado em outro local." }, { status: 409 });
     return extensionErrorResponse(error);
   }
 }
