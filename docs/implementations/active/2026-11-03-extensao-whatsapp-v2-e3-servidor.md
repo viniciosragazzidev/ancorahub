@@ -42,7 +42,7 @@ Decisão explícita em `respostas-cinzel-e3.md`, recebida nesta sessão:
 - `npx tsc --noEmit`: passou.
 - Vitest focado: 208 casos distintos em 11 arquivos passaram, sem banco (rodada principal de 190; rodada adicional de 29, com 11 casos repetidos). Inclui as rotas E0a com os três novos endpoints, allowlist E2/listagem, disputa/prazo/ownership, fora do plantão, duplicação, recusa canônica, auditoria, sessão e caminho WhatsApp sem offerId; também os contratos existentes de domínio/resultado.
 - ESLint dos helpers/rotas/testes da extensão e regressão nova: passou. `git diff --check`: passou.
-- Build padrão tentou compilar e encontrou a limitação conhecida do Turbopack com node_modules por junction; prebuild da extensão passou. Webpack compilou com sucesso (aviso preexistente de `unpdf`); resultado completo ainda em validação. Ver evidência de verificação.
+- `npm run build`: prebuild passou; Turbopack encontrou a limitação conhecida de node_modules por junction. **`npm run build -- --webpack` passou por completo (exit 0)**, incluindo TypeScript, coleta e geração de páginas. Houve aviso de `unpdf` fora do diff e diagnósticos esperados de fallback de rotas dinâmicas por uso de `headers`. Nenhum erro bloqueou o build.
 - Sem `.env`, `.env.local`, `.env.production` ou DATABASE_URL/POSTGRES_URL no processo; não houve acesso ao banco nem migração. Nenhuma alteração nos arquivos da interface reservados ao Vigia.
 
 ## Integração, revisão e rollback
