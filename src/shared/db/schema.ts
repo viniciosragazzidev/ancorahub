@@ -2601,6 +2601,7 @@ export const extensionAuthCodes = pgTable(
   {
     id: text("id").primaryKey(),
     codeHash: text("code_hash").notNull().unique(),
+    extensionId: text("extension_id"),
     userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),

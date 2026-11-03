@@ -4,6 +4,7 @@ import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import type { TenantContext } from "@/shared/auth/types";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
+import { extensionLeadPayloadSchema } from "./payload";
 import { maskPhone, normalizePhone } from "./schemas";
 
 export function isExtensionLeadVisibleForUser(context: Pick<TenantContext, "userId" | "branchId">, lead: { corretorId: string | null; branchId: string | null }) {
@@ -27,14 +28,14 @@ export async function resolveLeadForExtension(context: TenantContext, phone: str
     status: schema.leads.status, version: schema.leads.version, qualificationStatus: schema.leads.qualificationStatus, origem: schema.leads.origem,
     sourceCampaign: schema.leads.sourceCampaign, branchId: schema.leads.branchId, branchName: schema.branches.name,
     corretorId: schema.leads.corretorId, corretorName: schema.user.name,
-  }).from(schema.leads).leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id)).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(and(eq(schema.leads.tenantId, context.tenantId), sql`regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g') = ${normalized}`));
+  }).from(schema.leads).leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id)).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, context.userId), context.branchId ? eq(schema.leads.branchId, context.branchId) : sql`false`, sql`regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g') = ${normalized}`));
   if (!candidates.length) return { status: "NOT_FOUND" as const };
   const lead = selectVisibleExtensionLead(context, candidates);
-  if (!lead) return { status: "FORBIDDEN" as const };
+  if (!lead) return { status: "NOT_FOUND" as const };
   const [nextTask] = await db.select({ id: schema.leadTasks.id, title: schema.leadTasks.title, dueAt: schema.leadTasks.dueAt }).from(schema.leadTasks).where(and(eq(schema.leadTasks.tenantId, context.tenantId), eq(schema.leadTasks.leadId, lead.id), isNull(schema.leadTasks.completedAt), or(eq(schema.leadTasks.assignedTo, context.userId), eq(schema.leadTasks.assignedTo, lead.corretorId ?? context.userId)))).orderBy(sql`${schema.leadTasks.dueAt} asc nulls last`).limit(1);
   return {
     status: "FOUND" as const,
-    lead: {
+    lead: extensionLeadPayloadSchema.parse({
       id: lead.id, version: lead.version, name: lead.nome, phoneMasked: maskPhone(lead.telefone),
       currentStatus: { id: lead.status, label: LEAD_STATUS_LABELS[lead.status] ?? lead.status },
       origin: lead.origem, sourceCampaign: lead.sourceCampaign ?? undefined,
@@ -43,7 +44,7 @@ export async function resolveLeadForExtension(context: TenantContext, phone: str
       nextAction: nextTask ? { id: nextTask.id, title: nextTask.title, dueAt: nextTask.dueAt?.toISOString() ?? null, status: "PENDING" as const } : null,
       qualification: { completed: lead.qualificationStatus === "qualified" ? ["qualification"] : [], missing: lead.qualificationStatus === "qualified" ? [] : ["qualification"] },
       allowedActions: ["VIEW_LEAD", "CHANGE_STATUS", "REGISTER_FEEDBACK", "CREATE_TASK", "GENERATE_REPLY"],
-    },
+    }),
   };
 }
 
