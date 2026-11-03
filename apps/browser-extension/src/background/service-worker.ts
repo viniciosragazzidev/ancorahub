@@ -1,5 +1,7 @@
 import { CRM_BASE } from "../config";
 import { mensagemConectarValida, remetenteConfiavel } from "./conexao";
+import { chamarApiReal } from "./api";
+import { avisarAbasWhatsApp } from "./abas";
 import { obterDeviceId } from "../shared/dispositivo";
 import { trocarCodigo } from "../shared/sessao";
 
@@ -28,16 +30,17 @@ function createResponder(sendResponse: (value: unknown) => void) {
 chrome.runtime.onMessage.addListener((message: { type?: string; payload?: Record<string, unknown> }, _sender, sendResponse) => {
   const respond = createResponder(sendResponse);
   if (message.type === "API_REQUEST") {
-    void (async () => {
-      try {
-        const { token } = await chrome.storage.session.get("token");
-        const response = await fetch(`${API_BASE}${String(message.payload?.path ?? "")}`, { method: String(message.payload?.method ?? "GET"), headers: { authorization: token ? `Bearer ${token}` : "", "content-type": "application/json" }, body: message.payload?.body ? JSON.stringify(message.payload.body) : undefined });
-        respond({ ok: response.ok, status: response.status, body: await response.json().catch(() => ({})) });
-      } catch {
-        respond({ ok: false, status: 0, body: { error: "OFFLINE" } });
-      }
-    })();
+    const metodo = String(message.payload?.method ?? "GET") === "POST" ? "POST" : "GET";
+    void chamarApiReal(String(message.payload?.path ?? ""), metodo, message.payload?.body)
+      .then((resposta) => respond({ ok: resposta.ok, status: resposta.status, body: resposta.body, retryAfter: resposta.retryAfter }))
+      .catch(() => respond({ ok: false, status: 0, body: { error: "OFFLINE" } }));
     return true;
+  }
+  if (message.type === "SESSAO_MUDOU") {
+    // Pedido de popup ou página: avisa as abas do WhatsApp Web para refazerem a consulta.
+    void avisarAbasWhatsApp();
+    respond({ ok: true });
+    return false;
   }
   if (message.type === "OPEN_CRM_LEAD") {
     const leadId = String(message.payload?.leadId ?? "");
