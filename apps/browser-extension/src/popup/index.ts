@@ -54,7 +54,7 @@ async function desconectar(credencial: Credencial) {
   if (botao) { botao.disabled = true; botao.textContent = "Desconectando…"; }
   const resultado = await mensagem<{ revogado: boolean; removido: boolean }>("DESCONECTAR", { geracao: credencial.geracao });
   if (resultado && !resultado.revogado && status) status.textContent = "Desconectado neste navegador. Não foi possível revogar no CRM agora; a sessão expira sozinha.";
-  showSemSessao("desconectada", null, resultado && !resultado.revogado ? "Desconectado neste navegador. Não foi possível revogar no CRM agora; a sessão expira sozinha." : "");
+  showSemSessao("desconectada", resultado && !resultado.revogado ? "Desconectado neste navegador. Não foi possível revogar no CRM agora; a sessão expira sozinha." : "");
 }
 
 function ligarDesconectar(credencial: Credencial | null) {
@@ -76,15 +76,17 @@ function showConectada(credencial: Credencial, perfil: Perfil | null) {
   ligarDesconectar(credencial);
 }
 
-/** Sem credencial: "desconectada" (primeira vez ou após desconectar) ou "expirada" (CRM recusou a sessão). */
-function showSemSessao(estado: "desconectada" | "expirada", perfil: Perfil | null = null, message = "") {
+/**
+ * Sem credencial: "desconectada" (primeira vez ou após desconectar) ou "expirada" (CRM recusou a sessão).
+ * Não recebe o perfil: a tela expirada não mostra o nome nem a unidade da conta anterior.
+ */
+function showSemSessao(estado: "desconectada" | "expirada", message = "") {
   const selo = estado === "expirada" ? '<span class="selo aviso">Sessão expirada</span>' : '<span class="selo">Desconectada</span>';
   const texto = estado === "expirada"
     ? "Sua conexão com o CRM expirou. Conecte de novo para continuar."
     : "Conecte este navegador à sua conta para ver o contexto do lead no WhatsApp Web.";
   render(`${cabecalho(selo)}
     <p class="texto">${texto}</p>
-    ${estado === "expirada" && perfil ? `<p class="secundario">${escapar(perfil.nome)} · ${escapar(perfil.unidade)}</p>` : ""}
     <button id="conectar-crm" class="primario" type="button">Conectar ao CRM</button>
     <div class="separador"><span>ou use o código</span></div>
     <input id="code" placeholder="Código temporário" autocomplete="one-time-code" aria-label="Código temporário">
@@ -153,8 +155,8 @@ async function verificar(): Promise<void> {
       return showConectada(credencial, mesmaSessao ? perfil : null);
     }
     case "expirada":
-      // O worker já descartou a sessão ao receber 401.
-      return showSemSessao("expirada", credencial.perfil);
+      // O worker já descartou a sessão ao receber 401. Sem perfil: a conta anterior não aparece.
+      return showSemSessao("expirada");
     case "indisponivel":
       return showIndisponivel(credencial);
     case "limitada":
