@@ -2,6 +2,13 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 03/11/2026 - Extensão v2, servidor E2/E3
+
+- Contexto comercial ampliado em allowlist estrita, com histórico só de tipo/data e contato mascarado antes do aceite.
+- Listagem de ofertas próprias e aceite/recusa pelo serviço canônico, com permissão, limite, auditoria e resposta idempotente por oferta. Contato completo só para vencedor confirmado; fora do plantão é aviso.
+- Correção canônica aprovada: recusa vencida não consome pulo, e oferta já resolvida não informa sucesso falso. Interface de ofertas ainda pendente.
+- Registro: [E3 e servidor E2](implementations/active/2026-11-03-extensao-whatsapp-v2-e3-servidor.md).
+
 ## 03/11/2026 - Extensão v2, E0a: segurança do gateway
 
 - Gate único de conta, tenant, unidade, flags e permissão nas rotas; limites isolados e resposta uniforme contra enumeração.

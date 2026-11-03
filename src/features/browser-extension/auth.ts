@@ -9,7 +9,7 @@ import { recordExtensionAudit } from "./audit";
 import { condicaoSessaoAtiva, sessaoAtivaEm, SESSION_MAX_MS } from "./sessao-ativa";
 
 export { SESSION_IDLE_MS, SESSION_MAX_MS } from "./sessao-ativa";
-export const SESSION_PERMISSIONS = ["VIEW_LEAD", "CHANGE_STATUS", "REGISTER_FEEDBACK", "CREATE_TASK", "GENERATE_REPLY"];
+export const SESSION_PERMISSIONS = ["VIEW_LEAD", "ACCEPT_LEAD", "CHANGE_STATUS", "REGISTER_FEEDBACK", "CREATE_TASK", "GENERATE_REPLY"];
 export const SESSION_TOUCH_MS = 5 * 60_000;
 export type ExtensionPrincipal = Omit<typeof schema.extensionSessions.$inferSelect, "permissions"> & { permissions: string[] };
 export type ExtensionGrant = typeof schema.extensionAuthCodes.$inferSelect;
