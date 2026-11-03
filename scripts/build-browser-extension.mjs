@@ -2,6 +2,8 @@ import { build } from "esbuild";
 import { readFileSync } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
+import { verificarLimites } from "./extensao-gates.mjs";
 
 const root = new URL("../apps/browser-extension/", import.meta.url);
 const distPath = fileURLToPath(new URL("./dist/", root));
@@ -58,3 +60,11 @@ manifest.externally_connectable = { matches: [`${crmBase}/extensao/conectar*`] }
 // O painel React é carregado pelo script de conteúdo no WhatsApp Web; só esse arquivo fica acessível.
 manifest.web_accessible_resources = [{ resources: ["panel/panel.js"], matches: ["https://web.whatsapp.com/*"] }];
 await writeFile(fileURLToPath(new URL("./dist/manifest.json", root)), `${JSON.stringify(manifest, null, 2)}\n`);
+
+// Checagem automática dos limites (gzip, como na README). Em EXTENSION_STRICT=1 (CI) o build falha; fora dele, só avisa.
+const gzipPorArquivo = Object.fromEntries(await Promise.all(["background-service-worker.js", "content-index.js", "panel/panel.js"].map(
+  async (arquivo) => [arquivo, gzipSync(await readFile(`${distPath}${arquivo}`), { level: 9 }).length],
+)));
+const estouros = verificarLimites(gzipPorArquivo);
+for (const linha of estouros) console.error(`[extensão] Acima do limite de tamanho: ${linha}`);
+if (estouros.length && process.env.EXTENSION_STRICT === "1") throw new Error("Extensão acima do limite de tamanho (EXTENSION_STRICT=1).");
