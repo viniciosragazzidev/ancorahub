@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { EstadoGaveta, LeadAmpliado, Temperatura } from "../shared/types";
 import { chegadaTexto, dataCurta, formatarValor, iniciais, rotuloTemperatura } from "./formatos";
+import { AcoesLead, type PedidoAcao, type ResultadoAcao } from "./acoes-lead";
 
 export type Objetivo = "ASK_MISSING_FIELD" | "CONTINUE_ATTENDANCE";
 
@@ -8,6 +9,8 @@ export type AcoesGaveta = {
   abrirNoCrm(leadId: string): void;
   respostas(lead: LeadAmpliado, objetivo: Objetivo): Promise<string[]>;
   inserir(texto: string): void;
+  /** Envia uma ação ao CRM (etapa, nota, tarefa, lembrete). Devolve conflito quando a versão mudou. */
+  acao(lead: LeadAmpliado, pedido: PedidoAcao): Promise<ResultadoAcao>;
   conectar(): void;
   tentarNovamente(): void;
   fechar(): void;
@@ -112,6 +115,8 @@ function VisaoLead({ lead, acoes }: { lead: LeadAmpliado; acoes: AcoesGaveta }) 
         ) : null}
         <p className="dica">As sugestões só preenchem a mensagem. Você revisa e envia.</p>
       </section>
+
+      <AcoesLead lead={lead} acao={(pedido) => acoes.acao(lead, pedido)} />
 
       <div className="rodape">
         <button className="primario" type="button" onClick={() => acoes.abrirNoCrm(lead.id)}>Abrir no CRM</button>

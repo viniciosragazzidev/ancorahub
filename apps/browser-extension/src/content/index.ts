@@ -3,6 +3,8 @@ import { criarPainelWhatsApp, type PainelWhatsApp, type SeloCabecalho } from "./
 import { mostrarAvisoConexao } from "./aviso-conexao";
 import { criarConsulta, type ApiResult, type EstadoSessaoConteudo } from "./consulta";
 import type { EstadoGaveta, LeadAmpliado } from "../shared/types";
+import type { PedidoAcao, ResultadoAcao } from "../panel/acoes-lead";
+import { requisicaoDaAcao, resultadoDaAcao } from "./acoes";
 
 const adapter = new DefaultWhatsAppWebAdapter();
 
@@ -65,6 +67,7 @@ function garantirPainel() {
     inserir: (texto) => { void adapter.insertComposerText(texto); },
     conectar: () => chrome.runtime.sendMessage({ type: "OPEN_CRM_CONNECT" }, () => void chrome.runtime.lastError),
     tentarNovamente: () => { consulta.invalidar(); safeSync(); },
+    acao: (lead, pedido) => executarAcao(lead, pedido),
   }).then((criado) => {
     painelInstancia = criado;
     return criado;
@@ -85,6 +88,31 @@ async function aoEstadoSessao(estado: EstadoSessaoConteudo) {
   }
 }
 
+// Versão nova do lead depois de uma ação. Vale só enquanto o CRM ainda estiver na versão de base:
+// se a versão mudou por outro lado, a versão local é descartada e a tela usa a do servidor.
+const versoes = new Map<string, { versao: number; base: number }>();
+
+function ajustarVersao(estado: EstadoGaveta): EstadoGaveta {
+  if (estado.tipo !== "lead") return estado;
+  const local = versoes.get(estado.lead.id);
+  if (!local || local.base !== estado.lead.version) return estado;
+  return { tipo: "lead", lead: { ...estado.lead, version: local.versao } };
+}
+
+async function executarAcao(lead: LeadAmpliado, pedido: PedidoAcao): Promise<ResultadoAcao> {
+  const requisicao = requisicaoDaAcao(lead, pedido);
+  const resposta = await requisitar(requisicao.path, requisicao.metodo, requisicao.corpo);
+  const resultado = resultadoDaAcao(resposta.status);
+  if (!resultado.ok) {
+    if (resultado.conflito) { consulta.invalidar(); safeSync(); }
+    return resultado;
+  }
+  if (typeof resposta.body.version === "number") versoes.set(lead.id, { versao: resposta.body.version, base: lead.version });
+  // Mudança de etapa altera o cartão inteiro: recarrega do CRM em vez de remendar a tela.
+  if (pedido.tipo === "etapa") { consulta.invalidar(); safeSync(); }
+  return resultado;
+}
+
 // Época de renderização: ao esconder por troca de sessão, renderizações que ainda estavam na fila perdem o efeito.
 let epocaRender = 0;
 
@@ -94,7 +122,7 @@ const consulta = criarConsulta({
   requisitar,
   mostrar: (estado: EstadoGaveta, selo: SeloCabecalho | null) => {
     const epoca = epocaRender;
-    void garantirPainel().then((controle) => { if (epoca === epocaRender) controle?.mostrar(estado, selo); });
+    void garantirPainel().then((controle) => { if (epoca === epocaRender) controle?.mostrar(ajustarVersao(estado), selo); });
   },
   ocultar: () => {
     const epoca = epocaRender;

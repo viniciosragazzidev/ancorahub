@@ -9,6 +9,8 @@ export type ResolveState = { status: "INITIALIZING" | "NO_CONVERSATION" | "UNIDE
 export type Temperatura = "quente" | "morno" | "frio" | "sem-dados";
 
 export type LeadAmpliado = {
+  /** Id da etapa no CRM (ex.: "in_contact"): base das transições válidas. */
+  etapaId?: string;
   id: string;
   version: number;
   name: string;

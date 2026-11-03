@@ -29,6 +29,7 @@ export function leadAmpliadoDe(raw: Record<string, unknown>): LeadAmpliado | nul
     version: raw.version,
     name,
     phoneMasked: texto(raw.phoneMasked) ?? "",
+    etapaId: texto(objeto(raw.currentStatus)?.id),
     etapa: texto(objeto(raw.currentStatus)?.label) ?? "Em atendimento",
     unidade: texto(objeto(raw.unit)?.name),
     corretor: texto(objeto(raw.assignedUser)?.name),
