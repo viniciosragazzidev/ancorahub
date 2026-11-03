@@ -38,7 +38,7 @@ export function ExtensionConnectLite() {
   );
 }
 
-export function ExtensionHelpLite() {
+export function ExtensionHelpLite({ version }: { version: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -48,10 +48,12 @@ export function ExtensionHelpLite() {
       </button>
       <LiteSidePanel open={open} onOpenChange={setOpen} title="AncoraHub Assistant no WhatsApp Web" description="Um apoio contextual para o seu atendimento, nunca um disparador automático.">
         <ol className={styles.steps}>
-          <li><strong>Instale.</strong> Baixe o arquivo e adicione a extensão no Chrome. Não há comando para executar.</li>
-          <li><strong>Ative neste navegador.</strong> Gere o código temporário nesta tela e informe no popup da extensão.</li>
+          <li><strong>Baixe e extraia.</strong> Use o pacote v{version} disponível nesta tela.</li>
+          <li><strong>Instale no Chrome.</strong> Em chrome://extensions, ative o modo desenvolvedor, clique em “Carregar sem compactação” e escolha a pasta extraída.</li>
+          <li><strong>Conecte em um clique.</strong> No popup da extensão, clique em “Conectar ao CRM”. Se necessário, o código temporário desta tela continua como alternativa.</li>
           <li><strong>Abra o WhatsApp Web.</strong> O painel só aparece quando a conversa pertence a um lead atribuído a você e à sua unidade.</li>
-          <li><strong>Trabalhe com segurança.</strong> Você decide cada ação; a extensão não envia mensagens, não abre conversas e não lê listas de contatos.</li>
+          <li><strong>Atualize cada versão.</strong> Baixe e extraia o pacote novo pelo CRM e clique em “Atualizar” em chrome://extensions.</li>
+          <li><strong>Atenda com segurança.</strong> Você decide cada ação; a extensão nunca envia mensagens automaticamente nem lê listas de contatos.</li>
         </ol>
       </LiteSidePanel>
     </>

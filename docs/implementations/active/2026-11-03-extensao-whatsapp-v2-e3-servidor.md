@@ -18,14 +18,14 @@ Mapas: `mapa-ext-e1-e3.md` e `mapa-ext-e2-e4.md`, fornecidos pelo Maestro.
 ## Rotas e contrato para a interface posterior
 
 - `GET /api/extension/offers`: somente broker, gate `VIEW_LEAD`, ofertas próprias no tenant com status PENDING/SENT/DELIVERED/READ e `expiresAt > agora`, ordenadas pelo vencimento, como Minha fila.
-- Resposta: `{offers:[{id,expiresAt,plantao,temperatura,primeiroNome,phoneMasked}]}`. Não retorna telefone completo, nome completo, mensagens, lead inteiro ou conteúdo de tarefa.
+- Resposta: `{offers:[{id,expiresAt,plantao,temperatura,primeiroNome,phoneMasked,foraDoPlantao}]}`. `foraDoPlantao` é somente aviso para a listagem. Não retorna telefone completo, nome completo, mensagens, lead inteiro ou conteúdo de tarefa.
 - `POST /api/extension/offers/[offerId]/accept` e `/decline`: somente broker com permissão de sessão **ACCEPT_LEAD**, gate/flags/membership E0a e limite de aceite de 10/minuto por rota normalizada e sessão. `offerId` é UUID. Corpo não decide ação, tenant, usuário ou telefone.
 - Chama `handleLeadOfferWebhookResponse` com `offerId` exato, tenant/usuário confiáveis e `buttonText` fixo `aceitar` ou `recusar`. Acrescenta override apenas de auditoria, com ação `extension.offer.accepted`/`declined` e metadata E0a; auditoria canônica não se repete em respostas já processadas.
-- Vencedor: `{success:true,offerId,leadId,action:"accepted",alreadyAccepted,phone,greeting,whatsappUrl,foraDoPlantao}`. Depois do serviço, exige a mesma oferta ACCEPTED e propriedade atual do lead no tenant antes de selecionar/devolver contato. Repetição `already_accepted` só libera contato se essa confirmação continua válida.
-- Erros de aceite reaproveitam `resolveLeadAcceptOutcome`; oferta alheia/inexistente dá 404 uniforme. Falhas de disputa/prazo dão 409 sem telefone, saudação ou URL.
-- Recusa: `{success:true,offerId,action:"declined",alreadyDeclined,foraDoPlantao,contaComoPulo:true,message}`; não libera contato. Retry da mesma oferta DECLINED é resposta idempotente sem novo pulo. ACCEPTED/EXPIRED/LOST não são reportados como recusa bem-sucedida.
+- Vencedor: `{success:true,offerId,leadId,action:"accepted",alreadyAccepted,phone,greeting,whatsappUrl}`. Depois do serviço, exige a mesma oferta ACCEPTED e propriedade atual do lead no tenant antes de selecionar/devolver contato. Repetição `already_accepted` só libera contato se essa confirmação continua válida.
+- Erros de aceite reaproveitam `resolveLeadAcceptOutcome`; oferta alheia/inexistente dá 404 uniforme. Falhas de disputa, prazo ou plantão dão 409 sem telefone, saudação ou URL.
+- Recusa: `{success:true,offerId,action:"declined",alreadyDeclined,contaComoPulo,message}`; não libera contato nem inclui aviso de plantão. Retry da mesma oferta DECLINED é resposta idempotente sem novo pulo. ACCEPTED/EXPIRED/LOST não são reportados como recusa bem-sucedida.
 - Saudação e URL reaproveitam `loadBrokerGreetingSafe` e `buildWhatsAppUrl`. A extensão não envia mensagens; os efeitos oficiais do aceite continuam exclusivamente no serviço do CRM.
-- P1: `findBrokerRunningDutyScheduleId`, que usa `pickBrokerRunningDutyScheduleId`, serve só para `foraDoPlantao`. Não é condição de aceite. Falha dessa consulta consultiva não transforma aceite confirmado em erro nem produz aviso falso de fora do plantão.
+- P1 / DEC-166: listagem informa `foraDoPlantao` por escala efetiva. O serviço canônico bloqueia antes da transação o aceite de oferta com `dutyScheduleId` quando o corretor está fora daquela escala; não altera oferta, auditoria, pulo ou distribuição. Oferta sem plantão não chama o helper. Oferta já aceita pula a verificação e mantém idempotência depois do turno.
 
 ## Correção canônica da recusa aprovada pelo Maestro
 
@@ -51,3 +51,7 @@ Decisão explícita em `respostas-cinzel-e3.md`, recebida nesta sessão:
 - Prioridade da revisão: alterações em `lead-distribution/offers.ts`, contagem do pulo e seleção exata por offerId. Regras de nivelamento, agenda, tolerância do aceite e distribuição O6 não foram alteradas.
 - Testes/prints de abrir conversa com e sem contato salvo pertencem à interface posterior; não foram simulados como entrega deste servidor.
 - Reverter os commits remove as três rotas e os novos campos; a E2 tolera campos ausentes. Sessões com capacidade adicional não a exercem sem as rotas. Não restaurar tokens nem reverter regras de produção automaticamente.
+
+## Verificacao DEC-166
+
+Resultados DEC-166: 137 testes focados em 7 arquivos e TypeScript passaram; ESLint sem erros (dois avisos preexistentes em `super-admin/actions.ts:567,1229`); `npx next build --webpack` concluiu com exit 0, com avisos conhecidos de `unpdf` e `headers`. `git diff --check` passou. O build direto evitou o prebuild que altera arquivos reservados ao Vigia.

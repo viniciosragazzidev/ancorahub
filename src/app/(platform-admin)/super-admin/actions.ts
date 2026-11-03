@@ -40,6 +40,7 @@ import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag
 import { liveStatusSettingKey } from "@/features/live-status/flag";
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import { qualificationContextAnalysisSettingKeys } from "@/features/ai-agent/qualification-context-analysis-settings";
+import { EXTENSION_PILOT_USERS_SETTING } from "@/features/browser-extension/pilot";
 
 async function requirePlatformTenantTarget(tenantId: string) {
   const parsedTenantId = z.string().uuid().safeParse(tenantId);
@@ -915,9 +916,15 @@ export async function updateRealtimeSyncSettingsAction(formData: FormData) {
 export async function updateExtensionGlobalSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("extensionEnabled") === "true" ? "true" : "false";
+  const pilotUsers = String(formData.get("extensionPilotUsers") ?? "").split(/[\r\n,]+/).map((userId) => userId.trim()).filter(Boolean);
+  if (pilotUsers.length > 100 || pilotUsers.some((userId) => !/^[a-zA-Z0-9_-]{1,128}$/.test(userId))) {
+    throw new Error("Informe até 100 IDs de usuário válidos, separados por vírgula.");
+  }
+  const uniquePilotUsers = [...new Set(pilotUsers)];
   const now = new Date();
   await setSystemSetting("feature_browser_extension_enabled", enabled, now);
-  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "update_browser_extension_global_settings", targetType: "system_settings", targetId: "browser_extension", metadata: { enabled }, createdAt: now });
+  await setSystemSetting(EXTENSION_PILOT_USERS_SETTING, uniquePilotUsers.join(","), now);
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "update_browser_extension_global_settings", targetType: "system_settings", targetId: "browser_extension", metadata: { enabled, pilotUserCount: uniquePilotUsers.length }, createdAt: now });
 }
 
 export async function updateLeadManagementActionsSettingsAction(formData: FormData) {

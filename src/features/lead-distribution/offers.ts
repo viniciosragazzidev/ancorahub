@@ -16,6 +16,7 @@ import { evaluateBrokerOfferPacing, isOfferPacingEnabled, type OfferPacingConfig
 
 import { normalizePhone } from "@/shared/utils/phone";
 import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, isBlockingActiveOffer, resolveLeadOfferAcceptance } from "./domain";
+import { isBrokerRunningInDuty } from "./active-queue-duty-roster";
 import { formatLeadTypeLabel, readSourcePlanType } from "./lead-type-label";
 import { buildLeadClientInfo, buildLeadOfferSummary } from "@/features/leads/client-info";
 import { getRelevantDutyWindow, isDutyWindowActive } from "./duty-presence-domain";
@@ -844,6 +845,24 @@ export async function handleLeadOfferWebhookResponse(input: {
 
   if (!isAccept && !isDecline) {
     return { processed: false, reason: "unrecognized_action" };
+  }
+
+  // Plantão só restringe ofertas vinculadas a um plantão e ainda elegíveis.
+  // Ofertas já aceitas continuam idempotentes mesmo após o fim da escala.
+  if (isAccept && offer.dutyScheduleId && offer.status !== "ACCEPTED"
+    && ACTIVE_OFFER_STATUSES.some((status) => status === offer.status) && offer.expiresAt > new Date()) {
+    const inDuty = await isBrokerRunningInDuty({ tenantId: input.tenantId, brokerId: broker.id, dutyScheduleId: offer.dutyScheduleId });
+    if (!inDuty) {
+      // Preserve idempotency if another request accepted this exact offer while the duty lookup ran.
+      const [latestOffer] = await db.select({ status: schema.leadOffers.status, expiresAt: schema.leadOffers.expiresAt })
+        .from(schema.leadOffers).where(and(
+          eq(schema.leadOffers.id, offer.id), eq(schema.leadOffers.tenantId, input.tenantId),
+          eq(schema.leadOffers.brokerId, broker.id),
+        )).limit(1);
+      if (latestOffer && ACTIVE_OFFER_STATUSES.some((status) => status === latestOffer.status) && latestOffer.expiresAt > new Date()) {
+        return { processed: false, reason: "outside_duty" };
+      }
+    }
   }
 
   // Handle DECLINE

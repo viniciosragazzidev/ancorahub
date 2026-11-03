@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   authenticate: vi.fn(), exchangePrincipal: vi.fn(), touch: vi.fn(), context: vi.fn(), global: vi.fn(),
   resolve: vi.fn(), getLead: vi.fn(), audit: vi.fn(), changeStatus: vi.fn(), renew: vi.fn(), revoke: vi.fn(), exchange: vi.fn(),
-  select: vi.fn(), settings: { enabled: true, minimumVersion: "0.1.0", allowInsert: true, maxSuggestions: 3 },
+  select: vi.fn(), pilot: vi.fn(), settings: { enabled: true, minimumVersion: "0.1.0", allowInsert: true, maxSuggestions: 3 },
 }));
 vi.mock("@/shared/db", async () => ({
   schema: await import("@/shared/db/schema"),
@@ -13,6 +13,7 @@ vi.mock("./auth", () => ({ authenticateExtensionRequest: state.authenticate,
   getExtensionExchangePrincipal: state.exchangePrincipal, touchExtensionSession: state.touch,
   renewExtensionSession: state.renew, revokeExtensionSession: state.revoke, exchangeExtensionCode: state.exchange }));
 vi.mock("./context", () => ({ getExtensionTenantContext: state.context }));
+vi.mock("./pilot", () => ({ isExtensionPilotUser: state.pilot }));
 vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: state.global }));
 vi.mock("./lead-context", () => ({ resolveLeadForExtension: state.resolve, getLeadForExtension: state.getLead }));
 vi.mock("./audit", () => ({ recordExtensionAudit: state.audit,
@@ -65,6 +66,7 @@ beforeEach(() => {
   state.exchangePrincipal.mockResolvedValue({ session: principal, grant: { id: "grant-a" } });
   state.context.mockResolvedValue({ userId: "user-a", tenantId: "tenant-a", branchId: "branch-a", role: "broker", jobTitle: "broker" });
   state.global.mockResolvedValue("true");
+  state.pilot.mockResolvedValue(true);
   state.select.mockImplementation(() => ({ from: () => ({ where: () => ({ limit: async () => [state.settings] }) }) }));
   state.resolve.mockResolvedValue({ status: "NOT_FOUND" });
   state.getLead.mockResolvedValue({ id: "lead-a", version: 1 });
@@ -72,11 +74,12 @@ beforeEach(() => {
 
 describe("gateway de todas as rotas da extensão, sem banco", () => {
   for (const [path, handle] of routes) {
-    it.each(["global", "tenant", "membership", "branch"])(path + " nega quando %s está indisponível", async (denial) => {
+    it.each(["global", "tenant", "membership", "branch", "pilot"])(path + " nega quando %s está indisponível", async (denial) => {
       if (denial === "global") state.global.mockResolvedValue("false");
       if (denial === "tenant") state.settings.enabled = false;
       if (denial === "membership") state.context.mockResolvedValue(null);
       if (denial === "branch") state.context.mockResolvedValue({ role: "broker", branchId: null });
+      if (denial === "pilot") state.pilot.mockResolvedValue(false);
       const response = await handle(request(path, path === "auth/exchange" ? exchangeBody : {}));
       expect(response.status).toBe(403);
       expect(await response.json()).toEqual({ error: "FORBIDDEN" });

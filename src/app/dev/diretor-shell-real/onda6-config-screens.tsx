@@ -16,6 +16,7 @@ import { MaterialsWhatsAppLite } from "@/app/(dashboard)/integrations/whatsapp/m
 import { QualificationHubLite } from "@/app/(dashboard)/qualificacao/_components/lite/qualification-hub-lite";
 import { QUALIFICATION_HUB_FIXTURE } from "@/app/(dashboard)/qualificacao/_components/qualification-hub-fixtures";
 import { ExtensionLiteView } from "@/app/(dashboard)/settings/_components/lite/extension-lite-view";
+import { BROWSER_EXTENSION_MANIFEST_VERSION } from "@/features/browser-extension/manifest-version";
 import { FeedbackTemplatesLite } from "@/app/(dashboard)/settings/feedback-templates/feedback-templates-lite";
 import { WahaDiagnosticLite } from "@/app/(dashboard)/settings/waha-diagnostic/waha-diagnostic-lite";
 import { WhatsAppPageLite, type WhatsAppChannel } from "@/app/(dashboard)/settings/whatsapp-page-lite";
@@ -121,7 +122,7 @@ export function ExtensaoShellScreen() {
   return (
     <>
       <DashboardHeader breadcrumb="Configurações / Integrações" title="AncoraHub Assistant" />
-      <main className={litePage.stack}><ExtensionLiteView data={{ enabled: true, minimumVersion: "0.4.2", canConfigure: true, conectada: false }} /></main>
+      <main className={litePage.stack}><ExtensionLiteView data={{ enabled: true, minimumVersion: "0.4.2", extensionVersion: BROWSER_EXTENSION_MANIFEST_VERSION, canConfigure: true, conectada: false }} /></main>
     </>
   );
 }

@@ -7,6 +7,7 @@ import { authenticateExtensionRequest, getExtensionExchangePrincipal, touchExten
 import { getExtensionTenantContext } from "./context";
 import { extensionDeviceSchema } from "./schemas";
 import { enforceExtensionRateLimit, extensionRouteKey } from "./rate-limit";
+import { isExtensionPilotUser } from "./pilot";
 
 export type ExtensionPermission = "VIEW_LEAD" | "ACCEPT_LEAD" | "CHANGE_STATUS" | "REGISTER_FEEDBACK" | "CREATE_TASK" | "GENERATE_REPLY" | "EXCHANGE_CODE";
 
@@ -20,6 +21,7 @@ export async function requireExtensionAccess(request: Request, permission: Exten
   const context = await getExtensionTenantContext(session.userId, session.tenantId);
   if (!context?.branchId || !["broker", "manager", "director"].includes(context.role)) throw new AuthorizationError("Vínculo ou unidade inválidos.");
   if ((await getSystemSetting("feature_browser_extension_enabled")) === "false") throw new AuthorizationError("Extensão desativada.");
+  if (!await isExtensionPilotUser(session.userId)) throw new AuthorizationError("Extensão desativada.");
   const [settings] = await getDatabase().select().from(schema.extensionSettings)
     .where(eq(schema.extensionSettings.tenantId, session.tenantId)).limit(1);
   if (!settings?.enabled) throw new AuthorizationError("Extensão desativada.");

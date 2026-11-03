@@ -6,7 +6,7 @@ import { desconectarExtensaoAction } from "@/features/browser-extension/conexao-
 import { ExtensionConnectLite, ExtensionHelpLite } from "./extension-lite-parts";
 import styles from "@/components/lite/page/lite-sections.module.css";
 
-export type ExtensionLiteData = { enabled: boolean; minimumVersion: string; canConfigure: boolean; conectada: boolean };
+export type ExtensionLiteData = { enabled: boolean; minimumVersion: string; extensionVersion: string; canConfigure: boolean; conectada: boolean };
 
 export function ExtensionLiteView({ data }: { data: ExtensionLiteData }) {
   return (
@@ -19,11 +19,11 @@ export function ExtensionLiteView({ data }: { data: ExtensionLiteData }) {
       </div>
       <div className={styles.formBody}>
         <div className={styles.badges}>
-          <a href="/downloads/ancorahub-assistant.zip" download className={page.primaryButton}>Baixar extensão</a>
-          <ExtensionHelpLite />
+          <a href="/downloads/ancorahub-assistant.zip" download className={page.primaryButton}>Baixar extensão v{data.extensionVersion}</a>
+          <ExtensionHelpLite version={data.extensionVersion} />
         </div>
-        <p className={styles.note}>Depois de baixar, extraia o arquivo e adicione a pasta em chrome://extensions. Quando a publicação na Chrome Web Store estiver disponível, a instalação poderá ser feita em um clique.</p>
-        <p className={styles.note}>Versão mínima: {data.minimumVersion}</p>
+        <p className={styles.note}>Versão do pacote: {data.extensionVersion} · Versão mínima: {data.minimumVersion}. Para atualizar, baixe e extraia a nova versão pelo CRM e clique em “Atualizar” em chrome://extensions.</p>
+        <p className={styles.note}>Para instalar: abra chrome://extensions, ative o modo desenvolvedor, clique em “Carregar sem compactação” e escolha a pasta extraída. Depois, no popup da extensão, clique em “Conectar ao CRM”; o código desta tela fica como alternativa.</p>
       </div>
       <div className={styles.row}>
         {data.canConfigure ? (
