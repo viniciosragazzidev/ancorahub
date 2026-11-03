@@ -516,7 +516,14 @@ async function deferOrFailJob(
   return exhausted;
 }
 
-export async function runLeadDistributionProcessor(input: { tenantId?: string; leadId?: string; limit?: number; deadline?: number } = {}): Promise<DistributionJobRunResult> {
+export async function runLeadDistributionProcessor(input: {
+  tenantId?: string;
+  leadId?: string;
+  limit?: number;
+  deadline?: number;
+  /** One lead of the priority pass: the tenant-wide sweeps (offers, plantão wake-up) already ran for the pass. */
+  skipTenantSweeps?: boolean;
+} = {}): Promise<DistributionJobRunResult> {
   const config = await getDistributionJobConfig();
   const result: DistributionJobRunResult = { seeded: 0, claimed: 0, assigned: 0, offered: 0, outboundMessageIds: [], deferred: 0, failed: 0, skipped: 0, recoveredLeases: 0, recoveredAssignments: 0 };
   if (!config.enabled) return result;
@@ -536,10 +543,10 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
       if (ms >= 5_000) console.warn("[lead-distribution] slow_step", { step: name, ms });
     }
   };
-  await step("expire_offers", () => expireOutdatedLeadOffers(input.tenantId));
+  if (!input.skipTenantSweeps) await step("expire_offers", () => expireOutdatedLeadOffers(input.tenantId));
   result.recoveredLeases = await step("recover_leases", () => recoverExpiredJobLeases(now, input.tenantId, input.leadId));
   result.recoveredAssignments = await step("recover_assignments", () => recoverStuckLeadAssignments(now, effectiveConfig, input.tenantId, input.leadId));
-  const awakenedDutyJobs = await step("wake_duty_jobs", () => wakeJobsForActiveDuty(now, input.tenantId));
+  const awakenedDutyJobs = input.skipTenantSweeps ? 0 : await step("wake_duty_jobs", () => wakeJobsForActiveDuty(now, input.tenantId));
   if (awakenedDutyJobs > 0) {
     console.info("[lead-distribution] active_duty_jobs_awakened", {
       tenantId: input.tenantId ?? "all",
@@ -680,6 +687,108 @@ export async function drainLeadDistributionBacklog(input: { tenantId?: string; m
   }
   if (Date.now() >= deadline) aggregate.stoppedByBudget = true;
   return aggregate;
+}
+
+/**
+ * Priority pass (03/11): a hot or warm lead must have a broker within 3 minutes of its
+ * qualification. The backlog holds hundreds of jobs that can never be handed out (held by a
+ * rule, manual hold, old leads) and each run only got through a few, so a freshly qualified
+ * hot lead waited 30 minutes for its turn with eligible brokers free. This pass runs first in
+ * every scheduled run (and right after a qualification that found no broker) and only looks
+ * at the recently qualified hot/warm leads without a broker, oldest qualification first.
+ */
+export const PRIORITY_DISTRIBUTION_WINDOW_MS = 6 * 60 * 60_000;
+export const PRIORITY_DISTRIBUTION_BUDGET_MS = 25_000;
+export const PRIORITY_DISTRIBUTION_LIMIT = 10;
+
+async function findPriorityDistributionLeads(now: Date, limit: number, tenantId?: string, leadId?: string) {
+  const earlyHot = await isHotLeadEarlyDistributionEnabled();
+  return getDatabase().select({ id: schema.leads.id, tenantId: schema.leads.tenantId })
+    .from(schema.leads)
+    .where(and(
+      inArray(schema.leads.qualificationStatus, ["hot", "warm"]),
+      isNull(schema.leads.corretorId),
+      inArray(schema.leads.distributionStatus, ["queued", "unassigned", "returned_to_queue"]),
+      ne(schema.leads.status, "lost"),
+      isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
+      isNull(schema.leads.distributionRemovedAt),
+      not(ilike(schema.leads.nome, "Lead WhatsApp (%)")),
+      notHeldByRunningQualificationSql(earlyHot),
+      gt(sql`coalesce(${schema.leads.qualificationCompletedAt}, ${schema.leads.updatedAt})`, new Date(now.getTime() - PRIORITY_DISTRIBUTION_WINDOW_MS)),
+      // A job waiting for its retry time (held by a rule, offer still open) keeps its own pace.
+      sql`not exists (select 1 from ${schema.leadDistributionJobs} j where j.lead_id = ${schema.leads.id} and j.status in ('pending', 'retrying', 'processing') and (j.status = 'processing' or j.run_after > ${now}))`,
+      tenantId ? eq(schema.leads.tenantId, tenantId) : undefined,
+      leadId ? eq(schema.leads.id, leadId) : undefined,
+    ))
+    .orderBy(sql`coalesce(${schema.leads.qualificationCompletedAt}, ${schema.leads.createdAt}) asc`)
+    .limit(limit);
+}
+
+type PriorityDistributionDeps = {
+  findLeads: typeof findPriorityDistributionLeads;
+  expireOffers: typeof expireOutdatedLeadOffers;
+  ensureJob: typeof enqueueLeadDistributionJob;
+  processLead: typeof runLeadDistributionProcessor;
+  sendOffer: (tenantId: string, outboundMessageId: string) => Promise<unknown>;
+};
+
+const priorityDistributionDeps: PriorityDistributionDeps = {
+  findLeads: findPriorityDistributionLeads,
+  expireOffers: expireOutdatedLeadOffers,
+  ensureJob: enqueueLeadDistributionJob,
+  processLead: runLeadDistributionProcessor,
+  sendOffer: (tenantId, outboundMessageId) => processMetaOutboundBatch(1, tenantId, outboundMessageId),
+};
+
+export async function runPriorityLeadDistribution(
+  input: { tenantId?: string; leadId?: string; budgetMs?: number; limit?: number } = {},
+  overrides: Partial<PriorityDistributionDeps> = {},
+) {
+  const deps = { ...priorityDistributionDeps, ...overrides };
+  const deadline = Date.now() + (input.budgetMs ?? PRIORITY_DISTRIBUTION_BUDGET_MS);
+  const aggregate = { leads: 0, claimed: 0, assigned: 0, offered: 0, deferred: 0, failed: 0, skipped: 0, stoppedByBudget: false };
+  const now = new Date();
+  const leads = await deps.findLeads(now, input.limit ?? PRIORITY_DISTRIBUTION_LIMIT, input.tenantId, input.leadId);
+  aggregate.leads = leads.length;
+  if (!leads.length) return aggregate;
+  // Once for the pass: an expired offer frees the lead for the next broker.
+  await deps.expireOffers(input.tenantId);
+  for (const lead of leads) {
+    if (Date.now() >= deadline) {
+      aggregate.stoppedByBudget = true;
+      break;
+    }
+    // The lead's own job, created now when it has none (the active-job index keeps it unique).
+    await deps.ensureJob({ tenantId: lead.tenantId, leadId: lead.id });
+    const result = await deps.processLead({ tenantId: lead.tenantId, leadId: lead.id, limit: 1, deadline, skipTenantSweeps: true });
+    for (const key of ["claimed", "assigned", "offered", "deferred", "failed", "skipped"] as const) aggregate[key] += result[key];
+    // The offer goes out now; past the budget the outbox job sends it within a minute.
+    await runWithConcurrency(result.outboundMessageIds, 3, async (outboundMessageId) => {
+      if (Date.now() >= deadline) return;
+      await deps.sendOffer(lead.tenantId, outboundMessageId);
+    });
+  }
+  return aggregate;
+}
+
+/** Retries after a qualification that found no broker, so the 3-minute target does not depend on the scheduler. */
+export const PRIORITY_RETRY_DELAYS_MS = [60_000, 150_000] as const;
+
+export function schedulePriorityDistributionRetries(
+  tenantId: string,
+  leadId: string,
+  delays: readonly number[] = PRIORITY_RETRY_DELAYS_MS,
+  run: (input: { tenantId: string; leadId: string; limit: number }) => Promise<unknown> = (input) => runPriorityLeadDistribution(input),
+) {
+  for (const delay of delays) {
+    const timer = setTimeout(() => {
+      void run({ tenantId, leadId, limit: 1 }).catch((error) => {
+        console.warn("[lead-distribution] priority_retry_failed", { tenantId, leadId, message: sanitizeError(error) });
+      });
+    }, delay);
+    timer.unref?.();
+  }
 }
 
 export async function getLeadDistributionJobHealth(tenantId?: string) {
