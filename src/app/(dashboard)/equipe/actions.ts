@@ -455,6 +455,7 @@ export async function updateTeamMemberAction(
 
       if (authorityChanged) {
         await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
+        await tx.update(schema.extensionSessions).set({ revokedAt: new Date() }).where(and(eq(schema.extensionSessions.userId, member.userId), eq(schema.extensionSessions.tenantId, context.tenantId), isNull(schema.extensionSessions.revokedAt)));
         await tx.insert(schema.auditLogs).values({
           id: randomUUID(),
           userId: context.userId,
@@ -548,6 +549,7 @@ export async function bulkToggleTeamMemberStatusAction(
         if (!nextActive) {
           await detachFromSupervision(tx, { tenantId: context.tenantId, actorId: context.userId, userId: member.userId });
           await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
+        await tx.update(schema.extensionSessions).set({ revokedAt: new Date() }).where(and(eq(schema.extensionSessions.userId, member.userId), eq(schema.extensionSessions.tenantId, context.tenantId), isNull(schema.extensionSessions.revokedAt)));
         }
       });
       updatedCount++;
@@ -622,6 +624,7 @@ export async function toggleTeamMemberStatusAction(
       // Revogar sessões ao desativar membro
       if (!nextActive) {
         await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
+        await tx.update(schema.extensionSessions).set({ revokedAt: new Date() }).where(and(eq(schema.extensionSessions.userId, member.userId), eq(schema.extensionSessions.tenantId, context.tenantId), isNull(schema.extensionSessions.revokedAt)));
         await detachFromSupervision(tx, { tenantId: context.tenantId, actorId: context.userId, userId: member.userId });
       }
     });
@@ -800,6 +803,7 @@ export async function deleteTeamMemberAction(
         await detachFromSupervision(tx, { tenantId: context.tenantId, actorId: context.userId, userId: member.userId });
         await tx.delete(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.id, member.membershipId), eq(schema.tenantMemberships.tenantId, context.tenantId)));
         await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
+        await tx.update(schema.extensionSessions).set({ revokedAt: new Date() }).where(and(eq(schema.extensionSessions.userId, member.userId), eq(schema.extensionSessions.tenantId, context.tenantId), isNull(schema.extensionSessions.revokedAt)));
       });
     } else {
       const [profile] = await db.select({ id: schema.brokerProfiles.id, branchId: schema.brokerProfiles.branchId, userId: schema.brokerProfiles.userId, invitedEmail: schema.brokerProfiles.invitedEmail }).from(schema.brokerProfiles).where(and(eq(schema.brokerProfiles.id, memberId), eq(schema.brokerProfiles.tenantId, context.tenantId))).limit(1);

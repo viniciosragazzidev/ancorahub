@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { revokeExtensionSession } from "@/features/browser-extension/auth";
-import { AuthenticationError } from "@/shared/auth/errors";
-
+import { requireExtensionAccess } from "@/features/browser-extension/access";
+import { extensionErrorResponse } from "@/features/browser-extension/http";
 export async function POST(request: Request) {
-  try { await revokeExtensionSession(request); return NextResponse.json({ success: true }); }
-  catch (error) { return NextResponse.json({ error: error instanceof AuthenticationError ? "SESSION_EXPIRED" : "INVALID_REQUEST" }, { status: 401 }); }
+  try {
+    const { session } = await requireExtensionAccess(request, "VIEW_LEAD");
+    await revokeExtensionSession(session);
+    return NextResponse.json({ success: true });
+  } catch (error) { return extensionErrorResponse(error); }
 }

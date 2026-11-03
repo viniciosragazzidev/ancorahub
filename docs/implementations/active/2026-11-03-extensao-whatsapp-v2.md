@@ -208,6 +208,16 @@ Execução em worktrees próprias, a partir de `feat/extensao-v2`.
 O Lince mapeia a próxima etapa enquanto a atual é executada e faz o QA de cada
 entrega.
 
+## Entrega E0a (03/11/2026)
+
+Status: implementada em `feat/ext-v2-e0a`, aguardando revisão cruzada do Vigia e QA do Lince.
+Registro: [E0a segurança e rotas](2026-11-03-extensao-whatsapp-v2-e0a.md).
+Todas as rotas usam `requireExtensionAccess`, inclusive exchange autenticado pelo grant de uso único.
+O plano B manual continua sem vínculo; E1 pode emitir código com `{extensionId, deviceId}`.
+A unidade/membership é conferida em cada chamada. Renovação explícita: `POST /api/extension/session`;
+`GET` permanece compatível e não rotaciona. SQL manual: `drizzle/0216_extension_auth_code_binding.sql`.
+Validações: typecheck e testes focados com mocks; detalhes e limites no registro da E0a.
+
 ## Pendente com o Vinicios
 
 - Conta de desenvolvedor da Chrome Web Store (E6).
