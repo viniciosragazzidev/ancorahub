@@ -1,4 +1,6 @@
-const API_BASE = "https://crm.ancorasaude.cloud";
+import { CRM_BASE } from "../config";
+
+const API_BASE = CRM_BASE;
 
 /**
  * Encapsula o `sendResponse` do listener. Quando o remetente encerra o canal
