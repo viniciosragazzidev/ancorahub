@@ -12,6 +12,7 @@ export type NoticeFields =
   | { purpose: "leadAssignmentUnavailable" | "leadAssignmentExpired"; broker: string; lead: string }
   | { purpose: "leadFeedbackReminder"; broker: string; lead: string }
   | { purpose: "leadClientReturned"; broker: string; lead: string; since: string; link: string | null }
+  | { purpose: "leadClosingStage"; broker: string; lead: string; link: string | null }
   | { purpose: "taskReminder"; name: string; task: string; when: string }
   | { purpose: "brokerAccountActivated"; name: string; company: string; loginUrl: string }
   | { purpose: "dutyPresenceConfirmation"; broker: string; hour: string; link: string | null }
@@ -110,6 +111,18 @@ export function builtInNoticeVariants(fields: NoticeFields, hour: number): strin
         `${hi}, *${broker}*! *${lead}* acabou de mandar mensagem. Está com você desde ${since}, vale responder logo.${tail(link, "Abrir no CRM: ")}`,
         `Oi *${broker}*, *${lead}* voltou a falar no WhatsApp. Lead seu desde ${since}.${tail(link, "👉 ")}`,
         `🔔 ${broker}, mensagem nova de *${lead}* (com você desde ${since}). Responda enquanto está quente.${tail(link, "Conversa: ")}`,
+      ];
+    }
+    case "leadClosingStage": {
+      const { broker, lead, link } = fields;
+      const checklist = "valor, nº de vidas, operadora/plano, documentos e data";
+      return [
+        `🎉 *Parabéns, ${broker}!*
+
+*${lead}* entrou na etapa de fechamento. Para finalizar com sucesso, registre no CRM: ${checklist}.${tail(link, "👉 *Abrir no CRM:* ")}`,
+        `${hi}, *${broker}*! *${lead}* chegou ao fechamento, parabéns 👏 Antes de concluir, deixe no CRM ${checklist}.${tail(link, "Abrir no CRM: ")}`,
+        `Parabéns, *${broker}*! *${lead}* está em fechamento. Dica: confira os documentos e registre no CRM ${checklist}.${tail(link, "👉 ")}`,
+        `🎉 ${broker}, *${lead}* está quase fechado! Para não travar na análise, registre no CRM ${checklist}.${tail(link, "Lead: ")}`,
       ];
     }
     case "taskReminder": {

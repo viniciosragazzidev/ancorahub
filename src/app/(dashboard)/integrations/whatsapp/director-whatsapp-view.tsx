@@ -20,6 +20,7 @@ const PREVIEW_VARIABLES: Record<string, string[]> = {
   leadAssignmentUnavailable: ["Ana"],
   leadAssignmentExpired: ["Ana"],
   leadFeedbackReminder: ["Ana", "Maria Souza"],
+  leadClosingStage: ["Ana", "Maria Souza", "exemplo"],
   taskReminder: ["Ana", "Ligar para Maria Souza", "Hoje, 15:00"],
   brokerAccountActivated: ["Ana", "Âncora"],
   dutyPresenceConfirmation: ["Ana", "08:00", "exemplo"],

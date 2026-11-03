@@ -82,6 +82,7 @@ describe.skipIf(!enabled)("message library (real schema, rolled back)", () => {
         leadAssignmentUnavailable: [vinicios.name, "Lead de teste"],
         leadAssignmentExpired: [vinicios.name, "Lead de teste"],
         leadFeedbackReminder: [vinicios.name, "Lead de teste"],
+        leadClosingStage: [vinicios.name, "Lead de teste", leadId],
         taskReminder: [vinicios.name, "Ligar para o lead de teste", "30/09 14:00"],
         brokerAccountActivated: [vinicios.name, "Âncora", "https://crm.ancorasaude.cloud/login"],
         dutyPresenceConfirmation: [vinicios.name, "09:00", randomUUID()],
