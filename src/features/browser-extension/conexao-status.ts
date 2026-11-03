@@ -1,42 +1,21 @@
 import "server-only";
 
-import { and, eq, gt, isNull, sql, type SQL } from "drizzle-orm";
+import { and, eq, type SQL } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
-import { SESSION_IDLE_MS, SESSION_MAX_MS } from "./auth";
+import { condicaoSessaoAtiva as criterioDeVida, sessaoAtivaEm } from "./sessao-ativa";
 
-type SessaoLida = {
-  userId: string;
-  tenantId: string;
-  revokedAt: Date | null;
-  expiresAt: Date;
-  createdAt: Date;
-  lastSeenAt: Date | null;
-};
+export { sessaoAtivaEm };
 
-/**
- * Mesmo critério da autenticação da E0a (auth.ts): não revogada, não vencida, teto de 30 dias desde a criação
- * e ociosidade de 7 dias desde o último uso (lastSeenAt, ou createdAt quando nunca foi usada).
- */
-export function sessaoAtivaEm(sessao: SessaoLida, agora: Date): boolean {
-  return sessao.revokedAt === null
-    && sessao.expiresAt > agora
-    && agora.getTime() - sessao.createdAt.getTime() < SESSION_MAX_MS
-    && agora.getTime() - (sessao.lastSeenAt ?? sessao.createdAt).getTime() < SESSION_IDLE_MS;
-}
-
-/** Versão SQL do mesmo critério. Só lê: não renova lastSeenAt. */
+/** Sessão deste usuário nesta empresa que segue o critério único (sessao-ativa.ts). Só lê. */
 export function condicaoSessaoAtiva(userId: string, tenantId: string, agora: Date): SQL {
   return and(
     eq(schema.extensionSessions.userId, userId),
     eq(schema.extensionSessions.tenantId, tenantId),
-    isNull(schema.extensionSessions.revokedAt),
-    gt(schema.extensionSessions.expiresAt, agora),
-    gt(schema.extensionSessions.createdAt, new Date(agora.getTime() - SESSION_MAX_MS)),
-    sql`coalesce(${schema.extensionSessions.lastSeenAt}, ${schema.extensionSessions.createdAt}) > ${new Date(agora.getTime() - SESSION_IDLE_MS)}`,
+    criterioDeVida(agora),
   )!;
 }
 
-/** Há alguma sessão de extensão ativa deste usuário nesta empresa (critério da E0a). */
+/** Há alguma sessão de extensão ativa deste usuário nesta empresa. */
 export async function sessaoExtensaoAtiva(userId: string, tenantId: string, agora = new Date()) {
   const [sessao] = await getDatabase()
     .select({ id: schema.extensionSessions.id })

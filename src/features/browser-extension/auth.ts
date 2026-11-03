@@ -6,10 +6,10 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError, AuthenticationError } from "@/shared/auth/errors";
 import { extensionCodeBindingSchema, type ExtensionCodeBinding, type ExtensionDeviceInput, type ExtensionSession } from "./schemas";
 import { recordExtensionAudit } from "./audit";
+import { condicaoSessaoAtiva, sessaoAtivaEm, SESSION_MAX_MS } from "./sessao-ativa";
 
+export { SESSION_IDLE_MS, SESSION_MAX_MS } from "./sessao-ativa";
 export const SESSION_PERMISSIONS = ["VIEW_LEAD", "CHANGE_STATUS", "REGISTER_FEEDBACK", "CREATE_TASK", "GENERATE_REPLY"];
-export const SESSION_IDLE_MS = 7 * 24 * 60 * 60_000;
-export const SESSION_MAX_MS = 30 * 24 * 60 * 60_000;
 export const SESSION_TOUCH_MS = 5 * 60_000;
 export type ExtensionPrincipal = Omit<typeof schema.extensionSessions.$inferSelect, "permissions"> & { permissions: string[] };
 export type ExtensionGrant = typeof schema.extensionAuthCodes.$inferSelect;
@@ -38,12 +38,9 @@ export async function authenticateExtensionRequest(request: Request): Promise<Ex
   const now = new Date();
   // The token hash is the initial capability; tenant is taken from this row, never from the request.
   const [session] = await getDatabase().select().from(schema.extensionSessions).where(and(
-    eq(schema.extensionSessions.tokenHash, hash(token)), isNull(schema.extensionSessions.revokedAt),
-    gt(schema.extensionSessions.expiresAt, now), gt(schema.extensionSessions.createdAt, new Date(now.getTime() - SESSION_MAX_MS)),
-    sql`coalesce(${schema.extensionSessions.lastSeenAt}, ${schema.extensionSessions.createdAt}) > ${new Date(now.getTime() - SESSION_IDLE_MS)}`,
+    eq(schema.extensionSessions.tokenHash, hash(token)), condicaoSessaoAtiva(now),
   )).limit(1);
-  if (!session || session.revokedAt || session.expiresAt <= now || now.getTime() - session.createdAt.getTime() >= SESSION_MAX_MS
-    || now.getTime() - (session.lastSeenAt ?? session.createdAt).getTime() >= SESSION_IDLE_MS) {
+  if (!session || !sessaoAtivaEm(session, now)) {
     throw new AuthenticationError("Sessão da extensão expirada ou revogada.");
   }
   return { ...session, permissions: Array.isArray(session.permissions)
@@ -103,8 +100,7 @@ export async function renewExtensionSession(session: ExtensionPrincipal) {
     const [updated] = await tx.update(schema.extensionSessions).set({ tokenHash: hash(token) }).where(and(
       eq(schema.extensionSessions.id, session.id), eq(schema.extensionSessions.tenantId, session.tenantId),
       eq(schema.extensionSessions.tokenHash, session.tokenHash), isNull(schema.extensionSessions.revokedAt),
-      gt(schema.extensionSessions.expiresAt, now), gt(schema.extensionSessions.createdAt, new Date(now.getTime() - SESSION_MAX_MS)),
-      sql`coalesce(${schema.extensionSessions.lastSeenAt}, ${schema.extensionSessions.createdAt}) > ${new Date(now.getTime() - SESSION_IDLE_MS)}`,
+      condicaoSessaoAtiva(now),
     )).returning({ id: schema.extensionSessions.id });
     if (!updated) throw new AuthenticationError("Sessão expirada ou já renovada.");
     await recordExtensionAudit("extension.session.renewed", session, {}, tx);
