@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
-const state = vi.hoisted(() => ({ access: vi.fn(), canonical: vi.fn(), greeting: vi.fn(), duty: vi.fn(), audit: vi.fn(),
+const state = vi.hoisted(() => ({ access: vi.fn(), canonical: vi.fn(), greeting: vi.fn(), inDuty: vi.fn(), audit: vi.fn(),
   rows: [] as unknown[][], select: vi.fn(), conditions: [] as unknown[] }));
 vi.mock("@/shared/db", async () => ({ schema: await import("@/shared/db/schema"), getDatabase: () => ({ select: state.select }) }));
 vi.mock("./access", () => ({ requireExtensionAccess: state.access }));
 vi.mock("@/features/lead-distribution/offers", () => ({ handleLeadOfferWebhookResponse: state.canonical }));
-vi.mock("@/features/lead-distribution/active-queue-duty-roster", () => ({ findBrokerRunningDutyScheduleId: state.duty }));
+vi.mock("@/features/lead-distribution/active-queue-duty-roster", () => ({ isBrokerRunningInDuty: state.inDuty }));
 vi.mock("@/features/leads/broker-greeting-server", () => ({ loadBrokerGreetingSafe: state.greeting }));
 vi.mock("./audit", async () => ({ ...await vi.importActual<typeof import("./audit")>("./audit"), recordExtensionAudit: state.audit }));
 import { GET } from "@/app/api/extension/offers/route";
@@ -16,7 +16,7 @@ import { AuthorizationError } from "@/shared/auth/errors";
 const offerId = "00000000-0000-4000-8000-000000000001";
 const context = { tenantId: "tenant-a", userId: "broker-a", role: "broker" as const, jobTitle: "broker", branchId: "branch-a" };
 const session = { id: "session-a", userId: "broker-a", tenantId: "tenant-a", deviceId: "device-a", extensionVersion: "0.2.0" };
-const offer = { id: offerId, leadId: "lead-a", status: "PENDING" };
+const offer = { id: offerId, leadId: "lead-a", status: "PENDING", dutyScheduleId: "duty-a" };
 const winner = { id: "lead-a", nome: "Cliente de teste", telefone: "+5511999990000", branchId: "branch-a" };
 const params = { params: Promise.resolve({ offerId }) };
 function request(action: string) { return new Request("https://crm.test/api/extension/offers/" + offerId + "/" + action,
@@ -25,7 +25,7 @@ beforeEach(() => {
   vi.clearAllMocks(); state.conditions = [];
   state.access.mockResolvedValue({ context, session });
   state.canonical.mockResolvedValue({ processed: true, action: "accepted", won: true, leadId: "lead-a" });
-  state.greeting.mockResolvedValue("Olá, sou o corretor de teste."); state.duty.mockResolvedValue("duty-a");
+  state.greeting.mockResolvedValue("Olá, sou o corretor de teste."); state.inDuty.mockResolvedValue(true);
   state.rows = [[offer], [winner]];
   state.select.mockImplementation(() => {
     const rows = state.rows.shift() ?? [];
@@ -40,7 +40,8 @@ describe("ofertas da extensão, somente mocks", () => {
   it("somente vencedor confirmado recebe telefone, saudação e URL", async () => {
     const response = await accept(request("accept"), params); const body = await response.json();
     expect(response.status).toBe(200);
-    expect(body).toMatchObject({ success: true, phone: "5511999990000", greeting: "Olá, sou o corretor de teste.", foraDoPlantao: false });
+    expect(body).toMatchObject({ success: true, phone: "5511999990000", greeting: "Olá, sou o corretor de teste." });
+    expect(body).not.toHaveProperty("foraDoPlantao");
     expect(body.whatsappUrl).toContain("phone=5511999990000");
     expect(state.access).toHaveBeenCalledWith(expect.any(Request), "ACCEPT_LEAD");
     expect(state.canonical).toHaveBeenCalledWith({ tenantId: "tenant-a", brokerId: "broker-a", offerId, buttonText: "aceitar",
@@ -79,11 +80,13 @@ describe("ofertas da extensão, somente mocks", () => {
     const response = await accept(request("accept"), params);
     expect(response.status).toBe(409); expect(await response.json()).not.toHaveProperty("phone");
   });
-  it("fora do plantão só avisa; falha da consulta não desfaz aceite", async () => {
-    state.duty.mockResolvedValue(null);
-    expect(await (await accept(request("accept"), params)).json()).toMatchObject({ success: true, foraDoPlantao: true });
-    state.rows = [[offer], [winner]]; state.duty.mockRejectedValue(new Error("lookup failed"));
-    expect((await accept(request("accept"), params)).status).toBe(200);
+  it("outside_duty apresenta a mensagem do serviço sem liberar dados de contato", async () => {
+    state.canonical.mockResolvedValue({ processed: false, reason: "outside_duty" });
+    const response = await accept(request("accept"), params); const body = await response.json();
+    expect(response.status).toBe(409);
+    expect(body.message).toBe("Você não está no plantão desta fila agora.");
+    expect(body).not.toHaveProperty("phone"); expect(body).not.toHaveProperty("whatsappUrl");
+    expect(state.greeting).not.toHaveBeenCalled();
   });
   it("recusa fixa avisa pulo, não retorna telefone e repetição não vira novo efeito", async () => {
     state.canonical.mockResolvedValue({ processed: true, action: "declined" });
@@ -104,13 +107,22 @@ describe("ofertas da extensão, somente mocks", () => {
   it("lista tem allowlist fechada e primeiro nome, sem contato completo", async () => {
     state.rows = [[{ ...offer, expiresAt: new Date("2026-11-04T12:00:00Z"), dutyName: "Plantão teste", name: "Ana Cliente Exemplo",
       phone: winner.telefone, qualificationStatus: "warm", cpf: "never-export", note: "never-export" }]];
+    state.inDuty.mockResolvedValue(false);
     const [item] = await listExtensionOffers(context);
-    expect(item).toMatchObject({ primeiroNome: "Ana", temperatura: "morno" });
-    expect(Object.keys(item).sort()).toEqual(["id", "expiresAt", "plantao", "temperatura", "primeiroNome", "phoneMasked"].sort());
+    expect(item).toMatchObject({ primeiroNome: "Ana", temperatura: "morno", foraDoPlantao: true });
+    expect(Object.keys(item).sort()).toEqual(["id", "expiresAt", "plantao", "temperatura", "primeiroNome", "phoneMasked", "foraDoPlantao"].sort());
+    expect(state.inDuty).toHaveBeenCalledExactlyOnceWith({ tenantId: context.tenantId, brokerId: context.userId, dutyScheduleId: "duty-a" });
     expect(JSON.stringify(item)).not.toContain(winner.telefone); expect(JSON.stringify(item)).not.toContain("never-export");
     expect(extensionOfferPayloadSchema.safeParse({ ...item, phone: winner.telefone }).success).toBe(false);
     const filter = new PgDialect().sqlToQuery(state.conditions[0] as Parameters<PgDialect["sqlToQuery"]>[0]);
     expect(filter.params).toEqual(expect.arrayContaining([context.tenantId, context.userId, "PENDING", "SENT", "DELIVERED", "READ"]));
     expect(filter.sql).toContain('"expires_at" >');
+  });
+  it("falha da consulta de plantão não esconde ofertas nem inventa aviso", async () => {
+    state.rows = [[{ ...offer, expiresAt: new Date("2026-11-04T12:00:00Z"), dutyName: "Plantão teste", name: "Ana Cliente",
+      phone: winner.telefone, qualificationStatus: "warm" }]];
+    state.inDuty.mockRejectedValue(new Error("lookup failed"));
+    const [item] = await listExtensionOffers(context);
+    expect(item.foraDoPlantao).toBe(false);
   });
 });

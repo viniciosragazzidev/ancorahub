@@ -47,6 +47,7 @@ import { FeedbackLite, StageModeLite } from "./_components/lite/atendimento-lite
 import { IntegrationsLite } from "./_components/lite/integrations-lite";
 import { SecurityLite } from "./_components/lite/security-lite";
 import { ExtensionLite } from "./_components/lite/extension-lite";
+import { isExtensionPilotUser } from "@/features/browser-extension/pilot";
 
 export default async function SettingsPage() {
   const context = await getRequiredTenantContext();
@@ -56,6 +57,7 @@ export default async function SettingsPage() {
     const [team] = await getDatabase().select({ name: schema.supervisorTeams.name, imageUrl: schema.supervisorTeams.imageUrl }).from(schema.supervisorTeams).where(and(eq(schema.supervisorTeams.tenantId, context.tenantId), eq(schema.supervisorTeams.supervisorId, context.userId))).limit(1).catch(() => []);
     return <SupervisorLiteSettings user={{ name: user?.name ?? "Supervisor", image: user?.image ?? null }} branchName={branch?.name ?? null} team={team ?? null} />;
   }
+  const extensionPilot = await isExtensionPilotUser(context.userId);
   const canViewIntegrations = context.role === "director" || await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null, permission: "ver_importacoes_meta" });
   const db = getDatabase();
   const [tenant, user] = await Promise.all([
@@ -76,7 +78,8 @@ export default async function SettingsPage() {
 
   const integrations = canViewIntegrations ? await getIntegrationsData() : null;
   const brokerAvailability = context.role === "broker" ? await getBrokerAvailabilityProfile(context) : null;
-  const tabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "whatsapp", "integracoes", "seguranca", "extensao"] : canViewIntegrations ? ["conta", "integracoes", "whatsapp", "seguranca", "extensao"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca", "extensao"] : ["conta", "disponibilidade", "whatsapp", "seguranca", "extensao"];
+  const baseTabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "whatsapp", "integracoes", "seguranca"] : canViewIntegrations ? ["conta", "integracoes", "whatsapp", "seguranca"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca"] : ["conta", "disponibilidade", "whatsapp", "seguranca"];
+  const tabIds: TabId[] = extensionPilot ? [...baseTabIds, "extensao"] : baseTabIds;
 
   const canEditFeedback = context.role === "director" || context.role === "manager";
   const aiStageMode = context.role === "director" ? await getAiStageMode(context.tenantId) : null;
@@ -98,7 +101,7 @@ export default async function SettingsPage() {
   const whatsapp = <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>WhatsApp pessoal de atendimento</CardTitle><CardDescription>Conecte somente o número usado por você. A conexão é isolada por usuário e não altera a identidade da corretora.</CardDescription></CardHeader><CardContent><Button render={<a href="/integrations/whatsapp" />}><WhatsappLogo /> Configurar meu WhatsApp</Button></CardContent></Card>;
   const account = <MinhaContaTab name={user[0]?.name ?? "Usuário"} email={user[0]?.email ?? ""} role={context.role} />;
   const company = <EmpresaTab canEdit tenant={{ name: tenant[0]?.name ?? "", legalName: tenant[0]?.legalName ?? null, cnpj: tenant[0]?.cnpj ?? null, logoUrl: tenant[0]?.logoUrl ?? null, brandColor: tenant[0]?.brandColor ?? null }} />;
-  const extension = <ExtensionTab />;
+  const extension = extensionPilot ? <ExtensionTab /> : null;
 
   // Manager Lite: personal settings plus their own unit, read only (rules and queues stay with the director).
   if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
@@ -131,7 +134,7 @@ export default async function SettingsPage() {
             { id: "whatsapp", title: "WhatsApp pessoal", description: "O número que você usa no atendimento", node: <LightWhatsappSection connected={whatsappConnection?.status === "ready"} status={whatsappConnection?.status ?? "disconnected"} /> },
             { id: "notificacoes", title: "Notificações", description: "Avisos no celular e no navegador", node: <div className="rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)"><PushNotificationManager variant="compact" /></div> },
             { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} /> },
-            { id: "extensao", title: "Extensão para o WhatsApp Web", description: "Atendimento contextual no navegador", node: extension },
+            ...(extensionPilot ? [{ id: "extensao" as const, title: "Extensão para o WhatsApp Web", description: "Atendimento contextual no navegador", node: extension }] : []),
             { id: "acessibilidade", title: "Acessibilidade", description: "Texto maior, menos animação e alto contraste", node: <AccessibilityPreferences /> },
           ]}
           footer={<ManagerLiteSettingsFooter />}
@@ -165,7 +168,7 @@ export default async function SettingsPage() {
           },
           { id: "whatsapp", title: "WhatsApp pessoal", description: "O número que você usa no atendimento", node: <LightWhatsappSection connected={whatsappConnection?.status === "ready"} status={whatsappConnection?.status ?? "disconnected"} /> },
           { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} /> },
-          { id: "extensao", title: "Extensão para o WhatsApp Web", description: "Atendimento contextual no navegador", node: extension },
+          ...(extensionPilot ? [{ id: "extensao" as const, title: "Extensão para o WhatsApp Web", description: "Atendimento contextual no navegador", node: extension }] : []),
           { id: "acessibilidade", title: "Acessibilidade", description: "Texto maior, menos animação e alto contraste", node: <AccessibilityPreferences /> },
         ]}
       />
@@ -202,7 +205,7 @@ export default async function SettingsPage() {
       whatsapp: { id: "whatsapp", title: "WhatsApp", description: "O número que você usa no atendimento", node: <WhatsappLite /> },
       integracoes: integrations ? { id: "integracoes", title: "Integrações", description: "Fontes de captura, webhooks e pixels", node: <IntegrationsLite branches={integrations.branches} integrations={integrations.integrations} /> } : undefined,
       seguranca: { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityLite enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} /> },
-      extensao: { id: "extensao", title: "Extensão", description: "Atendimento contextual no WhatsApp Web", node: <ExtensionLite /> },
+      extensao: extensionPilot ? { id: "extensao", title: "Extensão", description: "Atendimento contextual no WhatsApp Web", node: <ExtensionLite /> } : undefined,
     };
     const sections = tabIds.map((id) => nodes[id]).filter((section): section is SettingsLiteSection => Boolean(section));
     return (

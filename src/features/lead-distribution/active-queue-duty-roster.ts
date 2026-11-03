@@ -6,7 +6,7 @@ import { getLocalDutyParts } from "@/features/leads/assignment";
 import { getDatabase, schema } from "@/shared/db";
 import { selectMatchingDutyScheduleIds, selectQueueLinkedDutySchedules } from "./duty-roster-matching";
 import { getPresenceEligibleAssignments } from "./duty-presence";
-import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
+import { filterPausedDutyAssignmentsBeforeResolution, resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { selectBrokerDutyScheduleIds } from "./shared-duty-roster";
 import { countLeadsReceivedInDuty, type DutyLeadCap } from "./duty-lead-cap";
 import { findRunningDutySchedule } from "./duty-presence-domain";
@@ -225,8 +225,7 @@ export function pickBrokerRunningDutyScheduleId(
   return first?.scheduleId ?? null;
 }
 
-/** Plantão em andamento do corretor agora (qualquer fila), ou null se ele não está escalado. Com a unidade do lead, prefere o plantão dessa unidade. */
-export async function findBrokerRunningDutyScheduleId(input: { tenantId: string; brokerId: string; leadBranchId?: string | null; now?: Date }): Promise<string | null> {
+async function findBrokerEffectiveRunningDutyRows(input: { tenantId: string; brokerId: string; now?: Date }, excludePaused = false) {
   const db = getDatabase();
   const now = input.now ?? new Date();
   const local = getLocalDutyParts(now);
@@ -236,6 +235,7 @@ export async function findBrokerRunningDutyScheduleId(input: { tenantId: string;
       brokerId: schema.dutyRosterAssignments.brokerId,
       scheduleId: schema.dutyRosterAssignments.scheduleId,
       dutyDate: schema.dutyRosterAssignments.dutyDate,
+      pausedAt: schema.dutyRosterAssignments.pausedAt,
       startsAt: schema.unitDutySchedules.startsAt,
       branchId: schema.unitDutySchedules.branchId,
     })
@@ -260,6 +260,18 @@ export async function findBrokerRunningDutyScheduleId(input: { tenantId: string;
       lte(schema.unitDutySchedules.validFrom, now),
       or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, now)),
     ));
-  if (!rows.length) return null;
-  return pickBrokerRunningDutyScheduleId(await resolveEffectiveDutyAssignments(input.tenantId, rows, now), input.leadBranchId);
+  const activeRows = excludePaused ? filterPausedDutyAssignmentsBeforeResolution(rows) : rows;
+  return activeRows.length ? resolveEffectiveDutyAssignments(input.tenantId, activeRows, now) : [];
+}
+
+/** True only while this broker is on the exact effective duty attached to the offer. */
+export async function isBrokerRunningInDuty(input: { tenantId: string; brokerId: string; dutyScheduleId: string; now?: Date }): Promise<boolean> {
+  const rows = await findBrokerEffectiveRunningDutyRows(input, true);
+  return rows.some((row) => row.scheduleId === input.dutyScheduleId);
+}
+
+/** Plantão em andamento do corretor agora (qualquer fila), ou null se ele não está escalado. Com a unidade do lead, prefere o plantão dessa unidade. */
+export async function findBrokerRunningDutyScheduleId(input: { tenantId: string; brokerId: string; leadBranchId?: string | null; now?: Date }): Promise<string | null> {
+  const rows = await findBrokerEffectiveRunningDutyRows(input);
+  return pickBrokerRunningDutyScheduleId(rows, input.leadBranchId);
 }

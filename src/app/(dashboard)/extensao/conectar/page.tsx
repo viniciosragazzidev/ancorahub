@@ -1,9 +1,10 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { conexaoParamsSchema } from "@/features/browser-extension/conexao-schemas";
+import { isExtensionPilotUser } from "@/features/browser-extension/pilot";
 
 import { ConectarExtensao } from "./conectar-extensao";
 
@@ -15,6 +16,7 @@ export default async function ExtensaoConectarPage({
   const context = await getRequiredTenantContext();
   // A conexão é para o corretor. Gestor e diretor usam a configuração da empresa.
   if (context.role !== "broker") redirect("/dashboard");
+  if (!await isExtensionPilotUser(context.userId)) notFound();
   const params = await searchParams;
   const parsed = conexaoParamsSchema.safeParse({
     ext: Array.isArray(params.ext) ? params.ext[0] : params.ext,

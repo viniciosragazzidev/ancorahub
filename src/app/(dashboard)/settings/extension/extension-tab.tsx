@@ -5,11 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { updateExtensionSettingsAction } from "@/features/browser-extension/actions";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { isExtensionPilotUser } from "@/features/browser-extension/pilot";
+import { BROWSER_EXTENSION_MANIFEST_VERSION } from "@/features/browser-extension/manifest-version";
 import { ExtensionConnectCard } from "./extension-connect-card";
 import { ExtensionHelpDialog } from "./extension-help-dialog";
 
 export async function ExtensionTab() {
   const context = await getRequiredTenantContext();
+  if (!await isExtensionPilotUser(context.userId)) return null;
   const [settings] = await getDatabase()
     .select({ enabled: schema.extensionSettings.enabled, minimumVersion: schema.extensionSettings.minimumVersion })
     .from(schema.extensionSettings)
@@ -27,15 +30,15 @@ export async function ExtensionTab() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Button render={<a href="/downloads/ancorahub-assistant.zip" download>Baixar AncoraHub Assistant</a>}>
+          <Button render={<a href="/downloads/ancorahub-assistant.zip" download>Baixar AncoraHub Assistant v{BROWSER_EXTENSION_MANIFEST_VERSION}</a>}>
             Baixar extensão
           </Button>
-          <ExtensionHelpDialog />
+          <ExtensionHelpDialog version={BROWSER_EXTENSION_MANIFEST_VERSION} />
         </div>
         <p className="text-sm text-muted-foreground">
-          Após baixar, extraia o arquivo e adicione a pasta em <span className="font-medium text-foreground">chrome://extensions</span>. Quando a publicação na Chrome Web Store estiver disponível, a instalação poderá ser feita em um clique.
+          Versão do pacote: {BROWSER_EXTENSION_MANIFEST_VERSION} · Versão mínima: {settings?.minimumVersion ?? "0.1.0"}. Para atualizar, baixe a nova versão pelo CRM e clique em “Atualizar” em <span className="font-medium text-foreground">chrome://extensions</span>.
         </p>
-        <p className="text-sm text-muted-foreground">Versão mínima: {settings?.minimumVersion ?? "0.1.0"}</p>
+        <p className="text-sm text-muted-foreground">Baixe e extraia o pacote, ative o modo desenvolvedor em chrome://extensions, clique em “Carregar sem compactação” e selecione a pasta. Depois clique no ícone da extensão e em “Conectar ao CRM”. Se necessário, o código temporário nesta tela fica como alternativa.</p>
         {canConfigure ? (
           <form action={updateExtensionSettingsAction} className="flex flex-wrap items-center gap-3">
             <input type="hidden" name="enabled" value={settings?.enabled ? "false" : "true"} />

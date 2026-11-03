@@ -1,24 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   rows: [] as unknown[][], select: vi.fn(), update: vi.fn(), values: vi.fn(), transaction: vi.fn(),
-  skip: vi.fn(), jobs: vi.fn(), signal: vi.fn(), updated: true,
+  skip: vi.fn(), jobs: vi.fn(), signal: vi.fn(), inDuty: vi.fn(), effect: vi.fn(), intro: vi.fn(), txValues: vi.fn(), updated: true,
 }));
 vi.mock("@/shared/db", async () => ({
   schema: await import("@/shared/db/schema"),
   getDatabase: () => ({ select: state.select, update: state.update, insert: () => ({ values: state.values }), transaction: state.transaction }),
 }));
 vi.mock("./ownership-signal", () => ({ signalLeadOwnershipChange: state.signal }));
+vi.mock("./active-queue-duty-roster", () => ({ isBrokerRunningInDuty: state.inDuty }));
 vi.mock("./duty-skips", () => ({ applyDutySkipPolicy: state.skip }));
 vi.mock("./jobs", () => ({ enqueueAndProcessLeadDistribution: state.jobs }));
-vi.mock("@/features/communication-channels/outbound-service", () => ({ enqueueMetaTemplateMessage: vi.fn(), processMetaOutboundBatch: vi.fn() }));
+vi.mock("@/features/communication-channels/outbound-service", () => ({ enqueueMetaTemplateMessage: vi.fn(async () => ({ id: "outbound-a" })), processMetaOutboundBatch: vi.fn() }));
 vi.mock("@/features/leads/start-service-on-message", () => ({ startServiceOnFirstMessage: vi.fn() }));
-vi.mock("@/features/leads/webhooks/services/lead-effect-outbox", () => ({ enqueueLeadEffectTx: vi.fn() }));
+vi.mock("@/features/leads/lead-broker-intro", () => ({ sendLeadBrokerIntro: state.intro }));
+vi.mock("@/features/leads/webhooks/services/lead-effect-outbox", () => ({ enqueueLeadEffectTx: state.effect }));
 vi.mock("@/shared/tenant/system-user", () => ({ resolveSystemUserId: vi.fn() }));
 import { handleLeadOfferWebhookResponse } from "./offers";
 
 const now = new Date("2026-11-03T14:00:00Z");
 const broker = { id: "broker-a", name: "Corretor de teste", phone: "+5511999990000" };
-const offer = { id: "offer-a", tenantId: "tenant-a", brokerId: broker.id, leadId: "lead-a", dutyScheduleId: "duty-a",
+const offer: { id: string; tenantId: string; brokerId: string; leadId: string; dutyScheduleId: string | null; status: string; expiresAt: Date } = { id: "offer-a", tenantId: "tenant-a", brokerId: broker.id, leadId: "lead-a", dutyScheduleId: "duty-a",
   status: "PENDING", expiresAt: new Date(now.getTime() + 60_000) };
 function query(rows: unknown[]) {
   const result = {
@@ -33,10 +35,20 @@ beforeEach(() => {
   state.updated = true; state.rows = [[broker], [offer], []];
   state.select.mockImplementation(() => query(state.rows.shift() ?? []));
   state.update.mockReturnValue({ set: () => ({ where: () => ({ returning: async () => state.updated ? [{ id: offer.id }] : [] }) }) });
-  state.transaction.mockImplementation(async (work: (tx: { select: typeof state.select; update: typeof state.update }) => Promise<unknown>) => work({ select: state.select, update: state.update }));
+  state.inDuty.mockResolvedValue(true);
+  state.txValues.mockResolvedValue(undefined);
+  state.transaction.mockImplementation(async (work: (tx: { select: typeof state.select; update: typeof state.update; insert: () => { values: typeof state.txValues } }) => Promise<unknown>) => work({
+    select: state.select, update: state.update, insert: () => ({ values: state.txValues }),
+  }));
 });
 afterEach(() => vi.useRealTimers());
 const decline = () => handleLeadOfferWebhookResponse({ tenantId: "tenant-a", brokerId: broker.id, offerId: offer.id, buttonText: "recusar" });
+const lead = { id: offer.leadId, nome: "Lead de teste", telefone: "+5511999990000", tipo: "individual", email: null,
+  formData: {}, sourceMetadata: null, sourceChannel: null, qualificationDetails: null, corretorId: null, branchId: null, queueId: null };
+const acceptedRows = (selectedOffer = offer) => [[{ ...broker, phone: null }], [selectedOffer], [lead], [selectedOffer], []];
+const acceptByOffer = (selectedOffer = offer) => handleLeadOfferWebhookResponse({
+  tenantId: "tenant-a", brokerId: broker.id, offerId: selectedOffer.id, buttonText: "aceitar",
+});
 
 describe("recusa canônica, sem banco", () => {
   it("recusa válida conta um pulo e mantém efeitos canônicos", async () => {
@@ -94,5 +106,70 @@ describe("recusa canônica, sem banco", () => {
     }
     expect(state.update).not.toHaveBeenCalled(); expect(state.values).not.toHaveBeenCalled();
     expect(state.skip).not.toHaveBeenCalled(); expect(state.jobs).not.toHaveBeenCalled();
+  });
+
+  it("aceita oferta de plantão quando o corretor está na escala exata", async () => {
+    state.rows = acceptedRows();
+    expect(await acceptByOffer()).toMatchObject({ processed: true, action: "accepted", won: true });
+    expect(state.inDuty).toHaveBeenCalledExactlyOnceWith({ tenantId: "tenant-a", brokerId: broker.id, dutyScheduleId: offer.dutyScheduleId });
+    expect(state.transaction).toHaveBeenCalledTimes(1);
+    expect(state.effect).toHaveBeenCalledTimes(1);
+  });
+
+  it("bloqueia fora do plantão antes da transação e sem mutação ou efeito", async () => {
+    state.rows = [[broker], [offer], [offer]];
+    state.inDuty.mockResolvedValue(false);
+    expect(await acceptByOffer()).toEqual({ processed: false, reason: "outside_duty" });
+    expect(state.transaction).not.toHaveBeenCalled(); expect(state.update).not.toHaveBeenCalled();
+    expect(state.txValues).not.toHaveBeenCalled(); expect(state.values).not.toHaveBeenCalled();
+    expect(state.effect).not.toHaveBeenCalled(); expect(state.signal).not.toHaveBeenCalled();
+    expect(state.skip).not.toHaveBeenCalled(); expect(state.jobs).not.toHaveBeenCalled();
+  });
+
+  it("preserva já aceito se outra resposta concluir a oferta durante a consulta de plantão", async () => {
+    const alreadyAccepted = { ...offer, status: "ACCEPTED" };
+    state.rows = [[broker], [offer], [alreadyAccepted], [{ ...lead, corretorId: broker.id }], [alreadyAccepted]];
+    state.inDuty.mockResolvedValue(false);
+    expect(await acceptByOffer()).toMatchObject({ processed: true, won: false, reason: "already_accepted" });
+    expect(state.inDuty).toHaveBeenCalledTimes(1); expect(state.update).not.toHaveBeenCalled();
+  });
+
+  it("mantém o resultado de vencida antes de consultar o plantão", async () => {
+    const expiredOffer = { ...offer, expiresAt: new Date(now.getTime() - 1) };
+    state.rows = [[broker], [expiredOffer], [lead], [expiredOffer]];
+    state.inDuty.mockResolvedValue(false);
+    expect(await acceptByOffer(expiredOffer)).toMatchObject({ processed: true, won: false, reason: "expired" });
+    expect(state.inDuty).not.toHaveBeenCalled(); expect(state.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("oferta sem plantão mantém aceite sem consultar escala", async () => {
+    const noDutyOffer = { ...offer, dutyScheduleId: null };
+    state.rows = acceptedRows(noDutyOffer);
+    expect(await acceptByOffer(noDutyOffer)).toMatchObject({ processed: true, won: true });
+    expect(state.inDuty).not.toHaveBeenCalled();
+  });
+
+  it("WhatsApp sem offerId mantém seleção da oferta ativa e o aceite no plantão", async () => {
+    state.rows = [[broker], [offer], [lead], [offer], []];
+    const response = await handleLeadOfferWebhookResponse({ tenantId: "tenant-a", phone: broker.phone, buttonText: "aceitar" });
+    expect(response).toMatchObject({ processed: true, action: "accepted", won: true });
+    expect(state.inDuty).toHaveBeenCalledExactlyOnceWith({ tenantId: "tenant-a", brokerId: broker.id, dutyScheduleId: offer.dutyScheduleId });
+  });
+
+  it("WhatsApp sem offerId e oferta sem plantão preservam o aceite anterior", async () => {
+    const noDutyOffer = { ...offer, dutyScheduleId: null };
+    state.rows = [[broker], [noDutyOffer], [lead], [noDutyOffer], []];
+    const response = await handleLeadOfferWebhookResponse({ tenantId: "tenant-a", phone: broker.phone, buttonText: "aceitar" });
+    expect(response).toMatchObject({ processed: true, action: "accepted", won: true });
+    expect(state.inDuty).not.toHaveBeenCalled();
+  });
+
+  it("já aceito continua idempotente depois que o plantão termina", async () => {
+    const alreadyAccepted = { ...offer, status: "ACCEPTED" };
+    state.rows = [[broker], [alreadyAccepted], [{ ...lead, corretorId: broker.id }], [alreadyAccepted]];
+    state.inDuty.mockResolvedValue(false);
+    expect(await acceptByOffer(alreadyAccepted)).toMatchObject({ processed: true, won: false, reason: "already_accepted" });
+    expect(state.inDuty).not.toHaveBeenCalled(); expect(state.update).not.toHaveBeenCalled();
+    expect(state.txValues).not.toHaveBeenCalled(); expect(state.effect).not.toHaveBeenCalled();
   });
 });

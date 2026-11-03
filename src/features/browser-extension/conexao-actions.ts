@@ -3,18 +3,18 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireAnyRole } from "@/shared/auth/authorization";
+import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { createExtensionCodeAction } from "./actions";
 import { conexaoParamsSchema } from "./conexao-schemas";
+import { isExtensionPilotUser } from "./pilot";
 
 /** Gera o código de uso único amarrado à extensão e ao aparelho que abriram a página de conexão. */
 export async function gerarCodigoConexaoAction(entrada: unknown) {
-  requireAnyRole(await getRequiredTenantContext(), ["broker"]);
+  const context = requireAnyRole(await getRequiredTenantContext(), ["broker"]);
+  if (!await isExtensionPilotUser(context.userId)) throw new AuthorizationError("Extensão desativada.");
   const params = conexaoParamsSchema.parse(entrada);
-  // TODO(E0a): a E0a passa a aceitar { extensionId, deviceId } em createExtensionCodeAction. Até a integração,
-  // a chamada sai sem amarração no servidor; o cast existe só para o tipo aceitar o objeto.
-  const gerar = createExtensionCodeAction as unknown as (amarracao: { extensionId: string; deviceId: string }) => ReturnType<typeof createExtensionCodeAction>;
-  return gerar({ extensionId: params.ext, deviceId: params.device });
+  return createExtensionCodeAction({ extensionId: params.ext, deviceId: params.device });
 }
 
 /** Desconecta do lado do CRM: revoga todas as sessões de extensão deste usuário nesta empresa. */

@@ -29,4 +29,9 @@ describe("CRM lead acceptance outcome", () => {
     expect(resolveLeadAcceptOutcome({ processed: true, won: false, reason: "already_assigned" }, accepted, "broker-2"))
       .toEqual({ ok: false, error: "Este lead já foi assumido por outro corretor." });
   });
+
+  it("explica quando uma oferta de plantão está fora do turno do corretor", () => {
+    expect(resolveLeadAcceptOutcome({ processed: false, reason: "outside_duty" }, null, "broker-1"))
+      .toEqual({ ok: false, error: "Você não está no plantão desta fila agora." });
+  });
 });

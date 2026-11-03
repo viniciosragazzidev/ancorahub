@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import type { TenantContext } from "@/shared/auth/types";
 import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
-import { findBrokerRunningDutyScheduleId } from "@/features/lead-distribution/active-queue-duty-roster";
+import { isBrokerRunningInDuty } from "@/features/lead-distribution/active-queue-duty-roster";
 import { resolveLeadAcceptOutcome } from "@/features/leads/accept-offer-outcome";
 import { loadBrokerGreetingSafe } from "@/features/leads/broker-greeting-server";
 import { buildWhatsAppUrl, normalizeWhatsAppDestination } from "@/lib/whatsapp-url";
@@ -16,13 +16,14 @@ import { maskPhone } from "./schemas";
 export const extensionOfferIdSchema = z.string().uuid();
 export const extensionOfferPayloadSchema = z.object({
   id: z.string(), expiresAt: z.string().datetime(), plantao: z.string().nullable(),
-  temperatura: extensionTemperatureSchema, primeiroNome: z.string(), phoneMasked: z.string(),
+  temperatura: extensionTemperatureSchema, primeiroNome: z.string(), phoneMasked: z.string(), foraDoPlantao: z.boolean(),
 }).strict();
 const ACTIVE = ["PENDING", "SENT", "DELIVERED", "READ"];
 
 export async function listExtensionOffers(context: TenantContext) {
   const rows = await getDatabase().select({
-    id: schema.leadOffers.id, expiresAt: schema.leadOffers.expiresAt, dutyName: schema.unitDutySchedules.name,
+    id: schema.leadOffers.id, expiresAt: schema.leadOffers.expiresAt, dutyScheduleId: schema.leadOffers.dutyScheduleId,
+    dutyName: schema.unitDutySchedules.name,
     name: schema.leads.nome, phone: schema.leads.telefone, qualificationStatus: schema.leads.qualificationStatus,
   }).from(schema.leadOffers)
     .innerJoin(schema.leads, and(eq(schema.leads.id, schema.leadOffers.leadId), eq(schema.leads.tenantId, context.tenantId)))
@@ -31,10 +32,16 @@ export async function listExtensionOffers(context: TenantContext) {
       inArray(schema.leadOffers.status, ACTIVE), gt(schema.leadOffers.expiresAt, new Date()),
       isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
     .orderBy(asc(schema.leadOffers.expiresAt));
+  const dutyStatus = new Map(await Promise.all([...new Set(rows.flatMap((row) => row.dutyScheduleId ? [row.dutyScheduleId] : []))]
+    // This field is advisory; a lookup failure must not hide offers or claim the broker is off duty.
+    .map(async (dutyScheduleId) => [dutyScheduleId, await isBrokerRunningInDuty({
+      tenantId: context.tenantId, brokerId: context.userId, dutyScheduleId,
+    }).catch(() => true)] as const)));
   return rows.map((row) => extensionOfferPayloadSchema.parse({
     id: row.id, expiresAt: row.expiresAt.toISOString(), plantao: row.dutyName,
     temperatura: extensionTemperature(row.qualificationStatus),
     primeiroNome: row.name.trim().split(/\s+/)[0] || "Lead", phoneMasked: maskPhone(row.phone),
+    foraDoPlantao: row.dutyScheduleId ? !dutyStatus.get(row.dutyScheduleId) : false,
   }));
 }
 
@@ -58,8 +65,7 @@ export async function respondToExtensionOffer(context: TenantContext, session: E
     const declined = result.processed && result.action === "declined";
     const repeated = result.reason === "already_resolved" && (await findOwnOffer(context, offerId))?.status === "DECLINED";
     if (declined || repeated) {
-      const dutyId = await findBrokerRunningDutyScheduleId({ tenantId: context.tenantId, brokerId: context.userId }).catch(() => undefined);
-      return { status: 200, body: { success: true, offerId, action: "declined", alreadyDeclined: Boolean(repeated), foraDoPlantao: dutyId === null,
+      return { status: 200, body: { success: true, offerId, action: "declined", alreadyDeclined: Boolean(repeated),
         contaComoPulo: !repeated, message: repeated ? "Esta oferta já foi recusada." : "Oferta recusada. A recusa conta como pulo do plantão." } };
     }
     return { status: 409, body: { success: false, error: result.reason ?? "UNAVAILABLE", message: result.reason === "expired"
@@ -73,18 +79,14 @@ export async function respondToExtensionOffer(context: TenantContext, session: E
   // Re-check both the exact accepted offer and current ownership. Owning the lead via a different
   // offer never authorizes this offer's phone response, even on an idempotent retry.
   const [winner] = await getDatabase().select({
-    id: schema.leads.id, nome: schema.leads.nome, telefone: schema.leads.telefone, branchId: schema.leads.branchId,
+    id: schema.leads.id, nome: schema.leads.nome, telefone: schema.leads.telefone,
   }).from(schema.leads).innerJoin(schema.leadOffers, and(eq(schema.leadOffers.leadId, schema.leads.id),
     eq(schema.leadOffers.tenantId, context.tenantId), eq(schema.leadOffers.id, offerId),
     eq(schema.leadOffers.brokerId, context.userId), eq(schema.leadOffers.status, "ACCEPTED")))
     .where(and(eq(schema.leads.id, offer.leadId), eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, context.userId),
       isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))).limit(1);
   if (!winner) return { status: 409, body: { success: false, error: "UNAVAILABLE", message: "Este lead não está mais disponível para você." } };
-  const [greeting, dutyId] = await Promise.all([
-    loadBrokerGreetingSafe({ tenantId: context.tenantId, leadId: winner.id, brokerUserId: context.userId, leadName: winner.nome }),
-    // Failure of this advisory lookup must never turn a committed acceptance into a failure.
-    findBrokerRunningDutyScheduleId({ tenantId: context.tenantId, brokerId: context.userId, leadBranchId: winner.branchId }).catch(() => undefined),
-  ]);
+  const greeting = await loadBrokerGreetingSafe({ tenantId: context.tenantId, leadId: winner.id, brokerUserId: context.userId, leadName: winner.nome });
   return { status: 200, body: { success: true, offerId, leadId: winner.id, action: "accepted", alreadyAccepted: result.reason === "already_accepted",
-    phone: normalizeWhatsAppDestination(winner.telefone), greeting, whatsappUrl: buildWhatsAppUrl(winner.telefone, greeting), foraDoPlantao: dutyId === null } };
+    phone: normalizeWhatsAppDestination(winner.telefone), greeting, whatsappUrl: buildWhatsAppUrl(winner.telefone, greeting) } };
 }

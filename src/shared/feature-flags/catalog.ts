@@ -305,7 +305,14 @@ export const FEATURE_FLAGS = {
     scope: "global",
     defaultValue: "true",
     allowedValues: ["true", "false"] as const,
-    description: "Habilita a extensão de navegador para captura de leads.",
+    description: "Habilita a extensão contextual do WhatsApp Web junto com os gates de tenant e piloto.",
+  },
+
+  BROWSER_EXTENSION_PILOT_USERS: {
+    key: "feature_browser_extension_pilot_users",
+    scope: "global",
+    defaultValue: "",
+    description: "Usuários autorizados no piloto da extensão de navegador.",
   },
 
   UNLINKED_CONVERSATION_DELETION: {
