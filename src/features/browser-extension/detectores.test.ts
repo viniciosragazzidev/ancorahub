@@ -30,6 +30,23 @@ describe("registro de detectores (fixtures sintéticos)", () => {
     expect(achados.barraEsquerda.estado).toBe("ok");
   });
 
+  it("acha a barra da esquerda na marcação do WhatsApp Web real (diagnóstico do piloto, 03/11)", () => {
+    // Estrutura sanitizada do diagnóstico: header da barra + seção primária; não há nav com aria-label.
+    document.body.innerHTML = `<div data-testid="wa-web-main-screen">
+      <header data-testid="chatlist-header" data-tab="2"><div data-testid="navbar-primary-section"><button aria-label="Conversas"></button></div>
+      <div data-testid="navbar-footer-section"></div></header>
+      <header data-testid="chatlist-header"></header>
+      <div id="main" data-testid="conversation-panel-wrapper"><header data-testid="conversation-header"></header>
+      <footer><div role="textbox" contenteditable="true" data-testid="conversation-compose-box-input"></div></footer></div>
+      <div data-testid="drawer-right"></div></div>`;
+    const achados = localizarTodas(document, { visivel });
+    expect(achados.barraEsquerda.estado).toBe("ok");
+    expect(achados.shell.estado).toBe("ok");
+    expect(achados.cabecalho.estado).toBe("ok");
+    expect(achados.composer.estado).toBe("ok");
+    expect(achados.gaveta.estado).toBe("ok");
+  });
+
   it("usa o aria-label em inglês quando o data-testid não existe", () => {
     document.body.innerHTML = fixture("whatsapp-sintetico-en.html");
     const achados = localizarTodas(document, { visivel });

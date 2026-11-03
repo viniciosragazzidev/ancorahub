@@ -8,8 +8,12 @@ export type Detector = { capacidade: Capacidade; alternativas: readonly string[]
 
 export const DETECTORES: readonly Detector[] = [
   { capacidade: "shell", alternativas: ['[data-testid="wa-web-main-screen"]'] },
-  // Não validado contra HTML real: confirmar com captura sanitizada (E6). Ver README da extensão.
-  { capacidade: "barraEsquerda", alternativas: ['nav[aria-label="Navegação"]', 'nav[aria-label="Navigation"]'] },
+  // Conferido no WhatsApp Web real em 03/11 (diagnóstico do piloto): a barra de ícones é um header com a
+  // seção navbar-primary-section. Os nav com aria-label ficam como reserva para versões antigas.
+  {
+    capacidade: "barraEsquerda",
+    alternativas: ['[data-testid="navbar-primary-section"]', 'nav[aria-label="Navegação"]', 'nav[aria-label="Navigation"]'],
+  },
   { capacidade: "cabecalho", alternativas: ['[data-testid="conversation-header"]'] },
   {
     capacidade: "composer",

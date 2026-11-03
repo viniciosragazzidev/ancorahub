@@ -198,7 +198,7 @@ const consulta = criarConsulta({
   neutro: () => {
     epocaRender++;
     // Só esconde o que já existe; a tela nova aparece quando a sessão nova for confirmada.
-    painelInstancia?.ocultar();
+    painelInstancia?.limpar();
   },
   aoEstadoSessao: (estado) => { void aoEstadoSessao(estado); },
   agora: () => Date.now(),

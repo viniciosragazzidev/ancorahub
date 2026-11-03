@@ -36,6 +36,8 @@ type Acoes = Omit<AcoesGaveta, "fechar">;
 export type PainelWhatsApp = {
   mostrar(estado: EstadoGaveta, selo: SeloCabecalho | null): void;
   ocultar(): void;
+  /** Troca ou perda de sessão: fecha a gaveta e tira tudo da tela, inclusive o botão. */
+  limpar(): void;
   mostrarAviso(aviso: AvisoInboxExtensao): void;
   abrirOfertas(offerId?: string): void;
   /** A gaveta está aberta agora (o aviso de conexão só aparece com ela fechada). */
@@ -193,7 +195,18 @@ export async function criarPainelWhatsApp(acoes: Acoes): Promise<PainelWhatsApp 
       controleGaveta.atualizar(estado);
       if (gavetaAberta) posicionar();
     },
+    // Sem lead na conversa aberta: tira o selo e os dados do lead, mas o botão da barra continua,
+    // para o corretor ver as ofertas pendentes de qualquer tela (piloto 03/11). A gaveta, se aberta, fica.
     ocultar() {
+      ultimoSelo = null;
+      seloHost?.host.remove();
+      seloHost = null;
+      controleSelo?.desmontar();
+      controleSelo = null;
+      controleGaveta.atualizar({ tipo: "sem-lead" });
+      garantirBotao();
+    },
+    limpar() {
       ultimoSelo = null;
       alternarGaveta(false);
       seloHost?.host.remove();
