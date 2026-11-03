@@ -37,7 +37,6 @@ function temperatura(temperature: Temperatura) {
 function mensagemErro(error: string, fallback: string) {
   if (error === "expired") return "O prazo terminou. Esta oferta não pode mais ser aceita.";
   if (["already_assigned", "already_resolved", "offer_not_found", "UNAVAILABLE", "NOT_FOUND"].includes(error)) return "Este lead já foi atribuído ou deixou de estar disponível.";
-  if (error === "outside_duty") return "Esta oferta só pode ser aceita durante o plantão indicado.";
   if (error === "RATE_LIMITED") return "Muitas tentativas. Aguarde e tente de novo.";
   return fallback;
 }
@@ -102,7 +101,8 @@ export function OfertasPendentes({ acoes, refreshKey, destacarOfferId, ativa }: 
   }
 
   async function aceitar(oferta: OfertaExtensao) {
-    if (oferta.foraDoPlantao || Date.parse(oferta.expiresAt) <= agora) return;
+    // Só o prazo trava aqui. O aviso de plantão da lista pode estar atrasado: quem decide é o servidor.
+    if (Date.parse(oferta.expiresAt) <= agora) return;
     setOcupada(oferta.id);
     setMensagem("");
     let resultado: ResultadoAceiteOferta;
@@ -170,7 +170,7 @@ export function OfertasPendentes({ acoes, refreshKey, destacarOfferId, ativa }: 
               </div>
               <p className="oferta-contato">{oferta.phoneMasked}</p>
               <p className="oferta-contexto">{oferta.plantao ? `Plantão ${oferta.plantao}` : "Oferta da fila"}</p>
-              {oferta.foraDoPlantao ? <p className="aviso-plantao" role="status">Aceite disponível durante este plantão.</p> : null}
+              {oferta.foraDoPlantao ? <p className="aviso-plantao" role="status">Você não está no plantão desta fila agora. O CRM confirma ao aceitar.</p> : null}
               <p className={`prazo-oferta${vence ? " urgente" : ""}`} role="timer" aria-label={`Prazo: ${contagem(oferta.expiresAt, agora)}`} aria-live="off">
                 {contagem(oferta.expiresAt, agora)}
               </p>
@@ -184,8 +184,8 @@ export function OfertasPendentes({ acoes, refreshKey, destacarOfferId, ativa }: 
                 </div>
               ) : (
                 <div className="acoes-oferta">
-                  <button className="primario" type="button" disabled={Boolean(ocupada) || oferta.foraDoPlantao || restante <= 0} onClick={() => void aceitar(oferta)}>
-                    {ocupada === oferta.id ? "Aceitando…" : oferta.foraDoPlantao ? "Fora do plantão" : "Aceitar e abrir"}
+                  <button className="primario" type="button" disabled={Boolean(ocupada) || restante <= 0} onClick={() => void aceitar(oferta)}>
+                    {ocupada === oferta.id ? "Aceitando…" : "Aceitar e abrir"}
                   </button>
                   <button className="seco" type="button" disabled={Boolean(ocupada)} onClick={() => setConfirmarRecusa(oferta.id)}>Recusar</button>
                 </div>

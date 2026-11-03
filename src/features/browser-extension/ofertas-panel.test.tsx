@@ -69,7 +69,6 @@ describe("ofertas pendentes no painel Lite", () => {
   it.each([
     ["expired", "O prazo terminou. Esta oferta não pode mais ser aceita."],
     ["already_assigned", "Este lead já foi atribuído ou deixou de estar disponível."],
-    ["outside_duty", "Esta oferta só pode ser aceita durante o plantão indicado."],
   ])("mostra a resposta de negócio %s sem perder o contexto", async (error, message) => {
     const acoes = criarAcoes({ aceitar: vi.fn(async () => ({ ok: false as const, error, message: "resposta do servidor" })) });
     render(<OfertasPendentes acoes={acoes} refreshKey={0} destacarOfferId={null} ativa={true} />);
@@ -79,12 +78,27 @@ describe("ofertas pendentes no painel Lite", () => {
     expect(acoes.abrirConversa).not.toHaveBeenCalled();
   });
 
-  it("não habilita aceitar fora do plantão e mantém o aviso de pulo explícito", async () => {
+  it("fora do plantão: o aceite segue ativo, a lista avisa e a recusa do servidor vira a mensagem dele", async () => {
+    const acoes = criarAcoes({
+      carregar: vi.fn(async () => ({ ok: true as const, ofertas: [{ ...OFERTA, foraDoPlantao: true }] })),
+      aceitar: vi.fn(async () => ({ ok: false as const, error: "outside_duty", message: "Você não está no plantão desta fila agora." })),
+    });
+    render(<OfertasPendentes acoes={acoes} refreshKey={0} destacarOfferId={null} ativa={true} />);
+
+    expect(await screen.findByText(/Você não está no plantão desta fila agora\. O CRM confirma/)).toBeTruthy();
+    const botao = screen.getByRole("button", { name: "Aceitar e abrir" });
+    expect(botao).toHaveProperty("disabled", false);
+    fireEvent.click(botao);
+    expect(await screen.findByText("Você não está no plantão desta fila agora.")).toBeTruthy();
+    expect(acoes.aceitar).toHaveBeenCalledWith(OFERTA.id);
+    expect(acoes.abrirConversa).not.toHaveBeenCalled();
+  });
+
+  it("recusa continua disponível fora do plantão e mantém o aviso de pulo", async () => {
     const acoes = criarAcoes({ carregar: vi.fn(async () => ({ ok: true as const, ofertas: [{ ...OFERTA, foraDoPlantao: true }] })) });
     render(<OfertasPendentes acoes={acoes} refreshKey={0} destacarOfferId={null} ativa={true} />);
 
-    expect(await screen.findByRole("button", { name: "Fora do plantão" })).toHaveProperty("disabled", true);
-    fireEvent.click(screen.getByRole("button", { name: "Recusar" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Recusar" }));
     expect(screen.getByText("A recusa conta como pulo do plantão.")).toBeTruthy();
   });
 });
