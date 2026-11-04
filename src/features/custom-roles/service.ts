@@ -59,6 +59,9 @@ const loadCargo = cache(async (tenantId: string, customRoleId: string): Promise<
   return { status: role.status, permissions: grants.map((grant) => grant.key) };
 });
 
+/** Liga quando a F2 do plano de cargos estiver no ar (ações de leads, equipe e distribuição pelo cargo). */
+export const CARGO_PROTEGE_ACOES = false;
+
 type AccessInput = { tenantId: string; role: TenantRole; jobTitle: string; customRoleId: string | null };
 
 /** Fonte única do acesso efetivo no servidor: papel, ou papel ∩ cargo. */
@@ -83,9 +86,9 @@ export async function listEffectiveRoutes(input: { tenantId: string; customRoleI
 
 export async function hasEffectiveRouteAccess(input: AccessInput & { routeKey: string; fallbackPermission?: PermissionKey }) {
   const definition = routeCatalog.find((route) => route.key === input.routeKey) as RouteDefinition | undefined;
-  return canAccessRoute(await getEffectiveAccess(input), definition ?? {
+  return canAccessRoute(await getEffectiveAccess(input), definition ?? (input.fallbackPermission ? {
     key: input.routeKey, path: "", label: "", description: "", category: "", fallbackPermission: input.fallbackPermission,
-  });
+  } : undefined));
 }
 
 /** Creates the tenant-local default used for the Marketing pilot without widening access. */
@@ -167,6 +170,10 @@ export async function archiveCustomRole(roleId: string) {
   const db = getDatabase();
   const [role] = await db.select().from(schema.customRoles).where(and(eq(schema.customRoles.id, roleId), eq(schema.customRoles.tenantId, context.tenantId))).limit(1);
   if (!role) throw new Error("Cargo não encontrado.");
+  // Arquivar devolveria as pessoas ao papel base, ampliando o acesso delas: tira o cargo de cada uma antes.
+  const [comMembro] = await db.select({ id: schema.tenantMemberships.id }).from(schema.tenantMemberships)
+    .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.customRoleId, role.id))).limit(1);
+  if (comMembro) throw new Error("Tire o cargo das pessoas antes de arquivar: arquivar ampliaria o acesso delas.");
   const version = role.version + 1;
   await db.transaction(async (tx) => {
     await tx.update(schema.customRoles).set({ status: "archived", archivedAt: new Date(), version, updatedAt: new Date() }).where(eq(schema.customRoles.id, role.id));
@@ -201,11 +208,19 @@ export async function assertCargoAssignable(input: {
   customRoleId: string;
 }) {
   if (input.actor.role !== "director" || input.actor.customRoleId) throw new Error("Somente o Diretor pode definir cargos.");
+  // Até a F2 (ações internas das telas respeitando o cargo), o cargo só esconderia menu e páginas, sem
+  // proteger os dados: atribuir fica fechado para não dar falsa segurança (revisão do Vigia, 04/11).
+  if (!CARGO_PROTEGE_ACOES) throw new Error("A atribuição de cargos volta quando as telas internas respeitarem o cargo.");
   const db = getDatabase();
   const [role] = await db.select({ id: schema.customRoles.id, scope: schema.customRoles.scope }).from(schema.customRoles).where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, input.actor.tenantId), eq(schema.customRoles.status, "active"))).limit(1);
   if (!role) throw new Error("Escolha um cargo ativo da própria empresa.");
   const grants = await db.select({ key: schema.customRolePermissions.permissionKey }).from(schema.customRolePermissions).where(eq(schema.customRolePermissions.customRoleId, role.id));
-  const foraDoPapel = grants.map((grant) => grant.key).filter((key) => !isRoutePermission(key) && !hasCapability(input.role, key as PermissionKey, input.jobTitle));
+  // Rota conta pelo piso dela: um cargo não pode abrir uma tela que o papel não abre.
+  const foraDoPapel = grants.map((grant) => grant.key).filter((key) => {
+    if (!isRoutePermission(key)) return !hasCapability(input.role, key as PermissionKey, input.jobTitle);
+    const rota = (routeCatalog as readonly RouteDefinition[]).find((route) => routePermissionKey(route.key) === key);
+    return !rota || !hasCapability(input.role, rota.fallbackPermission, input.jobTitle);
+  });
   if (foraDoPapel.length) throw new Error(`O papel desta pessoa não tem: ${foraDoPapel.join(", ")}. Ajuste o cargo ou o papel.`);
   if (input.role === "director") {
     const [livre] = await db.select({ id: schema.tenantMemberships.id }).from(schema.tenantMemberships).where(and(

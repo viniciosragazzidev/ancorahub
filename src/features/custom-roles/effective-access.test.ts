@@ -79,4 +79,26 @@ describe("rotas", () => {
     expect(getRouteDefinition("/integrations/meta")?.key).toBe("integracoes");
     expect(getRouteDefinition("/marketing/campanhas")?.key).toBe("campanhas");
   });
+
+  it("o piso do papel vale também para as rotas novas (revisão do Vigia)", () => {
+    const cargo = { status: "active", permissions: ["relatorios", "configuracoes", "marketing", "integracoes", "unidades"].map(routePermissionKey) };
+    const broker = resolveEffectiveAccess({ role: "broker", jobTitle: "broker", cargo });
+    for (const path of ["/relatorios", "/configuracoes/comissoes", "/marketing/importacoes", "/integrations/meta", "/unidades/1"]) {
+      expect(canAccessRoute(broker, getRouteDefinition(path))).toBe(false);
+    }
+    const director = resolveEffectiveAccess({ role: "director", jobTitle: "director", cargo });
+    expect(canAccessRoute(director, getRouteDefinition("/relatorios"))).toBe(true);
+  });
+
+  it("toda rota do catálogo tem piso de papel", () => {
+    for (const route of routeCatalog) expect(route.fallbackPermission).toBeTruthy();
+  });
+
+  it("sem cargo, /leads/distribuicao segue como antes (aberta no layout; a página decide)", () => {
+    for (const role of PAPEIS) {
+      const access = resolveEffectiveAccess({ role, jobTitle: role, cargo: null });
+      expect(canAccessRoute(access, getRouteDefinition("/leads/distribuicao/plantao/1"))).toBe(true);
+    }
+  });
 });
+

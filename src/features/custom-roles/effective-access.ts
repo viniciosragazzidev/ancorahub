@@ -56,13 +56,13 @@ export function isAlwaysAllowedPath(pathname: string) {
  */
 export function canAccessRoute(access: EffectiveAccess, definition: RouteDefinition | undefined): boolean {
   if (!access.hasCargo) {
-    if (!definition?.fallbackPermission) return true;
+    if (!definition || definition.legacyOpen) return true;
     return access.capabilities.has(definition.fallbackPermission);
   }
   if (!definition) return false;
   if (!access.routes.has(routePermissionKey(definition.key))) return false;
   // A chave da rota é a concessão do cargo; o papel continua sendo o piso.
-  return !definition.fallbackPermission || access.roleCapabilities.has(definition.fallbackPermission);
+  return access.roleCapabilities.has(definition.fallbackPermission);
 }
 
 /** Primeira tela liberada, na ordem do catálogo: para onde vai quem tem cargo sem acesso ao Painel. */
