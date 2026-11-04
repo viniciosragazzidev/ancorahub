@@ -15,7 +15,6 @@ import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import { formatLiteDate } from "@/components/lite/format/date";
 import { LiteSkeletonToContent, LiteSwap } from "@/components/lite/motion";
 import litePage from "@/components/lite/page/lite-page.module.css";
-import { intentLabel } from "@/features/conversation-intelligence/components/radar-model";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import type { NegotiationLevel } from "./negotiation-model";
 import { getNegotiationTimelineAction } from "./actions";
@@ -23,17 +22,27 @@ import { createNegotiationLeadColumns, formatNegotiationMetric, LEVEL_LABELS, Ne
 import type { NegotiationLead, NegotiationTimelineEvent, NegotiationsDashboardData } from "./queries";
 import { NegotiationStageSummary } from "./negotiation-stage-summary";
 import { NegotiationLeadRow } from "./negotiation-lead-row";
-import { NegotiationLeadSignals } from "./negotiation-lead-signals";
+import { NegotiationLeadAi, NegotiationLeadSituation, NegotiationLeadTrail } from "./negotiation-lead-signals";
+import { NegotiationClosingNow } from "./negotiation-closing-now";
 import styles from "./negotiations.module.css";
 
 type Filter = "all" | NegotiationLevel | "customers_waiting";
 type PageTab = "negotiations" | "statistics";
+/** "team": supervisor e gestor do app Light leem a conversa da equipe; "inbox": a conversa abre na caixa de Conversas. */
+export type NegotiationConversationMode = "team" | "inbox";
+
+/** Ordem dos grupos da lista: quem está mais perto de fechar vem primeiro. */
+const GROUP_ORDER: NegotiationLevel[] = ["closing", "advanced", "in_conversation", "cooling", "no_crm_conversation"];
+
+export function negotiationConversationHref(leadId: string, mode: NegotiationConversationMode) {
+  return mode === "team" ? `/mensagens/${leadId}` : `/conversas?leadId=${encodeURIComponent(leadId)}`;
+}
 
 function statusLabel(status: string) {
   return LEAD_STATUS_LABELS[status] ?? status;
 }
 
-export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: NegotiationsDashboardData; activeTab: PageTab; generatedAt: Date }) {
+export function NegotiationsDashboard({ data, activeTab, generatedAt, conversationMode = "inbox" }: { data: NegotiationsDashboardData; activeTab: PageTab; generatedAt: Date; conversationMode?: NegotiationConversationMode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedBranch = searchParams.get("unidade");
@@ -107,7 +116,10 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
   const levelOptions = useMemo(() => [{ value: "all", label: "Todos os níveis" }, ...Object.entries(LEVEL_LABELS).map(([value, label]) => ({ value, label }))], []);
   const branchOptions = useMemo(() => [{ value: "all", label: "Todas as unidades" }, ...data.scope.branches.map((branch) => ({ value: branch.id, label: branch.name }))], [data.scope.branches]);
   const leadHref = selectedLead ? `/leads/${selectedLead.id}` : "/leads";
-  const conversationHref = selectedLead ? `/mensagens/${selectedLead.id}` : "/mensagens";
+  const conversationHref = selectedLead ? negotiationConversationHref(selectedLead.id, conversationMode) : "/conversas";
+  const groupedRows = useMemo(() => GROUP_ORDER
+    .map((level) => ({ level, rows: pageRows.filter((lead) => lead.level === level) }))
+    .filter((group) => group.rows.length > 0), [pageRows]);
 
   function setBranch(value: string) {
     const params = new URLSearchParams();
@@ -146,6 +158,7 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
                 activeFilter={activeFilter}
                 onFilter={(filter) => setActiveFilter(activeFilter === filter ? "all" : filter)}
               />
+              <NegotiationClosingNow leads={data.leads} generatedAt={generatedAt} onOpen={openLead} onShowAll={() => setActiveFilter("closing")} />
               <section className={styles.list} aria-label="Lista de negociações">
                 <div className={styles.toolbar}>
                   <label className={styles.search}>
@@ -163,9 +176,19 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
                 </div>
                 <LiteSwap swapKey={listPresentation}>
                   {pageRows.length ? listPresentation === "cards" ? (
-                    <ul className={styles.leadCards} aria-label="Atendimentos em cartões" data-lite="negotiation-cards">
-                      {pageRows.map((lead, index) => <NegotiationLeadRow key={lead.id} lead={lead} index={index} generatedAt={generatedAt} onOpen={openLead} />)}
-                    </ul>
+                    <div className={styles.leadGroups} data-lite="negotiation-groups">
+                      {groupedRows.map((group) => (
+                        <section key={group.level} className={styles.leadGroup} aria-labelledby={`negotiation-group-${group.level}`}>
+                          <h3 className={styles.groupTitle} id={`negotiation-group-${group.level}`}>
+                            <span className={styles.groupDot} data-level={group.level} aria-hidden="true" />
+                            {LEVEL_LABELS[group.level]}
+                          </h3>
+                          <ul className={styles.leadCards} aria-label={`Atendimentos em ${LEVEL_LABELS[group.level]}`} data-lite="negotiation-cards">
+                            {group.rows.map((lead, index) => <NegotiationLeadRow key={lead.id} lead={lead} index={index} generatedAt={generatedAt} onOpen={openLead} />)}
+                          </ul>
+                        </section>
+                      ))}
+                    </div>
                   ) : (
                     <LiteDataTable
                       caption="Atendimentos ativos por nível de negociação"
@@ -191,15 +214,13 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
         <LiteSidePanel open={Boolean(selectedLead)} onOpenChange={(open) => { if (!open) closeLead(); }} title={selectedLead?.name ?? "Atendimento"} description={selectedLead ? `${LEVEL_LABELS[selectedLead.level]} · ${statusLabel(selectedLead.status)}` : undefined}>
           {selectedLead ? (
             <div className={styles.drawerStack}>
-              <NegotiationLeadSignals lead={selectedLead} />
-              <section className={styles.drawerSection}>
-                <h3 className={styles.drawerTitle}>Resumo da IA</h3>
-                <p className={styles.drawerText}>{selectedLead.ai.summary ?? "A IA ainda não gerou um resumo para este atendimento."}</p>
-                <p className={styles.drawerText}><strong>Próxima ação:</strong> {selectedLead.ai.nextBestAction ?? "Sem sugestão no momento."}</p>
-                <p className={styles.drawerText}><strong>Intenção:</strong> {intentLabel[selectedLead.ai.customerIntent] ?? "Intenção pendente"}</p>
-                {selectedLead.ai.risk ? <p className={styles.drawerText}><strong>Risco:</strong> {selectedLead.ai.risk}</p> : null}
-                {selectedLead.statusBehindAi ? <p className={styles.statusBehind}>A IA indica uma etapa à frente do CRM. O status não foi alterado.</p> : null}
-              </section>
+              <div className={styles.drawerActions}>
+                <Link className={litePage.primaryButton} href={conversationHref}>Abrir conversa</Link>
+                <Link className={styles.textLink} href={leadHref}>Ver lead</Link>
+              </div>
+              <NegotiationLeadTrail lead={selectedLead} />
+              <NegotiationLeadSituation lead={selectedLead} now={generatedAt} />
+              <NegotiationLeadAi lead={selectedLead} now={generatedAt} />
 
               <section className={styles.drawerSection}>
                 <h3 className={styles.drawerTitle}>Linha do tempo</h3>
@@ -223,10 +244,6 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt }: { data: 
                 </LiteSkeletonToContent>
               </section>
 
-              <div className={styles.linkRow}>
-                <Link className={styles.textLink} href={conversationHref}>Abrir conversa</Link>
-                <Link className={styles.textLink} href={leadHref}>Ver lead</Link>
-              </div>
             </div>
           ) : null}
         </LiteSidePanel>

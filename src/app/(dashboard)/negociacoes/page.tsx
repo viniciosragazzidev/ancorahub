@@ -7,6 +7,7 @@ import { getFeatureFlag } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
 import { canOpenNegotiations } from "@/features/negotiations/negotiation-scope";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,12 @@ export default async function NegotiationsPage({ searchParams }: { searchParams:
     redirect("/access-denied");
   }
 
-  const data = await getNegotiationsDashboard(context, single(params.unidade));
+  const [data, audience] = await Promise.all([
+    getNegotiationsDashboard(context, single(params.unidade)),
+    getLiteAudience(context).catch(() => null),
+  ]);
+  // Supervisor e gestor no app Light leem a conversa da equipe em /mensagens; os demais abrem a conversa em /conversas.
+  const conversationMode = audience === "manager" || audience === "supervisor" ? "team" : "inbox";
   const activeTab = single(params.aba) === "estatisticas" ? "statistics" : "negotiations";
-  return <NegotiationsDashboard data={data} activeTab={activeTab} generatedAt={new Date(data.generatedAt)} />;
+  return <NegotiationsDashboard data={data} activeTab={activeTab} generatedAt={new Date(data.generatedAt)} conversationMode={conversationMode} />;
 }

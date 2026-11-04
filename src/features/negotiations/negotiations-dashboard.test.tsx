@@ -34,8 +34,8 @@ describe("NegotiationsDashboard", () => {
     const attention = summary.querySelector('[aria-label="Faixas de atenção"]') as HTMLElement;
     expect(within(attention).getByRole("button", { name: /Sem conversa no CRM/ })).toBeTruthy();
     expect(container.querySelectorAll('[data-lite="negotiation-cards"] > li')).toHaveLength(20);
-    expect(container.querySelector('[data-lite="negotiation-cards"]')?.textContent).toContain("Aguardando o corretor");
-    const cardList = container.querySelector('[data-lite="negotiation-cards"]');
+    const cardList = container.querySelector('[data-lite="negotiation-groups"]');
+    expect(cardList?.textContent).toContain("Aguardando o corretor");
     expect(cardList?.querySelector('[aria-label*="Sem troca"]')).toBeNull();
     expect(cardList?.textContent).toContain("Sem troca");
     expect(screen.getByRole("button", { name: /Aguardando resposta/ }).textContent).toContain(String(data.counts.customers_waiting));
@@ -110,7 +110,8 @@ describe("NegotiationsDashboard", () => {
 
     fireEvent.click(container.querySelector('[data-lite="table"] tbody tr')!);
     expect(await screen.findByRole("heading", { name: "Linha do tempo" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Abrir conversa" }).getAttribute("href")).toBe(`/mensagens/${data.leads[0]!.id}`);
+    // Diretor e modo normal: a conversa do lead abre direto em Conversas.
+    expect(screen.getByRole("link", { name: "Abrir conversa" }).getAttribute("href")).toBe(`/conversas?leadId=${data.leads[0]!.id}`);
   });
 
   it("mostra skeleton no painel sem bloquear cartões enquanto a linha do tempo carrega", async () => {
@@ -154,5 +155,32 @@ describe("NegotiationsDashboard", () => {
 
     expect(screen.getByRole("status").textContent).toContain("Escopo indisponível");
     expect(screen.getByText("Nenhum corretor está associado à sua equipe.")).toBeTruthy();
+  });
+
+  it("no app Light do supervisor e do gestor, Abrir conversa vai para a conversa da equipe", async () => {
+    const data = createNegotiationsFixture("director");
+    render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} conversationMode="team" />);
+    fireEvent.click(screen.getByRole("button", { name: `Ver detalhes de ${data.leads[0]!.name}` }));
+    expect((await screen.findByRole("link", { name: "Abrir conversa" })).getAttribute("href")).toBe(`/mensagens/${data.leads[0]!.id}`);
+  });
+
+  it("agrupa a lista por etapa, com Fechamento primeiro", () => {
+    const data = createNegotiationsFixture("director");
+    const { container } = render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} />);
+    const titles = [...container.querySelectorAll('[data-lite="negotiation-groups"] h3')].map((title) => title.textContent);
+    expect(titles[0]).toContain("Fechamento");
+    expect(container.querySelectorAll('[data-lite="negotiation-cards"] > li')).toHaveLength(20);
+  });
+
+  it("mostra quem está em fechamento agora e abre o painel ao clicar", async () => {
+    const data = createNegotiationsFixture("director");
+    render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} />);
+    const strip = screen.getByRole("region", { name: /Em fechamento agora/ });
+    const items = within(strip).getAllByRole("button", { name: /em fechamento$/ });
+    expect(items.length).toBe(Math.min(6, data.counts.closing));
+    fireEvent.click(items[0]!);
+    expect(await screen.findByRole("heading", { name: "Leitura da IA" })).toBeTruthy();
+    expect(screen.getByText("Próxima ação")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Situação" })).toBeTruthy();
   });
 });
