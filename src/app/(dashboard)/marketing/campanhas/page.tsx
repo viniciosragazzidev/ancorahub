@@ -52,7 +52,8 @@ export default async function CampaignsPage() {
             description="Navegação contextual para captação de leads e anúncios."
             links={[
               { label: "Importações de leads Meta", href: "/marketing/importacoes", description: "Logs de entrada e formulários" },
-              { label: "Configurar webhooks Meta Lead Ads", href: "/settings?tab=integracoes", description: "Token de acesso e formulários" },
+              { label: "Materiais de divulgação", href: "/materiais-divulgacao", description: "Banners, e-books e artes de apoio" },
+              { label: "Configurar webhooks Meta Lead Ads", href: "/settings?tab=integrations", description: "Token de acesso e formulários" },
               { label: "Regras de qualificação IA", href: "/qualificacao", description: "Como a IA atende os novos leads" },
             ]}
           />
@@ -100,7 +101,8 @@ export default async function CampaignsPage() {
           description="Navegação contextual para captação de leads e anúncios."
           links={[
             { label: "Importações de Leads Meta", href: "/marketing/importacoes", description: "Logs de entrada e formulários" },
-            { label: "Configurar Webhooks Meta Lead Ads", href: "/settings?tab=integracoes", description: "Token de acesso e formulários" },
+            { label: "Materiais de Divulgação", href: "/materiais-divulgacao", description: "Banners, e-books e artes de apoio" },
+            { label: "Configurar Webhooks Meta Lead Ads", href: "/settings?tab=integrations", description: "Token de acesso e formulários" },
             { label: "Regras de Qualificação IA", href: "/qualificacao", description: "Como a IA atende os novos leads" },
           ]}
         />

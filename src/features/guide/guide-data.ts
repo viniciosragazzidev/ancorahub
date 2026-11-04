@@ -180,7 +180,7 @@ export const guideSections: GuideSection[] = [
     description: "Ajuste a identidade da corretora, integrações, acesso e proteção da conta.",
     icon: "SlidersHorizontal",
     audience: ["director"],
-    links: [{ label: "Abrir Configurações", href: "/settings" }, { label: "Segurança", href: "/settings?tab=seguranca" }, { label: "Integrações", href: "/settings?tab=integracoes" }],
+    links: [{ label: "Abrir Configurações", href: "/settings" }, { label: "Segurança", href: "/settings?tab=security" }, { label: "Integrações", href: "/settings?tab=integrations" }],
     steps: [
       { title: "Atualize a identidade", description: "Defina nome, logo e cor da corretora. A identidade aparece no ambiente de trabalho da equipe." },
       { title: "Conecte as integrações", description: "Gere e gerencie fontes de leads e configure o WhatsApp quando o canal estiver pronto." },
@@ -210,7 +210,7 @@ export const guideSections: GuideSection[] = [
     description: "Configure um formulário externo para enviar leads automaticamente ao CorreTop via API.",
     icon: "RocketLaunch",
     audience: ["director"],
-    links: [{ label: "Abrir Configurações", href: "/settings?tab=integracoes" }],
+    links: [{ label: "Abrir Configurações", href: "/settings?tab=integrations" }],
     steps: [
       { title: "Crie uma fonte de captura", description: "Em Configurações > Integrações, clique em Nova fonte. Escolha o nome, a origem padrão (landing_page) e a filial de destino." },
       { title: "Copie o token gerado", description: "O token completo (crt_live_...) é exibido apenas uma vez. Copie e guarde em local seguro." },
