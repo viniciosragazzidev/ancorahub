@@ -35,7 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 import { DutyTypeTag, MODALITY_LABEL, typeStripe, typeUnitsLabel, type DutyTypeOption } from "./duty-type-ui";
 
-type Broker = { id: string; name: string; branchId: string | null; branchName?: string | null; internalCode?: string | null };
+type Broker = { id: string; name: string; branchId: string | null; branchName?: string | null; internalCode?: string | null; pending?: boolean };
 type Branch = { id: string; name: string };
 /** A plantão as the planner needs it (the roster snapshot row). */
 export type PlannerSchedule = MonthlyPlanSchedule & { status: string; typeName?: string | null; typeHue?: number | null };
@@ -521,7 +521,7 @@ export function MonthlyDutyPlanner({
                         return {
                           id: broker.id,
                           label: broker.name,
-                          hint: <>{broker.internalCode ? `${broker.internalCode} · ` : ""}{broker.branchName ?? "Sem unidade"}{fits ? null : <span className="text-warning"> · fora das unidades dos tipos</span>}</>,
+                          hint: <>{broker.internalCode ? `${broker.internalCode} · ` : ""}{broker.branchName ?? "Sem unidade"}{broker.pending ? <span className="text-warning"> · convite pendente</span> : null}{fits ? null : <span className="text-warning"> · fora das unidades dos tipos</span>}</>,
                           keywords: `${broker.internalCode ?? ""} ${broker.branchName ?? ""}`,
                         };
                       })}
@@ -554,7 +554,7 @@ export function MonthlyDutyPlanner({
                           return (
                             <li key={entry.brokerId} className="flex items-center gap-2 px-3 py-2">
                               <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditingBroker(entry.brokerId)} aria-label={`Configurar ${broker.name}`}>
-                                <span className="block truncate text-sm font-medium">{broker.name}</span>
+                                <span className="flex items-center gap-2"><span className="block min-w-0 truncate text-sm font-medium">{broker.name}</span>{broker.pending ? <Badge variant="warning" className="shrink-0">Convite pendente</Badge> : null}</span>
                                 <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
                                   <span>{broker.internalCode ? `${broker.internalCode} · ` : ""}{broker.branchName ?? "Sem unidade"}</span>
                                   {entry.modality !== "any" ? <span>· só {MODALITY_LABEL[entry.modality].toLocaleLowerCase("pt-BR")}</span> : null}
@@ -676,7 +676,7 @@ export function MonthlyDutyPlanner({
                               const seats = plan.settings?.brokers.find((item) => item.brokerId === row.broker.id)?.seats ?? {};
                               return (
                                 <tr key={row.broker.id}>
-                                  <td className="px-3 py-2"><span className="font-medium">{row.broker.name}</span>{row.broker.code ? <span className="text-muted-foreground"> · {row.broker.code}</span> : null}</td>
+                                  <td className="px-3 py-2"><span className="font-medium">{row.broker.name}</span>{row.broker.code ? <span className="text-muted-foreground"> · {row.broker.code}</span> : null}{row.broker.pending ? <Badge variant="warning" className="ml-2">Convite pendente</Badge> : null}</td>
                                   <td className="px-3 py-2 text-muted-foreground">{row.broker.branchName ?? "Sem unidade"}</td>
                                   {planTypeKeys.map((key) => {
                                     const given = row.byType.get(key) ?? 0;
@@ -707,7 +707,7 @@ export function MonthlyDutyPlanner({
                             .map((broker) => ({
                               id: broker.id,
                               label: broker.name,
-                              hint: <>{broker.internalCode ? `${broker.internalCode} · ` : ""}{broker.branchName ?? ""}{occurrence.allowedBrokerIds.includes(broker.id) ? null : <span className="text-warning"> · fora da unidade do tipo</span>}</>,
+                              hint: <>{broker.internalCode ? `${broker.internalCode} · ` : ""}{broker.branchName ?? ""}{broker.pending ? <span className="text-warning"> · convite pendente</span> : null}{occurrence.allowedBrokerIds.includes(broker.id) ? null : <span className="text-warning"> · fora da unidade do tipo</span>}</>,
                               keywords: `${broker.internalCode ?? ""} ${broker.branchName ?? ""}`,
                             }));
                           return (
@@ -746,6 +746,7 @@ export function MonthlyDutyPlanner({
                                   >
                                     {broker.code ? <span className="font-semibold tabular-nums">{broker.code}</span> : null}
                                     <span>{broker.name}</span>
+                                    {broker.pending ? <span className="text-warning">· convite pendente</span> : null}
                                     {!filterBranch && broker.branchName ? <span className="text-muted-foreground">· {broker.branchName}</span> : null}
                                     {editable && broker.origin !== "weekly" && !occurrence.started ? (
                                       <button type="button" aria-label={`Remover ${broker.name} de ${occurrence.scheduleName} em ${dateLabel(date)}`} disabled={pending} onClick={() => editDraft(occurrence.id, broker.id, "remove")} className="grid size-4 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50">

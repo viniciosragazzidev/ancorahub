@@ -1635,7 +1635,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], queueOrders = [
 
       {monthlySchedulingEnabled ? (
         <MonthlyDutyPlanner
-          brokers={snapshot.brokers}
+          brokers={[...snapshot.brokers, ...snapshot.pendingBrokers]}
           branches={snapshot.branches}
           types={snapshot.types}
           enabled={monthlySchedulingEnabled}

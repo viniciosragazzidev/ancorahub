@@ -1,3 +1,7 @@
+## 2026-11-04: corretores pendentes na escala mensal
+
+Papel: Direção em `/leads/distribuicao`, modal da escala mensal. Objetivo: permitir pesquisar e reservar perfis pendentes para as ocorrências da escala. Estados: cadastro ativo, convite pendente identificado no resultado e na escala, e ausência de resultados. O rótulo de pendência esclarece que a reserva ainda não distribui leads; reutiliza a busca e os componentes existentes, sem novo token, primitiva ou movimento. Não avança a etapa global do redesign.
+
 ## 2026-10-27: corretor exclusivamente no Lite
 
 Papel: corretor. Objetivo: atender no Lite. Retirada da alternância para o modo

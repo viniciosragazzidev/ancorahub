@@ -50,7 +50,7 @@ export type MonthlyPlanOccurrence = {
  * on the weekly roster ("weekly", never re-published), drawn by this
  * generation ("generated") or added by hand ("manual").
  */
-export type AssignmentOrigin = "existing" | "weekly" | "generated" | "manual";
+export type AssignmentOrigin = "existing" | "weekly" | "generated" | "manual" | "pending";
 export type MonthlyPlanAssignment = { occurrenceId: string; brokerId: string; origin?: AssignmentOrigin };
 
 export const MONTH_KEY_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -204,6 +204,10 @@ export function shiftEnd(schedule: Pick<MonthlyPlanSchedule, "startsAt" | "endsA
   const [hours, minutes] = schedule.endsAt.split(":").map(Number);
   const end = new Date(zonedMidnight(dutyDate, schedule.timezone).getTime() + (hours * 60 + minutes) * 60_000);
   return end.getTime() <= start.getTime() ? new Date(end.getTime() + 24 * 3600_000) : end;
+}
+
+export function isMonthlyOccurrenceEnded(occurrence: Pick<MonthlyPlanOccurrence, "dutyDate" | "startsAt" | "endsAt">, timezone: string, now = new Date()) {
+  return shiftEnd({ ...occurrence, timezone }, occurrence.dutyDate).getTime() <= now.getTime();
 }
 
 /**
