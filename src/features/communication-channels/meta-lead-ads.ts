@@ -95,7 +95,15 @@ function normalizeLeadType(value: string): LeadType | undefined {
   return undefined;
 }
 
-const CONTACT_FIELD_NAMES = ["full_name", "nome", "name", "first_name", "primeiro_nome", "last_name", "sobrenome", "phone_number", "telefone", "phone", "celular", "whatsapp", "email", "email_address", "e_mail"];
+/**
+ * The client's name: Meta's standard field or a custom question ("Nome completo" arrives as
+ * "nome_completo"; the Niterói Amil form of 04/11 had every lead named "Lead sem nome").
+ */
+const NAME_FIELD_NAMES = [
+  "full_name", "nome", "name", "nome_completo", "seu_nome", "seu_nome_completo", "nome_e_sobrenome",
+  "qual_seu_nome", "qual_o_seu_nome", "qual_e_o_seu_nome", "qual_seu_nome_completo", "qual_o_seu_nome_completo", "nome_do_titular",
+];
+const CONTACT_FIELD_NAMES = [...NAME_FIELD_NAMES, "first_name", "primeiro_nome", "last_name", "sobrenome", "phone_number", "telefone", "phone", "celular", "whatsapp", "email", "email_address", "e_mail"];
 const CNPJ_TYPE_FIELD_NAMES = ["tipo_de_cnpj", "tipo_cnpj", "cnpj_type"];
 const PLAN_TYPE_FIELD_NAMES = [
   "tipo_de_plano", "tipo_plano", "plan_type", "tipo_de_produto", "tipo_produto",
@@ -145,7 +153,7 @@ function collectUnmappedAnswers(fields: MetaLeadField[]) {
 /** Deterministic field mapping; unknown form answers are never sent to logs. */
 export function normalizeMetaLead(record: MetaLeadAdRecord) {
   const fields = record.field_data ?? [];
-  let nome = firstField(fields, ["full_name", "nome", "name"]) || [firstField(fields, ["first_name", "primeiro_nome"]), firstField(fields, ["last_name", "sobrenome"])].filter(Boolean).join(" ");
+  let nome = firstField(fields, NAME_FIELD_NAMES) || [firstField(fields, ["first_name", "primeiro_nome"]), firstField(fields, ["last_name", "sobrenome"])].filter(Boolean).join(" ");
   let telefone = firstField(fields, ["phone_number", "telefone", "phone", "celular", "whatsapp"]);
   let email = firstField(fields, ["email", "email_address", "e_mail"]);
   const tipoCnpj = firstField(fields, CNPJ_TYPE_FIELD_NAMES).slice(0, 120);

@@ -93,6 +93,21 @@ describe("Meta Lead Ads normalization", () => {
     })).toMatchObject({ formAnswers: ["Você tem empresa?: sim, mei", "Qual seu plano atual: Amil 400", "Possui doença preexistente?: sim"] });
   });
 
+  it("reads the name from a custom 'Nome completo' question (Niterói Amil form, 04/11)", () => {
+    const lead = normalizeMetaLead({
+      id: "leadgen_nome_completo",
+      field_data: [
+        { name: "possui_empresa_ou_cnpj?_(mais_barato_ainda)", values: ["não"] },
+        { name: "nome_completo", values: ["Andyara Góes"] },
+        { name: "cidade", values: ["Niterói"] },
+        { name: "phone_number", values: ["+5521999990000"] },
+      ],
+    });
+    expect(lead.nome).toBe("Andyara Góes");
+    expect(lead.unmappedFormFields).not.toContain("nome_completo");
+    expect(lead.formAnswers).toContain("Cidade: Niterói");
+  });
+
   it("does not list contact or already-mapped questions as unmapped", () => {
     expect(normalizeMetaLead({
       id: "leadgen_all_mapped",
