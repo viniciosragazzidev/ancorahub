@@ -99,11 +99,16 @@ export function drawReportLogo(page: PDFPage, logo: PDFImage | null, top: number
 }
 
 /** "<tenant> · <area>" on the left and "Página x de y" on the right of every page. */
-export function drawReportFooters(pdf: PDFDocument, label: string, font: PDFFont) {
+export function drawReportFooters(
+  pdf: PDFDocument,
+  label: string,
+  font: PDFFont,
+  pageSize: { width: number; height: number; margin: number } = REPORT_PAGE,
+) {
   const pages = pdf.getPages();
   pages.forEach((pageItem, index) => {
-    pageItem.drawText(printable(label, 120), { x: REPORT_PAGE.margin, y: 17, size: 7, font, color: reportColors.muted });
+    pageItem.drawText(printable(label, 120), { x: pageSize.margin, y: 17, size: 7, font, color: reportColors.muted });
     const pageLabel = `Página ${index + 1} de ${pages.length}`;
-    pageItem.drawText(pageLabel, { x: REPORT_PAGE.width - REPORT_PAGE.margin - font.widthOfTextAtSize(pageLabel, 7), y: 17, size: 7, font, color: reportColors.muted });
+    pageItem.drawText(pageLabel, { x: pageSize.width - pageSize.margin - font.widthOfTextAtSize(pageLabel, 7), y: 17, size: 7, font, color: reportColors.muted });
   });
 }
