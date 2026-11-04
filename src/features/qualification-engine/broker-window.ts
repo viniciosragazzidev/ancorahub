@@ -99,6 +99,7 @@ function nextDay(day: CalendarDay): CalendarDay {
 }
 
 export const BROKER_RETURN_IN_INSTANTS = "em instantes";
+export const BROKER_RETURN_SOON = "em breve";
 
 /** Used in replies: "{{quando}}" becomes one of these phrases. */
 export const BROKER_RETURN_PHRASE_PLACEHOLDER = "{{quando}}";
@@ -116,17 +117,9 @@ export function brokerAvailability(now: Date = new Date()): BrokerAvailability {
   const openNow = isWorkingDay(parts) && parts.hour >= BROKER_OPENING_HOUR && parts.hour < BROKER_CLOSING_HOUR;
   if (openNow) return { open: true, returnPhrase: BROKER_RETURN_IN_INSTANTS };
 
-  // Before 9h on a working day: the same day starts at 9h.
-  if (isWorkingDay(parts) && parts.hour < BROKER_OPENING_HOUR) {
-    return { open: false, returnPhrase: "hoje, a partir das 9h" };
-  }
-
-  // Otherwise, the next working day, looking at most one week ahead.
-  const tomorrow = nextDay(parts);
-  let candidate = tomorrow;
-  for (let step = 0; step < 7 && !isWorkingDay(candidate); step += 1) candidate = nextDay(candidate);
-  const isTomorrow = isWorkingDay(tomorrow) && candidate.day === tomorrow.day && candidate.month === tomorrow.month;
-  return { open: false, returnPhrase: isTomorrow ? "amanhã, a partir das 9h" : "no próximo dia útil, a partir das 9h" };
+  // Outside working hours the message does not promise a time: brokers asked not to
+  // announce "a partir das 9h" to leads, so the phrase stays neutral.
+  return { open: false, returnPhrase: BROKER_RETURN_SOON };
 }
 
 /** Puts the return phrase in a message: "{{quando}}" is replaced, other text is kept. */

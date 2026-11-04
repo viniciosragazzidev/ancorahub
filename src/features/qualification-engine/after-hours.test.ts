@@ -19,7 +19,7 @@ describe("encerramento fora do horário (19h às 9h)", () => {
 
   it("diz quando o corretor volta, sem prometer instantes à noite", () => {
     const text = renderConversationVariables(withBrokerReturnPhrase(AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, sp(20)), createEmptyMemory(), "Edivaldo Souza");
-    expect(text).toContain("Um corretor fala com você por aqui amanhã, a partir das 9h.");
+    expect(text).toContain("Um corretor fala com você por aqui em breve.");
     expect(text).not.toMatch(/instantes|agora|\{\{/);
   });
 

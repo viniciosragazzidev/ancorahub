@@ -54,8 +54,8 @@ describe("textos de encerramento e handoff", () => {
   });
 
   it("fora do horário, o texto diz quando o corretor volta, e não sobra modelo", () => {
-    expect(withBrokerReturnPhrase(AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, WEDNESDAY_NIGHT)).toContain("por aqui amanhã, a partir das 9h.");
-    expect(renderConversationVariables(withBrokerReturnPhrase(AFTER_HOURS_HUMAN_REQUEST_TEXT, WEDNESDAY_NIGHT), createEmptyMemory(), "Ana")).toContain("por aqui amanhã, a partir das 9h.");
+    expect(withBrokerReturnPhrase(AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, WEDNESDAY_NIGHT)).toContain("por aqui em breve.");
+    expect(renderConversationVariables(withBrokerReturnPhrase(AFTER_HOURS_HUMAN_REQUEST_TEXT, WEDNESDAY_NIGHT), createEmptyMemory(), "Ana")).toContain("por aqui em breve.");
     expect(withBrokerReturnPhrase(CLOSING_AFTER_HOURS_TEXT, WEDNESDAY_NIGHT)).not.toContain("{{quando}}");
   });
 
@@ -115,13 +115,13 @@ describe("texto do tenant vence fora do horário", () => {
   const NIGHT = "Um corretor fala com você por aqui {{quando}}.";
 
   it("troca só o padrão por texto noturno", () => {
-    expect(afterHoursText(DEFAULT, DEFAULT, NIGHT, WEDNESDAY_NIGHT)).toBe("Um corretor fala com você por aqui amanhã, a partir das 9h.");
-    expect(afterHoursText(null, DEFAULT, NIGHT, WEDNESDAY_NIGHT)).toBe("Um corretor fala com você por aqui amanhã, a partir das 9h.");
+    expect(afterHoursText(DEFAULT, DEFAULT, NIGHT, WEDNESDAY_NIGHT)).toBe("Um corretor fala com você por aqui em breve.");
+    expect(afterHoursText(null, DEFAULT, NIGHT, WEDNESDAY_NIGHT)).toBe("Um corretor fala com você por aqui em breve.");
   });
 
   it("texto do tenant sem horário ganha a frase de retorno, e o texto dele fica", () => {
     const tenant = "Recebi seu pedido, a Ana vai te responder.";
-    expect(afterHoursText(tenant, DEFAULT, NIGHT, WEDNESDAY_NIGHT)).toBe(`${tenant} Um corretor continua a conversa por aqui amanhã, a partir das 9h.`);
+    expect(afterHoursText(tenant, DEFAULT, NIGHT, WEDNESDAY_NIGHT)).toBe(`${tenant} Um corretor continua a conversa por aqui em breve.`);
   });
 
   it("texto do tenant que já fala de horário não muda", () => {
@@ -133,7 +133,7 @@ describe("texto do tenant vence fora do horário", () => {
     const handoff = renderConversationVariables(afterHoursText(null, DEFAULT_QUALIFIED_HANDOFF_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, WEDNESDAY_NIGHT), createEmptyMemory(), "Ana");
     const reply = [handoff, "Se quiser, me conta quem é cada pessoa."].join(" ");
     expect(reply.endsWith("Se quiser, me conta quem é cada pessoa.")).toBe(true);
-    expect(reply).toContain("amanhã, a partir das 9h");
+    expect(reply).toContain("em breve");
   });
 });
 

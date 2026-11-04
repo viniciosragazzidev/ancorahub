@@ -53,51 +53,30 @@ describe("quando o corretor responde", () => {
     expect(brokerAvailability(sp(2026, 10, 24, 10))).toEqual({ open: true, returnPhrase: "em instantes" });
   });
 
-  it("antes das 9h num dia útil: hoje, a partir das 9h", () => {
-    expect(brokerAvailability(sp(2026, 10, 21, 7))).toEqual({ open: false, returnPhrase: "hoje, a partir das 9h" });
-  });
-
-  it("à noite num dia útil: amanhã, a partir das 9h", () => {
-    expect(brokerAvailability(sp(2026, 10, 21, 19))).toEqual({ open: false, returnPhrase: "amanhã, a partir das 9h" });
-    expect(brokerAvailability(sp(2026, 10, 21, 23, 30))).toEqual({ open: false, returnPhrase: "amanhã, a partir das 9h" });
-  });
-
-  it("sexta à noite: o sábado conta como dia de atendimento", () => {
-    expect(brokerAvailability(sp(2026, 10, 23, 20))).toEqual({ open: false, returnPhrase: "amanhã, a partir das 9h" });
-  });
-
-  it("sábado à noite: próximo dia útil, a partir das 9h, e domingo de manhã vira amanhã", () => {
-    expect(brokerAvailability(sp(2026, 10, 24, 20))).toEqual({ open: false, returnPhrase: "no próximo dia útil, a partir das 9h" });
-    expect(brokerAvailability(sp(2026, 10, 25, 12))).toEqual({ open: false, returnPhrase: "amanhã, a partir das 9h" });
-  });
-
-  it("feriado não atende, como domingo: Sexta-feira Santa, sábado de manhã segue o atendimento", () => {
-    expect(brokerAvailability(sp(2026, 4, 3, 10))).toEqual({ open: false, returnPhrase: "amanhã, a partir das 9h" });
-  });
-
-  it("feriado fixo em dia útil: Tiradentes numa terça", () => {
-    expect(brokerAvailability(sp(2026, 4, 21, 10))).toEqual({ open: false, returnPhrase: "amanhã, a partir das 9h" });
-  });
-
-  it("feriado numa segunda, com a terça seguinte útil: Finados", () => {
-    expect(brokerAvailability(sp(2026, 11, 2, 10))).toEqual({ open: false, returnPhrase: "amanhã, a partir das 9h" });
-  });
-
-  it("véspera de feriado sexta: Natal cai numa sexta, o retorno vai para o próximo dia útil", () => {
-    // 24/12 é quinta. Às 20h, amanhã é feriado (sexta, Natal), o sábado seguinte é dia de atendimento, então não é amanhã.
-    expect(brokerAvailability(sp(2026, 12, 24, 20))).toEqual({ open: false, returnPhrase: "no próximo dia útil, a partir das 9h" });
-  });
-
-  it("feriado em domingo: segunda seguinte, como amanhã", () => {
-    // 15/11/2026 é domingo e feriado. A segunda 16/11 é dia útil.
-    expect(brokerAvailability(sp(2026, 11, 15, 10))).toEqual({ open: false, returnPhrase: "amanhã, a partir das 9h" });
+  it("fora do horário a frase é neutra e nunca cita as 9h", () => {
+    const closed = [
+      sp(2026, 10, 21, 7), // antes das 9h num dia útil
+      sp(2026, 10, 21, 19), // à noite
+      sp(2026, 10, 21, 23, 30),
+      sp(2026, 10, 23, 20), // sexta à noite
+      sp(2026, 10, 24, 20), // sábado à noite
+      sp(2026, 10, 25, 12), // domingo
+      sp(2026, 4, 3, 10), // Sexta-feira Santa
+      sp(2026, 4, 21, 10), // Tiradentes
+      sp(2026, 11, 2, 10), // Finados
+      sp(2026, 12, 24, 20), // véspera de Natal
+      sp(2026, 11, 15, 10), // feriado em domingo
+    ];
+    for (const moment of closed) {
+      expect(brokerAvailability(moment)).toEqual({ open: false, returnPhrase: "em breve" });
+    }
   });
 });
 
 describe("withBrokerReturnPhrase", () => {
   it("troca {{quando}} pela frase do momento e deixa o resto", () => {
     const text = "Um corretor fala com você por aqui {{quando}}.";
-    expect(withBrokerReturnPhrase(text, sp(2026, 10, 21, 20))).toBe("Um corretor fala com você por aqui amanhã, a partir das 9h.");
+    expect(withBrokerReturnPhrase(text, sp(2026, 10, 21, 20))).toBe("Um corretor fala com você por aqui em breve.");
     expect(withBrokerReturnPhrase(text, sp(2026, 10, 21, 10))).toBe("Um corretor fala com você por aqui em instantes.");
   });
 });
