@@ -25,27 +25,50 @@ import {
 
 export type { TenantContext };
 
-async function assertCargoActionRoute(input: { tenantId: string; role: TenantContext["role"]; jobTitle: string; customRoleId: string }) {
-  let method = "";
-  let path = "";
-  try {
-    const list = await headers();
-    method = list.get("next-action") ? "POST" : "";
-    path = (list.get("x-pathname") ?? "").split("?")[0];
-  } catch {
-    return; // fora de um request (scripts, jobs): sem tela para conferir
+/** Arquivo de origem de cada ação, lido do manifesto do build (uma vez por processo). */
+let manifestoAcoes: Map<string, string> | null = null;
+async function arquivoDaAcao(actionId: string): Promise<string | null> {
+  if (!manifestoAcoes) {
+    try {
+      const [{ readFile }, path] = await Promise.all([import("node:fs/promises"), import("node:path")]);
+      const bruto = JSON.parse(await readFile(path.join(process.cwd(), ".next", "server", "server-reference-manifest.json"), "utf8")) as {
+        node?: Record<string, { filename?: string }>;
+      };
+      manifestoAcoes = new Map(Object.entries(bruto.node ?? {}).flatMap(([id, item]) => (item.filename ? [[id, item.filename]] : [])));
+    } catch {
+      return null; // sem manifesto: quem tem cargo fica negado (fail closed)
+    }
   }
-  if (method !== "POST" || !path || path.startsWith("/api/")) return;
-  const [{ getEffectiveAccess }, { canAccessRoute, isAlwaysAllowedPath }, { getRouteDefinition }] = await Promise.all([
+  return manifestoAcoes.get(actionId) ?? null;
+}
+
+/**
+ * Cargos (04/11, F2): ação de servidor de quem tem cargo só roda se a ÁREA do arquivo da ação estiver
+ * liberada (action-areas.ts). A fronteira é o arquivo da ação, não a URL que o cliente manda.
+ */
+async function assertCargoActionRoute(input: { tenantId: string; role: TenantContext["role"]; jobTitle: string; customRoleId: string }) {
+  let actionId = "";
+  try {
+    actionId = (await headers()).get("next-action") ?? "";
+  } catch {
+    return; // fora de um request (scripts, jobs)
+  }
+  if (!actionId) return; // página (GET) e /api: o layout e cada rota decidem
+  const [{ getEffectiveAccess }, { canAccessRoute }, { routeCatalog }, { requisitoDaAcao }] = await Promise.all([
     import("@/features/custom-roles/service"),
     import("@/features/custom-roles/effective-access"),
     import("@/features/custom-roles/routes"),
+    import("@/features/custom-roles/action-areas"),
   ]);
-  if (isAlwaysAllowedPath(path)) return;
-  const access = await getEffectiveAccess({ ...input, customRoleId: input.customRoleId });
-  if (!canAccessRoute(access, getRouteDefinition(path))) {
-    throw new AuthorizationError("Seu cargo não libera esta ação.");
-  }
+  const requisito = requisitoDaAcao(await arquivoDaAcao(actionId));
+  if (requisito.kind === "livre") return;
+  const access = await getEffectiveAccess(input);
+  const liberado = requisito.kind === "cap"
+    ? access.capabilities.has(requisito.permission)
+    : requisito.kind === "route"
+      ? canAccessRoute(access, routeCatalog.find((route) => route.key === requisito.key))
+      : false;
+  if (!liberado) throw new AuthorizationError("Seu cargo não libera esta ação.");
 }
 
 const TENANT_QUERY_TIMEOUT_MS = 5_000;
@@ -141,8 +164,7 @@ async function resolveRequiredTenantContext(): Promise<TenantContext> {
       throw new AuthorizationError("The associated branch is not active.");
     }
 
-    // Cargos (04/11, F2): ação de servidor (POST) de quem tem cargo só roda numa tela que o cargo libera.
-    // A página (GET) já é barrada pelo layout; /api/* fica com a checagem de cada rota.
+    // Cargos (04/11, F2): ação de servidor de quem tem cargo só roda se a área da ação estiver liberada.
     if (membership.customRoleId) {
       await assertCargoActionRoute({
         tenantId: membership.tenantId,

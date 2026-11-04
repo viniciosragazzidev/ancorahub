@@ -85,8 +85,8 @@ const labels: Record<PermissionKey, [string, string, string]> = {
     "Distribuição & Filas",
   ],
   duty_schedules_manage: [
-    "Gerenciar plantões",
-    "Configurar a escala de plantonistas das unidades.",
+    "Gerenciar plantões e corretores pendentes",
+    "Configurar escalas, adicionar ou remover corretores convidados sem conta e gerenciar plantonistas das unidades.",
     "Distribuição & Filas",
   ],
   distribution_audit_view: [

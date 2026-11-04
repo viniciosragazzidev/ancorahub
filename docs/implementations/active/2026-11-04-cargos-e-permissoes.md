@@ -67,6 +67,13 @@
 - Pisos de `mensagens` e `fluxos-whatsapp` = `acessar_qualificacao_ia` (Vinicios manteve, 04/11). `/plantoes`
   mantém `acessar_leads` (é o calendário do próprio corretor).
 
+- **F2 (04/11):** fronteira real = **arquivo da ação**. O manifesto do build (`.next/server/
+  server-reference-manifest.json`) dá o arquivo de cada ação; `action-areas.ts` diz a área (rota ou
+  capacidade) de cada pasta; quem tem cargo só roda ação de área liberada; arquivo sem regra = negado e um
+  teste falha se aparecer arquivo de ação novo sem regra. A URL do cliente NÃO é fronteira. Cortes finos:
+  `requireCargoCapability` em equipe, distribuição, plantões e importação. Leads e Conversas ainda não têm
+  corte fino: o cargo leva a área inteira (`AREAS_SEM_CORTE_FINO`). `/api/*` ainda sem trava de cargo.
+
 ## Cargo Plantões (proposta)
 
 | Área | Rota / seção | Pode |
@@ -74,7 +81,7 @@
 | Leads em geral | /leads (todas as unidades, a confirmar) | ver, atribuir e reatribuir |
 | Conversas | /conversas | ver e responder |
 | Equipe | /equipe (sem Cargos e sem convites de gestor) | ver membros e status |
-| Plantões | /distribuicao › Plantão, /plantoes | montar e editar escalas |
+| Plantões | /distribuicao › Plantão, /plantoes | montar e editar escalas; adicionar e remover corretores convidados sem conta |
 | Filas | /distribuicao › Filas e Operar | ver e pausar filas |
 | Sugeridos | Notificações, Tarefas, Configurações pessoais (perfil e senha), Resumo do dia da distribuição | ver |
 | Escondido | Painel geral, Vendas, Negociações, Relatórios, Financeiro, Qualificação IA, Campanhas, Integrações, Unidades, Configurações da empresa | |

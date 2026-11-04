@@ -62,6 +62,12 @@ const loadCargo = cache(async (tenantId: string, customRoleId: string): Promise<
 /** F2 no ar (04/11): ações de equipe, distribuição, plantões e importação checam o cargo; POST fora das telas do cargo é negado. */
 export const CARGO_PROTEGE_ACOES = true;
 
+/** Telas cujas ações internas ainda checam o papel cru (F2): o cargo não pode cortar só um pedaço delas. */
+const AREAS_SEM_CORTE_FINO: Record<string, readonly PermissionKey[]> = {
+  leads: ["acessar_leads", "criar_lead_manual", "alterar_status_lead", "reabrir_lead_perdido", "leads_view_all"],
+  conversas: ["acessar_conversas"],
+};
+
 type AccessInput = { tenantId: string; role: TenantRole; jobTitle: string; customRoleId: string | null };
 
 /** Fonte única do acesso efetivo no servidor: papel, ou papel ∩ cargo. */
@@ -222,6 +228,15 @@ export async function assertCargoAssignable(input: {
     return !rota || !hasCapability(input.role, rota.fallbackPermission, input.jobTitle);
   });
   if (foraDoPapel.length) throw new Error(`O papel desta pessoa não tem: ${foraDoPapel.join(", ")}. Ajuste o cargo ou o papel.`);
+  // Dentro dessas telas as ações ainda checam o papel, não o cargo: o cargo leva a área inteira ou não leva
+  // a tela (revisão do Vigia, 04/11). Ao cobrir as ações com requireCargoCapability, sai da lista.
+  const chaves = new Set(grants.map((grant) => grant.key));
+  const cortesSemTrava = Object.entries(AREAS_SEM_CORTE_FINO).flatMap(([rotaKey, permissoes]) =>
+    chaves.has(routePermissionKey(rotaKey))
+      ? permissoes.filter((permission) => hasCapability(input.role, permission, input.jobTitle) && !chaves.has(permission))
+      : [],
+  );
+  if (cortesSemTrava.length) throw new Error(`Nesta tela o cargo ainda precisa levar também: ${cortesSemTrava.join(", ")}.`);
   if (input.role === "director") {
     const [livre] = await db.select({ id: schema.tenantMemberships.id }).from(schema.tenantMemberships).where(and(
       eq(schema.tenantMemberships.tenantId, input.actor.tenantId),

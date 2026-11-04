@@ -643,3 +643,13 @@ Cada número Coex pode direcionar novos contatos para sua própria fila, sem des
 ## 2026-10-29 - Análise contextual na qualificação
 
 Um interpretador estruturado lê o contexto recente antes da resposta e auxilia a extração/correção de fatos; a máquina determinística segue escolhendo o próximo passo e redigindo o texto. A capacidade vem ligada por padrão, pode ser desligada pelo Super-admin por empresa/fila em system_settings, e respeita filas com qualificação por IA desabilitada. Falhas/timeout usam o extrator por regras. Registro: DEC-164 e `docs/implementations/completed/2026-10-29-qualification-context-analysis.md`.
+# 04/11/2026 - Permissão de corretores pendentes em escala
+
+- A capacidade `duty_schedules_manage` fica identificada na tela de cargos como gerenciamento de plantões e corretores pendentes. Ela já protege no servidor as ações de adicionar/remover convidados sem conta; o papel continua limitado por tenant e unidade.
+- Implementação: `src/features/custom-roles/catalog.ts`, `src/features/lead-distribution/duty-roster-pending-actions.ts`.
+
+# 04/11/2026 - PDF da escala sem plantões sem tipo
+
+- O quadro e a legenda do PDF incluem somente plantões com tipo configurado; ocorrências sem tipo deixam de aparecer no documento.
+- Implementação: `src/features/lead-distribution/duty-escala-pdf.ts`.
+

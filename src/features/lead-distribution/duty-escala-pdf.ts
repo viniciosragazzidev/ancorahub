@@ -5,7 +5,7 @@ export type DutyEscalaPdfBroker = { name: string; code: string | null; branchNam
 export type DutyEscalaPdfType = { id: string; name: string; hue: number | null; modality: "online" | "presencial" };
 export type DutyEscalaPdfOccurrence = {
   id: string;
-  /** null = "Sem tipo" */
+  /** null when the source plantão has no configured type. */
   typeId: string | null;
   scheduleName: string;
   /** YYYY-MM-DD */
@@ -90,9 +90,6 @@ const MIN_ROW_H = 26;
 const MAX_ROW_H = PAGE_H - MARGIN - COMPACT_HEADER_H - SECTION_TITLE_H - COLUMN_HEADER_H - BOTTOM_LIMIT - 4;
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-const NO_TYPE_ID = "__sem_tipo__";
-/** Warm stone neutral, so "Sem tipo" never looks like a type that just has no hue. */
-const NO_TYPE_PALETTE: Palette = { strong: rgb(0.52, 0.49, 0.45), soft: rgb(0.97, 0.965, 0.955), text: rgb(0.33, 0.3, 0.27) };
 const weekendTint = rgb(0.955, 0.96, 0.975);
 const gridLine = rgb(0.83, 0.85, 0.88);
 const draftBg = rgb(1, 0.93, 0.8);
@@ -181,26 +178,18 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
   const logo = await embedTenantLogo(pdf, input.tenantLogoUrl);
   const generatedLabel = dateTimeLabel(input.generatedAt ?? new Date());
 
-  // ---- Columns (types present, ordered as input.types, "Sem tipo" last) ----
+  // Untyped occurrences are omitted from this PDF; only configured categories belong in its legend/grid.
   const knownTypes = new Map(input.types.map((type) => [type.id, type]));
-  const columnIdOf = (occurrence: DutyEscalaPdfOccurrence) => (occurrence.typeId && knownTypes.has(occurrence.typeId) ? occurrence.typeId : NO_TYPE_ID);
-  const presentIds = new Set(input.occurrences.map(columnIdOf));
+  const occurrences = input.occurrences.filter((occurrence) => occurrence.typeId !== null && knownTypes.has(occurrence.typeId));
+  const columnIdOf = (occurrence: DutyEscalaPdfOccurrence) => occurrence.typeId!;
+  const presentIds = new Set(occurrences.map(columnIdOf));
   const columns: Column[] = input.types
     .filter((type) => presentIds.has(type.id))
     .map((type) => ({ id: type.id, name: type.name, modalityLabel: modalityLabel(type.modality), palette: hueToRgb(type.hue) }));
-  if (presentIds.has(NO_TYPE_ID)) {
-    const modalities = new Set(input.occurrences.filter((occurrence) => columnIdOf(occurrence) === NO_TYPE_ID).map((occurrence) => occurrence.modality));
-    columns.push({
-      id: NO_TYPE_ID,
-      name: "Sem tipo",
-      modalityLabel: modalities.size === 1 ? modalityLabel([...modalities][0]) : "Online e presencial",
-      palette: NO_TYPE_PALETTE,
-    });
-  }
 
   // ---- Grouping: date -> column -> occurrences (sorted by time) ----
   const grid = new Map<string, Map<string, DutyEscalaPdfOccurrence[]>>();
-  for (const occurrence of input.occurrences) {
+  for (const occurrence of occurrences) {
     const byColumn = grid.get(occurrence.dutyDate) ?? new Map<string, DutyEscalaPdfOccurrence[]>();
     const columnId = columnIdOf(occurrence);
     byColumn.set(columnId, [...(byColumn.get(columnId) ?? []), occurrence]);
@@ -212,7 +201,7 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
     }
   }
   const allDates = [...grid.keys()].sort();
-  const uniqueBrokers = new Set(input.occurrences.flatMap((occurrence) => occurrence.brokers.map(brokerKey)));
+  const uniqueBrokers = new Set(occurrences.flatMap((occurrence) => occurrence.brokers.map(brokerKey)));
 
   // ---- Page scaffolding ----
   let page!: PDFPage;
@@ -234,8 +223,8 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
     const right = PAGE_W - MARGIN;
     const generated = safe(`Gerado em ${generatedLabel}`);
     page.drawText(generated, { x: right - regular.widthOfTextAtSize(generated, 7.5), y: top - 9, size: 7.5, font: regular, color: colors.muted });
-    if (input.occurrences.length) {
-      const stats = safe(plural(input.occurrences.length, "plantão", "plantões"));
+    if (occurrences.length) {
+      const stats = safe(plural(occurrences.length, "plantão", "plantões"));
       page.drawText(stats, { x: right - bold.widthOfTextAtSize(stats, 13), y: top - 28, size: 13, font: bold, color: colors.accent });
       const sub = safe(`${plural(allDates.length, "dia", "dias")} · ${plural(uniqueBrokers.size, "corretor", "corretores")}`);
       page.drawText(sub, { x: right - regular.widthOfTextAtSize(sub, 8), y: top - 41, size: 8, font: regular, color: colors.muted });
@@ -278,7 +267,7 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
   const drawLegend = () => {
     if (!columns.length) return;
     const counts = new Map<string, number>();
-    for (const occurrence of input.occurrences) counts.set(columnIdOf(occurrence), (counts.get(columnIdOf(occurrence)) ?? 0) + 1);
+    for (const occurrence of occurrences) counts.set(columnIdOf(occurrence), (counts.get(columnIdOf(occurrence)) ?? 0) + 1);
     const label = safe("Legenda");
     const rowH = 18;
     let x: number = MARGIN;
@@ -422,7 +411,7 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
     const columnWidth = (CONTENT_W - DATE_COL_W) / band.length;
     const bandIds = new Set(band.map((column) => column.id));
     const dates = allDates.filter((date) => [...(grid.get(date)?.keys() ?? [])].some((id) => bandIds.has(id)));
-    const bandOccurrences = input.occurrences.filter((occurrence) => bandIds.has(columnIdOf(occurrence))).length;
+    const bandOccurrences = occurrences.filter((occurrence) => bandIds.has(columnIdOf(occurrence))).length;
     const baseTitle = bands.length > 1 ? `Quadro (parte ${bandIndex + 1} de ${bands.length})` : "Quadro";
     const detail = `${plural(dates.length, "dia", "dias")} · ${plural(bandOccurrences, "plantão", "plantões")}`;
 
@@ -477,7 +466,7 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
   const drawSummary = () => {
     type BrokerRow = { code: string | null; name: string; branch: string | null; counts: Map<string, number>; total: number };
     const brokers = new Map<string, BrokerRow>();
-    for (const occurrence of input.occurrences) {
+    for (const occurrence of occurrences) {
       const columnId = columnIdOf(occurrence);
       const seen = new Set<string>();
       for (const broker of occurrence.brokers) {
@@ -594,7 +583,7 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
 
   // ---- Compose ----
   addPage(true);
-  if (!input.occurrences.length) {
+  if (!occurrences.length) {
     const boxH = 90;
     const boxY = y - 30 - boxH;
     page.drawRectangle({ x: MARGIN, y: boxY, width: CONTENT_W, height: boxH, color: colors.stripe, borderColor: colors.border, borderWidth: 0.6 });
