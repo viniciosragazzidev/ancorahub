@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { fetchBrokerDailySummary, type BrokerDailySummaryAggregate } from "./broker-summary-service";
@@ -23,6 +24,7 @@ export async function getBrokerDailySummaryAction(
   input: BrokerSummaryQueryInput,
 ): Promise<BrokerDailySummaryAggregate> {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "lead_queues_view");
   assertAdminRole(context.role);
 
   const parsed = brokerSummaryQuerySchema.parse(input);

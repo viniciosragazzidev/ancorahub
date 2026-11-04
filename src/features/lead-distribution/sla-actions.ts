@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
@@ -21,6 +22,7 @@ export async function saveBrokerAcceptanceSlaAction(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "distribution_settings_manage");
     if (context.role !== "director" && context.role !== "manager") {
       return { success: false, error: "Permissão insuficiente para alterar configurações de distribuição." };
     }

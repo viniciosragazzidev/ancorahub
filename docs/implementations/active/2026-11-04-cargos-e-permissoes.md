@@ -64,7 +64,7 @@
 - **F0 no ar** (`34f72cdf` + `a9f71241`, aprovada pelo Vigia em 04/11). Atribuir cargo está FECHADO por
   `CARGO_PROTEGE_ACOES = false` (custom-roles/service.ts): **remover/ligar na F2**, quando as ações internas
   respeitarem o cargo.
-- Pisos a confirmar com o Vinicios: `mensagens` e `fluxos-whatsapp` com `acessar_qualificacao_ia`. `/plantoes`
+- Pisos de `mensagens` e `fluxos-whatsapp` = `acessar_qualificacao_ia` (Vinicios manteve, 04/11). `/plantoes`
   mantém `acessar_leads` (é o calendário do próprio corretor).
 
 ## Cargo Plantões (proposta)

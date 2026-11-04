@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -24,6 +25,7 @@ export async function saveDddRoutingSettingsAction(
   input: DddRoutingSettingsInput,
 ): Promise<{ success: true } | { success: false; error: string }> {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "distribution_settings_manage");
   if (context.role !== "director") {
     return { success: false, error: "Apenas o Diretor pode alterar a regra de DDD, que vale para a empresa inteira." };
   }

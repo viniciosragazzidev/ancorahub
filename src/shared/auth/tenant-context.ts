@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
+import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { TtlCache } from "@/shared/cache/ttl-cache";
@@ -23,6 +24,29 @@ import {
 } from "@/shared/observability/request-timing";
 
 export type { TenantContext };
+
+async function assertCargoActionRoute(input: { tenantId: string; role: TenantContext["role"]; jobTitle: string; customRoleId: string }) {
+  let method = "";
+  let path = "";
+  try {
+    const list = await headers();
+    method = list.get("next-action") ? "POST" : "";
+    path = (list.get("x-pathname") ?? "").split("?")[0];
+  } catch {
+    return; // fora de um request (scripts, jobs): sem tela para conferir
+  }
+  if (method !== "POST" || !path || path.startsWith("/api/")) return;
+  const [{ getEffectiveAccess }, { canAccessRoute, isAlwaysAllowedPath }, { getRouteDefinition }] = await Promise.all([
+    import("@/features/custom-roles/service"),
+    import("@/features/custom-roles/effective-access"),
+    import("@/features/custom-roles/routes"),
+  ]);
+  if (isAlwaysAllowedPath(path)) return;
+  const access = await getEffectiveAccess({ ...input, customRoleId: input.customRoleId });
+  if (!canAccessRoute(access, getRouteDefinition(path))) {
+    throw new AuthorizationError("Seu cargo não libera esta ação.");
+  }
+}
 
 const TENANT_QUERY_TIMEOUT_MS = 5_000;
 
@@ -115,6 +139,17 @@ async function resolveRequiredTenantContext(): Promise<TenantContext> {
 
     if (membership.branchId && membership.branchStatus !== "active") {
       throw new AuthorizationError("The associated branch is not active.");
+    }
+
+    // Cargos (04/11, F2): ação de servidor (POST) de quem tem cargo só roda numa tela que o cargo libera.
+    // A página (GET) já é barrada pelo layout; /api/* fica com a checagem de cada rota.
+    if (membership.customRoleId) {
+      await assertCargoActionRoute({
+        tenantId: membership.tenantId,
+        role: membership.role,
+        jobTitle: membership.jobTitle,
+        customRoleId: membership.customRoleId,
+      });
     }
 
     return {

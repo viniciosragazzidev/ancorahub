@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -32,6 +33,7 @@ export type DutyTypeResult = { ok: true; typeId: string } | { ok: false; error: 
 
 async function directorScope() {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "duty_schedules_manage");
   if (context.role !== "director") throw new Error("Apenas Diretores podem configurar tipos de plantão.");
   return { context, db: getDatabase() };
 }

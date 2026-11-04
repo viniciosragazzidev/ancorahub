@@ -13,7 +13,7 @@ import { isTeamMemberProfileEnabled } from "@/features/team/member-profile";
 import { canEditMemberAuthority, canManageMember } from "@/shared/auth/team-permissions";
 import { TeamInviteSection } from "./team-invite-section";
 import { TeamMembersTable } from "./team-members-table";
-import { isCustomRolesEnabled } from "@/features/custom-roles/service";
+import { hasEffectiveCapability, isCustomRolesEnabled } from "@/features/custom-roles/service";
 import { TeamManagementTabs } from "./team-management-tabs";
 import { UnitsView } from "./units-view";
 import { getPendingBrokerTransferRequestsAction } from "@/features/supervisor-workspace/transfer-actions";
@@ -36,6 +36,9 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
     ]);
     return <ManagerLiteTeam initialData={initialData} initialTransfers={initialTransfers} />;
   }
+  // Cargos (04/11, F2): quem tem cargo só gerencia a equipe se o cargo liberar; as ações também checam.
+  const podeGerirEquipe = !context.customRoleId || await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId, permission: "convidar_corretor" });
+  const diretorSemCargo = context.role === "director" && !context.customRoleId;
   const params = await searchParams;
   if (params.visao === "unidades") {
     if (context.role !== "director" && !(context.role === "manager" && context.branchId)) redirect("/access-denied");
@@ -240,7 +243,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       return {
         ...member,
         canEditAuthority: canEditMemberAuthority(context, target),
-        canManage: canManageMember(context, target),
+        canManage: podeGerirEquipe && canManageMember(context, target),
       };
     });
   const activeMembers = members.filter((member) => member.status === "active").length;
@@ -257,7 +260,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         <DashboardHeader
           breadcrumb={tenant[0]?.name ?? "Gestão"}
           title="Equipe e unidades"
-          rightSlot={<TeamHeaderActionsLite isDirector={context.role === "director"} branches={branches} customRoles={customRoles} />}
+          rightSlot={podeGerirEquipe ? <TeamHeaderActionsLite isDirector={diretorSemCargo} branches={branches} customRoles={customRoles} /> : undefined}
         />
         <main className={litePage.stack}>
           <TeamLite
@@ -282,7 +285,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       <DashboardHeader
         breadcrumb={tenant[0]?.name ?? "Gestao"}
         title="Equipe e unidades"
-        rightSlot={<div className="flex items-center gap-1.5 sm:gap-2">{context.role === "director" ? <Button aria-label="Cargos e permissões" render={<Link href="/equipe/cargos" />} variant="outline" className="max-[559px]:px-2.5"><ShieldCheck className="size-4" /><span className="max-[559px]:hidden">Cargos e permissões</span></Button> : null}<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} canInviteDirector={context.role === "director"} customRoles={customRoles} /></div>}
+        rightSlot={<div className="flex items-center gap-1.5 sm:gap-2">{diretorSemCargo ? <Button aria-label="Cargos e permissões" render={<Link href="/equipe/cargos" />} variant="outline" className="max-[559px]:px-2.5"><ShieldCheck className="size-4" /><span className="max-[559px]:hidden">Cargos e permissões</span></Button> : null}{podeGerirEquipe ? <TeamInviteSection branches={branches} canInviteManager={context.role === "director"} canInviteDirector={context.role === "director"} customRoles={customRoles} /> : null}</div>}
       />
       <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <TeamManagementTabs active="membros" />

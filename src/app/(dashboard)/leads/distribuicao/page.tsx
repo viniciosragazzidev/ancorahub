@@ -35,7 +35,8 @@ import { DutyOperationsWorkspace } from "./plantao/_components/duty-operations-w
 import { getDutyRosterSnapshot } from "@/features/lead-distribution/roster-queries";
 import { getDutyQueueOrderPreviews } from "@/features/lead-distribution/duty-queue-order-queries";
 import { BrokerAcceptanceSlaPanel } from "./_components/broker-acceptance-sla-panel";
-import { resolveDistributionView } from "@/features/lead-distribution/distribution-view-access";
+import { resolveDistributionView, visibleDistributionViews } from "@/features/lead-distribution/distribution-view-access";
+import { getEffectiveAccess } from "@/features/custom-roles/service";
 import { getHoldDisqualifiedLeads } from "@/features/lead-distribution/disqualified-routing-settings";
 import { getDddRoutingSettings } from "@/features/lead-distribution/ddd-routing-settings";
 import { DisqualifiedLeadsRoutingPanel } from "./_components/disqualified-leads-routing-panel";
@@ -108,7 +109,13 @@ export default async function LeadDistributionPage({
 
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
-  const view = resolveDistributionView(context.role, params.view);
+  // Cargos (04/11, F2): quem tem cargo vê só as abas que o cargo libera, também pela URL (?view=).
+  const access = await getEffectiveAccess({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null });
+  const cargoCapabilities = access.hasCargo ? access.capabilities : undefined;
+  const resolvedView = resolveDistributionView(context.role, params.view, cargoCapabilities);
+  if (!resolvedView) redirect("/access-denied");
+  const view = resolvedView;
+  const allowedViews = cargoCapabilities ? visibleDistributionViews(context.role, cargoCapabilities) : undefined;
   const monthlyDutySchedulingEnabled = view === "plantao"
     ? (await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) === "true"
     : false;
@@ -635,6 +642,7 @@ export default async function LeadDistributionPage({
           <DirectorDistributionTabs
             activeView={view}
             showQueues={canViewDistributionQueues(context.role)}
+            allowedViews={allowedViews}
             status={params.status}
             escalaMes={params.escalaMes}
           />
@@ -698,7 +706,7 @@ export default async function LeadDistributionPage({
                 }))}
               />
             </section>
-          ) : view === "filas" && canViewDistributionQueues(context.role) ? (
+          ) : view === "filas" && canViewDistributionQueues(context.role) && (!allowedViews || allowedViews.includes("filas")) ? (
             <section className={directorDistributionStyles.stack} aria-label="Filas de distribuição">
               {coldLeadReview ? <ColdLeadRequalificationPanel {...coldLeadReview} /> : null}
               <QueueControlCenter

@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
@@ -46,12 +47,14 @@ function isDistributionModeMigrationMissing(error: unknown) {
 
 export async function getRoutingRulesAction() {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "distribution_settings_manage");
   assertAdminRole(context.role);
   return fetchRoutingRules(context.tenantId);
 }
 
 export async function saveRoutingRuleAction(input: RoutingRuleInput) {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "distribution_settings_manage");
   assertAdminRole(context.role);
 
   const parsed = routingRuleSchema.parse(input);
@@ -137,6 +140,7 @@ export async function saveRoutingRuleAction(input: RoutingRuleInput) {
 
 export async function deleteRoutingRuleAction(ruleId: string) {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "distribution_settings_manage");
   assertAdminRole(context.role);
 
   const db = getDatabase();
@@ -164,6 +168,7 @@ export async function deleteRoutingRuleAction(ruleId: string) {
 
 export async function reorderRoutingRulesAction(orderedIds: string[]) {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "distribution_settings_manage");
   assertAdminRole(context.role);
 
   const db = getDatabase();
@@ -190,6 +195,7 @@ export async function reorderRoutingRulesAction(orderedIds: string[]) {
 
 export async function simulateRoutingAction(leadInput: LeadRoutingInput) {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "distribution_settings_manage");
   assertAdminRole(context.role);
   return simulateLeadRouting(context.tenantId, leadInput);
 }

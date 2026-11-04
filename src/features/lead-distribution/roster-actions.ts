@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { randomUUID } from "node:crypto";
 import { and, eq, gt, lt, ne, or, sql, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -33,6 +34,7 @@ function parseInput(formData: FormData) {
 
 async function assertRosterScope(scheduleId: string, brokerId: string) {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "duty_schedules_manage");
   if (context.role !== "director" && context.role !== "manager") throw new Error("Apenas Gestores e Diretores podem editar a escala.");
   const db = getDatabase();
   const [schedule] = await db.select({ id: schema.unitDutySchedules.id, name: schema.unitDutySchedules.name, branchId: schema.unitDutySchedules.branchId, validFrom: schema.unitDutySchedules.validFrom, validUntil: schema.unitDutySchedules.validUntil, status: schema.unitDutySchedules.status, maximumBrokers: schema.unitDutySchedules.maximumBrokers })
@@ -221,6 +223,7 @@ export async function removeRosterAssignmentAction(_previous: RosterActionState,
   if (!assignmentId.success) return { error: "Alocação inválida." };
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "duty_schedules_manage");
     if (context.role !== "director" && context.role !== "manager") throw new Error("Sem permissão.");
     const db = getDatabase();
     return await db.transaction(async (tx) => {

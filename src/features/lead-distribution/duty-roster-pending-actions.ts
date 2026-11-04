@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -14,6 +15,7 @@ type Result = { success: true } | { success: false; error: string };
 /** The plantão, if the viewer manages it (director; manager of its unit). */
 async function scheduleInScope(scheduleId: string) {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "duty_schedules_manage");
   if (context.role !== "director" && context.role !== "manager") throw new Error("Sem permissão.");
   const [schedule] = await getDatabase()
     .select({ id: schema.unitDutySchedules.id, branchId: schema.unitDutySchedules.branchId, status: schema.unitDutySchedules.status })

@@ -16,6 +16,8 @@ type DirectorDistributionTabsProps = {
   showQueues: boolean;
   status?: string;
   escalaMes?: string;
+  /** Abas liberadas (cargo). Sem a lista, vale `showQueues` como antes. */
+  allowedViews?: readonly string[];
 };
 
 export function canViewDistributionQueues(role: string) {
@@ -23,8 +25,8 @@ export function canViewDistributionQueues(role: string) {
 }
 
 /** URL navigation keeps the active area on the server and never sends server-created JSX to a client component. */
-export function DirectorDistributionTabs({ activeView, showQueues, status, escalaMes }: DirectorDistributionTabsProps) {
-  const tabs = TABS.filter((tab) => !("directorOnly" in tab) || showQueues);
+export function DirectorDistributionTabs({ activeView, showQueues, status, escalaMes, allowedViews }: DirectorDistributionTabsProps) {
+  const tabs = TABS.filter((tab) => (!("directorOnly" in tab) || showQueues) && (!allowedViews || allowedViews.includes(tab.id)));
 
   return (
     <nav className={styles.root} aria-label="Áreas da distribuição">

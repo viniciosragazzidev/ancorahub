@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -73,6 +74,7 @@ const PLANTAO_PATH = "/leads/distribuicao";
 
 async function readScope() {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "duty_schedules_manage");
   if (context.role !== "director" && context.role !== "manager") throw new Error("Apenas Diretores e Gestores podem ver a escala mensal.");
   if (context.role === "manager" && !context.branchId) throw new Error("A unidade do Gestor não está definida.");
   return context;

@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -126,6 +127,7 @@ export async function createTeamUserAction(
   formData: FormData,
 ): Promise<TeamActionState> {
   try {
+    await requireCargoCapability(await getRequiredTenantContext(), "convidar_corretor");
     const res = await createTeamUser(Object.fromEntries(formData));
     invalidateTenantContextCache(); // role/unit/status changes apply at once
     return { success: true, token: res.token, invitationId: res.invitationId, whatsappStatus: res.whatsappStatus };
@@ -144,6 +146,7 @@ export async function updateTeamMemberAction(
     const input = updateMemberInput.parse(Object.fromEntries(formData));
     const supervisedBrokerIds = supervisedBrokersField.parse(formData.get("supervisedBrokerIds") ?? undefined);
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "convidar_corretor");
     const db = getDatabase();
     const phone = await resolveMemberPhoneChange(db, context, input.phone, input.memberId);
 
@@ -491,6 +494,7 @@ export async function bulkToggleTeamMemberStatusAction(
 
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "convidar_corretor");
     const db = getDatabase();
 
     const nextActive = targetStatus === "active";
@@ -577,6 +581,7 @@ export async function toggleTeamMemberStatusAction(
   try {
     const { memberId } = memberIdInput.parse(Object.fromEntries(formData));
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "convidar_corretor");
     const db = getDatabase();
 
     const [member] = await db
@@ -644,6 +649,7 @@ export async function toggleLiteBrokerStatusAction(_prev: TeamActionState, formD
   try {
     const userId = liteBrokerIdInput.parse(formData.get("userId"));
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "convidar_corretor");
     const audience = await getLiteAudience(context);
     if ((context.role !== "manager" || audience !== "manager") && (context.role !== "supervisor" || audience !== "supervisor")) throw new Error("Esta ação não está disponível.");
     const target = await getLiteManagedBroker(userId, context);
@@ -660,6 +666,7 @@ export async function updateLiteBrokerContactAction(input: unknown): Promise<Tea
   try {
     const data = liteContactInput.parse(input);
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "convidar_corretor");
     const audience = await getLiteAudience(context);
     if ((context.role !== "manager" || audience !== "manager") && (context.role !== "supervisor" || audience !== "supervisor")) throw new Error("Esta ação não está disponível.");
     const target = await getLiteManagedBroker(data.userId, context);
@@ -684,6 +691,7 @@ export async function generateLiteBrokerPasswordResetAction(_prev: TeamActionSta
   try {
     const userId = liteBrokerIdInput.parse(formData.get("userId"));
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "convidar_corretor");
     if (context.role !== "manager" || (await getLiteAudience(context)) !== "manager") throw new Error("Apenas o gestor Lite pode gerar este link.");
     const target = await getLiteManagedBroker(userId, context);
     if (!target) throw new Error("Corretor fora da sua unidade.");
@@ -701,6 +709,7 @@ export async function deleteTeamMemberAction(
   try {
     const { memberId } = memberIdInput.parse(Object.fromEntries(formData));
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "convidar_corretor");
     const db = getDatabase();
 
     const [member] = await db
@@ -838,6 +847,7 @@ export async function transferLeadsAction(
   try {
     const input = transferLeadsInput.parse(Object.fromEntries(formData));
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "leads_reassign");
     if (context.role !== "director" && context.role !== "manager") throw new Error("Apenas Diretores e Gestores podem transferir carteiras.");
     if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") throw new Error("As ações de gestão de leads estão desativadas pelo Super-admin.");
     const db = getDatabase();
@@ -962,6 +972,7 @@ export async function transferLeadsAction(
 /** Busca convites pendentes associados a membros sem userId ativo */
 export async function getPendingInvitesAction() {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "convidar_corretor");
   const db = getDatabase();
   return db.select({
     id: schema.brokerInvitations.id,
@@ -1051,6 +1062,7 @@ export async function resendInviteAction(_prev: TeamActionState, formData: FormD
   try {
     const identifier = String(formData.get("memberId") ?? formData.get("invitationId") ?? "").trim();
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "convidar_corretor");
     const invitation = await findTeamInvitation(context.tenantId, identifier);
     // An expired invitation is renewed too: its member decides the scope.
     const target = invitation?.target ?? await findInvitationMember(context.tenantId, identifier);
@@ -1068,6 +1080,7 @@ export async function revokeInviteAction(_prev: TeamActionState, formData: FormD
   try {
     const invitationId = String(formData.get("invitationId") ?? "").trim();
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "convidar_corretor");
     const db = getDatabase();
 
     const invitation = await findTeamInvitation(context.tenantId, invitationId);
@@ -1094,6 +1107,7 @@ export async function importBrokersAction(
 ): Promise<TeamActionState & { report?: string }> {
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "convidar_corretor");
     if (context.role !== "director" && context.role !== "manager") {
       throw new Error("Não autorizado.");
     }
@@ -1313,6 +1327,7 @@ export async function generateResetPasswordLinkAction(
   formData: FormData,
 ): Promise<TeamActionState & { resetUrl?: string; resetWhatsApp?: "sent" | "failed" | "no_phone" }> {
   try {
+    await requireCargoCapability(await getRequiredTenantContext(), "convidar_corretor");
     const userId = String(formData.get("userId") ?? "").trim();
     if (!userId) throw new Error("ID do usuário é obrigatório.");
 

@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -15,6 +16,7 @@ type Result = { success: true; message: string; config: ColdAgeReleaseConfig } |
 
 async function loadQueue(queueId: string) {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "distribution_settings_manage");
   if (context.role !== "director") throw new Error("Só o diretor altera a liberação dos leads frios.");
   const [queue] = await getDatabase().select({ id: schema.leadQueues.id, name: schema.leadQueues.name })
     .from(schema.leadQueues)

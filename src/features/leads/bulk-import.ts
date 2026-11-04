@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -66,6 +67,7 @@ import { runInBackgroundPool } from "@/shared/db/background-pool";
 export async function importLeadsFromCsvAction(formData: FormData) {
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "importar_planilhas");
     if (!hasCapability(context.role, "importar_planilhas", context.jobTitle)) throw new AuthorizationError("Seu perfil não pode importar leads.");
     
     const input = requestSchema.parse({

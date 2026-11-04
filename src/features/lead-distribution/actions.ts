@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { aliasedTable, and, desc, eq, gte, inArray, isNull, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -118,6 +119,7 @@ export async function saveDistributionPolicyAction(
     return { success: false, error: "Os pesos do ranking não podem ultrapassar 100." };
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "distribution_settings_manage");
     // Resolve the complete server-side capability set (including custom roles)
     // before evaluating distribution-settings authorization. The legacy adapter
     // intentionally exposes only `acessar_leads` and would make this specific
@@ -187,9 +189,16 @@ export async function saveDistributionPolicyAction(
 }
 
 
+/** Contexto com a trava do cargo (04/11, F2): sem cargo, igual a getRequiredTenantContext. */
+async function contextoComCargo(permission: Parameters<typeof requireCargoCapability>[1]) {
+  const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, permission);
+  return context;
+}
+
 export async function saveDistributionQueueAction(input: unknown) {
   try {
-    const result = await saveDistributionQueue(await getRequiredTenantContext(), input);
+    const result = await saveDistributionQueue(await contextoComCargo("lead_queues_manage"), input);
     return {
       success: true,
       id: result.id,
@@ -203,7 +212,7 @@ export async function saveDistributionQueueAction(input: unknown) {
 
 export async function syncDutySchedulesIntoQueueAction(input: { queueId: string; scheduleIds: string[] }) {
   try {
-    await syncDutySchedulesIntoQueue(await getRequiredTenantContext(), input.queueId, input.scheduleIds);
+    await syncDutySchedulesIntoQueue(await contextoComCargo("lead_queues_manage"), input.queueId, input.scheduleIds);
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível vincular o plantão à fila." };
@@ -212,7 +221,7 @@ export async function syncDutySchedulesIntoQueueAction(input: { queueId: string;
 
 export async function deleteDistributionQueueAction(queueId: string) {
   try {
-    await deleteDistributionQueue(await getRequiredTenantContext(), queueId);
+    await deleteDistributionQueue(await contextoComCargo("lead_queues_manage"), queueId);
     return { success: true, message: "Fila removida com sucesso." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível excluir a fila." };
@@ -226,6 +235,7 @@ export type QueueDependencyInfo = {
 export async function getQueueDependenciesAction(queueId: string): Promise<{ success: boolean; dependencies?: QueueDependencyInfo; error?: string }> {
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "lead_queues_manage");
     const deps = await getQueueDependencies(context, queueId);
     return { success: true, dependencies: deps };
   } catch (error) {
@@ -235,7 +245,7 @@ export async function getQueueDependenciesAction(queueId: string): Promise<{ suc
 
 export async function forceDeleteQueueAction(queueId: string) {
   try {
-    await forceDeleteQueue(await getRequiredTenantContext(), queueId);
+    await forceDeleteQueue(await contextoComCargo("lead_queues_manage"), queueId);
     return { success: true, message: "Fila excluída e dependências desvinculadas." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível forçar a exclusão da fila." };
@@ -244,7 +254,7 @@ export async function forceDeleteQueueAction(queueId: string) {
 
 export async function deleteMetaCampaignQueueRouteAction(campaignId: string) {
   try {
-    const route = await deleteMetaCampaignQueueRoute(await getRequiredTenantContext(), campaignId);
+    const route = await deleteMetaCampaignQueueRoute(await contextoComCargo("distribution_settings_manage"), campaignId);
     return { success: true, route, message: "Regra de campanha removida. A campanha voltará a usar a fila geral." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível remover a regra da campanha." };
@@ -253,7 +263,7 @@ export async function deleteMetaCampaignQueueRouteAction(campaignId: string) {
 
 export async function deleteMetaAdQueueRouteAction(adId: string) {
   try {
-    const route = await deleteMetaAdQueueRoute(await getRequiredTenantContext(), adId);
+    const route = await deleteMetaAdQueueRoute(await contextoComCargo("distribution_settings_manage"), adId);
     return { success: true, route, message: "Regra de anúncio removida. O anúncio voltará a usar a fila geral." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível remover a regra do anúncio." };
@@ -262,7 +272,7 @@ export async function deleteMetaAdQueueRouteAction(adId: string) {
 
 export async function simulateDistributionAction(input: unknown) {
   try {
-    return { success: true, ...(await simulateDistribution(await getRequiredTenantContext(), input)) };
+    return { success: true, ...(await simulateDistribution(await contextoComCargo("lead_queues_view"), input)) };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível simular a distribuição." };
   }
@@ -276,7 +286,7 @@ function revalidateCampaignDestinations() {
 
 export async function saveMetaCampaignQueueRouteAction(input: unknown) {
   try {
-    const route = await saveMetaCampaignQueueRoute(await getRequiredTenantContext(), input);
+    const route = await saveMetaCampaignQueueRoute(await contextoComCargo("distribution_settings_manage"), input);
     revalidateCampaignDestinations();
     return { success: true, route, message: "Fila de distribuição da campanha atualizada." };
   } catch (error) {
@@ -286,7 +296,7 @@ export async function saveMetaCampaignQueueRouteAction(input: unknown) {
 
 export async function saveMetaAdQueueRouteAction(input: unknown) {
   try {
-    const route = await saveMetaAdQueueRoute(await getRequiredTenantContext(), input);
+    const route = await saveMetaAdQueueRoute(await contextoComCargo("distribution_settings_manage"), input);
     revalidateCampaignDestinations();
     return { success: true, route, message: "Regra de anúncio atualizada." };
   } catch (error) {
@@ -298,6 +308,7 @@ export async function retryLeadEffectAction(formData: FormData) {
   const parsed = z.string().uuid().safeParse(formData.get("effectId"));
   if (!parsed.success) throw new Error("Efeito inválido.");
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "leads_assign");
   if (context.role !== "director" && context.role !== "manager")
     throw new Error("Sem permissão para reprocessar efeitos.");
   const [effect] = await getDatabase()
@@ -345,6 +356,7 @@ export async function routeLeadToBranchAction(
     return { mutationId, error: parsed.error.issues[0]?.message ?? "Selecione uma unidade válida." };
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "leads_route_to_unit");
     if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") throw new Error("As ações de gestão de leads estão desativadas pelo Super-admin.");
     const result = await routeLeadToBranch(
       context,
@@ -411,6 +423,7 @@ export async function assignLeadToBrokerAction(
     return { mutationId, error: parsed.error.issues[0]?.message ?? "Selecione um corretor válido." };
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "leads_assign");
     if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") return { mutationId, error: "As ações de gestão de leads estão desativadas pelo Super-admin." };
     if (parsed.data.assignmentMode) {
       const enabled = (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false";
@@ -490,6 +503,7 @@ export async function routeAndAssignLeadAction(
   if (!parsed.success) return { mutationId, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "leads_assign");
     if (context.role !== "director")
       return { mutationId, error: "Apenas Diretores podem rotear e atribuir em uma única operação." };
     if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") return { mutationId, error: "As ações de gestão de leads estão desativadas pelo Super-admin." };
@@ -591,6 +605,7 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
 
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "leads_assign");
     if (context.role !== "director" && context.role !== "manager") {
       return { mutationId, error: "Você não pode iniciar a distribuição de todos os leads." };
     }
@@ -745,6 +760,7 @@ export async function archiveUnassignedLeadsAction(
 
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "leads_bulk_assign");
     if (context.role !== "director") {
       return { mutationId, error: "Apenas o Diretor pode arquivar leads sem distribuição." };
     }
@@ -878,6 +894,7 @@ export async function distributeLeadBatchAction(
   if (!branch.success) return { mutationId, error: "Selecione uma unidade." };
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "leads_assign");
     if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") return { mutationId, error: "As ações de gestão de leads estão desativadas pelo Super-admin." };
     let processed = 0;
     let conflicts = 0;
@@ -935,6 +952,7 @@ export async function assignLeadBatchToBrokerAction(
   if (!branch.success) return { mutationId, error: "Selecione uma unidade." };
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "leads_assign");
     if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") return { mutationId, error: "As ações de gestão de leads estão desativadas pelo Super-admin." };
     const db = getDatabase();
     const leads = await db
@@ -1004,6 +1022,7 @@ export async function getLeadAssignmentHistoryAction(inputLeadId: string): Promi
   if (!parsed.success) return [];
   try {
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "distribution_audit_view");
     const db = getDatabase();
 
     const [lead] = await db

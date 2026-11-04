@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, gt, gte, inArray, isNull, lt, ne, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -25,6 +26,7 @@ export type DutyActionState = { success?: boolean; error?: string; message?: str
 
 async function assertBatchDutyAccess() {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "duty_schedules_manage");
   if (context.role !== "director") throw new Error("Apenas Diretores podem configurar plantões globais.");
   return { context, db: getDatabase() };
 }
@@ -140,6 +142,7 @@ function validateSchedule(input: Pick<z.infer<typeof dutyScheduleInput>, "dayOfW
 
 async function findScheduleForMutation(scheduleId: string) {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "duty_schedules_manage");
   const db = getDatabase();
   const [schedule] = await db
     .select({

@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { randomUUID } from "node:crypto";
 import { and, eq, gt, gte, inArray, isNotNull, isNull, ne, notInArray, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -143,6 +144,7 @@ export async function listDutySwapCandidatesAction(assignmentId: string): Promis
   try {
     const id = z.string().min(1).max(120).parse(assignmentId);
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "duty_schedules_manage");
     if (!canManageSwaps(context.role)) return { ok: false, reason: "Apenas Diretores e Gestores podem trocar corretores da escala." };
     const actor = { role: context.role, branchId: context.branchId ?? null };
     const db = getDatabase();
@@ -216,6 +218,7 @@ export async function swapDutyAssignmentsAction(input: unknown): Promise<DutySwa
     if (!parsed.success) return { ok: false, reason: "Dados inválidos para a troca." };
     const { sourceAssignmentId, targetAssignmentId } = parsed.data;
     const context = await getRequiredTenantContext();
+    await requireCargoCapability(context, "duty_schedules_manage");
     if (!canManageSwaps(context.role)) return { ok: false, reason: "Apenas Diretores e Gestores podem trocar corretores da escala." };
     const actor = { role: context.role, branchId: context.branchId ?? null };
     const db = getDatabase();

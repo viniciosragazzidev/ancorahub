@@ -59,8 +59,8 @@ const loadCargo = cache(async (tenantId: string, customRoleId: string): Promise<
   return { status: role.status, permissions: grants.map((grant) => grant.key) };
 });
 
-/** Liga quando a F2 do plano de cargos estiver no ar (ações de leads, equipe e distribuição pelo cargo). */
-export const CARGO_PROTEGE_ACOES = false;
+/** F2 no ar (04/11): ações de equipe, distribuição, plantões e importação checam o cargo; POST fora das telas do cargo é negado. */
+export const CARGO_PROTEGE_ACOES = true;
 
 type AccessInput = { tenantId: string; role: TenantRole; jobTitle: string; customRoleId: string | null };
 

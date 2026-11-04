@@ -1,5 +1,6 @@
 "use server";
 
+import { requireCargoCapability } from "@/shared/auth/authorization";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -20,6 +21,7 @@ const inputSchema = z.object({
 
 async function resolveLiveOccurrence(scheduleId: string, dutyDate: string) {
   const context = await getRequiredTenantContext();
+  await requireCargoCapability(context, "duty_schedules_manage");
   if (context.role !== "director") throw new Error("Apenas o diretor pode ordenar a fila do plantão.");
   const now = new Date();
   const profile = await getDutyScheduleProfile(context, scheduleId);
