@@ -122,6 +122,10 @@ export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<R
       if (found.length !== messageIds.length) return { success: false, error: "Uma das mensagens escolhidas não existe ou está inativa." };
     }
     const now = new Date();
+    // Numbers first: already validated, and a failure here leaves the switches untouched (no half save).
+    for (const list of phoneLists) {
+      if (list.key === "LEAD_CLOSING_DIRECTOR") await setSystemSetting(closingDirectorRecipientsKey(context.tenantId), JSON.stringify(list.phones), now);
+    }
     await getDatabase().transaction(async (tx) => {
       for (const item of rows) {
         await tx.insert(schema.teamNoticeSettings).values({
@@ -137,9 +141,6 @@ export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<R
         acao: `team_notices.updated:${rows.map((item) => `${item.key}=${item.enabled ? item.channel : "off"}`).join(",")}`.slice(0, 500),
       });
     });
-    for (const list of phoneLists) {
-      if (list.key === "LEAD_CLOSING_DIRECTOR") await setSystemSetting(closingDirectorRecipientsKey(context.tenantId), JSON.stringify(list.phones), now);
-    }
     revalidatePath("/integrations/whatsapp");
     return { success: true };
   } catch (error) {

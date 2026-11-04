@@ -4,9 +4,12 @@ import { and, eq } from "drizzle-orm";
 
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { teamNoticeByKey } from "@/features/team-notices/catalog";
+import { getTeamNoticeSetting } from "@/features/team-notices/service";
 import { getDatabase, schema } from "@/shared/db";
 import { entersClosingStage } from "./closing-stage-notice-core";
 import {
+  CLOSING_DIRECTOR_NOTICE_KEY,
   CLOSING_DIRECTOR_PURPOSE,
   closingDirectorAlertKey,
   closingDirectorAlertVariables,
@@ -44,6 +47,9 @@ export async function notifyDirectorsClosingStage(input: {
   try {
     const recipients = await getClosingDirectorRecipients(input.tenantId);
     if (!recipients.length) return { notified: 0 };
+    // Switched off in Avisos da equipe: nothing goes out (the outbox would also skip it; this saves the lookups).
+    const notice = teamNoticeByKey(CLOSING_DIRECTOR_NOTICE_KEY);
+    if (!notice || !(await getTeamNoticeSetting(input.tenantId, notice)).enabled) return { notified: 0 };
     const db = getDatabase();
     const [lead] = await db
       .select({
