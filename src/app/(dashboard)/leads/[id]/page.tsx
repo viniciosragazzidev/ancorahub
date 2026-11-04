@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LeadStatusSelector } from "@/features/leads/components/lead-status-selector";
 import { canManagementRegisterSale } from "@/features/post-sale/register-sale-access";
+import { cargoAllowsRegisterSale } from "@/features/post-sale/register-sale-access-server";
 import { RegisterSaleButton } from "./register-sale-button";
 import { LeadTimeline } from "@/features/leads/components/lead-timeline";
 import { LeadTasks } from "@/features/leads/components/lead-tasks";
@@ -531,7 +532,8 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
   const beneficiaries = beneficiariesResult.status === "fulfilled" ? beneficiariesResult.value : [];
   const carriers = carriersResult.status === "fulfilled" ? carriersResult.value : [];
   // Director and manager register the sale of a broker's lead (04/11); the broker keeps the status selector.
-  const canRegisterSaleForBroker = canManagementRegisterSale({ role: context.role, userId: context.userId, branchId: context.branchId, lead: { corretorId: lead.corretorId, branchId: lead.branchId, status: lead.status } });
+  const canRegisterSaleForBroker = canManagementRegisterSale({ role: context.role, userId: context.userId, branchId: context.branchId, lead: { corretorId: lead.corretorId, branchId: lead.branchId, status: lead.status } })
+    && (await cargoAllowsRegisterSale(context));
   const saleDocuments = leadDocs.map((document) => ({ id: document.id, filename: document.filename, status: document.status }));
 
   if (!interactions) notFound();
