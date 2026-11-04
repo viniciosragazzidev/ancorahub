@@ -13,7 +13,11 @@ describe("modelos de cargo", () => {
       const assignable = new Set(getAssignableCapabilities(modelo.scope).map((item) => item.key));
       const rotas = new Set(routeCatalog.map((route) => routePermissionKey(route.key)));
       for (const key of modelo.permissions) {
-        if (isRoutePermission(key)) expect(rotas.has(key)).toBe(true);
+        if (isRoutePermission(key)) {
+          expect(rotas.has(key)).toBe(true);
+          const rota = routeCatalog.find((route) => routePermissionKey(route.key) === key)!;
+          expect(hasCapability(modelo.papel, rota.fallbackPermission, modelo.papel)).toBe(true);
+        }
         else {
           expect(assignable.has(key as PermissionKey)).toBe(true);
           expect(hasCapability(modelo.papel, key as PermissionKey, modelo.papel)).toBe(true);

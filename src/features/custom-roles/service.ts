@@ -128,7 +128,7 @@ export async function getCustomRolesWorkspace() {
   const [enabled, roles, members] = await Promise.all([
     isCustomRolesEnabled(context.tenantId),
     db.select().from(schema.customRoles).where(eq(schema.customRoles.tenantId, context.tenantId)),
-    db.select({ customRoleId: schema.tenantMemberships.customRoleId, count: schema.tenantMemberships.id, name: schema.user.name, role: schema.tenantMemberships.role })
+    db.select({ customRoleId: schema.tenantMemberships.customRoleId, count: schema.tenantMemberships.id, id: schema.tenantMemberships.id, name: schema.user.name, role: schema.tenantMemberships.role })
       .from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
       .where(eq(schema.tenantMemberships.tenantId, context.tenantId)),
@@ -142,7 +142,7 @@ export async function getCustomRolesWorkspace() {
     catalog: getAssignableCapabilities("none").concat(getAssignableCapabilities("own"), getAssignableCapabilities("branch"), getAssignableCapabilities("tenant"))
       .filter((item, index, list) => list.findIndex((candidate) => candidate.key === item.key) === index),
     routeCatalog,
-    roles: roles.map((role) => ({ ...role, memberCount: counts.get(role.id) ?? 0, members: members.filter((member) => member.customRoleId === role.id).map((member) => ({ name: member.name, role: member.role })), permissions: permissions.filter((item) => item.customRoleId === role.id).map((item) => item.permissionKey) })),
+    roles: roles.map((role) => ({ ...role, memberCount: counts.get(role.id) ?? 0, members: members.filter((member) => member.customRoleId === role.id).map((member) => ({ id: member.id, name: member.name, role: member.role })), permissions: permissions.filter((item) => item.customRoleId === role.id).map((item) => item.permissionKey) })),
   };
 }
 

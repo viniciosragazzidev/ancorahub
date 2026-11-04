@@ -37,7 +37,7 @@ export type CargoRole = {
   version: number;
   updatedAt: Date | string;
   memberCount: number;
-  members?: { name: string; role: string }[];
+  members?: { id: string; name: string; role: string }[];
   permissions: string[];
 };
 
@@ -229,7 +229,7 @@ function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose }: 
             <div className={form.form}>
               <div className={styles.info}>
                 <span className={page.cellTitle}>Telas liberadas</span>
-                <span className={page.cellSub}>Quem tem este cargo só abre as telas marcadas, no menu, pelo link direto e nas ações. {Object.keys(AREAS_SEM_CORTE_FINO).map((key) => routeCatalog.find((route) => route.key === key)?.label ?? key).join(" e ")} entram inteiras: ao marcar, as permissões da área vêm junto.</span>
+                <span className={page.cellSub}>Quem tem este cargo só abre as telas marcadas: no menu, pelo link direto e nas ações dessas telas. {Object.keys(AREAS_SEM_CORTE_FINO).map((key) => routeCatalog.find((route) => route.key === key)?.label ?? key).join(" e ")} entram inteiras: ao marcar, as permissões da área vêm junto.</span>
               </div>
               <p className={page.muted}>{routeCount} de {routeCatalog.length} telas liberadas.</p>
               {group(routeCatalog).map(([category, items]) => (
@@ -257,7 +257,7 @@ function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose }: 
                 <div className={form.form}>
                   <ul className={styles.toggles}>
                     {(editing.members ?? []).map((member) => (
-                      <li key={member.name} className={styles.toggleRow}><span className={page.cellTitle}>{member.name}</span><span className={page.badge}>{member.role === "director" ? "Diretor" : member.role === "manager" ? "Gestor" : member.role === "supervisor" ? "Supervisor" : "Corretor"}</span></li>
+                      <li key={member.id} className={styles.toggleRow}><span className={page.cellTitle}>{member.name}</span><span className={page.badge}>{member.role === "director" ? "Diretor" : member.role === "manager" ? "Gestor" : member.role === "supervisor" ? "Supervisor" : "Corretor"}</span></li>
                     ))}
                   </ul>
                   <p className={page.muted}>Para pôr ou tirar o cargo de alguém, edite o perfil do colaborador na <Link href="/equipe" className={page.cellLink}>equipe</Link>.</p>
