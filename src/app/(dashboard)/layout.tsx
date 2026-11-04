@@ -33,7 +33,8 @@ import { WhatsAppLinkHandler } from "@/components/whatsapp/whatsapp-link-handler
 import { hasPermission } from "@/shared/auth/permissions";
 import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
 import { getRouteDefinition } from "@/features/custom-roles/routes";
-import { hasEffectiveRouteAccess } from "@/features/custom-roles/service";
+import { getEffectiveAccess, hasEffectiveRouteAccess } from "@/features/custom-roles/service";
+import { canAccessRoute, firstAllowedPath, isAlwaysAllowedPath } from "@/features/custom-roles/effective-access";
 import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 import { resolveNegotiationsRouteAccess } from "@/features/negotiations/route-access";
 
@@ -112,17 +113,17 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     .limit(1);
   // Started now, not after the redirects below: each one is independent of the others.
   const pathnamePromise = headersPromise.then((list) => list.get("x-pathname") || "");
-  const routeAccessPromise = pathnamePromise.then((pathname) => {
-    const definition = getRouteDefinition(pathname.split("?")[0]);
-    if (!definition || pathname === "") return true;
-    return hasEffectiveRouteAccess({
-      tenantId: context.tenantId,
-      role: context.role,
-      jobTitle: context.jobTitle,
-      customRoleId: context.customRoleId ?? null,
-      routeKey: definition.key,
-      fallbackPermission: definition.fallbackPermission,
-    });
+  // 04/11: papel ∩ cargo. Para quem tem cargo, rota fora do catálogo fica negada (fail closed).
+  const effectiveAccessPromise = getEffectiveAccess({
+    tenantId: context.tenantId,
+    role: context.role,
+    jobTitle: context.jobTitle,
+    customRoleId: context.customRoleId ?? null,
+  });
+  const routeAccessPromise = pathnamePromise.then(async (pathname) => {
+    const path = pathname.split("?")[0];
+    if (path === "" || isAlwaysAllowedPath(path)) return true;
+    return canAccessRoute(await effectiveAccessPromise, getRouteDefinition(path));
   });
   const negotiationsRouteAccessPromise = resolveNegotiationsRouteAccess({
     featureSetting: negotiationsAreaPromise,
@@ -155,6 +156,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const teamManagementPromise = context.role === "manager" ? isTeamManagementEnabled() : Promise.resolve(false);
   // Keep a rejected early start from surfacing as unhandled when a redirect ends the render first.
   routeAccessPromise.catch(() => undefined);
+  effectiveAccessPromise.catch(() => undefined);
   negotiationsRouteAccessPromise.catch(() => undefined);
   queueBadgeCountPromise.catch(() => undefined);
   realtimeSyncPromise.catch(() => undefined);
@@ -230,7 +232,12 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     }
   }
 
-  if (!(await routeAccessPromise)) redirect("/access-denied");
+  if (!(await routeAccessPromise)) {
+    // Quem tem cargo sem o Painel cai na primeira tela liberada, não na página de acesso negado.
+    const access = await effectiveAccessPromise;
+    const destino = access.hasCargo && (pathname === "/dashboard" || pathname === "/") ? firstAllowedPath(access) : null;
+    redirect(destino ?? "/access-denied");
+  }
 
   const [queueBadgeCount, realtimeSyncEnabled] = await Promise.all([queueBadgeCountPromise, realtimeSyncPromise]);
 

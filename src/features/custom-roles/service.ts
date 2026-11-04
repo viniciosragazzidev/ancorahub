@@ -1,15 +1,17 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { cache } from "react";
+import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getAssignableCapabilities, type CustomRoleScope } from "./catalog";
-import { isRoutePermission, routeCatalog, routePermissionKey } from "./routes";
-import { PERMISSIONS, type PermissionKey, hasCapability } from "@/shared/auth/permissions";
+import { isRoutePermission, routeCatalog, routePermissionKey, type RouteDefinition } from "./routes";
+import { canAccessRoute, resolveEffectiveAccess, type CargoAtribuido, type EffectiveAccess } from "./effective-access";
+import { hasCapability, type PermissionKey } from "@/shared/auth/permissions";
 
 const roleInput = z.object({
   id: z.string().uuid().optional(),
@@ -24,7 +26,8 @@ const roleInput = z.object({
 
 async function requireDirector() {
   const context = await getRequiredTenantContext();
-  if (context.role !== "director") throw new Error("Somente o Diretor pode gerenciar cargos e permissões.");
+  // Diretor com cargo (ex.: Plantões) não mexe em cargos: senão tiraria a própria restrição (04/11).
+  if (context.role !== "director" || context.customRoleId) throw new Error("Somente o Diretor pode gerenciar cargos e permissões.");
   return context;
 }
 
@@ -37,50 +40,52 @@ export async function isCustomRolesEnabled(tenantId: string) {
 
 import type { TenantRole } from "@/shared/db/schema";
 
-/** Resolves the effective capability server-side. A custom role replaces, never augments, legacy grants. */
-export async function hasEffectiveCapability(input: { tenantId: string; role: TenantRole; jobTitle: string; customRoleId: string | null; permission: PermissionKey }) {
-  if (!input.customRoleId || !(await isCustomRolesEnabled(input.tenantId))) {
-    return hasCapability(input.role, input.permission, input.jobTitle);
-  }
-  const [role] = await getDatabase().select({ id: schema.customRoles.id, status: schema.customRoles.status })
-    .from(schema.customRoles).where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, input.tenantId))).limit(1);
-  if (!role || role.status !== "active") return false;
-  const [grant] = await getDatabase().select({ id: schema.customRolePermissions.id }).from(schema.customRolePermissions)
-    .where(and(eq(schema.customRolePermissions.customRoleId, role.id), eq(schema.customRolePermissions.permissionKey, input.permission))).limit(1);
-  return Boolean(grant);
+/**
+ * Cargo atribuído (status + chaves), uma leitura por request. 04/11: o cargo vale sempre que estiver
+ * atribuído, mesmo com o piloto desligado (desligar não pode soltar quem tem restrição); o piloto só
+ * controla criar e editar cargos na tela.
+ */
+const loadCargo = cache(async (tenantId: string, customRoleId: string): Promise<CargoAtribuido> => {
+  const db = getDatabase();
+  const [role] = await db.select({ id: schema.customRoles.id, status: schema.customRoles.status })
+    .from(schema.customRoles)
+    .where(and(eq(schema.customRoles.id, customRoleId), eq(schema.customRoles.tenantId, tenantId)))
+    .limit(1);
+  // Cargo que sumiu ou é de outra empresa: trata como cargo sem nada liberado (fail closed).
+  if (!role) return { status: "missing", permissions: [] };
+  const grants = await db.select({ key: schema.customRolePermissions.permissionKey })
+    .from(schema.customRolePermissions)
+    .where(eq(schema.customRolePermissions.customRoleId, role.id));
+  return { status: role.status, permissions: grants.map((grant) => grant.key) };
+});
+
+type AccessInput = { tenantId: string; role: TenantRole; jobTitle: string; customRoleId: string | null };
+
+/** Fonte única do acesso efetivo no servidor: papel, ou papel ∩ cargo. */
+export async function getEffectiveAccess(input: AccessInput): Promise<EffectiveAccess> {
+  const cargo = input.customRoleId ? await loadCargo(input.tenantId, input.customRoleId) : null;
+  return resolveEffectiveAccess({ role: input.role, jobTitle: input.jobTitle, cargo });
 }
 
-export async function listEffectiveCapabilities(input: { tenantId: string; role: TenantRole; jobTitle: string; customRoleId: string | null }) {
-  if (!input.customRoleId || !(await isCustomRolesEnabled(input.tenantId))) {
-    return (Object.keys(PERMISSIONS) as PermissionKey[]).filter((permission) => hasCapability(input.role, permission, input.jobTitle));
-  }
-  const [role] = await getDatabase().select({ id: schema.customRoles.id, status: schema.customRoles.status })
-    .from(schema.customRoles).where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, input.tenantId))).limit(1);
-  if (!role || role.status !== "active") return [];
-  const grants = await getDatabase().select({ key: schema.customRolePermissions.permissionKey })
-    .from(schema.customRolePermissions).where(eq(schema.customRolePermissions.customRoleId, role.id));
-  return grants.map((grant) => grant.key as PermissionKey);
+export async function hasEffectiveCapability(input: AccessInput & { permission: PermissionKey }) {
+  return (await getEffectiveAccess(input)).capabilities.has(input.permission);
+}
+
+export async function listEffectiveCapabilities(input: AccessInput) {
+  return [...(await getEffectiveAccess(input)).capabilities];
 }
 
 export async function listEffectiveRoutes(input: { tenantId: string; customRoleId: string | null }) {
-  if (!input.customRoleId || !(await isCustomRolesEnabled(input.tenantId))) return [];
-  const [role] = await getDatabase().select({ id: schema.customRoles.id, status: schema.customRoles.status })
-    .from(schema.customRoles).where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, input.tenantId))).limit(1);
-  if (!role || role.status !== "active") return [];
-  const grants = await getDatabase().select({ key: schema.customRolePermissions.permissionKey })
-    .from(schema.customRolePermissions).where(eq(schema.customRolePermissions.customRoleId, role.id));
-  return grants.map((grant) => grant.key).filter(isRoutePermission);
+  if (!input.customRoleId) return [];
+  const cargo = await loadCargo(input.tenantId, input.customRoleId);
+  return cargo && cargo.status === "active" ? cargo.permissions.filter(isRoutePermission) : [];
 }
 
-export async function hasEffectiveRouteAccess(input: { tenantId: string; role: TenantRole; jobTitle: string; customRoleId: string | null; routeKey: string; fallbackPermission: PermissionKey }) {
-  if (!input.customRoleId || !(await isCustomRolesEnabled(input.tenantId))) return hasCapability(input.role, input.fallbackPermission, input.jobTitle);
-  const [role] = await getDatabase().select({ id: schema.customRoles.id, status: schema.customRoles.status })
-    .from(schema.customRoles).where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, input.tenantId))).limit(1);
-  if (!role || role.status !== "active") return false;
-  const grants = await getDatabase().select({ key: schema.customRolePermissions.permissionKey })
-    .from(schema.customRolePermissions).where(eq(schema.customRolePermissions.customRoleId, role.id));
-  const explicitRoutes = grants.map((grant) => grant.key).filter(isRoutePermission);
-  return grants.some((grant) => grant.key === input.fallbackPermission) && (explicitRoutes.length === 0 || explicitRoutes.includes(routePermissionKey(input.routeKey)));
+export async function hasEffectiveRouteAccess(input: AccessInput & { routeKey: string; fallbackPermission?: PermissionKey }) {
+  const definition = routeCatalog.find((route) => route.key === input.routeKey) as RouteDefinition | undefined;
+  return canAccessRoute(await getEffectiveAccess(input), definition ?? {
+    key: input.routeKey, path: "", label: "", description: "", category: "", fallbackPermission: input.fallbackPermission,
+  });
 }
 
 /** Creates the tenant-local default used for the Marketing pilot without widening access. */
@@ -174,11 +179,43 @@ export async function assignCustomRole(memberId: string, customRoleId: string | 
   const context = await requireDirector();
   const db = getDatabase();
   const [member] = await db.select().from(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.id, memberId), eq(schema.tenantMemberships.tenantId, context.tenantId))).limit(1);
-  if (!member || member.role === "director" || member.userId === context.userId) throw new Error("Este acesso não pode ter o cargo alterado.");
+  if (!member || member.userId === context.userId) throw new Error("Este acesso não pode ter o cargo alterado.");
   if (customRoleId) {
-    const [role] = await db.select().from(schema.customRoles).where(and(eq(schema.customRoles.id, customRoleId), eq(schema.customRoles.tenantId, context.tenantId), eq(schema.customRoles.status, "active"))).limit(1);
-    if (!role) throw new Error("Escolha um cargo ativo da própria empresa.");
+    await assertCargoAssignable({ actor: context, membershipId: member.id, role: member.role, jobTitle: member.jobTitle, customRoleId });
   }
   await db.update(schema.tenantMemberships).set({ customRoleId, updatedAt: new Date() }).where(eq(schema.tenantMemberships.id, member.id));
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "tenant_membership", entidadeId: member.id, acao: customRoleId ? "custom_role.assigned" : "custom_role.removed" });
+}
+
+/**
+ * Regras para pôr um cargo em alguém (04/11), usadas na tela de cargos, na edição do membro e no convite:
+ * só diretor sem cargo atribui; o cargo precisa estar ativo e ser da empresa; nenhuma permissão do cargo
+ * pode faltar ao papel da pessoa (o cargo só corta); diretor com cargo é permitido desde que sobre outro
+ * diretor ativo sem cargo.
+ */
+export async function assertCargoAssignable(input: {
+  actor: { tenantId: string; role: string; customRoleId?: string | null };
+  membershipId: string | null;
+  role: TenantRole;
+  jobTitle: string;
+  customRoleId: string;
+}) {
+  if (input.actor.role !== "director" || input.actor.customRoleId) throw new Error("Somente o Diretor pode definir cargos.");
+  const db = getDatabase();
+  const [role] = await db.select({ id: schema.customRoles.id, scope: schema.customRoles.scope }).from(schema.customRoles).where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, input.actor.tenantId), eq(schema.customRoles.status, "active"))).limit(1);
+  if (!role) throw new Error("Escolha um cargo ativo da própria empresa.");
+  const grants = await db.select({ key: schema.customRolePermissions.permissionKey }).from(schema.customRolePermissions).where(eq(schema.customRolePermissions.customRoleId, role.id));
+  const foraDoPapel = grants.map((grant) => grant.key).filter((key) => !isRoutePermission(key) && !hasCapability(input.role, key as PermissionKey, input.jobTitle));
+  if (foraDoPapel.length) throw new Error(`O papel desta pessoa não tem: ${foraDoPapel.join(", ")}. Ajuste o cargo ou o papel.`);
+  if (input.role === "director") {
+    const [livre] = await db.select({ id: schema.tenantMemberships.id }).from(schema.tenantMemberships).where(and(
+      eq(schema.tenantMemberships.tenantId, input.actor.tenantId),
+      eq(schema.tenantMemberships.role, "director"),
+      eq(schema.tenantMemberships.status, "active"),
+      isNull(schema.tenantMemberships.customRoleId),
+      ...(input.membershipId ? [ne(schema.tenantMemberships.id, input.membershipId)] : []),
+    )).limit(1);
+    if (!livre) throw new Error("A empresa precisa de pelo menos um diretor sem cargo.");
+  }
+  return role;
 }

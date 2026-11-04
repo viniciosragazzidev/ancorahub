@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { assertCargoAssignable } from "@/features/custom-roles/service";
+
 import { resendTeamInvitation } from "@/features/team/resend-invitation";
 import { createTeamUser } from "@/features/team/create-user";
 import { generatePasswordResetLinkForMember } from "@/features/team/password-recovery";
@@ -206,18 +208,12 @@ export async function updateTeamMemberAction(
       }
 
       let customRoleScope: "none" | "own" | "branch" | "tenant" | null = null;
+      // 04/11: cargo no convite segue as mesmas regras da tela de cargos (assertCargoAssignable).
+      if ((input.customRoleId ?? null) !== (pendingProfile.customRoleId ?? null) && (context.role !== "director" || context.customRoleId)) {
+        throw new Error("Somente o Diretor pode definir cargos.");
+      }
       if (input.customRoleId) {
-        if (input.role === "director") throw new Error("Cargos personalizados não podem ser vinculados a um acesso de Diretor.");
-        const [customRole] = await db.select({ id: schema.customRoles.id, scope: schema.customRoles.scope })
-          .from(schema.customRoles)
-          .where(and(
-            eq(schema.customRoles.id, input.customRoleId),
-            eq(schema.customRoles.tenantId, context.tenantId),
-            eq(schema.customRoles.status, "active"),
-          ))
-          .limit(1);
-        if (!customRole) throw new Error("Escolha um cargo personalizado ativo da própria empresa.");
-        customRoleScope = customRole.scope;
+        customRoleScope = (await assertCargoAssignable({ actor: context, membershipId: null, role: input.role, jobTitle: input.jobTitle, customRoleId: input.customRoleId })).scope;
       }
 
       requireCanUpdateMemberAuthority({
@@ -331,14 +327,20 @@ export async function updateTeamMemberAction(
       throw new Error("Membros com acesso ativo precisam de um e-mail.");
     }
     let customRoleScope: "none" | "own" | "branch" | "tenant" | null = null;
+    // 04/11: pôr, trocar ou tirar o cargo é só do diretor sem cargo; manter o cargo ao mudar papel ou
+    // unidade também revalida (o papel novo precisa cobrir o cargo).
+    if ((input.customRoleId ?? null) !== (member.customRoleId ?? null) && (context.role !== "director" || context.customRoleId)) {
+      throw new Error("Somente o Diretor pode definir cargos.");
+    }
     if (input.customRoleId) {
-      if (input.role === "director") throw new Error("Cargos personalizados não podem ser vinculados a um acesso de Diretor.");
-      const [customRole] = await db.select({ id: schema.customRoles.id, scope: schema.customRoles.scope })
-        .from(schema.customRoles)
-        .where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, context.tenantId), eq(schema.customRoles.status, "active")))
-        .limit(1);
-      if (!customRole) throw new Error("Escolha um cargo personalizado ativo da própria empresa.");
-      customRoleScope = customRole.scope;
+      if (context.role === "director" && !context.customRoleId) {
+        customRoleScope = (await assertCargoAssignable({ actor: context, membershipId: member.membershipId, role: input.role, jobTitle: input.jobTitle, customRoleId: input.customRoleId })).scope;
+      } else {
+        const [customRole] = await db.select({ scope: schema.customRoles.scope }).from(schema.customRoles)
+          .where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, context.tenantId), eq(schema.customRoles.status, "active"))).limit(1);
+        if (!customRole) throw new Error("Escolha um cargo personalizado ativo da própria empresa.");
+        customRoleScope = customRole.scope;
+      }
     }
     requireCanUpdateMemberAuthority({
       actorContext: context,

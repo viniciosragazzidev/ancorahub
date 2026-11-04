@@ -10,7 +10,7 @@ import { CargosLite } from "./_components/cargos-lite";
 
 export default async function CustomRolesPage() {
   const context = await getRequiredTenantContext();
-  if (context.role !== "director") redirect("/access-denied");
+  if (context.role !== "director" || context.customRoleId) redirect("/access-denied");
   const workspace = await getCustomRolesWorkspace();
   if (await isDirectorLitePageOnServer(context, "/equipe/cargos")) {
     return <>

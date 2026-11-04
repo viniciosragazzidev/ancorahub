@@ -50,8 +50,8 @@ export function canShowNavigationItem(item: NavigationAccessItem, user: Navigati
   if (pathname === "/equipe") {
     if (explicitRoutes.length > 0) {
       return Boolean(routePermission && permissions.includes(routePermission))
-        || permissions.includes("route:/filiais")
-        || permissions.includes("route:/unidades")
+        || permissions.includes("route:filiais")
+        || permissions.includes("route:unidades")
         || permissions.includes("acessar_configuracoes_unidade");
     }
     return permissions.includes("convidar_corretor") || permissions.includes("acessar_configuracoes_unidade");
