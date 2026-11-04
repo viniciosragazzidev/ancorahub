@@ -28,6 +28,8 @@ export function generateTypedAssignments(input: {
   commitments?: ReadonlyArray<{ brokerId: string; dutyDate: string; startsAt: string; endsAt: string }>;
   /** Brokers already on each occurrence: they stay, use up their seats and the draw only fills the rest. */
   existingByOccurrence?: ReadonlyMap<string, readonly string[]>;
+  /** Profiles without an account reserve a planned seat but are not published to the active roster yet. */
+  pendingBrokerIds?: ReadonlySet<string>;
 }): MonthlyPlanAssignment[] {
   const assignments: MonthlyPlanAssignment[] = [];
   const byId = new Map(input.occurrences.map((occurrence) => [occurrence.id, occurrence]));
@@ -60,7 +62,7 @@ export function generateTypedAssignments(input: {
       })),
     );
     for (const assignment of result.assignments) {
-      assignments.push({ ...assignment, origin: "generated" });
+      assignments.push({ ...assignment, origin: input.pendingBrokerIds?.has(assignment.brokerId) ? "pending" : "generated" });
       const occurrence = byId.get(assignment.occurrenceId)!;
       committed.set(assignment.brokerId, [...(committed.get(assignment.brokerId) ?? []), occurrence]);
     }

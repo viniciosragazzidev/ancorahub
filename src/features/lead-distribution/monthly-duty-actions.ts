@@ -10,7 +10,7 @@ import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/querie
 import { getRequiredTenantContext, type TenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { applyForcedBrokers, generateTypedAssignments } from "./duty-plan-generation";
-import { getRosterBrokerAccountFilter } from "./roster-broker-account-filter";
+import { getRosterBrokerAccountFilter, pendingBrokerPlanningEnabled } from "./roster-broker-account-filter";
 import { decideLeftoverRows } from "./monthly-duty-preservation";
 import { publishedAddProblem, publishedRemoveProblem } from "./monthly-duty-published-edit";
 import { lockMonthlyDutyPlans, persistMonthlyPlanAssignmentRemoval, upsertMonthlyPlanAssignment } from "./monthly-duty-plan-assignments";
@@ -104,7 +104,20 @@ async function loadPlanningBrokers(db: Executor, tenantId: string) {
       await getRosterBrokerAccountFilter(),
       eq(schema.branches.status, "active"),
     ));
-  return rows.filter((row): row is typeof row & { branchId: string } => Boolean(row.branchId));
+  const activeAccounts = rows.filter((row): row is typeof row & { branchId: string } => Boolean(row.branchId)).map((row) => ({ ...row, pending: false }));
+  if (!(await pendingBrokerPlanningEnabled())) return activeAccounts;
+  const pendingProfiles = await db.select({ id: schema.brokerProfiles.id, name: schema.brokerProfiles.professionalName, branchId: schema.brokerProfiles.branchId })
+    .from(schema.brokerProfiles)
+    .leftJoin(schema.user, eq(schema.user.id, schema.brokerProfiles.userId))
+    .innerJoin(schema.branches, and(eq(schema.branches.id, schema.brokerProfiles.branchId), eq(schema.branches.tenantId, tenantId), eq(schema.branches.status, "active")))
+    .where(and(
+      eq(schema.brokerProfiles.tenantId, tenantId),
+      or(
+        and(isNull(schema.brokerProfiles.userId), inArray(schema.brokerProfiles.lifecycleStatus, ["DRAFT", "INVITED", "INVITATION_EXPIRED", "ONBOARDING"])),
+        eq(schema.user.status, "pending"),
+      ),
+    ));
+  return [...activeAccounts, ...pendingProfiles.map((row) => ({ ...row, pending: true as const }))];
 }
 
 async function loadActiveSchedules(db: Executor, tenantId: string) {
@@ -211,7 +224,28 @@ async function buildPlanView(db: Executor, context: TenantContext, monthKey: str
       .leftJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.userId, schema.user.id), eq(schema.brokerProfiles.tenantId, context.tenantId)))
       .where(inArray(schema.user.id, brokerIds))
     : [];
-  const person = new Map(people.map((row) => [row.id, row]));
+  const pendingPeople = brokerIds.length
+    ? await db.select({
+      id: schema.brokerProfiles.id,
+      name: schema.brokerProfiles.professionalName,
+      branchId: schema.brokerProfiles.branchId,
+      branchName: schema.branches.name,
+      code: schema.brokerProfiles.internalCode,
+    })
+      .from(schema.brokerProfiles)
+      .leftJoin(schema.user, eq(schema.user.id, schema.brokerProfiles.userId))
+      .leftJoin(schema.branches, and(eq(schema.branches.id, schema.brokerProfiles.branchId), eq(schema.branches.tenantId, context.tenantId)))
+      .where(and(
+        eq(schema.brokerProfiles.tenantId, context.tenantId),
+        inArray(schema.brokerProfiles.id, brokerIds),
+        or(
+          and(isNull(schema.brokerProfiles.userId), inArray(schema.brokerProfiles.lifecycleStatus, ["DRAFT", "INVITED", "INVITATION_EXPIRED", "ONBOARDING"])),
+          eq(schema.user.status, "pending"),
+        ),
+      ))
+    : [];
+  const person = new Map([...people, ...pendingPeople].map((row) => [row.id, row]));
+  const pendingBrokerIds = new Set(pendingPeople.map((row) => row.id));
   const visible = (brokerId: string) => context.role !== "manager" || person.get(brokerId)?.branchId === context.branchId;
   const assignments = allAssignments.filter((item) => visible(item.brokerId));
   const visibleQuotas = quotas.filter((item) => visible(item.brokerId));
@@ -245,9 +279,9 @@ async function buildPlanView(db: Executor, context: TenantContext, monthKey: str
     const key = `${item.brokerId}|${typeKeyOf(occurrenceById.get(item.occurrenceId)?.typeId)}`;
     assignedByBrokerType.set(key, (assignedByBrokerType.get(key) ?? 0) + 1);
   }
-  const brokerView = (brokerId: string) => {
+  const brokerView = (brokerId: string): { id: string; name: string; code: string | null; branchId: string | null; branchName: string | null; pending?: boolean } => {
     const row = person.get(brokerId);
-    return { id: brokerId, name: row?.name ?? "Corretor", code: row?.code ?? null, branchId: row?.branchId ?? null, branchName: row?.branchName ?? null };
+    return { id: brokerId, name: row?.name ?? "Corretor", code: row?.code ?? null, branchId: row?.branchId ?? null, branchName: row?.branchName ?? null, pending: pendingBrokerIds.has(brokerId) };
   };
   return {
     id: plan.id,
@@ -267,7 +301,7 @@ async function buildPlanView(db: Executor, context: TenantContext, monthKey: str
         ...brokerView(item.brokerId),
         forced: Boolean(occurrence.forcedBrokerIds?.includes(item.brokerId)),
         /** Already on the roster before this generation (kept), or new now. */
-        origin: (item.origin ?? (plan.status === "draft" ? "generated" : "existing")) as "existing" | "weekly" | "generated" | "manual",
+        origin: (item.origin ?? (plan.status === "draft" ? "generated" : "existing")) as "existing" | "weekly" | "generated" | "manual" | "pending",
       })),
       assignedCount: summary.assignedByOccurrence.get(occurrence.id) ?? 0,
       /** Shift already over: read-only in a draft and never published. */
@@ -454,6 +488,7 @@ export async function generateMonthlyDutyPlanAction(rawInput: unknown): Promise<
       windowsByBroker,
       commitments: keptAssignments.map((item) => ({ brokerId: item.brokerId, ...keptById.get(item.occurrenceId)! })),
       existingByOccurrence,
+      pendingBrokerIds: new Set(brokers.filter((broker) => broker.pending).map((broker) => broker.id)),
     });
 
     const settings = mergeSettings(parsePlanSettings(latest?.settings), settingsInput);
@@ -504,8 +539,8 @@ export async function updateMonthlyDutyDraftAction(input: unknown): Promise<Mont
       if (target.origin === "weekly") throw new Error("Este corretor está na escala semanal do plantão. Remova-o pelo próprio plantão.");
       next = current.filter((item) => item !== target);
     } else {
-      const planningIds = new Set((await loadPlanningBrokers(tx, context.tenantId)).map((broker) => broker.id));
-      if (!planningIds.has(brokerId)) throw new Error("Este corretor está fora da corretora ou da política de inclusão na escala.");
+      const broker = (await loadPlanningBrokers(tx, context.tenantId)).find((item) => item.id === brokerId);
+      if (!broker) throw new Error("Este corretor está fora da corretora ou da política de inclusão na escala.");
       const target = occurrences.find((occurrence) => occurrence.id === occurrenceId);
       if (!target) throw new Error("Este plantão não está na proposta.");
       if (occurrenceEnded(target, new Date())) throw new Error("Este plantão já terminou. Não é possível escalar corretores nele.");
@@ -515,14 +550,18 @@ export async function updateMonthlyDutyDraftAction(input: unknown): Promise<Mont
           ? { ...occurrence, allowedBrokerIds: [...occurrence.allowedBrokerIds, brokerId], forcedBrokerIds: [...new Set([...(occurrence.forcedBrokerIds ?? []), brokerId])] }
           : occurrence);
       }
-      next = [...current, { occurrenceId, brokerId, origin: "manual" }];
+      next = [...current, { occurrenceId, brokerId, origin: broker.pending ? "pending" : "manual" }];
       // DEC-132: an overlap with the broker's other occurrences no longer blocks the add.
       const problems = findDraftProblems(occurrences, next).filter((problem) => problem.occurrenceId === occurrenceId && problem.kind !== "overlap");
       if (problems.length) throw new Error(describeDraftProblem(problems[0]));
     }
     await tx.update(schema.dutyScheduleMonthlyPlans).set({ assignments: next, occurrences, updatedAt: new Date() })
       .where(eq(schema.dutyScheduleMonthlyPlans.id, planId));
-    await audit(tx, context.userId, planId, operation === "add" ? (force ? "duty_schedule_monthly_plan.broker_forced" : "duty_schedule_monthly_plan.broker_added") : "duty_schedule_monthly_plan.broker_removed");
+    await audit(tx, context.userId, planId, operation === "add"
+      ? brokerId && next.some((item) => item.brokerId === brokerId && item.origin === "pending")
+        ? "duty_schedule_monthly_plan.pending_broker_added"
+        : force ? "duty_schedule_monthly_plan.broker_forced" : "duty_schedule_monthly_plan.broker_added"
+      : "duty_schedule_monthly_plan.broker_removed");
     return plan.monthKey;
   });
 
@@ -591,6 +630,9 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
     }
     // A draft can be days old: shifts that ended since then are dropped, never published.
     const assignments = storedAssignments.filter((assignment) => !endedIds.has(assignment.occurrenceId) && !staleIds.has(assignment.occurrenceId));
+    if (assignments.some((assignment) => assignment.origin === "pending") && !(await pendingBrokerPlanningEnabled())) {
+      throw new Error("A inclusão de corretores pendentes foi desativada pelo Super-admin. Gere uma nova proposta sem essas reservas.");
+    }
     if (staleIds.size) await audit(tx, context.userId, planId, `duty_schedule_monthly_plan.stale_dropped:${staleIds.size}`);
     if (!assignments.length) {
       throw new Error(staleIds.size
@@ -639,8 +681,9 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
     const inserts: Array<typeof schema.dutyRosterAssignments.$inferInsert> = [];
     const insertedFor: StoredAssignment[] = [];
     for (const assignment of assignments) {
-      // Weekly roster brokers are already on duty (weekly and published add up): no dated row.
-      if (assignment.origin === "weekly") continue;
+      // Weekly roster brokers already have a recurring row. Pending invite profiles reserve a seat
+      // in the published plan but only enter the active roster after accepting their invite.
+      if (assignment.origin === "weekly" || assignment.origin === "pending") continue;
       const existing = existingByKey.get(`${assignment.occurrenceId}|${assignment.brokerId}`);
       if (existing) {
         kept.push({ assignment, rowId: existing.id });
@@ -730,7 +773,10 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
     await audit(tx, context.userId, planId, "duty_schedule_monthly_plan.published");
 
     const counts = new Map<string, number>();
-    for (const assignment of [...assignments, ...preservedAssignments]) counts.set(assignment.brokerId, (counts.get(assignment.brokerId) ?? 0) + 1);
+    for (const assignment of [...assignments, ...preservedAssignments]) {
+      if (assignment.origin === "pending") continue;
+      counts.set(assignment.brokerId, (counts.get(assignment.brokerId) ?? 0) + 1);
+    }
     const { rangeFrom, rangeUntil } = planRange(plan, occurrences);
     const short = (key: string) => `${key.slice(8, 10)}/${key.slice(5, 7)}`;
     for (const [brokerId, count] of counts) {
@@ -873,39 +919,40 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
     if (problem) throw new Error(problem);
     if (!broker || !schedule) throw new Error("Este plantão ou corretor não está disponível para a escala.");
 
-    // The broker's dated row for this plantão: an active one is adopted by this plan, an inactive one comes back, otherwise a row is created.
-    const row = datedRows.find((item) => item.status === "active") ?? datedRows.find((item) => item.status === "inactive") ?? datedRows[0];
-    let rosterId: string;
-    if (row) {
-      rosterId = row.id;
-      // A broker who comes back joins now: createdAt is when the tolerance of a running plantão starts counting.
-      await tx.update(schema.dutyRosterAssignments).set({ status: "active", monthlyPlanId: plan.id, updatedBy: context.userId, updatedAt: now, ...(row.status === "inactive" ? { createdAt: now } : {}) })
-        .where(eq(schema.dutyRosterAssignments.id, row.id));
-    } else {
-      rosterId = randomUUID();
-      const validity = occurrenceValidity(occurrence.dutyDate, schedule.timezone);
-      await tx.insert(schema.dutyRosterAssignments).values({
-        id: rosterId,
-        tenantId: context.tenantId,
-        branchId: broker.branchId,
-        scheduleId: occurrence.scheduleId,
-        brokerId,
-        dayOfWeek: dayOfWeekOf(occurrence.dutyDate),
-        startsAt: occurrence.startsAt,
-        endsAt: occurrence.endsAt,
-        validFrom: validity.validFrom,
-        validUntil: validity.validUntil,
-        dutyDate: occurrence.dutyDate,
-        monthlyPlanId: plan.id,
-        status: "active",
-        createdBy: context.userId,
-        updatedBy: context.userId,
-        createdAt: now,
-        updatedAt: now,
-      });
+    let rosterId: string | null = null;
+    if (!broker.pending) {
+      // The broker's dated row: reuse an existing row or create one for this occurrence.
+      const row = datedRows.find((item) => item.status === "active") ?? datedRows.find((item) => item.status === "inactive") ?? datedRows[0];
+      if (row) {
+        rosterId = row.id;
+        await tx.update(schema.dutyRosterAssignments).set({ status: "active", monthlyPlanId: plan.id, updatedBy: context.userId, updatedAt: now, ...(row.status === "inactive" ? { createdAt: now } : {}) })
+          .where(eq(schema.dutyRosterAssignments.id, row.id));
+      } else {
+        rosterId = randomUUID();
+        const validity = occurrenceValidity(occurrence.dutyDate, schedule.timezone);
+        await tx.insert(schema.dutyRosterAssignments).values({
+          id: rosterId,
+          tenantId: context.tenantId,
+          branchId: broker.branchId,
+          scheduleId: occurrence.scheduleId,
+          brokerId,
+          dayOfWeek: dayOfWeekOf(occurrence.dutyDate),
+          startsAt: occurrence.startsAt,
+          endsAt: occurrence.endsAt,
+          validFrom: validity.validFrom,
+          validUntil: validity.validUntil,
+          dutyDate: occurrence.dutyDate,
+          monthlyPlanId: plan.id,
+          status: "active",
+          createdBy: context.userId,
+          updatedBy: context.userId,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
     }
 
-    const entry: StoredAssignment = { occurrenceId: targetId, brokerId, origin: "manual", rosterAssignmentId: rosterId };
+    const entry: StoredAssignment = { occurrenceId: targetId, brokerId, origin: broker.pending ? "pending" : "manual", ...(rosterId ? { rosterAssignmentId: rosterId } : {}) };
     const withBroker = (item: MonthlyPlanOccurrence) => (item.id === targetId && !item.allowedBrokerIds.includes(brokerId)
       ? { ...item, allowedBrokerIds: [...item.allowedBrokerIds, brokerId], forcedBrokerIds: [...new Set([...(item.forcedBrokerIds ?? []), brokerId])] }
       : item);
@@ -927,8 +974,10 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
         }).where(eq(schema.dutyScheduleMonthlyPlans.id, draft.id));
       }
     }
-    await audit(tx, context.userId, plan.id, !allowed ? "duty_schedule_monthly_plan.published_broker_forced" : "duty_schedule_monthly_plan.published_broker_added");
-    await notifyPlantaoChange(tx, { tenantId: context.tenantId, brokerId, kind: "added", occurrence, scheduleName: schedule.name, rosterId, now });
+    await audit(tx, context.userId, plan.id, broker.pending
+      ? "duty_schedule_monthly_plan.pending_broker_added"
+      : !allowed ? "duty_schedule_monthly_plan.published_broker_forced" : "duty_schedule_monthly_plan.published_broker_added");
+    if (!broker.pending && rosterId) await notifyPlantaoChange(tx, { tenantId: context.tenantId, brokerId, kind: "added", occurrence, scheduleName: schedule.name, rosterId, now });
     return plan.monthKey;
   });
 

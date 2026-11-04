@@ -3,7 +3,7 @@ import "server-only";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
-import { getRosterBrokerAccountFilter } from "./roster-broker-account-filter";
+import { getRosterBrokerAccountFilter, pendingBrokerPlanningEnabled } from "./roster-broker-account-filter";
 
 export type DutyRosterSnapshot = Awaited<ReturnType<typeof getDutyRosterSnapshot>>;
 
@@ -18,7 +18,7 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
     .where(branchCondition)
     .orderBy(asc(schema.branches.name));
   const branchIds = branches.map((branch) => branch.id);
-  if (!branchIds.length) return { branches: [], queues: [], credentials: [], types: [], schedules: [], brokers: [], assignments: [], publishedAssignments: [], history: [] };
+  if (!branchIds.length) return { branches: [], queues: [], credentials: [], types: [], schedules: [], brokers: [], pendingBrokers: [], assignments: [], publishedAssignments: [], history: [] };
 
   const [queues, credentials, schedules, brokers, assignments, campaignOrigins, typeRows] = await Promise.all([
     db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId, name: schema.leadQueues.name })
@@ -253,5 +253,28 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       .orderBy(asc(schema.dutyRosterAssignments.dutyDate), asc(schema.user.name))
     : [];
 
-  return { branches, queues, credentials: displayCredentials, types, schedules: displaySchedules, brokers, assignments, publishedAssignments, history };
+  const pendingBrokers = (await pendingBrokerPlanningEnabled())
+    ? await db.select({
+      id: schema.brokerProfiles.id,
+      name: schema.brokerProfiles.professionalName,
+      internalCode: schema.brokerProfiles.internalCode,
+      branchId: schema.brokerProfiles.branchId,
+      branchName: schema.branches.name,
+      pending: sql<boolean>`true`,
+    })
+      .from(schema.brokerProfiles)
+      .leftJoin(schema.user, eq(schema.user.id, schema.brokerProfiles.userId))
+      .innerJoin(schema.branches, and(eq(schema.branches.id, schema.brokerProfiles.branchId), eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.status, "active")))
+      .where(and(
+        eq(schema.brokerProfiles.tenantId, context.tenantId),
+        inArray(schema.brokerProfiles.branchId, branchIds),
+        or(
+          and(isNull(schema.brokerProfiles.userId), inArray(schema.brokerProfiles.lifecycleStatus, ["DRAFT", "INVITED", "INVITATION_EXPIRED", "ONBOARDING"])),
+          eq(schema.user.status, "pending"),
+        ),
+      ))
+      .orderBy(asc(schema.brokerProfiles.professionalName))
+    : [];
+
+  return { branches, queues, credentials: displayCredentials, types, schedules: displaySchedules, brokers, pendingBrokers, assignments, publishedAssignments, history };
 }
