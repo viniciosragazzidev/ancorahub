@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import { setSystemSetting } from "@/features/system-settings/queries";
+import { invalidateSystemSettingsCache, setSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 import { tenantChannelRoutingKey } from "@/features/waha-cadence/tenant-channel-routing";
 import { normalizeTenantChannelRouting, type TenantChannelRouting } from "@/features/waha-cadence/tenant-channel-routing-rules";
@@ -122,11 +122,14 @@ export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<R
       if (found.length !== messageIds.length) return { success: false, error: "Uma das mensagens escolhidas não existe ou está inativa." };
     }
     const now = new Date();
-    // Numbers first: already validated, and a failure here leaves the switches untouched (no half save).
-    for (const list of phoneLists) {
-      if (list.key === "LEAD_CLOSING_DIRECTOR") await setSystemSetting(closingDirectorRecipientsKey(context.tenantId), JSON.stringify(list.phones), now);
-    }
     await getDatabase().transaction(async (tx) => {
+      // Numbers in the same transaction as the switches: all saved or nothing.
+      for (const list of phoneLists) {
+        if (list.key !== "LEAD_CLOSING_DIRECTOR") continue;
+        const value = JSON.stringify(list.phones);
+        await tx.insert(schema.systemSettings).values({ key: closingDirectorRecipientsKey(context.tenantId), value, updatedAt: now })
+          .onConflictDoUpdate({ target: schema.systemSettings.key, set: { value, updatedAt: now } });
+      }
       for (const item of rows) {
         await tx.insert(schema.teamNoticeSettings).values({
           tenantId: context.tenantId, noticeKey: item.key, enabled: item.enabled, channel: item.channel,
@@ -141,6 +144,7 @@ export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<R
         acao: `team_notices.updated:${rows.map((item) => `${item.key}=${item.enabled ? item.channel : "off"}`).join(",")}`.slice(0, 500),
       });
     });
+    if (phoneLists.length) invalidateSystemSettingsCache();
     revalidatePath("/integrations/whatsapp");
     return { success: true };
   } catch (error) {
