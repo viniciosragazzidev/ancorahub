@@ -1,6 +1,6 @@
 # Organização das rotas: cada assunto numa área, com abas
 
-Data: 2026-11-04. Status: Fases 0, 1 e 2 feitas; Fases 3 a 8 pendentes.
+Data: 2026-11-04. Status: Fases 0 a 3 feitas; Fases 4 a 8 pendentes.
 
 ## Objetivo
 
@@ -56,7 +56,12 @@ O modo Light (corretor, supervisor e gerente) mantém a estrutura atual; só os 
   - Saíram as abas internas da Qualificação e de Atendimento e o botão "Qualificação turbo".
   - Pendente para a fase de Configurações: Conectividade vai para Configurações > WhatsApp; o cartão de modo da IA ainda está em Ajustes > Atendimento.
   - O contador de alertas que aparecia em "Simulador (1)" saiu junto com a aba interna.
-- **Fases 3 a 8, uma área por vez:** Distribuição, Comercial, Equipe, Configurações, Leads e Conversas.
+- **Fase 3, Distribuição: feita** (branch `feat/organizacao-rotas-f3`). Uma fileira de abas: Hoje, Operação, Plantões, Regras, Filas (diretor) e Saúde, só para diretor e gestor.
+  - `/leads/distribuicao` vale como a mesma página; o detalhe de um plantão marca a aba Plantões.
+  - Saíram as abas internas (versão normal e Lite do diretor). A versão normal lê a aba pela URL.
+  - As abas da Distribuição recarregam a página no servidor (a versão do diretor monta cada visão no servidor); só as abas marcadas `inPlace` trocam sem recarregar.
+  - Pendente: "sem atribuição" (Leads), "distribuídos" (Conversas), "repassar" (Equipe) e o limite de leads ativos (Ajustes) ainda não foram trazidos para cá; entram nas fases de Leads, Conversas e Configurações.
+- **Fases 4 a 8, uma área por vez:** Comercial, Equipe, Configurações, Leads e Conversas.
 - **Limpeza final:** apagar as telas mortas `/minha-fila/page.tsx`, os 6 `*/dashboard` de domínio, `/tarefas/dashboard` e `/settings/extension`. Antes, verificar se `/minha-fila` tem algo que a fila Light não tem, como a aba "Aguardando aceite".
 
 ## Riscos

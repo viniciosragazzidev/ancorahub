@@ -11,13 +11,13 @@ import { resolveNavLocation, visibleNavTabs } from "@/shared/navigation/nav-regi
 import { useNavFlags, useNavUser } from "./nav-access";
 
 /**
- * Abas que são visões da mesma página (?tab=...) trocam só a URL, sem ida ao servidor:
- * a página lê a aba pela query e o que a pessoa digitou continua na tela.
+ * Abas marcadas como inPlace (visões que a página troca sozinha pela query) mudam só a URL, sem ida ao servidor:
+ * o que a pessoa digitou continua na tela. As demais navegam normalmente.
  */
-function switchViewInPlace(event: MouseEvent<HTMLElement>) {
+function switchViewInPlace(event: MouseEvent<HTMLElement>, inPlaceHrefs: ReadonlySet<string>) {
   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   const anchor = (event.target as HTMLElement).closest("a");
-  if (!anchor) return;
+  if (!anchor || !inPlaceHrefs.has(anchor.getAttribute("href") ?? "")) return;
   const target = new URL(anchor.href, window.location.href);
   if (target.origin !== window.location.origin || target.pathname !== window.location.pathname) return;
   event.preventDefault();
@@ -42,7 +42,9 @@ export function AreaTabs() {
   if (tabs.length < 2 || !tabs.some((tab) => tab.id === location.tab.id)) return null;
 
   const items = tabs.map((tab) => ({ id: tab.id, label: tab.label, href: tab.href }));
+  const inPlaceHrefs = new Set(tabs.filter((tab) => tab.inPlace).map((tab) => tab.href));
+  const onClickCapture = (event: MouseEvent<HTMLElement>) => switchViewInPlace(event, inPlaceHrefs);
   const label = `Seções de ${location.area.label}`;
-  if (directorLite) return <div data-slot="area-tabs" className="px-4 pt-2" onClickCapture={switchViewInPlace}><LiteRouteTabs label={label} tabs={items} active={location.tab.id} /></div>;
-  return <div data-slot="area-tabs" className="bg-background px-5 lg:px-6" onClickCapture={switchViewInPlace}><RouteSectionTabs label={label} tabs={items} active={location.tab.id} /></div>;
+  if (directorLite) return <div data-slot="area-tabs" className="px-4 pt-2" onClickCapture={onClickCapture}><LiteRouteTabs label={label} tabs={items} active={location.tab.id} /></div>;
+  return <div data-slot="area-tabs" className="bg-background px-5 lg:px-6" onClickCapture={onClickCapture}><RouteSectionTabs label={label} tabs={items} active={location.tab.id} /></div>;
 }

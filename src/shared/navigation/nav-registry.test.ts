@@ -113,6 +113,23 @@ describe("nav-registry", () => {
     expect(resolveNavLocation("/atendimento/fluxo")).toMatchObject({ tab: { id: "perguntas" } });
   });
 
+  it("Distribuição: views by ?view=, the old /leads/distribuicao address and the duty detail", () => {
+    expect(resolveNavLocation("/distribuicao")).toMatchObject({ area: { id: "distribuicao" }, tab: { id: "hoje" } });
+    expect(resolveNavLocation("/distribuicao?view=resumo_dia")).toMatchObject({ tab: { id: "hoje" } });
+    expect(resolveNavLocation("/distribuicao?view=operar")).toMatchObject({ tab: { id: "operacao" } });
+    expect(resolveNavLocation("/leads/distribuicao?view=roteamento")).toMatchObject({ tab: { id: "regras" } });
+    expect(resolveNavLocation("/distribuicao?view=historico")).toMatchObject({ tab: { id: "saude" } });
+    expect(resolveNavLocation("/leads/distribuicao/plantao/abc")).toMatchObject({ tab: { id: "plantoes" } });
+    const manager: NavAccessUser = { ...director, roleKey: "manager" };
+    const distribution = NAV_AREAS.find((area) => area.id === "distribuicao")!;
+    expect(distribution.tabs.filter((tab) => canShowNavTab(tab, manager)).map((tab) => tab.id)).not.toContain("filas");
+  });
+
+  it("only views the page switches by itself change the URL in place", () => {
+    const inPlace = NAV_AREAS.flatMap((area) => area.tabs).filter((tab) => tab.inPlace).map((tab) => tab.href);
+    expect(inPlace.every((href) => href.startsWith("/qualificacao"))).toBe(true);
+  });
+
   it("the director sees 9 menu items, each opening its first visible tab", () => {
     const areas = visibleNavAreas(director);
     expect(areas.map((item) => item.area.id)).toEqual(["inicio", "conversas", "leads", "distribuicao", "comercial", "equipe", "atendimento-ia", "marketing", "configuracoes"]);

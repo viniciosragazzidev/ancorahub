@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
 import { DashboardHeader } from "@/components/dashboard-header";
-import { DirectorDistributionTabs } from "@/app/(dashboard)/leads/distribuicao/_components/director-distribution-tabs";
 import { DistributionInbox } from "@/app/(dashboard)/leads/distribuicao/_components/distribution-inbox";
 import { DistributionMetrics } from "@/app/(dashboard)/leads/distribuicao/_components/distribution-dashboard";
 import { QueueControlCenter } from "@/app/(dashboard)/leads/distribuicao/_components/queue-control-center";
@@ -130,8 +129,9 @@ const leadRows: DutyLeadRecord[] = inboxLeads.map((lead, index) => {
   };
 });
 
-function Tabs({ activeView, role }: { activeView: string; role: string }) {
-  return <DirectorDistributionTabs activeView={activeView} showQueues={role === "director"} escalaMes="2026-10" />;
+/** As abas da distribuição agora vêm da barra da área (AreaTabs no cabeçalho). */
+function Tabs(_props: { activeView: string; role: string }) {
+  return null;
 }
 
 function OperationScreen({ role }: PreviewContext) {
@@ -164,10 +164,10 @@ function OverviewScreen() {
 }
 
 export const ONDA5_SCREENS: Record<string, Screen> = {
-  "distribuicao-operar": { path: "/distribuicao", render: (context) => <OperationScreen {...context} /> },
-  "distribuicao-filas": { path: "/distribuicao", render: (context) => <QueueScreen {...context} /> },
-  "distribuicao-plantao": { path: "/distribuicao", render: (context) => <CalendarScreen {...context} /> },
+  "distribuicao-operar": { path: "/distribuicao?view=operar", render: (context) => <OperationScreen {...context} /> },
+  "distribuicao-filas": { path: "/distribuicao?view=filas", render: (context) => <QueueScreen {...context} /> },
+  "distribuicao-plantao": { path: "/distribuicao?view=plantao", render: (context) => <CalendarScreen {...context} /> },
   "distribuicao-ocorrencia": { path: "/leads/distribuicao/plantao/demo-schedule", render: (context) => <ScheduleScreen {...context} /> },
-  "distribuicao-saude": { path: "/distribuicao", render: (context) => <HealthScreen {...context} /> },
+  "distribuicao-saude": { path: "/distribuicao?view=saude_historico", render: (context) => <HealthScreen {...context} /> },
   "distribuicao-dashboard": { path: "/distribuicao/dashboard", render: () => <OverviewScreen /> },
 };

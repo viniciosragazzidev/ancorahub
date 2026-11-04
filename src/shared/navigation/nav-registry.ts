@@ -24,6 +24,13 @@ export type NavTab = {
   requires?: "negotiations" | "relationshipCenter";
   /** Outros valores de query que abrem a mesma aba (links antigos), ex.: { tab: ["alerts"] }. */
   aliases?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * A página troca esta visão sozinha pela query (componente de cliente lendo a URL): a aba muda só a URL,
+   * sem ida ao servidor. Sem isso, a aba navega normalmente e a página renderiza de novo no servidor.
+   */
+  inPlace?: boolean;
+  /** A mesma página também responde nestes endereços (ex.: /leads/distribuicao é /distribuicao). */
+  alsoAt?: readonly string[];
 };
 
 export type NavArea = {
@@ -70,7 +77,12 @@ export const NAV_AREAS: readonly NavArea[] = [
     fullLabel: "Distribuição de leads, plantões e regras",
     section: "Operação",
     tabs: [
-      { id: "distribuicao", label: "Distribuição", href: "/distribuicao", permission: "acessar_qualificacao_ia", paths: ["/distribuicao", "/leads/distribuicao"] },
+      { id: "hoje", label: "Hoje", href: "/distribuicao", permission: "acessar_qualificacao_ia", roles: ["director", "manager"], paths: ["/distribuicao", "/leads/distribuicao"] },
+      { id: "operacao", label: "Operação", href: "/distribuicao?view=operar", alsoAt: ["/leads/distribuicao"], permission: "acessar_qualificacao_ia", roles: ["director", "manager"] },
+      { id: "plantoes", label: "Plantões", href: "/distribuicao?view=plantao", alsoAt: ["/leads/distribuicao"], permission: "acessar_qualificacao_ia", roles: ["director", "manager"], paths: ["/leads/distribuicao/plantao"] },
+      { id: "regras", label: "Regras", href: "/distribuicao?view=roteamento", alsoAt: ["/leads/distribuicao"], permission: "acessar_qualificacao_ia", roles: ["director", "manager"] },
+      { id: "filas", label: "Filas", href: "/distribuicao?view=filas", alsoAt: ["/leads/distribuicao"], permission: "acessar_qualificacao_ia", roles: ["director"] },
+      { id: "saude", label: "Saúde", href: "/distribuicao?view=saude_historico", alsoAt: ["/leads/distribuicao"], permission: "acessar_qualificacao_ia", roles: ["director", "manager"], aliases: { view: ["saude", "historico"] } },
     ],
   },
   {
@@ -104,15 +116,15 @@ export const NAV_AREAS: readonly NavArea[] = [
     fullLabel: "Qualificação por IA, roteiros e mensagens",
     section: "Crescimento",
     tabs: [
-      { id: "comportamento", label: "Comportamento", href: "/qualificacao", permission: "acessar_qualificacao_ia" },
+      { id: "comportamento", label: "Comportamento", href: "/qualificacao", permission: "acessar_qualificacao_ia", inPlace: true },
       { id: "perguntas", label: "Perguntas", href: "/atendimento/fluxo", permission: "acessar_qualificacao_ia" },
       { id: "situacoes", label: "Situações", href: "/atendimento/situacoes", permission: "acessar_qualificacao_ia", paths: ["/atendimento"] },
       { id: "mensagens", label: "Mensagens", href: "/atendimento/mensagens", permission: "acessar_qualificacao_ia" },
-      { id: "follow-up", label: "Follow-up", href: "/qualificacao?tab=followup_rules", permission: "acessar_qualificacao_ia" },
-      { id: "simulador", label: "Simulador", href: "/qualificacao?tab=simulator", permission: "acessar_qualificacao_ia", aliases: { tab: ["alerts"] } },
+      { id: "follow-up", label: "Follow-up", href: "/qualificacao?tab=followup_rules", permission: "acessar_qualificacao_ia", inPlace: true },
+      { id: "simulador", label: "Simulador", href: "/qualificacao?tab=simulator", permission: "acessar_qualificacao_ia", inPlace: true, aliases: { tab: ["alerts"] } },
       { id: "turbo", label: "Turbo", href: "/qualificacao/turbo", permission: "acessar_qualificacao_ia" },
-      { id: "permissoes", label: "Permissões", href: "/qualificacao?tab=agent_triggers", permission: "acessar_qualificacao_ia", aliases: { tab: ["mcp_governance"] } },
-      { id: "conectividade", label: "Conectividade", href: "/qualificacao?tab=whatsapp_diag", permission: "acessar_qualificacao_ia" },
+      { id: "permissoes", label: "Permissões", href: "/qualificacao?tab=agent_triggers", permission: "acessar_qualificacao_ia", inPlace: true, aliases: { tab: ["mcp_governance"] } },
+      { id: "conectividade", label: "Conectividade", href: "/qualificacao?tab=whatsapp_diag", permission: "acessar_qualificacao_ia", inPlace: true },
       { id: "fluxos", label: "Fluxos de WhatsApp", href: "/fluxos-whatsapp", permission: "acessar_qualificacao_ia", roles: ["director"] },
       { id: "base", label: "Base de conhecimento", href: "/ferramentas/materiais-operadoras", permission: "acessar_ferramentas", roles: ["director"] },
     ],
@@ -167,12 +179,16 @@ function tabMatchScore(tab: NavTab, pathname: string, search: NavSearch | null) 
   const query = queryOf(tab.href);
   const keys = Object.keys(query);
   if (keys.length > 0) {
-    if (pathname !== own) return 0;
+    // Uma aba de query também pode ser dona de outros caminhos (ex.: o detalhe de um plantão).
+    const owned = (tab.paths ?? []).filter((candidate) => covers(candidate, pathname)).reduce((longest, candidate) => Math.max(longest, candidate.length), 0);
+    if (owned > 0) return owned * 2 + 1;
+    const samePage = [own, ...(tab.alsoAt ?? [])].find((candidate) => candidate === pathname);
+    if (!samePage) return 0;
     const matches = keys.every((key) => {
       const value = search?.get(key) ?? null;
       return value === query[key] || (value !== null && (tab.aliases?.[key] ?? []).includes(value));
     });
-    return matches ? own.length * 2 + 1 : 0;
+    return matches ? samePage.length * 2 + 1 : 0;
   }
   let best = 0;
   for (const candidate of [own, ...(tab.paths ?? [])]) {
