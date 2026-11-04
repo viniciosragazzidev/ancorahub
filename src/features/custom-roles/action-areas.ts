@@ -27,7 +27,6 @@ const REGRAS: readonly Regra[] = [
   ["src/app/primeiro-acesso/", livre],
   ["src/shared/auth/", livre],
   ["src/shared/utils/", livre],
-  ["src/utils/plugins/", livre],
   ["src/features/user-profile/", livre],
   ["src/features/notifications/", livre],
   ["src/features/onboarding/", livre],
@@ -51,6 +50,8 @@ const REGRAS: readonly Regra[] = [
   ["src/app/(dashboard)/settings/whatsapp-actions", rota("whatsapp")],
 
   ["src/features/leads/", rota("leads")],
+  // Dispara aviso de lead atribuído (push/WhatsApp): é da área de Leads, não livre (revisão do Vigia).
+  ["src/utils/plugins/", rota("leads")],
   ["src/features/lead-tags/", rota("leads")],
   ["src/features/manager-workspace/", rota("leads")],
   ["src/features/post-sale/", rota("leads")],

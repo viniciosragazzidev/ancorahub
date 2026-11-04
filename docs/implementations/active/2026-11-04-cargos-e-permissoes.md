@@ -72,7 +72,11 @@
   capacidade) de cada pasta; quem tem cargo só roda ação de área liberada; arquivo sem regra = negado e um
   teste falha se aparecer arquivo de ação novo sem regra. A URL do cliente NÃO é fronteira. Cortes finos:
   `requireCargoCapability` em equipe, distribuição, plantões e importação. Leads e Conversas ainda não têm
-  corte fino: o cargo leva a área inteira (`AREAS_SEM_CORTE_FINO`). `/api/*` ainda sem trava de cargo.
+  corte fino: o cargo leva a área inteira (`AREAS_SEM_CORTE_FINO`).
+- **Não é fronteira (ainda):** `/api/*` não passa pela trava de cargo; as áreas `livre` de action-areas.ts
+  (sessão, perfil, notificações, onboarding, disponibilidade, plataforma) confiam na checagem de cada ação.
+- **Manifesto em produção:** a imagem standalone (Dockerfile, WORKDIR /app) traz `.next/server/
+  server-reference-manifest.json`; sem ele, quem tem cargo fica sem ações (fail closed). Conferir no 1º teste.
 
 ## Cargo Plantões (proposta)
 
