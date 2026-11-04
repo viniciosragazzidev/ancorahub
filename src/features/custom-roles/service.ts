@@ -10,6 +10,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getAssignableCapabilities, type CustomRoleScope } from "./catalog";
 import { isRoutePermission, routeCatalog, routePermissionKey, type RouteDefinition } from "./routes";
+import { AREAS_SEM_CORTE_FINO } from "./presets";
 import { canAccessRoute, resolveEffectiveAccess, type CargoAtribuido, type EffectiveAccess } from "./effective-access";
 import { hasCapability, type PermissionKey } from "@/shared/auth/permissions";
 
@@ -61,12 +62,6 @@ const loadCargo = cache(async (tenantId: string, customRoleId: string): Promise<
 
 /** F2 no ar (04/11): ações de equipe, distribuição, plantões e importação checam o cargo; POST fora das telas do cargo é negado. */
 export const CARGO_PROTEGE_ACOES = true;
-
-/** Telas cujas ações internas ainda checam o papel cru (F2): o cargo não pode cortar só um pedaço delas. */
-const AREAS_SEM_CORTE_FINO: Record<string, readonly PermissionKey[]> = {
-  leads: ["acessar_leads", "criar_lead_manual", "alterar_status_lead", "reabrir_lead_perdido", "leads_view_all"],
-  conversas: ["acessar_conversas"],
-};
 
 type AccessInput = { tenantId: string; role: TenantRole; jobTitle: string; customRoleId: string | null };
 
@@ -133,8 +128,10 @@ export async function getCustomRolesWorkspace() {
   const [enabled, roles, members] = await Promise.all([
     isCustomRolesEnabled(context.tenantId),
     db.select().from(schema.customRoles).where(eq(schema.customRoles.tenantId, context.tenantId)),
-    db.select({ customRoleId: schema.tenantMemberships.customRoleId, count: schema.tenantMemberships.id })
-      .from(schema.tenantMemberships).where(eq(schema.tenantMemberships.tenantId, context.tenantId)),
+    db.select({ customRoleId: schema.tenantMemberships.customRoleId, count: schema.tenantMemberships.id, name: schema.user.name, role: schema.tenantMemberships.role })
+      .from(schema.tenantMemberships)
+      .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+      .where(eq(schema.tenantMemberships.tenantId, context.tenantId)),
   ]);
   const counts = new Map<string, number>();
   for (const member of members) if (member.customRoleId) counts.set(member.customRoleId, (counts.get(member.customRoleId) ?? 0) + 1);
@@ -145,7 +142,7 @@ export async function getCustomRolesWorkspace() {
     catalog: getAssignableCapabilities("none").concat(getAssignableCapabilities("own"), getAssignableCapabilities("branch"), getAssignableCapabilities("tenant"))
       .filter((item, index, list) => list.findIndex((candidate) => candidate.key === item.key) === index),
     routeCatalog,
-    roles: roles.map((role) => ({ ...role, memberCount: counts.get(role.id) ?? 0, permissions: permissions.filter((item) => item.customRoleId === role.id).map((item) => item.permissionKey) })),
+    roles: roles.map((role) => ({ ...role, memberCount: counts.get(role.id) ?? 0, members: members.filter((member) => member.customRoleId === role.id).map((member) => ({ name: member.name, role: member.role })), permissions: permissions.filter((item) => item.customRoleId === role.id).map((item) => item.permissionKey) })),
   };
 }
 

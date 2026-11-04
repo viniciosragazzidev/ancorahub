@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { roleScopeLabel } from "@/features/custom-roles/member-scope";
 import type { RouteDefinition } from "@/features/custom-roles/routes";
 import { isRoutePermission, routePermissionKey } from "@/features/custom-roles/routes";
+import { AREAS_SEM_CORTE_FINO, CARGO_MODELOS, completarAreas, telasDoCargo } from "@/features/custom-roles/presets";
 
 import { archiveCustomRoleAction, saveCustomRoleAction } from "../actions";
 import styles from "./cargos-lite.module.css";
@@ -36,6 +37,7 @@ export type CargoRole = {
   version: number;
   updatedAt: Date | string;
   memberCount: number;
+  members?: { name: string; role: string }[];
   permissions: string[];
 };
 
@@ -102,7 +104,17 @@ function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose }: 
     }
   }, [open, editing]);
 
-  const toggle = (key: string) => setSelected((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));
+  const toggle = (key: string) => setSelected((current) => (current.includes(key) ? current.filter((item) => item !== key) : completarAreas([...current, key])));
+  const aplicarModelo = (id: string) => {
+    const modelo = CARGO_MODELOS.find((item) => item.id === id);
+    if (!modelo) return;
+    setName(modelo.name);
+    setDescription(modelo.description);
+    setScope(modelo.scope);
+    setSelected([...modelo.permissions]);
+    toast.success(`Modelo "${modelo.name}" aplicado. Revise as telas e salve.`);
+  };
+  const telas = telasDoCargo(selected).map((key) => routeCatalog.find((route) => route.key === key)?.label ?? key);
   const changeScope = (next: string) => {
     const value = next as CargoRole["scope"];
     setScope(value);
@@ -146,12 +158,30 @@ function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose }: 
       description={editing ? `Versão ${editing.version} · atualizado em ${updatedDate.format(new Date(editing.updatedAt))}` : "Defina nome, abrangência e quais permissões este cargo terá no CRM."}
     >
       <form onSubmit={submit} className={form.form}>
+        {/* Resumo do que quem tem este cargo enxerga (F3, 04/11). */}
+        <div className={styles.info} role="status">
+          <span className={page.cellTitle}>O que quem tem este cargo vê</span>
+          <span className={page.cellSub}>
+            {telas.length ? `Telas: ${telas.join(", ")}.` : "Nenhuma tela marcada: a pessoa não abre nada do CRM."}
+          </span>
+          <span className={page.cellSub}>O cargo só corta: a pessoa nunca ganha mais do que o papel dela (diretor, gestor, supervisor ou corretor) permite.</span>
+        </div>
+        {!editing ? (
+          <div className={form.field}>
+            <span className={form.label}>Começar de um modelo</span>
+            <span className={styles.footerEnd}>
+              {CARGO_MODELOS.map((modelo) => (
+                <button key={modelo.id} type="button" className={page.button} onClick={() => aplicarModelo(modelo.id)} title={modelo.description}>{modelo.name}</button>
+              ))}
+            </span>
+          </div>
+        ) : null}
         <Tabs value={tab} onValueChange={(value) => setTab(String(value))} variant="segment" className={styles.tabs}>
           <div className={styles.tabsScroll}>
             <TabsList aria-label="Partes do cargo" className="w-max">
               <TabsTrigger value="identidade">Identidade</TabsTrigger>
               <TabsTrigger value="permissoes">Permissões{permissionCount ? <span className={styles.count}>{permissionCount}</span> : null}</TabsTrigger>
-              <TabsTrigger value="rotas">Rotas visíveis{routeCount ? <span className={styles.count}>{routeCount}</span> : null}</TabsTrigger>
+              <TabsTrigger value="rotas">Telas{routeCount ? <span className={styles.count}>{routeCount}</span> : null}</TabsTrigger>
               {editing ? <TabsTrigger value="membros">Membros{editing.memberCount ? <span className={styles.count}>{editing.memberCount}</span> : null}</TabsTrigger> : null}
             </TabsList>
           </div>
@@ -198,10 +228,10 @@ function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose }: 
           <TabsContent value="rotas">
             <div className={form.form}>
               <div className={styles.info}>
-                <span className={page.cellTitle}>Visibilidade no menu</span>
-                <span className={page.cellSub}>Escolha quais áreas este cargo enxerga. Sem rota marcada, o acesso segue as permissões.</span>
+                <span className={page.cellTitle}>Telas liberadas</span>
+                <span className={page.cellSub}>Quem tem este cargo só abre as telas marcadas, no menu, pelo link direto e nas ações. {Object.keys(AREAS_SEM_CORTE_FINO).map((key) => routeCatalog.find((route) => route.key === key)?.label ?? key).join(" e ")} entram inteiras: ao marcar, as permissões da área vêm junto.</span>
               </div>
-              <p className={page.muted}>{routeCount} de {routeCatalog.length} rotas com regra explícita.</p>
+              <p className={page.muted}>{routeCount} de {routeCatalog.length} telas liberadas.</p>
               {group(routeCatalog).map(([category, items]) => (
                 <section key={category} className={styles.group} aria-label={sentence(category)}>
                   <div className={styles.groupHead}><span className={page.cellTitle}>{sentence(category)}</span></div>
@@ -224,7 +254,14 @@ function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose }: 
                   <Link href="/equipe" className={page.button}><Users aria-hidden="true" size={16} />Ir para a equipe</Link>
                 </div>
               ) : (
-                <p className={page.muted}>Este cargo está com {editing.memberCount} membro{editing.memberCount === 1 ? "" : "s"}. Para trocar quem tem o cargo, edite o perfil do colaborador na <Link href="/equipe" className={page.cellLink}>equipe</Link>.</p>
+                <div className={form.form}>
+                  <ul className={styles.toggles}>
+                    {(editing.members ?? []).map((member) => (
+                      <li key={member.name} className={styles.toggleRow}><span className={page.cellTitle}>{member.name}</span><span className={page.badge}>{member.role === "director" ? "Diretor" : member.role === "manager" ? "Gestor" : member.role === "supervisor" ? "Supervisor" : "Corretor"}</span></li>
+                    ))}
+                  </ul>
+                  <p className={page.muted}>Para pôr ou tirar o cargo de alguém, edite o perfil do colaborador na <Link href="/equipe" className={page.cellLink}>equipe</Link>.</p>
+                </div>
               )}
             </TabsContent>
           ) : null}
