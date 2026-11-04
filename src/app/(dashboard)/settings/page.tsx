@@ -220,7 +220,7 @@ export default async function SettingsPage() {
               links={[
                 { label: "Qualificação e robô IA", href: "/qualificacao", description: "Prompt, diagnóstico do WhatsApp e MCP" },
                 { label: "Equipe e corretores", href: "/equipe", description: "Convites de usuários e permissões" },
-                { label: "Regras de distribuição", href: "/leads?tab=distribuicao", description: "Roleta de atendimento e prioridades" },
+                { label: "Regras de distribuição", href: "/distribuicao?view=roteamento", description: "Roleta de atendimento e prioridades" },
                 { label: "Guia e manual do sistema", href: "/guia", description: "Tours e definições de domínio" },
               ]}
             />
@@ -254,7 +254,7 @@ export default async function SettingsPage() {
             links={[
               { label: "Qualificação & Robô IA", href: "/qualificacao", description: "Prompt, WhatsApp Diagnóstico e MCP" },
               { label: "Equipe & Corretores", href: "/equipe", description: "Convites de usuários e permissões" },
-              { label: "Regras de Distribuição", href: "/leads?tab=distribuicao", description: "Roleta de atendimento e prioridades" },
+              { label: "Regras de Distribuição", href: "/distribuicao?view=roteamento", description: "Roleta de atendimento e prioridades" },
               { label: "Guia & Manual do Sistema", href: "/guia", description: "Tours e definições de domínio" },
             ]}
           />

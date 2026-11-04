@@ -32,6 +32,8 @@ const ROUTES: readonly RouteRule[] = [
   detail(/^\/dashboard\/drill\/[^/]+$/, "Detalhe do painel", () => "/dashboard"),
   detail(/^\/leads\/distribuicao\/plantao\/[^/]+$/, "Plantão", () => "/distribuicao?view=plantao"),
   detail(/^\/plantoes\/corretor\/[^/]+$/, "Plantão do corretor", () => "/plantoes"),
+  { test: exact("/propostas"), route: { title: "Propostas", parentHref: "/vendas" } },
+  { test: exact("/configuracoes/comissoes"), route: { title: "Regras de comissão", parentHref: "/vendas" } },
   { test: exact("/equipe/cargos"), route: { title: "Cargos", parentHref: "/equipe" } },
   { test: exact("/equipe/convidar"), route: { title: "Convidar corretor", parentHref: "/equipe" } },
   { test: exact("/equipe/recuperacoes"), route: { title: "Recuperações", parentHref: "/equipe" } },
