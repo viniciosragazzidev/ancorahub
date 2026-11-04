@@ -2,12 +2,10 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { getMessageLibrary } from "@/features/message-library/service";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { AtendimentoHeading } from "../_components/atendimento-heading";
 import { MessagesWorkspace } from "./_components/messages-workspace";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { isDutyShiftReminderEnabled } from "@/features/lead-distribution/duty-shift-reminder-flag";
-import { AtendimentoHeadingLite } from "../_components/atendimento-heading-lite";
 import { MessagesWorkspaceLite } from "./_components/messages-workspace-lite";
 
 export const dynamic = "force-dynamic";
@@ -33,9 +31,8 @@ export default async function AtendimentoMensagensPage() {
   if (await isDirectorLitePageOnServer(context, "/atendimento/mensagens")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Atendimento" title="Mensagens" />
+        <DashboardHeader breadcrumb="Atendimento IA" title="Mensagens" />
         <main className={litePage.stack}>
-          <AtendimentoHeadingLite active="mensagens" />
           <MessagesWorkspaceLite messages={messages} dutyReminderEnabled={dutyReminderEnabled} />
         </main>
       </>
@@ -44,9 +41,8 @@ export default async function AtendimentoMensagensPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Atendimento" title="Mensagens" />
+      <DashboardHeader breadcrumb="Atendimento IA" title="Mensagens" />
       <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
-        <AtendimentoHeading active="mensagens" />
         <MessagesWorkspace messages={messages} dutyReminderEnabled={dutyReminderEnabled} />
       </main>
     </>

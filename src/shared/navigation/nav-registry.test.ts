@@ -101,6 +101,18 @@ describe("nav-registry", () => {
     expect(resolveNavLocation("/dashboard?tab=quality")).toMatchObject({ area: { id: "inicio" } });
   });
 
+  it("views of the same page match by query, and old values keep working", () => {
+    expect(resolveNavLocation("/qualificacao")).toMatchObject({ area: { id: "atendimento-ia" }, tab: { id: "comportamento" } });
+    expect(resolveNavLocation("/qualificacao?tab=followup_rules")).toMatchObject({ tab: { id: "follow-up" } });
+    expect(resolveNavLocation("/qualificacao", new URLSearchParams("tab=simulator"))).toMatchObject({ tab: { id: "simulador" } });
+    expect(resolveNavLocation("/qualificacao?tab=alerts")).toMatchObject({ tab: { id: "simulador" } });
+    expect(resolveNavLocation("/qualificacao?tab=mcp_governance")).toMatchObject({ tab: { id: "permissoes" } });
+    expect(resolveNavLocation("/qualificacao?tab=training")).toMatchObject({ tab: { id: "comportamento" } });
+    expect(resolveNavLocation("/qualificacao/turbo")).toMatchObject({ tab: { id: "turbo" } });
+    expect(resolveNavLocation("/atendimento")).toMatchObject({ area: { id: "atendimento-ia" }, tab: { id: "situacoes" } });
+    expect(resolveNavLocation("/atendimento/fluxo")).toMatchObject({ tab: { id: "perguntas" } });
+  });
+
   it("the director sees 9 menu items, each opening its first visible tab", () => {
     const areas = visibleNavAreas(director);
     expect(areas.map((item) => item.area.id)).toEqual(["inicio", "conversas", "leads", "distribuicao", "comercial", "equipe", "atendimento-ia", "marketing", "configuracoes"]);

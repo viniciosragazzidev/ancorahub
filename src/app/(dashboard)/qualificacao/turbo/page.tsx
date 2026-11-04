@@ -20,7 +20,7 @@ export default async function QualificacaoTurboPage() {
   if (await isDirectorLitePageOnServer(context, "/qualificacao/turbo")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Qualificação" title="Qualificação turbo" />
+        <DashboardHeader breadcrumb="Atendimento IA" title="Turbo" />
         <main className={litePage.stack}>
           <TurboAdminLite data={data} />
         </main>
@@ -29,7 +29,7 @@ export default async function QualificacaoTurboPage() {
   }
   return (
     <>
-      <DashboardHeader breadcrumb="Qualificação" title="Qualificação turbo" />
+      <DashboardHeader breadcrumb="Atendimento IA" title="Turbo" />
       <main className="flex flex-1 flex-col p-(--mobile-page-padding) lg:p-6">
         <TurboAdmin data={data} />
       </main>

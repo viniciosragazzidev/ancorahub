@@ -22,6 +22,8 @@ export type NavTab = {
   roles?: readonly TenantRole[];
   /** Escondida enquanto a chave correspondente estiver desligada. */
   requires?: "negotiations" | "relationshipCenter";
+  /** Outros valores de query que abrem a mesma aba (links antigos), ex.: { tab: ["alerts"] }. */
+  aliases?: Readonly<Record<string, readonly string[]>>;
 };
 
 export type NavArea = {
@@ -103,7 +105,14 @@ export const NAV_AREAS: readonly NavArea[] = [
     section: "Crescimento",
     tabs: [
       { id: "comportamento", label: "Comportamento", href: "/qualificacao", permission: "acessar_qualificacao_ia" },
-      { id: "roteiros", label: "Roteiros e mensagens", href: "/atendimento/situacoes", permission: "acessar_qualificacao_ia", paths: ["/atendimento"] },
+      { id: "perguntas", label: "Perguntas", href: "/atendimento/fluxo", permission: "acessar_qualificacao_ia" },
+      { id: "situacoes", label: "Situações", href: "/atendimento/situacoes", permission: "acessar_qualificacao_ia", paths: ["/atendimento"] },
+      { id: "mensagens", label: "Mensagens", href: "/atendimento/mensagens", permission: "acessar_qualificacao_ia" },
+      { id: "follow-up", label: "Follow-up", href: "/qualificacao?tab=followup_rules", permission: "acessar_qualificacao_ia" },
+      { id: "simulador", label: "Simulador", href: "/qualificacao?tab=simulator", permission: "acessar_qualificacao_ia", aliases: { tab: ["alerts"] } },
+      { id: "turbo", label: "Turbo", href: "/qualificacao/turbo", permission: "acessar_qualificacao_ia" },
+      { id: "permissoes", label: "Permissões", href: "/qualificacao?tab=agent_triggers", permission: "acessar_qualificacao_ia", aliases: { tab: ["mcp_governance"] } },
+      { id: "conectividade", label: "Conectividade", href: "/qualificacao?tab=whatsapp_diag", permission: "acessar_qualificacao_ia" },
       { id: "fluxos", label: "Fluxos de WhatsApp", href: "/fluxos-whatsapp", permission: "acessar_qualificacao_ia", roles: ["director"] },
       { id: "base", label: "Base de conhecimento", href: "/ferramentas/materiais-operadoras", permission: "acessar_ferramentas", roles: ["director"] },
     ],
@@ -137,33 +146,55 @@ function pathOf(href: string) {
   return href.split(/[?#]/, 1)[0] || "/";
 }
 
+function queryOf(href: string): Record<string, string> {
+  const query = href.split("?")[1]?.split("#")[0];
+  return query ? Object.fromEntries(new URLSearchParams(query)) : {};
+}
+
 function covers(prefix: string, pathname: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
-/** Tamanho do caminho mais específico da aba que cobre o pathname; 0 quando não cobre. */
-function tabMatchLength(tab: NavTab, pathname: string) {
+/** Leitor de query: URLSearchParams e o ReadonlyURLSearchParams do Next servem. */
+export type NavSearch = { get(name: string): string | null };
+
+/**
+ * Quanto a aba cobre o endereço; 0 quando não cobre. Vence o caminho mais longo; no mesmo caminho,
+ * a aba cuja query bate vence a aba sem query (a visão padrão da página).
+ */
+function tabMatchScore(tab: NavTab, pathname: string, search: NavSearch | null) {
   const own = pathOf(tab.href);
-  const candidates = [own, ...(tab.paths ?? [])];
+  const query = queryOf(tab.href);
+  const keys = Object.keys(query);
+  if (keys.length > 0) {
+    if (pathname !== own) return 0;
+    const matches = keys.every((key) => {
+      const value = search?.get(key) ?? null;
+      return value === query[key] || (value !== null && (tab.aliases?.[key] ?? []).includes(value));
+    });
+    return matches ? own.length * 2 + 1 : 0;
+  }
   let best = 0;
-  for (const candidate of candidates) {
-    if (covers(candidate, pathname) && candidate.length > best) best = candidate.length;
+  for (const candidate of [own, ...(tab.paths ?? [])]) {
+    if (covers(candidate, pathname) && candidate.length * 2 > best) best = candidate.length * 2;
   }
   return best;
 }
 
 export type NavMatch = { area: NavArea; tab: NavTab };
 
-/** Área e aba de um caminho: vence o caminho mais específico entre todas as abas. */
-export function resolveNavLocation(pathname: string): NavMatch | null {
-  const path = pathOf(pathname).replace(/(.)\/+$/, "$1");
+/** Área e aba de um endereço: vence o caminho mais específico entre todas as abas. */
+export function resolveNavLocation(pathname: string, search: NavSearch | null = null): NavMatch | null {
+  const [rawPath, rawQuery] = pathname.split("?");
+  const path = (rawPath || "/").replace(/(.)\/+$/, "$1");
+  const query = search ?? (rawQuery ? new URLSearchParams(rawQuery) : null);
   let found: NavMatch | null = null;
-  let bestLength = 0;
+  let bestScore = 0;
   for (const area of NAV_AREAS) {
     for (const tab of area.tabs) {
-      const length = tabMatchLength(tab, path);
-      if (length > bestLength) {
-        bestLength = length;
+      const score = tabMatchScore(tab, path, query);
+      if (score > bestScore) {
+        bestScore = score;
         found = { area, tab };
       }
     }

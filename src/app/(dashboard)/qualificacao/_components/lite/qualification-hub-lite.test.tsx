@@ -47,12 +47,13 @@ describe("hub de qualificação Lite", () => {
     expect(payload.businessContext).toContain("Rio de Janeiro");
   });
 
-  it("aba antiga redireciona e a troca de aba mostra o conteúdo certo", () => {
+  it("aba antiga redireciona e a aba segue a URL (a barra da área Atendimento IA troca a query)", () => {
     search.value = "tab=mcp_governance";
-    render(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} />);
-    expect(screen.getByRole("tab", { name: "Permissões" })).toHaveAttribute("aria-selected", "true");
+    const { rerender } = render(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} />);
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(screen.getAllByText("Bloqueada (crítica)").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole("tab", { name: "Conectividade" }));
+    search.value = "tab=whatsapp_diag";
+    rerender(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} />);
     expect(screen.getByText("+55 21 99999-0000")).toBeInTheDocument();
   });
 
@@ -70,7 +71,6 @@ describe("hub de qualificação Lite", () => {
   it("simulador: alerta ativo aparece na aba e resolve pela mesma ação", async () => {
     search.value = "tab=alerts";
     render(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} />);
-    expect(screen.getByRole("tab", { name: "Simulador (1)" })).toHaveAttribute("aria-selected", "true");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Resolver alerta" }));
     });

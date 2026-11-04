@@ -1,6 +1,6 @@
 # Organização das rotas: cada assunto numa área, com abas
 
-Data: 2026-11-04. Status: Fase 0 feita; Fases 1 a 8 pendentes.
+Data: 2026-11-04. Status: Fases 0, 1 e 2 feitas; Fases 3 a 8 pendentes.
 
 ## Objetivo
 
@@ -50,8 +50,13 @@ O modo Light (corretor, supervisor e gerente) mantém a estrutura atual; só os 
     - `/leads?tab=plantao` passou para `/distribuicao?view=plantao`
     - `/dashboard?tab=commercial` passou para `/dashboard`
   - Removido o link "Materiais de divulgação" de Campanhas: não existe tela de materiais para a corretora.
-- **Fase 1, base:** cadastro único de navegação, componente de abas da área e menu lateral com 8 áreas.
-- **Fases 2 a 8, uma área por vez:** Atendimento IA, Distribuição, Comercial, Equipe, Configurações, Leads e Conversas.
+- **Fase 1, base: feita** (branch `feat/organizacao-rotas-f1`). Cadastro em `src/shared/navigation/nav-registry.ts`, `AreaTabs` abaixo do cabeçalho, menu lateral com as áreas.
+- **Fase 2, Atendimento IA: feita** (branch `feat/organizacao-rotas-f2`). Uma fileira de abas: Comportamento, Perguntas, Situações, Mensagens, Follow-up, Simulador, Turbo, Permissões, Conectividade, Fluxos de WhatsApp (diretor) e Base de conhecimento (diretor).
+  - O cadastro aceita aba por query (`/qualificacao?tab=...`, com valores antigos como `alerts` e `mcp_governance`); trocar entre visões da mesma página só muda a URL, sem recarregar nem perder o que foi digitado.
+  - Saíram as abas internas da Qualificação e de Atendimento e o botão "Qualificação turbo".
+  - Pendente para a fase de Configurações: Conectividade vai para Configurações > WhatsApp; o cartão de modo da IA ainda está em Ajustes > Atendimento.
+  - O contador de alertas que aparecia em "Simulador (1)" saiu junto com a aba interna.
+- **Fases 3 a 8, uma área por vez:** Distribuição, Comercial, Equipe, Configurações, Leads e Conversas.
 - **Limpeza final:** apagar as telas mortas `/minha-fila/page.tsx`, os 6 `*/dashboard` de domínio, `/tarefas/dashboard` e `/settings/extension`. Antes, verificar se `/minha-fila` tem algo que a fila Light não tem, como a aba "Aguardando aceite".
 
 ## Riscos
