@@ -485,6 +485,9 @@ export async function changeLeadStatus(
     previousStatus,
     newStatus,
   });
+  // And the direction (numbers set in Avisos da equipe): client, broker and the conversation summary.
+  const { notifyDirectorsClosingStage } = await import("./closing-director-alert");
+  void notifyDirectorsClosingStage({ tenantId: lead.tenantId, leadId: lead.id, previousStatus, newStatus });
 
   if (newStatus === "lost") {
     const { triggerInstantAutomation } = await import("@/features/automations/engine");

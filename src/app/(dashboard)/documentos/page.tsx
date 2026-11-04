@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -7,6 +8,7 @@ import { DocumentsWorkspace } from "@/features/documents/components/documents-wo
 import { DocumentsLite } from "@/features/documents/components/documents-lite";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import {
   getDocumentRequirements,
   getPendingDocuments,
@@ -14,6 +16,14 @@ import {
 
 export default async function DocumentsPage() {
   const context = await getRequiredTenantContext();
+  const canAccess = await hasEffectiveCapability({
+    tenantId: context.tenantId,
+    role: context.role,
+    jobTitle: context.jobTitle,
+    customRoleId: context.customRoleId ?? null,
+    permission: "acessar_documentos",
+  });
+  if (!canAccess) redirect("/access-denied");
 
   const db = getDatabase();
 
@@ -55,6 +65,7 @@ export default async function DocumentsPage() {
             initialRequirements={requirements}
             initialPendingDocs={pendingDocs.map((doc) => ({ ...doc, createdAt: new Date(doc.createdAt) }))}
             canConfigure={context.role === "director"}
+            generatedAt={new Date()}
           />
         </main>
       </>
@@ -65,16 +76,6 @@ export default async function DocumentsPage() {
     <>
       <DashboardHeader breadcrumb="Operação comercial" title="Documentos" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
-        {/* Contexto de página legado, preservado para eventual restauração:
-        <section>
-          <p className="text-xs font-medium text-primary">OPERAÇÃO COMERCIAL</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Gestão Documental</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Acompanhe pendências de documentos enviados pelos corretores e configure exigências obrigatórias.
-          </p>
-        </section>
-        */}
-
         <DocumentsWorkspace
           role={context.role}
           carriers={carriers}

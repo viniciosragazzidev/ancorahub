@@ -27,6 +27,7 @@ import {
   Megaphone,
   HandHeart,
   Toolbox,
+  FileText,
 } from "@phosphor-icons/react";
 import {
   DropdownMenu,
@@ -135,6 +136,15 @@ const navigationItems: NavItemConfig[] = [
     permission: "acessar_vendas",
     section: "Operação",
     iconTone: "text-orange-600 dark:text-orange-300",
+  },
+  {
+    label: "Documentos",
+    fullLabel: "Documentos dos leads e requisitos",
+    icon: FileText,
+    url: "/documentos",
+    permission: "acessar_documentos",
+    section: "Operação",
+    iconTone: "text-blue-600 dark:text-blue-300",
   },
   {
     label: "Equipe",

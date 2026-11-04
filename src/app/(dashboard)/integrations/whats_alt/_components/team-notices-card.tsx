@@ -7,6 +7,7 @@ import { LockKey, ChatCircleText, Trash } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { SearchAddList } from "@/components/ui/search-add-list";
 import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,6 +33,8 @@ export type TeamNoticeRow = {
   freeMessageIds: string[];
   /** The built-in versions with example values, for the preview. */
   builtInPreviews: string[];
+  /** Notices sent to typed WhatsApp numbers (Fechamento para a direção). */
+  recipientPhones?: string[];
 };
 
 type FreeMessage = { id: string; name: string; content: string };
@@ -69,7 +72,10 @@ export function TeamNoticesCard({
   const update = (key: string, patch: Partial<TeamNoticeRow>) => setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
 
   function save() {
-    const payload: TeamNoticeInput[] = rows.filter((row) => !row.metaOnly).map((row) => ({ key: row.key, enabled: row.enabled, channel: row.channel, freeMessageIds: row.freeMessageIds }));
+    const payload: TeamNoticeInput[] = rows.filter((row) => !row.metaOnly).map((row) => ({
+      key: row.key, enabled: row.enabled, channel: row.channel, freeMessageIds: row.freeMessageIds,
+      ...(row.recipientPhones ? { recipientPhones: row.recipientPhones.map((phone) => phone.trim()).filter(Boolean) } : {}),
+    }));
     startTransition(async () => {
       const result = await saveTeamNoticesAction(payload);
       if (!result.success) {
@@ -116,6 +122,22 @@ export function TeamNoticesCard({
                   {row.alwaysOn && !row.chat ? <span className="text-[11px] font-normal text-muted-foreground">sempre ligado</span> : null}
                 </p>
                 <p className="text-xs leading-5 text-muted-foreground">{row.description}</p>
+                {row.recipientPhones ? (
+                  <label className="mt-2 grid gap-1">
+                    <span className="text-xs font-medium text-foreground">Quem recebe (WhatsApp, separados por vírgula)</span>
+                    <Input
+                      value={row.recipientPhones.join(", ")}
+                      disabled={!row.enabled}
+                      inputMode="tel"
+                      placeholder="(21) 99999-0000"
+                      aria-label={`Números que recebem ${row.label}`}
+                      onChange={(event) => update(row.key, { recipientPhones: event.target.value.split(",").map((phone) => phone.trimStart()) })}
+                    />
+                    {row.enabled && !row.recipientPhones.some((phone) => phone.trim()) ? (
+                      <span className="text-[11px] text-muted-foreground">Sem número, nada é enviado.</span>
+                    ) : null}
+                  </label>
+                ) : null}
               </div>
             </div>
             {row.metaOnly ? (

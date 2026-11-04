@@ -7,6 +7,7 @@
  * formulário de novo requisito. Mesmas Server Actions, mensagens e o tratamento de versão nova do sistema.
  */
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ExternalLink, RefreshCw, Search, Trash2, XCircle } from "lucide-react";
 
@@ -68,9 +69,22 @@ const STATUS_BADGE: Record<string, { label: string; tone?: "success" | "danger" 
   rejected: { label: "Rejeitado", tone: "danger" },
 };
 
-export function DocumentsLite({ carriers, plans, initialRequirements, initialPendingDocs, canConfigure = false }: {
+const HOUR_MS = 60 * 60 * 1000;
+
+/** Idade do pendente mais antigo em linguagem curta (horas até 1 dia, depois dias). */
+export function formatPendingAge(createdAt: Date, now: Date) {
+  const hours = Math.max(0, Math.floor((now.getTime() - createdAt.getTime()) / HOUR_MS));
+  if (hours < 1) return "Menos de 1 hora";
+  if (hours < 24) return hours === 1 ? "1 hora" : `${hours} horas`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "1 dia" : `${days} dias`;
+}
+
+export function DocumentsLite({ carriers, plans, initialRequirements, initialPendingDocs, canConfigure = false, generatedAt }: {
   /** Aba "Configuração de requisitos": a mesma regra do DocumentsWorkspace (só o diretor). */
   canConfigure?: boolean;
+  /** Momento em que o servidor montou a fila: base estável para a idade do pendente mais antigo (sem divergência na hidratação). */
+  generatedAt?: Date;
   carriers: Carrier[];
   plans: Plan[];
   initialRequirements: RequirementLite[];
@@ -85,6 +99,12 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
   const [carrierId, setCarrierId] = useState("");
   const [planId, setPlanId] = useState("");
   const [, startTransition] = useTransition();
+  const [bulkPending, startBulkTransition] = useTransition();
+  const [deletePending, startDeleteTransition] = useTransition();
+  // Linhas com revisão em andamento: os botões ficam desabilitados até a resposta, para o clique duplo não enviar duas vezes.
+  const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(() => new Set());
+  const busyRef = useRef(new Set<string>());
+  const [now] = useState(() => generatedAt ?? new Date());
   const [reqState, reqAction, reqPending] = useActionState(createRequirementAction, {});
   const reqFormRef = useRef<HTMLFormElement>(null);
   const [reqKey, setReqKey] = useState(0);
@@ -117,11 +137,24 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
     return byStatus.filter((doc) => [doc.leadNome, doc.filename, doc.requirementName ?? ""].some((value) => value.toLocaleLowerCase("pt-BR").includes(needle)));
   }, [docs, status, query]);
 
+  const oldestPending = useMemo(() => docs.reduce<PendingDocLite | null>((oldest, doc) => {
+    if (doc.status !== "pending") return oldest;
+    return !oldest || new Date(doc.createdAt).getTime() < new Date(oldest.createdAt).getTime() ? doc : oldest;
+  }, null), [docs]);
+
   const ids = useMemo(() => filtered.map((doc) => doc.id), [filtered]);
   const multiSelect = useMultiSelect(ids);
   const { pageRows, pagination } = useLitePages(filtered, 10);
 
+  const setBusy = (docId: string, busy: boolean) => {
+    if (busy) busyRef.current.add(docId);
+    else busyRef.current.delete(docId);
+    setBusyIds(new Set(busyRef.current));
+  };
+
   const review = (docId: string, leadId: string, next: "approved" | "rejected") => {
+    if (busyRef.current.has(docId)) return;
+    setBusy(docId, true);
     startTransition(async () => {
       try {
         const result = await reviewDocumentAction({ documentId: docId, leadId, status: next });
@@ -133,14 +166,16 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
       } catch (error) {
         if (isVersionSkewError(error)) reloadAfterDeploymentUpdate();
         else toast.error("Não foi possível atualizar o documento. Tente novamente.");
+      } finally {
+        setBusy(docId, false);
       }
     });
   };
 
   const bulkReview = (next: "approved" | "rejected") => {
     const selected = multiSelect.selectedIds;
-    if (selected.length === 0) return;
-    startTransition(async () => {
+    if (selected.length === 0 || bulkPending) return;
+    startBulkTransition(async () => {
       try {
         const result = await bulkReviewDocumentsAction(selected, next);
         if (result.error) toast.error(result.error);
@@ -159,20 +194,25 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
   const confirmDelete = () => {
     const requirement = deleting;
     setDeleting(null);
-    if (!requirement) return;
-    startTransition(async () => {
-      const result = await deleteRequirementAction(requirement.id);
-      if (result.error) toast.error(result.error);
-      else {
-        toast.success("Requisito removido.");
-        setRequirements((current) => current.filter((item) => item.id !== requirement.id));
+    if (!requirement || deletePending) return;
+    startDeleteTransition(async () => {
+      try {
+        const result = await deleteRequirementAction(requirement.id);
+        if (result.error) toast.error(result.error);
+        else {
+          toast.success("Requisito removido.");
+          setRequirements((current) => current.filter((item) => item.id !== requirement.id));
+        }
+      } catch (error) {
+        if (isVersionSkewError(error)) reloadAfterDeploymentUpdate();
+        else toast.error("Não foi possível remover o requisito. Tente novamente.");
       }
     });
   };
   const cancelDelete = useCallback(() => setDeleting(null), []);
 
   const columns: LiteColumn<PendingDocLite>[] = [
-    { id: "lead", label: "Lead", primary: true, render: (doc) => <a href={`/leads/${doc.leadId}`} className={styles.link}>{doc.leadNome}</a> },
+    { id: "lead", label: "Lead", primary: true, render: (doc) => <Link href={`/leads/${doc.leadId}`} className={styles.link}>{doc.leadNome}</Link> },
     {
       id: "file",
       label: "Documento e tipo",
@@ -200,22 +240,27 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
       id: "actions",
       label: "Ações",
       render: (doc) => doc.status === "pending" ? (
-        <span className={styles.rowActions}>
-          <button type="button" className={styles.iconSuccess} aria-label={`Aprovar ${doc.filename} de ${doc.leadNome}`} title="Aprovar" onClick={() => review(doc.id, doc.leadId, "approved")}><CheckCircle2 aria-hidden="true" size={18} /></button>
-          <button type="button" className={styles.iconDanger} aria-label={`Rejeitar ${doc.filename} de ${doc.leadNome}`} title="Rejeitar" onClick={() => review(doc.id, doc.leadId, "rejected")}><XCircle aria-hidden="true" size={18} /></button>
+        <span className={styles.rowActions} aria-busy={busyIds.has(doc.id) || undefined}>
+          <button type="button" className={styles.iconSuccess} aria-label={`Aprovar ${doc.filename} de ${doc.leadNome}`} title="Aprovar" disabled={busyIds.has(doc.id)} onClick={() => review(doc.id, doc.leadId, "approved")}><CheckCircle2 aria-hidden="true" size={18} /></button>
+          <button type="button" className={styles.iconDanger} aria-label={`Rejeitar ${doc.filename} de ${doc.leadNome}`} title="Rejeitar" disabled={busyIds.has(doc.id)} onClick={() => review(doc.id, doc.leadId, "rejected")}><XCircle aria-hidden="true" size={18} /></button>
         </span>
       ) : (
-        <button type="button" className={page.iconButton} aria-label={`Alterar status de ${doc.filename}`} title="Alterar status" onClick={() => review(doc.id, doc.leadId, doc.status === "approved" ? "rejected" : "approved")}>
+        <button type="button" className={page.iconButton} aria-label={`Alterar status de ${doc.filename}`} title="Alterar status" disabled={busyIds.has(doc.id)} onClick={() => review(doc.id, doc.leadId, doc.status === "approved" ? "rejected" : "approved")}>
           <RefreshCw aria-hidden="true" size={18} />
         </button>
       ),
     },
   ];
 
-  const emptyText = status === "pending" ? "Nenhum documento aguardando aprovação." : status === "approved" ? "Nenhum documento aprovado encontrado." : status === "rejected" ? "Nenhum documento rejeitado encontrado." : "Nenhum documento encontrado.";
+  // Vazio pela busca (há documentos no status, mas nenhum bate com o texto) é diferente de não haver documento no status.
+  const emptyByQuery = query.trim() !== "" && counts[status] > 0;
+  const emptyTitle = emptyByQuery ? "Nenhum resultado" : status === "pending" ? "Tudo em dia" : "Nada por aqui";
+  const emptyText = emptyByQuery
+    ? "Nenhum documento encontrado com esse filtro."
+    : status === "pending" ? "Nenhum documento aguardando aprovação." : status === "approved" ? "Nenhum documento aprovado ainda." : status === "rejected" ? "Nenhum documento rejeitado." : "Nenhum documento enviado nos leads ainda.";
 
   return (
-    <div className={`arc-venancor ${page.stack}`} data-skin="diretor">
+    <div className={`arc-venancor ${styles.root}`} data-skin="diretor">
       <Tabs defaultValue="queue" variant="segment" className={styles.tabs}>
         {canConfigure ? (
           <div className={styles.views}>
@@ -227,6 +272,21 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
         ) : null}
 
         <TabsContent value="queue" className={styles.panel}>
+          <div className={page.stats} role="group" aria-label="Resumo da fila">
+            <div className={page.stat}>
+              <span className={page.statLabel}>Aguardando aprovação</span>
+              <span className={page.statValue}>{counts.pending}</span>
+            </div>
+            <div className={page.stat}>
+              <span className={page.statLabel}>Pendente mais antigo</span>
+              <span className={page.statValue}>{oldestPending ? formatPendingAge(new Date(oldestPending.createdAt), now) : "Nenhum"}</span>
+              {oldestPending ? <span className={page.statHint} title={oldestPending.leadNome}>{oldestPending.leadNome}</span> : null}
+            </div>
+            <div className={page.stat}>
+              <span className={page.statLabel}>Rejeitados</span>
+              <span className={page.statValue}>{counts.rejected}</span>
+            </div>
+          </div>
           <div className={page.toolbar}>
             <label className={page.search}>
               <Search aria-hidden="true" size={18} className={page.searchIcon} />
@@ -247,8 +307,9 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
           />
           {filtered.length === 0 ? (
             <div className={page.empty}>
-              <h2 className={page.emptyTitle}>Tudo em dia</h2>
+              <h2 className={page.emptyTitle}>{emptyTitle}</h2>
               <p className={page.emptyText}>{emptyText}</p>
+              {emptyByQuery ? <button type="button" className={page.button} onClick={() => setQuery("")}>Limpar busca</button> : null}
             </div>
           ) : (
             <>
@@ -273,8 +334,8 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
             count={multiSelect.count}
             onClear={multiSelect.clear}
             actions={[
-              { id: "approve", label: "Aprovar", onRun: () => bulkReview("approved") },
-              { id: "reject", label: "Rejeitar", tone: "danger", onRun: () => bulkReview("rejected") },
+              { id: "approve", label: "Aprovar", disabled: bulkPending, onRun: () => bulkReview("approved") },
+              { id: "reject", label: "Rejeitar", tone: "danger", disabled: bulkPending, onRun: () => bulkReview("rejected") },
             ]}
           />
         </TabsContent>
@@ -305,7 +366,7 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
                       label: "Ações",
                       numeric: true,
                       render: (requirement) => (
-                        <button type="button" className={styles.iconDanger} aria-label={`Excluir requisito ${requirement.name}`} onClick={() => setDeleting(requirement)}>
+                        <button type="button" className={styles.iconDanger} aria-label={`Excluir requisito ${requirement.name}`} disabled={deletePending} onClick={() => setDeleting(requirement)}>
                           <Trash2 aria-hidden="true" size={16} />
                         </button>
                       ),
