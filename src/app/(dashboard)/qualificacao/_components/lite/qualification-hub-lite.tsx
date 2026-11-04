@@ -217,7 +217,7 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
 
   return (
     <>
-      <DashboardHeader breadcrumb="Atendimento IA" title="Atendimento IA" />
+      <DashboardHeader breadcrumb="Qualificação IA" title="Qualificação IA" />
       <main className={page.stack}>
         <div className={styles.actions}>
           <span className={page.badge} data-tone={fields.enabled ? "success" : undefined}>{fields.enabled ? "IA operando" : "IA pausada"}</span>

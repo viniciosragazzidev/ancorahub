@@ -141,7 +141,7 @@ export function SituacoesShellScreen() {
   ];
   return (
     <>
-      <DashboardHeader breadcrumb="Atendimento IA" title="Situações" />
+      <DashboardHeader breadcrumb="Atendimento" title="Situações" />
       <main className={litePage.stack}>
         <SituationsWorkspaceLite situations={situations} learning={{ suggestions: [], coverage: { percent: 82, covered: 41, total: 50 }, autoActivate: false }} autoActivatedKeys={["s1"]} canConfigure />
       </main>
@@ -162,7 +162,7 @@ export function MensagensShellScreen() {
   ];
   return (
     <>
-      <DashboardHeader breadcrumb="Atendimento IA" title="Mensagens" />
+      <DashboardHeader breadcrumb="Atendimento" title="Mensagens" />
       <main className={litePage.stack}>
         <MessagesWorkspaceLite messages={messages} />
       </main>
@@ -174,7 +174,7 @@ export function FluxoShellScreen() {
   const keys = QUALIFICATION_FIELDS.map((field) => field.key);
   return (
     <>
-      <DashboardHeader breadcrumb="Atendimento IA" title="Perguntas" />
+      <DashboardHeader breadcrumb="Atendimento" title="Fluxo de atendimento" />
       <main className={litePage.stack}>
         <FlowEditorLite enabledOrder={keys.slice(0, Math.max(1, keys.length - 1))} texts={{ [keys[0]!]: "Para começar, qual o seu nome completo?" }} canEdit />
       </main>

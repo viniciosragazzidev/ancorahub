@@ -23,7 +23,7 @@ export default async function MateriaisOperadorasPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Atendimento IA" title="Base de conhecimento" />
+      <DashboardHeader breadcrumb="Ferramentas" title="Materiais das operadoras" />
       <main className="flex flex-1 flex-col p-(--mobile-page-padding) lg:p-6">
         <MaterialsWorkspace
           materials={materials}

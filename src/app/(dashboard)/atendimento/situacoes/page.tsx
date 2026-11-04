@@ -34,7 +34,7 @@ export default async function AtendimentoSituacoesPage({ searchParams }: { searc
   if (await isDirectorLitePageOnServer(context, "/atendimento/situacoes")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Atendimento IA" title="Situações" />
+        <DashboardHeader breadcrumb="Atendimento" title="Situações" />
         <main className={litePage.stack}>
           <SituationsWorkspaceLite situations={situations} learning={learning} autoActivatedKeys={aiKeys} initialView={params.view} canConfigure={context.role === "director"} />
         </main>
@@ -44,7 +44,7 @@ export default async function AtendimentoSituacoesPage({ searchParams }: { searc
 
   return (
     <>
-      <DashboardHeader breadcrumb="Atendimento IA" title="Situações" />
+      <DashboardHeader breadcrumb="Atendimento" title="Situações" />
       <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <SituationsWorkspace situations={situations} learning={learning} autoActivatedKeys={aiKeys} initialView={params.view} canConfigure={context.role === "director"} />
       </main>

@@ -31,7 +31,7 @@ export default async function AtendimentoMensagensPage() {
   if (await isDirectorLitePageOnServer(context, "/atendimento/mensagens")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Atendimento IA" title="Mensagens" />
+        <DashboardHeader breadcrumb="Atendimento" title="Mensagens" />
         <main className={litePage.stack}>
           <MessagesWorkspaceLite messages={messages} dutyReminderEnabled={dutyReminderEnabled} />
         </main>
@@ -41,7 +41,7 @@ export default async function AtendimentoMensagensPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Atendimento IA" title="Mensagens" />
+      <DashboardHeader breadcrumb="Atendimento" title="Mensagens" />
       <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <MessagesWorkspace messages={messages} dutyReminderEnabled={dutyReminderEnabled} />
       </main>

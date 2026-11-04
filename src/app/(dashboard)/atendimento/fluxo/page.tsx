@@ -23,7 +23,7 @@ export default async function AtendimentoFluxoPage() {
   if (await isDirectorLitePageOnServer(context, "/atendimento/fluxo")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Atendimento IA" title="Perguntas" />
+        <DashboardHeader breadcrumb="Atendimento" title="Fluxo de atendimento" />
         <main className={litePage.stack}>
           <FlowEditorLite enabledOrder={flow.enabledOrder} texts={flow.texts} canEdit={context.role === "director"} />
         </main>
@@ -33,7 +33,7 @@ export default async function AtendimentoFluxoPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Atendimento IA" title="Perguntas" />
+      <DashboardHeader breadcrumb="Atendimento" title="Fluxo de atendimento" />
       <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <FlowEditor enabledOrder={flow.enabledOrder} texts={flow.texts} canEdit={context.role === "director"} />
       </main>

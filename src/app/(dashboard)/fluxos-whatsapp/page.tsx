@@ -29,7 +29,7 @@ export default async function FluxosWhatsappPage() {
   if (await isDirectorLitePageOnServer(context, "/fluxos-whatsapp")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Atendimento IA" title="Fluxos de WhatsApp" />
+        <DashboardHeader breadcrumb="Atendimento" title="Fluxos de WhatsApp" />
         <main className={litePage.stack}>
           <p className={litePage.cardDescription}>Recepção, qualificação e roteamento de contatos do WhatsApp usando a frota ativa do WAHA.</p>
           <WhatsappFlowsLite initialFlows={flows} />

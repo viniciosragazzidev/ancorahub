@@ -348,8 +348,8 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
   return (
     <div className="flex min-h-full flex-col bg-background">
       <DashboardHeader
-        breadcrumb="Atendimento IA"
-        title="Atendimento IA"
+        breadcrumb="Qualificação IA"
+        title="Qualificação IA"
         rightSlot={
           <div className="flex items-center gap-2">
             <BulkQualificationDialog />

@@ -133,12 +133,14 @@ describe("nav-registry", () => {
   it("the director sees 9 menu items, each opening its first visible tab", () => {
     const areas = visibleNavAreas(director);
     expect(areas.map((item) => item.area.id)).toEqual(["inicio", "conversas", "leads", "distribuicao", "comercial", "equipe", "atendimento-ia", "marketing", "configuracoes"]);
-    expect(areas.find((item) => item.area.id === "comercial")?.href).toBe("/negociacoes");
+    expect(areas.find((item) => item.area.id === "comercial")?.href).toBe("/vendas");
   });
 
-  it("Comercial starts at Propostas while negotiations are off", () => {
+  it("Comercial opens at Vendas, like the old menu item, and hides Negociações while it is off", () => {
     const areas = visibleNavAreas({ ...director, negotiationsEnabled: false });
-    expect(areas.find((item) => item.area.id === "comercial")?.href).toBe("/propostas");
+    const comercial = areas.find((item) => item.area.id === "comercial")!;
+    expect(comercial.href).toBe("/vendas");
+    expect(comercial.tabs.map((tab) => tab.id)).not.toContain("negociacoes");
   });
 
   it("role-only tabs stay hidden for other roles", () => {
