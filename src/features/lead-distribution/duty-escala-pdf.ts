@@ -71,23 +71,8 @@ export function hueToRgb(hue: number | null): Palette {
 // Layout
 // ---------------------------------------------------------------------------
 
-const { width: PAGE_W, height: PAGE_H, margin: MARGIN } = REPORT_PAGE;
-const CONTENT_W = PAGE_W - MARGIN * 2;
-const BOTTOM_LIMIT = MARGIN + 18; // footer sits at y=17
-const FULL_HEADER_H = 64;
-const COMPACT_HEADER_H = 30;
-const SECTION_TITLE_H = 24;
-const COLUMN_HEADER_H = 30;
-const DATE_COL_W = 74;
+const MARGIN = REPORT_PAGE.margin;
 const MAX_BAND_COLUMNS = 4;
-const CELL_PAD_X = 6;
-const CELL_PAD_Y = 6;
-const TIME_LINE_H = 10.5;
-const BROKER_LINE_H = 9.6;
-const OCCURRENCE_GAP = 5;
-const MIN_ROW_H = 26;
-/** Tallest row that still fits a fresh continuation page; taller cells are clipped with "+ N". */
-const MAX_ROW_H = PAGE_H - MARGIN - COMPACT_HEADER_H - SECTION_TITLE_H - COLUMN_HEADER_H - BOTTOM_LIMIT - 4;
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const weekendTint = rgb(0.955, 0.96, 0.975);
@@ -98,14 +83,14 @@ type Column = { id: string; name: string; modalityLabel: string; palette: Palett
 
 type CellLine =
   | { kind: "time"; text: string; warning: string | null; palette: Palette }
-  | { kind: "broker"; code: string | null; name: string; branch: string | null; palette: Palette }
+  | { kind: "broker"; name: string; branch: string | null; palette: Palette }
   | { kind: "note"; text: string; color: RGB }
   | { kind: "gap" };
 
-function lineHeight(line: CellLine) {
-  if (line.kind === "time") return TIME_LINE_H;
-  if (line.kind === "gap") return OCCURRENCE_GAP;
-  return BROKER_LINE_H;
+function lineHeight(line: CellLine, scale: number) {
+  if (line.kind === "time") return 10.5 * scale;
+  if (line.kind === "gap") return 5 * scale;
+  return 9.6 * scale;
 }
 
 function fit(value: string, font: PDFFont, size: number, maxWidth: number) {
@@ -113,22 +98,6 @@ function fit(value: string, font: PDFFont, size: number, maxWidth: number) {
   if (maxWidth <= 0) return "";
   while (text.length > 1 && font.widthOfTextAtSize(text, size) > maxWidth) text = `${text.slice(0, -2)}…`;
   return font.widthOfTextAtSize(text, size) > maxWidth ? "" : text;
-}
-
-/** Word-wraps into at most two lines; the second one is truncated with "…". */
-function wrapTwoLines(value: string, font: PDFFont, size: number, maxWidth: number) {
-  const words = safe(value, 120).split(" ").filter(Boolean);
-  let first = "";
-  let index = 0;
-  while (index < words.length) {
-    const candidate = first ? `${first} ${words[index]}` : words[index];
-    if (font.widthOfTextAtSize(candidate, size) > maxWidth) break;
-    first = candidate;
-    index += 1;
-  }
-  if (!first) return [fit(value, font, size, maxWidth)];
-  const rest = words.slice(index).join(" ");
-  return rest ? [first, fit(rest, font, size, maxWidth)] : [first];
 }
 
 function hhmm(value: string) {
@@ -186,6 +155,22 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
   const columns: Column[] = input.types
     .filter((type) => presentIds.has(type.id))
     .map((type) => ({ id: type.id, name: type.name, modalityLabel: modalityLabel(type.modality), palette: hueToRgb(type.hue) }));
+  const singlePlantao = columns.length === 1;
+  const scale = singlePlantao ? 1.25 : 1;
+  const PAGE_W = singlePlantao ? REPORT_PAGE.height : REPORT_PAGE.width;
+  const PAGE_H = singlePlantao ? REPORT_PAGE.width : REPORT_PAGE.height;
+  const CONTENT_W = PAGE_W - MARGIN * 2;
+  const BOTTOM_LIMIT = MARGIN + 18;
+  const FULL_HEADER_H = 64 * scale;
+  const COMPACT_HEADER_H = 30 * scale;
+  const SECTION_TITLE_H = 24 * scale;
+  const COLUMN_HEADER_H = 30 * scale;
+  const DATE_COL_W = 74 * scale;
+  const CELL_PAD_X = 6 * scale;
+  const CELL_PAD_Y = 6 * scale;
+  const MIN_ROW_H = 26 * scale;
+  /** Tallest row that still fits a fresh continuation page; taller cells are clipped with "+ N". */
+  const MAX_ROW_H = PAGE_H - MARGIN - COMPACT_HEADER_H - SECTION_TITLE_H - COLUMN_HEADER_H - BOTTOM_LIMIT - 4 * scale;
 
   // ---- Grouping: date -> column -> occurrences (sorted by time) ----
   const grid = new Map<string, Map<string, DutyEscalaPdfOccurrence[]>>();
@@ -209,44 +194,44 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
 
   const drawFullHeader = () => {
     const top = PAGE_H - MARGIN;
-    const titleX = drawReportLogo(page, logo, top, 46);
-    const rightReserve = 190;
+    const titleX = drawReportLogo(page, logo, top, 46 * scale);
+    const rightReserve = singlePlantao ? 150 : 190;
     const titleWidth = PAGE_W - MARGIN - titleX - rightReserve;
-    page.drawText(fit(input.tenantName, bold, 8.5, titleWidth), { x: titleX, y: top - 9, size: 8.5, font: bold, color: colors.muted });
+    page.drawText(fit(input.tenantName, bold, 8.5 * scale, titleWidth), { x: titleX, y: top - 9 * scale, size: 8.5 * scale, font: bold, color: colors.muted });
     const title = "Escala de plantões";
-    page.drawText(safe(title), { x: titleX, y: top - 30, size: 19, font: bold, color: colors.ink });
+    page.drawText(safe(title), { x: titleX, y: top - 30 * scale, size: 19 * scale, font: bold, color: colors.ink });
     if (input.status === "draft") {
-      drawPill(page, "RASCUNHO", titleX + bold.widthOfTextAtSize(safe(title), 19) + 10, top - 24, bold, 7.5, draftBg, colors.warning);
+      drawPill(page, "RASCUNHO", titleX + bold.widthOfTextAtSize(safe(title), 19 * scale) + 10 * scale, top - 24 * scale, bold, 7.5 * scale, draftBg, colors.warning);
     }
-    page.drawText(fit(`${input.scopeLabel} · ${input.periodLabel}`, regular, 9.5, titleWidth + 60), { x: titleX, y: top - 45, size: 9.5, font: regular, color: colors.muted });
+    page.drawText(fit(`${input.scopeLabel} · ${input.periodLabel}`, regular, 9.5 * scale, titleWidth + 60), { x: titleX, y: top - 45 * scale, size: 9.5 * scale, font: regular, color: colors.muted });
 
     const right = PAGE_W - MARGIN;
     const generated = safe(`Gerado em ${generatedLabel}`);
-    page.drawText(generated, { x: right - regular.widthOfTextAtSize(generated, 7.5), y: top - 9, size: 7.5, font: regular, color: colors.muted });
+    page.drawText(generated, { x: right - regular.widthOfTextAtSize(generated, 7.5 * scale), y: top - 9 * scale, size: 7.5 * scale, font: regular, color: colors.muted });
     if (occurrences.length) {
       const stats = safe(plural(occurrences.length, "plantão", "plantões"));
-      page.drawText(stats, { x: right - bold.widthOfTextAtSize(stats, 13), y: top - 28, size: 13, font: bold, color: colors.accent });
+      page.drawText(stats, { x: right - bold.widthOfTextAtSize(stats, 13 * scale), y: top - 28 * scale, size: 13 * scale, font: bold, color: colors.accent });
       const sub = safe(`${plural(allDates.length, "dia", "dias")} · ${plural(uniqueBrokers.size, "corretor", "corretores")}`);
-      page.drawText(sub, { x: right - regular.widthOfTextAtSize(sub, 8), y: top - 41, size: 8, font: regular, color: colors.muted });
+      page.drawText(sub, { x: right - regular.widthOfTextAtSize(sub, 8 * scale), y: top - 41 * scale, size: 8 * scale, font: regular, color: colors.muted });
     }
-    y = top - FULL_HEADER_H + 8;
-    page.drawRectangle({ x: MARGIN, y: y - 1.6, width: CONTENT_W, height: 1.6, color: colors.accent });
-    y -= 12;
+    y = top - FULL_HEADER_H + 8 * scale;
+    page.drawRectangle({ x: MARGIN, y: y - 1.6 * scale, width: CONTENT_W, height: 1.6 * scale, color: colors.accent });
+    y -= 12 * scale;
   };
 
   const drawCompactHeader = () => {
     const top = PAGE_H - MARGIN;
     const title = safe("Escala de plantões");
-    page.drawText(title, { x: MARGIN, y: top - 11, size: 11, font: bold, color: colors.ink });
-    let x = MARGIN + bold.widthOfTextAtSize(title, 11) + 8;
-    if (input.status === "draft") x += drawPill(page, "RASCUNHO", x, top - 7.5, bold, 6.5, draftBg, colors.warning) + 8;
-    const detail = fit(`${input.scopeLabel} · ${input.periodLabel}`, regular, 8.5, PAGE_W - MARGIN - x - 160);
-    page.drawText(detail, { x, y: top - 11, size: 8.5, font: regular, color: colors.muted });
-    const tenant = fit(input.tenantName, regular, 7.5, 150);
-    page.drawText(tenant, { x: PAGE_W - MARGIN - regular.widthOfTextAtSize(tenant, 7.5), y: top - 11, size: 7.5, font: regular, color: colors.muted });
-    y = top - 19;
-    page.drawRectangle({ x: MARGIN, y: y - 0.8, width: CONTENT_W, height: 0.8, color: colors.accent });
-    y -= COMPACT_HEADER_H - 19;
+    page.drawText(title, { x: MARGIN, y: top - 11 * scale, size: 11 * scale, font: bold, color: colors.ink });
+    let x = MARGIN + bold.widthOfTextAtSize(title, 11 * scale) + 8 * scale;
+    if (input.status === "draft") x += drawPill(page, "RASCUNHO", x, top - 7.5 * scale, bold, 6.5 * scale, draftBg, colors.warning) + 8 * scale;
+    const detail = fit(`${input.scopeLabel} · ${input.periodLabel}`, regular, 8.5 * scale, PAGE_W - MARGIN - x - 160 * scale);
+    page.drawText(detail, { x, y: top - 11 * scale, size: 8.5 * scale, font: regular, color: colors.muted });
+    const tenant = fit(input.tenantName, regular, 7.5 * scale, 150 * scale);
+    page.drawText(tenant, { x: PAGE_W - MARGIN - regular.widthOfTextAtSize(tenant, 7.5 * scale), y: top - 11 * scale, size: 7.5 * scale, font: regular, color: colors.muted });
+    y = top - 19 * scale;
+    page.drawRectangle({ x: MARGIN, y: y - 0.8 * scale, width: CONTENT_W, height: 0.8 * scale, color: colors.accent });
+    y -= COMPACT_HEADER_H - 19 * scale;
   };
 
   const addPage = (full = false) => {
@@ -256,10 +241,10 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
   };
 
   const drawSectionTitle = (title: string, detail: string) => {
-    const baseline = y - 14;
-    page.drawText(safe(title), { x: MARGIN, y: baseline, size: 11.5, font: bold, color: colors.header });
+    const baseline = y - 14 * scale;
+    page.drawText(safe(title), { x: MARGIN, y: baseline, size: 11.5 * scale, font: bold, color: colors.header });
     const info = safe(detail);
-    page.drawText(info, { x: PAGE_W - MARGIN - regular.widthOfTextAtSize(info, 8), y: baseline, size: 8, font: regular, color: colors.muted });
+    page.drawText(info, { x: PAGE_W - MARGIN - regular.widthOfTextAtSize(info, 8 * scale), y: baseline, size: 8 * scale, font: regular, color: colors.muted });
     y -= SECTION_TITLE_H;
   };
 
@@ -269,28 +254,28 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
     const counts = new Map<string, number>();
     for (const occurrence of occurrences) counts.set(columnIdOf(occurrence), (counts.get(columnIdOf(occurrence)) ?? 0) + 1);
     const label = safe("Legenda");
-    const rowH = 18;
+    const rowH = 18 * scale;
     let x: number = MARGIN;
     let rowTop = y;
-    page.drawText(label, { x, y: rowTop - 12, size: 7.5, font: bold, color: colors.muted });
-    x += bold.widthOfTextAtSize(label, 7.5) + 12;
+    page.drawText(label, { x, y: rowTop - 12 * scale, size: 7.5 * scale, font: bold, color: colors.muted });
+    x += bold.widthOfTextAtSize(label, 7.5 * scale) + 12 * scale;
     const startX = x;
     for (const column of columns) {
-      const name = fit(column.name, bold, 8, 180);
+      const name = fit(column.name, bold, 8 * scale, 180 * scale);
       const meta = safe(`${column.modalityLabel} · ${counts.get(column.id) ?? 0}`);
-      const chipW = 8 + 10 + bold.widthOfTextAtSize(name, 8) + 6 + regular.widthOfTextAtSize(meta, 7) + 10;
+      const chipW = (8 + 10 + 6 + 10) * scale + bold.widthOfTextAtSize(name, 8 * scale) + regular.widthOfTextAtSize(meta, 7 * scale);
       if (x + chipW > PAGE_W - MARGIN && x > startX) {
         x = startX;
-        rowTop -= rowH + 4;
+        rowTop -= rowH + 4 * scale;
       }
       const chipY = rowTop - rowH;
       page.drawRectangle({ x, y: chipY, width: chipW, height: rowH, color: column.palette.soft, borderColor: column.palette.strong, borderWidth: 0.6 });
-      page.drawRectangle({ x: x + 6, y: chipY + 5, width: 8, height: 8, color: column.palette.strong });
-      page.drawText(name, { x: x + 18, y: chipY + 6, size: 8, font: bold, color: column.palette.text });
-      page.drawText(meta, { x: x + 18 + bold.widthOfTextAtSize(name, 8) + 6, y: chipY + 6.3, size: 7, font: regular, color: colors.muted });
-      x += chipW + 8;
+      page.drawRectangle({ x: x + 6 * scale, y: chipY + 5 * scale, width: 8 * scale, height: 8 * scale, color: column.palette.strong });
+      page.drawText(name, { x: x + 18 * scale, y: chipY + 6 * scale, size: 8 * scale, font: bold, color: column.palette.text });
+      page.drawText(meta, { x: x + 18 * scale + bold.widthOfTextAtSize(name, 8 * scale) + 6 * scale, y: chipY + 6.3 * scale, size: 7 * scale, font: regular, color: colors.muted });
+      x += chipW + 8 * scale;
     }
-    y = rowTop - rowH - 14;
+    y = rowTop - rowH - 14 * scale;
   };
 
   // ---- Board cells ----
@@ -310,26 +295,26 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
       if (!occurrence.brokers.length) lines.push({ kind: "note", text: "Sem corretores", color: colors.muted });
       const brokers = [...occurrence.brokers].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
       for (const broker of brokers) {
-        lines.push({ kind: "broker", code: broker.code, name: broker.name, branch: input.showBranch ? broker.branchName : null, palette: column.palette });
+        lines.push({ kind: "broker", name: broker.name, branch: input.showBranch ? broker.branchName : null, palette: column.palette });
       }
     });
     // Clip cells taller than a page, keeping the tail as "+ N corretores".
     const maxContent = MAX_ROW_H - CELL_PAD_Y * 2;
-    const total = lines.reduce((sum, line) => sum + lineHeight(line), 0);
+    const total = lines.reduce((sum, line) => sum + lineHeight(line, scale), 0);
     if (total <= maxContent) return lines;
     const kept: CellLine[] = [];
-    let used = BROKER_LINE_H;
+    let used = 9.6 * scale;
     for (const line of lines) {
-      if (used + lineHeight(line) > maxContent) break;
+      if (used + lineHeight(line, scale) > maxContent) break;
       kept.push(line);
-      used += lineHeight(line);
+      used += lineHeight(line, scale);
     }
     const hiddenBrokers = lines.slice(kept.length).filter((line) => line.kind === "broker").length;
     kept.push({ kind: "note", text: `+ ${plural(hiddenBrokers, "corretor", "corretores")}`, color: colors.muted });
     return kept;
   };
 
-  const cellHeight = (lines: CellLine[]) => (lines.length ? lines.reduce((sum, line) => sum + lineHeight(line), 0) + CELL_PAD_Y * 2 : 0);
+  const cellHeight = (lines: CellLine[]) => (lines.length ? lines.reduce((sum, line) => sum + lineHeight(line, scale), 0) + CELL_PAD_Y * 2 : 0);
 
   const drawCellLines = (lines: CellLine[], x: number, top: number, width: number) => {
     let lineTop = top - CELL_PAD_Y;
@@ -339,13 +324,13 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
     let blockPalette: Palette | null = null;
     const closeBlock = (bottom: number) => {
       if (blockStart !== null && blockPalette) {
-        page.drawRectangle({ x: innerX, y: bottom + 1, width: 1.6, height: blockStart - bottom - 1, color: blockPalette.strong });
+        page.drawRectangle({ x: innerX, y: bottom + scale, width: 1.6 * scale, height: blockStart - bottom - scale, color: blockPalette.strong });
       }
       blockStart = null;
     };
     for (const line of lines) {
-      const height = lineHeight(line);
-      const baseline = lineTop - height + 2.6;
+      const height = lineHeight(line, scale);
+      const baseline = lineTop - height + 2.6 * scale;
       if (line.kind === "gap") {
         closeBlock(lineTop);
       } else if (line.kind === "time") {
@@ -355,32 +340,23 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
         let warningWidth = 0;
         if (line.warning) {
           const warning = safe(line.warning);
-          warningWidth = bold.widthOfTextAtSize(warning, 6.5) + 4;
-          page.drawText(warning, { x: innerX + innerW - warningWidth + 4, y: baseline + 0.4, size: 6.5, font: bold, color: colors.warning });
+          warningWidth = bold.widthOfTextAtSize(warning, 6.5 * scale) + 4 * scale;
+          page.drawText(warning, { x: innerX + innerW - warningWidth + 4 * scale, y: baseline + 0.4 * scale, size: 6.5 * scale, font: bold, color: colors.warning });
         }
-        page.drawText(fit(line.text, bold, 7.6, innerW - 6 - warningWidth), { x: innerX + 6, y: baseline, size: 7.6, font: bold, color: line.palette.text });
+        page.drawText(fit(line.text, bold, 7.6 * scale, innerW - 6 * scale - warningWidth), { x: innerX + 6 * scale, y: baseline, size: 7.6 * scale, font: bold, color: line.palette.text });
       } else if (line.kind === "note") {
-        page.drawText(fit(line.text, regular, 7, innerW - 6), { x: innerX + 6, y: baseline + 0.4, size: 7, font: regular, color: line.color });
+        page.drawText(fit(line.text, regular, 7 * scale, innerW - 6 * scale), { x: innerX + 6 * scale, y: baseline + 0.4 * scale, size: 7 * scale, font: regular, color: line.color });
       } else {
-        let cursor = innerX + 6;
-        const available = innerW - 6;
-        const sep = safe(" · ");
-        const code = line.code ? fit(line.code, bold, 7, available * 0.4) : "";
-        if (code) {
-          page.drawText(code, { x: cursor, y: baseline, size: 7, font: bold, color: line.palette.text });
-          cursor += bold.widthOfTextAtSize(code, 7);
-          page.drawText(sep, { x: cursor, y: baseline, size: 7, font: regular, color: colors.muted });
-          cursor += regular.widthOfTextAtSize(sep, 7);
-        }
+        let cursor = innerX + 6 * scale;
         const remaining = innerX + innerW - cursor;
         const branchFull = line.branch ? safe(line.branch, 120) : "";
-        const branchBudget = branchFull ? Math.min(regular.widthOfTextAtSize(branchFull, 6.2), remaining * 0.4) : 0;
-        const name = fit(line.name, regular, 7.4, remaining - (branchFull ? branchBudget + 4 : 0));
-        page.drawText(name, { x: cursor, y: baseline, size: 7.4, font: regular, color: colors.ink });
-        cursor += regular.widthOfTextAtSize(name, 7.4);
+        const branchBudget = branchFull ? Math.min(regular.widthOfTextAtSize(branchFull, 6.2 * scale), remaining * 0.4) : 0;
+        const name = fit(line.name, regular, 7.4 * scale, remaining - (branchFull ? branchBudget + 4 * scale : 0));
+        page.drawText(name, { x: cursor, y: baseline, size: 7.4 * scale, font: regular, color: colors.ink });
+        cursor += regular.widthOfTextAtSize(name, 7.4 * scale);
         if (branchFull) {
-          const branch = fit(branchFull, regular, 6.2, innerX + innerW - cursor - 4);
-          if (branch) page.drawText(branch, { x: cursor + 4, y: baseline + 0.3, size: 6.2, font: regular, color: colors.muted });
+          const branch = fit(branchFull, regular, 6.2 * scale, innerX + innerW - cursor - 4 * scale);
+          if (branch) page.drawText(branch, { x: cursor + 4 * scale, y: baseline + 0.3 * scale, size: 6.2 * scale, font: regular, color: colors.muted });
         }
       }
       lineTop -= height;
@@ -395,12 +371,12 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
   const drawColumnHeader = (band: Column[], columnWidth: number) => {
     const headerY = y - COLUMN_HEADER_H;
     page.drawRectangle({ x: MARGIN, y: headerY, width: DATE_COL_W, height: COLUMN_HEADER_H, color: colors.header });
-    page.drawText(safe("Data"), { x: MARGIN + 8, y: headerY + 11.5, size: 8.5, font: bold, color: colors.headerText });
+    page.drawText(safe("Data"), { x: MARGIN + 8 * scale, y: headerY + 11.5 * scale, size: 8.5 * scale, font: bold, color: colors.headerText });
     band.forEach((column, index) => {
       const x = MARGIN + DATE_COL_W + index * columnWidth;
       page.drawRectangle({ x, y: headerY, width: columnWidth, height: COLUMN_HEADER_H, color: column.palette.strong });
-      page.drawText(fit(column.name, bold, 9, columnWidth - 16), { x: x + 8, y: headerY + 16, size: 9, font: bold, color: colors.headerText });
-      page.drawText(fit(column.modalityLabel, regular, 7, columnWidth - 16), { x: x + 8, y: headerY + 6, size: 7, font: regular, color: rgb(0.94, 0.95, 0.97) });
+      page.drawText(fit(column.name, bold, 9 * scale, columnWidth - 16 * scale), { x: x + 8 * scale, y: headerY + 16 * scale, size: 9 * scale, font: bold, color: colors.headerText });
+      page.drawText(fit(column.modalityLabel, regular, 7 * scale, columnWidth - 16 * scale), { x: x + 8 * scale, y: headerY + 6 * scale, size: 7 * scale, font: regular, color: rgb(0.94, 0.95, 0.97) });
       if (index > 0) page.drawLine({ start: { x, y: headerY }, end: { x, y: headerY + COLUMN_HEADER_H }, thickness: 0.8, color: colors.headerText });
     });
     page.drawLine({ start: { x: MARGIN + DATE_COL_W, y: headerY }, end: { x: MARGIN + DATE_COL_W, y: headerY + COLUMN_HEADER_H }, thickness: 0.8, color: colors.headerText });
@@ -435,8 +411,8 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
       const rowY = y - row.height;
       const label = dateLabel(row.date);
       page.drawRectangle({ x: MARGIN, y: rowY, width: DATE_COL_W, height: row.height, color: label.weekend ? weekendTint : rgb(1, 1, 1) });
-      page.drawText(safe(label.weekday), { x: MARGIN + 8, y: row.height > 34 ? y - 15 : rowY + row.height / 2 - 3, size: 9, font: bold, color: label.weekend ? colors.muted : colors.ink });
-      page.drawText(safe(label.day), { x: MARGIN + 8 + bold.widthOfTextAtSize(safe(label.weekday), 9) + 5, y: row.height > 34 ? y - 15 : rowY + row.height / 2 - 3, size: 9, font: regular, color: label.weekend ? colors.muted : colors.ink });
+      page.drawText(safe(label.weekday), { x: MARGIN + 8 * scale, y: row.height > 34 * scale ? y - 15 * scale : rowY + row.height / 2 - 3 * scale, size: 9 * scale, font: bold, color: label.weekend ? colors.muted : colors.ink });
+      page.drawText(safe(label.day), { x: MARGIN + 8 * scale + bold.widthOfTextAtSize(safe(label.weekday), 9 * scale) + 5 * scale, y: row.height > 34 * scale ? y - 15 * scale : rowY + row.height / 2 - 3 * scale, size: 9 * scale, font: regular, color: label.weekend ? colors.muted : colors.ink });
 
       row.cells.forEach((lines, columnIndex) => {
         const column = band[columnIndex];
@@ -447,7 +423,7 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
         } else {
           page.drawRectangle({ x, y: rowY, width: columnWidth, height: row.height, color: label.weekend ? weekendTint : rgb(1, 1, 1) });
           const dash = "-";
-          page.drawText(dash, { x: x + columnWidth / 2 - regular.widthOfTextAtSize(dash, 9) / 2, y: rowY + row.height / 2 - 3, size: 9, font: regular, color: rgb(0.7, 0.72, 0.76) });
+          page.drawText(dash, { x: x + columnWidth / 2 - regular.widthOfTextAtSize(dash, 9 * scale) / 2, y: rowY + row.height / 2 - 3 * scale, size: 9 * scale, font: regular, color: rgb(0.7, 0.72, 0.76) });
         }
       });
       // Grid lines
@@ -459,126 +435,7 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
       }
       y = rowY;
     });
-    y -= 16;
-  };
-
-  // ---- Summary per broker ----
-  const drawSummary = () => {
-    type BrokerRow = { code: string | null; name: string; branch: string | null; counts: Map<string, number>; total: number };
-    const brokers = new Map<string, BrokerRow>();
-    for (const occurrence of occurrences) {
-      const columnId = columnIdOf(occurrence);
-      const seen = new Set<string>();
-      for (const broker of occurrence.brokers) {
-        const key = brokerKey(broker);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const row = brokers.get(key) ?? { code: broker.code, name: broker.name, branch: broker.branchName, counts: new Map(), total: 0 };
-        row.counts.set(columnId, (row.counts.get(columnId) ?? 0) + 1);
-        row.total += 1;
-        brokers.set(key, row);
-      }
-    }
-    const rows = [...brokers.values()].sort((a, b) => {
-      if (input.showBranch) {
-        if (a.branch && !b.branch) return -1;
-        if (!a.branch && b.branch) return 1;
-        const byBranch = (a.branch ?? "").localeCompare(b.branch ?? "", "pt-BR");
-        if (byBranch) return byBranch;
-      }
-      return a.name.localeCompare(b.name, "pt-BR") || (a.code ?? "").localeCompare(b.code ?? "", "pt-BR");
-    });
-
-    const codeW = 62;
-    const totalW = 56;
-    const branchW = input.showBranch ? (columns.length > 4 ? 118 : 140) : 0;
-    const typeW = Math.max(46, Math.min(96, (CONTENT_W - codeW - totalW - branchW - 160) / Math.max(1, columns.length)));
-    const nameW = CONTENT_W - codeW - totalW - branchW - typeW * columns.length;
-    const HEAD_H = 30;
-    const ROW_H = 18;
-    const detail = plural(rows.length, "corretor", "corretores");
-
-    const drawHead = () => {
-      const headY = y - HEAD_H;
-      page.drawRectangle({ x: MARGIN, y: headY, width: CONTENT_W, height: HEAD_H, color: colors.header });
-      let x: number = MARGIN;
-      const label = (text: string, width: number, align: "left" | "center" = "left") => {
-        const value = fit(text, bold, 7.8, width - 12);
-        const textX = align === "center" ? x + (width - bold.widthOfTextAtSize(value, 7.8)) / 2 : x + 7;
-        page.drawText(value, { x: textX, y: headY + 11.5, size: 7.8, font: bold, color: colors.headerText });
-        x += width;
-      };
-      label("Código", codeW);
-      label("Corretor", nameW);
-      if (input.showBranch) label("Unidade", branchW);
-      for (const column of columns) {
-        page.drawRectangle({ x, y: headY, width: typeW, height: 3, color: column.palette.strong });
-        const nameLines = wrapTwoLines(column.name, bold, 7.4, typeW - 10);
-        nameLines.forEach((value, lineIndex) => {
-          const lineY = nameLines.length === 1 ? headY + 11.5 : headY + 16.5 - lineIndex * 9;
-          page.drawText(value, { x: x + (typeW - bold.widthOfTextAtSize(value, 7.4)) / 2, y: lineY, size: 7.4, font: bold, color: colors.headerText });
-        });
-        x += typeW;
-      }
-      label("Total", totalW, "center");
-      y = headY;
-    };
-
-    addPage();
-    drawSectionTitle("Resumo por corretor", detail);
-    drawHead();
-
-    const drawRow = (row: BrokerRow | null, index: number) => {
-      if (y - ROW_H < BOTTOM_LIMIT) {
-        addPage();
-        drawSectionTitle("Resumo por corretor · continuação", detail);
-        drawHead();
-      }
-      const rowY = y - ROW_H;
-      const isTotal = row === null;
-      if (isTotal) page.drawRectangle({ x: MARGIN, y: rowY, width: CONTENT_W, height: ROW_H, color: colors.sectionBg });
-      else if (index % 2 === 1) page.drawRectangle({ x: MARGIN, y: rowY, width: CONTENT_W, height: ROW_H, color: colors.stripe });
-      if (!isTotal) page.drawRectangle({ x: PAGE_W - MARGIN - totalW, y: rowY, width: totalW, height: ROW_H, color: colors.sectionBg, opacity: 0.6 });
-      // Thicker rule where the unit changes (rows are grouped by unit).
-      const previous = index > 0 ? rows[index - 1] : null;
-      if (input.showBranch && !isTotal && previous && previous.branch !== row.branch) {
-        page.drawLine({ start: { x: MARGIN, y }, end: { x: PAGE_W - MARGIN, y }, thickness: 1, color: colors.muted });
-      }
-      page.drawLine({ start: { x: MARGIN, y: rowY }, end: { x: PAGE_W - MARGIN, y: rowY }, thickness: 0.4, color: colors.border });
-      const textY = rowY + 6;
-      let x: number = MARGIN;
-      if (isTotal) {
-        page.drawText(safe("Total"), { x: x + 7, y: textY, size: 7.8, font: bold, color: colors.ink });
-        x += codeW + nameW + branchW;
-      } else {
-        page.drawText(fit(row.code ?? "-", regular, 7.6, codeW - 12), { x: x + 7, y: textY, size: 7.6, font: regular, color: row.code ? colors.muted : colors.border });
-        x += codeW;
-        page.drawText(fit(row.name, bold, 7.8, nameW - 12), { x: x + 7, y: textY, size: 7.8, font: bold, color: colors.ink });
-        x += nameW;
-        if (input.showBranch) {
-          page.drawText(fit(row.branch ?? "Sem unidade", regular, 7.6, branchW - 12), { x: x + 7, y: textY, size: 7.6, font: regular, color: colors.muted });
-          x += branchW;
-        }
-      }
-      for (const column of columns) {
-        const count = isTotal ? rows.reduce((sum, item) => sum + (item.counts.get(column.id) ?? 0), 0) : (row.counts.get(column.id) ?? 0);
-        const text = count ? String(count) : "-";
-        const font = count ? bold : regular;
-        page.drawText(text, { x: x + (typeW - font.widthOfTextAtSize(text, 8)) / 2, y: textY, size: 8, font, color: count ? column.palette.text : colors.border });
-        x += typeW;
-      }
-      const total = String(isTotal ? rows.reduce((sum, item) => sum + item.total, 0) : row.total);
-      page.drawText(total, { x: x + (totalW - bold.widthOfTextAtSize(total, 8.4)) / 2, y: textY, size: 8.4, font: bold, color: colors.ink });
-      y = rowY;
-    };
-
-    rows.forEach((row, index) => drawRow(row, index));
-    if (rows.length) drawRow(null, rows.length);
-    else {
-      const emptyY = y - ROW_H;
-      page.drawText(safe("Nenhum corretor escalado."), { x: MARGIN + 7, y: emptyY + 6, size: 8, font: regular, color: colors.muted });
-      y = emptyY;
-    }
+    y -= 16 * scale;
   };
 
   // ---- Compose ----
@@ -594,9 +451,8 @@ export async function encodeDutyEscalaPdf(input: DutyEscalaPdfInput): Promise<Ui
   } else {
     drawLegend();
     bands.forEach((band, index) => drawBand(band, index));
-    drawSummary();
   }
 
-  drawReportFooters(pdf, `${input.tenantName} · Escala de plantões`, regular);
+  drawReportFooters(pdf, `${input.tenantName} · Escala de plantões`, regular, { width: PAGE_W, height: PAGE_H, margin: MARGIN });
   return new Uint8Array(await pdf.save());
 }

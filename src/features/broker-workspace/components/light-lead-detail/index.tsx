@@ -121,6 +121,7 @@ export function LightLeadDetail({
           carriers={carriers}
           open={c.showSaleConfirm}
           onOpenChange={c.setShowSaleConfirm}
+          onRegistered={c.markConverted}
         />
         {c.successOverlay}
       </>
@@ -166,6 +167,7 @@ export function LightLeadDetail({
         carriers={carriers}
         open={c.showSaleConfirm}
         onOpenChange={c.setShowSaleConfirm}
+        onRegistered={c.markConverted}
       />
       {c.successOverlay}
     </div>

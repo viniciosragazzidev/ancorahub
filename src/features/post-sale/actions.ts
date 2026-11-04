@@ -3,7 +3,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gte, isNull, lt, or } from "drizzle-orm";
+import { and, eq, gte, isNull, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -11,6 +11,7 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { generateCommissionSchedule } from "@/features/commissions/commission-rules-service";
 import { publishNotification } from "@/features/notifications/send-push-helper";
+import { publishDomainInvalidation } from "@/features/notifications/realtime-sync";
 import { buildCustomerRenewalStatusScope } from "./customer-renewal-scope";
 import { enqueueMetaConversionEvent } from "@/features/meta-ads/meta-conversion-service";
 
@@ -24,7 +25,7 @@ const registerSaleInput = z.object({
   renewalType: z.enum(schema.renewalTypeValues).default("reajuste_operadora"),
   renewalContactPreference: z.string().trim().max(100).default("whatsapp"),
   postSaleNotes: z.string().trim().max(2000).optional(),
-  approvedValue: z.coerce.number().finite().nonnegative("O valor aprovado não pode ser negativo."),
+  approvedValue: z.coerce.number().finite().positive("Informe o valor aprovado da venda."),
   confirmationDocumentId: z.string().min(1, "Anexe a confirmação da operadora."),
   carrierId: z.string().uuid("Operadora inválida.").optional(),
 });
@@ -104,11 +105,38 @@ export async function removeLeadBeneficiaryAction(beneficiaryId: string) {
   return { success: true };
 }
 
-export async function registerSaleAction(rawInput: z.input<typeof registerSaleInput>) {
-  const input = registerSaleInput.parse(rawInput);
+/** Already converted, or an active sale exists: a second registration would duplicate client, commissions and reminders. */
+class SaleAlreadyRegisteredError extends Error {}
+
+type RegisterSaleResult = { success: true; saleId: string; activeCustomerId: string } | { success?: undefined; error: string };
+
+/**
+ * Registers the sale (04/11 review): every failure comes back as `{ error }` for the panel's toast, never as a
+ * thrown error that would take the screen to the error page; the lead row is locked so a double click or two
+ * tabs register one sale only.
+ */
+export async function registerSaleAction(rawInput: z.input<typeof registerSaleInput>): Promise<RegisterSaleResult> {
+  const parsed = registerSaleInput.safeParse(rawInput);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Confira os dados da venda." };
+  try {
+    return await registerSale(parsed.data);
+  } catch (error) {
+    if (error instanceof SaleAlreadyRegisteredError) return { error: error.message };
+    console.error("[register-sale] failed", { leadId: parsed.data.leadId, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
+    const message = error instanceof Error ? error.message : "";
+    // Scope and cargo messages are written for the user; anything else is generic.
+    const forUser = /^(Lead não encontrado|Você só pode|Este lead não pertence|Seu cargo)/.test(message);
+    return { error: forUser ? message : "Não foi possível registrar a venda. Tente de novo; se continuar, avise a direção." };
+  }
+}
+
+async function registerSale(input: z.output<typeof registerSaleInput>): Promise<RegisterSaleResult> {
   const { context, db, lead } = await assertLeadScope(input.leadId);
   if (!hasPermission(context.role, "alterar_status_lead")) return { error: "Você não pode registrar vendas." };
   if (!lead.corretorId && context.role === "broker") return { error: "O lead precisa ter um corretor responsável." };
+  if (lead.status === "converted") return { error: "A venda deste lead já foi registrada." };
+  if (lead.status === "lost") return { error: "Este lead está perdido. Reabra o lead antes de registrar a venda." };
+  if (input.expirationDate && input.expirationDate <= input.coverageStartDate) return { error: "O vencimento precisa ser depois do início da vigência." };
 
   const beneficiaries = await db.select().from(schema.leadBeneficiaries).where(and(eq(schema.leadBeneficiaries.leadId, lead.id), eq(schema.leadBeneficiaries.tenantId, context.tenantId)));
   if (!beneficiaries.some((beneficiary) => beneficiary.isHolder)) return { error: "Cadastre o titular e os beneficiários antes de registrar a venda." };
@@ -138,14 +166,8 @@ export async function registerSaleAction(rawInput: z.input<typeof registerSaleIn
           .where(and(eq(schema.carrierPlans.id, lead.planId), eq(schema.carrierPlans.carrierId, input.carrierId), eq(schema.carrierPlans.tenantId, context.tenantId)))
           .limit(1);
         if (!plan) resolvedPlanId = null;
-      } else {
-        const [firstPlan] = await db
-          .select({ id: schema.carrierPlans.id })
-          .from(schema.carrierPlans)
-          .where(and(eq(schema.carrierPlans.carrierId, input.carrierId), eq(schema.carrierPlans.tenantId, context.tenantId), eq(schema.carrierPlans.active, true)))
-          .limit(1);
-        resolvedPlanId = firstPlan?.id ?? null;
       }
+      // Without a plan on the lead none is guessed: an arbitrary "first plan" could pick the wrong commission rule.
     }
   }
 
@@ -160,6 +182,15 @@ export async function registerSaleAction(rawInput: z.input<typeof registerSaleIn
   const schedule = await generateCommissionSchedule(context.tenantId, saleId, resolvedPlanId, input.approvedValue);
 
   await db.transaction(async (tx) => {
+    // Lock the lead and check again inside the transaction: two concurrent submits register one sale.
+    const [locked] = await tx.select({ status: schema.leads.status }).from(schema.leads)
+      .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId))).limit(1).for("update");
+    if (!locked || locked.status === "converted") throw new SaleAlreadyRegisteredError("A venda deste lead já foi registrada.");
+    if (locked.status === "lost") throw new SaleAlreadyRegisteredError("Este lead está perdido. Reabra o lead antes de registrar a venda.");
+    const [activeSale] = await tx.select({ id: schema.sales.id }).from(schema.sales)
+      .where(and(eq(schema.sales.leadId, lead.id), eq(schema.sales.tenantId, context.tenantId), eq(schema.sales.status, "active"))).limit(1);
+    if (activeSale) throw new SaleAlreadyRegisteredError("Este lead já tem uma venda ativa registrada.");
+
     await tx.insert(schema.clients).values({ id: clientId, tenantId: context.tenantId, leadId: lead.id, branchId: lead.branchId, corretorId: lead.corretorId ?? context.userId, nome: lead.nome, telefone: lead.telefone, email: lead.email, convertedAt: now }).onConflictDoNothing({ target: schema.clients.leadId });
     const [client] = await tx.select({ id: schema.clients.id }).from(schema.clients).where(and(eq(schema.clients.leadId, lead.id), eq(schema.clients.tenantId, context.tenantId))).limit(1);
 
@@ -229,9 +260,7 @@ export async function registerSaleAction(rawInput: z.input<typeof registerSaleIn
       });
     }
 
-    await tx.update(schema.leads).set({ status: "converted", stageEnteredAt: now }).where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
-    const { triggerInstantAutomation } = await import("@/features/automations/engine");
-    void triggerInstantAutomation(context.tenantId, lead.id, "venda_realizada").catch(console.error);
+    await tx.update(schema.leads).set({ status: "converted", stageEnteredAt: now, updatedAt: now, version: sql`${schema.leads.version} + 1` }).where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
     const metadata: Record<string, unknown> = {
       saleId,
       policyNumber: input.policyNumber,
@@ -253,8 +282,27 @@ export async function registerSaleAction(rawInput: z.input<typeof registerSaleIn
       metadata,
     });
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "sale", entidadeId: saleId, acao: "registrou" });
-    await tx.insert(schema.notifications).values({ id: randomUUID(), tenantId: context.tenantId, recipientUserId: lead.corretorId ?? context.userId, leadId: lead.id, type: "sale_registered", title: "Venda registrada", message: `${lead.nome} foi convertido em cliente ativo. Vencimento: ${expirationDate}.`, createdAt: now });
+    // With a broker the push below already writes the inbox row; one notice, not two.
+    if (!lead.corretorId) await tx.insert(schema.notifications).values({ id: randomUUID(), tenantId: context.tenantId, recipientUserId: context.userId, leadId: lead.id, type: "sale_registered", title: "Venda registrada", message: `${lead.nome} foi convertido em cliente ativo. Vencimento: ${expirationDate}.`, createdAt: now });
   });
+
+  // Only after the commit: a rolled-back sale never fires the "venda realizada" automation.
+  const { triggerInstantAutomation } = await import("@/features/automations/engine");
+  void triggerInstantAutomation(context.tenantId, lead.id, "venda_realizada").catch(console.error);
+
+  // Lists and kanban of the direction, the unit manager and the broker update without F5 (best effort).
+  void (async () => {
+    const watcherScope = lead.branchId
+      ? or(eq(schema.tenantMemberships.role, "director"), and(eq(schema.tenantMemberships.role, "manager"), eq(schema.tenantMemberships.branchId, lead.branchId)))
+      : eq(schema.tenantMemberships.role, "director");
+    const watchers = await db.select({ userId: schema.tenantMemberships.userId }).from(schema.tenantMemberships)
+      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.status, "active"), watcherScope))
+      .groupBy(schema.tenantMemberships.userId).limit(20);
+    const targets = new Set(watchers.map((watcher) => watcher.userId));
+    if (lead.corretorId) targets.add(lead.corretorId);
+    targets.delete(context.userId);
+    await publishDomainInvalidation([...targets].map((userId) => ({ tenantId: context.tenantId, userId })), "leads");
+  })().catch(() => { /* non-blocking */ });
 
   // Conversions API for CRM: "Venda" (Lead Ads leads only, never throws).
   await enqueueMetaConversionEvent({ tenantId: context.tenantId, leadId: lead.id, stage: "sale", at: now });

@@ -26,6 +26,8 @@ export type TeamNotice = {
   defaultChannel?: NoticeChannel;
   /** Free text typed in the chat, not an automatic notice: only the channel is chosen. */
   chat?: boolean;
+  /** Goes to the WhatsApp numbers the director types (not to a team member): the card shows the field. */
+  phoneRecipients?: boolean;
 };
 
 export const TEAM_NOTICES: readonly TeamNotice[] = [
@@ -90,6 +92,17 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     class: "critical",
     defaultEnabled: true,
     defaultChannel: "company_number",
+  },
+  {
+    key: "LEAD_CLOSING_DIRECTOR",
+    purpose: "leadClosingDirectorAlert",
+    label: "Fechamento para a direção",
+    description: "Quando um lead entra em Documentação ou Em análise, manda para os números escolhidos abaixo: cliente, corretor, valor e vidas e o resumo da conversa feito pela IA. Uma vez por lead e número.",
+    // A deal is closing now: goes out at once, any day.
+    class: "critical",
+    defaultEnabled: true,
+    defaultChannel: "company_number",
+    phoneRecipients: true,
   },
   {
     key: "LEAD_FEEDBACK_REMINDER",

@@ -13,6 +13,7 @@ export type NoticeFields =
   | { purpose: "leadFeedbackReminder"; broker: string; lead: string }
   | { purpose: "leadClientReturned"; broker: string; lead: string; since: string; link: string | null }
   | { purpose: "leadClosingStage"; broker: string; lead: string; link: string | null }
+  | { purpose: "leadClosingDirectorAlert"; lead: string; phone: string; deal: string; broker: string; stage: string; summary: string; link: string | null }
   | { purpose: "taskReminder"; name: string; task: string; when: string }
   | { purpose: "brokerAccountActivated"; name: string; company: string; loginUrl: string }
   | { purpose: "dutyPresenceConfirmation"; broker: string; hour: string; link: string | null }
@@ -123,6 +124,16 @@ export function builtInNoticeVariants(fields: NoticeFields, hour: number): strin
         `${hi}, *${broker}*! *${lead}* chegou ao fechamento, parabéns 👏 Antes de concluir, deixe no CRM ${checklist}.${tail(link, "Abrir no CRM: ")}`,
         `Parabéns, *${broker}*! *${lead}* está em fechamento. Dica: confira os documentos e registre no CRM ${checklist}.${tail(link, "👉 ")}`,
         `🎉 ${broker}, *${lead}* está quase fechado! Para não travar na análise, registre no CRM ${checklist}.${tail(link, "Lead: ")}`,
+      ];
+    }
+    case "leadClosingDirectorAlert": {
+      const { lead, phone, deal, broker, stage, summary, link } = fields;
+      const body = `👤 *Cliente:* ${lead}\n📞 ${phone}\n📋 ${deal}\n🧑‍💼 *Corretor:* ${broker}\n📍 *Etapa:* ${stage}\n\n📝 *Resumo da conversa:*\n${summary}`;
+      return [
+        `🏁 *Lead em fechamento*\n\n${body}${tail(link, "👉 *Abrir no CRM:* ")}`,
+        `${hi}! Mais um lead chegou ao fechamento 🙌\n\n${body}${tail(link, "Abrir no CRM: ")}`,
+        `🏁 *Fechamento em andamento*\n\n${body}${tail(link, "👉 ")}`,
+        `📈 *Novo lead em fechamento*\n\n${body}${tail(link, "Lead: ")}`,
       ];
     }
     case "taskReminder": {

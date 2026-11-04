@@ -180,6 +180,23 @@ export const MESSAGE_EVENT_CATALOG = [
     variables: [brokerName, leadName, leadId],
   },
   {
+    key: "LEAD_CLOSING_DIRECTOR",
+    purpose: "leadClosingDirectorAlert",
+    label: "Fechamento para a direção",
+    description: "Avisa a direção quando um lead entra em Documentação ou Em análise: cliente, corretor e resumo da conversa.",
+    audience: "user",
+    windowRule: "corporate_internal",
+    variables: [
+      leadName,
+      { key: "cliente_telefone", label: "Telefone do cliente", aliases: ["telefone"], fallback: "Sem telefone" },
+      { key: "negocio", label: "Tipo, vidas, plano e valor", aliases: ["detalhes"], fallback: "Sem valor e vidas registrados ainda" },
+      brokerName,
+      { key: "etapa", label: "Etapa", aliases: ["status"], fallback: "Fechamento" },
+      { key: "resumo", label: "Resumo da conversa", aliases: ["resumo_conversa"], fallback: "A IA ainda não resumiu esta conversa." },
+      leadId,
+    ],
+  },
+  {
     key: "BROKER_WELCOME",
     purpose: "brokerInvitation",
     label: "Primeiro acesso do corretor",
