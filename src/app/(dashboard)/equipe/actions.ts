@@ -333,7 +333,8 @@ export async function updateTeamMemberAction(
       throw new Error("Somente o Diretor pode definir cargos.");
     }
     if (input.customRoleId) {
-      if (context.role === "director" && !context.customRoleId) {
+      const cargoMudou = input.customRoleId !== member.customRoleId || input.role !== member.role || input.jobTitle !== member.jobTitle;
+      if (cargoMudou && context.role === "director" && !context.customRoleId) {
         customRoleScope = (await assertCargoAssignable({ actor: context, membershipId: member.membershipId, role: input.role, jobTitle: input.jobTitle, customRoleId: input.customRoleId })).scope;
       } else {
         const [customRole] = await db.select({ scope: schema.customRoles.scope }).from(schema.customRoles)
