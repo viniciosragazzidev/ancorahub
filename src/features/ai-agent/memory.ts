@@ -223,6 +223,22 @@ export function hasQuoteReadyData(memory: ConversationMemory | null | undefined)
   return hasCoreQuoteData(memory) && Boolean(memory?.city?.value?.trim());
 }
 
+/** "6, 48 e 71": ages as the customer and the broker read them. */
+export function formatAgeList(ages: readonly (number | string)[]) {
+  const items = ages.map(String);
+  return items.length > 1 ? `${items.slice(0, -1).join(", ")} e ${items[items.length - 1]}` : items[0] ?? "";
+}
+
+/**
+ * The ages a company customer listed one by one ("6, 48, 71"). Empty when the customer gave only an average.
+ * Every age is kept and repeated as told: the average stays only as an internal number (Vinicios, 04/11/2026).
+ */
+export function groupAgeList(memory: ConversationMemory | null | undefined): number[] {
+  if (memory?.planType?.value !== "empresarial") return [];
+  const list = (memory.age?.value?.match(/\d{1,3}/g) ?? []).map(Number).filter((age) => age < 150);
+  return list.length >= 2 ? list : [];
+}
+
 export function readAgeList(message: string): number[] {
   // "17.16.49.48" (case Eliane, 27/10): short numbers joined by dots are a list, never money
   // (money groups thousands in 3 digits: "4.500").
@@ -765,6 +781,8 @@ export function extractFieldsFromMessage(
       if (memory.planType?.value === "empresarial") {
         const average = Math.round(ageValues.reduce((sum, age) => sum + age, 0) / ageValues.length);
         memory.averageAge = { value: String(average), confidence: 1, sourceMessageId };
+        // Several ages are kept one by one; the average is only internal.
+        if (ageValues.length > 1) memory.age = { value: ageValues.join(", "), confidence: 1, sourceMessageId };
       } else if (asksForAge || explicitAgeValues.length > 0) {
         memory.age = { value: ageValues.join(", "), confidence: 1, sourceMessageId };
       }
@@ -952,7 +970,9 @@ export function buildMemoryContext(memory: ConversationMemory): string {
   if (memory.city?.value) parts.push(`- Cidade: ${memory.city.value}`);
   if (memory.planType?.value) parts.push(`- Tipo de plano: ${memory.planType.value}`);
   if (memory.numberOfLives?.value) parts.push(`- N° de vidas: ${memory.numberOfLives.value}`);
-  if (memory.planType?.value === "empresarial" && memory.averageAge?.value) parts.push(`- Média de idade do grupo: ${memory.averageAge.value} anos`);
+  const groupAges = groupAgeList(memory);
+  if (groupAges.length) parts.push(`- Idades do grupo (repita todas, nunca a média): ${formatAgeList(groupAges)} anos`);
+  else if (memory.planType?.value === "empresarial" && memory.averageAge?.value) parts.push(`- Média de idade do grupo (informada pelo cliente): ${memory.averageAge.value} anos`);
   else if (memory.age?.value) parts.push(`- Idades: ${memory.age.value}`);
   if (memory.email?.value) parts.push(`- E-mail: ${memory.email.value}`);
   if (memory.intent?.value) parts.push(`- Intenção: ${memory.intent.value}`);

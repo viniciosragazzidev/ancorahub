@@ -964,7 +964,9 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                     <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
                       <div><p className="text-xs text-muted-foreground">Vidas</p><p className="mt-1 font-medium">{qualificationDetails.numberOfLives ?? "Não informado"}</p></div>
                       {lead.tipo === "PME" ? (
-                        <div><p className="text-xs text-muted-foreground">Média de idade do grupo</p><p className="mt-1 font-medium">{qualificationDetails.averageAge ? `${qualificationDetails.averageAge} anos` : "Não informada"}</p></div>
+                        qualificationDetails.individualAges
+                          ? <div><p className="text-xs text-muted-foreground">Idades do grupo</p><p className="mt-1 font-medium">{qualificationDetails.individualAges}</p></div>
+                          : <div><p className="text-xs text-muted-foreground">Média de idade do grupo</p><p className="mt-1 font-medium">{qualificationDetails.averageAge ? `${qualificationDetails.averageAge} anos` : "Não informada"}</p></div>
                       ) : (
                         <div><p className="text-xs text-muted-foreground">{beneficiaryDetails.label}</p><p className="mt-1 font-medium">{beneficiaryDetails.value ?? qualificationDetails.individualAges ?? "Não informadas"}</p></div>
                       )}

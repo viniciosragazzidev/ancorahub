@@ -2572,7 +2572,12 @@ export async function processInboundAiResponse({
         const isPme = updatedMemory.planType?.value === "empresarial";
         const currentAgeValue = isPme ? updatedMemory.averageAge : updatedMemory.age;
         if (!currentAgeValue || confidence >= (currentAgeValue.confidence ?? 0)) {
-          if (isPme) updatedMemory.averageAge = { value, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
+          const listed = value.match(/\d{1,3}/g)?.map(Number).filter((age) => age < 150) ?? [];
+          if (isPme && listed.length > 1) {
+            // Several ages: keep each one (said back to the customer); the average is only an internal number.
+            updatedMemory.age = { value: listed.join(", "), confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
+            updatedMemory.averageAge = { value: String(Math.round(listed.reduce((sum, age) => sum + age, 0) / listed.length)), confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
+          } else if (isPme) updatedMemory.averageAge = { value, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
           else updatedMemory.age = { value, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
           addField("age");
         }

@@ -232,7 +232,9 @@ export function mergeQualificationContextAnalysis(input: {
     const averageValue = String(Math.round(groundedAges.reduce((total, age) => total + age, 0) / groundedAges.length));
     const currentAverage = memory.averageAge?.value;
     const canApplyAverage = !businessPlan || currentAverage === averageValue || !currentAverage || canApplyField({ field: "averageAge", correctionField: "ages", value: averageValue, confidence: input.analysis.confidence.ages, analysis: input.analysis, message: input.currentMessage, memory, baseMemory: input.baseMemory, sourceMessageId });
-    if (canApplyAges && canApplyAverage) {
+    // The rules may have kept the same list already (a company's ages are kept one by one since 04/11): still link the beneficiaries.
+    const agesAlreadyKept = memory.age?.value === ageValue && !memory.beneficiaries?.length;
+    if ((canApplyAges || agesAlreadyKept) && canApplyAverage) {
       memory.age = { value: ageValue, confidence: 1, sourceMessageId };
       if (businessPlan) memory.averageAge = { value: averageValue, confidence: 1, sourceMessageId };
       memory.beneficiaries = groundedAges.map((age) => ({ age, relation: null, sourceMessageId }));

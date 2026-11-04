@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
-import { asksCurrentPlan, hasQuoteReadyData, type ConversationMemory } from "@/features/ai-agent/memory";
+import { asksCurrentPlan, formatAgeList, groupAgeList, hasQuoteReadyData, type ConversationMemory } from "@/features/ai-agent/memory";
 import { beneficiariesFromMemory, parseAgeValues } from "@/features/ai-agent/beneficiary-relations";
 import { deriveLeadQualificationStatus } from "@/features/leads/qualification-status";
 import { enqueueMetaQualificationConversion } from "@/features/meta-ads/meta-conversion-service";
@@ -123,7 +123,7 @@ const ALL_QUESTIONS_DEFINITIONS: Record<string, QualificationQuestionDefinition>
   age: {
     id: "Q4",
     key: "age",
-    text: "Quais as idades dos beneficiários (ou média de idades se for empresa)?",
+    text: "Quais as idades de cada pessoa que vai entrar no plano?",
     type: "text",
     required: true,
     targetField: "memory.age",
@@ -381,7 +381,7 @@ export function buildPrivateQualificationContext(memory: ConversationMemory, upd
     memory.planType?.value ? `tipo de plano: ${memory.planType.value}` : null,
     memory.numberOfLives?.value ? `vidas: ${memory.numberOfLives.value}` : null,
     isSingleLifeBusinessPlan(memory) ? PME_SINGLE_LIFE_NOTE : null,
-    memory.averageAge?.value ? `média de idade: ${memory.averageAge.value}` : memory.age?.value ? `idades: ${memory.age.value}` : null,
+    groupAgeList(memory).length ? `idades: ${formatAgeList(groupAgeList(memory))}` : memory.averageAge?.value ? `média de idade: ${memory.averageAge.value}` : memory.age?.value ? `idades: ${memory.age.value}` : null,
     memory.city?.value ? `cidade: ${memory.city.value}` : null,
     memory.neighborhood?.value ? `bairro: ${memory.neighborhood.value}` : null,
     memory.currentPlan?.value ? `plano atual: ${memory.currentPlan.value}` : null,
@@ -459,7 +459,7 @@ export async function persistQualificationEvaluation(input: {
         reasons: result.reasons,
         planType: input.memory.planType?.value ?? null,
         numberOfLives: input.memory.numberOfLives?.value ?? null,
-        individualAges: input.memory.planType?.value === "empresarial" ? null : input.memory.age?.value ?? null,
+        individualAges: input.memory.planType?.value === "empresarial" ? (groupAgeList(input.memory).length ? groupAgeList(input.memory).join(", ") : null) : input.memory.age?.value ?? null,
         averageAge: input.memory.planType?.value === "empresarial" ? input.memory.averageAge?.value ?? null : null,
         city: input.memory.city?.value ?? null,
         neighborhood: input.memory.neighborhood?.value ?? null,

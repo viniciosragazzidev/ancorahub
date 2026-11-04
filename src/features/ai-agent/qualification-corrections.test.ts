@@ -22,7 +22,7 @@ describe("a correction after the qualification", () => {
       { field: "age", value: "12, 42" },
       { field: "averageAge", value: "27" },
     ]);
-    expect(describeQualificationCorrections(corrections)).toBe("2 vidas; idades 12, 42 (média 27)");
+    expect(describeQualificationCorrections(corrections)).toBe("2 vidas; idades 12 e 42");
   });
 
   it("does not read small talk as new data", () => {
@@ -75,7 +75,7 @@ describe("a correction after the qualification", () => {
 
     expect(corrections).toContainEqual({ field: "age", value: "46, 10" });
     expect(beneficiaryCapture?.status).toBe("ambiguous");
-    expect(describeQualificationCorrections(corrections)).toContain("idades 46, 10");
+    expect(describeQualificationCorrections(corrections)).toContain("idades 46 e 10");
     expect(memory.beneficiaries?.every(({ relation }) => relation === null)).toBe(true);
     expect(summarizeQualification(memory, ["age"])).toBe("46 e 10 anos");
   });
