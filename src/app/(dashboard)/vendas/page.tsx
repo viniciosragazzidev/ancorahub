@@ -7,11 +7,9 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { SalesWorkspace } from "./sales-workspace";
-import { RelatedActions } from "@/components/related-actions";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import { buildSalesPageScope } from "@/features/sales/sales-page-scope";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
-import { LiteRelatedLinks } from "@/components/lite/page/related-links";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { SalesWorkspaceLite } from "./sales-workspace-lite";
 
@@ -86,17 +84,6 @@ export default async function SalesPage({
             branches={canFilterBranch ? branches : []}
             branchId={effectiveBranchId}
           />
-          <LiteRelatedLinks
-            title="Navegação comercial relacionada"
-            description="Funções ligadas a vendas e faturamento."
-            links={[
-              { label: "Propostas comerciais", href: "/propostas", description: "Propostas abertas, validades e fechamento" },
-              { label: "Ver base de clientes", href: "/clientes", description: "Gestão da carteira de contratos ativos" },
-              ...(canFilterBranch ? [{ label: "Tabela de comissões", href: "/configuracoes/comissoes", description: "Regras de comissionamento por produto" }] : []),
-              { label: "Anexar documentos de propostas", href: "/documentos", description: "Conferência de documentos e apólices" },
-              { label: "Relatório de desempenho", href: "/dashboard", description: "Métricas de fechamento por corretor" },
-            ]}
-          />
         </main>
       </>
     );
@@ -127,17 +114,6 @@ export default async function SalesPage({
           period={period}
         />
 
-        <RelatedActions
-          title="Navegação Comercial Relacionada"
-          description="Acesse funções diretas ligadas a vendas e faturamento."
-          links={[
-            { label: "Propostas Comerciais", href: "/propostas", description: "Propostas abertas, validades e fechamento" },
-            { label: "Ver Base de Clientes", href: "/clientes", description: "Gestão da carteira de contratos ativos" },
-            ...(canFilterBranch ? [{ label: "Tabela de Comissões", href: "/configuracoes/comissoes", description: "Regras de comissionamento por produto" }] : []),
-            { label: "Anexar Documentos de Propostas", href: "/documentos", description: "Conferência de documentos e apólices" },
-            { label: "Relatório de Desempenho", href: "/dashboard", description: "Métricas de fechamento por corretor" },
-          ]}
-        />
       </main>
     </>
   );
