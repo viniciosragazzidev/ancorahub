@@ -1404,7 +1404,32 @@ function handoffBodyFor(configured: string | null | undefined, defaultText: stri
   return isAfterHoursInSaoPaulo() ? afterHoursText(text, defaultText, afterHoursDefault) : text;
 }
 
-export async function processInboundAiResponse({
+type ProcessInboundAiInput = Parameters<typeof processInboundAiTurn>[0];
+
+/**
+ * One customer message, answered by the AI. When this turn's reply was dropped for a newer
+ * message, or the turn was skipped because another one held the conversation, the newest message
+ * may be left with no answer (case "Viva o Presente", 04/11/2026): once the other turn is done,
+ * the unanswered burst gets its own turn. `followUpDepth` bounds the chain.
+ */
+export async function processInboundAiResponse(input: ProcessInboundAiInput, followUpDepth = 0): Promise<Awaited<ReturnType<typeof processInboundAiTurn>>> {
+  const result = await processInboundAiTurn(input);
+  if (process.env.NODE_ENV !== "test" && (result.status === "superseded_by_newer_message" || result.status === "skipped_concurrent")) {
+    const { answerLatestUnansweredInbound } = await import("./unanswered-recovery");
+    await answerLatestUnansweredInbound({
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      depth: followUpDepth,
+      waitForLock: true,
+      // A dropped reply: the newer message's own turn gets its debounce (8 s) and claim first.
+      settleMs: result.status === "superseded_by_newer_message" ? 12_000 : 0,
+      reason: result.status,
+    }).catch((error) => console.error("[ai-wpp] unanswered.follow_up_failed", { leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" }));
+  }
+  return result;
+}
+
+async function processInboundAiTurn({
   tenantId,
   leadId,
   phone,
@@ -1488,7 +1513,7 @@ export async function processInboundAiResponse({
     if (debounceMs > 0) {
       // Newer than this message as the customer sent it (the provider time), not the server clock.
       const [ownMessage] = providerMessageId || whatsappMessageId
-        ? await db.select({ sentAt: schema.whatsappMessages.sentAt }).from(schema.whatsappMessages)
+        ? await db.select({ sentAt: schema.whatsappMessages.sentAt, storedAt: schema.whatsappMessages.createdAt }).from(schema.whatsappMessages)
           .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.messageId, (providerMessageId || whatsappMessageId)!))).limit(1)
         : [];
       const receivedAt = ownMessage?.sentAt ?? nowReceived;
@@ -1528,6 +1553,12 @@ export async function processInboundAiResponse({
       const [lastReply] = await db.select({ sentAt: schema.whatsappMessages.sentAt }).from(schema.whatsappMessages)
         .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.leadId, leadId), inArray(schema.whatsappMessages.direction, ["outbound", "outgoing"])))
         .orderBy(desc(schema.whatsappMessages.sentAt)).limit(1);
+      // A recovery turn already answered this burst while this one waited: never answer twice.
+      // Compared with when this message was stored: a reply sent after that already saw it.
+      if (lastReply?.sentAt && lastReply.sentAt.getTime() > new Date(ownMessage?.storedAt ?? receivedAt).getTime()) {
+        console.info("[ai-wpp] inbound.already_answered", { tenantId, leadId });
+        return { status: "already_answered" as const };
+      }
       const burst = await db.select({ body: schema.whatsappMessages.body }).from(schema.whatsappMessages)
         .where(and(
           eq(schema.whatsappMessages.tenantId, tenantId),
@@ -1565,7 +1596,7 @@ export async function processInboundAiResponse({
     // anything but another refusal reopens the qualification (case Adelair, 21/10).
     const reopened = await reopenAfterSoftDecline({ tenantId, leadId, conversation, body: userMessageBody });
     if (!reopened) return { status: "ignored_PAUSED" };
-    return processInboundAiResponse({ tenantId, leadId, phone, userMessageBody, messageKind, communicationChannelId, providerMessageId, whatsappMessageId, transport, openWaSessionId, wahaRunId, skipDebounce: true, correctionOnly });
+    return processInboundAiTurn({ tenantId, leadId, phone, userMessageBody, messageKind, communicationChannelId, providerMessageId, whatsappMessageId, transport, openWaSessionId, wahaRunId, skipDebounce: true, correctionOnly });
   }
   if (sourceIdentifier) {
     const [quickReplyEvent] = await db.select({ id: schema.aiQuickReplyEvents.id }).from(schema.aiQuickReplyEvents).where(and(eq(schema.aiQuickReplyEvents.tenantId, tenantId), eq(schema.aiQuickReplyEvents.sourceMessageId, sourceIdentifier), eq(schema.aiQuickReplyEvents.conversationId, conversation.id))).limit(1);
@@ -1580,7 +1611,7 @@ export async function processInboundAiResponse({
 
   // Distributed by the time limit with the flow unfinished: the customer's answer resumes it.
   if (conversation.status === "CLOSED" && await reopenDistributedQualification({ tenantId, leadId, conversation })) {
-    return processInboundAiResponse({ tenantId, leadId, phone, userMessageBody, messageKind, communicationChannelId, providerMessageId, whatsappMessageId, transport, openWaSessionId, wahaRunId, skipDebounce: true, correctionOnly });
+    return processInboundAiTurn({ tenantId, leadId, phone, userMessageBody, messageKind, communicationChannelId, providerMessageId, whatsappMessageId, transport, openWaSessionId, wahaRunId, skipDebounce: true, correctionOnly });
   }
 
   if (conversation.status === "CLOSED" || conversation.status === "FAILED") {
