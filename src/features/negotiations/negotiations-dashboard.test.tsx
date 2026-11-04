@@ -183,4 +183,34 @@ describe("NegotiationsDashboard", () => {
     expect(screen.getByText("Próxima ação")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Situação" })).toBeTruthy();
   });
+  it("sem a observação ligada, não mostra Sem retorno do corretor", () => {
+    const data = createNegotiationsFixture("director");
+    render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} />);
+    expect(screen.queryByRole("button", { name: /Sem retorno do corretor/ })).toBeNull();
+  });
+
+  it("em observação, mostra quem está sem retorno, inclusive quem não é negociação, e a espera no painel do lead", async () => {
+    const data = createNegotiationsFixture("director");
+    const listed = data.leads[0]!;
+    const base = { status: "in_contact", brokerId: "b1", brokerName: "Luiz Marques", branchName: null, clockStartedAt: data.generatedAt, nextStage: null, nextStageAt: null, unansweredCount: 4, urgent: true, customerQuote: "Esqueceram de me dar os valores" } as const;
+    const vera = { ...base, leadId: "vera", leadName: "Vera", waitingBusinessMinutes: 130, stage: "reassign" as const };
+    const other = { ...base, leadId: listed.id, leadName: listed.name, waitingBusinessMinutes: 20, stage: "acknowledge" as const, urgent: false, customerQuote: null };
+    data.customerWaitingGuard = { mode: "observe", rows: [vera, other] };
+    data.leads = data.leads.map((lead) => lead.id === listed.id ? { ...lead, waiting: other } : lead);
+    render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} />);
+
+    const button = screen.getByRole("button", { name: /Sem retorno do corretor/ });
+    expect(button.textContent).toContain("2");
+    expect(button.textContent).toContain("trocaria 1 corretor");
+    fireEvent.click(button);
+    const panel = screen.getByRole("region", { name: "Sem retorno do corretor" });
+    expect(panel.textContent).toContain("Vera");
+    expect(panel.textContent).toContain("Esqueceram de me dar os valores");
+    expect(panel.textContent).toContain("2 h 10 min");
+    expect(panel.textContent).toContain("Troca de corretor");
+
+    fireEvent.click(button);
+    fireEvent.click(screen.getByRole("button", { name: `Ver detalhes de ${listed.name}` }));
+    expect((await screen.findByText("Espera do cliente")).parentElement?.textContent).toContain("20 min úteis");
+  });
 });

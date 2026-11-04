@@ -21,6 +21,7 @@ export const JOB_SCHEDULE = {
   engagement: { path: "/api/internal/jobs/engagement", cron: "*/2 * * * *", label: "Jornada do corretor" },
   "supervisor-digest": { path: "/api/internal/jobs/supervisor-digest", cron: "0 22 * * *", label: "Resumo das 19h" },
   "operator-catalog": { path: "/api/internal/jobs/operator-catalog", cron: "*/5 * * * *", label: "Catálogo das operadoras" },
+  "customer-waiting": { path: "/api/internal/jobs/customer-waiting", cron: "*/5 * * * *", label: "Cliente aguardando o corretor" },
 } as const;
 
 export type JobKey = keyof typeof JOB_SCHEDULE;

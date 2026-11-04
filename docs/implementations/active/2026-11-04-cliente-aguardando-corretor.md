@@ -1,6 +1,6 @@
 # Cliente aguardando o corretor: IA acolhe, corretor é cobrado, atendimento é redistribuído
 
-Status: aprovado com as recomendações (04/11/2026). F0 concluída; F1 é a próxima.
+Status: aprovado com as recomendações (04/11/2026). F0 e F1 concluídas; F2 é a próxima.
 
 ## Decisões (04/11/2026, Vinicios: "pode seguir com os recomendados")
 
@@ -138,6 +138,45 @@ Fora do horário comercial, a IA responde na hora com o horário em que a equipe
 8. **Operação**
    - Entra uma linha nova no `docs/runbooks/coolify-scheduled-tasks.md`.
    - A BR-023 ganha uma exceção, com sua DEC, no `business-rules.md` e no `decision-log.md`.
+
+## F1. Observação (04/11/2026)
+
+**Cálculo** (`src/features/customer-waiting/domain.ts`, função pura com testes)
+- A espera começa na primeira mensagem do cliente que ainda não teve resposta. Contam como resposta:
+  - qualquer `outgoing` (número oficial ou WAHA);
+  - a mensagem da IA enviada antes da atribuição.
+- O relógio começa na atribuição, porque antes dela o corretor não tem o lead. Ele conta só em horário comercial (`businessMillisecondsBetween` e `addBusinessMilliseconds` em `src/shared/time/business-hours.ts`).
+- Não abrem espera:
+  - "ok", agradecimentos curtos, figurinhas e reações;
+  - texto repetido pelo cliente (por exemplo, o texto pronto do anúncio);
+  - "já estou falando com o corretor".
+- A espera ganha prioridade quando o cliente reclama, escreve em caixa alta ou manda 3 mensagens ou mais sem resposta.
+- Quando a IA respondeu depois da última mensagem do cliente, o caso fica marcado com `aiRepliedLast`. Na F2, a IA não manda o acolhimento nesses casos e só o corretor é cobrado.
+
+**Chave por empresa**
+- `feature_customer_waiting_guard_<tenantId>` aceita `off` e `observe`. O Super-admin liga na página da empresa ("Cliente aguardando o corretor").
+- Ao ligar, o sistema grava `_since`. Só contam as esperas que começarem depois disso.
+
+**Tarefa agendada**
+- `/api/internal/jobs/customer-waiting`, a cada 5 min, com lease e heartbeat.
+- Grava `lead.customer_waiting.observed` em `audit_logs`, uma vez por ciclo e etapa. O registro traz o que o sistema faria, o corretor, a espera em minutos úteis e a frase do cliente.
+- Não envia nada.
+
+**Negociações**
+- Com a observação ligada, a faixa de atenção ganha "Sem retorno do corretor". O botão mostra a contagem e quantas trocas o sistema faria.
+- O filtro abre a tabela dessa espera, que também inclui quem não aparece como negociação, como o aceite sem conversa. Clicar numa linha abre a conversa.
+- O drawer do lead mostra a "Espera do cliente".
+- Prévia sem banco: `/dev/negociacoes-preview?espera=1`.
+
+**Consulta real** (somente leitura, 04/11/2026 ~16h, últimos 7 dias, Âncora Saúde)
+- 157 leads com o cliente esperando, de 64 corretores:
+  - 150 já passaram do prazo de troca;
+  - 3 estão na 2ª cobrança;
+  - 2 na 1ª;
+  - 2 ainda no prazo.
+- 43 têm a última mensagem nas últimas 24h e 26 estão com prioridade.
+- 17 tiveram resposta da IA depois da última mensagem do cliente.
+- O acumulado é antigo. Por isso a tarefa só conta as esperas novas a partir do momento em que a observação é ligada.
 
 ## Fases
 

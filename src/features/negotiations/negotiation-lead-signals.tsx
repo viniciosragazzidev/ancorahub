@@ -9,6 +9,7 @@ import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import type { NegotiationLead } from "./queries";
 import { LEVEL_LABELS } from "./negotiations-data-views";
 import { negotiationSignalTags, replyOwedLabel } from "./negotiation-lead-row";
+import { formatBusinessMinutes, waitingStepText } from "./negotiation-waiting-panel";
 import styles from "./negotiations.module.css";
 
 const TRAIL = [
@@ -52,6 +53,7 @@ export function NegotiationLeadSituation({ lead, now }: { lead: NegotiationLead;
         <div><dt>Etapa no CRM</dt><dd>{LEAD_STATUS_LABELS[lead.status] ?? lead.status}{atStage ? <span className={styles.factHint}> · {atStage}</span> : null}</dd></div>
         <div><dt>Agora</dt><dd data-tone={lead.customerWaiting ? "waiting" : undefined}>{replyOwedLabel(lead)}</dd></div>
         <div><dt>Última troca</dt><dd>{lastExchange ?? "Sem troca recente"}</dd></div>
+        {lead.waiting ? <div><dt>Espera do cliente</dt><dd data-tone="waiting">{formatBusinessMinutes(lead.waiting.waitingBusinessMinutes)} úteis<span className={styles.factHint}> · {waitingStepText(lead.waiting)} (observação)</span></dd></div> : null}
         <div><dt>Corretor</dt><dd>{lead.brokerName}{lead.branchName ? <span className={styles.factHint}> · {lead.branchName}</span> : null}</dd></div>
       </dl>
       {tags.length ? <div className={styles.tagRow}>{tags.map((tag) => <span key={tag} className={styles.signalTag}>{tag}</span>)}</div> : null}

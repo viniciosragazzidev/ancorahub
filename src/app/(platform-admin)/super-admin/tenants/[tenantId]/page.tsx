@@ -11,6 +11,7 @@ import {
   updateDirectorLiteStylePilotAction,
   updateLiveStatusPilotAction,
   updateDutyShiftReminderPilotAction,
+  updateCustomerWaitingModeAction,
   updateQualificationContextAnalysisTenantAction,
   updateQualificationContextAnalysisQueueAction,
   updateMetaLeadAdsPilotAction,
@@ -28,6 +29,7 @@ import { ArrowRight } from "@/components/huge-icons";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag";
 import { liveStatusSettingKey } from "@/features/live-status/flag";
+import { customerWaitingSettingKey, parseCustomerWaitingMode } from "@/features/customer-waiting/flag";
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import { qualificationContextAnalysisSettingKeys } from "@/features/ai-agent/qualification-context-analysis-settings";
 import { CLEAN_UI_FEATURE, getCleanUiOperationalLegacyTenantIds } from "@/features/clean-ui/feature";
@@ -86,6 +88,7 @@ export default async function SuperAdminTenantDetailPage({
       directorLiteStyleSettingKey(tenantId.data),
       liveStatusSettingKey(tenantId.data),
       dutyShiftReminderSettingKey(tenantId.data),
+      customerWaitingSettingKey(tenantId.data),
       qualificationContextAnalysisSettingKeys(tenantId.data).tenant,
     ]),
     getMetaLeadAdsPilotTenantIds(),
@@ -106,6 +109,7 @@ export default async function SuperAdminTenantDetailPage({
   const directorLiteEnabled = settingMap.get(directorLiteStyleSettingKey(tenant.id)) === "true";
   const liveStatusEnabled = settingMap.get(liveStatusSettingKey(tenant.id)) === "true";
   const dutyShiftReminderEnabled = settingMap.get(dutyShiftReminderSettingKey(tenant.id)) === "true";
+  const customerWaitingObserving = parseCustomerWaitingMode(settingMap.get(customerWaitingSettingKey(tenant.id))) === "observe";
   const contextAnalysisTenantKey = qualificationContextAnalysisSettingKeys(tenant.id).tenant;
   const contextAnalysisTenantEnabled = settingMap.get(contextAnalysisTenantKey) !== "false";
   const metaLeadAdsPilotEnabled = metaLeadAdsPilotTenantIds.includes(tenant.id);
@@ -118,6 +122,7 @@ export default async function SuperAdminTenantDetailPage({
   const directorLiteAction = updateDirectorLiteStylePilotAction.bind(null, tenant.id);
   const liveStatusAction = updateLiveStatusPilotAction.bind(null, tenant.id);
   const dutyShiftReminderAction = updateDutyShiftReminderPilotAction.bind(null, tenant.id);
+  const customerWaitingAction = updateCustomerWaitingModeAction.bind(null, tenant.id);
   const contextAnalysisTenantAction = updateQualificationContextAnalysisTenantAction.bind(null, tenant.id);
 
   return (
@@ -221,6 +226,21 @@ export default async function SuperAdminTenantDetailPage({
                   <input name="enabled" type="hidden" value={dutyShiftReminderEnabled ? "false" : "true"} />
                   <Button type="submit" variant={dutyShiftReminderEnabled ? "outline" : "default"}>
                     {dutyShiftReminderEnabled ? "Desligar" : "Ligar"}
+                  </Button>
+                </form>
+              </div>
+              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="max-w-2xl">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-medium">Cliente aguardando o corretor</h3>
+                    <Badge variant={customerWaitingObserving ? "success" : "outline"}>{customerWaitingObserving ? "Observando" : "Desligado"}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">Mede a espera do cliente sem resposta do corretor em horas úteis e mostra na Negociações. Em observação, só registra o que faria (IA acolhe, cobranças, troca de corretor) a partir de agora; não envia nada.</p>
+                </div>
+                <form action={customerWaitingAction}>
+                  <input name="mode" type="hidden" value={customerWaitingObserving ? "off" : "observe"} />
+                  <Button type="submit" variant={customerWaitingObserving ? "outline" : "default"}>
+                    {customerWaitingObserving ? "Desligar" : "Ligar observação"}
                   </Button>
                 </form>
               </div>

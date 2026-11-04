@@ -81,3 +81,45 @@ export function scheduleForBusinessHours(now = new Date()) {
   return zonedBusinessOpeningToUtc(next.year, next.month, next.day);
 }
 
+
+/** The instant the business day containing `instant` closes (18:00 local). Only meaningful inside business hours. */
+function businessClosingAt(instant: Date) {
+  const local = localBusinessTime(instant);
+  const minutesLeft = BUSINESS_END_HOUR * 60 - (local.hour * 60 + local.minute);
+  const startOfMinute = instant.getTime() - (instant.getTime() % 60_000);
+  return new Date(startOfMinute + minutesLeft * 60_000);
+}
+
+/** Milliseconds of business time (weekdays, 08:00 to 18:00 in São Paulo) between two instants. */
+export function businessMillisecondsBetween(start: Date, end: Date) {
+  let cursor = start;
+  let total = 0;
+  for (let guard = 0; cursor < end && guard < 1000; guard += 1) {
+    if (!isWithinBusinessHours(cursor)) {
+      cursor = scheduleForBusinessHours(cursor);
+      continue;
+    }
+    const segmentEnd = new Date(Math.min(end.getTime(), businessClosingAt(cursor).getTime()));
+    total += segmentEnd.getTime() - cursor.getTime();
+    cursor = segmentEnd;
+  }
+  return total;
+}
+
+/** The instant reached after `milliseconds` of business time from `start` (skips nights and weekends). */
+export function addBusinessMilliseconds(start: Date, milliseconds: number) {
+  let cursor = start;
+  let left = Math.max(0, milliseconds);
+  for (let guard = 0; guard < 1000; guard += 1) {
+    if (!isWithinBusinessHours(cursor)) {
+      cursor = scheduleForBusinessHours(cursor);
+      continue;
+    }
+    const closing = businessClosingAt(cursor);
+    const available = closing.getTime() - cursor.getTime();
+    if (left <= available) return new Date(cursor.getTime() + left);
+    left -= available;
+    cursor = closing;
+  }
+  return cursor;
+}

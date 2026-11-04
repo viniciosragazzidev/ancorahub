@@ -345,3 +345,10 @@
 @media (prefers-reduced-motion: reduce) {
   .closingItem:active { transform: none; }
 }
+
+/* Cliente aguardando o corretor (observação F1, plano 2026-11-04). */
+.waitingHead { display: grid; gap: 2px; min-width: 0; }
+.waitingTitle { margin: 0; font-size: var(--text-base); font-weight: 500; }
+.waitingLead { display: grid; gap: 2px; min-width: 220px; }
+.waitingName { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 500; }
+.signalTag[data-tone="urgent"] { background: var(--danger-subtle); color: var(--danger); }

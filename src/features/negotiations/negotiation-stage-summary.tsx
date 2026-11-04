@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, MessageCircle, Snowflake, Timer, Unplug } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Hourglass, MessageCircle, Snowflake, Timer, Unplug } from "lucide-react";
 
 import { LiteAttention, LiteNumber, LiteProgress, LiteSwap } from "@/components/lite/motion";
 import { formatAbsoluteTime, formatAgo, formatCountdown } from "@/components/lite/status/format";
@@ -13,7 +13,7 @@ import type { NegotiationLead, NegotiationsDashboardData } from "./queries";
 import { enteredToday } from "./negotiation-stage-summary-model";
 import styles from "./negotiations.module.css";
 
-type SummaryFilter = NegotiationLevel | "customers_waiting";
+export type SummaryFilter = NegotiationLevel | "customers_waiting" | "no_reply";
 
 /** As três etapas em ordem: a trilha mostra que o atendimento anda da conversa ao fechamento. */
 const STAGES: Array<{ id: Extract<NegotiationLevel, "closing" | "advanced" | "in_conversation">; label: string; detail: string; icon: typeof CheckCircle2 }> = [
@@ -71,6 +71,9 @@ export function NegotiationStageSummary({ data, generatedAt, activeFilter, onFil
   }, [data.counts]);
 
   const now = clockNow ?? generatedAt.getTime();
+  const noReplyRows = data.customerWaitingGuard?.rows ?? [];
+  const noReplyDue = noReplyRows.filter((row) => row.stage !== "watching").length;
+  const noReplySwap = noReplyRows.filter((row) => row.stage === "reassign").length;
   const targetText = waitTarget
     ? remaining === null ? formatAbsoluteTime(waitTarget, generatedAt.toISOString()) : due ? "Vencendo agora, reclassifica na próxima atualização" : `Reclassifica em ${formatCountdown(remaining)}`
     : null;
@@ -124,6 +127,13 @@ export function NegotiationStageSummary({ data, generatedAt, activeFilter, onFil
           <LiteAttention pulseKey={countPulses.cooling || undefined} className={styles.attentionValue}><LiteNumber value={data.counts.cooling} countFromZero live /></LiteAttention>
           <span className={styles.attentionHint}>{cooling ? `Mais antigo parado ${formatAgo(now - new Date(cooling.lastExchangeAt!).getTime())}` : data.counts.cooling ? "Sem data da última troca" : "Nenhum parado"}</span>
         </button>
+        {data.customerWaitingGuard ? (
+          <button type="button" className={styles.attentionAction} data-tone="no_reply" data-active={activeFilter === "no_reply" || undefined} aria-pressed={activeFilter === "no_reply"} onClick={() => onFilter("no_reply")}>
+            <span className={styles.attentionLabel}><Hourglass aria-hidden="true" size={14} /> Sem retorno do corretor</span>
+            <LiteAttention pulseKey={noReplyDue || undefined} className={styles.attentionValue}><LiteNumber value={noReplyDue} countFromZero live /></LiteAttention>
+            <span className={styles.attentionHint}>{noReplySwap ? `Observação: trocaria ${noReplySwap} ${noReplySwap === 1 ? "corretor" : "corretores"}` : noReplyDue ? "Observação: só cobranças até agora" : "Ninguém esperando além de 15 min"}</span>
+          </button>
+        ) : null}
         {data.counts.no_crm_conversation > 0 ? (
           <button type="button" className={styles.attentionAction} data-tone="no_crm" data-active={activeFilter === "no_crm_conversation" || undefined} aria-pressed={activeFilter === "no_crm_conversation"} onClick={() => onFilter("no_crm_conversation")}>
             <span className={styles.attentionLabel}><Unplug aria-hidden="true" size={14} /> Sem conversa no CRM</span>

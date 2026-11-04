@@ -136,3 +136,22 @@ export function createNegotiationsFixture(role: NegotiationsScope["role"] = "dir
     aiHealth: { analysesLast24Hours: 26, failuresLast24Hours: 2 },
   };
 }
+
+/** Observação "Cliente aguardando o corretor" com dados sintéticos: um caso de troca, uma 2ª cobrança, uma 1ª e um ainda no prazo. */
+export function withCustomerWaitingFixture(data: NegotiationsDashboardData): NegotiationsDashboardData {
+  const listed = data.leads.filter((lead) => lead.level === "cooling" || lead.level === "in_conversation").slice(0, 2);
+  const at = (minutes: number) => new Date(NOW.getTime() + minutes * 60_000).toISOString();
+  const rows: NonNullable<NegotiationsDashboardData["customerWaitingGuard"]>["rows"] = [
+    { leadId: "fixture-vera", leadName: "Vera Lúcia Andrade", status: "in_contact", brokerId: BROKERS[3]!.id, brokerName: BROKERS[3]!.name, branchName: BRANCHES[0]!.name, clockStartedAt: at(-200), waitingBusinessMinutes: 135, stage: "reassign", nextStage: null, nextStageAt: null, unansweredCount: 4, urgent: true, customerQuote: "Esqueceram de me dar os valores" },
+    ...listed.map((lead, index) => ({
+      leadId: lead.id, leadName: lead.name, status: lead.status, brokerId: lead.brokerId, brokerName: lead.brokerName, branchName: lead.branchName,
+      clockStartedAt: at(index ? -20 : -50), waitingBusinessMinutes: index ? 20 : 50,
+      stage: index ? "acknowledge" as const : "second_charge" as const,
+      nextStage: index ? "second_charge" as const : "reassign" as const, nextStageAt: at(index ? 25 : 70),
+      unansweredCount: 1, urgent: false, customerQuote: index ? "Consegue me mandar a carência?" : "Qual o valor para 2 vidas?",
+    })),
+    { leadId: "fixture-recente", leadName: "Marcos Vinícius Prado", status: "quote_sent", brokerId: BROKERS[0]!.id, brokerName: BROKERS[0]!.name, branchName: BRANCHES[1]!.name, clockStartedAt: at(-6), waitingBusinessMinutes: 6, stage: "watching", nextStage: "acknowledge", nextStageAt: at(9), unansweredCount: 1, urgent: false, customerQuote: "Recebi, vou ver com minha esposa e já te falo" },
+  ];
+  const byLead = new Map(rows.map((row) => [row.leadId, row]));
+  return { ...data, customerWaitingGuard: { mode: "observe", rows }, leads: data.leads.map((lead) => ({ ...lead, waiting: byLead.get(lead.id) ?? null })) };
+}
