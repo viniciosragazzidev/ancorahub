@@ -715,9 +715,10 @@ async function findPriorityDistributionLeads(now: Date, limit: number, tenantId?
       isNull(schema.leads.distributionRemovedAt),
       not(ilike(schema.leads.nome, "Lead WhatsApp (%)")),
       notHeldByRunningQualificationSql(earlyHot),
-      gt(sql`coalesce(${schema.leads.qualificationCompletedAt}, ${schema.leads.updatedAt})`, new Date(now.getTime() - PRIORITY_DISTRIBUTION_WINDOW_MS)),
+      // Raw SQL: the driver does not serialize a Date here (every priority pass failed from 03/11 to 04/11).
+      sql`coalesce(${schema.leads.qualificationCompletedAt}, ${schema.leads.updatedAt}) > ${new Date(now.getTime() - PRIORITY_DISTRIBUTION_WINDOW_MS).toISOString()}::timestamptz`,
       // A job waiting for its retry time (held by a rule, offer still open) keeps its own pace.
-      sql`not exists (select 1 from ${schema.leadDistributionJobs} j where j.lead_id = ${schema.leads.id} and j.status in ('pending', 'retrying', 'processing') and (j.status = 'processing' or j.run_after > ${now}))`,
+      sql`not exists (select 1 from ${schema.leadDistributionJobs} j where j.lead_id = ${schema.leads.id} and j.status in ('pending', 'retrying', 'processing') and (j.status = 'processing' or j.run_after > ${now.toISOString()}::timestamptz))`,
       tenantId ? eq(schema.leads.tenantId, tenantId) : undefined,
       leadId ? eq(schema.leads.id, leadId) : undefined,
     ))
