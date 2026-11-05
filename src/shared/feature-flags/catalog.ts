@@ -405,6 +405,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Exige confirmação do corretor antes de torná-lo elegível aos leads do plantão vigente.",
   },
+  DUTY_PRESENCE_REQUIRES_WHATSAPP: {
+    key: "feature_duty_presence_requires_whatsapp",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "A partir de 06/11/2026, o corretor só confirma presença no plantão com o WhatsApp dele conectado; sem conexão, o app abre a conexão por código e confirma ao conectar.",
+  },
   LEAD_BROKER_INTRO: {
     key: "feature_lead_broker_intro_enabled",
     scope: "global",

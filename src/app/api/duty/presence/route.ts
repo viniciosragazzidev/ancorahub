@@ -12,6 +12,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { cleanPresencePhoto, isAllowedImage } from "@/features/lead-distribution/presence-photo";
 import { isR2StorageEnabled } from "@/features/storage/r2-storage-feature";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { PRESENCE_WHATSAPP_REQUIRED_CODE, PRESENCE_WHATSAPP_REQUIRED_MESSAGE } from "@/features/lead-distribution/duty-presence-whatsapp";
+import { checkBrokerWhatsAppForPresence } from "@/features/lead-distribution/duty-presence-whatsapp-server";
 import { uploadR2Object } from "@/shared/storage/r2-storage";
 
 export const runtime = "nodejs";
@@ -20,7 +22,7 @@ export const dynamic = "force-dynamic";
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const assignmentSchema = z.string().min(1).max(80).regex(/^[A-Za-z0-9_-]+$/);
 
-const fail = (error: string, status: number) => NextResponse.json({ ok: false, error }, { status });
+const fail = (error: string, status: number, code?: string) => NextResponse.json({ ok: false, error, ...(code ? { code } : {}) }, { status });
 
 /**
  * The broker confirms his presence in the plantão from the app (multipart:
@@ -42,6 +44,9 @@ export async function POST(request: Request) {
     return fail(resolved.reason === "outside_window" ? "A confirmação abre 30 minutos antes do plantão e vale até o fim dele." : "Não achei esse plantão na sua escala.", resolved.reason === "outside_window" ? 409 : 404);
   }
   const { occurrence } = resolved;
+  // A partir de 06/11/2026: sem o WhatsApp conectado, não confirma (o app abre a conexão por código).
+  const whatsapp = await checkBrokerWhatsAppForPresence({ tenantId: context.tenantId, brokerId: context.userId });
+  if (!whatsapp.allowed) return fail(PRESENCE_WHATSAPP_REQUIRED_MESSAGE, 409, PRESENCE_WHATSAPP_REQUIRED_CODE);
 
   let photoStorageKey: string | null = null;
   if (occurrence.mode === "presencial") {

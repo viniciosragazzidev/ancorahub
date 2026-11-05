@@ -175,3 +175,34 @@ export function resolvePairingCopyBody(body: string | undefined, phoneSuffix?: s
   if (!body) return undefined;
   return body.replace("{phone}", phoneSuffix ? ` · número final ${phoneSuffix}` : "");
 }
+
+/**
+ * Tutorial do código de pareamento no celular (05/11, presença exige WhatsApp): o caminho muda entre
+ * Android e iPhone até "Dispositivos conectados"; dali em diante é igual.
+ */
+export const PAIRING_CODE_TUTORIAL = {
+  title: "Como digitar o código no WhatsApp",
+  platforms: [
+    { value: "android", label: "Android" },
+    { value: "iphone", label: "iPhone" },
+  ],
+  steps: {
+    android: [
+      "Abra o WhatsApp no celular do número informado.",
+      "Toque nos três pontinhos (⋮), no canto de cima, e em Dispositivos conectados.",
+      "Toque em Conectar dispositivo.",
+      "Embaixo do leitor de QR Code, toque em Conectar com número de telefone.",
+      "Digite o código de 8 letras e números que aparece aqui.",
+    ],
+    iphone: [
+      "Abra o WhatsApp no celular do número informado.",
+      "Toque em Configurações, embaixo à direita, e em Dispositivos conectados.",
+      "Toque em Conectar dispositivo.",
+      "Embaixo do leitor de QR Code, toque em Conectar com número de telefone.",
+      "Digite o código de 8 letras e números que aparece aqui.",
+    ],
+  },
+  hint: "Dica: copie o código aqui antes de abrir o WhatsApp. Se ele expirar (cerca de 2 minutos), gere outro.",
+} as const;
+
+export type PairingTutorialPlatform = keyof typeof PAIRING_CODE_TUTORIAL.steps;

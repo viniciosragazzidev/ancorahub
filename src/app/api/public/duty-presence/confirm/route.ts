@@ -5,6 +5,8 @@ import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { effectiveAttendanceMode, getExtraShiftConfirmationWindowState, getSelfDutyConfirmationWindowState, isExtraShiftRecord, SELF_CONFIRM_LATE_MESSAGE, SELF_CONFIRM_OPENS_MINUTES, SELF_CONFIRM_TOLERANCE_MINUTES } from "@/features/lead-distribution/duty-presence-domain";
 import { wakeLeadsAwaitingEligibleBroker } from "@/features/lead-distribution/jobs";
+import { PRESENCE_WHATSAPP_REQUIRED_CODE, PRESENCE_WHATSAPP_REQUIRED_MESSAGE } from "@/features/lead-distribution/duty-presence-whatsapp";
+import { checkBrokerWhatsAppForPresence } from "@/features/lead-distribution/duty-presence-whatsapp-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +20,7 @@ export async function POST(request: NextRequest) {
   const db = getDatabase();
   // Presencial is confirmed only in the app, with the photo of the place (the link page sends the broker there).
   // A broker marked online inside a presencial plantão confirms here with one tap.
-  const [mode] = await db.select({ status: schema.dutyPresenceConfirmations.status, attendanceMode: schema.unitDutySchedules.attendanceMode, assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode, shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt, shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt, joinedAt: schema.dutyRosterAssignments.createdAt, assignmentStartsAt: schema.dutyRosterAssignments.startsAt, timezone: schema.unitDutySchedules.timezone })
+  const [mode] = await db.select({ tenantId: schema.dutyPresenceConfirmations.tenantId, brokerId: schema.dutyPresenceConfirmations.brokerId, status: schema.dutyPresenceConfirmations.status, attendanceMode: schema.unitDutySchedules.attendanceMode, assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode, shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt, shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt, joinedAt: schema.dutyRosterAssignments.createdAt, assignmentStartsAt: schema.dutyRosterAssignments.startsAt, timezone: schema.unitDutySchedules.timezone })
     .from(schema.dutyPresenceConfirmations)
     .innerJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.dutyPresenceConfirmations.scheduleId), eq(schema.unitDutySchedules.tenantId, schema.dutyPresenceConfirmations.tenantId)))
     .leftJoin(schema.dutyRosterAssignments, and(eq(schema.dutyRosterAssignments.id, schema.dutyPresenceConfirmations.assignmentId), eq(schema.dutyRosterAssignments.tenantId, schema.dutyPresenceConfirmations.tenantId)))
@@ -34,6 +36,11 @@ export async function POST(request: NextRequest) {
   if (mode?.status === "pending" && windowState === "late") return NextResponse.json({ success: false, error: SELF_CONFIRM_LATE_MESSAGE }, { status: 409 });
   if (mode?.status === "pending" && windowState === "not_open") return NextResponse.json({ success: false, error: `A confirmação abre ${SELF_CONFIRM_OPENS_MINUTES} minutos antes do plantão.` }, { status: 409 });
   if (mode && !isExtra && effectiveAttendanceMode(mode.assignmentAttendanceMode, mode.attendanceMode) === "presencial") return NextResponse.json({ success: false, error: "Este plantão é presencial: confirme pelo app, tirando uma foto do local." }, { status: 409 });
+  // A partir de 06/11/2026: sem o WhatsApp conectado, não confirma; a página leva o corretor ao app para conectar.
+  if (mode?.status === "pending") {
+    const whatsapp = await checkBrokerWhatsAppForPresence({ tenantId: mode.tenantId, brokerId: mode.brokerId, now });
+    if (!whatsapp.allowed) return NextResponse.json({ success: false, error: PRESENCE_WHATSAPP_REQUIRED_MESSAGE, code: PRESENCE_WHATSAPP_REQUIRED_CODE }, { status: 409 });
+  }
   const result = await db.transaction(async (tx) => {
     const [confirmed] = await tx.update(schema.dutyPresenceConfirmations).set({ status: "confirmed", confirmedAt: now, updatedAt: now })
       .where(and(

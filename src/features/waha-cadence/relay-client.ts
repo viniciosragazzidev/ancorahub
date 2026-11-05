@@ -429,3 +429,20 @@ export async function resumeWahaRelaySession(sessionId: string) {
 export async function disconnectWahaRelaySession(sessionId: string) {
   return relaySessionRequest(`/v1/sessions/${encodeURIComponent(sessionId)}`, "DELETE");
 }
+
+/**
+ * Status ao vivo de uma sessão (05/11, presença exige WhatsApp). Prazo curto: quem chama decide o que fazer
+ * se o serviço não responder (a confirmação de presença libera e registra).
+ */
+export async function getWahaSessionLiveStatus(sessionName: string, timeoutMs = 5_000): Promise<{ status: string | null }> {
+  const config = relayConfig();
+  const response = await fetch(`${config.url}/internal/waha/connections/${encodeURIComponent(sessionName)}/status`, {
+    method: "GET",
+    headers: getFastifyHeaders(config.secret, false),
+    cache: "no-store",
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  const data = (await response.json().catch(() => null)) as { ok?: boolean; status?: string } | null;
+  if (!response.ok || !data?.ok) throw new Error(`WhatsApp status ${response.status}`);
+  return { status: typeof data.status === "string" ? data.status : null };
+}

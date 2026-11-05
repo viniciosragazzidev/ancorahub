@@ -27,7 +27,7 @@ import {
   toggleWhatsAppChatAction,
 } from "@/app/(dashboard)/settings/whatsapp-actions";
 import { PAIRING_BADGE_LABELS, PAIRING_TOASTS, type PairingMethod } from "@/features/waha-cadence/pairing-copy";
-import { FadeSwap, PairingCodePanel, PairingGuide, PairingQrPanel, PairingStepper } from "./whatsapp-pairing-panel";
+import { FadeSwap, PairingCodePanel, PairingCodeTutorial, PairingGuide, PairingQrPanel, PairingStepper } from "./whatsapp-pairing-panel";
 
 type Connection = Awaited<ReturnType<typeof getWhatsAppConnection>>;
 type PollSnapshot = Extract<Awaited<ReturnType<typeof pollWhatsAppConnection>>, { success: true }>;
@@ -86,7 +86,16 @@ export function WhatsAppConnectDialog({
   onConnectionChanged,
   onOpenChange,
   trigger,
+  initialMethod,
+  showCodeTutorial = false,
+  onReady,
 }: {
+  /** Chamado quando o WhatsApp fica conectado (ex.: confirmar presença segue sozinha). */
+  onReady?: () => void;
+  /** Abre já neste modo (ex.: confirmar presença abre no código, 05/11). */
+  initialMethod?: PairingMethod;
+  /** Mostra o passo a passo de onde digitar o código no celular. */
+  showCodeTutorial?: boolean;
   /** A custom trigger (e.g. the round status button of the Lite); default is the labeled button. */
   trigger?: React.ReactElement;
   initial: Connection;
@@ -123,7 +132,7 @@ export function WhatsAppConnectDialog({
   // Pareamento pendente com o dialog fechado: a verificação continua em segundo plano.
   const [watching, setWatching] = useState(false);
   // ── Código de pareamento (alternativa ao QR; padrão no celular) ──────
-  const [method, setMethod] = useState<PairingMethod>("qr");
+  const [method, setMethod] = useState<PairingMethod>(initialMethod ?? "qr");
   const [pairingPhone, setPairingPhone] = useState("");
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [generatingCode, setGeneratingCode] = useState(false);
@@ -147,7 +156,7 @@ export function WhatsAppConnectDialog({
   const wake = useRef<(() => void) | null>(null);
   const intervalMs = useRef(1_000);
   const openRef = useRef(false);
-  const methodChosen = useRef(false);
+  const methodChosen = useRef(Boolean(initialMethod));
   const phoneLoaded = useRef(false);
   const pairingCodeRef = useRef<string | null>(null);
   const generatingRef = useRef(false);
@@ -195,6 +204,18 @@ export function WhatsAppConnectDialog({
   useEffect(() => () => {
     if (successTimer.current) window.clearTimeout(successTimer.current);
   }, []);
+
+  // Aberto por outro CTA já no modo escolhido (confirmar presença): roda a mesma abertura do clique.
+  const controlledOpened = useRef(false);
+  useEffect(() => {
+    if (!initialMethod) return;
+    if (controlledOpen && !controlledOpened.current) {
+      controlledOpened.current = true;
+      handleOpenChange(true);
+    }
+    if (!controlledOpen) controlledOpened.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando o pai abre ou fecha
+  }, [controlledOpen, initialMethod]);
 
   // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -270,6 +291,7 @@ export function WhatsAppConnectDialog({
     if (!celebrate) {
       if (completedInBackground) toast.success(PAIRING_TOASTS.connectedBackground);
       onConnectionChanged?.();
+      onReady?.();
       return;
     }
     toast.success(PAIRING_TOASTS.connected);
@@ -279,6 +301,7 @@ export function WhatsAppConnectDialog({
     successTimer.current = window.setTimeout(() => {
       updateOpen(false);
       onConnectionChanged?.();
+      onReady?.();
       if (returnTo) router.replace(returnTo);
     }, SUCCESS_HOLD_MS);
   }
@@ -709,6 +732,7 @@ export function WhatsAppConnectDialog({
               method={method}
               hasCode={Boolean(pairingCode)}
             />
+            {showCodeTutorial && method === "code" && !ready ? <PairingCodeTutorial /> : null}
 
             <div className={method === "qr" ? "flex flex-wrap gap-ds-8" : "hidden"}>
               {phase === "idle" && (
