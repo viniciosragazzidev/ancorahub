@@ -723,7 +723,7 @@ export function WhatsAppConnectDialog({
   if (variant === "presence") {
     return (
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogPopup className="max-w-md">
+        <DialogPopup className="max-w-md overflow-y-auto overscroll-contain">
           {ready ? (
             <PresenceWhatsAppConnected />
           ) : !presenceStarted ? (

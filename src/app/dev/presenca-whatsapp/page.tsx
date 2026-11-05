@@ -39,7 +39,7 @@ export default function PresenceWhatsAppPreviewPage() {
   return (
     <main className="min-h-dvh bg-ds-canvas-white p-ds-16">
       <Dialog open>
-        <DialogPopup className="max-w-md">
+        <DialogPopup className="max-w-md overflow-y-auto overscroll-contain">
           {screen === "intro" ? <PresenceWhatsAppIntro onStart={() => setScreen("generating")} />
             : screen === "connected" ? <PresenceWhatsAppConnected />
               : <PresenceWhatsAppCode panel={panel} onOpenWhatsApp={() => undefined} />}
