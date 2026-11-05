@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 05/11/2026 - Exportação da carteira atual do corretor
+
+- Diretor e gestor com capacidade efetiva podem baixar os leads atualmente atribuídos ao corretor em CSV para Excel pt-BR, com filtros de unidade/tenant, convertidos e perdidos incluídos por padrão e processamento em lotes sem teto artificial.
+- A exportação audita `report.generated`; a tela informa estado e quantidade, e permite excluir convertidos/perdidos.
+- Implementação e validações: [exportação de leads do corretor](implementations/completed/2026-11-05-exportar-leads-corretor.md).
+
 ## 05/11/2026 - Recuperação da qualificação por IA no WhatsApp
 
 - O gateway abre cooldown de 10 minutos para provedor com HTTP 401/402 sem gastar tentativa; a qualificação tenta Haiku 5.5 novamente em saída JSON inválida/timeout, depois usa OpenAI direto e provedores pagos do OpenRouter.

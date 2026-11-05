@@ -10,6 +10,7 @@ import { hasCapability } from "@/shared/auth/permissions";
 import type { TenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getReportDefinition, type ReportFormat, type ReportId } from "./report-registry";
+import { encodeCsvDocument } from "./csv-export";
 
 const MAX_EXPORT_ROWS = 10_000;
 const MAX_RANGE_DAYS = 366;
@@ -36,9 +37,7 @@ function toRows(rows: Record<string, unknown>[]) {
 
 function encodeCsv(rows: Record<string, unknown>[]) {
   const normalized = toRows(rows);
-  const columns = Object.keys(normalized[0] ?? {});
-  const quote = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-  return `\uFEFF${[columns.join(";"), ...normalized.map((row) => columns.map((column) => quote(row[column])).join(";"))].join("\r\n")}`;
+  return encodeCsvDocument(normalized);
 }
 
 function printable(value: unknown) {

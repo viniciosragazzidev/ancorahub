@@ -18,6 +18,7 @@ import page from "@/components/lite/page/lite-page.module.css";
 import { acceptRate, formatDuration, RANK_LABEL, type BrokerOfferStats, type RankPosition } from "@/features/engagement/ranking";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { SupervisorNoteHistory } from "@/features/supervisor-workspace/broker-profile/supervisor-broker-profile";
+import { BrokerLeadsExportButton } from "./broker-leads-export-button";
 import type { SupervisorNote } from "@/features/supervisor-workspace/notes-types";
 import type { getTeamMemberProfile } from "@/features/team/member-profile";
 
@@ -199,7 +200,7 @@ function DutySection({ days, now }: { days: DutyDay[]; now: Date }) {
   );
 }
 
-export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, ranking, scopeNote, now }: {
+export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, ranking, scopeNote, canExportLeads = false, now }: {
   profile: Profile;
   /** MEMBER_PROFILE_LEADS_LIMIT: acima disso a lista avisa que considera só os mais recentes. */
   leadsLimit: number;
@@ -208,6 +209,7 @@ export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, r
   ranking: { stats: BrokerOfferStats | null; ranks: RankPosition[]; periodDays: number; withoutStep: number } | null;
   /** Aviso do gestor: só dados da própria unidade. */
   scopeNote: boolean;
+  canExportLeads?: boolean;
   now: string;
 }) {
   const at = useMemo(() => new Date(now), [now]);
@@ -234,6 +236,7 @@ export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, r
             </span>
             <span className={page.cellSub}>{roleName} · {member.branchName ?? "Geral da empresa"}</span>
             <span className={page.cellSub}>{member.email}</span>
+            {canExportLeads && isBroker ? <BrokerLeadsExportButton brokerId={member.userId} compact /> : null}
           </div>
           <dl className={styles.facts}>
             <div><dt>Disponibilidade</dt><dd>{AVAILABILITY[member.availabilityStatus] ?? member.availabilityStatus}</dd></div>
