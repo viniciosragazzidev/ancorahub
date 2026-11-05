@@ -1,6 +1,8 @@
 "use server";
 
 import { requireCargoCapability } from "@/shared/auth/authorization";
+import { exclusiveScheduleIdsForManager } from "./manager-unit-scope-server";
+import { MANAGER_SCOPE_ERROR } from "./manager-unit-scope";
 import { randomUUID } from "node:crypto";
 import { and, eq, gt, gte, inArray, isNotNull, isNull, ne, notInArray, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -186,11 +188,15 @@ export async function listDutySwapCandidatesAction(assignmentId: string): Promis
         .limit(SWAP_WEEKLY_LIMIT),
     ]);
     const all: SwapCandidateRow[] = [...datedRows, ...weeklyRows].map((row) => ({ ...toSwapSlot(row), brokerBranchId: row.brokerBranchId ?? null, brokerCode: row.brokerCode ?? null }));
-    const sourceRow = all.find((row) => row.id === source.id);
+    // Gestor (05/11): só plantões exclusivos da unidade dele entram na troca.
+    const exclusive = context.role === "manager" ? await exclusiveScheduleIdsForManager(db, context, all.map((row) => row.scheduleId)) : null;
+    if (exclusive && !exclusive.has(source.scheduleId)) return { ok: false, reason: MANAGER_SCOPE_ERROR };
+    const inScope = exclusive ? all.filter((row) => exclusive.has(row.scheduleId)) : all;
+    const sourceRow = inScope.find((row) => row.id === source.id);
     if (!sourceRow) return { ok: false, reason: "Esta escalação não existe mais. Atualize a página." };
     // Only brokers still on the escala (active account and unit) are offered.
-    const brokers = await loadSwapBrokers(db, context.tenantId, [...new Set(all.map((row) => row.brokerId))]);
-    const candidates = selectSwapCandidates(sourceRow, all, actor, now).filter((candidate) => brokers.get(candidate.brokerId)?.eligible);
+    const brokers = await loadSwapBrokers(db, context.tenantId, [...new Set(inScope.map((row) => row.brokerId))]);
+    const candidates = selectSwapCandidates(sourceRow, inScope, actor, now).filter((candidate) => brokers.get(candidate.brokerId)?.eligible);
     return {
       ok: true,
       source: { brokerName: sourceRow.brokerName, scheduleName: sourceRow.scheduleName, dutyDate: source.dutyDate, startsAt: source.startsAt, endsAt: source.endsAt },
@@ -245,6 +251,10 @@ export async function swapDutyAssignmentsAction(input: unknown): Promise<DutySwa
           brokerAlreadyOn(tx, context.tenantId, target.brokerId, source, [source.id, target.id]),
         ])
         : [false, false];
+      if (context.role === "manager" && source && target) {
+        const exclusive = await exclusiveScheduleIdsForManager(tx, context, [source.scheduleId, target.scheduleId]);
+        if (!exclusive.has(source.scheduleId) || !exclusive.has(target.scheduleId)) throw new Error(MANAGER_SCOPE_ERROR);
+      }
       const problem = dutySwapProblem({ actor, source, target, sourceBroker, targetBroker, sourceBrokerAlreadyOnTarget, targetBrokerAlreadyOnSource, now });
       if (problem) throw new Error(problem);
       const a = source!;

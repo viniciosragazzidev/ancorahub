@@ -12,7 +12,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("./roster-broker-account-filter", () => ({ getRosterBrokerAccountFilter: async () => undefined }));
+vi.mock("./roster-broker-account-filter", () => ({ getRosterBrokerAccountFilter: async () => undefined, pendingBrokerPlanningEnabled: async () => false }));
 vi.mock("@/shared/auth/tenant-context", () => ({
   getRequiredTenantContext: async () => ({ tenantId: "t1", userId: "dir-1", role: "director", branchId: null }),
 }));

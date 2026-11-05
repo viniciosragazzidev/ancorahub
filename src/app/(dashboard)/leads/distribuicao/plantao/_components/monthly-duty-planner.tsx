@@ -699,7 +699,7 @@ export function MonthlyDutyPlanner({
                           const info = typeInfo.get(key);
                           const below = occurrence.assignedCount < occurrence.minimumBrokers;
                           const full = occurrence.maximumBrokers !== null && occurrence.assignedCount >= occurrence.maximumBrokers;
-                          const editable = canEdit && !occurrence.ended;
+                          const editable = (canEdit || Boolean(plan.canEditSeats)) && !occurrence.ended;
                           const shown = filterBranch ? occurrence.brokers.filter((broker) => broker.branchId === filterBranch) : occurrence.brokers;
                           const modality = occurrence.attendanceMode ?? (schedules.find((schedule) => schedule.id === occurrence.scheduleId)?.attendanceMode === "presencial" ? "presencial" : "online");
                           const candidates = eligibleBrokers
@@ -950,7 +950,7 @@ function EscalaPdfDialog({ open, onOpenChange, planId, canChooseUnit, branches, 
       <DialogPopup>
         <DialogHeader>
           <DialogTitle>Gerar PDF da escala</DialogTitle>
-          <DialogDescription>Um quadro de escala por dia, com as cores de cada tipo, o código, o nome e a unidade de cada corretor.</DialogDescription>
+          <DialogDescription>Um quadro diário com as cores de cada tipo, os nomes dos corretores e, quando aplicável, suas unidades.</DialogDescription>
         </DialogHeader>
         <DialogPanel className="gap-3">
           <div role="radiogroup" aria-label="Recorte do PDF" className="grid gap-1.5">

@@ -1,6 +1,7 @@
 "use server";
 
 import { requireCargoCapability } from "@/shared/auth/authorization";
+import { assertScheduleInManagerUnit } from "./manager-unit-scope-server";
 import { randomUUID } from "node:crypto";
 import { and, eq, gt, lt, ne, or, sql, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -42,8 +43,8 @@ async function assertRosterScope(scheduleId: string, brokerId: string) {
     .where(and(eq(schema.unitDutySchedules.id, scheduleId), eq(schema.unitDutySchedules.tenantId, context.tenantId)))
     .limit(1);
   if (!schedule || schedule.status !== "active") throw new Error("O plantão selecionado não está ativo.");
-  if (context.role === "manager" && schedule.branchId && context.branchId !== schedule.branchId) throw new Error("Você só pode editar a escala da sua unidade.");
-  if (!schedule.branchId && context.role === "manager" && !context.branchId) throw new Error("Unidade do corretor não identificada.");
+  // Gestor (05/11): só a escala de plantão exclusivo da unidade dele.
+  await assertScheduleInManagerUnit(db, context, schedule.id);
   const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId })
     .from(schema.tenantMemberships)
     .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
@@ -195,11 +196,12 @@ export async function moveRosterAssignmentAction(_previous: RosterActionState, f
   try {
     const input = parseInput(formData);
     const { context, db, schedule } = await assertRosterScope(input.scheduleId, input.brokerId);
-    const [assignment] = await db.select({ id: schema.dutyRosterAssignments.id, brokerId: schema.dutyRosterAssignments.brokerId, tenantId: schema.dutyRosterAssignments.tenantId })
+    const [assignment] = await db.select({ id: schema.dutyRosterAssignments.id, brokerId: schema.dutyRosterAssignments.brokerId, tenantId: schema.dutyRosterAssignments.tenantId, scheduleId: schema.dutyRosterAssignments.scheduleId })
       .from(schema.dutyRosterAssignments)
       .where(and(eq(schema.dutyRosterAssignments.id, assignmentId.data), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active"), isNull(schema.dutyRosterAssignments.dutyDate)))
       .limit(1);
     if (!assignment || assignment.brokerId !== input.brokerId) throw new Error("A alocação não pertence a este corretor.");
+    await assertScheduleInManagerUnit(db, context, assignment.scheduleId);
     const overlapWarning = await db.transaction(async (tx): Promise<BrokerOverlapWarning> => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${input.dayOfWeek}`}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-broker:${input.brokerId}:${input.dayOfWeek}`}))`);
@@ -242,6 +244,7 @@ export async function removeRosterAssignmentAction(_previous: RosterActionState,
         eq(schema.dutyRosterAssignments.status, "active"),
       )).limit(1);
       if (!assignment || (context.role === "manager" && context.branchId !== assignment.branchId)) throw new Error("Escala fora do seu escopo.");
+      await assertScheduleInManagerUnit(db, context, assignment.scheduleId);
       const now = new Date();
       // Dated monthly rows and their JSON plan entries are one write under the same tenant lock.
       const ended = assignment.dutyDate !== null && shiftEnd({

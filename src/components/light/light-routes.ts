@@ -76,6 +76,10 @@ export const LIGHT_MANAGER_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/relacionamento$/,
   /^\/gestao\/equipes\/[^/]+$/,
   new RegExp(`^/unidades/${ID}$`),
+  // Plantão da unidade (05/11): a página só mostra a aba Plantão e o que é exclusivo da unidade.
+  /^\/distribuicao$/,
+  /^\/leads\/distribuicao$/,
+  /^\/leads\/distribuicao\/plantao\/[^/]+$/,
 ];
 
 export function isLightRouteAllowed(pathname: string, audience: "broker" | "supervisor" | "manager" = "broker") {
@@ -107,6 +111,7 @@ export const LIGHT_MANAGER_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/leads", label: "Leads da unidade" },
   { href: "/negociacoes", label: "Negociações", requires: "negotiations" },
   { href: "/equipe", label: "Equipe" },
+  { href: "/distribuicao?view=plantao", label: "Plantão da unidade" },
   { href: "/gestao", label: "Gestão", requires: "teamManagement" },
   { href: "/clientes", label: "Clientes" },
   { href: "/mensagens", label: "Mensagens" },

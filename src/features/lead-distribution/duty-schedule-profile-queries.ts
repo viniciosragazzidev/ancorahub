@@ -6,6 +6,7 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { selectEffectiveDutyAssignments } from "./dated-duty-roster";
+import { exclusiveScheduleIdsForManager } from "./manager-unit-scope-server";
 import { dutyLeadsSinceStart, effectiveAttendanceMode, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, presenceOccurrenceKey, resolveDutyLeadWindowBounds, type DutyLeadsSinceOption } from "./duty-presence-domain";
 import { getSaoPauloDateKey } from "./dated-duty-roster";
 import { firstValidShift } from "./monthly-duty-plan";
@@ -62,7 +63,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     .where(and(eq(schema.unitDutySchedules.id, scheduleId), eq(schema.unitDutySchedules.tenantId, context.tenantId)))
     .limit(1);
   if (!schedule) throw new Error("Plantão não encontrado.");
-  if (context.role === "manager" && context.branchId && schedule.branchId && schedule.branchId !== context.branchId) {
+  // Gestor (05/11): só plantão exclusivo da unidade dele (nem da empresa toda, nem com outra unidade).
+  if (context.role === "manager" && !(await exclusiveScheduleIdsForManager(db, context, [schedule.id])).has(schedule.id)) {
     throw new AuthorizationError("Este plantão está fora da sua unidade.");
   }
 

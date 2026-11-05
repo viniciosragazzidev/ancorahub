@@ -32,10 +32,12 @@ import { fetchRoutingRules } from "@/features/lead-distribution/routing-engine";
 import { BrokerDailySummaryPanel } from "./_components/broker-daily-summary-panel";
 import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-summary-service";
 import { DutyOperationsWorkspace } from "./plantao/_components/duty-operations-workspace";
+import { UnitQueueModeCard } from "./plantao/_components/unit-queue-mode-card";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getDutyRosterSnapshot } from "@/features/lead-distribution/roster-queries";
 import { getDutyQueueOrderPreviews } from "@/features/lead-distribution/duty-queue-order-queries";
 import { BrokerAcceptanceSlaPanel } from "./_components/broker-acceptance-sla-panel";
-import { resolveDistributionView, visibleDistributionViews } from "@/features/lead-distribution/distribution-view-access";
+import { resolveDistributionView, visibleDistributionViews, type DistributionView } from "@/features/lead-distribution/distribution-view-access";
 import { getEffectiveAccess } from "@/features/custom-roles/service";
 import { getHoldDisqualifiedLeads } from "@/features/lead-distribution/disqualified-routing-settings";
 import { getDddRoutingSettings } from "@/features/lead-distribution/ddd-routing-settings";
@@ -112,10 +114,14 @@ export default async function LeadDistributionPage({
   // Cargos (04/11, F2): quem tem cargo vê só as abas que o cargo libera, também pela URL (?view=).
   const access = await getEffectiveAccess({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null });
   const cargoCapabilities = access.hasCargo ? access.capabilities : undefined;
-  const resolvedView = resolveDistributionView(context.role, params.view, cargoCapabilities);
+  // Modo Gestor (05/11): a distribuição do gestor é só a aba Plantão, com o que é exclusivo da unidade dele.
+  const managerGestorMode = context.role === "manager" && (await getLiteAudience(context)) === "manager";
+  const resolvedView = managerGestorMode
+    ? (!cargoCapabilities || cargoCapabilities.has("duty_schedules_manage") ? "plantao" : null)
+    : resolveDistributionView(context.role, params.view, cargoCapabilities);
   if (!resolvedView) redirect("/access-denied");
   const view = resolvedView;
-  const allowedViews = cargoCapabilities ? visibleDistributionViews(context.role, cargoCapabilities) : undefined;
+  const allowedViews = managerGestorMode ? (["plantao"] as readonly DistributionView[]) : cargoCapabilities ? visibleDistributionViews(context.role, cargoCapabilities) : undefined;
   const monthlyDutySchedulingEnabled = view === "plantao"
     ? (await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) === "true"
     : false;
@@ -624,6 +630,43 @@ export default async function LeadDistributionPage({
       activeLeads: queue.branchId ? (leadsByBranch.get(queue.branchId) ?? 0) : totalNewLeads,
     };
   });
+  // Gestor (05/11): o plantão só oferece filas da unidade dele; nenhuma global nem de outra unidade.
+  const plantaoQueues = queuesForControl
+    .filter((queue) => queue.status === "active" && (context.role !== "manager" || (Boolean(context.branchId) && queue.branchId === context.branchId)))
+    .map((queue) => ({ id: queue.id, name: queue.name, offerIntervalMinutes: queue.offerIntervalMinutes }));
+  const unitQueueModes = context.role === "manager" && context.branchId
+    ? queuesForControl
+      .filter((queue) => queue.status === "active" && queue.branchId === context.branchId)
+      .map((queue) => ({ id: queue.id, name: queue.name, mode: queue.assignmentMode === "manual" ? "manual" as const : "automatic" as const }))
+    : null;
+  const canChangeUnitQueueMode = Boolean(unitQueueModes) && (!cargoCapabilities || cargoCapabilities.has("lead_queues_manage"));
+  const plantaoWorkspace = (
+    <>
+      {canChangeUnitQueueMode && unitQueueModes ? <UnitQueueModeCard queues={unitQueueModes} /> : null}
+      <DutyOperationsWorkspace
+        snapshot={dutyRoster}
+        queueOrders={dutyQueueOrders}
+        monthlySchedulingEnabled={monthlyDutySchedulingEnabled}
+        canPlanMonthlySchedule={context.role === "director"}
+        initialMonthlyScheduleMonth={view === "plantao" && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.escalaMes ?? "") ? params.escalaMes : null}
+        queues={plantaoQueues}
+      />
+    </>
+  );
+  if (managerGestorMode) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Gestão da unidade" title="Plantão" />
+        <main className={directorDistributionStyles.page}>
+          <section className={directorDistributionStyles.stack} aria-label="Plantão da unidade">
+            {plantaoWorkspace}
+            <p className="text-xs text-muted-foreground">Você vê só os plantões, corretores e filas exclusivos da sua unidade.</p>
+          </section>
+        </main>
+      </>
+    );
+  }
+
   const coldLeadReview = context.role === "director"
     ? await getColdLeadRequalificationReview(context)
     : null;
@@ -745,16 +788,7 @@ export default async function LeadDistributionPage({
             </section>
           ) : view === "filas" ? null : view === "plantao" ? (
             <section className={directorDistributionStyles.stack} aria-label="Gestão de plantões">
-              <DutyOperationsWorkspace
-                snapshot={dutyRoster}
-                queueOrders={dutyQueueOrders}
-                monthlySchedulingEnabled={monthlyDutySchedulingEnabled}
-                canPlanMonthlySchedule={context.role === "director"}
-                initialMonthlyScheduleMonth={view === "plantao" && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.escalaMes ?? "") ? params.escalaMes : null}
-                queues={queuesForControl
-                  .filter((queue) => queue.status === "active")
-                  .map((queue) => ({ id: queue.id, name: queue.name, offerIntervalMinutes: queue.offerIntervalMinutes }))}
-              />
+              {plantaoWorkspace}
             </section>
           ) : (
             <DirectorDistributionHealth
@@ -919,18 +953,7 @@ export default async function LeadDistributionPage({
                 </div>
               </>
             }
-            plantaoContent={
-              <DutyOperationsWorkspace
-                snapshot={dutyRoster}
-                queueOrders={dutyQueueOrders}
-                monthlySchedulingEnabled={monthlyDutySchedulingEnabled}
-                canPlanMonthlySchedule={context.role === "director"}
-                initialMonthlyScheduleMonth={view === "plantao" && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.escalaMes ?? "") ? params.escalaMes : null}
-                queues={queuesForControl
-                  .filter((queue) => queue.status === "active")
-                  .map((queue) => ({ id: queue.id, name: queue.name, offerIntervalMinutes: queue.offerIntervalMinutes }))}
-              />
-            }
+            plantaoContent={<div className="grid gap-ds-16">{plantaoWorkspace}</div>}
             saudeHistoricoContent={
               <div className="grid gap-ds-24 xl:grid-cols-[1.15fr_0.85fr]">
                 <Card variant="overview">

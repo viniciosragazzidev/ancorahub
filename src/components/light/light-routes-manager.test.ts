@@ -3,13 +3,13 @@ import { getLightMoreDestinations, isLightRouteAllowed, LIGHT_MANAGER_ALLOWED_RO
 
 describe("manager Lite routes", () => {
   it("allows only the manager's first Lite destinations and a single lead detail segment", () => {
-    for (const path of ["/dashboard", "/negociacoes", "/leads", "/leads/abc", "/notificacoes", "/settings", "/primeiro-acesso", "/equipe", "/equipe/member-1", "/clientes", "/clientes/client-1", "/empresas", "/unidades/branch-1"]) {
+    for (const path of ["/dashboard", "/negociacoes", "/leads", "/leads/abc", "/notificacoes", "/settings", "/primeiro-acesso", "/equipe", "/equipe/member-1", "/clientes", "/clientes/client-1", "/empresas", "/unidades/branch-1", "/distribuicao", "/leads/distribuicao", "/leads/distribuicao/plantao/schedule-1"]) {
       expect(isLightRouteAllowed(path, "manager"), path).toBe(true);
     }
-    for (const path of ["/dashboard/c/ancora", "/leads/dashboard", "/leads/arquivados", "/leads/distribuicao", "/leads/a/b", "/leads/distribuicao/plantao", "/equipe/cargos", "/equipe/convidar", "/equipe/dashboard", "/equipe/recuperacoes", "/equipe/minha", "/equipe/plantao", "/equipe/repassar", "/equipe/transferencia", "/equipe/a/b", "/clientes/a/b", "/empresas/abc", "/empresas/abc/leads", "/unidades", "/unidades/branch-1/subpage", "/relatorios", "/cotacao", "/primeiro-acesso/etapa"]) {
+    for (const path of ["/dashboard/c/ancora", "/leads/dashboard", "/leads/arquivados", "/distribuicao/dashboard", "/leads/a/b", "/leads/distribuicao/plantao", "/leads/distribuicao/plantao/a/b", "/equipe/cargos", "/equipe/convidar", "/equipe/dashboard", "/equipe/recuperacoes", "/equipe/minha", "/equipe/plantao", "/equipe/repassar", "/equipe/transferencia", "/equipe/a/b", "/clientes/a/b", "/empresas/abc", "/empresas/abc/leads", "/unidades", "/unidades/branch-1/subpage", "/relatorios", "/cotacao", "/primeiro-acesso/etapa"]) {
       expect(isLightRouteAllowed(path, "manager"), path).toBe(false);
     }
-    expect(LIGHT_MANAGER_ALLOWED_ROUTES).toHaveLength(19);
+    expect(LIGHT_MANAGER_ALLOWED_ROUTES).toHaveLength(22);
     expect(isLightRouteAllowed("/gestao", "manager")).toBe(true);
     expect(isLightRouteAllowed("/gestao/a/b", "manager")).toBe(false);
     expect(isLightRouteAllowed("/mensagens", "manager")).toBe(true);
@@ -18,8 +18,8 @@ describe("manager Lite routes", () => {
     expect(isLightRouteAllowed("/empresas", "manager")).toBe(true);
   });
 
-  it("shows unit leads, team, clients, companies, notifications and settings in Mais", () => {
+  it("shows unit leads, team, unit plantão, clients, companies, notifications and settings in Mais", () => {
     expect(getLightMoreDestinations({ quoteSimulator: true, dutyCalendar: true, relationshipCenter: true, negotiations: true }, "manager").map((item) => item.href))
-      .toEqual(["/leads", "/negociacoes", "/equipe", "/clientes", "/mensagens", "/empresas", "/notificacoes", "/settings"]);
+      .toEqual(["/leads", "/negociacoes", "/equipe", "/distribuicao?view=plantao", "/clientes", "/mensagens", "/empresas", "/notificacoes", "/settings"]);
   });
 });

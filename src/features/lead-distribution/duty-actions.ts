@@ -17,6 +17,8 @@ import { dutyAttendanceOverrideProblem, getRelevantDutyWindow, parseDutyLeadsSin
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { brokerOccurrenceAssignmentBounds, getDutyWindowOnDate } from "./duty-presence-domain";
 import { assignLeadToBroker } from "./service";
+import { assertScheduleInManagerUnit } from "./manager-unit-scope-server";
+import { isTypeUsableByUnit } from "./manager-unit-scope";
 import { isHotLeadEarlyDistributionEnabled, notHeldByRunningQualificationSql } from "./qualification-hold";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { publishNotification } from "@/features/notifications/send-push-helper";
@@ -27,8 +29,38 @@ export type DutyActionState = { success?: boolean; error?: string; message?: str
 async function assertBatchDutyAccess() {
   const context = await getRequiredTenantContext();
   await requireCargoCapability(context, "duty_schedules_manage");
-  if (context.role !== "director") throw new Error("Apenas Diretores podem configurar plantões globais.");
+  if (context.role === "manager") {
+    if (!context.branchId) throw new Error("A unidade do Gestor não está definida.");
+  } else if (context.role !== "director") throw new Error("Apenas Diretores e Gestores podem criar plantões.");
   return { context, db: getDatabase() };
+}
+
+/**
+ * Plantão criado ou editado pelo gestor (05/11): fica gravado na unidade dele, só recebe filas da unidade,
+ * só usa tipo existente que vale para a unidade (não cria tipo novo) e não troca a credencial de webhook.
+ */
+async function assertManagerScheduleInputs(
+  db: ReturnType<typeof getDatabase>,
+  context: { tenantId: string; role: string; branchId?: string | null },
+  input: { queueIds: readonly string[]; typeId?: string | null; typeName?: string | null },
+) {
+  if (context.role !== "manager") return;
+  const unitId = context.branchId;
+  if (!unitId) throw new Error("A unidade do Gestor não está definida.");
+  if (input.queueIds.length) {
+    const queues = await db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId }).from(schema.leadQueues)
+      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), inArray(schema.leadQueues.id, [...input.queueIds])));
+    if (queues.length !== new Set(input.queueIds).size || queues.some((queue) => queue.branchId !== unitId)) {
+      throw new Error("Escolha só filas da sua unidade.");
+    }
+  }
+  if (input.typeId) {
+    const [type] = await db.select({ branchIds: schema.dutyScheduleTypes.branchIds }).from(schema.dutyScheduleTypes)
+      .where(and(eq(schema.dutyScheduleTypes.id, input.typeId), eq(schema.dutyScheduleTypes.tenantId, context.tenantId))).limit(1);
+    if (!type || !isTypeUsableByUnit(Array.isArray(type.branchIds) ? type.branchIds : [], unitId)) throw new Error("Esse tipo de plantão não vale para a sua unidade.");
+  } else if (input.typeName?.trim()) {
+    throw new Error("Escolha um tipo de plantão já cadastrado. Tipos novos são criados pelo Diretor.");
+  }
 }
 
 type ScheduleConflictInput = Pick<z.infer<typeof dutyScheduleInput>, "branchId" | "queueId" | "dayOfWeek" | "startsAt" | "endsAt"> & {
@@ -171,9 +203,8 @@ async function findScheduleForMutation(scheduleId: string) {
     .limit(1);
   if (!schedule) throw new Error("Plantão não encontrado.");
   if (context.role !== "director" && context.role !== "manager") throw new Error("Sem permissão.");
-  if (context.role === "manager" && schedule.branchId && context.branchId !== schedule.branchId) {
-    throw new Error("Plantão fora do seu escopo.");
-  }
+  // Gestor (05/11): só plantão exclusivo da unidade dele; plantão da empresa toda ou com outra unidade fica fora.
+  await assertScheduleInManagerUnit(db, context, schedule.id);
   return { context, db, schedule };
 }
 
@@ -308,18 +339,23 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
     if (parsed.data.splitIntoShifts && !validShiftSplit(base, DEFAULT_SHIFT_SPLIT_AT)) {
       throw new Error(`Para dividir em turnos, o plantão precisa começar antes das ${DEFAULT_SHIFT_SPLIT_AT} e terminar depois.`);
     }
-    const schedules = parsed.data.splitIntoShifts
+    const allSchedules = parsed.data.splitIntoShifts
       ? perDay.flatMap((schedule) => [
         { ...schedule, name: `${schedule.name} · Manhã`, endsAt: DEFAULT_SHIFT_SPLIT_AT, shiftSplitAt: null },
         { ...schedule, name: `${schedule.name} · Tarde`, startsAt: DEFAULT_SHIFT_SPLIT_AT, shiftSplitAt: null },
       ])
       : perDay;
-    for (const schedule of schedules) validateSchedule(schedule);
+    for (const schedule of allSchedules) validateSchedule(schedule);
     const { context, db } = await assertBatchDutyAccess();
+    // Plantão do gestor nasce gravado na unidade dele (exclusivo); o do diretor segue da empresa.
+    const ownBranchId = context.role === "manager" ? context.branchId ?? null : null;
+    const schedules = allSchedules.map((schedule) => ({ ...schedule, branchId: ownBranchId }));
     const receivingQueueIds = await activeQueueIds(db, context.tenantId, [
       ...(parsed.data.responsibleQueueIds ?? []),
       ...(parsed.data.responsibleQueueId ? [parsed.data.responsibleQueueId] : []),
     ]);
+    await assertManagerScheduleInputs(db, context, { queueIds: receivingQueueIds, typeId: parsed.data.typeId, typeName: parsed.data.typeName });
+    if (context.role === "manager" && parsed.data.webhookCredentialId) throw new Error("A origem do plantão é definida pelo Diretor.");
     const sharedWarnings = new Set<string>();
     for (const schedule of schedules) {
       // Each queue has its own roster: the plantão only collides with another of the same queue.
@@ -363,7 +399,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
       }
     });
     revalidateDutyWorkspace();
-    return { success: true, scheduleId: scheduleIds[0], scheduleIds, message: [...sharedWarnings].join(" ") || `${scheduleIds.length} plantão(ões) criado(s) para todas as unidades.` };
+    return { success: true, scheduleId: scheduleIds[0], scheduleIds, message: [...sharedWarnings].join(" ") || (ownBranchId ? `${scheduleIds.length} plantão(ões) criado(s) para a sua unidade.` : `${scheduleIds.length} plantão(ões) criado(s) para todas as unidades.`) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível criar o plantão." };
   }
@@ -377,7 +413,6 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
     validateSchedule(parsed.data);
     const { context, db, schedule } = await findScheduleForMutation(scheduleId.data);
     if (schedule.status === "archived") throw new Error("Restaure o plantão antes de editá-lo.");
-    if (context.role === "manager") throw new Error("Apenas Diretores podem editar plantões globais.");
     const nextSplit = validShiftSplit(parsed.data, parsed.data.shiftSplitAt);
     if (parsed.data.shiftSplitAt && !nextSplit) throw new Error("A divisão em turnos precisa ficar entre o início e o fim do plantão.");
     // Optional: the queues that receive this plantão ([] = none). Absent = unchanged.
@@ -390,6 +425,9 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         ? [z.union([z.literal(""), z.string().uuid()]).parse(singleField)].filter(Boolean)
         : undefined;
     const receivingQueueIds = requestedQueueIds === undefined ? undefined : await activeQueueIds(db, context.tenantId, requestedQueueIds);
+    // Gestor: o plantão continua exclusivo da unidade (filas e tipo da unidade, origem do webhook intocada).
+    await assertManagerScheduleInputs(db, context, { queueIds: receivingQueueIds ?? [], typeId: parsed.data.typeId, typeName: parsed.data.typeId ? null : parsed.data.typeName });
+    const webhookCredentialId = context.role === "manager" ? schedule.webhookCredentialId ?? null : parsed.data.webhookCredentialId ?? null;
     const sharedWarnings = new Set<string>();
     if (receivingQueueIds?.length) {
       for (const queueId of receivingQueueIds) for (const warning of await assertNoScheduleConflict(db, { ...parsed.data, responsibleQueueId: queueId }, context.tenantId, schedule.id)) sharedWarnings.add(warning);
@@ -412,7 +450,8 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         }
       }
       await tx.update(schema.unitDutySchedules).set({
-        branchId: schedule.branchId,
+        // Gestor: o plantão fica gravado na unidade dele, então trocar o tipo nunca o abre para outras unidades.
+        branchId: context.role === "manager" ? context.branchId ?? schedule.branchId : schedule.branchId,
         queueId: schedule.queueId,
         name: parsed.data.name,
         dayOfWeek: parsed.data.dayOfWeek,
@@ -427,7 +466,7 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         ...(formData.has("shiftSplitAt") ? { shiftSplitAt: nextSplit } : {}),
         validFrom: parsed.data.validFrom,
         validUntil: parsed.data.validUntil ?? null,
-        webhookCredentialId: parsed.data.webhookCredentialId ?? null,
+        webhookCredentialId,
         updatedAt: new Date(),
       }).where(and(eq(schema.unitDutySchedules.id, schedule.id), eq(schema.unitDutySchedules.tenantId, context.tenantId)));
       // The weekly roster keeps a copy of the plantão's validity (distribution

@@ -4,6 +4,8 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { getRosterBrokerAccountFilter, pendingBrokerPlanningEnabled } from "./roster-broker-account-filter";
+import { exclusiveScheduleIdsForManager } from "./manager-unit-scope-server";
+import { isTypeUsableByUnit } from "./manager-unit-scope";
 
 export type DutyRosterSnapshot = Awaited<ReturnType<typeof getDutyRosterSnapshot>>;
 
@@ -18,9 +20,9 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
     .where(branchCondition)
     .orderBy(asc(schema.branches.name));
   const branchIds = branches.map((branch) => branch.id);
-  if (!branchIds.length) return { branches: [], queues: [], credentials: [], types: [], schedules: [], brokers: [], pendingBrokers: [], assignments: [], publishedAssignments: [], history: [] };
+  if (!branchIds.length || (context.role === "manager" && !context.branchId)) return { branches: [], queues: [], credentials: [], types: [], schedules: [], brokers: [], pendingBrokers: [], assignments: [], publishedAssignments: [], history: [] };
 
-  const [queues, credentials, schedules, brokers, assignments, campaignOrigins, typeRows] = await Promise.all([
+  const [queues, allCredentials, allSchedules, brokers, allAssignments, campaignOrigins, typeRows] = await Promise.all([
     db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId, name: schema.leadQueues.name })
       .from(schema.leadQueues)
       .where(and(eq(schema.leadQueues.tenantId, context.tenantId), inArray(schema.leadQueues.branchId, branchIds), eq(schema.leadQueues.status, "active")))
@@ -162,12 +164,21 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       .where(eq(schema.dutyScheduleTypes.tenantId, context.tenantId))
       .orderBy(asc(schema.dutyScheduleTypes.name)),
   ]);
-  const types = typeRows.map((type) => ({
+  const allTypes = typeRows.map((type) => ({
     ...type,
     attendanceMode: (type.attendanceMode === "presencial" ? "presencial" : "online") as "online" | "presencial",
     branchIds: Array.isArray(type.branchIds) ? type.branchIds : [],
   }));
-  const typeById = new Map(types.map((type) => [type.id, type]));
+  const typeById = new Map(allTypes.map((type) => [type.id, type]));
+  // Gestor (05/11): só o que é exclusivo da unidade dele. Plantão da empresa toda, de tipo com outras
+  // unidades ou que alimenta fila de outra unidade não aparece; nem a escala desses plantões.
+  const managerUnitId = context.role === "manager" ? context.branchId ?? null : null;
+  const managerScope = context.role === "manager" ? await exclusiveScheduleIdsForManager(db, context, allSchedules.map((schedule) => schedule.id)) : null;
+  const schedules = managerScope ? allSchedules.filter((schedule) => managerScope.has(schedule.id)) : allSchedules;
+  const assignments = managerScope ? allAssignments.filter((assignment) => managerScope.has(assignment.scheduleId)) : allAssignments;
+  const types = managerUnitId ? allTypes.filter((type) => isTypeUsableByUnit(type.branchIds, managerUnitId)) : allTypes;
+  // A origem (webhook) do plantão é decisão do Diretor.
+  const credentials = context.role === "manager" ? [] : allCredentials;
 
   const campaignNamesByCredential = new Map<string, string[]>();
   for (const origin of campaignOrigins) {

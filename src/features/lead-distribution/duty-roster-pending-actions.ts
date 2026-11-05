@@ -1,6 +1,7 @@
 "use server";
 
 import { requireCargoCapability } from "@/shared/auth/authorization";
+import { assertScheduleInManagerUnit } from "./manager-unit-scope-server";
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -23,7 +24,8 @@ async function scheduleInScope(scheduleId: string) {
     .where(and(eq(schema.unitDutySchedules.id, scheduleId), eq(schema.unitDutySchedules.tenantId, context.tenantId)))
     .limit(1);
   if (!schedule) throw new Error("Plantão não encontrado.");
-  if (context.role === "manager" && schedule.branchId && context.branchId !== schedule.branchId) throw new Error("Plantão fora do seu escopo.");
+  // Gestor (05/11): só plantão exclusivo da unidade dele.
+  await assertScheduleInManagerUnit(getDatabase(), context, schedule.id);
   return { context, schedule };
 }
 

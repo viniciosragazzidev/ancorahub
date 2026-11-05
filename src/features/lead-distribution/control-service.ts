@@ -257,6 +257,23 @@ async function getDutyFallbackWarning(
     : "Nenhum plantão selecionado está ativo agora; os leads aguardarão o próximo plantão.";
 }
 
+/** A fila passou a distribuir sozinha: os leads que esperavam nela são distribuídos agora, não na próxima rodada. */
+export async function distributeWaitingQueueLeads(db: ReturnType<typeof getDatabase>, tenantId: string, queueId: string) {
+  const waiting = await db.select({ id: schema.leads.id }).from(schema.leads).where(and(
+    eq(schema.leads.tenantId, tenantId),
+    eq(schema.leads.queueId, queueId),
+    isNull(schema.leads.corretorId),
+    isNull(schema.leads.deletedAt),
+    isNull(schema.leads.archivedAt),
+    inArray(schema.leads.distributionStatus, ["queued", "unassigned", "returned_to_queue"]),
+  ));
+  const { enqueueLeadDistributionJob, wakeLeadDistributionJob } = await import("./jobs");
+  for (const lead of waiting) {
+    await enqueueLeadDistributionJob({ tenantId, leadId: lead.id });
+    await wakeLeadDistributionJob(tenantId, lead.id);
+  }
+}
+
 export async function saveDistributionQueue(context: TenantContext, rawInput: unknown) {
   const input = queueInput.parse(rawInput);
   const allowedSourceIds = Array.from(new Set(input.allowedSourceIds));
@@ -381,19 +398,7 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     // Destination went from "none" to distributing: the leads that were
     // waiting in the queue are distributed now, not at the next retry.
     if (queue.assignmentMode !== "automatic" && input.assignmentMode === "automatic" && input.status === "active") {
-      const waiting = await db.select({ id: schema.leads.id }).from(schema.leads).where(and(
-        eq(schema.leads.tenantId, context.tenantId),
-        eq(schema.leads.queueId, queue.id),
-        isNull(schema.leads.corretorId),
-        isNull(schema.leads.deletedAt),
-        isNull(schema.leads.archivedAt),
-        inArray(schema.leads.distributionStatus, ["queued", "unassigned", "returned_to_queue"]),
-      ));
-      const { enqueueLeadDistributionJob, wakeLeadDistributionJob } = await import("./jobs");
-      for (const lead of waiting) {
-        await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: lead.id });
-        await wakeLeadDistributionJob(context.tenantId, lead.id);
-      }
+      await distributeWaitingQueueLeads(db, context.tenantId, queue.id);
     }
   } else {
     queueId = randomUUID();

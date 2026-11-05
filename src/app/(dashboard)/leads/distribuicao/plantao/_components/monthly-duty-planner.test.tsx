@@ -74,6 +74,7 @@ const draft: MonthlyDutyPlanView = {
   problems: [],
   warnings: [],
   canEdit: true,
+  canEditSeats: true,
   replacesPublished: false,
   publishedOccurrenceIds: [],
 };
@@ -233,7 +234,7 @@ describe("monthly duty planner", () => {
   });
 
   it("shows Managers the review only, without editing controls", async () => {
-    vi.mocked(getMonthlyDutyPlanAction).mockResolvedValue({ ...draft, canEdit: false });
+    vi.mocked(getMonthlyDutyPlanAction).mockResolvedValue({ ...draft, canEdit: false, canEditSeats: false });
     render(<Harness canEdit={false} />);
 
     expect(await screen.findByText("PME · Manhã")).toBeTruthy();

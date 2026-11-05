@@ -31,6 +31,8 @@ vi.mock("@/shared/db", () => ({ getDatabase: () => state.db, schema: state.schem
 vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: () => Promise.resolve(state.context) }));
 vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: vi.fn(async () => "true") }));
 vi.mock("./duty-schedule-profile-queries", () => ({}));
+// Escopo da unidade (05/11) tem teste próprio em manager-unit-scope.test.ts; aqui o plantão é da unidade do gestor.
+vi.mock("./manager-unit-scope-server", () => ({ assertScheduleInManagerUnit: vi.fn(async () => undefined) }));
 vi.mock("./service", () => ({}));
 vi.mock("./domain", () => ({}));
 vi.mock("./duty-schedule-input", () => ({}));

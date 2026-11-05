@@ -6,6 +6,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, readDistributionPolicy, type IntelligentDistributionPolicy } from "./domain";
 import type { AssignmentStrategy } from "./types";
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
+import { exclusiveScheduleIdsForManager } from "./manager-unit-scope-server";
 import { findRunningDutySchedule, OVERNIGHT_LEADS_UNTIL } from "./duty-presence-domain";
 import { operationDayStart } from "./broker-day-history";
 import { countReceivedInDayByBroker, getDutyScheduleReceiptScope, NON_COUNTING_OFFER_STATUS, overnightExtraReceiptGap, type DayReceipt } from "./received-in-day";
@@ -105,8 +106,12 @@ export async function getDutyQueueOrderPreviews(context: TenantContext, now = ne
         ? or(isNull(schema.unitDutySchedules.branchId), eq(schema.unitDutySchedules.branchId, context.branchId))
         : undefined,
     ));
+  // Gestor (05/11): só plantão exclusivo da unidade dele; sem unidade, nada.
+  if (context.role === "manager" && !context.branchId) return [];
+  const managerScope = context.role === "manager" ? await exclusiveScheduleIdsForManager(getDatabase(), context, snapshot.map((schedule) => schedule.id)) : null;
   const running = snapshot.flatMap((schedule) => {
     if (schedule.status !== "active") return [];
+    if (managerScope && !managerScope.has(schedule.id)) return [];
     const occurrence = findRunningDutySchedule([schedule], now);
     return occurrence ? [{ schedule, dutyDate: occurrence.window.dutyDate }] : [];
   });

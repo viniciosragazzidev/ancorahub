@@ -14,6 +14,8 @@ import { getRosterBrokerAccountFilter, pendingBrokerPlanningEnabled } from "./ro
 import { decideLeftoverRows } from "./monthly-duty-preservation";
 import { publishedAddProblem, publishedRemoveProblem } from "./monthly-duty-published-edit";
 import { lockMonthlyDutyPlans, persistMonthlyPlanAssignmentRemoval, upsertMonthlyPlanAssignment } from "./monthly-duty-plan-assignments";
+import { exclusiveScheduleIdsForManager } from "./manager-unit-scope-server";
+import { MANAGER_SCOPE_ERROR } from "./manager-unit-scope";
 import {
   buildRangeOccurrences,
   DATE_KEY_PATTERN,
@@ -86,6 +88,26 @@ async function writeScope() {
   if (context.role !== "director") throw new Error("Apenas o Diretor pode montar e publicar a escala mensal.");
   if ((await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) !== "true") throw new Error("A escala mensal está desativada pelo Super-admin.");
   return context;
+}
+
+/**
+ * Gestor (05/11): coloca e tira corretores da unidade dele, só em plantão exclusivo da unidade.
+ * Gerar e publicar a escala da empresa continua com o Diretor (writeScope).
+ */
+async function seatScope() {
+  const context = await readScope();
+  if (context.role !== "director" && context.role !== "manager") throw new Error("Sem permissão.");
+  if ((await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) !== "true") throw new Error("A escala mensal está desativada pelo Super-admin.");
+  return context;
+}
+
+/** Gestor: plantão exclusivo da unidade e corretor da unidade; nada de "escalar mesmo assim" fora da unidade. */
+async function assertManagerSeat(db: Executor, context: TenantContext, scheduleId: string, brokerId: string, force?: boolean) {
+  if (context.role !== "manager") return;
+  if (!(await exclusiveScheduleIdsForManager(db, context, [scheduleId])).has(scheduleId)) throw new Error(MANAGER_SCOPE_ERROR);
+  const broker = (await loadPlanningBrokers(db, context.tenantId)).find((item) => item.id === brokerId);
+  if (!broker || broker.branchId !== context.branchId) throw new Error("Escolha um corretor da sua unidade.");
+  if (force) throw new Error("Só o Diretor escala um corretor fora da unidade do tipo.");
 }
 
 /**
@@ -203,7 +225,10 @@ function planRange(plan: { monthKey: string; settings: unknown }, occurrences: r
 async function buildPlanView(db: Executor, context: TenantContext, monthKey: string) {
   const plan = await loadLatestPlan(db, context.tenantId, monthKey);
   if (!plan) return null;
-  const occurrences = asArray<MonthlyPlanOccurrence>(plan.occurrences);
+  const planOccurrences = asArray<MonthlyPlanOccurrence>(plan.occurrences);
+  // Gestor (05/11): só os plantões exclusivos da unidade dele aparecem na escala.
+  const managerScope = context.role === "manager" ? await exclusiveScheduleIdsForManager(db, context, planOccurrences.map((occurrence) => occurrence.scheduleId)) : null;
+  const occurrences = managerScope ? planOccurrences.filter((occurrence) => managerScope.has(occurrence.scheduleId)) : planOccurrences;
   const storedAssignments = asArray<StoredAssignment>(plan.assignments);
   // JSON entries linked to missing or inactive dated rows are stale, not live assignments.
   const allAssignments = await livePlanAssignments(db, context.tenantId, storedAssignments, { occurrences, now: new Date() });
@@ -318,6 +343,8 @@ async function buildPlanView(db: Executor, context: TenantContext, monthKey: str
       ...(staleLabels.length ? [`${staleLabels.length === 1 ? "Este plantão não existe mais" : "Estes plantões não existem mais"} (removido, inativo ou com outra data) e ${staleLabels.length === 1 ? "será ignorado" : "serão ignorados"} ao publicar: ${staleLabels.join(", ")}.`] : []),
     ],
     canEdit: context.role === "director",
+    /** Gestor: põe e tira corretores da unidade nos plantões exclusivos dela (sem gerar nem publicar). */
+    canEditSeats: context.role === "director" || context.role === "manager",
     /** Publishing this draft replaces a published escala on the dates that have not ended. */
     replacesPublished: Boolean(publishedBefore),
     /** Occurrences of this draft that the published revision already staffed: live, not pending. */
@@ -518,7 +545,7 @@ export async function generateMonthlyDutyPlanAction(rawInput: unknown): Promise<
 
 /** Manual adjustment of a draft: add or remove one broker from one occurrence. */
 export async function updateMonthlyDutyDraftAction(input: unknown): Promise<MonthlyDutyPlanView> {
-  const context = await writeScope();
+  const context = await seatScope();
   const { planId, occurrenceId, brokerId, operation, force } = editSchema.parse(input);
   const db = getDatabase();
 
@@ -532,6 +559,11 @@ export async function updateMonthlyDutyDraftAction(input: unknown): Promise<Mont
 
     let occurrences = asArray<MonthlyPlanOccurrence>(plan.occurrences);
     const current = asArray<StoredAssignment>(plan.assignments);
+    const editedOccurrence = occurrences.find((occurrence) => occurrence.id === occurrenceId);
+    if (context.role === "manager") {
+      if (!editedOccurrence) throw new Error("Este plantão não está na proposta.");
+      await assertManagerSeat(tx, context, editedOccurrence.scheduleId, brokerId, force);
+    }
     let next: StoredAssignment[];
     if (operation === "remove") {
       const target = current.find((item) => item.occurrenceId === occurrenceId && item.brokerId === brokerId);
@@ -875,13 +907,14 @@ async function notifyPlantaoChange(tx: Transaction, input: {
 
 /** Adds a broker to a plantão of the published escala. The dated row is written now; no new revision. */
 export async function addBrokerToPublishedOccurrenceAction(input: unknown): Promise<MonthlyDutyPlanView> {
-  const context = await writeScope();
+  const context = await seatScope();
   const { occurrenceId: targetId, brokerId, force } = publishedEditSchema.parse(input);
   const db = getDatabase();
 
   const monthKey = await db.transaction(async (tx) => {
     await lockMonthlyDutyPlans(tx, context.tenantId);
     const { plan, occurrence, assignments, draft } = await loadPublishedOccurrence(tx, context.tenantId, targetId);
+    await assertManagerSeat(tx, context, occurrence.scheduleId, brokerId, force);
     const now = new Date();
     const schedule = (await loadActiveSchedules(tx, context.tenantId)).find((item) => item.id === occurrence.scheduleId) ?? null;
     const broker = (await loadPlanningBrokers(tx, context.tenantId)).find((item) => item.id === brokerId) ?? null;
@@ -990,13 +1023,14 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
 
 /** Removes a broker from a plantão of the published escala: the dated row leaves the roster now; no new revision. */
 export async function removeBrokerFromPublishedOccurrenceAction(input: unknown): Promise<MonthlyDutyPlanView> {
-  const context = await writeScope();
+  const context = await seatScope();
   const { occurrenceId: targetId, brokerId } = publishedEditSchema.parse(input);
   const db = getDatabase();
 
   const monthKey = await db.transaction(async (tx) => {
     await lockMonthlyDutyPlans(tx, context.tenantId);
     const { plan, occurrence, assignments, draft } = await loadPublishedOccurrence(tx, context.tenantId, targetId);
+    await assertManagerSeat(tx, context, occurrence.scheduleId, brokerId);
     const now = new Date();
     const entry = assignments.find((item) => item.occurrenceId === targetId && item.brokerId === brokerId);
     const problem = publishedRemoveProblem({
