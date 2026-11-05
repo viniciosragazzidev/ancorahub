@@ -41,7 +41,7 @@ function allow(user: string, now = Date.now()) {
 }
 
 const PROVIDER_COOLDOWN_MS = 10 * 60_000;
-const providerCooldowns = new Map<AiProvider, { until: number; status: 401 | 402 }>();
+const providerCooldowns = new Map<string, { until: number; status: 401 | 402 }>();
 
 /** @internal Isolates cooldown state between gateway contract tests. */
 export function resetProviderCooldownsForTests() {
@@ -55,11 +55,16 @@ class ProviderHttpError extends Error {
   }
 }
 
-function providerIsCoolingDown(provider: AiProvider, now = Date.now()) {
-  const cooldown = providerCooldowns.get(provider);
+function providerCooldownKey(ref: ModelRef) {
+  return `${ref.provider}:${isFreeTier(ref) ? "free" : "paid"}`;
+}
+
+function providerIsCoolingDown(ref: ModelRef, now = Date.now()) {
+  const key = providerCooldownKey(ref);
+  const cooldown = providerCooldowns.get(key);
   if (!cooldown) return false;
   if (cooldown.until <= now) {
-    providerCooldowns.delete(provider);
+    providerCooldowns.delete(key);
     return false;
   }
   return true;
@@ -82,7 +87,7 @@ function anthropicSchema(schema: z.ZodType<unknown>) {
   return clean(raw);
 }
 
-function anthropicRequest(input: {
+export function buildAnthropicMessagesRequest(input: {
   model: string;
   messages: GatewayMessage[];
   maxTokens: number;
@@ -162,11 +167,15 @@ export async function runGateway<T>(input: {
   sourceMessageId?: string | null;
   /** Maximum paid model calls before the caller's deterministic fallback. 401/402 do not consume a call. */
   maxAttempts?: number;
+  /** Total wall-clock budget across all provider attempts. Interpreter calls default to 12 seconds. */
+  totalTimeoutMs?: number;
   /** Retry direct Claude Haiku 5.5 once for malformed/empty output or timeout before fallback. */
   retryAnthropicHaikuOnTransient?: boolean;
   /** Client conversation or health data inside: only paid providers that do not train on it (LGPD art. 11). */
   sensitive?: boolean;
 }): Promise<GatewayResult<T>> {
+  const totalTimeoutMs = input.totalTimeoutMs ?? (input.profile === "interpreter" ? 12_000 : undefined);
+  const totalDeadlineAt = totalTimeoutMs && totalTimeoutMs > 0 ? Date.now() + totalTimeoutMs : undefined;
   if (!allow(`${input.tenantId}:${input.userId}`)) return { ok: false, reason: "rate_limited", attempts: 0 };
 
   const keys = new Map<AiProvider, string>();
@@ -184,14 +193,24 @@ export async function runGateway<T>(input: {
   const log = { tenantId: input.tenantId, purpose: input.purpose, leadId: input.leadId ?? null, conversationId: input.conversationId ?? null, sourceMessageId: input.sourceMessageId ?? null };
   const maxAttempts = input.maxAttempts && input.maxAttempts > 0 ? input.maxAttempts : chain.length;
   for (const ref of chain) {
-    if (providerIsCoolingDown(ref.provider)) {
-      const cooldown = providerCooldowns.get(ref.provider);
+    if (totalDeadlineAt !== undefined && Date.now() >= totalDeadlineAt) {
+      lastError = `total deadline exceeded (${totalTimeoutMs}ms)`;
+      break;
+    }
+    if (providerIsCoolingDown(ref)) {
+      const cooldown = providerCooldowns.get(providerCooldownKey(ref));
       lastError = `${ref.provider}: temporarily disabled after HTTP ${cooldown?.status ?? 401}`;
       continue;
     }
     const retryHaiku = input.retryAnthropicHaikuOnTransient === true && ref.provider === "anthropic" && ref.model.includes("haiku-5-5");
     for (let providerAttempt = 0; providerAttempt < (retryHaiku ? 2 : 1); providerAttempt += 1) {
       if (attempts >= maxAttempts) break;
+      const remainingTotalMs = totalDeadlineAt === undefined ? undefined : totalDeadlineAt - Date.now();
+      if (remainingTotalMs !== undefined && remainingTotalMs <= 0) {
+        lastError = `total deadline exceeded (${totalTimeoutMs}ms)`;
+        break;
+      }
+      const attemptTimeoutMs = Math.max(1, Math.min(input.timeoutMs ?? 12_000, remainingTotalMs ?? Number.POSITIVE_INFINITY));
       const startedAt = Date.now();
       attempts += 1;
       const nativeAnthropic = ref.provider === "anthropic" && input.profile === "interpreter";
@@ -208,7 +227,7 @@ export async function runGateway<T>(input: {
             : { Authorization: `Bearer ${keys.get(ref.provider)}` }),
           ...(ref.provider === "openrouter" ? { "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://crm.ancorasaude.cloud", "X-Title": "Ancora CRM" } : {}),
         },
-        body: JSON.stringify(nativeAnthropic ? anthropicRequest({
+        body: JSON.stringify(nativeAnthropic ? buildAnthropicMessagesRequest({
           model: ref.model,
           messages,
           maxTokens: input.maxTokens ?? 500,
@@ -226,7 +245,7 @@ export async function runGateway<T>(input: {
           // gpt-oss thinks before answering: low effort keeps the answer inside max_tokens and fast.
           ...(ref.model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
         }),
-        signal: AbortSignal.timeout(input.timeoutMs ?? 12_000),
+        signal: AbortSignal.timeout(attemptTimeoutMs),
       });
       if (!response.ok) {
         const detail = (await response.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
@@ -253,14 +272,14 @@ export async function runGateway<T>(input: {
       void logAiUsage({ ...log, model: `${ref.provider}/${ref.model}`, startedAt, usage, success: true });
       return { ok: true, value: parsed.data, text, model: ref, attempts };
     } catch (error) {
-      const message = error instanceof Error ? (error.name === "TimeoutError" ? `timeout ${input.timeoutMs ?? 12_000}ms` : error.message) : "error";
+      const message = error instanceof Error ? (error.name === "TimeoutError" ? `timeout ${attemptTimeoutMs}ms` : error.message) : "error";
       lastError = `${ref.provider}/${ref.model}: ${message}`;
       void logAiUsage({ ...log, model: `${ref.provider}/${ref.model}`, startedAt, success: false, error: message });
       if (error instanceof ProviderHttpError && (error.status === 401 || error.status === 402)) {
-        // Auth/billing failures are provider health, not model attempts. Skip every model on
-        // that provider for ten minutes while continuing to the next paid provider.
+        // Auth/billing failures are provider/tier health, not model attempts. A paid OpenRouter
+        // failure must not disable :free models in profiles that can use those models.
         attempts -= 1;
-        providerCooldowns.set(ref.provider, { until: Date.now() + PROVIDER_COOLDOWN_MS, status: error.status });
+        providerCooldowns.set(providerCooldownKey(ref), { until: Date.now() + PROVIDER_COOLDOWN_MS, status: error.status });
         break;
       }
       const isTransientHaikuFailure = retryHaiku

@@ -12,7 +12,10 @@ import { redactQualificationContextText } from "./context-analysis";
  */
 
 export const INTERPRETER_TIMEOUT_MS = 6_000;
+export const INTERPRETER_TOTAL_TIMEOUT_MS = 12_000;
 export const INTERPRETER_MAX_ATTEMPTS = 5;
+export const MAX_INTERPRETER_TURN_MESSAGES = 50;
+export const MAX_INTERPRETER_TURN_CHARS = 12_000;
 export const RULE_ENGINE_MODEL = "fallback-rule-engine";
 
 /**
@@ -55,12 +58,23 @@ export function buildInterpreterMessages(input: {
     OUTPUT_INSTRUCTION,
   ].filter(Boolean).join("\n\n");
   const lastAssistantIndex = input.messages.reduce((lastIndex, message, index) => message.role === "assistant" ? index : lastIndex, -1);
-  const currentTurn = input.messages.slice(lastAssistantIndex + 1);
-  const priorContext = lastAssistantIndex >= 0 ? input.messages.slice(0, lastAssistantIndex + 1).slice(-12) : [];
-  const turnContext = [...priorContext, ...currentTurn];
+  const currentTurn = input.messages.slice(lastAssistantIndex + 1, undefined).slice(-MAX_INTERPRETER_TURN_MESSAGES)
+    .map((message) => ({ role: message.role, content: redact(message.content) }));
+  let remainingTurnChars = MAX_INTERPRETER_TURN_CHARS;
+  const boundedCurrentTurn: typeof currentTurn = [];
+  for (let index = currentTurn.length - 1; index >= 0 && remainingTurnChars > 0; index -= 1) {
+    const message = currentTurn[index]!;
+    const content = message.content.slice(0, remainingTurnChars);
+    boundedCurrentTurn.unshift({ ...message, content });
+    remainingTurnChars -= content.length;
+  }
+  const priorContext = lastAssistantIndex >= 0
+    ? input.messages.slice(0, lastAssistantIndex + 1).slice(-12).map((message) => ({ role: message.role, content: redact(message.content) }))
+    : [];
+  const turnContext = [...priorContext, ...boundedCurrentTurn];
   return [
     { role: "system" as const, content: system },
-    ...turnContext.map((message) => ({ role: message.role, content: redact(message.content) })),
+    ...turnContext,
   ];
 }
 
@@ -109,6 +123,7 @@ export async function interpretQualificationTurn(input: {
       temperature: 0,
       maxTokens: 1_000,
       timeoutMs: INTERPRETER_TIMEOUT_MS,
+      totalTimeoutMs: INTERPRETER_TOTAL_TIMEOUT_MS,
       maxAttempts: INTERPRETER_MAX_ATTEMPTS,
       retryAnthropicHaikuOnTransient: true,
       schema: interpreterOutputSchema,
@@ -209,6 +224,7 @@ export async function verifyExtractedFacts(input: {
       temperature: 0,
       maxTokens: 200,
       timeoutMs: INTERPRETER_TIMEOUT_MS,
+      totalTimeoutMs: INTERPRETER_TOTAL_TIMEOUT_MS,
       maxAttempts: INTERPRETER_MAX_ATTEMPTS,
       schema: verificationSchema,
       messages: [{ role: "system", content: system }, { role: "user", content: user }],

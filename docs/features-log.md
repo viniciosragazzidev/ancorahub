@@ -5,7 +5,9 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 ## 05/11/2026 - Recuperação da qualificação por IA no WhatsApp
 
 - O gateway abre cooldown de 10 minutos para provedor com HTTP 401/402 sem gastar tentativa; a qualificação tenta Haiku 5.5 novamente em saída JSON inválida/timeout, depois usa OpenAI direto e provedores pagos do OpenRouter.
+- O cooldown distingue provedor pago/gratuito (um 402 de OpenRouter pago não interrompe modelos `:free`); interpreter tem deadline total de 12 s, e o turno fica limitado a 50 mensagens/12.000 caracteres.
 - Haiku 5.5 usa Messages API com pensamento desativado, schema JSON estruturado e limite de 1.000 tokens, evitando que pensamento adaptativo consuma a saída visível.
+- Uma chamada real única com texto sintético e schema do interpretador foi aceita pelo Messages API: HTTP 200, JSON válido.
 - A retomada reconstrói todo o turno inbound após a última resposta da IA, incluindo mensagens sem `conversationId`; lista de idades em resposta à pergunta de vidas atualiza quantidade e média empresarial.
 - Teste sintético: 53, 51, 16 e 14 anos resultam em 4 vidas e média arredondada de 34 anos, sem dados reais do cliente.
 - Registro e validações: [fallback contextual da qualificação por IA](implementations/active/2026-09-16-ai-contextual-qualification-fallback.md).

@@ -181,6 +181,26 @@ describe("interpreter profile (qualification interpreter and lateral answer)", (
     ]);
   });
 
+  it("keeps the paid OpenRouter cooldown separate from OpenRouter :free in another profile", async () => {
+    settings.values.set("ai_gateway_profiles", JSON.stringify({
+      "chat-fast": [{ provider: "openrouter", model: "vendor/paid-model" }],
+      "json-structured": [{ provider: "openrouter", model: "vendor/free-model:free" }],
+    }));
+    process.env = { ...env, OPENROUTER_API_KEY: "o", GROQ_API_KEY: "", GOOGLE_API_KEY: "", OPENAI_API_KEY: "", ANTHROPIC_API_KEY: "" };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("billing unavailable", { status: 402 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: "{\"text\":\"ok\"}" } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const paid = await runGateway({ profile: "chat-fast", purpose: "paid-cooldown-test", tenantId: "t", userId: "paid", messages: [{ role: "user", content: "x" }], schema: z.object({ text: z.string() }), maxAttempts: 1 });
+    const free = await runGateway({ profile: "json-structured", purpose: "free-after-paid-cooldown-test", tenantId: "t", userId: "free", messages: [{ role: "user", content: "x" }], schema: z.object({ text: z.string() }), maxAttempts: 1 });
+
+    expect(paid).toMatchObject({ ok: false, attempts: 0 });
+    expect(free).toMatchObject({ ok: true, model: { provider: "openrouter", model: "vendor/free-model:free" } });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body).model).toBe("vendor/free-model:free");
+  });
+
   it("retries direct Haiku once on a transient failure before falling back to OpenAI", async () => {
     settings.values.set("ai_gateway_profiles", JSON.stringify({ interpreter: [
       { provider: "anthropic", model: "claude-haiku-5-5" },
@@ -199,6 +219,44 @@ describe("interpreter profile (qualification interpreter and lateral answer)", (
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock.mock.calls.slice(0, 2).every((call) => call[0] === "https://api.anthropic.com/v1/messages")).toBe(true);
     expect(fetchMock.mock.calls[2]?.[0]).toBe("https://api.openai.com/v1/chat/completions");
+  });
+
+  it("keeps the Haiku retry inside the interpreter's twelve-second total deadline", async () => {
+    settings.values.set("ai_gateway_profiles", JSON.stringify({ interpreter: [
+      { provider: "anthropic", model: "claude-haiku-5-5" },
+      { provider: "openai", model: "gpt-4o-mini" },
+    ] }));
+    process.env = { ...env, ANTHROPIC_API_KEY: "a", OPENAI_API_KEY: "o", OPENROUTER_API_KEY: "", GROQ_API_KEY: "", GOOGLE_API_KEY: "" };
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const attemptTimeouts: number[] = [];
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout").mockImplementation((timeoutMs: number) => {
+      attemptTimeouts.push(timeoutMs);
+      return new AbortController().signal;
+    });
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(async () => {
+        await vi.advanceTimersByTimeAsync(7_000);
+        throw Object.assign(new Error("timed out"), { name: "TimeoutError" });
+      })
+      .mockImplementationOnce(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+        throw Object.assign(new Error("timed out"), { name: "TimeoutError" });
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      const result = await runGateway({ profile: "interpreter", purpose: "deadline-test", tenantId: "t", userId: "haiku-deadline", messages: [{ role: "user", content: "x" }], schema: z.object({ text: z.string() }), sensitive: true, timeoutMs: 6_000, totalTimeoutMs: 12_000, maxAttempts: 5, retryAnthropicHaikuOnTransient: true });
+
+      expect(result).toMatchObject({ ok: false, attempts: 2, lastError: "total deadline exceeded (12000ms)" });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls.every((call) => call[0] === "https://api.anthropic.com/v1/messages")).toBe(true);
+      expect(attemptTimeouts).toEqual([6_000, 5_000]);
+      expect(Date.now()).toBe(12_000);
+    } finally {
+      timeoutSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });
 

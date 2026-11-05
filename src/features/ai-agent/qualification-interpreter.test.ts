@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ runGateway: vi.fn(), logAiUsage: vi.fn() }));
 vi.mock("@/features/ai-gateway/gateway", () => ({ runGateway: mocks.runGateway }));
 vi.mock("./ai-usage-log", () => ({ logAiUsage: mocks.logAiUsage }));
 
-import { buildInterpreterMessages, interpretQualificationTurn, verifyExtractedFacts, INTERPRETER_MAX_ATTEMPTS, INTERPRETER_TIMEOUT_MS } from "./qualification-interpreter";
+import { buildInterpreterMessages, interpretQualificationTurn, verifyExtractedFacts, INTERPRETER_MAX_ATTEMPTS, INTERPRETER_TIMEOUT_MS, INTERPRETER_TOTAL_TIMEOUT_MS, MAX_INTERPRETER_TURN_CHARS, MAX_INTERPRETER_TURN_MESSAGES } from "./qualification-interpreter";
 
 const input = {
   tenantId: "t1",
@@ -21,8 +21,9 @@ describe("qualification interpreter", () => {
   it("uses paid providers only, 6 s each, Haiku retry, and a widened paid fallback chain", async () => {
     mocks.runGateway.mockResolvedValue({ ok: true, value: { memoryUpdates: [{ field: "planType", value: "familiar", confidence: 1 }] }, text: "", model: { provider: "openrouter", model: "google/gemini-3.1-flash-lite" }, attempts: 1 });
     const result = await interpretQualificationTurn(input);
-    expect(mocks.runGateway).toHaveBeenCalledWith(expect.objectContaining({ profile: "interpreter", purpose: "qualification_fallback", sensitive: true, timeoutMs: INTERPRETER_TIMEOUT_MS, maxTokens: 1_000, maxAttempts: INTERPRETER_MAX_ATTEMPTS, retryAnthropicHaikuOnTransient: true, conversationId: "c1", sourceMessageId: "m1" }));
+    expect(mocks.runGateway).toHaveBeenCalledWith(expect.objectContaining({ profile: "interpreter", purpose: "qualification_fallback", sensitive: true, timeoutMs: INTERPRETER_TIMEOUT_MS, totalTimeoutMs: INTERPRETER_TOTAL_TIMEOUT_MS, maxTokens: 1_000, maxAttempts: INTERPRETER_MAX_ATTEMPTS, retryAnthropicHaikuOnTransient: true, conversationId: "c1", sourceMessageId: "m1" }));
     expect(INTERPRETER_TIMEOUT_MS).toBe(6_000);
+    expect(INTERPRETER_TOTAL_TIMEOUT_MS).toBe(12_000);
     expect(INTERPRETER_MAX_ATTEMPTS).toBe(5);
     expect(result).toMatchObject({ ok: true, modelUsed: "openrouter/google/gemini-3.1-flash-lite", memoryUpdates: [{ field: "planType", value: "familiar" }] });
     // The gateway logs the successful attempt itself.
@@ -69,6 +70,31 @@ describe("qualification interpreter", () => {
     expect(built).toHaveLength(16);
     expect(built[1]).toEqual({ role: "assistant", content: "Quantas vidas?" });
     expect(built.slice(2).map((message) => message.content)).toEqual(Array.from({ length: 14 }, (_, index) => `resposta ${index + 1}`));
+  });
+
+  it("caps the unanswered turn at fifty messages and twelve thousand redacted characters", () => {
+    const manyMessages = [
+      { role: "assistant" as const, content: "Quantas vidas?" },
+      ...Array.from({ length: MAX_INTERPRETER_TURN_MESSAGES + 5 }, (_, index) => ({ role: "user" as const, content: `resposta ${index + 1}` })),
+    ];
+    const boundedMessages = buildInterpreterMessages({ ...input, messages: manyMessages });
+    expect(boundedMessages).toHaveLength(1 + 1 + MAX_INTERPRETER_TURN_MESSAGES);
+    expect(boundedMessages.slice(2).map((message) => message.content)).toEqual(
+      manyMessages.slice(-MAX_INTERPRETER_TURN_MESSAGES).map((message) => message.content),
+    );
+
+    const boundedChars = buildInterpreterMessages({
+      ...input,
+      messages: [
+        { role: "assistant", content: "Quantas vidas?" },
+        { role: "user", content: "a".repeat(MAX_INTERPRETER_TURN_CHARS) },
+        { role: "user", content: "b".repeat(1_000) },
+      ],
+    });
+    const currentTurn = boundedChars.slice(2);
+    expect(currentTurn.reduce((total, message) => total + message.content.length, 0)).toBe(MAX_INTERPRETER_TURN_CHARS);
+    expect(currentTurn.at(-1)?.content).toBe("b".repeat(1_000));
+    expect(currentTurn[0]?.content).toBe("a".repeat(MAX_INTERPRETER_TURN_CHARS - 1_000));
   });
 
   it("redacts identifiers, address and the lead name throughout fallback provider input", () => {

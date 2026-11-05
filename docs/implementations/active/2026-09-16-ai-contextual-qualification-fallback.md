@@ -6,10 +6,11 @@ Data: 16 de setembro de 2026
 
 - Causa do `invalid_output (length, 0 chars)`: no endpoint OpenAI-compatible da Anthropic, o Haiku 5.5 iniciava pensamento adaptativo por padrão; os tokens internos consumiam o `max_tokens: 450` antes de existir texto visível. O gateway lia somente `message.content`, então registrava zero caracteres. A compatibilidade também não aplicava schema estruturado.
 - O interpretador passa a usar `/v1/messages`, pensamento desativado, saída JSON estruturada a partir do schema Zod e `max_tokens: 1000`. A cadeia sensível permanece só em provedores pagos; Haiku direto recebe uma repetição para JSON inválido/timeout, seguido por OpenAI direto e OpenRouter pago.
-- 401/402 colocam o provedor em cooldown process-local de 10 minutos e não consomem limite de chamadas; outros modelos do mesmo provedor são ignorados nesse intervalo.
+- 401/402 colocam o provedor e a classe de modelo (pago/gratuito) em cooldown process-local de 10 minutos e não consomem limite de chamadas; um 402 do OpenRouter pago não desativa os modelos `:free`.
+- As tentativas do perfil interpreter compartilham deadline total de 12 segundos, incluindo o retry Haiku. O turno enviado ao interpretador fica limitado a 50 mensagens e 12.000 caracteres; a consulta de pendências tem limite de 50 linhas.
 - O turno pendente inclui mensagens vinculadas à conversa e mensagens inbound do mesmo lead ainda sem `conversationId`; fatos originados nesse turno são reconstruídos em ordem antes de validar a resposta. Lista de idades em uma linha durante pergunta de vidas informa quantidade e média empresarial.
 - Arquivos: `src/features/ai-gateway/{gateway.ts,profiles.ts}`, `src/features/ai-agent/{qualification-interpreter.ts,conversation-state-machine.ts,memory.ts}` e testes de gateway, interpretador, memória e máquina de estados.
-- Validação desta entrega: `npx tsc --noEmit` passou; `npx vitest run src/features/ai-agent src/features/ai-gateway` passou com 29 arquivos e 294 testes, sem variáveis de banco. Harness integral interrompido a pedido durante a suíte completa; snapshots alterados por essa suíte foram restaurados. Build não executado.
+- Validação desta entrega: `npx tsc --noEmit` passou; `npx vitest run src/features/ai-agent src/features/ai-gateway` passou com 29 arquivos e 297 testes, sem variáveis de banco. Uma chamada real e única ao Messages API, com mensagens sintéticas e `interpreterOutputSchema`, retornou HTTP 200 e JSON válido. O harness integral foi interrompido a pedido durante a suíte completa; snapshots alterados por ela foram restaurados. Build não executado.
 
 ## Objetivo
 

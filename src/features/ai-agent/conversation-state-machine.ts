@@ -1723,7 +1723,8 @@ export async function processInboundAiResponse({
         and(eq(schema.whatsappMessages.leadId, leadId), isNull(schema.whatsappMessages.conversationId), afterLastAiReply),
       ),
     ))
-    .orderBy(asc(schema.whatsappMessages.sentAt));
+    .orderBy(asc(schema.whatsappMessages.sentAt))
+    .limit(50);
 
   const linkedPastMessages = await db
     .select({
