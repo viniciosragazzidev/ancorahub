@@ -295,6 +295,13 @@ export type PlanSettings = {
   typeKeys: string[];
   /** Types chosen in the latest generation (the escala step shows these). */
   generatedTypeKeys?: string[];
+  /**
+   * Período em que os tipos da última geração foram refeitos: o novo mais o da revisão anterior (05/11).
+   * Ao publicar, quem estava escalado nesses tipos dentro dele e saiu da proposta sai da escala
+   * (gerou 1-9, regerou 1-8: o dia 9 sai). Ausente = o próprio período.
+   */
+  redrawFrom?: string;
+  redrawUntil?: string;
   brokers: PlanBrokerSetting[];
 };
 
@@ -307,6 +314,7 @@ export function parsePlanSettings(value: unknown): PlanSettings | null {
     rangeUntil: raw.rangeUntil,
     typeKeys: raw.typeKeys.filter((key): key is string => typeof key === "string"),
     generatedTypeKeys: Array.isArray(raw.generatedTypeKeys) ? raw.generatedTypeKeys.filter((key): key is string => typeof key === "string") : undefined,
+    ...(typeof raw.redrawFrom === "string" && typeof raw.redrawUntil === "string" ? { redrawFrom: raw.redrawFrom, redrawUntil: raw.redrawUntil } : {}),
     brokers: (Array.isArray(raw.brokers) ? raw.brokers : []).filter((item): item is PlanBrokerSetting => Boolean(item && typeof item.brokerId === "string")).map((item) => ({
       brokerId: item.brokerId,
       modality: item.modality === "online" || item.modality === "presencial" ? item.modality : "any",

@@ -378,7 +378,7 @@ export async function getMonthlyDutyPlanAction(monthKeyInput: string): Promise<M
  * take their brokers and seats from this input; every other type keeps what
  * the previous revision had (an escala of PME does not undo the Premium one).
  */
-function mergeSettings(previous: PlanSettings | null, input: Omit<PlanSettings, "brokers"> & { brokers: PlanBrokerSetting[] }): PlanSettings {
+function mergeSettings(previous: PlanSettings | null, input: Omit<PlanSettings, "brokers"> & { brokers: PlanBrokerSetting[] }, keptDates: readonly string[] = []): PlanSettings {
   const chosen = new Set(input.typeKeys);
   const byBroker = new Map<string, PlanBrokerSetting>();
   for (const broker of previous?.brokers ?? []) {
@@ -395,9 +395,16 @@ function mergeSettings(previous: PlanSettings | null, input: Omit<PlanSettings, 
       forcedTypeKeys: [...new Set([...(kept?.forcedTypeKeys ?? []), ...broker.forcedTypeKeys.filter((key) => chosen.has(key))])],
     });
   }
+  // O período é o novo, esticado só pelo que ficou da revisão anterior (outros tipos, plantão em andamento).
+  // Antes juntava com o período antigo: regerar 1-9 como 1-8 continuava mostrando até o dia 9 (05/11).
+  const dates = [input.rangeFrom, input.rangeUntil, ...keptDates].sort();
+  // Onde os tipos escolhidos foram refeitos: o período novo e o anterior (a publicação limpa o que sobrou ali).
+  const redraw = [input.rangeFrom, input.rangeUntil, ...(previous ? [previous.rangeFrom, previous.rangeUntil] : [])].sort();
   return {
-    rangeFrom: previous && previous.rangeFrom < input.rangeFrom ? previous.rangeFrom : input.rangeFrom,
-    rangeUntil: previous && previous.rangeUntil > input.rangeUntil ? previous.rangeUntil : input.rangeUntil,
+    rangeFrom: dates[0]!,
+    rangeUntil: dates.at(-1)!,
+    redrawFrom: redraw[0]!,
+    redrawUntil: redraw.at(-1)!,
     typeKeys: [...new Set([...(previous?.typeKeys ?? []), ...input.typeKeys])],
     generatedTypeKeys: [...input.typeKeys],
     brokers: [...byBroker.values()].filter((broker) => Object.keys(broker.seats).length > 0),
@@ -407,7 +414,8 @@ function mergeSettings(previous: PlanSettings | null, input: Omit<PlanSettings, 
 /**
  * Generates a new draft revision for the chosen plantão types over a period
  * that starts in `monthKey` and may run into the next month. Assignments of
- * the previous revision outside this choice (other types or dates) are kept.
+ * the previous revision of other types are kept; the chosen types keep only the new period (an
+ * occurrence of theirs outside it leaves the draft, unless it already started).
  */
 export async function generateMonthlyDutyPlanAction(rawInput: unknown): Promise<MonthlyDutyPlanView> {
   const context = await writeScope();
@@ -459,8 +467,10 @@ export async function generateMonthlyDutyPlanAction(rawInput: unknown): Promise<
     const running = new Set(fresh.filter((occurrence) => previousIds.has(occurrence.id) && occurrenceStarted(occurrence, now)).map((occurrence) => occurrence.id));
     const toDraw = fresh.filter((occurrence) => !running.has(occurrence.id));
     const freshIds = new Set(toDraw.map((occurrence) => occurrence.id));
+    // Os tipos escolhidos ficam só com o período novo: uma data deles fora do período sai da proposta
+    // (gerar 1-9 e depois 1-8 tira o dia 9). Plantão que já começou fica como está; outros tipos também.
     const regenerated = (occurrence: MonthlyPlanOccurrence) =>
-      !running.has(occurrence.id) && (freshIds.has(occurrence.id) || (chosenKeys.has(typeKeyOf(occurrence.typeId)) && occurrence.dutyDate >= rangeFrom && occurrence.dutyDate <= rangeUntil));
+      !running.has(occurrence.id) && (freshIds.has(occurrence.id) || (chosenKeys.has(typeKeyOf(occurrence.typeId)) && !occurrenceStarted(occurrence, now)));
     const keptOccurrences = previousOccurrences.filter((occurrence) => !regenerated(occurrence) && !occurrenceEnded(occurrence, now));
     const keptIds = new Set(keptOccurrences.map((occurrence) => occurrence.id));
     const keptAssignments = await livePlanAssignments(tx, context.tenantId, previousAssignments.filter((item) => keptIds.has(item.occurrenceId)));
@@ -518,7 +528,7 @@ export async function generateMonthlyDutyPlanAction(rawInput: unknown): Promise<
       pendingBrokerIds: new Set(brokers.filter((broker) => broker.pending).map((broker) => broker.id)),
     });
 
-    const settings = mergeSettings(parsePlanSettings(latest?.settings), settingsInput);
+    const settings = mergeSettings(parsePlanSettings(latest?.settings), settingsInput, keptOccurrences.map((occurrence) => occurrence.dutyDate));
     const occurrences = [...keptOccurrences, ...drawn].sort((a, b) => a.dutyDate.localeCompare(b.dutyDate) || a.startsAt.localeCompare(b.startsAt) || a.id.localeCompare(b.id));
     const id = randomUUID();
     await tx.insert(schema.dutyScheduleMonthlyPlans).values({
@@ -751,12 +761,14 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
     // leave the roster. Everything else stays active: a broker placed by hand, or on a
     // type nobody redrew, is still on duty after the publication.
     const draftRange = planRange(plan, occurrences);
+    const draftSettings = parsePlanSettings(plan.settings);
     const decision = decideLeftoverRows({
       leftovers: [...existingByKey.values()].map((row) => ({ id: row.id, scheduleId: row.scheduleId, brokerId: row.brokerId, dutyDate: row.dutyDate, startsAt: row.startsAt, monthlyPlanId: row.monthlyPlanId })),
       draftOccurrenceIds: new Set(occurrences.map((occurrence) => occurrence.id)),
-      generatedTypeKeys: parsePlanSettings(plan.settings)?.generatedTypeKeys ?? null,
-      rangeFrom: draftRange.rangeFrom,
-      rangeUntil: draftRange.rangeUntil,
+      generatedTypeKeys: draftSettings?.generatedTypeKeys ?? null,
+      // Regerar com período menor: as datas que saíram (ex.: dia 9) também saem da escala publicada.
+      rangeFrom: draftSettings?.redrawFrom && draftSettings.redrawFrom < draftRange.rangeFrom ? draftSettings.redrawFrom : draftRange.rangeFrom,
+      rangeUntil: draftSettings?.redrawUntil && draftSettings.redrawUntil > draftRange.rangeUntil ? draftSettings.redrawUntil : draftRange.rangeUntil,
       typeKeyOfSchedule: (scheduleId) => typeKeyOf(scheduleById.get(scheduleId)?.typeId),
       started: (row) => occurrenceStarted({ dutyDate: row.dutyDate, startsAt: row.startsAt }, now),
       occurrenceIdOf,

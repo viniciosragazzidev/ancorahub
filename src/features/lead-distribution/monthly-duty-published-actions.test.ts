@@ -214,6 +214,65 @@ describe("adicionar corretor a um plantão publicado (ação de servidor)", () =
     expect(createdDraft?.assignments).not.toContainEqual(expect.objectContaining({ occurrenceId: staleOccurrence.id, brokerId: "bruno" }));
   });
 
+  it("regerar com período menor tira as datas que sobraram do mesmo tipo (gerou até o dia 26, regerou até o 19)", async () => {
+    const typeId = "7ee1c683-5440-4eb8-b36e-0905c1f95e00";
+    const generationSchedule = { ...schedule, typeId };
+    const sameTypeLeftover = { ...occurrence, id: "sch-1:2099-10-26", dutyDate: "2099-10-26", typeId };
+    const otherType = { ...occurrence, id: "sch-2:2099-10-26", scheduleId: "sch-2", dutyDate: "2099-10-26", typeId: "t2" };
+    const latest = {
+      ...draftPlan,
+      occurrences: [{ ...occurrence, id: "sch-1:2099-10-19", dutyDate: "2099-10-19", typeId }, sameTypeLeftover, otherType],
+      assignments: [],
+      revision: 10,
+      settings: { rangeFrom: "2099-10-19", rangeUntil: "2099-10-26", typeKeys: [typeId, "t2"], brokers: [] },
+    };
+    state.queue = [[latest], [generationSchedule], [], [bruno], [], []];
+
+    await expect(generateMonthlyDutyPlanAction({
+      monthKey: "2099-10",
+      rangeFrom: "2099-10-19",
+      rangeUntil: "2099-10-19",
+      typeKeys: [typeId],
+      brokers: [{ brokerId: "bruno", modality: "any", seats: { [typeId]: 1 }, forcedTypeKeys: [] }],
+    })).rejects.toThrow(/proposta foi gerada|não pôde ser carregada/i);
+
+    const createdDraft = state.inserts.find((item) => item.table === schema.dutyScheduleMonthlyPlans)?.values as { occurrences: { id: string }[]; settings: { rangeFrom: string; rangeUntil: string } };
+    const ids = createdDraft.occurrences.map((item) => item.id);
+    expect(ids).toContain("sch-1:2099-10-19");
+    expect(ids).not.toContain(sameTypeLeftover.id);
+    // Outro tipo, fora desta geração, continua na proposta.
+    expect(ids).toContain(otherType.id);
+    expect(createdDraft.settings.rangeFrom).toBe("2099-10-19");
+    expect(createdDraft.settings.rangeUntil).toBe("2099-10-26");
+  });
+
+  it("regerar só o tipo com período menor encurta o período salvo", async () => {
+    const typeId = "7ee1c683-5440-4eb8-b36e-0905c1f95e00";
+    const latest = {
+      ...draftPlan,
+      occurrences: [{ ...occurrence, id: "sch-1:2099-10-19", dutyDate: "2099-10-19", typeId }, { ...occurrence, id: "sch-1:2099-10-26", dutyDate: "2099-10-26", typeId }],
+      assignments: [],
+      revision: 10,
+      settings: { rangeFrom: "2099-10-19", rangeUntil: "2099-10-26", typeKeys: [typeId], brokers: [] },
+    };
+    state.queue = [[latest], [{ ...schedule, typeId }], [], [bruno], [], []];
+
+    await expect(generateMonthlyDutyPlanAction({
+      monthKey: "2099-10",
+      rangeFrom: "2099-10-19",
+      rangeUntil: "2099-10-19",
+      typeKeys: [typeId],
+      brokers: [{ brokerId: "bruno", modality: "any", seats: { [typeId]: 1 }, forcedTypeKeys: [] }],
+    })).rejects.toThrow(/proposta foi gerada|não pôde ser carregada/i);
+
+    const createdDraft = state.inserts.find((item) => item.table === schema.dutyScheduleMonthlyPlans)?.values as { occurrences: { id: string }[]; settings: { rangeUntil: string; redrawFrom: string; redrawUntil: string } };
+    expect(createdDraft.occurrences.map((item) => item.id)).toEqual(["sch-1:2099-10-19"]);
+    expect(createdDraft.settings.rangeUntil).toBe("2099-10-19");
+    // A publicação limpa até o dia 26: quem estava escalado no 26 publicado sai da escala.
+    expect(createdDraft.settings.redrawFrom).toBe("2099-10-19");
+    expect(createdDraft.settings.redrawUntil).toBe("2099-10-26");
+  });
+
   it("publica sem recriar quem só aparece numa entrada obsoleta", async () => {
     const liveRowId = "4b64da33-01da-4ef7-a204-0023fb93d116";
     const carla = { id: "carla", name: "Carla", branchId: "b1" };
