@@ -36,6 +36,8 @@ export type NavTab = {
    * Sem cargo vale só o papel, como antes.
    */
   cargoCapability?: string;
+  /** Só para quem não tem cargo (a página recusa quem tem, ex.: /equipe/cargos). */
+  noCargo?: boolean;
 };
 
 export type NavArea = {
@@ -153,8 +155,8 @@ export const NAV_AREAS: readonly NavArea[] = [
       { id: "ajustes", label: "Ajustes", href: "/settings", permission: "acessar_configuracoes_pessoais", paths: ["/settings", "/extensao"] },
       { id: "whatsapp", label: "WhatsApp", href: "/integrations/whatsapp", permission: "acessar_configuracoes_pessoais" },
       { id: "integracoes", label: "Integrações", href: "/integrations", permission: "acessar_integracao_meta", paths: ["/integrations/meta", "/guia/webhook"] },
-      { id: "cargos", label: "Cargos", href: "/equipe/cargos", permission: "convidar_corretor", roles: ["director"] },
-      { id: "recuperacoes", label: "Recuperações de acesso", href: "/equipe/recuperacoes", permission: "convidar_corretor", roles: ["director"] },
+      { id: "cargos", label: "Cargos", href: "/equipe/cargos", permission: "convidar_corretor", roles: ["director"], noCargo: true },
+      { id: "recuperacoes", label: "Recuperações de acesso", href: "/equipe/recuperacoes", permission: "convidar_corretor", roles: ["director"], noCargo: true },
     ],
   },
 ];
@@ -231,7 +233,9 @@ export function canShowNavTab(tab: NavTab, user: NavAccessUser | null) {
   if (tab.requires === "negotiations" && !user.negotiationsEnabled) return false;
   // Cargo (04/11, F2): as permissões trazem rotas "route:" só para quem tem cargo; aí a aba exige a capacidade.
   const permissions = user.permissions ?? [];
-  if (tab.cargoCapability && permissions.some((permission) => permission.startsWith("route:")) && !permissions.includes(tab.cargoCapability)) return false;
+  const hasCargo = permissions.some((permission) => permission.startsWith("route:"));
+  if (tab.noCargo && hasCargo) return false;
+  if (tab.cargoCapability && hasCargo && !permissions.includes(tab.cargoCapability)) return false;
   return canShowNavigationItem({ url: tab.href, permission: tab.permission, requires: tab.requires === "relationshipCenter" ? "relationshipCenter" : undefined }, user);
 }
 

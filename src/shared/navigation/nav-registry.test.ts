@@ -134,6 +134,15 @@ describe("nav-registry", () => {
     expect(distribution.tabs.filter((tab) => canShowNavTab(tab, cargo)).map((tab) => tab.id)).toEqual(["plantoes"]);
   });
 
+  it("Cargos and Recuperações de acesso stay hidden for whoever has a cargo (the pages refuse them)", () => {
+    const settings = NAV_AREAS.find((area) => area.id === "configuracoes")!;
+    const withCargo: NavAccessUser = { ...director, permissions: [...(director.permissions ?? []), "route:equipe"] };
+    const shown = settings.tabs.filter((tab) => canShowNavTab(tab, withCargo)).map((tab) => tab.id);
+    expect(shown).not.toContain("cargos");
+    expect(shown).not.toContain("recuperacoes");
+    expect(settings.tabs.filter((tab) => canShowNavTab(tab, director)).map((tab) => tab.id)).toEqual(expect.arrayContaining(["cargos", "recuperacoes"]));
+  });
+
   it("only views the page switches by itself change the URL in place", () => {
     const inPlace = NAV_AREAS.flatMap((area) => area.tabs).filter((tab) => tab.inPlace).map((tab) => tab.href);
     expect(inPlace.every((href) => href.startsWith("/qualificacao"))).toBe(true);
