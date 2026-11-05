@@ -76,7 +76,8 @@ export type BrokerLeadExportSource = {
   livesCount: number | null;
   createdAt: Date;
   assignedAt: Date | null;
-  latestInteractionAt: Date | null;
+  /** Raw sql subquery: postgres-js returns it as a string, not a Date. */
+  latestInteractionAt: Date | string | null;
   firstContactAt: Date | null;
   motivoPerda: string | null;
   qualificationSummary: string | null;
@@ -89,8 +90,10 @@ const dateTime = new Intl.DateTimeFormat("pt-BR", {
 });
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
-function dateLabel(value: Date | null) {
-  return value ? dateTime.format(value) : "";
+function dateLabel(value: Date | string | null) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : dateTime.format(date);
 }
 
 function typeLabel(value: string) {

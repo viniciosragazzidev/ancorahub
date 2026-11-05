@@ -68,4 +68,14 @@ describe("exportação da carteira atual do corretor", () => {
     expect(row["Resumo da IA"]).toBe("Busca plano empresarial");
     expect(row["Link do lead no CRM"]).toBe("https://crm.example.test/leads/lead%2F123");
   });
+  it("aceita o último contato vindo do banco como texto (subconsulta sql)", () => {
+    const row = buildBrokerLeadExportRow({
+      id: "lead-2", nome: "Bia", telefone: "21999990000", email: null, tipo: "PF", origem: "whatsapp",
+      sourceChannel: "whatsapp", sourceCampaign: null, queueName: null, branchName: null, status: "new",
+      qualificationStatus: null, monthlyValue: null, livesCount: null,
+      createdAt: new Date("2026-11-01T12:00:00.000Z"), assignedAt: null,
+      latestInteractionAt: "2026-11-02 15:00:00+00", firstContactAt: null, motivoPerda: null, qualificationSummary: null,
+    }, "https://crm.example.test");
+    expect(row["Último contato"]).toBe("02/11/2026, 12:00");
+  });
 });
