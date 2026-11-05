@@ -43,7 +43,7 @@ import {
 const phoneSchema = z.string().trim().transform((value) => value.replace(/\D/g, "")).pipe(z.string().min(10).max(15));
 const variablesSchema = z.array(z.string().trim().min(1).max(512)).max(10).default([]);
 
-export const whatsappOutboundStatusValues = ["pending", "queued", "processing", "sent", "delivered", "read", "failed", "cancelled", "expired"] as const;
+export const whatsappOutboundStatusValues = ["pending", "queued", "processing", "sent", "delivered", "read", "failed", "cancelled", "expired", "skipped"] as const;
 export type WhatsAppOutboundStatus = (typeof whatsappOutboundStatusValues)[number];
 
 export const META_OUTBOUND_STALE_AFTER_HOURS_SETTING = "whatsapp_outbox_stale_after_hours";
@@ -172,7 +172,7 @@ function assertMetaChannelAvailable(
   return selection;
 }
 
-async function resolveMetaOutboundChannel(row: OutboundRow) {
+async function resolveMetaOutboundChannel(row: OutboundRow, allowPinnedSourceChannel = false) {
   if (row.recipientType !== "lead" && row.recipientType !== "client" && row.recipientType !== "user") {
     throw outboundChannelError("META_RECIPIENT_TYPE_UNSUPPORTED", "O destinatário desta mensagem não é compatível com o canal Meta.");
   }
@@ -189,6 +189,7 @@ async function resolveMetaOutboundChannel(row: OutboundRow) {
     recipientId: row.recipientId,
     customerPhone: row.destinationPhone,
     pinnedChannelId: row.channelId,
+    allowPinnedSourceChannel,
   });
   if (channel && "blocked" in channel) {
     console.warn("[meta-outbox] customer_source_channel_unavailable", {
@@ -396,6 +397,8 @@ export async function enqueueMetaTemplateMessage(input: {
   requireApprovedMetaTemplate?: boolean;
   /** With requireApprovedMetaTemplate: this approved template instead of the event's configured one. */
   templateName?: string;
+  /** Preserve the exact selected source channel for post-sale contact. */
+  strictSourceChannel?: boolean;
 }) {
   const requestedDestinationPhone = phoneSchema.parse(input.destinationPhone);
   // A team member's number comes from their profile. The message-history lookup is for leads only:
@@ -416,13 +419,14 @@ export async function enqueueMetaTemplateMessage(input: {
     recipientId: input.recipientId,
     customerPhone: destinationPhone,
     pinnedChannelId: input.channelId,
-    corporateOnly: input.requireApprovedMetaTemplate,
+    corporateOnly: input.requireApprovedMetaTemplate && !input.strictSourceChannel,
+    allowPinnedSourceChannel: input.strictSourceChannel,
   }));
   if (input.requireApprovedMetaTemplate && !channel) {
     throw outboundChannelError("META_CHANNEL_UNAVAILABLE", "Não existe um canal oficial da Meta ativo para este tenant.");
   }
   const messagePlan = input.requireApprovedMetaTemplate
-    ? await resolveApprovedMetaEventTemplate({ tenantId: input.tenantId, purpose: input.purpose, variables, templateName: input.templateName })
+    ? await resolveApprovedMetaEventTemplate({ tenantId: input.tenantId, purpose: input.purpose, variables, templateName: input.templateName, wabaId: channel?.wabaId })
     : input.purpose === "dutyPresenceConfirmation" ? null : await resolveEventMessagePlan({
       tenantId: input.tenantId,
       recipientType: input.recipientType,
@@ -735,6 +739,79 @@ export async function enqueueMetaTextMessage(input: {
   return { id, status: "queued" as const, duplicate: false };
 }
 
+/** Queues the post-sale opening through the exact WAHA source number, without cross-channel fallback. */
+export async function enqueuePostSaleSurveyWahaMessage(input: {
+  tenantId: string;
+  leadId: string;
+  wahaNumberId: string;
+  destinationPhone: string;
+  body: string;
+  requestedBy: string;
+  idempotencyKey: string;
+  scheduledAt?: Date;
+}) {
+  const destinationPhone = phoneSchema.parse(input.destinationPhone);
+  const body = z.string().trim().min(1).max(4096).parse(input.body);
+  const db = getDatabase();
+  const [existing] = await db.select({ id: schema.whatsappOutboundMessages.id, status: schema.whatsappOutboundMessages.status })
+    .from(schema.whatsappOutboundMessages)
+    .where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey)))
+    .limit(1);
+  if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
+
+  const [lead] = await db.select({ id: schema.leads.id }).from(schema.leads).where(and(
+    eq(schema.leads.id, input.leadId),
+    eq(schema.leads.tenantId, input.tenantId),
+    isNull(schema.leads.deletedAt),
+    isNull(schema.leads.archivedAt),
+  )).limit(1);
+  if (!lead) throw Object.assign(new Error("Lead indisponível nesta empresa."), { code: "POST_SALE_SOURCE_UNAVAILABLE" });
+
+  const [number] = await db.select({ id: schema.wahaNumbers.id, status: schema.wahaNumbers.status, pausedUntil: schema.wahaNumbers.pausedUntil })
+    .from(schema.wahaNumbers)
+    .where(and(
+      eq(schema.wahaNumbers.id, input.wahaNumberId),
+      eq(schema.wahaNumbers.tenantId, input.tenantId),
+      eq(schema.wahaNumbers.scope, "tenant"),
+      inArray(schema.wahaNumbers.status, TENANT_CHANNEL_CONNECTED_STATUSES),
+    ))
+    .limit(1);
+  if (!number || (number.pausedUntil && number.pausedUntil > new Date())) {
+    throw Object.assign(new Error("O número de origem está indisponível."), { code: "POST_SALE_SOURCE_UNAVAILABLE" });
+  }
+
+  const id = randomUUID();
+  const now = new Date();
+  await db.insert(schema.whatsappOutboundMessages).values({
+    id,
+    tenantId: input.tenantId,
+    channelId: null,
+    deliveryRoute: "waha_direct",
+    wahaNumberId: number.id,
+    recipientType: "lead",
+    recipientId: input.leadId,
+    destinationPhone,
+    purpose: "postSaleSurvey",
+    messageType: "text",
+    templateName: "__text__",
+    templateLanguage: "pt_BR",
+    variables: [body],
+    renderedBody: body,
+    status: input.scheduledAt && input.scheduledAt > now ? "pending" : "queued",
+    idempotencyKey: input.idempotencyKey,
+    scheduledAt: input.scheduledAt ?? null,
+    queuedAt: now,
+    requestedBy: input.requestedBy,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(), userId: input.requestedBy, entidade: "whatsapp_outbound_message", entidadeId: id,
+    acao: "whatsapp_message_queued", metadata: { source: "post_sale_audit" }, createdAt: now,
+  });
+  return { id, status: input.scheduledAt && input.scheduledAt > now ? "pending" as const : "queued" as const, duplicate: false };
+}
+
 function textBaseUrl() {
   return process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.APP_URL?.trim() || "https://crm.ancorasaude.cloud";
 }
@@ -879,6 +956,23 @@ export function resolveNoticeTextVariants(purpose: string, rawVariables: string[
 type OutboundRow = typeof schema.whatsappOutboundMessages.$inferSelect;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+async function syncPostSaleSurveyOutbound(row: OutboundRow, result: { status: "sent" | "failed" | "skipped"; reason?: string }) {
+  if (row.purpose !== "postSaleSurvey") return;
+  const [, campaignId, leadId] = row.idempotencyKey.split(":");
+  if (!campaignId || !leadId) return;
+  const now = new Date();
+  await getDatabase().update(schema.postSaleSurveys).set({
+    outboundId: row.id,
+    status: result.status,
+    sentAt: result.status === "sent" ? now : undefined,
+    skipReason: result.status === "skipped" || result.status === "failed" ? (result.reason ?? "Falha no canal de origem.").slice(0, 240) : null,
+  }).where(and(
+    eq(schema.postSaleSurveys.tenantId, row.tenantId),
+    eq(schema.postSaleSurveys.campaignId, campaignId),
+    eq(schema.postSaleSurveys.leadId, leadId),
+  ));
+}
+
 /**
  * Applies the delivery guard to a team notice row. "held": back to the queue
  * with the reason and when to retry; "dropped": skipped for good (stale
@@ -888,10 +982,11 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function guardNoticeRow(row: OutboundRow, channel: "company_number" | "meta", exact: boolean): Promise<"go" | "held" | "dropped"> {
   const db = getDatabase();
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const verdict = await evaluateNoticeRow({ ...row, noticeKey: row.noticeKey! }, channel);
+    const verdict = await evaluateNoticeRow(row, channel);
     if (verdict.kind === "now") return "go";
     if (verdict.kind === "drop") {
       await db.update(schema.whatsappOutboundMessages).set({ status: "skipped", holdReason: verdict.reason, updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+      await syncPostSaleSurveyOutbound(row, { status: "skipped", reason: verdict.reason });
       return "dropped";
     }
     const waitMs = verdict.until.getTime() - Date.now();
@@ -1070,6 +1165,14 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
         }).where(eq(schema.whatsappOutboundMessages.id, row.id));
         return;
       }
+      if (row.purpose === "postSaleSurvey" && !viaTenantChannel && row.deliveryRoute !== "meta_only") {
+        await db.update(schema.whatsappOutboundMessages).set({
+          status: "skipped", failedAt: new Date(), providerErrorCode: "POST_SALE_SOURCE_UNAVAILABLE",
+          providerErrorMessage: "O número de origem da pesquisa está indisponível; nenhum outro canal será usado.", updatedAt: new Date(),
+        }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), eq(schema.whatsappOutboundMessages.tenantId, row.tenantId)));
+        await syncPostSaleSurveyOutbound(row, { status: "skipped", reason: "Número de origem indisponível." });
+        return;
+      }
       if (!viaTenantChannel && !companyFallback && (row.deliveryRoute !== "meta_only" || row.wahaNumberId)) {
         await db.update(schema.whatsappOutboundMessages).set({
           deliveryRoute: "meta_only",
@@ -1158,7 +1261,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
       if (await deferColdLeadReactivationOutsideWindow(row, new Date())) return;
 
       // Delivery guard (DEC-125): business hours, spacing and limits for team notices.
-      if (row.noticeKey) {
+      if (row.noticeKey || row.purpose === "postSaleSurvey") {
         const verdict = await guardNoticeRow(row, viaTenantChannel ? "company_number" : "meta", Boolean(outboundId));
         if (verdict === "held") return;
         if (verdict === "dropped") return;
@@ -1186,7 +1289,8 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
             companyUnavailable = companyChatUnavailableMessage(tenantNumber.pausedUntil);
             throw new Error("Número da empresa pausado após falhas seguidas.");
           }
-          if (row.noticeKey && !await takeCompanySlot(row.wahaNumberId!, row.noticeKey, Boolean(outboundId))) {
+          const spacingKey = row.noticeKey ?? (row.purpose === "postSaleSurvey" ? "POST_SALE_SURVEY" : null);
+          if (spacingKey && !await takeCompanySlot(row.wahaNumberId!, spacingKey, Boolean(outboundId))) {
             await db.update(schema.whatsappOutboundMessages).set({ status: "queued", attempts: row.attempts, nextAttemptAt: new Date(Date.now() + 5_000), holdReason: "number_spacing", updatedAt: new Date() })
               .where(eq(schema.whatsappOutboundMessages.id, row.id));
             return;
@@ -1201,6 +1305,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId: sentByWaha.messageId, providerErrorCode: null, providerErrorMessage: null, holdReason: null, sentAt: new Date(), updatedAt: new Date() })
             .where(eq(schema.whatsappOutboundMessages.id, row.id));
           await recordCompanyNumberSuccess(row.wahaNumberId!).catch(() => undefined);
+          await syncPostSaleSurveyOutbound(row, { status: "sent" });
           await markPresenceNotified(row);
           await markInvitationSent(row);
           sent += 1;
@@ -1216,6 +1321,19 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
               providerErrorMessage: failure.message,
               updatedAt: new Date(),
             }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+            return;
+          }
+          if (row.purpose === "postSaleSurvey") {
+            const unavailable = Boolean(companyUnavailable);
+            const reason = unavailable ? "Número de origem indisponível." : (wahaError instanceof Error ? wahaError.message : "Falha ao enviar pelo número de origem.");
+            await db.update(schema.whatsappOutboundMessages).set({
+              status: unavailable ? "skipped" : "failed",
+              failedAt: new Date(),
+              providerErrorCode: unavailable ? "POST_SALE_SOURCE_UNAVAILABLE" : "POST_SALE_WAHA_SEND_FAILED",
+              providerErrorMessage: reason.slice(0, 240),
+              updatedAt: new Date(),
+            }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), eq(schema.whatsappOutboundMessages.tenantId, row.tenantId)));
+            await syncPostSaleSurveyOutbound(row, { status: unavailable ? "skipped" : "failed", reason });
             return;
           }
           if (!row.noticeKey && row.recipientType === "user" && !(await brokerMetaWindowOpen(row.tenantId, row.destinationPhone))) {
@@ -1263,8 +1381,18 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
       // is mandatory for the post-activation notice: it must use the same
       // corporate number that delivered the original invitation. Legacy rows
       // without a usable binding may still fall back to the tenant default.
-      const channel = await resolveMetaOutboundChannel(row);
-      if (!channel?.phoneNumberId || !channel.accessTokenCiphertext) throw new Error("Canal corporativo incompleto.");
+      const channel = await resolveMetaOutboundChannel(row, row.purpose === "postSaleSurvey");
+      if (!channel?.phoneNumberId || !channel.accessTokenCiphertext) {
+        if (row.purpose === "postSaleSurvey") {
+          await db.update(schema.whatsappOutboundMessages).set({
+            status: "skipped", failedAt: new Date(), providerErrorCode: "POST_SALE_SOURCE_UNAVAILABLE",
+            providerErrorMessage: "O canal Meta de origem está indisponível; nenhum outro canal será usado.", updatedAt: new Date(),
+          }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), eq(schema.whatsappOutboundMessages.tenantId, row.tenantId)));
+          await syncPostSaleSurveyOutbound(row, { status: "skipped", reason: "Canal Meta de origem indisponível." });
+          return;
+        }
+        throw new Error("Canal corporativo incompleto.");
+      }
       if (row.channelId !== channel.id || (!companyFallback && (row.deliveryRoute !== "meta_only" || row.wahaNumberId))) {
         await db.update(schema.whatsappOutboundMessages).set({
           channelId: channel.id,
@@ -1441,6 +1569,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
 
       const providerMessageId = metaResponse.messages?.[0]?.id || "wamid_sent";
       await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId, providerErrorCode: null, providerErrorMessage: null, sentAt: new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+      await syncPostSaleSurveyOutbound(row, { status: "sent" });
       if (row.purpose === "dutyPresenceConfirmation" && Array.isArray(row.variables) && typeof row.variables[2] === "string") {
         await db.update(schema.dutyPresenceConfirmations).set({ notificationStatus: "sent", notificationErrorCode: null, updatedAt: new Date() }).where(and(
           eq(schema.dutyPresenceConfirmations.id, row.variables[2]),
@@ -1485,6 +1614,12 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
         : null;
       const finalStatus: WhatsAppOutboundStatus = nextAttemptAt ? "pending" : "failed";
       await db.update(schema.whatsappOutboundMessages).set({ status: finalStatus, deliveryRoute: "meta_only", wahaNumberId: null, providerErrorCode: code, providerErrorMessage: message, nextAttemptAt, failedAt: nextAttemptAt ? null : new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+      if (!nextAttemptAt) {
+        await syncPostSaleSurveyOutbound(row, {
+          status: terminalTemplateFailure || terminalRoutingFailure ? "skipped" : "failed",
+          reason: message,
+        });
+      }
       if (!nextAttemptAt && row.purpose === "dutyPresenceConfirmation" && Array.isArray(row.variables) && typeof row.variables[2] === "string") {
         await db.update(schema.dutyPresenceConfirmations).set({ notificationStatus: "error", notificationErrorCode: "TEMPLATE_DELIVERY_FAILED", updatedAt: new Date() }).where(and(
           eq(schema.dutyPresenceConfirmations.id, row.variables[2]),

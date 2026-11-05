@@ -315,6 +315,14 @@ export const FEATURE_FLAGS = {
     description: "Habilita a extensão contextual do WhatsApp Web junto com os gates de tenant e piloto.",
   },
 
+  POST_SALE_AUDIT: {
+    key: "feature_post_sale_audit_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita campanhas de auditoria do atendimento pós-venda por WhatsApp.",
+  },
+
   BROWSER_EXTENSION_PILOT_USERS: {
     key: "feature_browser_extension_pilot_users",
     scope: "global",

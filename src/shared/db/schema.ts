@@ -3652,6 +3652,59 @@ export const postSaleSettings = pgTable(
 
 /* ─── Goals ─── */
 
+export const postSaleCampaigns = pgTable(
+  "post_sale_campaigns",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    audience: jsonb("audience").$type<Record<string, unknown>>().notNull(),
+    openingMessage: text("opening_message").notNull(),
+    createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    status: text("status").notNull().default("draft"),
+    totals: jsonb("totals").$type<Record<string, number>>().notNull().default({}),
+    createdAt,
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("post_sale_campaigns_tenant_created_idx").on(table.tenantId, table.createdAt),
+    index("post_sale_campaigns_tenant_status_idx").on(table.tenantId, table.status),
+  ],
+);
+
+export const postSaleSurveys = pgTable(
+  "post_sale_surveys",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    campaignId: text("campaign_id").notNull().references(() => postSaleCampaigns.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    brokerId: text("broker_id").references(() => user.id, { onDelete: "set null" }),
+    phone: text("phone").notNull(),
+    status: text("status").notNull().default("queued"),
+    step: integer("step").notNull().default(0),
+    answers: jsonb("answers").$type<Record<string, unknown>>().notNull().default({}),
+    outcome: text("outcome"),
+    rating: integer("rating"),
+    outboundId: text("outbound_id").references(() => whatsappOutboundMessages.id, { onDelete: "set null" }),
+    channelType: text("channel_type", { enum: ["waha", "meta"] }),
+    channelRef: text("channel_ref"),
+    skipReason: text("skip_reason"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    lastReplyAt: timestamp("last_reply_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("post_sale_surveys_tenant_campaign_lead_unique").on(table.tenantId, table.campaignId, table.leadId),
+    index("post_sale_surveys_tenant_broker_idx").on(table.tenantId, table.brokerId),
+    index("post_sale_surveys_tenant_lead_status_idx").on(table.tenantId, table.leadId, table.status),
+    index("post_sale_surveys_tenant_campaign_status_idx").on(table.tenantId, table.campaignId, table.status),
+    index("post_sale_surveys_tenant_channel_idx").on(table.tenantId, table.channelType, table.channelRef),
+  ],
+);
+
 export const goals = pgTable(
   "goals",
   {

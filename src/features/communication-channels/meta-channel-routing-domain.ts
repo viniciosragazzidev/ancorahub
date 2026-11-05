@@ -97,6 +97,8 @@ export function selectMetaOutboundChannel(input: {
   latestInboundChannelId?: string | null;
   pinnedChannelId?: string | null;
   corporateOnly?: boolean;
+  /** A pinned customer source, including a branch or coexistence channel, must be preserved exactly. */
+  allowPinnedSourceChannel?: boolean;
 }): MetaChannelSelection {
   const customer = input.recipientType !== "user";
 
@@ -112,10 +114,16 @@ export function selectMetaOutboundChannel(input: {
   // a legacy outbox row has a Coex or non-default channel pinned.
   if (customer && input.pinnedChannelId) {
     const pinned = input.channels.find((channel) => channel.id === input.pinnedChannelId);
-    if (pinned && pinned.onboardingMode !== "coexistence" && (!input.corporateOnly || pinned.branchId === null) && isUsable(pinned)) {
+    const allowedPinned = input.allowPinnedSourceChannel
+      || (pinned?.onboardingMode !== "coexistence" && (!input.corporateOnly || pinned?.branchId === null));
+    if (pinned && allowedPinned && isUsable(pinned)) {
       return { kind: "selected", channel: pinned, source: "pinned" };
     }
     return { kind: "blocked", ...sourceChannelBlock(pinned) };
+  }
+
+  if (customer && input.allowPinnedSourceChannel) {
+    return { kind: "blocked", ...sourceChannelBlock() };
   }
 
   const official = officialCandidates(input.channels, input.corporateOnly ?? false)[0];

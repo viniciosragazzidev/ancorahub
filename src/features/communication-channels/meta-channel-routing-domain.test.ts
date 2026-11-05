@@ -90,6 +90,24 @@ describe("Coex multi-number decisions", () => {
     })).toMatchObject({ kind: "selected", source: "official", channel: { id: "official-a" } });
   });
 
+  it("keeps a specifically pinned customer source even when it is branch-scoped coexistence", () => {
+    const source = channel({ id: "coex-source", branchId: "branch-a", onboardingMode: "coexistence", isDefault: false });
+    const official = channel({ id: "official-default" });
+    expect(selectMetaOutboundChannel({
+      channels: [official, source],
+      recipientType: "lead",
+      pinnedChannelId: "coex-source",
+      corporateOnly: true,
+      allowPinnedSourceChannel: true,
+    })).toMatchObject({ kind: "selected", source: "pinned", channel: { id: "coex-source" } });
+  });
+
+  it("blocks strict source routing when the source channel binding is missing", () => {
+    expect(selectMetaOutboundChannel({
+      channels: [channel()], recipientType: "lead", allowPinnedSourceChannel: true,
+    })).toMatchObject({ kind: "blocked", reason: "META_SOURCE_CHANNEL_UNAVAILABLE" });
+  });
+
   it("uses a stable ID tiebreak when official channels have the same creation time", () => {
     const second = channel({ id: "official-b", isDefault: false });
     const first = channel({ id: "official-a", isDefault: false });

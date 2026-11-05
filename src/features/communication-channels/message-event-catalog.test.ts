@@ -24,6 +24,7 @@ describe("message event catalog", () => {
   it("maps the real qualification and broker producers to registered events", () => {
     expect(getMessageEventByPurpose("leadQualification")?.key).toBe("FIRST_CONTACT");
     expect(getMessageEventByPurpose("brokerLeadNotification")?.key).toBe("LEAD_ASSIGNMENT");
+    expect(getMessageEventByPurpose("postSaleSurvey")?.key).toBe("POST_SALE_INTRODUCTION");
     expect(getMessageEventByPurpose("unknown")).toBeNull();
   });
 

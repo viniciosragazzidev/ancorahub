@@ -117,20 +117,23 @@ export async function evaluateNoticeRow(row: {
   id: string;
   tenantId: string;
   recipientId: string | null;
-  noticeKey: string;
+  noticeKey?: string | null;
+  purpose?: string;
   variables: unknown;
   createdAt: Date;
   wahaNumberId: string | null;
 }, channel: "company_number" | "meta", now = new Date()): Promise<GuardResult> {
-  const notice = teamNoticeByKey(row.noticeKey);
-  if (!notice) return { kind: "now" };
+  const notice = row.noticeKey ? teamNoticeByKey(row.noticeKey) : null;
+  const postSaleSurvey = row.purpose === "postSaleSurvey";
+  if (!notice && !postSaleSurvey) return { kind: "now" };
+  const noticeClass = postSaleSurvey ? "informative" : notice!.class;
   const db = getDatabase();
   const dayAgo = new Date(now.getTime() - 24 * 3_600_000);
   const hourAgo = new Date(now.getTime() - 3_600_000);
   const today = localDateKey(now);
 
-  const recipientRows = row.recipientId && notice.class !== "critical"
-    ? await db.select({ sentAt: schema.whatsappOutboundMessages.sentAt, noticeKey: schema.whatsappOutboundMessages.noticeKey, variables: schema.whatsappOutboundMessages.variables })
+  const recipientRows = row.recipientId && (postSaleSurvey || noticeClass !== "critical")
+    ? await db.select({ sentAt: schema.whatsappOutboundMessages.sentAt, noticeKey: schema.whatsappOutboundMessages.noticeKey, purpose: schema.whatsappOutboundMessages.purpose, variables: schema.whatsappOutboundMessages.variables })
       .from(schema.whatsappOutboundMessages)
       .where(and(
         eq(schema.whatsappOutboundMessages.tenantId, row.tenantId),
@@ -139,7 +142,7 @@ export async function evaluateNoticeRow(row: {
         gte(schema.whatsappOutboundMessages.sentAt, dayAgo),
       ))
     : [];
-  const nonCritical = recipientRows.filter((item) => item.noticeKey && teamNoticeByKey(item.noticeKey)?.class !== "critical");
+  const nonCritical = recipientRows.filter((item) => item.purpose === "postSaleSurvey" || (item.noticeKey && teamNoticeByKey(item.noticeKey)?.class !== "critical"));
   const sameSubject = JSON.stringify(row.variables ?? []);
   const lastSentAt = recipientRows.reduce<Date | null>((latest, item) => (item.sentAt && (!latest || item.sentAt > latest) ? item.sentAt : latest), null);
 
@@ -157,7 +160,7 @@ export async function evaluateNoticeRow(row: {
   }
 
   return evaluateDeliveryGuard({
-    noticeClass: notice.class,
+    noticeClass,
     now,
     createdAt: row.createdAt,
     channel,
@@ -166,8 +169,8 @@ export async function evaluateNoticeRow(row: {
       lastSentAt,
       sentLastHour: nonCritical.filter((item) => item.sentAt! >= hourAgo).length,
       sentToday: nonCritical.filter((item) => localDateKey(item.sentAt!) === today).length,
-      remindersToday: nonCritical.filter((item) => teamNoticeByKey(item.noticeKey!)?.class === "reminder" && localDateKey(item.sentAt!) === today).length,
-      duplicateRecently: nonCritical.some((item) => item.noticeKey === row.noticeKey && item.sentAt! >= new Date(now.getTime() - DELIVERY_LIMITS.recipient.duplicateWindowMs) && JSON.stringify(item.variables ?? []) === sameSubject),
+      remindersToday: nonCritical.filter((item) => item.noticeKey && teamNoticeByKey(item.noticeKey)?.class === "reminder" && localDateKey(item.sentAt!) === today).length,
+      duplicateRecently: Boolean(row.noticeKey && nonCritical.some((item) => item.noticeKey === row.noticeKey && item.sentAt! >= new Date(now.getTime() - DELIVERY_LIMITS.recipient.duplicateWindowMs) && JSON.stringify(item.variables ?? []) === sameSubject)),
     },
     number,
   });
