@@ -103,3 +103,49 @@ export async function removeDatedRosterAssignmentFromMonthlyPlans(tx: Transactio
     now: input.now,
   });
 }
+
+/**
+ * Tira da escala (JSON) as ocorrências que o filtro aponta e as vagas delas (05/11).
+ * Usado ao apagar/arquivar um plantão e ao tirar um dia inteiro da escala.
+ */
+export function dropPlanOccurrences<O extends { id: string }, A extends { occurrenceId: string }>(
+  occurrences: readonly O[],
+  assignments: readonly A[],
+  drop: (occurrence: O) => boolean,
+) {
+  const dropped = new Set(occurrences.filter(drop).map((occurrence) => occurrence.id));
+  return {
+    droppedIds: dropped,
+    occurrences: occurrences.filter((occurrence) => !dropped.has(occurrence.id)),
+    assignments: assignments.filter((item) => !dropped.has(item.occurrenceId)),
+  };
+}
+
+/** Hoje em São Paulo (YYYY-MM-DD). */
+export function saoPauloToday(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(now);
+}
+
+/**
+ * Plantão apagado ou arquivado (05/11): suas datas de hoje em diante saem das escalas mensais
+ * (publicadas e rascunhos). Antes ficavam no JSON e apareciam no PDF e no planejador sem plantão.
+ */
+export async function dropScheduleFromMonthlyPlans(tx: Transaction, input: { tenantId: string; scheduleId: string; fromDate: string; now: Date }) {
+  const plans = await tx.select({ id: schema.dutyScheduleMonthlyPlans.id, occurrences: schema.dutyScheduleMonthlyPlans.occurrences, assignments: schema.dutyScheduleMonthlyPlans.assignments })
+    .from(schema.dutyScheduleMonthlyPlans)
+    .where(and(
+      eq(schema.dutyScheduleMonthlyPlans.tenantId, input.tenantId),
+      inArray(schema.dutyScheduleMonthlyPlans.status, ["draft", "published"]),
+      sql`${schema.dutyScheduleMonthlyPlans.occurrences} @> ${JSON.stringify([{ scheduleId: input.scheduleId }])}::jsonb`,
+    ));
+  for (const plan of plans) {
+    const next = dropPlanOccurrences(
+      asArray<{ id: string; scheduleId: string; dutyDate: string }>(plan.occurrences),
+      asArray<MonthlyPlanAssignmentEntry>(plan.assignments),
+      (occurrence) => occurrence.scheduleId === input.scheduleId && occurrence.dutyDate >= input.fromDate,
+    );
+    if (!next.droppedIds.size) continue;
+    await tx.update(schema.dutyScheduleMonthlyPlans).set({ occurrences: next.occurrences, assignments: next.assignments, updatedAt: input.now })
+      .where(eq(schema.dutyScheduleMonthlyPlans.id, plan.id));
+  }
+}

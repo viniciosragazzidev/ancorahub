@@ -9,6 +9,7 @@ vi.mock("@/features/lead-distribution/monthly-duty-actions", () => ({
   getMonthlyDutyPlanAction: vi.fn().mockResolvedValue(null),
   publishMonthlyDutyPlanAction: vi.fn(),
   updateMonthlyDutyDraftAction: vi.fn(),
+  setMonthlyDutyDayExcludedAction: vi.fn(),
 }));
 vi.mock("@/features/lead-distribution/duty-type-actions", () => ({
   createDutyTypeAction: vi.fn(),
@@ -20,6 +21,7 @@ import {
   generateMonthlyDutyPlanAction,
   getMonthlyDutyPlanAction,
   publishMonthlyDutyPlanAction,
+  setMonthlyDutyDayExcludedAction,
   updateMonthlyDutyDraftAction,
   type MonthlyDutyPlanView,
 } from "@/features/lead-distribution/monthly-duty-actions";
@@ -208,6 +210,36 @@ describe("monthly duty planner", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Remover Corretor Exemplo de PME · Manhã/ }));
     await waitFor(() => expect(updateMonthlyDutyDraftAction).toHaveBeenCalledWith({ planId: draft.id, occurrenceId: draft.occurrences[0].id, brokerId: "broker-1", operation: "remove", force: false }));
     expect(await screen.findByText("Ninguém escalado")).toBeTruthy();
+  });
+
+  it("tira um dia inteiro da escala depois de confirmar e mostra o dia como fora, com Devolver", async () => {
+    vi.mocked(getMonthlyDutyPlanAction).mockResolvedValue(draft);
+    const afterView: MonthlyDutyPlanView = { ...draft, occurrences: [], totalAssigned: 0, settings: { ...draft.settings!, excludedDates: ["2026-12-07"] } };
+    vi.mocked(setMonthlyDutyDayExcludedAction).mockResolvedValue({ ok: true, view: afterView, message: "07/12 saiu da escala (1 plantão)." });
+    render(<Harness />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Tirar .*07.* da escala/ }));
+    expect(await screen.findByText(/Todos os plantões desse dia saem da escala/)).toBeTruthy();
+    expect(setMonthlyDutyDayExcludedAction).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Tirar dia" }));
+    await waitFor(() => expect(setMonthlyDutyDayExcludedAction).toHaveBeenCalledWith({ monthKey: "2026-12", dutyDate: "2026-12-07", restore: false }));
+    expect(await screen.findByLabelText("Dias fora da escala")).toBeTruthy();
+
+    vi.mocked(setMonthlyDutyDayExcludedAction).mockResolvedValue({ ok: true, view: draft, message: "O dia 07/12 volta na próxima vez que você gerar a escala." });
+    const restore = await screen.findByRole("button", { name: /Devolver .* para a escala/ });
+    await waitFor(() => expect((restore as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(restore);
+    await waitFor(() => expect(setMonthlyDutyDayExcludedAction).toHaveBeenLastCalledWith({ monthKey: "2026-12", dutyDate: "2026-12-07", restore: true }));
+  });
+
+  it("mostra o motivo quando não dá para tirar o dia, sem quebrar a tela", async () => {
+    vi.mocked(getMonthlyDutyPlanAction).mockResolvedValue(draft);
+    vi.mocked(setMonthlyDutyDayExcludedAction).mockResolvedValue({ ok: false, reason: "Os plantões de 07/12 já começaram. Não dá para tirar esse dia agora." });
+    render(<Harness />);
+    fireEvent.click(await screen.findByRole("button", { name: /Tirar .*07.* da escala/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Tirar dia" }));
+    await waitFor(() => expect(setMonthlyDutyDayExcludedAction).toHaveBeenCalled());
+    expect(screen.getByText(/PME · Manhã/)).toBeTruthy();
   });
 
   it("asks for confirmation before publishing", async () => {

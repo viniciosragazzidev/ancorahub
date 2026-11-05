@@ -129,7 +129,8 @@ describe("adicionar corretor a um plantão publicado (ação de servidor)", () =
     const reactivatedPlan = { ...stalePlan, assignments: [{ ...staleEntry, origin: "manual" }] };
     state.queue = [
       [stalePlan], [stalePlan], [schedule], [bruno], [], [{ id: DATED_ASSIGNMENT_ID, status: "inactive" }],
-      [reactivatedPlan], [{ id: DATED_ASSIGNMENT_ID }], [bruno],
+      // buildPlanView: plano, plantões que ainda existem, linhas ativas, pessoas.
+      [reactivatedPlan], [{ id: "sch-1" }], [{ id: DATED_ASSIGNMENT_ID }], [bruno],
     ];
 
     const view = await addBrokerToPublishedOccurrenceAction({ occurrenceId: OCCURRENCE_ID, brokerId: "bruno" });
@@ -304,11 +305,23 @@ describe("adicionar corretor a um plantão publicado (ação de servidor)", () =
   it("não mostra como escalada a entrada ligada a uma linha datada inativa", async () => {
     const staleEntry = { occurrenceId: OCCURRENCE_ID, brokerId: "bruno", origin: "manual", rosterAssignmentId: DATED_ASSIGNMENT_ID };
     const stalePlan = { ...publishedPlan, assignments: [staleEntry] };
-    state.queue = [[stalePlan], [], [bruno]];
+    state.queue = [[stalePlan], [{ id: "sch-1" }], [], [bruno]];
 
     const view = await getMonthlyDutyPlanAction("2099-10");
 
     expect(view?.occurrences[0]?.brokers).toEqual([]);
+    expect(view?.totalAssigned).toBe(0);
+  });
+
+  it("não mostra datas futuras de plantão apagado (o dia 20 que ficou na escala)", async () => {
+    const deleted = { ...occurrence, id: `sch-apagado:${FUTURE_DAY}`, scheduleId: "sch-apagado" };
+    const plan = { ...publishedPlan, occurrences: [occurrence, deleted], assignments: [{ occurrenceId: deleted.id, brokerId: "bruno", origin: "generated" }] };
+    // Só sch-1 ainda existe.
+    state.queue = [[plan], [{ id: "sch-1" }], [bruno]];
+
+    const view = await getMonthlyDutyPlanAction("2099-10");
+
+    expect(view?.occurrences.map((item) => item.id)).toEqual([OCCURRENCE_ID]);
     expect(view?.totalAssigned).toBe(0);
   });
 

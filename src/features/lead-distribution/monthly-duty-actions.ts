@@ -13,7 +13,7 @@ import { applyForcedBrokers, generateTypedAssignments } from "./duty-plan-genera
 import { getRosterBrokerAccountFilter, pendingBrokerPlanningEnabled } from "./roster-broker-account-filter";
 import { decideLeftoverRows } from "./monthly-duty-preservation";
 import { publishedAddProblem, publishedRemoveProblem } from "./monthly-duty-published-edit";
-import { lockMonthlyDutyPlans, persistMonthlyPlanAssignmentRemoval, upsertMonthlyPlanAssignment } from "./monthly-duty-plan-assignments";
+import { dropPlanOccurrences, lockMonthlyDutyPlans, persistMonthlyPlanAssignmentRemoval, upsertMonthlyPlanAssignment } from "./monthly-duty-plan-assignments";
 import { exclusiveScheduleIdsForManager } from "./manager-unit-scope-server";
 import { MANAGER_SCOPE_ERROR } from "./manager-unit-scope";
 import {
@@ -204,6 +204,15 @@ function occurrenceEnded(occurrence: Pick<MonthlyPlanOccurrence, "dutyDate" | "s
   return shiftEnd({ ...occurrence, timezone: "America/Sao_Paulo" }, occurrence.dutyDate).getTime() <= now.getTime();
 }
 
+/** Ids, entre os informados, de plantões que ainda existem (qualquer status). */
+async function existingScheduleIdsOf(db: Executor, tenantId: string, scheduleIds: readonly string[]) {
+  const ids = [...new Set(scheduleIds)];
+  if (!ids.length) return new Set<string>();
+  const rows = await db.select({ id: schema.unitDutySchedules.id }).from(schema.unitDutySchedules)
+    .where(and(eq(schema.unitDutySchedules.tenantId, tenantId), inArray(schema.unitDutySchedules.id, ids)));
+  return new Set(rows.map((row) => row.id));
+}
+
 async function audit(db: Executor, userId: string, planId: string, acao: string) {
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId, entidade: "duty_schedule_monthly_plan", entidadeId: planId, acao });
 }
@@ -228,10 +237,15 @@ async function buildPlanView(db: Executor, context: TenantContext, monthKey: str
   const planOccurrences = asArray<MonthlyPlanOccurrence>(plan.occurrences);
   // Gestor (05/11): só os plantões exclusivos da unidade dele aparecem na escala.
   const managerScope = context.role === "manager" ? await exclusiveScheduleIdsForManager(db, context, planOccurrences.map((occurrence) => occurrence.scheduleId)) : null;
-  const occurrences = managerScope ? planOccurrences.filter((occurrence) => managerScope.has(occurrence.scheduleId)) : planOccurrences;
+  const scopedOccurrences = managerScope ? planOccurrences.filter((occurrence) => managerScope.has(occurrence.scheduleId)) : planOccurrences;
+  // Plantão apagado antes da limpeza automática (05/11): suas datas futuras não aparecem nem aceitam edição.
+  const existingScheduleIds = await existingScheduleIdsOf(db, context.tenantId, scopedOccurrences.map((occurrence) => occurrence.scheduleId));
+  const viewNow = new Date();
+  const occurrences = scopedOccurrences.filter((occurrence) => existingScheduleIds.has(occurrence.scheduleId) || occurrenceEnded(occurrence, viewNow));
   const storedAssignments = asArray<StoredAssignment>(plan.assignments);
   // JSON entries linked to missing or inactive dated rows are stale, not live assignments.
-  const allAssignments = await livePlanAssignments(db, context.tenantId, storedAssignments, { occurrences, now: new Date() });
+  const shownIds = new Set(occurrences.map((occurrence) => occurrence.id));
+  const allAssignments = (await livePlanAssignments(db, context.tenantId, storedAssignments, { occurrences, now: new Date() })).filter((item) => shownIds.has(item.occurrenceId));
   const quotas = asArray<StoredQuota>(plan.quotas);
   const settings = parsePlanSettings(plan.settings);
   const brokerIds = [...new Set([...allAssignments.map((item) => item.brokerId), ...quotas.map((item) => item.brokerId), ...(settings?.brokers.map((item) => item.brokerId) ?? [])])];
@@ -405,6 +419,7 @@ function mergeSettings(previous: PlanSettings | null, input: Omit<PlanSettings, 
     rangeUntil: dates.at(-1)!,
     redrawFrom: redraw[0]!,
     redrawUntil: redraw.at(-1)!,
+    ...(previous?.excludedDates?.length ? { excludedDates: previous.excludedDates } : {}),
     typeKeys: [...new Set([...(previous?.typeKeys ?? []), ...input.typeKeys])],
     generatedTypeKeys: [...input.typeKeys],
     brokers: [...byBroker.values()].filter((broker) => Object.keys(broker.seats).length > 0),
@@ -452,7 +467,10 @@ export async function generateMonthlyDutyPlanAction(rawInput: unknown): Promise<
     const now = new Date();
     // Only shifts that have not ended yet: a past plantão is never staffed.
     const chosenSchedules = schedules.filter((schedule) => chosenKeys.has(typeKeyOf(schedule.typeId)));
-    const fresh = applyForcedBrokers(buildRangeOccurrences(rangeFrom, rangeUntil, chosenSchedules, brokers, { from: now }), settingsInput);
+    // Dias tirados da escala ("Tirar dia da escala") não ganham plantão ao gerar de novo.
+    const excludedDates = new Set(parsePlanSettings(latest?.settings)?.excludedDates ?? []);
+    const fresh = applyForcedBrokers(buildRangeOccurrences(rangeFrom, rangeUntil, chosenSchedules, brokers, { from: now }), settingsInput)
+      .filter((occurrence) => !excludedDates.has(occurrence.dutyDate));
     if (!fresh.length) throw new Error("Nenhum plantão desses tipos ainda vai acontecer no período escolhido.");
 
     // What the previous revision had outside this choice stays as it was.
@@ -1083,4 +1101,95 @@ export async function removeBrokerFromPublishedOccurrenceAction(input: unknown):
   const view = await buildPlanView(db, context, monthKey);
   if (!view) throw new Error("Proposta não encontrada.");
   return view;
+}
+
+
+const dayInput = z.object({ monthKey: monthSchema, dutyDate: dateSchema, restore: z.boolean().optional() });
+
+export type MonthlyDayResult = { ok: true; view: MonthlyDutyPlanView; message: string } | { ok: false; reason: string };
+
+/**
+ * "Tirar dia da escala" (05/11): tira de uma vez todos os plantÃµes de um dia (feriado, reuniÃ£o,
+ * plantÃ£o apagado) da escala do mÃªs. Na escala publicada, quem estava escalado sai e Ã© avisado;
+ * no rascunho, as vagas somem. O dia fica marcado como fora e nÃ£o volta ao gerar de novo.
+ * PlantÃ£o que jÃ¡ comeÃ§ou fica como estÃ¡. `restore` devolve o dia para a prÃ³xima geraÃ§Ã£o.
+ * Devolve o motivo em vez de lanÃ§ar erro: em produÃ§Ã£o o Next esconde a mensagem do erro.
+ */
+export async function setMonthlyDutyDayExcludedAction(rawInput: unknown): Promise<MonthlyDayResult> {
+  try {
+    const context = await writeScope();
+    const { monthKey, dutyDate, restore } = dayInput.parse(rawInput);
+    const db = getDatabase();
+    const outcome = await db.transaction(async (tx): Promise<{ error: string } | { message: string }> => {
+      await lockMonthlyDutyPlans(tx, context.tenantId);
+      const latest = await loadLatestPlan(tx, context.tenantId, monthKey);
+      if (!latest) return { error: "NÃ£o hÃ¡ escala neste mÃªs." };
+      const [published] = latest.status === "published"
+        ? [latest]
+        : await tx.select().from(schema.dutyScheduleMonthlyPlans)
+          .where(and(eq(schema.dutyScheduleMonthlyPlans.tenantId, context.tenantId), eq(schema.dutyScheduleMonthlyPlans.monthKey, monthKey), eq(schema.dutyScheduleMonthlyPlans.status, "published")))
+          .orderBy(desc(schema.dutyScheduleMonthlyPlans.revision))
+          .limit(1);
+      const plans = [latest, ...(published && published.id !== latest.id ? [published] : [])];
+      const now = new Date();
+      const day = `${dutyDate.slice(8, 10)}/${dutyDate.slice(5, 7)}`;
+      const withDay = (settings: unknown) => {
+        const parsed = parsePlanSettings(settings);
+        if (!parsed) return settings;
+        const dates = new Set(parsed.excludedDates ?? []);
+        if (restore) dates.delete(dutyDate); else dates.add(dutyDate);
+        return { ...parsed, excludedDates: [...dates].sort() };
+      };
+      if (restore) {
+        for (const plan of plans) {
+          await tx.update(schema.dutyScheduleMonthlyPlans).set({ settings: withDay(plan.settings), updatedAt: now }).where(eq(schema.dutyScheduleMonthlyPlans.id, plan.id));
+        }
+        await audit(tx, context.userId, latest.id, "duty_schedule_monthly_plan.day_restored");
+        return { message: `O dia ${day} volta na prÃ³xima vez que vocÃª gerar a escala.` };
+      }
+      let removedShifts = 0;
+      let startedShifts = 0;
+      for (const plan of plans) {
+        const planOccurrences = asArray<MonthlyPlanOccurrence>(plan.occurrences);
+        const onDay = planOccurrences.filter((occurrence) => occurrence.dutyDate === dutyDate);
+        startedShifts = Math.max(startedShifts, onDay.filter((occurrence) => occurrenceStarted(occurrence, now)).length);
+        const next = dropPlanOccurrences(planOccurrences, asArray<StoredAssignment>(plan.assignments), (occurrence) => occurrence.dutyDate === dutyDate && !occurrenceStarted(occurrence, now));
+        if (plan.status === "published") {
+          // Quem estava escalado de verdade nesse dia sai da escala e recebe o aviso.
+          for (const occurrence of onDay.filter((item) => next.droppedIds.has(item.id))) {
+            const rows = await tx.update(schema.dutyRosterAssignments).set({ status: "inactive", updatedBy: context.userId, updatedAt: now })
+              .where(and(
+                eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+                eq(schema.dutyRosterAssignments.scheduleId, occurrence.scheduleId),
+                eq(schema.dutyRosterAssignments.dutyDate, occurrence.dutyDate),
+                eq(schema.dutyRosterAssignments.monthlyPlanId, plan.id),
+                eq(schema.dutyRosterAssignments.status, "active"),
+              ))
+              .returning({ id: schema.dutyRosterAssignments.id, brokerId: schema.dutyRosterAssignments.brokerId });
+            for (const row of rows) {
+              await notifyPlantaoChange(tx, { tenantId: context.tenantId, brokerId: row.brokerId, kind: "removed", occurrence, scheduleName: occurrence.scheduleName, rosterId: row.id, now });
+            }
+          }
+        }
+        removedShifts = Math.max(removedShifts, next.droppedIds.size);
+        await tx.update(schema.dutyScheduleMonthlyPlans).set({ occurrences: next.occurrences, assignments: next.assignments, settings: withDay(plan.settings), updatedAt: now })
+          .where(eq(schema.dutyScheduleMonthlyPlans.id, plan.id));
+      }
+      if (!removedShifts && startedShifts) return { error: `Os plantÃµes de ${day} jÃ¡ comeÃ§aram. NÃ£o dÃ¡ para tirar esse dia agora.` };
+      await audit(tx, context.userId, latest.id, "duty_schedule_monthly_plan.day_excluded");
+      return {
+        message: removedShifts
+          ? `${day} saiu da escala (${removedShifts} ${removedShifts === 1 ? "plantÃ£o" : "plantÃµes"}).${startedShifts ? " Os que jÃ¡ comeÃ§aram ficaram." : ""} Ao gerar de novo, esse dia fica de fora.`
+          : `${day} fica de fora da escala ao gerar de novo.`,
+      };
+    });
+    if ("error" in outcome) return { ok: false, reason: outcome.error };
+    revalidatePath(PLANTAO_PATH);
+    revalidatePath("/minha-fila");
+    const view = await buildPlanView(db, context, monthKey);
+    if (!view) return { ok: false, reason: "NÃ£o foi possÃ­vel carregar a escala. Recarregue a pÃ¡gina." };
+    return { ok: true, view, message: outcome.message };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel tirar o dia da escala." };
+  }
 }
