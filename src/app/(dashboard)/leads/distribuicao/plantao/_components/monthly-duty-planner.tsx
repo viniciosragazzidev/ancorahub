@@ -20,6 +20,7 @@ import {
   addBrokerToPublishedOccurrenceAction,
   publishMonthlyDutyPlanAction,
   removeBrokerFromPublishedOccurrenceAction,
+  setMonthlyDutyDayExcludedAction,
   updateMonthlyDutyDraftAction,
   type MonthlyDutyPlanView,
 } from "@/features/lead-distribution/monthly-duty-actions";
@@ -191,6 +192,8 @@ export function MonthlyDutyPlanner({
   const [addingTo, setAddingTo] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [confirmPublish, setConfirmPublish] = useState(false);
+  // "Tirar dia da escala": o dia esperando confirmação.
+  const [confirmDay, setConfirmDay] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   // review filters
@@ -328,6 +331,27 @@ export function MonthlyDutyPlanner({
           toast.error(`${message} Carreguei a versão atual da escala.`);
           void load(month, true);
         } else toast.error(message);
+      } finally {
+        setBusyKey(null);
+      }
+    });
+  }
+
+  /** Tira (ou devolve) um dia inteiro da escala. A ação devolve o motivo em vez de lançar erro. */
+  function setDayExcluded(date: string, restore = false) {
+    setBusyKey(`day:${date}`);
+    startTransition(async () => {
+      try {
+        const result = await setMonthlyDutyDayExcludedAction({ monthKey: month, dutyDate: date, restore });
+        if (!result.ok) {
+          toast.error(result.reason);
+          return;
+        }
+        setPlan(result.view);
+        setConfirmDay(null);
+        toast.success(result.message);
+      } catch {
+        toast.error("Não foi possível alterar a escala. Recarregue a página e tente de novo.");
       } finally {
         setBusyKey(null);
       }
@@ -632,6 +656,21 @@ export function MonthlyDutyPlanner({
                         </div>
                       ))}
                     </dl>
+                    {plan.settings?.excludedDates?.length ? (
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground" aria-label="Dias fora da escala">
+                        <span>Dias fora da escala:</span>
+                        {plan.settings.excludedDates.map((date) => (
+                          <span key={date} className="inline-flex items-center gap-1 rounded-full border border-dashed border-border py-0.5 pl-2.5 pr-1 tabular-nums">
+                            <span className="line-through">{shortDate(date)}</span>
+                            {canEdit ? (
+                              <button type="button" disabled={pending} onClick={() => setDayExcluded(date, true)} className="rounded-full px-1.5 text-foreground hover:bg-muted disabled:opacity-50" aria-label={`Devolver ${shortDate(date)} para a escala`}>
+                                {busyKey === `day:${date}` ? <Loader2Icon className="size-3 animate-spin" /> : "Devolver"}
+                              </button>
+                            ) : null}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                     {plan.problems.length ? (
                       <div role="alert" className="flex gap-2 rounded-[var(--radius-card)] border border-destructive/30 bg-destructive/5 p-3 text-xs">
                         <Warning aria-hidden="true" className="size-4 shrink-0 text-destructive" />
@@ -725,7 +764,14 @@ export function MonthlyDutyPlanner({
                       </div>
                     ) : reviewDates.length ? reviewDates.map((date) => (
                       <section key={date} aria-label={dateLabel(date)} className="grid gap-2">
-                        <h4 className="text-xs font-semibold text-muted-foreground">{dateLabel(date)}</h4>
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="text-xs font-semibold text-muted-foreground">{dateLabel(date)}</h4>
+                          {canEdit && reviewOccurrences.some((occurrence) => occurrence.dutyDate === date && !occurrence.started) ? (
+                            <Button type="button" size="xs" variant="ghost" disabled={pending} onClick={() => setConfirmDay(date)} aria-label={`Tirar ${dateLabel(date)} da escala`}>
+                              <X className="size-3" /> Tirar dia
+                            </Button>
+                          ) : null}
+                        </div>
                         {reviewOccurrences.filter((occurrence) => occurrence.dutyDate === date).map((occurrence) => {
                           const key = typeKeyOfOccurrence(occurrence);
                           const info = typeInfo.get(key);
@@ -935,6 +981,25 @@ export function MonthlyDutyPlanner({
       </Dialog>
 
       {plan ? <EscalaPdfDialog key={plan.id} open={pdfOpen} onOpenChange={setPdfOpen} planId={plan.id} rangeFrom={plan.rangeFrom} rangeUntil={plan.rangeUntil} canChooseUnit={canEdit} branches={branches} types={allPlanTypeKeys.map((key) => ({ key, name: typeInfo.get(key)?.name ?? "Sem tipo" }))} /> : null}
+
+      <Dialog open={confirmDay !== null} onOpenChange={(open) => { if (!open) setConfirmDay(null); }}>
+        <DialogPopup>
+          <DialogHeader>
+            <DialogTitle>Tirar {confirmDay ? dateLabel(confirmDay) : ""} da escala?</DialogTitle>
+            <DialogDescription>
+              Todos os plantões desse dia saem da escala de {monthLabel(month)}.
+              {published || plan?.replacesPublished ? " Quem estava escalado sai e recebe um aviso." : ""}
+              {" "}Ao gerar a escala de novo, esse dia fica de fora. Plantão que já começou continua como está.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={pending} onClick={() => setConfirmDay(null)}>Voltar</Button>
+            <Button type="button" disabled={pending || !confirmDay} onClick={() => confirmDay && setDayExcluded(confirmDay)}>
+              {confirmDay && busyKey === `day:${confirmDay}` ? "Tirando…" : "Tirar dia"}
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
 
       <Dialog open={confirmPublish} onOpenChange={setConfirmPublish}>
         <DialogPopup>
