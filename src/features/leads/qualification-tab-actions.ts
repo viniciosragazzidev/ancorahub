@@ -1,5 +1,7 @@
 "use server";
 
+import { decidirCorretorNaMudancaDeEtapa } from "./qualification-stage-rules";
+
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -241,6 +243,8 @@ export async function manuallyChangeQualificationStageAction(input: {
         nome: schema.leads.nome,
         telefone: schema.leads.telefone,
         branchId: schema.leads.branchId,
+        corretorId: schema.leads.corretorId,
+        status: schema.leads.status,
       })
       .from(schema.leads)
       .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, context.tenantId)))
@@ -251,6 +255,17 @@ export async function manuallyChangeQualificationStageAction(input: {
     }
 
     const now = new Date();
+    // 05/11: a broker already holding the lead (offer accepted, service started) must not be removed by a
+    // qualification stage change from a stale board. Only an explicit broker choice reassigns.
+    const corretorAtual = lead.corretorId;
+    const decisao = decidirCorretorNaMudancaDeEtapa({
+      targetStage: input.targetStage,
+      corretorAtual,
+      brokerEscolhido: input.brokerId ?? null,
+    });
+    if (decisao.tipo === "bloquear") {
+      return { success: false, error: decisao.motivo };
+    }
 
     if (input.targetStage === "qualificacoes") {
       await db.transaction(async (tx) => {
@@ -284,8 +299,9 @@ export async function manuallyChangeQualificationStageAction(input: {
         });
       });
     } else if (input.targetStage === "qualificado" || input.targetStage === "humano") {
-      const brokerToAssign = input.brokerId || null;
+      const brokerToAssign = decisao.tipo === "manter" ? corretorAtual : input.brokerId || null;
       const isAssigned = Boolean(brokerToAssign);
+      const manterAtendimento = decisao.tipo === "manter";
       const chosenRating = input.rating ?? "qualified";
       const finalQualStatus = chosenRating === "not_qualified" ? "disqualified" : chosenRating;
 
@@ -296,12 +312,17 @@ export async function manuallyChangeQualificationStageAction(input: {
             qualificationStatus: finalQualStatus,
             qualificationState: "QUALIFIED",
             qualificationCompletedAt: now,
-            status: "distributed",
-            distributionStatus: isAssigned ? "assigned" : "queued",
-            corretorId: brokerToAssign,
-            assignmentSource: isAssigned ? "manual_override" : null,
-            distributionUpdatedAt: now,
-            assignedAt: isAssigned ? now : null,
+            // Same broker keeps the lead: only the qualification changes, the service stays where it is.
+            ...(manterAtendimento
+              ? {}
+              : {
+                  status: "distributed" as const,
+                  distributionStatus: isAssigned ? ("assigned" as const) : ("queued" as const),
+                  corretorId: brokerToAssign,
+                  assignmentSource: isAssigned ? "manual_override" : null,
+                  distributionUpdatedAt: now,
+                  assignedAt: isAssigned ? now : null,
+                }),
             updatedAt: now,
           })
           .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
@@ -325,7 +346,9 @@ export async function manuallyChangeQualificationStageAction(input: {
         });
       });
 
-      if (brokerToAssign) {
+      if (manterAtendimento) {
+        // Nothing to notify or distribute: the lead stays with the broker who already has it.
+      } else if (brokerToAssign) {
         void notifyNewLead(
           lead.id,
           context.tenantId,
