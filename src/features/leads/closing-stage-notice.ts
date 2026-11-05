@@ -19,16 +19,15 @@ import {
  * lead and broker, through the unique idempotency keys. Never throws: the
  * status change is already saved.
  */
-export async function notifyBrokerClosingStage(input: {
+async function deliverBrokerClosingStageNotice(input: {
   tenantId: string;
   leadId: string;
   leadName: string | null;
   brokerId: string | null;
-  previousStatus: string;
-  newStatus: string;
+  requestedBy?: string | null;
 }) {
   const brokerId = input.brokerId;
-  if (!brokerId || !entersClosingStage(input.previousStatus, input.newStatus)) return { notified: false as const };
+  if (!brokerId) return { notified: false as const };
   const key = closingStageNoticeKey(input.leadId, brokerId);
   try {
     const [broker] = await getDatabase()
@@ -48,7 +47,7 @@ export async function notifyBrokerClosingStage(input: {
           destinationPhone: phone,
           purpose: "leadClosingStage",
           variables: closingStageNoticeVariables({ brokerName: broker?.name ?? null, leadName: input.leadName, leadId: input.leadId }),
-          requestedBy: null,
+          requestedBy: input.requestedBy ?? null,
           idempotencyKey: key,
         }).then((queued) => (queued.duplicate || (queued.status as string) === "skipped"
           ? null
@@ -75,4 +74,27 @@ export async function notifyBrokerClosingStage(input: {
     console.error("[closing-stage] failed", { leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
     return { notified: false as const };
   }
+}
+
+export async function notifyBrokerClosingStage(input: {
+  tenantId: string;
+  leadId: string;
+  leadName: string | null;
+  brokerId: string | null;
+  previousStatus: string;
+  newStatus: string;
+}) {
+  if (!input.brokerId || !entersClosingStage(input.previousStatus, input.newStatus)) return { notified: false as const };
+  return deliverBrokerClosingStageNotice(input);
+}
+
+/** Explicit, audited recovery for a lead already in a closing stage before the notice existed. */
+export async function manuallyNotifyBrokerClosingStage(input: {
+  tenantId: string;
+  leadId: string;
+  leadName: string | null;
+  brokerId: string | null;
+  requestedBy: string;
+}) {
+  return deliverBrokerClosingStageNotice(input);
 }

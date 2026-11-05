@@ -13,6 +13,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LeadStatusSelector } from "@/features/leads/components/lead-status-selector";
+import { SendMissedClosingNoticeButton } from "@/features/leads/components/send-missed-closing-notice-button";
 import { LeadTimeline } from "@/features/leads/components/lead-timeline";
 import { LeadTasks } from "@/features/leads/components/lead-tasks";
 import { LeadChat } from "@/features/leads/components/lead-chat";
@@ -21,6 +22,10 @@ import { getLeadTimeline } from "@/features/leads/queries";
 import { getLeadProductLabel, readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
+import { hasEffectiveCapability } from "@/features/custom-roles/service";
+import { closingStageNoticeKey, CLOSING_STAGE_STATUSES } from "@/features/leads/closing-stage-notice-core";
+import { teamNoticeByKey } from "@/features/team-notices/catalog";
+import { getTeamNoticeSetting } from "@/features/team-notices/service";
 import { getDatabase, schema } from "@/shared/db";
 import { brokerGreeting, greetingFactsFromLead } from "@/features/leads/broker-greeting";
 import { StartServiceButton } from "./start-service-button";
@@ -212,6 +217,39 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
     .limit(1);
 
   if (!lead) notFound();
+
+  const canSendMissedClosingNotice = context.role === "director"
+    && Boolean(lead.corretorId)
+    && CLOSING_STAGE_STATUSES.has(lead.status)
+    && await hasEffectiveCapability({
+      tenantId: context.tenantId,
+      role: context.role,
+      jobTitle: context.jobTitle,
+      customRoleId: context.customRoleId ?? null,
+      permission: "alterar_status_lead",
+    });
+  let showMissedClosingNoticeAction = false;
+  if (canSendMissedClosingNotice && lead.corretorId) {
+    const notice = teamNoticeByKey("LEAD_CLOSING_STAGE");
+    const setting = notice ? await getTeamNoticeSetting(context.tenantId, notice) : null;
+    if (setting?.enabled) {
+      const [brokerProfile] = await db.select({ phone: schema.brokerProfiles.phone })
+        .from(schema.brokerProfiles)
+        .where(and(
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+          eq(schema.brokerProfiles.userId, lead.corretorId),
+        )).limit(1);
+      if (brokerProfile?.phone?.trim()) {
+        const [existingNotice] = await db.select({ id: schema.whatsappOutboundMessages.id })
+          .from(schema.whatsappOutboundMessages)
+          .where(and(
+            eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
+            eq(schema.whatsappOutboundMessages.idempotencyKey, closingStageNoticeKey(lead.id, lead.corretorId)),
+          )).limit(1);
+        showMissedClosingNoticeAction = !existingNotice;
+      }
+    }
+  }
   if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
     const [timeline, supplements] = await Promise.all([
       getLeadTimeline(id),
@@ -642,6 +680,9 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                   {canDirectorMarkLeadInService({ role: context.role, corretorId: lead.corretorId, status: lead.status }) ? (
                     <MarkLeadInServiceButton leadId={lead.id} brokerName={lead.corretorNome} />
                   ) : null}
+                  {showMissedClosingNoticeAction && lead.corretorNome ? (
+                    <SendMissedClosingNoticeButton leadId={lead.id} brokerName={lead.corretorNome} />
+                  ) : null}
                   {(lead.corretorId ? (context.userId === lead.corretorId && lead.status !== "distributed") : (context.role !== "broker")) ? (
                     <LeadStatusSelector
                       leadId={lead.id}
@@ -789,6 +830,9 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
               )}
               {canDirectorMarkLeadInService({ role: context.role, corretorId: lead.corretorId, status: lead.status }) ? (
                 <MarkLeadInServiceButton leadId={lead.id} brokerName={lead.corretorNome} />
+              ) : null}
+              {showMissedClosingNoticeAction && lead.corretorNome ? (
+                <SendMissedClosingNoticeButton leadId={lead.id} brokerName={lead.corretorNome} />
               ) : null}
               <Badge className={slaUrgent ? "border-warning/30 bg-warning/[0.08] text-warning" : "border-border/80"} variant="outline">
                 {lead.status === "distributed" ? `SLA: ${remainingMinutes > 0 ? `expira em ${remainingMinutes}min` : "expirado"}` : "SLA em acompanhamento"}
