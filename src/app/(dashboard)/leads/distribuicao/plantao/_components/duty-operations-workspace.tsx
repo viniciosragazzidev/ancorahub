@@ -255,7 +255,12 @@ function DutyFormSheet({
   const initialDate = schedule ? singleDutyDate(schedule) ?? dateInputValue(schedule.validFrom) : defaultStartDate ?? dateInputValue(new Date());
   const [rangeFrom, setRangeFrom] = useState(initialDate);
   const [rangeUntil, setRangeUntil] = useState(initialDate);
-  const plannedDates = useMemo(() => (mode === "dates" && !schedule ? datesInRange(rangeFrom, rangeUntil, selectedDays) : []), [mode, rangeFrom, rangeUntil, schedule, selectedDays]);
+  const rangeDates = useMemo(() => (mode === "dates" && !schedule ? datesInRange(rangeFrom, rangeUntil, selectedDays) : []), [mode, rangeFrom, rangeUntil, schedule, selectedDays]);
+  // Dias tirados antes de criar (feriado, reunião...): esses dias não ganham plantão.
+  const [excludedDates, setExcludedDates] = useState<string[]>([]);
+  const plannedDates = useMemo(() => rangeDates.filter((date) => !excludedDates.includes(date)), [excludedDates, rangeDates]);
+  const excludedInRange = useMemo(() => rangeDates.filter((date) => excludedDates.includes(date)), [excludedDates, rangeDates]);
+  const toggleExcludedDate = (date: string) => setExcludedDates((current) => (current.includes(date) ? current.filter((item) => item !== date) : [...current, date]));
   // Only offered at creation: picking a queue here is a shortcut for the same
   // "Exclusividade de Plantão" checklist the queue editor already has.
   // The queue that receives this plantão (kept in sync with Filas → Exclusividade de Plantão).
@@ -442,12 +447,34 @@ function DutyFormSheet({
                     </div>
                     <div className="grid gap-1.5">
                       <p className="text-xs text-muted-foreground">
-                        {tooManyDates ? "Escolha no máximo 93 dias (cerca de 3 meses) por vez." : plannedDates.length ? `Serão criados ${plannedDates.length} ${plannedDates.length === 1 ? "plantão de um dia" : "plantões de um dia cada"}:` : "Nenhum dia selecionado no período."}
+                        {tooManyDates ? "Escolha no máximo 93 dias (cerca de 3 meses) por vez." : plannedDates.length ? `Serão criados ${plannedDates.length} ${plannedDates.length === 1 ? "plantão de um dia" : "plantões de um dia cada"}:` : rangeDates.length ? "Todos os dias do período foram tirados." : "Nenhum dia selecionado no período."}
                       </p>
-                      {plannedDates.length && !tooManyDates ? (
-                        <div className="flex max-h-24 flex-wrap gap-1 overflow-y-auto">
-                          {plannedDates.map((date) => <Badge key={date} variant="outline" className="font-normal tabular-nums">{dateTag(date)}</Badge>)}
-                        </div>
+                      {rangeDates.length && !tooManyDates ? (
+                        <>
+                          <div className="flex max-h-28 flex-wrap gap-1 overflow-y-auto" role="group" aria-label="Dias que terão plantão">
+                            {rangeDates.map((date) => {
+                              const excluded = excludedDates.includes(date);
+                              return (
+                                <button
+                                  key={date}
+                                  type="button"
+                                  aria-pressed={!excluded}
+                                  aria-label={`${dateTag(date)}: ${excluded ? "fora, sem plantão" : "com plantão"}`}
+                                  title={excluded ? "Clique para devolver o plantão neste dia" : "Clique para tirar este dia (feriado, reunião...)"}
+                                  onClick={() => toggleExcludedDate(date)}
+                                  className={cn("rounded-full border px-2 py-0.5 text-xs tabular-nums transition-colors", excluded ? "border-dashed border-border bg-muted/40 text-muted-foreground line-through" : "border-border bg-card text-foreground hover:bg-muted/40")}
+                                >
+                                  {dateTag(date)}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            {excludedInRange.length
+                              ? `${excludedInRange.length} ${excludedInRange.length === 1 ? "dia fora" : "dias fora"}, sem plantão: ${excludedInRange.map(dateTag).join(", ")}.`
+                              : "Tem feriado, reunião ou outro dia sem plantão? Clique no dia para tirá-lo antes de criar."}
+                          </p>
+                        </>
                       ) : null}
                     </div>
                   </>
