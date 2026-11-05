@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { runQualificationTimeoutSweep, runSlaSweep, runColdLeadRequalificationSweep, attendanceFlowsEnabled, wakeDueRuns } = vi.hoisted(() => ({
+const { runQualificationTimeoutSweep, runUnansweredInboundRecovery, runSlaSweep, runColdLeadRequalificationSweep, attendanceFlowsEnabled, wakeDueRuns } = vi.hoisted(() => ({
   runQualificationTimeoutSweep: vi.fn(),
+  runUnansweredInboundRecovery: vi.fn(),
   runSlaSweep: vi.fn(),
   runColdLeadRequalificationSweep: vi.fn(),
   attendanceFlowsEnabled: vi.fn(),
@@ -16,18 +17,20 @@ vi.mock("@/features/attendance-flows/handlers", () => ({ flowEffectHandlers: () 
 vi.mock("@/features/ai-agent/qualification-timeout-sweep", () => ({
   runQualificationTimeoutSweep,
 }));
+vi.mock("@/features/ai-agent/unanswered-recovery", () => ({ runUnansweredInboundRecovery }));
 
 vi.mock("@/features/leads/sla", () => ({
   runSlaSweep,
 }));
 vi.mock("@/features/ai-qualification/cold-lead-requalification", () => ({ runColdLeadRequalificationSweep }));
 
-import { GET } from "./route";
+import { GET, maxDuration } from "./route";
 
 describe("qualification timeout internal job", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.stubEnv("CRON_SECRET", "test-cron-secret");
+    runUnansweredInboundRecovery.mockResolvedValue({ candidates: 0, answered: 0 });
   });
 
   it("rejects requests without the internal scheduler credential", async () => {
@@ -38,7 +41,15 @@ describe("qualification timeout internal job", () => {
   });
 
   it("runs the timeout sweep only after scheduler authentication", async () => {
-    runQualificationTimeoutSweep.mockResolvedValue({ tenantsChecked: 1, timedOutLeads: 2, distributedLeads: 2 });
+    const order: string[] = [];
+    runQualificationTimeoutSweep.mockImplementation(async () => {
+      order.push("timeout");
+      return { tenantsChecked: 1, timedOutLeads: 2, distributedLeads: 2 };
+    });
+    runUnansweredInboundRecovery.mockImplementation(async () => {
+      order.push("recovery");
+      return { candidates: 1, answered: 1 };
+    });
     runSlaSweep.mockResolvedValue({ tenants: 1, unworked: 0, warnings: 0, stalled: 0, notifications: 0 });
     runColdLeadRequalificationSweep.mockResolvedValue({ tenantsChecked: 1, candidates: 1, queued: 1, sent: 0, blocked: 0 });
     attendanceFlowsEnabled.mockResolvedValue(true);
@@ -55,7 +66,11 @@ describe("qualification timeout internal job", () => {
       slaResult: { tenants: 1, unworked: 0, warnings: 0, stalled: 0, notifications: 0 },
       attendanceRuns: 3,
       coldLeadRequalification: { tenantsChecked: 1, candidates: 1, queued: 1, sent: 0, blocked: 0 },
+      unansweredRecovery: { candidates: 1, answered: 1 },
     });
+    expect(order).toEqual(["timeout", "recovery"]);
+    expect(runUnansweredInboundRecovery).toHaveBeenCalledWith({ deadlineAt: expect.any(Number) });
+    expect(maxDuration).toBe(60);
   });
 
   it("does not wake attendance flows while their switch is off", async () => {
