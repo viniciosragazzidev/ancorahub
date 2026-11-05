@@ -357,6 +357,8 @@ export type PairingCodePanelProps = {
   expired: boolean;
   onGenerate: () => void;
   onOpenWhatsApp: () => void;
+  /** Esconde Copiar/Abrir (a tela de presença tem um botão só para os dois). */
+  hideActions?: boolean;
 };
 
 export function PairingCodePanel({
@@ -369,6 +371,7 @@ export function PairingCodePanel({
   expired,
   onGenerate,
   onOpenWhatsApp,
+  hideActions = false,
 }: PairingCodePanelProps) {
   const [editing, setEditing] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
@@ -408,7 +411,7 @@ export function PairingCodePanel({
                 para <span className="font-medium tabular-nums text-ds-charcoal">+55 {formatPairingPhone(phone)}</span>
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-ds-8">
+            <div className={hideActions ? "hidden" : "grid grid-cols-2 gap-ds-8"}>
               <Button variant="outline" size="sm" onClick={copy} aria-label={copied ? PAIRING_CODE_CAPTIONS.copied : PAIRING_CODE_CAPTIONS.copy}>
                 <CopyCheckIcon copied={copied}><Copy className="size-4" aria-hidden /></CopyCheckIcon>
                 {copied ? "Copiado" : "Copiar"}

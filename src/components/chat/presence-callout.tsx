@@ -262,7 +262,7 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
           initial={whatsapp.connection}
           open={whatsapp.open}
           initialMethod="code"
-          showCodeTutorial
+          variant="presence"
           triggerLabel="Conectar WhatsApp"
           onOpenChange={(open) => setWhatsapp((current) => (current ? { ...current, open } : current))}
           onReady={() => continueAfterConnected(state.kind === "whatsapp" ? state.photo : null)}

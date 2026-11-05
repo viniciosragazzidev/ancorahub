@@ -15,8 +15,8 @@ const connection = { tenantId: "t1", userId: "u1", sessionId: "s1", sessionName:
 vi.mock("@/app/(dashboard)/settings/whatsapp-actions", () => ({ getWhatsAppConnection: async () => connection }));
 // O diálogo real conversa com o WhatsApp; aqui basta saber que abriu no código e avisar "conectado".
 vi.mock("@/components/whatsapp/whatsapp-connect-dialog", () => ({
-  WhatsAppConnectDialog: (props: { open?: boolean; initialMethod?: string; showCodeTutorial?: boolean; onReady?: () => void }) => props.open
-    ? <div role="dialog" aria-label="Conectar WhatsApp"><p>modo {props.initialMethod}{props.showCodeTutorial ? " com tutorial" : ""}</p><button type="button" onClick={props.onReady}>Simular conectado</button></div>
+  WhatsAppConnectDialog: (props: { open?: boolean; initialMethod?: string; variant?: string; onReady?: () => void }) => props.open
+    ? <div role="dialog" aria-label="Conectar WhatsApp"><p>modo {props.initialMethod} {props.variant}</p><button type="button" onClick={props.onReady}>Simular conectado</button></div>
     : null,
 }));
 
@@ -43,7 +43,7 @@ describe("PresenceCallout: WhatsApp obrigatório (06/11)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirmar presença" }));
 
     expect(await screen.findByRole("dialog", { name: "Conectar WhatsApp" })).toBeTruthy();
-    expect(screen.getByText("modo code com tutorial")).toBeTruthy();
+    expect(screen.getByText("modo code presence")).toBeTruthy();
     expect(screen.getByText(/conecte o seu WhatsApp/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Conectar WhatsApp e confirmar" })).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();

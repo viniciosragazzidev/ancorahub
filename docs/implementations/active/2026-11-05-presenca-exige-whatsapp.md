@@ -80,3 +80,21 @@ cartão `presence-callout.tsx` (carrega a conexão só quando precisa), `WhatsAp
 ## Critério de pronto
 A partir de 06/11, ninguém confirma presença sem WhatsApp conectado, nem pelo app nem pelo link; quem não está
 conectado conecta pelo código, com o tutorial, e a presença é confirmada sem novo toque.
+
+## Ajuste de 05/11 (tarde): tela guiada e enxuta
+
+Pedido do Vinicios: bem guiado, simples, com o botão já abrindo o WhatsApp, animação mostrando como é fácil,
+tela limpa, e mensagem de vantagens com a garantia de que conversa pessoal não é monitorada.
+
+- `WhatsAppConnectDialog variant="presence"` usa as telas de `presence-whatsapp-screens.tsx`:
+  1. **Vantagens** (3 linhas) + **"Suas conversas pessoais são só suas"** + um botão "Gerar meu código".
+  2. **Código** grande + um botão "Copiar código e abrir o WhatsApp" + celular animado (`pairing-code-demo.tsx`)
+     com os toques; o passo a passo em texto fica escondido em "Ver passo a passo". Com o número no cadastro, o
+     código sai sozinho.
+  3. **Conectado** → a presença é confirmada sozinha.
+- Texto de privacidade conferido no código (05/11): `waha-cadence/inbound.ts` descarta mensagem de contato que não
+  é lead nem cliente do corretor; grupos e status são ignorados; a IA só lê conversa ligada a um lead; gestores
+  só veem conversas de leads. Por isso o texto diz "não são salvas nem lidas", e não "nem passam pelo sistema".
+- Removido o aviso "WhatsApp para os leads do plantão a partir de 20/10" (banner diário no layout e lembrete fixo na
+  conversa com o Jack). A flag `feature_whatsapp_plantao_notice_enabled` ficou sem uso na tela.
+- Preview só em desenvolvimento: `/dev/presenca-whatsapp`.
