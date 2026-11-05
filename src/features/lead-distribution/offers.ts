@@ -343,7 +343,7 @@ export async function createLeadOffersForBrokers(input: {
       if (lockedLead.firstContactAt || lockedLead.serviceStartedAt || !["new", "distributed"].includes(lockedLead.status)) return null;
       if (input.assignmentSource === "manual_offer" && (
         lockedLead.archivedAt || lockedLead.deletedAt ||
-        !["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lockedLead.status)
+        !["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(lockedLead.status)
       )) return null;
 
       const commitOffer = async () => {
@@ -505,7 +505,7 @@ export async function createLeadOffersForBrokers(input: {
                 eq(schema.leads.tenantId, input.tenantId),
                 eq(schema.leads.queueId, input.queueId!),
                 eq(schema.leads.corretorId, broker.id),
-                inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]),
+                inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"]),
                 isNull(schema.leads.deletedAt),
                 isNull(schema.leads.archivedAt),
                 ne(schema.leads.id, input.leadId),
@@ -1299,7 +1299,7 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
               eq(schema.leads.assignmentSource, "manual_offer"),
               isNull(schema.leads.deletedAt),
               isNull(schema.leads.archivedAt),
-              inArray(schema.leads.status, ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]),
+              inArray(schema.leads.status, ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"]),
             ))
             .returning({ id: schema.leads.id })
         : [];

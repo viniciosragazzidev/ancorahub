@@ -48,7 +48,8 @@ export const customRoleStatusValues = ["draft", "active", "archived"] as const;
 export const customRoleScopeValues = ["none", "own", "branch", "tenant"] as const;
 export const teamJobTitleValues = ["director", "manager", "supervisor", "broker", "marketing", "finance", "operations", "support"] as const;
 export const userStatusValues = ["pending", "active", "disabled"] as const;
-export const leadStatusValues = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"] as const;
+/** `awaiting_reply` ("Aguardando retorno", 05/11): o cliente parou de responder; sai da lista ativa e volta se ele responder. */
+export const leadStatusValues = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"] as const;
 export const leadOriginValues = ["manual", "webhook"] as const;
 export const leadDistributionStatusValues = ["unassigned", "awaiting_unit", "queued", "assigning", "assigned", "distribution_failed", "returned_to_queue"] as const;
 export const leadDistributionOriginValues = ["parent", "unit"] as const;
@@ -413,6 +414,10 @@ export const leads = pgTable(
     serviceStartedAt: timestamp("service_started_at", { withTimezone: true }),
     serviceStartedBy: text("service_started_by").references(() => user.id),
     stageEnteredAt: timestamp("stage_entered_at", { withTimezone: true }).notNull().defaultNow(),
+    /** "Manter na etapa" (05/11): a regra de chat parado não mexe no lead até esta data. */
+    stageHoldUntil: timestamp("stage_hold_until", { withTimezone: true }),
+    /** Etapa em que o lead estava ao ir para "Aguardando retorno": ele volta para ela se o cliente responder. */
+    stageBeforeAwaiting: leadStatus("stage_before_awaiting"),
     consentimentoLgpd: boolean("consentimento_lgpd").notNull().default(false),
     formData: jsonb("form_data").notNull().default({}),
     motivoPerda: text("motivo_perda"),
@@ -691,6 +696,70 @@ export const leadDistributionEvents = pgTable(
     createdAt,
   },
   (table) => [index("lead_distribution_events_tenant_lead_idx").on(table.tenantId, table.leadId, table.createdAt)],
+);
+
+/**
+ * Histórico de etapas (05/11, funil profissional): uma linha por mudança de etapa, com quem mudou, por quê,
+ * quanto tempo o lead ficou na etapa anterior e a origem do lead no momento. Plano:
+ * docs/implementations/active/2026-11-05-etapas-e-funil.md
+ */
+export const leadStageHistory = pgTable(
+  "lead_stage_history",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    fromStatus: leadStatus("from_status"),
+    toStatus: leadStatus("to_status").notNull(),
+    changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
+    /** broker | manager | director | supervisor | ai | rule | system */
+    actorType: text("actor_type").notNull(),
+    actorUserId: text("actor_user_id"),
+    reason: text("reason"),
+    lossCode: text("loss_code"),
+    secondsInPrevious: integer("seconds_in_previous"),
+    branchId: text("branch_id"),
+    queueId: text("queue_id"),
+    sourceChannel: text("source_channel"),
+    metaCampaignId: text("meta_campaign_id"),
+    metaAdId: text("meta_ad_id"),
+    metaFormId: text("meta_form_id"),
+    /** Linha reconstruída do passado (lead_interactions / audit_logs), não registrada na hora. */
+    backfilled: boolean("backfilled").notNull().default(false),
+  },
+  (table) => [
+    index("lead_stage_history_tenant_changed_idx").on(table.tenantId, table.changedAt),
+    index("lead_stage_history_lead_idx").on(table.leadId, table.changedAt),
+  ],
+);
+
+/**
+ * Marcos do funil por lead (05/11): chegou, mensagens, cada pergunta da qualificação, qualificado,
+ * corretor, etapas, perdido/vendido. `dedupeKey` evita contar duas vezes o mesmo marco.
+ */
+export const leadFunnelEvents = pgTable(
+  "lead_funnel_events",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    event: text("event").notNull(),
+    stepKey: text("step_key"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    dedupeKey: text("dedupe_key"),
+    metadata: jsonb("metadata").notNull().default({}),
+    queueId: text("queue_id"),
+    branchId: text("branch_id"),
+    sourceChannel: text("source_channel"),
+    metaCampaignId: text("meta_campaign_id"),
+    metaAdId: text("meta_ad_id"),
+    metaFormId: text("meta_form_id"),
+  },
+  (table) => [
+    index("lead_funnel_events_tenant_event_idx").on(table.tenantId, table.event, table.occurredAt),
+    index("lead_funnel_events_lead_idx").on(table.leadId, table.occurredAt),
+    uniqueIndex("lead_funnel_events_dedupe_unique").on(table.tenantId, table.dedupeKey),
+  ],
 );
 
 export const leadDistributionJobs = pgTable(

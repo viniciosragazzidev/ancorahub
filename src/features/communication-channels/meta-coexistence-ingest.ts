@@ -26,7 +26,7 @@ async function findLeadAndClient(tenantId: string, customerPhone: string) {
   const [lead] = await db.select({ id: schema.leads.id })
     .from(schema.leads)
     .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt), sql`regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g') LIKE ${"%" + suffix}`))
-    .orderBy(sql`case when ${schema.leads.status} in ('in_contact','quote_sent','negotiation','documentation_pending','under_analysis') then 0 else 1 end`)
+    .orderBy(sql`case when ${schema.leads.status} in ('in_contact','quote_sent','negotiation','documentation_pending','under_analysis', 'awaiting_reply') then 0 else 1 end`)
     .limit(1);
   const [client] = await db.select({ id: schema.clients.id })
     .from(schema.clients)

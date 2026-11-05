@@ -142,13 +142,13 @@ export async function backfillBrokerMetricDailySnapshots(now = new Date()): Prom
     ),
     state_rollup as (
       select m.tenant_id, m.broker_id,
-        count(distinct l.id) filter (where l.status in ('new', 'distributed', 'in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis'))::int as active_leads,
+        count(distinct l.id) filter (where l.status in ('new', 'distributed', 'in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis', 'awaiting_reply'))::int as active_leads,
         count(task.id) filter (where task.completed_at is null and task.due_at < ${now}::timestamptz)::int as overdue_returns,
         count(task.id) filter (where task.completed_at is null and task.due_at < ${now}::timestamptz and task.priority = 'urgent')::int as critical_overdue_returns,
-        count(l.id) filter (where l.status in ('in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis') and task.id is null)::int as leads_without_next_action
+        count(l.id) filter (where l.status in ('in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis', 'awaiting_reply') and task.id is null)::int as leads_without_next_action
       from missing m
       left join leads l on l.tenant_id = m.tenant_id and l.corretor_id = m.broker_id and l.deleted_at is null and l.archived_at is null
-        and l.status in ('new', 'distributed', 'in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis')
+        and l.status in ('new', 'distributed', 'in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis', 'awaiting_reply')
       left join lead_tasks task on task.tenant_id = m.tenant_id and task.lead_id = l.id and task.completed_at is null
       where m.snapshot_day = (select latest_day from clock)
       group by m.tenant_id, m.broker_id

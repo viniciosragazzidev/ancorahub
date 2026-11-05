@@ -38,6 +38,7 @@ const ENGAGED_LEAD_STATUSES = new Set([
   "negotiation",
   "documentation_pending",
   "under_analysis",
+  "awaiting_reply",
 ]);
 
 /**

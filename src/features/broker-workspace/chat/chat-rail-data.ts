@@ -76,7 +76,7 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
           unassigned: waiting,
           activeBrokers: data.team.length,
           brokersWithoutWhatsApp: data.brokersWithoutWhatsApp,
-          inService: data.leads.filter((lead) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)).length,
+          inService: data.leads.filter((lead) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(lead.status)).length,
           late,
         },
       };

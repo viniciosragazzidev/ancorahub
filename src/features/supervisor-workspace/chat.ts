@@ -103,7 +103,7 @@ export function buildSupervisorLeadThreads(data: SupervisorWorkspaceData, now: D
   });
 }
 
-const TEAM_STATUS_LABEL: Record<string, string> = { new: "novo", distributed: "aguardando contato", in_contact: "em atendimento", quote_sent: "cotação enviada", negotiation: "em negociação", documentation_pending: "documentação", under_analysis: "em análise" };
+const TEAM_STATUS_LABEL: Record<string, string> = { new: "novo", distributed: "aguardando contato", in_contact: "em atendimento", quote_sent: "cotação enviada", negotiation: "em negociação", documentation_pending: "documentação", under_analysis: "em análise", awaiting_reply: "aguardando retorno" };
 
 export type TeamLeadForThread = {
   id: string; name: string; status: string; ownerId: string | null; ownerName: string | null;

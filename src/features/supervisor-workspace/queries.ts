@@ -11,7 +11,7 @@ import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 
 const WAITING = ["new", "distributed"] as const;
-const IN_SERVICE = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
+const IN_SERVICE = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 const TIME_ZONE = "America/Sao_Paulo";
 
 export type TeamBroker = {

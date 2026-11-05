@@ -7,7 +7,7 @@ import { publishNotification } from "@/features/notifications/send-push-helper";
 import { enqueueMetaTemplateMessage } from "@/features/communication-channels/outbound-service";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 
-const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
+const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 const MAX_DAILY_FEEDBACK_REMINDERS = 2;
 
 export type FeedbackReminderResult = {

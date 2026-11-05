@@ -14,6 +14,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LeadStatusSelector } from "@/features/leads/components/lead-status-selector";
 import { SendMissedClosingNoticeButton } from "@/features/leads/components/send-missed-closing-notice-button";
+import { AwaitingReplyBanner } from "@/features/leads/components/awaiting-reply-banner";
+import { KeepStageButton } from "@/features/leads/components/keep-stage-button";
 import { canManagementRegisterSale } from "@/features/post-sale/register-sale-access";
 import { cargoAllowsRegisterSale } from "@/features/post-sale/register-sale-access-server";
 import { RegisterSaleButton } from "./register-sale-button";
@@ -163,6 +165,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
     .select({
       id: schema.leads.id,
       nome: schema.leads.nome,
+      stageBeforeAwaiting: schema.leads.stageBeforeAwaiting,
       telefone: schema.leads.telefone,
       email: schema.leads.email,
       origem: schema.leads.origem,
@@ -345,6 +348,11 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       .limit(1)
     : Promise.resolve([]);
 
+  // Aguardando retorno (05/11): faixa e "Manter na etapa" para o corretor do lead e a gestão.
+  const awaitingPreviousLabel = lead.stageBeforeAwaiting ? (LEAD_STATUS_LABELS[lead.stageBeforeAwaiting] ?? null) : null;
+  const canKeepStage = lead.corretorId === context.userId || context.role === "director" || (context.role === "manager" && lead.branchId === context.branchId);
+  const awaitingBanner = lead.status === "awaiting_reply" ? <AwaitingReplyBanner leadId={lead.id} previousLabel={awaitingPreviousLabel} canKeep={canKeepStage} /> : null;
+
   if (isLightBroker) {
     // Phone and e-mail leave the server only after this broker accepted the lead.
     const lightContact = lightContactFields(lead, { status: lead.status, isCurrentBroker: lead.corretorId === context.userId });
@@ -493,6 +501,8 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       const lastClient = waMessages.find((message) => message.sentAt && !isOutboundMessage(message.direction));
       const lastBroker = waMessages.find((message) => message.sentAt && isOutboundMessage(message.direction) && message.senderRole !== "assistant");
       return (
+        <>
+        {awaitingBanner}
         <LightLeadDetail
           variant="panel"
           lead={lightLead}
@@ -515,10 +525,13 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
           commercialValuesEnabled={commercialValuesEnabled}
           quotePlans={quotePlans}
         />
+        </>
       );
     }
 
     return (
+      <>
+      {awaitingBanner}
       <LightLeadDetail
         lead={lightLead}
         brokerName={brokerUser?.name || "Corretor"}
@@ -538,6 +551,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
         commercialValuesEnabled={commercialValuesEnabled}
         quotePlans={quotePlans}
       />
+      </>
     );
   }
   const formData = readFormData(lead.formData);
@@ -690,6 +704,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                   {showMissedClosingNoticeAction && lead.corretorNome ? (
                     <SendMissedClosingNoticeButton leadId={lead.id} brokerName={lead.corretorNome} />
                   ) : null}
+                  {lead.status === "awaiting_reply" && canKeepStage ? <KeepStageButton leadId={lead.id} previousLabel={awaitingPreviousLabel} size="xs" /> : null}
                   {(lead.corretorId ? (context.userId === lead.corretorId && lead.status !== "distributed") : (context.role !== "broker")) ? (
                     <LeadStatusSelector
                       leadId={lead.id}
@@ -842,6 +857,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
               {showMissedClosingNoticeAction && lead.corretorNome ? (
                 <SendMissedClosingNoticeButton leadId={lead.id} brokerName={lead.corretorNome} />
               ) : null}
+              {lead.status === "awaiting_reply" && canKeepStage ? <KeepStageButton leadId={lead.id} previousLabel={awaitingPreviousLabel} /> : null}
               <Badge className={slaUrgent ? "border-warning/30 bg-warning/[0.08] text-warning" : "border-border/80"} variant="outline">
                 {lead.status === "distributed" ? `SLA: ${remainingMinutes > 0 ? `expira em ${remainingMinutes}min` : "expirado"}` : "SLA em acompanhamento"}
               </Badge>

@@ -230,7 +230,7 @@ export function SupervisionPanel({
 
   // Chave do diretor: mesmo painel e mesmas ações, só com o visual Lite (sem caixa alta, tokens, raios concêntricos).
   const litePage = useDirectorLitePage();
-  const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(displayedAssignment.status);
+  const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(displayedAssignment.status);
   const canResend = Boolean(displayedAssignment.ownerId) && !serviceStartedAt && ["new", "distributed"].includes(displayedAssignment.status);
 
   return (

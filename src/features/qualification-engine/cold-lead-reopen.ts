@@ -54,7 +54,7 @@ export async function reopenColdLeadForQualification(input: { tenantId: string; 
         ),
       ),
       isNull(schema.leads.corretorId),
-      notInArray(schema.leads.status, ["lost", "converted", "under_analysis"]),
+      notInArray(schema.leads.status, ["lost", "converted", "under_analysis", "awaiting_reply"]),
       isNull(schema.leads.distributionRemovedAt),
       isNull(schema.leads.archivedAt),
       isNull(schema.leads.deletedAt),

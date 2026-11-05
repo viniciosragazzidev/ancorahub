@@ -63,6 +63,7 @@ const activeStatuses = [
   "negotiation",
   "documentation_pending",
   "under_analysis",
+  "awaiting_reply",
 ] as const;
 
 // Static reference content, opened from the Filas "⋯" menu (only the queue

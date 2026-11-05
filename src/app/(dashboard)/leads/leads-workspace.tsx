@@ -116,7 +116,7 @@ const KANBAN_STORAGE_KEY = "ancorahub_kanban_config";
 
 // One view of the server-enforced lead state machine. The terminal "lost" stage
 // stays out of the operational board and remains available through filters/history.
-const kanbanStatuses = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted"];
+const kanbanStatuses = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted"];
 
 function loadKanbanConfig(): { ordered: string[]; hidden: string[] } | null {
   if (typeof window === "undefined") return null;
@@ -182,6 +182,11 @@ const kanbanTone: Record<string, { dot: string; column: string; count: string }>
     dot: "bg-cyan-500",
     column: "border-cyan-500/20 bg-cyan-500/[0.035]",
     count: "border-cyan-500/25 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
+  },
+  awaiting_reply: {
+    dot: "bg-muted-foreground",
+    column: "border-border bg-muted/30",
+    count: "border-border bg-muted text-muted-foreground",
   },
   converted: {
     dot: "bg-emerald-500",

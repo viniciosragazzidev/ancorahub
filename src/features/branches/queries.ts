@@ -125,7 +125,7 @@ export async function getBranchProfileData(
   const label = `últimos ${period} dias`;
 
   // 2. Lead metrics for the period.
-  const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
+  const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 
   const [metricsRaw] = await db
     .select({

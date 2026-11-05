@@ -38,6 +38,7 @@ const activeLeadStatuses = [
   "negotiation",
   "documentation_pending",
   "under_analysis",
+  "awaiting_reply",
 ] as const;
 
 export default async function IntegrityPage() {

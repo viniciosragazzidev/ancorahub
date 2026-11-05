@@ -31,6 +31,7 @@ const statusLabels: Record<string, { label: string; color: string }> = {
     color: "bg-chart-5 text-chart-5",
   },
   under_analysis: { label: "Em análise", color: "bg-muted-foreground text-muted-foreground" },
+  awaiting_reply: { label: "Aguardando retorno", color: "bg-muted-foreground text-muted-foreground" },
   converted: { label: "Convertido", color: "bg-success text-success" },
   lost: { label: "Perdido", color: "bg-destructive text-destructive" },
 };

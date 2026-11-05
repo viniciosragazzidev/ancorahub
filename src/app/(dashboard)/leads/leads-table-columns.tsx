@@ -109,6 +109,11 @@ const STATUS_CONFIG: Record<
     dotColor: "bg-cyan-500",
     className: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/30",
   },
+  awaiting_reply: {
+    label: "Aguardando Retorno",
+    dotColor: "bg-muted-foreground",
+    className: "bg-muted text-muted-foreground border-border",
+  },
   em_analise: {
     label: "Em Análise",
     dotColor: "bg-cyan-500",
@@ -334,6 +339,7 @@ export const getLeadsColumns = (
         { label: "Em Negociação", value: "negotiation" },
         { label: "Pend. Documentos", value: "documentation_pending" },
         { label: "Em Análise", value: "under_analysis" },
+        { label: "Aguardando Retorno", value: "awaiting_reply" },
         { label: "Qualificado", value: "qualified" },
         { label: "Venda Realizada", value: "converted" },
         { label: "Perdido", value: "lost" },

@@ -162,7 +162,7 @@ export async function getTeamMemberProfile(memberUserId: string) {
   const [leadMetrics, salesMetrics, taskMetrics, quoteMetrics, interactionMetrics, redistributionMetrics, offerStatusMetrics, recentLeads, recentRedistributions, dutyRosterRows] = await Promise.all([
     db.select({
       total: sql<number>`count(*)::int`,
-      active: sql<number>`count(*) filter (where ${schema.leads.status} in ('distributed', 'in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis'))::int`,
+      active: sql<number>`count(*) filter (where ${schema.leads.status} in ('distributed', 'in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis', 'awaiting_reply'))::int`,
       qualified: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} in ('qualified', 'hot', 'warm'))::int`,
       hot: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} = 'hot')::int`,
       warm: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} = 'warm')::int`,

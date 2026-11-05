@@ -405,6 +405,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Exige confirmação do corretor antes de torná-lo elegível aos leads do plantão vigente.",
   },
+  STALE_STAGE_RULE: {
+    key: "feature_stale_stage_rule_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Regra de chat parado (05/11): lead em cotação, negociação ou fechamento com o cliente 5 dias úteis sem responder vai para Aguardando retorno, e depois de mais 10 para Perdido (sem contato); volta sozinho se o cliente responder. Cada empresa começa em simulação. Desligar para tudo.",
+  },
   DUTY_PRESENCE_REQUIRES_WHATSAPP: {
     key: "feature_duty_presence_requires_whatsapp",
     scope: "global",

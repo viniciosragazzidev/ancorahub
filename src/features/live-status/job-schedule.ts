@@ -22,6 +22,8 @@ export const JOB_SCHEDULE = {
   "supervisor-digest": { path: "/api/internal/jobs/supervisor-digest", cron: "0 22 * * *", label: "Resumo das 19h" },
   "operator-catalog": { path: "/api/internal/jobs/operator-catalog", cron: "*/5 * * * *", label: "Catálogo das operadoras" },
   "customer-waiting": { path: "/api/internal/jobs/customer-waiting", cron: "*/5 * * * *", label: "Cliente aguardando o corretor" },
+  "stale-stages": { path: "/api/internal/jobs/stale-stages", cron: "0 12 * * *", label: "Regra de chat parado" },
+  "daily-report": { path: "/api/internal/jobs/daily-report", cron: "0 21 * * *", label: "Relatório das 18h" },
 } as const;
 
 export type JobKey = keyof typeof JOB_SCHEDULE;

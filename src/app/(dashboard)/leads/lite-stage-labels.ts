@@ -10,6 +10,7 @@ const LITE_STAGE_LABELS: Record<string, string> = {
   negotiation: "Negociação",
   documentation_pending: "Documentação pendente",
   under_analysis: "Em análise",
+  awaiting_reply: "Aguardando retorno",
   converted: "Convertido",
   lost: "Perdido",
 };

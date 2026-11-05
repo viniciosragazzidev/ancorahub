@@ -21,6 +21,8 @@ import {
   VALID_TRANSITIONS,
 } from "./lead-status-constants";
 import type { MotivoPerda } from "./lead-status-constants";
+import { recordStageChange, stageActorType } from "./stage-history";
+import { isStageRegression } from "./stage-history-core";
 
 // ─── Tipos ────────────────────────────────────────────────────────────
 
@@ -51,6 +53,12 @@ export type SystemStatusChange = {
   skipTransitionCheck?: boolean;
   /** Only applies when the lead is still in this status (a broker change meanwhile wins). */
   expectedStatus?: string;
+  /** Quem mudou, no histórico de etapas (05/11): IA, regra de chat parado ou sistema. Padrão: IA. */
+  actorType?: "ai" | "rule" | "system";
+  /** Motivo curto para o histórico de etapas. */
+  reason?: string;
+  /** "Manter na etapa": a regra de chat parado não mexe no lead até esta data. */
+  holdUntil?: Date | null;
 };
 
 export type ChangeLeadStatusResult = {
@@ -186,6 +194,12 @@ export async function changeLeadStatus(
       qualificationDetails: schema.leads.qualificationDetails,
       version: schema.leads.version,
       nome: schema.leads.nome,
+      stageEnteredAt: schema.leads.stageEnteredAt,
+      queueId: schema.leads.queueId,
+      sourceChannel: schema.leads.sourceChannel,
+      metaCampaignId: schema.leads.metaCampaignId,
+      metaAdId: schema.leads.metaAdId,
+      metaFormId: schema.leads.metaFormId,
     })
     .from(schema.leads)
     .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, context.tenantId)))
@@ -234,9 +248,8 @@ export async function changeLeadStatus(
 
   // 4.1. Proteção de Regressão da IA (bloqueia perda ou recuo de leads com alta intenção de compra sem justificativa)
   const isLost = newStatus === "lost";
-  const prevRank = LEAD_STATUS_ORDER[previousStatus] ?? 0;
-  const newRank = LEAD_STATUS_ORDER[newStatus] ?? 0;
-  const isRegression = isLost || (previousStatus !== "lost" && newRank < prevRank);
+  // Sair de "Aguardando retorno" para a etapa anterior não é recuo (o cliente voltou a responder).
+  const isRegression = isLost || isStageRegression({ previousStatus, newStatus, order: LEAD_STATUS_ORDER });
 
   const potentialSaleCheck = isAiPotentialSale(lead.qualificationDetails);
 
@@ -274,6 +287,11 @@ export async function changeLeadStatus(
         status: newStatus as LeadStatus,
         stageEnteredAt: now,
         motivoPerda,
+        // Aguardando retorno (05/11): guarda a etapa de onde veio, para voltar se o cliente responder.
+        stageBeforeAwaiting: newStatus === "awaiting_reply"
+          ? (previousStatus === "awaiting_reply" ? undefined : previousStatus as LeadStatus)
+          : null,
+        ...(system?.holdUntil !== undefined ? { stageHoldUntil: system.holdUntil } : {}),
         ...(qualificationValidation.newQualificationStatus
           ? { qualificationStatus: qualificationValidation.newQualificationStatus }
           : {}),
@@ -331,6 +349,21 @@ export async function changeLeadStatus(
         createdAt: now,
       });
     }
+
+    // Histórico de etapas e marco do funil (05/11), na mesma transação.
+    await recordStageChange(tx, {
+      tenantId: lead.tenantId,
+      leadId: lead.id,
+      fromStatus: previousStatus,
+      toStatus: newStatus,
+      changedAt: now,
+      actorType: stageActorType({ systemActor: system ? (system.actorType ?? "ai") : null, role: context.role }),
+      actorUserId: system ? (system.actorType === "rule" || system.actorType === "system" ? null : actorUserId) : context.userId,
+      reason: system?.reason ?? (newStatus === "lost" ? (MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda ?? null) : (input.justificativaRegressao?.trim() || null)),
+      lossCode: newStatus === "lost" ? canonicalMotivoPerda ?? null : null,
+      previousStageEnteredAt: lead.stageEnteredAt ?? null,
+      lead: { branchId: lead.branchId, queueId: lead.queueId, sourceChannel: lead.sourceChannel, metaCampaignId: lead.metaCampaignId, metaAdId: lead.metaAdId, metaFormId: lead.metaFormId },
+    });
 
     // Criar auditoria
     const auditAction = system?.auditAction ?? audit?.action ?? (isReopening

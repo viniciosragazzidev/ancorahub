@@ -20,10 +20,12 @@ import { LeadsHeaderActions } from "./_components/leads-header-actions";
 import { WifiHigh, Plus, Target } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { StaleStageSimulationCard } from "@/features/leads/components/stale-stage-simulation-card";
+import { getStaleStageState } from "@/features/leads/stale-stage-sweep";
 import { NextUrgentLeadButton } from "@/components/next-urgent-lead-button";
 import { getUrgentLeadForUser } from "@/features/leads/queries";
 import { ContextNote } from "@/components/ui/context-note";
-import { getSystemSettings } from "@/features/system-settings/queries";
+import { getFeatureFlag, getSystemSettings } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { legacyLeadLivesCount, resolveLeadCommercialValues } from "@/features/leads/commercial-values";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -301,6 +303,7 @@ async function LeadsPageContent({
             "negotiation",
             "documentation_pending",
             "under_analysis",
+            "awaiting_reply",
           ]),
           lt(schema.leads.stageEnteredAt, stalledSince)
         )
@@ -778,6 +781,10 @@ async function LeadsPageContent({
   } satisfies LeadsFiltersProps;
   const leadsFilters = <LeadsFilters {...leadsFiltersProps} />;
 
+  const staleStage = context.role === "director" && (await getFeatureFlag(FEATURE_FLAGS.STALE_STAGE_RULE).catch(() => "true")) !== "false"
+    ? await getStaleStageState(context.tenantId).catch(() => null)
+    : null;
+
   return (
     <>
       <DashboardHeader
@@ -823,6 +830,9 @@ async function LeadsPageContent({
             </Button>
           </div>
         ) : null}
+
+        {/* Regra de chat parado em simulação (05/11): o diretor vê o que mudaria e liga com um toque. */}
+        {staleStage && staleStage.mode === "simulate" ? <StaleStageSimulationCard simulation={staleStage.simulation} /> : null}
 
         {/* Filters */}
         {directorLitePage && hasWorkspace ? null : leadsFilters}

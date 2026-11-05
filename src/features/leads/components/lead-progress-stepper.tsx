@@ -24,6 +24,7 @@ function statusToStageIndex(status: string): number {
     case "negotiation":
     case "documentation_pending":
     case "under_analysis":
+    case "awaiting_reply":
       return 3;
     case "converted":
       return 4;

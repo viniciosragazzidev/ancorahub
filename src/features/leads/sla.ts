@@ -15,7 +15,7 @@ import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy"
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 
-const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
+const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 type SlaKind = "lead_unworked" | "lead_warning_10m" | "lead_stalled";
 
 export type SlaSweepResult = { tenants: number; unworked: number; warnings: number; stalled: number; notifications: number };

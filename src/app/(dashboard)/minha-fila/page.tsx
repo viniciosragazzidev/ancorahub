@@ -33,6 +33,7 @@ const activeLeadStatuses = [
   "negotiation",
   "documentation_pending",
   "under_analysis",
+  "awaiting_reply",
 ] as const;
 
 export const dynamic = "force-dynamic";

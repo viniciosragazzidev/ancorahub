@@ -23,6 +23,7 @@ import { changeLeadStatus } from "@/features/leads/change-lead-status";
 import type { TenantContext } from "@/shared/auth/types";
 import { getAiStageMode } from "./stage-mode";
 import { conversationMessageBody } from "@/features/conversations/message-media-text";
+import { recentlyUndoneAiMove, type AiAutoMove } from "./ai-move";
 import {
   ConversationAssessmentSchema,
   type ConversationAssessment,
@@ -249,6 +250,10 @@ ${ASSESSMENT_JSON_INSTRUCTION}` },
   });
   if (mode === "off" && policyResult.action !== "INSIGHT_ONLY") {
     policyResult = { ...policyResult, action: "INSIGHT_ONLY", transitionAllowed: false, reason: "A empresa desligou a mudança de etapa pela IA." };
+  }
+  // O corretor desfez um avanço da IA neste lead há menos de 7 dias (05/11): a IA só sugere, não move de novo.
+  if (policyResult.action === "AUTO_TRANSITION" && recentlyUndoneAiMove(qualDetails.aiLastAutoMove as AiAutoMove | undefined)) {
+    policyResult = { ...policyResult, action: "SUGGEST", transitionAllowed: false, reason: "O corretor desfez o último avanço da IA neste lead; a IA só sugere por 7 dias." };
   }
 
   const now = new Date();

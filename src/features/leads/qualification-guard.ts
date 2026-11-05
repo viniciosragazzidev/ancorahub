@@ -11,6 +11,7 @@ export const QUALIFIED_STAGES = [
   "negotiation",
   "documentation_pending",
   "under_analysis",
+  "awaiting_reply",
   "converted",
 ] as const;
 
