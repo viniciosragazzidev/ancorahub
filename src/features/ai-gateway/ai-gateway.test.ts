@@ -8,12 +8,12 @@ const usage = vi.hoisted(() => ({ log: vi.fn() }));
 vi.mock("@/features/ai-agent/ai-usage-log", () => ({ logAiUsage: usage.log }));
 
 import { AGENT_REGISTRY, assistantReplySchema, buildMessages, replyToBlocks } from "./agents";
-import { extractJson, runGateway } from "./gateway";
+import { extractJson, resetProviderCooldownsForTests, runGateway } from "./gateway";
 import { maskPersonalData, shortName } from "./privacy";
 import { defaultChains, isFreeTier, resolveChain } from "./profiles";
 
 const env = { ...process.env };
-beforeEach(() => { settings.values.clear(); usage.log.mockReset(); process.env = { ...env, GROQ_API_KEY: "g", OPENROUTER_API_KEY: "o", GOOGLE_API_KEY: "", OPENAI_API_KEY: "", ANTHROPIC_API_KEY: "" }; });
+beforeEach(() => { settings.values.clear(); usage.log.mockReset(); resetProviderCooldownsForTests(); process.env = { ...env, GROQ_API_KEY: "g", OPENROUTER_API_KEY: "o", GOOGLE_API_KEY: "", OPENAI_API_KEY: "", ANTHROPIC_API_KEY: "" }; });
 afterEach(() => { vi.unstubAllGlobals(); process.env = env; });
 
 describe("profiles", () => {
@@ -142,7 +142,7 @@ describe("interpreter profile (qualification interpreter and lateral answer)", (
     expect(defaultChains({}).interpreter.some((ref) => /llama/.test(ref.model))).toBe(false);
   });
 
-  it("stops after maxAttempts and reports the last error (with timeout) so the caller can log the fallback", async () => {
+  it("does not spend an attempt on auth failure and reaches the next paid OpenRouter model", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response("{\"error\":{\"message\":\"User not found.\",\"code\":401}}", { status: 401 }))
       .mockRejectedValueOnce(Object.assign(new Error("aborted"), { name: "TimeoutError" }))
@@ -150,10 +150,55 @@ describe("interpreter profile (qualification interpreter and lateral answer)", (
     vi.stubGlobal("fetch", fetchMock);
     process.env = { ...env, OPENROUTER_API_KEY: "o", ANTHROPIC_API_KEY: "a", GROQ_API_KEY: "", GOOGLE_API_KEY: "", OPENAI_API_KEY: "" };
     const result = await runGateway({ profile: "interpreter", purpose: "qualification_fallback", tenantId: "t", userId: "conversation:c1", conversationId: "c1", sourceMessageId: "m1", messages: [{ role: "user", content: "x" }], schema: z.object({ text: z.string() }), sensitive: true, timeoutMs: 6_000, maxAttempts: 2 });
-    // Anthropic direct first (Console credit, 24/10), then Gemini Flash Lite on OpenRouter.
-    expect(result).toMatchObject({ ok: false, reason: "all_failed", attempts: 2, lastError: "openrouter/google/gemini-3.1-flash-lite: timeout 6000ms" });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ ok: true, attempts: 2, model: { provider: "openrouter", model: "anthropic/claude-haiku-5.5" } });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(usage.log).toHaveBeenCalledWith(expect.objectContaining({ success: false, purpose: "qualification_fallback", conversationId: "c1", sourceMessageId: "m1", error: expect.stringContaining("HTTP 401") }));
+  });
+
+  it.each([401, 402])( "cools down provider auth/billing failure %s without consuming an attempt", async (status) => {
+    settings.values.set("ai_gateway_profiles", JSON.stringify({ "chat-fast": [
+      { provider: "openrouter", model: "test/first" },
+      { provider: "openrouter", model: "test/second" },
+      { provider: "openai", model: "gpt-4o-mini" },
+    ] }));
+    process.env = { ...env, OPENROUTER_API_KEY: "o", OPENAI_API_KEY: "a", GROQ_API_KEY: "", GOOGLE_API_KEY: "", ANTHROPIC_API_KEY: "" };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("provider unavailable", { status }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: "{\"text\":\"ok\"}" } }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: "{\"text\":\"ok\"}" } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = await runGateway({ profile: "chat-fast", purpose: "breaker-test", tenantId: "t", userId: `breaker-${status}-1`, messages: [{ role: "user", content: "x" }], schema: z.object({ text: z.string() }), maxAttempts: 1 });
+    const second = await runGateway({ profile: "chat-fast", purpose: "breaker-test", tenantId: "t", userId: `breaker-${status}-2`, messages: [{ role: "user", content: "x" }], schema: z.object({ text: z.string() }), maxAttempts: 1 });
+
+    expect(first).toMatchObject({ ok: true, attempts: 1, model: { provider: "openai" } });
+    expect(second).toMatchObject({ ok: true, attempts: 1, model: { provider: "openai" } });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "https://openrouter.ai/api/v1/chat/completions",
+      "https://api.openai.com/v1/chat/completions",
+      "https://api.openai.com/v1/chat/completions",
+    ]);
+  });
+
+  it("retries direct Haiku once on a transient failure before falling back to OpenAI", async () => {
+    settings.values.set("ai_gateway_profiles", JSON.stringify({ interpreter: [
+      { provider: "anthropic", model: "claude-haiku-5-5" },
+      { provider: "openai", model: "gpt-4o-mini" },
+    ] }));
+    process.env = { ...env, ANTHROPIC_API_KEY: "a", OPENAI_API_KEY: "o", OPENROUTER_API_KEY: "", GROQ_API_KEY: "", GOOGLE_API_KEY: "" };
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error("timed out"), { name: "TimeoutError" }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ content: [], stop_reason: "max_tokens" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: "{\"text\":\"ok\"}" } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await runGateway({ profile: "interpreter", purpose: "qualification_fallback", tenantId: "t", userId: "haiku-retry", messages: [{ role: "user", content: "x" }], schema: z.object({ text: z.string() }), sensitive: true, maxAttempts: 3, retryAnthropicHaikuOnTransient: true });
+
+    expect(result).toMatchObject({ ok: true, attempts: 3, model: { provider: "openai" }, value: { text: "ok" } });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls.slice(0, 2).every((call) => call[0] === "https://api.anthropic.com/v1/messages")).toBe(true);
+    expect(fetchMock.mock.calls[2]?.[0]).toBe("https://api.openai.com/v1/chat/completions");
   });
 });
 
@@ -166,13 +211,20 @@ describe("Anthropic direct first when its key exists (Console credit, 24/10)", (
 });
 
 describe("Anthropic direct request", () => {
-  it("never sends temperature, which Claude Haiku 5.5 refuses", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: "{\"text\":\"ok\"}" } }] }), { status: 200 }));
+  it("uses native structured JSON, disables Haiku 5.5 thinking, and sends no temperature", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ content: [{ type: "text", text: "{\"text\":\"ok\"}" }], stop_reason: "end_turn", usage: { input_tokens: 31, output_tokens: 18 } }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     process.env = { ...env, ANTHROPIC_API_KEY: "a", OPENROUTER_API_KEY: "", GROQ_API_KEY: "", GOOGLE_API_KEY: "", OPENAI_API_KEY: "" };
-    const result = await runGateway({ profile: "chat-smart", purpose: "test", tenantId: "t", userId: "anthropic", messages: [{ role: "user", content: "x" }], schema: z.object({ text: z.string() }), temperature: 0 });
+    const result = await runGateway({ profile: "interpreter", purpose: "qualification_fallback", tenantId: "t", userId: "anthropic", messages: [{ role: "system", content: "system rules" }, { role: "user", content: "x" }, { role: "user", content: "y" }], schema: z.object({ text: z.string().min(1).max(100) }), sensitive: true, temperature: 0, maxTokens: 1_000 });
     expect(result).toMatchObject({ ok: true, model: { provider: "anthropic" } });
-    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).not.toHaveProperty("temperature");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.anthropic.com/v1/messages");
+    expect(fetchMock.mock.calls[0]?.[1].headers).toMatchObject({ "x-api-key": "a", "anthropic-version": "2023-06-01" });
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
+    expect(body).toMatchObject({ max_tokens: 1_000, system: "system rules", thinking: { type: "disabled" }, output_config: { format: { type: "json_schema" } } });
+    expect(body.messages).toEqual([{ role: "user", content: "x\n\ny" }]);
+    expect(body.output_config.format.schema.properties.text).toEqual({ type: "string" });
+    expect(body).not.toHaveProperty("temperature");
+    expect(usage.log).toHaveBeenCalledWith(expect.objectContaining({ usage: { prompt_tokens: 31, completion_tokens: 18, total_tokens: 49 } }));
   });
 });
 

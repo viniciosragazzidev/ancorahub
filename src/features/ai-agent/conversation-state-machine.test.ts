@@ -72,6 +72,25 @@ describe("ai-agent service & state machine", () => {
       expect(result.aiMessages).toEqual([{ role: "user", content: "Quero uma cotação" }]);
     });
 
+    it("keeps all bubbles from the unanswered customer turn while resetting earlier session context", () => {
+      const currentTurnMessages = [
+        { role: "user" as const, content: "CNPJ" },
+        { role: "user" as const, content: "53,51,16,14\nEmpresarial" },
+        { role: "user" as const, content: "2 funcionárias e 2 dependentes" },
+      ];
+      const result = resolveMemoryResetContext({
+        resetMode: "before_each_message",
+        storedMemory,
+        formattedHistory: history,
+        currentMessage: "2 funcionárias e 2 dependentes",
+        currentTurnMessages,
+        historyAlreadyContainsCurrentMessage: true,
+      });
+
+      expect(result.baseMemory.customerName).toBeUndefined();
+      expect(result.aiMessages).toEqual(currentTurnMessages);
+    });
+
     it("preserves stored memory and full history on before_each_session", () => {
       const result = resolveMemoryResetContext({
         resetMode: "before_each_session",

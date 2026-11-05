@@ -268,6 +268,26 @@ export function readAgeList(message: string): number[] {
     .filter((age) => age >= 0 && age <= 120);
 }
 
+/**
+ * During a pending question about lives, customers sometimes send a single line
+ * of ages together with other facts in the same WhatsApp turn. Keep the
+ * contextual shortcut deliberately narrow: only a complete numeric-list line
+ * is treated as ages, so CNPJs, prices, and counts in prose are not reclassified.
+ */
+export function readAgeListForLivesQuestion(message: string, question?: string | null): number[] {
+  const normalizedQuestion = normalizeForMatching(question ?? "");
+  if (!/quantas vidas|quantas pessoas|quantidade de pessoas|numero de vidas|beneficiari/.test(normalizedQuestion)) {
+    return readAgeList(message);
+  }
+  const direct = readAgeList(message);
+  if (direct.length >= 2) return direct;
+  for (const line of message.split(/\r?\n/)) {
+    const ages = readAgeList(line.trim());
+    if (ages.length >= 2) return ages;
+  }
+  return direct;
+}
+
 const NUMBER_WORD_VALUES: Record<string, number> = {
   um: 1,
   uma: 1,
@@ -353,6 +373,40 @@ export function extractUnansweredMessages(
     next = extractFieldsFromMessage(message.body, { ...next, lastQuestionAsked: questionNow, lastQuestionsAsked: questionsNow }, message.messageId ?? undefined);
   }
   return { ...next, lastQuestionAsked: questionNow, lastQuestionsAsked: questionsNow };
+}
+
+/**
+ * Rebuild facts attributed to messages in the still-unanswered customer turn.
+ * A prior failed attempt may already have persisted a partial or wrong read of
+ * one message; facts sourced from this same turn are therefore removed and the
+ * whole turn is replayed oldest-first against the pre-turn memory.
+ */
+export function replayUnansweredTurn(
+  memory: ConversationMemory,
+  messages: ReadonlyArray<{ body: string | null | undefined; messageId?: string | null }>,
+): ConversationMemory {
+  return extractUnansweredMessages(clearUnansweredTurnFacts(memory, messages), messages);
+}
+
+export function clearUnansweredTurnFacts(
+  memory: ConversationMemory,
+  messages: ReadonlyArray<{ messageId?: string | null }>,
+): ConversationMemory {
+  const turnIds = new Set(messages.map((message) => message.messageId).filter((id): id is string => Boolean(id)));
+  if (!turnIds.size) return memory;
+
+  const next = { ...memory } as ConversationMemory;
+  const clearedFields = new Set<string>();
+  for (const [key, value] of Object.entries(next)) {
+    if (!value || typeof value !== "object" || Array.isArray(value) || !("sourceMessageId" in value)) continue;
+    const sourceMessageId = (value as { sourceMessageId?: unknown }).sourceMessageId;
+    if (typeof sourceMessageId === "string" && turnIds.has(sourceMessageId)) {
+      delete (next as unknown as Record<string, unknown>)[key];
+      clearedFields.add(key);
+    }
+  }
+  next.collectedFields = next.collectedFields.filter((field) => !clearedFields.has(field));
+  return next;
 }
 
 /**
@@ -714,7 +768,7 @@ export function extractFieldsFromMessage(
     }
 
     // Several ages in one answer are the people of the plan: "12 e 42 anos" is 2 lives.
-    const listedAges = readAgeList(trimmed);
+    const listedAges = readAgeListForLivesQuestion(trimmed, memory.lastQuestionAsked);
     if (!memory.numberOfLives && listedAges.length >= 2 && listedAges.length < 100) {
       memory.numberOfLives = { value: String(listedAges.length), confidence: 1, sourceMessageId };
       addCollectedField(memory, "numberOfLives");
@@ -763,7 +817,7 @@ export function extractFieldsFromMessage(
     // A baby's age in days, weeks or months ("bebê de 16 dias") is 0 years.
     const babyAge = /\b\d{1,2}\s*(?:dias?|semanas?|m[eê]s(?:es)?)\b|\brec[eé]m[- ]nascid/i.test(trimmed);
     const ageText = babyAge ? trimmed.replace(/\b\d{1,2}\s*(?:dias?|semanas?|m[eê]s(?:es)?)\b/gi, "0 anos") : trimmed;
-    const listedAgeValues = readAgeList(ageText).filter((age) => age > 0 || babyAge);
+    const listedAgeValues = readAgeListForLivesQuestion(ageText, memory.lastQuestionAsked).filter((age) => age > 0 || babyAge);
     const selfOnlyAge = readSelfOnlyAge(ageText);
     const explicitAgeValues = selfOnlyAge !== null
       ? [selfOnlyAge]

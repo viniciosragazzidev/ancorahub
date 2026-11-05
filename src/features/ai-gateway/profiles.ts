@@ -15,7 +15,7 @@ export type AiProfile = (typeof PROFILES)[number];
 
 export type ModelRef = { provider: AiProvider; model: string };
 
-/** OpenAI-compatible endpoints: one client for every provider. */
+/** Chat-completions-compatible endpoints for providers with an OpenAI-compatible API. */
 export const PROVIDER_ENDPOINT: Record<AiProvider, string> = {
   groq: "https://api.groq.com/openai/v1/chat/completions",
   openrouter: "https://openrouter.ai/api/v1/chat/completions",
@@ -23,6 +23,9 @@ export const PROVIDER_ENDPOINT: Record<AiProvider, string> = {
   openai: "https://api.openai.com/v1/chat/completions",
   anthropic: "https://api.anthropic.com/v1/chat/completions",
 };
+
+/** Native Messages endpoint used by the sensitive qualification interpreter. */
+export const ANTHROPIC_MESSAGES_ENDPOINT = "https://api.anthropic.com/v1/messages";
 
 /** Env vars of each provider key (the gateway also reads the existing system_settings keys). */
 export const PROVIDER_KEY_ENV: Record<AiProvider, string> = {
@@ -63,10 +66,8 @@ export function defaultChains(env: Env): Record<AiProfile, ModelRef[]> {
     { provider: "openrouter", model: env.AI_OPENROUTER_FALLBACK_MODEL || "openai/gpt-oss-120b" },
   ];
   const paid: ModelRef[] = [{ provider: "anthropic", model: anthropic }, { provider: "openai", model: openai }];
-  // 2026-10-21: the WhatsApp qualification interpreter and the lateral answer run inside the
-  // customer's turn, so they need a fast model that answers in ~1-2 s. Gemini Flash Lite
-  // (no thinking) first, Claude Haiku 5.5 (the gateway's paid default) as the second try;
-  // both paid on OpenRouter (no training on the client's data). Anthropic/OpenAI direct last.
+  // WhatsApp qualification is sensitive: use direct paid providers first, then paid OpenRouter
+  // only as a fallback with data_collection=deny. The gateway retries transient Haiku failures.
   const interpreter: ModelRef[] = [
     { provider: "openrouter", model: env.AI_INTERPRETER_MODEL || "google/gemini-3.1-flash-lite" },
     { provider: "openrouter", model: env.AI_INTERPRETER_FALLBACK_MODEL || "anthropic/claude-haiku-5.5" },
@@ -76,7 +77,7 @@ export function defaultChains(env: Env): Record<AiProfile, ModelRef[]> {
   // by resolveChain and the order below is the one of before (OpenRouter first).
   const anthropicDirect: ModelRef = { provider: "anthropic", model: anthropic };
   return {
-    interpreter: [anthropicDirect, ...interpreter, ...paid],
+    interpreter: [anthropicDirect, { provider: "openai", model: openai }, ...interpreter, ...paid],
     "chat-fast": [anthropicDirect, ...routerPaid, ...paid, { provider: "groq", model: groqFast }, { provider: "groq", model: groqSmart }, { provider: "openrouter", model: openrouterFree }],
     "chat-smart": [anthropicDirect, ...routerPaid, ...paid, { provider: "groq", model: groqSmart }, { provider: "google", model: gemini }, { provider: "openrouter", model: openrouterFree }],
     "json-structured": [anthropicDirect, ...routerPaid, ...paid, { provider: "groq", model: groqSmart }, { provider: "google", model: gemini }, { provider: "openrouter", model: openrouterFree }],

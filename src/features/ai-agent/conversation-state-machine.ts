@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, asc, count, desc, eq, gt, inArray, isNull, ne, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, lt, ne, notInArray, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { generateAiResponse, detectLanguage, detectHumanTransferRequest } from "./service";
 import { loadTenantAiAgentConfig } from "./tenant-config";
@@ -8,7 +8,8 @@ import {
   buildMemoryContext,
   COLLECTIBLE_FIELDS,
   createEmptyMemory,
-  extractUnansweredMessages,
+  clearUnansweredTurnFacts,
+  replayUnansweredTurn,
   pendingQuestionOf,
   pendingQuestionsOf,
   type ConversationMemory,
@@ -68,8 +69,8 @@ type AiMessage = { role: "user" | "assistant"; content: string };
  * Decisão pura do reset de memória por mensagem.
  *
  * Quando o modo é "before_each_message", o agente responde do zero:
- * a memória base é zerada (createEmptyMemory) e o contexto enviado à IA
- * contém apenas a mensagem atual (sem histórico).
+ * a memória base é zerada (createEmptyMemory), mas todas as bolhas ainda
+ * sem resposta no turno atual seguem juntas para a IA.
  *
  * Em qualquer outro modo (before_each_session, never, manual), preserva-se
  * a memória armazenada e o histórico formatado.
@@ -79,6 +80,7 @@ export function resolveMemoryResetContext(input: {
   storedMemory: ConversationMemory | null;
   formattedHistory: AiMessage[];
   currentMessage: string;
+  currentTurnMessages?: AiMessage[];
   historyAlreadyContainsCurrentMessage: boolean;
 }): { resetMemoryEachMessage: boolean; baseMemory: ConversationMemory; aiMessages: AiMessage[] } {
   const resetMemoryEachMessage = (input.resetMode ?? "before_each_session") === "before_each_message";
@@ -86,7 +88,7 @@ export function resolveMemoryResetContext(input: {
     ? createEmptyMemory()
     : input.storedMemory ?? createEmptyMemory();
   const aiMessages: AiMessage[] = resetMemoryEachMessage
-    ? [{ role: "user", content: input.currentMessage }]
+    ? (input.currentTurnMessages?.length ? input.currentTurnMessages : [{ role: "user", content: input.currentMessage }])
     : input.historyAlreadyContainsCurrentMessage
       ? input.formattedHistory
       : [...input.formattedHistory, { role: "user", content: input.currentMessage }];
@@ -1686,8 +1688,26 @@ export async function processInboundAiResponse({
   const turnLatestInboundAt = turnInbound?.latest ? new Date(turnInbound.latest) : null;
 
   // 5. Buscar histórico de mensagens recentes do lead
-  const pastMessages = await db
+  const [lastAiReply] = await db
+    .select({ sentAt: schema.whatsappMessages.sentAt })
+    .from(schema.whatsappMessages)
+    .where(and(
+      eq(schema.whatsappMessages.tenantId, tenantId),
+      eq(schema.whatsappMessages.conversationId, conversation.id),
+      or(eq(schema.whatsappMessages.direction, "outbound"), eq(schema.whatsappMessages.senderRole, "assistant")),
+      or(isNull(schema.whatsappMessages.providerStatus), ne(schema.whatsappMessages.providerStatus, "failed")),
+    ))
+    .orderBy(desc(schema.whatsappMessages.sentAt))
+    .limit(1);
+  const afterLastAiReply = lastAiReply?.sentAt
+    ? or(
+      gt(schema.whatsappMessages.sentAt, lastAiReply.sentAt),
+      sourceIdentifier ? eq(schema.whatsappMessages.messageId, sourceIdentifier) : undefined,
+    )
+    : undefined;
+  const unansweredIncoming = await db
     .select({
+      id: schema.whatsappMessages.id,
       messageId: schema.whatsappMessages.messageId,
       body: schema.whatsappMessages.body,
       direction: schema.whatsappMessages.direction,
@@ -1695,21 +1715,55 @@ export async function processInboundAiResponse({
       sentAt: schema.whatsappMessages.sentAt,
     })
     .from(schema.whatsappMessages)
-    .where(
-      and(
-        eq(schema.whatsappMessages.tenantId, tenantId),
-        eq(schema.whatsappMessages.leadId, leadId),
-        eq(schema.whatsappMessages.conversationId, conversation.id),
+    .where(and(
+      eq(schema.whatsappMessages.tenantId, tenantId),
+      inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
+      or(
+        and(eq(schema.whatsappMessages.conversationId, conversation.id), afterLastAiReply),
+        and(eq(schema.whatsappMessages.leadId, leadId), isNull(schema.whatsappMessages.conversationId), afterLastAiReply),
       ),
-    )
+    ))
+    .orderBy(asc(schema.whatsappMessages.sentAt));
+
+  const linkedPastMessages = await db
+    .select({
+      id: schema.whatsappMessages.id,
+      messageId: schema.whatsappMessages.messageId,
+      body: schema.whatsappMessages.body,
+      direction: schema.whatsappMessages.direction,
+      senderRole: schema.whatsappMessages.senderRole,
+      sentAt: schema.whatsappMessages.sentAt,
+    })
+    .from(schema.whatsappMessages)
+    .where(and(
+      eq(schema.whatsappMessages.tenantId, tenantId),
+      eq(schema.whatsappMessages.conversationId, conversation.id),
+      or(isNull(schema.whatsappMessages.providerStatus), ne(schema.whatsappMessages.providerStatus, "failed")),
+    ))
     .orderBy(desc(schema.whatsappMessages.sentAt))
     .limit(12);
+  const historyById = new Map<string, (typeof linkedPastMessages)[number]>();
+  for (const message of [...linkedPastMessages, ...unansweredIncoming]) historyById.set(message.id, message);
+  const pastMessages = [...historyById.values()].sort((left, right) => left.sentAt.getTime() - right.sentAt.getTime());
+  const currentTurnRows: Array<{ messageId?: string; body: string }> = unansweredIncoming
+    .filter((message) => message.body && !isAutomatedInboundMessage(message.body))
+    .map((message) => ({ messageId: message.messageId ?? message.id, body: message.body }));
+  const currentMessageIsInTurn = currentTurnRows.some((message) =>
+    (sourceIdentifier && message.messageId === sourceIdentifier) || message.body === normalizedInboundMessage,
+  );
+  if (!currentMessageIsInTurn && normalizedInboundMessage) {
+    currentTurnRows.push({ messageId: sourceIdentifier ?? undefined, body: normalizedInboundMessage });
+  }
+  const currentTurnSourceMessageId = [...currentTurnRows].reverse().find((message) => message.body === normalizedInboundMessage)?.messageId ?? sourceIdentifier ?? undefined;
+  const currentTurnMessageText = currentTurnRows.map((message) => message.body).join("\n") || normalizedInboundMessage;
+  const currentTurnMessages = currentTurnRows.map((message) => ({ role: "user" as const, content: message.body }));
 
-  const formattedHistory = pastMessages.reverse().map((m) => ({
+  const formattedHistory = pastMessages.map((m) => ({
     role: (m.senderRole === "assistant" || m.direction === "outbound" ? "assistant" : "user") as "user" | "assistant",
     content: m.body,
   }));
-  const historyAlreadyContainsCurrentMessage = Boolean(sourceIdentifier) && pastMessages.some((message) => message.messageId === sourceIdentifier);
+  const historyAlreadyContainsCurrentMessage = Boolean(sourceIdentifier && pastMessages.some((message) => message.messageId === sourceIdentifier))
+    || pastMessages.at(-1)?.body === normalizedInboundMessage;
 
   // 5. Quick Reply gate: deterministic, tenant-template based, and before AI.
   // Reset de memória geral: se ai_memory_reset_mode === "before_each_message", o agente
@@ -1720,6 +1774,7 @@ export async function processInboundAiResponse({
     storedMemory: conversation.memory as ConversationMemory | null,
     formattedHistory,
     currentMessage: normalizedInboundMessage,
+    currentTurnMessages,
     historyAlreadyContainsCurrentMessage,
   });
   const hasPriorMessages = pastMessages.some((message) => !sourceIdentifier || message.messageId !== sourceIdentifier);
@@ -1866,18 +1921,52 @@ export async function processInboundAiResponse({
   }
   let updatedMemory = inboundIsAutomated
     ? { ...currentMemory, collectedFields: [...currentMemory.collectedFields] }
-    : extractFieldsFromMessage(userMessageBody, currentMemory, sourceIdentifier ?? undefined);
+    : extractFieldsFromMessage(userMessageBody, currentMemory, currentTurnSourceMessageId);
   let fieldsExtractedFromCurrentMessage = updatedMemory.collectedFields.filter((field) => !fieldsBeforeMessage.has(field));
 
-  // 6-bis. The AI checks age, people and plan type the rules read from a longer message
-  // before the reply repeats them (case Edivaldo, 21/10: "63 anos" twice became 2 people).
+  // 6b. Analisar historico de mensagens recebidas para acumular informacoes ja fornecidas
+  const allIncomingMsgs = lastAiReply?.sentAt
+    ? await db
+      .select({ id: schema.whatsappMessages.id, messageId: schema.whatsappMessages.messageId, body: schema.whatsappMessages.body })
+      .from(schema.whatsappMessages)
+      .where(and(
+        eq(schema.whatsappMessages.tenantId, tenantId),
+        eq(schema.whatsappMessages.leadId, leadId),
+        inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
+        lt(schema.whatsappMessages.sentAt, lastAiReply.sentAt),
+      ))
+    : [];
+
+  // Messages from before the AI's last reply are read without the question being asked now: "Faz uma
+  // coisa", said before the city question, is not a city.
+  const questionNow = currentMemory.lastQuestionAsked;
+  const questionsNow = currentMemory.lastQuestionsAsked;
+  updatedMemory = { ...currentMemory, collectedFields: [...currentMemory.collectedFields], lastQuestionAsked: undefined, lastQuestionsAsked: undefined };
+  for (const inc of allIncomingMsgs) {
+    if (inc.body && !isAutomatedInboundMessage(inc.body)) {
+      updatedMemory = extractFieldsFromMessage(inc.body, updatedMemory, inc.messageId ?? inc.id);
+    }
+  }
+  updatedMemory = { ...updatedMemory, lastQuestionAsked: questionNow, lastQuestionsAsked: questionsNow };
+
+  // Every customer message sent after the AI's last reply is an answer to its last question: read them
+  // all, oldest first, each with that question (28/10). Before, only the last message of a batch was
+  // read with it, so a city sent just before "Não tenho plano" was lost.
+  // Recompute every pending message together so facts from a failed partial attempt can be corrected.
+  const currentTurnForMemory = currentTurnRows
+    .filter((message) => message.body && !isAutomatedInboundMessage(message.body));
+  const memoryBeforeCurrentTurn = clearUnansweredTurnFacts(updatedMemory, currentTurnForMemory);
+  updatedMemory = replayUnansweredTurn(memoryBeforeCurrentTurn, currentTurnForMemory);
+  fieldsExtractedFromCurrentMessage = updatedMemory.collectedFields.filter((field) => !fieldsBeforeMessage.has(field));
+
+  // Verify structured extraction against the entire pending turn, not just its last WhatsApp bubble.
   const factsToVerify = fieldsExtractedFromCurrentMessage.filter((field): field is VerifiableField => (VERIFIABLE_FIELDS as readonly string[]).includes(field));
-  if (!inboundIsAutomated && factsToVerify.length && effectiveMessageKind === "text" && shouldVerifyExtraction(userMessageBody)) {
+  if (!inboundIsAutomated && factsToVerify.length && effectiveMessageKind === "text" && shouldVerifyExtraction(currentTurnMessageText)) {
     const facts: Partial<Record<VerifiableField, string>> = {};
     for (const field of factsToVerify) facts[field] = (updatedMemory[field] as { value?: string } | undefined)?.value ?? "";
     const verification = await verifyExtractedFacts({
-      tenantId, conversationId: conversation.id, leadId, sourceMessageId: sourceIdentifier ?? null,
-      message: userMessageBody, lastQuestion: currentMemory.lastQuestionAsked ?? null, leadName: lead?.nome ?? null, facts,
+      tenantId, conversationId: conversation.id, leadId, sourceMessageId: currentTurnSourceMessageId ?? null,
+      message: currentTurnMessageText, lastQuestion: currentMemory.lastQuestionAsked ?? null, leadName: lead?.nome ?? null, facts,
     });
     const applied: string[] = [];
     for (const correction of verification.corrections) {
@@ -1893,7 +1982,7 @@ export async function processInboundAiResponse({
         void _removed;
         updatedMemory = { ...rest, collectedFields: updatedMemory.collectedFields.filter((field) => field !== correction.field) } as ConversationMemory;
       } else {
-        updatedMemory = { ...updatedMemory, [correction.field]: { value, confidence: 1, sourceMessageId: sourceIdentifier ?? undefined } };
+        updatedMemory = { ...updatedMemory, [correction.field]: { value, confidence: 1, sourceMessageId: currentTurnSourceMessageId } };
       }
       applied.push(`${correction.field}=${value || "removido"}`);
     }
@@ -1912,59 +2001,6 @@ export async function processInboundAiResponse({
       collectedFields: Array.from(new Set([...updatedMemory.collectedFields, "customerName"])),
     };
   }
-
-  // 6b. Analisar historico de mensagens recebidas para acumular informacoes ja fornecidas
-  const allIncomingMsgs = await db
-    .select({ body: schema.whatsappMessages.body })
-    .from(schema.whatsappMessages)
-    .where(
-      and(
-        eq(schema.whatsappMessages.tenantId, tenantId),
-        eq(schema.whatsappMessages.leadId, leadId),
-        eq(schema.whatsappMessages.direction, "incoming")
-      )
-    );
-
-  // Messages from before the AI's last reply are read without the question being asked now: "Faz uma
-  // coisa", said before the city question, is not a city.
-  const questionNow = updatedMemory.lastQuestionAsked;
-  const questionsNow = updatedMemory.lastQuestionsAsked;
-  for (const inc of allIncomingMsgs) {
-    if (inc.body && !isAutomatedInboundMessage(inc.body)) {
-      updatedMemory = extractFieldsFromMessage(inc.body, { ...updatedMemory, lastQuestionAsked: undefined, lastQuestionsAsked: undefined });
-    }
-  }
-  updatedMemory = { ...updatedMemory, lastQuestionAsked: questionNow, lastQuestionsAsked: questionsNow };
-
-  // Every customer message sent after the AI's last reply is an answer to its last question: read them
-  // all, oldest first, each with that question (28/10). Before, only the last message of a batch was
-  // read with it, so a city sent just before "Não tenho plano" was lost.
-  const [lastAiReply] = await db
-    .select({ sentAt: schema.whatsappMessages.sentAt })
-    .from(schema.whatsappMessages)
-    .where(and(
-      eq(schema.whatsappMessages.tenantId, tenantId),
-      eq(schema.whatsappMessages.conversationId, conversation.id),
-      or(eq(schema.whatsappMessages.direction, "outbound"), eq(schema.whatsappMessages.senderRole, "assistant")),
-    ))
-    .orderBy(desc(schema.whatsappMessages.sentAt))
-    .limit(1);
-  const unansweredIncoming = await db
-    .select({ messageId: schema.whatsappMessages.messageId, body: schema.whatsappMessages.body })
-    .from(schema.whatsappMessages)
-    .where(and(
-      eq(schema.whatsappMessages.tenantId, tenantId),
-      eq(schema.whatsappMessages.conversationId, conversation.id),
-      inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
-      lastAiReply?.sentAt ? gt(schema.whatsappMessages.sentAt, lastAiReply.sentAt) : undefined,
-    ))
-    .orderBy(asc(schema.whatsappMessages.sentAt))
-    .limit(50);
-  // The message this turn already reads (step 6) is left out.
-  updatedMemory = extractUnansweredMessages(
-    updatedMemory,
-    unansweredIncoming.filter((message) => message.messageId !== sourceIdentifier && message.body && !isAutomatedInboundMessage(message.body)),
-  );
 
   // 6c. Buscar textos de mensagens enviadas para evitar repeticao de perguntas
   const allOutboundMsgs = await db
@@ -2055,8 +2091,8 @@ export async function processInboundAiResponse({
         tenantId,
         conversationId: conversation.id,
         leadId,
-        sourceMessageId: sourceIdentifier,
-        currentMessage: normalizedInboundMessage,
+        sourceMessageId: currentTurnSourceMessageId,
+        currentMessage: currentTurnMessageText,
         previousQuestion: currentMemory.lastQuestionAsked ?? "",
         leadName: lead?.nome ?? null,
         messages: pastMessages.map((message) => ({
@@ -2064,7 +2100,7 @@ export async function processInboundAiResponse({
           content: message.body ?? "",
         })),
         memory: updatedMemory,
-        baseMemory: currentMemory,
+        baseMemory: memoryBeforeCurrentTurn,
       });
       updatedMemory = contextAnalysis.memory;
       fieldsExtractedFromCurrentMessage = updatedMemory.collectedFields.filter((field) => !fieldsBeforeMessage.has(field));
@@ -2091,7 +2127,7 @@ export async function processInboundAiResponse({
     expectedWasAnswered,
     advancedToAnotherField: currentMessageAdvancedToAnotherField,
     extractedFieldCount: fieldsExtractedFromCurrentMessage.length,
-    messageLength: normalizedInboundMessage.length,
+    messageLength: currentTurnMessageText.length,
     messageKind: effectiveMessageKind,
   })) {
     const pendingField = pendingQuestionAfterExtraction.key as keyof ConversationMemory;
@@ -2125,7 +2161,7 @@ export async function processInboundAiResponse({
         });
       }
 
-      const applied = applyAiMemoryUpdates(updatedMemory, aiFallbackResult?.memoryUpdates, sourceIdentifier ?? undefined, normalizedInboundMessage);
+      const applied = applyAiMemoryUpdates(updatedMemory, aiFallbackResult?.memoryUpdates, currentTurnSourceMessageId, currentTurnMessageText);
       if (applied.applied.length > 0) {
         updatedMemory = applied.memory;
         fallbackAppliedCount = applied.applied.length;
@@ -2523,9 +2559,9 @@ export async function processInboundAiResponse({
 
   // Merge any memory updates proposed by the LLM (from aiResult.structured)
   const currentInboundHasPositiveCnpjEvidence = extractFieldsFromMessage(
-    userMessageBody,
+    currentTurnMessageText,
     createEmptyMemory(),
-    sourceIdentifier ?? undefined,
+    currentTurnSourceMessageId,
   ).companyHasCnpj?.value === "true";
   if (aiResult.success && aiResult.structured?.memoryUpdates) {
     const addField = (key: string) => {
@@ -2543,29 +2579,29 @@ export async function processInboundAiResponse({
 
       if (field === "customerName") {
         if (!updatedMemory.customerName || confidence >= (updatedMemory.customerName.confidence ?? 0)) {
-          updatedMemory.customerName = { value, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
-          updatedMemory.customerFirstName = { value: value.split(" ")[0], confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
+          updatedMemory.customerName = { value, confidence: confidence as 0 | 1, sourceMessageId: currentTurnSourceMessageId };
+          updatedMemory.customerFirstName = { value: value.split(" ")[0], confidence: confidence as 0 | 1, sourceMessageId: currentTurnSourceMessageId };
           addField("customerName");
         }
       } else if (field === "email") {
         if (!updatedMemory.email || confidence >= (updatedMemory.email.confidence ?? 0)) {
-          updatedMemory.email = { value: value.toLowerCase(), confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
+          updatedMemory.email = { value: value.toLowerCase(), confidence: confidence as 0 | 1, sourceMessageId: currentTurnSourceMessageId };
           addField("email");
         }
       } else if (field === "city") {
         if (!updatedMemory.city || confidence >= (updatedMemory.city.confidence ?? 0)) {
-          updatedMemory.city = { value, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
+          updatedMemory.city = { value, confidence: confidence as 0 | 1, sourceMessageId: currentTurnSourceMessageId };
           addField("city");
         }
       } else if (field === "planType") {
         const planVal = /individual|familiar|empresarial/i.test(value) ? value.toLowerCase() : "individual";
         if (!updatedMemory.planType || confidence >= (updatedMemory.planType.confidence ?? 0)) {
-          updatedMemory.planType = { value: planVal, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
+          updatedMemory.planType = { value: planVal, confidence: confidence as 0 | 1, sourceMessageId: currentTurnSourceMessageId };
           addField("planType");
         }
       } else if (field === "numberOfLives") {
         if (!updatedMemory.numberOfLives || confidence >= (updatedMemory.numberOfLives.confidence ?? 0)) {
-          updatedMemory.numberOfLives = { value, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
+          updatedMemory.numberOfLives = { value, confidence: confidence as 0 | 1, sourceMessageId: currentTurnSourceMessageId };
           addField("numberOfLives");
         }
       } else if (field === "age") {
@@ -2575,17 +2611,17 @@ export async function processInboundAiResponse({
           const listed = value.match(/\d{1,3}/g)?.map(Number).filter((age) => age < 150) ?? [];
           if (isPme && listed.length > 1) {
             // Several ages: keep each one (said back to the customer); the average is only an internal number.
-            updatedMemory.age = { value: listed.join(", "), confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
-            updatedMemory.averageAge = { value: String(Math.round(listed.reduce((sum, age) => sum + age, 0) / listed.length)), confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
-          } else if (isPme) updatedMemory.averageAge = { value, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
-          else updatedMemory.age = { value, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
+            updatedMemory.age = { value: listed.join(", "), confidence: confidence as 0 | 1, sourceMessageId: currentTurnSourceMessageId };
+            updatedMemory.averageAge = { value: String(Math.round(listed.reduce((sum, age) => sum + age, 0) / listed.length)), confidence: confidence as 0 | 1, sourceMessageId: currentTurnSourceMessageId };
+          } else if (isPme) updatedMemory.averageAge = { value, confidence: confidence as 0 | 1, sourceMessageId: currentTurnSourceMessageId };
+          else updatedMemory.age = { value, confidence: confidence as 0 | 1, sourceMessageId: currentTurnSourceMessageId };
           addField("age");
         }
       } else if (field === "companyHasCnpj") {
         const val = /true|sim|yes/i.test(value) ? "true" : "false";
         if (val === "true" && !currentInboundHasPositiveCnpjEvidence) continue;
         if (!updatedMemory.companyHasCnpj || confidence >= (updatedMemory.companyHasCnpj.confidence ?? 0)) {
-          updatedMemory.companyHasCnpj = { value: val, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
+          updatedMemory.companyHasCnpj = { value: val, confidence: confidence as 0 | 1, sourceMessageId: currentTurnSourceMessageId };
           addField("companyHasCnpj");
         }
       }
@@ -2594,7 +2630,7 @@ export async function processInboundAiResponse({
 
   // Reapply deterministic facts after model updates so structured suggestions cannot
   // override positive company evidence from the inbound message.
-  updatedMemory = extractFieldsFromMessage(userMessageBody, updatedMemory, sourceIdentifier ?? undefined);
+  updatedMemory = extractFieldsFromMessage(userMessageBody, updatedMemory, currentTurnSourceMessageId);
 
   // The model can extract a field from the same message it responds to. Re-evaluate
   // after those structured updates so the final answer is not an extra question and

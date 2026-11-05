@@ -18,11 +18,12 @@ const input = {
 beforeEach(() => { mocks.runGateway.mockReset(); mocks.logAiUsage.mockReset(); });
 
 describe("qualification interpreter", () => {
-  it("uses the gateway interpreter profile: paid models only, 6 s each, two models at most", async () => {
+  it("uses paid providers only, 6 s each, Haiku retry, and a widened paid fallback chain", async () => {
     mocks.runGateway.mockResolvedValue({ ok: true, value: { memoryUpdates: [{ field: "planType", value: "familiar", confidence: 1 }] }, text: "", model: { provider: "openrouter", model: "google/gemini-3.1-flash-lite" }, attempts: 1 });
     const result = await interpretQualificationTurn(input);
-    expect(mocks.runGateway).toHaveBeenCalledWith(expect.objectContaining({ profile: "interpreter", purpose: "qualification_fallback", sensitive: true, timeoutMs: INTERPRETER_TIMEOUT_MS, maxAttempts: INTERPRETER_MAX_ATTEMPTS, conversationId: "c1", sourceMessageId: "m1" }));
+    expect(mocks.runGateway).toHaveBeenCalledWith(expect.objectContaining({ profile: "interpreter", purpose: "qualification_fallback", sensitive: true, timeoutMs: INTERPRETER_TIMEOUT_MS, maxTokens: 1_000, maxAttempts: INTERPRETER_MAX_ATTEMPTS, retryAnthropicHaikuOnTransient: true, conversationId: "c1", sourceMessageId: "m1" }));
     expect(INTERPRETER_TIMEOUT_MS).toBe(6_000);
+    expect(INTERPRETER_MAX_ATTEMPTS).toBe(5);
     expect(result).toMatchObject({ ok: true, modelUsed: "openrouter/google/gemini-3.1-flash-lite", memoryUpdates: [{ field: "planType", value: "familiar" }] });
     // The gateway logs the successful attempt itself.
     expect(mocks.logAiUsage).not.toHaveBeenCalled();
@@ -57,6 +58,17 @@ describe("qualification interpreter", () => {
     expect(system.content).toContain("Nome: [NOME]");
     expect(system.content).toContain("\"memoryUpdates\"");
     expect(last).toEqual({ role: "user", content: "é pra família" });
+  });
+
+  it("keeps every customer message since the last AI reply even when the burst exceeds twelve bubbles", () => {
+    const messages = [
+      { role: "assistant" as const, content: "Quantas vidas?" },
+      ...Array.from({ length: 14 }, (_, index) => ({ role: "user" as const, content: `resposta ${index + 1}` })),
+    ];
+    const built = buildInterpreterMessages({ ...input, messages });
+    expect(built).toHaveLength(16);
+    expect(built[1]).toEqual({ role: "assistant", content: "Quantas vidas?" });
+    expect(built.slice(2).map((message) => message.content)).toEqual(Array.from({ length: 14 }, (_, index) => `resposta ${index + 1}`));
   });
 
   it("redacts identifiers, address and the lead name throughout fallback provider input", () => {

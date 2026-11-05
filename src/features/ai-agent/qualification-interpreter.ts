@@ -6,13 +6,13 @@ import { redactQualificationContextText } from "./context-analysis";
 /**
  * The LLM interpreter of a qualification turn (purpose "qualification_fallback").
  * It runs inside the customer's turn, so it goes through the AI gateway with the
- * fast "interpreter" profile: two models at most, 6 s each, then the rule engine
+ * fast "interpreter" profile: paid providers, at most five model attempts, 6 s each, then the rule engine
  * answers alone. Every attempt is logged by the gateway; giving up is logged with
  * status "fallback" and the reason, so failures do not hide behind a "success".
  */
 
 export const INTERPRETER_TIMEOUT_MS = 6_000;
-export const INTERPRETER_MAX_ATTEMPTS = 2;
+export const INTERPRETER_MAX_ATTEMPTS = 5;
 export const RULE_ENGINE_MODEL = "fallback-rule-engine";
 
 /**
@@ -54,9 +54,13 @@ export function buildInterpreterMessages(input: {
     `Contexto do Lead: Nome: ${redactedName || "Não informado"}, Tipo: ${input.leadType || "Não definido"}.`,
     OUTPUT_INSTRUCTION,
   ].filter(Boolean).join("\n\n");
+  const lastAssistantIndex = input.messages.reduce((lastIndex, message, index) => message.role === "assistant" ? index : lastIndex, -1);
+  const currentTurn = input.messages.slice(lastAssistantIndex + 1);
+  const priorContext = lastAssistantIndex >= 0 ? input.messages.slice(0, lastAssistantIndex + 1).slice(-12) : [];
+  const turnContext = [...priorContext, ...currentTurn];
   return [
     { role: "system" as const, content: system },
-    ...input.messages.slice(-12).map((message) => ({ role: message.role, content: redact(message.content) })),
+    ...turnContext.map((message) => ({ role: message.role, content: redact(message.content) })),
   ];
 }
 
@@ -103,9 +107,10 @@ export async function interpretQualificationTurn(input: {
       // The customer's conversation: only paid models that do not train on it (LGPD art. 11).
       sensitive: true,
       temperature: 0,
-      maxTokens: 450,
+      maxTokens: 1_000,
       timeoutMs: INTERPRETER_TIMEOUT_MS,
       maxAttempts: INTERPRETER_MAX_ATTEMPTS,
+      retryAnthropicHaikuOnTransient: true,
       schema: interpreterOutputSchema,
       messages: buildInterpreterMessages(input),
     });
