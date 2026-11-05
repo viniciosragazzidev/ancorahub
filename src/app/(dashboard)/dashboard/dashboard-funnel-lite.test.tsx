@@ -26,7 +26,10 @@ vi.mock("@/features/qualification-turbo/funnel", () => ({
   parseFunnelPeriod: (value: string | undefined) => (value === "30" ? 30 : value === "90" ? 90 : 7),
   funnelPeriodForOverview: (period: "today" | "7d" | "30d") => period === "today" ? "today" : period === "7d" ? 7 : 30,
   getQualificationFunnel: (...args: unknown[]) => state.getFunnel(...args),
+  funnelPeriodStart: () => new Date("2026-11-01T03:00:00.000Z"),
 }));
+// Funil profissional (05/11): os recortes extras têm teste próprio; aqui só não podem quebrar a aba.
+vi.mock("@/features/funnel-insights/queries", () => ({ getFunnelInsights: async () => null }));
 vi.mock("@/features/reports/metrics/narrow-scope", () => ({ parseBranchIdParam: (value: string | undefined) => value ?? null }));
 vi.mock("@/features/director-lite/style-flag", () => ({ shouldUseDirectorLiteStyle: async () => !["broker", "supervisor"].includes(state.role) && state.flag }));
 vi.mock("@/features/dashboard/director-lite-branches", () => ({

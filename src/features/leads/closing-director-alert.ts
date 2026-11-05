@@ -14,8 +14,23 @@ import {
   closingDirectorAlertKey,
   closingDirectorAlertVariables,
   closingDirectorRecipientsKey,
+  noticeRecipientsKey,
   parseRecipientPhones,
 } from "./closing-director-alert-core";
+
+/**
+ * Números de um aviso enviado a telefones digitados (05/11). O relatório das 18h, sem lista própria, usa os números
+ * do Fechamento para a direção.
+ */
+export async function getNoticeRecipients(tenantId: string, noticeKey: string): Promise<string[]> {
+  try {
+    const own = parseRecipientPhones(await getSystemSetting(noticeRecipientsKey(noticeKey, tenantId)));
+    if (own.length || noticeKey === CLOSING_DIRECTOR_NOTICE_KEY) return own;
+    return getClosingDirectorRecipients(tenantId);
+  } catch {
+    return [];
+  }
+}
 
 export async function getClosingDirectorRecipients(tenantId: string): Promise<string[]> {
   try {

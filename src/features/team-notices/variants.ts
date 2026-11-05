@@ -14,6 +14,7 @@ export type NoticeFields =
   | { purpose: "leadClientReturned"; broker: string; lead: string; since: string; link: string | null }
   | { purpose: "leadClosingStage"; broker: string; lead: string; link: string | null }
   | { purpose: "leadClosingDirectorAlert"; lead: string; phone: string; deal: string; broker: string; stage: string; summary: string; link: string | null }
+  | { purpose: "dailyLeadsReport"; date: string; report: string; link: string | null }
   | { purpose: "taskReminder"; name: string; task: string; when: string }
   | { purpose: "brokerAccountActivated"; name: string; company: string; loginUrl: string }
   | { purpose: "dutyPresenceConfirmation"; broker: string; hour: string; link: string | null }
@@ -134,6 +135,15 @@ export function builtInNoticeVariants(fields: NoticeFields, hour: number): strin
         `${hi}! Mais um lead chegou ao fechamento 🙌\n\n${body}${tail(link, "Abrir no CRM: ")}`,
         `🏁 *Fechamento em andamento*\n\n${body}${tail(link, "👉 ")}`,
         `📈 *Novo lead em fechamento*\n\n${body}${tail(link, "Lead: ")}`,
+      ];
+    }
+    case "dailyLeadsReport": {
+      const { date, report, link } = fields;
+      return [
+        `📊 *Leads de ${date}*\n\n${report}${tail(link, "👉 *Funil no CRM:* ")}`,
+        `${hi}! Fechamento do dia (${date}) 📊\n\n${report}${tail(link, "Funil: ")}`,
+        `📊 *Resumo das 18h · ${date}*\n\n${report}${tail(link, "👉 ")}`,
+        `📈 *Como foi a entrada de leads hoje (${date})*\n\n${report}${tail(link, "Ver funil: ")}`,
       ];
     }
     case "taskReminder": {

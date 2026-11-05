@@ -811,6 +811,9 @@ function noticeTextFields(purpose: string, rawVariables: string[], urlButtonPara
       link: leadId ? `${baseUrl}/leads/${leadId}` : null,
     };
   }
+  if (purpose === "dailyLeadsReport") {
+    return { purpose, date: rawVariables[0]?.trim() || "hoje", report: rawVariables[1]?.trim() || "Nenhum lead entrou hoje.", link: `${baseUrl}/dashboard?tab=funnel` };
+  }
   if (purpose === "leadClosingDirectorAlert") {
     const leadId = rawVariables[6]?.trim();
     return {

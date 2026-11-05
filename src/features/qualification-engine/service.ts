@@ -9,6 +9,7 @@ import { beneficiariesFromMemory, parseAgeValues } from "@/features/ai-agent/ben
 import { deriveLeadQualificationStatus } from "@/features/leads/qualification-status";
 import { enqueueMetaQualificationConversion } from "@/features/meta-ads/meta-conversion-service";
 import { getDatabase, schema } from "@/shared/db";
+import { qualificationFunnelEvents, recordFunnelEvents } from "@/features/leads/funnel-events";
 import {
   composeQuestionReply,
   beneficiaryRelationInvitation,
@@ -429,10 +430,28 @@ export async function persistQualificationEvaluation(input: {
 
   await db.transaction(async (tx) => {
     const [currentLead] = await tx
-      .select({ qualificationDetails: schema.leads.qualificationDetails })
+      .select({
+        qualificationDetails: schema.leads.qualificationDetails,
+        branchId: schema.leads.branchId,
+        queueId: schema.leads.queueId,
+        sourceChannel: schema.leads.sourceChannel,
+        metaCampaignId: schema.leads.metaCampaignId,
+        metaAdId: schema.leads.metaAdId,
+        metaFormId: schema.leads.metaFormId,
+      })
       .from(schema.leads)
       .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
       .limit(1);
+    // Funil (05/11): cada pergunta respondida e o resultado da qualificação, uma vez cada.
+    if (currentLead) {
+      await recordFunnelEvents(tx, {
+        tenantId: input.tenantId,
+        leadId: input.leadId,
+        occurredAt: now,
+        origin: { branchId: currentLead.branchId, queueId: currentLead.queueId, sourceChannel: currentLead.sourceChannel, metaCampaignId: currentLead.metaCampaignId, metaAdId: currentLead.metaAdId, metaFormId: currentLead.metaFormId },
+        events: qualificationFunnelEvents(input.leadId, { state: result.state, classification: result.classification, completedFields: result.completedFields }),
+      });
+    }
     const existingDetails = currentLead?.qualificationDetails && typeof currentLead.qualificationDetails === "object" && !Array.isArray(currentLead.qualificationDetails)
       ? currentLead.qualificationDetails as Record<string, unknown>
       : {};

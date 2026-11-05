@@ -105,6 +105,17 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     phoneRecipients: true,
   },
   {
+    key: "DAILY_LEADS_REPORT",
+    purpose: "dailyLeadsReport",
+    label: "Relatório das 18h",
+    description: "Todo dia às 18h, para os números abaixo: quantos leads entraram em cada fila e quantos ficaram quentes, mornos e frios. Sem números próprios, usa os do Fechamento para a direção.",
+    // Sai às 18h todo dia (inclusive sábado e domingo), fora do horário comercial.
+    class: "any_day",
+    defaultEnabled: true,
+    defaultChannel: "company_number",
+    phoneRecipients: true,
+  },
+  {
     key: "LEAD_FEEDBACK_REMINDER",
     purpose: "leadFeedbackReminder",
     label: "Lembrete de feedback",

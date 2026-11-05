@@ -15,7 +15,7 @@ import { listLeadQualityQueues } from "@/features/reports/metrics/lead-quality-e
 import { LeadQualityCenter } from "@/features/reports/components/lead-quality-center";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
-import { funnelPeriodForOverview, getQualificationFunnel, parseFunnelPeriod } from "@/features/qualification-turbo/funnel";
+import { funnelPeriodForOverview, funnelPeriodStart, getQualificationFunnel, parseFunnelPeriod } from "@/features/qualification-turbo/funnel";
 import { QualificationFunnelView } from "@/features/qualification-turbo/components/qualification-funnel-view";
 import { parseOverviewPeriod } from "@/features/dashboard/overview-filter";
 import { parseBranchIdParam } from "@/features/reports/metrics/narrow-scope";
@@ -28,6 +28,8 @@ import { renderDirectorLiteQuality } from "@/features/dashboard/director-lite-qu
 import { getDirectorLiteViewerFirstName } from "@/features/dashboard/director-lite-viewer";
 import { liteDashboardTabs } from "@/features/dashboard/director-lite-tabs";
 import { hasPermission } from "@/shared/auth/permissions";
+import { FunnelInsightsPanel } from "@/features/funnel-insights/components/funnel-insights-panel";
+import { getFunnelInsights } from "@/features/funnel-insights/queries";
 
 type DashboardSearchParams = Record<string, string | string[] | undefined>;
 
@@ -86,15 +88,19 @@ export default async function DashboardPage({
         const funnelPeriod = funnelPeriodForOverview(overviewPeriod);
         const { canCompare, units } = await getDashboardUnitFilter(context);
         const branchId = canCompare ? resolveRequestedUnit(parseBranchIdParam(singleParam(resolvedSearchParams.unidade)), units) : null;
-        const [funnel, firstName] = await Promise.all([
+        const [funnel, firstName, insights] = await Promise.all([
           getQualificationFunnel(context, funnelPeriod, branchId),
           getDirectorLiteViewerFirstName(context.userId),
+          getFunnelInsights(context, funnelPeriodStart(funnelPeriod), branchId).catch(() => null),
         ]);
-        return <DirectorLiteQualificationFunnelPage data={funnel} branchId={branchId} branches={canCompare ? units : []} firstName={firstName} now={new Date()} />;
+        return <DirectorLiteQualificationFunnelPage data={funnel} branchId={branchId} branches={canCompare ? units : []} firstName={firstName} now={new Date()} insights={insights ? <FunnelInsightsPanel insights={insights} steps={funnel.stages} /> : null} />;
       }
       const funnelPeriod = parseFunnelPeriod(singleParam(resolvedSearchParams.period));
-      const funnel = await getQualificationFunnel(context, funnelPeriod);
-      return <QualificationFunnelView data={funnel} showQualityTab />;
+      const [funnel, insights] = await Promise.all([
+        getQualificationFunnel(context, funnelPeriod),
+        getFunnelInsights(context, funnelPeriodStart(funnelPeriod)).catch(() => null),
+      ]);
+      return <QualificationFunnelView data={funnel} showQualityTab {...(insights ? { insights: <FunnelInsightsPanel insights={insights} steps={funnel.stages} /> } : {})} />;
     }
     if (activeTab === "quality" && canReadQuality) {
       // Qualidade no visual Lite (chave ligada), vista Simples. Detalhada e recortes seguem na tela antiga.

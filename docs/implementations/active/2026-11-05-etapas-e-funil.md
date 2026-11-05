@@ -8,7 +8,27 @@
    melhorar a qualidade do lead junto com marketing e geração de leads. Por baixo, completo; na tela, leve
    para quem opera; o máximo automático, com informação clara.
 
-Status: **plano, aguardando aprovação.** Nenhum código mudou.
+Status: **implementado em 05/11** (decisões tomadas pelas recomendações: "Aguardando retorno", 5 + 10 dias úteis,
+Perdido sozinho com aviso 2 dias antes). **Aplicar `drizzle/0219_etapas_e_funil.sql` ANTES do deploy**: o código lê as
+colunas novas do lead em toda mudança de etapa.
+
+### O que foi entregue (05/11)
+- Etapa `awaiting_reply` em todas as listas de leads ativos e rótulos (fora de Negociações e da sequência do funil
+  de Relatórios, onde conta como "chegou até Cotação").
+- Regra de chat parado: `leads/stale-stage-rule.ts` (pura) + `stale-stage-sweep.ts` + job `/api/internal/jobs/stale-stages`
+  (9h de SP). Volta sozinho no gatilho de cada mensagem (`conversation-intelligence/trigger.ts`). Cada empresa começa em
+  simulação; cartão em Leads para o diretor com "Ver lista" e "Aplicar e ligar". Faixa e "Manter em …" no lead.
+- Histórico `lead_stage_history` gravado em `changeLeadStatus`, no lote, na venda (pós-venda e proposta) e no início do
+  atendimento. A distribuição já tem `lead_distribution_events` e não foi duplicada.
+- Eventos `lead_funnel_events`: primeira entrada em cada etapa, cada pergunta respondida e o resultado da qualificação
+  (em `persistQualificationEvaluation`). Chegada, mensagens e corretor saem das tabelas que já existem.
+- IA respeita o Desfazer por 7 dias (`ai-move.ts` `recentlyUndoneAiMove`).
+- Aba Funil (`/dashboard?tab=funnel`, nas duas versões): frase da maior perda, "Onde param na qualificação" (primeira
+  pergunta que faltou, vale para o passado), "Onde perdemos" e "Qualidade por campanha". Calculado na hora; o resumo
+  diário em tabela (`funnel_daily`) ficou para quando o volume pedir.
+- Relatório das 18h por WhatsApp (pedido de 05/11, no lugar do resumo semanal): aviso da equipe `DAILY_LEADS_REPORT`
+  com lista de números própria (sem lista, usa a do Fechamento para a direção), job `/api/internal/jobs/daily-report`.
+  Números por aviso: `noticeRecipientsKey` (o fechamento mantém a chave antiga).
 
 ---
 

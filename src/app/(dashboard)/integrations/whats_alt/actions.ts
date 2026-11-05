@@ -12,7 +12,7 @@ import { normalizeTenantChannelRouting, type TenantChannelRouting } from "@/feat
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { teamNoticeByKey, type NoticeChannel } from "@/features/team-notices/catalog";
 import { MAX_NOTICE_FREE_MESSAGES } from "@/features/team-notices/variants";
-import { closingDirectorRecipientsKey, MAX_CLOSING_DIRECTOR_RECIPIENTS, normalizeRecipientPhone } from "@/features/leads/closing-director-alert-core";
+import { MAX_CLOSING_DIRECTOR_RECIPIENTS, noticeRecipientsKey, normalizeRecipientPhone } from "@/features/leads/closing-director-alert-core";
 import {
   disconnectTenantChannel,
   readTenantChannelState,
@@ -125,9 +125,8 @@ export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<R
     await getDatabase().transaction(async (tx) => {
       // Numbers in the same transaction as the switches: all saved or nothing.
       for (const list of phoneLists) {
-        if (list.key !== "LEAD_CLOSING_DIRECTOR") continue;
         const value = JSON.stringify(list.phones);
-        await tx.insert(schema.systemSettings).values({ key: closingDirectorRecipientsKey(context.tenantId), value, updatedAt: now })
+        await tx.insert(schema.systemSettings).values({ key: noticeRecipientsKey(list.key, context.tenantId), value, updatedAt: now })
           .onConflictDoUpdate({ target: schema.systemSettings.key, set: { value, updatedAt: now } });
       }
       for (const item of rows) {
