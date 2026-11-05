@@ -30,6 +30,8 @@ import { getBrokerMetricTimeline } from "@/features/reports/metrics/team-metric-
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { MemberProfileLite } from "./_components/member-profile-lite";
+import { BrokerLeadsExportButton } from "./_components/broker-leads-export-button";
+import { canExportBrokerLeads } from "@/features/team/broker-lead-export-access";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +85,7 @@ export default async function TeamMemberProfilePage({
   const window = normalizeBrokerPerformanceWindow(janela);
   const profile = await getTeamMemberProfile(id);
   if (!profile) redirect("/access-denied");
+  const canExportLeads = profile.member.role === "broker" && await canExportBrokerLeads(context);
 
   const audience = await getLiteAudience(context);
   const managerLite = context.role === "manager" && audience === "manager";
@@ -118,7 +121,7 @@ export default async function TeamMemberProfilePage({
       metricTimeline={timeline.available ? timeline.points : null}
       recognitions={extras.recognitions}
       managerProfile={{ temperature: profile.metrics.temperature, quotes: profile.metrics.quotes, sales: profile.metrics.sales, interactions: profile.metrics.interactions, tasks: profile.metrics.tasks, dutyDays: profile.dutyDays.map((day) => ({ date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(`${day.date}T12:00:00-03:00`)), scheduleName: day.scheduleName, startsAt: day.startsAt, endsAt: day.endsAt, state: day.state })) }}
-      managementActions={<LiteBrokerProfileActions userId={profile.member.userId} name={profile.member.name} email={profile.member.email} phone={profile.member.brokerPhone ?? ""} active={active} canResetPassword />}
+      managementActions={<div className="flex flex-wrap items-center gap-2"><LiteBrokerProfileActions userId={profile.member.userId} name={profile.member.name} email={profile.member.email} phone={profile.member.brokerPhone ?? ""} active={active} canResetPassword />{canExportLeads ? <BrokerLeadsExportButton brokerId={profile.member.userId} compact /> : null}</div>}
       showSupervisorActions={false}
       monthGoal={monthGoalRow ? { brokerId: profile.member.userId, period: monthGoalRow.period, goal: monthGoalRow.goal, canEdit: false } : undefined}
     />;
@@ -231,6 +234,7 @@ export default async function TeamMemberProfilePage({
             showFeedbacks={isBroker && (context.role === "director" || context.role === "manager")}
             ranking={isBroker && ranking ? { stats: ranking.stats, ranks: ranking.ranks, periodDays: ranking.periodDays, withoutStep: ranking.withoutStep } : null}
             scopeNote={context.role === "manager"}
+            canExportLeads={canExportLeads}
             now={new Date().toISOString()}
           />
         </main>
@@ -241,6 +245,7 @@ export default async function TeamMemberProfilePage({
   return <>
     <DashboardHeader breadcrumb="Equipe" title="Perfil do membro" rightSlot={<Button render={<Link href="/equipe" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar à equipe</Button>} />
     <main className="mx-auto flex min-h-full w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6">
+      {canExportLeads ? <div className="flex justify-end"><BrokerLeadsExportButton brokerId={member.userId} compact /></div> : null}
       <Card className="border-transparent bg-transparent shadow-none">
         <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="flex min-w-0 items-center gap-4">

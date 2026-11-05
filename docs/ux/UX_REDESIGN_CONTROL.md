@@ -499,3 +499,10 @@ sem novo token, primitive de layout ou movimento. Componente decorativo comparti
 com alpha, dimensões reservadas e fallback. Controle global editável e auditado no
 Super-admin, exposição visual limitada pelo papel e modo no servidor. Não avança o
 gate global do redesign. Registro: docs/implementations/active/2026-10-28-contextual-illustrations.md.
+## 2026-11-05: exportação da carteira do corretor
+
+Papel: Diretor ou Gestor autorizado no perfil do corretor em `/equipe/[id]`.
+Ação secundária: baixar a carteira atual, podendo remover convertidos/perdidos.
+Estados: opção marcada por padrão, geração, sucesso com contagem, arquivo vazio e erro.
+Reutiliza Button, Checkbox e tokens existentes; sem novas primitives, tokens ou movimento.
+Não avança a etapa global do redesign. Registro: `docs/implementations/completed/2026-11-05-exportar-leads-corretor.md`.
