@@ -2,6 +2,13 @@
 
 import { decidirCorretorNaMudancaDeEtapa } from "./qualification-stage-rules";
 
+/** The lead changed hands between reading and writing; the screen must reload. */
+class ErroLeadMudou extends Error {
+  constructor() {
+    super("O lead acabou de mudar (outro corretor ou ação pegou ele). Atualize a tela e tente de novo.");
+  }
+}
+
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -266,10 +273,12 @@ export async function manuallyChangeQualificationStageAction(input: {
     if (decisao.tipo === "bloquear") {
       return { success: false, error: decisao.motivo };
     }
+    // Atomic guard: the write only applies if the broker is still the one read above (a broker may accept in between).
+    const mesmoCorretor = corretorAtual ? eq(schema.leads.corretorId, corretorAtual) : isNull(schema.leads.corretorId);
 
     if (input.targetStage === "qualificacoes") {
       await db.transaction(async (tx) => {
-        await tx
+        const atualizado = await tx
           .update(schema.leads)
           .set({
             qualificationStatus: "qualifying",
@@ -280,7 +289,9 @@ export async function manuallyChangeQualificationStageAction(input: {
             assignedAt: null,
             updatedAt: now,
           })
-          .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+          .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId), mesmoCorretor))
+          .returning({ id: schema.leads.id });
+        if (!atualizado.length) throw new ErroLeadMudou();
 
         await tx.insert(schema.leadInteractions).values({
           id: randomUUID(),
@@ -306,7 +317,7 @@ export async function manuallyChangeQualificationStageAction(input: {
       const finalQualStatus = chosenRating === "not_qualified" ? "disqualified" : chosenRating;
 
       await db.transaction(async (tx) => {
-        await tx
+        const atualizado = await tx
           .update(schema.leads)
           .set({
             qualificationStatus: finalQualStatus,
@@ -325,7 +336,9 @@ export async function manuallyChangeQualificationStageAction(input: {
                 }),
             updatedAt: now,
           })
-          .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+          .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId), mesmoCorretor))
+          .returning({ id: schema.leads.id });
+        if (!atualizado.length) throw new ErroLeadMudou();
 
         await tx.insert(schema.leadInteractions).values({
           id: randomUUID(),
@@ -389,6 +402,7 @@ export async function manuallyChangeQualificationStageAction(input: {
 
     return { success: true };
   } catch (error) {
+    if (error instanceof ErroLeadMudou) return { success: false, error: error.message };
     return {
       success: false,
       error: error instanceof Error ? error.message : "Erro ao alterar estágio do lead.",
