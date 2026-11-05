@@ -3,11 +3,9 @@ import { getSituationsOverview } from "@/features/attendance-situations/service"
 import { autoActivatedKeys, getLearningOverview } from "@/features/situation-learning/service";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { AtendimentoHeading } from "../_components/atendimento-heading";
 import { SituationsWorkspace } from "./_components/situations-workspace";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
-import { AtendimentoHeadingLite } from "../_components/atendimento-heading-lite";
 import { SituationsWorkspaceLite } from "./_components/situations-workspace-lite";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +36,6 @@ export default async function AtendimentoSituacoesPage({ searchParams }: { searc
       <>
         <DashboardHeader breadcrumb="Atendimento" title="Situações" />
         <main className={litePage.stack}>
-          <AtendimentoHeadingLite active="situacoes" />
           <SituationsWorkspaceLite situations={situations} learning={learning} autoActivatedKeys={aiKeys} initialView={params.view} canConfigure={context.role === "director"} />
         </main>
       </>
@@ -49,7 +46,6 @@ export default async function AtendimentoSituacoesPage({ searchParams }: { searc
     <>
       <DashboardHeader breadcrumb="Atendimento" title="Situações" />
       <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
-        <AtendimentoHeading active="situacoes" />
         <SituationsWorkspace situations={situations} learning={learning} autoActivatedKeys={aiKeys} initialView={params.view} canConfigure={context.role === "director"} />
       </main>
     </>

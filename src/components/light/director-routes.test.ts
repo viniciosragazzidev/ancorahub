@@ -14,8 +14,8 @@ describe("resolveDirectorRoute", () => {
     expect(resolveDirectorRoute("/equipe")).toEqual({ title: "Equipe", parentHref: null });
   });
 
-  it("retorna de Negociações ao painel", () => {
-    expect(resolveDirectorRoute("/negociacoes")).toEqual({ title: "Negociações", parentHref: "/dashboard" });
+  it("Negociações é aba de Comercial, sem voltar; a prévia volta ao painel", () => {
+    expect(resolveDirectorRoute("/negociacoes")).toEqual({ title: "Negociações", parentHref: null });
     expect(resolveDirectorRoute("/dev/negociacoes-preview")).toEqual({ title: "Negociações", parentHref: "/dashboard" });
   });
 
@@ -27,7 +27,8 @@ describe("resolveDirectorRoute", () => {
   });
 
   it("distingue rotas de detalhe das rotas secundárias da equipe", () => {
-    expect(resolveDirectorRoute("/equipe/cargos")).toEqual({ title: "Cargos", parentHref: "/equipe" });
+    // Cargos é aba de Configurações: troca pela barra de abas, sem voltar.
+    expect(resolveDirectorRoute("/equipe/cargos")).toEqual({ title: "Cargos", parentHref: null });
     expect(resolveDirectorRoute("/equipe/plantao")).toEqual({ title: "Plantão da equipe", parentHref: "/equipe" });
     expect(resolveDirectorRoute("/equipe/corretor-8")).toEqual({ title: "Perfil do corretor", parentHref: "/equipe" });
     expect(resolveDirectorRoute("/leads/distribuicao/plantao/agenda-2")).toEqual({ title: "Plantão", parentHref: "/distribuicao?view=plantao" });

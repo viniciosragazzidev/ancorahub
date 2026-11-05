@@ -7,7 +7,6 @@
  */
 import { DashboardHeader } from "@/components/dashboard-header";
 import litePage from "@/components/lite/page/lite-page.module.css";
-import { AtendimentoHeadingLite } from "@/app/(dashboard)/atendimento/_components/atendimento-heading-lite";
 import { FlowEditorLite } from "@/app/(dashboard)/atendimento/fluxo/_components/flow-editor-lite";
 import { MessagesWorkspaceLite } from "@/app/(dashboard)/atendimento/mensagens/_components/messages-workspace-lite";
 import { SituationsWorkspaceLite } from "@/app/(dashboard)/atendimento/situacoes/_components/situations-workspace-lite";
@@ -144,7 +143,6 @@ export function SituacoesShellScreen() {
     <>
       <DashboardHeader breadcrumb="Atendimento" title="Situações" />
       <main className={litePage.stack}>
-        <AtendimentoHeadingLite active="situacoes" />
         <SituationsWorkspaceLite situations={situations} learning={{ suggestions: [], coverage: { percent: 82, covered: 41, total: 50 }, autoActivate: false }} autoActivatedKeys={["s1"]} canConfigure />
       </main>
     </>
@@ -166,7 +164,6 @@ export function MensagensShellScreen() {
     <>
       <DashboardHeader breadcrumb="Atendimento" title="Mensagens" />
       <main className={litePage.stack}>
-        <AtendimentoHeadingLite active="mensagens" />
         <MessagesWorkspaceLite messages={messages} />
       </main>
     </>
@@ -179,7 +176,6 @@ export function FluxoShellScreen() {
     <>
       <DashboardHeader breadcrumb="Atendimento" title="Fluxo de atendimento" />
       <main className={litePage.stack}>
-        <AtendimentoHeadingLite active="fluxo" />
         <FlowEditorLite enabledOrder={keys.slice(0, Math.max(1, keys.length - 1))} texts={{ [keys[0]!]: "Para começar, qual o seu nome completo?" }} canEdit />
       </main>
     </>

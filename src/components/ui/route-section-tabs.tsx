@@ -7,7 +7,7 @@ type RouteSectionTab = {
   id: string;
   label: string;
   href: string;
-  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  icon?: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 };
 
 /** URL-backed section navigation shared by management pages. */
@@ -26,7 +26,7 @@ export function RouteSectionTabs({ label, tabs, active }: { label: string; tabs:
           current ? "text-foreground" : "text-muted-foreground hover:text-foreground",
         )}
       >
-        <Icon aria-hidden={true} className="size-3.5" />
+        {Icon ? <Icon aria-hidden={true} className="size-3.5" /> : null}
         {tab.label}
         {current ? <span aria-hidden="true" className="absolute -bottom-px left-3 right-3 h-0.5 rounded-full bg-primary" /> : null}
       </Link>;
