@@ -81,6 +81,16 @@ function monthEnd(month: string) {
   return new Date(Date.UTC(year, value, 0)).toISOString().slice(0, 10);
 }
 
+export type BrokerOrder = "added" | "seats" | "name";
+const BROKER_ORDER_LABEL: Record<BrokerOrder, string> = { added: "Adicionados", seats: "Cadeiras", name: "A–Z" };
+
+/** Lista de corretores da escala na ordem escolhida; empate em cadeiras vai por nome. */
+export function sortQualified<T extends Pick<Entry, "brokerId" | "allowed" | "seats">>(entries: readonly T[], order: BrokerOrder, chosen: ReadonlySet<string>, nameOf: (brokerId: string) => string): T[] {
+  if (order === "added") return [...entries];
+  const byName = (a: T, b: T) => nameOf(a.brokerId).localeCompare(nameOf(b.brokerId), "pt-BR", { sensitivity: "base" });
+  return [...entries].sort(order === "name" ? byName : (a, b) => seatTotal(b, chosen) - seatTotal(a, chosen) || byName(a, b));
+}
+
 const seatTotal = (entry: Pick<Entry, "allowed" | "seats">, keys?: ReadonlySet<string>) =>
   entry.allowed.filter((key) => !keys || keys.has(key)).reduce((sum, key) => sum + (entry.seats[key] ?? 0), 0);
 
@@ -252,6 +262,9 @@ export function MonthlyDutyPlanner({
   const isPending = (entry: Entry) => entry.allowed.some((key) => chosen.has(key) && !(entry.seats[key] > 0));
   const pendingCount = qualified.filter(isPending).length;
   const seatsRequested = qualified.reduce((sum, entry) => sum + seatTotal(entry, chosen), 0);
+  // Ordem da lista de corretores da escala: como foram adicionados, mais cadeiras primeiro ou A–Z.
+  const [brokerOrder, setBrokerOrder] = useState<BrokerOrder>("added");
+  const orderedQualified = useMemo(() => sortQualified(qualified, brokerOrder, chosen, (id) => brokerById.get(id)?.name ?? ""), [brokerById, brokerOrder, chosen, qualified]);
   const chosenDates = chosenList.reduce((sum, info) => sum + (periodByType.get(info.key)?.dates ?? 0), 0);
 
   function addBroker(broker: Broker) {
@@ -532,9 +545,27 @@ export function MonthlyDutyPlanner({
                       onAdd={(item) => { const broker = brokerById.get(item.id); if (broker) addBroker(broker); }}
                     />
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs text-muted-foreground">
-                        {qualified.length} {qualified.length === 1 ? "corretor qualificado" : "corretores qualificados"} · {seatsRequested} cadeiras para {chosenDates} datas
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {qualified.length} {qualified.length === 1 ? "corretor qualificado" : "corretores qualificados"} · {seatsRequested} cadeiras para {chosenDates} datas
+                        </p>
+                        {qualified.length > 1 ? (
+                          <div role="radiogroup" aria-label="Ordenar corretores" className="grid grid-cols-3 rounded-[var(--radius-card)] border border-border bg-muted/40 p-0.5">
+                            {(["added", "seats", "name"] as const).map((order) => (
+                              <button
+                                key={order}
+                                type="button"
+                                role="radio"
+                                aria-checked={brokerOrder === order}
+                                onClick={() => setBrokerOrder(order)}
+                                className={cn("rounded-full px-2.5 py-1 text-xs font-medium", brokerOrder === order ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground")}
+                              >
+                                {BROKER_ORDER_LABEL[order]}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
                       {qualified.length > 1 ? (
                         <div className="flex items-center gap-1.5">
                           <Label htmlFor="plan-bulk" className="text-xs text-muted-foreground">Mesmas cadeiras para todos</Label>
@@ -548,7 +579,7 @@ export function MonthlyDutyPlanner({
                     </div>
                     {qualified.length ? (
                       <ul className="divide-y divide-border/60 rounded-[var(--radius-card)] border border-border bg-card">
-                        {qualified.map((entry) => {
+                        {orderedQualified.map((entry) => {
                           const broker = brokerById.get(entry.brokerId)!;
                           const keys = entry.allowed.filter((key) => chosen.has(key));
                           const single = keys.length === 1 ? keys[0] : null;
