@@ -379,7 +379,8 @@ export function MonthlyDutyPlanner({
     return { kept, added };
   }, [reviewOccurrences]);
   const reviewDates = [...new Set(reviewOccurrences.map((occurrence) => occurrence.dutyDate))];
-  const planTypeKeys = useMemo(() => [...new Set((plan?.occurrences ?? []).map(typeKeyOfOccurrence))].filter((key) => !limitToGenerated || generatedKeys.has(key)).sort((a, b) => (a === NO_TYPE_KEY ? 1 : b === NO_TYPE_KEY ? -1 : (typeInfo.get(a)?.name ?? "").localeCompare(typeInfo.get(b)?.name ?? "", "pt-BR"))), [generatedKeys, limitToGenerated, plan, typeInfo, typeKeyOfOccurrence]);
+  const allPlanTypeKeys = useMemo(() => [...new Set((plan?.occurrences ?? []).map(typeKeyOfOccurrence))].sort((a, b) => (a === NO_TYPE_KEY ? 1 : b === NO_TYPE_KEY ? -1 : (typeInfo.get(a)?.name ?? "").localeCompare(typeInfo.get(b)?.name ?? "", "pt-BR"))), [plan, typeInfo, typeKeyOfOccurrence]);
+  const planTypeKeys = useMemo(() => allPlanTypeKeys.filter((key) => !limitToGenerated || generatedKeys.has(key)), [allPlanTypeKeys, generatedKeys, limitToGenerated]);
   const hiddenTypes = generatedKeys.size ? new Set((plan?.occurrences ?? []).map(typeKeyOfOccurrence).filter((key) => !generatedKeys.has(key))).size : 0;
   const brokerRows = useMemo(() => {
     if (!plan) return [];
@@ -902,7 +903,7 @@ export function MonthlyDutyPlanner({
         </DialogPopup>
       </Dialog>
 
-      {plan ? <EscalaPdfDialog key={plan.id} open={pdfOpen} onOpenChange={setPdfOpen} planId={plan.id} rangeFrom={plan.rangeFrom} rangeUntil={plan.rangeUntil} canChooseUnit={canEdit} branches={branches} types={planTypeKeys.map((key) => ({ key, name: typeInfo.get(key)?.name ?? "Sem tipo" }))} /> : null}
+      {plan ? <EscalaPdfDialog key={plan.id} open={pdfOpen} onOpenChange={setPdfOpen} planId={plan.id} rangeFrom={plan.rangeFrom} rangeUntil={plan.rangeUntil} canChooseUnit={canEdit} branches={branches} types={allPlanTypeKeys.map((key) => ({ key, name: typeInfo.get(key)?.name ?? "Sem tipo" }))} /> : null}
 
       <Dialog open={confirmPublish} onOpenChange={setConfirmPublish}>
         <DialogPopup>
