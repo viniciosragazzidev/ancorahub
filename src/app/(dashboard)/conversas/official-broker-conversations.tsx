@@ -126,9 +126,8 @@ export function OfficialBrokerConversations({
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [selectedId, setSelectedId] = useState<string | null>(
-    conversations[0]?.brokerProfileId ?? null
-  );
+  // null = nenhuma conversa escolhida (no celular, mostra a lista). No desktop o painel usa o primeiro corretor.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Input individual chat
   const [directMessageText, setDirectMessageText] = useState("");
@@ -230,6 +229,14 @@ export function OfficialBrokerConversations({
 
   const selected =
     filtered.find((item) => item.brokerProfileId === selectedId) ?? filtered[0] ?? null;
+  // No celular, a conversa só abre quando o corretor é escolhido; "Voltar" limpa a escolha e mostra a lista.
+  const threadOpen = selectedId !== null && selected !== null;
+  const messageCount = selected?.messages.length ?? 0;
+  const threadEndRef = useRef<HTMLDivElement>(null);
+  // Abre a conversa no fim (mensagem mais recente), não no topo.
+  useEffect(() => {
+    threadEndRef.current?.scrollIntoView({ block: "end" });
+  }, [threadOpen, selected?.brokerProfileId, messageCount]);
 
   // Selecionar todos os visíveis no disparo em massa
   const handleOpenBulkModal = () => {
@@ -381,7 +388,7 @@ export function OfficialBrokerConversations({
           aria-label="Corretores com histórico no canal oficial"
           className={cn(
             "flex min-h-0 flex-col border-r border-border bg-card",
-            selected && "max-lg:hidden"
+            threadOpen && "max-lg:hidden"
           )}
         >
           <div className="grid gap-2 border-b border-border p-3">
@@ -506,7 +513,7 @@ export function OfficialBrokerConversations({
           aria-live="polite"
           className={cn(
             "flex min-h-0 flex-col bg-muted/10 dark:bg-muted/5",
-            !selected && "max-lg:hidden"
+            !threadOpen && "max-lg:hidden"
           )}
         >
           {selected ? (
@@ -609,6 +616,7 @@ export function OfficialBrokerConversations({
                       </Fragment>
                     );
                   })}
+                  <div ref={threadEndRef} aria-hidden="true" />
 
                   {!selected.messages.length ? (
                     <EmptyState
