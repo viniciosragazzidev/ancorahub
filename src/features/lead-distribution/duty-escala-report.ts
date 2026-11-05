@@ -94,10 +94,13 @@ export async function getDutyEscalaReportData(
         .where(inArray(schema.user.id, brokerIds))
       : Promise.resolve([]),
   ]);
+  // Plantão apagado (05/11): as datas dele de hoje em diante não vão para o PDF.
+  const existingSchedules = new Set(schedules.map((row) => row.id));
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
   return {
     plan,
     tenant: { name: tenantRow[0]?.name ?? "AncoraHub", logoUrl: tenantRow[0]?.logoUrl ?? null },
-    occurrences: planOccurrences,
+    occurrences: planOccurrences.filter((item) => existingSchedules.has(item.scheduleId) || item.dutyDate < today),
     assignments,
     brokers: people.map((person) => ({ id: person.id, name: person.name ?? "Corretor", code: person.code, branchId: person.branchId, branchName: person.branchName })),
     schedules,

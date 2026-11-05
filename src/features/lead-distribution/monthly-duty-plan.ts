@@ -302,6 +302,8 @@ export type PlanSettings = {
    */
   redrawFrom?: string;
   redrawUntil?: string;
+  /** Dias tirados da escala (feriado, reunião...): a geração não monta plantão neles (05/11). */
+  excludedDates?: string[];
   brokers: PlanBrokerSetting[];
 };
 
@@ -315,6 +317,7 @@ export function parsePlanSettings(value: unknown): PlanSettings | null {
     typeKeys: raw.typeKeys.filter((key): key is string => typeof key === "string"),
     generatedTypeKeys: Array.isArray(raw.generatedTypeKeys) ? raw.generatedTypeKeys.filter((key): key is string => typeof key === "string") : undefined,
     ...(typeof raw.redrawFrom === "string" && typeof raw.redrawUntil === "string" ? { redrawFrom: raw.redrawFrom, redrawUntil: raw.redrawUntil } : {}),
+    ...(Array.isArray(raw.excludedDates) ? { excludedDates: [...new Set(raw.excludedDates.filter((date): date is string => typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)))].sort() } : {}),
     brokers: (Array.isArray(raw.brokers) ? raw.brokers : []).filter((item): item is PlanBrokerSetting => Boolean(item && typeof item.brokerId === "string")).map((item) => ({
       brokerId: item.brokerId,
       modality: item.modality === "online" || item.modality === "presencial" ? item.modality : "any",
