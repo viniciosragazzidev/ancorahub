@@ -38,12 +38,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ plan
         selection = { kind: "tipo", typeId: typeId === "__none" ? null : typeId };
       } else return NextResponse.json({ error: "Escopo de relatório inválido." }, { status: 400 });
     }
+    // Optional days of the PDF (05/11): "De" and "Até" in the dialog.
+    const isDay = (value: string | null) => value === null || /^\d{4}-\d{2}-\d{2}$/.test(value);
+    const from = search.get("from") || null;
+    const until = search.get("until") || null;
+    if (!isDay(from) || !isDay(until)) return NextResponse.json({ error: "Data inválida no período do PDF." }, { status: 400 });
+    if (from && until && from > until) return NextResponse.json({ error: "A data inicial precisa ser antes da final." }, { status: 400 });
     const scope = await resolveDutyEscalaScope(db, context.tenantId, selection);
     if (!scope) return NextResponse.json({ error: "Unidade ou tipo não encontrado." }, { status: 404 });
     const data = await getDutyEscalaReportData(db, context.tenantId, planId, scope);
     // A Gestor only sees escalas the Diretor already published.
     if (!data || (context.role === "manager" && data.plan.status === "draft")) return NextResponse.json({ error: "Escala não encontrada." }, { status: 404 });
-    const report = buildDutyEscalaPdfInput(data);
+    const report = buildDutyEscalaPdfInput(data, { from, until });
     const body = await encodeDutyEscalaPdf(report);
     await db.insert(schema.auditLogs).values({
       id: randomUUID(), userId: context.userId, entidade: "report", entidadeId: planId,

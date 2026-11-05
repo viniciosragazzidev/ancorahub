@@ -40,6 +40,19 @@ describe("duty escala report projection", () => {
     expect(result.occurrences[1].brokers.map((item) => item.name)).toEqual(["Ana"]);
   });
 
+  it("keeps only the chosen days and prints them as the period", () => {
+    const result = buildDutyEscalaPdfInput(reportData(), { from: "2026-11-01", until: "2026-11-04" });
+    expect(result.occurrences.map((item) => item.id)).toEqual(["b"]);
+    expect(result.periodLabel).toBe("01/11/2026 a 04/11/2026");
+  });
+
+  it("keeps the chosen days inside the escala period and falls back to it when empty", () => {
+    expect(buildDutyEscalaPdfInput(reportData(), { from: "2026-10-01", until: "2026-12-31" }).periodLabel).toBe("28/10/2026 a 04/11/2026");
+    const whole = buildDutyEscalaPdfInput(reportData(), { from: null, until: null });
+    expect(whole.periodLabel).toBe("28/10/2026 a 04/11/2026");
+    expect(whole.occurrences).toHaveLength(3);
+  });
+
   it("filters by type, including the explicit no-type key", () => {
     const data = reportData();
     data.scope = { kind: "tipo", typeId: "type-b", typeName: "Adesão" };
