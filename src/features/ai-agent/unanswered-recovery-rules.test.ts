@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { findUnansweredInbound, type RecoveryMessage } from "./unanswered-recovery-rules";
+import { findUnansweredInbound, hasRecoveryTurnBudget, isUnansweredRecoveryStateEligible, RECOVERY_TURN_WORST_CASE_MS, recoveryMaxAgeMs, type RecoveryMessage } from "./unanswered-recovery-rules";
 
 const message = (direction: string, at: string, body: string, provider = "meta_cloud", mediaKind: string | null = null): RecoveryMessage => ({
   direction, body, provider, mediaKind, sentAt: new Date(at), messageId: `m-${at}`, communicationChannelId: "channel-1",
@@ -18,8 +18,13 @@ describe("findUnansweredInbound", () => {
   it("Viva: the whole burst is answered in one turn, from the newest message", () => {
     const pending = findUnansweredInbound({ messages: viva, conversation: waiting, qualificationStatus: "qualifying", now: new Date("2026-11-04T21:26:00Z"), minAgeMs: 90_000 });
     expect(pending?.latest.body).toBe("62 anos");
-    expect(pending?.body).toBe("Digite sua idade por favor.\nRJ\n62 anos");
+    expect(pending?.body).toBe("RJ\n62 anos");
     expect(pending?.messageKind).toBe("text");
+  });
+
+  it("does not recover a burst made only of automated instructions", () => {
+    const automated = [message("incoming", "2026-11-04T21:19:30Z", "Digite sua idade por favor.")];
+    expect(findUnansweredInbound({ messages: automated, conversation: waiting, qualificationStatus: "qualifying", now: new Date("2026-11-04T21:26:00Z") })).toBeNull();
   });
 
   it("does nothing once the AI or a person answered after the last customer message", () => {
@@ -46,6 +51,25 @@ describe("findUnansweredInbound", () => {
     expect(findUnansweredInbound({ messages: viva, conversation: { status: "WAITING_CUSTOMER", automationState: "PAUSED" }, qualificationStatus: "qualifying", now })).toBeNull();
     expect(findUnansweredInbound({ messages: viva, conversation: waiting, qualificationStatus: "hot", now })).toBeNull();
     expect(findUnansweredInbound({ messages: viva, conversation: null, qualificationStatus: "pending", now })).toBeNull();
+    expect(findUnansweredInbound({ messages: viva, conversation: waiting, qualificationStatus: null, now })).toBeNull();
+    expect(findUnansweredInbound({ messages: viva, conversation: waiting, qualificationStatus: "qualifying", distributionStatus: "manual_hold", now })).toBeNull();
+  });
+
+  it("rejects a target whose state changed before its recovery turn", () => {
+    expect(isUnansweredRecoveryStateEligible({ conversation: { status: "CLOSED", automationState: "AI_ACTIVE" }, qualificationStatus: "qualifying" })).toBe(false);
+    expect(isUnansweredRecoveryStateEligible({ conversation: waiting, qualificationStatus: "cold" })).toBe(false);
+    expect(isUnansweredRecoveryStateEligible({ conversation: waiting, qualificationStatus: "pending", distributionStatus: "manual_hold" })).toBe(false);
+    expect(isUnansweredRecoveryStateEligible({ conversation: waiting, qualificationStatus: "qualifying" })).toBe(true);
+  });
+
+  it("keeps recovery younger than each tenant's configured timeout and only starts with full turn budget", () => {
+    expect(recoveryMaxAgeMs(15)).toBe(14 * 60_000);
+    expect(recoveryMaxAgeMs(5)).toBe(4 * 60_000);
+    expect(recoveryMaxAgeMs(1)).toBe(0);
+    expect(findUnansweredInbound({ messages: viva, conversation: waiting, qualificationStatus: "qualifying", timeoutMinutes: 15, now: new Date("2026-11-04T21:34:43Z") })).toBeNull();
+    expect(RECOVERY_TURN_WORST_CASE_MS).toBe(40_000);
+    expect(hasRecoveryTurnBudget(10_000, 50_000)).toBe(true);
+    expect(hasRecoveryTurnBudget(10_001, 50_000)).toBe(false);
   });
 
   it("only answers on the official number and keeps a media message as media", () => {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { generateAiResponse } from "./service";
-import { handleInitialMessageFailure, isExistingQualificationConversation, resolveMemoryResetContext, resolveQualifiedLeadType } from "./conversation-state-machine";
+import { confirmedOutboundReplyFilter, handleInitialMessageFailure, isExistingQualificationConversation, resolveMemoryResetContext, resolveQualifiedLeadType } from "./conversation-state-machine";
 import { createEmptyMemory, extractFieldsFromMessage, type ConversationMemory } from "./memory";
 
 describe("ai-agent service & state machine", () => {
@@ -41,6 +42,13 @@ describe("ai-agent service & state machine", () => {
       expect(isExistingQualificationConversation({ hasMessages: false, status: "WAITING_CUSTOMER" })).toBe(true);
       expect(isExistingQualificationConversation({ hasMessages: false, status: "NEW", lastProcessedMessageId: "wamid.1" })).toBe(true);
     });
+  });
+
+  it("excludes failed outbound messages from the debounce last-reply boundary", () => {
+    const query = new PgDialect().sqlToQuery(confirmedOutboundReplyFilter()!);
+    expect(query.sql).toContain("provider_status");
+    expect(query.sql).toContain("is null");
+    expect(query.params).toEqual(expect.arrayContaining(["outbound", "outgoing", "failed"]));
   });
 
   describe("resolveMemoryResetContext", () => {

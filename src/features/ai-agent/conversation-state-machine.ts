@@ -32,6 +32,7 @@ import { recordLearningEvent } from "@/features/situation-learning/service";
 import { loadQuickReplyTemplates, parseExplicitStop, parseOptOut, parseSoftDecline, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
 import { AFTER_HOURS_HUMAN_REQUEST_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, composeGreeting, DEFAULT_HUMAN_REQUEST_TEXT, DEFAULT_QUALIFIED_HANDOFF_TEXT, effectiveHandoffText, isAfterHoursInSaoPaulo, priceConcernLine, renderConversationVariables, shouldAddPriceConcern, shouldUsePeriodGreeting, summarizeQualification, type QualificationFieldKey } from "@/features/qualification-engine/reply-composer";
 import { isAutomatedInboundMessage } from "./automated-inbound";
+import { isUnansweredRecoveryStateEligible } from "./unanswered-recovery-rules";
 import { afterHoursText } from "@/features/qualification-engine/broker-window";
 import { getSystemSetting, getSystemSettings } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
@@ -93,6 +94,14 @@ export function resolveMemoryResetContext(input: {
       ? input.formattedHistory
       : [...input.formattedHistory, { role: "user", content: input.currentMessage }];
   return { resetMemoryEachMessage, baseMemory, aiMessages };
+}
+
+/** A failed outbound row is not an answer the customer received. */
+export function confirmedOutboundReplyFilter() {
+  return and(
+    inArray(schema.whatsappMessages.direction, ["outbound", "outgoing"]),
+    or(isNull(schema.whatsappMessages.providerStatus), ne(schema.whatsappMessages.providerStatus, "failed")),
+  );
 }
 
 export async function handleInitialMessageFailure({
@@ -1445,6 +1454,7 @@ async function processInboundAiTurn({
   wahaRunId,
   skipDebounce = false,
   correctionOnly = false,
+  recoveryOnly = false,
 }: {
   tenantId: string;
   leadId: string;
@@ -1458,6 +1468,8 @@ async function processInboundAiTurn({
   openWaSessionId?: string | null;
   wahaRunId?: string | null;
   skipDebounce?: boolean;
+  /** Recovery may answer only while the lead and conversation are still in an AI qualification state. */
+  recoveryOnly?: boolean;
   /** A qualified lead's message: only a correction while waiting for the broker is handled. */
   correctionOnly?: boolean;
 }) {
@@ -1490,12 +1502,30 @@ async function processInboundAiTurn({
     providerMessageId,
   });
 
-  // 1. Obter ou criar conversa
-  const conversation = await getOrCreateAiConversation({
-    tenantId,
-    leadId,
-    communicationChannelId,
-  });
+  // 1. Obter conversa; recovery must not create/reopen a conversation after timeout or handoff.
+  let conversation: Awaited<ReturnType<typeof getOrCreateAiConversation>>;
+  if (recoveryOnly) {
+    const [latestConversation] = await db.select().from(schema.aiConversations).where(and(
+      eq(schema.aiConversations.tenantId, tenantId),
+      eq(schema.aiConversations.leadId, leadId),
+    )).orderBy(desc(schema.aiConversations.updatedAt)).limit(1);
+    const [latestLeadState] = await db.select({
+      qualificationStatus: schema.leads.qualificationStatus,
+      distributionStatus: schema.leads.distributionStatus,
+    }).from(schema.leads).where(and(
+      eq(schema.leads.id, leadId),
+      eq(schema.leads.tenantId, tenantId),
+      isNull(schema.leads.deletedAt),
+    )).limit(1);
+    if (!latestConversation || !isUnansweredRecoveryStateEligible({
+      conversation: { status: latestConversation.status, automationState: latestConversation.automationState },
+      qualificationStatus: latestLeadState?.qualificationStatus ?? null,
+      distributionStatus: latestLeadState?.distributionStatus ?? null,
+    })) return { status: "ignored_unanswered_recovery_state" as const };
+    conversation = latestConversation;
+  } else {
+    conversation = await getOrCreateAiConversation({ tenantId, leadId, communicationChannelId });
+  }
 
   const nowReceived = new Date();
   await db
@@ -1553,7 +1583,7 @@ async function processInboundAiTurn({
 
       // This is the last message of the burst: the turn reads the whole burst.
       const [lastReply] = await db.select({ sentAt: schema.whatsappMessages.sentAt }).from(schema.whatsappMessages)
-        .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.leadId, leadId), inArray(schema.whatsappMessages.direction, ["outbound", "outgoing"])))
+        .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.leadId, leadId), confirmedOutboundReplyFilter()))
         .orderBy(desc(schema.whatsappMessages.sentAt)).limit(1);
       // A recovery turn already answered this burst while this one waited: never answer twice.
       // Compared with when this message was stored: a reply sent after that already saw it.

@@ -35,19 +35,20 @@ async function handle(request: NextRequest) {
   }
 
   try {
-    const [result, slaResult, attendanceRuns, coldLeadRequalification, unansweredRecovery] = await Promise.all([
-      runQualificationTimeoutSweep(),
+    const jobDeadlineAt = Date.now() + maxDuration * 1_000;
+    const result = await runQualificationTimeoutSweep();
+    // Timeout owns the 15-minute boundary; recovery must see its new qualification/conversation state.
+    const unansweredRecovery = await runUnansweredInboundRecovery({ deadlineAt: jobDeadlineAt }).catch((error) => {
+      console.error("[unanswered-recovery] failed", { message: error instanceof Error ? error.message.slice(0, 180) : "unknown" });
+      return null;
+    });
+    const [slaResult, attendanceRuns, coldLeadRequalification] = await Promise.all([
       runSlaSweep(),
       wakeAttendanceRuns().catch((error) => {
         console.error("[attendance-flows] wake failed", { message: error instanceof Error ? error.message.slice(0, 180) : "unknown" });
         return -1;
       }),
       runColdLeadRequalificationSweep(),
-      // Safety net: a qualification message left with no answer (lost turn, restart) is answered here.
-      runUnansweredInboundRecovery().catch((error) => {
-        console.error("[unanswered-recovery] failed", { message: error instanceof Error ? error.message.slice(0, 180) : "unknown" });
-        return null;
-      }),
     ]);
     return NextResponse.json({ success: true, result, slaResult, attendanceRuns, coldLeadRequalification, unansweredRecovery });
   } catch (error) {
