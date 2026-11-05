@@ -61,7 +61,7 @@
 
 ## Status
 
-- **F0 no ar** (`34f72cdf` + `a9f71241`, aprovada pelo Vigia em 04/11). Atribuir cargo está FECHADO por
+- **F0 e F2 no ar (04/11)**; F0: (`34f72cdf` + `a9f71241`, aprovada pelo Vigia em 04/11). Atribuir cargo está FECHADO por
   `CARGO_PROTEGE_ACOES = false` (custom-roles/service.ts): **remover/ligar na F2**, quando as ações internas
   respeitarem o cargo.
 - Pisos de `mensagens` e `fluxos-whatsapp` = `acessar_qualificacao_ia` (Vinicios manteve, 04/11). `/plantoes`

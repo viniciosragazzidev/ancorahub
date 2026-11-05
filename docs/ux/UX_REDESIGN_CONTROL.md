@@ -1,6 +1,18 @@
+## 2026-11-04: disparo manual de aviso de fechamento
+
+Papel: Direção na ficha `/leads/[id]`. Objetivo: recuperar o aviso de parabéns ao corretor responsável quando o lead já está em fechamento e o envio automático não foi registrado. Ação contextual secundária, com confirmação antes de disparar. Estados: ação disponível, confirmação, envio, enviado/em fila e erro. Reutiliza botão e diálogo compartilhados; sem novos tokens, primitives ou movimento. Não avança a etapa global do redesign.
+
 ## 2026-11-04: corretores pendentes na escala mensal
 
 Papel: Direção em `/leads/distribuicao`, modal da escala mensal. Objetivo: permitir pesquisar e reservar perfis pendentes para as ocorrências da escala. Estados: cadastro ativo, convite pendente identificado no resultado e na escala, e ausência de resultados. O rótulo de pendência esclarece que a reserva ainda não distribui leads; reutiliza a busca e os componentes existentes, sem novo token, primitiva ou movimento. Não avança a etapa global do redesign.
+
+## 2026-11-04: exportação PDF da escala
+
+Papel: Direção ao exportar a escala mensal. O documento omite o código antes do
+nome do corretor e a tabela de resumo; recortes com um único tipo usam A4 em
+retrato e conteúdo ampliado, enquanto recortes com vários tipos mantêm paisagem.
+Reutiliza tipografia, paleta e kit de PDF existentes; sem novos tokens ou
+primitives. Não avança a etapa global do redesign.
 
 ## 2026-10-27: corretor exclusivamente no Lite
 

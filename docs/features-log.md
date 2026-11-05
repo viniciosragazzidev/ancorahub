@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 04/11/2026 - Disparo manual do aviso de fechamento
+
+- A Direção pode enviar o aviso de parabéns ao corretor responsável quando um lead já está em fechamento e não existe envio registrado.
+- A ação respeita configuração, capacidade e escopo do tenant, pede confirmação, impede duplicidade por lead/corretor e audita o resultado.
+- Registro: [DEC-167](decision-log.md) e [recuperação do aviso de fechamento](implementations/active/2026-11-04-aviso-fechamento-manual.md).
+
 ## 03/11/2026 - Extensão v2, servidor E2/E3
 
 - Contexto comercial ampliado em allowlist estrita, com histórico só de tipo/data e contato mascarado antes do aceite.
@@ -657,3 +663,8 @@ Um interpretador estruturado lê o contexto recente antes da resposta e auxilia 
 
 - A escala mensal permite reservar corretores em cadastro/convite pendente; não recebem leads até aceitar o convite, quando as ocorrências futuras válidas são promovidas para a escala ativa.
 - Registro: [DEC-168](decision-log.md) e [implementação](implementations/completed/2026-11-04-corretores-pendentes-escala-mensal.md).
+
+# 04/11/2026 - Layout do PDF de escala
+
+- O PDF omite o código do corretor junto ao nome e a tabela de resumo por corretor. Quando o recorte contém um único tipo de plantão, usa página A4 em retrato com conteúdo ampliado; recortes com mais tipos preservam a orientação paisagem.
+- Implementação: `src/features/lead-distribution/duty-escala-pdf.ts` e `src/features/lead-distribution/report-pdf-kit.ts`.
