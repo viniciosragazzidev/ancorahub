@@ -653,3 +653,7 @@ Um interpretador estruturado lê o contexto recente antes da resposta e auxilia 
 - O quadro e a legenda do PDF incluem somente plantões com tipo configurado; ocorrências sem tipo deixam de aparecer no documento.
 - Implementação: `src/features/lead-distribution/duty-escala-pdf.ts`.
 
+# 04/11/2026 - Corretores pendentes na escala mensal
+
+- A escala mensal permite reservar corretores em cadastro/convite pendente; não recebem leads até aceitar o convite, quando as ocorrências futuras válidas são promovidas para a escala ativa.
+- Registro: [DEC-168](decision-log.md) e [implementação](implementations/completed/2026-11-04-corretores-pendentes-escala-mensal.md).

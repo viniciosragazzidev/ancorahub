@@ -453,7 +453,7 @@ export const FEATURE_FLAGS = {
     scope: "global",
     defaultValue: "true",
     allowedValues: ["true", "false"] as const,
-    description: "Permite incluir cadastros desativados em escalas sem reativar acesso ou recebimento de leads.",
+    description: "Permite planejar corretores desativados e convidados pendentes em escalas. Convidados só entram na operação depois de aceitar e criar acesso; a configuração não reativa contas.",
   },
   DUTY_OCCURRENCE_HISTORY: {
     key: "feature_duty_occurrence_history_enabled",
