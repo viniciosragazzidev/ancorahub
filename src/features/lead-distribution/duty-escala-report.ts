@@ -111,16 +111,28 @@ function dateLabel(date: string) {
   return `${day}/${month}/${year}`;
 }
 
-function periodLabel(data: DutyEscalaReportData) {
+/** Days of the PDF chosen in the dialog (YYYY-MM-DD, both inclusive); empty means the whole escala. */
+export type DutyEscalaRange = { from?: string | null; until?: string | null };
+
+function planPeriod(data: DutyEscalaReportData) {
   const settings = parsePlanSettings(data.plan.settings);
   const dates = data.occurrences.map((item) => item.dutyDate).filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)).sort();
   const from = settings?.rangeFrom ?? dates[0] ?? `${data.plan.monthKey}-01`;
   const until = settings?.rangeUntil ?? dates.at(-1) ?? `${data.plan.monthKey}-${String(new Date(Date.UTC(Number(data.plan.monthKey.slice(0, 4)), Number(data.plan.monthKey.slice(5, 7)), 0)).getUTCDate()).padStart(2, "0")}`;
-  return `${dateLabel(from)} a ${dateLabel(until)}`;
+  return { from, until };
+}
+
+/** The chosen days, kept inside the escala's own period. */
+export function resolveDutyEscalaPeriod(data: DutyEscalaReportData, range?: DutyEscalaRange) {
+  const plan = planPeriod(data);
+  const from = range?.from && range.from > plan.from ? range.from : plan.from;
+  const until = range?.until && range.until < plan.until ? range.until : plan.until;
+  return { from, until };
 }
 
 /** Pure projection and scope filter; terminated occurrences remain part of the plan snapshot. */
-export function buildDutyEscalaPdfInput(data: DutyEscalaReportData): DutyEscalaPdfInput {
+export function buildDutyEscalaPdfInput(data: DutyEscalaReportData, range?: DutyEscalaRange): DutyEscalaPdfInput {
+  const period = resolveDutyEscalaPeriod(data, range);
   const scheduleById = new Map(data.schedules.map((item) => [item.id, item]));
   const typeById = new Map(data.types.map((item) => [item.id, item]));
   const brokerById = new Map(data.brokers.map((item) => [item.id, item]));
@@ -129,6 +141,7 @@ export function buildDutyEscalaPdfInput(data: DutyEscalaReportData): DutyEscalaP
 
   const occurrences: DutyEscalaPdfOccurrence[] = [];
   for (const occurrence of data.occurrences) {
+    if (occurrence.dutyDate < period.from || occurrence.dutyDate > period.until) continue;
     const schedule = scheduleById.get(occurrence.scheduleId);
     const storedTypeId = occurrence.typeId ?? schedule?.typeId ?? null;
     const typeId = storedTypeId && typeById.has(storedTypeId) ? storedTypeId : null;
@@ -163,7 +176,7 @@ export function buildDutyEscalaPdfInput(data: DutyEscalaReportData): DutyEscalaP
   return {
     tenantName: data.tenant.name,
     tenantLogoUrl: data.tenant.logoUrl,
-    periodLabel: periodLabel(data),
+    periodLabel: `${dateLabel(period.from)} a ${dateLabel(period.until)}`,
     scopeLabel,
     status: data.plan.status === "draft" ? "draft" : "published",
     showBranch: data.scope.kind !== "unidade",

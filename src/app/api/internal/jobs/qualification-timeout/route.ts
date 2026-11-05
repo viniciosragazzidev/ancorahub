@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { runQualificationTimeoutSweep } from "@/features/ai-agent/qualification-timeout-sweep";
+import { runUnansweredInboundRecovery } from "@/features/ai-agent/unanswered-recovery";
 import { runColdLeadRequalificationSweep } from "@/features/ai-qualification/cold-lead-requalification";
 import { runSlaSweep } from "@/features/leads/sla";
 import { flowEffectHandlers } from "@/features/attendance-flows/handlers";
@@ -34,8 +35,14 @@ async function handle(request: NextRequest) {
   }
 
   try {
-    const [result, slaResult, attendanceRuns, coldLeadRequalification] = await Promise.all([
-      runQualificationTimeoutSweep(),
+    const jobDeadlineAt = Date.now() + maxDuration * 1_000;
+    const result = await runQualificationTimeoutSweep();
+    // Timeout owns the 15-minute boundary; recovery must see its new qualification/conversation state.
+    const unansweredRecovery = await runUnansweredInboundRecovery({ deadlineAt: jobDeadlineAt }).catch((error) => {
+      console.error("[unanswered-recovery] failed", { message: error instanceof Error ? error.message.slice(0, 180) : "unknown" });
+      return null;
+    });
+    const [slaResult, attendanceRuns, coldLeadRequalification] = await Promise.all([
       runSlaSweep(),
       wakeAttendanceRuns().catch((error) => {
         console.error("[attendance-flows] wake failed", { message: error instanceof Error ? error.message.slice(0, 180) : "unknown" });
@@ -43,7 +50,7 @@ async function handle(request: NextRequest) {
       }),
       runColdLeadRequalificationSweep(),
     ]);
-    return NextResponse.json({ success: true, result, slaResult, attendanceRuns, coldLeadRequalification });
+    return NextResponse.json({ success: true, result, slaResult, attendanceRuns, coldLeadRequalification, unansweredRecovery });
   } catch (error) {
     const message = error instanceof Error ? error.message.replace(/[\r\n]+/g, " ").slice(0, 180) : "unknown_error";
     console.error("[qualification-timeout-job] failed", { message });

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import { setSystemSetting } from "@/features/system-settings/queries";
+import { invalidateSystemSettingsCache, setSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 import { tenantChannelRoutingKey } from "@/features/waha-cadence/tenant-channel-routing";
 import { normalizeTenantChannelRouting, type TenantChannelRouting } from "@/features/waha-cadence/tenant-channel-routing-rules";
@@ -12,6 +12,7 @@ import { normalizeTenantChannelRouting, type TenantChannelRouting } from "@/feat
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { teamNoticeByKey, type NoticeChannel } from "@/features/team-notices/catalog";
 import { MAX_NOTICE_FREE_MESSAGES } from "@/features/team-notices/variants";
+import { closingDirectorRecipientsKey, MAX_CLOSING_DIRECTOR_RECIPIENTS, normalizeRecipientPhone } from "@/features/leads/closing-director-alert-core";
 import {
   disconnectTenantChannel,
   readTenantChannelState,
@@ -83,7 +84,7 @@ export async function saveTenantChannelRoutingAction(input: TenantChannelRouting
   }
 }
 
-export type TeamNoticeInput = { key: string; enabled: boolean; channel: NoticeChannel; freeMessageIds: string[] };
+export type TeamNoticeInput = { key: string; enabled: boolean; channel: NoticeChannel; freeMessageIds: string[]; recipientPhones?: string[] };
 
 /** Team notices (DEC-125): on/off, channel (Meta only or company WhatsApp) and the company-number text of each notice. */
 export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<Result<object>> {
@@ -100,6 +101,17 @@ export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<R
     });
     const tooMany = rows.find((item) => item.freeMessageIds.length > MAX_NOTICE_FREE_MESSAGES);
     if (tooMany) return { success: false, error: `Cada aviso aceita no máximo ${MAX_NOTICE_FREE_MESSAGES} textos.` };
+    // Notices sent to typed numbers (Fechamento para a direção): validated here, stored per tenant.
+    const phoneLists: Array<{ key: string; phones: string[] }> = [];
+    for (const item of rows) {
+      if (!teamNoticeByKey(item.key)?.phoneRecipients || !Array.isArray(item.recipientPhones)) continue;
+      const typed = item.recipientPhones.filter((phone) => typeof phone === "string" && phone.trim());
+      const invalid = typed.find((phone) => !normalizeRecipientPhone(phone));
+      if (invalid) return { success: false, error: `Número inválido em "${teamNoticeByKey(item.key)!.label}": ${invalid}. Use DDD + número.` };
+      const phones = [...new Set(typed.map((phone) => normalizeRecipientPhone(phone)!))];
+      if (phones.length > MAX_CLOSING_DIRECTOR_RECIPIENTS) return { success: false, error: `No máximo ${MAX_CLOSING_DIRECTOR_RECIPIENTS} números por aviso.` };
+      phoneLists.push({ key: item.key, phones });
+    }
     const messageIds = [...new Set(rows.flatMap((item) => item.freeMessageIds))];
     if (messageIds.length) {
       const found = await getDatabase().select({ id: schema.messageTemplates.id }).from(schema.messageTemplates).where(and(
@@ -111,6 +123,13 @@ export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<R
     }
     const now = new Date();
     await getDatabase().transaction(async (tx) => {
+      // Numbers in the same transaction as the switches: all saved or nothing.
+      for (const list of phoneLists) {
+        if (list.key !== "LEAD_CLOSING_DIRECTOR") continue;
+        const value = JSON.stringify(list.phones);
+        await tx.insert(schema.systemSettings).values({ key: closingDirectorRecipientsKey(context.tenantId), value, updatedAt: now })
+          .onConflictDoUpdate({ target: schema.systemSettings.key, set: { value, updatedAt: now } });
+      }
       for (const item of rows) {
         await tx.insert(schema.teamNoticeSettings).values({
           tenantId: context.tenantId, noticeKey: item.key, enabled: item.enabled, channel: item.channel,
@@ -125,6 +144,7 @@ export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<R
         acao: `team_notices.updated:${rows.map((item) => `${item.key}=${item.enabled ? item.channel : "off"}`).join(",")}`.slice(0, 500),
       });
     });
+    if (phoneLists.length) invalidateSystemSettingsCache();
     revalidatePath("/integrations/whatsapp");
     return { success: true };
   } catch (error) {

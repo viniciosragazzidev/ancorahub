@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,7 @@ function LeadTimeline({ items }: { items: TimelineItem[] }) {
   </section>;
 }
 
-export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocuments, conversation, brokerWhatsAppConnected, timeline, now, managerBrokers, tasks, documents }: {
+export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocuments, conversation, brokerWhatsAppConnected, timeline, now, managerBrokers, tasks, documents, saleAction }: {
   lead: { id: string; name: string; status: string; ownerId: string | null; ownerName: string | null; ownerImage: string | null; productName: string | null; assignedAt: Date | null; branchName: string | null };
   lightLead: LightLeadDetailData;
   requirements: LiteRequirement[];
@@ -82,6 +83,8 @@ export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocume
   managerBrokers?: TransferBroker[];
   tasks?: TaskItem[];
   documents?: DocumentItem[];
+  /** "Registrar venda" for the manager on a broker's lead (built by the page, which has the carriers). */
+  saleAction?: ReactNode;
 }) {
   const nowDate = new Date(now);
   const isManager = Boolean(managerBrokers);
@@ -128,7 +131,7 @@ export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocume
             <NextStepCard step={step} action={cardAction} />
             {isManager ? (
               <div className="flex flex-col gap-3" aria-label="Ações de gestão">
-                <div className="flex flex-wrap gap-2"><ManagerLeadStatusSheet leadId={lead.id} leadName={lead.name} currentStatus={lead.status} /></div>
+                <div className="flex flex-wrap gap-2"><ManagerLeadStatusSheet leadId={lead.id} leadName={lead.name} currentStatus={lead.status} />{saleAction}</div>
                 <ManagerLeadTransferForm leadId={lead.id} leadName={lead.name} brokers={managerBrokers ?? []} />
               </div>
             ) : showRepassar || showCobrar ? (

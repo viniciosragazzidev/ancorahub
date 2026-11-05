@@ -379,7 +379,8 @@ export function MonthlyDutyPlanner({
     return { kept, added };
   }, [reviewOccurrences]);
   const reviewDates = [...new Set(reviewOccurrences.map((occurrence) => occurrence.dutyDate))];
-  const planTypeKeys = useMemo(() => [...new Set((plan?.occurrences ?? []).map(typeKeyOfOccurrence))].filter((key) => !limitToGenerated || generatedKeys.has(key)).sort((a, b) => (a === NO_TYPE_KEY ? 1 : b === NO_TYPE_KEY ? -1 : (typeInfo.get(a)?.name ?? "").localeCompare(typeInfo.get(b)?.name ?? "", "pt-BR"))), [generatedKeys, limitToGenerated, plan, typeInfo, typeKeyOfOccurrence]);
+  const allPlanTypeKeys = useMemo(() => [...new Set((plan?.occurrences ?? []).map(typeKeyOfOccurrence))].sort((a, b) => (a === NO_TYPE_KEY ? 1 : b === NO_TYPE_KEY ? -1 : (typeInfo.get(a)?.name ?? "").localeCompare(typeInfo.get(b)?.name ?? "", "pt-BR"))), [plan, typeInfo, typeKeyOfOccurrence]);
+  const planTypeKeys = useMemo(() => allPlanTypeKeys.filter((key) => !limitToGenerated || generatedKeys.has(key)), [allPlanTypeKeys, generatedKeys, limitToGenerated]);
   const hiddenTypes = generatedKeys.size ? new Set((plan?.occurrences ?? []).map(typeKeyOfOccurrence).filter((key) => !generatedKeys.has(key))).size : 0;
   const brokerRows = useMemo(() => {
     if (!plan) return [];
@@ -902,7 +903,7 @@ export function MonthlyDutyPlanner({
         </DialogPopup>
       </Dialog>
 
-      {plan ? <EscalaPdfDialog open={pdfOpen} onOpenChange={setPdfOpen} planId={plan.id} canChooseUnit={canEdit} branches={branches} types={planTypeKeys.map((key) => ({ key, name: typeInfo.get(key)?.name ?? "Sem tipo" }))} /> : null}
+      {plan ? <EscalaPdfDialog key={plan.id} open={pdfOpen} onOpenChange={setPdfOpen} planId={plan.id} rangeFrom={plan.rangeFrom} rangeUntil={plan.rangeUntil} canChooseUnit={canEdit} branches={branches} types={allPlanTypeKeys.map((key) => ({ key, name: typeInfo.get(key)?.name ?? "Sem tipo" }))} /> : null}
 
       <Dialog open={confirmPublish} onOpenChange={setConfirmPublish}>
         <DialogPopup>
@@ -924,10 +925,13 @@ export function MonthlyDutyPlanner({
 }
 
 /** Picks the cut of the escala PDF: everything, one unit or one plantão type. */
-function EscalaPdfDialog({ open, onOpenChange, planId, canChooseUnit, branches, types }: {
+function EscalaPdfDialog({ open, onOpenChange, planId, rangeFrom, rangeUntil, canChooseUnit, branches, types }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   planId: string;
+  /** The escala's own period: the PDF days start on it and stay inside it. */
+  rangeFrom: string;
+  rangeUntil: string;
   /** Managers only get their own unit (the server forces it). */
   canChooseUnit: boolean;
   branches: readonly Branch[];
@@ -936,6 +940,9 @@ function EscalaPdfDialog({ open, onOpenChange, planId, canChooseUnit, branches, 
   const [scope, setScope] = useState<"geral" | "unidade" | "tipo">(canChooseUnit ? "geral" : "unidade");
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
   const [typeKey, setTypeKey] = useState(types[0]?.key ?? "");
+  const [from, setFrom] = useState(rangeFrom);
+  const [until, setUntil] = useState(rangeUntil);
+  const invalidPeriod = !from || !until || from > until;
   const choices = canChooseUnit
     ? ([["geral", "Geral"], ["unidade", "Por unidade"], ["tipo", "Por tipo de plantão"]] as const)
     : ([["unidade", "Minha unidade"]] as const);
@@ -943,6 +950,8 @@ function EscalaPdfDialog({ open, onOpenChange, planId, canChooseUnit, branches, 
     const params = new URLSearchParams({ scope });
     if (scope === "unidade" && canChooseUnit) params.set("branchId", branchId);
     if (scope === "tipo") params.set("typeId", typeKey);
+    params.set("from", from);
+    params.set("until", until);
     return `/api/reports/duty-escala/${planId}?${params}`;
   };
   return (
@@ -963,10 +972,24 @@ function EscalaPdfDialog({ open, onOpenChange, planId, canChooseUnit, branches, 
           </div>
           {scope === "unidade" && canChooseUnit ? <AppSelect aria-label="Unidade do PDF" value={branchId} onValueChange={setBranchId} options={branches.map((branch) => ({ value: branch.id, label: branch.name }))} /> : null}
           {scope === "tipo" ? <AppSelect aria-label="Tipo do PDF" value={typeKey} onValueChange={setTypeKey} options={types.map((type) => ({ value: type.key, label: type.name }))} /> : null}
+          <fieldset className="grid gap-1.5">
+            <legend className="mb-1.5 text-sm font-medium">Período</legend>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-1">
+                <Label htmlFor="escala-pdf-from">De</Label>
+                <Input id="escala-pdf-from" type="date" value={from} min={rangeFrom} max={until || rangeUntil} onChange={(event) => setFrom(event.target.value)} />
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="escala-pdf-until">Até</Label>
+                <Input id="escala-pdf-until" type="date" value={until} min={from || rangeFrom} max={rangeUntil} onChange={(event) => setUntil(event.target.value)} />
+              </div>
+            </div>
+            {invalidPeriod ? <p className="text-xs text-destructive">Escolha um período com a data inicial antes da final.</p> : null}
+          </fieldset>
         </DialogPanel>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button type="button" disabled={(scope === "unidade" && canChooseUnit && !branchId) || (scope === "tipo" && !typeKey)} onClick={() => { window.open(href(), "_blank", "noopener"); onOpenChange(false); }}>
+          <Button type="button" disabled={invalidPeriod || (scope === "unidade" && canChooseUnit && !branchId) || (scope === "tipo" && !typeKey)} onClick={() => { window.open(href(), "_blank", "noopener"); onOpenChange(false); }}>
             <FileArrowDown className="size-3.5" /> Baixar PDF
           </Button>
         </DialogFooter>

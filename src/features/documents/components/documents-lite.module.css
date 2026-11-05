@@ -1,5 +1,11 @@
 /* /documentos Lite: visões, fila e configuração. Só tokens; alvos de 44px; 24px entre regiões. */
 
+/* A página já entrega o fluxo de 24px (main.stack): a raiz só segura o escopo da pele, sem somar outro gap. */
+.root {
+  min-width: 0;
+  color: var(--foreground);
+}
+
 .tabs {
   display: grid;
   gap: 24px;
@@ -57,6 +63,18 @@
   background: var(--success-subtle);
   color: var(--success);
   cursor: pointer;
+}
+
+.iconSuccess:disabled,
+.iconDanger:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.iconSuccess:focus-visible,
+.iconDanger:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: 2px;
 }
 
 .danger {

@@ -38,6 +38,7 @@ import { SYSTEM_REPORT_DESTINATION_KEY, SYSTEM_REPORT_ENABLED_KEY } from "@/feat
 import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, META_OUTBOUND_STALE_AFTER_HOURS_SETTING } from "@/features/communication-channels/outbound-service";
 import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag";
 import { liveStatusSettingKey } from "@/features/live-status/flag";
+import { customerWaitingSettingKey, customerWaitingSinceKey } from "@/features/customer-waiting/flag";
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import { qualificationContextAnalysisSettingKeys } from "@/features/ai-agent/qualification-context-analysis-settings";
 import { EXTENSION_PILOT_USERS_SETTING } from "@/features/browser-extension/pilot";
@@ -420,6 +421,27 @@ export async function updateLiveStatusPilotAction(tenantId: string, formData: Fo
     targetType: "tenant",
     targetId: targetTenantId,
     metadata: { enabled: input.enabled === "true" },
+    createdAt: now,
+  });
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
+}
+
+/** Cliente aguardando o corretor (plano 04/11): desliga ou liga a observação por empresa, com auditoria. Ligar marca o início, sem acumulado. */
+export async function updateCustomerWaitingModeAction(tenantId: string, formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ mode: z.enum(["off", "observe"]) }).parse({ mode: formData.get("mode") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
+  const now = new Date();
+
+  if (input.mode === "observe") await setSystemSetting(customerWaitingSinceKey(targetTenantId), now.toISOString(), now);
+  await setSystemSetting(customerWaitingSettingKey(targetTenantId), input.mode, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "customer_waiting_guard.tenant_mode_updated",
+    targetType: "tenant",
+    targetId: targetTenantId,
+    metadata: { mode: input.mode },
     createdAt: now,
   });
   revalidatePath(`/super-admin/tenants/${targetTenantId}`);

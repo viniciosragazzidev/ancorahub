@@ -32,12 +32,15 @@ export function RegisterSalePanel({
   carriers,
   open,
   onOpenChange,
+  onRegistered,
 }: {
   leadId: string;
   documents: ConfirmationDocument[];
   carriers: CarrierOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Called after the sale is saved (the Lite screen keeps the status in local state). */
+  onRegistered?: () => void;
 }) {
   const { celebrate: celebrateSuccess, node: successOverlay } = useSuccessOverlay();
   const router = useRouter();
@@ -62,8 +65,11 @@ export function RegisterSalePanel({
   }, [coverageStartDate, contractTermMonths, customExpirationDate]);
 
   function submit() {
+    if (pending) return;
     startTransition(async () => {
-      const result = await registerSaleAction({
+      let result: Awaited<ReturnType<typeof registerSaleAction>>;
+      try {
+        result = await registerSaleAction({
         leadId,
         policyNumber,
         coverageStartDate,
@@ -77,8 +83,13 @@ export function RegisterSalePanel({
         confirmationDocumentId,
         carrierId: carrierId || undefined,
       });
+      } catch {
+        // Network drop or a new deploy in the middle: the sale may or may not be saved; the refresh shows which.
+        toast.error("Não foi possível confirmar o registro. Atualize a página para ver se a venda entrou antes de tentar de novo.");
+        return;
+      }
 
-      if (result.error) {
+      if ("error" in result) {
         toast.error(result.error);
         return;
       }
@@ -86,6 +97,7 @@ export function RegisterSalePanel({
       toast.success("Venda registrada com ciclo de vida e lembretes de renovação agendados!");
       celebrateSuccess("Venda registrada");
       onOpenChange(false);
+      onRegistered?.();
       setTimeout(() => router.refresh(), 0);
     });
   }

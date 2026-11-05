@@ -20,13 +20,14 @@ import type { NegotiationLevel } from "./negotiation-model";
 import { getNegotiationTimelineAction } from "./actions";
 import { createNegotiationLeadColumns, formatNegotiationMetric, LEVEL_LABELS, NegotiationStatsView } from "./negotiations-data-views";
 import type { NegotiationLead, NegotiationTimelineEvent, NegotiationsDashboardData } from "./queries";
-import { NegotiationStageSummary } from "./negotiation-stage-summary";
+import { NegotiationStageSummary, type SummaryFilter } from "./negotiation-stage-summary";
+import { NegotiationWaitingPanel } from "./negotiation-waiting-panel";
 import { NegotiationLeadRow } from "./negotiation-lead-row";
 import { NegotiationLeadAi, NegotiationLeadSituation, NegotiationLeadTrail } from "./negotiation-lead-signals";
 import { NegotiationClosingNow } from "./negotiation-closing-now";
 import styles from "./negotiations.module.css";
 
-type Filter = "all" | NegotiationLevel | "customers_waiting";
+type Filter = "all" | SummaryFilter;
 type PageTab = "negotiations" | "statistics";
 /** "team": supervisor e gestor do app Light leem a conversa da equipe; "inbox": a conversa abre na caixa de Conversas. */
 export type NegotiationConversationMode = "team" | "inbox";
@@ -93,7 +94,8 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt, conversati
     const needle = query.trim().toLocaleLowerCase("pt-BR");
     return data.leads.filter((lead) => {
       if (activeFilter !== "all" && activeFilter === "customers_waiting" && !lead.customerWaiting) return false;
-      if (activeFilter !== "all" && activeFilter !== "customers_waiting" && lead.level !== activeFilter) return false;
+      if (activeFilter === "no_reply" && !lead.waiting) return false;
+      if (activeFilter !== "all" && activeFilter !== "customers_waiting" && activeFilter !== "no_reply" && lead.level !== activeFilter) return false;
       if (branchFilter !== "all" && lead.branchId !== branchFilter) return false;
       if (brokerFilter !== "all" && lead.brokerId !== brokerFilter) return false;
       if (levelFilter !== "all" && lead.level !== levelFilter) return false;
@@ -159,6 +161,9 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt, conversati
                 onFilter={(filter) => setActiveFilter(activeFilter === filter ? "all" : filter)}
               />
               <NegotiationClosingNow leads={data.leads} generatedAt={generatedAt} onOpen={openLead} onShowAll={() => setActiveFilter("closing")} />
+              {activeFilter === "no_reply" && data.customerWaitingGuard ? (
+                <NegotiationWaitingPanel rows={data.customerWaitingGuard.rows} onOpen={(row) => router.push(negotiationConversationHref(row.leadId, conversationMode))} />
+              ) : (
               <section className={styles.list} aria-label="Lista de negociações">
                 <div className={styles.toolbar}>
                   <label className={styles.search}>
@@ -207,6 +212,7 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt, conversati
                 </LiteSwap>
                 <LitePagination {...pagination} label="Páginas de negociações" />
               </section>
+              )}
             </>
           )}
         </main>

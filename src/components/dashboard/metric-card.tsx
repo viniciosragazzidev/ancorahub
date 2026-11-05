@@ -138,7 +138,7 @@ export function StatCard({
             <CountUpText text={value} />
           </p>
           {sublabel && (
-            <p className="ui-metric-card-label mt-1 leading-tight transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/card:text-foreground/70 motion-reduce:transition-none">
+            <p className="ui-metric-card-label mt-1 text-[12px] leading-tight text-muted-foreground transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/card:text-foreground/70 motion-reduce:transition-none">
               {sublabel}
             </p>
           )}

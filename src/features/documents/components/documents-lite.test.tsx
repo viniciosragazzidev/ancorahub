@@ -51,6 +51,36 @@ describe("documentos Lite", () => {
     expect(actions.bulkReviewDocumentsAction).toHaveBeenCalledWith(expect.arrayContaining(["doc-2"]), "rejected");
   });
 
+  it("resumo da fila mostra pendentes e a idade do pendente mais antigo", () => {
+    render(<DocumentsLite carriers={CARRIER_FIXTURES} plans={PLAN_FIXTURES} initialRequirements={REQUIREMENT_FIXTURES} initialPendingDocs={DOC_FIXTURES} generatedAt={new Date(Date.UTC(2026, 9, 27, 8, 10))} />);
+    const summary = within(screen.getByRole("group", { name: "Resumo da fila" }));
+    expect(summary.getByText("Aguardando aprovação").nextSibling).toHaveTextContent("9");
+    expect(summary.getByText("3 dias")).toBeInTheDocument();
+  });
+
+  it("vazio pela busca é diferente de tudo em dia", () => {
+    renderDocs();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar documentos" }), { target: { value: "inexistente" } });
+    expect(screen.getByText("Nenhum documento encontrado com esse filtro.")).toBeInTheDocument();
+    expect(screen.queryByText("Tudo em dia")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Limpar busca" }));
+    expect(within(table()).getAllByRole("row")).toHaveLength(10);
+  });
+
+  it("linha fica desabilitada enquanto a revisão roda (sem envio duplo)", async () => {
+    let resolve: (value: { success: boolean }) => void = () => {};
+    actions.reviewDocumentAction.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    renderDocs();
+    const approve = within(table()).getAllByRole("button", { name: /^Aprovar / })[0]!;
+    await act(async () => {
+      fireEvent.click(approve);
+      fireEvent.click(approve);
+    });
+    expect(actions.reviewDocumentAction).toHaveBeenCalledTimes(1);
+    expect(approve).toBeDisabled();
+    await act(async () => resolve({ success: true }));
+  });
+
   it("requisitos: excluir pede confirmação Lite e roda a mesma ação", async () => {
     renderDocs();
     fireEvent.click(screen.getByRole("tab", { name: "Configuração de requisitos" }));

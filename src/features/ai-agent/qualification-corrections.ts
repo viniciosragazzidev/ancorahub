@@ -1,4 +1,4 @@
-import { createEmptyMemory, extractFieldsFromMessage, readAgeList, type ConversationMemory } from "./memory";
+import { createEmptyMemory, extractFieldsFromMessage, formatAgeList, readAgeList, type ConversationMemory } from "./memory";
 import { captureBeneficiaryRelations, parseAgeValues, type BeneficiaryRelationCapture } from "./beneficiary-relations";
 
 export type QualificationCorrection = { field: "numberOfLives" | "age" | "averageAge" | "email"; value: string };
@@ -85,7 +85,7 @@ export function detectQualificationCorrections(memory: ConversationMemory, messa
   return corrections;
 }
 
-/** "2 vidas; idades 12, 42 (média 27)": the corrections as the customer and the broker read them. */
+/** "2 vidas; idades 12 e 42": the corrections as the customer and the broker read them. Every age, never the average. */
 export function describeQualificationCorrections(corrections: QualificationCorrection[]) {
   const value = (field: QualificationCorrection["field"]) => corrections.find((correction) => correction.field === field)?.value;
   const parts: string[] = [];
@@ -93,7 +93,8 @@ export function describeQualificationCorrections(corrections: QualificationCorre
   if (lives) parts.push(`${lives} ${lives === "1" ? "vida" : "vidas"}`);
   const ages = value("age");
   const average = value("averageAge");
-  if (ages) parts.push(`${ages.includes(",") ? "idades" : "idade"} ${ages}${average && ages.includes(",") ? ` (média ${average})` : ""}`);
+  const ageList = ages?.match(/\d{1,3}/g) ?? [];
+  if (ages) parts.push(ageList.length > 1 ? `idades ${formatAgeList(ageList)}` : `idade ${ages}`);
   else if (average) parts.push(`idade média ${average}`);
   const email = value("email");
   if (email) parts.push(`e-mail ${email}`);

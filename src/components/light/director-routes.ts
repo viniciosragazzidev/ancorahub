@@ -1,4 +1,6 @@
 /** Títulos e destinos de retorno do chrome do diretor, sem alterar rotas. */
+import { isNavTabRoot } from "@/shared/navigation/nav-registry";
+
 export type DirectorRoute = {
   title: string;
   parentHref: string | null;
@@ -47,6 +49,7 @@ const ROUTES: readonly RouteRule[] = [
   { test: exact("/conversas"), route: { title: "Conversas", parentHref: null } },
   { test: exact("/equipe"), route: { title: "Equipe", parentHref: null } },
   { test: exact("/distribuicao"), route: { title: "Distribuição", parentHref: null } },
+  { test: exact("/documentos"), route: { title: "Documentos", parentHref: null } },
   { test: exact("/plantoes"), route: { title: "Plantões", parentHref: null } },
   { test: exact("/plantoes/agora"), route: { title: "Plantões", parentHref: null } },
   { test: exact("/qualificacao"), route: { title: "Qualificação", parentHref: null } },
@@ -72,5 +75,7 @@ export function resolveDirectorRoute(pathname: string): DirectorRoute {
   const normalized = pathname.split("?")[0]?.replace(/\/+$/, "") || "/";
   const match = ROUTES.find((rule) => rule.test(normalized));
   if (!match) return { title: titleFromPath(normalized), parentHref: null };
-  return typeof match.route === "function" ? match.route(normalized) : match.route;
+  const route = typeof match.route === "function" ? match.route(normalized) : match.route;
+  // Abas de uma área são irmãs: trocam pela barra de abas, sem "voltar".
+  return isNavTabRoot(normalized) ? { ...route, parentHref: null } : route;
 }

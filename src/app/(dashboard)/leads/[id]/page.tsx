@@ -14,6 +14,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LeadStatusSelector } from "@/features/leads/components/lead-status-selector";
 import { SendMissedClosingNoticeButton } from "@/features/leads/components/send-missed-closing-notice-button";
+import { canManagementRegisterSale } from "@/features/post-sale/register-sale-access";
+import { cargoAllowsRegisterSale } from "@/features/post-sale/register-sale-access-server";
+import { RegisterSaleButton } from "./register-sale-button";
 import { LeadTimeline } from "@/features/leads/components/lead-timeline";
 import { LeadTasks } from "@/features/leads/components/lead-tasks";
 import { LeadChat } from "@/features/leads/components/lead-chat";
@@ -566,6 +569,10 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
   const checklist = checklistResult.status === "fulfilled" ? checklistResult.value : [];
   const beneficiaries = beneficiariesResult.status === "fulfilled" ? beneficiariesResult.value : [];
   const carriers = carriersResult.status === "fulfilled" ? carriersResult.value : [];
+  // Director and manager register the sale of a broker's lead (04/11); the broker keeps the status selector.
+  const canRegisterSaleForBroker = canManagementRegisterSale({ role: context.role, userId: context.userId, branchId: context.branchId, lead: { corretorId: lead.corretorId, branchId: lead.branchId, status: lead.status } })
+    && (await cargoAllowsRegisterSale(context));
+  const saleDocuments = leadDocs.map((document) => ({ id: document.id, filename: document.filename, status: document.status }));
 
   if (!interactions) notFound();
 
@@ -695,6 +702,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                       carriers={carriers}
                     />
                   ) : null}
+                  {canRegisterSaleForBroker ? <RegisterSaleButton leadId={lead.id} documents={saleDocuments} carriers={carriers} size="xs" /> : null}
                 </>
               ),
               nextBestAction: <NextBestActionCard action={leadNextBestAction} />,
@@ -856,6 +864,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                   carriers={carriers}
                 />
               ) : null}
+              {canRegisterSaleForBroker ? <RegisterSaleButton leadId={lead.id} documents={saleDocuments} carriers={carriers} /> : null}
             </div>
           </div>
         </Card>
@@ -1008,7 +1017,9 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                     <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
                       <div><p className="text-xs text-muted-foreground">Vidas</p><p className="mt-1 font-medium">{qualificationDetails.numberOfLives ?? "Não informado"}</p></div>
                       {lead.tipo === "PME" ? (
-                        <div><p className="text-xs text-muted-foreground">Média de idade do grupo</p><p className="mt-1 font-medium">{qualificationDetails.averageAge ? `${qualificationDetails.averageAge} anos` : "Não informada"}</p></div>
+                        qualificationDetails.individualAges
+                          ? <div><p className="text-xs text-muted-foreground">Idades do grupo</p><p className="mt-1 font-medium">{qualificationDetails.individualAges}</p></div>
+                          : <div><p className="text-xs text-muted-foreground">Média de idade do grupo</p><p className="mt-1 font-medium">{qualificationDetails.averageAge ? `${qualificationDetails.averageAge} anos` : "Não informada"}</p></div>
                       ) : (
                         <div><p className="text-xs text-muted-foreground">{beneficiaryDetails.label}</p><p className="mt-1 font-medium">{beneficiaryDetails.value ?? qualificationDetails.individualAges ?? "Não informadas"}</p></div>
                       )}

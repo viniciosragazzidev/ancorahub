@@ -45,7 +45,7 @@ import { DisqualifiedLeadsRoutingPanel } from "./_components/disqualified-leads-
 import { ColdLeadRequalificationPanel } from "./_components/cold-lead-requalification-panel";
 import { getColdLeadRequalificationReview } from "@/features/ai-qualification/cold-lead-requalification";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
-import { canViewDistributionQueues, DirectorDistributionTabs } from "./_components/director-distribution-tabs";
+import { canViewDistributionQueues } from "./_components/director-distribution-tabs";
 import { DirectorDistributionHealth } from "./_components/director-distribution-health";
 import directorDistributionStyles from "./_components/director-distribution-page.module.css";
 import { LiveStatusBoundary } from "@/features/live-status/components/live-status-slot";
@@ -682,13 +682,6 @@ export default async function LeadDistributionPage({
       <>
         <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" />
         <main className={directorDistributionStyles.page}>
-          <DirectorDistributionTabs
-            activeView={view}
-            showQueues={canViewDistributionQueues(context.role)}
-            allowedViews={allowedViews}
-            status={params.status}
-            escalaMes={params.escalaMes}
-          />
           {live}
           {view === "resumo_dia" ? (
             <section className={directorDistributionStyles.stack} aria-label="Resumo diário da distribuição">

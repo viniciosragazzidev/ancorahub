@@ -1,5 +1,5 @@
 import { beneficiariesFromMemory, parseAgeValues } from "@/features/ai-agent/beneficiary-relations";
-import type { ConversationMemory } from "@/features/ai-agent/memory";
+import { formatAgeList, groupAgeList, type ConversationMemory } from "@/features/ai-agent/memory";
 import { brokerAvailability } from "./broker-window";
 
 /**
@@ -224,7 +224,9 @@ export function summarizeQualification(memory: ConversationMemory, only?: readon
   if (include("planType") && plan && planLabel[plan]) parts.push(plan === "empresarial" ? "plano empresarial" : planLabel[plan]);
   const count = lives(memory);
   if (include("age")) {
-    if (plan === "empresarial" && memory.averageAge?.value) parts.push(`média de ${memory.averageAge.value} anos`);
+    const groupAges = groupAgeList(memory);
+    if (groupAges.length) parts.push(`idades ${formatAgeList(groupAges)}`);
+    else if (plan === "empresarial" && memory.averageAge?.value) parts.push(`média de ${memory.averageAge.value} anos`);
     else {
       const list = ages(memory);
       const beneficiaries = beneficiariesFromMemory(memory, parseAgeValues(memory.age?.value));
@@ -301,6 +303,8 @@ function fieldAcks(key: QualificationFieldKey, memory: ConversationMemory, name:
       ];
     }
     case "age": {
+      const groupAges = groupAgeList(memory);
+      if (groupAges.length) return [{ text: `Idades ${formatAgeList(groupAges)}, anotado. Obrigado!` }, { text: `Beleza, anotei as idades: ${formatAgeList(groupAges)}.` }];
       if (memory.planType?.value === "empresarial" && memory.averageAge?.value) return [{ text: `Média de ${memory.averageAge.value} anos, anotado. Obrigado!` }, { text: "Beleza, anotei a idade média do grupo." }];
       const list = ages(memory);
       if (list.length === 1) return [

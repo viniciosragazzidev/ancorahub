@@ -11,13 +11,10 @@ import { toast } from "@/components/ui/sonner";
 import {
   SquaresFour,
   ChatCircleDots,
-  ChatCircleText,
   Lightbulb,
   PresentationChart,
-  ChartLineUp,
   CurrencyCircleDollar,
   UsersThree,
-  WhatsappLogo,
   Sparkle,
   CaretDown,
   SignOut,
@@ -25,8 +22,6 @@ import {
   UserCircle,
   ShieldCheck,
   Megaphone,
-  HandHeart,
-  Toolbox,
 } from "@phosphor-icons/react";
 import {
   DropdownMenu,
@@ -58,161 +53,40 @@ import { Badge as ArcBadge } from "@/components/arc/badge/badge";
 import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 import { useDirectorChrome } from "@/components/light/director-chrome-context";
 import { signOut } from "@/shared/auth/client";
-import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions";
+import type { UserDisplayInfo } from "@/shared/auth/actions";
 import { type PermissionKey } from "@/shared/auth/permissions";
 import { isCurrentUserOnDuty } from "@/features/lead-distribution/on-duty-check";
 import { SuperAdminRoleSwitcher } from "@/components/super-admin-role-switcher";
 import { ViewAsButton } from "@/features/super-admin/components/view-as";
 import { cn } from "@/lib/utils";
-import { canShowNavigationItem } from "@/shared/navigation-access";
+import { resolveNavLocation, visibleNavAreas, type NavAreaId } from "@/shared/navigation/nav-registry";
+import { useNavUser } from "@/components/navigation/nav-access";
 
 type NavItemConfig = {
+  id: NavAreaId;
   label: string;
   fullLabel: string;
-  icon: typeof SquaresFour;
   url: string;
-  permission: PermissionKey;
-  section: "Principal" | "Operação" | "Marketing" | "Ferramentas" | "Administração";
+  section: string;
+  icon: typeof SquaresFour;
   iconTone: string;
   isWhatsApp?: boolean;
   beta?: boolean;
   statusDot?: boolean;
-  /** Hidden while the matching flag is off. */
-  requires?: "relationshipCenter";
 };
 
-const navigationItems: NavItemConfig[] = [
-  {
-    label: "Painel",
-    fullLabel: "Dashboard & Visão Geral",
-    icon: SquaresFour,
-    url: "/dashboard",
-    permission: "acessar_dashboard",
-    section: "Principal",
-    iconTone: "text-sky-600 dark:text-sky-300",
-  },
-  {
-    label: "Conversas",
-    fullLabel: "Atendimento e WhatsApp",
-    icon: ChatCircleDots,
-    url: "/conversas",
-    permission: "acessar_conversas",
-    section: "Principal",
-    iconTone: "text-violet-600 dark:text-violet-300",
-  },
-  {
-    label: "Negociações",
-    fullLabel: "Acompanhamento de negociações",
-    icon: ChartLineUp,
-    url: "/negociacoes",
-    permission: "ver_dashboard_equipe",
-    section: "Principal",
-    iconTone: "text-teal-600 dark:text-teal-300",
-  },
-  {
-    label: "Leads",
-    fullLabel: "Leads & Oportunidades",
-    icon: Lightbulb,
-    url: "/leads",
-    permission: "acessar_leads",
-    section: "Principal",
-    iconTone: "text-amber-600 dark:text-amber-300",
-  },
-  {
-    label: "Distribuição",
-    fullLabel: "Distribuição de leads e roletas",
-    icon: PresentationChart,
-    url: "/distribuicao",
-    permission: "acessar_qualificacao_ia",
-    section: "Operação",
-    iconTone: "text-emerald-600 dark:text-emerald-300",
-  },
-  {
-    label: "Vendas",
-    fullLabel: "Vendas e propostas",
-    icon: CurrencyCircleDollar,
-    url: "/vendas",
-    permission: "acessar_vendas",
-    section: "Operação",
-    iconTone: "text-orange-600 dark:text-orange-300",
-  },
-  {
-    label: "Equipe",
-    fullLabel: "Equipe & Unidades",
-    icon: UsersThree,
-    url: "/equipe",
-    permission: "convidar_corretor",
-    section: "Operação",
-    iconTone: "text-cyan-600 dark:text-cyan-300",
-  },
-  {
-    label: "Relacionamento",
-    fullLabel: "Central de relacionamento com o corretor",
-    icon: HandHeart,
-    url: "/relacionamento",
-    permission: "convidar_corretor",
-    section: "Operação",
-    iconTone: "text-rose-600 dark:text-rose-300",
-    requires: "relationshipCenter",
-  },
-  {
-    label: "Qualificação",
-    fullLabel: "Qualificação IA",
-    icon: Sparkle,
-    url: "/qualificacao",
-    permission: "acessar_qualificacao_ia",
-    section: "Marketing",
-    iconTone: "text-fuchsia-600 dark:text-fuchsia-300",
-  },
-  {
-    label: "Atendimento",
-    fullLabel: "Atendimento: situações e mensagens",
-    icon: ChatCircleText,
-    url: "/atendimento/situacoes",
-    permission: "acessar_qualificacao_ia",
-    section: "Marketing",
-    iconTone: "text-indigo-600 dark:text-indigo-300",
-  },
-  {
-    label: "WhatsApp",
-    fullLabel: "Conexões WhatsApp",
-    icon: WhatsappLogo,
-    url: "/integrations/whatsapp",
-    permission: "acessar_configuracoes_pessoais",
-    section: "Marketing",
-    iconTone: "text-green-600 dark:text-green-300",
-    isWhatsApp: true,
-    beta: true,
-    statusDot: true,
-  },
-  {
-    label: "Campanhas",
-    fullLabel: "Campanhas de Marketing",
-    icon: Megaphone,
-    url: "/marketing/campanhas",
-    permission: "acessar_campanhas_meta",
-    section: "Marketing",
-    iconTone: "text-blue-600 dark:text-blue-300",
-  },
-  {
-    label: "Ferramentas",
-    fullLabel: "Ferramentas de conferência",
-    icon: Toolbox,
-    url: "/ferramentas",
-    permission: "acessar_ferramentas",
-    section: "Ferramentas",
-    iconTone: "text-blue-600 dark:text-blue-300",
-  },
-  {
-    label: "Ajustes",
-    fullLabel: "Configurações do Sistema",
-    icon: SlidersHorizontal,
-    url: "/settings",
-    permission: "acessar_configuracoes_pessoais",
-    section: "Administração",
-    iconTone: "text-slate-600 dark:text-slate-300",
-  },
-];
+/** Ícone e cor de cada área; quais áreas e abas existem vem de nav-registry. */
+const areaPresentation: Record<NavAreaId, Pick<NavItemConfig, "icon" | "iconTone">> = {
+  inicio: { icon: SquaresFour, iconTone: "text-sky-600 dark:text-sky-300" },
+  conversas: { icon: ChatCircleDots, iconTone: "text-violet-600 dark:text-violet-300" },
+  leads: { icon: Lightbulb, iconTone: "text-amber-600 dark:text-amber-300" },
+  distribuicao: { icon: PresentationChart, iconTone: "text-emerald-600 dark:text-emerald-300" },
+  comercial: { icon: CurrencyCircleDollar, iconTone: "text-orange-600 dark:text-orange-300" },
+  equipe: { icon: UsersThree, iconTone: "text-cyan-600 dark:text-cyan-300" },
+  "atendimento-ia": { icon: Sparkle, iconTone: "text-fuchsia-600 dark:text-fuchsia-300" },
+  marketing: { icon: Megaphone, iconTone: "text-blue-600 dark:text-blue-300" },
+  configuracoes: { icon: SlidersHorizontal, iconTone: "text-slate-600 dark:text-slate-300" },
+};
 
 export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initialOnDuty, negotiationsEnabled = false }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string; initialOnDuty?: boolean; negotiationsEnabled?: boolean }) {
   const currentPathname = usePathname();
@@ -220,14 +94,11 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
   const { isMobile, setOpenMobile } = useSidebar();
   const directorLite = useArcScopeEnabled();
   const chrome = useDirectorChrome();
-  const [user, setUser] = useState<UserDisplayInfo | null>(initialUser ?? null);
+  const user = useNavUser(initialUser);
   const [onDuty, setOnDuty] = useState(initialOnDuty ?? false);
 
   useEffect(() => {
-    if (!initialUser) {
-      getUserDisplayInfo().then(setUser);
-      isCurrentUserOnDuty().then(setOnDuty);
-    }
+    if (!initialUser) isCurrentUserOnDuty().then(setOnDuty);
   }, [initialUser]);
 
   useEffect(() => {
@@ -241,7 +112,15 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
     (pathname.startsWith("/distribuicao") && pathname.includes("view=plantao")) ||
     pathname.startsWith("/leads/distribuicao/plantao");
 
-  const visibleItems = navigationItems.filter((item) => (item.url !== "/negociacoes" || negotiationsEnabled) && canShowNavigationItem(item, user));
+  const activeAreaId = resolveNavLocation(pathname)?.area.id ?? null;
+  const visibleItems: NavItemConfig[] = visibleNavAreas(user ? { ...user, negotiationsEnabled } : null).map(({ area, href }) => ({
+    id: area.id,
+    label: area.label,
+    fullLabel: area.fullLabel,
+    url: href,
+    section: area.section,
+    ...areaPresentation[area.id],
+  }));
 
   async function handleLogout() {
     toast.info("Encerrando sua sessão...");
@@ -336,10 +215,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
           <nav aria-label="Menu principal" className="flex w-full flex-col gap-1 pb-4">
             {visibleItems.map((item, index) => {
               const Icon = item.icon;
-              const isActive =
-                pathname === item.url ||
-                (item.url !== "/dashboard" && pathname.startsWith(item.url + "/")) ||
-                (item.url.startsWith("/marketing") && pathname.startsWith("/marketing"));
+              const isActive = item.id === activeAreaId;
 
               const itemTargetUrl = item.url;
 
@@ -347,7 +223,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
               const showSection = !previousItem || previousItem.section !== item.section;
 
               return (
-                <div key={item.url} className="flex flex-col">
+                <div key={item.id} className="flex flex-col">
                   {showSection ? (
                     <p className="mt-3 mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/45 transition-[margin,opacity,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] first:mt-1 group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:mb-0 group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0 motion-reduce:transition-none">
                       {item.section}

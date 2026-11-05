@@ -5,9 +5,8 @@
  * Actions, mensagens e o mesmo ?tab= (com os redirecionamentos de abas antigas) da tela atual. O salvar do topo grava
  * os campos da aba "Prompt e comportamento", como hoje.
  */
-import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import page from "@/components/lite/page/lite-page.module.css";
@@ -49,7 +48,6 @@ function fieldsFrom(settings: QualificationHubProps["settings"]): OverviewFields
 
 export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRules: initialRules, toolPermissions: initialTools, stats, alerts: initialAlerts }: QualificationHubProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [fields, setFields] = useState<OverviewFields>(() => fieldsFrom(settings));
   const [handoffMessage, setHandoffMessage] = useState(settings?.handoffMessage ?? DEFAULT_HANDOFF);
@@ -65,7 +63,6 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
   ]);
   const [simInput, setSimInput] = useState("");
   const [simLoading, setSimLoading] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<string | null>(null);
 
   useEffect(() => {
     if (!settings) return;
@@ -82,19 +79,9 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
     { id: "simulator", label: `Simulador${activeAlerts > 0 ? ` (${activeAlerts})` : ""}` },
   ];
   const requested = searchParams.get("tab");
+  // A aba vem da URL: a barra da área Atendimento IA troca a query.
   const resolved = TAB_REDIRECTS[requested ?? ""] ?? requested;
-  const activeTab = selectedTab ?? (tabs.some((tab) => tab.id === resolved) ? resolved! : "overview");
-
-  const selectTab = (id: string) => {
-    setSelectedTab(id);
-    try {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("tab", id);
-      window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
-    } catch {
-      // Sem histórico (testes): a aba troca do mesmo jeito.
-    }
-  };
+  const activeTab = (tabs.some((tab) => tab.id === resolved) ? resolved! : "overview");
 
   const toggleEnabled = async (next: boolean) => {
     setFields((current) => ({ ...current, enabled: next }));
@@ -234,18 +221,10 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
       <main className={page.stack}>
         <div className={styles.actions}>
           <span className={page.badge} data-tone={fields.enabled ? "success" : undefined}>{fields.enabled ? "IA operando" : "IA pausada"}</span>
-          <Link href="/qualificacao/turbo" className={page.button}>Qualificação turbo</Link>
           <BulkQualificationDialog trigger={<button type="button" className={page.button}>Qualificar em massa</button>} />
           <button type="button" className={`${page.primaryButton} ${page.toolbarEnd}`} onClick={save} disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar alterações"}</button>
         </div>
-        <div role="tablist" aria-label="Áreas da qualificação" className={styles.tabs}>
-          {tabs.map((tab) => (
-            <button key={tab.id} type="button" role="tab" id={`qualification-tab-${tab.id}`} aria-selected={tab.id === activeTab} aria-controls="qualification-panel" className={styles.tab} onClick={() => selectTab(tab.id)}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        <div role="tabpanel" id="qualification-panel" aria-labelledby={`qualification-tab-${activeTab}`} className={page.stack}>
+        <div id="qualification-panel" className={page.stack}>
           {activeTab === "overview" ? <OverviewTabLite stats={stats} fields={fields} onChange={(patch) => setFields((current) => ({ ...current, ...patch }))} onToggleEnabled={toggleEnabled} /> : null}
           {activeTab === "whatsapp_diag" ? <DiagnosticTabLite diagnostic={whatsappDiagnostic} /> : null}
           {activeTab === "agent_triggers" ? <PermissionsTabLite tools={tools} onToggle={toggleTool} /> : null}

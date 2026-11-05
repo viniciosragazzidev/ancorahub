@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createEmptyMemory, extractFieldsFromMessage, isCoreQualificationComplete, COLLECTIBLE_FIELDS, readAgeList } from "./memory";
+import { createEmptyMemory, extractFieldsFromMessage, isCoreQualificationComplete, COLLECTIBLE_FIELDS, readAgeList, replayUnansweredTurn } from "./memory";
 
 describe("number of lives in real conversations", () => {
   const asked = { ...createEmptyMemory(), lastQuestionAsked: "Perfeito, Maria. Quantas pessoas serão incluídas no plano?" };
@@ -140,7 +140,28 @@ describe("conversation memory", () => {
     expect(updated.age).toBeUndefined();
   });
 
-  it("extracts every fact from a long PME answer and uses individual ages as the average-age signal", () => {
+  it("replays every message in a failed lives turn and reads a numeric age line for a business plan", () => {
+    const question = "Quantas vidas serão incluídas no plano?";
+    const previouslyPartialMemory = {
+      ...createEmptyMemory(),
+      lastQuestionAsked: question,
+      numberOfLives: { value: "2", confidence: 1 as const, sourceMessageId: "msg-employees" },
+      collectedFields: ["numberOfLives"],
+    };
+
+    const updated = replayUnansweredTurn(previouslyPartialMemory, [
+      { messageId: "msg-cnpj", body: "CNPJ" },
+      { messageId: "msg-business-ages", body: "53,51,16,14\nEmpresarial\nCidade Exemplo\nRJ" },
+      { messageId: "msg-employees", body: "2 funcionárias e 2 dependentes" },
+    ]);
+
+    expect(updated.planType?.value).toBe("empresarial");
+    expect(updated.numberOfLives).toMatchObject({ value: "4", sourceMessageId: "msg-business-ages" });
+    expect(updated.age?.value).toBe("53, 51, 16, 14");
+    expect(updated.averageAge).toMatchObject({ value: "34", sourceMessageId: "msg-business-ages" });
+  });
+
+  it("extracts every fact from a long PME answer and keeps each age, with the average only as an internal signal", () => {
     const updated = extractFieldsFromMessage(
       "No nosso caso é a empresa MEI da minha esposa. Seriam 2 vidas. Tenho 62 anos e ela 61. Gostaríamos de ver opções mais baratas, pois moramos no Recreio dos Bandeirantes.",
       { ...createEmptyMemory(), lastQuestionAsked: "Você busca um plano individual/familiar ou para empresa (PJ)?" },
@@ -151,7 +172,7 @@ describe("conversation memory", () => {
     expect(updated.planType?.value).toBe("empresarial");
     expect(updated.numberOfLives?.value).toBe("2");
     expect(updated.averageAge?.value).toBe("62");
-    expect(updated.age).toBeUndefined();
+    expect(updated.age?.value).toBe("62, 61");
     expect(updated.city?.value).toBe("Recreio dos Bandeirantes");
     expect(updated.intent?.value).toMatch(/opções mais baratas/i);
     expect(updated.collectedFields).toEqual(expect.arrayContaining(["planType", "numberOfLives", "age", "city", "intent"]));

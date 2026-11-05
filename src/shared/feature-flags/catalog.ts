@@ -221,6 +221,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Mostra a faixa \"Agora na operação\" (status vivos) no Painel e na Distribuição desta empresa. O Super-admin liga por empresa; a chave real é feature_live_status_strip_<tenantId>.",
   },
+  CUSTOMER_WAITING_GUARD: {
+    key: "feature_customer_waiting_guard",
+    scope: "tenant",
+    defaultValue: "off",
+    allowedValues: ["off", "observe"] as const,
+    description: "Cliente aguardando o corretor: em \"observe\" registra no histórico do lead o que faria (IA acolhe, cobranças, troca de corretor) sem enviar nada e mostra a espera na Negociações. O Super-admin liga por empresa; a chave real é feature_customer_waiting_guard_<tenantId>.",
+  },
   DUTY_SHIFT_REMINDER_24H: {
     key: "feature_duty_reminder_24h",
     scope: "tenant",

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/components/navigation/area-tabs", () => ({ AreaTabs: () => null }));
 vi.mock("@/components/ui/button", () => ({ Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button> }));
 vi.mock("@/components/theme-toggle", () => ({ ThemeToggle: () => <span data-testid="theme-toggle" /> }));
 vi.mock("@/components/global-search", () => ({ GlobalSearch: () => <span data-testid="global-search" /> }));

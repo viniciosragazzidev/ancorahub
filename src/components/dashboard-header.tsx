@@ -15,6 +15,7 @@ import { useDirectorRoute } from "@/components/light/use-director-route";
 import { DirectorMoreSheet } from "@/components/light/director-more-sheet";
 import { useDirectorChrome } from "@/components/light/director-chrome-context";
 import { useState } from "react";
+import { AreaTabs } from "@/components/navigation/area-tabs";
 
 type DashboardHeaderProps = {
   breadcrumb: string;
@@ -41,6 +42,7 @@ export function DashboardHeader({
   }
 
   return (
+    <>
     <header
       data-slot="dashboard-header"
       className="sticky top-0 z-30 flex h-(--header-height) min-w-0 shrink-0 items-center gap-3 border-b border-border/80 bg-background/92 px-5 backdrop-blur-md lg:px-6 max-[559px]:h-auto max-[559px]:min-h-[calc(var(--mobile-header-height)+var(--mobile-safe-top))] max-[559px]:flex-wrap max-[559px]:gap-x-2 max-[559px]:gap-y-1.5 max-[559px]:pb-2 max-[559px]:pt-(--mobile-safe-top) max-[559px]:pl-[max(var(--mobile-page-padding),var(--mobile-safe-left))] max-[559px]:pr-[max(var(--mobile-page-padding),var(--mobile-safe-right))]"
@@ -77,6 +79,8 @@ export function DashboardHeader({
         <NotificationPopover />
       </div>
     </header>
+    <AreaTabs />
+    </>
   );
 }
 
@@ -92,6 +96,7 @@ function DirectorDashboardHeader({
   const root = route.parentHref === null;
 
   return (
+    <>
     <div data-slot="dashboard-header" className="arc-venancor director-dashboard-header" data-skin="diretor">
       <LightAppHeader
         availability="available"
@@ -121,5 +126,7 @@ function DirectorDashboardHeader({
       />
       <DirectorMoreSheet open={moreOpen} onOpenChange={setMoreOpen} />
     </div>
+    <AreaTabs />
+    </>
   );
 }

@@ -215,7 +215,9 @@ export function DirectorLiteLeadDetail(props: DirectorLiteLeadDetailProps) {
                   <dl className={styles.fields}>
                     <Field label="Vidas">{qualification.numberOfLives ?? "Não informado"}</Field>
                     {lead.tipo === "PME"
-                      ? <Field label="Média de idade do grupo">{qualification.averageAge ? `${qualification.averageAge} anos` : "Não informada"}</Field>
+                      ? qualification.individualAges
+                        ? <Field label="Idades do grupo">{qualification.individualAges}</Field>
+                        : <Field label="Média de idade do grupo">{qualification.averageAge ? `${qualification.averageAge} anos` : "Não informada"}</Field>
                       : <Field label={fullyMappedGroup ? "Pessoas no plano" : "Idades informadas"}>{peopleOnPlan ?? (agesText || "Não informadas")}</Field>}
                     {qualification.beneficiaryRaw ? <Field label="O cliente escreveu:">{qualification.beneficiaryRaw}</Field> : null}
                     <Field label="Tipo de atendimento">{meta.tipoPlanoStatus === "not_provided" ? "Não informado" : lead.tipo === "PME" ? "Empresa / PME" : lead.tipo === "PJ" ? "Pessoa jurídica" : "Pessoa física"}</Field>

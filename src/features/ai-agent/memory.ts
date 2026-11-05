@@ -223,6 +223,22 @@ export function hasQuoteReadyData(memory: ConversationMemory | null | undefined)
   return hasCoreQuoteData(memory) && Boolean(memory?.city?.value?.trim());
 }
 
+/** "6, 48 e 71": ages as the customer and the broker read them. */
+export function formatAgeList(ages: readonly (number | string)[]) {
+  const items = ages.map(String);
+  return items.length > 1 ? `${items.slice(0, -1).join(", ")} e ${items[items.length - 1]}` : items[0] ?? "";
+}
+
+/**
+ * The ages a company customer listed one by one ("6, 48, 71"). Empty when the customer gave only an average.
+ * Every age is kept and repeated as told: the average stays only as an internal number (Vinicios, 04/11/2026).
+ */
+export function groupAgeList(memory: ConversationMemory | null | undefined): number[] {
+  if (memory?.planType?.value !== "empresarial") return [];
+  const list = (memory.age?.value?.match(/\d{1,3}/g) ?? []).map(Number).filter((age) => age < 150);
+  return list.length >= 2 ? list : [];
+}
+
 export function readAgeList(message: string): number[] {
   // "17.16.49.48" (case Eliane, 27/10): short numbers joined by dots are a list, never money
   // (money groups thousands in 3 digits: "4.500").
@@ -250,6 +266,26 @@ export function readAgeList(message: string): number[] {
   return Array.from(withoutNoise.matchAll(/(?<![\d@.])(\d{1,3})(?![\d@])/g))
     .map((match) => Number(match[1]))
     .filter((age) => age >= 0 && age <= 120);
+}
+
+/**
+ * During a pending question about lives, customers sometimes send a single line
+ * of ages together with other facts in the same WhatsApp turn. Keep the
+ * contextual shortcut deliberately narrow: only a complete numeric-list line
+ * is treated as ages, so CNPJs, prices, and counts in prose are not reclassified.
+ */
+export function readAgeListForLivesQuestion(message: string, question?: string | null): number[] {
+  const normalizedQuestion = normalizeForMatching(question ?? "");
+  if (!/quantas vidas|quantas pessoas|quantidade de pessoas|numero de vidas|beneficiari/.test(normalizedQuestion)) {
+    return readAgeList(message);
+  }
+  const direct = readAgeList(message);
+  if (direct.length >= 2) return direct;
+  for (const line of message.split(/\r?\n/)) {
+    const ages = readAgeList(line.trim());
+    if (ages.length >= 2) return ages;
+  }
+  return direct;
 }
 
 const NUMBER_WORD_VALUES: Record<string, number> = {
@@ -337,6 +373,40 @@ export function extractUnansweredMessages(
     next = extractFieldsFromMessage(message.body, { ...next, lastQuestionAsked: questionNow, lastQuestionsAsked: questionsNow }, message.messageId ?? undefined);
   }
   return { ...next, lastQuestionAsked: questionNow, lastQuestionsAsked: questionsNow };
+}
+
+/**
+ * Rebuild facts attributed to messages in the still-unanswered customer turn.
+ * A prior failed attempt may already have persisted a partial or wrong read of
+ * one message; facts sourced from this same turn are therefore removed and the
+ * whole turn is replayed oldest-first against the pre-turn memory.
+ */
+export function replayUnansweredTurn(
+  memory: ConversationMemory,
+  messages: ReadonlyArray<{ body: string | null | undefined; messageId?: string | null }>,
+): ConversationMemory {
+  return extractUnansweredMessages(clearUnansweredTurnFacts(memory, messages), messages);
+}
+
+export function clearUnansweredTurnFacts(
+  memory: ConversationMemory,
+  messages: ReadonlyArray<{ messageId?: string | null }>,
+): ConversationMemory {
+  const turnIds = new Set(messages.map((message) => message.messageId).filter((id): id is string => Boolean(id)));
+  if (!turnIds.size) return memory;
+
+  const next = { ...memory } as ConversationMemory;
+  const clearedFields = new Set<string>();
+  for (const [key, value] of Object.entries(next)) {
+    if (!value || typeof value !== "object" || Array.isArray(value) || !("sourceMessageId" in value)) continue;
+    const sourceMessageId = (value as { sourceMessageId?: unknown }).sourceMessageId;
+    if (typeof sourceMessageId === "string" && turnIds.has(sourceMessageId)) {
+      delete (next as unknown as Record<string, unknown>)[key];
+      clearedFields.add(key);
+    }
+  }
+  next.collectedFields = next.collectedFields.filter((field) => !clearedFields.has(field));
+  return next;
 }
 
 /**
@@ -698,7 +768,7 @@ export function extractFieldsFromMessage(
     }
 
     // Several ages in one answer are the people of the plan: "12 e 42 anos" is 2 lives.
-    const listedAges = readAgeList(trimmed);
+    const listedAges = readAgeListForLivesQuestion(trimmed, memory.lastQuestionAsked);
     if (!memory.numberOfLives && listedAges.length >= 2 && listedAges.length < 100) {
       memory.numberOfLives = { value: String(listedAges.length), confidence: 1, sourceMessageId };
       addCollectedField(memory, "numberOfLives");
@@ -747,7 +817,7 @@ export function extractFieldsFromMessage(
     // A baby's age in days, weeks or months ("bebê de 16 dias") is 0 years.
     const babyAge = /\b\d{1,2}\s*(?:dias?|semanas?|m[eê]s(?:es)?)\b|\brec[eé]m[- ]nascid/i.test(trimmed);
     const ageText = babyAge ? trimmed.replace(/\b\d{1,2}\s*(?:dias?|semanas?|m[eê]s(?:es)?)\b/gi, "0 anos") : trimmed;
-    const listedAgeValues = readAgeList(ageText).filter((age) => age > 0 || babyAge);
+    const listedAgeValues = readAgeListForLivesQuestion(ageText, memory.lastQuestionAsked).filter((age) => age > 0 || babyAge);
     const selfOnlyAge = readSelfOnlyAge(ageText);
     const explicitAgeValues = selfOnlyAge !== null
       ? [selfOnlyAge]
@@ -765,6 +835,8 @@ export function extractFieldsFromMessage(
       if (memory.planType?.value === "empresarial") {
         const average = Math.round(ageValues.reduce((sum, age) => sum + age, 0) / ageValues.length);
         memory.averageAge = { value: String(average), confidence: 1, sourceMessageId };
+        // Several ages are kept one by one; the average is only internal.
+        if (ageValues.length > 1) memory.age = { value: ageValues.join(", "), confidence: 1, sourceMessageId };
       } else if (asksForAge || explicitAgeValues.length > 0) {
         memory.age = { value: ageValues.join(", "), confidence: 1, sourceMessageId };
       }
@@ -952,7 +1024,9 @@ export function buildMemoryContext(memory: ConversationMemory): string {
   if (memory.city?.value) parts.push(`- Cidade: ${memory.city.value}`);
   if (memory.planType?.value) parts.push(`- Tipo de plano: ${memory.planType.value}`);
   if (memory.numberOfLives?.value) parts.push(`- N° de vidas: ${memory.numberOfLives.value}`);
-  if (memory.planType?.value === "empresarial" && memory.averageAge?.value) parts.push(`- Média de idade do grupo: ${memory.averageAge.value} anos`);
+  const groupAges = groupAgeList(memory);
+  if (groupAges.length) parts.push(`- Idades do grupo (repita todas, nunca a média): ${formatAgeList(groupAges)} anos`);
+  else if (memory.planType?.value === "empresarial" && memory.averageAge?.value) parts.push(`- Média de idade do grupo (informada pelo cliente): ${memory.averageAge.value} anos`);
   else if (memory.age?.value) parts.push(`- Idades: ${memory.age.value}`);
   if (memory.email?.value) parts.push(`- E-mail: ${memory.email.value}`);
   if (memory.intent?.value) parts.push(`- Intenção: ${memory.intent.value}`);

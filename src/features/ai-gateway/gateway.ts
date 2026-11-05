@@ -1,11 +1,11 @@
 import "server-only";
 
-import type { z } from "zod";
+import { toJSONSchema, type z } from "zod";
 
 import { logAiUsage } from "@/features/ai-agent/ai-usage-log";
 import { getSystemSetting } from "@/features/system-settings/queries";
 
-import { PROVIDER_ENDPOINT, PROVIDER_KEY_ENV, isFreeTier, resolveChain, type AiProfile, type AiProvider, type ModelRef } from "./profiles";
+import { ANTHROPIC_MESSAGES_ENDPOINT, PROVIDER_ENDPOINT, PROVIDER_KEY_ENV, isFreeTier, resolveChain, type AiProfile, type AiProvider, type ModelRef } from "./profiles";
 import { maskPersonalData } from "./privacy";
 
 export type GatewayMessage = { role: "system" | "user" | "assistant"; content: string };
@@ -38,6 +38,83 @@ function allow(user: string, now = Date.now()) {
   list.push(now);
   recent.set(user, list);
   return true;
+}
+
+const PROVIDER_COOLDOWN_MS = 10 * 60_000;
+const providerCooldowns = new Map<string, { until: number; status: 401 | 402 }>();
+
+/** @internal Isolates cooldown state between gateway contract tests. */
+export function resetProviderCooldownsForTests() {
+  providerCooldowns.clear();
+}
+
+class ProviderHttpError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = "ProviderHttpError";
+  }
+}
+
+function providerCooldownKey(ref: ModelRef) {
+  return `${ref.provider}:${isFreeTier(ref) ? "free" : "paid"}`;
+}
+
+function providerIsCoolingDown(ref: ModelRef, now = Date.now()) {
+  const key = providerCooldownKey(ref);
+  const cooldown = providerCooldowns.get(key);
+  if (!cooldown) return false;
+  if (cooldown.until <= now) {
+    providerCooldowns.delete(key);
+    return false;
+  }
+  return true;
+}
+
+function anthropicSchema(schema: z.ZodType<unknown>) {
+  const raw = toJSONSchema(schema, { unrepresentable: "any" }) as Record<string, unknown>;
+  const unsupported = new Set(["$schema", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "maxItems"]);
+  const clean = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(clean);
+    if (!value || typeof value !== "object") return value;
+    const output: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value)) {
+      if (unsupported.has(key)) continue;
+      if (key === "minItems" && typeof child === "number" && child > 1) continue;
+      output[key] = clean(child);
+    }
+    return output;
+  };
+  return clean(raw);
+}
+
+export function buildAnthropicMessagesRequest(input: {
+  model: string;
+  messages: GatewayMessage[];
+  maxTokens: number;
+  schema: z.ZodType<unknown>;
+}) {
+  const system = input.messages.filter((message) => message.role === "system").map((message) => message.content).filter(Boolean).join("\n\n");
+  const turns = input.messages.filter((message) => message.role !== "system");
+  const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
+  for (const message of turns) {
+    const role = message.role as "user" | "assistant";
+    const previous = messages[messages.length - 1];
+    if (previous?.role === role) previous.content += `\n\n${message.content}`;
+    else messages.push({ role, content: message.content });
+  }
+  // Messages API requires a user turn first. Older context before the first customer turn
+  // has no bearing on the current answer and is safely omitted.
+  while (messages[0]?.role === "assistant") messages.shift();
+  if (!messages.length) messages.push({ role: "user", content: "Responda ao pedido usando o formato JSON definido." });
+
+  return {
+    model: input.model,
+    max_tokens: input.maxTokens,
+    ...(system ? { system } : {}),
+    messages,
+    ...(input.model.includes("haiku-5-5") ? { thinking: { type: "disabled" } } : {}),
+    output_config: { format: { type: "json_schema", schema: anthropicSchema(input.schema) } },
+  };
 }
 
 /**
@@ -88,11 +165,17 @@ export async function runGateway<T>(input: {
   leadId?: string | null;
   conversationId?: string | null;
   sourceMessageId?: string | null;
-  /** Stop after this many models (the caller is inside a customer's turn and has a fallback). */
+  /** Maximum paid model calls before the caller's deterministic fallback. 401/402 do not consume a call. */
   maxAttempts?: number;
+  /** Total wall-clock budget across all provider attempts. Interpreter calls default to 12 seconds. */
+  totalTimeoutMs?: number;
+  /** Retry direct Claude Haiku 5.5 once for malformed/empty output or timeout before fallback. */
+  retryAnthropicHaikuOnTransient?: boolean;
   /** Client conversation or health data inside: only paid providers that do not train on it (LGPD art. 11). */
   sensitive?: boolean;
 }): Promise<GatewayResult<T>> {
+  const totalTimeoutMs = input.totalTimeoutMs ?? (input.profile === "interpreter" ? 12_000 : undefined);
+  const totalDeadlineAt = totalTimeoutMs && totalTimeoutMs > 0 ? Date.now() + totalTimeoutMs : undefined;
   if (!allow(`${input.tenantId}:${input.userId}`)) return { ok: false, reason: "rate_limited", attempts: 0 };
 
   const keys = new Map<AiProvider, string>();
@@ -108,24 +191,51 @@ export async function runGateway<T>(input: {
   let attempts = 0;
   let lastError: string | undefined;
   const log = { tenantId: input.tenantId, purpose: input.purpose, leadId: input.leadId ?? null, conversationId: input.conversationId ?? null, sourceMessageId: input.sourceMessageId ?? null };
-  for (const ref of chain.slice(0, input.maxAttempts && input.maxAttempts > 0 ? input.maxAttempts : chain.length)) {
-    attempts += 1;
-    const startedAt = Date.now();
-    const messages = isFreeTier(ref)
-      ? input.messages.map((message) => ({ ...message, content: maskPersonalData(message.content) }))
-      : input.messages;
+  const maxAttempts = input.maxAttempts && input.maxAttempts > 0 ? input.maxAttempts : chain.length;
+  for (const ref of chain) {
+    if (totalDeadlineAt !== undefined && Date.now() >= totalDeadlineAt) {
+      lastError = `total deadline exceeded (${totalTimeoutMs}ms)`;
+      break;
+    }
+    if (providerIsCoolingDown(ref)) {
+      const cooldown = providerCooldowns.get(providerCooldownKey(ref));
+      lastError = `${ref.provider}: temporarily disabled after HTTP ${cooldown?.status ?? 401}`;
+      continue;
+    }
+    const retryHaiku = input.retryAnthropicHaikuOnTransient === true && ref.provider === "anthropic" && ref.model.includes("haiku-5-5");
+    for (let providerAttempt = 0; providerAttempt < (retryHaiku ? 2 : 1); providerAttempt += 1) {
+      if (attempts >= maxAttempts) break;
+      const remainingTotalMs = totalDeadlineAt === undefined ? undefined : totalDeadlineAt - Date.now();
+      if (remainingTotalMs !== undefined && remainingTotalMs <= 0) {
+        lastError = `total deadline exceeded (${totalTimeoutMs}ms)`;
+        break;
+      }
+      const attemptTimeoutMs = Math.max(1, Math.min(input.timeoutMs ?? 12_000, remainingTotalMs ?? Number.POSITIVE_INFINITY));
+      const startedAt = Date.now();
+      attempts += 1;
+      const nativeAnthropic = ref.provider === "anthropic" && input.profile === "interpreter";
+      const messages = isFreeTier(ref)
+        ? input.messages.map((message) => ({ ...message, content: maskPersonalData(message.content) }))
+        : input.messages;
     try {
-      const response = await fetch(PROVIDER_ENDPOINT[ref.provider], {
+      const response = await fetch(nativeAnthropic ? ANTHROPIC_MESSAGES_ENDPOINT : PROVIDER_ENDPOINT[ref.provider], {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${keys.get(ref.provider)}`,
+          ...(nativeAnthropic
+            ? { "x-api-key": keys.get(ref.provider)!, "anthropic-version": "2023-06-01" }
+            : { Authorization: `Bearer ${keys.get(ref.provider)}` }),
           ...(ref.provider === "openrouter" ? { "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://crm.ancorasaude.cloud", "X-Title": "Ancora CRM" } : {}),
         },
-        body: JSON.stringify({
+        body: JSON.stringify(nativeAnthropic ? buildAnthropicMessagesRequest({
           model: ref.model,
           messages,
-          // Claude Haiku 5.5 direct refuses `temperature` (HTTP 400 "deprecated for this model", 24/10).
+          maxTokens: input.maxTokens ?? 500,
+          schema: input.schema,
+        }) : {
+          model: ref.model,
+          messages,
+          // Claude Haiku 5.5 refuses `temperature` even on its compatibility endpoint.
           ...(ref.provider === "anthropic" ? {} : { temperature: input.temperature ?? 0.3 }),
           max_tokens: input.maxTokens ?? 500,
           ...(ref.provider === "anthropic" ? {} : { response_format: { type: "json_object" } }),
@@ -135,24 +245,50 @@ export async function runGateway<T>(input: {
           // gpt-oss thinks before answering: low effort keeps the answer inside max_tokens and fast.
           ...(ref.model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
         }),
-        signal: AbortSignal.timeout(input.timeoutMs ?? 12_000),
+        signal: AbortSignal.timeout(attemptTimeoutMs),
       });
       if (!response.ok) {
         const detail = (await response.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
-        throw new Error(`HTTP ${response.status}${detail ? ` ${detail}` : ""}`);
+        throw new ProviderHttpError(response.status, `HTTP ${response.status}${detail ? ` ${detail}` : ""}`);
       }
-      const body = await response.json() as { choices?: Array<{ message?: { content?: string }; finish_reason?: string }>; usage?: Parameters<typeof logAiUsage>[0]["usage"] };
-      const text = body.choices?.[0]?.message?.content ?? "";
+      const body = await response.json() as {
+        choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
+        content?: Array<{ type?: string; text?: string }>;
+        stop_reason?: string | null;
+        usage?: (NonNullable<Parameters<typeof logAiUsage>[0]["usage"]> & { input_tokens?: number; output_tokens?: number }) | null;
+      };
+      const finishReason = nativeAnthropic ? body.stop_reason : body.choices?.[0]?.finish_reason;
+      const text = nativeAnthropic
+        ? (body.content ?? []).filter((block) => block.type === "text").map((block) => block.text ?? "").join("\n")
+        : body.choices?.[0]?.message?.content ?? "";
       const parsed = input.schema.safeParse(extractJson(text));
       // The reason without the content (it may carry client data): cut by max_tokens or not JSON.
-      if (!parsed.success) throw new Error(`invalid_output (${body.choices?.[0]?.finish_reason ?? "?"}, ${text.length} chars)`);
-      void logAiUsage({ ...log, model: `${ref.provider}/${ref.model}`, startedAt, usage: body.usage ?? null, success: true });
+      if (!parsed.success) throw new Error(`invalid_output (${finishReason ?? "?"}, ${text.length} chars)`);
+      const usage = nativeAnthropic && body.usage ? {
+        prompt_tokens: body.usage.input_tokens,
+        completion_tokens: body.usage.output_tokens,
+        total_tokens: (body.usage.input_tokens ?? 0) + (body.usage.output_tokens ?? 0),
+      } : body.usage ?? null;
+      void logAiUsage({ ...log, model: `${ref.provider}/${ref.model}`, startedAt, usage, success: true });
       return { ok: true, value: parsed.data, text, model: ref, attempts };
     } catch (error) {
-      const message = error instanceof Error ? (error.name === "TimeoutError" ? `timeout ${input.timeoutMs ?? 12_000}ms` : error.message) : "error";
+      const message = error instanceof Error ? (error.name === "TimeoutError" ? `timeout ${attemptTimeoutMs}ms` : error.message) : "error";
       lastError = `${ref.provider}/${ref.model}: ${message}`;
       void logAiUsage({ ...log, model: `${ref.provider}/${ref.model}`, startedAt, success: false, error: message });
+      if (error instanceof ProviderHttpError && (error.status === 401 || error.status === 402)) {
+        // Auth/billing failures are provider/tier health, not model attempts. A paid OpenRouter
+        // failure must not disable :free models in profiles that can use those models.
+        attempts -= 1;
+        providerCooldowns.set(providerCooldownKey(ref), { until: Date.now() + PROVIDER_COOLDOWN_MS, status: error.status });
+        break;
+      }
+      const isTransientHaikuFailure = retryHaiku
+        && providerAttempt === 0
+        && (error instanceof Error && (error.name === "TimeoutError" || /^invalid_output\s*\(/.test(error.message)));
+      if (!isTransientHaikuFailure) break;
     }
+    }
+    if (attempts >= maxAttempts) break;
   }
   return { ok: false, reason: "all_failed", attempts, lastError };
 }

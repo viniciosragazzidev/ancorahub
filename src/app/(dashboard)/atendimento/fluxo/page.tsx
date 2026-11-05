@@ -2,11 +2,9 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { getQualificationFlow } from "@/features/qualification-flow/queries";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { AtendimentoHeading } from "../_components/atendimento-heading";
 import { FlowEditor } from "./_components/flow-editor";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
-import { AtendimentoHeadingLite } from "../_components/atendimento-heading-lite";
 import { FlowEditorLite } from "./_components/flow-editor-lite";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +25,6 @@ export default async function AtendimentoFluxoPage() {
       <>
         <DashboardHeader breadcrumb="Atendimento" title="Fluxo de atendimento" />
         <main className={litePage.stack}>
-          <AtendimentoHeadingLite active="fluxo" />
           <FlowEditorLite enabledOrder={flow.enabledOrder} texts={flow.texts} canEdit={context.role === "director"} />
         </main>
       </>
@@ -38,7 +35,6 @@ export default async function AtendimentoFluxoPage() {
     <>
       <DashboardHeader breadcrumb="Atendimento" title="Fluxo de atendimento" />
       <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
-        <AtendimentoHeading active="fluxo" />
         <FlowEditor enabledOrder={flow.enabledOrder} texts={flow.texts} canEdit={context.role === "director"} />
       </main>
     </>

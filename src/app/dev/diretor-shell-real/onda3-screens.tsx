@@ -5,7 +5,6 @@
  * valores grandes, várias unidades). Cada tela usa os mesmos componentes Lite da página real.
  */
 import { DashboardHeader } from "@/components/dashboard-header";
-import { LiteRelatedLinks } from "@/components/lite/page/related-links";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { SalesWorkspaceLite, type SaleLiteRow } from "@/app/(dashboard)/vendas/sales-workspace-lite";
 import { SaleDetailLite } from "@/app/(dashboard)/vendas/[id]/sale-detail-lite";
@@ -56,16 +55,6 @@ export function VendasShellScreen({ role = "director" }: { role?: string } = {})
       <DashboardHeader breadcrumb="Operação comercial" title="Vendas" />
       <main className={litePage.stack}>
         <SalesWorkspaceLite sales={SALES} totalRevenue={totalRevenue} currentRole={role} period={30} branches={BRANCHES} />
-        <LiteRelatedLinks
-          title="Navegação comercial relacionada"
-          description="Funções ligadas a vendas e faturamento."
-          links={[
-            { label: "Ver base de clientes", href: "/clientes", description: "Gestão da carteira de contratos ativos" },
-            { label: "Tabela de comissões", href: "/settings?tab=comissoes", description: "Regras de comissionamento por produto" },
-            { label: "Anexar documentos de propostas", href: "/documentos", description: "Conferência de documentos e apólices" },
-            { label: "Relatório de desempenho", href: "/dashboard?tab=commercial", description: "Métricas de fechamento por corretor" },
-          ]}
-        />
       </main>
     </>
   );

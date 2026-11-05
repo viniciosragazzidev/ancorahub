@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef } from "react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { CorreTopSidebar } from "@/components/corretop-sidebar";
+import { NavFlagsProvider } from "@/components/navigation/nav-access";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import type { ChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
@@ -287,7 +288,7 @@ export function AppShell({
             ...(directorLiteEnabled && !directorLiteRouteOptedOut ? directorSkinStyle : {}),
           }}
         >
-          <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+          <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col"><NavFlagsProvider negotiationsEnabled={negotiationsEnabled} initialUser={initialSidebarUser} previewPathname={initialSidebarPathname}>{children}</NavFlagsProvider></div>
         </SidebarInset>
         <OnboardingWelcomeDialog />
       </SidebarProvider>

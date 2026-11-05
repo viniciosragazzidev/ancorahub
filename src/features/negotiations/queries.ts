@@ -7,6 +7,9 @@ import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { computeNegotiationLevel, NEGOTIATION_LIMITS, type NegotiationLevel } from "./negotiation-model";
 import { canViewNegotiationLead } from "./negotiation-scope";
+import type { CustomerWaitingStage } from "@/features/customer-waiting/domain";
+import { getCustomerWaitingMode } from "@/features/customer-waiting/flag";
+import { loadCustomerWaitingLeads } from "@/features/customer-waiting/queries";
 
 const ACTIVE_STATUSES = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 const BROKER_MESSAGE = sql`(${schema.whatsappMessages.direction} = 'outgoing' or (${schema.whatsappMessages.direction} = 'outbound' and coalesce(${schema.whatsappMessages.senderRole}, '') not in ('assistant', 'system'))) `;
@@ -44,6 +47,8 @@ export type NegotiationLead = {
   hasCrmConversation: boolean;
   customerSentPdf: boolean;
   customerSentImage: boolean;
+  /** Cliente aguardando o corretor (observação F1): só presente com a chave da empresa em "observe". */
+  waiting?: NegotiationWaiting | null;
   ai: {
     conversationStage: string;
     customerIntent: string;
@@ -55,6 +60,24 @@ export type NegotiationLead = {
     buyingSignals: string[];
     lastAnalyzedAt: string | null;
   };
+};
+
+/** Espera do cliente por uma pessoa da empresa, em horas úteis (plano 2026-11-04). */
+export type NegotiationWaiting = {
+  leadId: string;
+  leadName: string;
+  status: string;
+  brokerId: string;
+  brokerName: string;
+  branchName: string | null;
+  clockStartedAt: string;
+  waitingBusinessMinutes: number;
+  stage: CustomerWaitingStage;
+  nextStage: Exclude<CustomerWaitingStage, "watching"> | null;
+  nextStageAt: string | null;
+  unansweredCount: number;
+  urgent: boolean;
+  customerQuote: string | null;
 };
 
 export type NegotiationTimelineEvent = {
@@ -88,6 +111,8 @@ export type NegotiationsDashboardData = {
   brokerStats: NegotiationBrokerStats[];
   dailyStats: NegotiationDayStats[];
   aiHealth: { analysesLast24Hours: number; failuresLast24Hours: number };
+  /** Null com a chave desligada. Em observação, todos os leads do escopo com o cliente esperando, listados ou não. */
+  customerWaitingGuard?: { mode: "observe"; rows: NegotiationWaiting[] } | null;
 };
 
 function asDate(value: Date | string | null | undefined) {
@@ -134,6 +159,7 @@ function emptyData(scope: NegotiationsScope, now: Date): NegotiationsDashboardDa
   return {
     generatedAt: now.toISOString(), scope, leads: [], brokers: [],
     counts: { closing: 0, advanced: 0, in_conversation: 0, cooling: 0, no_crm_conversation: 0, customers_waiting: 0 },
+    customerWaitingGuard: null,
     brokerStats: [], dailyStats: [], aiHealth: { analysesLast24Hours: 0, failuresLast24Hours: 0 },
   };
 }
@@ -464,7 +490,11 @@ export async function getNegotiationsDashboard(context: TenantContext, requested
       eq(schema.aiAttendanceLogs.status, "failed"),
       gte(schema.aiAttendanceLogs.createdAt, since24Hours),
     ));
-  const [aiAudit, aiFailures] = await Promise.all([aiAuditPromise, aiFailuresPromise]);
+  const [aiAudit, aiFailures, customerWaitingGuard] = await Promise.all([aiAuditPromise, aiFailuresPromise, loadNegotiationWaiting(context.tenantId, leadRows, now)]);
+  if (customerWaitingGuard) {
+    const byLead = new Map(customerWaitingGuard.rows.map((row) => [row.leadId, row]));
+    for (const lead of leads) lead.waiting = byLead.get(lead.id) ?? null;
+  }
 
   return {
     generatedAt: now.toISOString(),
@@ -475,7 +505,41 @@ export async function getNegotiationsDashboard(context: TenantContext, requested
     brokerStats,
     dailyStats,
     aiHealth: { analysesLast24Hours: Number(aiAudit[0]?.total ?? 0), failuresLast24Hours: Number(aiFailures[0]?.total ?? 0) },
+    customerWaitingGuard,
   };
+}
+
+const WAITING_STAGE_RANK: Record<CustomerWaitingStage, number> = { reassign: 0, second_charge: 1, acknowledge: 2, watching: 3 };
+
+/** Observação F1: a espera de todos os leads do escopo (inclusive os que ainda não são negociação, como o aceite sem conversa). */
+async function loadNegotiationWaiting(
+  tenantId: string,
+  leadRows: ReadonlyArray<{ id: string; name: string; status: string; brokerId: string | null; brokerName: string | null; branchName: string | null }>,
+  now: Date,
+): Promise<NonNullable<NegotiationsDashboardData["customerWaitingGuard"]> | null> {
+  if ((await getCustomerWaitingMode(tenantId)) !== "observe") return null;
+  const rowsById = new Map(leadRows.map((row) => [row.id, row]));
+  const waiting = await loadCustomerWaitingLeads({ tenantId, now, lookbackDays: NEGOTIATION_LIMITS.messageWindowDays, leadIds: leadRows.map((row) => row.id) });
+  const rows: NegotiationWaiting[] = waiting.map(({ leadId, brokerId, assessment }) => {
+    const lead = rowsById.get(leadId);
+    return {
+      leadId,
+      leadName: lead?.name ?? "Lead",
+      status: lead?.status ?? "in_contact",
+      brokerId,
+      brokerName: lead?.brokerName ?? "Corretor",
+      branchName: lead?.branchName ?? null,
+      clockStartedAt: assessment.clockStartedAt,
+      waitingBusinessMinutes: assessment.waitingBusinessMinutes,
+      stage: assessment.stage,
+      nextStage: assessment.nextStage,
+      nextStageAt: assessment.nextStageAt,
+      unansweredCount: assessment.unansweredCount,
+      urgent: assessment.urgent,
+      customerQuote: assessment.customerQuote,
+    };
+  }).sort((left, right) => WAITING_STAGE_RANK[left.stage] - WAITING_STAGE_RANK[right.stage] || Number(right.urgent) - Number(left.urgent) || right.waitingBusinessMinutes - left.waitingBusinessMinutes);
+  return { mode: "observe", rows };
 }
 
 /** Details load only when a user opens a drawer. The visible lead is rechecked against the current session scope. */

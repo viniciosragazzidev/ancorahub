@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 
 import { useState, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -43,7 +42,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs } from "@/components/ui/tabs";
 import { AgentTrainingTab } from "@/app/(dashboard)/settings/_components/agent-training-tab";
 import { AgentTriggersPanel } from "./agent-triggers-panel";
 import { StatCard } from "@/components/dashboard/metric-card";
@@ -143,6 +142,11 @@ export function QualificationHubClient({
     training: "overview",
   };
 
+
+  // A barra da área troca a aba pela URL: a escolha local (ex.: "testar no simulador") vale até a URL mudar.
+  useEffect(() => {
+    setSelectedTab(null);
+  }, [requestedTab]);
 
   const resolvedRequestedTab = tabRedirectMap[requestedTab ?? ""] ?? requestedTab;
   const activeTab = selectedTab ?? (tabs.some((t) => t.id === resolvedRequestedTab) ? resolvedRequestedTab! : "overview");
@@ -348,9 +352,6 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         title="Qualificação IA"
         rightSlot={
           <div className="flex items-center gap-2">
-            <Button render={<Link href="/qualificacao/turbo" />} variant="outline" size="sm" className="gap-1.5 text-xs">
-              Qualificação turbo
-            </Button>
             <BulkQualificationDialog />
             <Badge variant={enabled ? "success" : "secondary"} className="gap-1 px-2 py-1 text-xs">
               <span className={`size-2 rounded-full ${enabled ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"}`} />
@@ -367,28 +368,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
 
       <main data-ui-surface="qualification" className="flex min-w-0 flex-1 flex-col gap-5 bg-background px-(--mobile-page-padding) pb-(--mobile-page-padding) sm:gap-6 lg:px-6 lg:pb-6">
         <Tabs value={activeTab} onValueChange={handleSelectTab} variant="underline" className="w-full min-w-0 gap-6">
-          <nav
-            aria-label="Áreas da qualificação"
-            data-slot="qualification-tabs"
-            className="sticky top-[var(--header-height)] z-20 -mx-(--mobile-page-padding) border-b border-border/70 bg-background/95 px-(--mobile-page-padding) backdrop-blur supports-[backdrop-filter]:bg-background/85 lg:-mx-6 lg:px-6 max-[559px]:top-[calc(var(--mobile-header-height)+var(--mobile-safe-top))]"
-          >
-            <TabsList aria-label="Áreas da qualificação" className="h-auto w-full justify-start gap-1 overflow-x-auto border-0 bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <TabsTrigger
-                    key={tab.id}
-                    value={tab.id}
-                    className="min-h-10 shrink-0 gap-1.5 px-3 py-0 text-xs font-medium transition-colors duration-150"
-                    indicatorClassName="left-3 right-3 rounded-full"
-                  >
-                    <Icon aria-hidden="true" className="size-3.5" />
-                    {tab.label}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
-          </nav>
+          {/* As abas da qualificação ficam na barra da área Atendimento IA (nav-registry), uma fileira só. */}
 
           <div className="min-w-0 space-y-5">
             {activeTab === "overview" && (

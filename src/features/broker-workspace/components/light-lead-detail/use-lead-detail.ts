@@ -385,6 +385,8 @@ export function useLeadDetail({
   return {
     accepted,
     leadStatus,
+    /** After the sale is registered: the screen leaves "Confirmar venda" at once (no second tap). */
+    markConverted: () => setLeadStatus("converted"),
     detailsExpanded,
     setDetailsExpanded,
     accepting,
