@@ -130,9 +130,60 @@ function parseComponents(components: MetaGraphTemplateComponent[] = []) {
   return { headerType, bodyText: bodyText.trim(), footerText, variables, buttons };
 }
 
-export async function syncTenantTemplates(tenantId: string) {
+/** Every active Meta channel of the tenant, one per WABA (default channel first). */
+async function resolveAllMetaChannelCredentials(tenantId: string) {
   const db = getDatabase();
-  const credentials = await resolveMetaChannelCredentials(tenantId);
+  const channels = await db
+    .select({
+      id: schema.communicationChannels.id,
+      wabaId: schema.communicationChannels.wabaId,
+      accessTokenCiphertext: schema.communicationChannels.accessTokenCiphertext,
+    })
+    .from(schema.communicationChannels)
+    .where(and(
+      eq(schema.communicationChannels.tenantId, tenantId),
+      inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
+      eq(schema.communicationChannels.status, "active"),
+    ))
+    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.updatedAt));
+  const encryptionKey =
+    process.env.META_WHATSAPP_TOKEN_ENCRYPTION_KEY?.trim() ||
+    process.env.INVITATION_TOKEN_ENCRYPTION_KEY?.trim();
+  if (!encryptionKey) throw new Error("Chave de criptografia de tokens do WhatsApp não configurada.");
+  const byWaba = new Map<string, { wabaId: string; accessToken: string }>();
+  for (const channel of channels) {
+    if (!channel.wabaId || !channel.accessTokenCiphertext || byWaba.has(channel.wabaId)) continue;
+    byWaba.set(channel.wabaId, { wabaId: channel.wabaId, accessToken: decryptChannelSecret(channel.accessTokenCiphertext, encryptionKey) });
+  }
+  return [...byWaba.values()];
+}
+
+/**
+ * Syncs the templates of every WABA the tenant uses (06/11: before, only the default channel's
+ * WABA was read, so templates of the other official numbers never reached the CRM).
+ */
+export async function syncTenantTemplates(tenantId: string) {
+  const all = await resolveAllMetaChannelCredentials(tenantId);
+  if (!all.length) await resolveMetaChannelCredentials(tenantId); // keeps the original "no channel" error
+  let syncedCount = 0;
+  let syncedAt = new Date();
+  const failures: string[] = [];
+  for (const credentials of all) {
+    try {
+      const result = await syncWabaTemplates(tenantId, credentials);
+      syncedCount += result.syncedCount;
+      syncedAt = result.syncedAt;
+    } catch (error) {
+      failures.push(credentials.wabaId);
+      console.error("[meta-templates] waba_sync_failed", { tenantId, wabaId: credentials.wabaId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
+    }
+  }
+  if (failures.length === all.length && all.length > 0) throw new Error("Não foi possível sincronizar os templates da Meta.");
+  return { syncedCount, syncedAt };
+}
+
+async function syncWabaTemplates(tenantId: string, credentials: { wabaId: string; accessToken: string }) {
+  const db = getDatabase();
   const { data: remoteTemplates } = await fetchWabaMessageTemplates(
     credentials.wabaId,
     credentials.accessToken,
