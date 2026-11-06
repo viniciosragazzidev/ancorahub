@@ -1,6 +1,7 @@
 ALTER TABLE post_sale_surveys
   ADD COLUMN last_inbound_message_id text,
-  ADD COLUMN pending_reply_text text;
+  ADD COLUMN pending_reply_text text,
+  ADD COLUMN media_text_prompt_step integer;
 
 CREATE TABLE post_sale_opt_outs (
   id text PRIMARY KEY NOT NULL,

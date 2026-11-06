@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { postSaleMediaReply, retryPostSaleOperation, routePostSaleInboundSafely } from "./conversation-operations";
+import { postSaleMediaReply, requestPostSaleTextOnceAtStep, retryPostSaleOperation, routePostSaleInboundSafely, runPostSaleOptOutTransaction } from "./conversation-operations";
 
 describe("post-sale conversation operations", () => {
   it("uses one text-only prompt for an active survey media message", () => {
@@ -23,6 +23,45 @@ describe("post-sale conversation operations", () => {
     expect(enqueue).toHaveBeenNthCalledWith(2, stableIdempotencyKey);
     expect(onFailure).toHaveBeenCalledTimes(1);
     expect(onFailure).toHaveBeenCalledWith(expect.any(Error), 1);
+  });
+
+  it("only enqueues one text request for two media messages in the same survey step", async () => {
+    let promptedStep: number | null = null;
+    const claimStep = vi.fn(async (step: number) => {
+      if (promptedStep === step) return false;
+      promptedStep = step;
+      return true;
+    });
+    const send = vi.fn(async () => undefined);
+    const releaseStep = vi.fn(async () => undefined);
+    const onFailure = vi.fn();
+    const request = () => requestPostSaleTextOnceAtStep({ step: 2, claimStep, send, releaseStep, onFailure });
+
+    await expect(Promise.all([request(), request()])).resolves.toEqual([true, false]);
+    expect(claimStep).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not change the survey to opted_out when the opt-out insert fails", async () => {
+    const state = { status: "answering" };
+    const updateSurvey = vi.fn(async (tx: typeof state) => { tx.status = "opted_out"; return tx.status; });
+    const transaction = async <T>(work: (tx: typeof state) => Promise<T>) => {
+      const previousStatus = state.status;
+      try {
+        return await work(state);
+      } catch (error) {
+        state.status = previousStatus;
+        throw error;
+      }
+    };
+
+    await expect(runPostSaleOptOutTransaction({
+      transaction,
+      insertOptOut: async () => { throw new Error("opt-out storage unavailable"); },
+      updateSurvey,
+    })).rejects.toThrow("opt-out storage unavailable");
+    expect(state.status).toBe("answering");
+    expect(updateSurvey).not.toHaveBeenCalled();
   });
 
   it("does not swallow qualification when the active-survey lookup errors", async () => {

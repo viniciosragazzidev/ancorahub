@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, lt, ne, or } from "drizzle-orm";
 import { after } from "next/server";
 import { runGateway } from "@/features/ai-gateway/gateway";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
@@ -11,11 +11,12 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { POST_SALE_META_TEMPLATE } from "./template-contract";
 import { businessHoursBetween, detectPostSaleKeywords, isActivePostSaleSurvey, postSaleAnswerSchema, postSaleNextTurn, type PostSaleAnswers } from "./conversation-rules";
-import { postSaleMediaReply, retryPostSaleOperation, type PostSaleMessageKind } from "./conversation-operations";
+import { postSaleMediaReply, requestPostSaleTextOnceAtStep, retryPostSaleOperation, runPostSaleOptOutTransaction, type PostSaleMessageKind } from "./conversation-operations";
 
 const ACTIVE_STATUSES = ["sent", "answering"] as const;
 const SURVEY_WINDOW_MS = 5 * 86_400_000;
 const REMINDER_BUSINESS_MS = 24 * 3_600_000;
+type PostSaleWriteExecutor = Pick<ReturnType<typeof getDatabase>, "insert" | "update">;
 
 export type PostSaleInbound = {
   tenantId: string;
@@ -75,16 +76,6 @@ async function finalizeProcessedTurn(survey: typeof schema.postSaleSurveys.$infe
   const now = new Date();
   const answers = (survey.answers ?? {}) as PostSaleAnswers;
   if (survey.status === "opted_out") {
-    await db.insert(schema.postSaleOptOuts).values({
-      id: randomUUID(),
-      tenantId: survey.tenantId,
-      leadId: survey.leadId,
-      surveyId: survey.id,
-      channelType: survey.channelType,
-      channelRef: survey.channelRef,
-      providerMessageId,
-      createdAt: now,
-    }).onConflictDoNothing({ target: [schema.postSaleOptOuts.tenantId, schema.postSaleOptOuts.leadId] });
     await db.update(schema.aiConversations).set({ optOutAt: now, updatedAt: now }).where(and(eq(schema.aiConversations.tenantId, survey.tenantId), eq(schema.aiConversations.leadId, survey.leadId)));
   }
   if (survey.status === "completed" || survey.status === "opted_out") {
@@ -184,7 +175,7 @@ async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof sche
   if (!(ACTIVE_STATUSES as readonly string[]).includes(currentSurvey.status)) return;
   const mediaReply = postSaleMediaReply(input.messageKind ?? "text");
   if (mediaReply) {
-    await enqueueSurveyReplyWithRetry(currentSurvey, mediaReply, `post-sale-media:${currentSurvey.id}:${input.providerMessageId}`, input);
+    await enqueueSurveyMediaPromptOnce(currentSurvey, mediaReply, input);
     return;
   }
   const [lead] = await db.select({ name: schema.leads.nome, tenantId: schema.leads.tenantId }).from(schema.leads).where(and(eq(schema.leads.id, currentSurvey.leadId), eq(schema.leads.tenantId, currentSurvey.tenantId), isNull(schema.leads.deletedAt))).limit(1);
@@ -196,7 +187,7 @@ async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof sche
   answer.comment ??= input.text.slice(0, 500);
   const turn = postSaleNextTurn(currentSurvey.step, prior, answer, { lead: lead.name.trim().split(/\s+/)[0] || "Cliente", broker: broker?.name?.trim().split(/\s+/)[0] || "corretor" });
   const answers = turn.answers as PostSaleAnswers;
-  const [updated] = await db.update(schema.postSaleSurveys).set({
+  const updateValues = {
     status: turn.status,
     step: turn.step,
     answers,
@@ -204,44 +195,71 @@ async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof sche
     lastInboundMessageId: input.providerMessageId,
     pendingReplyText: turn.text,
     ...(turn.status === "completed" || turn.status === "opted_out" ? { completedAt: new Date(), outcome: turn.outcome ?? "other", rating: answers.rating ?? null } : {}),
-  }).where(and(
-    eq(schema.postSaleSurveys.id, currentSurvey.id),
-    eq(schema.postSaleSurveys.tenantId, input.tenantId),
-    eq(schema.postSaleSurveys.step, currentSurvey.step),
-    inArray(schema.postSaleSurveys.status, [...ACTIVE_STATUSES]),
-    isNull(schema.postSaleSurveys.pendingReplyText),
-  )).returning();
-  if (!updated) {
-    const [latest] = await db.select().from(schema.postSaleSurveys).where(and(
+  };
+  const updateSurvey = async (executor: PostSaleWriteExecutor) => {
+    const [updated] = await executor.update(schema.postSaleSurveys).set(updateValues).where(and(
       eq(schema.postSaleSurveys.id, currentSurvey.id),
       eq(schema.postSaleSurveys.tenantId, input.tenantId),
-    )).limit(1);
-    if (latest?.lastInboundMessageId === input.providerMessageId) await finalizeProcessedTurn(latest);
-    return;
+      eq(schema.postSaleSurveys.step, currentSurvey.step),
+      inArray(schema.postSaleSurveys.status, [...ACTIVE_STATUSES]),
+      isNull(schema.postSaleSurveys.pendingReplyText),
+    )).returning();
+    if (!updated) throw new Error("Pesquisa mudou de etapa antes de salvar a resposta.");
+    return updated;
+  };
+  let updated: typeof schema.postSaleSurveys.$inferSelect;
+  if (turn.status === "opted_out") {
+    updated = await runPostSaleOptOutTransaction<PostSaleWriteExecutor, typeof schema.postSaleSurveys.$inferSelect>({
+      transaction: (work) => db.transaction((tx) => work(tx)),
+      insertOptOut: async (tx) => {
+        await tx.insert(schema.postSaleOptOuts).values({
+          id: randomUUID(),
+          tenantId: currentSurvey.tenantId,
+          leadId: currentSurvey.leadId,
+          surveyId: currentSurvey.id,
+          channelType: currentSurvey.channelType,
+          channelRef: currentSurvey.channelRef,
+          providerMessageId: input.providerMessageId,
+          createdAt: new Date(),
+        }).onConflictDoNothing({ target: [schema.postSaleOptOuts.tenantId, schema.postSaleOptOuts.leadId] });
+      },
+      updateSurvey: (tx) => updateSurvey(tx),
+    });
+  } else {
+    updated = await updateSurvey(db);
   }
   await finalizeProcessedTurn(updated);
 }
 
-async function enqueueSurveyReplyWithRetry(survey: typeof schema.postSaleSurveys.$inferSelect, body: string, key: string, input: PostSaleInbound) {
-  try {
-    await retryPostSaleOperation(
-      () => enqueueSurveyReply(survey, body, key),
-      (error, attempt) => console.error("[post-sale-audit] media_reply_retry", {
+async function enqueueSurveyMediaPromptOnce(survey: typeof schema.postSaleSurveys.$inferSelect, body: string, input: PostSaleInbound) {
+  const db = getDatabase();
+  await requestPostSaleTextOnceAtStep({
+    step: survey.step,
+    claimStep: async (step) => {
+      const [claimed] = await db.update(schema.postSaleSurveys).set({ mediaTextPromptStep: step }).where(and(
+        eq(schema.postSaleSurveys.id, survey.id),
+        eq(schema.postSaleSurveys.tenantId, survey.tenantId),
+        eq(schema.postSaleSurveys.step, step),
+        inArray(schema.postSaleSurveys.status, [...ACTIVE_STATUSES]),
+        or(isNull(schema.postSaleSurveys.mediaTextPromptStep), ne(schema.postSaleSurveys.mediaTextPromptStep, step)),
+      )).returning({ id: schema.postSaleSurveys.id });
+      return Boolean(claimed);
+    },
+    send: () => enqueueSurveyReply(survey, body, `post-sale-media:${survey.id}:${survey.step}`),
+    releaseStep: async (step) => db.update(schema.postSaleSurveys).set({ mediaTextPromptStep: null }).where(and(
+      eq(schema.postSaleSurveys.id, survey.id),
+      eq(schema.postSaleSurveys.tenantId, survey.tenantId),
+      eq(schema.postSaleSurveys.step, step),
+      eq(schema.postSaleSurveys.mediaTextPromptStep, step),
+    )),
+    onFailure: (error, attempt) => console.error("[post-sale-audit] media_reply_retry", {
         tenantId: input.tenantId,
         leadId: input.leadId,
         providerMessageId: input.providerMessageId,
         attempt,
         error: error instanceof Error ? error.message.slice(0, 120) : "unknown",
       }),
-    );
-  } catch (error) {
-    console.error("[post-sale-audit] media_reply_exhausted", {
-      tenantId: input.tenantId,
-      leadId: input.leadId,
-      providerMessageId: input.providerMessageId,
-      error: error instanceof Error ? error.message.slice(0, 120) : "unknown",
-    });
-  }
+  });
 }
 
 export async function runPostSaleReminderJob(now = new Date()) {

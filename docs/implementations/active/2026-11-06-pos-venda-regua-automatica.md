@@ -85,9 +85,10 @@ Job a cada 15 min (rota interna de jobs existente). Para cada regra ligada: busc
 - Erro transitório ao procurar pesquisa ativa é registrado e devolve `handled = false`, deixando o fluxo normal de qualificação continuar. Só uma pesquisa ativa confirmada segura a mensagem na rota de pós-venda.
 - Opt-out fica em `post_sale_opt_outs`, único por tenant e lead, e não expira. Pesquisas antigas com status `opted_out` também excluem o lead indefinidamente, além do estado legado em `ai_conversations`.
 - Estado da mensagem recebida e resposta pendente ficam no survey antes da finalização. Uma tentativa idempotente retoma esse estado, reaproveita a chave do outbox e usa ID determinístico para evitar resposta ou nota duplicada.
-- Com survey ativa, áudio ou imagem gera uma resposta única pedindo texto, sem alterar a etapa e sem passar o conteúdo para qualificação.
+- Opt-out e mudança para `opted_out` são escritos na mesma transação. Se a persistência do opt-out falha, o status continua ativo e pode ser reprocessado.
+- Com survey ativa, áudio ou imagem gera no máximo um pedido de resposta por texto em cada etapa, sem alterar a etapa e sem passar o conteúdo para qualificação.
 - A resposta no Meta é texto livre dentro da janela de 24 horas aberta pela mensagem do cliente; essa premissa foi registrada para orientar o canal.
-- Migration `drizzle/0219_post_sale_opt_out_retry.sql` criada e não executada. Validação da revisão em `reports/agent/verification/2026-11-06-pos-venda-fase2-review-fixes.md`.
+- Migration `drizzle/0219_post_sale_opt_out_retry.sql` criada e não executada; inclui o marcador da solicitação de texto por etapa. Validação da revisão em `reports/agent/verification/2026-11-06-pos-venda-fase2-review-fixes.md` e `reports/agent/verification/2026-11-06-pos-venda-optout-atomico.md`.
 
 ## Riscos
 

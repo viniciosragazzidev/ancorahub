@@ -3698,6 +3698,7 @@ export const postSaleSurveys = pgTable(
     reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
     lastInboundMessageId: text("last_inbound_message_id"),
     pendingReplyText: text("pending_reply_text"),
+    mediaTextPromptStep: integer("media_text_prompt_step"),
     lastReplyAt: timestamp("last_reply_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt,

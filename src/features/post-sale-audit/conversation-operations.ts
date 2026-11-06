@@ -20,6 +20,34 @@ export async function retryPostSaleOperation<T>(operation: () => Promise<T>, onF
   }
 }
 
+export async function requestPostSaleTextOnceAtStep(input: {
+  step: number;
+  claimStep: (step: number) => Promise<boolean>;
+  send: () => Promise<unknown>;
+  releaseStep: (step: number) => Promise<unknown>;
+  onFailure: (error: unknown, attempt: 1 | 2) => void;
+}): Promise<boolean> {
+  if (!await input.claimStep(input.step)) return false;
+  try {
+    await retryPostSaleOperation(input.send, input.onFailure);
+    return true;
+  } catch {
+    await input.releaseStep(input.step).catch(() => undefined);
+    return false;
+  }
+}
+
+export function runPostSaleOptOutTransaction<Tx, Result>(input: {
+  transaction: (work: (tx: Tx) => Promise<Result>) => Promise<Result>;
+  insertOptOut: (tx: Tx) => Promise<unknown>;
+  updateSurvey: (tx: Tx) => Promise<Result>;
+}): Promise<Result> {
+  return input.transaction(async (tx) => {
+    await input.insertOptOut(tx);
+    return input.updateSurvey(tx);
+  });
+}
+
 export async function routePostSaleInboundSafely(
   route: () => Promise<boolean>,
   context: { tenantId: string; leadId: string; channelType: "waha" | "meta" },
