@@ -7,7 +7,7 @@ import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast
 import { channelLeadIntakeKey, parseChannelLeadIntake } from "@/features/communication-channels/channel-lead-intake";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
-import { evaluatePostSaleEligibility, pickPostSaleSourceMessage, POST_SALE_EXCLUSION_LABELS, POST_SALE_SURVEY_COOLDOWN_DAYS, type PostSaleExclusionReason, type PostSaleAudience } from "./rules";
+import { evaluatePostSaleEligibility, isPostSaleOptedOut, pickPostSaleSourceMessage, POST_SALE_EXCLUSION_LABELS, POST_SALE_SURVEY_COOLDOWN_DAYS, type PostSaleExclusionReason, type PostSaleAudience } from "./rules";
 import { isApprovedPostSaleMetaTemplate } from "./template-contract";
 
 const META_PROVIDERS = [META_CLOUD_PROVIDER, "meta_cloud_api"];
@@ -157,7 +157,7 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
   const cooldownDate = new Date(now.getTime() - POST_SALE_SURVEY_COOLDOWN_DAYS * 86_400_000);
   const humanCutoff = new Date(now.getTime() - 24 * 3_600_000);
 
-  const [messages, conversations, recentSurveys, humanMessages, metaChannels, wahaNumbers] = await Promise.all([
+  const [messages, conversations, recentSurveys, optOuts, humanMessages, metaChannels, wahaNumbers] = await Promise.all([
     db.select({
       id: schema.whatsappMessages.id,
       leadId: schema.whatsappMessages.leadId,
@@ -177,11 +177,15 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
     db.select({ leadId: schema.aiConversations.leadId, status: schema.aiConversations.status, optOutAt: schema.aiConversations.optOutAt, wrongNumberAt: schema.aiConversations.wrongNumberAt, lastActivityAt: schema.aiConversations.lastActivityAt, updatedAt: schema.aiConversations.updatedAt })
       .from(schema.aiConversations).where(and(eq(schema.aiConversations.tenantId, context.tenantId), inArray(schema.aiConversations.leadId, leadIds)))
       .orderBy(desc(schema.aiConversations.updatedAt)),
-    db.select({ leadId: schema.postSaleSurveys.leadId }).from(schema.postSaleSurveys).where(and(
+    db.select({ leadId: schema.postSaleSurveys.leadId, status: schema.postSaleSurveys.status }).from(schema.postSaleSurveys).where(and(
       eq(schema.postSaleSurveys.tenantId, context.tenantId),
       inArray(schema.postSaleSurveys.leadId, leadIds),
-      gte(schema.postSaleSurveys.createdAt, cooldownDate),
       inArray(schema.postSaleSurveys.status, ["queued", "sent", "answering", "completed", "no_reply", "opted_out"]),
+      or(gte(schema.postSaleSurveys.createdAt, cooldownDate), eq(schema.postSaleSurveys.status, "opted_out")),
+    )),
+    db.select({ leadId: schema.postSaleOptOuts.leadId }).from(schema.postSaleOptOuts).where(and(
+      eq(schema.postSaleOptOuts.tenantId, context.tenantId),
+      inArray(schema.postSaleOptOuts.leadId, leadIds),
     )),
     db.select({ leadId: schema.whatsappMessages.leadId }).from(schema.whatsappMessages).where(and(
       eq(schema.whatsappMessages.tenantId, context.tenantId),
@@ -242,6 +246,8 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
     conversationsByLead.set(conversation.leadId, list);
   }
   const recentSurveyLeadIds = new Set(recentSurveys.map((survey) => survey.leadId));
+  const optedOutSurveyLeadIds = new Set(recentSurveys.filter((survey) => survey.status === "opted_out").map((survey) => survey.leadId));
+  const durableOptOutLeadIds = new Set(optOuts.map((optOut) => optOut.leadId));
   const humanActiveLeadIds = new Set(humanMessages.map((message) => message.leadId).filter((id): id is string => Boolean(id)));
 
   const defaultQueueSources = new Map<string, Source>();
@@ -279,7 +285,11 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
     const sourceMessage = pickPostSaleSourceMessage(leadMessages);
     const source = sourceMessage ? sourceFromMessage(sourceMessage) : resolveDefaultQueueSource(lead);
     const leadConversations = conversationsByLead.get(lead.leadId) ?? [];
-    const optedOut = leadConversations.some((conversation) => Boolean(conversation.optOutAt));
+    const optedOut = isPostSaleOptedOut({
+      conversationOptOutAt: leadConversations.find((conversation) => conversation.optOutAt)?.optOutAt,
+      durableOptOut: durableOptOutLeadIds.has(lead.leadId),
+      optedOutSurvey: optedOutSurveyLeadIds.has(lead.leadId),
+    });
     const wrongNumber = leadConversations.some((conversation) => Boolean(conversation.wrongNumberAt));
     const humanActive = humanActiveLeadIds.has(lead.leadId) || leadConversations.some((conversation) =>
       ["WAITING_HUMAN", "HUMAN_ACTIVE"].includes(conversation.status)

@@ -4,7 +4,7 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 
 ## 06/11/2026 - Conversa e campanha manual de pós-venda
 
-- Respostas do cliente são roteadas para a pesquisa ativa no mesmo canal antes da qualificação. A conversa usa o interpretador sensível com fallback por palavras-chave, registra respostas no survey e na linha do tempo, reconhece opt-out e envia um lembrete único após 24 horas úteis.
+- Respostas do cliente são roteadas para a pesquisa ativa no mesmo canal antes da qualificação. A conversa usa o interpretador sensível com fallback por palavras-chave, registra respostas no survey e na linha do tempo, bloqueia opt-out de forma durável e envia um lembrete único após 24 horas úteis.
 - Diretor e gestor de unidade podem criar campanhas manuais por corretor, fila ou período, conferir exclusões e exemplos e acompanhar respostas recentes na área Equipe Lite. Meta usa o template aprovado; WAHA usa o texto inicial editável.
 - Schema preparado para campanhas automáticas futuras; SQL `0218_post_sale_manual_conversation.sql` não executado.
 - Registro e validações: [plano da régua de pós-venda](implementations/active/2026-11-06-pos-venda-regua-automatica.md) e [evidências da Fase 2](../reports/agent/verification/2026-11-06-pos-venda-fase2.md).

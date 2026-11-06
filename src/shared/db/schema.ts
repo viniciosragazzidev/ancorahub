@@ -3696,6 +3696,8 @@ export const postSaleSurveys = pgTable(
     skipReason: text("skip_reason"),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
+    lastInboundMessageId: text("last_inbound_message_id"),
+    pendingReplyText: text("pending_reply_text"),
     lastReplyAt: timestamp("last_reply_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt,
@@ -3709,6 +3711,21 @@ export const postSaleSurveys = pgTable(
     index("post_sale_surveys_tenant_lead_created_idx").on(table.tenantId, table.leadId, table.createdAt.desc()),
     index("post_sale_surveys_reminder_due_idx").on(table.status, table.sentAt).where(sql`${table.status} in ('sent', 'answering')`),
   ],
+);
+
+export const postSaleOptOuts = pgTable(
+  "post_sale_opt_outs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    surveyId: text("survey_id").references(() => postSaleSurveys.id, { onDelete: "set null" }),
+    channelType: text("channel_type", { enum: ["waha", "meta"] }),
+    channelRef: text("channel_ref"),
+    providerMessageId: text("provider_message_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("post_sale_opt_outs_tenant_lead_unique").on(table.tenantId, table.leadId)],
 );
 
 export const goals = pgTable(

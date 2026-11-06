@@ -55,6 +55,10 @@ export type PostSaleSourceMessage = {
   wahaNumberId: string | null;
 };
 
+export function isPostSaleOptedOut(input: { conversationOptOutAt?: Date | null; durableOptOut?: boolean; optedOutSurvey?: boolean }) {
+  return Boolean(input.conversationOptOutAt || input.durableOptOut || input.optedOutSurvey);
+}
+
 /** Prefer the first inbound; form leads without a reply use their first outbound contact. */
 export function pickPostSaleSourceMessage(messages: readonly PostSaleSourceMessage[]) {
   return messages.find((message) => message.direction === "incoming" || message.direction === "inbound")

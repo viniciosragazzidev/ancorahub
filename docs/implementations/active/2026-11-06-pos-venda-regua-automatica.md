@@ -69,13 +69,25 @@ Job a cada 15 min (rota interna de jobs existente). Para cada regra ligada: busc
 ## Implementação da Fase 2 (06/11/2026)
 
 - Respostas recebidas pelo Meta e WAHA passam primeiro pela pesquisa ativa do mesmo lead e canal, somente nos estados `sent` ou `answering` e dentro de cinco dias. Sem pesquisa correspondente, o fluxo anterior de qualificação continua.
+- Premissa do canal Meta: a resposta da pesquisa chega como texto livre dentro da janela de 24 horas aberta pela mensagem do cliente. Fora dessa janela, uma nova conversa exige o template aprovado.
+- Opt-out é persistido por tenant e lead sem prazo e também bloqueia a audiência quando a pesquisa antiga já está em `opted_out`. O processamento após a resposta guarda a saída pendente e a chave da mensagem para retomar com uma nova tentativa idempotente.
+- Áudio ou imagem durante uma pesquisa ativa recebem um único pedido gentil para responder por texto; a pesquisa permanece aberta e a mensagem não segue para a qualificação.
 - A conversa começa pela apresentação já aprovada da Fase 1, faz uma pergunta por vez e usa o interpretador `interpreter` com `sensitive: true`; palavras-chave contextualizadas pela pergunta cobrem falhas da IA. Opt-out encerra a pesquisa, grava a preferência existente de não contato e registra o resultado no lead e no survey.
 - O job interno do WhatsApp envia um lembrete após 24 horas úteis sem resposta. Depois de mais 24 horas úteis sem resposta ao lembrete, conclui como `no_reply`. O lembrete usa o mesmo canal de origem e é idempotente.
 - A área Equipe ganhou a tela manual Lite para diretor e gestor com unidade: público por corretor, fila ou período, prévia com exclusões e três exemplos, disparo e respostas recentes por lead. Gestores recebem filtros e dados restritos à unidade efetiva.
 - O texto editável de abertura só se aplica a WAHA; no Meta, o canal usa o template aprovado `pos_venda_apresentacao`.
 - Schema atualizado para `kind` (`manual` ou `auto`) e `rule_key` em campanhas, `rule_key` em surveys, mais `reminder_sent_at` para controlar o único lembrete.
-- Migration criada em `drizzle/0218_post_sale_manual_conversation.sql`; não foi executada.
+- Migrations criadas em `drizzle/0218_post_sale_manual_conversation.sql` e `drizzle/0219_post_sale_opt_out_retry.sql`; não foram executadas.
 - Validação focada, sem banco: Vitest nas áreas de pós-venda, canais, inbound WAHA, navegação e acesso a áreas; TypeScript e ESLint registrados em `reports/agent/verification/2026-11-06-pos-venda-fase2.md`.
+
+## Correções da revisão da Fase 2 (06/11/2026)
+
+- Erro transitório ao procurar pesquisa ativa é registrado e devolve `handled = false`, deixando o fluxo normal de qualificação continuar. Só uma pesquisa ativa confirmada segura a mensagem na rota de pós-venda.
+- Opt-out fica em `post_sale_opt_outs`, único por tenant e lead, e não expira. Pesquisas antigas com status `opted_out` também excluem o lead indefinidamente, além do estado legado em `ai_conversations`.
+- Estado da mensagem recebida e resposta pendente ficam no survey antes da finalização. Uma tentativa idempotente retoma esse estado, reaproveita a chave do outbox e usa ID determinístico para evitar resposta ou nota duplicada.
+- Com survey ativa, áudio ou imagem gera uma resposta única pedindo texto, sem alterar a etapa e sem passar o conteúdo para qualificação.
+- A resposta no Meta é texto livre dentro da janela de 24 horas aberta pela mensagem do cliente; essa premissa foi registrada para orientar o canal.
+- Migration `drizzle/0219_post_sale_opt_out_retry.sql` criada e não executada. Validação da revisão em `reports/agent/verification/2026-11-06-pos-venda-fase2-review-fixes.md`.
 
 ## Riscos
 

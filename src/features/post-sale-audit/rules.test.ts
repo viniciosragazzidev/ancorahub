@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluatePostSaleEligibility, findUnknownPostSaleOpeningVariables, firstName, pickPostSaleSourceMessage, renderPostSaleOpeningMessage } from "./rules";
+import { evaluatePostSaleEligibility, findUnknownPostSaleOpeningVariables, firstName, isPostSaleOptedOut, pickPostSaleSourceMessage, renderPostSaleOpeningMessage } from "./rules";
 import { isApprovedPostSaleMetaTemplate, POST_SALE_META_TEMPLATE, POST_SALE_WAHA_OPENING_DEFAULT } from "./template-contract";
 
 const eligible = {
@@ -29,6 +29,13 @@ describe("post-sale audience rules", () => {
 
   it("accepts only an eligible lead", () => {
     expect(evaluatePostSaleEligibility(eligible)).toBeNull();
+  });
+
+  it("keeps an opt-out effective even if no AI conversation exists or the survey is old", () => {
+    expect(isPostSaleOptedOut({ durableOptOut: true })).toBe(true);
+    expect(isPostSaleOptedOut({ optedOutSurvey: true })).toBe(true);
+    expect(isPostSaleOptedOut({ conversationOptOutAt: new Date() })).toBe(true);
+    expect(isPostSaleOptedOut({})).toBe(false);
   });
 
   it("uses the first outbound channel when the lead has never sent an inbound message", () => {

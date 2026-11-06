@@ -404,13 +404,11 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
 
         let handledByPostSale = false;
         if (activeLeadId && !unsupported) {
-          try {
+          const { routePostSaleInboundSafely } = await import("@/features/post-sale-audit/conversation-operations");
+          handledByPostSale = await routePostSaleInboundSafely(async () => {
             const { handlePostSaleInbound } = await import("@/features/post-sale-audit/conversation");
-            handledByPostSale = await handlePostSaleInbound({ tenantId: channel.tenantId, leadId: activeLeadId, channelType: "meta", channelRef: channel.id, text, providerMessageId: message.id });
-          } catch (error) {
-            console.error("[post-sale-audit] meta_inbound_route_failed", { tenantId: channel.tenantId, leadId: activeLeadId, error: error instanceof Error ? error.message.slice(0, 120) : "unknown" });
-            handledByPostSale = true;
-          }
+            return handlePostSaleInbound({ tenantId: channel.tenantId, leadId: activeLeadId, channelType: "meta", channelRef: channel.id, text, providerMessageId: message.id, messageKind });
+          }, { tenantId: channel.tenantId, leadId: activeLeadId, channelType: "meta" });
         }
 
         if (handledByPostSale) {
