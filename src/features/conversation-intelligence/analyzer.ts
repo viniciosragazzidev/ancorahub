@@ -219,6 +219,8 @@ Orientações:
     leadId: lead.id,
     // The customer's conversation: only paid models that do not train on it (LGPD art. 11).
     sensitive: true,
+    // The analysis never needs phone, e-mail, CPF or boleto numbers (LGPD art. 6 III).
+    maskPersonalData: true,
     temperature: 0.2,
     // 1.500 cut Claude Haiku mid-JSON (finish_reason length, 26/10): the full assessment needs room.
     maxTokens: 4_000,

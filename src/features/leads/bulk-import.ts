@@ -245,7 +245,9 @@ export async function importLeadsFromCsvAction(formData: FormData) {
               qualificationState: "NOT_STARTED",
               distributionStatus: "queued",
               distributionUpdatedAt: new Date(),
-              consentimentoLgpd: true,
+              // A spreadsheet carries no proof of consent: never record one (LGPD art. 8 §2).
+
+              consentimentoLgpd: false,
             });
 
             await tx.insert(schema.leadInteractions).values({
@@ -292,7 +294,9 @@ export async function importLeadsFromCsvAction(formData: FormData) {
               sourceCampaign: campanha,
               sourceMetadata: { import: "csv", targetQueueId },
               distributionUpdatedAt: new Date(),
-              consentimentoLgpd: true,
+              // A spreadsheet carries no proof of consent: never record one (LGPD art. 8 §2).
+
+              consentimentoLgpd: false,
             });
 
             await tx.insert(schema.leadInteractions).values({
