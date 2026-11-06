@@ -14,6 +14,7 @@ import {
   previewPostSaleAudienceAction,
   startPostSaleCampaignAction,
 } from "@/features/post-sale-audit/actions";
+import { POST_SALE_EXCLUSION_LABELS, type PostSaleExclusionReason } from "@/features/post-sale-audit/rules";
 import { POST_SALE_WAHA_OPENING_DEFAULT } from "@/features/post-sale-audit/template-contract";
 
 type WorkspaceData = Extract<Awaited<ReturnType<typeof getPostSaleWorkspaceAction>>, { ok: true }>['data'];
@@ -118,9 +119,9 @@ export function PostSaleWorkspace({ initialData }: { initialData: WorkspaceData 
             {feedback ? <p className="text-sm text-[var(--text-secondary)]" role="status">{feedback}</p> : null}
             {preview?.ok ? <section className="grid gap-4 rounded-2xl border border-border bg-[var(--surface-secondary)] p-4" aria-label="Prévia da campanha">
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm"><strong>{preview.data.totalEligible} elegíveis</strong><span>{preview.data.totalSelected} selecionados</span></div>
-              <ul className="grid gap-1 text-sm text-muted-foreground">{Object.entries(preview.data.excluded).filter(([, count]) => count > 0).map(([reason, count]) => <li key={reason}>{count} excluídos: {reason.replaceAll("_", " ")}</li>)}</ul>
+              <ul className="grid gap-1 text-sm text-muted-foreground">{Object.entries(preview.data.excluded).filter(([, count]) => count > 0).map(([reason, count]) => <li key={reason}>{count} fora: {POST_SALE_EXCLUSION_LABELS[reason as PostSaleExclusionReason] ?? reason.replaceAll("_", " ")}</li>)}</ul>
               <div className="grid gap-2 sm:grid-cols-3">{preview.data.examples.map((example) => <div className="rounded-xl border border-border bg-card px-3 py-2 text-sm" key={example.leadId}>{example.name}<span className="ml-2 text-xs text-muted-foreground">{example.channelType === "meta" ? "Meta" : "WhatsApp"}</span></div>)}</div>
-              {!preview.data.canStart ? <p className="text-sm text-destructive">Reduza o público para iniciar a campanha.</p> : null}
+              {!preview.data.canStart ? <p className="text-sm text-destructive">{preview.data.totalEligible === 0 ? ((preview.data.excluded.template_unapproved ?? 0) > 0 ? "Nenhum lead pode receber agora. Os leads do número oficial esperam a Meta aprovar o template pos_venda_apresentacao." : "Nenhum lead pode receber agora. Ajuste o público.") : "Reduza o público para iniciar a campanha."}</p> : null}
             </section> : null}
             {preview && !preview.ok ? <p className="text-sm text-destructive" role="alert">{preview.error}</p> : null}
           </CardContent>
