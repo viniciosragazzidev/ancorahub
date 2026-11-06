@@ -72,6 +72,7 @@ export function AppShell({
   queueBadgeCount = 0,
   directorLiteEnabled = false,
   negotiationsEnabled = false,
+  postSaleAuditEnabled = false,
   initialSidebarUser,
   initialSidebarPathname,
   initialSidebarOnDuty,
@@ -99,6 +100,7 @@ export function AppShell({
   queueBadgeCount?: number;
   directorLiteEnabled?: boolean;
   negotiationsEnabled?: boolean;
+  postSaleAuditEnabled?: boolean;
   /** Só usado pela prévia de desenvolvimento, sem consultar dados de usuário. */
   initialSidebarUser?: UserDisplayInfo | null;
   /** Só usado pela prévia de desenvolvimento para destacar a rota representada. */
@@ -271,10 +273,10 @@ export function AppShell({
         {directorLiteEnabled ? <div className="arc-venancor director-view-as-banner" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}><ViewAsBanner viewingAs={viewAs.viewingAs} /></div> : <ViewAsBanner viewingAs={viewAs.viewingAs} />}
         {directorLiteEnabled ? (
           <div className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}>
-            <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} />
+            <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} />
           </div>
         ) : (
-          <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} />
+          <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} />
         )}
         {directorLiteEnabled ? <div id={DIRECTOR_LITE_PORTAL_ROOT_ID} className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }} /> : null}
         <SidebarInset
@@ -288,7 +290,7 @@ export function AppShell({
             ...(directorLiteEnabled && !directorLiteRouteOptedOut ? directorSkinStyle : {}),
           }}
         >
-          <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col"><NavFlagsProvider negotiationsEnabled={negotiationsEnabled} initialUser={initialSidebarUser} previewPathname={initialSidebarPathname}>{children}</NavFlagsProvider></div>
+          <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col"><NavFlagsProvider negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} initialUser={initialSidebarUser} previewPathname={initialSidebarPathname}>{children}</NavFlagsProvider></div>
         </SidebarInset>
         <OnboardingWelcomeDialog />
       </SidebarProvider>

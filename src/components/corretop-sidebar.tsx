@@ -88,7 +88,7 @@ const areaPresentation: Record<NavAreaId, Pick<NavItemConfig, "icon" | "iconTone
   configuracoes: { icon: SlidersHorizontal, iconTone: "text-slate-600 dark:text-slate-300" },
 };
 
-export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initialOnDuty, negotiationsEnabled = false }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string; initialOnDuty?: boolean; negotiationsEnabled?: boolean }) {
+export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initialOnDuty, negotiationsEnabled = false, postSaleAuditEnabled = false }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string; initialOnDuty?: boolean; negotiationsEnabled?: boolean; postSaleAuditEnabled?: boolean }) {
   const currentPathname = usePathname();
   const pathname = initialPathname ?? currentPathname;
   const { isMobile, setOpenMobile } = useSidebar();
@@ -113,7 +113,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
     pathname.startsWith("/leads/distribuicao/plantao");
 
   const activeAreaId = resolveNavLocation(pathname)?.area.id ?? null;
-  const visibleItems: NavItemConfig[] = visibleNavAreas(user ? { ...user, negotiationsEnabled } : null).map(({ area, href }) => ({
+  const visibleItems: NavItemConfig[] = visibleNavAreas(user ? { ...user, negotiationsEnabled, postSaleAuditEnabled } : null).map(({ area, href }) => ({
     id: area.id,
     label: area.label,
     fullLabel: area.fullLabel,

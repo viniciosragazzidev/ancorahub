@@ -979,6 +979,16 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function syncPostSaleSurveyOutbound(row: OutboundRow, result: { status: "sent" | "failed" | "skipped"; reason?: string }) {
   if (row.purpose !== "postSaleSurvey") return;
+  const reminderPrefix = "post-sale-reminder:";
+  if (row.idempotencyKey.startsWith(reminderPrefix)) {
+    const surveyId = row.idempotencyKey.slice(reminderPrefix.length);
+    if (!surveyId) return;
+    await getDatabase().update(schema.postSaleSurveys).set({
+      ...(result.status === "sent" ? { reminderSentAt: new Date() } : {}),
+      ...(result.status === "failed" || result.status === "skipped" ? { skipReason: (result.reason ?? "Falha no lembrete de pós-venda.").slice(0, 240) } : {}),
+    }).where(and(eq(schema.postSaleSurveys.id, surveyId), eq(schema.postSaleSurveys.tenantId, row.tenantId), inArray(schema.postSaleSurveys.status, ["sent", "answering"])));
+    return;
+  }
   const [, campaignId, leadId] = row.idempotencyKey.split(":");
   if (!campaignId || !leadId) return;
   const now = new Date();

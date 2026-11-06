@@ -3,7 +3,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { enqueueMetaTemplateMessage, enqueuePostSaleSurveyWahaMessage } from "@/features/communication-channels/outbound-service";
@@ -288,6 +288,44 @@ export async function startPostSaleCampaignAction(campaignId: string): Promise<A
     await db.update(schema.postSaleCampaigns).set({ totals }).where(and(eq(schema.postSaleCampaigns.id, campaign.id), eq(schema.postSaleCampaigns.tenantId, context.tenantId)));
     await recordPostSaleAudit({ tenantId: context.tenantId, userId: context.userId, campaignId: campaign.id, action: "post_sale_campaign.started", metadata: { ...totals } });
     return { ok: true, data: { queued, skipped, failed } };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+export async function getPostSaleWorkspaceAction(): Promise<ActionResult<{
+  brokers: Array<{ id: string; name: string }>;
+  queues: Array<{ id: string; name: string }>;
+  campaigns: Array<{ id: string; name: string; status: string; totals: Record<string, number>; createdAt: string }>;
+  responses: Array<{ id: string; leadId: string; leadName: string; campaignName: string; status: string; rating: number | null; answers: Record<string, unknown>; lastReplyAt: string | null }>;
+}>> {
+  try {
+    const context = await authorizedContext();
+    const db = getDatabase();
+    const branchFilter = context.role === "manager" ? context.branchId : undefined;
+    const [brokers, queues, campaigns, responses] = await Promise.all([
+      db.select({ id: schema.tenantMemberships.userId, name: schema.user.name }).from(schema.tenantMemberships)
+        .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+        .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), branchFilter ? eq(schema.tenantMemberships.branchId, branchFilter) : undefined))
+        .orderBy(schema.user.name),
+      db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name }).from(schema.leadQueues).where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"), isNull(schema.leadQueues.deletedAt), branchFilter ? or(eq(schema.leadQueues.branchId, branchFilter), isNull(schema.leadQueues.branchId)) : undefined)).orderBy(schema.leadQueues.name),
+      db.select({ id: schema.postSaleCampaigns.id, name: schema.postSaleCampaigns.name, status: schema.postSaleCampaigns.status, totals: schema.postSaleCampaigns.totals, createdAt: schema.postSaleCampaigns.createdAt }).from(schema.postSaleCampaigns)
+        .where(and(eq(schema.postSaleCampaigns.tenantId, context.tenantId), context.role === "manager" ? eq(schema.postSaleCampaigns.createdBy, context.userId) : undefined))
+        .orderBy(desc(schema.postSaleCampaigns.createdAt)).limit(20),
+      db.select({ id: schema.postSaleSurveys.id, leadId: schema.postSaleSurveys.leadId, leadName: schema.leads.nome, campaignName: schema.postSaleCampaigns.name, status: schema.postSaleSurveys.status, rating: schema.postSaleSurveys.rating, answers: schema.postSaleSurveys.answers, lastReplyAt: schema.postSaleSurveys.lastReplyAt, createdAt: schema.postSaleSurveys.createdAt })
+        .from(schema.postSaleSurveys)
+        .innerJoin(schema.leads, and(eq(schema.leads.id, schema.postSaleSurveys.leadId), eq(schema.leads.tenantId, schema.postSaleSurveys.tenantId)))
+        .innerJoin(schema.postSaleCampaigns, and(eq(schema.postSaleCampaigns.id, schema.postSaleSurveys.campaignId), eq(schema.postSaleCampaigns.tenantId, schema.postSaleSurveys.tenantId)))
+        .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
+        .where(and(eq(schema.postSaleSurveys.tenantId, context.tenantId), isNull(schema.leads.deletedAt), branchFilter ? sql`coalesce(${schema.leads.branchId}, ${schema.leadQueues.branchId}) = ${branchFilter}` : undefined))
+        .orderBy(desc(schema.postSaleSurveys.lastReplyAt), desc(schema.postSaleSurveys.createdAt)).limit(100),
+    ]);
+    return { ok: true, data: {
+      brokers: brokers.map((row) => ({ id: row.id, name: row.name ?? "Corretor" })),
+      queues,
+      campaigns: campaigns.map((row) => ({ ...row, totals: row.totals as Record<string, number>, createdAt: row.createdAt.toISOString() })),
+      responses: responses.map((row) => ({ ...row, answers: row.answers as Record<string, unknown>, lastReplyAt: row.lastReplyAt?.toISOString() ?? null })),
+    } };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };
   }

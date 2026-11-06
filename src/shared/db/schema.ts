@@ -3659,6 +3659,8 @@ export const postSaleCampaigns = pgTable(
     tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     audience: jsonb("audience").$type<Record<string, unknown>>().notNull(),
+    kind: text("kind").$type<"manual" | "auto">().notNull().default("manual"),
+    ruleKey: text("rule_key"),
     openingMessage: text("opening_message").notNull(),
     createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
     status: text("status").notNull().default("draft"),
@@ -3690,8 +3692,10 @@ export const postSaleSurveys = pgTable(
     outboundId: text("outbound_id").references(() => whatsappOutboundMessages.id, { onDelete: "set null" }),
     channelType: text("channel_type", { enum: ["waha", "meta"] }),
     channelRef: text("channel_ref"),
+    ruleKey: text("rule_key"),
     skipReason: text("skip_reason"),
     sentAt: timestamp("sent_at", { withTimezone: true }),
+    reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
     lastReplyAt: timestamp("last_reply_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt,
@@ -3702,6 +3706,8 @@ export const postSaleSurveys = pgTable(
     index("post_sale_surveys_tenant_lead_status_idx").on(table.tenantId, table.leadId, table.status),
     index("post_sale_surveys_tenant_campaign_status_idx").on(table.tenantId, table.campaignId, table.status),
     index("post_sale_surveys_tenant_channel_idx").on(table.tenantId, table.channelType, table.channelRef),
+    index("post_sale_surveys_tenant_lead_created_idx").on(table.tenantId, table.leadId, table.createdAt.desc()),
+    index("post_sale_surveys_reminder_due_idx").on(table.status, table.sentAt).where(sql`${table.status} in ('sent', 'answering')`),
   ],
 );
 

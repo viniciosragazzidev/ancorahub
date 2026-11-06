@@ -66,6 +66,17 @@ Job a cada 15 min (rota interna de jobs existente). Para cada regra ligada: busc
 4. **Fase 4 (régua automática):** `post_sale_rules`, motor de 15 min, aba Régua automática com prévia; piloto com R1 em uma fila e 20 por dia.
 5. **Fase 5 (ajuste):** depois de uma semana de respostas, ajustar textos, atrasos e ligar R2 a R4; R5 por último.
 
+## Implementação da Fase 2 (06/11/2026)
+
+- Respostas recebidas pelo Meta e WAHA passam primeiro pela pesquisa ativa do mesmo lead e canal, somente nos estados `sent` ou `answering` e dentro de cinco dias. Sem pesquisa correspondente, o fluxo anterior de qualificação continua.
+- A conversa começa pela apresentação já aprovada da Fase 1, faz uma pergunta por vez e usa o interpretador `interpreter` com `sensitive: true`; palavras-chave contextualizadas pela pergunta cobrem falhas da IA. Opt-out encerra a pesquisa, grava a preferência existente de não contato e registra o resultado no lead e no survey.
+- O job interno do WhatsApp envia um lembrete após 24 horas úteis sem resposta. Depois de mais 24 horas úteis sem resposta ao lembrete, conclui como `no_reply`. O lembrete usa o mesmo canal de origem e é idempotente.
+- A área Equipe ganhou a tela manual Lite para diretor e gestor com unidade: público por corretor, fila ou período, prévia com exclusões e três exemplos, disparo e respostas recentes por lead. Gestores recebem filtros e dados restritos à unidade efetiva.
+- O texto editável de abertura só se aplica a WAHA; no Meta, o canal usa o template aprovado `pos_venda_apresentacao`.
+- Schema atualizado para `kind` (`manual` ou `auto`) e `rule_key` em campanhas, `rule_key` em surveys, mais `reminder_sent_at` para controlar o único lembrete.
+- Migration criada em `drizzle/0218_post_sale_manual_conversation.sql`; não foi executada.
+- Validação focada, sem banco: Vitest nas áreas de pós-venda, canais, inbound WAHA, navegação e acesso a áreas; TypeScript e ESLint registrados em `reports/agent/verification/2026-11-06-pos-venda-fase2.md`.
+
 ## Riscos
 
 - Mensagem automática demais irrita o cliente: limite de 1 conversa a cada 30 dias e opt-out imediato.
