@@ -615,6 +615,9 @@ export async function resolveEventMessagePlan(input: {
 /** Resolves an approved Meta template for a governed event, never free text. */
 /** An approved template of the active WABA by name (qualification approaches and reminders). */
 async function loadApprovedMetaResourceByName(tenantId: string, name: string, pinnedWabaId?: string | null): Promise<MetaResource | null> {
+  // A specific source channel without a WABA cannot borrow a template from a
+  // different active number. That would break source-channel guarantees.
+  if (pinnedWabaId === null) return null;
   const wabaId = pinnedWabaId ?? await getActiveWabaId(tenantId);
   if (!wabaId) return null;
   const [template] = await getDatabase().select({

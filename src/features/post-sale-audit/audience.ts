@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, ne, notExists, or, sql } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
@@ -126,7 +126,7 @@ async function selectCandidates(context: TenantContext, audience: PostSaleAudien
     isNull(selectedLead.deletedAt),
     isNull(selectedLead.archivedAt),
     ids ? inArray(selectedLead.id, ids) : undefined,
-    branchId ? or(eq(selectedLead.branchId, branchId), eq(queue.branchId, branchId)) : undefined,
+    branchId ? sql`coalesce(${selectedLead.branchId}, ${queue.branchId}) = ${branchId}` : undefined,
     audience.kind === "filters" && audience.queueId ? eq(selectedLead.queueId, audience.queueId) : undefined,
     audience.kind === "filters" && audience.types.length ? inArray(selectedLead.tipo, audience.types) : undefined,
     audience.kind === "filters" && audience.statuses.length ? inArray(selectedLead.status, audience.statuses) : undefined,
@@ -188,6 +188,10 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
       inArray(schema.whatsappMessages.leadId, leadIds),
       inArray(schema.whatsappMessages.direction, ["outgoing", "outbound"]),
       or(isNull(schema.whatsappMessages.senderRole), ne(schema.whatsappMessages.senderRole, "assistant")),
+      notExists(db.select({ id: schema.whatsappOutboundMessages.id }).from(schema.whatsappOutboundMessages).where(and(
+        eq(schema.whatsappOutboundMessages.tenantId, schema.whatsappMessages.tenantId),
+        eq(schema.whatsappOutboundMessages.providerMessageId, schema.whatsappMessages.messageId),
+      ))),
       gte(schema.whatsappMessages.sentAt, humanCutoff),
       or(isNull(schema.whatsappMessages.providerStatus), ne(schema.whatsappMessages.providerStatus, "failed")),
     )),
@@ -243,16 +247,17 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
   const defaultQueueSources = new Map<string, Source>();
   const resolveDefaultQueueSource = (lead: LeadRow): Source => {
     if (!lead.queueId) return null;
-    const existing = defaultQueueSources.get(lead.queueId);
+    const cacheKey = `${lead.queueId}:${lead.branchId ?? ""}`;
+    const existing = defaultQueueSources.get(cacheKey);
     if (existing !== undefined) return existing;
     const mapped = metaChannels.filter((channel) => intakeQueueByChannel.get(channel.id) === lead.queueId);
     if (mapped.length === 1) {
       const source = { type: "meta" as const, ref: mapped[0].id };
-      defaultQueueSources.set(lead.queueId, source);
+      defaultQueueSources.set(cacheKey, source);
       return source;
     }
     if (mapped.length > 1) {
-      defaultQueueSources.set(lead.queueId, null);
+      defaultQueueSources.set(cacheKey, null);
       return null;
     }
     const branchMeta = metaChannels.filter((channel) => channel.isDefault && (channel.branchId === lead.branchId || channel.branchId === null));
@@ -262,7 +267,7 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
       ...branchWaha.map((number) => ({ type: "waha" as const, ref: number.id })),
     ];
     const source = choices.length === 1 ? choices[0] : null;
-    defaultQueueSources.set(lead.queueId, source);
+    defaultQueueSources.set(cacheKey, source);
     return source;
   };
 

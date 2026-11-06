@@ -27,6 +27,7 @@ import { dutyShiftReminderFailureCode, dutyShiftReminderWahaFailure, isDutyShift
 import { findConnectedTenantChannelId, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
 import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
 import { BROKER_CHAT_NOTICE, teamNoticeByKey, teamNoticeForPurpose } from "@/features/team-notices/catalog";
+import { resolvePostSaleOutboundInsert } from "./post-sale-outbound-idempotency";
 import { companyNumberUsable, decideTeamNotice } from "@/features/team-notices/decision";
 import { DELIVERY_LIMITS } from "@/features/team-notices/guard";
 import { builtInNoticeVariants, INVITE_LINK_PLACEHOLDER, localHour, withInviteLink, type NoticeFields } from "@/features/team-notices/variants";
@@ -426,7 +427,7 @@ export async function enqueueMetaTemplateMessage(input: {
     throw outboundChannelError("META_CHANNEL_UNAVAILABLE", "Não existe um canal oficial da Meta ativo para este tenant.");
   }
   const messagePlan = input.requireApprovedMetaTemplate
-    ? await resolveApprovedMetaEventTemplate({ tenantId: input.tenantId, purpose: input.purpose, variables, templateName: input.templateName, wabaId: channel?.wabaId })
+    ? await resolveApprovedMetaEventTemplate({ tenantId: input.tenantId, purpose: input.purpose, variables, templateName: input.templateName, wabaId: channel?.wabaId ?? null })
     : input.purpose === "dutyPresenceConfirmation" ? null : await resolveEventMessagePlan({
       tenantId: input.tenantId,
       recipientType: input.recipientType,
@@ -520,7 +521,7 @@ export async function enqueueMetaTemplateMessage(input: {
   if (!channel && !tenantChannel && !noticeRoute?.wahaNumberId) throw new Error("Nenhum canal corporativo ativo foi configurado.");
   const id = randomUUID();
   const now = new Date();
-  await db.insert(schema.whatsappOutboundMessages).values({
+  const [inserted] = await db.insert(schema.whatsappOutboundMessages).values({
     id, tenantId: input.tenantId, channelId: channel?.id ?? null,
     deliveryRoute: noticeRoute ? noticeRoute.route : tenantChannel ? "waha_direct" : delivery.route,
     holdReason: noticeRoute?.note ?? null,
@@ -547,11 +548,21 @@ export async function enqueueMetaTemplateMessage(input: {
     fallbackTemplateVariableNames: messagePlan?.fallback?.templateVariableNames ?? null,
     status: input.scheduledAt && input.scheduledAt > now ? "pending" : "queued", idempotencyKey: input.idempotencyKey,
     scheduledAt: input.scheduledAt ?? null, queuedAt: now, requestedBy: input.requestedBy ?? null, createdAt: now, updatedAt: now,
-  });
-  if (input.requestedBy) {
-    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.requestedBy, entidade: "whatsapp_outbound_message", entidadeId: id, acao: "whatsapp_message_queued" });
+  }).onConflictDoNothing().returning({ id: schema.whatsappOutboundMessages.id });
+  if (!inserted) {
+    return resolvePostSaleOutboundInsert({
+      readRacedRow: async () => {
+        const [raced] = await db.select({ id: schema.whatsappOutboundMessages.id, status: schema.whatsappOutboundMessages.status }).from(schema.whatsappOutboundMessages)
+          .where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
+        return raced ?? null;
+      },
+      intendedStatus: input.scheduledAt && input.scheduledAt > now ? "pending" : "queued",
+    });
   }
-  return { id, status: "queued" as const, duplicate: false };
+  if (input.requestedBy) {
+    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.requestedBy, entidade: "whatsapp_outbound_message", entidadeId: inserted.id, acao: "whatsapp_message_queued" });
+  }
+  return resolvePostSaleOutboundInsert({ insertedId: inserted.id, intendedStatus: input.scheduledAt && input.scheduledAt > now ? "pending" : "queued" });
 }
 
 /**
@@ -782,7 +793,7 @@ export async function enqueuePostSaleSurveyWahaMessage(input: {
 
   const id = randomUUID();
   const now = new Date();
-  await db.insert(schema.whatsappOutboundMessages).values({
+  const [inserted] = await db.insert(schema.whatsappOutboundMessages).values({
     id,
     tenantId: input.tenantId,
     channelId: null,
@@ -804,12 +815,22 @@ export async function enqueuePostSaleSurveyWahaMessage(input: {
     requestedBy: input.requestedBy,
     createdAt: now,
     updatedAt: now,
-  });
+  }).onConflictDoNothing().returning({ id: schema.whatsappOutboundMessages.id });
+  if (!inserted) {
+    return resolvePostSaleOutboundInsert({
+      readRacedRow: async () => {
+        const [raced] = await db.select({ id: schema.whatsappOutboundMessages.id, status: schema.whatsappOutboundMessages.status }).from(schema.whatsappOutboundMessages)
+          .where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
+        return raced ?? null;
+      },
+      intendedStatus: input.scheduledAt && input.scheduledAt > now ? "pending" : "queued",
+    });
+  }
   await db.insert(schema.auditLogs).values({
     id: randomUUID(), userId: input.requestedBy, entidade: "whatsapp_outbound_message", entidadeId: id,
     acao: "whatsapp_message_queued", metadata: { source: "post_sale_audit" }, createdAt: now,
   });
-  return { id, status: input.scheduledAt && input.scheduledAt > now ? "pending" as const : "queued" as const, duplicate: false };
+  return resolvePostSaleOutboundInsert({ insertedId: inserted.id, intendedStatus: input.scheduledAt && input.scheduledAt > now ? "pending" : "queued" });
 }
 
 function textBaseUrl() {

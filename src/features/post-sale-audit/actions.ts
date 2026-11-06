@@ -3,7 +3,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { enqueueMetaTemplateMessage, enqueuePostSaleSurveyWahaMessage } from "@/features/communication-channels/outbound-service";
@@ -69,6 +69,32 @@ async function recordPostSaleAudit(input: {
   });
 }
 
+async function campaignIsInManagerBranch(tenantId: string, branchId: string | null, audience: ReturnType<typeof postSaleAudienceSchema.parse>) {
+  if (!branchId) return false;
+  const db = getDatabase();
+  if (audience.kind === "broker") {
+    const [membership] = await db.select({ userId: schema.tenantMemberships.userId }).from(schema.tenantMemberships).where(and(
+      eq(schema.tenantMemberships.tenantId, tenantId), eq(schema.tenantMemberships.userId, audience.brokerId),
+      eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.tenantMemberships.branchId, branchId),
+    )).limit(1);
+    return Boolean(membership);
+  }
+  if (audience.kind === "filters") {
+    if (audience.branchId !== branchId) return false;
+    if (!audience.queueId) return true;
+    const [queue] = await db.select({ branchId: schema.leadQueues.branchId }).from(schema.leadQueues).where(and(
+      eq(schema.leadQueues.id, audience.queueId), eq(schema.leadQueues.tenantId, tenantId), isNull(schema.leadQueues.deletedAt),
+    )).limit(1);
+    return Boolean(queue && (!queue.branchId || queue.branchId === branchId));
+  }
+  const ids = audience.kind === "lead" ? [audience.leadId] : audience.kind === "leadIds" ? [...new Set(audience.leadIds)] : [];
+  if (!ids.length) return false;
+  const rows = await db.select({ id: schema.leads.id }).from(schema.leads)
+    .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
+    .where(and(eq(schema.leads.tenantId, tenantId), inArray(schema.leads.id, ids), sql`coalesce(${schema.leads.branchId}, ${schema.leadQueues.branchId}) = ${branchId}`));
+  return rows.length === ids.length;
+}
+
 export async function previewPostSaleAudienceAction(rawAudience: unknown): Promise<ActionResult<{
   totalSelected: number;
   totalEligible: number;
@@ -97,7 +123,10 @@ export async function createPostSaleCampaignAction(rawInput: unknown): Promise<A
   try {
     const context = await authorizedContext();
     const parsed = campaignInput.parse(rawInput);
-    const audience = postSaleAudienceSchema.parse(parsed.audience);
+    const requestedAudience = postSaleAudienceSchema.parse(parsed.audience);
+    const audience = context.role === "manager" && requestedAudience.kind === "filters"
+      ? { ...requestedAudience, branchId: context.branchId! }
+      : requestedAudience;
     const unknownVariables = findUnknownPostSaleOpeningVariables(parsed.openingMessage);
     if (unknownVariables.length) throw new PostSaleActionError(`Variável não reconhecida: {{${unknownVariables[0]}}}.`);
     const preview = await resolvePostSaleAudience(context, audience);
@@ -136,6 +165,12 @@ export async function startPostSaleCampaignAction(campaignId: string): Promise<A
       eq(schema.postSaleCampaigns.tenantId, context.tenantId),
     )).limit(1);
     if (!campaign) throw new PostSaleActionError("Campanha não encontrada.");
+    if (context.role === "manager" && campaign.createdBy !== context.userId) {
+      const savedAudience = postSaleAudienceSchema.parse(campaign.audience);
+      if (!(await campaignIsInManagerBranch(context.tenantId, context.branchId, savedAudience))) {
+        throw new PostSaleActionError("Esta campanha não pertence à sua unidade.");
+      }
+    }
     if (campaign.status !== "draft" && campaign.status !== "running") throw new PostSaleActionError("Esta campanha não pode ser iniciada novamente.");
     const audience = postSaleAudienceSchema.parse(campaign.audience);
     const preview = await resolvePostSaleAudience(context, audience);

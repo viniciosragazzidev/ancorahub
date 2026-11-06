@@ -4,6 +4,8 @@ Pedido do Vinicios (06/11): além da campanha manual (escolher um grupo de leads
 
 Base: Fase 1 de `2026-11-05-pos-venda-auditoria.md` (`0c770b13`): tabelas `post_sale_campaigns` e `post_sale_surveys`, público com exclusões, canal de origem (WAHA ou Meta com o template `pos_venda_apresentacao`), envio idempotente pelo outbox, flag `feature_post_sale_audit_enabled` desligada.
 
+Nota da revisão da Fase 1: números WAHA com escopo de unidade não são origens elegíveis para as campanhas atuais e devem resultar em `source_unavailable` até esse escopo ter regra explícita de envio.
+
 ## Ideia central
 
 Uma única máquina de pesquisa (survey) com duas portas de entrada:

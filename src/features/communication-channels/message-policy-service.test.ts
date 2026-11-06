@@ -72,6 +72,11 @@ describe("qualification template cost policy", () => {
     await expect(resolveApprovedMetaEventTemplate(input)).resolves.toBeNull();
   });
 
+  it("does not borrow an active WABA template when the selected source has no WABA", async () => {
+    await expect(resolveApprovedMetaEventTemplate({ ...input, templateName: "anc_t1_lembrete", wabaId: null })).resolves.toBeNull();
+    expect(database.conditions).toHaveLength(0);
+  });
+
   it("requires an active WABA even for a known Utility template name", async () => {
     database.results.push([]);
     await expect(resolveApprovedMetaEventTemplate({ ...input, templateName: "anc_t1_lembrete" })).resolves.toBeNull();
