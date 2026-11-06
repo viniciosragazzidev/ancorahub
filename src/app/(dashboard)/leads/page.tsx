@@ -111,6 +111,8 @@ async function LeadsPageContent({
 }) {
   await connection();
   const context = await withPerfSpan("tenant_context.resolve", () => getRequiredTenantContext());
+  const postSaleEnabled = (context.role === "director" || context.role === "manager")
+    && await getFeatureFlag(FEATURE_FLAGS.POST_SALE_AUDIT).catch(() => "false") === "true";
   // Mesma regra do useDirectorLitePage, no servidor: chave do diretor ligada e /leads fora do opt-out.
   const directorLitePage = !isDirectorLiteRouteOptedOut("/leads") && (await shouldUseDirectorLiteStyle(context).catch(() => false));
   const capabilityPromise = withPerfSpan("rbac.leads_access", () => hasEffectiveCapability({
@@ -139,7 +141,7 @@ async function LeadsPageContent({
     redirect("/access-denied");
 
   if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
-    return <ManagerLiteLeadsPage />;
+    return <ManagerLiteLeadsPage postSaleEnabled={postSaleEnabled} />;
   }
 
   if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
@@ -868,6 +870,7 @@ async function LeadsPageContent({
               })))}
               queues={activeQueues}
               contextRole={leadManagementActionsEnabled ? context.role : "broker"}
+              postSaleEnabled={postSaleEnabled}
               showUnassignedFilter={canViewUnassigned}
               initialView={initialView}
               contextJobTitle={context.jobTitle}

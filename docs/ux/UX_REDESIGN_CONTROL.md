@@ -506,3 +506,7 @@ Ação secundária: baixar a carteira atual, podendo remover convertidos/perdido
 Estados: opção marcada por padrão, geração, sucesso com contagem, arquivo vazio e erro.
 Reutiliza Button, Checkbox e tokens existentes; sem novas primitives, tokens ou movimento.
 Não avança a etapa global do redesign. Registro: `docs/implementations/completed/2026-11-05-exportar-leads-corretor.md`.
+
+## 2026-11-06: pós-venda, relatório, alertas e seleção em lote
+
+Papéis e rotas: diretor e gestor com flag ativa em `/equipe/pos-venda`, `/equipe/[id]`, `/leads` e `/leads/[id]`; gestor limitado à unidade efetiva. Ações: consultar relatório por corretor, abrir lead, marcar alerta como tratado e levar até 300 leads selecionados à prévia da campanha manual. Estados: sem respostas, alerta aberto/tratado, carregamento, erro de consulta/ação, prévia elegível ou com exclusões. Disclosure nas seções do relatório e alertas e nos cartões de lead/perfil. Reutiliza Card, Button, AppSelect, Checkbox e tokens Lite existentes; sem token, primitive ou animação nova. Não avança a etapa global UX-M1.10. Registro: `docs/implementations/active/2026-11-06-pos-venda-regua-automatica.md`.

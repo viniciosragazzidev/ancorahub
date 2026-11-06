@@ -12,14 +12,17 @@ import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { SupervisorLeadsRadar } from "@/features/supervisor-workspace/supervisor-leads-radar";
 import { withRadarSignals } from "@/features/supervisor-workspace/radar-signals";
 import { SupervisorLeadDetail } from "@/features/supervisor-workspace/supervisor-lead-detail";
+import { PostSaleLeadCard } from "@/features/post-sale-audit/components/post-sale-lead-card";
+import { getFeatureFlag } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 
-export async function ManagerLiteLeadsPage() {
+export async function ManagerLiteLeadsPage({ postSaleEnabled = false }: { postSaleEnabled?: boolean }) {
   const context = await getRequiredTenantContext();
   const scope = getManagerUnitScope(context);
   if (!scope) return <div className="arc-venancor p-6"><EmptyState title="Sua unidade ainda não está configurada" description="Peça ao administrador para vincular seu acesso a uma unidade. Seus leads aparecerão aqui quando o vínculo estiver ativo." /></div>;
   const data = await getManagerLiteLeads(context);
   const leads = await withRadarSignals(scope.tenantId, data.leads);
-  return <SupervisorLeadsRadar data={{ ...data, leads }} now={new Date().toISOString()} audience="manager" />;
+  return <SupervisorLeadsRadar data={{ ...data, leads }} now={new Date().toISOString()} audience="manager" postSaleEnabled={postSaleEnabled} />;
 }
 
 export async function ManagerLiteLeadDetailPage({ leadId }: { leadId: string }) {
@@ -36,6 +39,8 @@ export async function ManagerLiteLeadDetailPage({ leadId }: { leadId: string }) 
       .where(and(eq(schema.carriers.tenantId, context.tenantId), eq(schema.carriers.status, "active"))).orderBy(schema.carriers.name)
       .catch(() => [])
     : [];
+  const postSaleEnabled = (context.role === "director" || context.role === "manager")
+    && await getFeatureFlag(FEATURE_FLAGS.POST_SALE_AUDIT).catch(() => "false") === "true";
   return <SupervisorLeadDetail
     lead={data.lead}
     lightLead={data.lightLead}
@@ -48,6 +53,7 @@ export async function ManagerLiteLeadDetailPage({ leadId }: { leadId: string }) 
     managerBrokers={data.brokers.filter((broker) => broker.id !== data.lead.ownerId)}
     tasks={data.tasks}
     documents={data.documents}
+    postSaleCard={postSaleEnabled ? <PostSaleLeadCard leadId={data.lead.id} /> : null}
     saleAction={canRegisterSale ? <RegisterSaleButton leadId={data.lead.id} documents={data.leadDocuments} carriers={carriers} /> : undefined}
   />;
 }

@@ -121,6 +121,15 @@ Job a cada 15 min (rota interna de jobs existente). Para cada regra ligada: busc
 - Premissa: o cliente recebe a pesquisa de um número da empresa diferente do celular do corretor; a conversa com o corretor continua no celular dele, fora do pós-venda. A apresentação já diz que é a equipe de qualidade, para não confundir com o corretor.
 - Medido em 06/11 (só leitura): 1 número WAHA da empresa ativo e nenhum de unidade.
 
+## Implementação da Fase 3 (06/11/2026)
+
+- A página Equipe > Pós-venda mostra relatório por corretor com períodos de 7, 30 ou 90 dias; o padrão é 30 dias. Enviadas usa `sent_at`, respondidas usa `last_reply_at`, atendimento e fechamento usam somente respostas válidas, nota é média das notas de 1 a 5, e alertas abertos contam pesquisas ainda não tratadas. Gestores ficam limitados à unidade efetiva do lead (`coalesce(leads.branch_id, lead_queues.branch_id)`).
+- Alertas são criados ao processar cada resposta que gera `no_contact`, `bad_service`, nota até 2 ou pedido de ajuda. As notificações são separadas por destinatário e chave idempotente de pesquisa+motivo; chegam a diretores do tenant e gestores da unidade efetiva. A lista permite abrir o lead e marcar o alerta como tratado, atualizando survey, notificações e auditoria na mesma transação.
+- A migration `drizzle/0221_post_sale_alerts.sql` adiciona `post_sale_surveys.alerts_handled_at timestamptz`; não foi executada.
+- A ficha do lead e o perfil de corretor mostram os cartões de respostas e avaliação somente a diretor/gestor com a flag `feature_post_sale_audit_enabled` ligada. A lista de leads permite selecionar até 300 leads e abrir a campanha manual já existente com público pré-preenchido; a prévia e a autorização de escopo continuam no servidor.
+- A régua automática, regras R0 a R5 e disparo automático seguem fora desta fase.
+- Validação focada: Vitest, TypeScript e ESLint registrados em `reports/agent/verification/2026-11-06-pos-venda-fase3.md`; nenhum banco foi acessado para escrita e a migration não foi executada.
+
 ## Riscos
 
 - Mensagem automática demais irrita o cliente: limite de 1 conversa a cada 30 dias e opt-out imediato.

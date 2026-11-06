@@ -8,6 +8,7 @@
  */
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { LiteFilterChips } from "@/components/lite/controls";
@@ -200,7 +201,7 @@ function DutySection({ days, now }: { days: DutyDay[]; now: Date }) {
   );
 }
 
-export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, ranking, scopeNote, canExportLeads = false, now }: {
+export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, ranking, scopeNote, canExportLeads = false, postSaleEvaluation, now }: {
   profile: Profile;
   /** MEMBER_PROFILE_LEADS_LIMIT: acima disso a lista avisa que considera só os mais recentes. */
   leadsLimit: number;
@@ -210,6 +211,7 @@ export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, r
   /** Aviso do gestor: só dados da própria unidade. */
   scopeNote: boolean;
   canExportLeads?: boolean;
+  postSaleEvaluation?: ReactNode;
   now: string;
 }) {
   const at = useMemo(() => new Date(now), [now]);
@@ -257,6 +259,7 @@ export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, r
         <div className={page.stat} data-tone={metrics.tasks.overdue ? "warning" : undefined}><span className={page.statLabel}>Tarefas</span><span className={page.statValue}>{metrics.tasks.open}</span><span className={page.statHint}>{metrics.tasks.overdue} vencida{metrics.tasks.overdue === 1 ? "" : "s"}</span></div>
       </div>
 
+      {postSaleEvaluation}
       <div className={styles.columns}>
         <div className={page.stack}>
           <div className={styles.pair}>

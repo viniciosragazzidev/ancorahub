@@ -103,6 +103,7 @@ export type SupervisorBrokerProfileProps = {
     dutyDays: Array<{ date: string; scheduleName: string; startsAt: string; endsAt: string; state: string }>;
   };
   managementActions?: ReactNode;
+  postSaleEvaluation?: ReactNode;
   showSupervisorActions?: boolean;
   /** Meta do mês do corretor (Lite com gestão de equipes). canEdit: quem pode editar (o supervisor da equipe). */
   monthGoal?: { brokerId: string; period: string; goal: LiteGoalView | null; canEdit: boolean };
@@ -183,6 +184,7 @@ export function SupervisorBrokerProfile({
   weeklyAcceptances = [],
   managerProfile,
   managementActions,
+  postSaleEvaluation,
   showSupervisorActions = true,
   monthGoal,
 }: SupervisorBrokerProfileProps) {
@@ -254,6 +256,7 @@ export function SupervisorBrokerProfile({
         </section>
 
         {monthGoal ? <BrokerMonthGoal brokerId={monthGoal.brokerId} brokerName={member.name} period={monthGoal.period} goal={monthGoal.goal} canEdit={monthGoal.canEdit} /> : null}
+        {postSaleEvaluation}
         {leadOffers ? <section className={styles.card} aria-labelledby="broker-lead-offers-title">
           <div className={styles.sectionHeading}><h2 id="broker-lead-offers-title">Leads enviados × aceitos</h2><span>Histórico completo</span></div>
           <div className={styles.todayGrid}>

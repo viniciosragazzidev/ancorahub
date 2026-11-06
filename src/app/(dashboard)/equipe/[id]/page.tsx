@@ -32,6 +32,8 @@ import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag"
 import { MemberProfileLite } from "./_components/member-profile-lite";
 import { BrokerLeadsExportButton } from "./_components/broker-leads-export-button";
 import { canExportBrokerLeads } from "@/features/team/broker-lead-export-access";
+import { getPostSaleBrokerSummaryAction } from "@/features/post-sale-audit/actions";
+import { PostSaleEvaluationCard } from "@/features/post-sale-audit/components/post-sale-evaluation-card";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +87,12 @@ export default async function TeamMemberProfilePage({
   const window = normalizeBrokerPerformanceWindow(janela);
   const profile = await getTeamMemberProfile(id);
   if (!profile) redirect("/access-denied");
+  const postSaleSummary = profile.member.role === "broker" && (context.role === "director" || context.role === "manager")
+    ? await getPostSaleBrokerSummaryAction(profile.member.userId, 30)
+    : null;
+  const postSaleEvaluation = postSaleSummary?.ok && postSaleSummary.data
+    ? <PostSaleEvaluationCard report={postSaleSummary.data} />
+    : undefined;
   const canExportLeads = profile.member.role === "broker" && await canExportBrokerLeads(context);
 
   const audience = await getLiteAudience(context);
@@ -121,6 +129,7 @@ export default async function TeamMemberProfilePage({
       metricTimeline={timeline.available ? timeline.points : null}
       recognitions={extras.recognitions}
       managerProfile={{ temperature: profile.metrics.temperature, quotes: profile.metrics.quotes, sales: profile.metrics.sales, interactions: profile.metrics.interactions, tasks: profile.metrics.tasks, dutyDays: profile.dutyDays.map((day) => ({ date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(`${day.date}T12:00:00-03:00`)), scheduleName: day.scheduleName, startsAt: day.startsAt, endsAt: day.endsAt, state: day.state })) }}
+      postSaleEvaluation={postSaleEvaluation}
       managementActions={<div className="flex flex-wrap items-center gap-2"><LiteBrokerProfileActions userId={profile.member.userId} name={profile.member.name} email={profile.member.email} phone={profile.member.brokerPhone ?? ""} active={active} canResetPassword />{canExportLeads ? <BrokerLeadsExportButton brokerId={profile.member.userId} compact /> : null}</div>}
       showSupervisorActions={false}
       monthGoal={monthGoalRow ? { brokerId: profile.member.userId, period: monthGoalRow.period, goal: monthGoalRow.goal, canEdit: false } : undefined}
@@ -235,6 +244,7 @@ export default async function TeamMemberProfilePage({
             ranking={isBroker && ranking ? { stats: ranking.stats, ranks: ranking.ranks, periodDays: ranking.periodDays, withoutStep: ranking.withoutStep } : null}
             scopeNote={context.role === "manager"}
             canExportLeads={canExportLeads}
+            postSaleEvaluation={postSaleEvaluation}
             now={new Date().toISOString()}
           />
         </main>
@@ -279,6 +289,7 @@ export default async function TeamMemberProfilePage({
         </div>
 
         <aside className="grid content-start gap-5">
+          {postSaleEvaluation}
           {isBroker && (context.role === "director" || context.role === "manager") ? (
             <Card>
               <CardHeader>

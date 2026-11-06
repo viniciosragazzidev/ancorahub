@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,14 +12,17 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   createPostSaleCampaignAction,
   getPostSaleWorkspaceAction,
+  markPostSaleAlertHandledAction,
   previewPostSaleAudienceAction,
   startPostSaleCampaignAction,
 } from "@/features/post-sale-audit/actions";
 import { POST_SALE_EXCLUSION_LABELS, type PostSaleExclusionReason } from "@/features/post-sale-audit/rules";
+import type { PostSaleAudience } from "@/features/post-sale-audit/rules";
+import { POST_SALE_ALERT_REASON_LABELS } from "@/features/post-sale-audit/alert-rules";
 import { POST_SALE_WAHA_OPENING_DEFAULT } from "@/features/post-sale-audit/template-contract";
 
 type WorkspaceData = Extract<Awaited<ReturnType<typeof getPostSaleWorkspaceAction>>, { ok: true }>['data'];
-type AudienceKind = "broker" | "queue" | "period";
+type AudienceKind = "broker" | "queue" | "period" | "leadIds";
 type Preview = Awaited<ReturnType<typeof previewPostSaleAudienceAction>>;
 
 function dayKey(date = new Date()) {
@@ -26,27 +30,55 @@ function dayKey(date = new Date()) {
   return local.toISOString().slice(0, 10);
 }
 
-export function PostSaleWorkspace({ initialData }: { initialData: WorkspaceData }) {
+export function PostSaleWorkspace({ initialData, initialAudience, initialPreview, initialFeedback }: {
+  initialData: WorkspaceData;
+  initialAudience?: PostSaleAudience;
+  initialPreview?: Preview;
+  initialFeedback?: string;
+}) {
   const router = useRouter();
   const [data, setData] = useState(initialData);
-  const [kind, setKind] = useState<AudienceKind>("broker");
+  const [kind, setKind] = useState<AudienceKind>(initialAudience?.kind === "leadIds" ? "leadIds" : "broker");
   const [brokerId, setBrokerId] = useState("");
   const [queueId, setQueueId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [name, setName] = useState(`Pós-venda ${dayKey()}`);
   const [openingMessage, setOpeningMessage] = useState(POST_SALE_WAHA_OPENING_DEFAULT);
-  const [preview, setPreview] = useState<Preview | null>(null);
-  const [feedback, setFeedback] = useState("");
+  const [preview, setPreview] = useState<Preview | null>(initialPreview ?? null);
+  const [feedback, setFeedback] = useState(initialFeedback ?? "");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
 
   const audience = useMemo(() => {
+    if (kind === "leadIds") return initialAudience?.kind === "leadIds" ? initialAudience : null;
     const dates = { ...(from ? { arrivalFrom: from } : {}), ...(to ? { arrivalTo: to } : {}) };
     if (kind === "broker") return brokerId ? { kind: "broker" as const, brokerId, ...dates } : null;
     if (kind === "queue") return queueId ? { kind: "filters" as const, queueId, ...dates } : null;
     return { kind: "filters" as const, ...dates };
-  }, [brokerId, from, kind, queueId, to]);
+  }, [brokerId, from, initialAudience, kind, queueId, to]);
+
+  function changeReportPeriod(value: string) {
+    const periodDays = Number(value);
+    if (![7, 30, 90].includes(periodDays)) return;
+    setFeedback("");
+    startTransition(async () => {
+      const refreshed = await getPostSaleWorkspaceAction(periodDays);
+      if (refreshed.ok) setData(refreshed.data);
+      else setFeedback(refreshed.error);
+    });
+  }
+
+  function markAlertHandled(surveyId: string) {
+    setFeedback("");
+    startTransition(async () => {
+      const result = await markPostSaleAlertHandledAction(surveyId);
+      if (!result.ok) { setFeedback(result.error); return; }
+      setFeedback(result.data.changed ? "Alerta marcado como tratado." : "Este alerta já foi tratado.");
+      const refreshed = await getPostSaleWorkspaceAction(data.periodDays);
+      if (refreshed.ok) setData(refreshed.data);
+    });
+  }
 
   function previewAudience() {
     if (!audience) { setFeedback("Escolha um corretor ou uma fila."); return; }
@@ -67,7 +99,7 @@ export function PostSaleWorkspace({ initialData }: { initialData: WorkspaceData 
       const started = await startPostSaleCampaignAction(created.data.id);
       if (!started.ok) { setFeedback(started.error); return; }
       setFeedback(`Campanha iniciada. ${started.data.queued} mensagens na fila, ${started.data.skipped} ignoradas e ${started.data.failed} falhas.`);
-      const refreshed = await getPostSaleWorkspaceAction();
+      const refreshed = await getPostSaleWorkspaceAction(data.periodDays);
       if (refreshed.ok) setData(refreshed.data);
       setPreview(null);
       router.refresh();
@@ -87,6 +119,39 @@ export function PostSaleWorkspace({ initialData }: { initialData: WorkspaceData 
         </header>
 
         <Card>
+          <CardHeader className="flex flex-wrap items-start justify-between gap-3 sm:flex-row sm:items-center">
+            <div><CardTitle>Relatório por corretor</CardTitle><CardDescription>Pesquisas enviadas no período. Percentuais consideram apenas respostas válidas.</CardDescription></div>
+            <label className="grid gap-1 text-xs font-medium text-muted-foreground">Período
+              <AppSelect aria-label="Período do relatório" value={String(data.periodDays)} onValueChange={changeReportPeriod} options={[
+                { value: "7", label: "7 dias" }, { value: "30", label: "30 dias" }, { value: "90", label: "90 dias" },
+              ]} />
+            </label>
+          </CardHeader>
+          <CardContent>
+            {data.report.length ? <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead><tr className="border-b border-border text-xs text-muted-foreground">
+                  <th className="px-2 py-2 font-medium">Corretor</th><th className="px-2 py-2 font-medium">Enviadas</th><th className="px-2 py-2 font-medium">Respondidas</th><th className="px-2 py-2 font-medium">Foi atendido</th><th className="px-2 py-2 font-medium">Nota média</th><th className="px-2 py-2 font-medium">Fechou</th><th className="px-2 py-2 font-medium">Sem contato</th><th className="px-2 py-2 font-medium">Alertas abertos</th>
+                </tr></thead>
+                <tbody>{data.report.map((row) => <tr key={row.brokerId} className="border-b border-border/60 last:border-0">
+                  <th scope="row" className="px-2 py-3 font-medium">{row.brokerName}</th><td className="px-2 py-3 tabular-nums">{row.sent}</td><td className="px-2 py-3 tabular-nums">{row.responded}</td><td className="px-2 py-3">{row.attendancePercent === null ? "Sem respostas" : `${row.attendancePercent}%`}</td><td className="px-2 py-3">{row.averageRating === null ? "Sem notas" : `${row.averageRating}/5`}</td><td className="px-2 py-3">{row.closePercent === null ? "Sem respostas" : `${row.closePercent}%`}</td><td className="px-2 py-3 tabular-nums">{row.noContact}</td><td className="px-2 py-3 tabular-nums">{row.openAlerts}</td>
+                </tr>)}</tbody>
+              </table>
+            </div> : <p className="rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-muted-foreground">Nenhum corretor disponível no escopo atual.</p>}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Alertas</CardTitle><CardDescription>Clientes que precisam de acompanhamento da direção ou da unidade.</CardDescription></CardHeader>
+          <CardContent className="grid gap-3">
+            {data.alerts.length ? data.alerts.map((alert) => <div key={alert.surveyId} className="flex flex-col gap-3 rounded-xl border border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0"><p className="font-medium">{alert.leadName}</p><p className="text-sm text-muted-foreground">{alert.brokerName} · {alert.reasons.map((reason) => POST_SALE_ALERT_REASON_LABELS[reason]).join("; ")}</p><time className="text-xs text-muted-foreground" dateTime={alert.occurredAt}>{new Date(alert.occurredAt).toLocaleString("pt-BR")}</time></div>
+              <div className="flex shrink-0 flex-wrap gap-2"><Button render={<Link href={`/leads/${encodeURIComponent(alert.leadId)}`} />} variant="outline" size="sm">Abrir lead</Button><Button type="button" variant="outline" size="sm" loading={busy} onClick={() => markAlertHandled(alert.surveyId)}>Marcar como tratado</Button></div>
+            </div>) : <p className="rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-muted-foreground">Nenhum alerta aberto.</p>}
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader>
             <CardTitle>Nova campanha</CardTitle>
             <CardDescription>Escolha um corretor, uma fila ou um período de chegada. A prévia mostra as exclusões antes do envio.</CardDescription>
@@ -95,9 +160,10 @@ export function PostSaleWorkspace({ initialData }: { initialData: WorkspaceData 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-2 text-sm font-medium">Público
                 <AppSelect aria-label="Tipo de público" value={kind} onValueChange={(value) => setKind(value as AudienceKind)} options={[
-                  { value: "broker", label: "Por corretor" }, { value: "queue", label: "Por fila" }, { value: "period", label: "Por período de chegada" },
+                  { value: "broker", label: "Por corretor" }, { value: "queue", label: "Por fila" }, { value: "period", label: "Por período de chegada" }, ...(initialAudience?.kind === "leadIds" ? [{ value: "leadIds", label: "Leads selecionados" }] : []),
                 ]} />
               </label>
+              {kind === "leadIds" && initialAudience?.kind === "leadIds" ? <p className="self-end text-sm text-muted-foreground">{initialAudience.leadIds.length} leads selecionados na lista.</p> : null}
               {kind === "broker" ? <label className="grid gap-2 text-sm font-medium">Corretor
                 <AppSelect aria-label="Corretor" value={brokerId} onValueChange={setBrokerId} placeholder="Selecione o corretor" options={data.brokers.map((broker) => ({ value: broker.id, label: broker.name }))} />
               </label> : null}

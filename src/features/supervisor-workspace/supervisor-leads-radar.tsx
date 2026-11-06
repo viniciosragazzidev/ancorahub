@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { Badge, type BadgeTone } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { ChipGroup } from "@/components/arc/chip-group/chip-group";
 import { PeopleEmpty, PeopleFilters, PeoplePage, PeopleRow, PeopleSection } from "@/components/light/people-list/people-list";
+import { Checkbox } from "@/components/ui/checkbox";
+import { buildPostSaleAudienceHref } from "@/features/post-sale-audit/bulk-navigation";
+import { POST_SALE_CAMPAIGN_MAX_LEADS } from "@/features/post-sale-audit/rules";
 
 export type RadarTag = { id: string; name: string; colorHue: number | null };
 export type RadarLead = {
@@ -90,7 +94,7 @@ function tagText(tags: RadarTag[] | undefined, max: number) {
 }
 
 /** One lead in the phone-book list: the main alert as the chip, who has it, and the action that resolves it. */
-function RadarRow({ item, index, isManager, slaMinutes, now }: { item: Item; index: number; isManager: boolean; slaMinutes: number; now: Date }) {
+function RadarRow({ item, index, isManager, slaMinutes, now, selectable = false, selected = false, selectionLimitReached = false, onSelect }: { item: Item; index: number; isManager: boolean; slaMinutes: number; now: Date; selectable?: boolean; selected?: boolean; selectionLimitReached?: boolean; onSelect?: (leadId: string, checked: boolean) => void }) {
   const { lead, bucket, alerts } = item;
   const [main, ...others] = alerts;
   const owner = lead.ownerId ? firstName(lead.ownerName) : "Sem corretor";
@@ -114,6 +118,10 @@ function RadarRow({ item, index, isManager, slaMinutes, now }: { item: Item; ind
           {lead.ownerId ? <Link href={`/relacionamento?brokerId=${encodeURIComponent(lead.ownerId)}&leadId=${encodeURIComponent(lead.id)}&action=reminder`} className={actionPill}>Cobrar {owner}</Link> : null}
         </span>
     : undefined;
+  const rowAction = selectable ? <span className="flex flex-wrap items-center justify-end gap-3">
+    <label className="inline-flex min-h-10 items-center gap-2 text-sm text-(--text-secondary)"><Checkbox aria-label={`Selecionar lead ${lead.name}`} checked={selected} disabled={!selected && selectionLimitReached} onCheckedChange={(checked) => onSelect?.(lead.id, checked === true)} /><span>Selecionar</span></label>
+    {action}
+  </span> : action;
   return (
     <PeopleRow
       index={index}
@@ -125,7 +133,7 @@ function RadarRow({ item, index, isManager, slaMinutes, now }: { item: Item; ind
       meta={lead.assignedAt ? <time dateTime={lead.assignedAt} suppressHydrationWarning>{timeFormat.format(new Date(lead.assignedAt))}</time> : undefined}
       dot={main ? (main.kind === "late" ? "alert" : "waiting") : null}
       dotLabel={main ? main.chip : undefined}
-      action={action}
+      action={rowAction}
     />
   );
 }
@@ -134,12 +142,14 @@ function RadarRow({ item, index, isManager, slaMinutes, now }: { item: Item; ind
  * The manager's (unit) or supervisor's (team) lead list, built from the same Arc pieces as the
  * broker's queue: the phone-book list, what needs attention first, the rest grouped by the day it arrived.
  */
-export function SupervisorLeadsRadar({ data, now, search = "", audience = "supervisor", initialTab }: { initialTab?: Tab; data: { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number }; now: string; search?: string; audience?: "supervisor" | "manager" }) {
+export function SupervisorLeadsRadar({ data, now, search = "", audience = "supervisor", initialTab, postSaleEnabled = false }: { initialTab?: Tab; data: { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number }; now: string; search?: string; audience?: "supervisor" | "manager"; postSaleEnabled?: boolean }) {
+  const router = useRouter();
   const isManager = audience === "manager";
   const currentTime = useMemo(() => new Date(now), [now]);
   const [query, setQuery] = useState(search);
   const [brokerIds, setBrokerIds] = useState<string[]>([]);
   const [tagIds, setTagIds] = useState<string[]>([]);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const brokerId = brokerIds[0] ?? null;
   const tagId = tagIds[0] ?? null;
 
@@ -184,6 +194,12 @@ export function SupervisorLeadsRadar({ data, now, search = "", audience = "super
 
   const filtering = Boolean(query.trim() || brokerId || tagId);
   const clear = () => { setQuery(""); setBrokerIds([]); setTagIds([]); };
+  const selectLead = (leadId: string, checked: boolean) => setSelectedLeadIds((current) => {
+    if (checked) return current.includes(leadId) || current.length >= POST_SALE_CAMPAIGN_MAX_LEADS ? current : [...current, leadId];
+    return current.filter((id) => id !== leadId);
+  });
+  const postSaleHref = postSaleEnabled ? buildPostSaleAudienceHref(selectedLeadIds) : null;
+  const renderRow = (item: Item, index: number) => <RadarRow key={item.lead.id} item={item} index={index} isManager={isManager} slaMinutes={data.slaMinutes} now={currentTime} selectable={postSaleEnabled && isManager} selected={selectedLeadIds.includes(item.lead.id)} selectionLimitReached={selectedLeadIds.length >= POST_SALE_CAMPAIGN_MAX_LEADS} onSelect={postSaleEnabled && isManager ? selectLead : undefined} />;
 
   const groups = useMemo(() => {
     const sorted = [...visible].sort((a, b) => new Date(b.lead.assignedAt ?? 0).getTime() - new Date(a.lead.assignedAt ?? 0).getTime());
@@ -216,6 +232,11 @@ export function SupervisorLeadsRadar({ data, now, search = "", audience = "super
       {brokerOptions.length ? <ChipGroup label="Corretor" options={brokerOptions} value={brokerIds} onValueChange={setBrokerIds} maxVisible={6} /> : null}
       {tagOptions.length ? <ChipGroup label="Tags" options={tagOptions} value={tagIds} onValueChange={setTagIds} maxVisible={5} /> : null}
 
+      {postSaleEnabled && isManager ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-(--surface-muted) p-3 text-sm">
+        <span className="text-(--text-secondary)">{selectedLeadIds.length} selecionados. Limite de {POST_SALE_CAMPAIGN_MAX_LEADS} por campanha.</span>
+        <span className="flex flex-wrap gap-2"><Button variant="ghost" size="sm" onClick={() => setSelectedLeadIds([])} disabled={!selectedLeadIds.length}>Limpar seleção</Button><Button size="sm" onClick={() => { if (postSaleHref) router.push(postSaleHref); }} disabled={!postSaleHref}>Enviar pós-venda</Button></span>
+      </div> : null}
+
       {filtering ? (
         <div className="flex items-center justify-between gap-2 text-sm text-(--text-secondary)">
           <span>{visible.length === 1 ? "1 lead" : `${visible.length} leads`} com esses filtros</span>
@@ -230,12 +251,12 @@ export function SupervisorLeadsRadar({ data, now, search = "", audience = "super
         />
       ) : tab === "attention" ? (
         <PeopleSection id="radar-attention" title="Precisa de você agora" count={visible.length} label="Leads que precisam de você">
-          {visible.map((item, index) => <RadarRow key={item.lead.id} item={item} index={index} isManager={isManager} slaMinutes={data.slaMinutes} now={currentTime} />)}
+          {visible.map(renderRow)}
         </PeopleSection>
       ) : (
         groups.map((group) => (
           <PeopleSection key={group.key} id={`radar-${group.key}`} title={group.label} count={group.items.length}>
-            {group.items.map((item, index) => <RadarRow key={item.lead.id} item={item} index={index} isManager={isManager} slaMinutes={data.slaMinutes} now={currentTime} />)}
+            {group.items.map(renderRow)}
           </PeopleSection>
         ))
       )}

@@ -61,7 +61,7 @@ import { ManagerLiteLeadDetailPage } from "@/features/manager-workspace/manager-
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
 import { LeadActionHub } from "@/features/leads/components/lead-action-hub";
-import { getSystemSetting } from "@/features/system-settings/queries";
+import { getFeatureFlag, getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { getCachedLegacyPlans } from "@/features/leads/reference-data";
@@ -84,6 +84,7 @@ import {
 import { shouldShowExpiredOfferLanding } from "@/features/lead-distribution/expired-offer-landing";
 import { ExpiredOfferLandingScreen } from "@/features/lead-distribution/components/expired-offer-landing-screen";
 import { UnavailableLeadView } from "@/features/broker-workspace/components/light-lead-detail/unavailable-view";
+import { PostSaleLeadCard } from "@/features/post-sale-audit/components/post-sale-lead-card";
 
 function getCurrentTimestamp() {
   return Date.now();
@@ -598,6 +599,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
     : [];
 
   const isManagement = context.role === "manager" || context.role === "director";
+  const postSaleEnabled = isManagement && await getFeatureFlag(FEATURE_FLAGS.POST_SALE_AUDIT).catch(() => "false") === "true";
   // Brokers never see when the lead arrived or which campaign/source it came from.
   const isBrokerRole = context.role === "broker";
   const shouldMask = isMarketing && lead.branchId !== context.branchId;
@@ -721,6 +723,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                 </>
               ),
               nextBestAction: <NextBestActionCard action={leadNextBestAction} />,
+              postSale: postSaleEnabled ? <PostSaleLeadCard leadId={lead.id} /> : null,
               supervision: isManagement ? (
                 <SupervisionPanel
                   leadId={lead.id}
@@ -965,6 +968,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
               </TabsList>
 
               <TabsContent value="service" className="mt-4 space-y-5">
+                {postSaleEnabled ? <PostSaleLeadCard leadId={lead.id} /> : null}
                 {isManagement && (
                   <SupervisionPanel
                     leadId={lead.id}

@@ -83,6 +83,7 @@ import { getLeadProductLabel, readMetaLeadDisplayDetails } from "@/features/lead
 import { leadsViewRequiresServerData } from "./leads-view-navigation";
 import { MarkLeadInServiceButton } from "@/features/leads/components/mark-lead-in-service-button";
 import { canDirectorMarkLeadInService } from "@/features/leads/director-service-start";
+import { buildPostSaleAudienceHref } from "@/features/post-sale-audit/bulk-navigation";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { LeadDetailsDrawer } from "@/features/leads/components/lead-details-drawer";
 import { formatLeadCommercialTotals, sumLeadCommercialValues } from "@/features/leads/commercial-values";
@@ -203,6 +204,7 @@ export function LeadsWorkspace({
   qualifyingLeads = [],
   queues = [],
   contextRole,
+  postSaleEnabled = false,
   showUnassignedFilter = false,
   initialView,
   contextJobTitle,
@@ -225,6 +227,7 @@ export function LeadsWorkspace({
   qualifyingLeads?: QualifyingLeadItem[];
   queues?: Array<{ id: string; name: string; branchId: string | null }>;
   contextRole: string;
+  postSaleEnabled?: boolean;
   showUnassignedFilter?: boolean;
   initialView?: string;
   contextJobTitle?: string | null;
@@ -539,10 +542,14 @@ export function LeadsWorkspace({
             onBranchCommitted={handleBulkBranchCommitted}
             onRevertCommitted={handleBulkRevertCommitted}
           />
+          {postSaleEnabled ? <Button type="button" size="sm" variant="outline" disabled={!buildPostSaleAudienceHref(multiSelect.selectedIds)} onClick={() => {
+            const href = buildPostSaleAudienceHref(multiSelect.selectedIds);
+            if (href) router.push(href);
+          }}>Enviar pós-venda</Button> : null}
         </>
       )}
     </>
-  ), [contextRole, multiSelect.selectedIds, multiSelect.count, brokers, branches, handleBulkReassignCommitted, handleBulkBranchCommitted, handleBulkRevertCommitted, handleBulkStatusCommitted]);
+  ), [contextRole, multiSelect.selectedIds, multiSelect.count, brokers, branches, postSaleEnabled, router, handleBulkReassignCommitted, handleBulkBranchCommitted, handleBulkRevertCommitted, handleBulkStatusCommitted]);
 
 
   const activeCount = useMemo(() => workspaceLeads.filter((l) => l.status === "in_contact" || l.status === "negotiation").length, [workspaceLeads]);
@@ -739,6 +746,7 @@ export function LeadsWorkspace({
                 onRowClick={setSelectedLead}
                 liteBulk={directorLite ? {
                   role: contextRole,
+                  postSaleEnabled,
                   brokers,
                   branches,
                   onStatusCommitted: handleBulkStatusCommitted,
@@ -767,6 +775,7 @@ export function LeadsWorkspace({
               onClearSelection={multiSelect.clear}
               bulk={{
                 role: contextRole,
+                postSaleEnabled,
                 brokers,
                 branches,
                 onStatusCommitted: handleBulkStatusCommitted,
@@ -963,6 +972,7 @@ export function LeadsWorkspace({
                     onRowClick={setSelectedLead}
                     liteBulk={directorLite ? {
                       role: contextRole,
+                      postSaleEnabled,
                       brokers,
                       branches,
                       onStatusCommitted: handleBulkStatusCommitted,

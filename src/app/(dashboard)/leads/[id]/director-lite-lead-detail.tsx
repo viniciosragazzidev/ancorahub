@@ -91,6 +91,7 @@ export type DirectorLiteLeadDetailProps = {
     documents: ReactNode;
     timeline: ReactNode;
     tasks: ReactNode;
+    postSale?: ReactNode;
   };
 };
 
@@ -191,6 +192,7 @@ export function DirectorLiteLeadDetail(props: DirectorLiteLeadDetailProps) {
       <div className={styles.layout}>
         <div className={styles.mainColumn}>
           {slots.nextBestAction}
+          {slots.postSale}
           <Tabs defaultValue={props.defaultTab} className={styles.tabs}>
             <TabsList aria-label="Etapas do atendimento" id="tabs-lead-page" className={styles.tabList}>
               <TabsTrigger value="service">Atendimento</TabsTrigger>

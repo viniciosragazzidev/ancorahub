@@ -2,6 +2,13 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 06/11/2026 - Relatórios, alertas e cartões de pós-venda
+
+- A página Equipe > Pós-venda agrega métricas por corretor e período, mostra alertas abertos e permite tratá-los com auditoria. A ficha do lead e o perfil do corretor mostram respostas e avaliação sob a flag de pós-venda.
+- A lista de leads permite abrir a campanha manual existente com até 300 leads selecionados, mantendo prévia e escopo no servidor.
+- Migration `0221_post_sale_alerts.sql` criada para o estado de tratamento de alertas e não executada.
+- Registro e evidências: [plano da régua de pós-venda](implementations/active/2026-11-06-pos-venda-regua-automatica.md) e [validação da Fase 3](../reports/agent/verification/2026-11-06-pos-venda-fase3.md).
+
 ## 06/11/2026 - Conversa e campanha manual de pós-venda
 
 - Respostas do cliente são roteadas para a pesquisa ativa no mesmo canal antes da qualificação. A conversa usa o interpretador sensível com fallback por palavras-chave, registra respostas no survey e na linha do tempo, bloqueia opt-out de forma durável e envia um lembrete único após 24 horas úteis.

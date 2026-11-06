@@ -71,7 +71,7 @@ function LeadTimeline({ items }: { items: TimelineItem[] }) {
   </section>;
 }
 
-export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocuments, conversation, brokerWhatsAppConnected, timeline, now, managerBrokers, tasks, documents, saleAction }: {
+export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocuments, conversation, brokerWhatsAppConnected, timeline, now, managerBrokers, tasks, documents, saleAction, postSaleCard }: {
   lead: { id: string; name: string; status: string; ownerId: string | null; ownerName: string | null; ownerImage: string | null; productName: string | null; assignedAt: Date | null; branchName: string | null };
   lightLead: LightLeadDetailData;
   requirements: LiteRequirement[];
@@ -85,6 +85,7 @@ export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocume
   documents?: DocumentItem[];
   /** "Registrar venda" for the manager on a broker's lead (built by the page, which has the carriers). */
   saleAction?: ReactNode;
+  postSaleCard?: ReactNode;
 }) {
   const nowDate = new Date(now);
   const isManager = Boolean(managerBrokers);
@@ -146,6 +147,7 @@ export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocume
         side={
           <div className="flex flex-col gap-4">
             {lead.ownerId && !isManager ? <Link className="w-max text-sm font-medium text-(--chat-action-text)" href={`/equipe/${encodeURIComponent(lead.ownerId)}`}>Ver corretor</Link> : null}
+            {postSaleCard}
             {tasks && documents ? <LeadTasksAndDocuments tasks={tasks} documents={documents} /> : null}
             <LeadTimeline items={timeline} />
           </div>
