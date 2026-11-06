@@ -61,7 +61,13 @@ export function NegotiationLeadSituation({ lead, now }: { lead: NegotiationLead;
   );
 }
 
-/** Leitura da IA, separada em blocos: o que fazer, o que ela entendeu, o que ajuda e o que trava. */
+const ATTENTION_LABEL = { ACT: "Precisa da direção", WATCH: "Acompanhar", NONE: "Bem encaminhado" } as const;
+
+/**
+ * Leitura da IA para quem gerencia (06/11): primeiro o que a direção precisa saber e fazer;
+ * o próximo passo do corretor fica abaixo, como informação. Análises antigas (sem a leitura
+ * para a direção) mostram o resumo no topo até a próxima análise da conversa.
+ */
 export function NegotiationLeadAi({ lead, now }: { lead: NegotiationLead; now: Date }) {
   const { ai } = lead;
   const analyzed = ago(ai.lastAnalyzedAt, now);
@@ -73,16 +79,35 @@ export function NegotiationLeadAi({ lead, now }: { lead: NegotiationLead; now: D
       </div>
 
       <div className={styles.aiNext}>
-        <span className={styles.aiLabel}><ArrowRight aria-hidden="true" size={14} /> Próxima ação</span>
-        <p>{ai.nextBestAction ?? "Sem sugestão no momento."}</p>
+        <span className={styles.aiLabel}><ArrowRight aria-hidden="true" size={14} /> Para a direção</span>
+        <p>{ai.directorBrief ?? ai.summary ?? "A IA ainda não analisou este atendimento."}</p>
+        {!ai.directorBrief && ai.summary ? <span className={styles.factHint}>A leitura para a direção sai na próxima análise desta conversa.</span> : null}
       </div>
+
+      {ai.directorAttention && ai.directorAttention !== "NONE" && ai.directorAction ? (
+        <div className={styles.aiRisk} role="note" data-attention={ai.directorAttention}>
+          <span className={styles.aiLabel}><AlertTriangle aria-hidden="true" size={14} /> {ATTENTION_LABEL[ai.directorAttention]}</span>
+          <p>{ai.directorAction}</p>
+        </div>
+      ) : ai.directorAttention === "NONE" ? (
+        <p className={styles.factHint}>{ATTENTION_LABEL.NONE}: sem ação da direção agora.</p>
+      ) : null}
 
       {lead.statusBehindAi ? <p className={styles.statusBehind}>A IA indica uma etapa à frente do CRM. O status não foi alterado.</p> : null}
 
-      <div className={styles.aiBlock}>
-        <span className={styles.aiLabel}>Resumo</span>
-        <p>{ai.summary ?? "A IA ainda não gerou um resumo para este atendimento."}</p>
-      </div>
+      {ai.directorBrief && ai.summary ? (
+        <div className={styles.aiBlock}>
+          <span className={styles.aiLabel}>Resumo da conversa</span>
+          <p>{ai.summary}</p>
+        </div>
+      ) : null}
+
+      {ai.nextBestAction ? (
+        <div className={styles.aiBlock}>
+          <span className={styles.aiLabel}>Próximo passo do corretor</span>
+          <p>{ai.nextBestAction}</p>
+        </div>
+      ) : null}
 
       <div className={styles.aiPair}>
         <div className={styles.aiBlock}>
