@@ -21,7 +21,7 @@ export type NavTab = {
   /** Só estes papéis enxergam a aba (a página também barra os outros). */
   roles?: readonly TenantRole[];
   /** Escondida enquanto a chave correspondente estiver desligada. */
-  requires?: "negotiations" | "relationshipCenter";
+  requires?: "negotiations" | "relationshipCenter" | "postSaleAudit";
   /** Outros valores de query que abrem a mesma aba (links antigos), ex.: { tab: ["alerts"] }. */
   aliases?: Readonly<Record<string, readonly string[]>>;
   /**
@@ -115,6 +115,7 @@ export const NAV_AREAS: readonly NavArea[] = [
     tabs: [
       { id: "pessoas", label: "Pessoas", href: "/equipe", permission: "convidar_corretor", paths: ["/equipe", "/filiais", "/unidades"] },
       { id: "relacionamento", label: "Relacionamento", href: "/relacionamento", permission: "convidar_corretor", requires: "relationshipCenter" },
+      { id: "pos-venda", label: "Pós-venda", href: "/equipe/pos-venda", permission: "acessar_leads", roles: ["director", "manager"], requires: "postSaleAudit" },
     ],
   },
   {
@@ -225,12 +226,13 @@ export function resolveNavLocation(pathname: string, search: NavSearch | null = 
   return found;
 }
 
-export type NavAccessUser = NavigationAccessUser & { negotiationsEnabled?: boolean };
+export type NavAccessUser = NavigationAccessUser & { negotiationsEnabled?: boolean; postSaleAuditEnabled?: boolean };
 
 export function canShowNavTab(tab: NavTab, user: NavAccessUser | null) {
   if (!user?.roleKey) return false;
   if (tab.roles && !tab.roles.includes(user.roleKey)) return false;
   if (tab.requires === "negotiations" && !user.negotiationsEnabled) return false;
+  if (tab.requires === "postSaleAudit" && !user.postSaleAuditEnabled) return false;
   // Cargo (04/11, F2): as permissões trazem rotas "route:" só para quem tem cargo; aí a aba exige a capacidade.
   const permissions = user.permissions ?? [];
   const hasCargo = permissions.some((permission) => permission.startsWith("route:"));

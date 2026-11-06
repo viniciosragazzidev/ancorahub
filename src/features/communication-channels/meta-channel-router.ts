@@ -27,9 +27,10 @@ export async function resolveMetaOutboundChannel(input: {
   clientId?: string | null;
   pinnedChannelId?: string | null;
   corporateOnly?: boolean;
+  allowPinnedSourceChannel?: boolean;
 }): Promise<typeof schema.communicationChannels.$inferSelect | MetaChannelBlock | null> {
   const db = getDatabase();
-  const latestInboundChannelId = input.recipientType === "user"
+  const latestInboundChannelId = input.recipientType === "user" || input.allowPinnedSourceChannel
     ? null
     : await findLatestInboundChannelId(input.tenantId, resolveMetaInboundLookup({
       leadId: input.leadId ?? (input.recipientType === "lead" ? input.recipientId : null),
@@ -57,6 +58,7 @@ export async function resolveMetaOutboundChannel(input: {
     latestInboundChannelId,
     pinnedChannelId: input.pinnedChannelId,
     corporateOnly: input.corporateOnly,
+    allowPinnedSourceChannel: input.allowPinnedSourceChannel,
   });
   if (selection.kind === "blocked") return selection;
   if (selection.kind !== "selected") return null;

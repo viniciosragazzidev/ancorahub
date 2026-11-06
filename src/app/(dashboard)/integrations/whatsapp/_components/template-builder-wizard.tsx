@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, ArrowRight, InfoIcon, PaperPlaneTilt, Plus } from "@/components/huge-icons";
+import { POST_SALE_META_TEMPLATE } from "@/features/post-sale-audit/template-contract";
 
 type TemplateBuilderWizardProps = {
   open: boolean;
@@ -32,11 +33,13 @@ export function TemplateBuilderWizard({ open, onClose, onSuccess }: TemplateBuil
   const [footerText, setFooterText] = useState("");
   const [buttonType, setButtonType] = useState<"NONE" | "QUICK_REPLY" | "URL">("NONE");
   const [buttonText, setButtonText] = useState("Falar com consultor");
+  const [secondQuickReplyText, setSecondQuickReplyText] = useState("");
   const [buttonUrl, setButtonUrl] = useState("https://crm.ancorasaude.cloud/onboarding/");
 
   // Step 3: Variables & Samples
   const [sampleVar1, setSampleVar1] = useState("Marcos");
   const [sampleVar2, setSampleVar2] = useState("Âncora Saúde");
+  const [sampleVar3, setSampleVar3] = useState("Ana");
 
   const formattedName = name.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
 
@@ -44,6 +47,22 @@ export function TemplateBuilderWizard({ open, onClose, onSuccess }: TemplateBuil
     const match = bodyText.match(/\{\{(\d+)\}\}/g);
     const nextIndex = match ? match.length + 1 : 1;
     setBodyText((prev) => `${prev} {{${nextIndex}}}`);
+  };
+
+  const applyPostSalePreset = () => {
+    setName(POST_SALE_META_TEMPLATE.name);
+    setCategory(POST_SALE_META_TEMPLATE.category);
+    setLanguage(POST_SALE_META_TEMPLATE.language);
+    setHeaderType("NONE");
+    setHeaderText("");
+    setBodyText(POST_SALE_META_TEMPLATE.body);
+    setFooterText("");
+    setButtonType("QUICK_REPLY");
+    setButtonText(POST_SALE_META_TEMPLATE.quickReplies[0]);
+    setSecondQuickReplyText(POST_SALE_META_TEMPLATE.quickReplies[1]);
+    setSampleVar1("Marcos");
+    setSampleVar2("Âncora Saúde");
+    setSampleVar3("Ana");
   };
 
   const handleSubmit = async () => {
@@ -74,6 +93,7 @@ export function TemplateBuilderWizard({ open, onClose, onSuccess }: TemplateBuil
         const samples: string[] = [];
         if (bodyText.includes("{{1}}")) samples.push(sampleVar1.trim() || "Amostra 1");
         if (bodyText.includes("{{2}}")) samples.push(sampleVar2.trim() || "Amostra 2");
+        if (bodyText.includes("{{3}}")) samples.push(sampleVar3.trim() || "Amostra 3");
         bodyComponent.example = {
           body_text: [samples],
         };
@@ -90,7 +110,10 @@ export function TemplateBuilderWizard({ open, onClose, onSuccess }: TemplateBuil
       if (buttonType === "QUICK_REPLY" && buttonText.trim()) {
         components.push({
           type: "BUTTONS",
-          buttons: [{ type: "QUICK_REPLY", text: buttonText.trim() }],
+          buttons: [
+            { type: "QUICK_REPLY", text: buttonText.trim() },
+            ...(secondQuickReplyText.trim() ? [{ type: "QUICK_REPLY", text: secondQuickReplyText.trim() }] : []),
+          ],
         });
       } else if (buttonType === "URL" && buttonText.trim() && buttonUrl.trim()) {
         components.push({
@@ -127,7 +150,8 @@ export function TemplateBuilderWizard({ open, onClose, onSuccess }: TemplateBuil
   const getPreviewText = () => {
     return bodyText
       .replace(/\{\{1\}\}/g, sampleVar1 || "[Exemplo 1]")
-      .replace(/\{\{2\}\}/g, sampleVar2 || "[Exemplo 2]");
+      .replace(/\{\{2\}\}/g, sampleVar2 || "[Exemplo 2]")
+      .replace(/\{\{3\}\}/g, sampleVar3 || "[Exemplo 3]");
   };
 
   return (
@@ -149,6 +173,9 @@ export function TemplateBuilderWizard({ open, onClose, onSuccess }: TemplateBuil
         {/* PASSO 1: BÁSICO */}
         {step === 1 ? (
           <div className="space-y-4 py-2">
+            <Button variant="outline" size="sm" type="button" onClick={applyPostSalePreset}>
+              Preencher template de pós-venda
+            </Button>
             <div className="space-y-1.5">
               <Label htmlFor="template-name">Nome do template (formatado automaticamente em snake_case)</Label>
               <Input
@@ -269,6 +296,13 @@ export function TemplateBuilderWizard({ open, onClose, onSuccess }: TemplateBuil
                   value={buttonText}
                   onChange={(e) => setButtonText(e.target.value)}
                 />
+                {buttonType === "QUICK_REPLY" ? (
+                  <Input
+                    placeholder="Segundo botão de resposta (opcional)"
+                    value={secondQuickReplyText}
+                    onChange={(e) => setSecondQuickReplyText(e.target.value)}
+                  />
+                ) : null}
                 {buttonType === "URL" ? (
                   <Input
                     placeholder="URL do site (ex: https://site.com/{{1}})"
@@ -303,6 +337,13 @@ export function TemplateBuilderWizard({ open, onClose, onSuccess }: TemplateBuil
                   <Input value={sampleVar2} onChange={(e) => setSampleVar2(e.target.value)} className="text-xs" />
                 </div>
               ) : null}
+
+              {bodyText.includes("{{3}}") ? (
+                <div className="space-y-1">
+                  <Label className="text-xs">Exemplo para {"{{3}}"}</Label>
+                  <Input value={sampleVar3} onChange={(e) => setSampleVar3(e.target.value)} className="text-xs" />
+                </div>
+              ) : null}
             </div>
 
             {/* Simulated Phone Mockup */}
@@ -319,6 +360,7 @@ export function TemplateBuilderWizard({ open, onClose, onSuccess }: TemplateBuil
                 {buttonType !== "NONE" ? (
                   <div className="pt-2 border-t border-border flex justify-center">
                     <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{buttonText}</span>
+                    {buttonType === "QUICK_REPLY" && secondQuickReplyText.trim() ? <span className="ml-4 text-xs font-medium text-emerald-600 dark:text-emerald-400">{secondQuickReplyText}</span> : null}
                   </div>
                 ) : null}
               </div>

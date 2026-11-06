@@ -294,6 +294,20 @@ export const MESSAGE_EVENT_CATALOG = [
       { key: "mensagem", label: "Mensagem", aliases: ["message"], fallback: "" },
     ],
   },
+  {
+    key: "POST_SALE_INTRODUCTION",
+    purpose: "postSaleSurvey",
+    label: "Apresentação da pesquisa de pós-venda",
+    description: "Pede licença ao cliente para duas perguntas sobre o atendimento recebido.",
+    audience: "lead",
+    windowRule: "meta_required_without_window",
+    templateOnly: true,
+    variables: [
+      { key: "cliente_nome", label: "Primeiro nome do cliente", aliases: ["nome", "lead_nome"], fallback: "Cliente" },
+      { key: "empresa", label: "Nome da empresa", aliases: ["company"], fallback: "nossa equipe" },
+      { key: "corretor_nome", label: "Primeiro nome do corretor", aliases: ["corretor", "nome_corretor"], fallback: "nosso corretor" },
+    ],
+  },
 ] as const satisfies readonly MessageEventDefinition[];
 
 export type MessageEventKey = (typeof MESSAGE_EVENT_CATALOG)[number]["key"];

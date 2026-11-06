@@ -486,7 +486,16 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   }
 
   // ── 8. AI processing (optional, background, only for inbound to relay numbers) ──────────
-  if (!contentless && !isOutgoing && source.kind === "number" && leadId && (await getSystemSetting(WAHA_AI_FEATURE)) === "true") {
+  let handledByPostSale = false;
+  if (!contentless && !isOutgoing && source.kind === "number" && leadId && tenantId) {
+    const inboundMessage = event.message;
+    const { routePostSaleInboundSafely } = await import("@/features/post-sale-audit/conversation-operations");
+    handledByPostSale = await routePostSaleInboundSafely(async () => {
+      const { handlePostSaleInbound } = await import("@/features/post-sale-audit/conversation");
+      return handlePostSaleInbound({ tenantId, leadId, channelType: "waha", channelRef: source.number.id, text: inboundMessage.body ?? "", providerMessageId, messageKind: inboundMessage.type });
+    }, { tenantId, leadId, channelType: "waha" });
+  }
+  if (!handledByPostSale && !contentless && !isOutgoing && source.kind === "number" && leadId && (await getSystemSetting(WAHA_AI_FEATURE)) === "true") {
     const { processInboundAiResponse } =
       await import("@/features/ai-agent/conversation-state-machine");
     const aiPromise = processInboundAiResponse({

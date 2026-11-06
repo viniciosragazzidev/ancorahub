@@ -73,6 +73,7 @@ const REGRAS: readonly Regra[] = [
   ["src/features/sales-tools/", rota("ferramentas")],
   ["src/features/promotional-materials/", rota("ferramentas")],
   ["src/features/relationship/", rota("relacionamento")],
+  ["src/features/post-sale-audit/", rota("equipe")],
   ["src/features/journey/", rota("jornada")],
   ["src/features/performance/", rota("desempenho")],
   ["src/features/tenant-intelligence/", rota("dashboard")],

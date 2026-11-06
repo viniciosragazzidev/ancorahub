@@ -77,6 +77,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const negotiationsAreaPromise = context.role === "director" || context.role === "manager" || context.role === "supervisor"
     ? getFeatureFlag(FEATURE_FLAGS.NEGOTIATIONS_AREA).catch(() => "false")
     : Promise.resolve("false");
+  const postSaleAuditFlagPromise = context.role === "director" || context.role === "manager"
+    ? getFeatureFlag(FEATURE_FLAGS.POST_SALE_AUDIT).catch(() => "false")
+    : Promise.resolve("false");
   const headersPromise = headers();
   // Tenant branding, the signed-in user and their membership in one round trip:
   // the layout renders on every navigation and every realtime refresh, and the
@@ -169,6 +172,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     directorLiteStyleEnabled,
     negotiationsAreaSetting,
     negotiationsRouteAccess,
+    postSaleAuditFlag,
     illustrationsSetting,
   ] = await Promise.all([
     experienceModePromise,
@@ -185,6 +189,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     directorLiteStylePromise,
     negotiationsAreaPromise,
     negotiationsRouteAccessPromise,
+    postSaleAuditFlagPromise,
     illustrationsPromise,
   ]);
 
@@ -252,6 +257,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         cleanUiEnabled={cleanUiEnabled}
         directorLiteEnabled={directorLiteStyleEnabled}
         negotiationsEnabled={negotiationsAreaSetting === "true" && negotiationsRouteAccess}
+        postSaleAuditEnabled={postSaleAuditFlag === "true"}
         isLightBroker={isLightBroker || isLightSupervisor || isLightManager}
         liteAudience={liteAudience}
         initialChatRail={initialChatRail}

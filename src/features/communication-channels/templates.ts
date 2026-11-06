@@ -27,6 +27,7 @@ export const META_WHATSAPP_TEMPLATE_PURPOSES = {
   leadAssignmentExpired: { name: "lead_assignment_expired", language: "pt_BR" },
   leadFeedbackReminder: { name: "registrar_feedback_lead", language: "pt_BR" },
   aiQualification: { name: "__text__", language: "pt_BR" },
+  postSaleSurvey: { name: "pos_venda_apresentacao", language: "pt_BR" },
 } as const;
 
 export type MetaWhatsAppTemplatePurpose = keyof typeof META_WHATSAPP_TEMPLATE_PURPOSES;
@@ -63,6 +64,7 @@ export function getMetaWhatsAppTemplate(purpose: string) {
  * {{cargo}} and {{unidade}}, rather than positional placeholders.
  */
 export function getMetaWhatsAppTemplateVariableNames(purpose: string) {
+  if (purpose === "postSaleSurvey") return ["cliente_nome", "empresa", "corretor_nome"];
   if (purpose === "brokerInvitation") return ["nome", "empresa", "cargo", "unidade"];
   if (purpose === "brokerAccountActivated") return ["nome", "empresa", "login_url"];
   if (purpose === "dutyPresenceConfirmation") return ["nome", "hora"];

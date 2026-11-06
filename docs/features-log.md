@@ -2,6 +2,13 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 06/11/2026 - Conversa e campanha manual de pós-venda
+
+- Respostas do cliente são roteadas para a pesquisa ativa no mesmo canal antes da qualificação. A conversa usa o interpretador sensível com fallback por palavras-chave, registra respostas no survey e na linha do tempo, bloqueia opt-out de forma durável e envia um lembrete único após 24 horas úteis.
+- Diretor e gestor de unidade podem criar campanhas manuais por corretor, fila ou período, conferir exclusões e exemplos e acompanhar respostas recentes na área Equipe Lite. Meta usa o template aprovado; WAHA usa o texto inicial editável.
+- Schema preparado para campanhas automáticas futuras; SQL `0218_post_sale_manual_conversation.sql` não executado.
+- Registro e validações: [plano da régua de pós-venda](implementations/active/2026-11-06-pos-venda-regua-automatica.md) e [evidências da Fase 2](../reports/agent/verification/2026-11-06-pos-venda-fase2.md).
+
 ## 05/11/2026 - Exportação da carteira atual do corretor
 
 - Diretor e gestor com capacidade efetiva podem baixar os leads atualmente atribuídos ao corretor em CSV para Excel pt-BR, com filtros de unidade/tenant, convertidos e perdidos incluídos por padrão e processamento em lotes sem teto artificial.

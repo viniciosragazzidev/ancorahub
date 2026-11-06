@@ -168,6 +168,15 @@ describe("nav-registry", () => {
     expect(canShowNavTab(cargos, manager)).toBe(false);
   });
 
+  it("shows the post-sale workspace only to directors and unit managers when enabled", () => {
+    const team = NAV_AREAS.find((area) => area.id === "equipe")!;
+    const postSale = team.tabs.find((tab) => tab.id === "pos-venda")!;
+    expect(canShowNavTab(postSale, director)).toBe(false);
+    expect(canShowNavTab(postSale, { ...director, postSaleAuditEnabled: true })).toBe(true);
+    expect(canShowNavTab(postSale, { ...director, roleKey: "manager", postSaleAuditEnabled: true })).toBe(true);
+    expect(canShowNavTab(postSale, { ...director, roleKey: "broker", postSaleAuditEnabled: true })).toBe(false);
+  });
+
   it("a broker does not see management areas", () => {
     const broker: NavAccessUser = { roleKey: "broker", jobTitle: null, permissions: ["acessar_dashboard", "acessar_conversas", "acessar_leads", "acessar_vendas", "acessar_clientes", "acessar_documentos", "acessar_configuracoes_pessoais"] };
     const ids = visibleNavAreas(broker).map((item) => item.area.id);

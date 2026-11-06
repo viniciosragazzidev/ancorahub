@@ -614,8 +614,11 @@ export async function resolveEventMessagePlan(input: {
 
 /** Resolves an approved Meta template for a governed event, never free text. */
 /** An approved template of the active WABA by name (qualification approaches and reminders). */
-async function loadApprovedMetaResourceByName(tenantId: string, name: string): Promise<MetaResource | null> {
-  const wabaId = await getActiveWabaId(tenantId);
+async function loadApprovedMetaResourceByName(tenantId: string, name: string, pinnedWabaId?: string | null): Promise<MetaResource | null> {
+  // A specific source channel without a WABA cannot borrow a template from a
+  // different active number. That would break source-channel guarantees.
+  if (pinnedWabaId === null) return null;
+  const wabaId = pinnedWabaId ?? await getActiveWabaId(tenantId);
   if (!wabaId) return null;
   const [template] = await getDatabase().select({
     id: schema.metaWhatsAppTemplates.id,
@@ -641,12 +644,14 @@ export async function resolveApprovedMetaEventTemplate(input: {
   variables: string[];
   /** A specific approved template instead of the event's configured one. */
   templateName?: string;
+  /** The selected source channel's WABA. */
+  wabaId?: string | null;
 }): Promise<ResolvedEventMessagePlan | null> {
   const event = getMessageEventByPurpose(input.purpose);
   if (!event) return null;
 
   if (input.templateName) {
-    const named = await loadApprovedMetaResourceByName(input.tenantId, input.templateName);
+    const named = await loadApprovedMetaResourceByName(input.tenantId, input.templateName, input.wabaId);
     if (!named || (event.key === "FIRST_CONTACT" && named.category !== "UTILITY")) return null;
     const automatic = buildAutomaticMetaVariableMappings(event, named.variables);
     return {

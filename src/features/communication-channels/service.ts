@@ -402,7 +402,18 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           }
         }
 
-        if (unsupported) {
+        let handledByPostSale = false;
+        if (activeLeadId && !unsupported) {
+          const { routePostSaleInboundSafely } = await import("@/features/post-sale-audit/conversation-operations");
+          handledByPostSale = await routePostSaleInboundSafely(async () => {
+            const { handlePostSaleInbound } = await import("@/features/post-sale-audit/conversation");
+            return handlePostSaleInbound({ tenantId: channel.tenantId, leadId: activeLeadId, channelType: "meta", channelRef: channel.id, text, providerMessageId: message.id, messageKind });
+          }, { tenantId: channel.tenantId, leadId: activeLeadId, channelType: "meta" });
+        }
+
+        if (handledByPostSale) {
+          console.info("[post-sale-audit] meta_inbound_routed", { tenantId: channel.tenantId, leadId: activeLeadId });
+        } else if (unsupported) {
           console.info("[ai-wpp] inbound.ignored_unsupported_message", { tenantId: channel.tenantId, leadId: activeLeadId ?? null });
         } else if (skipAiQualification && activeLeadId) {
           console.info("[ai-wpp] inbound.ignored_coexistence_number", { tenantId: channel.tenantId, leadId: activeLeadId });

@@ -34,7 +34,8 @@ export type EventKey =
   | "LEAD_FEEDBACK_REMINDER"
   | "QUOTE_READY"
   | "TASK_REMINDER"
-  | "CLIENT_NOTICE";
+  | "CLIENT_NOTICE"
+  | "POST_SALE_INTRODUCTION";
 
 export const CRM_EVENT_LABEL_MAP: Record<EventKey, string> = {
   FIRST_CONTACT: "Primeiro contato da qualificação",
@@ -49,6 +50,7 @@ export const CRM_EVENT_LABEL_MAP: Record<EventKey, string> = {
   QUOTE_READY: "Cotação / Proposta Concluída",
   TASK_REMINDER: "Lembrete de Tarefa Comercial",
   CLIENT_NOTICE: "Aviso Geral ao Cliente",
+  POST_SALE_INTRODUCTION: "Apresentação da pesquisa de pós-venda",
 };
 
 export async function resolveMetaChannelCredentials(tenantId: string) {
@@ -401,6 +403,7 @@ export class WhatsAppTemplateResolver {
     else if (purpose === "leadFeedbackReminder") eventKey = "LEAD_FEEDBACK_REMINDER";
     else if (purpose === "taskReminder") eventKey = "TASK_REMINDER";
     else if (purpose === "clientNotice") eventKey = "CLIENT_NOTICE";
+    else if (purpose === "postSaleSurvey") eventKey = "POST_SALE_INTRODUCTION";
 
     try {
       const db = getDatabase();
