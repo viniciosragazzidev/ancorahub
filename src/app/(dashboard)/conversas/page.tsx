@@ -181,6 +181,9 @@ export default async function ConversationsPage({
           ),
         )
         .orderBy(
+          // The lead opened by link (?leadId=, "Abrir conversa") always makes the list, even when its
+          // last message is older than the 30-day window or the list is full (06/11).
+          ...(leadId ? [sql`case when ${schema.leads.id} = ${leadId} then 0 else 1 end`] : []),
           ...(recentConversationLeadIds.length ? [sql`case when ${inArray(schema.leads.id, recentConversationLeadIds)} then 0 else 1 end`] : []),
           desc(schema.leads.stageEnteredAt),
         )

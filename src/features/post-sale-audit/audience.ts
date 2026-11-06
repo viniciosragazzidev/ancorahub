@@ -295,8 +295,11 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
     const recorded = sourceMessage ? sourceFromMessage(sourceMessage) : null;
     const fromMessage = recorded?.type === "meta" && byChannelId.get(recorded.ref)?.status !== "active" ? null : recorded;
     const defaultMeta = (): Source => {
-      const channel = metaChannels.find((item) => item.isDefault && item.status === "active" && (item.branchId === null || item.branchId === lead.branchId));
-      return channel ? { type: "meta", ref: channel.id } : null;
+      // More than one default candidate is ambiguous: skipped, never a guess.
+      const candidates = metaChannels.filter((item) => item.isDefault && item.status === "active" && (item.branchId === null || item.branchId === lead.branchId));
+      const unit = candidates.filter((item) => item.branchId === lead.branchId && lead.branchId !== null);
+      const pool = unit.length ? unit : candidates.filter((item) => item.branchId === null);
+      return pool.length === 1 ? { type: "meta", ref: pool[0].id } : null;
     };
     const source = choosePostSaleSource<NonNullable<Source>>({
       hasMessage: Boolean(sourceMessage),
