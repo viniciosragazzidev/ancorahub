@@ -73,7 +73,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ tena
   const isInternal = [...brokers, ...numbers, ...channels].some((b) => b.phone && samePhone(b.phone));
   const matchingLeads = isInternal ? [] : leads.filter((item) => samePhone(item.phone));
   const isOutgoing = event.direction === "outgoing" || event.fromMe === true;
-  let lead = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(item.status)) ?? matchingLeads[0];
+  let lead = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(item.status)) ?? matchingLeads[0];
   const client = isInternal ? undefined : clients.find((item) => samePhone(item.phone));
   if (!lead && !client && !isOutgoing && !isInternal) {
     const leadId = randomUUID();

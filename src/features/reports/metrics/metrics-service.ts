@@ -48,6 +48,7 @@ const ACTIVE_LEAD_STATUSES = [
   "negotiation",
   "documentation_pending",
   "under_analysis",
+  "awaiting_reply",
 ] as const;
 
 /** Estágios considerados "negociação avançada" para o item de atenção. */

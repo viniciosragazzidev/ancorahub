@@ -6,6 +6,7 @@
 export const JOB_SCHEDULE = {
   whatsapp: { path: "/api/internal/jobs/whatsapp", cron: "* * * * *", label: "Envio do WhatsApp" },
   distribution: { path: "/api/internal/jobs/distribution", cron: "*/2 * * * *", label: "Distribuição de leads" },
+  "distribution-priority": { path: "/api/internal/jobs/distribution-priority", cron: "* * * * *", label: "Distribuição de quentes e mornos" },
   "qualification-timeout": { path: "/api/internal/jobs/qualification-timeout", cron: "*/2 * * * *", label: "Tempo limite da qualificação" },
   "waha-sync": { path: "/api/internal/jobs/waha-sync", cron: "* * * * *", label: "Mensagens dos corretores" },
   "lead-effects": { path: "/api/internal/jobs/lead-effects", cron: "* * * * *", label: "Efeitos pós-entrada" },
@@ -22,6 +23,8 @@ export const JOB_SCHEDULE = {
   "supervisor-digest": { path: "/api/internal/jobs/supervisor-digest", cron: "0 22 * * *", label: "Resumo das 19h" },
   "operator-catalog": { path: "/api/internal/jobs/operator-catalog", cron: "*/5 * * * *", label: "Catálogo das operadoras" },
   "customer-waiting": { path: "/api/internal/jobs/customer-waiting", cron: "*/5 * * * *", label: "Cliente aguardando o corretor" },
+  "stale-stages": { path: "/api/internal/jobs/stale-stages", cron: "0 12 * * *", label: "Regra de chat parado" },
+  "daily-report": { path: "/api/internal/jobs/daily-report", cron: "0 21 * * *", label: "Relatório das 18h" },
 } as const;
 
 export type JobKey = keyof typeof JOB_SCHEDULE;

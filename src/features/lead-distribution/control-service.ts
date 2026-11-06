@@ -734,7 +734,7 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
   const paceableIds = ids.filter((id) => evaluateBrokerOfferPacing(recentOffers.get(id) ?? [], pacing, pacingNow).allowed);
   if (!paceableIds.length) return { queue: effectiveQueue, eligible: [], selected: null, reason: "Todos os corretores elegíveis estão no intervalo de ofertas ou com ofertas pendentes." };
   const loads = await db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads)
-    .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, paceableIds), inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]))).groupBy(schema.leads.corretorId);
+    .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, paceableIds), inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"]))).groupBy(schema.leads.corretorId);
   const loadByBroker = new Map(loads.map((row) => [row.brokerId, Number(row.total)]));
   // Same "menor carga" as the real distribution (DEC-154): count only this
   // broker's active plantão, or only unscoped assignments when no plantão applies.

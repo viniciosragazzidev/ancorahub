@@ -629,7 +629,7 @@ async function getBranchHealth(context: TenantContext): Promise<BranchHealth[]> 
     db.select({
       branchId: schema.leads.branchId,
       leadsToday: sql<number>`count(*) filter (where ${schema.leads.createdAt} >= ${today.start.toISOString()} and ${schema.leads.createdAt} < ${today.end.toISOString()})`,
-      activeAttendances: sql<number>`count(*) filter (where ${schema.leads.status} in ('in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis'))`,
+      activeAttendances: sql<number>`count(*) filter (where ${schema.leads.status} in ('in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis', 'awaiting_reply'))`,
       unassignedLeads: sql<number>`count(*) filter (where ${schema.leads.corretorId} is null and ${schema.leads.distributionStatus} in ('unassigned', 'queued', 'awaiting_unit', 'returned_to_queue'))`,
       slaRiskLeads: sql<number>`count(*) filter (where ${schema.leads.status} = 'distributed' and ${schema.leads.corretorId} is not null and ${schema.leads.firstContactAt} is null and ${schema.leads.assignedAt} is not null and ${schema.leads.assignedAt} < ${slaDeadline.toISOString()})`,
     }).from(schema.leads).where(and(eq(schema.leads.tenantId, scope.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), inArray(schema.leads.branchId, branchIds))).groupBy(schema.leads.branchId),

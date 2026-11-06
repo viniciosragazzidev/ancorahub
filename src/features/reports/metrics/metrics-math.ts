@@ -151,7 +151,8 @@ export interface FunnelStageRow {
 export function buildFunnelRows(
   statusCounts: Readonly<Record<string, number>>,
 ): { rows: readonly FunnelStageRow[]; lost: number; biggestBottleneck: number | null } {
-  const order = (status: string): number => FUNNEL_ACTIVE_STAGES.indexOf(status as FunnelStage);
+  // "Aguardando retorno" (05/11) só existe a partir de Cotação enviada: conta como tendo chegado até lá.
+  const order = (status: string): number => FUNNEL_ACTIVE_STAGES.indexOf((status === "awaiting_reply" ? "quote_sent" : status) as FunnelStage);
 
   const inStage = (stage: FunnelStage) => statusCounts[stage] ?? 0;
   const reached = (stage: FunnelStage) => {

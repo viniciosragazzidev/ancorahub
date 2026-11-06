@@ -14,6 +14,11 @@ export function closingDirectorRecipientsKey(tenantId: string) {
   return `closing_director_recipients_${tenantId}`;
 }
 
+/** Números de cada aviso enviado a telefones digitados (05/11): o fechamento mantém a chave antiga. */
+export function noticeRecipientsKey(noticeKey: string, tenantId: string) {
+  return noticeKey === CLOSING_DIRECTOR_NOTICE_KEY ? closingDirectorRecipientsKey(tenantId) : `team_notice_recipients_${noticeKey}_${tenantId}`;
+}
+
 /** Digits only, with the Brazil code: "(21) 96462-5966" and "+55 21 96462-5966" are the same number. */
 export function normalizeRecipientPhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");

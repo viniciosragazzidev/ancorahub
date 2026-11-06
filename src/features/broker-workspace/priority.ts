@@ -61,6 +61,7 @@ const activeLeadStatuses = new Set([
   "negotiation",
   "documentation_pending",
   "under_analysis",
+  "awaiting_reply",
 ]);
 
 const kindOrder: Record<BrokerWorkspaceActionKind, number> = {

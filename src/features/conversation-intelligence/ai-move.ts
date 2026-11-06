@@ -19,3 +19,12 @@ export function canUndoAiMove(move: AiAutoMove | null | undefined, currentStatus
   const at = Date.parse(move.at);
   return Number.isFinite(at) && now.getTime() - at <= AI_MOVE_UNDO_WINDOW_MS;
 }
+
+/** Depois de um "Desfazer" do corretor, a IA não move este lead sozinha por esta janela (05/11). */
+export const AI_MOVE_UNDO_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function recentlyUndoneAiMove(move: AiAutoMove | null | undefined, now: Date = new Date()) {
+  if (!move?.undoneAt) return false;
+  const undoneAt = Date.parse(move.undoneAt);
+  return Number.isFinite(undoneAt) && now.getTime() - undoneAt < AI_MOVE_UNDO_COOLDOWN_MS;
+}

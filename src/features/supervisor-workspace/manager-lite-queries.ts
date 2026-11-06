@@ -9,7 +9,7 @@ import type { RadarFunnel, RadarLead, RadarTeamMember } from "./supervisor-leads
 import { getLeadTimeline } from "@/features/leads/queries";
 import { buildTeamLeadLightDetail, getTeamLeadPresentationSupplements } from "./team-lead-detail-presentation";
 
-const ACTIVE_STATUSES = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
+const ACTIVE_STATUSES = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 
 export type ManagerLiteLeadData = { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number; viewerName: string; brokersWithoutWhatsApp: number };
 

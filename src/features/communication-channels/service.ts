@@ -332,7 +332,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
               .where(and(eq(schema.clients.tenantId, channel.tenantId), or(...clientPhoneConditions)))
           : [];
         const matchingLeads = leads.filter((item) => samePhone(item.phone, phone));
-        const lead = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(item.status)) ?? matchingLeads[0];
+        const lead = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(item.status)) ?? matchingLeads[0];
         const matchedClient = clients.find((item) => samePhone(item.phone, phone));
         const activeLeadId = lead?.id;
         // Unknown first messages are retained as channel history only. Lead

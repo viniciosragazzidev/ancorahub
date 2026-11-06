@@ -50,7 +50,7 @@ export function isEligibleColdLeadForReactivation(lead: ColdLeadReactivationCand
     && (lead.qualificationState === "QUALIFIED" || lead.qualificationState === "COMPLETED")
     && Boolean(lead.qualificationCompletedAt)
     && !lead.corretorId
-    && !["lost", "converted", "under_analysis", "deleted", "archived"].includes(lead.status)
+    && !["lost", "converted", "under_analysis", "awaiting_reply", "deleted", "archived"].includes(lead.status)
     && !["disqualified", "not_qualified"].includes(lead.qualificationStatus ?? "")
     && !["assigned", "manual_hold", "held", "removed", "returned_to_queue"].includes(lead.distributionStatus ?? "")
     && !lead.distributionRemovedAt
@@ -66,7 +66,7 @@ export function isEligibleColdLeadForQualificationResume(lead: ColdLeadReactivat
     && lead.qualificationCompletedAt === null
     && !lead.corretorId
     && lead.distributionStatus === "manual_hold"
-    && !["lost", "converted", "under_analysis", "deleted", "archived"].includes(lead.status)
+    && !["lost", "converted", "under_analysis", "awaiting_reply", "deleted", "archived"].includes(lead.status)
     && !lead.distributionRemovedAt
     && !lead.archivedAt
     && !lead.deletedAt;

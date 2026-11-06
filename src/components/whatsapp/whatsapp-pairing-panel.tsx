@@ -6,11 +6,14 @@ import { ArrowsClockwise, CheckCircle, Copy, LockKey, Phone, WarningCircle, What
 import { CopyCheckIcon } from "@/components/motion/copy-check-icon";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { Button } from "@/components/ui/button";
+import { DsSegmentedControl } from "@/components/ui/ds-segmented-control";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/utils/core/cn";
 import type { PairingPhase } from "@/features/waha-cadence/pairing-phase";
 import {
   PAIRING_CODE_CAPTIONS,
+  PAIRING_CODE_TUTORIAL,
+  type PairingTutorialPlatform,
   PAIRING_COPY,
   PAIRING_QR_CAPTIONS,
   type PairingMethod,
@@ -354,6 +357,8 @@ export type PairingCodePanelProps = {
   expired: boolean;
   onGenerate: () => void;
   onOpenWhatsApp: () => void;
+  /** Esconde Copiar/Abrir (a tela de presença tem um botão só para os dois). */
+  hideActions?: boolean;
 };
 
 export function PairingCodePanel({
@@ -366,6 +371,7 @@ export function PairingCodePanel({
   expired,
   onGenerate,
   onOpenWhatsApp,
+  hideActions = false,
 }: PairingCodePanelProps) {
   const [editing, setEditing] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
@@ -405,7 +411,7 @@ export function PairingCodePanel({
                 para <span className="font-medium tabular-nums text-ds-charcoal">+55 {formatPairingPhone(phone)}</span>
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-ds-8">
+            <div className={hideActions ? "hidden" : "grid grid-cols-2 gap-ds-8"}>
               <Button variant="outline" size="sm" onClick={copy} aria-label={copied ? PAIRING_CODE_CAPTIONS.copied : PAIRING_CODE_CAPTIONS.copy}>
                 <CopyCheckIcon copied={copied}><Copy className="size-4" aria-hidden /></CopyCheckIcon>
                 {copied ? "Copiado" : "Copiar"}
@@ -533,4 +539,38 @@ function PairingCodeSkeleton() {
       ))}
     </div>
   );
+}
+
+// ── Tutorial do código no celular ────────────────────────────────────
+
+/** Passo a passo de onde digitar o código, por sistema do celular (05/11). */
+export function PairingCodeTutorial({ defaultPlatform }: { defaultPlatform?: PairingTutorialPlatform }) {
+  const [platform, setPlatform] = React.useState<PairingTutorialPlatform>(() => defaultPlatform ?? guessPlatform());
+  return (
+    <section aria-label={PAIRING_CODE_TUTORIAL.title} className="space-y-ds-8 rounded-ds-cards border border-ds-ash bg-ds-canvas-white p-ds-12">
+      <div className="flex flex-wrap items-center justify-between gap-ds-8">
+        <p className="text-sm font-semibold text-foreground">{PAIRING_CODE_TUTORIAL.title}</p>
+        <DsSegmentedControl
+          aria-label="Sistema do celular"
+          options={PAIRING_CODE_TUTORIAL.platforms}
+          value={platform}
+          onValueChange={(next) => setPlatform(next as PairingTutorialPlatform)}
+        />
+      </div>
+      <ol className="space-y-ds-4 text-sm text-foreground">
+        {PAIRING_CODE_TUTORIAL.steps[platform].map((step, index) => (
+          <li key={step} className="flex gap-ds-8">
+            <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full border border-ds-ash text-xs font-semibold tabular-nums text-muted-foreground">{index + 1}</span>
+            <span>{step}</span>
+          </li>
+        ))}
+      </ol>
+      <p className="text-xs text-muted-foreground">{PAIRING_CODE_TUTORIAL.hint}</p>
+    </section>
+  );
+}
+
+function guessPlatform(): PairingTutorialPlatform {
+  if (typeof navigator === "undefined") return "android";
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent) ? "iphone" : "android";
 }

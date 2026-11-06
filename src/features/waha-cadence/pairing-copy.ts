@@ -175,3 +175,67 @@ export function resolvePairingCopyBody(body: string | undefined, phoneSuffix?: s
   if (!body) return undefined;
   return body.replace("{phone}", phoneSuffix ? ` · número final ${phoneSuffix}` : "");
 }
+
+/**
+ * Tutorial do código de pareamento no celular (05/11, presença exige WhatsApp): o caminho muda entre
+ * Android e iPhone até "Dispositivos conectados"; dali em diante é igual.
+ */
+export const PAIRING_CODE_TUTORIAL = {
+  title: "Como digitar o código no WhatsApp",
+  platforms: [
+    { value: "android", label: "Android" },
+    { value: "iphone", label: "iPhone" },
+  ],
+  steps: {
+    android: [
+      "Abra o WhatsApp no celular do número informado.",
+      "Toque nos três pontinhos (⋮), no canto de cima, e em Dispositivos conectados.",
+      "Toque em Conectar dispositivo.",
+      "Embaixo do leitor de QR Code, toque em Conectar com número de telefone.",
+      "Digite o código de 8 letras e números que aparece aqui.",
+    ],
+    iphone: [
+      "Abra o WhatsApp no celular do número informado.",
+      "Toque em Configurações, embaixo à direita, e em Dispositivos conectados.",
+      "Toque em Conectar dispositivo.",
+      "Embaixo do leitor de QR Code, toque em Conectar com número de telefone.",
+      "Digite o código de 8 letras e números que aparece aqui.",
+    ],
+  },
+  hint: "Dica: copie o código aqui antes de abrir o WhatsApp. Se ele expirar (cerca de 2 minutos), gere outro.",
+} as const;
+
+export type PairingTutorialPlatform = keyof typeof PAIRING_CODE_TUTORIAL.steps;
+
+/**
+ * Conexão pedida ao confirmar presença no plantão (05/11): tom de vantagem, curto, e a promessa de
+ * privacidade conferida no código (waha-cadence/inbound.ts descarta conversa que não é de lead ou cliente
+ * do corretor; grupos e status são ignorados; a IA só lê conversa ligada a um lead).
+ */
+export const PRESENCE_WHATSAPP_COPY = {
+  title: "Conecte seu WhatsApp e confirme sua presença",
+  benefits: [
+    "Seus leads chegam e você atende direto pelo seu WhatsApp.",
+    "A IA te ajuda no atendimento e melhora a qualidade dos leads que você recebe.",
+    "Leva 1 minuto e não precisa baixar nada.",
+  ],
+  privacyTitle: "Suas conversas pessoais são só suas",
+  privacy: "Elas não são salvas nem lidas por ninguém. Só as conversas com os seus leads e clientes ficam no sistema, para a IA ajudar no seu atendimento.",
+  start: "Gerar meu código",
+  watchTutorial: "Assistir tutorial",
+  tutorialDescription: "Vídeo de 1 minuto e meio mostrando como conectar o WhatsApp e confirmar a presença.",
+  openWhatsApp: "Copiar código e abrir o WhatsApp",
+  openOnPhone: "Abra o WhatsApp no seu celular e siga os passos.",
+  autoConfirm: "Assim que conectar, sua presença é confirmada sozinha.",
+  showSteps: "Ver passo a passo",
+  hideSteps: "Esconder passo a passo",
+  connected: "WhatsApp conectado! Confirmando sua presença…",
+  demo: [
+    "Abra o WhatsApp e toque em ⋮ (no iPhone, em Configurações).",
+    "Toque em Dispositivos conectados.",
+    "Toque em Conectar dispositivo.",
+    "Toque em Conectar com número de telefone.",
+    "Digite o código que aparece aqui.",
+    "Pronto! Sua presença é confirmada sozinha.",
+  ],
+} as const;

@@ -43,6 +43,7 @@ export const LEAD_STATUS: Record<string, { label: string; tone: DsStatusBadgeSta
   negotiation: { label: "Em negociação", tone: "info" },
   documentation_pending: { label: "Pend. documentos", tone: "warning" },
   under_analysis: { label: "Em análise", tone: "info" },
+  awaiting_reply: { label: "Aguardando retorno", tone: "secondary" },
   converted: { label: "Convertido", tone: "success" },
   lost: { label: "Perdido", tone: "destructive" },
 };

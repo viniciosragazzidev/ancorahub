@@ -6,7 +6,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { resolveEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
 
-const activeStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
+const activeStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 
 export function getLocalDutyParts(date: Date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(date);

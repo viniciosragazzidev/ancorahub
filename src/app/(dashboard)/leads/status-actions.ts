@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { recordStageChange, stageActorType } from "@/features/leads/stage-history";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { changeLeadStatus, type ChangeLeadStatusInput } from "@/features/leads/change-lead-status";
@@ -180,7 +181,18 @@ async function bulkChangeLeadStatusDirect(
   const now = new Date();
 
   const leads = await db
-    .select({ id: schema.leads.id, status: schema.leads.status, nome: schema.leads.nome })
+    .select({
+      id: schema.leads.id,
+      status: schema.leads.status,
+      nome: schema.leads.nome,
+      stageEnteredAt: schema.leads.stageEnteredAt,
+      branchId: schema.leads.branchId,
+      queueId: schema.leads.queueId,
+      sourceChannel: schema.leads.sourceChannel,
+      metaCampaignId: schema.leads.metaCampaignId,
+      metaAdId: schema.leads.metaAdId,
+      metaFormId: schema.leads.metaFormId,
+    })
     .from(schema.leads)
     .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, leadIds)));
 
@@ -196,8 +208,24 @@ async function bulkChangeLeadStatusDirect(
           status: newStatus as never,
           stageEnteredAt: now,
           motivoPerda: newStatus === "lost" ? motivoPerda : null,
+          stageBeforeAwaiting: newStatus === "awaiting_reply" && lead.status !== "awaiting_reply" ? lead.status : newStatus === "awaiting_reply" ? undefined : null,
         })
         .where(eq(schema.leads.id, lead.id));
+
+      // Histórico de etapas e marco do funil (05/11): o lote também fica registrado.
+      await recordStageChange(tx, {
+        tenantId: context.tenantId,
+        leadId: lead.id,
+        fromStatus: lead.status,
+        toStatus: newStatus,
+        changedAt: now,
+        actorType: stageActorType({ role: context.role }),
+        actorUserId: context.userId,
+        reason: newStatus === "lost" ? motivoPerda : "Mudança em lote",
+        lossCode: newStatus === "lost" ? motivoPerda : null,
+        previousStageEnteredAt: lead.stageEnteredAt ?? null,
+        lead,
+      });
 
       await tx.insert(schema.leadInteractions).values({
         id: randomUUID(),

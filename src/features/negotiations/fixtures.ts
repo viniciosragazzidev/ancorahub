@@ -63,6 +63,11 @@ function newLead(index: number): NegotiationLead {
       summary: `Cliente busca uma opção de saúde para a família e pediu detalhes sobre rede credenciada, carências e valores. Atendimento iniciado por ${broker.name}.`,
       nextBestAction: waiting ? "Retomar contato e responder às dúvidas sobre cobertura." : "Confirmar a faixa de preço e apresentar a próxima opção.",
       risk: index % 8 === 0 ? "Cliente mencionou que está avaliando outra proposta." : null,
+      directorBrief: waiting
+        ? `Cliente interessado, mas está sem resposta de ${broker.name} desde a última pergunta. Boa chance de fechar se o retorno vier hoje.`
+        : `Negociação andando bem: ${broker.name} respondeu no tempo e o cliente já pediu valores.`,
+      directorAttention: waiting ? "ACT" : "NONE",
+      directorAction: waiting ? `Cobrar ${broker.name}: o cliente está esperando resposta sobre cobertura.` : null,
       objections: index % 3 === 0 ? ["Quer comparar a rede credenciada", "Precisa confirmar o valor mensal"] : [],
       buyingSignals: index % 2 === 0 ? ["Informou a quantidade de pessoas", "Pediu prazo para começar"] : [],
       lastAnalyzedAt: isoDaysAgo(0, 14),

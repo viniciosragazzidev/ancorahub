@@ -7,6 +7,7 @@ import { and, eq } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { recordStageChangeForLead, stageActorType } from "@/features/leads/stage-history";
 import { generateCommissionSchedule } from "@/features/commissions/commission-rules-service";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import type { ProposalStatus } from "@/shared/db/schema";
@@ -432,6 +433,8 @@ export async function convertProposalToSaleAction(
         .update(schema.leads)
         .set({ status: "converted", stageEnteredAt: now })
         .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+      // Histórico de etapas (05/11): proposta aprovada fecha o funil do lead.
+      await recordStageChangeForLead(tx, { tenantId: context.tenantId, leadId: lead.id, fromStatus: null, toStatus: "converted", changedAt: now, actorType: stageActorType({ role: context.role }), actorUserId: context.userId, reason: "Proposta convertida em venda" });
 
       const { triggerInstantAutomation } = await import("@/features/automations/engine");
       void triggerInstantAutomation(context.tenantId, lead.id, "venda_realizada").catch(console.error);

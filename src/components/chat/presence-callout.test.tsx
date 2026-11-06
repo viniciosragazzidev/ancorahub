@@ -9,6 +9,17 @@ vi.mock("motion/react", async () => {
   return { ...actual, useReducedMotion: () => true };
 });
 
+const gate = vi.fn();
+vi.mock("@/features/lead-distribution/duty-presence-whatsapp-actions", () => ({ getPresenceWhatsAppGateAction: () => gate() }));
+const connection = { tenantId: "t1", userId: "u1", sessionId: "s1", sessionName: "s1", status: "disconnected", qrCode: null, chatInternoAtivo: true, connectedAt: null };
+vi.mock("@/app/(dashboard)/settings/whatsapp-actions", () => ({ getWhatsAppConnection: async () => connection }));
+// O diálogo real conversa com o WhatsApp; aqui basta saber que abriu no código e avisar "conectado".
+vi.mock("@/components/whatsapp/whatsapp-connect-dialog", () => ({
+  WhatsAppConnectDialog: (props: { open?: boolean; initialMethod?: string; variant?: string; onReady?: () => void }) => props.open
+    ? <div role="dialog" aria-label="Conectar WhatsApp"><p>modo {props.initialMethod} {props.variant}</p><button type="button" onClick={props.onReady}>Simular conectado</button></div>
+    : null,
+}));
+
 import { PresenceCallout } from "./presence-callout";
 import type { PresenceAskView } from "./types";
 
@@ -17,10 +28,64 @@ const fetchMock = vi.fn();
 
 beforeEach(() => {
   fetchMock.mockReset();
+  gate.mockReset();
+  gate.mockResolvedValue({ required: false });
   vi.stubGlobal("fetch", fetchMock);
   vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:local", revokeObjectURL: () => undefined }));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+describe("PresenceCallout: WhatsApp obrigatório (06/11)", () => {
+  it("sem WhatsApp, abre a conexão no código com tutorial e confirma sozinho ao conectar", async () => {
+    gate.mockResolvedValue({ required: true, connected: false, connection });
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    render(<PresenceCallout ask={base} />);
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar presença" }));
+
+    expect(await screen.findByRole("dialog", { name: "Conectar WhatsApp" })).toBeTruthy();
+    expect(screen.getByText("modo code presence")).toBeTruthy();
+    expect(screen.getByText(/conecte o seu WhatsApp/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Conectar WhatsApp e confirmar" })).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Simular conectado" }));
+    expect(await screen.findByText("Presença confirmada")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("presencial sem WhatsApp: conecta antes e só depois abre a câmera", async () => {
+    gate.mockResolvedValue({ required: true, connected: false, connection });
+    const { container } = render(<PresenceCallout ask={{ ...base, mode: "presencial" }} />);
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const click = vi.spyOn(input, "click");
+    fireEvent.click(screen.getByRole("button", { name: /Tirar foto do local/ }));
+    expect(await screen.findByRole("dialog", { name: "Conectar WhatsApp" })).toBeTruthy();
+    expect(click).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Simular conectado" }));
+    await waitFor(() => expect(click).toHaveBeenCalled());
+  });
+
+  it("se o servidor disser que o WhatsApp caiu, abre a conexão e tenta de novo ao conectar", async () => {
+    gate.mockResolvedValue({ required: true, connected: true, connection: { ...connection, status: "ready" } });
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ ok: false, code: "whatsapp_required", error: "Conecte o seu WhatsApp para confirmar presença no plantão." }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+    render(<PresenceCallout ask={base} />);
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar presença" }));
+    expect(await screen.findByRole("dialog", { name: "Conectar WhatsApp" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Simular conectado" }));
+    expect(await screen.findByText("Presença confirmada")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("com a regra desligada, confirma como antes", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    render(<PresenceCallout ask={base} />);
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar presença" }));
+    expect(await screen.findByText("Presença confirmada")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
 
 describe("PresenceCallout", () => {
   it("online: one tap confirms", async () => {
@@ -44,7 +109,7 @@ describe("PresenceCallout", () => {
     expect(input.getAttribute("capture")).toBe("environment");
     const click = vi.spyOn(input, "click");
     fireEvent.click(screen.getByRole("button", { name: /Tirar foto do local/ }));
-    expect(click).toHaveBeenCalled();
+    await waitFor(() => expect(click).toHaveBeenCalled());
     fireEvent.change(input, { target: { files: [new File(["x"], "local.jpg", { type: "image/jpeg" })] } });
     expect(await screen.findByText("Foto enviada")).toBeTruthy();
     expect(screen.getByText("Aguardando o diretor liberar")).toBeTruthy();
@@ -78,7 +143,7 @@ describe("PresenceCallout", () => {
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
     const click = vi.spyOn(input, "click");
     fireEvent.click(screen.getByRole("button", { name: /Tirar foto do local/ }));
-    expect(getUserMedia).toHaveBeenCalledWith(expect.objectContaining({ video: expect.objectContaining({ facingMode: { ideal: "environment" } }) }));
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledWith(expect.objectContaining({ video: expect.objectContaining({ facingMode: { ideal: "environment" } }) })));
     fireEvent.click(await screen.findByRole("button", { name: "Usar a câmera do celular" }));
     expect(click).toHaveBeenCalled();
     Object.defineProperty(navigator, "mediaDevices", { value: undefined, configurable: true });

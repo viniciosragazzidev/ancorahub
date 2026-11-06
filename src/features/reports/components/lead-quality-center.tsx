@@ -88,6 +88,7 @@ function leadStatusLabel(status: string) {
     negotiation: "Em negociação",
     documentation_pending: "Documentação pendente",
     under_analysis: "Em análise",
+    awaiting_reply: "Aguardando retorno",
     converted: "Convertido",
     lost: "Perdido",
   };

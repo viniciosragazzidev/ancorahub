@@ -91,7 +91,7 @@ export async function loadColdLeads(scope: LiveScope, now: Date): Promise<LiveSt
         isNull(schema.leads.corretorId),
         eq(schema.leads.qualificationStatus, "cold"),
         isNull(schema.leads.distributionRemovedAt),
-        notInArray(schema.leads.status, ["lost", "converted", "under_analysis"]),
+        notInArray(schema.leads.status, ["lost", "converted", "under_analysis", "awaiting_reply"]),
         isNotNull(schema.leads.queueId),
         or(
           isNull(schema.leads.distributionStatus),
@@ -155,7 +155,7 @@ export function buildColdRecoveriesQuery(scope: LiveScope, since: Date, now: Dat
         and audit_logs.created_at <= ${iso(now)}
         and ${warmOrHotAudit}
       where leads.qualification_status in ('warm', 'hot')
-        and leads.status not in ('lost', 'converted', 'under_analysis')
+        and leads.status not in ('lost', 'converted', 'under_analysis', 'awaiting_reply')
         and leads.deleted_at is null
         and leads.archived_at is null
         and ${liveScope}

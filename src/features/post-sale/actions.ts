@@ -9,6 +9,7 @@ import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
 import { getDatabase, schema } from "@/shared/db";
+import { recordStageChangeForLead, stageActorType } from "@/features/leads/stage-history";
 import { generateCommissionSchedule } from "@/features/commissions/commission-rules-service";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { publishDomainInvalidation } from "@/features/notifications/realtime-sync";
@@ -261,6 +262,8 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
     }
 
     await tx.update(schema.leads).set({ status: "converted", stageEnteredAt: now, updatedAt: now, version: sql`${schema.leads.version} + 1` }).where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+    // Histórico de etapas (05/11): a venda registrada fecha o funil do lead.
+    await recordStageChangeForLead(tx, { tenantId: context.tenantId, leadId: lead.id, fromStatus: null, toStatus: "converted", changedAt: now, actorType: stageActorType({ role: context.role }), actorUserId: context.userId, reason: "Venda registrada" });
     const metadata: Record<string, unknown> = {
       saleId,
       policyNumber: input.policyNumber,

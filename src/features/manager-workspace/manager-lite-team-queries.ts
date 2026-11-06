@@ -48,7 +48,7 @@ export async function getManagerLiteTeam(context: TenantContext): Promise<Manage
       )),
     getManagerLiteLeads(context),
     db.select({ brokerId: schema.leads.corretorId, total: count() }).from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), inArray(schema.leads.status, ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]), isNotNull(schema.leads.corretorId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
+      .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), inArray(schema.leads.status, ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"]), isNotNull(schema.leads.corretorId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
       .groupBy(schema.leads.corretorId),
     db.select({ id: schema.brokerInvitations.id, name: schema.brokerProfiles.professionalName, email: sql<string>`coalesce(${schema.brokerInvitations.email}, ${schema.brokerProfiles.invitedEmail}, '')`, createdAt: schema.brokerInvitations.createdAt })
       .from(schema.brokerInvitations)

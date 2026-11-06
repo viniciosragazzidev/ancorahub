@@ -1,6 +1,6 @@
 /**
  * Itens 11 e 12 do plano no mesmo cartão: plantão agora (confirmados de escalados, fim do turno, próximo turno) e
- * quem ainda não confirmou presença, com a tolerância de 20 min depois do início (duty-presence-domain.ts).
+ * quem ainda não confirmou presença, com a tolerância de 1 hora depois do início (duty-presence-domain.ts).
  * Fonte: as linhas de presença do dia (duty_presence_confirmations), criadas pelo robô quando o turno abre.
  */
 import { SELF_CONFIRM_TOLERANCE_MINUTES } from "@/features/lead-distribution/duty-presence-domain";

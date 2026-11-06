@@ -73,7 +73,11 @@ describe("qualification timeout policy", () => {
   });
 
   it("holds cold timeouts for manual requalification and queues warm timeouts", () => {
-    expect(qualificationTimeoutDistributionStatus("cold")).toBe("manual_hold");
+    // Frio só fica segurado com "Segurar frios" ligado na fila de destino (06/11).
+    expect(qualificationTimeoutDistributionStatus("cold", true)).toBe("manual_hold");
+    expect(qualificationTimeoutDistributionStatus("cold", false)).toBe("queued");
+    expect(qualificationTimeoutDistributionStatus("cold")).toBe("queued");
+    expect(qualificationTimeoutDistributionStatus("warm", true)).toBe("queued");
     expect(qualificationTimeoutDistributionStatus("warm")).toBe("queued");
   });
 

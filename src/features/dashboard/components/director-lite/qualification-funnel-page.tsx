@@ -18,7 +18,10 @@ export function DirectorLiteQualificationFunnelPage({
   branches,
   firstName,
   now,
+  insights,
 }: {
+  /** Funil profissional (05/11): onde param, onde perdemos e qualidade por campanha. */
+  insights?: React.ReactNode;
   data: QualificationFunnel;
   /** Unidade já validada no servidor; null representa todas as unidades autorizadas. */
   branchId: string | null;
@@ -32,6 +35,7 @@ export function DirectorLiteQualificationFunnelPage({
   return (
     <DirectorLiteChrome now={now} tab="funnel" period={period} branchId={branchId} branches={branches} firstName={firstName}>
       <QualificationFunnelView data={data} unitName={selectedBranch?.name ?? null} widerHref={dashboardHref("funnel", "7", branchId)} now={now} />
+      {insights ? <div className="mt-4">{insights}</div> : null}
     </DirectorLiteChrome>
   );
 }

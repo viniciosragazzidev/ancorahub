@@ -60,6 +60,7 @@ export const LEAD_STATUS: Record<string, { label: string; tone: "neutral" | "inf
   negotiation: { label: "Em negociação", tone: "info" },
   documentation_pending: { label: "Documentação pendente", tone: "warning" },
   under_analysis: { label: "Em análise", tone: "info" },
+  awaiting_reply: { label: "Aguardando retorno", tone: "neutral" },
   converted: { label: "Convertido", tone: "success" },
   lost: { label: "Perdido", tone: "danger" },
 };

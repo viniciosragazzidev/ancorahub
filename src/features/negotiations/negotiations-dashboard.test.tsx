@@ -180,7 +180,8 @@ describe("NegotiationsDashboard", () => {
     expect(items.length).toBe(Math.min(6, data.counts.closing));
     fireEvent.click(items[0]!);
     expect(await screen.findByRole("heading", { name: "Leitura da IA" })).toBeTruthy();
-    expect(screen.getByText("Próxima ação")).toBeTruthy();
+    expect(screen.getByText("Para a direção")).toBeTruthy();
+    expect(screen.getByText("Próximo passo do corretor")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Situação" })).toBeTruthy();
   });
   it("sem a observação ligada, não mostra Sem retorno do corretor", () => {

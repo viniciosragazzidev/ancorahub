@@ -25,6 +25,7 @@ const activeLeadStatuses = [
   "negotiation",
   "documentation_pending",
   "under_analysis",
+  "awaiting_reply",
 ] as const;
 
 export type DutyPresenceAsk = {
@@ -158,7 +159,7 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
         where ${schema.leads.tenantId} = ${context.tenantId}
           and ${schema.leads.corretorId} = ${context.userId}
           and ${schema.leads.deletedAt} is null
-          and ${schema.leads.status} in ('in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis')
+          and ${schema.leads.status} in ('in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis', 'awaiting_reply')
       )`,
       monthlySchedulingEnabled: sql<string>`coalesce((select ${schema.systemSettings.value} from ${schema.systemSettings} where ${schema.systemSettings.key} = ${FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key}), ${FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.defaultValue})`,
       presenceConfirmationEnabled: sql<string>`coalesce((select ${schema.systemSettings.value} from ${schema.systemSettings} where ${schema.systemSettings.key} = ${FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key}), ${FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.defaultValue})`,

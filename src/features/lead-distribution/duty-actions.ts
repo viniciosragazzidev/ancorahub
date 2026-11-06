@@ -18,6 +18,7 @@ import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { brokerOccurrenceAssignmentBounds, getDutyWindowOnDate } from "./duty-presence-domain";
 import { assignLeadToBroker } from "./service";
 import { assertScheduleInManagerUnit } from "./manager-unit-scope-server";
+import { dropScheduleFromMonthlyPlans, saoPauloToday } from "./monthly-duty-plan-assignments";
 import { isTypeUsableByUnit } from "./manager-unit-scope";
 import { isHotLeadEarlyDistributionEnabled, notHeldByRunningQualificationSql } from "./qualification-hold";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -566,6 +567,8 @@ export async function archiveDutyScheduleAction(_previous: DutyActionState, form
         .where(and(eq(schema.unitDutySchedules.id, schedule.id), eq(schema.unitDutySchedules.tenantId, context.tenantId)));
       await tx.update(schema.dutyRosterAssignments).set({ status: "inactive", updatedBy: context.userId, updatedAt: now })
         .where(and(eq(schema.dutyRosterAssignments.scheduleId, schedule.id), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active")));
+      // Plantão arquivado sai das escalas mensais de hoje em diante (PDF e planejador).
+      await dropScheduleFromMonthlyPlans(tx, { tenantId: context.tenantId, scheduleId: schedule.id, fromDate: saoPauloToday(now), now });
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(), userId: context.userId, entidade: "unit_duty_schedule", entidadeId: schedule.id, acao: "duty_schedule.archived",
       });
@@ -598,6 +601,9 @@ export async function deleteDutyScheduleAction(_previous: DutyActionState, formD
         eq(schema.unitDutySchedules.id, schedule.id),
         eq(schema.unitDutySchedules.tenantId, context.tenantId),
       ));
+      // Plantão apagado sai das escalas mensais de hoje em diante: antes o dia seguia no PDF e no
+      // planejador apontando para um plantão que não existe mais (05/11).
+      await dropScheduleFromMonthlyPlans(tx, { tenantId: context.tenantId, scheduleId: schedule.id, fromDate: saoPauloToday(), now: new Date() });
       // A permanently deleted plantão must stop being anyone's "fila
       // responsável" — otherwise the next save on that queue fails with
       // "Um dos plantões selecionados não pertence a esta corretora." for a

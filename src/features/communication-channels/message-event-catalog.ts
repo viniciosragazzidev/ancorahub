@@ -197,6 +197,18 @@ export const MESSAGE_EVENT_CATALOG = [
     ],
   },
   {
+    key: "DAILY_LEADS_REPORT",
+    purpose: "dailyLeadsReport",
+    label: "Relatório das 18h",
+    description: "Todo dia às 18h: os leads que entraram no dia em cada fila e quantos ficaram quentes, mornos e frios.",
+    audience: "user",
+    windowRule: "corporate_internal",
+    variables: [
+      { key: "data", label: "Dia do relatório", aliases: ["dia"], fallback: "hoje" },
+      { key: "relatorio", label: "Leads por fila", aliases: ["resumo"], fallback: "Nenhum lead entrou hoje." },
+    ],
+  },
+  {
     key: "BROKER_WELCOME",
     purpose: "brokerInvitation",
     label: "Primeiro acesso do corretor",

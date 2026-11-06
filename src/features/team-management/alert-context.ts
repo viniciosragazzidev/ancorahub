@@ -18,7 +18,7 @@ export type TeamAlertContext = {
   criticalLeads: Map<string, CriticalLead>;
 };
 
-const ACTIVE_STATUSES = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
+const ACTIVE_STATUSES = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 
 /**
  * Fontes que os alertas precisam e que as janelas do G0 não trazem: início do turno e último aceite,

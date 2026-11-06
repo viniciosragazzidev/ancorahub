@@ -132,6 +132,7 @@ const LEAD_STATUS_LABELS: Record<string, string> = {
   negotiation: "Em negociação",
   documentation_pending: "Documentação pendente",
   under_analysis: "Em análise",
+  awaiting_reply: "Aguardando retorno",
 };
 
 const DUTY_PRESENCE_LABELS: Record<BrokerDutyPresence, string> = {

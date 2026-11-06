@@ -216,6 +216,7 @@ function LeadsFiltersClassic({ trailing: _trailing, ...props }: LeadsFiltersProp
                       { value: "negotiation", label: "Negociação" },
                       { value: "documentation_pending", label: "Documento pendente" },
                       { value: "under_analysis", label: "Em análise" },
+                      { value: "awaiting_reply", label: "Aguardando retorno" },
                       { value: "converted", label: "Convertidos" },
                       { value: "lost", label: "Perdidos" },
                     ]}

@@ -35,6 +35,10 @@ function automaticQualificationFilter() {
       ne(schema.leads.qualificationStatus, "cold"),
       isNull(schema.leads.qualificationState),
       ne(schema.leads.qualificationState, "PARTIAL"),
+      // A cold lead whose qualification timed out waits for manual requalification
+      // only when its queue holds cold leads ("Segurar frios"). With the switch off
+      // it goes to the plantão like any other (06/11, Venâncio Leads: colds stuck all day).
+      sql`not exists (select 1 from ${schema.leadDistributionPolicies} p where p.tenant_id = ${schema.leads.tenantId} and p.queue_id = ${schema.leads.queueId} and (p.policy->>'holdColdLeads') = 'true')`,
     ),
   );
 }

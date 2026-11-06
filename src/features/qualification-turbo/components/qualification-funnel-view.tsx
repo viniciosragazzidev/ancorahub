@@ -74,7 +74,7 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <p className="px-4 py-6 text-sm text-muted-foreground">{children}</p>;
 }
 
-export function QualificationFunnelView({ data, showQualityTab }: { data: QualificationFunnel; showQualityTab: boolean }) {
+export function QualificationFunnelView({ data, showQualityTab, insights }: { data: QualificationFunnel; showQualityTab: boolean; insights?: React.ReactNode }) {
   const byKey = new Map(data.stages.map((stage) => [stage.key, stage.count]));
   const arrived = byKey.get("arrived") ?? 0;
   const replied = byKey.get("replied") ?? 0;
@@ -213,6 +213,7 @@ export function QualificationFunnelView({ data, showQualityTab }: { data: Qualif
             </ul>
           </Card> : null}
         </div>
+        {insights}
       </main>
     </>
   );

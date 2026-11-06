@@ -19,7 +19,7 @@ export type RadarLead = {
 export type RadarTeamMember = { id: string; name: string; image: string | null; availability: string; openCount: number; late: number };
 export type RadarFunnel = { new: number; firstContact: number; service: number; quote: number; closing: number };
 
-const serviceStatuses = new Set(["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]);
+const serviceStatuses = new Set(["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"]);
 const statusName: Record<string, string> = { new: "Novo", distributed: "Aguardando contato", in_contact: "Em atendimento", quote_sent: "Cotação enviada", negotiation: "Negociação", documentation_pending: "Documentação", under_analysis: "Em análise" };
 
 type Bucket = "late" | "waiting" | "service" | "stalled";

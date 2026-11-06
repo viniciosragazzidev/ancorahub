@@ -7,6 +7,13 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { AssistantAvatar } from "./assistant-avatar";
 import { CameraCapture, canUseInPageCamera } from "./camera-capture";
 import { LiteList, LiteListItem } from "@/components/light/light-motion";
+import dynamic from "next/dynamic";
+import type { getWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
+
+// Carregados só quando a confirmação pede o WhatsApp: o chat não leva o diálogo de conexão à toa.
+const WhatsAppConnectDialog = dynamic(() => import("@/components/whatsapp/whatsapp-connect-dialog").then((module) => module.WhatsAppConnectDialog), { ssr: false });
+const loadPresenceGate = () => import("@/features/lead-distribution/duty-presence-whatsapp-actions").then((module) => module.getPresenceWhatsAppGateAction());
+const loadWhatsAppConnection = () => import("@/app/(dashboard)/settings/whatsapp-actions").then((module) => module.getWhatsAppConnection());
 import styles from "./chat.module.css";
 import type { PresenceAskView } from "./types";
 
@@ -19,7 +26,12 @@ type State =
   | { kind: "sending"; preview: string | null }
   | { kind: "waiting"; preview: string | null }
   | { kind: "done"; preview: string | null; at: string | null }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string }
+  /** WhatsApp desconectado (regra de 06/11): a conexão por código está aberta e confirma ao conectar. */
+  | { kind: "whatsapp"; photo: Blob | null };
+
+type WhatsAppConnection = Awaited<ReturnType<typeof getWhatsAppConnection>>;
+const WHATSAPP_REQUIRED_CODE = "whatsapp_required";
 
 /** Phone photos are big: a 1600px JPEG is plenty to recognize the place and uploads fast. */
 async function shrink(file: File): Promise<Blob> {
@@ -55,6 +67,9 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
   );
   const previewUrl = useRef<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  // Conexão do WhatsApp aberta pela confirmação: some quando conecta e a presença é enviada.
+  const [whatsapp, setWhatsapp] = useState<{ connection: WhatsAppConnection; open: boolean } | null>(null);
+  const [checking, setChecking] = useState(false);
   const presencial = ask.mode === "presencial";
   const [started] = useState(() => new Date(ask.startsAt).getTime() <= Date.now());
 
@@ -87,7 +102,11 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
     if (photo) body.set("photo", photo, "local.jpg");
     try {
       const response = await fetch("/api/duty/presence", { method: "POST", body });
-      const result = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; awaitingRelease?: boolean };
+      const result = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; code?: string; awaitingRelease?: boolean };
+      if (result.code === WHATSAPP_REQUIRED_CODE) {
+        await openWhatsApp(photo);
+        return;
+      }
       if (!response.ok || !result.ok) throw new Error(result.error ?? "Não consegui confirmar agora. Tente de novo.");
       setState(result.awaitingRelease ? { kind: "waiting", preview } : { kind: "done", preview, at: hhmm(new Date().toISOString()) });
       if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(30);
@@ -97,19 +116,55 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
     }
   }
 
-  function start() {
-    if (state.kind === "sending") return;
-    // In-page camera first (the system camera app can make low-memory Androids close the browser).
-    if (presencial) {
-      if (canUseInPageCamera()) setCameraOpen(true);
-      else camera.current?.click();
+  /** Abre a conexão por código; ao conectar, a presença segue sozinha (com a foto, se já tirada). */
+  async function openWhatsApp(photo: Blob | null, known?: WhatsAppConnection) {
+    const connection = known ?? await loadWhatsAppConnection().catch(() => null);
+    if (!connection) {
+      setState({ kind: "error", message: "Conecte o seu WhatsApp para confirmar presença. Não consegui abrir a conexão agora; tente de novo." });
+      return;
     }
+    setState({ kind: "whatsapp", photo });
+    setWhatsapp({ connection, open: true });
+  }
+
+  function continueAfterConnected(photo: Blob | null) {
+    setWhatsapp(null);
+    if (photo || !presencial) void send(photo);
+    else openCamera();
+  }
+
+  function openCamera() {
+    // In-page camera first (the system camera app can make low-memory Androids close the browser).
+    if (canUseInPageCamera()) setCameraOpen(true);
+    else camera.current?.click();
+  }
+
+  async function start() {
+    if (state.kind === "sending" || checking) return;
+    if (state.kind === "whatsapp" && whatsapp) {
+      setWhatsapp({ ...whatsapp, open: true });
+      return;
+    }
+    // Regra de 06/11: sem WhatsApp conectado, abre a conexão antes (no presencial, antes da foto).
+    setChecking(true);
+    const gate = await loadPresenceGate().catch(() => null);
+    setChecking(false);
+    if (gate?.required && !gate.connected) {
+      await openWhatsApp(null, gate.connection);
+      return;
+    }
+    beginConfirm();
+  }
+
+  function beginConfirm() {
+    if (presencial) openCamera();
     else void send(null);
   }
 
   const done = state.kind === "done";
   const waiting = state.kind === "waiting";
   const sending = state.kind === "sending";
+  const needsWhatsApp = state.kind === "whatsapp";
   const preview = state.kind === "sending" || state.kind === "done" || state.kind === "waiting" ? state.preview : null;
 
   return (
@@ -165,6 +220,7 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
       </AnimatePresence>
 
       {state.kind === "error" ? <p className={styles.presenceError} role="alert">{state.message}</p> : null}
+      {needsWhatsApp ? <p className={styles.presenceError} role="status">Para confirmar presença, conecte o seu WhatsApp. Gere o código e digite no WhatsApp do celular; assim que conectar, a presença é confirmada.</p> : null}
 
       {done ? (
         <motion.p
@@ -182,14 +238,14 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
       ) : waiting ? (
         <div className={styles.presenceWaiting}>
           <p className={styles.presenceWaitingPill} role="status"><span className={styles.presenceClock} aria-hidden="true" />Aguardando o diretor liberar</p>
-          <button type="button" className={styles.presenceRetake} onClick={start}>Tirar outra foto</button>
+          <button type="button" className={styles.presenceRetake} onClick={() => { void start(); }}>Tirar outra foto</button>
         </div>
       ) : (
         <motion.button
           type="button"
           className={styles.presenceButton}
-          onClick={start}
-          disabled={sending}
+          onClick={() => { void start(); }}
+          disabled={sending || checking}
           whileTap={reduce ? undefined : { scale: 0.97 }}
         >
           {sending ? <span className={styles.shimmerText} style={{ color: "inherit" }}>{presencial ? "Enviando a foto…" : "Confirmando…"}</span> : presencial ? (
@@ -197,9 +253,21 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
               <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M2.5 5.5A1.5 1.5 0 0 1 4 4h1.4l1-1.5h3.2l1 1.5H12a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 12 13H4a1.5 1.5 0 0 1-1.5-1.5Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /><circle cx="8" cy="8.5" r="2.4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
               {state.kind === "error" ? "Tirar outra foto" : "Tirar foto do local"}
             </>
-          ) : state.kind === "error" ? "Tentar de novo" : "Confirmar presença"}
+          ) : needsWhatsApp ? "Conectar WhatsApp e confirmar" : state.kind === "error" ? "Tentar de novo" : "Confirmar presença"}
         </motion.button>
       )}
+
+      {whatsapp ? (
+        <WhatsAppConnectDialog
+          initial={whatsapp.connection}
+          open={whatsapp.open}
+          initialMethod="code"
+          variant="presence"
+          triggerLabel="Conectar WhatsApp"
+          onOpenChange={(open) => setWhatsapp((current) => (current ? { ...current, open } : current))}
+          onReady={() => continueAfterConnected(state.kind === "whatsapp" ? state.photo : null)}
+        />
+      ) : null}
 
       {cameraOpen ? (
         <CameraCapture

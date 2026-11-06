@@ -64,7 +64,7 @@ export function isEligibleColdLeadForManualRequalification(lead: ColdLeadRequali
   return lead.qualificationStatus === "cold"
     && !lead.corretorId
     && lead.queueId !== null
-    && !["lost", "converted", "under_analysis", "deleted", "archived"].includes(lead.status)
+    && !["lost", "converted", "under_analysis", "awaiting_reply", "deleted", "archived"].includes(lead.status)
     && !["assigned", "held", "removed", "returned_to_queue"].includes(lead.distributionStatus ?? "")
     && (lead.distributionStatus !== "manual_hold" || isColdTimeoutHold)
     && !lead.distributionRemovedAt

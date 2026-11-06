@@ -403,7 +403,7 @@ export async function runColdLeadRequalificationSweep(tenantIdFilter?: string, n
         eq(schema.leads.tenantId, tenantId), inArray(schema.leads.queueId, queues.map((queue) => queue.id)),
         eq(schema.leads.qualificationStatus, "cold"), isNull(schema.leads.corretorId),
         isNull(schema.leads.distributionRemovedAt), isNull(schema.leads.archivedAt), isNull(schema.leads.deletedAt),
-        notInArray(schema.leads.status, ["lost", "converted", "under_analysis"]),
+        notInArray(schema.leads.status, ["lost", "converted", "under_analysis", "awaiting_reply"]),
         notInArray(schema.leads.distributionStatus, ["assigned", "held", "removed", "returned_to_queue"]),
         gte(schema.leads.createdAt, arrivedSince),
       )).orderBy(asc(schema.leads.createdAt)).limit(200);

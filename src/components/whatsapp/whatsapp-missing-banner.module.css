@@ -1,6 +1,6 @@
 /* The view-as strip as a warning (18/10): same place, shape and colors (Vinicios: not red), one action. */
 .banner {
-  position: sticky; top: 0; z-index: 80;
+  position: sticky; top: 0; z-index: 40;
   width: 100%; flex: none;
   display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px;
   padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top));

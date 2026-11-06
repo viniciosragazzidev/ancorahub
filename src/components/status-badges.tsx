@@ -89,6 +89,8 @@ export function LeadStatusBadge({ status }: { status: string }) {
       return <AnimatedBadge status="warning" size="sm">Documentos</AnimatedBadge>;
     case "under_analysis":
       return <AnimatedBadge status="loading" size="sm">Em análise</AnimatedBadge>;
+    case "awaiting_reply":
+      return <AnimatedBadge status="neutral" size="sm">Aguardando retorno</AnimatedBadge>;
     case "converted":
       return <AnimatedBadge status="success" size="sm">Convertido</AnimatedBadge>;
     case "lost":

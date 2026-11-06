@@ -83,6 +83,7 @@ const STATUS_LABEL: Record<string, string> = {
   negotiation: "Em negociação",
   documentation_pending: "Documentação pendente",
   under_analysis: "Em análise",
+  awaiting_reply: "Aguardando retorno",
 };
 
 type LeadState = { tone: BadgeTone; chip: string; context: string };

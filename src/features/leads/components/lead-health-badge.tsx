@@ -120,6 +120,7 @@ export function computeLeadHealth(
     "negotiation",
     "documentation_pending",
     "under_analysis",
+    "awaiting_reply",
   ];
   if (activeStatuses.includes(lead.status) && lead.stageEnteredAt) {
     const stageTime = new Date(lead.stageEnteredAt).getTime();

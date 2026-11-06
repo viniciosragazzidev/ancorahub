@@ -47,16 +47,17 @@ describe("completed duty history", () => {
 describe("duty presence occurrence windows", () => {
   const shift = { dayOfWeek: 3, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
 
-  it("permits own confirmation until 20 minutes after start and rejects later attempts", () => {
+  it("permits own confirmation until 1 hour after start and rejects later attempts", () => {
     const startsAt = new Date("2026-10-21T12:00:00.000Z");
     const endsAt = new Date("2026-10-21T21:00:00.000Z");
     const atMinute = (minute: number) => new Date(startsAt.getTime() + minute * 60_000);
 
-    expect(SELF_CONFIRM_TOLERANCE_MINUTES).toBe(20);
-    expect(SELF_CONFIRM_LATE_MESSAGE).toBe("Seu plantão já passou do tempo de tolerância (20 minutos após o início). Entre em contato com seu supervisor para ser liberado.");
-    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(19) })).toBe("available");
-    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(20) })).toBe("available");
-    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(21) })).toBe("late");
+    expect(SELF_CONFIRM_TOLERANCE_MINUTES).toBe(60);
+    expect(SELF_CONFIRM_LATE_MESSAGE).toBe("Seu plantão já passou do tempo de tolerância (1 hora após o início). Entre em contato com seu supervisor para ser liberado.");
+    // Plantão das 9h: confirma até as 10h.
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(59) })).toBe("available");
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(60) })).toBe("available");
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(61) })).toBe("late");
   });
 
   it("counts the tolerance from when the broker joined a plantão that had already started", () => {
@@ -64,13 +65,13 @@ describe("duty presence occurrence windows", () => {
     const endsAt = new Date("2026-10-21T21:00:00.000Z");
     const atMinute = (minute: number) => new Date(startsAt.getTime() + minute * 60_000);
 
-    // Added 2h into the shift: 20 minutes from then.
-    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(130), joinedAt: atMinute(120) })).toBe("available");
-    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(140), joinedAt: atMinute(120) })).toBe("available");
-    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(141), joinedAt: atMinute(120) })).toBe("late");
+    // Added 2h into the shift: 1 hour from then.
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(150), joinedAt: atMinute(120) })).toBe("available");
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(180), joinedAt: atMinute(120) })).toBe("available");
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(181), joinedAt: atMinute(120) })).toBe("late");
     // Added before the start: the normal rule.
-    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(21), joinedAt: atMinute(-600) })).toBe("late");
-    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(21), joinedAt: null })).toBe("late");
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(61), joinedAt: atMinute(-600) })).toBe("late");
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(61), joinedAt: null })).toBe("late");
     // Added close to the end: still ends with the shift.
     expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(541), joinedAt: atMinute(535) })).toBe("ended");
   });

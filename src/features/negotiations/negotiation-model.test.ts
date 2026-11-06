@@ -39,13 +39,24 @@ describe("computeNegotiationLevel", () => {
     }).level).toBe("closing");
   });
 
-  it("reconhece fechamento por imagem somente quando a IA indica coleta", () => {
+  it("PDF ou foto do cliente sozinhos nunca põem em fechamento: vale a leitura da conversa (06/11)", () => {
+    expect(computeNegotiationLevel({ ...base, customerSentPdf: true }).level).toBe("in_conversation");
+    expect(computeNegotiationLevel({ ...base, status: "quote_sent", customerSentPdf: true, customerSentImage: true, twoWayExchangeDaysLast5: 3 }).level).toBe("advanced");
+  });
+
+  it("reconhece fechamento pela leitura da IA só depois da cotação no CRM", () => {
     const result = computeNegotiationLevel({
       ...base,
+      status: "quote_sent",
       customerSentImage: true,
       ai: { conversationStage: "DOCUMENT_COLLECTION" },
     });
     expect(result.level).toBe("closing");
+  });
+
+  it("não põe em fechamento lead ainda em atendimento, mesmo com a IA lendo fechamento (06/11)", () => {
+    expect(computeNegotiationLevel({ ...base, ai: { conversationStage: "CLOSING" } }).level).toBe("in_conversation");
+    expect(computeNegotiationLevel({ ...base, customerSentPdf: true, twoWayExchangeDaysLast5: 3, ai: { conversationStage: "DOCUMENT_COLLECTION" } }).level).toBe("in_conversation");
   });
 
   it("marca etapa comercial sem mensagem do corretor como sem conversa no CRM", () => {

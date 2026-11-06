@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, ne, or } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
+import { recordStageChangeForLead } from "./stage-history";
 import { signalLeadOwnershipChange } from "@/features/lead-distribution/ownership-signal";
 
 /**
@@ -63,6 +64,8 @@ export async function startServiceOnFirstMessage(input: {
       .returning({ id: schema.leads.id });
 
     if (!result.length) return false;
+    // Histórico de etapas (05/11): a primeira mensagem do corretor inicia o atendimento.
+    await recordStageChangeForLead(tx, { tenantId: input.tenantId, leadId: input.leadId, fromStatus: "distributed", toStatus: "in_contact", changedAt: now, actorType: "broker", actorUserId: input.brokerId, reason: "Primeira mensagem do corretor" });
 
     const activeOffers = await tx
       .select({ id: schema.leadOffers.id, brokerId: schema.leadOffers.brokerId, outboundMessageId: schema.leadOffers.outboundMessageId })

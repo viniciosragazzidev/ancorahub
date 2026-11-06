@@ -3,7 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { resolveNoticeTextVariants } from "@/features/communication-channels/outbound-service";
 import { isDutyShiftReminderEnabled } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import { formatRecipientPhone } from "@/features/leads/closing-director-alert-core";
-import { getClosingDirectorRecipients } from "@/features/leads/closing-director-alert";
+import { getNoticeRecipients } from "@/features/leads/closing-director-alert";
 import { teamNoticesFor } from "@/features/team-notices/catalog";
 import { getTeamNoticeSettings } from "@/features/team-notices/service";
 import { getTenantChannel } from "@/features/waha-cadence/tenant-channel";
@@ -23,6 +23,7 @@ const PREVIEW_VARIABLES: Record<string, string[]> = {
   leadAssignmentExpired: ["Ana"],
   leadFeedbackReminder: ["Ana", "Maria Souza"],
   leadClosingStage: ["Ana", "Maria Souza", "exemplo"],
+  dailyLeadsReport: ["05/11", "*Fila PME Rio*: 12 leads · 🔥 4 quentes · 🌤️ 5 mornos · ❄️ 3 frios\n*Fila Familiar*: 8 leads · 🔥 2 quentes · 🌤️ 3 mornos · ❄️ 3 frios\n\n*Total*: 20 leads · 🔥 6 · 🌤️ 8 · ❄️ 6"],
   leadClosingDirectorAlert: ["Maria Souza", "(21) 99999-0000", "Pessoa física · 2 vidas · Amil 400 · R$ 890,00/mês", "Ana Lima", "Documentação", "Cliente quer começar no dia 10, já mandou RG e comprovante. Falta a declaração de saúde do dependente.", "exemplo"],
   taskReminder: ["Ana", "Ligar para Maria Souza", "Hoje, 15:00"],
   brokerAccountActivated: ["Ana", "Âncora"],
@@ -30,7 +31,7 @@ const PREVIEW_VARIABLES: Record<string, string[]> = {
 };
 
 export async function DirectorWhatsAppView({ context, lite = false }: { context: TenantContext; lite?: boolean }) {
-  const [channel, settings, freeMessages, dutyReminderEnabled, closingRecipients] = await Promise.all([
+  const [channel, settings, freeMessages, dutyReminderEnabled, recipientsByNotice] = await Promise.all([
     getTenantChannel(context),
     getTeamNoticeSettings(context.tenantId),
     getDatabase()
@@ -39,7 +40,8 @@ export async function DirectorWhatsAppView({ context, lite = false }: { context:
       .where(and(eq(schema.messageTemplates.tenantId, context.tenantId), eq(schema.messageTemplates.active, true)))
       .orderBy(desc(schema.messageTemplates.updatedAt)),
     isDutyShiftReminderEnabled(context.tenantId),
-    getClosingDirectorRecipients(context.tenantId),
+    Promise.all(teamNoticesFor(true).filter((notice) => notice.phoneRecipients).map(async (notice) => [notice.key, await getNoticeRecipients(context.tenantId, notice.key)] as const))
+      .then((entries) => new Map(entries)),
   ]);
 
   const notices: TeamNoticeRow[] = teamNoticesFor(dutyReminderEnabled).map((notice) => {
@@ -55,7 +57,7 @@ export async function DirectorWhatsAppView({ context, lite = false }: { context:
       enabled: setting.enabled,
       channel: setting.channel,
       freeMessageIds: setting.freeMessageIds,
-      recipientPhones: notice.phoneRecipients ? closingRecipients.map(formatRecipientPhone) : undefined,
+      recipientPhones: notice.phoneRecipients ? (recipientsByNotice.get(notice.key) ?? []).map(formatRecipientPhone) : undefined,
       builtInPreviews: notice.chat || notice.metaOnly ? [] : resolveNoticeTextVariants(notice.purpose, PREVIEW_VARIABLES[notice.purpose] ?? []),
     };
   });

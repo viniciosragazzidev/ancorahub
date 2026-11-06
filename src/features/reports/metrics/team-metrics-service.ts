@@ -397,14 +397,14 @@ export async function resolveCanonicalTeamMetrics(
         1::int as active_leads,
         coalesce(ts.overdue_returns, 0)::int as overdue_returns,
         coalesce(ts.critical_overdue_returns, 0)::int as critical_overdue_returns,
-        case when leads.status in ('in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis')
+        case when leads.status in ('in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis', 'awaiting_reply')
           and ts.lead_id is null then 1 else 0 end::int as leads_without_next_action
       from leads
       join roster r on r.broker_id = leads.corretor_id
       left join task_summary ts on ts.lead_id = leads.id
       cross join params p
       where leads.tenant_id = p.tenant_id
-        and leads.status in ('new', 'distributed', 'in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis')
+        and leads.status in ('new', 'distributed', 'in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis', 'awaiting_reply')
         and leads.deleted_at is null
         and leads.archived_at is null
         ${supervisorLeadScope}

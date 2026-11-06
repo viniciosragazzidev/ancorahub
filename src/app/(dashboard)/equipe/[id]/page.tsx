@@ -105,7 +105,7 @@ export default async function TeamMemberProfilePage({
     ]);
     const performance = brokerPerformanceFromMetrics(metricResult, profile.member.userId, window);
     const newLeads = profile.recentLeads.filter((lead) => lead.status === "new" || lead.status === "distributed").length;
-    const activeStatuses = new Set(["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]);
+    const activeStatuses = new Set(["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"]);
     const active = profile.member.membershipStatus === "active" && profile.member.userStatus === "active";
     return <SupervisorBrokerProfile
       member={{ userId: profile.member.userId, name: profile.member.name, image: profile.member.image, branchName: profile.member.branchName, availabilityStatus: profile.member.availabilityStatus, email: profile.member.email, phone: profile.member.brokerPhone, brokerCode: profile.member.brokerCode, statusLabel: active ? "Ativo" : "Desativado" }}
@@ -150,7 +150,7 @@ export default async function TeamMemberProfilePage({
     const newLeads = profile.recentLeads.filter((lead) => lead.status === "new" || lead.status === "distributed").length;
     const duty = teamData?.duty.find((item) => item.brokerId === profile.member.userId);
     const liveAvailability = duty ? duty.paused ? "paused" : duty.presence === "confirmed" ? "on_duty" : "offline" : profile.member.availabilityStatus;
-    const activeStatuses = new Set(["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]);
+    const activeStatuses = new Set(["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"]);
     return (
       <SupervisorBrokerProfile
         member={{

@@ -10,6 +10,7 @@ import { transitionConversationState } from "./conversation-state-machine";
 import { resolveQualificationTimeoutRoute } from "./qualification-timeout-routing";
 import type { ConversationMemory } from "./memory";
 import { hasQualificationTimedOut, qualificationTimeoutDistributionStatus, qualificationTimeoutOutcome } from "./qualification-timeout-policy";
+import { readDistributionPolicy } from "@/features/lead-distribution/domain";
 
 export interface QualificationTimeoutSweepResult {
   tenantsChecked: number;
@@ -219,8 +220,6 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
         conversationMessages,
       );
       const targetQualificationStatus = timeoutOutcome.qualificationStatus;
-      const targetDistributionStatus = qualificationTimeoutDistributionStatus(targetQualificationStatus);
-
       const campaignId = lead.metaCampaignId || lead.sourceCampaign;
       const [configuredRoute] = campaignId
         ? await db
@@ -247,6 +246,14 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
         currentBranchId: lead.branchId,
         configuredRoute,
       });
+
+      // "Segurar frios" da fila de destino decide se o frio espera ou vai para a distribuição (06/11).
+      const [holdPolicy] = targetRoute.queueId
+        ? await db.select({ policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies)
+          .where(and(eq(schema.leadDistributionPolicies.tenantId, tenant.id), eq(schema.leadDistributionPolicies.queueId, targetRoute.queueId)))
+          .limit(1)
+        : [];
+      const targetDistributionStatus = qualificationTimeoutDistributionStatus(targetQualificationStatus, readDistributionPolicy(holdPolicy?.policy).holdColdLeads);
 
       let resolvedBranchId = targetRoute.branchId;
       if (!resolvedBranchId) {

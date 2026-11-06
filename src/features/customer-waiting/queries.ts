@@ -7,7 +7,7 @@ import { getDatabase } from "@/shared/db";
 import { assessCustomerWaiting, type CustomerWaitingAssessment, type CustomerWaitingMessage, type CustomerWaitingPolicy } from "./domain";
 
 /** Active statuses where a broker owns the conversation (same list as Negociações, plus "distributed"). */
-export const CUSTOMER_WAITING_STATUSES = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
+export const CUSTOMER_WAITING_STATUSES = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 
 export type CustomerWaitingLead = {
   leadId: string;

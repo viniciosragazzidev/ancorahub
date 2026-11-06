@@ -47,6 +47,7 @@ const activeStatuses = [
   "negotiation",
   "documentation_pending",
   "under_analysis",
+  "awaiting_reply",
 ] as const;
 
 export async function fetchBrokerDailySummary(

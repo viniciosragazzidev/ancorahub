@@ -28,6 +28,14 @@ export function scheduleLeadConversationAnalysis(
 
   const timer = setTimeout(async () => {
     pendingTimers.delete(leadId);
+    // Aguardando retorno (05/11): se o cliente respondeu, o lead volta para a etapa anterior. Antes da trava de
+    // orçamento da IA: não depende dela.
+    try {
+      const { restoreAwaitingLeadIfCustomerReplied } = await import("@/features/leads/stale-stage-sweep");
+      await restoreAwaitingLeadIfCustomerReplied(leadId, tenantId);
+    } catch (error) {
+      console.error("[stale-stage] restore_failed", leadId, error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200));
+    }
     try {
       // Over the monthly AI budget the 10-minute economy job analyses it instead.
       if (await isAiBudgetExceeded()) return;

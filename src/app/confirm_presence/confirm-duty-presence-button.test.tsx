@@ -11,6 +11,14 @@ afterEach(() => {
 });
 
 describe("confirmação de presença", () => {
+  it("sem WhatsApp conectado, explica a regra e leva ao app para conectar", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, json: async () => ({ success: false, code: "whatsapp_required", error: "Conecte o seu WhatsApp para confirmar presença no plantão." }) }));
+    render(<ConfirmDutyPresenceButton confirmationId="confirmation-id" />);
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar presença" }));
+    expect(await screen.findByRole("button", { name: "Abrir no app para conectar" })).toBeTruthy();
+    expect(screen.getByRole("alert")).toHaveTextContent("A partir de 06/11");
+  });
+
   it("mostra a ação inicial, permite repetir após falha e só confirma após sucesso do servidor", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: false, json: async () => ({ error: "Conexão indisponível." }) })

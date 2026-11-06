@@ -64,6 +64,6 @@ export function LeadsTableBody({ leads, contextRole }: { leads: LeadRow[]; conte
 }
 
 function isActiveServiceStatus(status: string) {
-  return ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(status);
+  return ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(status);
 }
 

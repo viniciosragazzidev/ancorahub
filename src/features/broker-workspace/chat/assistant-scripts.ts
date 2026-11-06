@@ -134,6 +134,7 @@ function threadForLead(lead: LeadQueueItem, now: Date): ThreadSummary {
     negotiation: "Negociação em andamento.",
     documentation_pending: "Documentação pendente.",
     under_analysis: "Lead em análise.",
+    awaiting_reply: "Cliente parou de responder: aguardando retorno.",
   };
 
   return {
@@ -329,7 +330,7 @@ function leadsPulse(data: BrokerWorkspaceData, now: Date): ChatBlock[] {
   if (!queue.length) return [];
   const count = (statuses: string[]) => queue.filter((lead) => statuses.includes(lead.status)).length;
   const waiting = queue.filter((lead) => isWaitingPriority(lead.nextAction, now)).length;
-  const inService = count(["in_contact", "negotiation", "documentation_pending", "under_analysis"]);
+  const inService = count(["in_contact", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"]);
   const quotes = count(["quote_sent"]);
   const negotiation = count(["negotiation"]);
   const stalled = queue.filter((lead) => lead.nextAction?.kind === "follow_up_stalled").length;
@@ -408,7 +409,7 @@ function leadScript(data: BrokerWorkspaceData, now: Date): ChatScript {
 
   blocks.push(assistantMessage("leads-all-clear", "Tudo em dia por aqui."));
   const inService = data.queue
-    .filter((lead) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status))
+    .filter((lead) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(lead.status))
     .slice(0, 5)
     .map((lead) => ({ id: lead.id, lead: lead.name, primary: lead.name, secondary: statusLabel(lead.status), href: `/leads/${lead.id}` }));
   blocks.push({ type: "list", id: "leads-in-service", title: "Em atendimento", items: inService, emptyText: "Você não tem nenhum lead em atendimento agora. Quando aceitar uma oferta, ele aparece nesta lista." });
@@ -434,6 +435,7 @@ function statusLabel(status: string) {
     negotiation: "Em negociação",
     documentation_pending: "Documentação pendente",
     under_analysis: "Em análise",
+    awaiting_reply: "Aguardando retorno",
   };
   return labels[status] ?? "Em atendimento";
 }

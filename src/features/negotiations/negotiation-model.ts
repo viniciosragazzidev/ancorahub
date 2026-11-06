@@ -84,7 +84,10 @@ export function computeNegotiationLevel(input: NegotiationSignals): NegotiationA
   const closingStatus = CLOSING_STATUSES.has(input.status);
   const aiStage = input.ai?.conversationStage ?? "UNKNOWN";
   const advancedSignal = advancedStatus || closingStatus || ADVANCED_AI_STAGES.has(aiStage);
-  const closingSignal = closingStatus || CLOSING_AI_STAGES.has(aiStage) || input.customerSentPdf || (input.customerSentImage && aiStage === "DOCUMENT_COLLECTION");
+  // "Fechamento" comes from the CRM stage or from the AI reading of the conversation, never from a file
+  // alone (06/11, Vinicios: a lone PDF put Marcelly and Marcelle there with almost no history). The AI
+  // reading only counts once the CRM shows a quote (Cristiane: bank details sent before any quote).
+  const closingSignal = closingStatus || (advancedStatus && CLOSING_AI_STAGES.has(aiStage));
   const noCrmConversation = (advancedStatus || closingStatus) && !input.hasBrokerMessageEver;
   const waitingTooLong = customerWaiting && customerAt !== null && now - customerAt >= NEGOTIATION_LIMITS.staleReplyHours * 60 * 60 * 1000;
   const exchangeStale = latestAt === -Infinity || now - latestAt >= NEGOTIATION_LIMITS.activeExchangeDays * 24 * 60 * 60 * 1000;

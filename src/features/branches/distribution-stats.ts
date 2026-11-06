@@ -12,6 +12,7 @@ export const ACTIVE_LEAD_STATUSES = [
   "negotiation",
   "documentation_pending",
   "under_analysis",
+  "awaiting_reply",
 ] as const;
 
 export type BranchDistributionStats = {

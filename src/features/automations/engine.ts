@@ -43,7 +43,7 @@ export async function scanAndEnqueueAutomations(tenantId: string) {
         .where(
           and(
             eq(schema.leads.tenantId, tenantId),
-            inArray(schema.leads.status, ["new", "in_contact", "distributed", "negotiation", "quote_sent", "documentation_pending", "under_analysis"]),
+            inArray(schema.leads.status, ["new", "in_contact", "distributed", "negotiation", "quote_sent", "documentation_pending", "under_analysis", "awaiting_reply"]),
             lt(schema.leads.updatedAt, threshold)
           )
         );

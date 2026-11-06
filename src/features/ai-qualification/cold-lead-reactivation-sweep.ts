@@ -84,7 +84,7 @@ export async function runColdLeadReactivationSweep(tenantIdFilter?: string): Pro
       inArray(schema.leads.qualificationState, ["QUALIFIED", "COMPLETED"]),
       isNotNull(schema.leads.qualificationCompletedAt),
       isNull(schema.leads.corretorId),
-      notInArray(schema.leads.status, ["lost", "converted", "under_analysis"]),
+      notInArray(schema.leads.status, ["lost", "converted", "under_analysis", "awaiting_reply"]),
       notInArray(schema.leads.distributionStatus, ["assigned", "manual_hold", "held", "removed", "returned_to_queue"]),
       isNull(schema.leads.distributionRemovedAt),
       isNull(schema.leads.archivedAt),

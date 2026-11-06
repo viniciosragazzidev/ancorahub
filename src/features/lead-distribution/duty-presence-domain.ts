@@ -6,13 +6,14 @@ export type DutyWindow = {
 
 /** The broker may confirm starting 30 minutes before the shift. */
 export const SELF_CONFIRM_OPENS_MINUTES = 30;
-export const SELF_CONFIRM_TOLERANCE_MINUTES = 20;
-export const SELF_CONFIRM_LATE_MESSAGE = "Seu plantão já passou do tempo de tolerância (20 minutos após o início). Entre em contato com seu supervisor para ser liberado.";
+/** Tolerância para confirmar depois do início (06/11: de 20 min para 1 hora, pedido do Vinicios). */
+export const SELF_CONFIRM_TOLERANCE_MINUTES = 60;
+export const SELF_CONFIRM_LATE_MESSAGE = "Seu plantão já passou do tempo de tolerância (1 hora após o início). Entre em contato com seu supervisor para ser liberado.";
 
 export type SelfDutyConfirmationWindowState = "not_open" | "available" | "late" | "ended";
 
 /**
- * When the 20-minute tolerance starts counting: the shift start, or the moment the
+ * When the 1-hour tolerance starts counting: the shift start, or the moment the
  * broker was put on the plantão when that happened after it had already started
  * (decision of 2026-10-22). `joinedAt` is the roster row's `createdAt`.
  */

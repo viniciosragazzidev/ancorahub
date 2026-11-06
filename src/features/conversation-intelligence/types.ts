@@ -65,6 +65,12 @@ export const ConversationAssessmentSchema = z.object({
   summary: z.string().trim().min(1),
   risk: z.string().nullable().optional(),
   opportunity: z.string().nullable().optional(),
+  /** Reading for the director/manager (06/11): where the deal stands and how the broker is handling it. */
+  directorBrief: z.string().trim().max(700).nullable().optional(),
+  /** Whether the management needs to step in: none, keep watching, or act now. */
+  directorAttention: z.enum(["NONE", "WATCH", "ACT"]).nullable().optional().catch(null),
+  /** What the director/manager should do, only when directorAttention is ACT or WATCH. */
+  directorAction: z.string().trim().max(300).nullable().optional(),
   facts: z.array(z.string()).default([]),
   inferences: z.array(z.string()).default([]),
 });
