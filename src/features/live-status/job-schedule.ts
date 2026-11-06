@@ -6,6 +6,7 @@
 export const JOB_SCHEDULE = {
   whatsapp: { path: "/api/internal/jobs/whatsapp", cron: "* * * * *", label: "Envio do WhatsApp" },
   distribution: { path: "/api/internal/jobs/distribution", cron: "*/2 * * * *", label: "Distribuição de leads" },
+  "distribution-priority": { path: "/api/internal/jobs/distribution-priority", cron: "* * * * *", label: "Distribuição de quentes e mornos" },
   "qualification-timeout": { path: "/api/internal/jobs/qualification-timeout", cron: "*/2 * * * *", label: "Tempo limite da qualificação" },
   "waha-sync": { path: "/api/internal/jobs/waha-sync", cron: "* * * * *", label: "Mensagens dos corretores" },
   "lead-effects": { path: "/api/internal/jobs/lead-effects", cron: "* * * * *", label: "Efeitos pós-entrada" },

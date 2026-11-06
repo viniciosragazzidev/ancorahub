@@ -48,6 +48,7 @@ sem rodar, avisar que o robô parou. Mudou o caminho ou a frequência aqui, mude
 |---|---|---|---|
 | `/api/internal/jobs/whatsapp` | `* * * * *` | Outbox do WhatsApp (Meta e número da empresa): envia a fila, retentativas e avisos segurados por horário, espaçamento ou limite | Sem ele, avisos fora do horário comercial ou segurados pelo espaçamento não saem |
 | `/api/internal/jobs/distribution` | `*/2 * * * *` | Distribuição contínua de leads | `coolify-lead-distribution-scheduler.md` |
+| `/api/internal/jobs/distribution-priority` | `* * * * *` | Via rápida: leva a um corretor os leads quentes e mornos qualificados nas últimas 6 h, no máximo 10 por rodada | Separada em 06/11: a rodada de `/distribution` passava de 2 min com a fila acumulada e um lead quente esperava até 15 min. Enquanto esta tarefa responde, `/distribution` pula a passada de quentes; se ela parar por 3 min, `/distribution` volta a fazer. Sem migration |
 | `/api/internal/jobs/qualification-timeout` | `*/2 * * * *` | Tempo limite da qualificação | `coolify-qualification-timeout-scheduler.md` |
 | `/api/internal/jobs/waha-sync` | `* * * * *` | Reconciliação de mensagens WAHA das conexões dos corretores | `coolify-waha-message-sync-scheduler.md` |
 | `/api/internal/jobs/lead-effects` | `* * * * *` | Efeitos pós-entrada do lead (outbox durável) | |

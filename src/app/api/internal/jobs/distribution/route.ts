@@ -4,7 +4,7 @@ import { drainLeadDistributionBacklog, runPriorityLeadDistribution } from "@/fea
 import { processDutyPresenceReminders } from "@/features/lead-distribution/duty-presence";
 import { processDutyShiftReminders } from "@/features/lead-distribution/duty-shift-reminders";
 import { backgroundRoute } from "@/shared/db/background-pool";
-import { withJobHeartbeat } from "@/features/live-status/heartbeat";
+import { readJobHeartbeats, withJobHeartbeat } from "@/features/live-status/heartbeat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +24,7 @@ const DUTY_SHIFT_REMINDER_TIMEOUT_MS = 15_000;
 const DRAIN_TIMEOUT_MS = 150_000;
 // Recently qualified hot/warm leads without a broker (03/11): its own budget is 25 s, the ceiling 30 s.
 const PRIORITY_TIMEOUT_MS = 30_000;
+const DEDICATED_PRIORITY_FRESH_MS = 3 * 60_000;
 
 class PhaseTimeoutError extends Error {
   constructor(phase: string, ms: number) {
@@ -73,10 +74,13 @@ async function runDistributionJob() {
   const errors: Record<string, string> = {};
   // Hot and warm leads qualified in the last hours go before everything (03/11): they must have a
   // broker within 3 minutes, and behind the plantão phases and the backlog one waited 30 minutes.
-  let priority: Awaited<ReturnType<typeof runPriorityLeadDistribution>> | null = null;
+  let priority: Awaited<ReturnType<typeof runPriorityLeadDistribution>> | { skipped: "dedicated_job_running" } | null = null;
   let priorityFailed = false;
   try {
-    priority = await timedPhase("priority", PRIORITY_TIMEOUT_MS, () => runPriorityLeadDistribution(), phaseMs);
+    // With /distribution-priority running every minute (06/11), this pass only covers for it when it stopped.
+    priority = await dedicatedPriorityJobIsRunning()
+      ? { skipped: "dedicated_job_running" }
+      : await timedPhase("priority", PRIORITY_TIMEOUT_MS, () => runPriorityLeadDistribution(), phaseMs);
   } catch (error) {
     priorityFailed = true;
     errors.priority = describeError(error);
@@ -115,6 +119,16 @@ async function runDistributionJob() {
   }
   const success = !distributionFailed && !dutyPresenceFailed && !dutyShiftReminderFailed && !priorityFailed;
   return NextResponse.json({ success, priority, result, dutyPresence, dutyShiftReminder, phaseMs, ...(Object.keys(errors).length ? { errors } : {}) }, { status: success ? 200 : 500 });
+}
+
+/** The minute-by-minute priority job answered fine in the last 3 minutes. Any doubt runs the pass here. */
+async function dedicatedPriorityJobIsRunning() {
+  try {
+    const heartbeat = (await readJobHeartbeats()).get("distribution-priority");
+    return Boolean(heartbeat && heartbeat.outcome === "ok" && Date.now() - new Date(heartbeat.finishedAt).getTime() < DEDICATED_PRIORITY_FRESH_MS);
+  } catch {
+    return false;
+  }
 }
 
 /** Name and a short message only: never a stack or data. */
