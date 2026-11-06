@@ -56,6 +56,9 @@ export type NegotiationLead = {
     summary: string | null;
     nextBestAction: string | null;
     risk: string | null;
+    directorBrief: string | null;
+    directorAttention: "NONE" | "WATCH" | "ACT" | null;
+    directorAction: string | null;
     objections: string[];
     buyingSignals: string[];
     lastAnalyzedAt: string | null;
@@ -135,6 +138,9 @@ function parseAiDetails(value: unknown, lastAnalyzedAt: unknown) {
     summary: typeof raw.summary === "string" ? raw.summary : null,
     nextBestAction: typeof raw.nextBestAction === "string" ? raw.nextBestAction : null,
     risk: typeof raw.risk === "string" ? raw.risk : null,
+    directorBrief: typeof raw.directorBrief === "string" && raw.directorBrief.trim() ? raw.directorBrief.trim() : null,
+    directorAttention: raw.directorAttention === "NONE" || raw.directorAttention === "WATCH" || raw.directorAttention === "ACT" ? (raw.directorAttention as "NONE" | "WATCH" | "ACT") : null,
+    directorAction: typeof raw.directorAction === "string" && raw.directorAction.trim() ? raw.directorAction.trim() : null,
     objections: strings(raw.objections),
     buyingSignals: strings(raw.buyingSignals),
     lastAnalyzedAt: toIso(lastAnalyzedAt as string | null | undefined),
