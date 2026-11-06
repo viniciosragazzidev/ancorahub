@@ -130,12 +130,11 @@ function parseComponents(components: MetaGraphTemplateComponent[] = []) {
   return { headerType, bodyText: bodyText.trim(), footerText, variables, buttons };
 }
 
-/** Every active Meta channel of the tenant, one per WABA (default channel first). */
-async function resolveAllMetaChannelCredentials(tenantId: string) {
+/** Every active Meta channel of the tenant, one per WABA (default channel first). Token stays encrypted. */
+async function listTenantMetaWabas(tenantId: string) {
   const db = getDatabase();
   const channels = await db
     .select({
-      id: schema.communicationChannels.id,
       wabaId: schema.communicationChannels.wabaId,
       accessTokenCiphertext: schema.communicationChannels.accessTokenCiphertext,
     })
@@ -146,16 +145,40 @@ async function resolveAllMetaChannelCredentials(tenantId: string) {
       eq(schema.communicationChannels.status, "active"),
     ))
     .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.updatedAt));
-  const encryptionKey =
-    process.env.META_WHATSAPP_TOKEN_ENCRYPTION_KEY?.trim() ||
-    process.env.INVITATION_TOKEN_ENCRYPTION_KEY?.trim();
-  if (!encryptionKey) throw new Error("Chave de criptografia de tokens do WhatsApp não configurada.");
-  const byWaba = new Map<string, { wabaId: string; accessToken: string }>();
+  const byWaba = new Map<string, { wabaId: string; ciphertext: string }>();
   for (const channel of channels) {
     if (!channel.wabaId || !channel.accessTokenCiphertext || byWaba.has(channel.wabaId)) continue;
-    byWaba.set(channel.wabaId, { wabaId: channel.wabaId, accessToken: decryptChannelSecret(channel.accessTokenCiphertext, encryptionKey) });
+    byWaba.set(channel.wabaId, { wabaId: channel.wabaId, ciphertext: channel.accessTokenCiphertext });
   }
   return [...byWaba.values()];
+}
+
+/**
+ * Runs one sync per WABA. A WABA whose token does not decrypt or whose sync fails is logged (never the
+ * token) and skipped; the others still sync. Only when every WABA fails, or there is none, it throws.
+ */
+export async function syncEachWaba<R extends { syncedCount: number; syncedAt: Date }>(
+  wabas: readonly { wabaId: string; ciphertext: string }[],
+  decrypt: (ciphertext: string) => string,
+  syncOne: (credentials: { wabaId: string; accessToken: string }) => Promise<R>,
+  onFailure: (wabaId: string, error: unknown) => void,
+) {
+  if (!wabas.length) throw new Error("Nenhum canal corporativo ativo do WhatsApp foi configurado para este tenant.");
+  let syncedCount = 0;
+  let syncedAt = new Date();
+  let failures = 0;
+  for (const waba of wabas) {
+    try {
+      const result = await syncOne({ wabaId: waba.wabaId, accessToken: decrypt(waba.ciphertext) });
+      syncedCount += result.syncedCount;
+      syncedAt = result.syncedAt;
+    } catch (error) {
+      failures += 1;
+      onFailure(waba.wabaId, error);
+    }
+  }
+  if (failures === wabas.length) throw new Error("Não foi possível sincronizar os templates da Meta.");
+  return { syncedCount, syncedAt };
 }
 
 /**
@@ -163,23 +186,16 @@ async function resolveAllMetaChannelCredentials(tenantId: string) {
  * WABA was read, so templates of the other official numbers never reached the CRM).
  */
 export async function syncTenantTemplates(tenantId: string) {
-  const all = await resolveAllMetaChannelCredentials(tenantId);
-  if (!all.length) await resolveMetaChannelCredentials(tenantId); // keeps the original "no channel" error
-  let syncedCount = 0;
-  let syncedAt = new Date();
-  const failures: string[] = [];
-  for (const credentials of all) {
-    try {
-      const result = await syncWabaTemplates(tenantId, credentials);
-      syncedCount += result.syncedCount;
-      syncedAt = result.syncedAt;
-    } catch (error) {
-      failures.push(credentials.wabaId);
-      console.error("[meta-templates] waba_sync_failed", { tenantId, wabaId: credentials.wabaId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
-    }
-  }
-  if (failures.length === all.length && all.length > 0) throw new Error("Não foi possível sincronizar os templates da Meta.");
-  return { syncedCount, syncedAt };
+  const encryptionKey =
+    process.env.META_WHATSAPP_TOKEN_ENCRYPTION_KEY?.trim() ||
+    process.env.INVITATION_TOKEN_ENCRYPTION_KEY?.trim();
+  if (!encryptionKey) throw new Error("Chave de criptografia de tokens do WhatsApp não configurada.");
+  return syncEachWaba(
+    await listTenantMetaWabas(tenantId),
+    (ciphertext) => decryptChannelSecret(ciphertext, encryptionKey),
+    (credentials) => syncWabaTemplates(tenantId, credentials),
+    (wabaId, error) => console.error("[meta-templates] waba_sync_failed", { tenantId, wabaId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" }),
+  );
 }
 
 async function syncWabaTemplates(tenantId: string, credentials: { wabaId: string; accessToken: string }) {
@@ -301,6 +317,17 @@ export async function listTenantTemplates(
   return templates;
 }
 
+/** Example values Meta approved for the body ({{1}}..{{n}} or named), or placeholders when missing. */
+export function templateExampleValues(componentsJson: unknown, variablesJson: unknown): string[] {
+  const components = Array.isArray(componentsJson) ? componentsJson as Array<Record<string, any>> : [];
+  const body = components.find((component) => String(component.type).toUpperCase() === "BODY");
+  const named = body?.example?.body_text_named_params as Array<{ example?: string }> | undefined;
+  if (named?.length) return named.map((param, index) => param.example?.trim() || `Exemplo ${index + 1}`);
+  const positional = body?.example?.body_text?.[0] as string[] | undefined;
+  const count = Array.isArray(variablesJson) ? variablesJson.length : positional?.length ?? 0;
+  return Array.from({ length: count }, (_, index) => positional?.[index]?.trim() || `Exemplo ${index + 1}`);
+}
+
 export async function sendTenantTemplateTestMessage(
   tenantId: string,
   userId: string,
@@ -329,6 +356,9 @@ export async function sendTenantTemplateTestMessage(
   if (!credentials.phoneNumberId) throw new Error("Número de telefone não configurado na conexão.");
 
   const components: any[] = [];
+  // The test button sends no values: fill the body variables with the example approved by Meta,
+  // otherwise Meta refuses with #132000 (number of parameters does not match).
+  if (!variables?.length) variables = templateExampleValues(template.componentsJson, template.variablesJson);
   if (variables && variables.length > 0) {
     const rawComponents = (template.componentsJson as any[]) || [];
     const bodyComp = rawComponents.find((c: any) => c.type === "BODY" || c.type === "body");
