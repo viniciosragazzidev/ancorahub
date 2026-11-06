@@ -75,7 +75,11 @@ export async function isMetaLeadAdsEnabled(tenantId?: string) {
 export function verifyMetaWebhookSignature(rawBody: string, signatureHeader: string | null, appSecret: string) {
   const signature = signatureHeader?.replace(/^sha256=/i, "") ?? "";
   const expected = createHmac("sha256", appSecret).update(rawBody).digest("hex");
-  return signature.length === expected.length && signature.length > 0 && timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"));
+  // Compare decoded buffers: a non-hex header decodes shorter and must fail
+  // (401) instead of making timingSafeEqual throw (500, and Meta retries).
+  const received = Buffer.from(signature, "hex");
+  const wanted = Buffer.from(expected, "hex");
+  return received.length === wanted.length && received.length > 0 && timingSafeEqual(received, wanted);
 }
 
 function normalizeFieldName(value: string) {

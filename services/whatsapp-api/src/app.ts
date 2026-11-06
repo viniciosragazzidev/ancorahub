@@ -4,7 +4,14 @@ import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
 import { getInternalApiToken, getWhatsAppReviewConfig, getWahaConfig } from "./config.js";
 import { MetaGraphError, MetaGraphTimeoutError } from "./integrations/whatsapp/client.js";
 import { sendTestMessage } from "./integrations/whatsapp/service.js";
-import { WahaClient, resolveWebhookUrl, type WahaRecoveryCleanup } from "./integrations/waha/client.js";
+import {
+  WAHA_WEBHOOK_TOKEN_HEADER,
+  WahaClient,
+  isWebhookTokenRequired,
+  resolveWebhookToken,
+  resolveWebhookUrl,
+  type WahaRecoveryCleanup,
+} from "./integrations/waha/client.js";
 import { WahaClientError } from "./integrations/waha/types.js";
 import { attachLidPhoneNumbers } from "./integrations/waha/lid.js";
 
@@ -100,7 +107,12 @@ export function humanTypingMs(text: string, random = Math.random()) {
 export function buildApp() {
   const app = Fastify({
     logger: {
-      redact: ["req.headers.x-corretop-internal-token", "req.body.to", "req.body.message"],
+      redact: [
+        "req.headers.x-corretop-internal-token",
+        `req.headers["${WAHA_WEBHOOK_TOKEN_HEADER}"]`,
+        "req.body.to",
+        "req.body.message",
+      ],
     },
   });
 
@@ -395,6 +407,35 @@ export function buildApp() {
         operation: "waha.test_session.reset",
         session: sessionName,
         errorCode: error instanceof Error ? error.message : "unknown",
+      });
+      return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+    }
+  });
+
+  // ── WAHA: reapply webhook config (token header) to every session ─────
+  // Run once after setting WAHA_WEBHOOK_TOKEN, before WAHA_WEBHOOK_TOKEN_REQUIRED.
+  app.post("/internal/waha/sessions/refresh-webhooks", async (request, reply) => {
+    if (!requireInternalAuth(request, reply, getInternalApiToken())) return;
+    if (!resolveWebhookToken()) {
+      return reply.code(409).send({ ok: false, error: "WAHA_WEBHOOK_TOKEN_NOT_CONFIGURED" });
+    }
+
+    let wahaConfig;
+    try {
+      wahaConfig = getWahaConfig();
+    } catch {
+      return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+    }
+
+    try {
+      const results = await new WahaClient(wahaConfig).refreshSessionWebhooks();
+      const failed = results.filter((item) => item.outcome === "failed").length;
+      request.log.info({ operation: "waha.sessions.refresh_webhooks", total: results.length, failed });
+      return reply.code(failed ? 207 : 200).send({ ok: failed === 0, total: results.length, failed, results });
+    } catch (error) {
+      request.log.warn({
+        operation: "waha.sessions.refresh_webhooks",
+        errorCode: error instanceof WahaClientError ? error.code : "unknown",
       });
       return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
     }
@@ -1078,6 +1119,24 @@ export function buildApp() {
       },
     },
     async (request, reply) => {
+      // This route is reachable from the internet and everything it accepts is
+      // signed and forwarded to the CRM, so the caller must prove it is WAHA.
+      // Phase 1: WAHA_WEBHOOK_TOKEN set, sessions send it (refresh-webhooks).
+      // Phase 2: WAHA_WEBHOOK_TOKEN_REQUIRED=true rejects calls without it.
+      const webhookToken = resolveWebhookToken();
+      const tokenOk = webhookToken !== null && secureEquals(request.headers[WAHA_WEBHOOK_TOKEN_HEADER], webhookToken);
+      if (!tokenOk) {
+        if (isWebhookTokenRequired()) {
+          if (!webhookToken) {
+            request.log.error({ operation: "waha.webhook.auth", error: "WAHA_WEBHOOK_TOKEN not configured" });
+            return reply.code(503).send({ accepted: false, error: "WEBHOOK_AUTH_NOT_CONFIGURED" });
+          }
+          request.log.warn({ operation: "waha.webhook.auth", outcome: "rejected" });
+          return reply.code(401).send({ accepted: false, error: "UNAUTHORIZED" });
+        }
+        request.log.warn({ operation: "waha.webhook.auth", outcome: "accepted_without_token" });
+      }
+
       const CRM_WEBHOOK_URL = process.env.CRM_WEBHOOK_URL?.trim();
       const CRM_WEBHOOK_SECRET = process.env.WAHA_RELAY_SHARED_SECRET?.trim();
 

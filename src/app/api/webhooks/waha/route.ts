@@ -7,6 +7,7 @@ import {
   wahaWebhookSchema,
 } from "@/features/waha-cadence/contract";
 import { backgroundRoute } from "@/shared/db/background-pool";
+import { exceedsBodyLimit } from "@/shared/http/body-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -15,6 +16,7 @@ export const maxDuration = 60;
 async function handlePOST(request: Request) {
   const secret = process.env.WAHA_RELAY_SHARED_SECRET?.trim();
   if (!secret) return NextResponse.json({ accepted: false, error: "WAHA webhook não configurado." }, { status: 503 });
+  if (exceedsBodyLimit(request)) return NextResponse.json({ accepted: false, error: "Payload too large" }, { status: 413 });
   const rawBody = await request.text();
   const valid = verifyRelaySignature({
     secret,

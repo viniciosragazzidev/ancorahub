@@ -244,6 +244,41 @@ export class WahaClient {
   }
 
   /**
+   * Reaplica a configuração de webhook (URL e cabeçalho com o token secreto)
+   * em todas as sessões existentes. O WAHA reinicia a sessão que estiver
+   * rodando ao receber a nova configuração; a autenticação do WhatsApp é
+   * mantida, então ninguém precisa reparear. Fase 1 da proteção do webhook:
+   * ver `resolveWebhookToken`.
+   */
+  async refreshSessionWebhooks(): Promise<Array<{ name: string; outcome: "updated" | "failed"; error?: string }>> {
+    const sessions = await this.request<Array<{ name?: string; config?: Record<string, unknown> | null }>>(
+      "/api/sessions?all=true",
+      { timeoutMs: 10_000 },
+    );
+    const webhook = buildWebhookConfig(resolveWebhookUrl());
+    const results: Array<{ name: string; outcome: "updated" | "failed"; error?: string }> = [];
+    for (const session of Array.isArray(sessions) ? sessions : []) {
+      const name = typeof session?.name === "string" ? session.name : null;
+      if (!name) continue;
+      // Keep the rest of the session config (proxy, metadata, engine options):
+      // WAHA replaces the whole config on PUT.
+      const config = { ...(session.config ?? {}), webhooks: [webhook] };
+      try {
+        await this.request(`/api/sessions/${encodeURIComponent(name)}`, {
+          method: "PUT",
+          timeoutMs: 15_000,
+          body: { name, config },
+          headers: { "content-type": "application/json" },
+        });
+        results.push({ name, outcome: "updated" });
+      } catch (error) {
+        results.push({ name, outcome: "failed", error: error instanceof WahaClientError ? error.code : "unknown" });
+      }
+    }
+    return results;
+  }
+
+  /**
    * Cria uma nova sessão no WAHA.
    * Se a sessão já existe (409), retorna o status atual (idempotente).
    * Detecta 409 via providerStatusCode, não via parsing de string.
@@ -258,12 +293,7 @@ export class WahaClient {
         body: {
           name,
           config: {
-            webhooks: [
-              {
-                url: webhookUrl,
-                events: ["message", "message.any", "session.status", "message.ack"],
-              },
-            ],
+            webhooks: [buildWebhookConfig(webhookUrl)],
           },
         },
         headers: { "content-type": "application/json" },
@@ -797,4 +827,32 @@ function isExpectedCleanupError(
 
 function cleanupIgnored(operation: WahaRecoveryCleanup["operation"], error: WahaClientError): WahaRecoveryCleanup {
   return { operation, outcome: "ignored", providerStatusCode: error.providerStatusCode, normalizedError: error.code };
+}
+
+export const WAHA_WEBHOOK_TOKEN_HEADER = "x-ancora-waha-token";
+const WAHA_WEBHOOK_EVENTS = ["message", "message.any", "session.status", "message.ack"];
+
+/**
+ * Token secreto que o WAHA envia em cada webhook (cabeçalho
+ * `x-ancora-waha-token`). A rota do webhook é pública e o Fastify assina e
+ * repassa ao CRM tudo o que aceita, então sem esse token qualquer um poderia
+ * forjar mensagens e eventos de sessão.
+ */
+export function resolveWebhookToken(env: NodeJS.ProcessEnv = process.env): string | null {
+  const token = env.WAHA_WEBHOOK_TOKEN?.trim();
+  return token ? token : null;
+}
+
+/** Exigir o token só depois que todas as sessões já o enviam (fase 2). */
+export function isWebhookTokenRequired(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.WAHA_WEBHOOK_TOKEN_REQUIRED?.trim() === "true";
+}
+
+export function buildWebhookConfig(url: string, env: NodeJS.ProcessEnv = process.env) {
+  const token = resolveWebhookToken(env);
+  return {
+    url,
+    events: [...WAHA_WEBHOOK_EVENTS],
+    ...(token ? { customHeaders: [{ name: WAHA_WEBHOOK_TOKEN_HEADER, value: token }] } : {}),
+  };
 }

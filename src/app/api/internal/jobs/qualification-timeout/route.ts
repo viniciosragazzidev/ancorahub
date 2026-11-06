@@ -8,6 +8,7 @@ import { flowEffectHandlers } from "@/features/attendance-flows/handlers";
 import { attendanceFlowsEnabled, wakeDueRuns } from "@/features/attendance-flows/runtime";
 import { backgroundRoute } from "@/shared/db/background-pool";
 import { withJobHeartbeat } from "@/features/live-status/heartbeat";
+import { isBearerAuthorized } from "@/shared/http/bearer-auth";
 
 /**
  * DEC-127: wakes attendance flow runs whose wait is over (only with the switch
@@ -30,7 +31,7 @@ export const maxDuration = 60;
 
 async function handle(request: NextRequest) {
   const secret = process.env.CRON_SECRET || process.env.INTERNAL_JOB_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!isBearerAuthorized(request, secret)) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { completeMetaConnectionAttempt } from "@/features/meta-ads/meta-connection-attempts";
+import { completeMetaConnectionAttempt, isPendingMarketingConnectionState } from "@/features/meta-ads/meta-connection-attempts";
 import { MetaGraphClient } from "@/features/meta-ads/meta-graph-client";
 import { exchangeCodeForLongLivedToken } from "@/features/meta-ads/meta-oauth";
 
@@ -27,6 +27,13 @@ export async function GET(request: NextRequest) {
   const origin = new URL(redirectUri).origin;
   if (!code || !state) {
     return popupResponse({ origin, type: "META_MARKETING_AUTH_ERROR", errorCode: "missing_parameters" });
+  }
+
+  // Validate the state before spending the code: a forged or replayed callback
+  // must not trigger a token exchange with Meta.
+  if (!(await isPendingMarketingConnectionState(state).catch(() => false))) {
+    console.warn("[meta-marketing-oauth-callback] invalid_or_expired_state");
+    return popupResponse({ origin, type: "META_MARKETING_AUTH_ERROR", errorCode: "authorization_persist_failed" });
   }
 
   let stage: Exclude<MarketingCallbackErrorCode, "missing_parameters"> = "token_exchange_failed";

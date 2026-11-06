@@ -175,3 +175,12 @@ O pentest externo (ME-18) é melhor depois dos lotes 1 a 6, para não pagar por 
 9. Configuração da política no formulário Lead Ads e reaprovação dos templates na Meta.
 
 **Técnico [T]:** todo o resto. Os lotes 1 a 9 são quase todos técnicos e não esperam jurídico, salvo os pontos marcados.
+
+---
+
+## 4. Andamento
+
+| Lote | Branch | Estado | Observações |
+|---|---|---|---|
+| 1 | `fix/seg-dependencias` | Na branch de deploy (`feat/diretor-visual-lite`) | next 16.4.5, better-auth 1.7.18, sharp 0.35.5, zod 4.6.7, Dependabot, `npm ci` estrito. O zod 4.6 mudou o preprocess de campos ausentes: 11 campos de plantão/distribuição ajustados. |
+| 2 | `fix/seg-superficie-publica` | Na branch de deploy | CR-3 em duas fases (token `x-ancora-waha-token`; ver `docs/integrations/waha-webhook.md`), AL-4 avatar, ME-1 mídia/documentos/materiais com `safeFileHeaders`, avatar de contato só raster, AL-6 rate limit no webhook de lead (60/min e 600/h por credencial; 10/min por visitante quando há `cf-connecting-ip`), ME-8 `/api/health` público só com status, `CRON_SECRET` em tempo constante (21 rotas), assinatura Meta por buffer, `state` do OAuth validado antes da troca do code, limite de 1 MB no corpo dos webhooks. Pendente do lote: nonce do HMAC WAHA (baixo). **Ação sua:** fases 1-3 do token WAHA no Coolify. |

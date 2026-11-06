@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const { exchangeCodeForLongLivedToken, discoverAssets, fetchGrantedPermissions, completeMetaConnectionAttempt } = vi.hoisted(() => ({
+const { exchangeCodeForLongLivedToken, discoverAssets, fetchGrantedPermissions, completeMetaConnectionAttempt, isPendingMarketingConnectionState } = vi.hoisted(() => ({
   exchangeCodeForLongLivedToken: vi.fn(),
   discoverAssets: vi.fn(),
   fetchGrantedPermissions: vi.fn(),
   completeMetaConnectionAttempt: vi.fn(),
+  isPendingMarketingConnectionState: vi.fn(),
 }));
 
 vi.mock("@/features/meta-ads/meta-oauth", () => ({ exchangeCodeForLongLivedToken }));
-vi.mock("@/features/meta-ads/meta-connection-attempts", () => ({ completeMetaConnectionAttempt }));
+vi.mock("@/features/meta-ads/meta-connection-attempts", () => ({ completeMetaConnectionAttempt, isPendingMarketingConnectionState }));
 vi.mock("@/features/meta-ads/meta-graph-client", () => ({
   MetaGraphClient: class {
     discoverAssets = discoverAssets;
@@ -30,6 +31,7 @@ describe("GET /api/integrations/meta/lead-ads/callback", () => {
     discoverAssets.mockResolvedValue({ business: { id: "business-1", name: "Corretora" }, pages: [], adAccounts: [], whatsapp: null, pixels: [], datasets: [] });
     fetchGrantedPermissions.mockResolvedValue(["pages_show_list", "leads_retrieval"]);
     completeMetaConnectionAttempt.mockResolvedValue({ id: "attempt-1" });
+    isPendingMarketingConnectionState.mockResolvedValue(true);
   });
 
   it("returns only a verified attempt id to the opener", async () => {
@@ -58,5 +60,14 @@ describe("GET /api/integrations/meta/lead-ads/callback", () => {
 
     expect(exchangeCodeForLongLivedToken).not.toHaveBeenCalled();
     expect(html).toContain('"missing_parameters"');
+  });
+
+  it("never exchanges the code when the state is unknown, expired or used", async () => {
+    isPendingMarketingConnectionState.mockResolvedValue(false);
+    const response = await GET(request());
+    const html = await response.text();
+
+    expect(exchangeCodeForLongLivedToken).not.toHaveBeenCalled();
+    expect(html).toContain('"META_MARKETING_AUTH_ERROR"');
   });
 });

@@ -68,6 +68,22 @@ const signature = createHmac("sha256", SHARED_SECRET)
 
 ---
 
+### Token do WAHA no Fastify (rota pública)
+
+`POST /internal/webhooks/waha` no Fastify é alcançável pela internet e assina com HMAC tudo o que aceita antes de repassar ao CRM. Por isso o WAHA precisa provar quem é: cada sessão envia o cabeçalho `x-ancora-waha-token` com o valor de `WAHA_WEBHOOK_TOKEN` (configurado em `config.webhooks[].customHeaders` ao criar a sessão).
+
+Ativação em duas fases, sem derrubar os webhooks atuais:
+
+1. No Coolify do serviço `whatsapp-api`, defina `WAHA_WEBHOOK_TOKEN` (`openssl rand -hex 32`) e faça o deploy. Sessões novas já saem com o cabeçalho; webhooks sem token ainda passam, com aviso `waha.webhook.auth accepted_without_token` no log.
+2. Atualize as sessões existentes (o WAHA reinicia cada sessão; o pareamento é mantido):
+   `curl -X POST -H "x-corretop-internal-token: $WHATSAPP_API_INTERNAL_TOKEN" https://api.crm.ancorasaude.cloud/internal/waha/sessions/refresh-webhooks`
+   A resposta lista cada sessão com `updated` ou `failed`.
+3. Quando o log parar de mostrar `accepted_without_token`, defina `WAHA_WEBHOOK_TOKEN_REQUIRED=true` e faça o deploy. A partir daí webhook sem o token recebe 401 e não chega ao CRM.
+
+Rollback: remova `WAHA_WEBHOOK_TOKEN_REQUIRED` (volta a aceitar sem token).
+
+---
+
 ## Payload — Eventos
 
 ### Estrutura base

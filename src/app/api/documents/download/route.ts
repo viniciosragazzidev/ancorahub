@@ -4,6 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { safeFileHeaders } from "@/shared/http/safe-file-headers";
 import { getDatabase, schema } from "@/shared/db";
 import { isR2StorageEnabled } from "@/features/storage/r2-storage-feature";
 import { downloadR2Object } from "@/shared/storage/r2-storage";
@@ -56,11 +57,7 @@ export async function GET(request: NextRequest) {
     const storageKey = document.storageKey === safeKey ? document.storageKey : safeKey;
     const file = await downloadR2Object(storageKey);
     return new NextResponse(file, {
-      headers: {
-        "Content-Disposition": `inline; filename="${document.filename.replaceAll('"', "")}"`,
-        "Cache-Control": "private, no-store",
-        "Content-Type": document.mimeType ?? "application/octet-stream",
-      },
+      headers: safeFileHeaders({ mimeType: document.mimeType, filename: document.filename }),
     });
   } catch {
     return NextResponse.json({ error: "Não foi possível abrir o documento." }, { status: 404 });

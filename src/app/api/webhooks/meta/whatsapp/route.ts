@@ -6,6 +6,7 @@ import { getMetaCloudServerConfig } from "@/features/communication-channels/meta
 import { ingestMetaCloudWebhook, isMetaCloudWhatsAppEnabled } from "@/features/communication-channels/service";
 import type { MetaWebhookPayload } from "@/features/communication-channels/types";
 import { backgroundRoute } from "@/shared/db/background-pool";
+import { exceedsBodyLimit } from "@/shared/http/body-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,6 +37,7 @@ async function handleGET(request: Request) {
 async function handlePOST(request: Request) {
   try {
     const config = getMetaCloudServerConfig();
+    if (exceedsBodyLimit(request)) return NextResponse.json({ error: "Payload too large" }, { status: 413 });
     const rawBody = await request.text();
     if (!signatureMatches(rawBody, request.headers.get("x-hub-signature-256"), config.appSecret)) return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     if (!(await isMetaCloudWhatsAppEnabled())) return NextResponse.json({ accepted: true, ignored: "feature_disabled" });

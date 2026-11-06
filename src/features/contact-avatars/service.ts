@@ -3,6 +3,7 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
+import { normalizeMime, RASTER_IMAGE_MIME } from "@/shared/http/safe-file-headers";
 import { findConnectedTenantChannelId } from "@/features/waha-cadence/tenant-channel-routing";
 import { getWahaProfilePictureUrl } from "@/features/waha-cadence/relay-client";
 
@@ -78,9 +79,10 @@ async function lookUpContactAvatar(tenantId: string, phone: string, phoneKey: st
     const url = await getWahaProfilePictureUrl({ sessionName: number.relaySessionId, phone: fullPhone.length <= 11 ? `55${fullPhone}` : fullPhone });
     if (url) {
       const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
-      const contentType = response.headers.get("content-type") ?? "";
+      const contentType = normalizeMime(response.headers.get("content-type"));
       const body = Buffer.from(await response.arrayBuffer());
-      if (response.ok && contentType.startsWith("image/") && body.length > 0 && body.length <= AVATAR_MAX_BYTES) {
+      // Raster only: an SVG served back from our origin could carry script.
+      if (response.ok && RASTER_IMAGE_MIME.test(contentType) && body.length > 0 && body.length <= AVATAR_MAX_BYTES) {
         picture = { body, contentType };
       }
     }
