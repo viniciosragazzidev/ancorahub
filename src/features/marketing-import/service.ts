@@ -358,7 +358,9 @@ export async function importMetaLeads(
             assignmentStrategy: null,
             distributionUpdatedAt: new Date(),
             assignedAt: null,
-            consentimentoLgpd: true,
+            // A spreadsheet carries no proof of consent: never record one (LGPD art. 8 §2).
+
+            consentimentoLgpd: false,
           });
 
           await tx.insert(schema.leadInteractions).values({

@@ -173,6 +173,12 @@ export async function runGateway<T>(input: {
   retryAnthropicHaikuOnTransient?: boolean;
   /** Client conversation or health data inside: only paid providers that do not train on it (LGPD art. 11). */
   sensitive?: boolean;
+  /**
+   * Mask phones, e-mails, CPFs and boleto lines for every provider, paid ones
+   * included. For tasks that never need those values (analysis, summaries):
+   * data minimisation, LGPD art. 6 III. Free tiers are always masked.
+   */
+  maskPersonalData?: boolean;
 }): Promise<GatewayResult<T>> {
   const totalTimeoutMs = input.totalTimeoutMs ?? (input.profile === "interpreter" ? 12_000 : undefined);
   const totalDeadlineAt = totalTimeoutMs && totalTimeoutMs > 0 ? Date.now() + totalTimeoutMs : undefined;
@@ -214,7 +220,7 @@ export async function runGateway<T>(input: {
       const startedAt = Date.now();
       attempts += 1;
       const nativeAnthropic = ref.provider === "anthropic" && input.profile === "interpreter";
-      const messages = isFreeTier(ref)
+      const messages = input.maskPersonalData || isFreeTier(ref)
         ? input.messages.map((message) => ({ ...message, content: maskPersonalData(message.content) }))
         : input.messages;
     try {

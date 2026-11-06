@@ -70,7 +70,9 @@ describe("quote flow", () => {
     expect(question(blocks).choices[0]?.action).toEqual({ kind: "href", href: `https://web.whatsapp.com/send?text=${encodeURIComponent(quoteSummaryText(complete, first!))}` });
     const text = quoteSummaryText(complete, first!);
     expect(text).toContain("3 vidas");
-    expect(text).not.toContain("(exemplo)");
+    // Demo prices: the client must see they are an example, not an operator quote.
+    expect(text).toContain("(exemplo)");
+    expect(text).toContain("não são uma cotação da operadora");
     expect(text).not.toContain("—");
   });
 

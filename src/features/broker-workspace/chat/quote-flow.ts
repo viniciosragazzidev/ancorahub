@@ -174,9 +174,13 @@ export function resultBlocks(answers: QuoteAnswers, round: number): ChatBlock[] 
   ];
 }
 
-/** Text sent to the client (WhatsApp or copied). */
+/**
+ * Text sent to the client (WhatsApp or copied). The plans in this simulator
+ * are demonstration data, so the client is told plainly that the price is an
+ * example and not an operator quote (CDC arts. 31 and 37).
+ */
 export function quoteSummaryText(answers: QuoteAnswers, result: QuoteResult) {
-  return `Olá! Segue uma simulação de plano de saúde: ${result.plan.carrier.replace(" (exemplo)", "")} ${result.plan.name}, ${lifeLabel(answers.ages?.length ?? 0)}, ${ACCOMMODATION_LABEL[answers.accommodation ?? "ward"].toLocaleLowerCase("pt-BR")}, total estimado de ${money(result.monthly)} por mês. Valores sujeitos à análise da operadora.`;
+  return `Olá! Segue uma simulação de exemplo de plano de saúde: ${result.plan.carrier} ${result.plan.name}, ${lifeLabel(answers.ages?.length ?? 0)}, ${ACCOMMODATION_LABEL[answers.accommodation ?? "ward"].toLocaleLowerCase("pt-BR")}, total ilustrativo de ${money(result.monthly)} por mês. Estes valores são de exemplo, não são uma cotação da operadora; o preço real depende da análise da operadora, das carências e da tabela vigente.`;
 }
 
 export function quoteWhatsAppHref(answers: QuoteAnswers, result: QuoteResult) {

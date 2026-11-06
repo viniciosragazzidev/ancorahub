@@ -247,6 +247,14 @@ export async function purgeUserLGPD(userId: string) {
     await tx.delete(schema.account).where(eq(schema.account.userId, userId));
     // Purge tenant membership
     await tx.delete(schema.tenantMemberships).where(eq(schema.tenantMemberships.userId, userId));
+    // The broker profile kept CPF, phone and invite e-mail after the purge:
+    // anonymise it too (rows stay for the history that points to them).
+    await tx.update(schema.brokerProfiles).set({
+      professionalName: "LGPD EXCLUÍDO",
+      phone: "",
+      cpf: null,
+      invitedEmail: null,
+    }).where(eq(schema.brokerProfiles.userId, userId));
     // Update user active status and nullify details
     await tx.update(schema.user).set({
       name: "LGPD EXCLUÍDO",
