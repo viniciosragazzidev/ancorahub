@@ -16,3 +16,8 @@ CREATE TABLE post_sale_opt_outs (
 
 CREATE UNIQUE INDEX post_sale_opt_outs_tenant_lead_unique
   ON post_sale_opt_outs (tenant_id, lead_id);
+
+-- RLS como as demais tabelas públicas: só o servidor acessa.
+ALTER TABLE post_sale_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_sale_surveys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_sale_opt_outs ENABLE ROW LEVEL SECURITY;
