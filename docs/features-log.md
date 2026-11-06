@@ -684,3 +684,7 @@ Um interpretador estruturado lê o contexto recente antes da resposta e auxilia 
 
 - O PDF omite o código do corretor junto ao nome e a tabela de resumo por corretor. Quando o recorte contém um único tipo de plantão, usa página A4 em retrato com conteúdo ampliado; recortes com mais tipos preservam a orientação paisagem.
 - Implementação: `src/features/lead-distribution/duty-escala-pdf.ts` e `src/features/lead-distribution/report-pdf-kit.ts`.
+
+# 06/11/2026 - Camada da faixa de WhatsApp desconectado
+
+A faixa fixa de conexão fica abaixo dos diálogos, preservando a confirmação de presença no plantão e o fluxo de obtenção do código de pareamento. Implementação em src/components/whatsapp/whatsapp-missing-banner.module.css.
