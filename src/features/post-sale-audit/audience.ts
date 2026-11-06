@@ -291,12 +291,21 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
     };
     // Origin on WAHA without a company number (broker's personal WhatsApp or unknown): company WAHA.
     // Ambiguous queue/unit channels are skipped as source_unavailable; only a missing source falls back.
+    // Official number recorded on the message but retired (inactive): treated as unknown.
+    const recorded = sourceMessage ? sourceFromMessage(sourceMessage) : null;
+    const fromMessage = recorded?.type === "meta" && byChannelId.get(recorded.ref)?.status !== "active" ? null : recorded;
+    const defaultMeta = (): Source => {
+      const channel = metaChannels.find((item) => item.isDefault && item.status === "active" && (item.branchId === null || item.branchId === lead.branchId));
+      return channel ? { type: "meta", ref: channel.id } : null;
+    };
     const source = choosePostSaleSource<NonNullable<Source>>({
       hasMessage: Boolean(sourceMessage),
-      fromMessage: sourceMessage ? sourceFromMessage(sourceMessage) : null,
+      fromMessage,
       messageProvider: sourceMessage?.provider ?? null,
+      messageIsMeta: sourceMessage ? isMetaProvider(sourceMessage.provider) : false,
       defaultState: sourceMessage ? null : resolveDefaultQueueSource(lead),
       companyWaha,
+      defaultMeta,
     });
     const leadConversations = conversationsByLead.get(lead.leadId) ?? [];
     const optedOut = isPostSaleOptedOut({
