@@ -19,6 +19,7 @@ import { isCustomerServiceWindowOpen, resolveApprovedMetaEventTemplate, resolveE
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { isPostSaleWahaNumberAllowed } from "@/features/post-sale-audit/rules";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { resolveCanonicalWhatsAppDestination } from "./phone-resolution";
 import { resolveNamedTemplateBodyParameters } from "./template-parameters";
@@ -770,24 +771,27 @@ export async function enqueuePostSaleSurveyWahaMessage(input: {
     .limit(1);
   if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
 
-  const [lead] = await db.select({ id: schema.leads.id }).from(schema.leads).where(and(
-    eq(schema.leads.id, input.leadId),
-    eq(schema.leads.tenantId, input.tenantId),
-    isNull(schema.leads.deletedAt),
-    isNull(schema.leads.archivedAt),
-  )).limit(1);
+  const [lead] = await db.select({ id: schema.leads.id, branchId: sql<string | null>`coalesce(${schema.leads.branchId}, ${schema.leadQueues.branchId})` })
+    .from(schema.leads)
+    .leftJoin(schema.leadQueues, eq(schema.leadQueues.id, schema.leads.queueId))
+    .where(and(
+      eq(schema.leads.id, input.leadId),
+      eq(schema.leads.tenantId, input.tenantId),
+      isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
+    )).limit(1);
   if (!lead) throw Object.assign(new Error("Lead indisponível nesta empresa."), { code: "POST_SALE_SOURCE_UNAVAILABLE" });
 
-  const [number] = await db.select({ id: schema.wahaNumbers.id, status: schema.wahaNumbers.status, pausedUntil: schema.wahaNumbers.pausedUntil })
+  const [number] = await db.select({ id: schema.wahaNumbers.id, scope: schema.wahaNumbers.scope, branchId: schema.wahaNumbers.branchId, status: schema.wahaNumbers.status, pausedUntil: schema.wahaNumbers.pausedUntil })
     .from(schema.wahaNumbers)
     .where(and(
       eq(schema.wahaNumbers.id, input.wahaNumberId),
       eq(schema.wahaNumbers.tenantId, input.tenantId),
-      eq(schema.wahaNumbers.scope, "tenant"),
+      inArray(schema.wahaNumbers.scope, ["tenant", "branch"]),
       inArray(schema.wahaNumbers.status, TENANT_CHANNEL_CONNECTED_STATUSES),
     ))
     .limit(1);
-  if (!number || (number.pausedUntil && number.pausedUntil > new Date())) {
+  if (!number || !isPostSaleWahaNumberAllowed(number, lead.branchId) || (number.pausedUntil && number.pausedUntil > new Date())) {
     throw Object.assign(new Error("O número de origem está indisponível."), { code: "POST_SALE_SOURCE_UNAVAILABLE" });
   }
 

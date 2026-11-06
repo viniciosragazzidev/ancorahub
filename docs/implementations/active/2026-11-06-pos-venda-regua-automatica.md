@@ -113,6 +113,14 @@ Job a cada 15 min (rota interna de jobs existente). Para cada regra ligada: busc
 - A resposta no Meta é texto livre dentro da janela de 24 horas aberta pela mensagem do cliente; essa premissa foi registrada para orientar o canal.
 - Migration `drizzle/0220_post_sale_opt_out_retry.sql` criada e não executada; inclui o marcador da solicitação de texto por etapa. Validação da revisão em `reports/agent/verification/2026-11-06-pos-venda-fase2-review-fixes.md` e `reports/agent/verification/2026-11-06-pos-venda-optout-atomico.md`.
 
+## Origem do envio (06/11, pedido do Vinicios)
+
+- A pesquisa sai pelo número por onde o lead entrou. Número WAHA de unidade vale só para leads da mesma unidade (lead ou fila), tanto na prévia quanto no enfileiramento.
+- Conversa feita pelo WhatsApp pessoal do corretor (`whatsapp_connections`) ou lead sem número registrado: a pesquisa sai pelo WAHA da unidade do lead ou, sem ele, pelo WAHA da empresa. Nunca pelo celular do corretor.
+- Fila ou unidade com mais de um canal possível (ambíguo) não troca de número: o lead fica fora como `source_unavailable`.
+- Premissa: o cliente recebe a pesquisa de um número da empresa diferente do celular do corretor; a conversa com o corretor continua no celular dele, fora do pós-venda. A apresentação já diz que é a equipe de qualidade, para não confundir com o corretor.
+- Medido em 06/11 (só leitura): 1 número WAHA da empresa ativo e nenhum de unidade.
+
 ## Riscos
 
 - Mensagem automática demais irrita o cliente: limite de 1 conversa a cada 30 dias e opt-out imediato.

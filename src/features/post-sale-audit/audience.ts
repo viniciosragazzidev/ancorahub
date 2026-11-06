@@ -7,7 +7,7 @@ import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast
 import { channelLeadIntakeKey, parseChannelLeadIntake } from "@/features/communication-channels/channel-lead-intake";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
-import { evaluatePostSaleEligibility, isPostSaleOptedOut, pickPostSaleSourceMessage, POST_SALE_EXCLUSION_LABELS, POST_SALE_SURVEY_COOLDOWN_DAYS, type PostSaleExclusionReason, type PostSaleAudience, pickPostSaleCompanyWaha } from "./rules";
+import { evaluatePostSaleEligibility, isPostSaleOptedOut, pickPostSaleSourceMessage, POST_SALE_EXCLUSION_LABELS, POST_SALE_SURVEY_COOLDOWN_DAYS, type PostSaleExclusionReason, type PostSaleAudience, pickPostSaleCompanyWaha, isPostSaleWahaNumberAllowed, choosePostSaleSource, type PostSaleDefaultSourceState } from "./rules";
 import { isApprovedPostSaleMetaTemplate } from "./template-contract";
 
 const META_PROVIDERS = [META_CLOUD_PROVIDER, "meta_cloud_api"];
@@ -202,7 +202,7 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
     db.select({ id: schema.communicationChannels.id, tenantId: schema.communicationChannels.tenantId, branchId: schema.communicationChannels.branchId, provider: schema.communicationChannels.provider, status: schema.communicationChannels.status, registrationStatus: schema.communicationChannels.registrationStatus, wabaId: schema.communicationChannels.wabaId, phoneNumberId: schema.communicationChannels.phoneNumberId, accessTokenCiphertext: schema.communicationChannels.accessTokenCiphertext, onboardingMode: schema.communicationChannels.onboardingMode, isDefault: schema.communicationChannels.isDefault })
       .from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, context.tenantId), inArray(schema.communicationChannels.provider, META_PROVIDERS))),
     db.select({ id: schema.wahaNumbers.id, tenantId: schema.wahaNumbers.tenantId, branchId: schema.wahaNumbers.branchId, scope: schema.wahaNumbers.scope, status: schema.wahaNumbers.status, pausedUntil: schema.wahaNumbers.pausedUntil })
-      .from(schema.wahaNumbers).where(and(eq(schema.wahaNumbers.tenantId, context.tenantId), eq(schema.wahaNumbers.scope, "tenant"))),
+      .from(schema.wahaNumbers).where(and(eq(schema.wahaNumbers.tenantId, context.tenantId), inArray(schema.wahaNumbers.scope, ["tenant", "branch"]))),
   ]);
 
   const channelSettings = await getSystemSettings(metaChannels.map((channel) => channelLeadIntakeKey(channel.id))).catch(() => []);
@@ -250,31 +250,33 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
   const durableOptOutLeadIds = new Set(optOuts.map((optOut) => optOut.leadId));
   const humanActiveLeadIds = new Set(humanMessages.map((message) => message.leadId).filter((id): id is string => Boolean(id)));
 
-  const defaultQueueSources = new Map<string, Source>();
-  const resolveDefaultQueueSource = (lead: LeadRow): Source => {
-    if (!lead.queueId) return null;
+  type DefaultSourceState = PostSaleDefaultSourceState<NonNullable<Source>>;
+  const defaultQueueSources = new Map<string, DefaultSourceState>();
+  const resolveDefaultQueueSource = (lead: LeadRow): DefaultSourceState => {
+    if (!lead.queueId) return { kind: "none" };
     const cacheKey = `${lead.queueId}:${lead.branchId ?? ""}`;
     const existing = defaultQueueSources.get(cacheKey);
     if (existing !== undefined) return existing;
     const mapped = metaChannels.filter((channel) => intakeQueueByChannel.get(channel.id) === lead.queueId);
     if (mapped.length === 1) {
-      const source = { type: "meta" as const, ref: mapped[0].id };
-      defaultQueueSources.set(cacheKey, source);
-      return source;
+      const state: DefaultSourceState = { kind: "one", source: { type: "meta", ref: mapped[0].id } };
+      defaultQueueSources.set(cacheKey, state);
+      return state;
     }
     if (mapped.length > 1) {
-      defaultQueueSources.set(cacheKey, null);
-      return null;
+      const state: DefaultSourceState = { kind: "ambiguous" };
+      defaultQueueSources.set(cacheKey, state);
+      return state;
     }
     const branchMeta = metaChannels.filter((channel) => channel.isDefault && (channel.branchId === lead.branchId || channel.branchId === null));
-    const branchWaha = wahaNumbers.filter((number) => number.branchId === lead.branchId || number.branchId === null);
+    const branchWaha = wahaNumbers.filter((number) => isPostSaleWahaNumberAllowed(number, lead.branchId));
     const choices = [
       ...branchMeta.map((channel) => ({ type: "meta" as const, ref: channel.id })),
       ...branchWaha.map((number) => ({ type: "waha" as const, ref: number.id })),
     ];
-    const source = choices.length === 1 ? choices[0] : null;
-    defaultQueueSources.set(cacheKey, source);
-    return source;
+    const state: DefaultSourceState = choices.length === 1 ? { kind: "one", source: choices[0] } : choices.length > 1 ? { kind: "ambiguous" } : { kind: "none" };
+    defaultQueueSources.set(cacheKey, state);
+    return state;
   };
 
   const excluded = { ...emptyExcluded };
@@ -288,9 +290,14 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
       return number ? { type: "waha", ref: number.id } : null;
     };
     // Origin on WAHA without a company number (broker's personal WhatsApp or unknown): company WAHA.
-    const source = sourceMessage
-      ? sourceFromMessage(sourceMessage) ?? (sourceMessage.provider === "waha" ? companyWaha() : null)
-      : resolveDefaultQueueSource(lead) ?? companyWaha();
+    // Ambiguous queue/unit channels are skipped as source_unavailable; only a missing source falls back.
+    const source = choosePostSaleSource<NonNullable<Source>>({
+      hasMessage: Boolean(sourceMessage),
+      fromMessage: sourceMessage ? sourceFromMessage(sourceMessage) : null,
+      messageProvider: sourceMessage?.provider ?? null,
+      defaultState: sourceMessage ? null : resolveDefaultQueueSource(lead),
+      companyWaha,
+    });
     const leadConversations = conversationsByLead.get(lead.leadId) ?? [];
     const optedOut = isPostSaleOptedOut({
       conversationOptOutAt: leadConversations.find((conversation) => conversation.optOutAt)?.optOutAt,
@@ -307,7 +314,7 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
     const sourceAvailable = source?.type === "meta"
       ? Boolean(metaChannel && metaChannel.status === "active" && metaChannel.registrationStatus === "registered" && metaChannel.phoneNumberId && metaChannel.accessTokenCiphertext && metaChannel.wabaId)
       : source?.type === "waha"
-        ? Boolean(wahaNumber && WAHA_STATUSES.includes(wahaNumber.status) && (!wahaNumber.pausedUntil || wahaNumber.pausedUntil <= now))
+        ? Boolean(wahaNumber && isPostSaleWahaNumberAllowed(wahaNumber, lead.branchId) && WAHA_STATUSES.includes(wahaNumber.status) && (!wahaNumber.pausedUntil || wahaNumber.pausedUntil <= now))
         : false;
     const templateApproved = source?.type === "meta" && metaChannel?.wabaId ? approvedWabas.has(metaChannel.wabaId) : source?.type === "waha";
     const brokerId = audience.kind === "broker" ? audience.brokerId : lead.currentBrokerId;

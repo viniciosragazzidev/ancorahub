@@ -61,10 +61,17 @@ export function isPostSaleOptedOut(input: { conversationOptOutAt?: Date | null; 
 
 export type PostSaleCompanyWahaNumber = {
   id: string;
+  scope: string;
   branchId: string | null;
   status: string;
   pausedUntil: Date | null;
 };
+
+/** Company WAHA numbers allowed for a lead: tenant-wide numbers, or a unit number of the lead's own unit. */
+export function isPostSaleWahaNumberAllowed(number: { scope: string; branchId: string | null }, leadBranchId: string | null) {
+  if (number.scope === "tenant") return true;
+  return number.scope === "branch" && Boolean(number.branchId) && number.branchId === leadBranchId;
+}
 
 /**
  * Company WhatsApp (WAHA) used when the lead's origin cannot send: the conversation ran on the
@@ -72,9 +79,31 @@ export type PostSaleCompanyWahaNumber = {
  * phone. Prefers the lead's unit number, then a company-wide one; only active, unpaused numbers.
  */
 export function pickPostSaleCompanyWaha(numbers: readonly PostSaleCompanyWahaNumber[], leadBranchId: string | null, now: Date) {
-  const usable = numbers.filter((number) => ["active", "ready"].includes(number.status) && (!number.pausedUntil || number.pausedUntil <= now));
-  const unit = leadBranchId ? usable.find((number) => number.branchId === leadBranchId) : undefined;
-  return unit ?? usable.find((number) => number.branchId === null) ?? null;
+  const usable = numbers.filter((number) => ["active", "ready"].includes(number.status)
+    && (!number.pausedUntil || number.pausedUntil <= now)
+    && isPostSaleWahaNumberAllowed(number, leadBranchId));
+  const unit = leadBranchId ? usable.find((number) => number.scope === "branch" && number.branchId === leadBranchId) : undefined;
+  return unit ?? usable.find((number) => number.scope === "tenant" && number.branchId === null) ?? null;
+}
+
+export type PostSaleDefaultSourceState<T> = { kind: "none" } | { kind: "ambiguous" } | { kind: "one"; source: T };
+
+/**
+ * Picks where the survey goes. The lead's own origin wins; an origin on WAHA without a company number
+ * (broker's personal WhatsApp) or a lead with no source at all falls back to the company WAHA.
+ * An ambiguous queue/unit channel never falls back: the lead is skipped as source_unavailable.
+ */
+export function choosePostSaleSource<T>(input: {
+  hasMessage: boolean;
+  fromMessage: T | null;
+  messageProvider: string | null;
+  defaultState: PostSaleDefaultSourceState<T> | null;
+  companyWaha: () => T | null;
+}): T | null {
+  if (input.hasMessage) return input.fromMessage ?? (input.messageProvider === "waha" ? input.companyWaha() : null);
+  if (input.defaultState?.kind === "one") return input.defaultState.source;
+  if (input.defaultState?.kind === "none") return input.companyWaha();
+  return null;
 }
 
 /** Prefer the first inbound; form leads without a reply use their first outbound contact. */

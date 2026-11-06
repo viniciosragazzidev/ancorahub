@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluatePostSaleEligibility, findUnknownPostSaleOpeningVariables, firstName, isPostSaleOptedOut, pickPostSaleCompanyWaha, pickPostSaleSourceMessage, renderPostSaleOpeningMessage } from "./rules";
+import { evaluatePostSaleEligibility, findUnknownPostSaleOpeningVariables, firstName, isPostSaleOptedOut, choosePostSaleSource, isPostSaleWahaNumberAllowed, pickPostSaleCompanyWaha, pickPostSaleSourceMessage, renderPostSaleOpeningMessage } from "./rules";
 import { isApprovedPostSaleMetaTemplate, POST_SALE_META_TEMPLATE, POST_SALE_WAHA_OPENING_DEFAULT } from "./template-contract";
 
 const eligible = {
@@ -77,8 +77,8 @@ describe("post-sale audience rules", () => {
 
 describe("pickPostSaleCompanyWaha", () => {
   const now = new Date("2026-11-06T15:00:00Z");
-  const company = { id: "w-company", branchId: null, status: "active", pausedUntil: null };
-  const unit = { id: "w-unit", branchId: "b1", status: "active", pausedUntil: null };
+  const company = { id: "w-company", scope: "tenant", branchId: null, status: "active", pausedUntil: null };
+  const unit = { id: "w-unit", scope: "branch", branchId: "b1", status: "active", pausedUntil: null };
 
   it("prefere o número da unidade do lead", () => {
     expect(pickPostSaleCompanyWaha([company, unit], "b1", now)?.id).toBe("w-unit");
@@ -93,5 +93,41 @@ describe("pickPostSaleCompanyWaha", () => {
     expect(pickPostSaleCompanyWaha([unit], "b2", now)).toBeNull();
     expect(pickPostSaleCompanyWaha([{ ...company, pausedUntil: new Date("2026-11-06T16:00:00Z") }], null, now)).toBeNull();
     expect(pickPostSaleCompanyWaha([{ ...company, status: "error" }], null, now)).toBeNull();
+  });
+});
+
+describe("isPostSaleWahaNumberAllowed", () => {
+  it("aceita número da empresa e número da própria unidade do lead", () => {
+    expect(isPostSaleWahaNumberAllowed({ scope: "tenant", branchId: null }, "b1")).toBe(true);
+    expect(isPostSaleWahaNumberAllowed({ scope: "branch", branchId: "b1" }, "b1")).toBe(true);
+  });
+
+  it("recusa número de outra unidade, de unidade sem lead na unidade e de materiais", () => {
+    expect(isPostSaleWahaNumberAllowed({ scope: "branch", branchId: "b1" }, "b2")).toBe(false);
+    expect(isPostSaleWahaNumberAllowed({ scope: "branch", branchId: "b1" }, null)).toBe(false);
+    expect(isPostSaleWahaNumberAllowed({ scope: "tenant_materials", branchId: null }, null)).toBe(false);
+  });
+});
+
+describe("choosePostSaleSource", () => {
+  const company = { type: "waha", ref: "w-company" };
+  const companyWaha = () => company;
+
+  it("fila com dois canais de entrada fica sem fonte, sem cair no número da empresa", () => {
+    expect(choosePostSaleSource({ hasMessage: false, fromMessage: null, messageProvider: null, defaultState: { kind: "ambiguous" }, companyWaha })).toBeNull();
+  });
+
+  it("lead sem fonte nenhuma usa o número da empresa", () => {
+    expect(choosePostSaleSource({ hasMessage: false, fromMessage: null, messageProvider: null, defaultState: { kind: "none" }, companyWaha })).toBe(company);
+  });
+
+  it("conversa pelo WhatsApp pessoal do corretor usa o número da empresa", () => {
+    expect(choosePostSaleSource({ hasMessage: true, fromMessage: null, messageProvider: "waha", defaultState: null, companyWaha })).toBe(company);
+  });
+
+  it("origem própria vence; origem Meta sem canal não troca de número", () => {
+    const meta = { type: "meta", ref: "c1" };
+    expect(choosePostSaleSource({ hasMessage: true, fromMessage: meta, messageProvider: "meta_cloud", defaultState: null, companyWaha })).toBe(meta);
+    expect(choosePostSaleSource({ hasMessage: true, fromMessage: null, messageProvider: "meta_cloud", defaultState: null, companyWaha })).toBeNull();
   });
 });
