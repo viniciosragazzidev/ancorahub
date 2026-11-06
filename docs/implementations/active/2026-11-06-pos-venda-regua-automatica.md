@@ -54,6 +54,28 @@ Regras de proteção, valendo para manual e automático:
 - Tabela `post_sale_rules`: `tenant_id`, `key` (R1 a R5), `enabled`, `delay_business_days`, `filters` jsonb, `daily_limit`, `pilot` jsonb (filas/corretores liberados), `updated_by`, `updated_at`. Único por (tenant, key).
 - `post_sale_surveys`: coluna `rule_key` e índice por (tenant, lead, created_at) para a regra de 30 dias.
 
+## Regra R0: cliente que volta a escrever depois de distribuído (pedido de 06/11)
+
+Caso real (06/11): lead empresarial já distribuído e "Em Atendimento" com a corretora; ela mandou "O que achou?", depois "Encerrando o atendimento". No dia seguinte o cliente escreve de novo pedindo cotação e a conversa fica parada em "Aguardando Humano", sem resposta.
+
+Gatilho: mensagem nova do cliente em lead que já tem corretor (aceito ou em atendimento, não vendido) e que fica sem resposta humana por X minutos em horário comercial (padrão 10 min), ou que chega depois de o corretor encerrar o atendimento. Diferente da R1 a R5, não depende de atraso em dias: é reativa à mensagem do cliente.
+
+Fluxo da IA (mesmo motor de pesquisa, roteiro próprio `rule_key = R0`, uma pergunta por vez):
+1. Acolhe e situa: "Oi, {nome}! Vi que você já conversou com {corretor} sobre o plano {tipo}. Me conta o que rolou: você chegou a ser atendido e receber a cotação?"
+2. Lê a resposta e classifica: (a) não foi atendido ou não recebeu cotação; (b) foi atendido e quer cotação nova, ajuste ou tirar dúvida; (c) já fechou ou desistiu; (d) outro assunto.
+3. Destino:
+   - (a) alerta "Cliente diz que não foi atendido" para a direção e o gestor da unidade, aviso ao corretor com prazo curto (padrão 15 min); sem resposta do corretor, o lead volta para a distribuição com prioridade e o histórico.
+   - (b) avisa o corretor ("{cliente} voltou e quer {pedido}"), confirma ao cliente que o corretor vai retomar; sem resposta do corretor no prazo, mesma escalada de (a).
+   - (c) registra no lead (vendido por fora, desistiu, motivo) e encerra com cordialidade; se desistiu, alimenta o motivo de perda.
+   - (d) responde em 1 frase e encaminha ao corretor.
+4. Grava tudo no lead (linha do tempo) e no survey; conta no relatório por corretor como "cliente voltou sem resposta".
+
+Proteções: no máximo 1 conversa R0 por lead a cada 7 dias; não dispara se o corretor respondeu nas últimas 2 horas ou se há pesquisa ativa; respeita opt-out; a IA nunca informa preço. Usa o canal por onde o cliente escreveu (no Meta já dentro da janela de 24h aberta pelo cliente, então texto livre).
+
+Relação com o "cliente aguardando corretor" (`da7b7668`, reprovado pelo Vigia em 05/11): a R0 substitui o lembrete passivo ao corretor por uma conversa com o cliente; o alerta ao corretor e a escalada reaproveitam aquele trabalho depois de corrigidos os bloqueios (corrida com o timeout de 15 min, job que pode duplicar, envio falho contando como respondido).
+
+Entrega: Fase 4a, antes da R1, porque o problema acontece hoje com leads quentes. Piloto em uma fila, com a direção recebendo os alertas.
+
 ## Motor automático
 
 Job a cada 15 min (rota interna de jobs existente). Para cada regra ligada: busca leads que bateram o marco + atraso no dia útil, aplica proteções e filtros, cria ou reaproveita a campanha automática do dia (`kind = auto`, `rule_key`) e enfileira com a chave `post-sale:<rule>:<lead>:<marco>`. Rodar duas vezes não duplica envio. Fora do horário comercial só agenda.
@@ -63,8 +85,9 @@ Job a cada 15 min (rota interna de jobs existente). Para cada regra ligada: busc
 1. **Fase 1 (pronta, `0c770b13`):** revisão do Vigia, push, SQL `0217` e envio do template `pos_venda_apresentacao` para aprovação da Meta.
 2. **Fase 2 (conversa + tela mínima manual):** roteamento das respostas (Meta e WAHA) antes da qualificação, roteiro com IA, opt-out, lembrete, gravação no lead, e uma tela simples: criar campanha manual por corretor, fila ou período, ver a prévia, disparar e ver as respostas. **Aqui já dá para começar com o grupo de leads de um corretor** (piloto de 10 a 20 leads).
 3. **Fase 3 (relatórios e alertas):** relatório por corretor, alertas, cartões no perfil do corretor e no lead, ação em massa na lista de leads.
-4. **Fase 4 (régua automática):** `post_sale_rules`, motor de 15 min, aba Régua automática com prévia; piloto com R1 em uma fila e 20 por dia.
-5. **Fase 5 (ajuste):** depois de uma semana de respostas, ajustar textos, atrasos e ligar R2 a R4; R5 por último.
+4. **Fase 4a (R0, cliente que volta a escrever):** gatilho reativo, roteiro "o que rolou?", alertas e escalada para o corretor e a direção.
+5. **Fase 4 (régua automática):** `post_sale_rules`, motor de 15 min, aba Régua automática com prévia; piloto com R1 em uma fila e 20 por dia.
+6. **Fase 5 (ajuste):** depois de uma semana de respostas, ajustar textos, atrasos e ligar R2 a R4; R5 por último.
 
 ## Implementação da Fase 2 (06/11/2026)
 
