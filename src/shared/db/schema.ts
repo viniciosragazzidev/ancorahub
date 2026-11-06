@@ -3770,6 +3770,7 @@ export const postSaleSurveys = pgTable(
     mediaTextPromptStep: integer("media_text_prompt_step"),
     lastReplyAt: timestamp("last_reply_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    alertsHandledAt: timestamp("alerts_handled_at", { withTimezone: true }),
     createdAt,
   },
   (table) => [

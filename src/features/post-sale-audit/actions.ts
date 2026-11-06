@@ -12,6 +12,9 @@ import { getFeatureFlag } from "@/features/system-settings/queries";
 import { isBusinessHours, nextBusinessOpening } from "@/features/team-notices/guard";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { loadLatestPostSaleLeadSurvey, loadPostSaleAlertTarget, loadPostSaleBrokerReport, loadPostSaleBrokerSummary, loadPostSaleOpenAlerts } from "./queries";
+import { postSaleAlertReasons } from "./alert-rules";
+import type { PostSaleBrokerReportRow } from "./reporting";
 import { firstName, findUnknownPostSaleOpeningVariables, renderPostSaleOpeningMessage } from "./rules";
 import { postSaleAudienceSchema, POST_SALE_CAMPAIGN_MAX_LEADS } from "./rules";
 import { resolvePostSaleAudience } from "./audience";
@@ -59,11 +62,29 @@ async function recordPostSaleAudit(input: {
   action: string;
   metadata?: Record<string, unknown>;
 }) {
+  await recordPostSaleAuditEvent({
+    tenantId: input.tenantId,
+    userId: input.userId,
+    entity: "post_sale_campaign",
+    entityId: input.campaignId,
+    action: input.action,
+    metadata: input.metadata,
+  });
+}
+
+async function recordPostSaleAuditEvent(input: {
+  tenantId: string;
+  userId: string;
+  entity: string;
+  entityId: string;
+  action: string;
+  metadata?: Record<string, unknown>;
+}) {
   await getDatabase().insert(schema.auditLogs).values({
     id: randomUUID(),
     userId: input.userId,
-    entidade: "post_sale_campaign",
-    entidadeId: input.campaignId,
+    entidade: input.entity,
+    entidadeId: input.entityId,
     acao: input.action,
     metadata: { source: "post_sale_audit", tenantId: input.tenantId, ...(input.metadata ?? {}) },
   });
@@ -293,17 +314,28 @@ export async function startPostSaleCampaignAction(campaignId: string): Promise<A
   }
 }
 
-export async function getPostSaleWorkspaceAction(): Promise<ActionResult<{
+const postSalePeriodSchema = z.union([z.literal(7), z.literal(30), z.literal(90)]);
+
+function postSaleWindow(periodDays: number, now = new Date()) {
+  return { from: new Date(now.getTime() - periodDays * 86_400_000), to: new Date(now.getTime() + 1) };
+}
+
+export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30): Promise<ActionResult<{
   brokers: Array<{ id: string; name: string }>;
   queues: Array<{ id: string; name: string }>;
   campaigns: Array<{ id: string; name: string; status: string; totals: Record<string, number>; createdAt: string }>;
   responses: Array<{ id: string; leadId: string; leadName: string; campaignName: string; status: string; rating: number | null; answers: Record<string, unknown>; lastReplyAt: string | null }>;
+  report: PostSaleBrokerReportRow[];
+  alerts: Awaited<ReturnType<typeof loadPostSaleOpenAlerts>>;
+  periodDays: number;
 }>> {
   try {
     const context = await authorizedContext();
+    const periodDays = postSalePeriodSchema.parse(rawPeriodDays);
+    const window = postSaleWindow(periodDays);
     const db = getDatabase();
     const branchFilter = context.role === "manager" ? context.branchId : undefined;
-    const [brokers, queues, campaigns, responses] = await Promise.all([
+    const [brokers, queues, campaigns, responses, report, alerts] = await Promise.all([
       db.select({ id: schema.tenantMemberships.userId, name: schema.user.name }).from(schema.tenantMemberships)
         .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
         .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), branchFilter ? eq(schema.tenantMemberships.branchId, branchFilter) : undefined))
@@ -319,13 +351,118 @@ export async function getPostSaleWorkspaceAction(): Promise<ActionResult<{
         .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
         .where(and(eq(schema.postSaleSurveys.tenantId, context.tenantId), isNull(schema.leads.deletedAt), branchFilter ? sql`coalesce(${schema.leads.branchId}, ${schema.leadQueues.branchId}) = ${branchFilter}` : undefined))
         .orderBy(desc(schema.postSaleSurveys.lastReplyAt), desc(schema.postSaleSurveys.createdAt)).limit(100),
+      loadPostSaleBrokerReport(context, window),
+      loadPostSaleOpenAlerts(context),
     ]);
+    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_report", entityId: "workspace", action: "post_sale_report.viewed", metadata: { periodDays, brokerRows: report.length, openAlerts: alerts.length } });
     return { ok: true, data: {
       brokers: brokers.map((row) => ({ id: row.id, name: row.name ?? "Corretor" })),
       queues,
       campaigns: campaigns.map((row) => ({ ...row, totals: row.totals as Record<string, number>, createdAt: row.createdAt.toISOString() })),
       responses: responses.map((row) => ({ ...row, answers: row.answers as Record<string, unknown>, lastReplyAt: row.lastReplyAt?.toISOString() ?? null })),
+      report,
+      alerts,
+      periodDays,
     } };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+export async function getPostSaleBrokerSummaryAction(rawBrokerId: unknown, rawPeriodDays: unknown = 30): Promise<ActionResult<PostSaleBrokerReportRow | null>> {
+  try {
+    const context = await authorizedContext();
+    const brokerId = z.string().trim().min(1).max(80).parse(rawBrokerId);
+    const periodDays = postSalePeriodSchema.parse(rawPeriodDays);
+    const report = await loadPostSaleBrokerSummary(context, brokerId, postSaleWindow(periodDays));
+    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_report", entityId: brokerId, action: "post_sale_report.broker_viewed", metadata: { periodDays, available: Boolean(report) } });
+    return { ok: true, data: report };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+export async function getPostSaleLeadSurveyAction(rawLeadId: unknown): Promise<ActionResult<{
+  id: string;
+  status: string;
+  outcome: string | null;
+  rating: number | null;
+  answers: Record<string, unknown>;
+  sentAt: string | null;
+  lastReplyAt: string | null;
+  completedAt: string | null;
+} | null>> {
+  try {
+    const context = await authorizedContext();
+    const leadId = z.string().trim().min(1).max(80).parse(rawLeadId);
+    const survey = await loadLatestPostSaleLeadSurvey(context, leadId);
+    if (!survey) return { ok: true, data: null };
+    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_survey", entityId: survey.id, action: "post_sale_survey.viewed", metadata: { leadId } });
+    return { ok: true, data: {
+      id: survey.id,
+      status: survey.status,
+      outcome: survey.outcome,
+      rating: survey.rating,
+      answers: survey.answers as Record<string, unknown>,
+      sentAt: survey.sentAt?.toISOString() ?? null,
+      lastReplyAt: survey.lastReplyAt?.toISOString() ?? null,
+      completedAt: survey.completedAt?.toISOString() ?? null,
+    } };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+export async function markPostSaleAlertHandledAction(rawSurveyId: unknown): Promise<ActionResult<{ changed: boolean }>> {
+  try {
+    const context = await authorizedContext();
+    const surveyId = z.string().trim().min(1).max(80).parse(rawSurveyId);
+    const target = await loadPostSaleAlertTarget(context, surveyId);
+    if (!target) throw new PostSaleActionError("Alerta não encontrado ou fora do seu escopo.");
+    if (target.alertsHandledAt) return { ok: true, data: { changed: false } };
+    const reasons = postSaleAlertReasons(target);
+    if (!reasons.length) return { ok: true, data: { changed: false } };
+
+    const now = new Date();
+    const managerScope = context.role === "manager" ? sql`exists (
+      select 1
+      from leads as post_sale_alert_lead
+      left join lead_queues as post_sale_alert_queue
+        on post_sale_alert_queue.id = post_sale_alert_lead.queue_id
+        and post_sale_alert_queue.tenant_id = post_sale_alert_lead.tenant_id
+      where post_sale_alert_lead.id = ${schema.postSaleSurveys.leadId}
+        and post_sale_alert_lead.tenant_id = ${context.tenantId}
+        and post_sale_alert_lead.deleted_at is null
+        and coalesce(post_sale_alert_lead.branch_id, post_sale_alert_queue.branch_id) = ${context.branchId}
+    )` : undefined;
+    const changed = await getDatabase().transaction(async (tx) => {
+      const [updated] = await tx.update(schema.postSaleSurveys).set({ alertsHandledAt: now }).where(and(
+        eq(schema.postSaleSurveys.id, surveyId),
+        eq(schema.postSaleSurveys.tenantId, context.tenantId),
+        isNull(schema.postSaleSurveys.alertsHandledAt),
+        managerScope,
+      )).returning({ id: schema.postSaleSurveys.id });
+      if (!updated) return false;
+
+      await tx.update(schema.notifications).set({ readAt: now, message: "Alerta de pós-venda tratado pela gestão." }).where(and(
+        eq(schema.notifications.tenantId, context.tenantId),
+        eq(schema.notifications.leadId, target.leadId),
+        eq(schema.notifications.type, "post_sale_alert"),
+        sql`${schema.notifications.idempotencyKey} like ${`post-sale-alert:${surveyId}:%`}`,
+        isNull(schema.notifications.readAt),
+      ));
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "post_sale_survey",
+        entidadeId: surveyId,
+        acao: "post_sale_alert.handled",
+        metadata: { source: "post_sale_audit", tenantId: context.tenantId, leadId: target.leadId, reasons },
+        createdAt: now,
+      });
+      return true;
+    });
+    return { ok: true, data: { changed } };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };
   }

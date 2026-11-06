@@ -10,6 +10,8 @@ import { enqueueMetaTemplateMessage, enqueueMetaTextMessage, enqueuePostSaleSurv
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { POST_SALE_META_TEMPLATE } from "./template-contract";
+import { postSaleAlertReasons } from "./alert-rules";
+import { ensurePostSaleSurveyAlerts } from "./alert-service";
 import { businessHoursBetween, detectPostSaleKeywords, isActivePostSaleSurvey, postSaleAnswerSchema, postSaleNextTurn, type PostSaleAnswers } from "./conversation-rules";
 import { postSaleMediaReply, requestPostSaleTextOnceAtStep, retryPostSaleOperation, runPostSaleOptOutTransaction, type PostSaleMessageKind } from "./conversation-operations";
 
@@ -75,6 +77,7 @@ async function finalizeProcessedTurn(survey: typeof schema.postSaleSurveys.$infe
   const db = getDatabase();
   const now = new Date();
   const answers = (survey.answers ?? {}) as PostSaleAnswers;
+  await ensurePostSaleSurveyAlerts(survey);
   if (survey.status === "opted_out") {
     await db.update(schema.aiConversations).set({ optOutAt: now, updatedAt: now }).where(and(eq(schema.aiConversations.tenantId, survey.tenantId), eq(schema.aiConversations.leadId, survey.leadId)));
   }
@@ -187,14 +190,23 @@ async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof sche
   answer.comment ??= input.text.slice(0, 500);
   const turn = postSaleNextTurn(currentSurvey.step, prior, answer, { lead: lead.name.trim().split(/\s+/)[0] || "Cliente", broker: broker?.name?.trim().split(/\s+/)[0] || "corretor" });
   const answers = turn.answers as PostSaleAnswers;
+  const previousAlertReasons = postSaleAlertReasons(currentSurvey);
+  const nextOutcome = turn.outcome === "ok" && answers.sentiment === "negative"
+    ? "bad_service"
+    : turn.outcome ?? currentSurvey.outcome;
+  const nextRating = answers.rating ?? currentSurvey.rating;
+  const nextAlertReasons = postSaleAlertReasons({ outcome: nextOutcome, rating: nextRating, answers });
   const updateValues = {
     status: turn.status,
     step: turn.step,
     answers,
+    outcome: nextOutcome,
+    rating: nextRating,
+    alertsHandledAt: nextAlertReasons.some((reason) => !previousAlertReasons.includes(reason)) ? null : currentSurvey.alertsHandledAt,
     lastReplyAt: new Date(),
     lastInboundMessageId: input.providerMessageId,
     pendingReplyText: turn.text,
-    ...(turn.status === "completed" || turn.status === "opted_out" ? { completedAt: new Date(), outcome: turn.outcome ?? "other", rating: answers.rating ?? null } : {}),
+    ...(turn.status === "completed" || turn.status === "opted_out" ? { completedAt: new Date(), outcome: nextOutcome ?? "other" } : {}),
   };
   const updateSurvey = async (executor: PostSaleWriteExecutor) => {
     const [updated] = await executor.update(schema.postSaleSurveys).set(updateValues).where(and(
