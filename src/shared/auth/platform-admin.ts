@@ -11,11 +11,12 @@ import { getDatabase, schema } from "@/shared/db";
 export const PLATFORM_ADMIN_2FA_SETUP_PATH = "/settings?tab=seguranca";
 
 /**
- * Break-glass only: PLATFORM_ADMIN_2FA_OPTIONAL=true lets an admin in without
- * 2FA (e.g. a new admin with no tenant to open Settings). Remove it right after.
+ * Turned on with PLATFORM_ADMIN_REQUIRE_2FA=true once every admin has 2FA:
+ * switching it on first could lock an admin out of /super-admin (an admin
+ * with no tenant has no Settings page to turn 2FA on).
  */
 export function isPlatformAdmin2faRequired(env: NodeJS.ProcessEnv = process.env) {
-  return env.PLATFORM_ADMIN_2FA_OPTIONAL?.trim() !== "true";
+  return env.PLATFORM_ADMIN_REQUIRE_2FA?.trim() === "true";
 }
 
 export async function getRequiredPlatformAdmin(): Promise<PlatformAdminContext> {
