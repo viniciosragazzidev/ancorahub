@@ -39,13 +39,9 @@ describe("computeNegotiationLevel", () => {
     }).level).toBe("closing");
   });
 
-  it("não põe em fechamento só porque o cliente mandou um PDF numa conversa curta (06/11)", () => {
+  it("PDF ou foto do cliente sozinhos nunca põem em fechamento: vale a leitura da conversa (06/11)", () => {
     expect(computeNegotiationLevel({ ...base, customerSentPdf: true }).level).toBe("in_conversation");
-    expect(computeNegotiationLevel({ ...base, status: "quote_sent", customerSentPdf: true, twoWayExchangeDaysLast5: 1 }).level).toBe("in_conversation");
-  });
-
-  it("aceita o PDF do cliente como fechamento numa venda já avançada com troca em dois dias", () => {
-    expect(computeNegotiationLevel({ ...base, status: "quote_sent", customerSentPdf: true, twoWayExchangeDaysLast5: 2 }).level).toBe("closing");
+    expect(computeNegotiationLevel({ ...base, status: "quote_sent", customerSentPdf: true, customerSentImage: true, twoWayExchangeDaysLast5: 3 }).level).toBe("advanced");
   });
 
   it("reconhece fechamento pela leitura da IA só depois da cotação no CRM", () => {
