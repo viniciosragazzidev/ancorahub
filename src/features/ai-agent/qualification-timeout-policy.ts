@@ -132,8 +132,12 @@ export function qualificationTimeoutOutcome(
   };
 }
 
-export function qualificationTimeoutDistributionStatus(qualificationStatus: "hot" | "warm" | "cold") {
-  return qualificationStatus === "cold" ? "manual_hold" as const : "queued" as const;
+/**
+ * Frio só fica segurado (manual_hold) quando a fila de destino tem "Segurar frios" ligado (06/11). Antes segurava
+ * todo frio, e filas com a opção desligada (ex.: Venâncio Leads, 7º andar) não distribuíam os frios.
+ */
+export function qualificationTimeoutDistributionStatus(qualificationStatus: "hot" | "warm" | "cold", holdColdLeads = false) {
+  return qualificationStatus === "cold" && holdColdLeads ? "manual_hold" as const : "queued" as const;
 }
 
 /** Manual re-open resets the SLA clock while a newer message still takes precedence. */
