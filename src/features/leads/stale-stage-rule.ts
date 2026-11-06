@@ -5,7 +5,10 @@
  * Plano: docs/implementations/active/2026-11-05-etapas-e-funil.md
  */
 
-export const STALE_WATCH_STATUSES = ["quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
+// Só cotação e negociação (06/11): em Documentação e Em análise quem responde é a operadora, e o silêncio do
+// cliente é normal. Ligada com as quatro etapas, a regra tirou ~80 leads do fechamento e, quando o cliente
+// respondeu, a volta para "Em análise" mandou "chegou ao fechamento" para a direção.
+export const STALE_WATCH_STATUSES = ["quote_sent", "negotiation"] as const;
 
 export const STALE_RULE = {
   /** Dias úteis sem mensagem do cliente para ir de uma etapa ativa para "Aguardando retorno". */

@@ -24,7 +24,7 @@ describe("dias úteis", () => {
 
 describe("regra de chat parado", () => {
   it("5 dias úteis sem o cliente responder: vai para Aguardando retorno", () => {
-    expect(decideStaleStage({ ...base, status: "documentation_pending", lastCustomerMessageAt: day("2026-10-28"), stageEnteredAt: day("2026-10-20"), now: WED }))
+    expect(decideStaleStage({ ...base, status: "quote_sent", lastCustomerMessageAt: day("2026-10-28"), stageEnteredAt: day("2026-10-20"), now: WED }))
       .toEqual({ action: "to_awaiting", silentBusinessDays: 5 });
     expect(decideStaleStage({ ...base, status: "negotiation", lastCustomerMessageAt: day("2026-10-29"), stageEnteredAt: day("2026-10-20"), now: WED }))
       .toEqual({ action: "none" });
@@ -34,14 +34,14 @@ describe("regra de chat parado", () => {
     expect(decideStaleStage({ ...base, status: "quote_sent", lastCustomerMessageAt: null, stageEnteredAt: day("2026-10-27"), now: WED }).action).toBe("to_awaiting");
   });
 
-  it("etapas iniciais e fechadas não são mexidas", () => {
-    for (const status of ["new", "distributed", "in_contact", "converted", "lost"]) {
+  it("etapas iniciais, de fechamento e fechadas não são mexidas", () => {
+    for (const status of ["new", "distributed", "in_contact", "documentation_pending", "under_analysis", "converted", "lost"]) {
       expect(decideStaleStage({ ...base, status, lastCustomerMessageAt: null, stageEnteredAt: day("2026-09-01"), now: WED })).toEqual({ action: "none" });
     }
   });
 
   it("'Manter na etapa' e mudança humana recente seguram a regra", () => {
-    const old = { status: "under_analysis", lastCustomerMessageAt: day("2026-10-01"), stageEnteredAt: day("2026-10-01"), now: WED };
+    const old = { status: "negotiation", lastCustomerMessageAt: day("2026-10-01"), stageEnteredAt: day("2026-10-01"), now: WED };
     expect(decideStaleStage({ ...base, ...old, holdUntil: day("2026-11-08") })).toEqual({ action: "none" });
     expect(decideStaleStage({ ...base, ...old, lastHumanStageChangeAt: day("2026-11-03") })).toEqual({ action: "none" });
     expect(decideStaleStage({ ...base, ...old, lastHumanStageChangeAt: day("2026-10-25") }).action).toBe("to_awaiting");

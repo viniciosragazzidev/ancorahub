@@ -84,7 +84,13 @@ export function computeNegotiationLevel(input: NegotiationSignals): NegotiationA
   const closingStatus = CLOSING_STATUSES.has(input.status);
   const aiStage = input.ai?.conversationStage ?? "UNKNOWN";
   const advancedSignal = advancedStatus || closingStatus || ADVANCED_AI_STAGES.has(aiStage);
-  const closingSignal = closingStatus || CLOSING_AI_STAGES.has(aiStage) || input.customerSentPdf || (input.customerSentImage && aiStage === "DOCUMENT_COLLECTION");
+  // A file from the customer is a closing sign only inside a sale already under way (06/11): a lone PDF
+  // in a first conversation (Marcelly, Marcelle) put the lead in "Fechamento" with almost no history.
+  const fileSignal = (input.customerSentPdf || (input.customerSentImage && aiStage === "DOCUMENT_COLLECTION"))
+    && input.twoWayExchangeDaysLast5 >= 2;
+  // The AI reading or a file only moves a lead to "Fechamento" once the CRM shows a quote (06/11, Cristiane:
+  // bank details sent before any quote read as closing while the lead was still "Em atendimento").
+  const closingSignal = closingStatus || (advancedStatus && (CLOSING_AI_STAGES.has(aiStage) || fileSignal));
   const noCrmConversation = (advancedStatus || closingStatus) && !input.hasBrokerMessageEver;
   const waitingTooLong = customerWaiting && customerAt !== null && now - customerAt >= NEGOTIATION_LIMITS.staleReplyHours * 60 * 60 * 1000;
   const exchangeStale = latestAt === -Infinity || now - latestAt >= NEGOTIATION_LIMITS.activeExchangeDays * 24 * 60 * 60 * 1000;

@@ -508,19 +508,24 @@ export async function changeLeadStatus(
     );
   }
 
-  // Entering the closing stage: congratulations and the registration checklist to the broker, once per lead.
-  const { notifyBrokerClosingStage } = await import("./closing-stage-notice");
-  void notifyBrokerClosingStage({
-    tenantId: lead.tenantId,
-    leadId: lead.id,
-    leadName: lead.nome,
-    brokerId: lead.corretorId,
-    previousStatus,
-    newStatus,
-  });
-  // And the direction (numbers set in Avisos da equipe): client, broker and the conversation summary.
-  const { notifyDirectorsClosingStage } = await import("./closing-director-alert");
-  void notifyDirectorsClosingStage({ tenantId: lead.tenantId, leadId: lead.id, previousStatus, newStatus });
+  // The stale-chat rule moving a lead out and back (client replied) is not progress (06/11, Jeronymo:
+  // back to "Em análise" after a 28-day silence sent "chegou ao fechamento" to the direction).
+  const ruleMove = system?.actorType === "rule";
+  if (!ruleMove) {
+    // Entering the closing stage: congratulations and the registration checklist to the broker, once per lead.
+    const { notifyBrokerClosingStage } = await import("./closing-stage-notice");
+    void notifyBrokerClosingStage({
+      tenantId: lead.tenantId,
+      leadId: lead.id,
+      leadName: lead.nome,
+      brokerId: lead.corretorId,
+      previousStatus,
+      newStatus,
+    });
+    // And the direction (numbers set in Avisos da equipe): client, broker and the conversation summary.
+    const { notifyDirectorsClosingStage } = await import("./closing-director-alert");
+    void notifyDirectorsClosingStage({ tenantId: lead.tenantId, leadId: lead.id, previousStatus, newStatus });
+  }
 
   if (newStatus === "lost") {
     const { triggerInstantAutomation } = await import("@/features/automations/engine");
