@@ -131,16 +131,3 @@ describe("choosePostSaleSource", () => {
     expect(choosePostSaleSource({ hasMessage: true, fromMessage: null, messageProvider: "meta_cloud", defaultState: null, companyWaha })).toBeNull();
   });
 });
-
-describe("choosePostSaleSource no número oficial", () => {
-  const company = { type: "waha", ref: "w-company" };
-  const official = { type: "meta", ref: "c-default" };
-
-  it("lead do número oficial sem canal registrado (ou canal desativado) usa o número oficial padrão", () => {
-    expect(choosePostSaleSource({ hasMessage: true, fromMessage: null, messageProvider: "meta_cloud", messageIsMeta: true, defaultState: null, companyWaha: () => company, defaultMeta: () => official })).toBe(official);
-  });
-
-  it("sem número oficial padrão continua sem fonte, sem cair no WAHA", () => {
-    expect(choosePostSaleSource({ hasMessage: true, fromMessage: null, messageProvider: "meta_cloud", messageIsMeta: true, defaultState: null, companyWaha: () => company, defaultMeta: () => null })).toBeNull();
-  });
-});

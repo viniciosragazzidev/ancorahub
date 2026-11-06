@@ -89,8 +89,7 @@ export function pickPostSaleCompanyWaha(numbers: readonly PostSaleCompanyWahaNum
 export type PostSaleDefaultSourceState<T> = { kind: "none" } | { kind: "ambiguous" } | { kind: "one"; source: T };
 
 /**
- * Picks where the survey goes. The lead's own origin wins; an official-number origin with no channel
- * recorded (or a retired one) uses the default official number; an origin on WAHA without a company number
+ * Picks where the survey goes. The lead's own origin wins; an origin on WAHA without a company number
  * (broker's personal WhatsApp) or a lead with no source at all falls back to the company WAHA.
  * An ambiguous queue/unit channel never falls back: the lead is skipped as source_unavailable.
  */
@@ -100,15 +99,8 @@ export function choosePostSaleSource<T>(input: {
   messageProvider: string | null;
   defaultState: PostSaleDefaultSourceState<T> | null;
   companyWaha: () => T | null;
-  /** Official default number, for an official-number origin with no (or a retired) channel recorded. */
-  defaultMeta?: () => T | null;
-  messageIsMeta?: boolean;
 }): T | null {
-  if (input.hasMessage) {
-    if (input.fromMessage) return input.fromMessage;
-    if (input.messageProvider === "waha") return input.companyWaha();
-    return input.messageIsMeta && input.defaultMeta ? input.defaultMeta() : null;
-  }
+  if (input.hasMessage) return input.fromMessage ?? (input.messageProvider === "waha" ? input.companyWaha() : null);
   if (input.defaultState?.kind === "one") return input.defaultState.source;
   if (input.defaultState?.kind === "none") return input.companyWaha();
   return null;
