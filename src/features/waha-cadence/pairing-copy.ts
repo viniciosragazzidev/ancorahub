@@ -222,6 +222,8 @@ export const PRESENCE_WHATSAPP_COPY = {
   privacyTitle: "Suas conversas pessoais são só suas",
   privacy: "Elas não são salvas nem lidas por ninguém. Só as conversas com os seus leads e clientes ficam no sistema, para a IA ajudar no seu atendimento.",
   start: "Gerar meu código",
+  watchTutorial: "Assistir tutorial",
+  tutorialDescription: "Vídeo de 1 minuto e meio mostrando como conectar o WhatsApp e confirmar a presença.",
   openWhatsApp: "Copiar código e abrir o WhatsApp",
   openOnPhone: "Abra o WhatsApp no seu celular e siga os passos.",
   autoConfirm: "Assim que conectar, sua presença é confirmada sozinha.",

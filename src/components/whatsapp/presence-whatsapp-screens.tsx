@@ -8,11 +8,12 @@ import { DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { PRESENCE_WHATSAPP_COPY } from "@/features/waha-cadence/pairing-copy";
 
 import { PairingCodeDemo } from "./pairing-code-demo";
+import { PresenceTutorialVideo } from "./presence-tutorial-video";
 import { PairingCodePanel, PairingCodeTutorial, type PairingCodePanelProps } from "./whatsapp-pairing-panel";
 
 /**
  * Telas da conexão pedida ao confirmar presença (05/11): pouca informação por vez.
- * 1) vantagens + privacidade + um botão; 2) código + abrir o WhatsApp + animação; 3) conectado.
+ * 1) vantagens + privacidade + um botão (e "Assistir tutorial", 06/11); 2) código + abrir o WhatsApp + animação; 3) conectado.
  */
 export function PresenceWhatsAppIntro({ onStart }: { onStart: () => void }) {
   return (
@@ -33,7 +34,10 @@ export function PresenceWhatsAppIntro({ onStart }: { onStart: () => void }) {
         <div className="flex items-center gap-ds-8 text-ds-body font-semibold text-ds-charcoal"><LockKey aria-hidden="true" className="size-4" /><span>{PRESENCE_WHATSAPP_COPY.privacyTitle}</span></div>
         <DialogDescription className="mt-ds-4 text-ds-caption">{PRESENCE_WHATSAPP_COPY.privacy}</DialogDescription>
       </div>
-      <Button className="w-full" size="lg" onClick={onStart}>{PRESENCE_WHATSAPP_COPY.start}</Button>
+      <div className="space-y-ds-8">
+        <Button className="w-full" size="lg" onClick={onStart}>{PRESENCE_WHATSAPP_COPY.start}</Button>
+        <PresenceTutorialVideo />
+      </div>
     </div>
   );
 }
