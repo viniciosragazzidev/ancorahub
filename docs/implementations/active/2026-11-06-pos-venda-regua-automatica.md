@@ -77,7 +77,7 @@ Job a cada 15 min (rota interna de jobs existente). Para cada regra ligada: busc
 - A área Equipe ganhou a tela manual Lite para diretor e gestor com unidade: público por corretor, fila ou período, prévia com exclusões e três exemplos, disparo e respostas recentes por lead. Gestores recebem filtros e dados restritos à unidade efetiva.
 - O texto editável de abertura só se aplica a WAHA; no Meta, o canal usa o template aprovado `pos_venda_apresentacao`.
 - Schema atualizado para `kind` (`manual` ou `auto`) e `rule_key` em campanhas, `rule_key` em surveys, mais `reminder_sent_at` para controlar o único lembrete.
-- Migrations criadas em `drizzle/0218_post_sale_manual_conversation.sql` e `drizzle/0219_post_sale_opt_out_retry.sql`; não foram executadas.
+- Migrations criadas em `drizzle/0218_post_sale_manual_conversation.sql` e `drizzle/0220_post_sale_opt_out_retry.sql`; não foram executadas.
 - Validação focada, sem banco: Vitest nas áreas de pós-venda, canais, inbound WAHA, navegação e acesso a áreas; TypeScript e ESLint registrados em `reports/agent/verification/2026-11-06-pos-venda-fase2.md`.
 
 ## Correções da revisão da Fase 2 (06/11/2026)
@@ -88,7 +88,7 @@ Job a cada 15 min (rota interna de jobs existente). Para cada regra ligada: busc
 - Opt-out e mudança para `opted_out` são escritos na mesma transação. Se a persistência do opt-out falha, o status continua ativo e pode ser reprocessado.
 - Com survey ativa, áudio ou imagem gera no máximo um pedido de resposta por texto em cada etapa, sem alterar a etapa e sem passar o conteúdo para qualificação.
 - A resposta no Meta é texto livre dentro da janela de 24 horas aberta pela mensagem do cliente; essa premissa foi registrada para orientar o canal.
-- Migration `drizzle/0219_post_sale_opt_out_retry.sql` criada e não executada; inclui o marcador da solicitação de texto por etapa. Validação da revisão em `reports/agent/verification/2026-11-06-pos-venda-fase2-review-fixes.md` e `reports/agent/verification/2026-11-06-pos-venda-optout-atomico.md`.
+- Migration `drizzle/0220_post_sale_opt_out_retry.sql` criada e não executada; inclui o marcador da solicitação de texto por etapa. Validação da revisão em `reports/agent/verification/2026-11-06-pos-venda-fase2-review-fixes.md` e `reports/agent/verification/2026-11-06-pos-venda-optout-atomico.md`.
 
 ## Riscos
 
