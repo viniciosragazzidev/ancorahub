@@ -7,7 +7,7 @@ import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast
 import { channelLeadIntakeKey, parseChannelLeadIntake } from "@/features/communication-channels/channel-lead-intake";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
-import { evaluatePostSaleEligibility, isPostSaleOptedOut, pickPostSaleSourceMessage, POST_SALE_EXCLUSION_LABELS, POST_SALE_SURVEY_COOLDOWN_DAYS, type PostSaleExclusionReason, type PostSaleAudience } from "./rules";
+import { evaluatePostSaleEligibility, isPostSaleOptedOut, pickPostSaleSourceMessage, POST_SALE_EXCLUSION_LABELS, POST_SALE_SURVEY_COOLDOWN_DAYS, type PostSaleExclusionReason, type PostSaleAudience, pickPostSaleCompanyWaha } from "./rules";
 import { isApprovedPostSaleMetaTemplate } from "./template-contract";
 
 const META_PROVIDERS = [META_CLOUD_PROVIDER, "meta_cloud_api"];
@@ -283,7 +283,14 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
   for (const lead of leads) {
     const leadMessages = messagesByLead.get(lead.leadId) ?? [];
     const sourceMessage = pickPostSaleSourceMessage(leadMessages);
-    const source = sourceMessage ? sourceFromMessage(sourceMessage) : resolveDefaultQueueSource(lead);
+    const companyWaha = (): Source => {
+      const number = pickPostSaleCompanyWaha(wahaNumbers, lead.branchId, now);
+      return number ? { type: "waha", ref: number.id } : null;
+    };
+    // Origin on WAHA without a company number (broker's personal WhatsApp or unknown): company WAHA.
+    const source = sourceMessage
+      ? sourceFromMessage(sourceMessage) ?? (sourceMessage.provider === "waha" ? companyWaha() : null)
+      : resolveDefaultQueueSource(lead) ?? companyWaha();
     const leadConversations = conversationsByLead.get(lead.leadId) ?? [];
     const optedOut = isPostSaleOptedOut({
       conversationOptOutAt: leadConversations.find((conversation) => conversation.optOutAt)?.optOutAt,

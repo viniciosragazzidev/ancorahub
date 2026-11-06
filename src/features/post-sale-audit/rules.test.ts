@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluatePostSaleEligibility, findUnknownPostSaleOpeningVariables, firstName, isPostSaleOptedOut, pickPostSaleSourceMessage, renderPostSaleOpeningMessage } from "./rules";
+import { evaluatePostSaleEligibility, findUnknownPostSaleOpeningVariables, firstName, isPostSaleOptedOut, pickPostSaleCompanyWaha, pickPostSaleSourceMessage, renderPostSaleOpeningMessage } from "./rules";
 import { isApprovedPostSaleMetaTemplate, POST_SALE_META_TEMPLATE, POST_SALE_WAHA_OPENING_DEFAULT } from "./template-contract";
 
 const eligible = {
@@ -72,5 +72,26 @@ describe("post-sale audience rules", () => {
       language: "pt_BR", category: "UTILITY", bodyText: "Outro texto",
       variables: ["1", "2", "3"], buttons: POST_SALE_META_TEMPLATE.quickReplies.map((text) => ({ type: "QUICK_REPLY", text })),
     })).toBe(false);
+  });
+});
+
+describe("pickPostSaleCompanyWaha", () => {
+  const now = new Date("2026-11-06T15:00:00Z");
+  const company = { id: "w-company", branchId: null, status: "active", pausedUntil: null };
+  const unit = { id: "w-unit", branchId: "b1", status: "active", pausedUntil: null };
+
+  it("prefere o número da unidade do lead", () => {
+    expect(pickPostSaleCompanyWaha([company, unit], "b1", now)?.id).toBe("w-unit");
+  });
+
+  it("usa o número da empresa quando a unidade não tem número", () => {
+    expect(pickPostSaleCompanyWaha([company, unit], "b2", now)?.id).toBe("w-company");
+    expect(pickPostSaleCompanyWaha([company], null, now)?.id).toBe("w-company");
+  });
+
+  it("ignora número de outra unidade, pausado ou fora do ar", () => {
+    expect(pickPostSaleCompanyWaha([unit], "b2", now)).toBeNull();
+    expect(pickPostSaleCompanyWaha([{ ...company, pausedUntil: new Date("2026-11-06T16:00:00Z") }], null, now)).toBeNull();
+    expect(pickPostSaleCompanyWaha([{ ...company, status: "error" }], null, now)).toBeNull();
   });
 });

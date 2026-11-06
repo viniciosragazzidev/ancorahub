@@ -59,6 +59,24 @@ export function isPostSaleOptedOut(input: { conversationOptOutAt?: Date | null; 
   return Boolean(input.conversationOptOutAt || input.durableOptOut || input.optedOutSurvey);
 }
 
+export type PostSaleCompanyWahaNumber = {
+  id: string;
+  branchId: string | null;
+  status: string;
+  pausedUntil: Date | null;
+};
+
+/**
+ * Company WhatsApp (WAHA) used when the lead's origin cannot send: the conversation ran on the
+ * broker's personal WhatsApp (whatsapp_connections) or has no recorded number. Never the broker's
+ * phone. Prefers the lead's unit number, then a company-wide one; only active, unpaused numbers.
+ */
+export function pickPostSaleCompanyWaha(numbers: readonly PostSaleCompanyWahaNumber[], leadBranchId: string | null, now: Date) {
+  const usable = numbers.filter((number) => ["active", "ready"].includes(number.status) && (!number.pausedUntil || number.pausedUntil <= now));
+  const unit = leadBranchId ? usable.find((number) => number.branchId === leadBranchId) : undefined;
+  return unit ?? usable.find((number) => number.branchId === null) ?? null;
+}
+
 /** Prefer the first inbound; form leads without a reply use their first outbound contact. */
 export function pickPostSaleSourceMessage(messages: readonly PostSaleSourceMessage[]) {
   return messages.find((message) => message.direction === "incoming" || message.direction === "inbound")
