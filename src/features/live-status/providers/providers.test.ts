@@ -150,7 +150,7 @@ describe("primeiro contato", () => {
 describe("plantão", () => {
   const start = minutes(-10);
   const end = minutes(170);
-  it("confirmados de escalados e tolerância de 20 min", () => {
+  it("confirmados de escalados e tolerância de 1 hora", () => {
     const status = buildDutyStatus({
       rows: [
         { status: "confirmed", shiftStartsAt: start, shiftEndsAt: end },
@@ -160,7 +160,7 @@ describe("plantão", () => {
       now: NOW, scope: director,
     });
     expect(status).toMatchObject({ valueText: "1 de 2", severity: "atencao" });
-    expect(status.nextEvent).toMatchObject({ at: minutes(10).toISOString(), label: "A tolerância para confirmar acaba" });
+    expect(status.nextEvent).toMatchObject({ at: minutes(50).toISOString(), label: "A tolerância para confirmar acaba" });
   });
   it("corretor com presença pendente vê o prazo dele", () => {
     const status = buildDutyStatus({ rows: [{ status: "pending", shiftStartsAt: start, shiftEndsAt: end }], now: NOW, scope: { role: "broker" } });

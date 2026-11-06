@@ -456,7 +456,7 @@ export type OwnDutyOccurrence = { assignmentId: string; scheduleId: string; mode
 
 /**
  * The broker's own occurrence of an assignment that can be confirmed now
- * (30 min before the start until 20 min after it, or after he was put on a plantão
+ * (30 min before the start until 1 hour after it, or after he was put on a plantão
  * that had already started). Scope: tenant + the broker himself.
  */
 export async function resolveOwnDutyOccurrence(input: { tenantId: string; brokerId: string; assignmentId: string; now?: Date }): Promise<{ ok: true; occurrence: OwnDutyOccurrence } | { ok: false; reason: "not_found" | "outside_window" | "late" | "absent" }> {
