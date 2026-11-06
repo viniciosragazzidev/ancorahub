@@ -811,3 +811,7 @@ Papeis: corretor e supervisor. Acao: abrir o destino de trabalho direto pelos at
 ## 2026-10-30 - Valor mensal e vidas no Kanban de leads
 
 O Kanban Full e Lite mostra no rodapé de cada coluna o total mensal e a soma de vidas dos leads já carregados, respeitando os filtros atuais. A ficha e o drawer permitem editar o snapshot e criar cotações vinculadas; com venda ou proposta ativa, o valor formal prevalece e a edição manual fica bloqueada. Reutiliza controles Arc/Lite e não introduz tokens ou primitives. Registro: docs/implementations/completed/2026-10-30-valor-vidas-funil.md.
+
+## 2026-11-06 — Faixa de conexão do WhatsApp abaixo de diálogos
+
+Papel: corretor Lite; objetivo: confirmar presença no plantão ou obter o código de pareamento. A faixa de WhatsApp desconectado permanece visível no shell, mas fica abaixo do overlay/dialog compartilhado para não cobrir controles nem conteúdo modal. Sem novo token, componente ou movimento.
