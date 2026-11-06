@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
-import { streamText } from "ai";
+import { streamText, type ModelMessage } from "ai";
 import { getAiEngineSettings } from "@/features/ai/engine";
 import { getAiModelInstance } from "@/features/ai/providers";
 import { answerIfOperatorQuestion, lastUserText } from "@/features/operator-catalog/answer";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { readChatRequest } from "@/features/ai/chat-request-guard";
 
 export async function POST(req: Request) {
   try {
     // Only signed-in users: this route calls a paid model.
     const context = await getRequiredTenantContext().catch(() => null);
     if (!context) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-    const { messages } = await req.json();
+    const guard = await readChatRequest(req, context);
+    if (!guard.ok) {
+      return NextResponse.json({ error: guard.error }, { status: guard.status, headers: guard.retryAfterSeconds ? { "Retry-After": String(guard.retryAfterSeconds) } : undefined });
+    }
+    const messages = guard.messages as ModelMessage[];
 
     // Operators, plans, prices, carências: only the imported material answers, never the free model.
     const operatorAnswer = await answerIfOperatorQuestion({ tenantId: context.tenantId, userId: context.userId, question: lastUserText(messages) }).catch(() => null);
@@ -45,7 +50,8 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("[AI Chat Route Error]:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro interno no servidor." },
+      // Never echo provider or database errors to the browser.
+      { error: "Não foi possível responder agora. Tente novamente." },
       { status: 500 }
     );
   }

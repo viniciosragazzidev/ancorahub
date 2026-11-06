@@ -1,5 +1,23 @@
 import type { NextConfig } from "next";
 
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  // Next.js inline bootstrap scripts; the Meta SDK for WhatsApp Embedded Signup.
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "media-src 'self' blob:",
+  // Supabase realtime/auth and the Meta Graph calls made by the SDK.
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://*.facebook.com",
+  "frame-src 'self' https://www.facebook.com https://web.facebook.com",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
 const nextConfig: NextConfig = {
   output: "standalone",
   // Docker build on the VPS (Dockerfile sets both): types are checked before every push (tsc),
@@ -60,6 +78,19 @@ const nextConfig: NextConfig = {
           {
             key: "Referrer-Policy",
             value: "strict-origin-when-cross-origin",
+          },
+          // The CRM is HTTPS only: browsers never try plain HTTP again for a year.
+          // No includeSubDomains/preload until every *.ancorasaude.cloud host is HTTPS.
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000",
+          },
+          // Report-Only first: the browser only logs what this policy would block,
+          // nothing stops working. Enforce it once the console shows no violation
+          // on the real screens (security plan, lote 5).
+          {
+            key: "Content-Security-Policy-Report-Only",
+            value: CONTENT_SECURITY_POLICY,
           },
         ],
       },

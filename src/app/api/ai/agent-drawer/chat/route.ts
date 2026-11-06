@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { streamText, tool } from "ai";
+import { streamText, tool, type ModelMessage } from "ai";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { readChatRequest } from "@/features/ai/chat-request-guard";
 import { getAiEngineSettings } from "@/features/ai/engine";
 import { getAiModelInstance } from "@/features/ai/providers";
 import { getMcpToolsForRole } from "@/features/agent-drawer/mcp-tools";
@@ -11,7 +12,11 @@ import { answerIfOperatorQuestion, lastUserText } from "@/features/operator-cata
 export async function POST(req: Request) {
   try {
     const context = await getRequiredTenantContext();
-    const { messages } = await req.json();
+    const guard = await readChatRequest(req, context);
+    if (!guard.ok) {
+      return NextResponse.json({ error: guard.error }, { status: guard.status, headers: guard.retryAfterSeconds ? { "Retry-After": String(guard.retryAfterSeconds) } : undefined });
+    }
+    const messages = guard.messages as ModelMessage[];
 
     // Operators, plans, prices, carências: only the imported material answers, never the free model.
     const operatorAnswer = await answerIfOperatorQuestion({ tenantId: context.tenantId, userId: context.userId, question: lastUserText(messages) }).catch(() => null);
@@ -73,7 +78,8 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("[Agent Drawer Chat Error]:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro interno no servidor do Agente." },
+      // Never echo provider or database errors to the browser.
+      { error: "Não foi possível responder agora. Tente novamente." },
       { status: 500 }
     );
   }
