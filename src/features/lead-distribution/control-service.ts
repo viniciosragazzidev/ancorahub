@@ -21,11 +21,11 @@ import { evaluateBrokerOfferPacing, isOfferPacingEnabled, normalizeOfferPacing, 
 
 const queueInput = z.object({
   id: z.string().uuid().optional(),
-  branchId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable().optional()),
-  exclusiveDutyScheduleId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable().optional()),
+  branchId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable()),
+  exclusiveDutyScheduleId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable()),
   exclusiveDutyScheduleIds: z.array(z.string().uuid()).max(1000).default([]), // each published plantão appends its id and old ones are never pruned, so long-lived queues pass 30 (2026-10-14)
   dutyFallbackPolicy: z.enum(dutyFallbackPolicyValues).default("unit_roster"),
-  dutyFallbackQueueId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable().optional()),
+  dutyFallbackQueueId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable()),
   allowedBranchIds: z.array(z.string().uuid()).default([]),
   allowedBrokerIds: z.array(z.string().uuid()).default([]),
   allowedSourceIds: z.array(z.string().trim().min(1).max(60)).max(20).default([]),

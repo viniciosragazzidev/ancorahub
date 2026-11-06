@@ -10,7 +10,8 @@ FROM base AS dependencies
 
 COPY package.json package-lock.json ./
 # npm's download cache survives between deploys: a lockfile change no longer downloads everything again.
-RUN --mount=type=cache,id=ancorahub-npm,target=/root/.npm npm ci || npm install
+# npm ci only: if the lockfile and package.json disagree the build fails instead of resolving new versions.
+RUN --mount=type=cache,id=ancorahub-npm,target=/root/.npm npm ci
 
 FROM base AS builder
 
