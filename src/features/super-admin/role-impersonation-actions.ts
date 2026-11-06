@@ -34,6 +34,7 @@ export async function setSuperAdminRoleOverrideAction(targetRole: RoleOverrideOp
     cookieStore.set(SUPERADMIN_ROLE_OVERRIDE_COOKIE, targetRole, {
       path: "/",
       httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 60 * 60 * 24, // 24 horas
     });

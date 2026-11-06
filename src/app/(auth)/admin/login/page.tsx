@@ -62,6 +62,11 @@ export default function AdminLoginPage() {
         setLoading(false);
         return;
       }
+      // With 2FA on, the password is only the first step (required for admins).
+      if (result.data && "twoFactorRedirect" in result.data && result.data.twoFactorRedirect) {
+        window.location.replace("/2fa");
+        return;
+      }
       toast.success("Acesso administrativo confirmado.");
       window.location.replace("/super-admin");
     } catch (error) {

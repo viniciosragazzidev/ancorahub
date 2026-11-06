@@ -24,3 +24,14 @@ export class AuthorizationError extends Error {
   }
 }
 
+
+/**
+ * Platform admin without two-factor authentication. The admin sees every
+ * tenant and can purge data, so a password alone is not enough: the layouts
+ * send them to set up 2FA first.
+ */
+export class SecondFactorRequiredError extends AuthorizationError {
+  constructor() {
+    super("Platform administrators must enable two-factor authentication.", "ACCESS_DENIED");
+  }
+}

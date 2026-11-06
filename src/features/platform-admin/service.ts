@@ -8,6 +8,7 @@ import { z } from "zod";
 import { getRequiredPlatformAdmin } from "@/shared/auth/platform-admin";
 import { getDatabase, schema } from "@/shared/db";
 import { buildCredentialAccount } from "@/shared/auth/credential-account";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/shared/auth/password-policy";
 
 const cnpjPattern = /^\d{14}$/;
 
@@ -36,7 +37,7 @@ const accessInput = z.object({
   branchId: z.string().uuid(),
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
-  password: z.string().min(8).max(128),
+  password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
   role: z.enum(["director", "manager", "broker"]),
 });
 
@@ -233,8 +234,12 @@ export async function getLossRateAlerts() {
 }
 
 export async function purgeUserLGPD(userId: string) {
-  await getRequiredPlatformAdmin();
+  const admin = await getRequiredPlatformAdmin();
   const db = getDatabase();
+  // Never purge your own account or another platform admin by mistake.
+  if (userId === admin.userId) throw new Error("Você não pode expurgar a sua própria conta.");
+  const [target] = await db.select({ isPlatformAdmin: schema.user.isPlatformAdmin }).from(schema.user).where(eq(schema.user.id, userId)).limit(1);
+  if (target?.isPlatformAdmin) throw new Error("Conta de administrador da plataforma não pode ser expurgada por aqui.");
   await db.transaction(async (tx) => {
     // Purge session
     await tx.delete(schema.session).where(eq(schema.session.userId, userId));

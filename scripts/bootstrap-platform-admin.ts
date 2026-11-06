@@ -9,52 +9,59 @@ import { buildCredentialAccount, buildCredentialAccountPasswordUpdate } from "..
 
 loadEnvConfig(process.cwd());
 
-const credentials = {
-  email: "vinicios@corretop.com",
-  password: "21509399",
-  name: "Vinícios CorreTop",
-  tenantName: "Corretora Vértice Saúde",
-  tenantSlug: "corretora-vertice-saude",
-  branchName: "Matriz São Paulo",
-};
+/**
+ * Creates or updates the platform administrator. Credentials come only from
+ * the environment: a password in this file would be in git history forever.
+ *
+ *   BOOTSTRAP_ADMIN_EMAIL=... BOOTSTRAP_ADMIN_NAME=... BOOTSTRAP_ADMIN_PASSWORD=... npm run bootstrap:platform-admin
+ *
+ * The admin is not added to any tenant: platform access and tenant roles stay
+ * separate, so a tenant director can never reset the admin's password.
+ * Turn on 2FA right after the first sign-in (required for /super-admin).
+ */
+const ADMIN_PASSWORD_MIN_LENGTH = 16;
+
+function requireEnvironment(name: string) {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} is required.`);
+  return value;
+}
+
+function readInput() {
+  const email = requireEnvironment("BOOTSTRAP_ADMIN_EMAIL").toLowerCase();
+  const name = requireEnvironment("BOOTSTRAP_ADMIN_NAME");
+  const password = requireEnvironment("BOOTSTRAP_ADMIN_PASSWORD");
+  if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("BOOTSTRAP_ADMIN_EMAIL must be a valid email address.");
+  if (password.length < ADMIN_PASSWORD_MIN_LENGTH) {
+    throw new Error(`BOOTSTRAP_ADMIN_PASSWORD must have at least ${ADMIN_PASSWORD_MIN_LENGTH} characters.`);
+  }
+  if (/^\d+$/.test(password)) throw new Error("BOOTSTRAP_ADMIN_PASSWORD must not be only digits.");
+  return { email, name, password };
+}
 
 async function main() {
+  const input = readInput();
   const db = getDatabase();
-  let [tenant] = await db.select().from(schema.tenants).where(eq(schema.tenants.slug, credentials.tenantSlug)).limit(1);
-  if (!tenant) {
-    const id = randomUUID();
-    await db.insert(schema.tenants).values({ id, name: credentials.tenantName, slug: credentials.tenantSlug, legalName: "Vértice Saúde Corretora Ltda.", cnpj: "41817056000170", subscriptionPlan: "Essencial", status: "active" });
-    [tenant] = await db.select().from(schema.tenants).where(eq(schema.tenants.id, id));
-  }
-  if (!tenant) throw new Error("Failed to create the demo tenant.");
 
-  let [branch] = await db.select().from(schema.branches).where(and(eq(schema.branches.tenantId, tenant.id), eq(schema.branches.name, credentials.branchName))).limit(1);
-  if (!branch) {
-    const id = randomUUID();
-    await db.insert(schema.branches).values({ id, tenantId: tenant.id, name: credentials.branchName, status: "active" });
-    [branch] = await db.select().from(schema.branches).where(eq(schema.branches.id, id));
-  }
-  if (!branch) throw new Error("Failed to create the demo branch.");
-
-  let [admin] = await db.select().from(schema.user).where(eq(schema.user.email, credentials.email)).limit(1);
+  let [admin] = await db.select().from(schema.user).where(eq(schema.user.email, input.email)).limit(1);
   if (!admin) {
     const id = randomUUID();
-    await db.insert(schema.user).values({ id, name: credentials.name, email: credentials.email, emailVerified: true, active: true, isPlatformAdmin: true });
+    await db.insert(schema.user).values({ id, name: input.name, email: input.email, emailVerified: true, active: true, isPlatformAdmin: true });
     [admin] = await db.select().from(schema.user).where(eq(schema.user.id, id));
   } else {
-    await db.update(schema.user).set({ name: credentials.name, active: true, isPlatformAdmin: true, updatedAt: new Date() }).where(eq(schema.user.id, admin.id));
+    await db.update(schema.user).set({ name: input.name, active: true, isPlatformAdmin: true, updatedAt: new Date() }).where(eq(schema.user.id, admin.id));
   }
   if (!admin) throw new Error("Failed to create the platform administrator.");
 
-  const password = await hashPassword(credentials.password);
+  const password = await hashPassword(input.password);
   const [account] = await db.select().from(schema.account).where(and(eq(schema.account.userId, admin.id), eq(schema.account.providerId, "credential"))).limit(1);
   if (account) await db.update(schema.account).set(buildCredentialAccountPasswordUpdate(admin.id, password)).where(eq(schema.account.id, account.id));
   else await db.insert(schema.account).values(buildCredentialAccount({ id: randomUUID(), userId: admin.id, password }));
 
-  const [membership] = await db.select().from(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.tenantId, tenant.id), eq(schema.tenantMemberships.userId, admin.id))).limit(1);
-  if (membership) await db.update(schema.tenantMemberships).set({ branchId: branch.id, role: "director", status: "active", updatedAt: new Date() }).where(eq(schema.tenantMemberships.id, membership.id));
-  else await db.insert(schema.tenantMemberships).values({ id: randomUUID(), tenantId: tenant.id, userId: admin.id, branchId: branch.id, role: "director", status: "active" });
-  console.log(`Platform admin ready: ${credentials.email}; tenant ${tenant.slug}.`);
+  // A new password ends every open session of this account.
+  await db.delete(schema.session).where(eq(schema.session.userId, admin.id));
+
+  console.log(`Platform admin ready: ${input.email}. Turn on 2FA at the first sign-in.`);
 }
 
 void main().catch((error: unknown) => { console.error(error); process.exitCode = 1; });

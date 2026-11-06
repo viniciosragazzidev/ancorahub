@@ -54,3 +54,21 @@ describe("generatePasswordResetLinkForMember", () => {
     expect(state.deletes).toContain(state.schema.session);
   });
 });
+
+describe("reset token storage", () => {
+  it("stores only a prefixed digest, never the raw token", async () => {
+    const { digestResetToken } = await import("./password-recovery");
+    const digest = digestResetToken("raw-token");
+    expect(digest).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(digest).not.toContain("raw-token");
+  });
+
+  it("generated link row holds the digest of the token in the URL", async () => {
+    state.setTarget({ tenantId: "tenant-a", userId: "broker-a", email: "a@example.com", role: "broker", branchId: "unit-a" });
+    const { digestResetToken } = await import("./password-recovery");
+    const result = await generatePasswordResetLinkForMember("broker-a");
+    const raw = new URL(result.resetUrl, "https://x.test").searchParams.get("token")!;
+    const row = state.inserts.filter((item) => item.table === state.schema.passwordResetRequests).at(-1)!.values as { token: string };
+    expect(row.token).toBe(digestResetToken(raw));
+  });
+});
