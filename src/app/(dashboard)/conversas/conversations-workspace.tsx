@@ -450,7 +450,8 @@ export function ConversationsWorkspace({
       ? coexLabel.split(" · ")[0]
       : "Leads";
   const activeFilterCount = [filter !== "all", branchFilter !== "all", tagFilter !== "all"].filter(Boolean).length;
-  // Lite (07/11): views, filters and bulk qualification live in one floating menu next to the search,
+  // Lite (07/11): views and filters live in one floating menu next to the search (bulk qualification is
+  // the icon beside it),
   // so the list starts right under it instead of below four rows of controls.
   const directorFiltersMenu = (
     <Popover>
@@ -492,11 +493,6 @@ export function ConversationsWorkspace({
             </Button>
           ) : null}
         </div>
-        {canSeeBrokerTab ? (
-          <div className="grid gap-2 border-t border-border pt-3">
-            <ConversationsBulkQualificationAction />
-          </div>
-        ) : null}
       </PopoverContent>
     </Popover>
   );
@@ -549,6 +545,7 @@ export function ConversationsWorkspace({
               />
             </div>
             {directorSkinEnabled ? directorFiltersMenu : null}
+            {directorSkinEnabled && canSeeBrokerTab ? <ConversationsBulkQualificationAction compact /> : null}
           </div>
 
           <ScrollArea className="min-h-0 flex-1">

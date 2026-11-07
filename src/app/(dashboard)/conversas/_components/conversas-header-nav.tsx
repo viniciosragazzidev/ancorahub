@@ -8,9 +8,27 @@ import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { Sparkles } from "lucide-react";
 import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
 
-export function ConversationsBulkQualificationAction() {
+export function ConversationsBulkQualificationAction({ compact = false }: { compact?: boolean } = {}) {
   const directorSkinEnabled = useDirectorLitePage();
   if (!directorSkinEnabled) return <BulkQualificationDialog />;
+  // Icon-only, beside the search (07/11): kept out of the filters popover so the dialog never nests in it.
+  if (compact) {
+    return (
+      <BulkQualificationDialog
+        trigger={(
+          <Button
+            aria-label="Abrir qualificação em massa"
+            title="Qualificação em massa"
+            size="sm"
+            variant="outline"
+            className="size-10 shrink-0 px-0"
+          >
+            <Sparkles aria-hidden="true" className="size-4" />
+          </Button>
+        )}
+      />
+    );
+  }
 
   return (
     <BulkQualificationDialog
