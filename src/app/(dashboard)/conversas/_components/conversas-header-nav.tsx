@@ -37,6 +37,8 @@ interface ConversasHeaderNavProps {
   distributedCount?: number;
   /** "WhatsApp coex · 7276" when a number is connected in coexistence; no tab otherwise. */
   coexLabel?: string | null;
+  /** "vertical": one view per line, full width (used inside the floating filters menu). */
+  orientation?: "horizontal" | "vertical";
 }
 
 export function ConversasHeaderNav({
@@ -44,7 +46,9 @@ export function ConversasHeaderNav({
   leadsCount,
   distributedCount,
   coexLabel,
+  orientation = "horizontal",
 }: ConversasHeaderNavProps) {
+  const vertical = orientation === "vertical";
   const directorSkinEnabled = useDirectorLitePage();
   const isLeadsActive = currentTab === "leads";
   const isDistributedActive = currentTab === "distribuidos";
@@ -52,7 +56,13 @@ export function ConversasHeaderNav({
   const isCoexActive = currentTab === "coex";
 
   return (
-    <div data-conversations-nav={directorSkinEnabled ? "true" : undefined} className="flex items-center rounded-[var(--radius-card)] border border-border/80 bg-muted/50 p-1 backdrop-blur-sm shadow-none">
+    <div
+      data-conversations-nav={directorSkinEnabled ? "true" : undefined}
+      data-orientation={vertical ? "vertical" : undefined}
+      className={vertical
+        ? "flex flex-col items-stretch gap-0.5 rounded-[var(--radius-card)] border border-border/80 bg-muted/50 p-1 shadow-none [&>a]:justify-between [&>a]:py-2 [&>a]:text-sm"
+        : "flex items-center rounded-[var(--radius-card)] border border-border/80 bg-muted/50 p-1 backdrop-blur-sm shadow-none"}
+    >
       <Link
         href="/conversas"
         aria-current={directorSkinEnabled && isLeadsActive ? "page" : undefined}
