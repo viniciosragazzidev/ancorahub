@@ -43,7 +43,22 @@ describe("dias úteis", () => {
     expect(addBusinessDaysToDateKey("2026-11-07", 1)).toBe("2026-11-09");
     expect(addBusinessDaysToDateKey("2026-11-09", 5)).toBe("2026-11-16");
     expect(addBusinessDaysToDateKey("2026-11-07", 0)).toBe("2026-11-09");
-    expect(addBusinessDaysToDateKey("2026-11-06", 30)).toBe("2026-12-18");
+    // 30 dias úteis passam pelo feriado de 20/11 (Consciência Negra) e terminam um dia útil depois.
+    expect(addBusinessDaysToDateKey("2026-11-06", 30)).toBe("2026-12-21");
+  });
+
+  it("pula feriados", () => {
+    // Quinta 19/11 + 1 dia útil: sexta 20/11 é feriado, então segunda 23/11.
+    expect(addBusinessDaysToDateKey("2026-11-19", 1)).toBe("2026-11-23");
+    // Marco no feriado com atraso 0: próximo dia útil.
+    expect(addBusinessDaysToDateKey("2026-11-20", 0)).toBe("2026-11-23");
+    // Sexta-feira Santa de 2027 e São Jorge (RJ).
+    expect(addBusinessDaysToDateKey("2027-03-25", 1)).toBe("2027-03-29");
+    expect(addBusinessDaysToDateKey("2026-04-22", 1)).toBe("2026-04-24");
+    // R1 (D+1) com marco na quinta 19/11: sai na segunda, não na sexta feriado.
+    const thursday = new Date("2026-11-19T15:00:00Z");
+    expect(autoRuleTiming({ milestoneAt: thursday, delayBusinessDays: 1, sendDay: "2026-11-20" })).toBe("early");
+    expect(autoRuleTiming({ milestoneAt: thursday, delayBusinessDays: 1, sendDay: "2026-11-23" })).toBe("due");
   });
 
   it("usa o calendário de São Paulo, não o UTC", () => {
@@ -61,8 +76,7 @@ describe("dias úteis", () => {
   });
 
   it("a busca começa antes de qualquer marco ainda no prazo", () => {
-    for (const delay of [1, 2, 3, 5, 30]) {
-      const sendDay = "2026-11-18";
+    for (const [delay, sendDay] of [1, 2, 3, 5, 30].flatMap((value) => [[value, "2026-11-18"], [value, "2026-11-24"]] as Array<[number, string]>)) {
       const floor = autoRuleMilestoneFloor(sendDay, delay);
       // O marco mais antigo ainda no prazo: dia de envio menos (atraso + tolerância) dias úteis.
       let day = sendDay;
@@ -70,7 +84,7 @@ describe("dias úteis", () => {
       const cursor = new Date(`${sendDay}T12:00:00Z`);
       while (back < delay + 2) {
         cursor.setUTCDate(cursor.getUTCDate() - 1);
-        if (cursor.getUTCDay() !== 0 && cursor.getUTCDay() !== 6) back += 1;
+        if (cursor.getUTCDay() !== 0 && cursor.getUTCDay() !== 6 && cursor.toISOString().slice(0, 10) !== "2026-11-20") back += 1;
         day = cursor.toISOString().slice(0, 10);
       }
       expect(floor.getTime()).toBeLessThanOrEqual(new Date(`${day}T03:00:00Z`).getTime());

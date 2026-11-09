@@ -1,5 +1,7 @@
 /** Pure helpers for the post-sale screen lists (09/11): pagination, search and answer chips. */
 
+import { readLossReasonCheck } from "./loss-reason-check";
+
 export const POST_SALE_PAGE_SIZE = 10;
 
 export function paginate<T>(items: readonly T[], page: number, size = POST_SALE_PAGE_SIZE) {
@@ -39,6 +41,7 @@ export function answerChips(input: { status: string; outcome: string | null; rat
   if (answers.closed === "yes") chips.push({ label: "Fechou", tone: "good" });
   else if (answers.closed === "no") chips.push({ label: "Não fechou", tone: "neutral" });
   if (answers.wantsHelp === true) chips.push({ label: "Quer ajuda", tone: "bad" });
+  if (readLossReasonCheck(answers)?.divergent) chips.push({ label: "Motivo diferente", tone: "bad" });
   if (answers.recommends === true) chips.push({ label: "Indicaria", tone: "good" });
   else if (answers.recommends === false) chips.push({ label: "Não indicaria", tone: "bad" });
   if (!chips.length && typeof answers.comment === "string" && /agora n[aã]o/i.test(answers.comment)) chips.push({ label: "Agora não", tone: "neutral" });

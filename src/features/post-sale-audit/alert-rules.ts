@@ -1,4 +1,6 @@
-export const POST_SALE_ALERT_REASONS = ["no_contact", "bad_service", "low_rating", "wants_help", "not_attended", "team_no_reply"] as const;
+import { lossReasonCheckSummary, readLossReasonCheck } from "./loss-reason-check";
+
+export const POST_SALE_ALERT_REASONS = ["no_contact", "bad_service", "low_rating", "wants_help", "not_attended", "team_no_reply", "loss_reason_mismatch"] as const;
 
 export type PostSaleAlertReason = (typeof POST_SALE_ALERT_REASONS)[number];
 
@@ -9,6 +11,7 @@ export const POST_SALE_ALERT_REASON_LABELS: Record<PostSaleAlertReason, string> 
   wants_help: "Cliente pediu ajuda da equipe",
   not_attended: "Cliente diz que não foi atendido",
   team_no_reply: "Cliente voltou a escrever e ficou 15 min sem resposta da equipe",
+  loss_reason_mismatch: "Motivo de perda diferente do registrado",
 };
 
 export type PostSaleAlertState = {
@@ -34,7 +37,17 @@ export function postSaleAlertReasons(state: PostSaleAlertState): PostSaleAlertRe
   if (state.outcome === "r0_not_attended") reasons.push("not_attended");
   const r0 = answerRecord(answers.r0);
   if (typeof r0.escalatedAt === "string" && r0.escalatedAt) reasons.push("team_no_reply");
+  // R4: motivo do cliente em outra categoria que a do corretor (gravado ao concluir, em answers.lossCheck).
+  if (readLossReasonCheck(answers)?.divergent) reasons.push("loss_reason_mismatch");
   return reasons;
+}
+
+/** Texto da notificação: o rótulo do motivo e, na divergência de perda, as duas versões. */
+export function postSaleAlertMessage(reason: PostSaleAlertReason, answers: unknown) {
+  const label = POST_SALE_ALERT_REASON_LABELS[reason];
+  if (reason !== "loss_reason_mismatch") return label;
+  const check = readLossReasonCheck(answers);
+  return check ? `${label}. ${lossReasonCheckSummary(check)}` : label;
 }
 
 export function postSaleAlertIdempotencyKey(surveyId: string, reason: PostSaleAlertReason, recipientUserId: string) {

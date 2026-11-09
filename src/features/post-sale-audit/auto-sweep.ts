@@ -5,7 +5,7 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, sql } fro
 
 import { enqueueMetaTemplateMessage, enqueuePostSaleSurveyWahaMessage } from "@/features/communication-channels/outbound-service";
 import { getFeatureFlag } from "@/features/system-settings/queries";
-import { isBusinessHours, nextBusinessOpening } from "@/features/team-notices/guard";
+import { isPostSaleBusinessHours, nextPostSaleBusinessOpening } from "./business-calendar";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { withJobLease } from "@/shared/db/job-lease";
@@ -68,10 +68,10 @@ function tenantWideContext(tenantId: string, userId: string): TenantContext {
   return { tenantId, userId, role: "director", jobTitle: "director", branchId: null, customRoleId: null };
 }
 
-/** Dentro do horário comercial envia agora; fora dele só agenda para a próxima abertura (seg a sex, 08h). */
+/** Dentro do horário comercial envia agora; fora dele (noite, fim de semana, feriado) só agenda para a próxima abertura (dia útil, 08h). */
 export function autoRuleSchedule(now: Date) {
-  const within = isBusinessHours(now);
-  const sendAt = within ? undefined : nextBusinessOpening(now);
+  const within = isPostSaleBusinessHours(now);
+  const sendAt = within ? undefined : nextPostSaleBusinessOpening(now);
   return { within, sendAt, sendDay: saoPauloDateKey(sendAt ?? now) };
 }
 

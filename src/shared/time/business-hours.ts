@@ -1,3 +1,8 @@
+import { isHolidayDateKey } from "./holidays";
+
+/** Opt-in: `skipHolidays` também trata como fechado os feriados de `holidays.ts` (pós-venda). Padrão: só fins de semana. */
+export type BusinessCalendarOptions = { skipHolidays?: boolean };
+
 export const BUSINESS_TIME_ZONE = "America/Sao_Paulo";
 export const BUSINESS_START_HOUR = 8;
 export const BUSINESS_END_HOUR = 18;
@@ -56,28 +61,38 @@ function zonedBusinessOpeningToUtc(year: number, month: number, day: number) {
   return new Date(approximate.getTime() - timezoneOffsetAt(approximate));
 }
 
-function nextWeekday(year: number, month: number, day: number) {
+function dateKey(year: number, month: number, day: number) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function isOpenDay(local: { year: number; month: number; day: number; weekday: number }, options?: BusinessCalendarOptions) {
+  if (local.weekday < 1 || local.weekday > 5) return false;
+  return !(options?.skipHolidays && isHolidayDateKey(dateKey(local.year, local.month, local.day)));
+}
+
+function nextWeekday(year: number, month: number, day: number, options?: BusinessCalendarOptions) {
   const candidate = new Date(Date.UTC(year, month - 1, day));
+  const open = () => isOpenDay({ year: candidate.getUTCFullYear(), month: candidate.getUTCMonth() + 1, day: candidate.getUTCDate(), weekday: candidate.getUTCDay() }, options);
   do candidate.setUTCDate(candidate.getUTCDate() + 1);
-  while (candidate.getUTCDay() === 0 || candidate.getUTCDay() === 6);
+  while (!open());
   return { year: candidate.getUTCFullYear(), month: candidate.getUTCMonth() + 1, day: candidate.getUTCDate() };
 }
 
-export function isWithinBusinessHours(now = new Date()) {
+export function isWithinBusinessHours(now = new Date(), options?: BusinessCalendarOptions) {
   const local = localBusinessTime(now);
-  return local.weekday >= 1 && local.weekday <= 5
+  return isOpenDay(local, options)
     && local.hour >= BUSINESS_START_HOUR
     && local.hour < BUSINESS_END_HOUR;
 }
 
-/** Returns the current instant when open, otherwise the next weekday at 08:00 BRT. */
-export function scheduleForBusinessHours(now = new Date()) {
-  if (isWithinBusinessHours(now)) return now;
+/** Returns the current instant when open, otherwise the next weekday (and, opt-in, non-holiday) at 08:00 BRT. */
+export function scheduleForBusinessHours(now = new Date(), options?: BusinessCalendarOptions) {
+  if (isWithinBusinessHours(now, options)) return now;
   const local = localBusinessTime(now);
-  const sameWeekdayBeforeOpening = local.weekday >= 1 && local.weekday <= 5 && local.hour < BUSINESS_START_HOUR;
+  const sameWeekdayBeforeOpening = isOpenDay(local, options) && local.hour < BUSINESS_START_HOUR;
   const next = sameWeekdayBeforeOpening
     ? { year: local.year, month: local.month, day: local.day }
-    : nextWeekday(local.year, local.month, local.day);
+    : nextWeekday(local.year, local.month, local.day, options);
   return zonedBusinessOpeningToUtc(next.year, next.month, next.day);
 }
 
@@ -91,12 +106,12 @@ function businessClosingAt(instant: Date) {
 }
 
 /** Milliseconds of business time (weekdays, 08:00 to 18:00 in São Paulo) between two instants. */
-export function businessMillisecondsBetween(start: Date, end: Date) {
+export function businessMillisecondsBetween(start: Date, end: Date, options?: BusinessCalendarOptions) {
   let cursor = start;
   let total = 0;
   for (let guard = 0; cursor < end && guard < 1000; guard += 1) {
-    if (!isWithinBusinessHours(cursor)) {
-      cursor = scheduleForBusinessHours(cursor);
+    if (!isWithinBusinessHours(cursor, options)) {
+      cursor = scheduleForBusinessHours(cursor, options);
       continue;
     }
     const segmentEnd = new Date(Math.min(end.getTime(), businessClosingAt(cursor).getTime()));
@@ -107,12 +122,12 @@ export function businessMillisecondsBetween(start: Date, end: Date) {
 }
 
 /** The instant reached after `milliseconds` of business time from `start` (skips nights and weekends). */
-export function addBusinessMilliseconds(start: Date, milliseconds: number) {
+export function addBusinessMilliseconds(start: Date, milliseconds: number, options?: BusinessCalendarOptions) {
   let cursor = start;
   let left = Math.max(0, milliseconds);
   for (let guard = 0; guard < 1000; guard += 1) {
-    if (!isWithinBusinessHours(cursor)) {
-      cursor = scheduleForBusinessHours(cursor);
+    if (!isWithinBusinessHours(cursor, options)) {
+      cursor = scheduleForBusinessHours(cursor, options);
       continue;
     }
     const closing = businessClosingAt(cursor);

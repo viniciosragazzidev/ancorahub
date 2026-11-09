@@ -6,7 +6,7 @@ import { getFeatureFlag } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
-import { POST_SALE_ALERT_REASON_LABELS, postSaleAlertIdempotencyKey, postSaleAlertReasons } from "./alert-rules";
+import { postSaleAlertIdempotencyKey, postSaleAlertMessage, postSaleAlertReasons } from "./alert-rules";
 
 export async function ensurePostSaleSurveyAlerts(survey: {
   id: string;
@@ -55,7 +55,7 @@ export async function ensurePostSaleSurveyAlerts(survey: {
       leadId: survey.leadId,
       type: "post_sale_alert",
       title: "Atenção no pós-venda",
-      message: POST_SALE_ALERT_REASON_LABELS[reason],
+      message: postSaleAlertMessage(reason, survey.answers),
       idempotencyKey: postSaleAlertIdempotencyKey(survey.id, reason, recipient.userId),
       createdAt: now,
     }));

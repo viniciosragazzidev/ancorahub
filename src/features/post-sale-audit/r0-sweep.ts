@@ -10,7 +10,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { withJobLease } from "@/shared/db/job-lease";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
-import { businessMillisecondsBetween, isWithinBusinessHours } from "@/shared/time/business-hours";
+import { isPostSaleBusinessHours, postSaleBusinessMillisecondsBetween, r0WaitingBusinessMinutes } from "./business-calendar";
 
 import { ensurePostSaleSurveyAlerts } from "./alert-service";
 import { decideR0Trigger, parseR0Settings, postSaleR0SettingKey, R0_DEFAULTS, R0_ELIGIBLE_STATUSES, R0_RULE_KEY, r0EscalationState, readR0State, renderR0Opening, type R0SkipReason } from "./r0-rules";
@@ -185,7 +185,7 @@ async function startTenant(tenant: { id: string; name: string | null }, settings
   result.waiting += waiting.length;
   if (!waiting.length) return;
   const byId = new Map(candidates.map((lead) => [lead.id, lead]));
-  const withinBusinessHours = isWithinBusinessHours(now);
+  const withinBusinessHours = isPostSaleBusinessHours(now);
   let systemUserId: string | null = null;
   let assistantName: string | null = null;
 
@@ -230,7 +230,7 @@ async function startTenant(tenant: { id: string; name: string | null }, settings
     const decision = decideR0Trigger({
       settings,
       lead: { status: lead.status, distributionStatus: lead.distributionStatus, queueId: lead.queueId, brokerId: lead.brokerId, ownerRole: lead.ownerRole },
-      waiting: { waitingBusinessMinutes: entry.assessment.waitingBusinessMinutes, lastCustomerMessageAt: entry.assessment.lastCustomerMessageAt },
+      waiting: { waitingBusinessMinutes: r0WaitingBusinessMinutes(entry.assessment, now), lastCustomerMessageAt: entry.assessment.lastCustomerMessageAt },
       lastHumanReply: lastHuman ? { at: lastHuman.at, body: lastHuman.body } : null,
       now,
       withinBusinessHours,
@@ -306,7 +306,7 @@ async function startTenant(tenant: { id: string; name: string | null }, settings
       entidade: "lead",
       entidadeId: lead.id,
       acao: "post_sale.r0.started",
-      metadata: { surveyId, campaignId, trigger: decision.reason, channelType: source.type, waitingBusinessMinutes: entry.assessment.waitingBusinessMinutes },
+      metadata: { surveyId, campaignId, trigger: decision.reason, channelType: source.type, waitingBusinessMinutes: r0WaitingBusinessMinutes(entry.assessment, now) },
       createdAt: now,
     });
     result.started += 1;
@@ -385,7 +385,7 @@ async function escalateTenant(tenantId: string, now: Date, result: PostSaleR0Swe
       gt(schema.whatsappMessages.sentAt, answeredAt),
       HUMAN_REPLY,
     )).orderBy(desc(schema.whatsappMessages.sentAt)).limit(1);
-    const verdict = r0EscalationState({ answeredAt, humanReplyAt: reply?.at ?? null, businessMsSinceAnswer: businessMillisecondsBetween(answeredAt, now), escalationMinutes: R0_DEFAULTS.escalationMinutes });
+    const verdict = r0EscalationState({ answeredAt, humanReplyAt: reply?.at ?? null, businessMsSinceAnswer: postSaleBusinessMillisecondsBetween(answeredAt, now), escalationMinutes: R0_DEFAULTS.escalationMinutes });
     if (verdict === "wait") continue;
     const field = verdict === "resolved" ? "resolvedAt" : "escalatedAt";
     const [updated] = await db.update(schema.postSaleSurveys).set({

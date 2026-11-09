@@ -25,6 +25,7 @@ import { POST_SALE_META_TEMPLATE, POST_SALE_WAHA_OPENING_DEFAULT } from "./templ
 import { autoRuleSettingsInputSchema, parsePostSaleRuleFilter, type AutoRuleSettings, type PostSaleRuleFilter } from "./auto-rules";
 import { AutoRulesTableMissingError, loadAutoRules, saveAutoRule } from "./auto-rules-store";
 import { previewAutoRule, type AutoRulePreview } from "./auto-sweep";
+import { postSaleViewAuditId } from "./view-audit";
 
 const campaignInput = z.object({
   name: z.string().trim().min(2, "Informe o nome da campanha.").max(120),
@@ -95,6 +96,30 @@ async function recordPostSaleAuditEvent(input: {
     acao: input.action,
     metadata: { source: "post_sale_audit", tenantId: input.tenantId, ...(input.metadata ?? {}) },
   });
+}
+
+/**
+ * Auditoria de visualização com dedupe: no máximo uma linha por usuário, entidade e ação a cada hora
+ * cheia (id determinístico + onConflictDoNothing), sem consulta extra.
+ */
+async function recordPostSaleViewAudit(input: {
+  tenantId: string;
+  userId: string;
+  entity: string;
+  entityId: string;
+  action: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const now = new Date();
+  await getDatabase().insert(schema.auditLogs).values({
+    id: postSaleViewAuditId({ ...input, now }),
+    userId: input.userId,
+    entidade: input.entity,
+    entidadeId: input.entityId,
+    acao: input.action,
+    metadata: { source: "post_sale_audit", tenantId: input.tenantId, ...(input.metadata ?? {}) },
+    createdAt: now,
+  }).onConflictDoNothing({ target: schema.auditLogs.id });
 }
 
 async function campaignIsInManagerBranch(tenantId: string, branchId: string | null, audience: ReturnType<typeof postSaleAudienceSchema.parse>) {
@@ -373,7 +398,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, ra
         .orderBy(schema.branches.name),
       loadAutoRules(context.tenantId),
     ]);
-    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_report", entityId: "workspace", action: "post_sale_report.viewed", metadata: { periodDays, brokerRows: report.length, openAlerts: alerts.length } });
+    await recordPostSaleViewAudit({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_report", entityId: "workspace", action: "post_sale_report.viewed", metadata: { periodDays, brokerRows: report.length, openAlerts: alerts.length } });
     return { ok: true, data: {
       brokers: brokers.map((row) => ({ id: row.id, name: row.name ?? "Corretor" })),
       queues,
@@ -398,7 +423,7 @@ export async function getPostSaleBrokerSummaryAction(rawBrokerId: unknown, rawPe
     const brokerId = z.string().trim().min(1).max(80).parse(rawBrokerId);
     const periodDays = postSalePeriodSchema.parse(rawPeriodDays);
     const report = await loadPostSaleBrokerSummary(context, brokerId, postSaleWindow(periodDays));
-    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_report", entityId: brokerId, action: "post_sale_report.broker_viewed", metadata: { periodDays, available: Boolean(report) } });
+    await recordPostSaleViewAudit({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_report", entityId: brokerId, action: "post_sale_report.broker_viewed", metadata: { periodDays, available: Boolean(report) } });
     return { ok: true, data: report };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };
@@ -420,7 +445,7 @@ export async function getPostSaleLeadSurveyAction(rawLeadId: unknown): Promise<A
     const leadId = z.string().trim().min(1).max(80).parse(rawLeadId);
     const survey = await loadLatestPostSaleLeadSurvey(context, leadId);
     if (!survey) return { ok: true, data: null };
-    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_survey", entityId: survey.id, action: "post_sale_survey.viewed", metadata: { leadId } });
+    await recordPostSaleViewAudit({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_survey", entityId: survey.id, action: "post_sale_survey.viewed", metadata: { leadId } });
     return { ok: true, data: {
       id: survey.id,
       status: survey.status,
@@ -461,7 +486,7 @@ export async function getPostSaleSurveyMessagesAction(rawSurveyId: unknown): Pro
       .orderBy(desc(schema.whatsappMessages.sentAt))
       .limit(80);
     rows.reverse(); // newest 80, shown oldest first: a long chat never cuts the survey answer (Vigia)
-    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_survey", entityId: surveyId, action: "post_sale_survey.messages_viewed", metadata: { leadId: survey.leadId, messages: rows.length } });
+    await recordPostSaleViewAudit({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_survey", entityId: surveyId, action: "post_sale_survey.messages_viewed", metadata: { leadId: survey.leadId, messages: rows.length } });
     return { ok: true, data: rows
       .map((row) => ({
         id: row.id,
