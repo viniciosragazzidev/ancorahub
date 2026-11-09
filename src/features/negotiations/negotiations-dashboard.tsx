@@ -25,6 +25,8 @@ import { NegotiationWaitingPanel } from "./negotiation-waiting-panel";
 import { NegotiationLeadRow } from "./negotiation-lead-row";
 import { NegotiationLeadAi, NegotiationLeadSituation, NegotiationLeadTrail } from "./negotiation-lead-signals";
 import { NegotiationClosingNow } from "./negotiation-closing-now";
+import { NegotiationClosingOutcomes } from "./negotiation-closing-outcomes";
+import type { ClosingOutcomesSummary } from "@/features/leads/closing-outcome-core";
 import styles from "./negotiations.module.css";
 
 type Filter = "all" | SummaryFilter;
@@ -43,7 +45,7 @@ function statusLabel(status: string) {
   return LEAD_STATUS_LABELS[status] ?? status;
 }
 
-export function NegotiationsDashboard({ data, activeTab, generatedAt, conversationMode = "inbox" }: { data: NegotiationsDashboardData; activeTab: PageTab; generatedAt: Date; conversationMode?: NegotiationConversationMode }) {
+export function NegotiationsDashboard({ data, activeTab, generatedAt, conversationMode = "inbox", closingOutcomes = null }: { data: NegotiationsDashboardData; activeTab: PageTab; generatedAt: Date; conversationMode?: NegotiationConversationMode; /** Só para o diretor (09/11). */ closingOutcomes?: ClosingOutcomesSummary | null }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedBranch = searchParams.get("unidade");
@@ -161,6 +163,7 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt, conversati
                 onFilter={(filter) => setActiveFilter(activeFilter === filter ? "all" : filter)}
               />
               <NegotiationClosingNow leads={data.leads} generatedAt={generatedAt} onOpen={openLead} onShowAll={() => setActiveFilter("closing")} />
+              {closingOutcomes ? <NegotiationClosingOutcomes summary={closingOutcomes} /> : null}
               {activeFilter === "no_reply" && data.customerWaitingGuard ? (
                 <NegotiationWaitingPanel rows={data.customerWaitingGuard.rows} onOpen={(row) => router.push(negotiationConversationHref(row.leadId, conversationMode))} />
               ) : (

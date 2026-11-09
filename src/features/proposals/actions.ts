@@ -265,6 +265,7 @@ export async function convertProposalToSaleAction(
         telefone: schema.leads.telefone,
         email: schema.leads.email,
         status: schema.leads.status,
+        stageEnteredAt: schema.leads.stageEnteredAt,
       })
       .from(schema.leads)
       .where(and(eq(schema.leads.id, proposal.leadId), leadScope))
@@ -434,7 +435,7 @@ export async function convertProposalToSaleAction(
         .set({ status: "converted", stageEnteredAt: now })
         .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
       // Histórico de etapas (05/11): proposta aprovada fecha o funil do lead.
-      await recordStageChangeForLead(tx, { tenantId: context.tenantId, leadId: lead.id, fromStatus: null, toStatus: "converted", changedAt: now, actorType: stageActorType({ role: context.role }), actorUserId: context.userId, reason: "Proposta convertida em venda" });
+      await recordStageChangeForLead(tx, { tenantId: context.tenantId, leadId: lead.id, fromStatus: lead.status, toStatus: "converted", changedAt: now, actorType: stageActorType({ role: context.role }), actorUserId: context.userId, reason: "Proposta convertida em venda", previousStageEnteredAt: lead.stageEnteredAt ?? null });
 
       const { triggerInstantAutomation } = await import("@/features/automations/engine");
       void triggerInstantAutomation(context.tenantId, lead.id, "venda_realizada").catch(console.error);
@@ -475,6 +476,20 @@ export async function convertProposalToSaleAction(
           policyNumber: input.policyNumber,
         },
       });
+    });
+
+    // Desfecho do fechamento (09/11): a venda de um lead em Documentação ou Em análise avisa a direção.
+    const { notifyDirectorsClosingOutcome } = await import("@/features/leads/closing-outcome-notice");
+    void notifyDirectorsClosingOutcome({
+      tenantId: context.tenantId,
+      leadId: lead.id,
+      previousStatus: lead.status,
+      newStatus: "converted",
+      actorType: stageActorType({ role: context.role }),
+      actorUserId: context.userId,
+      changedAt: now,
+      previousStageEnteredAt: lead.stageEnteredAt ?? null,
+      saleValue: approvedValue,
     });
 
     // Conversions API for CRM: "Venda" (Lead Ads leads only, never throws).

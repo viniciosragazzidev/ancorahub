@@ -23,6 +23,7 @@ import {
 import type { MotivoPerda } from "./lead-status-constants";
 import { recordStageChange, stageActorType } from "./stage-history";
 import { isStageRegression } from "./stage-history-core";
+import { leavesClosingStage } from "./closing-outcome-core";
 
 // ─── Tipos ────────────────────────────────────────────────────────────
 
@@ -278,6 +279,8 @@ export async function changeLeadStatus(
   // ─── Executar mudança ───────────────────────────────────────────────
   const now = new Date();
   const motivoPerda = newStatus === "lost" ? canonicalMotivoPerda! : null;
+  const actorType = stageActorType({ systemActor: system ? (system.actorType ?? "ai") : null, role: context.role });
+  const leavingClosing = leavesClosingStage(previousStatus, newStatus);
 
   await db.transaction(async (tx) => {
     // Atualizar lead
@@ -291,7 +294,10 @@ export async function changeLeadStatus(
         stageBeforeAwaiting: newStatus === "awaiting_reply"
           ? (previousStatus === "awaiting_reply" ? undefined : previousStatus as LeadStatus)
           : null,
-        ...(system?.holdUntil !== undefined ? { stageHoldUntil: system.holdUntil } : {}),
+        ...(system?.holdUntil !== undefined
+          ? { stageHoldUntil: system.holdUntil }
+          // Saiu do fechamento: a data prevista do "Continua em análise" (desfecho, 09/11) deixa de valer.
+          : leavingClosing ? { stageHoldUntil: null } : {}),
         ...(qualificationValidation.newQualificationStatus
           ? { qualificationStatus: qualificationValidation.newQualificationStatus }
           : {}),
@@ -357,7 +363,7 @@ export async function changeLeadStatus(
       fromStatus: previousStatus,
       toStatus: newStatus,
       changedAt: now,
-      actorType: stageActorType({ systemActor: system ? (system.actorType ?? "ai") : null, role: context.role }),
+      actorType,
       actorUserId: system ? (system.actorType === "rule" || system.actorType === "system" ? null : actorUserId) : context.userId,
       reason: system?.reason ?? (newStatus === "lost" ? (MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda ?? null) : (input.justificativaRegressao?.trim() || null)),
       lossCode: newStatus === "lost" ? canonicalMotivoPerda ?? null : null,
@@ -525,6 +531,22 @@ export async function changeLeadStatus(
     // And the direction (numbers set in Avisos da equipe): client, broker and the conversation summary.
     const { notifyDirectorsClosingStage } = await import("./closing-director-alert");
     void notifyDirectorsClosingStage({ tenantId: lead.tenantId, leadId: lead.id, previousStatus, newStatus });
+  }
+
+  // Desfecho do fechamento (09/11): saiu de Documentação ou Em análise por uma pessoa, a direção fica sabendo.
+  if (leavingClosing) {
+    const { notifyDirectorsClosingOutcome } = await import("./closing-outcome-notice");
+    void notifyDirectorsClosingOutcome({
+      tenantId: lead.tenantId,
+      leadId: lead.id,
+      previousStatus,
+      newStatus,
+      actorType,
+      actorUserId,
+      changedAt: now,
+      previousStageEnteredAt: lead.stageEnteredAt ?? null,
+      lossCode: motivoPerda,
+    });
   }
 
   if (newStatus === "lost") {

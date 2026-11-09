@@ -8,6 +8,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
 import { canOpenNegotiations } from "@/features/negotiations/negotiation-scope";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { getClosingOutcomesSummary } from "@/features/leads/closing-outcome-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +29,16 @@ export default async function NegotiationsPage({ searchParams }: { searchParams:
     getNegotiationsDashboard(context, single(params.unidade)),
     getLiteAudience(context).catch(() => null),
   ]);
+  // Desfechos do fechamento (09/11): só o diretor, na unidade escolhida (ou na empresa toda).
+  const branchId = data.scope.role === "director" && data.scope.branches.some((branch) => branch.id === single(params.unidade)) ? single(params.unidade)! : null;
+  const closingOutcomes = context.role === "director"
+    ? await getClosingOutcomesSummary({ tenantId: context.tenantId, branchId }).catch((error) => {
+      console.error("[closing-outcome] summary_failed", { error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
+      return null;
+    })
+    : null;
   // Supervisor e gestor no app Light leem a conversa da equipe em /mensagens; os demais abrem a conversa em /conversas.
   const conversationMode = audience === "manager" || audience === "supervisor" ? "team" : "inbox";
   const activeTab = single(params.aba) === "estatisticas" ? "statistics" : "negotiations";
-  return <NegotiationsDashboard data={data} activeTab={activeTab} generatedAt={new Date(data.generatedAt)} conversationMode={conversationMode} />;
+  return <NegotiationsDashboard data={data} activeTab={activeTab} generatedAt={new Date(data.generatedAt)} conversationMode={conversationMode} closingOutcomes={closingOutcomes} />;
 }

@@ -182,12 +182,15 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
   const activeCustomerId = randomUUID();
   const schedule = await generateCommissionSchedule(context.tenantId, saleId, resolvedPlanId, input.approvedValue);
 
+  // Etapa de onde a venda saiu (desfecho do fechamento, 09/11).
+  let soldFrom: { status: string; stageEnteredAt: Date | null } | null = null;
   await db.transaction(async (tx) => {
     // Lock the lead and check again inside the transaction: two concurrent submits register one sale.
-    const [locked] = await tx.select({ status: schema.leads.status }).from(schema.leads)
+    const [locked] = await tx.select({ status: schema.leads.status, stageEnteredAt: schema.leads.stageEnteredAt }).from(schema.leads)
       .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId))).limit(1).for("update");
     if (!locked || locked.status === "converted") throw new SaleAlreadyRegisteredError("A venda deste lead já foi registrada.");
     if (locked.status === "lost") throw new SaleAlreadyRegisteredError("Este lead está perdido. Reabra o lead antes de registrar a venda.");
+    soldFrom = { status: locked.status, stageEnteredAt: locked.stageEnteredAt ?? null };
     const [activeSale] = await tx.select({ id: schema.sales.id }).from(schema.sales)
       .where(and(eq(schema.sales.leadId, lead.id), eq(schema.sales.tenantId, context.tenantId), eq(schema.sales.status, "active"))).limit(1);
     if (activeSale) throw new SaleAlreadyRegisteredError("Este lead já tem uma venda ativa registrada.");
@@ -263,7 +266,7 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
 
     await tx.update(schema.leads).set({ status: "converted", stageEnteredAt: now, updatedAt: now, version: sql`${schema.leads.version} + 1` }).where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
     // Histórico de etapas (05/11): a venda registrada fecha o funil do lead.
-    await recordStageChangeForLead(tx, { tenantId: context.tenantId, leadId: lead.id, fromStatus: null, toStatus: "converted", changedAt: now, actorType: stageActorType({ role: context.role }), actorUserId: context.userId, reason: "Venda registrada" });
+    await recordStageChangeForLead(tx, { tenantId: context.tenantId, leadId: lead.id, fromStatus: locked.status, toStatus: "converted", changedAt: now, actorType: stageActorType({ role: context.role }), actorUserId: context.userId, reason: "Venda registrada", previousStageEnteredAt: locked.stageEnteredAt ?? null });
     const metadata: Record<string, unknown> = {
       saleId,
       policyNumber: input.policyNumber,
@@ -288,6 +291,23 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
     // With a broker the push below already writes the inbox row; one notice, not two.
     if (!lead.corretorId) await tx.insert(schema.notifications).values({ id: randomUUID(), tenantId: context.tenantId, recipientUserId: context.userId, leadId: lead.id, type: "sale_registered", title: "Venda registrada", message: `${lead.nome} foi convertido em cliente ativo. Vencimento: ${expirationDate}.`, createdAt: now });
   });
+
+  // Desfecho do fechamento (09/11): a venda de um lead em Documentação ou Em análise avisa a direção.
+  const closedFrom = soldFrom as { status: string; stageEnteredAt: Date | null } | null;
+  if (closedFrom) {
+    const { notifyDirectorsClosingOutcome } = await import("@/features/leads/closing-outcome-notice");
+    void notifyDirectorsClosingOutcome({
+      tenantId: context.tenantId,
+      leadId: lead.id,
+      previousStatus: closedFrom.status,
+      newStatus: "converted",
+      actorType: stageActorType({ role: context.role }),
+      actorUserId: context.userId,
+      changedAt: now,
+      previousStageEnteredAt: closedFrom.stageEnteredAt,
+      saleValue: input.approvedValue,
+    });
+  }
 
   // Only after the commit: a rolled-back sale never fires the "venda realizada" automation.
   const { triggerInstantAutomation } = await import("@/features/automations/engine");
