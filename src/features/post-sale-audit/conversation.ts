@@ -12,13 +12,17 @@ import { getFeatureFlag } from "@/features/system-settings/queries";
 import { POST_SALE_META_TEMPLATE } from "./template-contract";
 import { postSaleAlertReasons } from "./alert-rules";
 import { ensurePostSaleSurveyAlerts } from "./alert-service";
-import { decidePostSaleNudge, detectPostSaleKeywords, isActivePostSaleSurvey, postSaleAnswerSchema, postSaleNextTurn, type PostSaleAnswers } from "./conversation-rules";
+import { decidePostSaleNudge, detectPostSaleKeywords, isActivePostSaleSurvey, postSaleAnswerSchema, type PostSaleAnswers } from "./conversation-rules";
 import { postSaleMediaReply, requestPostSaleTextOnceAtStep, retryPostSaleOperation, runPostSaleOptOutTransaction, type PostSaleMessageKind } from "./conversation-operations";
-import { autoRuleNextTurn, autoRuleQuestionFocus, detectAutoRuleKeywords } from "./auto-rule-scripts";
+import { autoRuleQuestionFocus, detectAutoRuleKeywords } from "./auto-rule-scripts";
 import { isAutoRuleKey } from "./auto-rules";
 import { compareLossReasons } from "./loss-reason-check";
 import { MOTIVO_PERDA_LABELS, type MotivoPerda } from "@/features/leads/lead-status-constants";
-import { classifyR0AnswerByKeywords, r0AnswerSchema, r0NextTurn, r0TimelineSummary, readR0State, R0_RULE_KEY, type R0Answer, type R0SurveyState } from "./r0-rules";
+import { classifyR0AnswerByKeywords, r0ReadingSchema, r0TimelineSummary, readR0State, R0_RULE_KEY, type R0Answer, type R0SurveyState } from "./r0-rules";
+import { detectPostSaleIntents, mergeIntentState, postSaleIntentFields, postSaleReadingInstructions, readIntentState, type PostSaleIntentReading } from "./intents";
+import { decidePostSaleTurn, decideR0Turn, type PostSaleAnswersWithIntents } from "./turn-policy";
+import { firstName } from "./reply-variants";
+import { z } from "zod";
 
 const ACTIVE_STATUSES = ["sent", "answering"] as const;
 const SURVEY_WINDOW_MS = 5 * 86_400_000;
@@ -34,8 +38,19 @@ export type PostSaleInbound = {
   messageKind?: PostSaleMessageKind;
 };
 
-async function extractPostSaleAnswer(input: { tenantId: string; step: number; question: string; text: string; fallback?: PostSaleAnswers }): Promise<PostSaleAnswers> {
-  const fallback = input.fallback ?? detectPostSaleKeywords(input.text, input.question);
+const postSaleTurnReadingSchema = postSaleAnswerSchema.extend(postSaleIntentFields);
+
+function splitReading(value: z.infer<typeof postSaleTurnReadingSchema>): { answer: PostSaleAnswers; intents: PostSaleIntentReading } {
+  const { intents, complaintKind, quote, closedWith, gaveUpReason, questionTopic, scheduleText, ...answer } = value;
+  return { answer, intents: { intents: intents ?? [], complaintKind, quote, closedWith, gaveUpReason, questionTopic, scheduleText } };
+}
+
+/**
+ * Uma leitura de IA por mensagem (09/11): a resposta da pergunta da vez e as intenções da mensagem toda
+ * (preço, falar com alguém, reclamação, número errado...). Falhou: palavras-chave das duas partes.
+ */
+async function interpretPostSaleTurn(input: { tenantId: string; step: number; question: string; broker: string; text: string; fallback?: PostSaleAnswers }): Promise<{ answer: PostSaleAnswers; intents: PostSaleIntentReading; source: "ai" | "keywords" }> {
+  const fallback = { answer: input.fallback ?? detectPostSaleKeywords(input.text, input.question), intents: detectPostSaleIntents(input.text), source: "keywords" as const };
   try {
     const result = await runGateway({
       profile: "interpreter",
@@ -44,25 +59,25 @@ async function extractPostSaleAnswer(input: { tenantId: string; step: number; qu
       userId: "post-sale-survey",
       sensitive: true,
       temperature: 0,
-      maxTokens: 450,
+      maxTokens: 600,
       timeoutMs: 6_000,
       totalTimeoutMs: 12_000,
       maxAttempts: 2,
-      schema: postSaleAnswerSchema,
+      schema: postSaleTurnReadingSchema,
       messages: [
-        { role: "system", content: `Extraia somente os fatos explicitamente ditos na resposta, considerando a pergunta ${input.step}: ${input.question}. Não escreva uma resposta ao cliente. Não estime valores, preço ou cobertura. Para campo desconhecido, use null ou unknown. Opt-out só quando a pessoa pede claramente para não receber contato.${input.question.includes("motivo") ? " Em lossCategory, classifique o motivo dito: price (preço, valor, mensalidade), has_plan (já tem plano ou fechou com outra corretora ou operadora), gave_up (desistiu, sem interesse, não é o momento), not_attended (não foi atendido, ninguém respondeu ou retornou), coverage (documentação, carência, rede, hospitais, cobertura), other (outro motivo); null se não disse motivo." : ""}` },
+        { role: "system", content: postSaleReadingInstructions({ step: input.step, question: input.question, broker: input.broker, askLossCategory: input.question.includes("motivo") }) },
         { role: "user", content: input.text.slice(0, 2_000) },
       ],
     });
-    if (result.ok) return postSaleAnswerSchema.parse(result.value);
+    if (result.ok) return { ...splitReading(postSaleTurnReadingSchema.parse(result.value)), source: "ai" };
   } catch (error) {
     console.warn("[post-sale-audit] interpreter_fallback", { error: error instanceof Error ? error.message.slice(0, 120) : "unknown" });
   }
   return fallback;
 }
 
-async function extractR0Answer(input: { tenantId: string; text: string }): Promise<R0Answer> {
-  const fallback = classifyR0AnswerByKeywords(input.text);
+async function interpretR0Turn(input: { tenantId: string; text: string }): Promise<{ answer: R0Answer; intents: PostSaleIntentReading }> {
+  const fallback = { answer: classifyR0AnswerByKeywords(input.text), intents: detectPostSaleIntents(input.text) };
   try {
     const result = await runGateway({
       profile: "interpreter",
@@ -71,17 +86,20 @@ async function extractR0Answer(input: { tenantId: string; text: string }): Promi
       userId: "post-sale-survey",
       sensitive: true,
       temperature: 0,
-      maxTokens: 300,
+      maxTokens: 500,
       timeoutMs: 6_000,
       totalTimeoutMs: 12_000,
       maxAttempts: 2,
-      schema: r0AnswerSchema,
+      schema: r0ReadingSchema,
       messages: [
-        { role: "system", content: "O cliente já tinha falado com um corretor e voltou a escrever. A pergunta foi: você chegou a ser atendido e recebeu a cotação? Classifique a resposta em category: not_attended (não foi atendido ou não recebeu cotação), wants_more (foi atendido e quer cotação nova, ajuste ou tirar dúvida), closed_or_gave_up (já fechou, inclusive com outra empresa, ou desistiu; informe closedKind closed_elsewhere ou gave_up), other_subject (outro assunto). request: o pedido do cliente em poucas palavras, ou null. reason: motivo de desistência, se dito. optOut só quando a pessoa pede claramente para não receber mensagens. Não escreva resposta ao cliente e não estime valores." },
+        { role: "system", content: postSaleReadingInstructions({ step: 1, question: "você chegou a ser atendido e recebeu a cotação?", broker: "o corretor", askLossCategory: false, r0: true }) },
         { role: "user", content: input.text.slice(0, 2_000) },
       ],
     });
-    if (result.ok) return r0AnswerSchema.parse(result.value);
+    if (result.ok) {
+      const { intents, complaintKind, quote, closedWith, gaveUpReason, questionTopic, scheduleText, ...answer } = r0ReadingSchema.parse(result.value);
+      return { answer, intents: { intents: intents ?? [], complaintKind, quote, closedWith, gaveUpReason, questionTopic, scheduleText } };
+    }
   } catch (error) {
     console.warn("[post-sale-audit] r0_interpreter_fallback", { error: error instanceof Error ? error.message.slice(0, 120) : "unknown" });
   }
@@ -102,6 +120,20 @@ function postSaleInteractionId(surveyId: string, providerMessageId: string) {
   return `post-sale-${digest}`;
 }
 
+/** Linhas extras da nota do lead (pesquisa manual): o que o cliente pediu ou contou além das perguntas. */
+function intentTimelineLines(answers: unknown) {
+  const intents = readIntentState(answers);
+  if (!intents) return [];
+  return [
+    intents.list.includes("wrong_person") ? "Cliente informou número errado." : null,
+    intents.list.some((intent) => intent === "price_request" || intent === "wants_human" || intent === "scheduling") ? "Pediu para retomar o atendimento." : null,
+    intents.scheduleText ? `Melhor horário: ${intents.scheduleText.slice(0, 80)}.` : null,
+    intents.list.includes("closed_elsewhere") ? `Fechou por fora${intents.closedWith ? ` (${intents.closedWith.slice(0, 60)})` : ""}.` : null,
+    intents.list.includes("gave_up") ? "Desistiu." : null,
+    intents.list.includes("health_urgency") ? "Relatou urgência de saúde." : null,
+  ];
+}
+
 async function finalizeProcessedTurn(survey: typeof schema.postSaleSurveys.$inferSelect) {
   const providerMessageId = survey.lastInboundMessageId;
   if (!providerMessageId) return;
@@ -111,6 +143,11 @@ async function finalizeProcessedTurn(survey: typeof schema.postSaleSurveys.$infe
   await ensurePostSaleSurveyAlerts(survey);
   if (survey.status === "opted_out") {
     await db.update(schema.aiConversations).set({ optOutAt: now, updatedAt: now }).where(and(eq(schema.aiConversations.tenantId, survey.tenantId), eq(schema.aiConversations.leadId, survey.leadId)));
+  }
+  // Número errado (09/11): marca o número na conversa do lead, o mesmo sinal que a reativação usa e que a
+  // audiência do pós-venda já exclui. Só preenche quando ainda está vazio.
+  if (survey.status === "completed" && readIntentState(answers)?.list.includes("wrong_person")) {
+    await db.update(schema.aiConversations).set({ wrongNumberAt: now, updatedAt: now }).where(and(eq(schema.aiConversations.tenantId, survey.tenantId), eq(schema.aiConversations.leadId, survey.leadId), isNull(schema.aiConversations.wrongNumberAt)));
   }
   // R0 and the automatic rules (R1 to R5) leave no note on the lead timeline: the broker reads it and must
   // not notice the check (Vinicios, 09/11). Answers stay in the survey and in the post-sale page.
@@ -127,6 +164,7 @@ async function finalizeProcessedTurn(survey: typeof schema.postSaleSurveys.$infe
       answers.receivedQuote === true ? "Recebeu cotação." : answers.receivedQuote === false ? "Não recebeu cotação." : null,
       answers.closed === "yes" ? "Informou que fechou." : answers.closed === "no" ? "Informou que não fechou." : null,
       answers.wantsHelp ? "Pediu ajuda da equipe." : null,
+      ...intentTimelineLines(answers),
       answers.reason ? `Motivo: ${answers.reason.slice(0, 180)}.` : null,
       answers.comment ? `Comentário: ${answers.comment.slice(0, 180)}` : null,
     ].filter(Boolean).join(" ").slice(0, 900);
@@ -259,24 +297,24 @@ async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof sche
     return;
   }
   const [broker] = currentSurvey.brokerId ? await db.select({ name: schema.user.name }).from(schema.user).innerJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.user.id), eq(schema.tenantMemberships.tenantId, currentSurvey.tenantId), eq(schema.tenantMemberships.status, "active"))).where(eq(schema.user.id, currentSurvey.brokerId)).limit(1) : [];
-  const prior = (currentSurvey.answers ?? {}) as PostSaleAnswers;
+  const prior = (currentSurvey.answers ?? {}) as PostSaleAnswersWithIntents;
   const autoRule = isAutoRuleKey(currentSurvey.ruleKey) ? currentSurvey.ruleKey : null;
   const question = autoRule ? autoRuleQuestionFocus(autoRule, currentSurvey.step, prior) : currentSurvey.step === 0 ? "permissão para fazer duas perguntas" : currentSurvey.step === 1 ? "se o corretor conseguiu falar" : currentSurvey.step === 2 ? "como foi o atendimento" : currentSurvey.step === 3 ? prior.contacted === false ? "se ainda quer ajuda com o plano" : "se recebeu cotação" : currentSurvey.step === 4 ? "se fechou o plano" : "motivo da decisão";
-  const extracted = await extractPostSaleAnswer({ tenantId: input.tenantId, step: currentSurvey.step, question, text: input.text, fallback: autoRule ? detectAutoRuleKeywords(input.text, question) : undefined });
-  // Step 0 of the manual script only asks for permission: "Pode perguntar" must not become "foi atendido"
-  // (09/11, Dayana). Keep only the stop request and the client's own words.
-  const answer: PostSaleAnswers = !autoRule && currentSurvey.step === 0
-    ? { ...(extracted.optOut !== undefined ? { optOut: extracted.optOut } : {}), ...(extracted.sentiment ? { sentiment: extracted.sentiment } : {}) }
-    : extracted;
+  const names = { lead: firstName(lead.name, "Cliente"), broker: firstName(broker?.name, "corretor"), seed: currentSurvey.id };
+  // Uma leitura por mensagem: resposta da pergunta da vez e intenções da mensagem toda (09/11).
+  const reading = await interpretPostSaleTurn({ tenantId: input.tenantId, step: currentSurvey.step, question, broker: names.broker, text: input.text, fallback: autoRule ? detectAutoRuleKeywords(input.text, question) : undefined });
+  const answer: PostSaleAnswers = { ...reading.answer };
   answer.comment ??= input.text.slice(0, 500);
-  const names = { lead: lead.name.trim().split(/\s+/)[0] || "Cliente", broker: broker?.name?.trim().split(/\s+/)[0] || "corretor" };
-  // Régua automática: roteiro curto da regra (uma pergunta por vez); manual segue o roteiro de sempre.
-  const turn = autoRule ? autoRuleNextTurn(autoRule, currentSurvey.step, prior, answer, names) : postSaleNextTurn(currentSurvey.step, prior, answer, names);
+  // Política das intenções (opt-out, número errado, urgência, retomar, fechou por fora, desistiu, reclamação,
+  // pergunta fora do roteiro) e depois o roteiro, manual ou da régua, pulando o que o cliente já respondeu.
+  // Na abertura, "Pode perguntar" só autoriza (caso Dayana): a política descarta os fatos dessa resposta.
+  const turn = decidePostSaleTurn({ rule: autoRule, step: currentSurvey.step, prior, answer, reading: reading.intents, text: input.text, names });
   const answers = autoRule === "R4" && turn.status === "completed"
     ? await withLossReasonCheck(currentSurvey, turn.answers as PostSaleAnswers)
     : turn.answers as PostSaleAnswers;
   const previousAlertReasons = postSaleAlertReasons(currentSurvey);
-  const nextOutcome = turn.outcome === "ok" && answers.sentiment === "negative"
+  // Nota 4 ou 5 vence um "negativo" solto (caso real de 09/11: "foi 5, o problema é que agora não está dando").
+  const nextOutcome = turn.outcome === "ok" && answers.sentiment === "negative" && !(typeof answers.rating === "number" && answers.rating >= 4)
     ? "bad_service"
     : turn.outcome ?? currentSurvey.outcome;
   const nextRating = answers.rating ?? currentSurvey.rating;
@@ -305,7 +343,8 @@ async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof sche
     return updated;
   };
   let updated: typeof schema.postSaleSurveys.$inferSelect;
-  if (turn.status === "opted_out") {
+  // Número errado também entra na lista de bloqueio (nunca mais recebe pesquisa), na mesma transação.
+  if (turn.status === "opted_out" || turn.wrongNumber) {
     updated = await runPostSaleOptOutTransaction<PostSaleWriteExecutor, typeof schema.postSaleSurveys.$inferSelect>({
       transaction: (work) => db.transaction((tx) => work(tx)),
       insertOptOut: async (tx) => {
@@ -335,10 +374,13 @@ async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof sche
  */
 async function processR0Answer(input: PostSaleInbound, currentSurvey: typeof schema.postSaleSurveys.$inferSelect, leadName: string) {
   const db = getDatabase();
-  const answer = await extractR0Answer({ tenantId: input.tenantId, text: input.text });
-  const turn = r0NextTurn(answer, { lead: leadName.trim().split(/\s+/)[0] || "Cliente" });
+  const reading = await interpretR0Turn({ tenantId: input.tenantId, text: input.text });
+  const answer = reading.answer;
+  // Intenções valem também na R0: número errado, urgência, pedido de preço ou horário, reclamação.
+  const turn = decideR0Turn({ answer, reading: reading.intents, names: { lead: firstName(leadName, "Cliente"), broker: "", seed: currentSurvey.id } });
   const now = new Date();
   const previous = (currentSurvey.answers ?? {}) as Record<string, unknown>;
+  const intentState = mergeIntentState(readIntentState(previous), reading.intents, input.text);
   const r0: R0SurveyState = {
     ...readR0State(previous),
     category: answer.category,
@@ -350,7 +392,7 @@ async function processR0Answer(input: PostSaleInbound, currentSurvey: typeof sch
   };
   const updateValues = {
     status: turn.status,
-    answers: { ...previous, r0, comment: input.text.slice(0, 500), ...(answer.optOut ? { optOut: true } : {}) },
+    answers: { ...previous, r0, comment: input.text.slice(0, 500), ...(intentState.list.length ? { intents: intentState } : {}), ...(turn.status === "opted_out" ? { optOut: true } : {}) },
     outcome: turn.outcome,
     alertsHandledAt: null,
     lastReplyAt: now,
@@ -369,7 +411,7 @@ async function processR0Answer(input: PostSaleInbound, currentSurvey: typeof sch
     if (!updated) throw new Error("Pesquisa mudou de etapa antes de salvar a resposta.");
     return updated;
   };
-  const updated = turn.status === "opted_out"
+  const updated = turn.status === "opted_out" || turn.wrongNumber
     ? await runPostSaleOptOutTransaction<PostSaleWriteExecutor, typeof schema.postSaleSurveys.$inferSelect>({
       transaction: (work) => db.transaction((tx) => work(tx)),
       insertOptOut: async (tx) => {
@@ -448,7 +490,9 @@ export async function sendPostSaleNudge(survey: typeof schema.postSaleSurveys.$i
     .where(and(eq(schema.whatsappOutboundMessages.tenantId, survey.tenantId), eq(schema.whatsappOutboundMessages.recipientId, survey.leadId), eq(schema.whatsappOutboundMessages.purpose, "postSaleSurvey"), like(schema.whatsappOutboundMessages.idempotencyKey, `post-sale-reply:${survey.id}:%`)))
     .orderBy(desc(schema.whatsappOutboundMessages.createdAt)).limit(1);
   const fromVariables = Array.isArray(lastQuestion?.variables) && typeof lastQuestion.variables[0] === "string" ? lastQuestion.variables[0] : null;
-  const question = (lastQuestion?.renderedBody?.trim() || fromVariables?.trim() || "").replace(/^Obrigad[ao],?\s*[^!.]*[!.]\s*/i, "");
+  // A pergunta guardada no turno (sem saudação) vence o texto enviado; o texto fica para pesquisas antigas.
+  const stored = typeof (survey.answers as Record<string, unknown> | null)?.lastQuestion === "string" ? String((survey.answers as Record<string, unknown>).lastQuestion).trim() : "";
+  const question = stored || (lastQuestion?.renderedBody?.trim() || fromVariables?.trim() || "").replace(/^Obrigad[ao],?\s*[^!.]*[!.]\s*/i, "");
   const body = question ? `Oi, ${leadName}! Só retomando: ${question}` : `Oi, ${leadName}! Só retomando nossa pesquisa rápida de atendimento. Pode me responder quando puder?`;
   return enqueueSurveyReply(survey, body, key);
 }
