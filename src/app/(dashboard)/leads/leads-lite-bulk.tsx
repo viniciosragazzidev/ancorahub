@@ -12,7 +12,6 @@ import { LiteBulkBar, LiteConfirmDialog, type BulkAction } from "@/components/li
 import { BulkStatusDialog } from "@/components/ui/bulk-status-dialog";
 import { BulkReassignDialog, type BulkMode } from "@/components/ui/bulk-reassign-dialog";
 import { toast } from "@/components/ui/sonner";
-import { useRouter } from "next/navigation";
 
 import { bulkChangeLeadStatusAction, bulkRevertToQualificationAction } from "./status-actions";
 import { buildPostSaleAudienceHref } from "@/features/post-sale-audit/bulk-navigation";
@@ -31,7 +30,6 @@ export type LeadsLiteBulkConfig = {
 type OpenDialog = null | "status" | BulkMode;
 
 export function LeadsLiteBulk({ selectedIds, onClear, config }: { selectedIds: string[]; onClear: () => void; config: LeadsLiteBulkConfig }) {
-  const router = useRouter();
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [confirmRevert, setConfirmRevert] = useState(false);
   const [reverting, startRevert] = useTransition();
@@ -46,7 +44,7 @@ export function LeadsLiteBulk({ selectedIds, onClear, config }: { selectedIds: s
     actions.push({ id: "broker", label: "Trocar corretor", shortLabel: "Corretor", onRun: () => setDialog("broker") });
     if (branches.length > 0) actions.push({ id: "branch", label: "Transferir unidade", shortLabel: "Unidade", onRun: () => setDialog("branch") });
     actions.push({ id: "revert", label: "Devolver para qualificação", shortLabel: "Devolver", tone: "danger", onRun: () => { if (!reverting) setConfirmRevert(true); } });
-    if (config.postSaleEnabled) actions.push({ id: "post-sale", label: "Enviar pós-venda", shortLabel: "Pós-venda", disabled: !postSaleHref, onRun: () => { if (postSaleHref) router.push(postSaleHref); } });
+    if (config.postSaleEnabled) actions.push({ id: "post-sale", label: "Enviar pós-venda", shortLabel: "Pós-venda", disabled: !postSaleHref, onRun: () => { if (postSaleHref) window.location.assign(postSaleHref); } });
   }
   // A tabela atual oferece "Exportar CSV" na seleção; a Lite mantém o mesmo comportamento.
   actions.push({ id: "export", label: "Exportar CSV", shortLabel: "Exportar", onRun: () => alert(`Exportando ${count} lead(s)...`) });

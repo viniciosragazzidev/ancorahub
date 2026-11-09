@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { Badge, type BadgeTone } from "@/components/arc/badge/badge";
@@ -143,7 +142,6 @@ function RadarRow({ item, index, isManager, slaMinutes, now, selectable = false,
  * broker's queue: the phone-book list, what needs attention first, the rest grouped by the day it arrived.
  */
 export function SupervisorLeadsRadar({ data, now, search = "", audience = "supervisor", initialTab, postSaleEnabled = false }: { initialTab?: Tab; data: { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number }; now: string; search?: string; audience?: "supervisor" | "manager"; postSaleEnabled?: boolean }) {
-  const router = useRouter();
   const isManager = audience === "manager";
   const currentTime = useMemo(() => new Date(now), [now]);
   const [query, setQuery] = useState(search);
@@ -234,7 +232,7 @@ export function SupervisorLeadsRadar({ data, now, search = "", audience = "super
 
       {postSaleEnabled && isManager ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-(--surface-muted) p-3 text-sm">
         <span className="text-(--text-secondary)">{selectedLeadIds.length} selecionados. Limite de {POST_SALE_CAMPAIGN_MAX_LEADS} por campanha.</span>
-        <span className="flex flex-wrap gap-2"><Button variant="ghost" size="sm" onClick={() => setSelectedLeadIds([])} disabled={!selectedLeadIds.length}>Limpar seleção</Button><Button size="sm" onClick={() => { if (postSaleHref) router.push(postSaleHref); }} disabled={!postSaleHref}>Enviar pós-venda</Button></span>
+        <span className="flex flex-wrap gap-2"><Button variant="ghost" size="sm" onClick={() => setSelectedLeadIds([])} disabled={!selectedLeadIds.length}>Limpar seleção</Button><Button size="sm" onClick={() => { if (postSaleHref) window.location.assign(postSaleHref); }} disabled={!postSaleHref}>Enviar pós-venda</Button></span>
       </div> : null}
 
       {filtering ? (
