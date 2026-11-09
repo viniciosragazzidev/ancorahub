@@ -7,6 +7,7 @@ import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { computeNegotiationLevel, NEGOTIATION_LIMITS, type NegotiationLevel } from "./negotiation-model";
 import { canViewNegotiationLead } from "./negotiation-scope";
+import { negotiationTimingSignalSql } from "./message-signal";
 import type { CustomerWaitingStage } from "@/features/customer-waiting/domain";
 import { getCustomerWaitingMode } from "@/features/customer-waiting/flag";
 import { loadCustomerWaitingLeads } from "@/features/customer-waiting/queries";
@@ -236,7 +237,7 @@ export async function getNegotiationsDashboard(context: TenantContext, requested
     select 1 from ${schema.whatsappMessages} any_msg
     where any_msg.tenant_id = ${schema.leads.tenantId}
       and any_msg.lead_id = ${schema.leads.id}
-      and (any_msg.media_kind is not null or lower(trim(coalesce(any_msg.body, ''))) not in ('', '[text]'))
+      and ${negotiationTimingSignalSql("any_msg")}
   )`;
 
   const leadRows = await db.select({
@@ -289,7 +290,7 @@ export async function getNegotiationsDashboard(context: TenantContext, requested
         and l.tenant_id = ${context.tenantId}
         and m.sent_at >= ${since.toISOString()}::timestamptz
         and m.lead_id in (${messageIds})
-        and (m.media_kind is not null or lower(trim(coalesce(m.body, ''))) not in ('', '[text]'))
+        and ${negotiationTimingSignalSql("m")}
     ), daily_messages as (
       select
         lead_id,
@@ -591,7 +592,9 @@ export async function getNegotiationTimeline(context: TenantContext, leadId: str
   if (!canViewNegotiationLead(roleScope, lead, supervisorBrokerIds)) throw new Error("Este lead não pertence à sua unidade ou equipe.");
 
   const since = new Date(Date.now() - NEGOTIATION_LIMITS.messageWindowDays * 24 * 60 * 60 * 1000);
-  const customerAt = sql<Date | null>`max(${schema.whatsappMessages.sentAt}) filter (where ${schema.whatsappMessages.direction} = 'incoming' and ${REAL_MESSAGE})`;
+  // A textless client message still dates the client's reply (see message-signal.ts).
+  const timingSignal = negotiationTimingSignalSql("whatsapp_messages");
+  const customerAt = sql<Date | null>`max(${schema.whatsappMessages.sentAt}) filter (where ${schema.whatsappMessages.direction} = 'incoming' and ${timingSignal})`;
   const brokerAt = sql<Date | null>`max(${schema.whatsappMessages.sentAt}) filter (where ${BROKER_MESSAGE} and ${REAL_MESSAGE})`;
   const documentAt = sql<Date | null>`max(${schema.whatsappMessages.sentAt}) filter (where ${schema.whatsappMessages.direction} = 'incoming' and ${schema.whatsappMessages.mediaKind} = 'document' and ${schema.whatsappMessages.sentAt} >= ${schema.leads.assignedAt})`;
   const [messages, interactions] = await Promise.all([
@@ -603,7 +606,7 @@ export async function getNegotiationTimeline(context: TenantContext, leadId: str
         eq(schema.leads.tenantId, context.tenantId),
         eq(schema.whatsappMessages.leadId, leadId),
         gte(schema.whatsappMessages.sentAt, since),
-        REAL_MESSAGE,
+        timingSignal,
       )),
     db.select({ id: schema.leadInteractions.id, type: schema.leadInteractions.tipo, content: schema.leadInteractions.conteudo, createdAt: schema.leadInteractions.createdAt })
       .from(schema.leadInteractions)
