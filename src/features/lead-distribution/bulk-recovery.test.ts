@@ -11,6 +11,13 @@ describe("bulk distribution recovery", () => {
     ])).toEqual(["queued", "unassigned", "returned"]);
   });
 
+  it("re-enqueues a cold partial lead whose queue does not hold cold leads", () => {
+    expect(selectBulkDistributionCandidateIds([
+      { id: "cold-partial-free", status: "new", distributionStatus: "queued", qualificationState: "PARTIAL", qualificationStatus: "cold", queueHoldsColdLeads: false },
+      { id: "cold-partial-held", status: "new", distributionStatus: "queued", qualificationState: "PARTIAL", qualificationStatus: "cold", queueHoldsColdLeads: true },
+    ])).toEqual(["cold-partial-free"]);
+  });
+
   it("does not distribute leads that are qualifying, terminal, or already outside the recovery queue", () => {
     expect(selectBulkDistributionCandidateIds([
       { id: "qualifying", status: "new", distributionStatus: "queued", qualificationState: "IN_PROGRESS", qualificationStatus: "qualifying" },

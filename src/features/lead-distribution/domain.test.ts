@@ -243,6 +243,12 @@ describe("lead distribution domain", () => {
     expect(automaticDistributionHoldReason("warm", "PARTIAL")).toBeNull();
   });
 
+  it("holds a cold partial timeout lead only when its queue holds cold leads", () => {
+    expect(automaticDistributionHoldReason("cold", "PARTIAL", true)).toContain("requalificação manual");
+    expect(automaticDistributionHoldReason("cold", "PARTIAL", false)).toBeNull();
+    expect(automaticDistributionHoldReason("disqualified", "COMPLETED", false)).toContain("manual");
+  });
+
   it("chooses the lowest active workload when capacity is available", () => {
     const result = chooseBroker([
       { id: "a", createdAt: new Date("2026-01-01"), activeLeads: 4, capacity: 5 },
