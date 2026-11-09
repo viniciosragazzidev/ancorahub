@@ -305,3 +305,18 @@ para a última tela usada.
 - O fluxo com WhatsApp de verdade (WAHA) não foi rodado: o protótipo simula a conexão; a ligação com o diálogo real
   está coberta por testes.
 - Pendente do plano: o botão do link do lembrete (`/confirm_presence`) ainda leva a `/plantoes/agora` sem `?guia=1`.
+
+## 11. Ajuste de 09/11 (noite): o WhatsApp não abria e o aviso antes de abrir
+
+Pedido do Vinicios: "Abrir o WhatsApp" não abria o app; e, antes de abrir, mostrar que é na tela inicial, nos
+3 pontinhos.
+
+- **Causa:** o link do ajuste anterior não tinha o `send` (`whatsapp://` e o intent com host vazio). O WhatsApp só
+  atende o endereço `whatsapp://send`; sem número nem texto, ele só abre o app. Agora: Android
+  `intent://send#Intent;scheme=whatsapp;package=com.whatsapp;…` (com o fallback para o Business), iPhone e demais
+  `whatsapp://send`.
+- **Aviso antes de abrir:** todo "Abrir o WhatsApp" do roteiro abre primeiro a folha "Quando o WhatsApp abrir:" com
+  1) ir para a tela inicial (Conversas), voltando pela seta se cair numa conversa, e 2) tocar nos 3 pontinhos ⋮ em
+  cima à direita (no iPhone, Configurações embaixo), com a ilustração do toque. O app abre pelo botão
+  "Entendi, abrir o WhatsApp" do aviso (o toque do corretor, que o celular exige para abrir outro app).
+- Continua sem teste em Android e iPhone reais.

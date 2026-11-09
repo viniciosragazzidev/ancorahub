@@ -68,7 +68,7 @@ describe("WhatsAppConnectDialog mobile access", () => {
     render(<WhatsAppConnectDialog initial={readyConnection} />);
     fireEvent.click(screen.getByRole("button", { name: "WhatsApp conectado" }));
     fireEvent.click(await screen.findByRole("button", { name: /Abrir WhatsApp/ }));
-    expect(window.open).toHaveBeenCalledWith("whatsapp://", "_self");
+    expect(window.open).toHaveBeenCalledWith("whatsapp://send", "_self");
     expect(mocks.start).not.toHaveBeenCalled();
   });
 

@@ -281,7 +281,7 @@ export const PRESENCE_GUIDE_COPY = {
       iphone: ["Na tela Conversas, toque em Configurações, embaixo.", "Toque em Dispositivos conectados.", "Toque em Conectar dispositivo.", "Embaixo, toque em Conectar com número de telefone e cole o código."],
     },
     next: "Próximo toque",
-    cta: "Entendi, abrir o WhatsApp",
+    cta: "Abrir o WhatsApp",
   },
   waiting: { title: "Colou o código no WhatsApp? Estou esperando a confirmação.", sub: "Pode deixar esta tela aberta. Assim que conectar, eu sigo sozinho.", label: "Esperando o WhatsApp…", cta: "Abrir o WhatsApp de novo", again: "Ver o caminho de novo" },
   desktop: {
@@ -323,6 +323,16 @@ export const PRESENCE_GUIDE_COPY = {
     copyBlocked: { title: "Não consegui copiar. Anote o código:", sub: "Você vai digitar ele no WhatsApp.", cta: "Anotei" },
     unstable: { title: "O WhatsApp está instável agora. Pode confirmar sua presença mesmo assim.", sub: "Quando ele voltar, peço para você conectar.", cta: "Confirmar presença" },
     confirm: { cta: "Tentar de novo" },
+  },
+  /** Aparece ao tocar em "Abrir o WhatsApp", antes de sair do app: o que fazer assim que o WhatsApp abrir. */
+  beforeOpen: {
+    title: "Quando o WhatsApp abrir:",
+    steps: {
+      android: ["Vá para a tela inicial, a lista Conversas. Se abrir numa conversa, toque na seta ← em cima.", "Na tela inicial, toque nos 3 pontinhos ⋮, em cima à direita."],
+      iphone: ["Vá para a tela inicial, a lista Conversas. Se abrir numa conversa, toque em ‹ em cima.", "Na tela inicial, toque em Configurações, embaixo à direita."],
+    },
+    cta: "Entendi, abrir o WhatsApp",
+    back: "Voltar",
   },
   help: {
     title: "Precisa de ajuda?",

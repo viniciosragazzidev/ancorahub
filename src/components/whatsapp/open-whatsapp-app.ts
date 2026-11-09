@@ -1,11 +1,13 @@
 /**
- * Abre o app do WhatsApp sem entrar em conversa nenhuma (09/11). O `whatsapp://send` antigo é um link de envio:
- * abria dentro da conversa com o número da empresa. Nenhum link força a tela inicial (o celular volta para a
- * última tela usada), por isso o roteiro de presença tem o passo "Garanta que você está na tela inicial".
+ * Abre o app do WhatsApp (09/11). Nenhum link abre direto na tela inicial: o celular volta para a última tela
+ * usada (às vezes a conversa com o número da empresa). Por isso o roteiro de presença avisa, antes de abrir, para
+ * voltar até a tela Conversas e tocar nos 3 pontinhos.
+ * Correção de 09/11 (tarde): o link sem `send` (`whatsapp://` e o intent com host vazio) não abria o app no Android:
+ * o WhatsApp só atende o endereço `whatsapp://send`. Sem número nem texto, ele só abre o app.
  *
- * - Android: link de intent pelo pacote. Tenta o WhatsApp comum; se não estiver instalado, o Chrome segue o
- *   `browser_fallback_url`, que só muda o `#` desta página, e aí tentamos o WhatsApp Business.
- * - iPhone e demais celulares: `whatsapp://`, que só abre o app.
+ * - Android: link de intent pelo pacote, para o `whatsapp://send`. Tenta o WhatsApp comum; se não estiver instalado,
+ *   o Chrome segue o `browser_fallback_url`, que só muda o `#` desta página, e aí tentamos o WhatsApp Business.
+ * - iPhone e demais: `whatsapp://send`.
  */
 export type WhatsAppAppPlatform = "android" | "ios" | "other";
 
@@ -23,9 +25,9 @@ export function detectWhatsAppPlatform(userAgent: string): WhatsAppAppPlatform {
 
 /** Link que só abre o app. `fallbackUrl` (só Android) é para onde o Chrome vai se o pacote não existir. */
 export function whatsappAppUrl(platform: WhatsAppAppPlatform, options: { pkg?: string; fallbackUrl?: string } = {}): string {
-  if (platform !== "android") return "whatsapp://";
+  if (platform !== "android") return "whatsapp://send";
   const fallback = options.fallbackUrl ? `S.browser_fallback_url=${encodeURIComponent(options.fallbackUrl)};` : "";
-  return `intent://#Intent;scheme=whatsapp;package=${options.pkg ?? WHATSAPP_PACKAGE};${fallback}end`;
+  return `intent://send#Intent;scheme=whatsapp;package=${options.pkg ?? WHATSAPP_PACKAGE};${fallback}end`;
 }
 
 function pageWithHash(hash: string) {
