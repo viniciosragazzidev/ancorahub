@@ -23,7 +23,7 @@ import {
 import type { MotivoPerda } from "./lead-status-constants";
 import { recordStageChange, stageActorType } from "./stage-history";
 import { isStageRegression } from "./stage-history-core";
-import { leavesClosingStage } from "./closing-outcome-core";
+import { entersClosingStage, leavesClosingStage } from "./closing-outcome-core";
 
 // ─── Tipos ────────────────────────────────────────────────────────────
 
@@ -281,6 +281,7 @@ export async function changeLeadStatus(
   const motivoPerda = newStatus === "lost" ? canonicalMotivoPerda! : null;
   const actorType = stageActorType({ systemActor: system ? (system.actorType ?? "ai") : null, role: context.role });
   const leavingClosing = leavesClosingStage(previousStatus, newStatus);
+  const enteringClosing = entersClosingStage(previousStatus, newStatus);
 
   await db.transaction(async (tx) => {
     // Atualizar lead
@@ -297,7 +298,9 @@ export async function changeLeadStatus(
         ...(system?.holdUntil !== undefined
           ? { stageHoldUntil: system.holdUntil }
           // Saiu do fechamento: a data prevista do "Continua em análise" (desfecho, 09/11) deixa de valer.
-          : leavingClosing ? { stageHoldUntil: null } : {}),
+          // Entrou no fechamento: um "Manter na etapa" da regra de chat parado não pode esconder o desfecho
+          // pendente; dentro do fechamento a data só vem do "Continua em análise" (Vigia, 09/11).
+          : leavingClosing || enteringClosing ? { stageHoldUntil: null } : {}),
         ...(qualificationValidation.newQualificationStatus
           ? { qualificationStatus: qualificationValidation.newQualificationStatus }
           : {}),

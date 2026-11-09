@@ -6,6 +6,7 @@ import {
   closingOutcomeNotice,
   closingOutcomeNotificationKey,
   isPersonActor,
+  entersClosingStage,
   leavesClosingStage,
   parseClosingHoldDate,
   pendingClosingOutcome,
@@ -114,5 +115,14 @@ describe("resumo para a direção", () => {
     expect(summary.brokers.map((row) => row.brokerName)).toEqual(["Nayara", "Sem corretor", "Tainá"]);
     expect(summary.brokers[0]).toMatchObject({ inClosing: 2, pending: 1, returned: 1, converted: 0 });
     expect(summary.brokers[2]).toMatchObject({ converted: 1, lost: 1, inClosing: 0 });
+  });
+});
+
+describe("entersClosingStage", () => {
+  it("só conta a entrada vinda de fora do fechamento", () => {
+    expect(entersClosingStage("awaiting_reply", "documentation_pending")).toBe(true);
+    expect(entersClosingStage("negotiation", "under_analysis")).toBe(true);
+    expect(entersClosingStage("documentation_pending", "under_analysis")).toBe(false);
+    expect(entersClosingStage("under_analysis", "converted")).toBe(false);
   });
 });

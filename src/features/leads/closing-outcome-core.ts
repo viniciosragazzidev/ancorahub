@@ -26,6 +26,11 @@ export function leavesClosingStage(previousStatus: string | null | undefined, ne
   return Boolean(previousStatus) && CLOSING_STAGE_STATUSES.has(previousStatus!) && !CLOSING_STAGE_STATUSES.has(newStatus);
 }
 
+/** Entering Documentação/Em análise from another stage (a hold left by "Manter na etapa" must not carry over). */
+export function entersClosingStage(previousStatus: string | null | undefined, newStatus: string) {
+  return CLOSING_STAGE_STATUSES.has(newStatus) && !(previousStatus && CLOSING_STAGE_STATUSES.has(previousStatus));
+}
+
 export type ClosingOutcomeKind = "converted" | "lost" | "returned";
 
 export type ClosingOutcome = {
