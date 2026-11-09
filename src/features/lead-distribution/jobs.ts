@@ -38,9 +38,14 @@ function automaticQualificationFilter() {
       // A cold lead whose qualification timed out waits for manual requalification
       // only when its queue holds cold leads ("Segurar frios"). With the switch off
       // it goes to the plantão like any other (06/11, Venâncio Leads: colds stuck all day).
-      sql`not exists (select 1 from ${schema.leadDistributionPolicies} p where p.tenant_id = ${schema.leads.tenantId} and p.queue_id = ${schema.leads.queueId} and (p.policy->>'holdColdLeads') = 'true')`,
+      not(queueHoldsColdLeadsSql()),
     ),
   );
+}
+
+/** "Segurar frios" of the lead's queue, as SQL (same rule as automaticDistributionHoldReason). */
+export function queueHoldsColdLeadsSql() {
+  return sql<boolean>`exists (select 1 from ${schema.leadDistributionPolicies} p where p.tenant_id = ${schema.leads.tenantId} and p.queue_id = ${schema.leads.queueId} and (p.policy->>'holdColdLeads') = 'true')`;
 }
 
 const defaults = {
@@ -584,11 +589,11 @@ export async function runLeadDistributionProcessor(input: {
         result.skipped += 1;
         return;
       }
-      const [currentLead] = await getDatabase().select({ status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, qualificationState: schema.leads.qualificationState, distributionStatus: schema.leads.distributionStatus, deletedAt: schema.leads.deletedAt, archivedAt: schema.leads.archivedAt, nome: schema.leads.nome })
+      const [currentLead] = await getDatabase().select({ status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, qualificationState: schema.leads.qualificationState, distributionStatus: schema.leads.distributionStatus, deletedAt: schema.leads.deletedAt, archivedAt: schema.leads.archivedAt, nome: schema.leads.nome, queueHoldsColdLeads: queueHoldsColdLeadsSql() })
         .from(schema.leads)
         .where(and(eq(schema.leads.id, job.leadId), eq(schema.leads.tenantId, job.tenantId)))
         .limit(1);
-      if (!currentLead || currentLead.deletedAt || currentLead.archivedAt || currentLead.status === "lost" || currentLead.distributionStatus === "manual_hold" || automaticDistributionHoldReason(currentLead.qualificationStatus, currentLead.qualificationState) || /^Lead WhatsApp\s*\(/i.test(currentLead.nome?.trim() ?? "")) {
+      if (!currentLead || currentLead.deletedAt || currentLead.archivedAt || currentLead.status === "lost" || currentLead.distributionStatus === "manual_hold" || automaticDistributionHoldReason(currentLead.qualificationStatus, currentLead.qualificationState, currentLead.queueHoldsColdLeads) || /^Lead WhatsApp\s*\(/i.test(currentLead.nome?.trim() ?? "")) {
         await completeJob(job.id);
         result.skipped += 1;
         return;

@@ -13,7 +13,7 @@ import {
   offerLeadToBrokerManually,
   routeLeadToBranchAndAssignBroker,
 } from "./service";
-import { enqueueAndProcessLeadDistribution, enqueueLeadDistributionJob, runLeadDistributionProcessor, wakeLeadDistributionJob } from "./jobs";
+import { enqueueAndProcessLeadDistribution, enqueueLeadDistributionJob, queueHoldsColdLeadsSql, runLeadDistributionProcessor, wakeLeadDistributionJob } from "./jobs";
 import { isHotLeadEarlyDistributionEnabled } from "./qualification-hold";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
@@ -618,6 +618,7 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
         distributionStatus: schema.leads.distributionStatus,
         qualificationState: schema.leads.qualificationState,
         qualificationStatus: schema.leads.qualificationStatus,
+        queueHoldsColdLeads: queueHoldsColdLeadsSql(),
       })
       .from(schema.leads)
       .where(and(
