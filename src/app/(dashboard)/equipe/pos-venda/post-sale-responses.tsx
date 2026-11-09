@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getPostSaleSurveyMessagesAction } from "@/features/post-sale-audit/actions";
-import { answerChips, matchesSearch, paginate, type AnswerChip } from "@/features/post-sale-audit/responses-view";
+import { answerChips, matchesSearch, paginate, RESPONSE_GROUP_LABELS, responseGroups, type AnswerChip, type ResponseGroup } from "@/features/post-sale-audit/responses-view";
 import { cn } from "@/lib/utils";
 
 export type PostSaleResponseRow = {
@@ -36,11 +36,21 @@ const dateTime = (value: string | null) => value ? new Date(value).toLocaleStrin
 /** "Quem respondeu" (09/11): the clients who answered, searchable, 10 per page, with the conversation. */
 export function PostSaleResponses({ responses }: { responses: PostSaleResponseRow[] }) {
   const [query, setQuery] = useState("");
+  const [group, setGroup] = useState<ResponseGroup>("all");
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, Message[] | "loading" | string>>({});
 
-  const filtered = useMemo(() => responses.filter((row) => matchesSearch([row.leadName, row.brokerName, typeof row.answers.comment === "string" ? row.answers.comment : null], query)), [responses, query]);
+  const groupsById = useMemo(() => new Map(responses.map((row) => [row.id, responseGroups(row)])), [responses]);
+  const groupCounts = useMemo(() => {
+    const counts = Object.fromEntries(Object.keys(RESPONSE_GROUP_LABELS).map((key) => [key, 0])) as Record<ResponseGroup, number>;
+    counts.all = responses.length;
+    for (const groups of groupsById.values()) for (const item of groups) counts[item] += 1;
+    return counts;
+  }, [groupsById, responses.length]);
+  const filtered = useMemo(() => responses.filter((row) =>
+    (group === "all" || groupsById.get(row.id)?.includes(group))
+    && matchesSearch([row.leadName, row.brokerName, typeof row.answers.comment === "string" ? row.answers.comment : null], query)), [responses, query, group, groupsById]);
   const view = paginate(filtered, page);
 
   async function toggle(row: PostSaleResponseRow) {
@@ -68,12 +78,25 @@ export function PostSaleResponses({ responses }: { responses: PostSaleResponseRo
         />
       </CardHeader>
       <CardContent className="grid gap-2">
+        <div role="group" aria-label="Separar respostas por situação" className="flex flex-wrap gap-2 pb-1">
+          {(Object.keys(RESPONSE_GROUP_LABELS) as ResponseGroup[]).filter((key) => key === "all" || groupCounts[key] > 0).map((key) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={group === key}
+              onClick={() => { setGroup(key); setPage(1); }}
+              className={cn("min-h-9 rounded-full border px-3 text-xs font-medium transition-colors", group === key ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground")}
+            >
+              {RESPONSE_GROUP_LABELS[key]} · {groupCounts[key]}
+            </button>
+          ))}
+        </div>
         {view.items.length ? view.items.map((row) => {
           const chips = answerChips(row);
           const loaded = messages[row.id];
           return (
             <div key={row.id} className="rounded-xl border border-border">
-              <button type="button" className="flex min-h-14 w-full items-center justify-between gap-3 px-3 py-2 text-left" aria-expanded={open === row.id} onClick={() => void toggle(row)}>
+              <button type="button" className="flex min-h-14 w-full items-center justify-between gap-3 px-3 py-2 text-left" aria-expanded={open === row.id} aria-controls={`pos-venda-resposta-${row.id}`} onClick={() => void toggle(row)}>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{row.leadName}</span>
                   <span className="block truncate text-xs text-muted-foreground">{row.brokerName ?? "Sem corretor"} · respondeu {dateTime(row.lastReplyAt)}</span>
@@ -83,14 +106,14 @@ export function PostSaleResponses({ responses }: { responses: PostSaleResponseRo
                 </span>
               </button>
               {open === row.id ? (
-                <div className="grid gap-3 border-t border-border px-3 py-3">
+                <div id={`pos-venda-resposta-${row.id}`} className="grid gap-3 border-t border-border px-3 py-3">
                   {typeof row.answers.comment === "string" || typeof row.answers.reason === "string" ? (
                     <p className="text-sm text-muted-foreground">
                       {typeof row.answers.reason === "string" ? <>Motivo: {row.answers.reason}. </> : null}
                       {typeof row.answers.comment === "string" ? <>Comentário: “{row.answers.comment}”</> : null}
                     </p>
                   ) : null}
-                  <div className="grid max-h-80 gap-2 overflow-y-auto rounded-xl bg-[var(--surface-secondary)] p-3" aria-label={`Mensagens com ${row.leadName}`}>
+                  <div role="region" className="grid max-h-80 gap-2 overflow-y-auto rounded-xl bg-[var(--surface-secondary)] p-3" aria-label={`Mensagens com ${row.leadName}`}>
                     {loaded === "loading" || loaded === undefined ? <p className="text-sm text-muted-foreground">Carregando mensagens…</p>
                       : typeof loaded === "string" ? <p className="text-sm text-destructive">{loaded}</p>
                       : loaded.length ? loaded.map((message) => (

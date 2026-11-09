@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { answerChips, matchesSearch, paginate } from "./responses-view";
+import { answerChips, matchesSearch, paginate, responseGroups } from "./responses-view";
 
 describe("paginate", () => {
   it("mostra 10 por página e ajusta página fora do intervalo", () => {
@@ -26,5 +26,13 @@ describe("answerChips", () => {
     expect(answerChips({ status: "answering", outcome: null, rating: null, answers: { rating: 5, contacted: true } }).map((c) => c.label)).toEqual(["Foi atendido", "Nota 5/5"]);
     expect(answerChips({ status: "completed", outcome: "other", rating: null, answers: { comment: "Agora não" } }).map((c) => c.label)).toEqual(["Agora não"]);
     expect(answerChips({ status: "opted_out", outcome: null, rating: null, answers: {} }).map((c) => c.label)).toEqual(["Pediu para parar"]);
+  });
+});
+
+describe("responseGroups", () => {
+  it("separa por situação, um cliente pode cair em mais de um grupo", () => {
+    expect(responseGroups({ status: "completed", outcome: "no_contact", rating: null, answers: { contacted: false, wantsHelp: true } })).toEqual(["not_attended", "wants_help"]);
+    expect(responseGroups({ status: "answering", outcome: null, rating: 2, answers: { contacted: true } })).toEqual(["low_rating", "attended"]);
+    expect(responseGroups({ status: "completed", outcome: "other", rating: null, answers: { comment: "Agora não" } })).toEqual(["declined"]);
   });
 });

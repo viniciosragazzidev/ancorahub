@@ -3,7 +3,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { enqueueMetaTemplateMessage, enqueuePostSaleSurveyWahaMessage } from "@/features/communication-channels/outbound-service";
@@ -437,8 +437,10 @@ export async function getPostSaleSurveyMessagesAction(rawSurveyId: unknown): Pro
     const rows = await db.select({ id: schema.whatsappMessages.id, direction: schema.whatsappMessages.direction, body: schema.whatsappMessages.body, mediaKind: schema.whatsappMessages.mediaKind, sentAt: schema.whatsappMessages.sentAt, senderRole: schema.whatsappMessages.senderRole })
       .from(schema.whatsappMessages)
       .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, survey.leadId), gte(schema.whatsappMessages.sentAt, since)))
-      .orderBy(asc(schema.whatsappMessages.sentAt))
+      .orderBy(desc(schema.whatsappMessages.sentAt))
       .limit(80);
+    rows.reverse(); // newest 80, shown oldest first: a long chat never cuts the survey answer (Vigia)
+    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_survey", entityId: surveyId, action: "post_sale_survey.messages_viewed", metadata: { leadId: survey.leadId, messages: rows.length } });
     return { ok: true, data: rows
       .map((row) => ({
         id: row.id,

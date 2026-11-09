@@ -32,3 +32,29 @@ export function answerChips(input: { status: string; outcome: string | null; rat
   if (!chips.length && typeof answers.comment === "string" && /agora n[aã]o/i.test(answers.comment)) chips.push({ label: "Agora não", tone: "neutral" });
   return chips;
 }
+
+export type ResponseGroup = "all" | "not_attended" | "wants_help" | "low_rating" | "attended" | "declined" | "opted_out";
+
+export const RESPONSE_GROUP_LABELS: Record<ResponseGroup, string> = {
+  all: "Todos",
+  not_attended: "Não foi atendido",
+  wants_help: "Quer ajuda",
+  low_rating: "Nota baixa",
+  attended: "Foi atendido",
+  declined: "Agora não",
+  opted_out: "Pediu para parar",
+};
+
+/** The groups an answer belongs to (one answer can be in several, e.g. not attended and wants help). */
+export function responseGroups(input: { status: string; outcome: string | null; rating: number | null; answers: Record<string, unknown> }): ResponseGroup[] {
+  const labels = new Set(answerChips(input).map((chip) => chip.label));
+  const rating = input.rating ?? (typeof input.answers.rating === "number" ? input.answers.rating : null);
+  const groups: ResponseGroup[] = [];
+  if (labels.has("Não foi atendido")) groups.push("not_attended");
+  if (labels.has("Quer ajuda")) groups.push("wants_help");
+  if (rating !== null && rating <= 2) groups.push("low_rating");
+  if (labels.has("Foi atendido")) groups.push("attended");
+  if (labels.has("Agora não")) groups.push("declined");
+  if (labels.has("Pediu para parar")) groups.push("opted_out");
+  return groups;
+}
