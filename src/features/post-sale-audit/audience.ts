@@ -13,6 +13,8 @@ import { isApprovedPostSaleMetaTemplate } from "./template-contract";
 // "meta" is how the AI stores the messages it sent on the official number (09/11: 21 leads whose only
 // history was the AI on the 6404-1142 were wrongly "sem número de origem").
 const META_PROVIDERS = [META_CLOUD_PROVIDER, "meta_cloud_api", "meta"];
+/** Channels: only the real official-number providers (a channel row never uses "meta"; Vigia, 09/11). */
+const CHANNEL_META_PROVIDERS = [META_CLOUD_PROVIDER, "meta_cloud_api"];
 const WAHA_STATUSES = ["active", "ready"];
 const META_TEMPLATE_NAME = "pos_venda_apresentacao";
 
@@ -214,7 +216,7 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
       or(isNull(schema.whatsappMessages.providerStatus), ne(schema.whatsappMessages.providerStatus, "failed")),
     )),
     db.select({ id: schema.communicationChannels.id, tenantId: schema.communicationChannels.tenantId, branchId: schema.communicationChannels.branchId, provider: schema.communicationChannels.provider, status: schema.communicationChannels.status, registrationStatus: schema.communicationChannels.registrationStatus, wabaId: schema.communicationChannels.wabaId, phoneNumberId: schema.communicationChannels.phoneNumberId, accessTokenCiphertext: schema.communicationChannels.accessTokenCiphertext, onboardingMode: schema.communicationChannels.onboardingMode, isDefault: schema.communicationChannels.isDefault })
-      .from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, context.tenantId), inArray(schema.communicationChannels.provider, META_PROVIDERS))),
+      .from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, context.tenantId), inArray(schema.communicationChannels.provider, CHANNEL_META_PROVIDERS))),
     db.select({ id: schema.wahaNumbers.id, tenantId: schema.wahaNumbers.tenantId, branchId: schema.wahaNumbers.branchId, scope: schema.wahaNumbers.scope, status: schema.wahaNumbers.status, pausedUntil: schema.wahaNumbers.pausedUntil })
       .from(schema.wahaNumbers).where(and(eq(schema.wahaNumbers.tenantId, context.tenantId), inArray(schema.wahaNumbers.scope, ["tenant", "branch"]))),
   ]);
