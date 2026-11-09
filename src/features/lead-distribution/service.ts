@@ -355,6 +355,12 @@ async function loadDistributionPolicy(tenantId: string, queueId: string | null, 
   return { enabled: row?.enabled ?? true, value: readDistributionPolicy(row?.policy) };
 }
 
+/** "Segurar frios" of the lead's queue; only read for a cold lead (a lead with no queue is never held). */
+async function queueHoldsColdLeads(tenantId: string, queueId: string | null, qualificationStatus: string | null) {
+  if (!queueId || qualificationStatus !== "cold") return false;
+  return (await loadDistributionPolicy(tenantId, queueId, null)).value.holdColdLeads;
+}
+
 export async function validateCampaignQueueRoute(
   db: ReturnType<typeof getDatabase>,
   tenantId: string,
@@ -784,7 +790,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (lead.distributionStatus === "manual_hold") {
     return { status: "manual_required", leadId, reason: "A atribuição foi removida manualmente; o lead aguarda uma nova ação manual." };
   }
-  const qualificationHoldReason = automaticDistributionHoldReason(lead.qualificationStatus, lead.qualificationState);
+  const qualificationHoldReason = automaticDistributionHoldReason(lead.qualificationStatus, lead.qualificationState, await queueHoldsColdLeads(context.tenantId, lead.queueId, lead.qualificationStatus));
   if (qualificationHoldReason) {
     return { status: "manual_required", leadId, reason: qualificationHoldReason };
   }
@@ -1754,7 +1760,7 @@ export async function distributeQualifiedLead(input: {
 
   if (!lead) return { distributed: false, reason: "lead_not_found" };
   if (lead.distributionStatus === "manual_hold") return { distributed: false, reason: "manual_hold" };
-  const qualificationHoldReason = automaticDistributionHoldReason(lead.qualificationStatus, lead.qualificationState);
+  const qualificationHoldReason = automaticDistributionHoldReason(lead.qualificationStatus, lead.qualificationState, await queueHoldsColdLeads(input.tenantId, lead.queueId, lead.qualificationStatus));
   if (qualificationHoldReason) return { distributed: false, reason: "qualification_manual_hold", detail: qualificationHoldReason };
   if (lead.corretorId) return { distributed: true, brokerId: lead.corretorId, reason: "already_assigned" };
 
