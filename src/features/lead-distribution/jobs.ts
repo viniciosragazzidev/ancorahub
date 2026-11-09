@@ -17,7 +17,7 @@ import { expireOutdatedLeadOffers } from "./offers";
 import { automaticDistributionHoldReason, COLD_HELD_BY_QUEUE_REASON_PREFIX, HELD_DISTRIBUTION_RETRY_MS, distributionRetryDelayMilliseconds, isDeferredDistributionReason, isHeldDistributionReason } from "./domain";
 import { groupByTemperatureRank, type TemperatureRank } from "./temperature-priority";
 import { dutyScheduleBranchCondition, isDutyScheduleBranchCompatible } from "./duty-job-schedule-scope";
-import { LEAD_TIMEOUT_CODE, plantaoWakeAllowedCondition } from "./job-budget";
+import { BUDGET_RELEASED_CODE, BUDGET_RELEASED_MESSAGE, LEAD_TIMEOUT_CODE, distributionClaimRankSql, distributionWaveRank, plantaoWakeAllowedCondition } from "./job-budget";
 
 const JOB_TYPE = "process_queued_lead";
 
@@ -450,7 +450,8 @@ async function claimNextJob(workerId: string, config: DistributionJobConfig, ten
       // rank order starved cold leads: 100+ hot/warm jobs without an eligible
       // broker are deferred ~2 min and come back due every run, so a cold lead
       // whose broker was free never got claimed (PME 2026-10-06).
-      sql`${schema.leadDistributionJobs.runAfter} + (${leadTemperatureRank()}) * interval '5 minutes'`,
+      // A job handed back by the previous run's budget counts as hot here (job-budget.ts).
+      sql`${schema.leadDistributionJobs.runAfter} + (${distributionClaimRankSql(leadTemperatureRank(), schema.leadDistributionJobs.lastErrorCode)}) * interval '5 minutes'`,
       asc(schema.leadDistributionJobs.createdAt),
     )
     .limit(1);
@@ -473,12 +474,17 @@ async function claimNextJob(workerId: string, config: DistributionJobConfig, ten
   return claimed ? { job: claimed, rank: Number(candidate.rank) as TemperatureRank } : null;
 }
 
-/** Hands a claimed job back untouched (time budget reached): same attempt count, runs again next pass. */
+/**
+ * Hands a claimed job back untouched (time budget reached): same attempt count, runs again next
+ * pass, marked so it goes first next time (09/11: the cold wave was handed back every run).
+ */
 async function releaseJob(jobId: string) {
   const now = new Date();
   await getDatabase().update(schema.leadDistributionJobs).set({
     status: "pending",
     attemptCount: sql`greatest(${schema.leadDistributionJobs.attemptCount} - 1, 0)`,
+    lastErrorCode: BUDGET_RELEASED_CODE,
+    lastErrorMessage: BUDGET_RELEASED_MESSAGE,
     lockedAt: null,
     lockedBy: null,
     leaseExpiresAt: null,
@@ -584,7 +590,8 @@ export async function runLeadDistributionProcessor(input: {
 
   // In waves, hottest first: a colder lead never races a hotter one for the
   // same free broker inside a batch.
-  for (const wave of groupByTemperatureRank(claimedJobs, (claimed) => claimed.rank).map((group) => group.map((claimed) => claimed.job))) {
+  // A job handed back by the previous run's budget goes in the first wave (job-budget.ts).
+  for (const wave of groupByTemperatureRank(claimedJobs, (claimed) => distributionWaveRank(claimed.rank, claimed.job.lastErrorCode)).map((group) => group.map((claimed) => claimed.job))) {
     // 2 at a time: the jobs share a small set of DB sockets (24/10).
     await runWithConcurrency(wave, Math.min(2, wave.length || 1), async (job) => {
       // Offering a lead sends its WhatsApp inline (spacing + humanized WAHA), so one batch could
