@@ -533,7 +533,9 @@ export async function resumePostSaleSurveyAction(rawSurveyId: unknown): Promise<
       throw new PostSaleActionError("A janela de 24 h do número oficial fechou. Só dá para retomar quando o cliente escrever de novo.");
     }
     const reference = survey.lastReplyAt ?? survey.sentAt ?? survey.createdAt;
-    const outbound = await sendPostSaleNudge(survey, survey.lastReplyAt ? "question" : "opening", `manual:${reference.getTime()}`);
+    // Same key as the automatic reminder of this step: the button and the job never send two (Vigia).
+    if (survey.reminderSentAt && survey.reminderSentAt >= reference) return { ok: true, data: { duplicate: true } };
+    const outbound = await sendPostSaleNudge(survey, survey.lastReplyAt ? "question" : "opening", String(reference.getTime()));
     if (["failed", "cancelled", "expired", "skipped"].includes(outbound.status)) throw new PostSaleActionError("Não foi possível enviar pelo número de origem.");
     await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_survey", entityId: survey.id, action: "post_sale_survey.resumed", metadata: { leadId: survey.leadId, duplicate: Boolean(outbound.duplicate) } });
     return { ok: true, data: { duplicate: Boolean(outbound.duplicate) } };

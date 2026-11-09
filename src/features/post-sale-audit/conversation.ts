@@ -426,7 +426,10 @@ export async function runPostSaleReminderJob(now = new Date()) {
   )).orderBy(asc(schema.postSaleSurveys.sentAt)).limit(300);
   let enqueued = 0;
   let completed = 0;
+  // At most 20 reminders per run, so a backlog goes out gradually (Vigia, 09/11).
+  const REMINDERS_PER_RUN = 20;
   for (const survey of active) {
+    if (enqueued >= REMINDERS_PER_RUN) break;
     const decision = decidePostSaleNudge({ sentAt: survey.sentAt, lastReplyAt: survey.lastReplyAt, reminderSentAt: survey.reminderSentAt, channelType: survey.channelType, isR0: survey.ruleKey === R0_RULE_KEY, now });
     if (decision.action === "none") continue;
     if (decision.action === "close_no_reply") {

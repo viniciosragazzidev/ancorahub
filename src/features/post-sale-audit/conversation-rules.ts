@@ -117,6 +117,9 @@ export function businessHoursBetween(start: Date, end: Date) {
 export const POST_SALE_REMINDER_AFTER_MS = 4 * 3_600_000;
 /** After a reminder, the survey closes as "sem resposta" when this passes without an answer. */
 export const POST_SALE_NO_REPLY_AFTER_MS = 24 * 3_600_000;
+/** Surveys sent before the 4 h rule went live keep the old 24 h wait for the opening reminder, so the deploy
+ *  does not fire ~50 templates at once (Vigia, 09/11). */
+export const POST_SALE_FOUR_HOUR_RULE_FROM = new Date("2026-11-10T03:00:00Z");
 /** Free text on the official number only inside the client's 24 h window (1 h margin). */
 const META_WINDOW_MS = 23 * 3_600_000;
 
@@ -148,7 +151,8 @@ export function decidePostSaleNudge(input: {
   }
   const waited = businessHoursBetween(reference, input.now);
   if (input.isR0) return waited >= POST_SALE_NO_REPLY_AFTER_MS ? { action: "close_no_reply" } : { action: "none" };
-  if (waited < POST_SALE_REMINDER_AFTER_MS) return { action: "none" };
+  const legacyOpening = !input.lastReplyAt && input.sentAt !== null && input.sentAt < POST_SALE_FOUR_HOUR_RULE_FROM;
+  if (waited < (legacyOpening ? POST_SALE_NO_REPLY_AFTER_MS : POST_SALE_REMINDER_AFTER_MS)) return { action: "none" };
   if (!input.lastReplyAt) return { action: "remind_opening" };
   if (input.channelType === "meta" && input.now.getTime() - input.lastReplyAt.getTime() > META_WINDOW_MS) {
     return waited >= POST_SALE_NO_REPLY_AFTER_MS ? { action: "close_no_reply" } : { action: "none" };

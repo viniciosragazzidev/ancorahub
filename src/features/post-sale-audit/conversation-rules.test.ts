@@ -52,8 +52,8 @@ describe("post-sale conversation rules", () => {
 import { canResumePostSaleNow, decidePostSaleNudge } from "./conversation-rules";
 
 describe("lembrete da pesquisa (4 h úteis)", () => {
-  // Segunda 09/11/2026, horário de São Paulo (UTC-3).
-  const at = (hhmm: string) => new Date(`2026-11-09T${hhmm}:00-03:00`);
+  // Terça 10/11/2026 (já na regra de 4 h), horário de São Paulo (UTC-3).
+  const at = (hhmm: string) => new Date(`2026-11-10T${hhmm}:00-03:00`);
   const base = { sentAt: at("08:04"), lastReplyAt: null as Date | null, reminderSentAt: null as Date | null, channelType: "meta", isR0: false };
 
   it("sem resposta à abertura: lembrete depois de 4 h úteis", () => {
@@ -70,7 +70,7 @@ describe("lembrete da pesquisa (4 h úteis)", () => {
   it("um lembrete por etapa; depois fecha como sem resposta", () => {
     const reminded = { ...base, lastReplyAt: at("12:36"), reminderSentAt: at("16:40") };
     expect(decidePostSaleNudge({ ...reminded, now: at("17:00") }).action).toBe("none");
-    expect(decidePostSaleNudge({ ...reminded, now: new Date("2026-11-12T12:00:00-03:00") }).action).toBe("close_no_reply");
+    expect(decidePostSaleNudge({ ...reminded, now: new Date("2026-11-13T12:00:00-03:00") }).action).toBe("close_no_reply");
   });
 
   it("número oficial fora da janela de 24 h não manda texto livre", () => {
@@ -82,5 +82,14 @@ describe("lembrete da pesquisa (4 h úteis)", () => {
 
   it("R0 não tem lembrete", () => {
     expect(decidePostSaleNudge({ ...base, isR0: true, now: at("16:00") }).action).toBe("none");
+  });
+});
+
+describe("transição para a regra de 4 h", () => {
+  it("pesquisa enviada antes da regra mantém 24 h para o lembrete da abertura", () => {
+    const sentAt = new Date("2026-11-09T08:04:00-03:00");
+    expect(decidePostSaleNudge({ sentAt, lastReplyAt: null, reminderSentAt: null, channelType: "meta", isR0: false, now: new Date("2026-11-09T17:00:00-03:00") }).action).toBe("none");
+    const newer = new Date("2026-11-10T08:04:00-03:00");
+    expect(decidePostSaleNudge({ sentAt: newer, lastReplyAt: null, reminderSentAt: null, channelType: "meta", isR0: false, now: new Date("2026-11-10T12:10:00-03:00") }).action).toBe("remind_opening");
   });
 });
