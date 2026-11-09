@@ -28,6 +28,7 @@ import { shouldStartOrResumeAiQualification } from "@/features/qualification-eng
 import { isDistributedPartialQualification } from "@/features/ai-agent/distributed-resume";
 import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence/trigger";
 import { resolveMetaOutboundChannel } from "./meta-channel-router";
+import { shouldRecoverInitialQualificationAfterOutboundFailure } from "./post-sale-conversation-domain";
 
 export async function isMetaCloudWhatsAppEnabled() {
   const [row] = await getDatabase()
@@ -512,8 +513,6 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
       for (const status of change.value?.statuses ?? []) {
         const eventId = await registerWebhookEvent({ channelId: channel.id, externalEventId: `${status.id}:${status.status}`, eventType: "message.status", payloadHash });
         if (!eventId) continue;
-        // The AI stores its Meta messages as "meta": both are this channel's messages.
-        await db.update(schema.whatsappMessages).set({ providerStatus: status.status }).where(and(eq(schema.whatsappMessages.tenantId, channel.tenantId), eq(schema.whatsappMessages.messageId, status.id), inArray(schema.whatsappMessages.provider, [META_CLOUD_PROVIDER, "meta"])));
         const outboundUpdate: Partial<typeof schema.whatsappOutboundMessages.$inferInsert> = { updatedAt: new Date() };
         if (["sent", "delivered", "read"].includes(status.status)) outboundUpdate.status = status.status;
         else if (["failed", "deleted"].includes(status.status)) {
@@ -526,8 +525,30 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         const recordSentAt = status.status === "sent";
         if (status.status === "delivered") outboundUpdate.deliveredAt = new Date();
         if (status.status === "read") outboundUpdate.readAt = new Date();
-        if (status.status === "failed" || status.status === "deleted") {
-          outboundUpdate.failedAt = new Date();
+        if (status.status === "failed" || status.status === "deleted") outboundUpdate.failedAt = new Date();
+
+        const [outbound] = await db.update(schema.whatsappOutboundMessages).set(outboundUpdate).where(and(eq(schema.whatsappOutboundMessages.tenantId, channel.tenantId), eq(schema.whatsappOutboundMessages.providerMessageId, status.id))).returning({ id: schema.whatsappOutboundMessages.id, recipientId: schema.whatsappOutboundMessages.recipientId, purpose: schema.whatsappOutboundMessages.purpose, deliveryRoute: schema.whatsappOutboundMessages.deliveryRoute });
+        if (outbound && recordSentAt) {
+          await db.update(schema.whatsappOutboundMessages).set({ sentAt: new Date() }).where(and(eq(schema.whatsappOutboundMessages.id, outbound.id), isNull(schema.whatsappOutboundMessages.sentAt)));
+        }
+
+        if (outbound?.purpose === "postSaleSurvey") {
+          try {
+            const { syncPostSaleConversationMessage } = await import("./post-sale-conversation-sync");
+            await syncPostSaleConversationMessage({ tenantId: channel.tenantId, outboundId: outbound.id });
+          } catch (error) {
+            console.warn("[post-sale] conversation_history_sync_failed", {
+              tenantId: channel.tenantId,
+              outboundId: outbound.id,
+              error: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+            });
+          }
+        } else {
+          // The AI stores its Meta messages as "meta": both are this channel's messages.
+          await db.update(schema.whatsappMessages).set({ providerStatus: status.status }).where(and(eq(schema.whatsappMessages.tenantId, channel.tenantId), eq(schema.whatsappMessages.messageId, status.id), inArray(schema.whatsappMessages.provider, [META_CLOUD_PROVIDER, "meta"])));
+        }
+
+        if ((status.status === "failed" || status.status === "deleted") && shouldRecoverInitialQualificationAfterOutboundFailure(outbound?.purpose)) {
           const [msg] = await db
             .select({ leadId: schema.whatsappMessages.leadId, conversationId: schema.whatsappMessages.conversationId })
             .from(schema.whatsappMessages)
@@ -552,10 +573,6 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
               });
             }
           }
-        }
-        const [outbound] = await db.update(schema.whatsappOutboundMessages).set(outboundUpdate).where(and(eq(schema.whatsappOutboundMessages.tenantId, channel.tenantId), eq(schema.whatsappOutboundMessages.providerMessageId, status.id))).returning({ id: schema.whatsappOutboundMessages.id, recipientId: schema.whatsappOutboundMessages.recipientId, purpose: schema.whatsappOutboundMessages.purpose, deliveryRoute: schema.whatsappOutboundMessages.deliveryRoute });
-        if (outbound && recordSentAt) {
-          await db.update(schema.whatsappOutboundMessages).set({ sentAt: new Date() }).where(and(eq(schema.whatsappOutboundMessages.id, outbound.id), isNull(schema.whatsappOutboundMessages.sentAt)));
         }
         if (outbound && status.pricing) await recordOutboundPricing(outbound.id, status.pricing);
 

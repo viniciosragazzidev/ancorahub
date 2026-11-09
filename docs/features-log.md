@@ -702,3 +702,7 @@ Um interpretador estruturado lê o contexto recente antes da resposta e auxilia 
 # 06/11/2026 - Camada da faixa de WhatsApp desconectado
 
 A faixa fixa de conexão fica abaixo dos diálogos, preservando a confirmação de presença no plantão e o fluxo de obtenção do código de pareamento. Implementação em src/components/whatsapp/whatsapp-missing-banner.module.css.
+
+# 09/11/2026 - Mensagens de pós-venda no histórico de conversas
+
+Envios aceitos da pesquisa de pós-venda são espelhados de forma idempotente no histórico canônico do lead, que alimenta `/conversas`; recibos Meta atualizam o mesmo registro sem regredir o status. Falhas da pesquisa não disparam recovery de qualificação. O SQL `drizzle/0222_post_sale_conversation_history.sql` faz backfill das mensagens anteriores e permanece pendente de execução.

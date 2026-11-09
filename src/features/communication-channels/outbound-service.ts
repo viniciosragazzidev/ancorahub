@@ -984,6 +984,19 @@ export function resolveNoticeTextVariants(purpose: string, rawVariables: string[
 type OutboundRow = typeof schema.whatsappOutboundMessages.$inferSelect;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+async function mirrorPostSaleSurveyMessage(row: OutboundRow) {
+  try {
+    const { syncPostSaleConversationMessage } = await import("./post-sale-conversation-sync");
+    await syncPostSaleConversationMessage({ tenantId: row.tenantId, outboundId: row.id });
+  } catch (error) {
+    console.warn("[post-sale] conversation_history_sync_failed", {
+      tenantId: row.tenantId,
+      outboundId: row.id,
+      error: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+    });
+  }
+}
+
 async function syncPostSaleSurveyOutbound(row: OutboundRow, result: { status: "sent" | "failed" | "skipped"; reason?: string }) {
   if (row.purpose !== "postSaleSurvey") return;
   const reminderPrefix = "post-sale-reminder:";
@@ -994,6 +1007,7 @@ async function syncPostSaleSurveyOutbound(row: OutboundRow, result: { status: "s
       ...(result.status === "sent" ? { reminderSentAt: new Date() } : {}),
       ...(result.status === "failed" || result.status === "skipped" ? { skipReason: (result.reason ?? "Falha no lembrete de pós-venda.").slice(0, 240) } : {}),
     }).where(and(eq(schema.postSaleSurveys.id, surveyId), eq(schema.postSaleSurveys.tenantId, row.tenantId), inArray(schema.postSaleSurveys.status, ["sent", "answering"])));
+    await mirrorPostSaleSurveyMessage(row);
     return;
   }
   const [, campaignId, leadId] = row.idempotencyKey.split(":");
@@ -1009,6 +1023,7 @@ async function syncPostSaleSurveyOutbound(row: OutboundRow, result: { status: "s
     eq(schema.postSaleSurveys.campaignId, campaignId),
     eq(schema.postSaleSurveys.leadId, leadId),
   ));
+  await mirrorPostSaleSurveyMessage(row);
 }
 
 /**
