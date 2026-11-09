@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { postSaleIntentFields } from "./intents";
+import { pickVariant } from "./reply-variants";
 
 /**
  * Regra R0 do pós-venda (plano 2026-11-06): cliente que volta a escrever depois de distribuído.
@@ -152,6 +154,9 @@ export const r0AnswerSchema = z.object({
   optOut: z.boolean().optional(),
 });
 
+/** Leitura da R0 pela IA: a classificação da R0 mais as intenções da conversa inteligente (09/11). */
+export const r0ReadingSchema = r0AnswerSchema.extend(postSaleIntentFields);
+
 export type R0Answer = z.infer<typeof r0AnswerSchema>;
 
 const R0_OPT_OUT = /\b(pare de|parar de|para de me|nao me (chame|mande|envie|procure)|remova|me tira (da|dessa)|nao quero (mais )?receber)\b/;
@@ -199,19 +204,20 @@ export type R0Turn = {
  * Destino da resposta. A IA nunca informa preço e nunca promete o retorno de um corretor
  * específico: fala só em "a equipe". Nenhum caminho avisa o corretor (pedido de 09/11).
  */
-export function r0NextTurn(answer: R0Answer, names: { lead: string }): R0Turn {
+export function r0NextTurn(answer: R0Answer, names: { lead: string; seed?: string | null }): R0Turn {
+  const v = (key: string, variants: readonly string[]) => pickVariant(names.seed, `r0:${key}`, variants);
   if (answer.optOut) return { status: "opted_out", outcome: "other", awaitsTeam: false, text: "Tudo bem. Obrigada por avisar. Não vamos mais enviar mensagens de pesquisa." };
   switch (answer.category) {
     case "not_attended":
-      return { status: "completed", outcome: "r0_not_attended", awaitsTeam: true, text: `Poxa, ${names.lead}, sinto muito por isso. Já avisei a nossa equipe e alguém vai retomar seu atendimento por aqui o quanto antes.` };
+      return { status: "completed", outcome: "r0_not_attended", awaitsTeam: true, text: v("not_attended", [`Poxa, ${names.lead}, sinto muito por isso. Já avisei a nossa equipe e alguém vai retomar seu atendimento por aqui o quanto antes.`, `Sinto muito, ${names.lead}. Já passei para a nossa equipe e alguém vai retomar seu atendimento por aqui o quanto antes.`]) };
     case "wants_more":
-      return { status: "completed", outcome: "r0_wants_more", awaitsTeam: true, text: `Perfeito, ${names.lead}! Anotei o seu pedido e a equipe vai retomar seu atendimento por aqui em breve.` };
+      return { status: "completed", outcome: "r0_wants_more", awaitsTeam: true, text: v("wants_more", [`Perfeito, ${names.lead}! Anotei o seu pedido e a equipe vai retomar seu atendimento por aqui em breve.`, `Combinado, ${names.lead}! Já passei seu pedido e a equipe vai continuar seu atendimento por aqui em breve.`]) };
     case "closed_or_gave_up":
       return answer.closedKind === "gave_up"
-        ? { status: "completed", outcome: "r0_gave_up", awaitsTeam: false, text: `Entendi, ${names.lead}. Obrigada por me contar. Se mudar de ideia, é só chamar por aqui.` }
-        : { status: "completed", outcome: "r0_closed_elsewhere", awaitsTeam: false, text: `Que bom que você já resolveu, ${names.lead}! Obrigada por avisar. Se precisar de algo, é só chamar por aqui.` };
+        ? { status: "completed", outcome: "r0_gave_up", awaitsTeam: false, text: v("gave_up", [`Entendi, ${names.lead}. Obrigada por me contar. Se mudar de ideia, é só chamar por aqui.`, `Tudo bem, ${names.lead}, obrigada por avisar. Quando fizer sentido, é só chamar por aqui.`]) }
+        : { status: "completed", outcome: "r0_closed_elsewhere", awaitsTeam: false, text: v("closed", [`Que bom que você já resolveu, ${names.lead}! Obrigada por avisar. Se precisar de algo, é só chamar por aqui.`, `Fico feliz que já esteja resolvido, ${names.lead}! Obrigada por contar. Qualquer coisa, estamos por aqui.`]) };
     default:
-      return { status: "completed", outcome: "r0_other", awaitsTeam: true, text: `Obrigada, ${names.lead}! Já registrei sua mensagem e a equipe vai te responder por aqui em breve.` };
+      return { status: "completed", outcome: "r0_other", awaitsTeam: true, text: v("other", [`Obrigada, ${names.lead}! Já registrei sua mensagem e a equipe vai te responder por aqui em breve.`, `Recebido, ${names.lead}! Deixei sua mensagem registrada e a equipe vai te responder por aqui em breve.`]) };
   }
 }
 

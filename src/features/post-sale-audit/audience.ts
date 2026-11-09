@@ -181,12 +181,20 @@ export async function resolvePostSaleAudience(context: TenantContext, audience: 
     db.select({ leadId: schema.aiConversations.leadId, status: schema.aiConversations.status, optOutAt: schema.aiConversations.optOutAt, wrongNumberAt: schema.aiConversations.wrongNumberAt, lastActivityAt: schema.aiConversations.lastActivityAt, updatedAt: schema.aiConversations.updatedAt })
       .from(schema.aiConversations).where(and(eq(schema.aiConversations.tenantId, context.tenantId), inArray(schema.aiConversations.leadId, leadIds)))
       .orderBy(desc(schema.aiConversations.updatedAt)),
-    db.select({ leadId: schema.postSaleSurveys.leadId, status: schema.postSaleSurveys.status }).from(schema.postSaleSurveys).where(and(
-      eq(schema.postSaleSurveys.tenantId, context.tenantId),
-      inArray(schema.postSaleSurveys.leadId, leadIds),
-      inArray(schema.postSaleSurveys.status, ["queued", "sent", "answering", "completed", "no_reply", "opted_out"]),
-      or(gte(schema.postSaleSurveys.createdAt, cooldownDate), eq(schema.postSaleSurveys.status, "opted_out")),
-    )),
+    db.select({ leadId: schema.postSaleSurveys.leadId, status: schema.postSaleSurveys.status }).from(schema.postSaleSurveys)
+      .leftJoin(schema.whatsappOutboundMessages, and(
+        eq(schema.whatsappOutboundMessages.id, schema.postSaleSurveys.outboundId),
+        eq(schema.whatsappOutboundMessages.tenantId, schema.postSaleSurveys.tenantId),
+      ))
+      .where(and(
+        eq(schema.postSaleSurveys.tenantId, context.tenantId),
+        inArray(schema.postSaleSurveys.leadId, leadIds),
+        inArray(schema.postSaleSurveys.status, ["queued", "sent", "answering", "completed", "no_reply", "opted_out"]),
+        or(gte(schema.postSaleSurveys.createdAt, cooldownDate), eq(schema.postSaleSurveys.status, "opted_out")),
+        // The cooldown counts only surveys that really went out: an opening the provider rejected after
+        // accepting it (e.g. Meta 131042) left the survey "sent" with a failed outbox row (09/11).
+        sql`not (${schema.postSaleSurveys.status} = 'sent' and ${schema.postSaleSurveys.lastReplyAt} is null and coalesce(${schema.whatsappOutboundMessages.status}, '') in ('failed', 'cancelled', 'expired'))`,
+      )),
     db.select({ leadId: schema.postSaleOptOuts.leadId }).from(schema.postSaleOptOuts).where(and(
       eq(schema.postSaleOptOuts.tenantId, context.tenantId),
       inArray(schema.postSaleOptOuts.leadId, leadIds),

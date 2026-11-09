@@ -15,8 +15,10 @@ import {
   getPostSaleWorkspaceAction,
   markPostSaleAlertHandledAction,
   previewPostSaleAudienceAction,
+  retryFailedPostSaleCampaignAction,
   startPostSaleCampaignAction,
 } from "@/features/post-sale-audit/actions";
+import { describePostSaleRetryResult } from "@/features/post-sale-audit/campaign-retry";
 import { POST_SALE_EXCLUSION_LABELS, type PostSaleExclusionReason } from "@/features/post-sale-audit/rules";
 import type { PostSaleAudience } from "@/features/post-sale-audit/rules";
 import { POST_SALE_ALERT_REASON_LABELS } from "@/features/post-sale-audit/alert-rules";
@@ -54,6 +56,7 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
   const [preview, setPreview] = useState<Preview | null>(initialPreview ?? null);
   const [feedback, setFeedback] = useState(initialFeedback ?? "");
   const [reportPage, setReportPage] = useState(1);
+  const [retryFeedback, setRetryFeedback] = useState<{ campaignId: string; text: string; error: boolean } | null>(null);
   const [busy, startTransition] = useTransition();
 
   const audience = useMemo(() => {
@@ -85,6 +88,21 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
       const result = await markPostSaleAlertHandledAction(surveyId);
       if (!result.ok) { setFeedback(result.error); return; }
       setFeedback(result.data.changed ? "Alerta marcado como tratado." : "Este alerta já foi tratado.");
+      const refreshed = await getPostSaleWorkspaceAction(data.periodDays, data.ruleFilter);
+      if (refreshed.ok) setData(refreshed.data);
+    });
+  }
+
+  function retryFailed(campaign: WorkspaceData["campaigns"][number]) {
+    const count = campaign.counts.retryable;
+    if (!count) return;
+    if (!window.confirm(`Reenviar ${count} ${count === 1 ? "pesquisa que falhou" : "pesquisas que falharam"} em "${campaign.name}"? As regras de hoje valem de novo (opt-out, 60 dias, conversa humana em 24 h, número errado).`)) return;
+    setRetryFeedback(null);
+    startTransition(async () => {
+      const result = await retryFailedPostSaleCampaignAction(campaign.id);
+      setRetryFeedback(result.ok
+        ? { campaignId: campaign.id, text: describePostSaleRetryResult(result.data), error: false }
+        : { campaignId: campaign.id, text: result.error, error: true });
       const refreshed = await getPostSaleWorkspaceAction(data.periodDays, data.ruleFilter);
       if (refreshed.ok) setData(refreshed.data);
     });
@@ -164,7 +182,7 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
           <CardHeader><CardTitle>Alertas</CardTitle><CardDescription>Clientes que precisam de acompanhamento da direção ou da unidade.</CardDescription></CardHeader>
           <CardContent className="grid gap-3">
             {data.alerts.length ? data.alerts.map((alert) => <div key={alert.surveyId} className="flex flex-col gap-3 rounded-xl border border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0"><p className="font-medium">{alert.leadName}</p><p className="text-sm text-muted-foreground"><BrokerProfileLink brokerId={alert.brokerId} name={alert.brokerName} /> · {alert.reasons.map((reason) => POST_SALE_ALERT_REASON_LABELS[reason]).join("; ")}</p>{alert.lossDetail ? <p className="text-sm text-muted-foreground">{alert.lossDetail}</p> : null}<time className="text-xs text-muted-foreground" dateTime={alert.occurredAt}>{new Date(alert.occurredAt).toLocaleString("pt-BR")}</time></div>
+              <div className="min-w-0"><p className="font-medium">{alert.leadName}</p><p className="text-sm text-muted-foreground"><BrokerProfileLink brokerId={alert.brokerId} name={alert.brokerName} /> · {alert.reasons.map((reason) => POST_SALE_ALERT_REASON_LABELS[reason]).join("; ")}</p>{alert.detail ? <p className="text-sm text-muted-foreground">{alert.detail}</p> : null}<time className="text-xs text-muted-foreground" dateTime={alert.occurredAt}>{new Date(alert.occurredAt).toLocaleString("pt-BR")}</time></div>
               <div className="flex shrink-0 flex-wrap gap-2"><Button render={<Link href={`/leads/${encodeURIComponent(alert.leadId)}`} />} variant="outline" size="sm">Abrir lead</Button><Button type="button" variant="outline" size="sm" loading={busy} onClick={() => markAlertHandled(alert.surveyId)}>Marcar como tratado</Button></div>
             </div>) : <p className="rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-muted-foreground">Nenhum alerta aberto.</p>}
           </CardContent>
@@ -220,9 +238,18 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
           <Card>
             <CardHeader><CardTitle>Campanhas recentes</CardTitle><CardDescription>Últimas campanhas criadas nesta empresa ou unidade.</CardDescription></CardHeader>
             <CardContent className="grid gap-3">
-              {data.campaigns.length ? data.campaigns.map((campaign) => <div key={campaign.id} className="flex items-center justify-between gap-4 rounded-xl border border-border px-3 py-3">
-                <div className="min-w-0"><p className="truncate text-sm font-medium">{campaign.name}</p><p className="text-xs text-muted-foreground">{new Date(campaign.createdAt).toLocaleDateString("pt-BR")} · {postSaleRuleLabel(campaign.ruleKey)} · {campaign.status}</p></div>
-                <span className="shrink-0 text-xs text-muted-foreground">{campaign.totals.queued ?? 0} na fila</span>
+              {data.campaigns.length ? data.campaigns.map((campaign) => <div key={campaign.id} className="grid gap-2 rounded-xl border border-border px-3 py-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0"><p className="truncate text-sm font-medium">{campaign.name}</p><p className="text-xs text-muted-foreground">{new Date(campaign.createdAt).toLocaleDateString("pt-BR")} · {postSaleRuleLabel(campaign.ruleKey)} · {campaign.status}</p></div>
+                  {campaign.counts.queued ? <span className="shrink-0 text-xs text-muted-foreground">{campaign.counts.queued} na fila</span> : null}
+                </div>
+                <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground tabular-nums">
+                  <span>{campaign.counts.sent} enviadas</span><span>{campaign.counts.failed} falharam</span><span>{campaign.counts.skipped} puladas</span>
+                </p>
+                {campaign.ruleKey === null && campaign.status !== "draft" && campaign.counts.retryable > 0 ? <div>
+                  <Button type="button" variant="outline" size="sm" loading={busy} onClick={() => retryFailed(campaign)}>Reenviar as que falharam ({campaign.counts.retryable})</Button>
+                </div> : null}
+                {retryFeedback?.campaignId === campaign.id ? <p className={retryFeedback.error ? "text-xs text-destructive" : "text-xs text-[var(--text-secondary)]"} role={retryFeedback.error ? "alert" : "status"}>{retryFeedback.text}</p> : null}
               </div>) : <p className="rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-muted-foreground">Nenhuma campanha foi criada ainda.</p>}
             </CardContent>
           </Card>

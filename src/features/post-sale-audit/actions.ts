@@ -26,6 +26,8 @@ import { autoRuleSettingsInputSchema, parsePostSaleRuleFilter, type AutoRuleSett
 import { AutoRulesTableMissingError, loadAutoRules, saveAutoRule } from "./auto-rules-store";
 import { previewAutoRule, type AutoRulePreview } from "./auto-sweep";
 import { postSaleViewAuditId } from "./view-audit";
+import { emptyPostSaleCampaignCounts, type PostSaleCampaignCounts, type PostSaleRetryResult } from "./campaign-retry";
+import { loadPostSaleCampaignCounts, retryFailedPostSaleSurveys } from "./campaign-retry-service";
 
 const campaignInput = z.object({
   name: z.string().trim().min(2, "Informe o nome da campanha.").max(120),
@@ -356,7 +358,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, ra
   brokers: Array<{ id: string; name: string }>;
   queues: Array<{ id: string; name: string }>;
   branches: Array<{ id: string; name: string }>;
-  campaigns: Array<{ id: string; name: string; ruleKey: string | null; status: string; totals: Record<string, number>; createdAt: string }>;
+  campaigns: Array<{ id: string; name: string; ruleKey: string | null; status: string; totals: Record<string, number>; createdAt: string; counts: PostSaleCampaignCounts }>;
   responses: Array<{ id: string; leadId: string; leadName: string; brokerName: string | null; campaignName: string; ruleKey: string | null; status: string; outcome: string | null; rating: number | null; answers: Record<string, unknown>; sentAt: string | null; lastReplyAt: string | null }>;
   report: PostSaleBrokerReportRow[];
   alerts: Awaited<ReturnType<typeof loadPostSaleOpenAlerts>>;
@@ -398,11 +400,12 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, ra
         .orderBy(schema.branches.name),
       loadAutoRules(context.tenantId),
     ]);
+    const campaignCounts = await loadPostSaleCampaignCounts(context.tenantId, campaigns.map((row) => row.id));
     await recordPostSaleViewAudit({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_report", entityId: "workspace", action: "post_sale_report.viewed", metadata: { periodDays, brokerRows: report.length, openAlerts: alerts.length } });
     return { ok: true, data: {
       brokers: brokers.map((row) => ({ id: row.id, name: row.name ?? "Corretor" })),
       queues,
-      campaigns: campaigns.map((row) => ({ ...row, totals: row.totals as Record<string, number>, createdAt: row.createdAt.toISOString() })),
+      campaigns: campaigns.map((row) => ({ ...row, totals: row.totals as Record<string, number>, createdAt: row.createdAt.toISOString(), counts: campaignCounts[row.id] ?? emptyPostSaleCampaignCounts() })),
       responses: responses.map((row) => ({ ...row, brokerName: row.brokerName ?? null, answers: row.answers as Record<string, unknown>, sentAt: row.sentAt?.toISOString() ?? null, lastReplyAt: row.lastReplyAt?.toISOString() ?? null })),
       report,
       alerts,
@@ -673,6 +676,39 @@ export async function previewPostSaleAutoRuleAction(raw: unknown): Promise<Actio
     const input = autoRuleSettingsInputSchema.parse(raw);
     const preview = await previewAutoRule(context, { ...input, updatedAt: null });
     return { ok: true, data: preview };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+/**
+ * "Reenviar as que falharam" (09/11): pesquisas de uma campanha manual que falharam no envio (outbox
+ * failed/cancelled/expired, inclusive a abertura aceita e depois recusada pela Meta, ex. 131042) ou foram
+ * puladas por canal/template. Reavalia o público só desses leads com as regras atuais e devolve a mesma
+ * linha para a fila com uma chave nova no outbox. Diretor; gestor só na campanha da unidade dele.
+ */
+export async function retryFailedPostSaleCampaignAction(campaignId: string): Promise<ActionResult<PostSaleRetryResult>> {
+  try {
+    const context = await authorizedContext();
+    const validId = z.string().trim().min(1).max(80).parse(campaignId);
+    const [campaign] = await getDatabase().select().from(schema.postSaleCampaigns).where(and(
+      eq(schema.postSaleCampaigns.id, validId),
+      eq(schema.postSaleCampaigns.tenantId, context.tenantId),
+    )).limit(1);
+    if (!campaign) throw new PostSaleActionError("Campanha não encontrada.");
+    if (context.role === "manager" && campaign.createdBy !== context.userId) {
+      const savedAudience = postSaleAudienceSchema.parse(campaign.audience);
+      if (!(await campaignIsInManagerBranch(context.tenantId, context.branchId, savedAudience))) {
+        throw new PostSaleActionError("Esta campanha não pertence à sua unidade.");
+      }
+    }
+    if (campaign.kind !== "manual" || campaign.ruleKey) throw new PostSaleActionError("Só campanhas manuais podem ser reenviadas por aqui.");
+    if (campaign.status === "draft") throw new PostSaleActionError("Esta campanha ainda não foi iniciada.");
+    const result = await retryFailedPostSaleSurveys(context, campaign);
+    if (!result.retryable) throw new PostSaleActionError("Nenhuma pesquisa desta campanha está para reenviar.");
+    const { retryable, ...data } = result;
+    await recordPostSaleAudit({ tenantId: context.tenantId, userId: context.userId, campaignId: campaign.id, action: "post_sale_campaign.retried", metadata: { retryable, ...data } });
+    return { ok: true, data };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };
   }
