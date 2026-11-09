@@ -2,69 +2,98 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import { savePostSaleR0SettingsAction } from "@/features/post-sale-audit/actions";
 import { R0_DEFAULTS } from "@/features/post-sale-audit/r0-rules";
+import { AutomationRow, CheckList, type Option, type RowFeedback } from "./post-sale-auto-rules";
 
 type R0Settings = { enabled: boolean; queueIds: string[]; canEdit: boolean };
 
-/** Regra R0 (cliente que volta a escrever): liga e desliga e escolhe as filas do piloto. Só o diretor edita. */
-export function PostSaleR0Settings({ initial, queues }: { initial: R0Settings; queues: Array<{ id: string; name: string }> }) {
-  const [enabled, setEnabled] = useState(initial.enabled);
+function sameIds(a: string[], b: string[]) {
+  return a.length === b.length && a.every((id) => b.includes(id));
+}
+
+function scopeLine(queueIds: string[]) {
+  return `Piloto em ${queueIds.length} ${queueIds.length === 1 ? "fila" : "filas"}.`;
+}
+
+/**
+ * Regra R0 (cliente que volta a escrever) como linha compacta: a chave salva na hora; as filas do
+ * piloto ficam em "Ajustar". Pelo plano, ligada sem fila não dispara, então a chave pede uma fila. Só o diretor edita.
+ */
+export function PostSaleR0Settings({ initial, queues, onSaved }: { initial: R0Settings; queues: Option[]; onSaved?: (settings: { enabled: boolean; queueIds: string[] }) => void }) {
+  const [saved, setSaved] = useState({ enabled: initial.enabled, queueIds: initial.queueIds });
   const [queueIds, setQueueIds] = useState<string[]>(initial.queueIds);
-  const [feedback, setFeedback] = useState("");
+  const [open, setOpen] = useState(false);
+  const [feedback, setFeedback] = useState<RowFeedback>(null);
   const [busy, startTransition] = useTransition();
   const disabled = !initial.canEdit || busy;
+  const dirty = !sameIds(queueIds, saved.queueIds);
 
-  function toggleQueue(id: string, checked: boolean) {
-    setQueueIds((current) => checked ? [...new Set([...current, id])] : current.filter((queueId) => queueId !== id));
-  }
-
-  function save() {
-    setFeedback("");
+  function persist(next: { enabled: boolean; queueIds: string[] }, okText: (data: { enabled: boolean; queueIds: string[] }) => string) {
+    const previous = saved;
+    setSaved(next);
+    setFeedback(null);
     startTransition(async () => {
-      const result = await savePostSaleR0SettingsAction({ enabled, queueIds });
-      if (!result.ok) { setFeedback(result.error); return; }
-      setEnabled(result.data.enabled);
+      const result = await savePostSaleR0SettingsAction(next);
+      if (!result.ok) {
+        setSaved(previous);
+        setFeedback({ tone: "error", text: `Não salvou: ${result.error}` });
+        return;
+      }
+      setSaved(result.data);
       setQueueIds(result.data.queueIds);
-      setFeedback(result.data.enabled ? `Regra ligada em ${result.data.queueIds.length} ${result.data.queueIds.length === 1 ? "fila" : "filas"}.` : "Regra desligada.");
+      onSaved?.(result.data);
+      setFeedback({ tone: "ok", text: okText(result.data) });
     });
   }
 
+  function toggle(next: boolean) {
+    const ids = open && dirty ? queueIds : saved.queueIds;
+    if (next && !ids.length) {
+      setOpen(true);
+      setFeedback({ tone: "error", text: "Escolha pelo menos uma fila do piloto abaixo. Ligada sem fila, a R0 não dispara." });
+      return;
+    }
+    persist({ enabled: next, queueIds: ids }, (data) => data.enabled ? `Regra R0 ligada. ${scopeLine(data.queueIds)}` : "Regra R0 desligada.");
+  }
+
+  function save() {
+    if (saved.enabled && !queueIds.length) {
+      setFeedback({ tone: "error", text: "Com a R0 ligada, deixe pelo menos uma fila. Para parar, desligue a chave." });
+      return;
+    }
+    persist({ enabled: saved.enabled, queueIds }, (data) => data.enabled ? `Filas da R0 salvas. ${scopeLine(data.queueIds)}` : `Filas da R0 salvas (${data.queueIds.length}). A regra segue desligada.`);
+  }
+
   return (
-    <Card>
-      <CardHeader className="flex flex-wrap items-start justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <CardTitle>Cliente voltou a escrever</CardTitle>
-          <CardDescription>
-            Quando um cliente que já está com um corretor escreve de novo e fica {R0_DEFAULTS.waitMinutes} min úteis sem resposta (ou escreve depois de o atendimento ser encerrado), a equipe de qualidade pergunta o que aconteceu pelo mesmo número. A direção e o gestor da unidade recebem os alertas; o corretor não é avisado.
-          </CardDescription>
-        </div>
-        <label className="flex items-center gap-2 text-sm font-medium">
-          <Switch checked={enabled} onCheckedChange={(value) => setEnabled(Boolean(value))} disabled={disabled} aria-label="Ligar a regra do cliente que voltou a escrever" />
-          {enabled ? "Ligada" : "Desligada"}
-        </label>
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        <fieldset className="grid gap-2" disabled={disabled}>
-          <legend className="mb-1 text-sm font-medium">Filas do piloto</legend>
-          {queues.length ? <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {queues.map((queue) => <label key={queue.id} className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm">
-              <Checkbox checked={queueIds.includes(queue.id)} onCheckedChange={(value) => toggleQueue(queue.id, Boolean(value))} disabled={disabled} />
-              <span className="truncate">{queue.name}</span>
-            </label>)}
-          </div> : <p className="text-sm text-muted-foreground">Nenhuma fila ativa.</p>}
-        </fieldset>
-        <p className="text-xs text-muted-foreground">
-          Proteções: no máximo 1 conversa por cliente a cada {R0_DEFAULTS.cooldownDays} dias, nada se o corretor respondeu nas últimas {R0_DEFAULTS.brokerRecentReplyHours} h, se há pesquisa em andamento, se o cliente pediu para parar ou se o lead é de um diretor. Sem retorno da equipe {R0_DEFAULTS.escalationMinutes} min úteis depois da resposta do cliente, a direção recebe um alerta para repassar o lead. A IA nunca informa preço.
-        </p>
-        {initial.canEdit ? <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" onClick={save} loading={busy}>Salvar</Button>
-          {feedback ? <p className="text-sm text-[var(--text-secondary)]" role="status">{feedback}</p> : null}
-        </div> : <p className="text-xs text-muted-foreground">Só a direção pode alterar esta regra.</p>}
-      </CardContent>
-    </Card>
+    <AutomationRow
+      id="regra-R0"
+      title="R0 · Cliente voltou a escrever"
+      description={`Cliente com corretor escreve de novo e fica ${R0_DEFAULTS.waitMinutes} min úteis sem resposta: a qualidade pergunta o que houve.`}
+      scope={scopeLine(saved.queueIds)}
+      enabled={saved.enabled}
+      canToggle={!disabled}
+      toggleLabel="Ligar a regra do cliente que voltou a escrever"
+      onToggle={toggle}
+      open={open}
+      onOpenChange={setOpen}
+      feedback={feedback}
+    >
+      <p className="text-xs text-muted-foreground">
+        Também dispara quando o cliente escreve depois de o atendimento ser encerrado. A direção e o gestor da unidade recebem os alertas; o corretor não é avisado. Sem retorno da equipe {R0_DEFAULTS.escalationMinutes} min úteis depois da resposta do cliente, a direção recebe um alerta para repassar o lead.
+      </p>
+      <CheckList
+        legend="Filas do piloto (obrigatório para ligar)"
+        options={queues}
+        selected={queueIds}
+        disabled={disabled}
+        empty="Nenhuma fila ativa."
+        onToggle={(id, checked) => setQueueIds((current) => checked ? [...new Set([...current, id])] : current.filter((queueId) => queueId !== id))}
+      />
+      {initial.canEdit ? <div className="flex flex-wrap items-center gap-3">
+        <Button type="button" onClick={save} loading={busy} disabled={!dirty}>Salvar filas</Button>
+        {dirty ? <span className="text-xs text-muted-foreground">Alterações não salvas.</span> : null}
+      </div> : <p className="text-xs text-muted-foreground">Só a direção pode alterar esta regra.</p>}
+    </AutomationRow>
   );
 }

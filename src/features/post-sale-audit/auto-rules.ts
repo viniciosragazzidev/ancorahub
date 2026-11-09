@@ -86,6 +86,42 @@ export const autoRuleSettingsInputSchema = z.object({
 
 export type AutoRuleSettingsInput = z.infer<typeof autoRuleSettingsInputSchema>;
 
+/**
+ * O que a tela manda para salvar uma regra. `draft` são os campos digitados (texto); sem ele, usa os
+ * números já salvos (a chave liga/desliga salva só o "enabled" e não leva rascunho pela metade).
+ */
+export function autoRuleSavePayload(settings: AutoRuleSettings, draft?: { delay: string; limit: string; enabled?: boolean }) {
+  const toInt = (value: string, fallback: number) => {
+    const trimmed = value.trim();
+    if (!trimmed) return fallback;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  return {
+    key: settings.key,
+    enabled: draft?.enabled ?? settings.enabled,
+    delayBusinessDays: draft ? toInt(draft.delay, settings.delayBusinessDays) : settings.delayBusinessDays,
+    dailyLimit: draft ? toInt(draft.limit, settings.dailyLimit) : settings.dailyLimit,
+    filters: {
+      queueIds: [...settings.filters.queueIds],
+      branchIds: [...settings.filters.branchIds],
+      leadTypes: [...settings.filters.leadTypes],
+    },
+    pilot: { queueIds: [...settings.pilot.queueIds], brokerIds: [...settings.pilot.brokerIds] },
+  };
+}
+
+/** Uma linha que resume o alcance da regra ligada: piloto ou geral, e quantas por dia. */
+export function describeAutoRuleScope(settings: Pick<AutoRuleSettings, "dailyLimit" | "pilot">) {
+  const limit = effectiveAutoRuleDailyLimit(settings);
+  if (!isAutoRulePilotMode(settings.pilot)) return `Sem piloto: vale para todas as filas, até ${limit} por dia.`;
+  const parts = [
+    settings.pilot.queueIds.length ? `${settings.pilot.queueIds.length} ${settings.pilot.queueIds.length === 1 ? "fila" : "filas"}` : "",
+    settings.pilot.brokerIds.length ? `${settings.pilot.brokerIds.length} ${settings.pilot.brokerIds.length === 1 ? "corretor" : "corretores"}` : "",
+  ].filter(Boolean);
+  return `Piloto em ${parts.join(" e ")}, até ${limit} por dia.`;
+}
+
 export function defaultAutoRuleSettings(key: AutoRuleKey): AutoRuleSettings {
   return {
     key,
