@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -669,6 +670,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
               metaFormId: lead.metaFormId,
               branchNome: lead.branchNome,
               corretorNome: lead.corretorNome,
+              corretorId: lead.corretorId,
               motivoPerda: lead.motivoPerda,
               lossCategory: lead.lossCategory,
             }}
@@ -688,6 +690,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
             formData={formData}
             canSeePersonalData={canSeePersonalData}
             shouldMask={shouldMask}
+            viewerRole={context.role}
             maskedPhone={maskedPhone}
             maskedEmail={maskedEmail}
             stageRank={stageRank}
@@ -839,7 +842,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                   <span className="hidden text-border sm:inline">•</span>
                   <span className="inline-flex items-center gap-1.5">
                     <UserPlus className="size-3.5 shrink-0 text-muted-foreground/80" />
-                    {lead.corretorNome ?? "Aguardando distribuição"}
+                    {lead.corretorNome ? <BrokerProfileLink brokerId={lead.corretorId} name={lead.corretorNome} viewerRole={context.role} /> : "Aguardando distribuição"}
                   </span>
                 </div>
               </div>
@@ -1235,7 +1238,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                   </div>
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Responsável</p>
-                    <p className="mt-0.5 text-sm font-medium">{lead.corretorNome ?? "Aguardando distribuição"}</p>
+                    <p className="mt-0.5 text-sm font-medium">{lead.corretorNome ? <BrokerProfileLink brokerId={lead.corretorId} name={lead.corretorNome} viewerRole={context.role} /> : "Aguardando distribuição"}</p>
                   </div>
                 </div>
 

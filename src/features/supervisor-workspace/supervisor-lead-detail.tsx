@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import type { ReactNode } from "react";
 
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
@@ -124,7 +125,7 @@ export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocume
         header={
           <div className="flex flex-col gap-3">
             <Link href="/leads" className="w-max text-sm text-(--text-muted) hover:text-(--foreground)">{isManager ? "← Leads da unidade" : "← Leads da equipe"}</Link>
-            <LeadHeaderBar name={lead.name} statusLabel={stageLabel(lightLead.status)} arrival={arrival} subline={lead.ownerName ? `Com ${lead.ownerName}` : "Sem corretor"} />
+            <LeadHeaderBar name={lead.name} statusLabel={stageLabel(lightLead.status)} arrival={arrival} subline={lead.ownerName ? <>Com <BrokerProfileLink brokerId={lead.ownerId} name={lead.ownerName} viewerRole="supervisor" /></> : "Sem corretor"} />
           </div>
         }
         next={

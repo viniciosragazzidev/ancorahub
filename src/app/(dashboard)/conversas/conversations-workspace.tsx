@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { OwnershipContext } from "@/components/ownership-context";
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import {
   ArrowLeft,
   ArrowSquareOut,
@@ -562,6 +563,7 @@ export function ConversationsWorkspace({
                   transition={{ duration: 0.24, delay: index * 0.02, ease: LITE_EASE }}
                 >
                   <ConversationRow
+                    viewerRole={role}
                     directorSkinEnabled={directorSkinEnabled}
                     active={conversation.id === selected?.id}
                     conversation={conversation}
@@ -662,7 +664,7 @@ export function ConversationsWorkspace({
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.28, ease: LITE_EASE }}
             >
-              <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} hideOrigin={role === "broker"} />
+              <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} hideOrigin={role === "broker"} viewerRole={role} />
             </motion.div>
           ) : null}
         </aside>
@@ -676,7 +678,7 @@ export function ConversationsWorkspace({
                 <SheetTitle>Perfil do atendimento</SheetTitle>
                 <SheetDescription>Contexto e ações disponíveis para {selected.nome}.</SheetDescription>
               </SheetHeader>
-              <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} hideOrigin={role === "broker"} />
+              <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} hideOrigin={role === "broker"} viewerRole={role} />
             </>
           ) : null}
         </SheetContent>
@@ -879,7 +881,7 @@ function ConversationHeader({
                 <span className="min-w-0 truncate">{client.nome}</span>
                 {displayBrokerName ? (
                   <span data-conversations-part={directorSkinEnabled ? "header-owner-name" : undefined} className="min-w-0 max-w-32 truncate text-xs font-normal text-muted-foreground">
-                    · {displayBrokerName}
+                    · <BrokerProfileLink brokerId={client.corretorId} name={displayBrokerName} viewerRole={role} />
                   </span>
                 ) : null}
               </h2>
@@ -1919,24 +1921,31 @@ function getConversationStatusLabel(status: string, qualificationStatus?: string
   return LEAD_STATUS_LABELS[status] ?? LEAD_QUALIFICATION_LABELS[normalized] ?? status;
 }
 
-function ConversationRow({ active, conversation, onClick, directorSkinEnabled }: { active: boolean; conversation: ConversationItem; onClick: () => void; directorSkinEnabled: boolean }) {
+function ConversationRow({ active, conversation, onClick, directorSkinEnabled, viewerRole }: { active: boolean; conversation: ConversationItem; onClick: () => void; directorSkinEnabled: boolean; viewerRole?: string }) {
   const hasHistory = conversation.messages.length > 0;
   const visibleMessageCount = conversation.messageCount ?? conversation.messages.filter((message) => !message.transition).length;
   const preview = conversation.latestMessage?.body ?? "Nenhuma mensagem sincronizada.";
   const displayBrokerName = brokerDisplayName(conversation.corretorNome);
   const title = displayBrokerName ? `${conversation.nome} · ${displayBrokerName}` : conversation.nome;
 
+  // Linha como div role="button": o nome do corretor é link próprio e <a> não pode ficar dentro de <button>.
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+        onClick();
+      }}
       aria-current={active ? "page" : undefined}
       data-lite={directorSkinEnabled ? undefined : "row"}
       data-conversations-part={directorSkinEnabled ? "row" : undefined}
       className={cn(
-        "group flex w-full items-start gap-3 rounded-full px-3 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        "group flex w-full cursor-pointer items-start gap-3 rounded-full px-3 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         active ? "bg-muted/80" : "hover:bg-muted/65",
       )}
       onClick={onClick}
-      type="button"
     >
       <ContactAvatar className="mt-0.5 shrink-0" name={conversation.nome} photoUrl={contactPhotoUrl(conversation)} photoWhenVisible />
       <span className="grid min-w-0 flex-1 gap-1">
@@ -1945,7 +1954,7 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled }:
             <span className="min-w-0 truncate text-sm font-medium">{conversation.nome}</span>
             {displayBrokerName ? (
               <span data-conversations-part={directorSkinEnabled ? "row-owner-name" : undefined} className="min-w-0 max-w-32 truncate text-xs text-muted-foreground">
-                · {displayBrokerName}
+                · <BrokerProfileLink brokerId={conversation.corretorId} name={displayBrokerName} viewerRole={viewerRole} />
               </span>
             ) : null}
           </span>
@@ -1968,7 +1977,7 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled }:
           </span>
         </span>
       </span>
-    </button>
+    </div>
   );
 }
 
@@ -2039,11 +2048,14 @@ function ClientProfile({
   client,
   onUpdateConversation,
   hideOrigin = false,
+  viewerRole,
 }: {
   client: ConversationItem;
   onUpdateConversation?: (leadId: string, updates: Partial<ConversationItem>) => void;
   /** Brokers do not see where the lead came from. */
   hideOrigin?: boolean;
+  /** Papel de quem vê: diretor, gestor e supervisor abrem o perfil do corretor pelo nome. */
+  viewerRole?: string;
 }) {
   const directorSkinEnabled = useDirectorLitePage();
   const approvedDocuments = client.documents.filter((document) => document.status === "approved").length;
@@ -2097,7 +2109,7 @@ function ClientProfile({
               </Badge>
             </div>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              <OwnershipContext brokerName={client.corretorNome} branchName={client.branchName} />
+              <OwnershipContext brokerName={client.corretorNome} branchName={client.branchName} brokerId={client.corretorId} viewerRole={viewerRole} />
             </p>
           </div>
         </div>

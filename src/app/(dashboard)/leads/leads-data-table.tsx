@@ -57,6 +57,7 @@ export function LeadsDataTable({
       city: item.branchName ?? null,
       state: null,
       assignedBrokerName: item.corretorNome ?? null,
+      assignedBrokerId: item.corretorId ?? null,
       isPlantaoAtivo: item.isPlantaoAtivo ?? false,
       returnedUnaccepted: item.returnedUnaccepted ?? false,
       isManagementInvestigation: item.isManagementInvestigation ?? false,

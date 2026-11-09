@@ -1,5 +1,6 @@
 "use client";
 
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { formatAgo } from "@/components/lite/status/format";
 import { PeopleRow } from "@/components/light/people-list/people-list";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
@@ -39,7 +40,7 @@ export function NegotiationLeadRow({ lead, index, generatedAt, onOpen }: {
     <PeopleRow
       name={lead.name}
       index={index}
-      chip={<span className={styles.cardStatus}>{LEAD_STATUS_LABELS[lead.status] ?? lead.status} · {lead.brokerName}</span>}
+      chip={<span className={styles.cardStatus}>{LEAD_STATUS_LABELS[lead.status] ?? lead.status} · <BrokerProfileLink brokerId={lead.brokerId} name={lead.brokerName} /></span>}
       preview={(
         <span className={styles.rowPreview}>
           <span className={styles.replyOwed} data-tone={lead.customerWaiting ? "waiting" : alert ? "alert" : undefined}>{replyOwedLabel(lead)}</span>

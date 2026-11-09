@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -454,7 +455,7 @@ export const getLeadsColumns = (
         <span className="flex flex-col items-start gap-1">
           <span className={`text-xs font-medium flex items-center gap-1.5 ${isPlantaoAtivo ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>
             <User className={`size-3 shrink-0 ${isPlantaoAtivo ? "text-amber-500" : "text-muted-foreground"}`} />
-            {broker || <span className="text-muted-foreground/70 italic font-normal">Sem atribuição</span>}
+            {broker ? <BrokerProfileLink brokerId={row.original.assignedBrokerId} name={broker} /> : <span className="text-muted-foreground/70 italic font-normal">Sem atribuição</span>}
           </span>
           {isPlantaoAtivo ? <Badge variant="warning" size="sm">Plantão ativo</Badge> : null}
           {isManagementInvestigation ? <Badge variant="secondary" size="sm">Investigação da gestão</Badge> : null}

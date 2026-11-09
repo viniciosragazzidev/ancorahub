@@ -1,5 +1,6 @@
 "use client";
 
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { LiteDataTable, type LiteColumn } from "@/components/lite/data/data";
 import type { ClosingOutcomeBrokerRow, ClosingOutcomesSummary } from "@/features/leads/closing-outcome-core";
 
@@ -7,7 +8,7 @@ import { formatNegotiationMetric } from "./negotiations-data-views";
 import styles from "./negotiations.module.css";
 
 const BROKER_COLUMNS: LiteColumn<ClosingOutcomeBrokerRow>[] = [
-  { id: "broker", label: "Corretor", primary: true, nowrap: true, render: (row) => <span title={row.brokerName}>{row.brokerName}</span> },
+  { id: "broker", label: "Corretor", primary: true, nowrap: true, render: (row) => <span title={row.brokerName}><BrokerProfileLink brokerId={row.brokerId} name={row.brokerName} /></span> },
   { id: "inClosing", label: "Em fechamento", numeric: true, render: (row) => formatNegotiationMetric(row.inClosing) },
   { id: "pending", label: "Pendentes", numeric: true, render: (row) => formatNegotiationMetric(row.pending) },
   { id: "converted", label: "Fechou", numeric: true, render: (row) => formatNegotiationMetric(row.converted) },

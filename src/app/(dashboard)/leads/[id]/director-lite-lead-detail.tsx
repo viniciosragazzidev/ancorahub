@@ -8,6 +8,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Building2, Lock, Mail, MessageCircle, Phone, Share2, UserPlus } from "lucide-react";
 
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { liteStageLabel } from "../lite-stage-labels";
@@ -37,6 +38,8 @@ export type DirectorLiteLeadDetailProps = {
     metaFormId: string | null;
     branchNome: string | null;
     corretorNome: string | null;
+    /** Id (usuário) do corretor: o nome vira link para o perfil dele. */
+    corretorId?: string | null;
     motivoPerda: string | null;
     lossCategory: string | null;
   };
@@ -69,6 +72,8 @@ export type DirectorLiteLeadDetailProps = {
   formData: Record<string, string | null>;
   canSeePersonalData: boolean;
   shouldMask: boolean;
+  /** Papel de quem vê: diretor, gestor e supervisor abrem o perfil do corretor pelo nome. */
+  viewerRole?: string;
   maskedPhone: string;
   maskedEmail: string;
   stageRank: number;
@@ -117,7 +122,8 @@ function Section({ title, description, children, tone }: { title: string; descri
 }
 
 export function DirectorLiteLeadDetail(props: DirectorLiteLeadDetailProps) {
-  const { lead, meta, qualification, formData, canSeePersonalData, shouldMask, maskedPhone, maskedEmail, stageRank, slots } = props;
+  const { lead, meta, qualification, formData, canSeePersonalData, shouldMask, maskedPhone, maskedEmail, stageRank, slots, viewerRole } = props;
+  const owner = lead.corretorNome ? <BrokerProfileLink brokerId={lead.corretorId} name={lead.corretorNome} viewerRole={viewerRole} /> : "Aguardando distribuição";
   const origin = lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook");
   const phone = canSeePersonalData
     ? <a className={styles.link} href={`tel:${lead.telefone.replace(/\D/g, "")}`}>{lead.telefone}</a>
@@ -164,7 +170,7 @@ export function DirectorLiteLeadDetail(props: DirectorLiteLeadDetailProps) {
             <li><Phone aria-hidden="true" size={16} /><span className={shouldMask ? styles.masked : undefined}>{phone}</span></li>
             <li><Mail aria-hidden="true" size={16} /><span className={shouldMask ? styles.masked : undefined}>{email}</span></li>
             <li><Building2 aria-hidden="true" size={16} /><span>{origin}</span></li>
-            <li><UserPlus aria-hidden="true" size={16} /><span>{lead.corretorNome ?? "Aguardando distribuição"}</span></li>
+            <li><UserPlus aria-hidden="true" size={16} /><span>{owner}</span></li>
           </ul>
         </div>
         <div id="lead-actions" className={styles.actions}>
@@ -301,7 +307,7 @@ export function DirectorLiteLeadDetail(props: DirectorLiteLeadDetailProps) {
               <Field label="E-mail"><span className={shouldMask ? styles.masked : undefined}>{email}</span></Field>
               <Field label="Origem"><span className={styles.withIcon}><Share2 aria-hidden="true" size={14} />{origin}</span></Field>
               <Field label="Unidade">{lead.branchNome ?? "Geral / Matriz"}</Field>
-              <Field label="Responsável">{lead.corretorNome ?? "Aguardando distribuição"}</Field>
+              <Field label="Responsável">{owner}</Field>
             </dl>
             {lead.motivoPerda ? (
               <div className={styles.note} data-tone="danger">
