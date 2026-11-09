@@ -16,3 +16,8 @@ Se o vídeo (ou outro feito com essa voz e esses efeitos) for usado fora da Ânc
 ## Onde está o projeto-fonte
 
 Fora do git (`/video/` no `.gitignore`): `video/boas-vindas/hf-v3/` (HyperFrames, versão 3: 14 cenas, Jack, Dicas de Atendimento, pontos; copy aprovada pelo Vinicios em 2026-10-13; trilha Cat Walk estendida com emenda), `video/boas-vindas/hf-v2/` (versão 2), `video/boas-vindas/audio-v2/` (música e efeitos) e `video/boas-vindas/desktop/` (composição 16:9). Plano completo: `docs/implementations/active/2026-10-12-video-boas-vindas.md`.
+
+## Voz da introdução do roteiro de presença (09/11/2026)
+
+`public/onboarding/narracao/presenca-whatsapp-intro.mp3`: mesma voz ("Liam", `eleven_multilingual_v2`), mesma conta
+Free e mesma condição de uso interno. Se o roteiro for usado fora da Âncora, gerar de novo num plano pago.

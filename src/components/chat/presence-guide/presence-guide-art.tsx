@@ -138,13 +138,17 @@ export function PhoneMock({ platform, scene }: { platform: GuidePlatform; scene:
     <div className={styles.mock} aria-hidden="true">
       <div className={styles.mockTop}>
         <span className={styles.mockBrand}><WaIcon /> WhatsApp</span>
-        <span className={styles.mockDots}>⋮{scene === 0 && platform === "android" ? <Tap style={{ left: 1, top: 1 }} /> : null}</span>
+        {/* Só o anel em volta: o ponto cobriria os 3 pontinhos que o texto manda tocar. */}
+        <span className={styles.mockDots} style={scene === 0 && platform === "android" ? { background: "var(--wa-soft)", color: "var(--wa-ink)", outline: "2px solid var(--wa)" } : undefined}>
+          ⋮{scene === 0 && platform === "android" ? <Tap style={{ left: 1, top: 1 }} dot={false} /> : null}
+        </span>
       </div>
       <AnimatePresence mode="wait" initial={false}>
         <motion.div key={`${platform}-${scene}`} initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={reduce ? undefined : { opacity: 0, y: -8 }} transition={{ duration: 0.22, ease: guideEase }}>
           {scene === 0 ? (
             <>
-              {[0, 1, 2, 3, 4].map((index) => <div key={index} className={styles.mockLine} style={{ opacity: 1 - index * 0.12 }} />)}
+              <div className={styles.listTitle}>Conversas</div>
+              {[0, 1, 2, 3].map((index) => <div key={index} className={styles.convRow} style={{ opacity: 1 - index * 0.14 }}><span className={styles.convAvatar} /><span className={styles.convLine} /></div>)}
               {platform === "iphone" ? (
                 <div style={{ position: "absolute", left: 10, right: 10, bottom: 10, display: "flex", justifyContent: "space-around", alignItems: "center", height: 40, borderTop: "1px solid var(--border)" }}>
                   {[0, 1, 2, 3].map((index) => (
@@ -241,6 +245,17 @@ export function CopyIcon() {
 export function CameraIcon() {
   return <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M2.5 5.5A1.5 1.5 0 0 1 4 4h1.4l1-1.5h3.2l1 1.5H12a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 12 13H4a1.5 1.5 0 0 1-1.5-1.5Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /><circle cx="8" cy="8.5" r="2.4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>;
 }
+export function SpeakerIcon({ on }: { on: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      {on
+        ? <path d="M15.5 9.5v5M18.5 9.5v5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        : <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />}
+    </svg>
+  );
+}
+
 export function CloseIcon() {
   return <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
 }

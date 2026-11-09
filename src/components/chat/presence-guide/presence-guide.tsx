@@ -10,7 +10,7 @@ import { PRESENCE_GUIDE_COPY as COPY } from "@/features/waha-cadence/pairing-cop
 import { cn } from "@/utils/core/cn";
 
 import {
-  AttentionArt, BeforeOpenArt, BigCheck, CameraIcon, CheckIcon, CloseIcon, CopyIcon, guideEase, HomeScreenArt, LockIcon, PhoneMock,
+  AttentionArt, BeforeOpenArt, BigCheck, SpeakerIcon, CameraIcon, CheckIcon, CloseIcon, CopyIcon, guideEase, HomeScreenArt, LockIcon, PhoneMock,
   Tiles, TilesSkeleton, WaIcon, WaitDots, WaitingMock, WelcomeArt,
 } from "./presence-guide-art";
 import {
@@ -64,7 +64,11 @@ export type PresenceGuidePresence = {
 /** Só para o protótipo (/dev/roteiro-presenca) e testes: abre direto numa etapa ou estado. */
 export type PresenceGuidePreview = { step?: GuideStep; scene?: number; local?: LocalIssue | null; copied?: boolean; sheet?: "ajuda" | "sair" | "abrir" | null; platform?: GuidePlatform };
 
-export function PresenceGuide({ device, connection, duty, presence, onClose, openWhatsApp, preview }: {
+/** Voz de introdução (ElevenLabs, ~11 s), tocada na tela de boas-vindas. O texto está em PRESENCE_GUIDE_COPY.welcome.voice. */
+export const PRESENCE_GUIDE_INTRO_AUDIO = "/onboarding/narracao/presenca-whatsapp-intro.mp3";
+const VOICE_MUTE_KEY = "ancora:presenca-guia:voz-desligada";
+
+export function PresenceGuide({ device, connection, duty, presence, onClose, openWhatsApp, preview, introAudio = PRESENCE_GUIDE_INTRO_AUDIO }: {
   device: GuideDevice;
   connection: PresenceGuideConnection;
   duty: PresenceGuideDuty;
@@ -73,6 +77,8 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   /** Troca o jeito de abrir o app (protótipo). Padrão: só abre o app, sem conversa. */
   openWhatsApp?: (onMissing: () => void) => void;
   preview?: PresenceGuidePreview;
+  /** Áudio da introdução; null desliga a voz. */
+  introAudio?: string | null;
 }) {
   const reduce = useReducedMotion();
   const desktop = device === "desktop";
@@ -87,6 +93,9 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   const [video, setVideo] = React.useState(false);
   const [showSteps, setShowSteps] = React.useState(false);
   const notOpenedTimer = React.useRef<number | null>(null);
+  // Voz da introdução: toca sozinha ao abrir (quando o navegador deixa) e o corretor pode parar ou ouvir de novo.
+  const voice = React.useRef<HTMLAudioElement | null>(null);
+  const [speaking, setSpeaking] = React.useState(false);
 
   // Retomada: o tipo de celular vem do aparelho; a etapa, da lembrança deste plantão.
   React.useEffect(() => {
@@ -104,6 +113,45 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   }, []);
 
   const step = visibleStep({ local: localStep, device, ready: connection.ready, stage: presence.stage });
+
+  function playVoice() {
+    if (!introAudio || typeof Audio === "undefined") return;
+    if (!voice.current) {
+      const audio = new Audio(introAudio);
+      audio.addEventListener("ended", () => setSpeaking(false));
+      audio.addEventListener("pause", () => setSpeaking(false));
+      audio.addEventListener("play", () => setSpeaking(true));
+      voice.current = audio;
+    }
+    voice.current.currentTime = 0;
+    try {
+      // Sem toque recente, o navegador pode recusar o som: fica o botão "Ouvir a explicação".
+      void Promise.resolve(voice.current.play()).catch(() => setSpeaking(false));
+    } catch {
+      setSpeaking(false);
+    }
+  }
+
+  function toggleVoice() {
+    if (speaking) {
+      voice.current?.pause();
+      try { window.localStorage.setItem(VOICE_MUTE_KEY, "1"); } catch { /* sem armazenamento: só para agora */ }
+      return;
+    }
+    try { window.localStorage.removeItem(VOICE_MUTE_KEY); } catch { /* idem */ }
+    playVoice();
+  }
+
+  // Abre nas boas-vindas: a voz começa sozinha, a não ser que o corretor tenha desligado antes.
+  React.useEffect(() => {
+    if (step !== "boasvindas") return;
+    let muted = false;
+    try { muted = window.localStorage.getItem(VOICE_MUTE_KEY) === "1"; } catch { /* sem armazenamento */ }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- inicia o áudio (sistema externo); o estado vem dos eventos dele
+    if (!muted) playVoice();
+    return () => voice.current?.pause();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao entrar e sair das boas-vindas
+  }, [step === "boasvindas"]);
   const error: GuideError | null = guideError({ step, device, facts: connection, local, stage: presence.stage });
 
   // Lembra onde parou (até a presença sair); limpa ao terminar.
@@ -245,7 +293,12 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
       case "boasvindas":
         scene$ = (
           <>
-            <Say title={presence.reconnect ? COPY.welcome.titleReconnect : COPY.welcome.title} sub={COPY.welcome.sub} />
+            <Say title={presence.reconnect ? COPY.welcome.titleReconnect : COPY.welcome.title} sub={COPY.welcome.sub} state={speaking ? "working" : "idle"} />
+            {introAudio ? (
+              <button type="button" className={styles.voice} aria-pressed={speaking} onClick={toggleVoice}>
+                <SpeakerIcon on={speaking} /> {speaking ? COPY.welcome.stop : COPY.welcome.listen}
+              </button>
+            ) : null}
             <div className={styles.art}><WelcomeArt /></div>
             <div className={styles.benefits}>
               {COPY.welcome.benefits.map((benefit) => <div key={benefit} className={styles.benefit}><span className={styles.benefitIcon}><CheckIcon size={14} /></span><span>{benefit}</span></div>)}

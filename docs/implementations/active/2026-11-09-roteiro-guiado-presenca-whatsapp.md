@@ -330,3 +330,20 @@ Pedido do Vinicios: o tutorial das próximas etapas aparecia depois de abrir o W
 - O caminho (4 de 7) mostra os 4 toques ("Depois, na tela Conversas, …") e só no fim tem "Abrir o WhatsApp", que
   mostra o resumo "Quando o WhatsApp abrir:" (tela inicial e 3 pontinhos) e abre o app. O WhatsApp abre uma vez só.
 - "Não abriu?" agora leva direto para a espera.
+
+## 13. Ajuste de 09/11 (noite): textos mais simples e voz de introdução
+
+Pedido do Vinicios: cada etapa clara, com texto simples; e uma voz de ~10 s no início (ElevenLabs).
+
+- **Textos** (`PRESENCE_GUIDE_COPY` em `pairing-copy.ts`): frases curtas, uma ação por frase, sempre dizendo onde
+  tocar ("no canto de cima, à direita"). "Tela inicial" virou "lista de Conversas" (o nome que aparece no WhatsApp).
+  O 4º toque diz "digite o código que você copiou". O resumo antes de abrir ganhou "Siga os 4 toques que você
+  acabou de ver". Na ilustração do 1º toque, o ⋮ fica com um anel em volta (o ponto verde escondia os 3 pontinhos).
+- **Voz:** `public/onboarding/narracao/presenca-whatsapp-intro.mp3`, 10,8 s, ElevenLabs CLI, voz Liam
+  (`TX3LPaxmHKxFdv7VOQHJ`), modelo `eleven_multilingual_v2`, pt. Texto: "Oi! Vamos conectar o seu WhatsApp para
+  você receber os leads do plantão. É rapidinho: leia cada tela e toque no botão de baixo. Eu te ajudo em cada
+  passo." (transcrição conferida). Toca sozinha nas boas-vindas; o botão "Parar a voz" / "Ouvir a explicação" fica
+  logo abaixo do título; quem parar não ouve de novo sozinho (`ancora:presenca-guia:voz-desligada`). Se o navegador
+  bloquear o som (iPhone sem toque recente), fica o botão para ouvir.
+- Uso da voz: mesma condição do vídeo de boas-vindas (conta Free, uso interno; ver
+  `docs/onboarding/creditos-video-boas-vindas.md`).
