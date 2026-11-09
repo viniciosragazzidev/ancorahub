@@ -186,6 +186,13 @@ export default async function ConversationsPage({
           // filters still apply.
           ...(leadId ? [sql`case when ${schema.leads.id} = ${leadId} then 0 else 1 end`] : []),
           ...(recentConversationLeadIds.length ? [sql`case when ${inArray(schema.leads.id, recentConversationLeadIds)} then 0 else 1 end`] : []),
+          // Leads in Fechamento (Documentação/Em análise) always load, even without recent messages, so the
+          // "Fechamento" filter shows all of them (09/11).
+          // Only broker leads: leads in a director's name are registrations by the direction (Vigia, 09/11).
+          sql`case when ${schema.leads.status} in ('documentation_pending', 'under_analysis') and not exists (
+            select 1 from ${schema.tenantMemberships} closing_owner
+            where closing_owner.tenant_id = ${schema.leads.tenantId} and closing_owner.user_id = ${schema.leads.corretorId} and closing_owner.role = 'director'
+          ) then 0 else 1 end`,
           desc(schema.leads.stageEnteredAt),
         )
         .limit(isDirector ? 800 : 250),
@@ -208,6 +215,9 @@ export default async function ConversationsPage({
     ]);
 
     branches = branchRows;
+    // Leads in a director's name are registrations by the direction, not a broker's closing (09/11).
+    const directorIds = new Set((await db.select({ userId: schema.tenantMemberships.userId }).from(schema.tenantMemberships)
+      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.role, "director")))).map((row) => row.userId));
     const leadIds = leads.map((lead) => lead.id);
     const scopeMessagesToLoadedLeads = Boolean(brokerId || repliedLast7Days || distributedLeadsTab);
 
@@ -726,6 +736,7 @@ export default async function ConversationsPage({
         telefone: lead.telefone,
         email: lead.email,
         status: lead.status,
+        inClosing: (lead.status === "documentation_pending" || lead.status === "under_analysis") && !(lead.corretorId && directorIds.has(lead.corretorId)),
         qualificationStatus: lead.qualificationStatus,
         origem: context.role === "broker" ? "" : lead.origem,
         branchId: lead.branchId,
