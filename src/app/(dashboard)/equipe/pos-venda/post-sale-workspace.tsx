@@ -113,7 +113,14 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
     setOverviewFeedback("");
     startTransition(async () => {
       const refreshed = await getPostSaleWorkspaceAction(periodDays, ruleFilter);
-      if (refreshed.ok) { setData(refreshed.data); setReportPage(1); }
+      if (refreshed.ok) {
+        setData(refreshed.data);
+        setReportPage(1);
+        // The period stays in the URL (?period=), so reloading keeps the same report (Vigia, 09/11).
+        const params = new URLSearchParams(window.location.search);
+        params.set("period", String(periodDays));
+        window.history.replaceState(window.history.state, "", `${window.location.pathname}?${params.toString()}`);
+      }
       else setOverviewFeedback(refreshed.error);
     });
   }

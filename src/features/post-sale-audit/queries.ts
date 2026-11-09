@@ -171,7 +171,8 @@ export async function loadPostSaleOpenAlerts(context: TenantContext): Promise<Po
       branchWhere(context),
     ))
     .orderBy(desc(sql`coalesce(${schema.postSaleSurveys.lastReplyAt}, ${schema.postSaleSurveys.completedAt}, ${schema.postSaleSurveys.sentAt}, ${schema.postSaleSurveys.createdAt})`))
-    .limit(200);
+    // Room for the open-alerts KPI to stay exact at the current volume (it stopped at 200; Vigia, 09/11).
+    .limit(1000);
 
   return rows.flatMap((row) => {
     const reasons = postSaleAlertReasons(row);
