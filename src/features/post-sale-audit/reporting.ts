@@ -10,6 +10,8 @@ export type PostSaleReportSurvey = {
   rating: number | null;
   answers: unknown;
   alertsHandledAt: Date | string | null;
+  /** "R0" = cliente que voltou a escrever; fica fora das métricas da pesquisa e conta à parte. */
+  ruleKey?: string | null;
 };
 
 export type PostSaleBrokerReportRow = {
@@ -26,6 +28,8 @@ export type PostSaleBrokerReportRow = {
   closed: number;
   noContact: number;
   openAlerts: number;
+  /** Conversas R0: o cliente voltou a escrever e ficou sem resposta. */
+  customerReturned: number;
 };
 
 function timestamp(value: Date | string | null) {
@@ -69,6 +73,7 @@ export function aggregatePostSaleBrokerReport(input: {
       closed: 0,
       noContact: 0,
       openAlerts: 0,
+      customerReturned: 0,
     };
     rows.set(brokerId, created);
     return created;
@@ -85,6 +90,12 @@ export function aggregatePostSaleBrokerReport(input: {
     if (sentAt === null || sentAt < from || sentAt >= to) continue;
     const row = ensure(survey.brokerId);
     const answers = answerRecord(survey.answers);
+    const openAlert = isPostSaleAlertOpen({ ...survey, alertsHandledAt: survey.alertsHandledAt ? new Date(survey.alertsHandledAt) : null });
+    if (survey.ruleKey === "R0") {
+      row.customerReturned += 1;
+      if (openAlert) row.openAlerts += 1;
+      continue;
+    }
     row.sent += 1;
     if (timestamp(survey.lastReplyAt) !== null) row.responded += 1;
     if (answers.contacted === true || answers.contacted === false) {
@@ -102,9 +113,7 @@ export function aggregatePostSaleBrokerReport(input: {
       rating.count += 1;
       ratingSums.set(survey.brokerId, rating);
     }
-    if (isPostSaleAlertOpen({ ...survey, alertsHandledAt: survey.alertsHandledAt ? new Date(survey.alertsHandledAt) : null })) {
-      row.openAlerts += 1;
-    }
+    if (openAlert) row.openAlerts += 1;
   }
 
   for (const row of rows.values()) {

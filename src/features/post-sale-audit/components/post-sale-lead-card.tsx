@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPostSaleLeadSurveyAction } from "../actions";
+import { R0_OUTCOME_LABELS } from "@/features/post-sale-audit/r0-rules";
 
 const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Sao_Paulo" });
 
@@ -11,6 +12,7 @@ const OUTCOME_LABELS: Record<string, string> = {
   no_reply: "Sem resposta",
   opted_out: "Pediu para não receber novas pesquisas",
   other: "Pesquisa encerrada",
+  ...R0_OUTCOME_LABELS,
 };
 
 function answerText(value: unknown, yes: string, no: string) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { runCustomerWaitingSweep } from "@/features/customer-waiting/sweep";
+import { runPostSaleR0Sweep } from "@/features/post-sale-audit/r0-sweep";
 import { backgroundRoute } from "@/shared/db/background-pool";
 import { withJobHeartbeat } from "@/features/live-status/heartbeat";
 import { isBearerAuthorized } from "@/shared/http/bearer-auth";
@@ -15,7 +16,13 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
   try {
-    return NextResponse.json({ success: true, result: await runCustomerWaitingSweep() });
+    const result = await runCustomerWaitingSweep();
+    // Pós-venda R0 (cliente que volta a escrever): mesma cadência, desligada por empresa por padrão.
+    const postSaleR0 = await runPostSaleR0Sweep().catch((error) => {
+      console.error("[post-sale-r0 cron] failed", error instanceof Error ? error.message : "unknown_error");
+      return null;
+    });
+    return NextResponse.json({ success: true, result, postSaleR0 });
   } catch (error) {
     console.error("[customer-waiting cron] failed", error instanceof Error ? error.message : "unknown_error");
     return NextResponse.json({ success: false, error: "Customer waiting sweep unavailable" }, { status: 500 });

@@ -23,6 +23,16 @@ export function answerChips(input: { status: string; outcome: string | null; rat
   const chips: AnswerChip[] = [];
   const answers = input.answers;
   if (answers.optOut === true || input.status === "opted_out") return [{ label: "Pediu para parar", tone: "neutral" }];
+  const r0 = answers.r0 && typeof answers.r0 === "object" && !Array.isArray(answers.r0) ? answers.r0 as Record<string, unknown> : null;
+  if (r0) {
+    const r0Chips: AnswerChip[] = [{ label: "Voltou a escrever", tone: "neutral" }];
+    if (r0.category === "not_attended") r0Chips.push({ label: "Não foi atendido", tone: "bad" });
+    else if (r0.category === "wants_more") r0Chips.push({ label: "Quer ajuda", tone: "bad" });
+    else if (r0.category === "closed_or_gave_up") r0Chips.push(r0.closedKind === "gave_up" ? { label: "Desistiu", tone: "neutral" } : { label: "Já fechou", tone: "neutral" });
+    else if (r0.category === "other_subject") r0Chips.push({ label: "Outro assunto", tone: "neutral" });
+    if (typeof r0.escalatedAt === "string") r0Chips.push({ label: "Sem resposta da equipe", tone: "bad" });
+    return r0Chips;
+  }
   if (typeof answers.contacted === "boolean") chips.push(answers.contacted ? { label: "Foi atendido", tone: "good" } : { label: "Não foi atendido", tone: "bad" });
   const rating = input.rating ?? (typeof answers.rating === "number" ? answers.rating : null);
   if (rating !== null) chips.push({ label: `Nota ${rating}/5`, tone: rating <= 2 ? "bad" : rating >= 4 ? "good" : "neutral" });

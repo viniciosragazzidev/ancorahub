@@ -8,7 +8,7 @@ import { z } from "zod";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { enqueueMetaTemplateMessage, enqueuePostSaleSurveyWahaMessage } from "@/features/communication-channels/outbound-service";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
-import { getFeatureFlag } from "@/features/system-settings/queries";
+import { getFeatureFlag, getSystemSetting, setSystemSetting } from "@/features/system-settings/queries";
 import { isBusinessHours, nextBusinessOpening } from "@/features/team-notices/guard";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -18,6 +18,7 @@ import type { PostSaleBrokerReportRow } from "./reporting";
 import { firstName, findUnknownPostSaleOpeningVariables, renderPostSaleOpeningMessage } from "./rules";
 import { postSaleAudienceSchema, POST_SALE_CAMPAIGN_MAX_LEADS } from "./rules";
 import { resolvePostSaleAudience } from "./audience";
+import { parseR0Settings, postSaleR0SettingKey, serializeR0Settings, type R0Settings } from "./r0-rules";
 import { POST_SALE_META_TEMPLATE, POST_SALE_WAHA_OPENING_DEFAULT } from "./template-contract";
 
 const campaignInput = z.object({
@@ -328,6 +329,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30): P
   report: PostSaleBrokerReportRow[];
   alerts: Awaited<ReturnType<typeof loadPostSaleOpenAlerts>>;
   periodDays: number;
+  r0: R0Settings & { canEdit: boolean };
 }>> {
   try {
     const context = await authorizedContext();
@@ -335,6 +337,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30): P
     const window = postSaleWindow(periodDays);
     const db = getDatabase();
     const branchFilter = context.role === "manager" ? context.branchId : undefined;
+    const r0Settings = parseR0Settings(await getSystemSetting(postSaleR0SettingKey(context.tenantId)).catch(() => null));
     const [brokers, queues, campaigns, responses, report, alerts] = await Promise.all([
       db.select({ id: schema.tenantMemberships.userId, name: schema.user.name }).from(schema.tenantMemberships)
         .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
@@ -365,6 +368,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30): P
       report,
       alerts,
       periodDays,
+      r0: { ...r0Settings, canEdit: context.role === "director" },
     } };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };
@@ -450,6 +454,36 @@ export async function getPostSaleSurveyMessagesAction(rawSurveyId: unknown): Pro
         fromAssistant: row.senderRole === "assistant" || row.senderRole === "system",
       }))
       .filter((row) => row.body) };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+const r0SettingsInput = z.object({
+  enabled: z.boolean(),
+  queueIds: z.array(z.string().trim().min(1).max(80)).max(100),
+});
+
+/**
+ * Liga ou desliga a R0 (cliente que volta a escrever) e escolhe as filas do piloto. Só diretor.
+ * Fica em system_settings (`post_sale_r0_<tenantId>`), desligada por padrão.
+ */
+export async function savePostSaleR0SettingsAction(raw: unknown): Promise<ActionResult<R0Settings>> {
+  try {
+    const context = await authorizedContext();
+    if (context.role !== "director") throw new PostSaleActionError("Apenas diretores podem ligar a regra do cliente que volta a escrever.");
+    const input = r0SettingsInput.parse(raw);
+    const queueIds = [...new Set(input.queueIds)];
+    if (input.enabled && !queueIds.length) throw new PostSaleActionError("Escolha pelo menos uma fila para o piloto.");
+    if (queueIds.length) {
+      const found = await getDatabase().select({ id: schema.leadQueues.id }).from(schema.leadQueues)
+        .where(and(eq(schema.leadQueues.tenantId, context.tenantId), inArray(schema.leadQueues.id, queueIds), isNull(schema.leadQueues.deletedAt)));
+      if (found.length !== queueIds.length) throw new PostSaleActionError("Uma das filas escolhidas não existe mais. Atualize a página.");
+    }
+    const settings: R0Settings = { enabled: input.enabled, queueIds };
+    await setSystemSetting(postSaleR0SettingKey(context.tenantId), serializeR0Settings(settings));
+    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_rule", entityId: "R0", action: "post_sale.r0.settings_updated", metadata: { enabled: settings.enabled, queueCount: queueIds.length } });
+    return { ok: true, data: settings };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };
   }

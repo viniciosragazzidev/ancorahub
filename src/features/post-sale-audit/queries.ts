@@ -53,6 +53,7 @@ export async function loadPostSaleBrokerReport(context: TenantContext, window: P
       rating: schema.postSaleSurveys.rating,
       answers: schema.postSaleSurveys.answers,
       alertsHandledAt: schema.postSaleSurveys.alertsHandledAt,
+      ruleKey: schema.postSaleSurveys.ruleKey,
     })
       .from(schema.postSaleSurveys)
       .innerJoin(schema.leads, and(eq(schema.leads.id, schema.postSaleSurveys.leadId), eq(schema.leads.tenantId, schema.postSaleSurveys.tenantId)))
@@ -83,6 +84,7 @@ export async function loadPostSaleBrokerReport(context: TenantContext, window: P
     rating: survey.rating,
     answers: survey.answers,
     alertsHandledAt: survey.alertsHandledAt,
+    ruleKey: survey.ruleKey,
   }));
   return aggregatePostSaleBrokerReport({ brokers: identities, surveys, from: window.from, to: window.to });
 }
@@ -117,6 +119,7 @@ export async function loadPostSaleBrokerSummary(context: TenantContext, brokerId
     closed: 0,
     noContact: 0,
     openAlerts: 0,
+    customerReturned: 0,
   };
 }
 
@@ -145,7 +148,8 @@ export async function loadPostSaleOpenAlerts(context: TenantContext): Promise<Po
       isNull(schema.postSaleSurveys.alertsHandledAt),
       isNull(schema.leads.deletedAt),
       or(
-        inArray(schema.postSaleSurveys.outcome, ["no_contact", "bad_service"]),
+        inArray(schema.postSaleSurveys.outcome, ["no_contact", "bad_service", "r0_not_attended"]),
+        sql`${schema.postSaleSurveys.answers}->'r0'->>'escalatedAt' is not null`,
         sql`${schema.postSaleSurveys.rating} <= 2`,
         sql`${schema.postSaleSurveys.answers}->>'sentiment' = 'negative'`,
         sql`${schema.postSaleSurveys.answers}->>'wantsHelp' = 'true'`,

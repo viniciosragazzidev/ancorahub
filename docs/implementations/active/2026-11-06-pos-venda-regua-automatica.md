@@ -64,10 +64,11 @@ Fluxo da IA (mesmo motor de pesquisa, roteiro próprio `rule_key = R0`, uma perg
 1. Acolhe e situa: "Oi, {nome}! Vi que você já conversou com {corretor} sobre o plano {tipo}. Me conta o que rolou: você chegou a ser atendido e receber a cotação?"
 2. Lê a resposta e classifica: (a) não foi atendido ou não recebeu cotação; (b) foi atendido e quer cotação nova, ajuste ou tirar dúvida; (c) já fechou ou desistiu; (d) outro assunto.
 3. Destino:
-   - (a) alerta "Cliente diz que não foi atendido" para a direção e o gestor da unidade, aviso ao corretor com prazo curto (padrão 15 min); sem resposta do corretor, o lead volta para a distribuição com prioridade e o histórico.
-   - (b) avisa o corretor ("{cliente} voltou e quer {pedido}"), confirma ao cliente que o corretor vai retomar; sem resposta do corretor no prazo, mesma escalada de (a).
-   - (c) registra no lead (vendido por fora, desistiu, motivo) e encerra com cordialidade; se desistiu, alimenta o motivo de perda.
-   - (d) responde em 1 frase e encaminha ao corretor.
+   - (a) alerta "Cliente diz que não foi atendido" para a direção e o gestor da unidade; sem resposta de alguém da empresa em 15 min úteis, escalada para a direção.
+   - (b) registra o pedido e confirma ao cliente que a equipe vai retomar; sem resposta no prazo, mesma escalada de (a).
+   - (c) registra no lead (vendido por fora, desistiu, motivo) e encerra com cordialidade.
+   - (d) responde em 1 frase, sem prometer um corretor específico; sem resposta no prazo, mesma escalada.
+   - Mudança do Vinicios (09/11): "Só remova o aviso ao corretor." A R0 não avisa o corretor por nenhum caminho (nada no app, nada no WhatsApp).
 4. Grava tudo no lead (linha do tempo) e no survey; conta no relatório por corretor como "cliente voltou sem resposta".
 
 Proteções: no máximo 1 conversa R0 por lead a cada 7 dias; não dispara se o corretor respondeu nas últimas 2 horas ou se há pesquisa ativa; respeita opt-out; a IA nunca informa preço. Usa o canal por onde o cliente escreveu (no Meta já dentro da janela de 24h aberta pelo cliente, então texto livre).
@@ -75,6 +76,22 @@ Proteções: no máximo 1 conversa R0 por lead a cada 7 dias; não dispara se o 
 Relação com o "cliente aguardando corretor" (`da7b7668`, reprovado pelo Vigia em 05/11): a R0 substitui o lembrete passivo ao corretor por uma conversa com o cliente; o alerta ao corretor e a escalada reaproveitam aquele trabalho depois de corrigidos os bloqueios (corrida com o timeout de 15 min, job que pode duplicar, envio falho contando como respondido).
 
 Entrega: Fase 4a, antes da R1, porque o problema acontece hoje com leads quentes. Piloto em uma fila, com a direção recebendo os alertas.
+
+### Implementação da R0 (09/11/2026, branch `feat/pos-venda-r0`)
+
+- **Chave e piloto:** Equipe > Pós-venda, cartão "Cliente voltou a escrever". O diretor liga ou desliga e marca as filas do piloto; gestor só vê. Fica em `system_settings`, chave `post_sale_r0_<tenantId>` com `{"enabled":true,"queueIds":[...]}`. Ausente = desligada. Ligada sem fila não dispara. Também exige a flag global `feature_post_sale_audit_enabled`. Sem tabela nova e sem migration.
+- **Onde roda:** dentro do job existente `/api/internal/jobs/customer-waiting` (a cada 5 min), depois da varredura do "cliente aguardando", com lease próprio (`post-sale-r0`). Falha da R0 não derruba o job. Nenhum job novo para cadastrar.
+- **Gatilho** (`r0-rules.ts`, `decideR0Trigger`): reaproveita `loadCustomerWaitingLeads` (ciclo aberto, minutos úteis de espera). Dispara com 10 min úteis sem resposta humana, ou na hora quando a última mensagem humana foi de encerramento ("Encerrando o atendimento", "vou encerrar", "atendimento finalizado"). Lead em `distributed`, `in_contact`, `quote_sent`, `negotiation` ou `awaiting_reply`, com `distribution_status = assigned`, numa fila do piloto. Não dispara: dono diretor, corretor respondeu nas últimas 2 h (a mensagem de encerramento não conta), pesquisa ativa (queued, sent, answering), opt-out (pós-venda ou conversa), R0 nos últimos 7 dias, fora do horário comercial, mensagem do cliente com mais de 23 h (janela do Meta) ou canal indisponível.
+- **Canal:** o mesmo da última mensagem do cliente. Número oficial Meta compartilhado da empresa (texto livre, `enqueueMetaTextMessage`) ou WAHA da empresa permitido para a unidade do lead. WhatsApp pessoal do corretor fica de fora (`source_unavailable`).
+- **Idempotência:** uma campanha automática por empresa e dia (`kind = auto`, `rule_key = R0`, id derivado de empresa + dia). Survey com id derivado de empresa + lead + mensagem que disparou, `rule_key = R0`, inserido antes do envio; conflito = já iniciado. Chave do outbox `post-sale:<campanha>:<lead>`, a mesma que o retorno de entrega usa para marcar `sent`.
+- **Conversa:** a resposta do cliente chega pelo roteamento existente (`handlePostSaleInbound`). Survey R0 vai para `processR0Answer`: IA (`interpreter`, `sensitive`) classifica em (a) `not_attended`, (b) `wants_more`, (c) `closed_or_gave_up` (fechou por fora ou desistiu), (d) `other_subject`; se falhar, `classifyR0AnswerByKeywords`. Uma resposta só: grava `answers.r0`, `outcome` (`r0_not_attended`, `r0_wants_more`, `r0_closed_elsewhere`, `r0_gave_up`, `r0_other`) e responde com texto fixo, sem preço e sem citar corretor. Opt-out explícito usa a mesma transação de opt-out da pesquisa.
+- **Alertas e escalada:** (a) gera na hora o alerta "Cliente diz que não foi atendido" para diretores e gestor da unidade (notificação in-app pelo `ensurePostSaleSurveyAlerts`). Em (a), (b) e (d) a varredura confere, a cada 5 min, se alguém da empresa respondeu depois da resposta do cliente: respondeu = `resolvedAt`; 15 min úteis sem resposta = `escalatedAt`, alerta "Cliente voltou a escrever e ficou 15 min sem resposta da equipe" para a direção e o gestor, e nota no lead.
+- **Redistribuição: não feita automaticamente.** A distribuição nunca tira um lead já aceito do corretor (mesma regra do SLA em `leads/sla.ts`; `processQueuedLead` não roda para lead aceito ou em atendimento). Mudar isso mexe no núcleo da distribuição, então a escalada só alerta a direção, que repassa pelo fluxo de transferência existente a partir do alerta ("Abrir lead").
+- **Registro:** nota na linha do tempo ao iniciar, ao concluir (resumo com destino, pedido e motivo) e ao escalar; auditoria `post_sale.r0.started` e `post_sale.r0.escalated`. "Desistiu" fica registrado com o motivo na nota e no survey; o lead não é marcado como perdido automaticamente.
+- **Relatório:** coluna "Voltou sem resposta" no relatório por corretor (conversas R0 no período). Survey R0 fica fora de enviadas, respondidas, atendimento, nota e fechou; alertas abertos da R0 contam em "Alertas abertos". Respostas mostram os chips "Voltou a escrever" e o destino.
+- **Lembrete:** R0 não recebe o lembrete de 24 h da pesquisa (no Meta seria o template); sem resposta em 24 h úteis, encerra como `no_reply`.
+- **Soma com o manual:** uma R0 conta como pesquisa recente para a campanha manual (proteção de 60 dias já existente).
+- Validação: Vitest de pós-venda, cliente aguardando, canais e inbound WAHA; `tsc --noEmit` limpo; ESLint sem erros nos arquivos tocados. Nenhum banco acessado e nada enviado.
 
 ## Motor automático
 

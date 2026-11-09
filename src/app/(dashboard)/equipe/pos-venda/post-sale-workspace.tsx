@@ -22,6 +22,7 @@ import { POST_SALE_ALERT_REASON_LABELS } from "@/features/post-sale-audit/alert-
 import { POST_SALE_WAHA_OPENING_DEFAULT } from "@/features/post-sale-audit/template-contract";
 import { paginate } from "@/features/post-sale-audit/responses-view";
 import { Pager, PostSaleResponses } from "./post-sale-responses";
+import { PostSaleR0Settings } from "./post-sale-r0-settings";
 
 type WorkspaceData = Extract<Awaited<ReturnType<typeof getPostSaleWorkspaceAction>>, { ok: true }>['data'];
 type AudienceKind = "broker" | "queue" | "period" | "leadIds";
@@ -134,12 +135,12 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
           </CardHeader>
           <CardContent>
             {data.report.length ? <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-left text-sm">
+              <table className="w-full min-w-[1000px] text-left text-sm">
                 <thead><tr className="border-b border-border text-xs text-muted-foreground">
-                  <th className="px-2 py-2 font-medium">Corretor</th><th className="px-2 py-2 font-medium">Enviadas</th><th className="px-2 py-2 font-medium">Respondidas</th><th className="px-2 py-2 font-medium">Foi atendido</th><th className="px-2 py-2 font-medium">Nota média</th><th className="px-2 py-2 font-medium">Fechou</th><th className="px-2 py-2 font-medium">Sem contato</th><th className="px-2 py-2 font-medium">Alertas abertos</th>
+                  <th className="px-2 py-2 font-medium">Corretor</th><th className="px-2 py-2 font-medium">Enviadas</th><th className="px-2 py-2 font-medium">Respondidas</th><th className="px-2 py-2 font-medium">Foi atendido</th><th className="px-2 py-2 font-medium">Nota média</th><th className="px-2 py-2 font-medium">Fechou</th><th className="px-2 py-2 font-medium">Sem contato</th><th className="px-2 py-2 font-medium">Voltou sem resposta</th><th className="px-2 py-2 font-medium">Alertas abertos</th>
                 </tr></thead>
                 <tbody>{paginate([...data.report].sort((a, b) => b.responded - a.responded || b.sent - a.sent || a.brokerName.localeCompare(b.brokerName)), reportPage).items.map((row) => <tr key={row.brokerId} className="border-b border-border/60 last:border-0">
-                  <th scope="row" className="px-2 py-3 font-medium">{row.brokerName}</th><td className="px-2 py-3 tabular-nums">{row.sent}</td><td className="px-2 py-3 tabular-nums">{row.responded}</td><td className="px-2 py-3">{row.attendancePercent === null ? "Sem respostas" : `${row.attendancePercent}%`}</td><td className="px-2 py-3">{row.averageRating === null ? "Sem notas" : `${row.averageRating}/5`}</td><td className="px-2 py-3">{row.closePercent === null ? "Sem respostas" : `${row.closePercent}%`}</td><td className="px-2 py-3 tabular-nums">{row.noContact}</td><td className="px-2 py-3 tabular-nums">{row.openAlerts}</td>
+                  <th scope="row" className="px-2 py-3 font-medium">{row.brokerName}</th><td className="px-2 py-3 tabular-nums">{row.sent}</td><td className="px-2 py-3 tabular-nums">{row.responded}</td><td className="px-2 py-3">{row.attendancePercent === null ? "Sem respostas" : `${row.attendancePercent}%`}</td><td className="px-2 py-3">{row.averageRating === null ? "Sem notas" : `${row.averageRating}/5`}</td><td className="px-2 py-3">{row.closePercent === null ? "Sem respostas" : `${row.closePercent}%`}</td><td className="px-2 py-3 tabular-nums">{row.noContact}</td><td className="px-2 py-3 tabular-nums">{row.customerReturned}</td><td className="px-2 py-3 tabular-nums">{row.openAlerts}</td>
                 </tr>)}</tbody>
               </table>
               <Pager page={paginate(data.report, reportPage).page} pages={paginate(data.report, reportPage).pages} onChange={setReportPage} label="corretores" />
@@ -156,6 +157,8 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
             </div>) : <p className="rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-muted-foreground">Nenhum alerta aberto.</p>}
           </CardContent>
         </Card>
+
+        <PostSaleR0Settings initial={data.r0} queues={data.queues} />
 
         <Card>
           <CardHeader>

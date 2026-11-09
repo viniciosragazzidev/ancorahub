@@ -18,8 +18,8 @@ describe("post-sale broker report aggregation", () => {
     });
 
     expect(report).toEqual([
-      { brokerId: "broker-1", brokerName: "Ana", sent: 3, responded: 2, attendancePercent: 50, attendanceAnswered: 2, attended: 1, averageRating: 3, closePercent: 50, closeAnswered: 2, closed: 1, noContact: 1, openAlerts: 1 },
-      { brokerId: "broker-2", brokerName: "Bia", sent: 0, responded: 0, attendancePercent: null, attendanceAnswered: 0, attended: 0, averageRating: null, closePercent: null, closeAnswered: 0, closed: 0, noContact: 0, openAlerts: 0 },
+      { brokerId: "broker-1", brokerName: "Ana", sent: 3, responded: 2, attendancePercent: 50, attendanceAnswered: 2, attended: 1, averageRating: 3, closePercent: 50, closeAnswered: 2, closed: 1, noContact: 1, openAlerts: 1, customerReturned: 0 },
+      { brokerId: "broker-2", brokerName: "Bia", sent: 0, responded: 0, attendancePercent: null, attendanceAnswered: 0, attended: 0, averageRating: null, closePercent: null, closeAnswered: 0, closed: 0, noContact: 0, openAlerts: 0, customerReturned: 0 },
     ]);
   });
 
@@ -46,5 +46,18 @@ describe("post-sale broker report aggregation", () => {
       to,
     });
     expect(report[0]).toMatchObject({ sent: 1, responded: 1, attendanceAnswered: 0, attendancePercent: null, noContact: 1, openAlerts: 1 });
+  });
+
+  it("counts R0 conversations apart, as client who came back without an answer", () => {
+    const report = aggregatePostSaleBrokerReport({
+      brokers: [{ id: "broker-1", name: "Ana" }],
+      surveys: [
+        { brokerId: "broker-1", sentAt: new Date("2026-10-10T12:00:00.000Z"), lastReplyAt: new Date("2026-10-10T12:05:00.000Z"), outcome: "r0_not_attended", rating: null, answers: { r0: { category: "not_attended" } }, alertsHandledAt: null, ruleKey: "R0" },
+        { brokerId: "broker-1", sentAt: new Date("2026-10-11T12:00:00.000Z"), lastReplyAt: null, outcome: null, rating: null, answers: {}, alertsHandledAt: null, ruleKey: "R0" },
+      ],
+      from,
+      to,
+    });
+    expect(report[0]).toMatchObject({ sent: 0, responded: 0, noContact: 0, customerReturned: 2, openAlerts: 1 });
   });
 });
