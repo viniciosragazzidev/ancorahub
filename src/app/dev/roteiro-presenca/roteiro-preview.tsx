@@ -16,7 +16,7 @@ import styles from "./roteiro.module.css";
  * Parâmetros para prints: ?aparelho=celular|computador&passo=…&erro=…&modo=online|presencial&limpo=1
  */
 type Mode = "online" | "presencial";
-type Screen = "cartao" | "retomar" | "fim" | GuideStep | "telainicial-aberto" | "codigo-copiado";
+type Screen = "cartao" | "retomar" | "fim" | GuideStep | "codigo-copiado";
 type Sim = "expirado" | "espera" | "falhou" | "recusado" | "demorando" | "naoabriu" | "copia" | "instavel" | "desconectou" | "atrasado" | "confirmar-erro";
 
 const CODE_A = "K7QM2XPD";
@@ -31,7 +31,6 @@ const SCREENS: { id: Screen; label: string }[] = [
   { id: "codigo", label: "2. Código" },
   { id: "codigo-copiado", label: "2. Copiado" },
   { id: "telainicial", label: "3. Tela inicial" },
-  { id: "telainicial-aberto", label: "3. Tela inicial (voltou)" },
   { id: "caminho", label: "4. Caminho" },
   { id: "esperando", label: "5. Esperando" },
   { id: "conectado", label: "6. Conectado" },
@@ -72,7 +71,6 @@ function setupFor(screen: Screen, sim: Sim | null, device: GuideDevice): Setup {
     case "codigo": step("codigo"); break;
     case "codigo-copiado": step("codigo"); preview.copied = true; break;
     case "telainicial": step("telainicial"); break;
-    case "telainicial-aberto": step("telainicial"); preview.openedHome = true; break;
     case "caminho": step("caminho"); break;
     case "esperando": step("esperando"); break;
     case "conectado": connected(); break;
@@ -86,7 +84,7 @@ function setupFor(screen: Screen, sim: Sim | null, device: GuideDevice): Setup {
     case "falhou": step("codigo"); facts.code = null; facts.issue = "O WhatsApp demorou para liberar o código."; break;
     case "recusado": step("esperando"); facts.phase = "error"; break;
     case "demorando": step("esperando"); facts.phase = "pairing"; facts.stalled = true; break;
-    case "naoabriu": step("telainicial"); preview.local = "notOpened"; break;
+    case "naoabriu": step("caminho"); preview.local = "notOpened"; break;
     case "copia": step("codigo"); preview.local = "copyBlocked"; break;
     case "instavel": step("esperando"); facts.connectivity = "unreachable"; break;
     case "desconectou": step("boasvindas"); facts.started = false; facts.code = null; reconnect = true; break;
@@ -206,8 +204,8 @@ export function RoteiroPresencaPreview() {
         onFinish: () => apply("fim", null, device),
       }}
       onClose={() => apply("retomar", null, device)}
-      // Simulação: o primeiro "Abrir o WhatsApp" é o da tela inicial; do segundo em diante, conecta depois de 4 s.
-      openWhatsApp={() => { opens.current += 1; if (opens.current >= 2) later(4_000, connect); }}
+      // Simulação: o WhatsApp abre no fim do tutorial e conecta depois de 4 s.
+      openWhatsApp={() => { opens.current += 1; later(4_000, connect); }}
       preview={setup.preview}
     />
   );
@@ -234,7 +232,7 @@ export function RoteiroPresencaPreview() {
           <aside className={styles.panel} aria-label="Controles do protótipo">
             <div>
               <div className={styles.panelTitle}>Roteiro de presença · protótipo</div>
-              <p className={styles.panelHint}>Mesmo componente do app, com a conexão simulada. No fluxo, o segundo &quot;Abrir o WhatsApp&quot; conecta depois de 4 s (no computador, 6 s depois de começar).</p>
+              <p className={styles.panelHint}>Mesmo componente do app, com a conexão simulada. No fluxo, &quot;Abrir o WhatsApp&quot; conecta depois de 4 s (no computador, 6 s depois de começar).</p>
             </div>
             <Group label="Aparelho">
               <Chip on={device === "mobile"} onClick={() => { setDevice("mobile"); apply(setup.screen, sim, "mobile"); }}>Celular</Chip>

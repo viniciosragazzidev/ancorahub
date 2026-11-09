@@ -266,15 +266,15 @@ export const PRESENCE_GUIDE_COPY = {
     cta: "Copiar código",
     next: "Continuar",
   },
+  // Tutorial antes de abrir (09/11): primeiro o que fazer no WhatsApp; ele só abre no fim do caminho.
   home: {
-    title: "Abra o WhatsApp e confira se está na tela Conversas.",
-    sub: "Se ele abrir dentro de uma conversa, toque na seta ← no canto de cima até ver a lista Conversas.",
+    title: "Antes de abrir o WhatsApp, veja o que fazer lá. Primeiro: comece pela tela Conversas.",
+    sub: "Se o WhatsApp abrir dentro de uma conversa, toque na seta ← no canto de cima até ver a lista Conversas.",
     captions: { android: "Toque na seta ←, em cima à esquerda, até aparecer Conversas.", iphone: "Toque em ‹ Voltar, em cima à esquerda, até aparecer Conversas." },
-    open: "Abrir o WhatsApp",
-    cta: "Estou na tela de Conversas",
+    cta: "Entendi, próximo passo",
   },
   path: {
-    title: "Agora, no WhatsApp, você vai tocar em 4 lugares. Veja:",
+    title: "Depois, na tela Conversas, você vai tocar em 4 lugares. Veja:",
     sub: (n: number) => `Toque ${n} de 4`,
     steps: {
       android: ["Na tela Conversas, toque nos três pontinhos, em cima.", "Toque em Dispositivos conectados.", "Toque em Conectar dispositivo.", "Embaixo, toque em Conectar com número de telefone e cole o código."],

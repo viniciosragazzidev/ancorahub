@@ -62,7 +62,7 @@ export type PresenceGuidePresence = {
 };
 
 /** Só para o protótipo (/dev/roteiro-presenca) e testes: abre direto numa etapa ou estado. */
-export type PresenceGuidePreview = { step?: GuideStep; scene?: number; local?: LocalIssue | null; copied?: boolean; sheet?: "ajuda" | "sair" | "abrir" | null; platform?: GuidePlatform; openedHome?: boolean };
+export type PresenceGuidePreview = { step?: GuideStep; scene?: number; local?: LocalIssue | null; copied?: boolean; sheet?: "ajuda" | "sair" | "abrir" | null; platform?: GuidePlatform };
 
 export function PresenceGuide({ device, connection, duty, presence, onClose, openWhatsApp, preview }: {
   device: GuideDevice;
@@ -84,7 +84,6 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   const [sheet, setSheet] = React.useState<"ajuda" | "sair" | "abrir" | null>(preview?.sheet ?? null);
   // O que fazer depois de abrir o WhatsApp pelo aviso "Quando o WhatsApp abrir" (seguir para a próxima etapa).
   const afterOpen = React.useRef<(() => void) | null>(null);
-  const [openedHome, setOpenedHome] = React.useState(preview?.openedHome ?? false);
   const [video, setVideo] = React.useState(false);
   const [showSteps, setShowSteps] = React.useState(false);
   const notOpenedTimer = React.useRef<number | null>(null);
@@ -202,11 +201,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
     switch (error) {
       case "expired": case "cooldown": case "issue": case "stalled": regenerate(); return;
       case "rejected": setLocal(null); setLocalStep("numero"); return;
-      case "notOpened":
-        setLocal(null);
-        if (localStep === "telainicial") setOpenedHome(true);
-        else setLocalStep("esperando");
-        return;
+      case "notOpened": setLocal(null); setLocalStep("esperando"); return;
       case "copyBlocked": setLocal(null); setLocalStep("telainicial"); return;
       case "unstable": case "confirm": presence.onConfirm(); return;
       default:
@@ -319,9 +314,9 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
             </div>
           </>
         );
-        cta$ = openedHome
-          ? <button type="button" className={styles.cta} onClick={() => { setScene(0); setLocalStep("caminho"); }}>{COPY.home.cta}</button>
-          : <button type="button" className={styles.cta} data-tone="whatsapp" onClick={() => askToOpenWhatsApp(() => setOpenedHome(true))}><WaIcon light /> {COPY.home.open}</button>;
+        // Tutorial antes de sair do app (09/11): a tela inicial e os 4 toques aparecem primeiro; o WhatsApp só
+        // abre uma vez, no fim do caminho.
+        cta$ = <button type="button" className={styles.cta} onClick={() => { setScene(0); setLocalStep("caminho"); }}>{COPY.home.cta}</button>;
         break;
       case "caminho":
         scene$ = (

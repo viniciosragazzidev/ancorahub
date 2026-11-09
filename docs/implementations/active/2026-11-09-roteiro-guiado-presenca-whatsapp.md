@@ -320,3 +320,13 @@ Pedido do Vinicios: "Abrir o WhatsApp" não abria o app; e, antes de abrir, most
   cima à direita (no iPhone, Configurações embaixo), com a ilustração do toque. O app abre pelo botão
   "Entendi, abrir o WhatsApp" do aviso (o toque do corretor, que o celular exige para abrir outro app).
 - Continua sem teste em Android e iPhone reais.
+
+## 12. Ajuste de 09/11 (noite): o tutorial vem todo antes de abrir o WhatsApp
+
+Pedido do Vinicios: o tutorial das próximas etapas aparecia depois de abrir o WhatsApp; ele tem de vir antes.
+
+- A etapa "tela inicial" (3 de 7) deixou de abrir o WhatsApp: agora só ensina ("Antes de abrir o WhatsApp, veja o
+  que fazer lá. Primeiro: comece pela tela Conversas.") e segue com "Entendi, próximo passo".
+- O caminho (4 de 7) mostra os 4 toques ("Depois, na tela Conversas, …") e só no fim tem "Abrir o WhatsApp", que
+  mostra o resumo "Quando o WhatsApp abrir:" (tela inicial e 3 pontinhos) e abre o app. O WhatsApp abre uma vez só.
+- "Não abriu?" agora leva direto para a espera.
