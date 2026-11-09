@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, type CSSProperties } from "react";
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 
 import { formatNegotiationMetric } from "./negotiations-data-views";
 import { buildClosingHistoryView, shapeClosingLeads, type ClosingSnapshotLead, type NegotiationSnapshotHistoryRow } from "./negotiation-snapshot-model";
@@ -18,7 +19,7 @@ function MoveList({ title, leads, empty }: { title: string; leads: readonly Clos
       {leads.length ? (
         <ul className={styles.historyMoveList}>
           {leads.map((lead) => (
-            <li key={lead.leadId}><span className={styles.closingName}>{lead.name}</span><span className={styles.closingMeta}> · {lead.brokerName}</span></li>
+            <li key={lead.leadId}><span className={styles.closingName}>{lead.name}</span><span className={styles.closingMeta}> · <BrokerProfileLink brokerId={lead.brokerId} name={lead.brokerName} /></span></li>
           ))}
         </ul>
       ) : <p className={styles.closingHint}>{empty}</p>}

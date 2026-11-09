@@ -1,5 +1,6 @@
 "use client";
 
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import { formatAgo } from "@/components/lite/status/format";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
@@ -69,7 +70,7 @@ function signalText(lead: NegotiationLead) {
 export function createNegotiationLeadColumns(reference: Date): LiteColumn<NegotiationLead>[] {
   return [
     { id: "lead", label: "Lead", primary: true, render: (lead) => <LeadCell lead={lead} /> },
-    { id: "broker", label: "Corretor", secondary: true, nowrap: true, render: (lead) => <span title={lead.brokerName}>{lead.brokerName}</span> },
+    { id: "broker", label: "Corretor", secondary: true, nowrap: true, render: (lead) => <span title={lead.brokerName}><BrokerProfileLink brokerId={lead.brokerId} name={lead.brokerName} /></span> },
     { id: "stage", label: "Etapa e nível", render: (lead) => <span className={styles.stageCell}><LevelBadge level={lead.level} customerWaiting={lead.customerWaiting} /><span className={styles.muted}>{statusLabel(lead.status)}</span></span> },
     { id: "stopped", label: "Parado há", numeric: true, render: (lead) => lead.lastExchangeAt ? formatAgo(reference.getTime() - new Date(lead.lastExchangeAt).getTime()) : "Sem troca" },
     { id: "signals", label: "Sinais", render: (lead) => <span className={styles.tableText} title={signalText(lead)}>{signalText(lead)}</span> },
@@ -79,7 +80,7 @@ export function createNegotiationLeadColumns(reference: Date): LiteColumn<Negoti
 
 export function NegotiationStatsView({ brokerStats, dailyStats, aiHealth, counts }: { brokerStats: NegotiationBrokerStats[]; dailyStats: NegotiationDayStats[]; aiHealth: NegotiationsDashboardData["aiHealth"]; counts: NegotiationsDashboardData["counts"] }) {
   const brokerColumns: LiteColumn<NegotiationBrokerStats>[] = [
-    { id: "broker", label: "Corretor", primary: true, render: (row) => row.brokerName },
+    { id: "broker", label: "Corretor", primary: true, render: (row) => <BrokerProfileLink brokerId={row.brokerId} name={row.brokerName} /> },
     { id: "total", label: "Leads ativos", numeric: true, render: (row) => formatNegotiationMetric(row.total) },
     { id: "closing", label: "Fechamento", numeric: true, render: (row) => formatNegotiationMetric(row.levels.closing) },
     { id: "advanced", label: "Avançada", numeric: true, render: (row) => formatNegotiationMetric(row.levels.advanced) },

@@ -5,6 +5,7 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getPostSaleWorkspaceAction, previewPostSaleAudienceAction } from "@/features/post-sale-audit/actions";
 import { POST_SALE_CAMPAIGN_MAX_LEADS, postSaleAudienceSchema, type PostSaleAudience } from "@/features/post-sale-audit/rules";
+import { BrokerProfileViewerProvider } from "@/components/broker-profile-link";
 import { PostSaleWorkspace } from "./post-sale-workspace";
 
 type PostSaleSearchParams = Promise<{ period?: string; leadIds?: string | string[] }>;
@@ -46,5 +47,9 @@ export default async function PostSalePage({ searchParams }: { searchParams: Pos
       }
     }
   }
-  return <PostSaleWorkspace initialData={initial.data} initialAudience={initialAudience} initialPreview={initialPreview} initialFeedback={initialFeedback} />;
+  return (
+    <BrokerProfileViewerProvider viewerRole={context.role}>
+      <PostSaleWorkspace initialData={initial.data} initialAudience={initialAudience} initialPreview={initialPreview} initialFeedback={initialFeedback} />
+    </BrokerProfileViewerProvider>
+  );
 }

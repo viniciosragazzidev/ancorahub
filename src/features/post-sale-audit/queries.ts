@@ -14,6 +14,8 @@ export type PostSaleOpenAlert = {
   leadId: string;
   leadName: string;
   brokerName: string;
+  /** Corretor da pesquisa: o nome vira link para o perfil dele. */
+  brokerId?: string | null;
   reasons: ReturnType<typeof postSaleAlertReasons>;
   occurredAt: string;
 };
@@ -131,6 +133,7 @@ export async function loadPostSaleOpenAlerts(context: TenantContext): Promise<Po
     surveyId: schema.postSaleSurveys.id,
     leadId: schema.postSaleSurveys.leadId,
     leadName: schema.leads.nome,
+    brokerId: schema.postSaleSurveys.brokerId,
     brokerName: schema.user.name,
     outcome: schema.postSaleSurveys.outcome,
     rating: schema.postSaleSurveys.rating,
@@ -164,7 +167,7 @@ export async function loadPostSaleOpenAlerts(context: TenantContext): Promise<Po
     const reasons = postSaleAlertReasons(row);
     if (!reasons.length) return [];
     const occurredAt = row.lastReplyAt ?? row.completedAt ?? row.sentAt ?? row.createdAt;
-    return [{ surveyId: row.surveyId, leadId: row.leadId, leadName: row.leadName ?? "Lead", brokerName: row.brokerName ?? "Sem corretor", reasons, occurredAt: occurredAt.toISOString() }];
+    return [{ surveyId: row.surveyId, leadId: row.leadId, leadName: row.leadName ?? "Lead", brokerName: row.brokerName ?? "Sem corretor", brokerId: row.brokerName ? row.brokerId : null, reasons, occurredAt: occurredAt.toISOString() }];
   });
 }
 

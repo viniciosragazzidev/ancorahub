@@ -1,5 +1,6 @@
 "use client";
 
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { AlertTriangle, ArrowRight, Sparkles } from "lucide-react";
 
 import { formatAgo } from "@/components/lite/status/format";
@@ -54,7 +55,7 @@ export function NegotiationLeadSituation({ lead, now }: { lead: NegotiationLead;
         <div><dt>Agora</dt><dd data-tone={lead.customerWaiting ? "waiting" : undefined}>{replyOwedLabel(lead)}</dd></div>
         <div><dt>Última troca</dt><dd>{lastExchange ?? "Sem troca recente"}</dd></div>
         {lead.waiting ? <div><dt>Espera do cliente</dt><dd data-tone="waiting">{formatBusinessMinutes(lead.waiting.waitingBusinessMinutes)} úteis<span className={styles.factHint}> · {waitingStepText(lead.waiting)} (observação)</span></dd></div> : null}
-        <div><dt>Corretor</dt><dd>{lead.brokerName}{lead.branchName ? <span className={styles.factHint}> · {lead.branchName}</span> : null}</dd></div>
+        <div><dt>Corretor</dt><dd><BrokerProfileLink brokerId={lead.brokerId} name={lead.brokerName} />{lead.branchName ? <span className={styles.factHint}> · {lead.branchName}</span> : null}</dd></div>
       </dl>
       {tags.length ? <div className={styles.tagRow}>{tags.map((tag) => <span key={tag} className={styles.signalTag}>{tag}</span>)}</div> : null}
     </section>

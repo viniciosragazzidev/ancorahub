@@ -1,5 +1,6 @@
 "use client";
 
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { LiteDataTable, type LiteColumn } from "@/components/lite/data/data";
 import { formatLiteDate } from "@/components/lite/format/date";
 import { STAGE_ACTIONS, STEP_NAMES } from "@/features/customer-waiting/domain";
@@ -38,7 +39,7 @@ const columns: LiteColumn<NegotiationWaiting>[] = [
       </span>
     ),
   },
-  { id: "broker", label: "Corretor", secondary: true, nowrap: true, render: (row) => <span title={row.brokerName}>{row.brokerName}</span> },
+  { id: "broker", label: "Corretor", secondary: true, nowrap: true, render: (row) => <span title={row.brokerName}><BrokerProfileLink brokerId={row.brokerId} name={row.brokerName} /></span> },
   { id: "wait", label: "Espera útil", numeric: true, nowrap: true, render: (row) => formatBusinessMinutes(row.waitingBusinessMinutes) },
   { id: "step", label: "O que o sistema faria", render: (row) => <span className={styles.tableText} title={waitingStepText(row)}>{waitingStepText(row)}</span> },
   { id: "status", label: "Etapa no CRM", nowrap: true, render: (row) => LEAD_STATUS_LABELS[row.status] ?? row.status },
