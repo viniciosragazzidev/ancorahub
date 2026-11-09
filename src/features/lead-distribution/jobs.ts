@@ -17,6 +17,7 @@ import { expireOutdatedLeadOffers } from "./offers";
 import { automaticDistributionHoldReason, COLD_HELD_BY_QUEUE_REASON_PREFIX, HELD_DISTRIBUTION_RETRY_MS, distributionRetryDelayMilliseconds, isDeferredDistributionReason, isHeldDistributionReason } from "./domain";
 import { groupByTemperatureRank, type TemperatureRank } from "./temperature-priority";
 import { dutyScheduleBranchCondition, isDutyScheduleBranchCompatible } from "./duty-job-schedule-scope";
+import { BUDGET_RELEASED_CODE, BUDGET_RELEASED_MESSAGE, LEAD_TIMEOUT_CODE, distributionClaimRankSql, distributionWaveRank, plantaoWakeAllowedCondition } from "./job-budget";
 
 const JOB_TYPE = "process_queued_lead";
 
@@ -304,6 +305,10 @@ async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
         ne(schema.leadDistributionJobs.lastErrorCode, "HELD_BY_RULE"),
         sql`${schema.leadDistributionJobs.lastErrorMessage} like 'Lead chegou antes do início deste plantão%'`,
       ),
+      // A lead that just hit the per-lead ceiling keeps its 5-minute pause (see job-budget.ts,
+      // same rule as plantaoWakeKeepsTimeoutPause): woken every run, the same slow leads used
+      // up the budget of every run and the cold wave was never reached (09/11).
+      plantaoWakeAllowedCondition(schema.leadDistributionJobs.lastErrorCode, schema.leadDistributionJobs.runAfter, now),
       eq(schema.unitDutySchedules.status, "active"),
       eq(schema.unitDutySchedules.dayOfWeek, local.weekday),
       lte(schema.unitDutySchedules.startsAt, local.time),
@@ -445,7 +450,8 @@ async function claimNextJob(workerId: string, config: DistributionJobConfig, ten
       // rank order starved cold leads: 100+ hot/warm jobs without an eligible
       // broker are deferred ~2 min and come back due every run, so a cold lead
       // whose broker was free never got claimed (PME 2026-10-06).
-      sql`${schema.leadDistributionJobs.runAfter} + (${leadTemperatureRank()}) * interval '5 minutes'`,
+      // A job handed back by the previous run's budget counts as hot here (job-budget.ts).
+      sql`${schema.leadDistributionJobs.runAfter} + (${distributionClaimRankSql(leadTemperatureRank(), schema.leadDistributionJobs.lastErrorCode)}) * interval '5 minutes'`,
       asc(schema.leadDistributionJobs.createdAt),
     )
     .limit(1);
@@ -468,12 +474,17 @@ async function claimNextJob(workerId: string, config: DistributionJobConfig, ten
   return claimed ? { job: claimed, rank: Number(candidate.rank) as TemperatureRank } : null;
 }
 
-/** Hands a claimed job back untouched (time budget reached): same attempt count, runs again next pass. */
+/**
+ * Hands a claimed job back untouched (time budget reached): same attempt count, runs again next
+ * pass, marked so it goes first next time (09/11: the cold wave was handed back every run).
+ */
 async function releaseJob(jobId: string) {
   const now = new Date();
   await getDatabase().update(schema.leadDistributionJobs).set({
     status: "pending",
     attemptCount: sql`greatest(${schema.leadDistributionJobs.attemptCount} - 1, 0)`,
+    lastErrorCode: BUDGET_RELEASED_CODE,
+    lastErrorMessage: BUDGET_RELEASED_MESSAGE,
     lockedAt: null,
     lockedBy: null,
     leaseExpiresAt: null,
@@ -579,7 +590,8 @@ export async function runLeadDistributionProcessor(input: {
 
   // In waves, hottest first: a colder lead never races a hotter one for the
   // same free broker inside a batch.
-  for (const wave of groupByTemperatureRank(claimedJobs, (claimed) => claimed.rank).map((group) => group.map((claimed) => claimed.job))) {
+  // A job handed back by the previous run's budget goes in the first wave (job-budget.ts).
+  for (const wave of groupByTemperatureRank(claimedJobs, (claimed) => distributionWaveRank(claimed.rank, claimed.job.lastErrorCode)).map((group) => group.map((claimed) => claimed.job))) {
     // 2 at a time: the jobs share a small set of DB sockets (24/10).
     await runWithConcurrency(wave, Math.min(2, wave.length || 1), async (job) => {
       // Offering a lead sends its WhatsApp inline (spacing + humanized WAHA), so one batch could
@@ -613,7 +625,7 @@ export async function runLeadDistributionProcessor(input: {
         if (distribution === "timeout") {
           const trace = readLeadTrace(job.leadId);
           console.error("[lead-distribution] lead_timeout", { leadId: job.leadId, step: trace?.step ?? "unknown", stepAgeMs: trace ? Date.now() - trace.at : null });
-          const failed = await deferOrFailJob(job, effectiveConfig, "LEAD_TIMEOUT", `O processamento passou de ${LEAD_PROCESSING_TIMEOUT_MS / 1000} s na etapa ${trace?.step ?? "desconhecida"}.`, true, new Date(Date.now() + 5 * 60_000));
+          const failed = await deferOrFailJob(job, effectiveConfig, LEAD_TIMEOUT_CODE, `O processamento passou de ${LEAD_PROCESSING_TIMEOUT_MS / 1000} s na etapa ${trace?.step ?? "desconhecida"}.`, true, new Date(Date.now() + 5 * 60_000));
           if (failed) result.failed += 1; else result.deferred += 1;
           return;
         }
