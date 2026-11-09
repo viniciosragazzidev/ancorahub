@@ -38,18 +38,19 @@ describe("distribution job budget: jobs handed back untouched", () => {
       { id: "cold", rank: 2 as const, lastErrorCode: null },
     ];
     const waves = groupByTemperatureRank(jobs, (job) => distributionWaveRank(job.rank, job.lastErrorCode)).map((wave) => wave.map((job) => job.id));
-    expect(waves).toEqual([["hot", "cold-starved"], ["warm"], ["cold"]]);
+    expect(waves).toEqual([["hot"], ["warm", "cold-starved"], ["cold"]]);
   });
 
   it("keeps the temperature order for every other job", () => {
     expect(distributionWaveRank(2, null)).toBe(2);
     expect(distributionWaveRank(1, LEAD_TIMEOUT_CODE)).toBe(1);
     expect(distributionWaveRank(0, BUDGET_RELEASED_CODE)).toBe(0);
+    expect(distributionWaveRank(2, BUDGET_RELEASED_CODE)).toBe(1);
   });
 
-  it("claims a job handed back by the budget as if it were hot", () => {
+  it("claims a job handed back by the budget with the warm ones, never ahead of a hot lead", () => {
     const query = new PgDialect().sqlToQuery(distributionClaimRankSql(sql<number>`2`, schema.leadDistributionJobs.lastErrorCode));
-    expect(query.sql).toBe('case when "lead_distribution_jobs"."last_error_code" = $1 then 0 else 2 end');
+    expect(query.sql).toBe('case when "lead_distribution_jobs"."last_error_code" = $1 then least(2, 1) else 2 end');
     expect(query.params).toEqual([BUDGET_RELEASED_CODE]);
   });
 });

@@ -33,14 +33,15 @@ export function plantaoWakeAllowedCondition(lastErrorCode: SQLWrapper, runAfter:
 }
 
 /**
- * A job handed back by the budget goes in the first wave of the next run (and is claimed
- * with the hot ones), so the same cold lead is not skipped run after run.
+ * A job handed back by the budget moves up to the warm wave of the next run (never ahead of a
+ * hot lead), so the same cold lead is not skipped run after run and new hot leads keep their
+ * place (Vigia, 09/11).
  */
 export function distributionWaveRank(rank: TemperatureRank, lastErrorCode: string | null): TemperatureRank {
-  return lastErrorCode === BUDGET_RELEASED_CODE ? 0 : rank;
+  return lastErrorCode === BUDGET_RELEASED_CODE ? (Math.min(rank, 1) as TemperatureRank) : rank;
 }
 
 /** SQL counterpart of distributionWaveRank for the claim order. */
 export function distributionClaimRankSql(rank: SQL<number>, lastErrorCode: SQLWrapper) {
-  return sql<number>`case when ${lastErrorCode} = ${BUDGET_RELEASED_CODE} then 0 else ${rank} end`;
+  return sql<number>`case when ${lastErrorCode} = ${BUDGET_RELEASED_CODE} then least(${rank}, 1) else ${rank} end`;
 }
