@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createNegotiationsFixture } from "./fixtures";
 import { getNegotiationTimelineAction } from "./actions";
 import { NegotiationsDashboard } from "./negotiations-dashboard";
+import { sortClosingLeads } from "./negotiation-closing-now";
 
 const navigation = vi.hoisted(() => ({ search: "" }));
 
@@ -184,6 +185,51 @@ describe("NegotiationsDashboard", () => {
     expect(screen.getByText("Próximo passo do corretor")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Situação" })).toBeTruthy();
   });
+  it("em fechamento agora: quem o cliente falou por último vem primeiro, com dias na etapa e selo de sem conversa", () => {
+    const data = createNegotiationsFixture("director");
+    const closing = data.leads.filter((lead) => lead.level === "closing");
+    const quiet = { ...closing[0]!, name: "Zuleica Quieta", lastCustomerMessageAt: null, noCrmConversation: true, daysAtStage: 12 };
+    const fresh = { ...closing[1]!, name: "Aurora Recente", lastCustomerMessageAt: data.generatedAt, noCrmConversation: false, daysAtStage: 1 };
+    data.leads = data.leads.map((lead) => lead.id === quiet.id ? quiet : lead.id === fresh.id ? fresh : lead);
+    render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} />);
+    const strip = screen.getByRole("region", { name: /Em fechamento agora/ });
+    const items = within(strip).getAllByRole("button", { name: /em fechamento$/ });
+    expect(items[0]!.textContent).toContain("Aurora Recente");
+    expect(items[0]!.textContent).toContain("1 dia na etapa");
+    expect(sortClosingLeads(data.leads).at(-1)?.name).toBe("Zuleica Quieta");
+    const quietItem = items.find((item) => item.textContent?.includes("Zuleica Quieta"));
+    if (quietItem) {
+      expect(quietItem).toBe(items.at(-1));
+      expect(quietItem.textContent).toContain("12 dias na etapa");
+      expect(quietItem.textContent).toContain("sem conversa no CRM");
+    }
+  });
+
+  it("diretor vê o fechamento dos últimos dias e quem entrou e saiu desde a última foto", () => {
+    const data = createNegotiationsFixture("director");
+    const closing = data.leads.filter((lead) => lead.level === "closing");
+    const kept = closing.slice(1).map((lead) => ({ leadId: lead.id, name: lead.name, brokerId: lead.brokerId, brokerName: lead.brokerName, branchId: lead.branchId, status: lead.status, daysAtStage: lead.daysAtStage }));
+    const gone = { leadId: "gone", name: "Sandra Saiu", brokerId: "b9", brokerName: "Corretor Nove", branchId: null, status: "under_analysis", daysAtStage: 9 };
+    const history = [
+      { day: "2026-10-26", closingLeads: [...kept, gone] },
+      { day: "2026-10-25", closingLeads: kept },
+    ];
+    render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} closingHistory={history} />);
+    const section = screen.getByRole("region", { name: "Fechamento nos últimos dias" });
+    expect(within(section).getAllByRole("listitem").length).toBeGreaterThanOrEqual(3);
+    expect(section.textContent).toContain("agora");
+    expect(section.textContent).toContain("1 entrou e 1 saiu");
+    expect(section.textContent).toContain(closing[0]!.name);
+    expect(section.textContent).toContain("Sandra Saiu");
+    expect(section.textContent).toContain("Corretor Nove");
+  });
+
+  it("sem foto ainda, a faixa dos últimos dias não aparece", () => {
+    const data = createNegotiationsFixture("director");
+    render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} closingHistory={[]} />);
+    expect(screen.queryByRole("region", { name: "Fechamento nos últimos dias" })).toBeNull();
+  });
+
   it("sem a observação ligada, não mostra Sem retorno do corretor", () => {
     const data = createNegotiationsFixture("director");
     render(<NegotiationsDashboard data={data} activeTab="negotiations" generatedAt={new Date(data.generatedAt)} />);
