@@ -89,6 +89,27 @@ export function isContentlessWahaMessage(message: { type?: string; body: string;
   return (message.type ?? "text") === "text" && !message.media && isContentlessMessage(message.body);
 }
 
+/**
+ * The id the broker's own copy of a message has, when `messageId` is the
+ * contact-side twin of it. WAHA ids are "<fromMe>_<chat>_<id>": the same
+ * WhatsApp id with "false_" instead of "true_" is the same message seen from
+ * the other side, not a new one.
+ *
+ * Some GOWS broker sessions deliver, about one second after each message the
+ * broker sends, a textless event with that "false_" twin id (most likely a
+ * delivery receipt the relay forwards as a message). Stored as an incoming
+ * "[text]", it was ~90% of the "empty" client messages measured from 24/10 to
+ * 09/11: the client never wrote it.
+ */
+export function ownMessageTwinId(messageId: string) {
+  return /^false_./.test(messageId) ? `true_${messageId.slice("false_".length)}` : null;
+}
+
+/** A textless contact-side event whose twin is a message the broker already sent: an echo, not the client. */
+export function isOwnMessageEcho(input: { contentless: boolean; isOutgoing: boolean; ownTwinExists: boolean }) {
+  return input.contentless && !input.isOutgoing && input.ownTwinExists;
+}
+
 
 
 /**
@@ -335,6 +356,21 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
 
   // Determine direction based on fromMe flag
   const isOutgoing = event.message.fromMe === true;
+
+  // A textless "incoming" twin of the broker's own message is an echo of it
+  // (see ownMessageTwinId): storing it drew a fake client message.
+  const twinId = contentless && !isOutgoing ? ownMessageTwinId(event.message.id) : null;
+  const ownTwinExists = twinId
+    ? Boolean((await db
+      .select({ id: schema.whatsappMessages.id })
+      .from(schema.whatsappMessages)
+      .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.messageId, twinId)))
+      .limit(1))[0])
+    : false;
+  if (isOwnMessageEcho({ contentless, isOutgoing, ownTwinExists })) {
+    await markIgnored(db, registered.id, "own_message_echo");
+    return { processed: 0, ignored: "own_message_echo" as const };
+  }
   const contactPhoneRaw = isOutgoing && event.message.to ? event.message.to : event.message.from;
   const normalizedPhone = normalizePhone(contactPhoneRaw);
 

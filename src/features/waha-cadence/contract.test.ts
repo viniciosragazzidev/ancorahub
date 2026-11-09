@@ -317,6 +317,41 @@ describe("WAHA group messages from a privacy id", () => {
     }
   });
 
+  it("keeps the client's text when WAHA leaves body empty and the text is only in _data", () => {
+    const shapes: Array<[string, Record<string, unknown>]> = [
+      ["WEBJS _data.body", { type: "chat", body: "Olá" }],
+      ["NOWEB conversation", { message: { conversation: "Olá" } }],
+      ["NOWEB quoted reply", { message: { extendedTextMessage: { text: "Olá" } } }],
+      ["GOWS disappearing chat", { Info: {}, Message: { ephemeralMessage: { message: { extendedTextMessage: { text: "Olá" } } } } }],
+    ];
+    for (const [, data] of shapes) {
+      const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+        event: "message",
+        session: "broker-session",
+        payload: { id: "false_5521999990000@c.us_ABC", from: "5521999990000@c.us", to: "5521988887777@c.us", body: "", fromMe: false, timestamp: 1_760_000_000, _data: data },
+      }));
+      expect(event.message).toMatchObject({ type: "text", body: "Olá" });
+    }
+  });
+
+  it("keeps a media caption sent with an empty body", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+      event: "message",
+      session: "broker-session",
+      payload: { id: "false_5521999990000@c.us_IMG", from: "5521999990000@c.us", body: "", caption: "Minha carteirinha", type: "image", hasMedia: true, fromMe: false, timestamp: 1_760_000_000 },
+    }));
+    expect(event.message).toMatchObject({ type: "image", body: "Minha carteirinha" });
+  });
+
+  it("reads the protocol type from WEBJS _data.type when the top-level type is missing", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+      event: "message",
+      session: "broker-session",
+      payload: { id: "false_5521999990000@c.us_REV", from: "5521999990000@c.us", body: "", fromMe: false, timestamp: 1_760_000_000, _data: { type: "revoked" } },
+    }));
+    expect(event.message).toMatchObject({ type: "text", body: "[text]" });
+  });
+
   it("reads the broker's own message as fromMe from a WEBJS serialized id when fromMe is absent", () => {
     const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
       event: "message.any",
