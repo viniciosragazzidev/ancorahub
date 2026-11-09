@@ -44,3 +44,11 @@ describe("extractWahaMessageText", () => {
     expect(extractWahaMessageText({ ack: 2, ackName: "DEVICE" })).toBe("");
   });
 });
+
+describe("miniatura sem tipo", () => {
+  it("base64 em _data.body sem _data.type não vira texto", () => {
+    const thumb = "/9j/4AAQSkZJRgABAQAAAQABAAD" + "A".repeat(200);
+    expect(extractWahaMessageText({ body: "", _data: { body: thumb } })).toBe("");
+    expect(extractWahaMessageText({ body: "", _data: { body: "Bom dia, recebi a cotação" } })).toBe("Bom dia, recebi a cotação");
+  });
+});

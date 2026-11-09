@@ -82,6 +82,11 @@ function protocolText(protocol: Rec | null, depth: number) {
   return protocol ? protoText(asRecord(field(protocol, "editedMessage")), depth + 1) : "";
 }
 
+/** A WEBJS media thumbnail: long base64 without spaces (a real message this long always has spaces). */
+export function looksLikeBase64(value: string): boolean {
+  return value.length >= 120 && !/\s/.test(value) && /^[A-Za-z0-9+/=_-]+$/.test(value);
+}
+
 export function extractWahaMessageText(payload: Rec): string {
   const direct = text(payload.body) || text(payload.caption);
   if (direct) return direct;
@@ -91,7 +96,9 @@ export function extractWahaMessageText(payload: Rec): string {
   // WEBJS puts the base64 thumbnail of a media message in `_data.body`: on
   // anything that is not a chat only the caption is text.
   const isChat = data.type === undefined || data.type === "chat";
-  const legacy = isChat ? text(data.body) : text(data.caption);
+  // Without a type, a long run of base64 with no spaces is a thumbnail, never text (Vigia, 09/11).
+  const chatBody = isChat && !looksLikeBase64(text(data.body)) ? text(data.body) : "";
+  const legacy = isChat ? chatBody : text(data.caption);
   if (legacy) return legacy;
 
   return protoText(asRecord(data.message) ?? asRecord(data.Message));
