@@ -122,6 +122,7 @@
 }
 
 .body {
+  position: relative;
   display: grid;
   gap: 8px;
   min-width: 0;
@@ -132,6 +133,28 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+/* Botão esticado: cobre o corpo inteiro (abre o lead); o link do corretor fica por cima dele. */
+.bodyOpen {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  cursor: pointer;
+}
+
+.bodyOpen:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: var(--focus-outline-offset, 2px);
+}
+
+.ownerLink {
+  position: relative;
+  z-index: 2;
 }
 
 .quoteButton {

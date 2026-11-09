@@ -177,6 +177,17 @@ describe("pele da central de conversas", () => {
     expect(html).toContain("Marina Exemplo");
   });
 
+  it("linha da lista: botão esticado abre a conversa e o link do corretor fica fora dele", () => {
+    const html = renderSelectedConversation();
+    const row = html.match(/<div data-active="true" data-conversations-part="row"[\s\S]*?data-conversations-part="row-message-count"/)?.[0] ?? "";
+    expect(row).not.toBe("");
+    expect(row).not.toContain('role="button"');
+    // O botão não tem filhos: o conteúdo e o link são irmãos dele.
+    expect(row).toMatch(/<button type="button" aria-label="Abrir conversa com Ana Ribeiro de Almeida Nogueira" aria-describedby="[^"]+" aria-current="page" data-conversations-part="row-open"[^>]*><\/button>/);
+    expect(row).toContain('href="/equipe/fixture-director"');
+    expect(row).toMatch(/<a[^>]*class="[^"]*relative z-10[^"]*"[^>]*>Marina Exemplo<\/a>/);
+  });
+
   it("omite o nome do corretor quando o lead nao esta atribuido", () => {
     const html = renderSelectedConversation(null);
     expect(html).not.toContain('data-conversations-part="row-owner-name"');

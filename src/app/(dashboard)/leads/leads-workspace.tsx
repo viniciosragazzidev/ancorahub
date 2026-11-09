@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 
 import {
@@ -1042,8 +1042,11 @@ function SortableKanbanColumn({
   slaFirstContactMinutes?: number;
   slaStagnantDays?: number;
 }) {
+  // role "group" em vez do "button" padrão do dnd-kit: a coluna arrastável contém cartões com botões e links,
+  // e filhos de role="button" viram texto para o leitor de tela. Teclado e arrastar seguem iguais.
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: status,
+    attributes: { role: "group" },
   });
 
   const style = {
@@ -1150,6 +1153,7 @@ function KanbanLeadCard({
   const selected = isSelected(lead.id);
   const sla = useMemo(() => computeSlaInfo(lead, slaFirstContactMinutes, slaStagnantDays), [lead, slaFirstContactMinutes, slaStagnantDays]);
   const phoneDigits = lead.telefone ? lead.telefone.replace(/\D/g, "") : "";
+  const detailsId = useId();
 
   return (
     <Card
@@ -1190,18 +1194,16 @@ function KanbanLeadCard({
       {/* SLA bar */}
       {sla && <SlaBar sla={sla} />}
 
-      {/* Card body: div role="button" porque o nome do corretor é link próprio (<a> não entra em <button>). */}
-      <div
-        role="button"
-        tabIndex={0}
-        className="w-full cursor-pointer p-3.5 pt-2.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none"
-        onClick={() => onOpen(lead)}
-        onKeyDown={(event) => {
-          if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
-          event.preventDefault();
-          onOpen(lead);
-        }}
-      >
+      {/* Corpo em "botão esticado": o <button> cobre o corpo (abre o lead) e o link do corretor fica irmão dele, por cima
+          (relative z-10). Nunca dentro de role="button": o leitor de tela trata os filhos de botão como texto e perde o link. */}
+      <div className="relative w-full cursor-pointer p-3.5 pt-2.5 text-left">
+        <button
+          type="button"
+          aria-label={`Abrir ${lead.nome}`}
+          aria-describedby={detailsId}
+          className="absolute inset-0 z-[1] w-full cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none"
+          onClick={() => onOpen(lead)}
+        />
         <div className="flex items-center gap-2.5">
           <UserAvatar
             seed={lead.nome}
@@ -1223,7 +1225,7 @@ function KanbanLeadCard({
           ) : null}
         </div>
 
-        <p className="mt-2 truncate text-[11px] text-muted-foreground">
+        <p id={detailsId} className="mt-2 truncate text-[11px] text-muted-foreground [&_a]:relative [&_a]:z-10">
           <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} brokerId={lead.corretorId} className="text-[11px]" />
         </p>
 
