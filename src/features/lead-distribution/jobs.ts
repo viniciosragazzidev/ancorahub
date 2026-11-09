@@ -44,9 +44,16 @@ function automaticQualificationFilter() {
   );
 }
 
-/** "Segurar frios" of the lead's queue, as SQL (same rule as automaticDistributionHoldReason). */
+/**
+ * "Segurar frios" of the lead's queue, as SQL (same rule as automaticDistributionHoldReason).
+ * The lead's columns are written qualified on purpose: in a select list drizzle renders a
+ * column without its table ("queue_id"), and inside this subquery that resolved to the
+ * policy's own column, so the job's pre-check read "true" whenever ANY queue held cold
+ * leads (09/11: Venâncio Leads with the switch off never sent a cold lead).
+ */
 export function queueHoldsColdLeadsSql() {
-  return sql<boolean>`exists (select 1 from ${schema.leadDistributionPolicies} p where p.tenant_id = ${schema.leads.tenantId} and p.queue_id = ${schema.leads.queueId} and (p.policy->>'holdColdLeads') = 'true')`;
+  const leadColumn = (name: string) => sql`${schema.leads}.${sql.identifier(name)}`;
+  return sql<boolean>`exists (select 1 from ${schema.leadDistributionPolicies} p where p.tenant_id = ${leadColumn(schema.leads.tenantId.name)} and p.queue_id = ${leadColumn(schema.leads.queueId.name)} and (p.policy->>'holdColdLeads') = 'true')`;
 }
 
 const defaults = {
