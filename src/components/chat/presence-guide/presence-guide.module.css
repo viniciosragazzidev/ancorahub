@@ -1,0 +1,133 @@
+/* Roteiro guiado de presença (09/11): tela de "lição", uma ideia e um botão por vez.
+   Tokens do Lite (escopo .arc-venancor): superfícies, texto, raios pílula/painel, azul de ação do chat e o verde
+   do WhatsApp (liberado dentro da ilustração, P3 do plano 2026-11-09). */
+.root {
+  --chat-action: oklch(62% 0.2 255);
+  --chat-action-strong: oklch(55% 0.21 258);
+  --chat-action-soft: oklch(62% 0.2 255 / 0.1);
+  --wa: oklch(64% 0.17 150);
+  --wa-soft: oklch(64% 0.17 150 / 0.12);
+  --wa-ink: oklch(42% 0.12 150);
+  --att-soft: oklch(93% 0.06 80);
+  --att-ink: oklch(42% 0.11 60);
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  font-family: var(--font-body);
+  color: var(--foreground);
+  background: var(--surface);
+}
+
+/* ---------- Roteiro (lição) ---------- */
+.lesson { position: absolute; inset: 0; display: grid; grid-template-rows: auto 1fr auto; }
+.top { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 12px; padding: calc(env(safe-area-inset-top) + 16px) 20px 8px; }
+.close { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 9999px; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
+.close:hover { background: var(--surface-muted); }
+.track { position: relative; height: 8px; border-radius: 9999px; background: var(--surface-muted); overflow: hidden; }
+.fill { position: absolute; inset: 0; border-radius: inherit; background: var(--chat-action); transform-origin: left center; }
+.count { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
+
+.body { position: relative; overflow-x: hidden; overflow-y: auto; padding: 8px 20px 0; }
+.scene { display: grid; gap: 20px; align-content: start; min-height: 100%; padding-bottom: 16px; }
+.say { display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: start; }
+.mascot { display: grid; place-items: center; }
+.sayText { display: grid; gap: 4px; padding-top: 4px; }
+.sayTitle { font-size: 18px; font-weight: 500; line-height: 1.4; letter-spacing: -0.01em; }
+.saySub { font-size: 14px; line-height: 1.5; color: var(--text-secondary); }
+.art { display: grid; place-items: center; gap: 12px; padding: 8px 0; }
+.caption { font-size: 14px; text-align: center; color: var(--text-secondary); max-width: 300px; line-height: 1.5; }
+.caption strong { color: var(--foreground); font-weight: 500; }
+
+.foot { display: grid; gap: 8px; padding: 12px 20px calc(env(safe-area-inset-bottom) + 20px); background: var(--surface); }
+.help { justify-self: center; min-height: 44px; padding: 0 12px; border: 0; background: transparent; font: inherit; font-size: 14px; color: var(--text-muted); cursor: pointer; border-radius: 9999px; }
+.help:hover { color: var(--foreground); }
+.cta { min-height: 50px; border: 0; border-radius: 9999px; padding: 0 22px; font: inherit; font-size: 16px; font-weight: 500; color: white; background: linear-gradient(180deg, var(--chat-action), var(--chat-action-strong)); box-shadow: 0 10px 24px oklch(55% 0.21 258 / 0.32); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.cta:disabled { background: var(--chat-action-soft); color: var(--chat-action); box-shadow: none; cursor: default; }
+.cta[data-tone="whatsapp"] { background: var(--wa); box-shadow: 0 10px 24px oklch(64% 0.17 150 / 0.3); }
+.link { justify-self: center; border: 0; background: transparent; font: inherit; font-size: 14px; color: var(--chat-action-strong); cursor: pointer; min-height: 44px; }
+
+/* ---------- Peças ---------- */
+.privacy { display: grid; grid-template-columns: 20px 1fr; gap: 8px; padding: 12px 16px; border-radius: var(--radius-panel); background: var(--surface-muted); font-size: 14px; line-height: 1.5; color: var(--text-secondary); }
+.privacy strong { display: block; color: var(--foreground); font-weight: 500; }
+.benefits { display: grid; gap: 10px; }
+.benefit { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: 14px; line-height: 1.5; }
+.benefitIcon { width: 22px; height: 22px; border-radius: 9999px; display: grid; place-items: center; background: var(--wa-soft); color: var(--wa-ink); }
+
+.tiles { display: flex; gap: 6px; align-items: center; justify-content: center; }
+.tile { width: 34px; height: 46px; border-radius: 12px; display: grid; place-items: center; border: 1px solid var(--border-strong); background: var(--surface); font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--foreground); }
+.tile[data-ok="true"] { border-color: var(--wa); background: var(--wa-soft); color: var(--wa-ink); }
+.tileDash { width: 8px; height: 2px; border-radius: 9999px; background: var(--border-strong); }
+.tilesBig .tile { width: 48px; height: 64px; font-size: 28px; }
+.copied { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: var(--wa-ink); min-height: 22px; }
+.skeletonTile { width: 34px; height: 46px; border-radius: 12px; background: var(--surface-muted); }
+
+.field { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px; min-height: 56px; padding: 0 18px; border-radius: 9999px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 22px; font-variant-numeric: tabular-nums; }
+.fieldPrefix { color: var(--text-muted); }
+.fieldInput { border: 0; outline: 0; font: inherit; background: transparent; min-width: 0; color: var(--foreground); }
+
+/* Celular ilustrado do passo 3 (formas, sem texto miúdo). */
+.mock { position: relative; width: 190px; height: 330px; border-radius: 30px; padding: 12px 10px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: var(--shadow-raised); overflow: hidden; }
+.mockTop { display: flex; justify-content: space-between; align-items: center; height: 28px; padding: 0 4px; }
+.mockBrand { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: var(--wa-ink); }
+.mockDots { width: 28px; height: 28px; border-radius: 9999px; display: grid; place-items: center; color: var(--text-muted); position: relative; }
+.mockLine { height: 34px; border-radius: 9999px; background: var(--surface-muted); margin-top: 8px; }
+.mockRow { position: relative; display: flex; align-items: center; min-height: 34px; margin-top: 8px; padding: 0 30px 0 12px; border-radius: 9999px; background: var(--surface-muted); font-size: 12px; color: transparent; }
+.mockRow[data-hot="true"] { background: var(--wa-soft); color: var(--wa-ink); font-weight: 500; outline: 2px solid var(--wa); }
+.mockQr { width: 108px; height: 108px; margin: 18px auto 10px; border-radius: 16px; border: 2px dashed var(--border-strong); }
+.mockCenter { text-align: center; }
+.tap { position: absolute; width: 26px; height: 26px; border-radius: 9999px; border: 3px solid var(--wa); pointer-events: none; }
+.tapDot { position: absolute; width: 12px; height: 12px; border-radius: 9999px; background: var(--wa); pointer-events: none; }
+.mockSteps { display: flex; gap: 6px; justify-content: center; }
+.mockStep { width: 8px; height: 8px; border-radius: 9999px; background: var(--border-strong); }
+.mockStep[data-on="true"] { width: 22px; background: var(--wa); }
+.platform { display: inline-flex; padding: 3px; gap: 2px; border-radius: 9999px; background: var(--surface-muted); }
+.platformBtn { min-height: 34px; padding: 0 14px; border: 0; border-radius: 9999px; background: transparent; font: inherit; font-size: 14px; color: var(--text-secondary); cursor: pointer; }
+.platformBtn[aria-pressed="true"] { background: var(--surface); color: var(--foreground); font-weight: 500; box-shadow: var(--shadow-resting); }
+
+.waitDots { display: inline-flex; gap: 6px; }
+.waitDot { width: 8px; height: 8px; border-radius: 9999px; background: var(--chat-action); }
+.checkBig { width: 96px; height: 96px; border-radius: 9999px; display: grid; place-items: center; background: var(--wa-soft); color: var(--wa-ink); }
+.duty { display: grid; gap: 4px; padding: 16px; border-radius: var(--radius-panel); border: 1px solid oklch(84% 0.08 28); background: var(--surface); box-shadow: var(--shadow-resting); }
+.dutyPill { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; color: oklch(45% 0.13 28); background: oklch(95% 0.04 28); }
+.dutyName { font-size: 16px; font-weight: 500; }
+.dutyMeta { font-size: 14px; color: var(--text-secondary); }
+.qr { width: 180px; height: 180px; padding: 10px; border-radius: 16px; border: 1px solid var(--border); display: grid; grid-template-columns: repeat(21, 1fr); gap: 0; }
+.qrCell { aspect-ratio: 1; }
+.qrCell[data-on="true"] { background: var(--foreground); }
+.list { display: grid; gap: 8px; counter-reset: s; }
+.listItem { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: center; font-size: 14px; line-height: 1.4; color: var(--text-secondary); }
+.listItem[data-on="true"] { color: var(--foreground); font-weight: 500; }
+.listNum { width: 28px; height: 28px; border-radius: 9999px; display: grid; place-items: center; background: var(--surface-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.listItem[data-on="true"] .listNum { background: var(--wa); color: white; }
+
+
+
+/* Folha inferior (ajuda, sair) */
+.sheetScrim { position: absolute; inset: 0; background: oklch(18% 0.01 260 / 0.4); z-index: 10; }
+.sheet { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 11; display: grid; gap: 4px; padding: 8px 8px calc(env(safe-area-inset-bottom) + 12px); border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--shadow-floating); }
+.sheetGrip { justify-self: center; width: 36px; height: 4px; border-radius: 9999px; background: var(--border-strong); margin: 4px 0 8px; }
+.sheetTitle { font-size: 16px; font-weight: 500; padding: 4px 12px 8px; }
+.sheetItem { display: grid; gap: 2px; text-align: left; padding: 12px; border: 0; border-radius: 18px; background: transparent; font: inherit; cursor: pointer; }
+.sheetItem:hover { background: var(--surface-muted); }
+.sheetItemTitle { font-size: 16px; font-weight: 500; color: var(--foreground); }
+.sheetItemText { font-size: 14px; color: var(--text-muted); }
+.sheetActions { display: grid; gap: 8px; padding: 8px 12px 0; }
+.ghost { min-height: 50px; border-radius: 9999px; border: 1px solid var(--border-strong); background: var(--surface); font: inherit; font-size: 16px; font-weight: 500; color: var(--foreground); cursor: pointer; }
+
+
+/* QR real (computador) */
+.qrImg { width: 180px; height: 180px; padding: 8px; border-radius: 16px; border: 1px solid var(--border); background: white; }
+.qrSkeleton { width: 180px; height: 180px; border-radius: 16px; background: var(--surface-muted); }
+
+/* Ilustração "tela inicial": conversa aberta → toque na seta → lista Conversas */
+.chatHead { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 6px; border-radius: 9999px; background: var(--wa-soft); }
+.chatBack { position: relative; width: 28px; height: 28px; border-radius: 9999px; display: grid; place-items: center; color: var(--wa-ink); font-size: 18px; font-weight: 500; }
+.chatAvatar { width: 22px; height: 22px; border-radius: 9999px; background: var(--border-strong); }
+.chatName { height: 10px; width: 64px; border-radius: 9999px; background: var(--border-strong); }
+.bubbleIn { height: 26px; width: 70%; margin-top: 12px; border-radius: 14px 14px 14px 6px; background: var(--surface-muted); }
+.bubbleOut { height: 26px; width: 60%; margin: 10px 0 0 auto; border-radius: 14px 14px 6px 14px; background: var(--wa-soft); }
+.listTitle { margin: 8px 6px 4px; font-size: 14px; font-weight: 500; color: var(--foreground); }
+.convRow { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: center; margin-top: 10px; padding: 0 4px; }
+.convAvatar { width: 26px; height: 26px; border-radius: 9999px; background: var(--surface-muted); }
+.convLine { height: 10px; border-radius: 9999px; background: var(--surface-muted); }
+.homeOk { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 9999px; background: var(--wa-soft); color: var(--wa-ink); font-size: 12px; font-weight: 500; white-space: nowrap; }

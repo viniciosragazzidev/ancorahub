@@ -15,14 +15,22 @@ const VIDEO = {
 /**
  * "Assistir tutorial" (06/11): the 90 s vertical video on connecting WhatsApp, in a floating
  * window over the connection screen, so the broker never leaves the page. Closing it stops it.
+ * Controlled (09/11): the guided presence flow opens it from "Precisa de ajuda?", without its own button.
  */
-export function PresenceTutorialVideo() {
-  const [open, setOpen] = React.useState(false);
+export function PresenceTutorialVideo({ open: controlledOpen, onOpenChange, hideTrigger = false }: { open?: boolean; onOpenChange?: (open: boolean) => void; hideTrigger?: boolean } = {}) {
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (next: boolean) => {
+    if (controlledOpen === undefined) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button className="w-full" size="lg" variant="outline" />}>
-        <Play className="size-4" /> {PRESENCE_WHATSAPP_COPY.watchTutorial}
-      </DialogTrigger>
+      {hideTrigger ? null : (
+        <DialogTrigger render={<Button className="w-full" size="lg" variant="outline" />}>
+          <Play className="size-4" /> {PRESENCE_WHATSAPP_COPY.watchTutorial}
+        </DialogTrigger>
+      )}
       <DialogPopup className="w-[min(92vw,calc(82dvh*9/16))] max-w-none p-ds-12">
         <DialogTitle className="sr-only">{PRESENCE_WHATSAPP_COPY.watchTutorial}</DialogTitle>
         <DialogDescription className="sr-only">{PRESENCE_WHATSAPP_COPY.tutorialDescription}</DialogDescription>
