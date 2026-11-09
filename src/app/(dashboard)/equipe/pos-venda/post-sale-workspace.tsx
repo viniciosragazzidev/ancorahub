@@ -20,6 +20,8 @@ import { POST_SALE_EXCLUSION_LABELS, type PostSaleExclusionReason } from "@/feat
 import type { PostSaleAudience } from "@/features/post-sale-audit/rules";
 import { POST_SALE_ALERT_REASON_LABELS } from "@/features/post-sale-audit/alert-rules";
 import { POST_SALE_WAHA_OPENING_DEFAULT } from "@/features/post-sale-audit/template-contract";
+import { paginate } from "@/features/post-sale-audit/responses-view";
+import { Pager, PostSaleResponses } from "./post-sale-responses";
 
 type WorkspaceData = Extract<Awaited<ReturnType<typeof getPostSaleWorkspaceAction>>, { ok: true }>['data'];
 type AudienceKind = "broker" | "queue" | "period" | "leadIds";
@@ -47,7 +49,7 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
   const [openingMessage, setOpeningMessage] = useState(POST_SALE_WAHA_OPENING_DEFAULT);
   const [preview, setPreview] = useState<Preview | null>(initialPreview ?? null);
   const [feedback, setFeedback] = useState(initialFeedback ?? "");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [reportPage, setReportPage] = useState(1);
   const [busy, startTransition] = useTransition();
 
   const audience = useMemo(() => {
@@ -115,7 +117,10 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
             <h1 className="text-2xl font-semibold tracking-tight">Pós-venda</h1>
             <p className="max-w-2xl text-sm text-muted-foreground">Acompanhe a experiência dos clientes e inicie uma pesquisa pelo mesmo número de WhatsApp.</p>
           </div>
-          <span className="rounded-full bg-[var(--surface-secondary)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)]">Campanhas manuais</span>
+          <span className="flex flex-wrap items-center gap-2">
+            <a href="#respostas" className="rounded-full bg-primary/10 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/15">Ver quem respondeu ({data.responses.length})</a>
+            <span className="rounded-full bg-[var(--surface-secondary)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)]">Campanhas manuais</span>
+          </span>
         </header>
 
         <Card>
@@ -133,10 +138,11 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
                 <thead><tr className="border-b border-border text-xs text-muted-foreground">
                   <th className="px-2 py-2 font-medium">Corretor</th><th className="px-2 py-2 font-medium">Enviadas</th><th className="px-2 py-2 font-medium">Respondidas</th><th className="px-2 py-2 font-medium">Foi atendido</th><th className="px-2 py-2 font-medium">Nota média</th><th className="px-2 py-2 font-medium">Fechou</th><th className="px-2 py-2 font-medium">Sem contato</th><th className="px-2 py-2 font-medium">Alertas abertos</th>
                 </tr></thead>
-                <tbody>{data.report.map((row) => <tr key={row.brokerId} className="border-b border-border/60 last:border-0">
+                <tbody>{paginate([...data.report].sort((a, b) => b.responded - a.responded || b.sent - a.sent || a.brokerName.localeCompare(b.brokerName)), reportPage).items.map((row) => <tr key={row.brokerId} className="border-b border-border/60 last:border-0">
                   <th scope="row" className="px-2 py-3 font-medium">{row.brokerName}</th><td className="px-2 py-3 tabular-nums">{row.sent}</td><td className="px-2 py-3 tabular-nums">{row.responded}</td><td className="px-2 py-3">{row.attendancePercent === null ? "Sem respostas" : `${row.attendancePercent}%`}</td><td className="px-2 py-3">{row.averageRating === null ? "Sem notas" : `${row.averageRating}/5`}</td><td className="px-2 py-3">{row.closePercent === null ? "Sem respostas" : `${row.closePercent}%`}</td><td className="px-2 py-3 tabular-nums">{row.noContact}</td><td className="px-2 py-3 tabular-nums">{row.openAlerts}</td>
                 </tr>)}</tbody>
               </table>
+              <Pager page={paginate(data.report, reportPage).page} pages={paginate(data.report, reportPage).pages} onChange={setReportPage} label="corretores" />
             </div> : <p className="rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-muted-foreground">Nenhum corretor disponível no escopo atual.</p>}
           </CardContent>
         </Card>
@@ -204,26 +210,7 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Respostas por lead</CardTitle><CardDescription>Respostas registradas nas pesquisas recentes.</CardDescription></CardHeader>
-            <CardContent className="grid gap-2">
-              {data.responses.length ? data.responses.map((response) => <div key={response.id} className="rounded-xl border border-border">
-                <button type="button" className="flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2 text-left" aria-expanded={expanded === response.id} onClick={() => setExpanded(expanded === response.id ? null : response.id)}>
-                  <span className="min-w-0"><span className="block truncate text-sm font-medium">{response.leadName}</span><span className="block truncate text-xs text-muted-foreground">{response.campaignName}</span></span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{response.rating ? `Nota ${response.rating}/5` : response.status}</span>
-                </button>
-                {expanded === response.id ? <div className="grid gap-1 border-t border-border px-3 py-3 text-sm text-muted-foreground">
-                  <p>Status: {response.status}</p>
-                  {typeof response.answers.contacted === "boolean" ? <p>Contato: {response.answers.contacted ? "sim" : "não"}</p> : null}
-                  {typeof response.answers.receivedQuote === "boolean" ? <p>Recebeu cotação: {response.answers.receivedQuote ? "sim" : "não"}</p> : null}
-                  {typeof response.answers.closed === "string" ? <p>Fechou: {response.answers.closed === "yes" ? "sim" : response.answers.closed === "no" ? "não" : "em decisão"}</p> : null}
-                  {typeof response.answers.wantsHelp === "boolean" ? <p>Pediu ajuda: {response.answers.wantsHelp ? "sim" : "não"}</p> : null}
-                  {typeof response.answers.reason === "string" ? <p>Motivo: {response.answers.reason}</p> : null}
-                  {typeof response.answers.comment === "string" ? <p>Comentário: {response.answers.comment}</p> : null}
-                </div> : null}
-              </div>) : <p className="rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-muted-foreground">As respostas aparecerão aqui quando os clientes responderem.</p>}
-            </CardContent>
-          </Card>
+          <PostSaleResponses responses={data.responses} />
         </div>
       </div>
     </main>

@@ -3,7 +3,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { enqueueMetaTemplateMessage, enqueuePostSaleSurveyWahaMessage } from "@/features/communication-channels/outbound-service";
@@ -324,7 +324,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30): P
   brokers: Array<{ id: string; name: string }>;
   queues: Array<{ id: string; name: string }>;
   campaigns: Array<{ id: string; name: string; status: string; totals: Record<string, number>; createdAt: string }>;
-  responses: Array<{ id: string; leadId: string; leadName: string; campaignName: string; status: string; rating: number | null; answers: Record<string, unknown>; lastReplyAt: string | null }>;
+  responses: Array<{ id: string; leadId: string; leadName: string; brokerName: string | null; campaignName: string; status: string; outcome: string | null; rating: number | null; answers: Record<string, unknown>; sentAt: string | null; lastReplyAt: string | null }>;
   report: PostSaleBrokerReportRow[];
   alerts: Awaited<ReturnType<typeof loadPostSaleOpenAlerts>>;
   periodDays: number;
@@ -344,13 +344,15 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30): P
       db.select({ id: schema.postSaleCampaigns.id, name: schema.postSaleCampaigns.name, status: schema.postSaleCampaigns.status, totals: schema.postSaleCampaigns.totals, createdAt: schema.postSaleCampaigns.createdAt }).from(schema.postSaleCampaigns)
         .where(and(eq(schema.postSaleCampaigns.tenantId, context.tenantId), context.role === "manager" ? eq(schema.postSaleCampaigns.createdBy, context.userId) : undefined))
         .orderBy(desc(schema.postSaleCampaigns.createdAt)).limit(20),
-      db.select({ id: schema.postSaleSurveys.id, leadId: schema.postSaleSurveys.leadId, leadName: schema.leads.nome, campaignName: schema.postSaleCampaigns.name, status: schema.postSaleSurveys.status, rating: schema.postSaleSurveys.rating, answers: schema.postSaleSurveys.answers, lastReplyAt: schema.postSaleSurveys.lastReplyAt, createdAt: schema.postSaleSurveys.createdAt })
+      // Only clients who answered (09/11, Vinicios: "ir para os leads que responderam de forma fácil").
+      db.select({ id: schema.postSaleSurveys.id, leadId: schema.postSaleSurveys.leadId, leadName: schema.leads.nome, brokerName: schema.user.name, campaignName: schema.postSaleCampaigns.name, status: schema.postSaleSurveys.status, outcome: schema.postSaleSurveys.outcome, rating: schema.postSaleSurveys.rating, answers: schema.postSaleSurveys.answers, sentAt: schema.postSaleSurveys.sentAt, lastReplyAt: schema.postSaleSurveys.lastReplyAt, createdAt: schema.postSaleSurveys.createdAt })
         .from(schema.postSaleSurveys)
+        .leftJoin(schema.user, eq(schema.user.id, schema.postSaleSurveys.brokerId))
         .innerJoin(schema.leads, and(eq(schema.leads.id, schema.postSaleSurveys.leadId), eq(schema.leads.tenantId, schema.postSaleSurveys.tenantId)))
         .innerJoin(schema.postSaleCampaigns, and(eq(schema.postSaleCampaigns.id, schema.postSaleSurveys.campaignId), eq(schema.postSaleCampaigns.tenantId, schema.postSaleSurveys.tenantId)))
         .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
-        .where(and(eq(schema.postSaleSurveys.tenantId, context.tenantId), isNull(schema.leads.deletedAt), branchFilter ? sql`coalesce(${schema.leads.branchId}, ${schema.leadQueues.branchId}) = ${branchFilter}` : undefined))
-        .orderBy(desc(schema.postSaleSurveys.lastReplyAt), desc(schema.postSaleSurveys.createdAt)).limit(100),
+        .where(and(eq(schema.postSaleSurveys.tenantId, context.tenantId), isNotNull(schema.postSaleSurveys.lastReplyAt), isNull(schema.leads.deletedAt), branchFilter ? sql`coalesce(${schema.leads.branchId}, ${schema.leadQueues.branchId}) = ${branchFilter}` : undefined))
+        .orderBy(desc(schema.postSaleSurveys.lastReplyAt), desc(schema.postSaleSurveys.createdAt)).limit(300),
       loadPostSaleBrokerReport(context, window),
       loadPostSaleOpenAlerts(context),
     ]);
@@ -359,7 +361,7 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30): P
       brokers: brokers.map((row) => ({ id: row.id, name: row.name ?? "Corretor" })),
       queues,
       campaigns: campaigns.map((row) => ({ ...row, totals: row.totals as Record<string, number>, createdAt: row.createdAt.toISOString() })),
-      responses: responses.map((row) => ({ ...row, answers: row.answers as Record<string, unknown>, lastReplyAt: row.lastReplyAt?.toISOString() ?? null })),
+      responses: responses.map((row) => ({ ...row, brokerName: row.brokerName ?? null, answers: row.answers as Record<string, unknown>, sentAt: row.sentAt?.toISOString() ?? null, lastReplyAt: row.lastReplyAt?.toISOString() ?? null })),
       report,
       alerts,
       periodDays,
@@ -408,6 +410,44 @@ export async function getPostSaleLeadSurveyAction(rawLeadId: unknown): Promise<A
       lastReplyAt: survey.lastReplyAt?.toISOString() ?? null,
       completedAt: survey.completedAt?.toISOString() ?? null,
     } };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+/** The WhatsApp messages of one survey's conversation (from 1 min before the send), for the answers list. */
+export async function getPostSaleSurveyMessagesAction(rawSurveyId: unknown): Promise<ActionResult<Array<{ id: string; direction: "in" | "out"; body: string; sentAt: string; fromAssistant: boolean }>>> {
+  try {
+    const context = await authorizedContext();
+    const surveyId = z.string().trim().min(1).max(80).parse(rawSurveyId);
+    const db = getDatabase();
+    const branchFilter = context.role === "manager" ? context.branchId : undefined;
+    const [survey] = await db.select({ leadId: schema.postSaleSurveys.leadId, sentAt: schema.postSaleSurveys.sentAt, createdAt: schema.postSaleSurveys.createdAt })
+      .from(schema.postSaleSurveys)
+      .innerJoin(schema.leads, and(eq(schema.leads.id, schema.postSaleSurveys.leadId), eq(schema.leads.tenantId, schema.postSaleSurveys.tenantId)))
+      .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
+      .where(and(
+        eq(schema.postSaleSurveys.id, surveyId),
+        eq(schema.postSaleSurveys.tenantId, context.tenantId),
+        branchFilter ? sql`coalesce(${schema.leads.branchId}, ${schema.leadQueues.branchId}) = ${branchFilter}` : undefined,
+      ))
+      .limit(1);
+    if (!survey) return { ok: false, error: "Pesquisa não encontrada." };
+    const since = new Date((survey.sentAt ?? survey.createdAt).getTime() - 60_000);
+    const rows = await db.select({ id: schema.whatsappMessages.id, direction: schema.whatsappMessages.direction, body: schema.whatsappMessages.body, mediaKind: schema.whatsappMessages.mediaKind, sentAt: schema.whatsappMessages.sentAt, senderRole: schema.whatsappMessages.senderRole })
+      .from(schema.whatsappMessages)
+      .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, survey.leadId), gte(schema.whatsappMessages.sentAt, since)))
+      .orderBy(asc(schema.whatsappMessages.sentAt))
+      .limit(80);
+    return { ok: true, data: rows
+      .map((row) => ({
+        id: row.id,
+        direction: row.direction === "incoming" || row.direction === "inbound" ? "in" as const : "out" as const,
+        body: row.body && row.body.trim() !== "[text]" ? row.body : row.mediaKind ? `[${row.mediaKind}]` : "",
+        sentAt: row.sentAt.toISOString(),
+        fromAssistant: row.senderRole === "assistant" || row.senderRole === "system",
+      }))
+      .filter((row) => row.body) };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };
   }
