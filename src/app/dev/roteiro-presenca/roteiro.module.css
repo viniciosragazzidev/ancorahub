@@ -1,0 +1,63 @@
+/* Protótipo do roteiro guiado de presença (09/11) — só em desenvolvimento.
+   Tokens do Lite (escopo .arc-venancor): superfícies, texto, raios pílula/painel e o azul de ação do chat.
+   Suposições marcadas na tela com .assume (ver plano 2026-11-09-roteiro-guiado-presenca-whatsapp.md § 8). */
+.root {
+  --chat-action: oklch(62% 0.2 255);
+  --chat-action-strong: oklch(55% 0.21 258);
+  --chat-action-soft: oklch(62% 0.2 255 / 0.1);
+  --wa: oklch(64% 0.17 150);
+  --wa-soft: oklch(64% 0.17 150 / 0.12);
+  --wa-ink: oklch(42% 0.12 150);
+  --att: oklch(55% 0.15 60);
+  --att-soft: oklch(93% 0.06 80);
+  font-family: var(--font-body);
+  color: var(--foreground);
+  background: var(--background);
+  min-height: 100dvh;
+}
+
+/* ---------- Página do protótipo (controles + aparelho) ---------- */
+.page { display: grid; grid-template-columns: 300px 1fr; gap: 24px; padding: 24px; align-items: start; }
+.panel { position: sticky; top: 24px; display: grid; gap: 16px; padding: 16px; border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-resting); font-size: 14px; }
+.panelTitle { font-size: 16px; font-weight: 500; }
+.panelHint { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.panelGroup { display: grid; gap: 8px; }
+.panelLabel { font-size: 12px; color: var(--text-muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { min-height: 32px; padding: 4px 12px; border-radius: 9999px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--foreground); border-color: var(--foreground); color: var(--surface); }
+.stage { display: grid; place-items: center; min-height: calc(100dvh - 48px); }
+
+.phoneFrame { width: 390px; height: 800px; border-radius: 44px; padding: 10px; background: oklch(18% 0.01 260); box-shadow: var(--shadow-floating); }
+.phoneScreen { position: relative; width: 100%; height: 100%; border-radius: 36px; overflow: hidden; background: var(--surface); }
+.desktopFrame { width: min(1100px, 100%); height: 720px; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-floating); display: grid; grid-template-rows: 36px 1fr; }
+.desktopBar { display: flex; align-items: center; gap: 6px; padding: 0 14px; background: var(--surface-muted); border-bottom: 1px solid var(--border); }
+.desktopDot { width: 10px; height: 10px; border-radius: 9999px; background: var(--border-strong); }
+.desktopUrl { margin-left: 12px; font-size: 12px; color: var(--text-muted); }
+.desktopBody { position: relative; background: var(--background); display: grid; place-items: center; overflow: hidden; }
+.desktopScrim { position: absolute; inset: 0; background: oklch(18% 0.01 260 / 0.32); }
+.desktopPanel { position: relative; width: 560px; height: 620px; border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--shadow-floating); overflow: hidden; }
+
+/* Modo limpo (para prints): o aparelho ocupa a janela inteira. */
+.bare { min-height: 100dvh; display: grid; }
+.bare .phoneScreen { border-radius: 0; height: 100dvh; }
+.bareDesktop { min-height: 100dvh; position: relative; display: grid; place-items: center; background: var(--background); }
+
+/* Cartão de presença (antes do roteiro e na retomada) */
+.home { position: absolute; inset: 0; padding: calc(env(safe-area-inset-top) + 20px) 16px 16px; display: grid; gap: 16px; align-content: start; background: var(--background); }
+.homeHello { font-size: 22px; font-weight: 500; letter-spacing: -0.03em; padding: 0 4px; }
+.card { display: grid; gap: 12px; padding: 16px; border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-raised); border: 1px solid oklch(84% 0.08 28); }
+.cardHead { display: grid; grid-template-columns: 44px 1fr; gap: 12px; }
+.cardTitle { font-size: 16px; font-weight: 500; }
+.cardText { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
+.cardResume { font-size: 12px; color: var(--text-muted); text-align: center; }
+.cta { min-height: 50px; border: 0; border-radius: 9999px; padding: 0 22px; font: inherit; font-size: 16px; font-weight: 500; color: white; background: linear-gradient(180deg, var(--chat-action), var(--chat-action-strong)); box-shadow: 0 10px 24px oklch(55% 0.21 258 / 0.32); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.cta[data-tone="whatsapp"] { background: var(--wa); box-shadow: 0 10px 24px oklch(64% 0.17 150 / 0.3); }
+.copied { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: var(--wa-ink); min-height: 22px; }
+.dutyPill { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; color: oklch(45% 0.13 28); background: oklch(95% 0.04 28); }
+.assume { display: inline-flex; align-items: center; white-space: normal; text-align: center; gap: 4px; justify-self: center; max-width: 100%; padding: 2px 10px; border-radius: 9999px; border: 1px dashed oklch(60% 0.15 300); background: oklch(97% 0.02 300); color: oklch(42% 0.14 300); font-size: 12px; line-height: 1.5; }
+.assumeHidden .assume { display: none; }
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; padding: 16px; }
+  .panel { position: static; }
+}

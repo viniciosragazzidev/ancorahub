@@ -26,9 +26,10 @@ import {
   startWhatsAppConnection,
   toggleWhatsAppChatAction,
 } from "@/app/(dashboard)/settings/whatsapp-actions";
-import { PAIRING_BADGE_LABELS, PAIRING_TOASTS, PRESENCE_WHATSAPP_COPY, type PairingMethod } from "@/features/waha-cadence/pairing-copy";
+import { PAIRING_BADGE_LABELS, PAIRING_TOASTS, type PairingMethod } from "@/features/waha-cadence/pairing-copy";
 import { FadeSwap, PairingCodePanel, PairingGuide, PairingQrPanel, PairingStepper } from "./whatsapp-pairing-panel";
-import { PresenceWhatsAppCode, PresenceWhatsAppConnected, PresenceWhatsAppIntro } from "./presence-whatsapp-screens";
+import { PresenceGuide, type PresenceGuideDuty, type PresenceGuidePresence } from "@/components/chat/presence-guide/presence-guide";
+import { openWhatsAppApp } from "./open-whatsapp-app";
 
 type Connection = Awaited<ReturnType<typeof getWhatsAppConnection>>;
 type PollSnapshot = Extract<Awaited<ReturnType<typeof pollWhatsAppConnection>>, { success: true }>;
@@ -90,7 +91,12 @@ export function WhatsAppConnectDialog({
   initialMethod,
   variant = "default",
   onReady,
+  duty,
+  presence,
 }: {
+  /** Roteiro guiado da presença (09/11): o plantão e onde a presença está. Só com variant="presence". */
+  duty?: PresenceGuideDuty;
+  presence?: PresenceGuidePresence;
   /** "presence": tela enxuta da confirmação de presença (vantagens, privacidade, código e animação). */
   variant?: "default" | "presence";
   /** Chamado quando o WhatsApp fica conectado (ex.: confirmar presença segue sozinha). */
@@ -139,6 +145,9 @@ export function WhatsAppConnectDialog({
   const [generatingCode, setGeneratingCode] = useState(false);
   const [codeExpired, setCodeExpired] = useState(false);
   const [codeCooldownUntil, setCodeCooldownUntil] = useState(0);
+  // Roteiro de presença: o número do cadastro já foi consultado; e o motivo de não ter saído código (na tela, sem toast).
+  const [phoneChecked, setPhoneChecked] = useState(false);
+  const [codeIssue, setCodeIssue] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   // Refs espelham o que o loop de polling (fechado em um efeito) precisa ler
@@ -209,7 +218,7 @@ export function WhatsAppConnectDialog({
   // Aberto por outro CTA já no modo escolhido (confirmar presença): roda a mesma abertura do clique.
   const controlledOpened = useRef(false);
   useEffect(() => {
-    if (!initialMethod) return;
+    if (!initialMethod && variant !== "presence") return;
     if (controlledOpen && !controlledOpened.current) {
       controlledOpened.current = true;
       handleOpenChange(true);
@@ -295,12 +304,13 @@ export function WhatsAppConnectDialog({
       onReady?.();
       return;
     }
-    toast.success(PAIRING_TOASTS.connected);
+    if (variant !== "presence") toast.success(PAIRING_TOASTS.connected);
     // Mantém a tela de sucesso visível antes de fechar. O pai só é avisado
     // depois: ele pode trocar de árvore ao ver "conectado" e desmontar este
     // dialog no meio da animação.
     successTimer.current = window.setTimeout(() => {
-      updateOpen(false);
+      // No roteiro de presença a tela continua aberta: depois de "conectado" vem confirmar a presença.
+      if (variant !== "presence") updateOpen(false);
       onConnectionChanged?.();
       onReady?.();
       if (returnTo) router.replace(returnTo);
@@ -441,8 +451,9 @@ export function WhatsAppConnectDialog({
   function openWhatsAppExternal() {
     const isMobile = window.matchMedia("(max-width: 767px)").matches;
     if (isMobile) {
-      // Keep the native-app handoff in the user's current mobile/PWA context.
-      window.open("whatsapp://send", "_self");
+      // Keep the native-app handoff in the user's current mobile/PWA context. Só abre o app (09/11): o antigo
+      // `whatsapp://send` caía dentro da conversa com o número da empresa.
+      openWhatsAppApp();
       return;
     }
     window.open("https://web.whatsapp.com/", "_blank", "noopener,noreferrer");
@@ -515,7 +526,8 @@ export function WhatsAppConnectDialog({
         // O campo guarda DDD + número; o 55 é fixo na tela.
         if (result.phone) setPairingPhone((current) => current || result.phone!.slice(2));
       })
-      .catch(() => { phoneLoaded.current = false; });
+      .catch(() => { phoneLoaded.current = false; })
+      .finally(() => setPhoneChecked(true));
   }
 
   function chooseMethod(next: PairingMethod) {
@@ -533,6 +545,7 @@ export function WhatsAppConnectDialog({
     generatingRef.current = true;
     setGeneratingCode(true);
     setCodeExpired(false);
+    setCodeIssue(null);
     try {
       if (!connection.sessionId && !connectingRef.current) runStart({ forceNew: false });
       for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt += 1) {
@@ -561,23 +574,28 @@ export function WhatsAppConnectDialog({
           wake.current?.();
           return;
         }
-        toast.error(
+        reportCodeIssue(
           result.code === "INVALID_PHONE"
             ? "Confira o número: DDD + celular."
             : result.code === "PAIRING_CODE_UNSUPPORTED"
               ? "O servidor do WhatsApp ainda não aceita código. Use o QR Code por enquanto."
               : errorMessage(result.code),
-          { duration: 8_000 },
         );
         return;
       }
-      toast.error("O WhatsApp demorou para liberar o código. Tente de novo.");
+      reportCodeIssue("O WhatsApp demorou para liberar o código. Tente de novo.");
     } catch (error) {
       showUnexpectedActionError(error);
     } finally {
       generatingRef.current = false;
       setGeneratingCode(false);
     }
+  }
+
+  /** No roteiro de presença o motivo aparece na própria tela; no diálogo padrão, em toast. */
+  function reportCodeIssue(message: string) {
+    if (variant === "presence") setCodeIssue(message);
+    else toast.error(message, { duration: 8_000 });
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -693,57 +711,59 @@ export function WhatsAppConnectDialog({
   // Fases finais (finalizando, conectado) são as mesmas nos dois métodos.
   const cardKey = method === "code" && phase !== "pairing" && phase !== "ready" ? "code" : `qr-${phase === "pairing" || phase === "ready" ? "end" : "scan"}`;
 
-  // ── Variante "presença" (05/11) ──────────────────────────────────────
+  // ── Variante "presença": roteiro guiado (09/11) ─────────────────────
   const [presenceStarted, setPresenceStarted] = useState(false);
+  const [presenceDevice] = useState<"mobile" | "desktop">(() => (typeof window !== "undefined" && !prefersPairingCode() ? "desktop" : "mobile"));
   const presenceAutoCode = useRef(false);
   const presencePhoneValid = /^\d{10,11}$/.test(pairingPhone);
-  // Com o número já no cadastro, o código sai sozinho depois de "Gerar meu código".
+  // Com o número já no cadastro, o código sai sozinho depois de "Vamos lá" (no celular; no computador, só se escolher o código).
   useEffect(() => {
-    if (variant !== "presence" || !presenceStarted || ready || pairingCode || generatingCode || !presencePhoneValid || presenceAutoCode.current) return;
+    if (variant !== "presence" || method !== "code" || !presenceStarted || ready || pairingCode || generatingCode || !presencePhoneValid || presenceAutoCode.current) return;
     presenceAutoCode.current = true;
     void generatePairingCode();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dispara uma vez quando o número fica pronto
-  }, [variant, presenceStarted, ready, pairingCode, generatingCode, presencePhoneValid]);
+  }, [variant, method, presenceStarted, ready, pairingCode, generatingCode, presencePhoneValid]);
 
-  function startPresenceCode() {
+  function startPresence() {
     setPresenceStarted(true);
     loadPairingPhone();
-  }
-
-  /** Copia o código e abre o app do WhatsApp; no computador, só copia e pede para abrir no celular. */
-  async function openWhatsAppWithCode() {
-    if (pairingCode) await navigator.clipboard?.writeText(pairingCode.replace(/[^A-Z0-9]/gi, "")).catch(() => undefined);
-    if (window.matchMedia("(max-width: 767px), (pointer: coarse)").matches) {
-      window.open("whatsapp://send", "_self");
-      return;
-    }
-    toast.info(pairingCode ? `Código copiado. ${PRESENCE_WHATSAPP_COPY.openOnPhone}` : PRESENCE_WHATSAPP_COPY.openOnPhone);
   }
 
   if (variant === "presence") {
     return (
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogPopup className="max-w-md overflow-y-auto overscroll-contain">
-          {ready ? (
-            <PresenceWhatsAppConnected />
-          ) : !presenceStarted ? (
-            <PresenceWhatsAppIntro onStart={startPresenceCode} />
-          ) : (
-            <PresenceWhatsAppCode
-              onOpenWhatsApp={() => void openWhatsAppWithCode()}
-              panel={{
-                phase,
-                phone: pairingPhone,
-                onPhoneChange: setPairingPhone,
-                code: pairingCode,
-                generating: generatingCode,
-                cooldownSeconds: codeCooldownSeconds,
-                expired: codeExpired,
-                onGenerate: () => void generatePairingCode(),
-                onOpenWhatsApp: () => void openWhatsAppWithCode(),
-              }}
-            />
-          )}
+        <DialogPopup
+          className="inset-0 left-0 top-0 h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-0 p-0 sm:w-full sm:p-0 md:left-1/2 md:top-1/2 md:h-[min(680px,calc(100dvh-2rem))] md:w-[560px] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-[var(--radius-surface)]"
+        >
+          <DialogTitle className="sr-only">Conectar WhatsApp e confirmar presença</DialogTitle>
+          <DialogDescription className="sr-only">Passo a passo para conectar o seu WhatsApp e confirmar a presença no plantão.</DialogDescription>
+          <PresenceGuide
+            device={presenceDevice}
+            duty={duty ?? { key: "presenca", scheduleName: "Plantão", branchName: null, mode: "online", until: "" }}
+            presence={presence ?? { stage: "connect", onConfirm: () => undefined, onFinish: () => handleOpenChange(false) }}
+            onClose={() => handleOpenChange(false)}
+            connection={{
+              ready,
+              phase,
+              method,
+              onMethodChange: chooseMethod,
+              qrCode: hasQr ? connection.qrCode : null,
+              started: presenceStarted,
+              onStart: startPresence,
+              phone: pairingPhone,
+              phoneValid: presencePhoneValid,
+              phoneChecked,
+              onPhoneChange: setPairingPhone,
+              code: pairingCode,
+              generating: generatingCode,
+              expired: codeExpired,
+              cooldownSeconds: codeCooldownSeconds,
+              stalled,
+              connectivity,
+              issue: codeIssue,
+              onGenerate: () => void generatePairingCode(),
+            }}
+          />
         </DialogPopup>
       </Dialog>
     );

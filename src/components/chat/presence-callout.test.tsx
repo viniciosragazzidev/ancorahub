@@ -13,10 +13,19 @@ const gate = vi.fn();
 vi.mock("@/features/lead-distribution/duty-presence-whatsapp-actions", () => ({ getPresenceWhatsAppGateAction: () => gate() }));
 const connection = { tenantId: "t1", userId: "u1", sessionId: "s1", sessionName: "s1", status: "disconnected", qrCode: null, chatInternoAtivo: true, connectedAt: null };
 vi.mock("@/app/(dashboard)/settings/whatsapp-actions", () => ({ getWhatsAppConnection: async () => connection }));
-// O diálogo real conversa com o WhatsApp; aqui basta saber que abriu no código e avisar "conectado".
+// O diálogo real conversa com o WhatsApp e desenha o roteiro guiado; aqui basta abrir, avisar "conectado" e
+// tocar nos botões do roteiro (confirmar, ir para o plantão).
+type GuideProps = { open?: boolean; variant?: string; onReady?: () => void; presence?: { stage: string; reconnect?: boolean; onConfirm: () => void; onFinish: () => void } };
 vi.mock("@/components/whatsapp/whatsapp-connect-dialog", () => ({
-  WhatsAppConnectDialog: (props: { open?: boolean; initialMethod?: string; variant?: string; onReady?: () => void }) => props.open
-    ? <div role="dialog" aria-label="Conectar WhatsApp"><p>modo {props.initialMethod} {props.variant}</p><button type="button" onClick={props.onReady}>Simular conectado</button></div>
+  WhatsAppConnectDialog: (props: GuideProps) => props.open
+    ? (
+      <div role="dialog" aria-label="Conectar WhatsApp">
+        <p>{props.variant} {props.presence?.stage}{props.presence?.reconnect ? " reconectar" : ""}</p>
+        <button type="button" onClick={props.onReady}>Simular conectado</button>
+        <button type="button" onClick={props.presence?.onConfirm}>Confirmar no roteiro</button>
+        <button type="button" onClick={props.presence?.onFinish}>Ir para o Plantão</button>
+      </div>
+    )
     : null,
 }));
 
@@ -36,21 +45,29 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("PresenceCallout: WhatsApp obrigatório (06/11)", () => {
-  it("sem WhatsApp, abre a conexão no código com tutorial e confirma sozinho ao conectar", async () => {
+  it("sem WhatsApp, abre o roteiro guiado; conectado, confirma com um toque dentro dele (09/11)", async () => {
     gate.mockResolvedValue({ required: true, connected: false, connection });
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
     render(<PresenceCallout ask={base} />);
     fireEvent.click(screen.getByRole("button", { name: "Confirmar presença" }));
 
     expect(await screen.findByRole("dialog", { name: "Conectar WhatsApp" })).toBeTruthy();
-    expect(screen.getByText("modo code presence")).toBeTruthy();
-    expect(screen.getByText(/conecte o seu WhatsApp/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Conectar WhatsApp e confirmar" })).toBeTruthy();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText("presence connect")).toBeTruthy();
+    expect(screen.getByText(/Falta conectar o seu WhatsApp/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Continuar de onde parei" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Simular conectado" }));
-    expect(await screen.findByText("Presença confirmada")).toBeTruthy();
+    expect(await screen.findByText("presence confirm")).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar no roteiro" }));
+    expect(await screen.findByText("presence done")).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Presença confirmada")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ir para o Plantão" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(refresh).toHaveBeenCalled();
   });
 
   it("presencial sem WhatsApp: conecta antes e só depois abre a câmera", async () => {
@@ -62,7 +79,10 @@ describe("PresenceCallout: WhatsApp obrigatório (06/11)", () => {
     expect(await screen.findByRole("dialog", { name: "Conectar WhatsApp" })).toBeTruthy();
     expect(click).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Simular conectado" }));
+    expect(click).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar no roteiro" }));
     await waitFor(() => expect(click).toHaveBeenCalled());
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("se o servidor disser que o WhatsApp caiu, abre a conexão e tenta de novo ao conectar", async () => {
@@ -73,7 +93,9 @@ describe("PresenceCallout: WhatsApp obrigatório (06/11)", () => {
     render(<PresenceCallout ask={base} />);
     fireEvent.click(screen.getByRole("button", { name: "Confirmar presença" }));
     expect(await screen.findByRole("dialog", { name: "Conectar WhatsApp" })).toBeTruthy();
+    expect(screen.getByText("presence connect reconectar")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Simular conectado" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirmar no roteiro" }));
     expect(await screen.findByText("Presença confirmada")).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });

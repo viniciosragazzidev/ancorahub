@@ -64,11 +64,11 @@ describe("WhatsAppConnectDialog mobile access", () => {
     expect(mocks.info).not.toHaveBeenCalled();
   });
 
-  it("opens the native app in the current context on mobile, without a popup", async () => {
+  it("opens the native app in the current context on mobile, without a popup and without entering a chat", async () => {
     render(<WhatsAppConnectDialog initial={readyConnection} />);
     fireEvent.click(screen.getByRole("button", { name: "WhatsApp conectado" }));
     fireEvent.click(await screen.findByRole("button", { name: /Abrir WhatsApp/ }));
-    expect(window.open).toHaveBeenCalledWith("whatsapp://send", "_self");
+    expect(window.open).toHaveBeenCalledWith("whatsapp://", "_self");
     expect(mocks.start).not.toHaveBeenCalled();
   });
 
