@@ -93,3 +93,12 @@ describe("post-sale campaign counts", () => {
     expect(text).not.toContain("—");
   });
 });
+
+describe("escopo do gestor no reenvio", () => {
+  it("pesquisa de lead de outra unidade fica fora (não é lida, reenviada nem marcada)", async () => {
+    const { keepSurveysInUnit } = await import("./campaign-retry");
+    const surveys = [{ id: "s1", leadId: "l1" }, { id: "s2", leadId: "l2" }];
+    expect(keepSurveysInUnit(surveys, new Set(["l1"])).map((s) => s.id)).toEqual(["s1"]);
+    expect(keepSurveysInUnit(surveys, new Set())).toEqual([]);
+  });
+});

@@ -7,6 +7,7 @@ import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { resolvePostSaleAudience } from "./audience";
 import {
+  keepSurveysInUnit,
   classifyPostSaleRetry,
   emptyPostSaleCampaignCounts,
   nextPostSaleRetryAttempt,
@@ -112,6 +113,16 @@ export async function retryFailedPostSaleSurveys(context: TenantContext, campaig
       hasReply: Boolean(row.lastReplyAt), completed: Boolean(row.completedAt), superseded: Boolean(row.superseded),
     });
     if (kind) retryable.push({ id: row.id, leadId: row.leadId, brokerId: row.brokerId, status: row.status, outboundId: row.outboundId, kind });
+  }
+  // A manager only touches surveys of leads in his unit (lead unit, or the queue's): reading, re-queueing
+  // and marking failed never reach another unit (Vigia, 09/11).
+  if (context.role === "manager") {
+    const leadIds = [...new Set(retryable.map((survey) => survey.leadId))];
+    const inUnit = leadIds.length ? await db.select({ id: schema.leads.id }).from(schema.leads)
+      .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
+      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, leadIds), sql`coalesce(${schema.leads.branchId}, ${schema.leadQueues.branchId}) = ${context.branchId}`)) : [];
+    const kept = keepSurveysInUnit(retryable, new Set(inUnit.map((row) => row.id)));
+    retryable.splice(0, retryable.length, ...kept);
   }
   const result: PostSaleRetryResult & { retryable: number } = { requeued: 0, failed: 0, stillSkipped: {}, retryable: retryable.length };
   if (!retryable.length) return result;

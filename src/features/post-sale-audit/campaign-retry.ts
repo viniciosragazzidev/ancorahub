@@ -130,3 +130,8 @@ export function describePostSaleRetryResult(result: PostSaleRetryResult) {
   if (skipped.length) parts.push(`Continuam fora: ${skipped.map(([reason, count]) => `${count} ${reason}`).join("; ")}`);
   return `${parts.join(". ")}.`;
 }
+
+/** Manager scope: keep only surveys whose lead is in his unit (the rest is never read, re-queued or marked). */
+export function keepSurveysInUnit<T extends { leadId: string }>(surveys: readonly T[], leadIdsInUnit: ReadonlySet<string>): T[] {
+  return surveys.filter((survey) => leadIdsInUnit.has(survey.leadId));
+}
