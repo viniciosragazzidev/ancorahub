@@ -106,6 +106,31 @@ export function HomeScreenArt({ platform }: { platform: GuidePlatform }) {
   );
 }
 
+/** Aviso antes de abrir: a tela inicial (Conversas) com o toque nos 3 pontinhos (no iPhone, em Configurações). */
+export function BeforeOpenArt({ platform }: { platform: GuidePlatform }) {
+  return (
+    <div className={styles.mock} style={{ width: 150, height: 170, borderRadius: 24 }} aria-hidden="true">
+      <div className={styles.mockTop}>
+        <span className={styles.mockBrand}><WaIcon /> WhatsApp</span>
+        <span className={styles.mockDots} style={platform === "android" ? { background: "var(--wa-soft)", color: "var(--wa-ink)", outline: "2px solid var(--wa)" } : undefined}>
+          ⋮{platform === "android" ? <Tap style={{ left: 1, top: 1 }} dot={false} /> : null}
+        </span>
+      </div>
+      <div className={styles.listTitle} style={{ fontSize: 12 }}>Conversas</div>
+      {[0, 1].map((index) => <div key={index} className={styles.convRow} style={{ marginTop: 6 }}><span className={styles.convAvatar} style={{ width: 20, height: 20 }} /><span className={styles.convLine} /></div>)}
+      {platform === "iphone" ? (
+        <div style={{ position: "absolute", left: 8, right: 8, bottom: 8, display: "flex", justifyContent: "space-around", alignItems: "center", height: 30, borderTop: "1px solid var(--border)" }}>
+          {[0, 1, 2, 3].map((index) => (
+            <span key={index} style={{ position: "relative", width: 18, height: 18, borderRadius: 9999, background: index === 3 ? "var(--wa-soft)" : "var(--surface-muted)", outline: index === 3 ? "2px solid var(--wa)" : undefined }}>
+              {index === 3 ? <Tap style={{ left: -4, top: -4 }} dot={false} /> : null}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** O caminho dentro do WhatsApp: um toque por cena, avançando pelo corretor (não por tempo). */
 export function PhoneMock({ platform, scene }: { platform: GuidePlatform; scene: number }) {
   const reduce = useReducedMotion();

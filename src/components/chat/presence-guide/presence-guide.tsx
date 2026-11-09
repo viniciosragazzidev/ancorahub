@@ -10,7 +10,7 @@ import { PRESENCE_GUIDE_COPY as COPY } from "@/features/waha-cadence/pairing-cop
 import { cn } from "@/utils/core/cn";
 
 import {
-  AttentionArt, BigCheck, CameraIcon, CheckIcon, CloseIcon, CopyIcon, guideEase, HomeScreenArt, LockIcon, PhoneMock,
+  AttentionArt, BeforeOpenArt, BigCheck, CameraIcon, CheckIcon, CloseIcon, CopyIcon, guideEase, HomeScreenArt, LockIcon, PhoneMock,
   Tiles, TilesSkeleton, WaIcon, WaitDots, WaitingMock, WelcomeArt,
 } from "./presence-guide-art";
 import {
@@ -62,7 +62,7 @@ export type PresenceGuidePresence = {
 };
 
 /** Só para o protótipo (/dev/roteiro-presenca) e testes: abre direto numa etapa ou estado. */
-export type PresenceGuidePreview = { step?: GuideStep; scene?: number; local?: LocalIssue | null; copied?: boolean; sheet?: "ajuda" | "sair" | null; platform?: GuidePlatform; openedHome?: boolean };
+export type PresenceGuidePreview = { step?: GuideStep; scene?: number; local?: LocalIssue | null; copied?: boolean; sheet?: "ajuda" | "sair" | "abrir" | null; platform?: GuidePlatform; openedHome?: boolean };
 
 export function PresenceGuide({ device, connection, duty, presence, onClose, openWhatsApp, preview }: {
   device: GuideDevice;
@@ -81,7 +81,9 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   const [platform, setPlatform] = React.useState<GuidePlatform>(preview?.platform ?? "android");
   const [copied, setCopied] = React.useState(preview?.copied ?? false);
   const [local, setLocal] = React.useState<LocalIssue | null>(preview?.local ?? null);
-  const [sheet, setSheet] = React.useState<"ajuda" | "sair" | null>(preview?.sheet ?? null);
+  const [sheet, setSheet] = React.useState<"ajuda" | "sair" | "abrir" | null>(preview?.sheet ?? null);
+  // O que fazer depois de abrir o WhatsApp pelo aviso "Quando o WhatsApp abrir" (seguir para a próxima etapa).
+  const afterOpen = React.useRef<(() => void) | null>(null);
   const [openedHome, setOpenedHome] = React.useState(preview?.openedHome ?? false);
   const [video, setVideo] = React.useState(false);
   const [showSteps, setShowSteps] = React.useState(false);
@@ -148,6 +150,19 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
       if (notOpenedTimer.current) window.clearTimeout(notOpenedTimer.current);
     };
   }, []);
+
+  /** Antes de sair do app, o aviso: tela inicial e 3 pontinhos. O app abre pelo botão do aviso (toque do corretor). */
+  function askToOpenWhatsApp(then?: () => void) {
+    afterOpen.current = then ?? null;
+    setSheet("abrir");
+  }
+
+  function confirmOpenWhatsApp() {
+    setSheet(null);
+    afterOpen.current?.();
+    afterOpen.current = null;
+    launchWhatsApp();
+  }
 
   function launchWhatsApp() {
     const missing = () => setLocal("notOpened");
@@ -306,7 +321,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
         );
         cta$ = openedHome
           ? <button type="button" className={styles.cta} onClick={() => { setScene(0); setLocalStep("caminho"); }}>{COPY.home.cta}</button>
-          : <button type="button" className={styles.cta} data-tone="whatsapp" onClick={() => { setOpenedHome(true); launchWhatsApp(); }}><WaIcon light /> {COPY.home.open}</button>;
+          : <button type="button" className={styles.cta} data-tone="whatsapp" onClick={() => askToOpenWhatsApp(() => setOpenedHome(true))}><WaIcon light /> {COPY.home.open}</button>;
         break;
       case "caminho":
         scene$ = (
@@ -322,7 +337,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
         );
         cta$ = scene < 3
           ? <button type="button" className={styles.cta} onClick={() => setScene(scene + 1)}>{COPY.path.next}</button>
-          : <button type="button" className={styles.cta} data-tone="whatsapp" onClick={() => { setLocalStep("esperando"); launchWhatsApp(); }}><WaIcon light /> {COPY.path.cta}</button>;
+          : <button type="button" className={styles.cta} data-tone="whatsapp" onClick={() => askToOpenWhatsApp(() => setLocalStep("esperando"))}><WaIcon light /> {COPY.path.cta}</button>;
         break;
       case "esperando":
         scene$ = (
@@ -335,7 +350,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
             </div>
           </>
         );
-        cta$ = <button type="button" className={styles.cta} data-tone="whatsapp" onClick={launchWhatsApp}><WaIcon light /> {COPY.waiting.cta}</button>;
+        cta$ = <button type="button" className={styles.cta} data-tone="whatsapp" onClick={() => askToOpenWhatsApp()}><WaIcon light /> {COPY.waiting.cta}</button>;
         break;
       case "conectado":
         scene$ = (
@@ -416,9 +431,23 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
         {sheet ? (
           <>
             <motion.div key="scrim" className={styles.sheetScrim} onClick={() => setSheet(null)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} />
-            <motion.div key="sheet" className={styles.sheet} role="dialog" aria-label={sheet === "ajuda" ? COPY.help.title : COPY.exit.title} initial={reduce ? { opacity: 0 } : { y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={reduce ? { opacity: 0 } : { y: 30, opacity: 0 }} transition={{ duration: 0.28, ease: guideEase }}>
+            <motion.div key="sheet" className={styles.sheet} role="dialog" aria-label={sheet === "ajuda" ? COPY.help.title : sheet === "abrir" ? COPY.beforeOpen.title : COPY.exit.title} initial={reduce ? { opacity: 0 } : { y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={reduce ? { opacity: 0 } : { y: 30, opacity: 0 }} transition={{ duration: 0.28, ease: guideEase }}>
               <span className={styles.sheetGrip} />
-              {sheet === "ajuda" ? (
+              {sheet === "abrir" ? (
+                <>
+                  <span className={styles.sheetTitle}>{COPY.beforeOpen.title}</span>
+                  <ol className={styles.list} style={{ padding: "0 12px 4px" }}>
+                    {COPY.beforeOpen.steps[platform].map((text, index) => (
+                      <li key={text} className={styles.listItem} data-on="true"><span className={styles.listNum}>{index + 1}</span>{text}</li>
+                    ))}
+                  </ol>
+                  <div className={styles.art} style={{ padding: "4px 0" }}><BeforeOpenArt platform={platform} /></div>
+                  <div className={styles.sheetActions}>
+                    <button type="button" className={styles.cta} data-tone="whatsapp" onClick={confirmOpenWhatsApp}><WaIcon light /> {COPY.beforeOpen.cta}</button>
+                    <button type="button" className={styles.ghost} onClick={() => setSheet(null)}>{COPY.beforeOpen.back}</button>
+                  </div>
+                </>
+              ) : sheet === "ajuda" ? (
                 <>
                   <span className={styles.sheetTitle}>{COPY.help.title}</span>
                   <button type="button" className={styles.sheetItem} onClick={() => { setSheet(null); setVideo(true); }}><span className={styles.sheetItemTitle}>{COPY.help.video[0]}</span><span className={styles.sheetItemText}>{COPY.help.video[1]}</span></button>

@@ -38,6 +38,11 @@ describe("PresenceGuide (roteiro guiado de presença, 09/11)", () => {
     expect(screen.getByText("Abra o WhatsApp e confira se está na tela Conversas.")).toBeTruthy();
     expect(screen.getByText("3 de 7")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Abrir o WhatsApp/ }));
+    // Antes de sair do app, o aviso: tela inicial e 3 pontinhos. Só o botão do aviso abre o WhatsApp.
+    expect(open).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Quando o WhatsApp abrir:" })).toBeTruthy();
+    expect(screen.getByText(/toque nos 3 pontinhos/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Entendi, abrir o WhatsApp/ }));
     expect(open).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Estou na tela de Conversas" }));
     expect(screen.getByText("Agora, no WhatsApp, você vai tocar em 4 lugares. Veja:")).toBeTruthy();
@@ -48,6 +53,7 @@ describe("PresenceGuide (roteiro guiado de presença, 09/11)", () => {
     const open = vi.fn();
     render(<PresenceGuide device="mobile" connection={connection()} duty={duty} presence={presence()} onClose={vi.fn()} openWhatsApp={open} preview={{ step: "caminho" }} />);
     for (let i = 0; i < 3; i += 1) fireEvent.click(screen.getByRole("button", { name: "Próximo toque" }));
+    fireEvent.click(screen.getByRole("button", { name: /Abrir o WhatsApp/ }));
     fireEvent.click(screen.getByRole("button", { name: /Entendi, abrir o WhatsApp/ }));
     expect(open).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Colou o código no WhatsApp? Estou esperando a confirmação.")).toBeTruthy();

@@ -149,9 +149,11 @@ export function RoteiroPresencaPreview() {
         ...current.preview,
         scene: cena >= 0 && cena <= 3 ? cena : 0,
         platform: p.get("plataforma") === "iphone" ? "iphone" : "android",
-        sheet: folha === "ajuda" || folha === "sair" ? folha : null,
+        sheet: folha === "ajuda" || folha === "sair" || folha === "abrir" ? folha : null,
       },
     }));
+    // Remonta o roteiro com os extras (ele lê a prévia só ao montar).
+    setMount((m) => m + 1);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [apply]);
 
