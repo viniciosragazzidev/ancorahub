@@ -15,18 +15,18 @@ async function handle(request: NextRequest) {
   if (!isBearerAuthorized(request, secret)) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
-  try {
-    const result = await runCustomerWaitingSweep();
-    // Pós-venda R0 (cliente que volta a escrever): mesma cadência, desligada por empresa por padrão.
-    const postSaleR0 = await runPostSaleR0Sweep().catch((error) => {
-      console.error("[post-sale-r0 cron] failed", error instanceof Error ? error.message : "unknown_error");
-      return null;
-    });
-    return NextResponse.json({ success: true, result, postSaleR0 });
-  } catch (error) {
+  // Each sweep fails alone: an error in "cliente aguardando" never stops the R0 sweep, and vice versa (Vigia).
+  const result = await runCustomerWaitingSweep().catch((error) => {
     console.error("[customer-waiting cron] failed", error instanceof Error ? error.message : "unknown_error");
-    return NextResponse.json({ success: false, error: "Customer waiting sweep unavailable" }, { status: 500 });
-  }
+    return null;
+  });
+  // Pós-venda R0 (cliente que volta a escrever): mesma cadência, desligada por empresa por padrão.
+  const postSaleR0 = await runPostSaleR0Sweep().catch((error) => {
+    console.error("[post-sale-r0 cron] failed", error instanceof Error ? error.message : "unknown_error");
+    return null;
+  });
+  if (!result) return NextResponse.json({ success: false, error: "Customer waiting sweep unavailable", postSaleR0 }, { status: 500 });
+  return NextResponse.json({ success: true, result, postSaleR0 });
 }
 
 async function handleGET(request: NextRequest) { return handle(request); }

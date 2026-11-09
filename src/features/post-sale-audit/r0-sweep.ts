@@ -60,7 +60,8 @@ function bump(result: PostSaleR0SweepResult, reason: R0SkipReason | "already_sta
 export async function runPostSaleR0Sweep(now = new Date()): Promise<PostSaleR0SweepResult> {
   const empty: PostSaleR0SweepResult = { tenants: 0, waiting: 0, started: 0, skipped: {}, escalated: 0, resolved: 0 };
   if (await getFeatureFlag(FEATURE_FLAGS.POST_SALE_AUDIT).catch(() => "false") !== "true") return empty;
-  const leased = await withJobLease("post-sale-r0", 4 * 60_000, () => sweepAllTenants(now));
+  const leased = await withJobLease("post-sale-r0", 110_000, // under the route maxDuration (120 s): a timed-out run never blocks the next one (Vigia)
+    () => sweepAllTenants(now));
   return leased.acquired ? leased.value : { ...empty, lease: "busy" };
 }
 
