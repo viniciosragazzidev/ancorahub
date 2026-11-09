@@ -1,4 +1,5 @@
 import { isPostSaleAlertOpen } from "./alert-rules";
+import { matchesPostSaleRuleFilter, type PostSaleRuleFilter } from "./auto-rules";
 
 export type PostSaleReportBroker = { id: string; name: string };
 
@@ -53,6 +54,8 @@ export function aggregatePostSaleBrokerReport(input: {
   surveys: PostSaleReportSurvey[];
   from: Date;
   to: Date;
+  /** Só as pesquisas de uma origem: manual, R0 ou uma regra da régua (R1 a R5). Padrão: todas. */
+  ruleFilter?: PostSaleRuleFilter;
 }): PostSaleBrokerReportRow[] {
   const rows = new Map<string, PostSaleBrokerReportRow>();
   const names = new Map(input.brokers.map((broker) => [broker.id, broker.name]));
@@ -86,6 +89,7 @@ export function aggregatePostSaleBrokerReport(input: {
 
   for (const survey of input.surveys) {
     if (!survey.brokerId) continue;
+    if (!matchesPostSaleRuleFilter(survey.ruleKey, input.ruleFilter ?? "all")) continue;
     const sentAt = timestamp(survey.sentAt);
     if (sentAt === null || sentAt < from || sentAt >= to) continue;
     const row = ensure(survey.brokerId);

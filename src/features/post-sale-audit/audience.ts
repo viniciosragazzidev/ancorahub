@@ -148,13 +148,17 @@ async function selectCandidates(context: TenantContext, audience: PostSaleAudien
     .orderBy(asc(selectedLead.createdAt), asc(selectedLead.id));
 }
 
-export async function resolvePostSaleAudience(context: TenantContext, audience: PostSaleAudience, now = new Date()): Promise<PostSaleAudiencePreview> {
+/**
+ * `cooldownDays`: intervalo mínimo entre conversas de pós-venda do mesmo lead. A campanha manual usa 60
+ * dias; a régua automática usa 30 (plano 06/11), contando manual, R0 e régua juntas.
+ */
+export async function resolvePostSaleAudience(context: TenantContext, audience: PostSaleAudience, now = new Date(), options: { cooldownDays?: number } = {}): Promise<PostSaleAudiencePreview> {
   const db = getDatabase();
   const leads = await selectCandidates(context, audience);
   const emptyExcluded = Object.fromEntries(Object.keys(POST_SALE_EXCLUSION_LABELS).map((key) => [key, 0])) as Record<PostSaleExclusionReason, number>;
   if (!leads.length) return { totalSelected: 0, totalEligible: 0, canStart: false, excluded: emptyExcluded, examples: [], recipients: [], skippedRecipients: [] };
   const leadIds = leads.map((lead) => lead.leadId);
-  const cooldownDate = new Date(now.getTime() - POST_SALE_SURVEY_COOLDOWN_DAYS * 86_400_000);
+  const cooldownDate = new Date(now.getTime() - (options.cooldownDays ?? POST_SALE_SURVEY_COOLDOWN_DAYS) * 86_400_000);
   const humanCutoff = new Date(now.getTime() - 24 * 3_600_000);
 
   const [messages, conversations, recentSurveys, optOuts, humanMessages, metaChannels, wahaNumbers] = await Promise.all([

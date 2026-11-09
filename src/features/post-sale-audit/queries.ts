@@ -4,6 +4,7 @@ import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql } from "dri
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { postSaleAlertReasons } from "./alert-rules";
+import type { PostSaleRuleFilter } from "./auto-rules";
 import { aggregatePostSaleBrokerReport, type PostSaleBrokerReportRow, type PostSaleReportBroker, type PostSaleReportSurvey } from "./reporting";
 
 export type PostSaleReportWindow = { from: Date; to: Date };
@@ -27,7 +28,7 @@ function canReadPostSale(context: TenantContext) {
   return (context.role === "director" || context.role === "manager") && (context.role !== "manager" || Boolean(context.branchId));
 }
 
-export async function loadPostSaleBrokerReport(context: TenantContext, window: PostSaleReportWindow): Promise<PostSaleBrokerReportRow[]> {
+export async function loadPostSaleBrokerReport(context: TenantContext, window: PostSaleReportWindow, ruleFilter: PostSaleRuleFilter = "all"): Promise<PostSaleBrokerReportRow[]> {
   if (!canReadPostSale(context)) return [];
   const db = getDatabase();
   const branchFilter = branchWhere(context);
@@ -86,7 +87,7 @@ export async function loadPostSaleBrokerReport(context: TenantContext, window: P
     alertsHandledAt: survey.alertsHandledAt,
     ruleKey: survey.ruleKey,
   }));
-  return aggregatePostSaleBrokerReport({ brokers: identities, surveys, from: window.from, to: window.to });
+  return aggregatePostSaleBrokerReport({ brokers: identities, surveys, from: window.from, to: window.to, ruleFilter });
 }
 
 export async function loadPostSaleBrokerSummary(context: TenantContext, brokerId: string, window: PostSaleReportWindow): Promise<PostSaleBrokerReportRow | null> {

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getPostSaleSurveyMessagesAction } from "@/features/post-sale-audit/actions";
+import { matchesPostSaleRuleFilter, postSaleRuleLabel, POST_SALE_RULE_FILTERS, type PostSaleRuleFilter } from "@/features/post-sale-audit/auto-rules";
 import { answerChips, matchesSearch, paginate, RESPONSE_GROUP_LABELS, responseGroups, type AnswerChip, type ResponseGroup } from "@/features/post-sale-audit/responses-view";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +16,7 @@ export type PostSaleResponseRow = {
   leadName: string;
   brokerName: string | null;
   campaignName: string;
+  ruleKey: string | null;
   status: string;
   outcome: string | null;
   rating: number | null;
@@ -37,6 +39,7 @@ const dateTime = (value: string | null) => value ? new Date(value).toLocaleStrin
 export function PostSaleResponses({ responses }: { responses: PostSaleResponseRow[] }) {
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<ResponseGroup>("all");
+  const [rule, setRule] = useState<PostSaleRuleFilter>("all");
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, Message[] | "loading" | string>>({});
@@ -48,9 +51,12 @@ export function PostSaleResponses({ responses }: { responses: PostSaleResponseRo
     for (const groups of groupsById.values()) for (const item of groups) counts[item] += 1;
     return counts;
   }, [groupsById, responses.length]);
+  // Origem da pesquisa (manual, R0 ou régua R1 a R5): só aparecem as que têm resposta.
+  const ruleOptions = useMemo(() => POST_SALE_RULE_FILTERS.filter((key) => key === "all" || responses.some((row) => matchesPostSaleRuleFilter(row.ruleKey, key))), [responses]);
   const filtered = useMemo(() => responses.filter((row) =>
-    (group === "all" || groupsById.get(row.id)?.includes(group))
-    && matchesSearch([row.leadName, row.brokerName, typeof row.answers.comment === "string" ? row.answers.comment : null], query)), [responses, query, group, groupsById]);
+    matchesPostSaleRuleFilter(row.ruleKey, rule)
+    && (group === "all" || groupsById.get(row.id)?.includes(group))
+    && matchesSearch([row.leadName, row.brokerName, typeof row.answers.comment === "string" ? row.answers.comment : null], query)), [responses, query, group, groupsById, rule]);
   const view = paginate(filtered, page);
 
   async function toggle(row: PostSaleResponseRow) {
@@ -91,6 +97,19 @@ export function PostSaleResponses({ responses }: { responses: PostSaleResponseRo
             </button>
           ))}
         </div>
+        {ruleOptions.length > 2 ? <div role="group" aria-label="Separar respostas por origem" className="flex flex-wrap gap-2 pb-1">
+          {ruleOptions.map((key) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={rule === key}
+              onClick={() => { setRule(key); setPage(1); }}
+              className={cn("min-h-9 rounded-full border px-3 text-xs font-medium transition-colors", rule === key ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground")}
+            >
+              {key === "all" ? "Todas as origens" : key === "manual" ? "Manual" : key}
+            </button>
+          ))}
+        </div> : null}
         {view.items.length ? view.items.map((row) => {
           const chips = answerChips(row);
           const loaded = messages[row.id];
@@ -99,7 +118,7 @@ export function PostSaleResponses({ responses }: { responses: PostSaleResponseRo
               <button type="button" className="flex min-h-14 w-full items-center justify-between gap-3 px-3 py-2 text-left" aria-expanded={open === row.id} aria-controls={`pos-venda-resposta-${row.id}`} onClick={() => void toggle(row)}>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{row.leadName}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{row.brokerName ?? "Sem corretor"} · respondeu {dateTime(row.lastReplyAt)}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{row.brokerName ?? "Sem corretor"} · {postSaleRuleLabel(row.ruleKey)} · respondeu {dateTime(row.lastReplyAt)}</span>
                 </span>
                 <span className="flex shrink-0 flex-wrap justify-end gap-1">
                   {chips.map((chip) => <span key={chip.label} className={cn("rounded-full px-2 py-0.5 text-xs font-medium", chipTone[chip.tone])}>{chip.label}</span>)}

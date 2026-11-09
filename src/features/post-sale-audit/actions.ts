@@ -20,6 +20,9 @@ import { postSaleAudienceSchema, POST_SALE_CAMPAIGN_MAX_LEADS } from "./rules";
 import { resolvePostSaleAudience } from "./audience";
 import { parseR0Settings, postSaleR0SettingKey, serializeR0Settings, type R0Settings } from "./r0-rules";
 import { POST_SALE_META_TEMPLATE, POST_SALE_WAHA_OPENING_DEFAULT } from "./template-contract";
+import { autoRuleSettingsInputSchema, parsePostSaleRuleFilter, type AutoRuleSettings, type PostSaleRuleFilter } from "./auto-rules";
+import { AutoRulesTableMissingError, loadAutoRules, saveAutoRule } from "./auto-rules-store";
+import { previewAutoRule, type AutoRulePreview } from "./auto-sweep";
 
 const campaignInput = z.object({
   name: z.string().trim().min(2, "Informe o nome da campanha.").max(120),
@@ -52,6 +55,7 @@ async function authorizedContext() {
 function safeFailure(error: unknown): string {
   if (error instanceof z.ZodError) return error.issues[0]?.message ?? "Confira os campos da campanha.";
   if (error instanceof PostSaleActionError) return error.message;
+  if (error instanceof AutoRulesTableMissingError) return error.message;
   console.error("[post-sale-audit] action failed", error);
   return "Não foi possível concluir a operação agora.";
 }
@@ -321,34 +325,38 @@ function postSaleWindow(periodDays: number, now = new Date()) {
   return { from: new Date(now.getTime() - periodDays * 86_400_000), to: new Date(now.getTime() + 1) };
 }
 
-export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30): Promise<ActionResult<{
+export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30, rawRuleFilter: unknown = "all"): Promise<ActionResult<{
   brokers: Array<{ id: string; name: string }>;
   queues: Array<{ id: string; name: string }>;
-  campaigns: Array<{ id: string; name: string; status: string; totals: Record<string, number>; createdAt: string }>;
-  responses: Array<{ id: string; leadId: string; leadName: string; brokerName: string | null; campaignName: string; status: string; outcome: string | null; rating: number | null; answers: Record<string, unknown>; sentAt: string | null; lastReplyAt: string | null }>;
+  branches: Array<{ id: string; name: string }>;
+  campaigns: Array<{ id: string; name: string; ruleKey: string | null; status: string; totals: Record<string, number>; createdAt: string }>;
+  responses: Array<{ id: string; leadId: string; leadName: string; brokerName: string | null; campaignName: string; ruleKey: string | null; status: string; outcome: string | null; rating: number | null; answers: Record<string, unknown>; sentAt: string | null; lastReplyAt: string | null }>;
   report: PostSaleBrokerReportRow[];
   alerts: Awaited<ReturnType<typeof loadPostSaleOpenAlerts>>;
   periodDays: number;
   r0: R0Settings & { canEdit: boolean };
+  ruleFilter: PostSaleRuleFilter;
+  autoRules: { ready: boolean; canEdit: boolean; rules: AutoRuleSettings[] };
 }>> {
   try {
     const context = await authorizedContext();
     const periodDays = postSalePeriodSchema.parse(rawPeriodDays);
+    const ruleFilter = parsePostSaleRuleFilter(rawRuleFilter);
     const window = postSaleWindow(periodDays);
     const db = getDatabase();
     const branchFilter = context.role === "manager" ? context.branchId : undefined;
     const r0Settings = parseR0Settings(await getSystemSetting(postSaleR0SettingKey(context.tenantId)).catch(() => null));
-    const [brokers, queues, campaigns, responses, report, alerts] = await Promise.all([
+    const [brokers, queues, campaigns, responses, report, alerts, branches, autoRules] = await Promise.all([
       db.select({ id: schema.tenantMemberships.userId, name: schema.user.name }).from(schema.tenantMemberships)
         .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
         .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), branchFilter ? eq(schema.tenantMemberships.branchId, branchFilter) : undefined))
         .orderBy(schema.user.name),
       db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name }).from(schema.leadQueues).where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"), isNull(schema.leadQueues.deletedAt), branchFilter ? or(eq(schema.leadQueues.branchId, branchFilter), isNull(schema.leadQueues.branchId)) : undefined)).orderBy(schema.leadQueues.name),
-      db.select({ id: schema.postSaleCampaigns.id, name: schema.postSaleCampaigns.name, status: schema.postSaleCampaigns.status, totals: schema.postSaleCampaigns.totals, createdAt: schema.postSaleCampaigns.createdAt }).from(schema.postSaleCampaigns)
+      db.select({ id: schema.postSaleCampaigns.id, name: schema.postSaleCampaigns.name, ruleKey: schema.postSaleCampaigns.ruleKey, status: schema.postSaleCampaigns.status, totals: schema.postSaleCampaigns.totals, createdAt: schema.postSaleCampaigns.createdAt }).from(schema.postSaleCampaigns)
         .where(and(eq(schema.postSaleCampaigns.tenantId, context.tenantId), context.role === "manager" ? eq(schema.postSaleCampaigns.createdBy, context.userId) : undefined))
         .orderBy(desc(schema.postSaleCampaigns.createdAt)).limit(20),
       // Only clients who answered (09/11, Vinicios: "ir para os leads que responderam de forma fácil").
-      db.select({ id: schema.postSaleSurveys.id, leadId: schema.postSaleSurveys.leadId, leadName: schema.leads.nome, brokerName: schema.user.name, campaignName: schema.postSaleCampaigns.name, status: schema.postSaleSurveys.status, outcome: schema.postSaleSurveys.outcome, rating: schema.postSaleSurveys.rating, answers: schema.postSaleSurveys.answers, sentAt: schema.postSaleSurveys.sentAt, lastReplyAt: schema.postSaleSurveys.lastReplyAt, createdAt: schema.postSaleSurveys.createdAt })
+      db.select({ id: schema.postSaleSurveys.id, leadId: schema.postSaleSurveys.leadId, leadName: schema.leads.nome, brokerName: schema.user.name, campaignName: schema.postSaleCampaigns.name, ruleKey: schema.postSaleSurveys.ruleKey, status: schema.postSaleSurveys.status, outcome: schema.postSaleSurveys.outcome, rating: schema.postSaleSurveys.rating, answers: schema.postSaleSurveys.answers, sentAt: schema.postSaleSurveys.sentAt, lastReplyAt: schema.postSaleSurveys.lastReplyAt, createdAt: schema.postSaleSurveys.createdAt })
         .from(schema.postSaleSurveys)
         .leftJoin(schema.user, eq(schema.user.id, schema.postSaleSurveys.brokerId))
         .innerJoin(schema.leads, and(eq(schema.leads.id, schema.postSaleSurveys.leadId), eq(schema.leads.tenantId, schema.postSaleSurveys.tenantId)))
@@ -356,8 +364,12 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30): P
         .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
         .where(and(eq(schema.postSaleSurveys.tenantId, context.tenantId), isNotNull(schema.postSaleSurveys.lastReplyAt), isNull(schema.leads.deletedAt), branchFilter ? sql`coalesce(${schema.leads.branchId}, ${schema.leadQueues.branchId}) = ${branchFilter}` : undefined))
         .orderBy(desc(schema.postSaleSurveys.lastReplyAt), desc(schema.postSaleSurveys.createdAt)).limit(300),
-      loadPostSaleBrokerReport(context, window),
+      loadPostSaleBrokerReport(context, window, ruleFilter),
       loadPostSaleOpenAlerts(context),
+      db.select({ id: schema.branches.id, name: schema.branches.name }).from(schema.branches)
+        .where(and(eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.status, "active"), branchFilter ? eq(schema.branches.id, branchFilter) : undefined))
+        .orderBy(schema.branches.name),
+      loadAutoRules(context.tenantId),
     ]);
     await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_report", entityId: "workspace", action: "post_sale_report.viewed", metadata: { periodDays, brokerRows: report.length, openAlerts: alerts.length } });
     return { ok: true, data: {
@@ -369,6 +381,9 @@ export async function getPostSaleWorkspaceAction(rawPeriodDays: unknown = 30): P
       alerts,
       periodDays,
       r0: { ...r0Settings, canEdit: context.role === "director" },
+      ruleFilter,
+      branches,
+      autoRules: { ready: autoRules.ready, canEdit: context.role === "director" && autoRules.ready, rules: autoRules.rules },
     } };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };
@@ -544,3 +559,56 @@ export async function markPostSaleAlertHandledAction(rawSurveyId: unknown): Prom
   }
 }
 
+
+/** Confere que filas, unidades e corretores escolhidos existem nesta empresa. */
+async function assertAutoRuleReferences(tenantId: string, input: { filters: { queueIds: string[]; branchIds: string[] }; pilot: { queueIds: string[]; brokerIds: string[] } }) {
+  const db = getDatabase();
+  const queueIds = [...new Set([...input.filters.queueIds, ...input.pilot.queueIds])];
+  const branchIds = [...new Set(input.filters.branchIds)];
+  const brokerIds = [...new Set(input.pilot.brokerIds)];
+  const [queues, branches, brokers] = await Promise.all([
+    queueIds.length ? db.select({ id: schema.leadQueues.id }).from(schema.leadQueues).where(and(eq(schema.leadQueues.tenantId, tenantId), inArray(schema.leadQueues.id, queueIds), isNull(schema.leadQueues.deletedAt))) : [],
+    branchIds.length ? db.select({ id: schema.branches.id }).from(schema.branches).where(and(eq(schema.branches.tenantId, tenantId), inArray(schema.branches.id, branchIds))) : [],
+    brokerIds.length ? db.select({ id: schema.tenantMemberships.userId }).from(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.tenantId, tenantId), inArray(schema.tenantMemberships.userId, brokerIds))) : [],
+  ]);
+  if (queues.length !== queueIds.length) throw new PostSaleActionError("Uma das filas escolhidas não existe mais. Atualize a página.");
+  if (branches.length !== branchIds.length) throw new PostSaleActionError("Uma das unidades escolhidas não existe mais. Atualize a página.");
+  if (new Set(brokers.map((row) => row.id)).size !== brokerIds.length) throw new PostSaleActionError("Um dos corretores escolhidos não está mais na empresa. Atualize a página.");
+}
+
+/**
+ * Régua automática (R1 a R5): liga ou desliga uma regra e ajusta atraso, filtros, limite e piloto.
+ * Só diretor. Fica em `post_sale_rules`; sem a tabela, avisa que o SQL ainda não rodou.
+ */
+export async function savePostSaleAutoRuleAction(raw: unknown): Promise<ActionResult<AutoRuleSettings>> {
+  try {
+    const context = await authorizedContext();
+    if (context.role !== "director") throw new PostSaleActionError("Apenas diretores podem alterar a régua automática.");
+    const input = autoRuleSettingsInputSchema.parse(raw);
+    await assertAutoRuleReferences(context.tenantId, input);
+    const saved = await saveAutoRule(context.tenantId, input, context.userId);
+    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_rule", entityId: input.key, action: "post_sale.auto_rule.updated", metadata: {
+      enabled: saved.enabled,
+      delayBusinessDays: saved.delayBusinessDays,
+      dailyLimit: saved.dailyLimit,
+      filters: { queues: saved.filters.queueIds.length, branches: saved.filters.branchIds.length, leadTypes: saved.filters.leadTypes },
+      pilot: { queues: saved.pilot.queueIds.length, brokers: saved.pilot.brokerIds.length },
+    } });
+    return { ok: true, data: saved };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+/** Prévia "amanhã sairiam N mensagens" com as configurações em edição. Só diretor; não grava nada. */
+export async function previewPostSaleAutoRuleAction(raw: unknown): Promise<ActionResult<AutoRulePreview>> {
+  try {
+    const context = await authorizedContext();
+    if (context.role !== "director") throw new PostSaleActionError("Apenas diretores podem ver a prévia da régua automática.");
+    const input = autoRuleSettingsInputSchema.parse(raw);
+    const preview = await previewAutoRule(context, { ...input, updatedAt: null });
+    return { ok: true, data: preview };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}

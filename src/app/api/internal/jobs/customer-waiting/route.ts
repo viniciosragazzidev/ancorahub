@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { runCustomerWaitingSweep } from "@/features/customer-waiting/sweep";
+import { runPostSaleAutoSweep } from "@/features/post-sale-audit/auto-sweep";
 import { runPostSaleR0Sweep } from "@/features/post-sale-audit/r0-sweep";
 import { backgroundRoute } from "@/shared/db/background-pool";
 import { withJobHeartbeat } from "@/features/live-status/heartbeat";
@@ -25,8 +26,14 @@ async function handle(request: NextRequest) {
     console.error("[post-sale-r0 cron] failed", error instanceof Error ? error.message : "unknown_error");
     return null;
   });
-  if (!result) return NextResponse.json({ success: false, error: "Customer waiting sweep unavailable", postSaleR0 }, { status: 500 });
-  return NextResponse.json({ success: true, result, postSaleR0 });
+  // Pós-venda, régua automática R1 a R5 (Fase 4): só a cada 15 min (minutos 0 a 4 de cada quarto de hora),
+  // desligada por empresa por padrão. Também falha sozinha.
+  const postSaleAuto = await runPostSaleAutoSweep().catch((error) => {
+    console.error("[post-sale-auto cron] failed", error instanceof Error ? error.message : "unknown_error");
+    return null;
+  });
+  if (!result) return NextResponse.json({ success: false, error: "Customer waiting sweep unavailable", postSaleR0, postSaleAuto }, { status: 500 });
+  return NextResponse.json({ success: true, result, postSaleR0, postSaleAuto });
 }
 
 async function handleGET(request: NextRequest) { return handle(request); }

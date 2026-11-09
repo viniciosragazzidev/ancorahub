@@ -11,6 +11,8 @@ export const postSaleAnswerSchema = z.object({
   reason: z.string().max(300).nullable().optional(),
   comment: z.string().max(500).nullable().optional(),
   optOut: z.boolean().optional(),
+  /** Régua R5: indicaria a empresa para um amigo ou familiar. */
+  recommends: z.boolean().nullable().optional(),
 });
 
 export type PostSaleAnswers = z.infer<typeof postSaleAnswerSchema>;

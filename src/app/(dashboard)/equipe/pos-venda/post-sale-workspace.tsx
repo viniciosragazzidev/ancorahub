@@ -23,6 +23,8 @@ import { POST_SALE_WAHA_OPENING_DEFAULT } from "@/features/post-sale-audit/templ
 import { paginate } from "@/features/post-sale-audit/responses-view";
 import { Pager, PostSaleResponses } from "./post-sale-responses";
 import { PostSaleR0Settings } from "./post-sale-r0-settings";
+import { PostSaleAutoRules } from "./post-sale-auto-rules";
+import { postSaleRuleLabel, POST_SALE_RULE_FILTERS } from "@/features/post-sale-audit/auto-rules";
 
 type WorkspaceData = Extract<Awaited<ReturnType<typeof getPostSaleWorkspaceAction>>, { ok: true }>['data'];
 type AudienceKind = "broker" | "queue" | "period" | "leadIds";
@@ -61,15 +63,19 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
     return { kind: "filters" as const, ...dates };
   }, [brokerId, from, initialAudience, kind, queueId, to]);
 
-  function changeReportPeriod(value: string) {
-    const periodDays = Number(value);
-    if (![7, 30, 90].includes(periodDays)) return;
+  function refreshReport(periodDays: number, ruleFilter: string) {
     setFeedback("");
     startTransition(async () => {
-      const refreshed = await getPostSaleWorkspaceAction(periodDays);
+      const refreshed = await getPostSaleWorkspaceAction(periodDays, ruleFilter);
       if (refreshed.ok) setData(refreshed.data);
       else setFeedback(refreshed.error);
     });
+  }
+
+  function changeReportPeriod(value: string) {
+    const periodDays = Number(value);
+    if (![7, 30, 90].includes(periodDays)) return;
+    refreshReport(periodDays, data.ruleFilter);
   }
 
   function markAlertHandled(surveyId: string) {
@@ -78,7 +84,7 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
       const result = await markPostSaleAlertHandledAction(surveyId);
       if (!result.ok) { setFeedback(result.error); return; }
       setFeedback(result.data.changed ? "Alerta marcado como tratado." : "Este alerta já foi tratado.");
-      const refreshed = await getPostSaleWorkspaceAction(data.periodDays);
+      const refreshed = await getPostSaleWorkspaceAction(data.periodDays, data.ruleFilter);
       if (refreshed.ok) setData(refreshed.data);
     });
   }
@@ -102,7 +108,7 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
       const started = await startPostSaleCampaignAction(created.data.id);
       if (!started.ok) { setFeedback(started.error); return; }
       setFeedback(`Campanha iniciada. ${started.data.queued} mensagens na fila, ${started.data.skipped} ignoradas e ${started.data.failed} falhas.`);
-      const refreshed = await getPostSaleWorkspaceAction(data.periodDays);
+      const refreshed = await getPostSaleWorkspaceAction(data.periodDays, data.ruleFilter);
       if (refreshed.ok) setData(refreshed.data);
       setPreview(null);
       router.refresh();
@@ -120,18 +126,23 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
           </div>
           <span className="flex flex-wrap items-center gap-2">
             <a href="#respostas" className="rounded-full bg-primary/10 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/15">Ver quem respondeu ({data.responses.length})</a>
-            <span className="rounded-full bg-[var(--surface-secondary)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)]">Campanhas manuais</span>
+            <a href="#regua-automatica" className="rounded-full bg-[var(--surface-secondary)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-foreground">Régua automática ({data.autoRules.rules.filter((rule) => rule.enabled).length} ligadas)</a>
           </span>
         </header>
 
         <Card>
           <CardHeader className="flex flex-wrap items-start justify-between gap-3 sm:flex-row sm:items-center">
             <div><CardTitle>Relatório por corretor</CardTitle><CardDescription>Pesquisas enviadas no período. Percentuais consideram apenas respostas válidas.</CardDescription></div>
-            <label className="grid gap-1 text-xs font-medium text-muted-foreground">Período
-              <AppSelect aria-label="Período do relatório" value={String(data.periodDays)} onValueChange={changeReportPeriod} options={[
-                { value: "7", label: "7 dias" }, { value: "30", label: "30 dias" }, { value: "90", label: "90 dias" },
-              ]} />
-            </label>
+            <span className="flex flex-wrap gap-3">
+              <label className="grid gap-1 text-xs font-medium text-muted-foreground">Origem
+                <AppSelect aria-label="Origem das pesquisas do relatório" value={data.ruleFilter} onValueChange={(value) => refreshReport(data.periodDays, value)} options={POST_SALE_RULE_FILTERS.map((key) => ({ value: key, label: key === "all" ? "Todas" : postSaleRuleLabel(key === "manual" ? null : key) }))} />
+              </label>
+              <label className="grid gap-1 text-xs font-medium text-muted-foreground">Período
+                <AppSelect aria-label="Período do relatório" value={String(data.periodDays)} onValueChange={changeReportPeriod} options={[
+                  { value: "7", label: "7 dias" }, { value: "30", label: "30 dias" }, { value: "90", label: "90 dias" },
+                ]} />
+              </label>
+            </span>
           </CardHeader>
           <CardContent>
             {data.report.length ? <div className="overflow-x-auto">
@@ -159,6 +170,8 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
         </Card>
 
         <PostSaleR0Settings initial={data.r0} queues={data.queues} />
+
+        <PostSaleAutoRules initial={data.autoRules} queues={data.queues} branches={data.branches} brokers={data.brokers} />
 
         <Card>
           <CardHeader>
@@ -207,7 +220,7 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
             <CardHeader><CardTitle>Campanhas recentes</CardTitle><CardDescription>Últimas campanhas criadas nesta empresa ou unidade.</CardDescription></CardHeader>
             <CardContent className="grid gap-3">
               {data.campaigns.length ? data.campaigns.map((campaign) => <div key={campaign.id} className="flex items-center justify-between gap-4 rounded-xl border border-border px-3 py-3">
-                <div className="min-w-0"><p className="truncate text-sm font-medium">{campaign.name}</p><p className="text-xs text-muted-foreground">{new Date(campaign.createdAt).toLocaleDateString("pt-BR")} · {campaign.status}</p></div>
+                <div className="min-w-0"><p className="truncate text-sm font-medium">{campaign.name}</p><p className="text-xs text-muted-foreground">{new Date(campaign.createdAt).toLocaleDateString("pt-BR")} · {postSaleRuleLabel(campaign.ruleKey)} · {campaign.status}</p></div>
                 <span className="shrink-0 text-xs text-muted-foreground">{campaign.totals.queued ?? 0} na fila</span>
               </div>) : <p className="rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-muted-foreground">Nenhuma campanha foi criada ainda.</p>}
             </CardContent>

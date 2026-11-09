@@ -3799,6 +3799,27 @@ export const postSaleOptOuts = pgTable(
   (table) => [uniqueIndex("post_sale_opt_outs_tenant_lead_unique").on(table.tenantId, table.leadId)],
 );
 
+/**
+ * Régua automática do pós-venda (Fase 4, 09/11): uma linha por empresa e regra (R1 a R5).
+ * Ausente = regra desligada. SQL em drizzle/0224_post_sale_rules.sql.
+ */
+export const postSaleRules = pgTable(
+  "post_sale_rules",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    enabled: boolean("enabled").notNull().default(false),
+    delayBusinessDays: integer("delay_business_days").notNull(),
+    filters: jsonb("filters").$type<{ queueIds?: string[]; branchIds?: string[]; leadTypes?: string[] }>().notNull().default({}),
+    dailyLimit: integer("daily_limit").notNull().default(60),
+    pilot: jsonb("pilot").$type<{ queueIds?: string[]; brokerIds?: string[] }>().notNull().default({}),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("post_sale_rules_tenant_key_unique").on(table.tenantId, table.key)],
+);
+
 export const goals = pgTable(
   "goals",
   {

@@ -39,6 +39,8 @@ export function answerChips(input: { status: string; outcome: string | null; rat
   if (answers.closed === "yes") chips.push({ label: "Fechou", tone: "good" });
   else if (answers.closed === "no") chips.push({ label: "Não fechou", tone: "neutral" });
   if (answers.wantsHelp === true) chips.push({ label: "Quer ajuda", tone: "bad" });
+  if (answers.recommends === true) chips.push({ label: "Indicaria", tone: "good" });
+  else if (answers.recommends === false) chips.push({ label: "Não indicaria", tone: "bad" });
   if (!chips.length && typeof answers.comment === "string" && /agora n[aã]o/i.test(answers.comment)) chips.push({ label: "Agora não", tone: "neutral" });
   return chips;
 }

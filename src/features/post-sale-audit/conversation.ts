@@ -14,6 +14,8 @@ import { postSaleAlertReasons } from "./alert-rules";
 import { ensurePostSaleSurveyAlerts } from "./alert-service";
 import { businessHoursBetween, detectPostSaleKeywords, isActivePostSaleSurvey, postSaleAnswerSchema, postSaleNextTurn, type PostSaleAnswers } from "./conversation-rules";
 import { postSaleMediaReply, requestPostSaleTextOnceAtStep, retryPostSaleOperation, runPostSaleOptOutTransaction, type PostSaleMessageKind } from "./conversation-operations";
+import { autoRuleNextTurn, autoRuleQuestionFocus, detectAutoRuleKeywords } from "./auto-rule-scripts";
+import { isAutoRuleKey } from "./auto-rules";
 import { classifyR0AnswerByKeywords, r0AnswerSchema, r0NextTurn, r0TimelineSummary, readR0State, R0_RULE_KEY, type R0Answer, type R0SurveyState } from "./r0-rules";
 
 const ACTIVE_STATUSES = ["sent", "answering"] as const;
@@ -31,8 +33,8 @@ export type PostSaleInbound = {
   messageKind?: PostSaleMessageKind;
 };
 
-async function extractPostSaleAnswer(input: { tenantId: string; step: number; question: string; text: string }): Promise<PostSaleAnswers> {
-  const fallback = detectPostSaleKeywords(input.text, input.question);
+async function extractPostSaleAnswer(input: { tenantId: string; step: number; question: string; text: string; fallback?: PostSaleAnswers }): Promise<PostSaleAnswers> {
+  const fallback = input.fallback ?? detectPostSaleKeywords(input.text, input.question);
   try {
     const result = await runGateway({
       profile: "interpreter",
@@ -109,8 +111,9 @@ async function finalizeProcessedTurn(survey: typeof schema.postSaleSurveys.$infe
   if (survey.status === "opted_out") {
     await db.update(schema.aiConversations).set({ optOutAt: now, updatedAt: now }).where(and(eq(schema.aiConversations.tenantId, survey.tenantId), eq(schema.aiConversations.leadId, survey.leadId)));
   }
-  // R0 leaves no note on the lead timeline: the broker reads it and must not notice the check (Vinicios, 09/11).
-  if ((survey.status === "completed" || survey.status === "opted_out") && survey.ruleKey !== R0_RULE_KEY) {
+  // R0 and the automatic rules (R1 to R5) leave no note on the lead timeline: the broker reads it and must
+  // not notice the check (Vinicios, 09/11). Answers stay in the survey and in the post-sale page.
+  if ((survey.status === "completed" || survey.status === "opted_out") && !survey.ruleKey) {
     const r0State = survey.ruleKey === R0_RULE_KEY ? readR0State(answers) : null;
     const summary = r0State ? r0TimelineSummary({
       outcome: (survey.status === "opted_out" ? "other" : survey.outcome ?? "r0_other") as Parameters<typeof r0TimelineSummary>[0]["outcome"],
@@ -223,10 +226,13 @@ async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof sche
   }
   const [broker] = currentSurvey.brokerId ? await db.select({ name: schema.user.name }).from(schema.user).innerJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.user.id), eq(schema.tenantMemberships.tenantId, currentSurvey.tenantId), eq(schema.tenantMemberships.status, "active"))).where(eq(schema.user.id, currentSurvey.brokerId)).limit(1) : [];
   const prior = (currentSurvey.answers ?? {}) as PostSaleAnswers;
-  const question = currentSurvey.step === 0 ? "permissão para fazer duas perguntas" : currentSurvey.step === 1 ? "se o corretor conseguiu falar" : currentSurvey.step === 2 ? "como foi o atendimento" : currentSurvey.step === 3 ? prior.contacted === false ? "se ainda quer ajuda com o plano" : "se recebeu cotação" : currentSurvey.step === 4 ? "se fechou o plano" : "motivo da decisão";
-  const answer = await extractPostSaleAnswer({ tenantId: input.tenantId, step: currentSurvey.step, question, text: input.text });
+  const autoRule = isAutoRuleKey(currentSurvey.ruleKey) ? currentSurvey.ruleKey : null;
+  const question = autoRule ? autoRuleQuestionFocus(autoRule, currentSurvey.step, prior) : currentSurvey.step === 0 ? "permissão para fazer duas perguntas" : currentSurvey.step === 1 ? "se o corretor conseguiu falar" : currentSurvey.step === 2 ? "como foi o atendimento" : currentSurvey.step === 3 ? prior.contacted === false ? "se ainda quer ajuda com o plano" : "se recebeu cotação" : currentSurvey.step === 4 ? "se fechou o plano" : "motivo da decisão";
+  const answer = await extractPostSaleAnswer({ tenantId: input.tenantId, step: currentSurvey.step, question, text: input.text, fallback: autoRule ? detectAutoRuleKeywords(input.text, question) : undefined });
   answer.comment ??= input.text.slice(0, 500);
-  const turn = postSaleNextTurn(currentSurvey.step, prior, answer, { lead: lead.name.trim().split(/\s+/)[0] || "Cliente", broker: broker?.name?.trim().split(/\s+/)[0] || "corretor" });
+  const names = { lead: lead.name.trim().split(/\s+/)[0] || "Cliente", broker: broker?.name?.trim().split(/\s+/)[0] || "corretor" };
+  // Régua automática: roteiro curto da regra (uma pergunta por vez); manual segue o roteiro de sempre.
+  const turn = autoRule ? autoRuleNextTurn(autoRule, currentSurvey.step, prior, answer, names) : postSaleNextTurn(currentSurvey.step, prior, answer, names);
   const answers = turn.answers as PostSaleAnswers;
   const previousAlertReasons = postSaleAlertReasons(currentSurvey);
   const nextOutcome = turn.outcome === "ok" && answers.sentiment === "negative"
