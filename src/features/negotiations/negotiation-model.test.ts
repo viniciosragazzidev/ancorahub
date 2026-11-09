@@ -129,18 +129,63 @@ describe("computeNegotiationLevel", () => {
     }).level).toBe("cooling");
     expect(computeNegotiationLevel({
       ...base,
-      status: "under_analysis",
-      lastCustomerMessageAt: "2026-10-22T10:00:00.000Z",
-      lastBrokerMessageAt: "2026-10-22T11:00:00.000Z",
-      now: new Date("2026-10-26T15:00:00.000Z"),
-    }).level).toBe("cooling");
-    expect(computeNegotiationLevel({
-      ...base,
       lastCustomerMessageAt: null,
       lastBrokerMessageAt: null,
       hasBrokerMessageEver: false,
       hasAnyMessageEver: false,
     }).level).toBeNull();
+  });
+
+  describe("fechamento até a negativa do cliente (diretor, 09/11)", () => {
+    it("Documentação e Em análise ficam em fechamento mesmo com a conversa parada há dias, com selo", () => {
+      for (const status of ["documentation_pending", "under_analysis"]) {
+        const result = computeNegotiationLevel({
+          ...base,
+          status,
+          lastCustomerMessageAt: "2026-10-12T10:00:00.000Z",
+          lastBrokerMessageAt: "2026-10-12T11:00:00.000Z",
+          twoWayExchangeDaysLast5: 0,
+        });
+        expect(result.level).toBe("closing");
+        expect(result.exchangeStale).toBe(true);
+        expect(result.noCrmConversation).toBe(false);
+      }
+    });
+
+    it("sem nenhuma conversa no CRM continua em fechamento e leva o selo de sem conversa", () => {
+      for (const status of ["documentation_pending", "under_analysis"]) {
+        const result = computeNegotiationLevel({
+          ...base,
+          status,
+          lastCustomerMessageAt: null,
+          lastBrokerMessageAt: null,
+          hasBrokerMessageEver: false,
+          hasAnyMessageEver: false,
+        });
+        expect(result.level).toBe("closing");
+        expect(result.noCrmConversation).toBe(true);
+        expect(result.exchangeStale).toBe(true);
+      }
+    });
+
+    it("cliente esperando há horas não tira do fechamento", () => {
+      const result = computeNegotiationLevel({
+        ...base,
+        status: "documentation_pending",
+        lastCustomerMessageAt: "2026-10-24T10:00:00.000Z",
+        lastBrokerMessageAt: "2026-10-23T10:00:00.000Z",
+      });
+      expect(result.level).toBe("closing");
+      expect(result.customerWaiting).toBe(true);
+      expect(result.daysAtStage).toBe(6);
+    });
+
+    it("fechamento pela leitura da IA em Cotação ou Negociação ainda pede troca recente nos dois sentidos", () => {
+      const stale = { lastCustomerMessageAt: "2026-10-20T10:00:00.000Z", lastBrokerMessageAt: "2026-10-20T11:00:00.000Z" };
+      expect(computeNegotiationLevel({ ...base, ...stale, status: "negotiation", ai: { conversationStage: "CLOSING" } }).level).toBe("cooling");
+      expect(computeNegotiationLevel({ ...base, status: "negotiation", ai: { conversationStage: "CLOSING" } }).level).toBe("closing");
+      expect(computeNegotiationLevel({ ...base, status: "quote_sent", hasBrokerMessageEver: false, lastBrokerMessageAt: null, ai: { conversationStage: "CLOSING" } }).level).toBe("no_crm_conversation");
+    });
   });
 
   it("mostra quando a IA está à frente da etapa do CRM", () => {

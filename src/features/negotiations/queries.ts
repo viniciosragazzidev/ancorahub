@@ -46,6 +46,10 @@ export type NegotiationLead = {
   replyOwedBy: "broker" | "customer" | "none";
   statusBehindAi: boolean;
   hasCrmConversation: boolean;
+  /** Etapa comercial sem mensagem do corretor no CRM: em Fechamento vira selo, não outro nível (09/11). */
+  noCrmConversation: boolean;
+  /** Sem troca há 3 dias ou mais: em Fechamento vira selo, não "Esfriando" (09/11). */
+  exchangeStale: boolean;
   customerSentPdf: boolean;
   customerSentImage: boolean;
   /** Cliente aguardando o corretor (observação F1): só presente com a chave da empresa em "observe". */
@@ -440,6 +444,8 @@ export async function getNegotiationsDashboard(context: TenantContext, requested
       replyOwedBy: assessment.replyOwedBy,
       statusBehindAi: assessment.statusBehindAi,
       hasCrmConversation: row.hasAnyMessageEver,
+      noCrmConversation: assessment.noCrmConversation,
+      exchangeStale: assessment.exchangeStale,
       customerSentPdf,
       customerSentImage,
       ai,

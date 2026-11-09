@@ -54,6 +54,8 @@ function newLead(index: number): NegotiationLead {
     replyOwedBy: waiting ? "broker" : level === "no_crm_conversation" ? "none" : "customer",
     statusBehindAi: index % 9 === 0,
     hasCrmConversation: level !== "no_crm_conversation",
+    noCrmConversation: level === "no_crm_conversation" || (level === "closing" && index % 4 === 0),
+    exchangeStale: level === "cooling" || level === "no_crm_conversation" || (level === "closing" && index % 4 === 0),
     customerSentPdf: level === "closing" && index % 2 === 0,
     customerSentImage: level === "closing" && index % 2 === 1,
     ai: {

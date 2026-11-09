@@ -41,6 +41,10 @@ export type NegotiationAssessment = {
   lastExchangeAt: string | null;
   daysAtStage: number | null;
   statusBehindAi: boolean;
+  /** Etapa comercial no CRM sem nenhuma mensagem do corretor registrada (vira selo no fechamento). */
+  noCrmConversation: boolean;
+  /** Sem troca de mensagens há 3 dias ou mais (vira selo no fechamento, que não esfria mais). */
+  exchangeStale: boolean;
 };
 
 const ADVANCED_STATUSES = new Set(["quote_sent", "negotiation"]);
@@ -87,15 +91,22 @@ export function computeNegotiationLevel(input: NegotiationSignals): NegotiationA
   // "Fechamento" comes from the CRM stage or from the AI reading of the conversation, never from a file
   // alone (06/11, Vinicios: a lone PDF put Marcelly and Marcelle there with almost no history). The AI
   // reading only counts once the CRM shows a quote (Cristiane: bank details sent before any quote).
-  const closingSignal = closingStatus || (advancedStatus && CLOSING_AI_STAGES.has(aiStage));
+  const aiClosingSignal = advancedStatus && CLOSING_AI_STAGES.has(aiStage);
   const noCrmConversation = (advancedStatus || closingStatus) && !input.hasBrokerMessageEver;
   const waitingTooLong = customerWaiting && customerAt !== null && now - customerAt >= NEGOTIATION_LIMITS.staleReplyHours * 60 * 60 * 1000;
   const exchangeStale = latestAt === -Infinity || now - latestAt >= NEGOTIATION_LIMITS.activeExchangeDays * 24 * 60 * 60 * 1000;
 
   let level: NegotiationLevel | null = null;
-  if (noCrmConversation) {
+  // Decisão do diretor (09/11): "O lead em fechamento pode continuar em fechamento até ter alguma negativa do
+  // cliente. O processo de fechamento é demorado e não significa que o cliente foi perdido." Documentação e Em
+  // análise são sempre Fechamento, com ou sem conversa recente ou no CRM; só sai quando alguém muda a etapa.
+  // Conversa parada e falta de conversa no CRM viram selos (noCrmConversation, exchangeStale), nunca outro nível.
+  if (closingStatus) {
+    level = "closing";
+  } else if (noCrmConversation) {
     level = "no_crm_conversation";
-  } else if (hasRecentTwoWay && closingSignal) {
+  } else if (hasRecentTwoWay && aiClosingSignal) {
+    // Fechamento pela leitura da IA (Cotação ou Negociação no CRM) continua pedindo troca recente nos dois sentidos.
     level = "closing";
   } else if (hasRecentTwoWay && input.twoWayExchangeDaysLast5 >= 2 && advancedSignal) {
     level = "advanced";
@@ -121,5 +132,7 @@ export function computeNegotiationLevel(input: NegotiationSignals): NegotiationA
     lastExchangeAt: latestAt === -Infinity ? null : new Date(latestAt).toISOString(),
     daysAtStage,
     statusBehindAi: aiRank !== undefined && statusRank !== undefined && aiRank > statusRank,
+    noCrmConversation,
+    exchangeStale,
   };
 }
