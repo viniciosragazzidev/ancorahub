@@ -7,8 +7,9 @@ import { getPostSaleWorkspaceAction, previewPostSaleAudienceAction } from "@/fea
 import { POST_SALE_CAMPAIGN_MAX_LEADS, postSaleAudienceSchema, type PostSaleAudience } from "@/features/post-sale-audit/rules";
 import { BrokerProfileViewerProvider } from "@/components/broker-profile-link";
 import { PostSaleWorkspace } from "./post-sale-workspace";
+import { parsePostSaleTab } from "./post-sale-tabs";
 
-type PostSaleSearchParams = Promise<{ period?: string; leadIds?: string | string[] }>;
+type PostSaleSearchParams = Promise<{ period?: string; leadIds?: string | string[]; aba?: string | string[] }>;
 
 function reportPeriod(value: string | undefined) {
   return value === "7" || value === "90" ? Number(value) : 30;
@@ -49,7 +50,7 @@ export default async function PostSalePage({ searchParams }: { searchParams: Pos
   }
   return (
     <BrokerProfileViewerProvider viewerRole={context.role}>
-      <PostSaleWorkspace initialData={initial.data} initialAudience={initialAudience} initialPreview={initialPreview} initialFeedback={initialFeedback} />
+      <PostSaleWorkspace initialTab={parsePostSaleTab(params.aba, rawLeadIds !== undefined)} initialData={initial.data} initialAudience={initialAudience} initialPreview={initialPreview} initialFeedback={initialFeedback} />
     </BrokerProfileViewerProvider>
   );
 }

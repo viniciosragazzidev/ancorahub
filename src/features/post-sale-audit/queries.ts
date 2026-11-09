@@ -123,6 +123,8 @@ export async function loadPostSaleBrokerSummary(context: TenantContext, brokerId
     attendanceAnswered: 0,
     attended: 0,
     averageRating: null,
+    ratingCount: 0,
+    ratingTotal: 0,
     closePercent: null,
     closeAnswered: 0,
     closed: 0,

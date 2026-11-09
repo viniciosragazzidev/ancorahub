@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregatePostSaleBrokerReport } from "./reporting";
+import { aggregatePostSaleBrokerReport, summarizePostSaleReport } from "./reporting";
 
 const from = new Date("2026-10-01T00:00:00.000Z");
 const to = new Date("2026-11-01T00:00:00.000Z");
@@ -18,8 +18,8 @@ describe("post-sale broker report aggregation", () => {
     });
 
     expect(report).toEqual([
-      { brokerId: "broker-1", brokerName: "Ana", sent: 3, responded: 2, attendancePercent: 50, attendanceAnswered: 2, attended: 1, averageRating: 3, closePercent: 50, closeAnswered: 2, closed: 1, noContact: 1, openAlerts: 1, customerReturned: 0 },
-      { brokerId: "broker-2", brokerName: "Bia", sent: 0, responded: 0, attendancePercent: null, attendanceAnswered: 0, attended: 0, averageRating: null, closePercent: null, closeAnswered: 0, closed: 0, noContact: 0, openAlerts: 0, customerReturned: 0 },
+      { brokerId: "broker-1", brokerName: "Ana", sent: 3, responded: 2, attendancePercent: 50, attendanceAnswered: 2, attended: 1, averageRating: 3, ratingCount: 2, ratingTotal: 6, closePercent: 50, closeAnswered: 2, closed: 1, noContact: 1, openAlerts: 1, customerReturned: 0 },
+      { brokerId: "broker-2", brokerName: "Bia", sent: 0, responded: 0, attendancePercent: null, attendanceAnswered: 0, attended: 0, averageRating: null, ratingCount: 0, ratingTotal: 0, closePercent: null, closeAnswered: 0, closed: 0, noContact: 0, openAlerts: 0, customerReturned: 0 },
     ]);
   });
 
@@ -59,5 +59,15 @@ describe("post-sale broker report aggregation", () => {
       to,
     });
     expect(report[0]).toMatchObject({ sent: 0, responded: 0, noContact: 0, customerReturned: 2, openAlerts: 1 });
+  });
+
+  it("summarizes the KPI strip weighting attendance and rating by what was answered", () => {
+    const base = { brokerName: "x", attendancePercent: null, averageRating: null, closePercent: null, closeAnswered: 0, closed: 0, noContact: 0, openAlerts: 0, customerReturned: 0 };
+    const summary = summarizePostSaleReport([
+      { ...base, brokerId: "a", sent: 10, responded: 4, attended: 3, attendanceAnswered: 4, ratingCount: 1, ratingTotal: 5 },
+      { ...base, brokerId: "b", sent: 5, responded: 1, attended: 0, attendanceAnswered: 1, ratingCount: 3, ratingTotal: 6 },
+    ], 2);
+    expect(summary).toEqual({ sent: 15, responded: 5, attendancePercent: 60, averageRating: 2.8, openAlerts: 2 });
+    expect(summarizePostSaleReport([], 0)).toEqual({ sent: 0, responded: 0, attendancePercent: null, averageRating: null, openAlerts: 0 });
   });
 });
