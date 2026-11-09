@@ -17,6 +17,7 @@ import { expireOutdatedLeadOffers } from "./offers";
 import { automaticDistributionHoldReason, COLD_HELD_BY_QUEUE_REASON_PREFIX, HELD_DISTRIBUTION_RETRY_MS, distributionRetryDelayMilliseconds, isDeferredDistributionReason, isHeldDistributionReason } from "./domain";
 import { groupByTemperatureRank, type TemperatureRank } from "./temperature-priority";
 import { dutyScheduleBranchCondition, isDutyScheduleBranchCompatible } from "./duty-job-schedule-scope";
+import { LEAD_TIMEOUT_CODE, plantaoWakeAllowedCondition } from "./job-budget";
 
 const JOB_TYPE = "process_queued_lead";
 
@@ -304,6 +305,10 @@ async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
         ne(schema.leadDistributionJobs.lastErrorCode, "HELD_BY_RULE"),
         sql`${schema.leadDistributionJobs.lastErrorMessage} like 'Lead chegou antes do início deste plantão%'`,
       ),
+      // A lead that just hit the per-lead ceiling keeps its 5-minute pause (see job-budget.ts,
+      // same rule as plantaoWakeKeepsTimeoutPause): woken every run, the same slow leads used
+      // up the budget of every run and the cold wave was never reached (09/11).
+      plantaoWakeAllowedCondition(schema.leadDistributionJobs.lastErrorCode, schema.leadDistributionJobs.runAfter, now),
       eq(schema.unitDutySchedules.status, "active"),
       eq(schema.unitDutySchedules.dayOfWeek, local.weekday),
       lte(schema.unitDutySchedules.startsAt, local.time),
@@ -613,7 +618,7 @@ export async function runLeadDistributionProcessor(input: {
         if (distribution === "timeout") {
           const trace = readLeadTrace(job.leadId);
           console.error("[lead-distribution] lead_timeout", { leadId: job.leadId, step: trace?.step ?? "unknown", stepAgeMs: trace ? Date.now() - trace.at : null });
-          const failed = await deferOrFailJob(job, effectiveConfig, "LEAD_TIMEOUT", `O processamento passou de ${LEAD_PROCESSING_TIMEOUT_MS / 1000} s na etapa ${trace?.step ?? "desconhecida"}.`, true, new Date(Date.now() + 5 * 60_000));
+          const failed = await deferOrFailJob(job, effectiveConfig, LEAD_TIMEOUT_CODE, `O processamento passou de ${LEAD_PROCESSING_TIMEOUT_MS / 1000} s na etapa ${trace?.step ?? "desconhecida"}.`, true, new Date(Date.now() + 5 * 60_000));
           if (failed) result.failed += 1; else result.deferred += 1;
           return;
         }
