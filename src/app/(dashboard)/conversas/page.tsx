@@ -188,7 +188,11 @@ export default async function ConversationsPage({
           ...(recentConversationLeadIds.length ? [sql`case when ${inArray(schema.leads.id, recentConversationLeadIds)} then 0 else 1 end`] : []),
           // Leads in Fechamento (Documentação/Em análise) always load, even without recent messages, so the
           // "Fechamento" filter shows all of them (09/11).
-          sql`case when ${schema.leads.status} in ('documentation_pending', 'under_analysis') then 0 else 1 end`,
+          // Only broker leads: leads in a director's name are registrations by the direction (Vigia, 09/11).
+          sql`case when ${schema.leads.status} in ('documentation_pending', 'under_analysis') and not exists (
+            select 1 from ${schema.tenantMemberships} closing_owner
+            where closing_owner.tenant_id = ${schema.leads.tenantId} and closing_owner.user_id = ${schema.leads.corretorId} and closing_owner.role = 'director'
+          ) then 0 else 1 end`,
           desc(schema.leads.stageEnteredAt),
         )
         .limit(isDirector ? 800 : 250),
