@@ -63,6 +63,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { maskPhone, maskName, formatDate } from "@/features/quotes/utils";
 import { OwnershipContext } from "@/components/ownership-context";
+import { BrokerProfileViewerProvider } from "@/components/broker-profile-link";
 import { LeadHealthBadge, computeLeadHealth } from "@/features/leads/components/lead-health-badge";
 import {
   Tooltip,
@@ -692,6 +693,7 @@ export function LeadsWorkspace({
 
   return (
     <HideLeadArrivalContext.Provider value={contextRole === "broker"}>
+    <BrokerProfileViewerProvider viewerRole={contextRole}>
     <div className={directorLite ? `operational-workspace ${litePageStyles.workspace}` : "operational-workspace flex min-h-0 flex-1 flex-col gap-4"}>
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
       <Tabs value={activeTab} onValueChange={handleViewChange} className={directorLite ? "flex min-h-0 flex-1 flex-col gap-0" : "flex min-h-0 flex-1 flex-col"}>
@@ -1014,6 +1016,7 @@ export function LeadsWorkspace({
         onLeadPatch={(patch) => applyLeadPatch([selectedLead.id], (lead) => ({ ...lead, ...patch }))}
       /> : null}
     </div>
+    </BrokerProfileViewerProvider>
     </HideLeadArrivalContext.Provider>
   );
 }
@@ -1187,11 +1190,17 @@ function KanbanLeadCard({
       {/* SLA bar */}
       {sla && <SlaBar sla={sla} />}
 
-      {/* Card body */}
-      <button
-        className="w-full p-3.5 pt-2.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none"
+      {/* Card body: div role="button" porque o nome do corretor é link próprio (<a> não entra em <button>). */}
+      <div
+        role="button"
+        tabIndex={0}
+        className="w-full cursor-pointer p-3.5 pt-2.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none"
         onClick={() => onOpen(lead)}
-        type="button"
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
+          event.preventDefault();
+          onOpen(lead);
+        }}
       >
         <div className="flex items-center gap-2.5">
           <UserAvatar
@@ -1215,7 +1224,7 @@ function KanbanLeadCard({
         </div>
 
         <p className="mt-2 truncate text-[11px] text-muted-foreground">
-          <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="text-[11px]" />
+          <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} brokerId={lead.corretorId} className="text-[11px]" />
         </p>
 
         <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border/50 pt-2 text-[11px]">
@@ -1229,7 +1238,7 @@ function KanbanLeadCard({
           </div>
           {hideArrival ? null : <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>}
         </div>
-      </button>
+      </div>
       {commercialValuesEnabled ? (
         <Button type="button" variant="outline" className="mx-3 mb-3 min-h-11 w-[calc(100%-1.5rem)] justify-center gap-2" onClick={() => onQuote(lead)}>
           <Calculator aria-hidden="true" /> Fazer cotação
