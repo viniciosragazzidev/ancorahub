@@ -135,7 +135,7 @@ Job a cada 15 min (rota interna de jobs existente). Para cada regra ligada: busc
 - A página `/conversas` e seu agrupamento de conversas leem `whatsapp_messages`; os envios da pesquisa eram persistidos somente em `whatsapp_outbound_messages`, por isso o status `read` na campanha não criava uma mensagem visível no chat.
 - Envios aceitos e recibos da Meta agora espelham a mensagem na tabela canônica com tenant, lead, canal, telefone, corpo e horário. O espelhamento é idempotente, preserva o recibo mais avançado e publica invalidação da conversa; falhas ficam best-effort e não repetem o envio.
 - O template Meta de abertura usa o corpo aprovado e variáveis persistidas. Falhas de entrega de pós-venda não entram no recovery da mensagem inicial de qualificação.
-- `drizzle/0222_post_sale_conversation_history.sql` preenche envios anteriores aceitos, incluindo status `read`. O SQL não foi executado; após aplicar a migration e publicar o servidor, as mensagens históricas passam a aparecer.
+- `drizzle/0223_post_sale_conversation_history.sql` preenche envios anteriores aceitos, incluindo status `read`. O SQL não foi executado; após aplicar a migration e publicar o servidor, as mensagens históricas passam a aparecer.
 - O backfill considera somente mensagens com `sent_at`, lead do mesmo tenant e corpo conhecido. Não inclui linhas pendentes ou mensagens de template desconhecido.
 
 ## Riscos
