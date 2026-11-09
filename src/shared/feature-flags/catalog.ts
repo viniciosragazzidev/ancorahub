@@ -249,6 +249,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Mostra ao corretor Lite o painel de Desempenho com os próprios números, funil, meta e vendas por operadora.",
   },
+  BROKER_SELF_UNIT_CHANGE: {
+    key: "feature_broker_self_unit_change_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Permite ao corretor trocar a própria unidade em Configurações, entre unidades ativas da mesma empresa, com auditoria e aviso à gestão (DEC-170).",
+  },
 
   SUPERVISOR_TEAM_SCOPE: {
     key: "feature_supervisor_team_scope_enabled",

@@ -706,3 +706,7 @@ A faixa fixa de conexão fica abaixo dos diálogos, preservando a confirmação 
 # 09/11/2026 - Mensagens de pós-venda no histórico de conversas
 
 Envios aceitos da pesquisa de pós-venda são espelhados de forma idempotente no histórico canônico do lead, que alimenta `/conversas`; recibos Meta atualizam o mesmo registro sem regredir o status. Falhas da pesquisa não disparam recovery de qualificação. O SQL `drizzle/0223_post_sale_conversation_history.sql` faz backfill das mensagens anteriores e permanece pendente de execução.
+
+# 09/11/2026 - Corretor troca a própria unidade
+
+Em Configurações > Minha unidade (Lite), o corretor escolhe outra unidade ativa da empresa e confirma numa folha que diz o que muda. A troca é imediata e auditada: membership e perfil mudam juntos, a supervisão anterior sai, as vagas abertas nos plantões da unidade antiga são encerradas e os gestores das duas unidades são avisados. Leads continuam com o corretor. Flag global no Super-admin. DEC-170; implementação: docs/implementations/active/2026-11-09-corretor-troca-unidade.md.
