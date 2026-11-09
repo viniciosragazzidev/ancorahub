@@ -35,6 +35,8 @@ import { getEffectiveAccess, hasEffectiveRouteAccess } from "@/features/custom-r
 import { canAccessRoute, firstAllowedPath, isAlwaysAllowedPath } from "@/features/custom-roles/effective-access";
 import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 import { resolveNegotiationsRouteAccess } from "@/features/negotiations/route-access";
+import { BrokerProfileViewerProvider } from "@/components/broker-profile-link";
+import { getBrokerProfileTeamIds } from "@/features/team/broker-profile-team";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   let context;
@@ -232,7 +234,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     redirect(destino ?? "/access-denied");
   }
 
-  const [queueBadgeCount, realtimeSyncEnabled] = await Promise.all([queueBadgeCountPromise, realtimeSyncPromise]);
+  // Supervisor: nome de corretor só vira link para o perfil quando o corretor é da equipe dele.
+  const [queueBadgeCount, realtimeSyncEnabled, brokerProfileTeamIds] = await Promise.all([queueBadgeCountPromise, realtimeSyncPromise, getBrokerProfileTeamIds(context)]);
 
   const [shell] = shellRows;
   const tenant = shell ? { name: shell.tenantName, brandColor: shell.brandColor, logoUrl: shell.logoUrl } : undefined;
@@ -305,7 +308,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
             {!isLightManager && <CommandPalette />}
             {!isLightBroker && !isLightManager && <SystemFeedbackDrawer />}
             {!isLightBroker && !isLightManager && <AgentDrawer />}
-            {children}
+            <BrokerProfileViewerProvider viewerRole={context.role} teamBrokerIds={brokerProfileTeamIds}>{children}</BrokerProfileViewerProvider>
           </NotificationCountProvider>
         </RealtimeSyncProvider>
       </AppShell>

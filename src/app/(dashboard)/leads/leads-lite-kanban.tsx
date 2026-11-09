@@ -5,7 +5,7 @@
  * visíveis na ordem guardada, arrastar reordena as colunas (o mesmo `arrayMove` do workspace) e o cartão abre o
  * drawer, seleciona para o lote e abre o WhatsApp. Cartões não mudam de etapa por arrastar, como hoje.
  */
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { Calculator, MessageCircle } from "lucide-react";
 
 import { BrokerProfileLink } from "@/components/broker-profile-link";
@@ -105,6 +105,7 @@ function LeadKanbanCard({ lead, selected, onToggle, onOpen, onQuote, commercialV
   const sla = computeSlaInfo(lead, slaFirstContactMinutes, slaStagnantDays, liteStageLabel);
   const health = computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays);
   const phoneDigits = lead.telefone ? lead.telefone.replace(/\D/g, "") : "";
+  const detailsId = useId();
   return (
     // Como hoje, puxar o cartão por mais de 8px arrasta a coluna inteira; clique abre o drawer.
     <article className={styles.card} data-selected={selected ? "true" : undefined} data-investigation={lead.isManagementInvestigation ? "true" : undefined}>
@@ -129,27 +130,18 @@ function LeadKanbanCard({ lead, selected, onToggle, onOpen, onQuote, commercialV
           </label>
         </span>
       </div>
-      {/* div role="button": o nome do corretor é link próprio e <a> não pode ficar dentro de <button>. */}
-      <div
-        role="button"
-        tabIndex={0}
-        className={styles.body}
-        onClick={() => onOpen(lead)}
-        onKeyDown={(event) => {
-          if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
-          event.preventDefault();
-          onOpen(lead);
-        }}
-        aria-label={`Abrir ${lead.nome}`}
-      >
-        <span className={styles.phone}>{lead.telefone}</span>
-        <span className={styles.owner}>
+      {/* Corpo em "botão esticado": o <button> cobre o corpo e o link do corretor fica irmão dele, por cima (ownerLink).
+          Nunca dentro de role="button": o leitor de tela trata os filhos de botão como texto e perde o link. */}
+      <div className={styles.body}>
+        <button type="button" className={styles.bodyOpen} onClick={() => onOpen(lead)} aria-label={`Abrir ${lead.nome}`} aria-describedby={`${detailsId}-phone ${detailsId}-owner ${detailsId}-meta`} />
+        <span className={styles.phone} id={`${detailsId}-phone`}>{lead.telefone}</span>
+        <span className={styles.owner} id={`${detailsId}-owner`}>
           {lead.corretorNome || lead.branchName
-            ? <><strong>{lead.corretorNome ? <BrokerProfileLink brokerId={lead.corretorId} name={lead.corretorNome} /> : "Sem corretor"}</strong> · {lead.branchName ?? "Sem unidade"}</>
+            ? <><strong>{lead.corretorNome ? <BrokerProfileLink brokerId={lead.corretorId} name={lead.corretorNome} className={styles.ownerLink} /> : "Sem corretor"}</strong> · {lead.branchName ?? "Sem unidade"}</>
             : "Aguardando distribuição"}
         </span>
         {sla ? <SlaRow sla={sla} /> : null}
-        <span className={styles.meta}>
+        <span className={styles.meta} id={`${detailsId}-meta`}>
           <span className={styles.badge} data-tone={lead.status === "converted" ? "success" : lead.status === "lost" ? "danger" : "neutral"}>{liteStageLabel(lead.status)}</span>
           {lead.isManagementInvestigation ? <span className={styles.badge} data-tone="neutral">Investigação da gestão</span> : null}
           <span className={styles.badge} data-tone="neutral">{lead.tipo}</span>

@@ -24,6 +24,9 @@ export type PostSaleBrokerReportRow = {
   attendanceAnswered: number;
   attended: number;
   averageRating: number | null;
+  /** Notas válidas (1 a 5) e a soma delas: a nota média geral pondera por isso. */
+  ratingCount: number;
+  ratingTotal: number;
   closePercent: number | null;
   closeAnswered: number;
   closed: number;
@@ -71,6 +74,8 @@ export function aggregatePostSaleBrokerReport(input: {
       attendanceAnswered: 0,
       attended: 0,
       averageRating: null,
+      ratingCount: 0,
+      ratingTotal: 0,
       closePercent: null,
       closeAnswered: 0,
       closed: 0,
@@ -125,7 +130,37 @@ export function aggregatePostSaleBrokerReport(input: {
     row.closePercent = percentage(row.closed, row.closeAnswered);
     const rating = ratingSums.get(row.brokerId);
     row.averageRating = rating ? Math.round((rating.total / rating.count) * 10) / 10 : null;
+    row.ratingCount = rating?.count ?? 0;
+    row.ratingTotal = rating?.total ?? 0;
   }
 
   return [...rows.values()].sort((a, b) => a.brokerName.localeCompare(b.brokerName, "pt-BR"));
+}
+
+export type PostSaleReportSummary = {
+  sent: number;
+  responded: number;
+  attendancePercent: number | null;
+  averageRating: number | null;
+  openAlerts: number;
+};
+
+/** Faixa de números da Visão geral: soma os corretores e pondera % atendido e nota pelo que foi respondido. */
+export function summarizePostSaleReport(rows: readonly PostSaleBrokerReportRow[], openAlerts: number): PostSaleReportSummary {
+  let sent = 0, responded = 0, attended = 0, attendanceAnswered = 0, ratingTotal = 0, ratingCount = 0;
+  for (const row of rows) {
+    sent += row.sent;
+    responded += row.responded;
+    attended += row.attended;
+    attendanceAnswered += row.attendanceAnswered;
+    ratingTotal += row.ratingTotal ?? 0;
+    ratingCount += row.ratingCount ?? 0;
+  }
+  return {
+    sent,
+    responded,
+    attendancePercent: percentage(attended, attendanceAnswered),
+    averageRating: ratingCount ? Math.round((ratingTotal / ratingCount) * 10) / 10 : null,
+    openAlerts,
+  };
 }

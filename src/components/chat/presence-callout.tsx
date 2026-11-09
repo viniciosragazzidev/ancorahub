@@ -9,6 +9,7 @@ import { CameraCapture, canUseInPageCamera } from "./camera-capture";
 import { LiteList, LiteListItem } from "@/components/light/light-motion";
 import dynamic from "next/dynamic";
 import type { getWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
+import { readGuideMemory, type ConfirmStage } from "@/components/chat/presence-guide/presence-guide-steps";
 
 // Carregados só quando a confirmação pede o WhatsApp: o chat não leva o diálogo de conexão à toa.
 const WhatsAppConnectDialog = dynamic(() => import("@/components/whatsapp/whatsapp-connect-dialog").then((module) => module.WhatsAppConnectDialog), { ssr: false });
@@ -27,8 +28,21 @@ type State =
   | { kind: "waiting"; preview: string | null }
   | { kind: "done"; preview: string | null; at: string | null }
   | { kind: "error"; message: string }
-  /** WhatsApp desconectado (regra de 06/11): a conexão por código está aberta e confirma ao conectar. */
+  /** WhatsApp desconectado (regra de 06/11): o roteiro guiado de conexão está aberto (09/11). */
   | { kind: "whatsapp"; photo: Blob | null };
+
+/** O roteiro guiado (09/11): conexão e, depois de conectar, a confirmação da presença dentro dele. */
+type Guide = {
+  connection: WhatsAppConnection;
+  open: boolean;
+  stage: ConfirmStage;
+  photo: Blob | null;
+  reconnect: boolean;
+  error: string | null;
+  confirmedAt: string | null;
+  /** Muda quando o WhatsApp cai no meio: o diálogo recomeça do zero com o estado novo. */
+  attempt: number;
+};
 
 type WhatsAppConnection = Awaited<ReturnType<typeof getWhatsAppConnection>>;
 const WHATSAPP_REQUIRED_CODE = "whatsapp_required";
@@ -67,8 +81,15 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
   );
   const previewUrl = useRef<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
-  // Conexão do WhatsApp aberta pela confirmação: some quando conecta e a presença é enviada.
-  const [whatsapp, setWhatsapp] = useState<{ connection: WhatsAppConnection; open: boolean } | null>(null);
+  // Roteiro guiado aberto pela confirmação (09/11): conecta o WhatsApp e confirma a presença sem sair dele.
+  const [whatsapp, setWhatsapp] = useState<Guide | null>(null);
+  const guideKey = `${ask.assignmentId}:${ask.startsAt}`;
+  // Parou no meio do roteiro (fechou, ou o celular recarregou a página): o botão diz que continua de onde parou.
+  const [resumable, setResumable] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lembrança local, lida só no navegador
+    setResumable(Boolean(readGuideMemory(guideKey)));
+  }, [guideKey]);
   const [checking, setChecking] = useState(false);
   const presencial = ask.mode === "presencial";
   const [started] = useState(() => new Date(ask.startsAt).getTime() <= Date.now());
@@ -92,11 +113,12 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
     if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
   }, []);
 
-  async function send(photo: Blob | null) {
+  async function send(photo: Blob | null, viaGuide = false) {
     if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
     const preview = photo ? URL.createObjectURL(photo) : null;
     previewUrl.current = preview;
     setState({ kind: "sending", preview });
+    if (viaGuide) setWhatsapp((current) => (current ? { ...current, stage: "sending", error: null } : current));
     const body = new FormData();
     body.set("assignmentId", ask.assignmentId);
     if (photo) body.set("photo", photo, "local.jpg");
@@ -104,33 +126,64 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
       const response = await fetch("/api/duty/presence", { method: "POST", body });
       const result = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; code?: string; awaitingRelease?: boolean };
       if (result.code === WHATSAPP_REQUIRED_CODE) {
-        await openWhatsApp(photo);
+        await openWhatsApp(photo, undefined, true);
         return;
       }
       if (!response.ok || !result.ok) throw new Error(result.error ?? "Não consegui confirmar agora. Tente de novo.");
-      setState(result.awaitingRelease ? { kind: "waiting", preview } : { kind: "done", preview, at: hhmm(new Date().toISOString()) });
+      const at = hhmm(new Date().toISOString());
+      setState(result.awaitingRelease ? { kind: "waiting", preview } : { kind: "done", preview, at });
+      if (viaGuide) setWhatsapp((current) => (current ? { ...current, stage: result.awaitingRelease ? "waiting" : "done", confirmedAt: at } : current));
       if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(30);
-      window.setTimeout(() => router.refresh(), 1600);
+      // Pelo roteiro, a tela atualiza quando o corretor sai dele ("Ir para o Plantão").
+      if (!viaGuide) window.setTimeout(() => router.refresh(), 1600);
     } catch (error) {
-      setState({ kind: "error", message: error instanceof Error ? error.message : "Não consegui confirmar agora. Tente de novo." });
+      const message = error instanceof Error ? error.message : "Não consegui confirmar agora. Tente de novo.";
+      setState({ kind: "error", message });
+      if (viaGuide) setWhatsapp((current) => (current ? { ...current, stage: "error", error: message } : current));
     }
   }
 
-  /** Abre a conexão por código; ao conectar, a presença segue sozinha (com a foto, se já tirada). */
-  async function openWhatsApp(photo: Blob | null, known?: WhatsAppConnection) {
+  /** Abre o roteiro guiado de conexão; ao conectar, ele segue para a confirmação (com a foto, se já tirada). */
+  async function openWhatsApp(photo: Blob | null, known?: WhatsAppConnection, reconnect = false) {
     const connection = known ?? await loadWhatsAppConnection().catch(() => null);
     if (!connection) {
       setState({ kind: "error", message: "Conecte o seu WhatsApp para confirmar presença. Não consegui abrir a conexão agora; tente de novo." });
       return;
     }
     setState({ kind: "whatsapp", photo });
-    setWhatsapp({ connection, open: true });
+    setWhatsapp((current) => ({
+      connection: reconnect ? { ...connection, status: "disconnected" } : connection,
+      open: true,
+      stage: "connect",
+      photo,
+      reconnect,
+      error: null,
+      confirmedAt: null,
+      attempt: (current?.attempt ?? 0) + (reconnect ? 1 : 0),
+    }));
   }
 
-  function continueAfterConnected(photo: Blob | null) {
+  /** Conectou: o roteiro mostra "Confirmar presença" (P7 do plano: um toque, não automático). */
+  function continueAfterConnected() {
+    setWhatsapp((current) => (current ? { ...current, stage: "confirm" } : current));
+  }
+
+  function confirmFromGuide() {
+    const guide = whatsapp;
+    if (!guide) return;
+    // Presencial sem foto: o roteiro fecha e a câmera abre; o cartão segue como antes (foto → diretor libera).
+    if (presencial && !guide.photo) {
+      setWhatsapp(null);
+      openCamera();
+      return;
+    }
+    void send(guide.photo, true);
+  }
+
+  function finishGuide() {
     setWhatsapp(null);
-    if (photo || !presencial) void send(photo);
-    else openCamera();
+    setResumable(false);
+    router.refresh();
   }
 
   function openCamera() {
@@ -220,7 +273,7 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
       </AnimatePresence>
 
       {state.kind === "error" ? <p className={styles.presenceError} role="alert">{state.message}</p> : null}
-      {needsWhatsApp ? <p className={styles.presenceError} role="status">Para confirmar presença, conecte o seu WhatsApp. Gere o código e digite no WhatsApp do celular; assim que conectar, a presença é confirmada.</p> : null}
+      {needsWhatsApp ? <p className={styles.presenceError} role="status">Falta conectar o seu WhatsApp. Toque abaixo e eu te guio passo a passo.</p> : null}
 
       {done ? (
         <motion.p
@@ -253,19 +306,35 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
               <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M2.5 5.5A1.5 1.5 0 0 1 4 4h1.4l1-1.5h3.2l1 1.5H12a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 12 13H4a1.5 1.5 0 0 1-1.5-1.5Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /><circle cx="8" cy="8.5" r="2.4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
               {state.kind === "error" ? "Tirar outra foto" : "Tirar foto do local"}
             </>
-          ) : needsWhatsApp ? "Conectar WhatsApp e confirmar" : state.kind === "error" ? "Tentar de novo" : "Confirmar presença"}
+          ) : needsWhatsApp || resumable ? "Continuar de onde parei" : state.kind === "error" ? "Tentar de novo" : "Confirmar presença"}
         </motion.button>
       )}
 
       {whatsapp ? (
         <WhatsAppConnectDialog
+          key={whatsapp.attempt}
           initial={whatsapp.connection}
           open={whatsapp.open}
-          initialMethod="code"
           variant="presence"
           triggerLabel="Conectar WhatsApp"
-          onOpenChange={(open) => setWhatsapp((current) => (current ? { ...current, open } : current))}
-          onReady={() => continueAfterConnected(state.kind === "whatsapp" ? state.photo : null)}
+          duty={{ key: guideKey, scheduleName: ask.scheduleName, branchName: ask.branchName, mode: ask.mode, until: hhmm(ask.endsAt) }}
+          presence={{
+            stage: whatsapp.stage,
+            error: whatsapp.error,
+            confirmedAt: whatsapp.confirmedAt,
+            reconnect: whatsapp.reconnect,
+            onConfirm: confirmFromGuide,
+            onFinish: finishGuide,
+          }}
+          onOpenChange={(open) => {
+            // Fechou depois de confirmar: é o mesmo que "Ir para o Plantão".
+            if (!open && (whatsapp.stage === "done" || whatsapp.stage === "waiting")) finishGuide();
+            else {
+              setWhatsapp((current) => (current ? { ...current, open } : current));
+              if (!open) setResumable(true);
+            }
+          }}
+          onReady={continueAfterConnected}
         />
       ) : null}
 

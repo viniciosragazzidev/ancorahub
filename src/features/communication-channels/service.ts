@@ -533,6 +533,17 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         }
 
         if (outbound?.purpose === "postSaleSurvey") {
+          // Meta accepted the opening and refused it later (e.g. 131042 payment issue): the survey must not
+          // stay "sent" (it would get reminders and block the lead's cooldown). Only the exact opening row
+          // of a survey still waiting for the first answer (09/11, 25 surveys of the 7276).
+          if (outboundUpdate.status === "failed") {
+            await db.update(schema.postSaleSurveys).set({ status: "failed", skipReason: (outboundUpdate.providerErrorMessage ?? "A Meta recusou a mensagem de abertura.").slice(0, 240) }).where(and(
+              eq(schema.postSaleSurveys.tenantId, channel.tenantId),
+              eq(schema.postSaleSurveys.outboundId, outbound.id),
+              eq(schema.postSaleSurveys.status, "sent"),
+              isNull(schema.postSaleSurveys.lastReplyAt),
+            )).catch((error) => console.warn("[post-sale] opening_failure_sync_failed", { tenantId: channel.tenantId, outboundId: outbound.id, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" }));
+          }
           try {
             const { syncPostSaleConversationMessage } = await import("./post-sale-conversation-sync");
             await syncPostSaleConversationMessage({ tenantId: channel.tenantId, outboundId: outbound.id });

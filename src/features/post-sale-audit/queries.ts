@@ -3,8 +3,7 @@ import "server-only";
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
-import { postSaleAlertReasons } from "./alert-rules";
-import { lossReasonCheckSummary, readLossReasonCheck } from "./loss-reason-check";
+import { postSaleAlertDetail, postSaleAlertReasons } from "./alert-rules";
 import type { PostSaleRuleFilter } from "./auto-rules";
 import { aggregatePostSaleBrokerReport, type PostSaleBrokerReportRow, type PostSaleReportBroker, type PostSaleReportSurvey } from "./reporting";
 
@@ -18,15 +17,13 @@ export type PostSaleOpenAlert = {
   /** Corretor da pesquisa: o nome vira link para o perfil dele. */
   brokerId?: string | null;
   reasons: ReturnType<typeof postSaleAlertReasons>;
-  /** Na divergência de motivo de perda (R4): "Corretor: ... Cliente: ...". */
-  lossDetail: string | null;
+  /** Detalhe por motivo: divergência de perda ("Corretor: ... Cliente: ..."), horário pedido, fala da reclamação. */
+  detail: string | null;
   occurredAt: string;
 };
 
-function lossDetailOf(reasons: ReturnType<typeof postSaleAlertReasons>, answers: unknown) {
-  if (!reasons.includes("loss_reason_mismatch")) return null;
-  const check = readLossReasonCheck(answers);
-  return check ? lossReasonCheckSummary(check) : null;
+function alertDetailOf(reasons: ReturnType<typeof postSaleAlertReasons>, answers: unknown) {
+  return reasons.map((reason) => postSaleAlertDetail(reason, answers)).filter(Boolean).join(" · ") || null;
 }
 
 function branchWhere(context: TenantContext) {
@@ -126,6 +123,8 @@ export async function loadPostSaleBrokerSummary(context: TenantContext, brokerId
     attendanceAnswered: 0,
     attended: 0,
     averageRating: null,
+    ratingCount: 0,
+    ratingTotal: 0,
     closePercent: null,
     closeAnswered: 0,
     closed: 0,
@@ -167,6 +166,7 @@ export async function loadPostSaleOpenAlerts(context: TenantContext): Promise<Po
         sql`${schema.postSaleSurveys.answers}->>'sentiment' = 'negative'`,
         sql`${schema.postSaleSurveys.answers}->>'wantsHelp' = 'true'`,
         sql`${schema.postSaleSurveys.answers}->'lossCheck'->>'divergent' = 'true'`,
+        sql`jsonb_exists_any(coalesce(${schema.postSaleSurveys.answers}->'intents'->'list', '[]'::jsonb), array['price_request', 'wants_human', 'scheduling', 'complaint', 'health_urgency'])`,
       ),
       branchWhere(context),
     ))
@@ -177,7 +177,7 @@ export async function loadPostSaleOpenAlerts(context: TenantContext): Promise<Po
     const reasons = postSaleAlertReasons(row);
     if (!reasons.length) return [];
     const occurredAt = row.lastReplyAt ?? row.completedAt ?? row.sentAt ?? row.createdAt;
-    return [{ surveyId: row.surveyId, leadId: row.leadId, leadName: row.leadName ?? "Lead", brokerName: row.brokerName ?? "Sem corretor", brokerId: row.brokerName ? row.brokerId : null, reasons, lossDetail: lossDetailOf(reasons, row.answers), occurredAt: occurredAt.toISOString() }];
+    return [{ surveyId: row.surveyId, leadId: row.leadId, leadName: row.leadName ?? "Lead", brokerName: row.brokerName ?? "Sem corretor", brokerId: row.brokerName ? row.brokerId : null, reasons, detail: alertDetailOf(reasons, row.answers), occurredAt: occurredAt.toISOString() }];
   });
 }
 

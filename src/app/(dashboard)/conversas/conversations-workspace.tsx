@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useLayoutEffect, useMemo, useState, useRef, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 import { motion, useReducedMotion } from "motion/react";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
@@ -1927,34 +1927,38 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled, v
   const preview = conversation.latestMessage?.body ?? "Nenhuma mensagem sincronizada.";
   const displayBrokerName = brokerDisplayName(conversation.corretorNome);
   const title = displayBrokerName ? `${conversation.nome} · ${displayBrokerName}` : conversation.nome;
+  const detailsId = useId();
 
-  // Linha como div role="button": o nome do corretor é link próprio e <a> não pode ficar dentro de <button>.
+  // Linha em "botão esticado": o <button> cobre a linha toda e o link do corretor fica irmão dele (por cima, z-10),
+  // nunca dentro de um role="button" (leitor de tela trata os filhos de botão como texto e perde o link).
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
-        event.preventDefault();
-        onClick();
-      }}
-      aria-current={active ? "page" : undefined}
+      data-active={active ? "true" : undefined}
       data-lite={directorSkinEnabled ? undefined : "row"}
       data-conversations-part={directorSkinEnabled ? "row" : undefined}
       className={cn(
-        "group flex w-full cursor-pointer items-start gap-3 rounded-full px-3 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        "group relative flex w-full cursor-pointer items-start gap-3 rounded-full px-3 py-3 text-left",
         active ? "bg-muted/80" : "hover:bg-muted/65",
       )}
-      onClick={onClick}
     >
+      <button
+        type="button"
+        aria-label={`Abrir conversa com ${conversation.nome}`}
+        aria-describedby={detailsId}
+        aria-current={active ? "page" : undefined}
+        data-conversations-part="row-open"
+        title={title}
+        className="absolute inset-0 z-[1] cursor-pointer rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        onClick={onClick}
+      />
       <ContactAvatar className="mt-0.5 shrink-0" name={conversation.nome} photoUrl={contactPhotoUrl(conversation)} photoWhenVisible />
-      <span className="grid min-w-0 flex-1 gap-1">
+      <span id={detailsId} className="grid min-w-0 flex-1 gap-1">
         <span className="flex min-w-0 items-center justify-between gap-3" title={title}>
           <span className="flex min-w-0 flex-1 items-center gap-1.5">
             <span className="min-w-0 truncate text-sm font-medium">{conversation.nome}</span>
             {displayBrokerName ? (
               <span data-conversations-part={directorSkinEnabled ? "row-owner-name" : undefined} className="min-w-0 max-w-32 truncate text-xs text-muted-foreground">
-                · <BrokerProfileLink brokerId={conversation.corretorId} name={displayBrokerName} viewerRole={viewerRole} />
+                · <BrokerProfileLink brokerId={conversation.corretorId} name={displayBrokerName} viewerRole={viewerRole} className="relative z-10" />
               </span>
             ) : null}
           </span>

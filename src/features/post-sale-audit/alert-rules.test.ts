@@ -33,3 +33,12 @@ describe("post-sale alert rules", () => {
     expect(isPostSaleAlertOpen({ ...state, outcome: "ok" })).toBe(false);
   });
 });
+
+describe("alerta repetível por mensagem", () => {
+  it("urgência de saúde e pedido de retomar notificam de novo a cada mensagem; os outros não", async () => {
+    const { postSaleAlertIdempotencyKey } = await import("./alert-rules");
+    expect(postSaleAlertIdempotencyKey("s1", "health_urgency", "u1", "m1")).not.toBe(postSaleAlertIdempotencyKey("s1", "health_urgency", "u1", "m2"));
+    expect(postSaleAlertIdempotencyKey("s1", "wants_resume", "u1", "m1")).toBe("post-sale-alert:s1:wants_resume:u1:m1");
+    expect(postSaleAlertIdempotencyKey("s1", "no_contact", "u1", "m1")).toBe("post-sale-alert:s1:no_contact:u1");
+  });
+});

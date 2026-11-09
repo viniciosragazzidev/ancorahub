@@ -239,3 +239,112 @@ export const PRESENCE_WHATSAPP_COPY = {
     "Pronto! Sua presença é confirmada sozinha.",
   ],
 } as const;
+
+/**
+ * Roteiro guiado da presença (09/11, plano 2026-11-09-roteiro-guiado-presenca-whatsapp.md): uma ideia e um botão
+ * por tela, conduzido pelo mascote do Plantão. Único lugar dos textos do roteiro.
+ * "Tela inicial" (09/11): nenhum link abre o WhatsApp na lista de conversas; o celular volta para a última tela
+ * usada, então o roteiro pede para conferir a tela "Conversas" antes do caminho.
+ */
+export const PRESENCE_GUIDE_COPY = {
+  welcome: {
+    title: "Para receber leads hoje, conecte seu WhatsApp.",
+    titleReconnect: "Seu WhatsApp desconectou. Vamos conectar de novo, é rápido.",
+    sub: "Leva 1 minuto e não precisa baixar nada.",
+    benefits: ["Os leads chegam e você atende pelo seu WhatsApp.", "A IA te ajuda no atendimento.", "Depois é só confirmar sua presença."],
+    privacyTitle: "Suas conversas pessoais são só suas",
+    privacy: "Ninguém lê nem salva. Só as conversas com os seus leads e clientes ficam no sistema.",
+    cta: "Vamos lá",
+  },
+  phone: { title: "Qual é o número do WhatsApp deste celular?", sub: "É nele que você vai receber os leads.", label: "Número do WhatsApp com DDD", cta: "Continuar" },
+  code: {
+    generating: "Estou gerando o seu código…",
+    title: "Este é o seu código. Toque para copiar.",
+    copiedTitle: "Copiado! Agora vamos ao WhatsApp.",
+    sub: "Você vai colar ele dentro do WhatsApp.",
+    copied: "Código copiado",
+    cta: "Copiar código",
+    next: "Continuar",
+  },
+  // Tutorial antes de abrir (09/11): primeiro o que fazer no WhatsApp; ele só abre no fim do caminho.
+  home: {
+    title: "Antes de abrir o WhatsApp, veja o que fazer lá. Primeiro: comece pela tela Conversas.",
+    sub: "Se o WhatsApp abrir dentro de uma conversa, toque na seta ← no canto de cima até ver a lista Conversas.",
+    captions: { android: "Toque na seta ←, em cima à esquerda, até aparecer Conversas.", iphone: "Toque em ‹ Voltar, em cima à esquerda, até aparecer Conversas." },
+    cta: "Entendi, próximo passo",
+  },
+  path: {
+    title: "Depois, na tela Conversas, você vai tocar em 4 lugares. Veja:",
+    sub: (n: number) => `Toque ${n} de 4`,
+    steps: {
+      android: ["Na tela Conversas, toque nos três pontinhos, em cima.", "Toque em Dispositivos conectados.", "Toque em Conectar dispositivo.", "Embaixo, toque em Conectar com número de telefone e cole o código."],
+      iphone: ["Na tela Conversas, toque em Configurações, embaixo.", "Toque em Dispositivos conectados.", "Toque em Conectar dispositivo.", "Embaixo, toque em Conectar com número de telefone e cole o código."],
+    },
+    next: "Próximo toque",
+    cta: "Abrir o WhatsApp",
+  },
+  waiting: { title: "Colou o código no WhatsApp? Estou esperando a confirmação.", sub: "Pode deixar esta tela aberta. Assim que conectar, eu sigo sozinho.", label: "Esperando o WhatsApp…", cta: "Abrir o WhatsApp de novo", again: "Ver o caminho de novo" },
+  desktop: {
+    qrTitle: "Aponte a câmera do WhatsApp para este código.",
+    codeTitle: "Digite este código no WhatsApp do celular.",
+    sub: "Faça no celular e deixe esta tela aberta. Eu aviso quando conectar.",
+    steps: (qr: boolean, platform: "android" | "iphone") => [
+      "Abra o WhatsApp no celular e confira se está na tela Conversas (se abrir numa conversa, toque na seta ←).",
+      platform === "android" ? "Toque nos três pontinhos, em cima, e em Dispositivos conectados." : "Toque em Configurações, embaixo, e em Dispositivos conectados.",
+      "Toque em Conectar dispositivo.",
+      qr ? "Aponte a câmera para o código ao lado." : "Toque em Conectar com número de telefone e digite o código.",
+    ],
+    phoneIs: "Seu celular é",
+    waiting: "Esperando o celular…",
+    useCode: "Prefiro usar um código",
+    useQr: "Prefiro ler o QR Code",
+  },
+  connected: { title: "Pronto, seu WhatsApp está conectado!", sub: "Agora falta só confirmar sua presença.", cta: "Seguindo…" },
+  confirm: {
+    online: { title: "Agora é só confirmar sua presença.", sub: "Um toque e os leads deste plantão podem chegar.", cta: "Confirmar presença" },
+    presencial: { title: "Agora tire uma foto do local do plantão.", sub: "O diretor vê a foto e libera você.", cta: "Tirar foto do local" },
+    sending: "Confirmando…",
+  },
+  done: {
+    title: (at: string | null) => (at ? `Presença confirmada às ${at}.` : "Presença confirmada."),
+    sub: "Os leads deste plantão já podem chegar para você.",
+    waitingTitle: "Foto enviada!",
+    waitingSub: "Agora o diretor valida e libera você. Até lá você fica pausado, sem receber leads.",
+    waitingPill: "Aguardando o diretor liberar",
+    cta: "Ir para o Plantão",
+  },
+  errors: {
+    expired: { title: "Esse código venceu. Já fiz outro para você.", sub: "É só copiar de novo e colar no WhatsApp.", cta: "Copiar o novo código" },
+    cooldown: { title: "Espere um pouquinho para eu pedir outro código.", sub: "O WhatsApp limita quantos códigos saem seguidos.", cta: "Gerar outro código", wait: (s: number) => `Aguarde ${s} s` },
+    issue: { title: "Não consegui gerar o código agora.", cta: "Tentar de novo" },
+    rejected: { title: "O WhatsApp não aceitou o código.", sub: (phone: string) => `O número precisa ser o do WhatsApp deste celular. Hoje está ${phone}.`, cta: "Corrigir o número" },
+    stalled: { title: "Está demorando. Deixe o WhatsApp aberto mais um pouco.", sub: "Se o WhatsApp já mostra o aparelho conectado, espere. Se não, peça outro código.", cta: "Gerar outro código" },
+    notOpened: { title: "Não abriu? Abra o WhatsApp pelo ícone na tela do celular.", sub: "Depois volte aqui, eu fico esperando.", cta: "Já abri" },
+    copyBlocked: { title: "Não consegui copiar. Anote o código:", sub: "Você vai digitar ele no WhatsApp.", cta: "Anotei" },
+    unstable: { title: "O WhatsApp está instável agora. Pode confirmar sua presença mesmo assim.", sub: "Quando ele voltar, peço para você conectar.", cta: "Confirmar presença" },
+    confirm: { cta: "Tentar de novo" },
+  },
+  /** Aparece ao tocar em "Abrir o WhatsApp", antes de sair do app: o que fazer assim que o WhatsApp abrir. */
+  beforeOpen: {
+    title: "Quando o WhatsApp abrir:",
+    steps: {
+      android: ["Vá para a tela inicial, a lista Conversas. Se abrir numa conversa, toque na seta ← em cima.", "Na tela inicial, toque nos 3 pontinhos ⋮, em cima à direita."],
+      iphone: ["Vá para a tela inicial, a lista Conversas. Se abrir numa conversa, toque em ‹ em cima.", "Na tela inicial, toque em Configurações, embaixo à direita."],
+    },
+    cta: "Entendi, abrir o WhatsApp",
+    back: "Voltar",
+  },
+  help: {
+    title: "Precisa de ajuda?",
+    video: ["Ver o vídeo", "1 minuto e meio mostrando cada toque."],
+    steps: ["Ler o passo a passo", "O caminho em texto, para Android e iPhone."],
+  },
+  exit: {
+    title: "Sair agora?",
+    sub: "Sem o WhatsApp conectado você não recebe leads do plantão. Depois você continua de onde parou.",
+    stay: "Continuar conectando",
+    leave: "Sair",
+  },
+  progress: (at: number, total: number) => `${at} de ${total}`,
+  close: "Sair do roteiro",
+} as const;

@@ -44,7 +44,7 @@
   background: var(--surface-muted);
 }
 
-.root [data-lite="row"][aria-current="page"] {
+.root [data-lite="row"][data-active="true"] {
   background: var(--accent-subtle);
 }
 
@@ -277,7 +277,7 @@
   background: var(--surface-muted);
 }
 
-.root[data-skin="diretor"] [data-conversations-part="row"][aria-current="page"] {
+.root[data-skin="diretor"] [data-conversations-part="row"][data-active="true"] {
   background: var(--accent-subtle);
 }
 

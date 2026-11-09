@@ -184,4 +184,20 @@ describe("kanban de /leads com a chave desligada", () => {
     // O workspace inteiro com o kanban ativo: colunas, cartões, barra de seleção e dicas.
     expect(container.innerHTML).toMatchSnapshot();
   });
+
+  it("link do corretor no cartão fica fora de botão e de role=button", () => {
+    const { container } = render(
+      <NuqsTestingAdapter>
+        <LeadsWorkspace leads={leads} contextRole="director" initialView="kanban" brokers={[]} branches={[]} />
+      </NuqsTestingAdapter>,
+    );
+    const links = screen.getAllByRole("link", { name: "Ver perfil de Ana Souza" });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.closest("button")).toBeNull();
+      expect(link.closest("[role='button']")).toBeNull();
+    }
+    expect(screen.getAllByRole("button", { name: "Abrir Carlos Mendes" }).length).toBeGreaterThan(0);
+    expect(container.querySelectorAll("[role='button'] a")).toHaveLength(0);
+  });
 });

@@ -297,7 +297,7 @@ export function SupervisionPanel({
               <p className="text-sm font-semibold text-foreground truncate">
                 {/* O painel só aparece para diretor e gestor (a página confere); "Você" não vira link. */}
                 {displayedAssignment.ownerName && displayedAssignment.ownerId !== currentUserId
-                  ? <BrokerProfileLink brokerId={displayedAssignment.ownerId} name={displayedAssignment.ownerName} viewerRole="manager" />
+                  ? <BrokerProfileLink brokerId={displayedAssignment.ownerId} name={displayedAssignment.ownerName} />
                   : displayedAssignment.ownerName || "Não distribuído"}
               </p>
               <p className="text-xs text-muted-foreground mt-1">

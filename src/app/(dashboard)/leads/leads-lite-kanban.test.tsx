@@ -4,6 +4,8 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 
+import { BrokerProfileViewerProvider } from "@/components/broker-profile-link";
+
 import { LeadsLiteKanban } from "./leads-lite-kanban";
 
 vi.mock("./status-actions", () => ({
@@ -51,7 +53,7 @@ function renderKanban(extra: Partial<Parameters<typeof LeadsLiteKanban>[0]> = {}
     bulk: { role: "director", brokers: [], branches: [] },
     ...extra,
   };
-  render(<LeadsLiteKanban {...props} />);
+  render(<BrokerProfileViewerProvider viewerRole="director"><LeadsLiteKanban {...props} /></BrokerProfileViewerProvider>);
   return props;
 }
 
@@ -114,5 +116,22 @@ describe("kanban Lite de /leads", () => {
     const { container } = render(<div />);
     renderKanban({ hideArrival: true });
     expect(container.ownerDocument.querySelector("[class*='arrival']")).toBeNull();
+  });
+
+  it("link do corretor fica fora de botão (irmão do botão esticado que abre o lead)", () => {
+    const { container } = render(<div />);
+    const props = renderKanban();
+    const link = screen.getByRole("link", { name: "Ver perfil de Ana Souza" });
+    expect(link).toHaveAttribute("href", "/equipe/c1");
+    expect(link.closest("button")).toBeNull();
+    expect(link.closest("[role='button']")).toBeNull();
+    expect(container.ownerDocument.querySelector("[role='button']")).toBeNull();
+    const open = screen.getByRole("button", { name: "Abrir Carlos Mendes" });
+    expect(open.parentElement).toContainElement(link);
+    expect(open.getAttribute("aria-describedby")).toBeTruthy();
+    fireEvent.click(link);
+    expect(props.onOpen).not.toHaveBeenCalled();
+    fireEvent.click(open);
+    expect(props.onOpen).toHaveBeenCalledWith(carlos);
   });
 });

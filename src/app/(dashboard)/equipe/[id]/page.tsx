@@ -6,7 +6,7 @@ import { MemberStatusBadge, RoleBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { getTeamMemberProfile, MEMBER_PROFILE_LEADS_LIMIT } from "@/features/team/member-profile";
+import { getTeamMemberProfile, isTeamMemberProfileEnabled, MEMBER_PROFILE_LEADS_LIMIT } from "@/features/team/member-profile";
 import { getBrokerMonthGoal } from "@/features/goals/lite-goals-queries";
 import { isTeamManagementEnabled } from "@/features/team-management-ui/flag";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -30,6 +30,7 @@ import { getBrokerMetricTimeline } from "@/features/reports/metrics/team-metric-
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { MemberProfileLite } from "./_components/member-profile-lite";
+import { OutOfTeamProfile } from "./_components/out-of-team-profile";
 import { BrokerLeadsExportButton } from "./_components/broker-leads-export-button";
 import { canExportBrokerLeads } from "@/features/team/broker-lead-export-access";
 import { getPostSaleBrokerSummaryAction } from "@/features/post-sale-audit/actions";
@@ -86,6 +87,8 @@ export default async function TeamMemberProfilePage({
   const { janela } = await searchParams;
   const window = normalizeBrokerPerformanceWindow(janela);
   const profile = await getTeamMemberProfile(id);
+  // Supervisor com o perfil ligado que abre corretor de fora da equipe: mensagem clara em vez de "acesso negado".
+  if (!profile && context.role === "supervisor" && (await isTeamMemberProfileEnabled())) return <OutOfTeamProfile />;
   if (!profile) redirect("/access-denied");
   const postSaleSummary = profile.member.role === "broker" && (context.role === "director" || context.role === "manager")
     ? await getPostSaleBrokerSummaryAction(profile.member.userId, 30)

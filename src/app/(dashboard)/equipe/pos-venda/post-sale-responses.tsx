@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { getPostSaleSurveyMessagesAction, resumePostSaleSurveyAction } from "@/features/post-sale-audit/actions";
 import { matchesPostSaleRuleFilter, postSaleRuleLabel, POST_SALE_RULE_FILTERS, type PostSaleRuleFilter } from "@/features/post-sale-audit/auto-rules";
-import { answerChips, matchesSearch, paginate, RESPONSE_GROUP_LABELS, responseGroups, type AnswerChip, type ResponseGroup } from "@/features/post-sale-audit/responses-view";
+import { answerChips, intentDetails, matchesSearch, paginate, RESPONSE_GROUP_LABELS, responseGroups, type AnswerChip, type ResponseGroup } from "@/features/post-sale-audit/responses-view";
 import { lossReasonCheckSummary, readLossReasonCheck } from "@/features/post-sale-audit/loss-reason-check";
 import { cn } from "@/lib/utils";
 
@@ -147,6 +147,7 @@ export function PostSaleResponses({ responses }: { responses: PostSaleResponseRo
                       </p>
                     );
                   })()}
+                  {intentDetails(row.answers).map((line) => <p key={line} className="text-sm text-muted-foreground">{line}</p>)}
                   {typeof row.answers.comment === "string" || typeof row.answers.reason === "string" ? (
                     <p className="text-sm text-muted-foreground">
                       {typeof row.answers.reason === "string" ? <>Motivo: {row.answers.reason}. </> : null}
