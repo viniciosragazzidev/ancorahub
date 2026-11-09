@@ -90,8 +90,14 @@ async function recoverStuckR0Surveys(tenantId: string, now: Date) {
         .where(and(eq(schema.postSaleSurveys.id, survey.id), eq(schema.postSaleSurveys.tenantId, tenantId), eq(schema.postSaleSurveys.status, "queued"), isNull(schema.postSaleSurveys.outboundId)));
       released += 1;
     };
-    // Free text only inside the client's 24 h window (R0 never uses a template).
-    if (now.getTime() - survey.createdAt.getTime() > 20 * 60 * 60_000 || !survey.channelType || !survey.channelRef) {
+    // Free text only inside the client's 24 h window (R0 never uses a template): it closes 24 h after the
+    // client's triggering message; 23 h keeps a margin (Vigia). Older rows without triggerAt use createdAt.
+    const triggerAtRaw = (survey.answers as { r0?: { triggerAt?: unknown } } | null)?.r0?.triggerAt;
+    const triggerAt = typeof triggerAtRaw === "string" ? new Date(triggerAtRaw) : null;
+    const windowClosed = triggerAt && Number.isFinite(triggerAt.getTime())
+      ? now.getTime() - triggerAt.getTime() > 23 * 60 * 60_000
+      : now.getTime() - survey.createdAt.getTime() > 20 * 60 * 60_000;
+    if (windowClosed || !survey.channelType || !survey.channelRef) {
       await release("envio interrompido; janela do cliente fechada");
       continue;
     }
@@ -257,7 +263,7 @@ async function startTenant(tenant: { id: string; name: string | null }, settings
       status: "queued",
       step: 0,
       // The opening text is kept so an interrupted send can be retried with the same words.
-      answers: { r0: { trigger: decision.reason, triggerMessageId: trigger.id, opening } },
+      answers: { r0: { trigger: decision.reason, triggerMessageId: trigger.id, triggerAt: trigger.sentAt.toISOString(), opening } },
       channelType: source.type,
       channelRef: source.ref,
       ruleKey: R0_RULE_KEY,
