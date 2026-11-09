@@ -1,5 +1,6 @@
 "use client";
 
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -151,7 +152,7 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
                   <th className="px-2 py-2 font-medium">Corretor</th><th className="px-2 py-2 font-medium">Enviadas</th><th className="px-2 py-2 font-medium">Respondidas</th><th className="px-2 py-2 font-medium">Foi atendido</th><th className="px-2 py-2 font-medium">Nota média</th><th className="px-2 py-2 font-medium">Fechou</th><th className="px-2 py-2 font-medium">Sem contato</th><th className="px-2 py-2 font-medium">Voltou sem resposta</th><th className="px-2 py-2 font-medium">Alertas abertos</th>
                 </tr></thead>
                 <tbody>{paginate([...data.report].sort((a, b) => b.responded - a.responded || b.sent - a.sent || a.brokerName.localeCompare(b.brokerName)), reportPage).items.map((row) => <tr key={row.brokerId} className="border-b border-border/60 last:border-0">
-                  <th scope="row" className="px-2 py-3 font-medium">{row.brokerName}</th><td className="px-2 py-3 tabular-nums">{row.sent}</td><td className="px-2 py-3 tabular-nums">{row.responded}</td><td className="px-2 py-3">{row.attendancePercent === null ? "Sem respostas" : `${row.attendancePercent}%`}</td><td className="px-2 py-3">{row.averageRating === null ? "Sem notas" : `${row.averageRating}/5`}</td><td className="px-2 py-3">{row.closePercent === null ? "Sem respostas" : `${row.closePercent}%`}</td><td className="px-2 py-3 tabular-nums">{row.noContact}</td><td className="px-2 py-3 tabular-nums">{row.customerReturned}</td><td className="px-2 py-3 tabular-nums">{row.openAlerts}</td>
+                  <th scope="row" className="px-2 py-3 font-medium"><BrokerProfileLink brokerId={row.brokerId} name={row.brokerName} /></th><td className="px-2 py-3 tabular-nums">{row.sent}</td><td className="px-2 py-3 tabular-nums">{row.responded}</td><td className="px-2 py-3">{row.attendancePercent === null ? "Sem respostas" : `${row.attendancePercent}%`}</td><td className="px-2 py-3">{row.averageRating === null ? "Sem notas" : `${row.averageRating}/5`}</td><td className="px-2 py-3">{row.closePercent === null ? "Sem respostas" : `${row.closePercent}%`}</td><td className="px-2 py-3 tabular-nums">{row.noContact}</td><td className="px-2 py-3 tabular-nums">{row.customerReturned}</td><td className="px-2 py-3 tabular-nums">{row.openAlerts}</td>
                 </tr>)}</tbody>
               </table>
               <Pager page={paginate(data.report, reportPage).page} pages={paginate(data.report, reportPage).pages} onChange={setReportPage} label="corretores" />
@@ -163,7 +164,7 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
           <CardHeader><CardTitle>Alertas</CardTitle><CardDescription>Clientes que precisam de acompanhamento da direção ou da unidade.</CardDescription></CardHeader>
           <CardContent className="grid gap-3">
             {data.alerts.length ? data.alerts.map((alert) => <div key={alert.surveyId} className="flex flex-col gap-3 rounded-xl border border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0"><p className="font-medium">{alert.leadName}</p><p className="text-sm text-muted-foreground">{alert.brokerName} · {alert.reasons.map((reason) => POST_SALE_ALERT_REASON_LABELS[reason]).join("; ")}</p>{alert.lossDetail ? <p className="text-sm text-muted-foreground">{alert.lossDetail}</p> : null}<time className="text-xs text-muted-foreground" dateTime={alert.occurredAt}>{new Date(alert.occurredAt).toLocaleString("pt-BR")}</time></div>
+              <div className="min-w-0"><p className="font-medium">{alert.leadName}</p><p className="text-sm text-muted-foreground"><BrokerProfileLink brokerId={alert.brokerId} name={alert.brokerName} /> · {alert.reasons.map((reason) => POST_SALE_ALERT_REASON_LABELS[reason]).join("; ")}</p>{alert.lossDetail ? <p className="text-sm text-muted-foreground">{alert.lossDetail}</p> : null}<time className="text-xs text-muted-foreground" dateTime={alert.occurredAt}>{new Date(alert.occurredAt).toLocaleString("pt-BR")}</time></div>
               <div className="flex shrink-0 flex-wrap gap-2"><Button render={<Link href={`/leads/${encodeURIComponent(alert.leadId)}`} />} variant="outline" size="sm">Abrir lead</Button><Button type="button" variant="outline" size="sm" loading={busy} onClick={() => markAlertHandled(alert.surveyId)}>Marcar como tratado</Button></div>
             </div>) : <p className="rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-muted-foreground">Nenhum alerta aberto.</p>}
           </CardContent>

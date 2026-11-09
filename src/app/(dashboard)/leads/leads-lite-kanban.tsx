@@ -8,6 +8,7 @@
 import { useMemo } from "react";
 import { Calculator, MessageCircle } from "lucide-react";
 
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { LiteKanban } from "@/components/lite/data/kanban";
 import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
 import { computeLeadHealth, type LeadHealth } from "@/features/leads/components/lead-health-badge";
@@ -128,11 +129,23 @@ function LeadKanbanCard({ lead, selected, onToggle, onOpen, onQuote, commercialV
           </label>
         </span>
       </div>
-      <button type="button" className={styles.body} onClick={() => onOpen(lead)} aria-label={`Abrir ${lead.nome}`}>
+      {/* div role="button": o nome do corretor é link próprio e <a> não pode ficar dentro de <button>. */}
+      <div
+        role="button"
+        tabIndex={0}
+        className={styles.body}
+        onClick={() => onOpen(lead)}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
+          event.preventDefault();
+          onOpen(lead);
+        }}
+        aria-label={`Abrir ${lead.nome}`}
+      >
         <span className={styles.phone}>{lead.telefone}</span>
         <span className={styles.owner}>
           {lead.corretorNome || lead.branchName
-            ? <><strong>{lead.corretorNome ?? "Sem corretor"}</strong> · {lead.branchName ?? "Sem unidade"}</>
+            ? <><strong>{lead.corretorNome ? <BrokerProfileLink brokerId={lead.corretorId} name={lead.corretorNome} /> : "Sem corretor"}</strong> · {lead.branchName ?? "Sem unidade"}</>
             : "Aguardando distribuição"}
         </span>
         {sla ? <SlaRow sla={sla} /> : null}
@@ -143,7 +156,7 @@ function LeadKanbanCard({ lead, selected, onToggle, onOpen, onQuote, commercialV
           <span className={styles.badge} data-tone={healthTone(health)}>{health.label}</span>
           {hideArrival ? null : <span className={styles.arrival}>{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>}
         </span>
-      </button>
+      </div>
       {commercialValuesEnabled && onQuote ? (
         <button type="button" className={styles.quoteButton} onClick={() => onQuote(lead)}>
           <Calculator aria-hidden="true" size={16} /> Fazer cotação

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { BrokerProfileViewerProvider } from "@/components/broker-profile-link";
 import { getNegotiationsDashboard, canAccessNegotiations } from "@/features/negotiations/queries";
 import { NegotiationsDashboard } from "@/features/negotiations/negotiations-dashboard";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
@@ -48,5 +49,9 @@ export default async function NegotiationsPage({ searchParams }: { searchParams:
   // Supervisor e gestor no app Light leem a conversa da equipe em /mensagens; os demais abrem a conversa em /conversas.
   const conversationMode = audience === "manager" || audience === "supervisor" ? "team" : "inbox";
   const activeTab = single(params.aba) === "estatisticas" ? "statistics" : "negotiations";
-  return <NegotiationsDashboard data={data} activeTab={activeTab} generatedAt={new Date(data.generatedAt)} conversationMode={conversationMode} closingOutcomes={closingOutcomes} closingHistory={closingHistory} />;
+  return (
+    <BrokerProfileViewerProvider viewerRole={context.role}>
+      <NegotiationsDashboard data={data} activeTab={activeTab} generatedAt={new Date(data.generatedAt)} conversationMode={conversationMode} closingOutcomes={closingOutcomes} closingHistory={closingHistory} />
+    </BrokerProfileViewerProvider>
+  );
 }

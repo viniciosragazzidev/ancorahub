@@ -4,6 +4,7 @@ import Link from "next/link";
 import { startTransition, useActionState, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { useSuccessOverlay } from "@/components/motion/success-overlay";
 import { Clock, UserPlus, ListChecks, ArrowRight, ChatCircleText, UserSwitch, RotateCcw } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
@@ -293,7 +294,12 @@ export function SupervisionPanel({
               <span className={litePage ? lite.metricLabel : "text-xs font-semibold uppercase tracking-wider"}>Responsável</span>
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground truncate">{displayedAssignment.ownerName || "Não distribuído"}</p>
+              <p className="text-sm font-semibold text-foreground truncate">
+                {/* O painel só aparece para diretor e gestor (a página confere); "Você" não vira link. */}
+                {displayedAssignment.ownerName && displayedAssignment.ownerId !== currentUserId
+                  ? <BrokerProfileLink brokerId={displayedAssignment.ownerId} name={displayedAssignment.ownerName} viewerRole="manager" />
+                  : displayedAssignment.ownerName || "Não distribuído"}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {displayedAssignment.assignedAt ? `Designado em ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(displayedAssignment.assignedAt))}` : "Aguardando fila de distribuição"}
               </p>

@@ -11,6 +11,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import { LitePagination } from "@/components/lite/data/pagination";
 import { LiteMenu, type LiteMenuItem } from "@/components/lite/controls";
@@ -214,7 +215,7 @@ function LeadName({ lead, hideEntry }: { lead: LeadWorkspaceItem; hideEntry: boo
 function BrokerCell({ lead }: { lead: LeadWorkspaceItem }) {
   return (
     <span className={styles.brokerCell}>
-      <span className={lead.corretorNome ? undefined : styles.muted}>{lead.corretorNome ?? "Sem atribuição"}</span>
+      <span className={lead.corretorNome ? undefined : styles.muted}>{lead.corretorNome ? <BrokerProfileLink brokerId={lead.corretorId} name={lead.corretorNome} /> : "Sem atribuição"}</span>
       <span className={styles.subtle}>{lead.branchName ?? "Sem unidade"}</span>
       {lead.isPlantaoAtivo ? <span className={styles.badge} data-tone="warning">Plantão ativo</span> : null}
       {lead.isManagementInvestigation ? <span className={styles.badge} data-tone="neutral">Investigação da gestão</span> : null}

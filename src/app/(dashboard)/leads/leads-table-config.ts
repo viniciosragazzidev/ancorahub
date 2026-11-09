@@ -17,6 +17,8 @@ export type LeadRow = {
   city: string | null;
   state: string | null;
   assignedBrokerName: string | null;
+  /** Id (usuário) do corretor responsável: o nome vira link para o perfil. */
+  assignedBrokerId?: string | null;
   isPlantaoAtivo: boolean;
   returnedUnaccepted?: boolean;
   isManagementInvestigation?: boolean;
