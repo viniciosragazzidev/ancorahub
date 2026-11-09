@@ -222,6 +222,9 @@ export async function getNegotiationsDashboard(context: TenantContext, requested
     isNotNull(schema.leads.corretorId),
     isNull(schema.leads.archivedAt),
     isNull(schema.leads.deletedAt),
+    // Leads in a director's name are registrations by the direction, not a broker negotiation (09/11:
+    // Tainá, Nayara and Vinicios held 80 of the 90 "Fechamento" leads).
+    sql`not exists (select 1 from ${schema.tenantMemberships} owner_role where owner_role.tenant_id = ${schema.leads.tenantId} and owner_role.user_id = ${schema.leads.corretorId} and owner_role.role = 'director')`,
   ];
   if (branchId) leadConditions.push(eq(schema.leads.branchId, branchId));
   if (context.role === "manager" && !branchId) return emptyData(scope, now);
