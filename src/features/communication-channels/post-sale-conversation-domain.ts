@@ -20,6 +20,11 @@ export function resolvePostSaleConversationBody(input: {
 }): string | null {
   const renderedBody = input.renderedBody?.trim();
   if (renderedBody) return renderedBody;
+  // Survey follow-up questions go out as free text ("__text__"): the text is the first variable (09/11:
+  // the questions were sent and read but never showed in /conversas).
+  if (input.templateName === "__text__" && Array.isArray(input.variables) && typeof input.variables[0] === "string" && input.variables[0].trim()) {
+    return input.variables[0].trim();
+  }
   if (input.templateName !== POST_SALE_META_TEMPLATE.name || !Array.isArray(input.variables)) return null;
 
   const values = [input.variables[0], input.variables[1], input.variables[2]];

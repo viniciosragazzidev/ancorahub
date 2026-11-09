@@ -46,3 +46,10 @@ describe("post-sale conversation message domain", () => {
     expect(shouldRecoverInitialQualificationAfterOutboundFailure("qualificationInitial")).toBe(true);
   });
 });
+
+describe("pergunta de texto livre da pesquisa", () => {
+  it("usa a primeira variável quando o envio é texto livre", () => {
+    expect(resolvePostSaleConversationBody({ renderedBody: null, templateName: "__text__", variables: ["Obrigada, Dayana! Você conseguiu falar com Alan?"] })).toBe("Obrigada, Dayana! Você conseguiu falar com Alan?");
+    expect(resolvePostSaleConversationBody({ renderedBody: "", templateName: "__text__", variables: [] })).toBeNull();
+  });
+});

@@ -228,7 +228,12 @@ async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof sche
   const prior = (currentSurvey.answers ?? {}) as PostSaleAnswers;
   const autoRule = isAutoRuleKey(currentSurvey.ruleKey) ? currentSurvey.ruleKey : null;
   const question = autoRule ? autoRuleQuestionFocus(autoRule, currentSurvey.step, prior) : currentSurvey.step === 0 ? "permissão para fazer duas perguntas" : currentSurvey.step === 1 ? "se o corretor conseguiu falar" : currentSurvey.step === 2 ? "como foi o atendimento" : currentSurvey.step === 3 ? prior.contacted === false ? "se ainda quer ajuda com o plano" : "se recebeu cotação" : currentSurvey.step === 4 ? "se fechou o plano" : "motivo da decisão";
-  const answer = await extractPostSaleAnswer({ tenantId: input.tenantId, step: currentSurvey.step, question, text: input.text, fallback: autoRule ? detectAutoRuleKeywords(input.text, question) : undefined });
+  const extracted = await extractPostSaleAnswer({ tenantId: input.tenantId, step: currentSurvey.step, question, text: input.text, fallback: autoRule ? detectAutoRuleKeywords(input.text, question) : undefined });
+  // Step 0 of the manual script only asks for permission: "Pode perguntar" must not become "foi atendido"
+  // (09/11, Dayana). Keep only the stop request and the client's own words.
+  const answer: PostSaleAnswers = !autoRule && currentSurvey.step === 0
+    ? { ...(extracted.optOut !== undefined ? { optOut: extracted.optOut } : {}), ...(extracted.sentiment ? { sentiment: extracted.sentiment } : {}) }
+    : extracted;
   answer.comment ??= input.text.slice(0, 500);
   const names = { lead: lead.name.trim().split(/\s+/)[0] || "Cliente", broker: broker?.name?.trim().split(/\s+/)[0] || "corretor" };
   // Régua automática: roteiro curto da regra (uma pergunta por vez); manual segue o roteiro de sempre.
