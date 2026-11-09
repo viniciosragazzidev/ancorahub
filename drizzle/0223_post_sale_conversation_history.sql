@@ -59,7 +59,7 @@ SELECT
   outbound.waha_number_id,
   'assistant',
   CASE WHEN outbound.delivery_route = 'waha_direct' THEN 'waha' ELSE 'meta_cloud' END,
-  NULLIF(outbound.provider_message_id, 'wamid_sent'),
+  NULLIF(outbound.provider_message_id, 'wamid_sent'),  -- only reached when no row owns this id (WHERE below)
   outbound.status,
   outbound.destination_phone,
   'outbound',
@@ -67,4 +67,11 @@ SELECT
   outbound.sent_at
 FROM message_rows AS outbound
 WHERE outbound.message_body IS NOT NULL
+  -- The canonical message (webhook/echo) already carries this provider id: it is in the history, skip
+  -- it so the conversation never shows the same send twice (Vigia, 09/11).
+  AND NOT EXISTS (
+    SELECT 1 FROM whatsapp_messages AS existing
+    WHERE existing.tenant_id = outbound.tenant_id
+      AND existing.message_id = NULLIF(outbound.provider_message_id, 'wamid_sent')
+  )
 ON CONFLICT DO NOTHING;

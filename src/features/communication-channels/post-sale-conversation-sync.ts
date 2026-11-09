@@ -85,6 +85,14 @@ export async function syncPostSaleConversationMessage(input: { tenantId: string;
     )
     : eq(schema.whatsappMessages.id, values.id);
   const [updated] = inserted ? [] : await db.update(schema.whatsappMessages).set({
+    // The mirror may have been stored before the provider id was known: fill it in once, unless another
+    // row (the canonical webhook/echo message) already owns that id (Vigia, 09/11).
+    ...(providerMessageId ? {
+      messageId: sql`coalesce(${schema.whatsappMessages.messageId}, case when not exists (
+        select 1 from whatsapp_messages owner_row
+        where owner_row.tenant_id = ${message.tenantId} and owner_row.message_id = ${providerMessageId}
+      ) then ${providerMessageId} end)`,
+    } : {}),
     providerStatus: sql`case
       when ${schema.whatsappMessages.providerStatus} = 'failed' or ${providerStatus} = 'failed' then 'failed'
       when ${schema.whatsappMessages.providerStatus} = 'read' or ${providerStatus} = 'read' then 'read'
