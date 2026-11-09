@@ -157,8 +157,9 @@ export function AutoRuleRow({ rule, canEdit, queues, branches, brokers, onSaved 
 
   function toggle(next: boolean) {
     const previous = saved;
-    // Com o painel aberto e alterado, a chave grava o que está na tela; senão, só muda o "ligada".
-    const payload = open && dirty ? autoRuleSavePayload(draft, { delay, limit, enabled: next }) : { ...autoRuleSavePayload(saved), enabled: next };
+    // A chave só muda o "ligada" com os ajustes já salvos; o rascunho do painel só vai com "Salvar ajustes"
+    // (Vigia, 09/11). Enquanto grava, a chave fica desabilitada (busy), então os cliques não se cruzam.
+    const payload = { ...autoRuleSavePayload(saved), enabled: next };
     setSaved({ ...saved, enabled: next });
     setFeedback(null);
     startTransition(async () => {
