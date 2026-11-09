@@ -39,7 +39,7 @@ describe("PresenceGuide (roteiro guiado de presença, 09/11)", () => {
     expect(screen.getByText("3 de 7")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Abrir o WhatsApp/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Entendi, próximo passo" }));
-    expect(screen.getByText("Depois, na tela Conversas, você vai tocar em 4 lugares. Veja:")).toBeTruthy();
+    expect(screen.getByText("Depois, na lista de Conversas, toque em 4 lugares, nesta ordem:")).toBeTruthy();
     expect(screen.getByText("4 de 7")).toBeTruthy();
     for (let i = 0; i < 3; i += 1) fireEvent.click(screen.getByRole("button", { name: "Próximo toque" }));
     expect(open).not.toHaveBeenCalled();
@@ -60,7 +60,7 @@ describe("PresenceGuide (roteiro guiado de presença, 09/11)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Abrir o WhatsApp/ }));
     fireEvent.click(screen.getByRole("button", { name: /Entendi, abrir o WhatsApp/ }));
     expect(open).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Colou o código no WhatsApp? Estou esperando a confirmação.")).toBeTruthy();
+    expect(screen.getByText("Digitou o código no WhatsApp? Agora é só esperar uns segundos.")).toBeTruthy();
   });
 
   it("conectado e confirmado: um toque confirma; o fim leva ao plantão", () => {
@@ -90,8 +90,28 @@ describe("PresenceGuide (roteiro guiado de presença, 09/11)", () => {
   it("no computador mostra o QR com o caminho ao lado, incluindo a tela Conversas", () => {
     render(<PresenceGuide device="desktop" connection={connection({ method: "qr", qrCode: "data:image/png;base64,AAA" })} duty={duty} presence={presence()} onClose={vi.fn()} preview={{ step: "codigo" }} />);
     expect(screen.getByAltText("QR Code para conectar o WhatsApp")).toBeTruthy();
-    expect(screen.getByText(/confira se está na tela Conversas/)).toBeTruthy();
+    expect(screen.getByText(/vá para a lista de Conversas/)).toBeTruthy();
     expect(screen.getByText("2 de 4")).toBeTruthy();
+  });
+
+  it("a voz de introdução toca sozinha nas boas-vindas e o corretor pode parar (e fica parada da próxima vez)", async () => {
+    const play = vi.fn(function (this: EventTarget) { this.dispatchEvent(new Event("play")); return Promise.resolve(); });
+    const pause = vi.fn(function (this: EventTarget) { this.dispatchEvent(new Event("pause")); });
+    class FakeAudio extends EventTarget { currentTime = 0; constructor(public src: string) { super(); } play = play; pause = pause; }
+    vi.stubGlobal("Audio", FakeAudio);
+    render(<PresenceGuide device="mobile" connection={connection({ started: false, code: null })} duty={duty} presence={presence()} onClose={vi.fn()} />);
+    await act(async () => {});
+    expect(play).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: /Parar a voz/ }));
+    expect(pause).toHaveBeenCalled();
+    expect(window.localStorage.getItem("ancora:presenca-guia:voz-desligada")).toBe("1");
+    expect(screen.getByRole("button", { name: /Ouvir a explicação/ })).toBeTruthy();
+    cleanup();
+    play.mockClear();
+    render(<PresenceGuide device="mobile" connection={connection({ started: false, code: null })} duty={duty} presence={presence()} onClose={vi.fn()} />);
+    await act(async () => {});
+    expect(play).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 
   it("lembra a etapa para retomar e esquece quando a presença sai", () => {

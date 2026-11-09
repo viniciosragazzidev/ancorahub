@@ -131,3 +131,8 @@
 .convAvatar { width: 26px; height: 26px; border-radius: 9999px; background: var(--surface-muted); }
 .convLine { height: 10px; border-radius: 9999px; background: var(--surface-muted); }
 .homeOk { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 9999px; background: var(--wa-soft); color: var(--wa-ink); font-size: 12px; font-weight: 500; white-space: nowrap; }
+
+/* Voz da introdução: controle secundário (não compete com o botão de ação) */
+.voice { justify-self: start; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; margin-left: 64px; padding: 0 14px; border-radius: 9999px; border: 1px solid var(--border); background: var(--surface); font: inherit; font-size: 14px; color: var(--text-secondary); cursor: pointer; }
+.voice:hover { background: var(--surface-muted); }
+.voice[aria-pressed="true"] { color: var(--chat-action-strong); border-color: color-mix(in oklab, var(--chat-action) 40%, var(--border)); }
