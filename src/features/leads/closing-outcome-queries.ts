@@ -35,6 +35,9 @@ export async function getClosingOutcomesSummary(input: {
   const periodDays = input.periodDays ?? CLOSING_OUTCOMES_DEFAULT_DAYS;
   const since = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
   const branchFilter = input.branchId ? sql`and l.branch_id = ${input.branchId}` : sql``;
+  // Leads in a director's name (registrations by the direction) are not a broker's sale (09/11, Vinicios:
+  // "são 3 diretores"): they stay out of Fechamento counts and the per-broker table.
+  const brokerOwnerOnly = sql`and not exists (select 1 from tenant_memberships tm where tm.tenant_id = l.tenant_id and tm.user_id = l.corretor_id and tm.role = 'director')`;
   const db = getDatabase();
 
   const [transitionsResult, openResult] = await Promise.all([
@@ -53,6 +56,7 @@ export async function getClosingOutcomesSummary(input: {
       where history.changed_at >= ${since.toISOString()}
         and l.deleted_at is null
         ${branchFilter}
+        ${brokerOwnerOnly}
     `),
     db.execute(sql`
       select l.corretor_id, u.name as broker_name, l.status::text as status, l.stage_entered_at, l.stage_hold_until
@@ -63,6 +67,7 @@ export async function getClosingOutcomesSummary(input: {
         and l.deleted_at is null
         and l.archived_at is null
         ${branchFilter}
+        ${brokerOwnerOnly}
     `),
   ]);
 
