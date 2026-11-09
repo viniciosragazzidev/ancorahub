@@ -13,6 +13,7 @@ import { LeadActionBar } from "./action-bar";
 import { DeclineSheet } from "./decline-sheet";
 import { DetailsZone } from "./details-panel";
 import { stageLabel } from "./format";
+import { ClosingOutcomeCard } from "./closing-outcome-card";
 import { ClientInfoCard, IdentityHeader } from "./identity-zone";
 import { LeadNotices } from "./lead-notices";
 import { PeopleDataSection } from "./people-data-section";
@@ -104,6 +105,7 @@ export function LightLeadDetail({
           next={<NextStepCard step={step} action={<LeadActionBar lead={lead} c={c} inline />} />}
           details={
             <div className="flex flex-col gap-4">
+              <ClosingOutcomeCard lead={lead} c={c} />
               <ClientInfoCard lead={lead} c={c} withSummary />
               <PeopleDataSection lead={lead} c={c} showRecordDetails={false} />
               <SaleSection c={c} />
@@ -150,6 +152,7 @@ export function LightLeadDetail({
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 pb-[calc(112px+var(--mobile-safe-bottom))] pt-2 sm:px-6">
         <LeadNotices lead={lead} />
         <IdentityHeader lead={lead} c={c} />
+        <ClosingOutcomeCard lead={lead} c={c} />
         <ClientInfoCard lead={lead} c={c} />
         <SaleSection c={c} />
         <DetailsZone lead={lead} c={c} />

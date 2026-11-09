@@ -149,10 +149,17 @@ export function isHeldByRunningQualification(
   return qualificationState === "IN_PROGRESS" || qualificationStatus === "qualifying";
 }
 
-/** Qualification states that must never enter automatic broker distribution. */
+/**
+ * Qualification states that must never enter automatic broker distribution.
+ * A cold lead whose AI qualification timed out (PARTIAL) waits for manual
+ * requalification only when its queue holds cold leads ("Segurar frios"); with
+ * the switch off it goes to the plantão like any other (09/11, Plantão 7° Andar:
+ * the job claimed these leads and this check sent them back, every minute).
+ */
 export function automaticDistributionHoldReason(
   qualificationStatus: string | null | undefined,
   qualificationState: string | null | undefined,
+  queueHoldsColdLeads = true,
 ) {
   if (qualificationStatus === "meta_blocked") {
     return "Envio bloqueado pela Meta; aguarda ação manual.";
@@ -160,7 +167,7 @@ export function automaticDistributionHoldReason(
   if (qualificationStatus === "disqualified" || qualificationStatus === "not_qualified") {
     return "Lead desqualificado; aguarda ação manual.";
   }
-  if (qualificationStatus === "cold" && qualificationState === "PARTIAL") {
+  if (queueHoldsColdLeads && qualificationStatus === "cold" && qualificationState === "PARTIAL") {
     return "Lead frio sem dados válidos de qualificação; aguarda requalificação manual.";
   }
   return null;

@@ -352,3 +352,18 @@
 .waitingLead { display: grid; gap: 2px; min-width: 220px; }
 .waitingName { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 500; }
 .signalTag[data-tone="urgent"] { background: var(--danger-subtle); color: var(--danger); }
+
+/* Desfechos do fechamento (09/11): o que aconteceu com quem entrou em Documentação ou Em análise. */
+.outcomes { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.outcomesPeriod { margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
+.outcomesStats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.outcomesStat { display: grid; gap: 2px; min-width: 0; padding: 10px 12px; border-radius: var(--radius-control); background: var(--surface-muted); }
+.outcomesStat[data-tone="warning"] { background: var(--warning-subtle); }
+.outcomesLabel { overflow: hidden; color: var(--text-muted); font-size: var(--text-xs); text-overflow: ellipsis; }
+.outcomesValue { margin: 0; color: var(--foreground); font-size: var(--text-lg, 1.125rem); font-weight: 500; font-variant-numeric: tabular-nums; }
+.outcomesHint { margin: 0; color: var(--text-secondary, var(--text-muted)); font-size: var(--text-sm); }
+
+@media (max-width: 767px) {
+  .outcomes { padding: 12px; }
+  .outcomesStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

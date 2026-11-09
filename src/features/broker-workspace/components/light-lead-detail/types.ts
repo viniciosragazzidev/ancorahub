@@ -57,6 +57,8 @@ export type LightLeadDetailData = {
   redistributionNotice?: { reason: string | null; createdAt: Date | string } | null;
   /** Everything the client told us (AI qualification + form), see buildLeadClientInfo. */
   clientInfo?: Array<{ key: string; label: string; value: string }>;
+  /** Desfecho do fechamento (09/11): lead parado em Documentação ou Em análise há mais de 10 dias. */
+  closingOutcome?: { pending: boolean; daysInClosing: number; heldUntil: string | null } | null;
 };
 
 export const DECLINE_REASONS = [
