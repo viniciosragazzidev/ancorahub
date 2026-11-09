@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { getPostSaleSurveyMessagesAction, resumePostSaleSurveyAction } from "@/features/post-sale-audit/actions";
 import { matchesPostSaleRuleFilter, postSaleRuleLabel, POST_SALE_RULE_FILTERS, type PostSaleRuleFilter } from "@/features/post-sale-audit/auto-rules";
 import { answerChips, matchesSearch, paginate, RESPONSE_GROUP_LABELS, responseGroups, type AnswerChip, type ResponseGroup } from "@/features/post-sale-audit/responses-view";
+import { lossReasonCheckSummary, readLossReasonCheck } from "@/features/post-sale-audit/loss-reason-check";
 import { cn } from "@/lib/utils";
 
 export type PostSaleResponseRow = {
@@ -136,6 +137,16 @@ export function PostSaleResponses({ responses }: { responses: PostSaleResponseRo
               </button>
               {open === row.id ? (
                 <div id={`pos-venda-resposta-${row.id}`} className="grid gap-3 border-t border-border px-3 py-3">
+                  {(() => {
+                    const lossCheck = readLossReasonCheck(row.answers);
+                    if (!lossCheck) return null;
+                    return (
+                      <p className={cn("text-sm", lossCheck.divergent ? "text-destructive" : "text-muted-foreground")}>
+                        {lossCheck.divergent ? "Motivo de perda diferente do registrado. " : null}
+                        {lossReasonCheckSummary(lossCheck)}
+                      </p>
+                    );
+                  })()}
                   {typeof row.answers.comment === "string" || typeof row.answers.reason === "string" ? (
                     <p className="text-sm text-muted-foreground">
                       {typeof row.answers.reason === "string" ? <>Motivo: {row.answers.reason}. </> : null}

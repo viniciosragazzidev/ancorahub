@@ -4,6 +4,7 @@ import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql } from "dri
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { postSaleAlertReasons } from "./alert-rules";
+import { lossReasonCheckSummary, readLossReasonCheck } from "./loss-reason-check";
 import type { PostSaleRuleFilter } from "./auto-rules";
 import { aggregatePostSaleBrokerReport, type PostSaleBrokerReportRow, type PostSaleReportBroker, type PostSaleReportSurvey } from "./reporting";
 
@@ -15,8 +16,16 @@ export type PostSaleOpenAlert = {
   leadName: string;
   brokerName: string;
   reasons: ReturnType<typeof postSaleAlertReasons>;
+  /** Na divergência de motivo de perda (R4): "Corretor: ... Cliente: ...". */
+  lossDetail: string | null;
   occurredAt: string;
 };
+
+function lossDetailOf(reasons: ReturnType<typeof postSaleAlertReasons>, answers: unknown) {
+  if (!reasons.includes("loss_reason_mismatch")) return null;
+  const check = readLossReasonCheck(answers);
+  return check ? lossReasonCheckSummary(check) : null;
+}
 
 function branchWhere(context: TenantContext) {
   if (context.role !== "manager") return undefined;
@@ -154,6 +163,7 @@ export async function loadPostSaleOpenAlerts(context: TenantContext): Promise<Po
         sql`${schema.postSaleSurveys.rating} <= 2`,
         sql`${schema.postSaleSurveys.answers}->>'sentiment' = 'negative'`,
         sql`${schema.postSaleSurveys.answers}->>'wantsHelp' = 'true'`,
+        sql`${schema.postSaleSurveys.answers}->'lossCheck'->>'divergent' = 'true'`,
       ),
       branchWhere(context),
     ))
@@ -164,7 +174,7 @@ export async function loadPostSaleOpenAlerts(context: TenantContext): Promise<Po
     const reasons = postSaleAlertReasons(row);
     if (!reasons.length) return [];
     const occurredAt = row.lastReplyAt ?? row.completedAt ?? row.sentAt ?? row.createdAt;
-    return [{ surveyId: row.surveyId, leadId: row.leadId, leadName: row.leadName ?? "Lead", brokerName: row.brokerName ?? "Sem corretor", reasons, occurredAt: occurredAt.toISOString() }];
+    return [{ surveyId: row.surveyId, leadId: row.leadId, leadName: row.leadName ?? "Lead", brokerName: row.brokerName ?? "Sem corretor", reasons, lossDetail: lossDetailOf(reasons, row.answers), occurredAt: occurredAt.toISOString() }];
   });
 }
 

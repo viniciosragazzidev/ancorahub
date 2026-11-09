@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isHolidayDateKey } from "@/shared/time/holidays";
+import { LOSS_REASON_CATEGORIES } from "./loss-reason-check";
 
 export const postSaleAnswerSchema = z.object({
   contacted: z.boolean().nullable().optional(),
@@ -14,6 +15,8 @@ export const postSaleAnswerSchema = z.object({
   optOut: z.boolean().optional(),
   /** Régua R5: indicaria a empresa para um amigo ou familiar. */
   recommends: z.boolean().nullable().optional(),
+  /** Régua R4: categoria do motivo da perda dito pelo cliente (comparada com a do corretor). */
+  lossCategory: z.enum(LOSS_REASON_CATEGORIES).nullable().optional(),
 });
 
 export type PostSaleAnswers = z.infer<typeof postSaleAnswerSchema>;

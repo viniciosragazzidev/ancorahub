@@ -16,6 +16,8 @@ import { decidePostSaleNudge, detectPostSaleKeywords, isActivePostSaleSurvey, po
 import { postSaleMediaReply, requestPostSaleTextOnceAtStep, retryPostSaleOperation, runPostSaleOptOutTransaction, type PostSaleMessageKind } from "./conversation-operations";
 import { autoRuleNextTurn, autoRuleQuestionFocus, detectAutoRuleKeywords } from "./auto-rule-scripts";
 import { isAutoRuleKey } from "./auto-rules";
+import { compareLossReasons } from "./loss-reason-check";
+import { MOTIVO_PERDA_LABELS, type MotivoPerda } from "@/features/leads/lead-status-constants";
 import { classifyR0AnswerByKeywords, r0AnswerSchema, r0NextTurn, r0TimelineSummary, readR0State, R0_RULE_KEY, type R0Answer, type R0SurveyState } from "./r0-rules";
 
 const ACTIVE_STATUSES = ["sent", "answering"] as const;
@@ -48,7 +50,7 @@ async function extractPostSaleAnswer(input: { tenantId: string; step: number; qu
       maxAttempts: 2,
       schema: postSaleAnswerSchema,
       messages: [
-        { role: "system", content: `Extraia somente os fatos explicitamente ditos na resposta, considerando a pergunta ${input.step}: ${input.question}. Não escreva uma resposta ao cliente. Não estime valores, preço ou cobertura. Para campo desconhecido, use null ou unknown. Opt-out só quando a pessoa pede claramente para não receber contato.` },
+        { role: "system", content: `Extraia somente os fatos explicitamente ditos na resposta, considerando a pergunta ${input.step}: ${input.question}. Não escreva uma resposta ao cliente. Não estime valores, preço ou cobertura. Para campo desconhecido, use null ou unknown. Opt-out só quando a pessoa pede claramente para não receber contato.${input.question.includes("motivo") ? " Em lossCategory, classifique o motivo dito: price (preço, valor, mensalidade), has_plan (já tem plano ou fechou com outra corretora ou operadora), gave_up (desistiu, sem interesse, não é o momento), not_attended (não foi atendido, ninguém respondeu ou retornou), coverage (documentação, carência, rede, hospitais, cobertura), other (outro motivo); null se não disse motivo." : ""}` },
         { role: "user", content: input.text.slice(0, 2_000) },
       ],
     });
@@ -192,6 +194,39 @@ export async function handlePostSaleInbound(input: PostSaleInbound): Promise<boo
   return true;
 }
 
+/**
+ * R4 concluída: compara o motivo do cliente com o motivo registrado pelo corretor (código do catálogo em
+ * `leads.motivo_perda`, categoria do sistema em `loss_category` e texto livre do histórico de etapas) e
+ * guarda o resultado em `answers.lossCheck`. Divergente gera o alerta "Motivo de perda diferente do
+ * registrado" pelo `ensurePostSaleSurveyAlerts`. Falha de leitura não trava a resposta ao cliente.
+ */
+async function withLossReasonCheck(survey: typeof schema.postSaleSurveys.$inferSelect, answers: PostSaleAnswers): Promise<PostSaleAnswers> {
+  try {
+    const db = getDatabase();
+    const [lead] = await db.select({ motivoPerda: schema.leads.motivoPerda, lossCategory: schema.leads.lossCategory })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, survey.leadId), eq(schema.leads.tenantId, survey.tenantId)))
+      .limit(1);
+    const [history] = await db.select({ reason: schema.leadStageHistory.reason, lossCode: schema.leadStageHistory.lossCode })
+      .from(schema.leadStageHistory)
+      .where(and(eq(schema.leadStageHistory.tenantId, survey.tenantId), eq(schema.leadStageHistory.leadId, survey.leadId), eq(schema.leadStageHistory.toStatus, "lost")))
+      .orderBy(desc(schema.leadStageHistory.changedAt))
+      .limit(1);
+    const motivo = lead?.motivoPerda?.trim() || null;
+    const brokerLabel = motivo ? MOTIVO_PERDA_LABELS[motivo as MotivoPerda] ?? motivo : history?.reason ?? null;
+    const lossCheck = compareLossReasons({
+      clientText: answers.reason ?? answers.comment ?? null,
+      clientAiCategory: answers.lossCategory,
+      brokerTexts: [motivo, history?.lossCode, history?.reason, lead?.lossCategory],
+      brokerLabel,
+    });
+    return { ...answers, lossCheck } as PostSaleAnswers;
+  } catch (error) {
+    console.warn("[post-sale-audit] r4_loss_check_failed", { surveyId: survey.id, error: error instanceof Error ? error.message.slice(0, 120) : "unknown" });
+    return answers;
+  }
+}
+
 async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof schema.postSaleSurveys.$inferSelect) {
   const db = getDatabase();
   let [currentSurvey] = await db.select().from(schema.postSaleSurveys).where(and(
@@ -237,7 +272,9 @@ async function processPostSaleAnswer(input: PostSaleInbound, survey: typeof sche
   const names = { lead: lead.name.trim().split(/\s+/)[0] || "Cliente", broker: broker?.name?.trim().split(/\s+/)[0] || "corretor" };
   // Régua automática: roteiro curto da regra (uma pergunta por vez); manual segue o roteiro de sempre.
   const turn = autoRule ? autoRuleNextTurn(autoRule, currentSurvey.step, prior, answer, names) : postSaleNextTurn(currentSurvey.step, prior, answer, names);
-  const answers = turn.answers as PostSaleAnswers;
+  const answers = autoRule === "R4" && turn.status === "completed"
+    ? await withLossReasonCheck(currentSurvey, turn.answers as PostSaleAnswers)
+    : turn.answers as PostSaleAnswers;
   const previousAlertReasons = postSaleAlertReasons(currentSurvey);
   const nextOutcome = turn.outcome === "ok" && answers.sentiment === "negative"
     ? "bad_service"
