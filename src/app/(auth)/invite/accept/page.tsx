@@ -10,6 +10,7 @@ import { PasswordField } from "@/components/arc/password-field/password-field";
 import { LightAuthTitle } from "@/components/light/light-auth-shell";
 
 import styles from "../../auth-lite.module.css";
+import { PASSWORD_MIN_LENGTH } from "@/shared/auth/password-policy";
 
 const PASSWORD_MESSAGES = { showPassword: "Mostrar senha", hidePassword: "Ocultar senha" };
 
@@ -29,7 +30,7 @@ export default function AcceptInvitePage() {
   }
   return (
     <>
-      <LightAuthTitle title="Defina sua senha" description="Convite CorreTop. Use uma senha com pelo menos 8 caracteres para ativar seu acesso." />
+      <LightAuthTitle title="Defina sua senha" description={`Convite CorreTop. Use uma senha com pelo menos ${PASSWORD_MIN_LENGTH} caracteres para ativar seu acesso.`} />
       <form onSubmit={submit} className={styles.form}>
         <input name="token" type="hidden" value={token} />
         <PasswordField id="invite-password" label="Senha" minLength={8} name="password" required messages={PASSWORD_MESSAGES} />

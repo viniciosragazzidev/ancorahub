@@ -73,6 +73,9 @@ export function formatCurrency(
 import { formatPhoneForWhatsApp, buildWhatsAppLink } from "@/shared/utils/phone";
 export { formatPhoneForWhatsApp, buildWhatsAppLink };
 
+/** Shown with every price sent to a client (CDC: the value is an estimate). */
+export const QUOTE_PRICE_DISCLAIMER = "Valores estimados, sujeitos à análise da operadora, às carências e à tabela vigente na contratação.";
+
 export function buildQuoteSummary(quote: {
   leadName: string;
   totalMonthly?: number | null;
@@ -90,6 +93,7 @@ export function buildQuoteSummary(quote: {
 
   if (quote.totalMonthly) {
     lines.push(`Valor mensal: ${formatCurrency(quote.totalMonthly)}`);
+    lines.push(QUOTE_PRICE_DISCLAIMER);
   }
 
   lines.push("");
@@ -106,7 +110,8 @@ export function buildQuoteWhatsAppMessage(quote: {
   baseUrl?: string;
 }): string {
   const baseUrl = quote.baseUrl ?? (typeof window !== "undefined" ? window.location.origin : "");
-  const proposalUrl = `${baseUrl}/cotacao/${quote.publicToken}`;
+  // /cotacao/<token> is a logged-in page; the client opens the public PDF.
+  const proposalUrl = `${baseUrl}/api/quotes/${quote.publicToken}/pdf`;
 
   const lines = [
     `Olá ${quote.leadName}!`,
@@ -120,6 +125,7 @@ export function buildQuoteWhatsAppMessage(quote: {
 
   if (quote.totalMonthly) {
     lines.push(`Valor mensal: ${formatCurrency(quote.totalMonthly)}`);
+    lines.push(QUOTE_PRICE_DISCLAIMER);
   }
 
   lines.push("");

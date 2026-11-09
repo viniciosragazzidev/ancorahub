@@ -4,6 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getContactAvatar } from "@/features/contact-avatars/service";
 import { canTagLead } from "@/features/lead-tags/rules";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { normalizeMime, RASTER_IMAGE_MIME } from "@/shared/http/safe-file-headers";
 import { getDatabase, schema } from "@/shared/db";
 
 /**
@@ -34,9 +35,16 @@ export async function GET(request: NextRequest) {
     const avatar = await getContactAvatar(context.tenantId, phone);
     // Too many new pictures this minute: not cached, the next visit asks again.
     if (avatar === "busy") return new NextResponse(null, { status: 404, headers: { "Cache-Control": "no-store" } });
-    if (!avatar) return new NextResponse(null, { status: 404, headers: { "Cache-Control": "private, max-age=3600" } });
+    // Older cache rows may hold any image type: only raster pictures are served.
+    if (!avatar || !RASTER_IMAGE_MIME.test(normalizeMime(avatar.contentType))) {
+      return new NextResponse(null, { status: 404, headers: { "Cache-Control": "private, max-age=3600" } });
+    }
     return new NextResponse(new Uint8Array(avatar.body), {
-      headers: { "Content-Type": avatar.contentType, "Cache-Control": "private, max-age=86400" },
+      headers: {
+        "Content-Type": normalizeMime(avatar.contentType),
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "private, max-age=86400",
+      },
     });
   } catch {
     return new NextResponse(null, { status: 404 });

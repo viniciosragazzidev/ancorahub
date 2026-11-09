@@ -6,6 +6,7 @@ import {
 } from "@/features/leads/webhooks/utils/lead-webhook.utils";
 import { authenticateLeadWebhook, WebhookAuthError } from "@/features/leads/webhooks/services/authenticate-lead-webhook";
 import { createLeadFromWebhookSync } from "@/features/leads/webhooks/services/create-lead-from-webhook-sync";
+import { checkLeadWebhookRateLimit } from "@/features/leads/webhooks/services/lead-webhook-rate-limit";
 import { backgroundRoute } from "@/shared/db/background-pool";
 
 export const runtime = "nodejs";
@@ -66,6 +67,15 @@ async function handlePOST(
     return NextResponse.json(
       { success: false, error: { code: "INTERNAL_ERROR", message: "Não foi possível processar a requisição." } },
       { status: 500, headers },
+    );
+  }
+
+  // ── Rate limit (the token is public on the landing page) ───────────
+  const limited = checkLeadWebhookRateLimit(request, credential.credentialId);
+  if (!limited.ok) {
+    return NextResponse.json(
+      { success: false, error: { code: "RATE_LIMITED", message: getErrorMessage("RATE_LIMITED") } },
+      { status: 429, headers: { ...headers, "Retry-After": String(limited.retryAfterSeconds) } },
     );
   }
 

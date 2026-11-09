@@ -6,6 +6,7 @@ import {
   resolveConversationMediaForViewer,
 } from "@/features/communication-channels/conversation-media";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { safeFileHeaders } from "@/shared/http/safe-file-headers";
 
 /**
  * Authenticated, tenant-scoped media access for official conversations
@@ -44,7 +45,6 @@ export async function GET(
     }
 
     const file = await downloadConversationMediaObject(media.mediaStorageKey!);
-    const filename = (media.mediaFilename ?? "arquivo").replaceAll('"', "");
 
     await recordMediaAccess({
       tenantId: context.tenantId,
@@ -52,12 +52,9 @@ export async function GET(
       messageId,
     });
 
+    // The MIME type was declared by whoever sent the file on WhatsApp.
     return new NextResponse(file, {
-      headers: {
-        "Content-Type": media.mediaMimeType ?? "application/octet-stream",
-        "Content-Disposition": `inline; filename="${filename}"`,
-        "Cache-Control": "private, no-store",
-      },
+      headers: safeFileHeaders({ mimeType: media.mediaMimeType, filename: media.mediaFilename }),
     });
   } catch {
     return NextResponse.json(

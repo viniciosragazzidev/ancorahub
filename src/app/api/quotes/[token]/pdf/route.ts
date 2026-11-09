@@ -3,6 +3,7 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 import { getQuoteByToken } from "@/features/quotes/queries";
 import { formatCurrency } from "@/features/quotes/utils";
+import { QUOTE_PRICE_DISCLAIMER } from "@/features/quotes/utils";
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -205,6 +206,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   page.drawText("Este documento não substitui a análise formal da operadora.", {
     x: 50,
     y: 28,
+    size: 8,
+    font: helveticaFont,
+    color: rgb(0.6, 0.6, 0.6),
+  });
+
+  page.drawText(QUOTE_PRICE_DISCLAIMER, {
+    x: 50,
+    y: 16,
     size: 8,
     font: helveticaFont,
     color: rgb(0.6, 0.6, 0.6),

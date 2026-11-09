@@ -5,6 +5,7 @@ import { processDutyPresenceReminders } from "@/features/lead-distribution/duty-
 import { processDutyShiftReminders } from "@/features/lead-distribution/duty-shift-reminders";
 import { backgroundRoute } from "@/shared/db/background-pool";
 import { readJobHeartbeats, withJobHeartbeat } from "@/features/live-status/heartbeat";
+import { isBearerAuthorized } from "@/shared/http/bearer-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,7 +54,7 @@ async function timedPhase<T>(phase: string, timeoutMs: number, work: () => Promi
 
 async function handle(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!isBearerAuthorized(request, secret)) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 

@@ -4,6 +4,7 @@ import { processMetaOutboundBatch } from "@/features/communication-channels/outb
 import { backgroundRoute } from "@/shared/db/background-pool";
 import { withJobHeartbeat } from "@/features/live-status/heartbeat";
 import { runPostSaleReminderJob } from "@/features/post-sale-audit/conversation";
+import { isBearerAuthorized } from "@/shared/http/bearer-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ export const maxDuration = 60;
 
 async function handleGET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  if (!isBearerAuthorized(request, secret)) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   try {
     const postSale = await runPostSaleReminderJob();
     // Up to 12 per run: a burst of presence calls by the company number goes

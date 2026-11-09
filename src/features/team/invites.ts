@@ -8,6 +8,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireCanCreateRole, type CreatableTeamRole } from "@/shared/auth/team-permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { buildCredentialAccount } from "@/shared/auth/credential-account";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/shared/auth/password-policy";
 
 const inviteInput = z.object({
   name: z.string().trim().min(2).max(120),
@@ -44,7 +45,7 @@ export async function createTeamInvite(rawInput: unknown) {
 
 export async function acceptTeamInvite(token: string, password: string) {
   const validatedToken = z.string().regex(/^[a-f0-9]{64}$/).parse(token);
-  const validatedPassword = z.string().min(8).max(128).parse(password);
+  const validatedPassword = z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH).parse(password);
   const db = getDatabase();
   const [invite] = await db.select().from(schema.invites).where(eq(schema.invites.tokenHash, digest(validatedToken))).limit(1);
   if (!invite || invite.usedAt || invite.expiresAt <= new Date()) throw new Error("Convite inválido ou expirado.");

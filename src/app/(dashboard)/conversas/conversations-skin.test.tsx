@@ -152,9 +152,9 @@ describe("pele da central de conversas", () => {
     expect(html).toContain('data-skin="diretor"');
     expect(html).toContain('data-conversations-part="frame"');
     expect(html).toContain('data-conversations-part="workspace"');
-    expect(html).toContain('data-conversations-part="filter-controls"');
-    expect(html).toContain('data-conversations-part="director-list-controls"');
-    expect(html).toContain('data-conversations-part="inline-actions"');
+    // Views, filters and bulk qualification sit in the floating menu next to the search (07/11).
+    expect(html).toContain('data-conversations-part="filters-trigger"');
+    expect(html).not.toContain('data-conversations-part="director-list-controls"');
     expect(html).not.toContain('data-conversations-part="page-actions"');
     expect(html).not.toContain('data-lite=');
     expect(html).not.toContain('data-slot="filter-toolbar"');

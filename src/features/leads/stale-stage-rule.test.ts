@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { recentlyUndoneAiMove } from "@/features/conversation-intelligence/ai-move";
 
 import { isStageRegression, stageActorType } from "./stage-history-core";
-import { businessDaysBetween, decideStaleStage, parseStaleStageMode, STALE_RULE } from "./stale-stage-rule";
+import { businessDaysBetween, decideStaleStage, parseStaleStageMode, STALE_RULE, STALE_WATCH_STATUSES } from "./stale-stage-rule";
 import { LEAD_STATUS_ORDER, VALID_TRANSITIONS } from "./lead-status-constants";
 
 // Quarta, 04/11/2026, 15h em São Paulo.
@@ -37,6 +37,14 @@ describe("regra de chat parado", () => {
   it("etapas iniciais, de fechamento e fechadas não são mexidas", () => {
     for (const status of ["new", "distributed", "in_contact", "documentation_pending", "under_analysis", "converted", "lost"]) {
       expect(decideStaleStage({ ...base, status, lastCustomerMessageAt: null, stageEnteredAt: day("2026-09-01"), now: WED })).toEqual({ action: "none" });
+    }
+  });
+
+  it("Documentação e Em análise ficam de fora da regra: o fechamento só sai com negativa do cliente (diretor, 09/11)", () => {
+    expect(STALE_WATCH_STATUSES).not.toContain("documentation_pending");
+    expect(STALE_WATCH_STATUSES).not.toContain("under_analysis");
+    for (const status of ["documentation_pending", "under_analysis"]) {
+      expect(decideStaleStage({ ...base, status, lastCustomerMessageAt: day("2026-08-01"), stageEnteredAt: day("2026-08-01"), lastHumanStageChangeAt: null, holdUntil: null, now: WED })).toEqual({ action: "none" });
     }
   });
 

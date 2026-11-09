@@ -1,0 +1,29 @@
+# Atualizações de dependências (lote 1 do plano de segurança, docs/implementations/active/2026-11-06-seguranca-conformidade-correcao.md).
+# Os PRs vão para a branch padrão (main). Enquanto o deploy sair de branch feat (ver lote 8), trate cada PR
+# como aviso: aplique a atualização na branch de trabalho do momento.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /services/whatsapp-api
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+  - package-ecosystem: docker
+    directories: [/, /services/whatsapp-api, /services/waha-relay]
+    schedule:
+      interval: weekly
+      day: monday
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

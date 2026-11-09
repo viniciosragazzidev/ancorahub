@@ -3,6 +3,8 @@ import "server-only";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
+import { extractWahaMessageText } from "./message-text";
+
 export const WAHA_CADENCE_FEATURE = "feature_waha_cadence_enabled";
 export const WAHA_AI_FEATURE = "feature_waha_ai_enabled";
 
@@ -208,7 +210,9 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
     }
 
     if (isNativeWahaMessage) {
-      const rawType = String(innerPayload.type || "chat");
+      const innerData = innerPayload._data && typeof innerPayload._data === "object" ? innerPayload._data as Record<string, unknown> : {};
+      // WAHA's top-level payload often has no `type`; WEBJS keeps it in `_data.type`.
+      const rawType = String(innerPayload.type || (typeof innerData.type === "string" ? innerData.type : "") || "chat");
       // Voice notes arrive as "ptt"; some engines omit the type on media and
       // only send the file's mimetype, so the kind is derived from it.
       const rawMedia = innerPayload.media && typeof innerPayload.media === "object" ? innerPayload.media as Record<string, unknown> : null;
@@ -247,7 +251,7 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
       const textless = mappedType === "text" && rawType !== "chat" && !WAHA_PROTOCOL_TYPES.has(rawType)
         ? "[unsupported]"
         : `[${mappedType}]`;
-      const bodyText = String(innerPayload.body ?? innerPayload.caption ?? "").trim() || textless;
+      const bodyText = extractWahaMessageText(innerPayload).slice(0, 4_000) || textless;
       const source = typeof innerPayload.source === "string" && innerPayload.source.trim()
         ? innerPayload.source.trim().slice(0, 64)
         : undefined;

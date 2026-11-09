@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   classifyIgnoredBrokerContact,
   isContentlessWahaMessage,
+  isOwnMessageEcho,
+  ownMessageTwinId,
   isWahaStatusBroadcast,
   getWhatsAppMessageSourceIds,
   shouldCreateSyntheticLead,
@@ -155,5 +157,20 @@ describe("isWahaStatusBroadcast (bug 2026-10-21: broker stories shown as her mes
     expect(isWahaStatusBroadcast({ id: "x", isStatusBroadcast: true })).toBe(true);
     expect(isWahaStatusBroadcast({ id: "false_status@broadcast_A564FF922F6FD_206066@lid" })).toBe(true);
     expect(isWahaStatusBroadcast({ id: "false_5521998765651@c.us_3EB0" })).toBe(false);
+  });
+});
+
+describe("echo of the broker's own message", () => {
+  it("maps a contact-side id to the broker's copy of the same WhatsApp message", () => {
+    expect(ownMessageTwinId("false_123456789012345@lid_A5F605C362D81DACDBDF33F75D72488A")).toBe("true_123456789012345@lid_A5F605C362D81DACDBDF33F75D72488A");
+    expect(ownMessageTwinId("true_5521999990000@c.us_ABC")).toBeNull();
+    expect(ownMessageTwinId("evt_123")).toBeNull();
+  });
+
+  it("ignores only a textless incoming event whose twin the broker already sent", () => {
+    expect(isOwnMessageEcho({ contentless: true, isOutgoing: false, ownTwinExists: true })).toBe(true);
+    expect(isOwnMessageEcho({ contentless: false, isOutgoing: false, ownTwinExists: true })).toBe(false);
+    expect(isOwnMessageEcho({ contentless: true, isOutgoing: false, ownTwinExists: false })).toBe(false);
+    expect(isOwnMessageEcho({ contentless: true, isOutgoing: true, ownTwinExists: true })).toBe(false);
   });
 });

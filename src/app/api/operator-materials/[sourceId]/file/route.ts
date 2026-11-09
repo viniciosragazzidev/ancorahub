@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { operatorFileStorageKey } from "@/features/operator-catalog/ingest";
 import { OPERATOR_MATERIAL_CATEGORY } from "@/features/tenant-intelligence/rag/constants";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { safeFileHeaders } from "@/shared/http/safe-file-headers";
 import { getDatabase, schema } from "@/shared/db";
 import { downloadR2Object } from "@/shared/storage/r2-storage";
 
@@ -25,11 +26,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   try {
     const file = await downloadR2Object(key);
     return new NextResponse(file, {
-      headers: {
-        "Content-Disposition": `inline; filename="${source.fileName.replaceAll('"', "")}"`,
-        "Cache-Control": "private, no-store",
-        "Content-Type": source.fileType || "application/octet-stream",
-      },
+      headers: safeFileHeaders({ mimeType: source.fileType, filename: source.fileName }),
     });
   } catch {
     return NextResponse.json({ error: "Não foi possível abrir o arquivo." }, { status: 404 });

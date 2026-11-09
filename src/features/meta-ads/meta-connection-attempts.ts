@@ -25,6 +25,19 @@ export async function createMetaConnectionAttempt(input: { tenantId: string; use
   return { id: attempt.id, state };
 }
 
+/**
+ * True when `state` belongs to a pending, unexpired Marketing attempt. Checked
+ * before the OAuth code is exchanged, so a forged callback never reaches Meta.
+ */
+export async function isPendingMarketingConnectionState(state: string) {
+  const [attempt] = await getDatabase().select({ product: schema.metaConnectionAttempts.product }).from(schema.metaConnectionAttempts).where(and(
+    eq(schema.metaConnectionAttempts.stateHash, hashMetaConnectionState(state)),
+    eq(schema.metaConnectionAttempts.status, "pending"),
+    gt(schema.metaConnectionAttempts.expiresAt, new Date()),
+  )).limit(1);
+  return attempt?.product === "marketing";
+}
+
 export async function completeMetaConnectionAttempt(input: { state: string; accessToken: string; assets: MetaDiscoveredAssets; tokenExpiresAt: Date | null }) {
   const db = getDatabase();
   const [attempt] = await db.select().from(schema.metaConnectionAttempts).where(and(

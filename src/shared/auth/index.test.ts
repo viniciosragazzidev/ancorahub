@@ -27,3 +27,18 @@ describe("trusted auth origins", () => {
     expect(getTrustedAuthOrigins()).not.toContain("https://corretop.vercel.app");
   });
 });
+
+describe("trusted auth origins in production", () => {
+  it("does not trust the staging host unless this deployment is staging", () => {
+    const savedAuth = process.env.BETTER_AUTH_URL;
+    const savedApp = process.env.NEXT_PUBLIC_APP_URL;
+    process.env.BETTER_AUTH_URL = "https://crm.ancorasaude.cloud";
+    process.env.NEXT_PUBLIC_APP_URL = "https://crm.ancorasaude.cloud";
+    try {
+      expect(getTrustedAuthOrigins()).toEqual(["https://crm.ancorasaude.cloud"]);
+    } finally {
+      process.env.BETTER_AUTH_URL = savedAuth;
+      process.env.NEXT_PUBLIC_APP_URL = savedApp;
+    }
+  });
+});

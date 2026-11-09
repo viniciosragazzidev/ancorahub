@@ -3982,6 +3982,23 @@ export const brokerMetricDaily = pgTable(
   ],
 );
 
+/**
+ * Foto diária do Fechamento em Negociações (09/11, diretor): uma linha por empresa e dia de São Paulo, gravada às
+ * 23:55 pelo job negotiation-snapshot (a última rodada do dia vence). Migration: drizzle/0222_negotiation_daily_snapshots.sql.
+ */
+export const negotiationDailySnapshots = pgTable(
+  "negotiation_daily_snapshots",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    day: date("day", { mode: "string" }).notNull(),
+    counts: jsonb("counts").$type<Record<string, number>>().notNull(),
+    closingLeads: jsonb("closing_leads").$type<unknown[]>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("negotiation_daily_snapshots_tenant_day_unique").on(table.tenantId, table.day)],
+);
+
 export const engagementWatermarks = pgTable(
   "engagement_watermarks",
   {

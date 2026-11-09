@@ -1,12 +1,13 @@
 import "server-only";
 
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq, gte, or } from "drizzle-orm";
+import { and, eq, gte, isNull, not, like, or } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { canGenerateMemberPasswordReset } from "./password-recovery-scope";
+import { passwordPolicyError } from "@/shared/auth/password-policy";
 import { enqueueMetaTextMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import {
   buildCredentialAccount,
@@ -17,6 +18,21 @@ import {
 /** One self-service link per person every 2 minutes: a repeated click does not flood their WhatsApp. */
 const SELF_SERVICE_INTERVAL_MS = 2 * 60_000;
 const SELF_SERVICE_LINK_TTL_MS = 60 * 60_000;
+
+/**
+ * Only a digest of the reset token is stored: whoever reads the table (a
+ * backup, the Supabase panel) cannot open anyone's account with it. The raw
+ * token exists only in the link sent to the person.
+ */
+const TOKEN_DIGEST_PREFIX = "sha256:";
+export function digestResetToken(token: string) {
+  return TOKEN_DIGEST_PREFIX + createHash("sha256").update(token).digest("hex");
+}
+
+function newResetToken() {
+  const token = randomBytes(32).toString("hex");
+  return { token, stored: digestResetToken(token) };
+}
 
 /**
  * "Esqueceu a senha?" on the login (Vinicios, 22/10): the person types their e-mail
@@ -53,7 +69,7 @@ export async function requestPasswordResetByWhatsApp(email: string) {
   if (recent) return { success: true };
 
   const id = randomUUID();
-  const token = randomBytes(32).toString("hex");
+  const { token, stored } = newResetToken();
   const now = new Date();
   await db.insert(schema.passwordResetRequests).values({
     id,
@@ -61,7 +77,7 @@ export async function requestPasswordResetByWhatsApp(email: string) {
     userId: user.id,
     userEmail: user.email,
     status: "approved",
-    token,
+    token: stored,
     tokenExpiresAt: new Date(now.getTime() + SELF_SERVICE_LINK_TTL_MS),
     reviewedAt: now,
     directorNotes: "Pedido pela própria pessoa na tela de login; link enviado no WhatsApp cadastrado.",
@@ -211,14 +227,14 @@ export async function approvePasswordReset(requestId: string) {
 
   if (!request) throw new Error("Solicitação não encontrada ou já processada.");
 
-  const token = randomBytes(32).toString("hex");
+  const { token, stored } = newResetToken();
   const tokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
 
   await db
     .update(schema.passwordResetRequests)
     .set({
       status: "approved",
-      token,
+      token: stored,
       tokenExpiresAt,
       reviewedBy: context.userId,
       reviewedAt: new Date(),
@@ -233,7 +249,8 @@ export async function approvePasswordReset(requestId: string) {
   // It used to reuse the invitation template with the wrong variables, so the link never arrived.
   await sendPasswordResetWhatsApp({ tenantId: context.tenantId, userId: request.userId, requestedBy: context.userId, resetUrl, requestId });
 
-  return { success: true, resetUrl };
+  // The link goes only to the person's own WhatsApp: the approver never sees it.
+  return { success: true };
 }
 
 /**
@@ -266,6 +283,8 @@ export async function rejectPasswordReset(requestId: string, reason?: string) {
  * Usuário finaliza o reset usando o token recebido.
  */
 export async function completePasswordReset(token: string, newPassword: string) {
+  const policyError = passwordPolicyError(newPassword);
+  if (policyError) throw new Error(policyError);
   const db = getDatabase();
 
   const [request] = await db
@@ -273,7 +292,12 @@ export async function completePasswordReset(token: string, newPassword: string) 
     .from(schema.passwordResetRequests)
     .where(
       and(
-        eq(schema.passwordResetRequests.token, token),
+        or(
+          eq(schema.passwordResetRequests.token, digestResetToken(token)),
+          // Links issued before tokens were hashed (valid for at most 24 h).
+          // A stored digest can never be replayed as a raw token.
+          and(eq(schema.passwordResetRequests.token, token), not(like(schema.passwordResetRequests.token, "sha256:%"))),
+        ),
         eq(schema.passwordResetRequests.status, "approved"),
       ),
     )
@@ -307,13 +331,16 @@ export async function completePasswordReset(token: string, newPassword: string) 
       }));
     }
 
-    // The new password ends every open session (the self-service request does not).
+    // The new password ends every open session (the self-service request does not),
+    // browser extension included.
     await tx.delete(schema.session).where(eq(schema.session.userId, request.userId));
+    await tx.update(schema.extensionSessions).set({ revokedAt: new Date() })
+      .where(and(eq(schema.extensionSessions.userId, request.userId), isNull(schema.extensionSessions.revokedAt)));
 
     // Marcar solicitação como concluída
     await tx
       .update(schema.passwordResetRequests)
-      .set({ status: "completed" })
+      .set({ status: "completed", token: null })
       .where(eq(schema.passwordResetRequests.id, request.id));
 
     // Registrar auditoria
@@ -380,7 +407,7 @@ export async function generatePasswordResetLinkForMember(targetIdentifier: strin
   const db = getDatabase();
 
   const [target] = await db
-    .select({ tenantId: schema.tenantMemberships.tenantId, userId: schema.user.id, email: schema.user.email, role: schema.tenantMemberships.role, branchId: schema.tenantMemberships.branchId })
+    .select({ tenantId: schema.tenantMemberships.tenantId, userId: schema.user.id, email: schema.user.email, role: schema.tenantMemberships.role, branchId: schema.tenantMemberships.branchId, isPlatformAdmin: schema.user.isPlatformAdmin })
     .from(schema.tenantMemberships)
     .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
     .leftJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.userId, schema.user.id), eq(schema.brokerProfiles.tenantId, context.tenantId)))
@@ -396,7 +423,7 @@ export async function generatePasswordResetLinkForMember(targetIdentifier: strin
   const targetUserId = target.userId;
 
   const id = randomUUID();
-  const token = randomBytes(32).toString("hex");
+  const { token, stored } = newResetToken();
   const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
   const now = new Date();
 
@@ -406,7 +433,7 @@ export async function generatePasswordResetLinkForMember(targetIdentifier: strin
     userId: targetUserId,
     userEmail: user.email,
     status: "approved",
-    token,
+    token: stored,
     tokenExpiresAt,
     reviewedBy: context.userId,
     reviewedAt: now,

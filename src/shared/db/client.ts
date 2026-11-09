@@ -140,13 +140,29 @@ export function backgroundConnectionLimit() {
   return process.env.NODE_ENV === "production" ? 8 : 1;
 }
 
+/**
+ * TLS to Postgres. Today it depends on `sslmode` inside DATABASE_URL, which
+ * the repo cannot see. DATABASE_SSL=require forces an encrypted connection
+ * whatever the URL says; DATABASE_SSL=verify-full also checks the certificate.
+ * Unset keeps the current behaviour, so turning it on is a deliberate step
+ * tested on staging first (a wrong mode means no database at all).
+ */
+export function databaseSslOption(env: NodeJS.ProcessEnv = process.env) {
+  const mode = env.DATABASE_SSL?.trim();
+  if (mode === "require") return "require" as const;
+  if (mode === "verify-full") return "verify-full" as const;
+  return undefined;
+}
+
 function createPostgresDatabase(databaseUrl: string, max = connectionLimit()): Database {
   logDbConfig(databaseUrl);
+  const ssl = databaseSslOption();
 
   return drizzlePostgres(
     postgres(databaseUrl, {
       prepare: false,
       max,
+      ...(ssl ? { ssl } : {}),
       connect_timeout: 10,
       idle_timeout: IDLE_TIMEOUT_SECONDS,
       max_lifetime: MAX_LIFETIME_SECONDS,

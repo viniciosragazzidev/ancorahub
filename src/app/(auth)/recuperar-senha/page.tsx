@@ -7,6 +7,7 @@ import { Button } from "@/components/arc/button/button";
 import { PasswordField } from "@/components/arc/password-field/password-field";
 import { LightAuthTitle } from "@/components/light/light-auth-shell";
 import { completePasswordResetAction } from "./actions";
+import { PASSWORD_MIN_LENGTH, passwordPolicyError } from "@/shared/auth/password-policy";
 
 const PASSWORD_MESSAGES = { showPassword: "Mostrar senha", hidePassword: "Ocultar senha" };
 
@@ -51,8 +52,8 @@ export default function PasswordResetPage() {
       setValidationError("As senhas não coincidem.");
       return;
     }
-    if (pwd.length < 8) {
-      setValidationError("A senha deve ter no mínimo 8 caracteres.");
+    if (passwordPolicyError(pwd)) {
+      setValidationError(passwordPolicyError(pwd) ?? "");
       return;
     }
     setValidationError("");
@@ -62,7 +63,7 @@ export default function PasswordResetPage() {
   const message = validationError || state.error;
   return (
     <>
-      <LightAuthTitle title="Criar nova senha" description="Escolha uma senha com pelo menos 8 caracteres. Ao salvar, os acessos abertos em outros aparelhos são encerrados." />
+      <LightAuthTitle title="Criar nova senha" description={`Escolha uma senha com pelo menos ${PASSWORD_MIN_LENGTH} caracteres. Ao salvar, os acessos abertos em outros aparelhos são encerrados.`} />
       <form action={handleSubmit} className="flex flex-col gap-4">
         <input type="hidden" name="token" value={token} />
         <PasswordField

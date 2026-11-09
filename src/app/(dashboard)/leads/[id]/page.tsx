@@ -29,6 +29,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { closingStageNoticeKey, CLOSING_STAGE_STATUSES } from "@/features/leads/closing-stage-notice-core";
+import { pendingClosingOutcome } from "@/features/leads/closing-outcome-core";
 import { teamNoticeByKey } from "@/features/team-notices/catalog";
 import { getTeamNoticeSetting } from "@/features/team-notices/service";
 import { getDatabase, schema } from "@/shared/db";
@@ -204,6 +205,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       assignedAt: schema.leads.assignedAt,
       serviceStartedAt: schema.leads.serviceStartedAt,
       stageEnteredAt: schema.leads.stageEnteredAt,
+      stageHoldUntil: schema.leads.stageHoldUntil,
       corretorNome: schema.user.name,
       corretorImage: schema.user.image,
       branchNome: schema.branches.name,
@@ -449,6 +451,10 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
           formData: lead.formData,
         });
         return lightContact.reveal ? info : redactClientInfo(info);
+      })(),
+      closingOutcome: (() => {
+        const outcome = pendingClosingOutcome({ status: lead.status, stageEnteredAt: lead.stageEnteredAt, holdUntil: lead.stageHoldUntil, now: new Date() });
+        return { pending: outcome.pending, daysInClosing: outcome.daysInClosing, heldUntil: outcome.heldUntil?.toISOString() ?? null };
       })(),
       redistributionNotice: redistributionNotice ? {
         reason: redistributionNotice.reason,

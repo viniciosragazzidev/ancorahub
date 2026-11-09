@@ -6,6 +6,8 @@ export type BulkDistributionCandidate = {
   distributionStatus: string;
   qualificationState: string | null;
   qualificationStatus: string | null;
+  /** "Segurar frios" of the lead's queue; a cold partial lead is held only there. */
+  queueHoldsColdLeads?: boolean;
 };
 
 const recoverableDistributionStatuses = new Set([
@@ -27,6 +29,6 @@ export function selectBulkDistributionCandidateIds(
     .filter((lead) => recoverableDistributionStatuses.has(lead.distributionStatus))
     .filter((lead) => !terminalLeadStatuses.has(lead.status))
     .filter((lead) => !isHeldByRunningQualification(lead.qualificationStatus, lead.qualificationState, earlyHot))
-    .filter((lead) => !automaticDistributionHoldReason(lead.qualificationStatus, lead.qualificationState))
+    .filter((lead) => !automaticDistributionHoldReason(lead.qualificationStatus, lead.qualificationState, lead.queueHoldsColdLeads ?? true))
     .map((lead) => lead.id);
 }

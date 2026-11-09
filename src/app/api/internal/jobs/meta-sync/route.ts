@@ -4,6 +4,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { runMetaTenantSync } from "@/features/meta-ads/meta-sync-service";
 import { backgroundRoute } from "@/shared/db/background-pool";
 import { withJobHeartbeat } from "@/features/live-status/heartbeat";
+import { isBearerAuthorized } from "@/shared/http/bearer-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,10 +20,9 @@ const STALE_SYNC_MS = 15 * 60_000;
  * response, on the server.
  */
 async function handleGET(request: Request) {
-  const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET || process.env.INTERNAL_JOB_SECRET;
 
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (!isBearerAuthorized(request, cronSecret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

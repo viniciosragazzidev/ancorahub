@@ -285,9 +285,33 @@
 .closingMain { display: grid; flex: 1 1 auto; gap: 2px; min-width: 0; }
 .closingName { overflow: hidden; font-size: var(--text-sm); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .closingMeta { overflow: hidden; color: var(--text-muted); font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
+.closingHint { margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
+.closingItem[data-quiet] .closingMeta { color: color-mix(in oklab, var(--warning) 45%, var(--text-muted)); }
 .closingWaiting { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 9999px; background: var(--accent-strong); }
 .closingItem:focus-visible,
 .closingAll:focus-visible { outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary)); outline-offset: 2px; }
+
+/* Fechamento nos últimos dias: a foto das 23:55 de cada dia (09/11, só o diretor). */
+.history { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.historyDays { display: grid; grid-auto-columns: minmax(44px, 1fr); grid-auto-flow: column; gap: 8px; min-width: 0; margin: 0; padding: 0; overflow-x: auto; list-style: none; }
+.historyDay { display: grid; grid-template-rows: 48px auto auto; justify-items: center; align-items: end; gap: 4px; min-width: 0; }
+.historyBar { width: 100%; max-width: 32px; height: var(--bar, 0%); min-height: 2px; border-radius: 4px 4px 0 0; background: color-mix(in oklab, var(--success) 35%, var(--surface-muted)); }
+.historyDay[data-now] .historyBar { background: var(--success); }
+.historyValue { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; font-variant-numeric: tabular-nums; }
+.historyLabel { color: var(--text-muted); font-size: var(--text-xs); white-space: nowrap; }
+.historyDay[data-now] .historyLabel { color: var(--foreground); font-weight: 500; }
+.historyDiff { min-width: 0; }
+.historySummary { min-height: 44px; display: flex; align-items: center; color: var(--foreground); font-size: var(--text-sm); cursor: pointer; }
+.historySummary:focus-visible { outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary)); outline-offset: 2px; }
+.historyMoves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; }
+.historyMove { display: grid; align-content: start; gap: 6px; min-width: 0; }
+.historyMoveTitle { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--text-secondary, var(--text-muted)); font-size: var(--text-sm); font-weight: 500; }
+.historyMoveList { display: grid; gap: 4px; max-height: 240px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.historyMoveList li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) {
+  .history { padding: 12px; }
+  .historyMoves { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* Lista agrupada por etapa. */
 .leadGroups { display: grid; gap: 20px; min-width: 0; }
@@ -352,3 +376,18 @@
 .waitingLead { display: grid; gap: 2px; min-width: 220px; }
 .waitingName { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 500; }
 .signalTag[data-tone="urgent"] { background: var(--danger-subtle); color: var(--danger); }
+
+/* Desfechos do fechamento (09/11): o que aconteceu com quem entrou em Documentação ou Em análise. */
+.outcomes { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.outcomesPeriod { margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
+.outcomesStats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.outcomesStat { display: grid; gap: 2px; min-width: 0; padding: 10px 12px; border-radius: var(--radius-control); background: var(--surface-muted); }
+.outcomesStat[data-tone="warning"] { background: var(--warning-subtle); }
+.outcomesLabel { overflow: hidden; color: var(--text-muted); font-size: var(--text-xs); text-overflow: ellipsis; }
+.outcomesValue { margin: 0; color: var(--foreground); font-size: var(--text-lg, 1.125rem); font-weight: 500; font-variant-numeric: tabular-nums; }
+.outcomesHint { margin: 0; color: var(--text-secondary, var(--text-muted)); font-size: var(--text-sm); }
+
+@media (max-width: 767px) {
+  .outcomes { padding: 12px; }
+  .outcomesStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

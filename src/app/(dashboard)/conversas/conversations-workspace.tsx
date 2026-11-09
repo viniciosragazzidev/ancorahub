@@ -29,6 +29,7 @@ import { LEAD_QUALIFICATION_LABELS, metaBlockedQualificationLabel, type LeadQual
 import type { LeadTag } from "@/features/lead-tags/rules";
 import { FilterToolbar } from "@/components/ui/filter-toolbar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -73,6 +74,7 @@ import {
   WhatsappLogo,
   PaperPlaneTilt,
   RotateCcw,
+  SlidersHorizontal,
   Sparkle,
   SunDim,
   ThermometerCold,
@@ -433,17 +435,67 @@ export function ConversationsWorkspace({
       }}
     />
   ) : null;
-  const directorActions = canSeeBrokerTab ? (
-    <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
-      <ConversasHeaderNav
-        currentTab={currentTab}
-        leadsCount={currentTab === "corretores" || currentTab === "distribuidos" ? undefined : conversations.length}
-        distributedCount={currentTab === "distribuidos" ? conversations.length : undefined}
-        coexLabel={coexLabel}
-      />
-      <ConversationsBulkQualificationAction />
-    </nav>
+  const directorViews = canSeeBrokerTab ? (
+    <ConversasHeaderNav
+      currentTab={currentTab}
+      leadsCount={currentTab === "corretores" || currentTab === "distribuidos" ? undefined : conversations.length}
+      distributedCount={currentTab === "distribuidos" ? conversations.length : undefined}
+      coexLabel={coexLabel}
+      orientation="vertical"
+    />
   ) : null;
+  const currentViewLabel = currentTab === "distribuidos"
+    ? "Distribuídos"
+    : currentTab === "coex" && coexLabel
+      ? coexLabel.split(" · ")[0]
+      : "Leads";
+  const activeFilterCount = [filter !== "all", branchFilter !== "all", tagFilter !== "all"].filter(Boolean).length;
+  // Lite (07/11): views and filters live in one floating menu next to the search (bulk qualification is
+  // the icon beside it),
+  // so the list starts right under it instead of below four rows of controls.
+  const directorFiltersMenu = (
+    <Popover>
+      <PopoverTrigger
+        render={(
+          <Button
+            aria-label={`Visão e filtros: ${currentViewLabel}${activeFilterCount ? `, ${activeFilterCount} filtro(s) ativo(s)` : ""}`}
+            className="h-10 shrink-0 gap-1.5 px-3"
+            data-conversations-part="filters-trigger"
+            size="sm"
+            variant="outline"
+          />
+        )}
+      >
+        <SlidersHorizontal aria-hidden="true" className="size-4" />
+        <span className="max-w-24 truncate text-xs">{currentViewLabel}</span>
+        {activeFilterCount ? <Badge className="px-1.5 py-0 text-[10px]" variant="secondary">{activeFilterCount}</Badge> : null}
+      </PopoverTrigger>
+      <PopoverContent align="end" className="grid w-80 gap-4" data-conversations-part="filters-menu">
+        {directorViews ? (
+          <div className="grid gap-2">
+            <p className="text-xs font-medium text-muted-foreground">Ver conversas de</p>
+            {directorViews}
+          </div>
+        ) : null}
+        <div className="grid gap-2">
+          <p className="text-xs font-medium text-muted-foreground">Filtrar</p>
+          <div data-conversations-part="filter-controls" className="grid gap-2 [&_[data-slot=select-trigger]]:w-full">
+            {filterContent}
+          </div>
+          {activeFilterCount ? (
+            <Button
+              className="justify-self-start px-0 text-xs"
+              onClick={() => { setFilter("all"); setBranchFilter("all"); setTagFilter("all"); }}
+              size="sm"
+              variant="link"
+            >
+              Limpar filtros
+            </Button>
+          ) : null}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 
   return (
     <section
@@ -478,21 +530,11 @@ export function ConversationsWorkspace({
           data-conversations-part={directorSkinEnabled ? "pane" : undefined}
           className={cn("flex min-h-0 flex-col border-r border-border bg-card", mobileView === "chat" && selected && "max-lg:hidden")}
         >
-          {directorSkinEnabled ? (
-            <div
-              aria-label="Abas e filtros da lista"
-              data-conversations-part="director-list-controls"
-              role="group"
-              className="flex min-w-0 flex-col gap-2 border-b border-border px-3 py-2"
-            >
-              {directorActions ? <div data-conversations-part="inline-actions">{directorActions}</div> : null}
-              <div data-conversations-part="filter-controls" className="flex min-w-0 flex-wrap items-center gap-2">
-                {filterContent}
-              </div>
-            </div>
-          ) : null}
-          <div data-conversations-part={directorSkinEnabled ? "search-header" : undefined} className="border-b border-border px-3 py-2.5">
-            <div className="relative" data-lite={directorSkinEnabled ? undefined : "search"} data-conversations-part={directorSkinEnabled ? "search" : undefined}>
+          <div
+            data-conversations-part={directorSkinEnabled ? "search-header" : undefined}
+            className={cn("border-b border-border px-3 py-2.5", directorSkinEnabled && "flex items-center gap-2")}
+          >
+            <div className={cn("relative", directorSkinEnabled && "min-w-0 flex-1")} data-lite={directorSkinEnabled ? undefined : "search"} data-conversations-part={directorSkinEnabled ? "search" : undefined}>
               <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 aria-label="Buscar atendimento por nome, telefone ou e-mail"
@@ -502,6 +544,8 @@ export function ConversationsWorkspace({
                 value={query}
               />
             </div>
+            {directorSkinEnabled ? directorFiltersMenu : null}
+            {directorSkinEnabled && canSeeBrokerTab ? <ConversationsBulkQualificationAction compact /> : null}
           </div>
 
           <ScrollArea className="min-h-0 flex-1">

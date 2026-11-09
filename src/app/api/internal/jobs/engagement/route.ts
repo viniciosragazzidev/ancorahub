@@ -4,6 +4,7 @@ import { runEngagementCollector } from "@/features/engagement/collector";
 import { runTeamManagementG6Jobs } from "@/features/team-management/g6-jobs";
 import { backgroundRoute } from "@/shared/db/background-pool";
 import { withJobHeartbeat } from "@/features/live-status/heartbeat";
+import { isBearerAuthorized } from "@/shared/http/bearer-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ export const maxDuration = 60;
 
 async function handle(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!isBearerAuthorized(request, secret)) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
   try {

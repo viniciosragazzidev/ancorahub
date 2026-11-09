@@ -19,5 +19,12 @@ describe("team password reset scope", () => {
   it("allows an in-unit broker and keeps director tenant access", () => {
     expect(canGenerateMemberPasswordReset(manager, { tenantId: "tenant-a", userId: "broker", role: "broker", branchId: "unit-a" })).toBe(true);
     expect(canGenerateMemberPasswordReset(director, { tenantId: "tenant-a", userId: "broker", role: "broker", branchId: "unit-b" })).toBe(true);
+    expect(canGenerateMemberPasswordReset(director, { tenantId: "tenant-a", userId: "manager-2", role: "manager", branchId: "unit-b" })).toBe(true);
+  });
+
+  it("never lets a director open another director or the platform admin", () => {
+    expect(canGenerateMemberPasswordReset(director, { tenantId: "tenant-a", userId: "director-2", role: "director", branchId: null })).toBe(false);
+    expect(canGenerateMemberPasswordReset(director, { tenantId: "tenant-a", userId: "admin", role: "broker", branchId: "unit-a", isPlatformAdmin: true })).toBe(false);
+    expect(canGenerateMemberPasswordReset(director, { tenantId: "tenant-a", userId: "director-1", role: "director", branchId: null })).toBe(false);
   });
 });

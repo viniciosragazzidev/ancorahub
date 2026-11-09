@@ -223,6 +223,8 @@ describe("Meta Lead Ads normalization", () => {
     const signature = `sha256=${createHmac("sha256", "secret").update(body).digest("hex")}`;
     expect(verifyMetaWebhookSignature(body, signature, "secret")).toBe(true);
     expect(verifyMetaWebhookSignature(body, "sha256=00", "secret")).toBe(false);
+    // 64 chars, not hex: must be rejected, never throw.
+    expect(verifyMetaWebhookSignature(body, `sha256=${"z".repeat(64)}`, "secret")).toBe(false);
   });
 
   it("never creates a synthetic lead when Meta rejects the lead lookup", async () => {

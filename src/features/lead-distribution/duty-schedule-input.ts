@@ -18,22 +18,22 @@ const endOfLocalDay = (value: unknown) => (typeof value === "string" && DATE_ONL
 // Plain object (no refinements) so create/update schemas can omit/extend it;
 // Zod 4 refuses `.omit()` on a refined schema at module load.
 const dutyScheduleFields = z.object({
-  branchId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable().optional()),
-  queueId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable().optional()),
+  branchId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable()),
+  queueId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable()),
   name: z.string().trim().min(2).max(100),
-  typeName: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().trim().min(2).max(60).nullable().optional()),
+  typeName: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().trim().min(2).max(60).nullable()),
   /** Saved plantão type (DEC-138). Wins over the legacy free-text typeName. */
-  typeId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable().optional()),
+  typeId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable()),
   attendanceMode: z.enum(["online", "presencial"]).default("online"),
   dayOfWeek: z.coerce.number().int().min(0).max(6),
   startsAt: z.string(),
   endsAt: z.string(),
   minimumBrokers: z.coerce.number().int().min(1).max(99),
-  maximumBrokers: z.preprocess((value) => value === "" || value === undefined ? null : value, z.coerce.number().int().min(1).max(99).nullable().optional()),
+  maximumBrokers: z.preprocess((value) => value === "" || value === undefined ? null : value, z.coerce.number().int().min(1).max(99).nullable()),
   /** Leads each broker may receive in one occurrence of this plantão; empty = no cap. */
-  maxLeadsPerBroker: z.preprocess((value) => value === "" || value === undefined ? null : value, z.coerce.number().int().min(1).max(500).nullable().optional()),
+  maxLeadsPerBroker: z.preprocess((value) => value === "" || value === undefined ? null : value, z.coerce.number().int().min(1).max(500).nullable()),
   /** Morning/afternoon split time ("13:30"); empty = the plantão is one shift. */
-  shiftSplitAt: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().regex(/^\d{2}:\d{2}$/, "Horário de divisão inválido.").nullable().optional()),
+  shiftSplitAt: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().regex(/^\d{2}:\d{2}$/, "Horário de divisão inválido.").nullable()),
   validFrom: z.preprocess(startOfLocalDay, z.coerce.date()),
   validUntil: z.preprocess(endOfLocalDay, z.coerce.date().optional()),
   webhookCredentialId: z.string().uuid().optional().nullable(),
@@ -76,7 +76,7 @@ const createDutyScheduleInput = dutyScheduleFields.omit({ branchId: true, queueI
   // Only used to scope the same-time conflict check: two global plantões at
   // the same day/time are fine as long as they end up serving different
   // queues, so the check needs to know which queue this one is headed for.
-  responsibleQueueId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable().optional()),
+  responsibleQueueId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable()),
   /** Queues that receive the new plantão(s): several are allowed. */
   responsibleQueueIds: z.preprocess((value) => {
     if (typeof value !== "string") return value;

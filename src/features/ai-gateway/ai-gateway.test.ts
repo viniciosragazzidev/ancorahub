@@ -54,6 +54,8 @@ describe("privacy", () => {
     expect(maskPersonalData("Ligue (21) 99999-8888 ou maria@x.com, CPF 123.456.789-00")).toBe("Ligue [telefone] ou [e-mail], CPF [cpf]");
     expect(maskPersonalData("meu fone 98765-4321.")).toBe("meu fone [telefone].");
     expect(maskPersonalData("protocolo 2026-10-10")).toBe("protocolo 2026-10-10");
+    expect(maskPersonalData("boleto 23793.38128 60082.677139 66006.333308 1 93060000056075 ok")).toBe("boleto [linha digitável] ok");
+    expect(maskPersonalData("pix 846700000017435900240209024050002435842210108119")).toBe("pix [linha digitável]");
     expect(shortName("Maria Souza Lima")).toBe("Maria L.");
   });
 });

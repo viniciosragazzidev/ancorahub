@@ -14,6 +14,9 @@ export function negotiationSignalTags(lead: NegotiationLead) {
   if (lead.customerSentImage) tags.push("Imagem enviada");
   if (lead.status === "quote_sent") tags.push("Proposta enviada");
   if (lead.statusBehindAi) tags.push("IA indica próxima etapa");
+  // Em Fechamento o lead não esfria nem sai por falta de conversa (09/11): o sinal vira etiqueta.
+  if (lead.level === "closing" && lead.noCrmConversation) tags.push("Sem conversa no CRM");
+  else if (lead.level === "closing" && lead.exchangeStale) tags.push("Sem troca há 3 dias ou mais");
   return tags;
 }
 
@@ -30,7 +33,7 @@ export function NegotiationLeadRow({ lead, index, generatedAt, onOpen }: {
   const stoppedAt = lead.lastExchangeAt ? new Date(lead.lastExchangeAt).getTime() : null;
   const stopped = stoppedAt !== null && Number.isFinite(stoppedAt) ? `Sem troca ${formatAgo(generatedAt.getTime() - stoppedAt)}` : "Sem troca recente";
   const tags = negotiationSignalTags(lead);
-  const alert = lead.level === "cooling" || lead.level === "no_crm_conversation";
+  const alert = lead.level === "cooling" || lead.level === "no_crm_conversation" || (lead.level === "closing" && lead.noCrmConversation);
 
   return (
     <PeopleRow
@@ -45,7 +48,7 @@ export function NegotiationLeadRow({ lead, index, generatedAt, onOpen }: {
       )}
       meta={<span className={styles.cardStopped}>{stopped}</span>}
       dot={lead.customerWaiting ? "waiting" : alert ? "alert" : null}
-      dotLabel={lead.customerWaiting ? "Cliente aguarda resposta" : lead.level === "cooling" ? "Atendimento esfriando" : lead.level === "no_crm_conversation" ? "Sem conversa no CRM" : undefined}
+      dotLabel={lead.customerWaiting ? "Cliente aguarda resposta" : lead.level === "cooling" ? "Atendimento esfriando" : lead.level === "no_crm_conversation" || lead.noCrmConversation ? "Sem conversa no CRM" : undefined}
       action={<button type="button" className={styles.cardOpen} aria-label={`Ver detalhes de ${lead.name}`} onClick={() => onOpen(lead)}>Ver detalhes</button>}
     />
   );

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getMetaLeadAdsWebhookConfig } from "@/features/communication-channels/meta-cloud-config";
 import { ingestMetaLeadAdsWebhook, type MetaLeadAdsWebhookPayload, verifyMetaWebhookSignature } from "@/features/communication-channels/meta-lead-ads";
 import { backgroundRoute } from "@/shared/db/background-pool";
+import { exceedsBodyLimit } from "@/shared/http/body-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -46,6 +47,7 @@ async function handleGET(request: Request) {
 async function handlePOST(request: Request) {
   try {
     const config = getMetaLeadAdsWebhookConfig();
+    if (exceedsBodyLimit(request)) return NextResponse.json({ error: "Payload too large" }, { status: 413 });
     const rawBody = await request.text();
     const signature = request.headers.get("x-hub-signature-256");
     console.log("[Meta Lead Ads Webhook POST received]", { bodyLength: rawBody.length, hasSignature: Boolean(signature) });

@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { completePasswordReset } from "@/features/team/password-recovery";
 import { getAuth } from "@/shared/auth";
+import { passwordPolicyError } from "@/shared/auth/password-policy";
 
 export type ResetPasswordState = {
   success?: boolean;
@@ -20,7 +21,8 @@ export async function completePasswordResetAction(
     const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
     if (!token) throw new Error("Token de recuperação inválido.");
-    if (password.length < 8) throw new Error("A senha deve ter no mínimo 8 caracteres.");
+    const policyError = passwordPolicyError(password);
+    if (policyError) throw new Error(policyError);
     if (password !== confirmPassword) throw new Error("As senhas não coincidem.");
 
     const { userEmail } = await completePasswordReset(token, password);

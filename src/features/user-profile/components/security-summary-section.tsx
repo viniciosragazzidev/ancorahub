@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PASSWORD_MIN_LENGTH, passwordPolicyError } from "@/shared/auth/password-policy";
 
 export function SecuritySummarySection({ data }: { data: PerfilData }) {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -22,7 +23,8 @@ export function SecuritySummarySection({ data }: { data: PerfilData }) {
   async function changePassword(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
-    if (newPassword.length < 8) { setError("A nova senha deve ter pelo menos 8 caracteres."); return; }
+    const policyError = passwordPolicyError(newPassword);
+    if (policyError) { setError(policyError); return; }
     if (newPassword !== confirmPassword) { setError("As senhas não coincidem."); return; }
     setBusy(true);
     try {
@@ -64,7 +66,7 @@ export function SecuritySummarySection({ data }: { data: PerfilData }) {
             </Field>
             <Field>
               <FieldLabel htmlFor="personal-new-password">Nova senha</FieldLabel>
-              <Input id="personal-new-password" type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Mínimo de 8 caracteres" />
+              <Input id="personal-new-password" type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={`Mínimo de ${PASSWORD_MIN_LENGTH} caracteres`} />
             </Field>
             <Field>
               <FieldLabel htmlFor="personal-confirm-password">Confirmar nova senha</FieldLabel>

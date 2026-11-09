@@ -37,3 +37,13 @@ describe("connectionLimit", () => {
     expect(connectionLimit()).toBe(2);
   });
 });
+
+describe("databaseSslOption", () => {
+  it("keeps the URL's own sslmode unless DATABASE_SSL says otherwise", async () => {
+    const { databaseSslOption } = await import("./client");
+    expect(databaseSslOption({} as unknown as NodeJS.ProcessEnv)).toBeUndefined();
+    expect(databaseSslOption({ DATABASE_SSL: "require" } as unknown as NodeJS.ProcessEnv)).toBe("require");
+    expect(databaseSslOption({ DATABASE_SSL: "verify-full" } as unknown as NodeJS.ProcessEnv)).toBe("verify-full");
+    expect(databaseSslOption({ DATABASE_SSL: "qualquer" } as unknown as NodeJS.ProcessEnv)).toBeUndefined();
+  });
+});

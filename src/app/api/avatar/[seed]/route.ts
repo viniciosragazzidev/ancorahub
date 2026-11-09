@@ -1,17 +1,26 @@
 import { NextResponse } from "next/server";
 
+import {
+  MAX_AVATAR_SEED_LENGTH,
+  SVG_SECURITY_HEADERS,
+  buildFallbackAvatarSvg,
+  parseAvatarSize,
+  parseAvatarStyle,
+} from "./avatar-svg";
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ seed: string }> }
 ) {
-  const { seed } = await params;
+  const { seed: rawSeed } = await params;
+  const seed = rawSeed.slice(0, MAX_AVATAR_SEED_LENGTH);
   const { searchParams } = new URL(request.url);
-  const style = searchParams.get("style") || "lorelei";
-  const size = searchParams.get("size") || "128";
+  const style = parseAvatarStyle(searchParams.get("style"));
+  const size = parseAvatarSize(searchParams.get("size"));
 
   const diceBearUrl = `https://api.dicebear.com/9.x/${encodeURIComponent(
     style
-  )}/svg?seed=${encodeURIComponent(seed)}&size=${encodeURIComponent(size)}`;
+  )}/svg?seed=${encodeURIComponent(seed)}&size=${size}`;
 
   try {
     const res = await fetch(diceBearUrl, {
@@ -19,38 +28,17 @@ export async function GET(
     });
 
     if (!res.ok) {
-      // Fallback SVG if DiceBear HTTP fails
-      const initials = seed
-        ? seed
-            .split(" ")
-            .map((word) => word[0])
-            .slice(0, 2)
-            .join("")
-            .toUpperCase()
-        : "--";
-
-      const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 100 100">
-        <rect width="100" height="100" rx="50" fill="#16A34A" />
-        <text x="50" y="55" font-family="sans-serif" font-size="36" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${initials}</text>
-      </svg>`;
-
-      return new Response(fallbackSvg, {
-        headers: {
-          "Content-Type": "image/svg+xml",
-          "Cache-Control": "public, max-age=86400",
-        },
+      return new Response(buildFallbackAvatarSvg(seed, size), {
+        headers: { ...SVG_SECURITY_HEADERS, "Cache-Control": "public, max-age=86400" },
       });
     }
 
     const svg = await res.text();
 
     return new Response(svg, {
-      headers: {
-        "Content-Type": "image/svg+xml",
-        "Cache-Control": "public, max-age=31536000, immutable",
-      },
+      headers: { ...SVG_SECURITY_HEADERS, "Cache-Control": "public, max-age=31536000, immutable" },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to generate avatar" }, { status: 500 });
   }
 }

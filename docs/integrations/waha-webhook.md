@@ -68,6 +68,14 @@ const signature = createHmac("sha256", SHARED_SECRET)
 
 ---
 
+### Proteção do webhook no Fastify (rota pública)
+
+A API em produção (`api.crm.ancorasaude.cloud`) é o `api/` do repositório **corretop-infra**, não `services/whatsapp-api` deste repositório. O WAHA chama `/internal/webhooks/waha` pela rede Docker; chamadas vindas da internet passam pelo proxy e chegam com `X-Forwarded-*`. Lá a proteção é `WAHA_WEBHOOK_BLOCK_PUBLIC` (modo observação primeiro, depois `true`); o passo a passo está no README do corretop-infra, seção "Webhook WAHA só pela rede interna".
+
+O `services/whatsapp-api` daqui ganhou o equivalente por token (`WAHA_WEBHOOK_TOKEN` / `WAHA_WEBHOOK_TOKEN_REQUIRED`), mas só vale se esse serviço voltar a ser usado.
+
+---
+
 ## Payload — Eventos
 
 ### Estrutura base

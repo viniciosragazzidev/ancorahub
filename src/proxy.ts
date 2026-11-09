@@ -7,7 +7,15 @@ import { eq } from "drizzle-orm";
 import { updateSession } from "@/utils/supabase/middleware";
 import { getDatabase, schema } from "@/shared/db/client";
 import { isNavigationPrefetch } from "@/shared/http/navigation-prefetch";
+import { isSameOriginRequest, needsSameOriginCheck } from "@/shared/http/same-origin";
 import { startMiddlewareTiming, endMiddlewareTiming, logMiddlewareSpan } from "@/shared/observability/middleware-timing";
+
+const SESSION_COOKIE_NAMES = [
+  "better-auth.session_token",
+  "__Secure-better-auth.session_token",
+  "better-auth.session_token.value",
+  "__Secure-better-auth.session_token.value",
+] as const;
 
 const protectedPathPrefixes = [
   "/welcome", "/dashboard", "/equipe", "/leads", "/roadmap", "/documentos",
@@ -156,6 +164,22 @@ export async function proxy(request: NextRequest) {
     return blocked;
   }
 
+  // CSRF: an API write that carries the session cookie must come from our own origin.
+  const carriesSessionCookie = SESSION_COOKIE_NAMES.some((name) => Boolean(request.cookies.get(name)?.value));
+  if (
+    needsSameOriginCheck({ method: request.method, pathname, hasSessionCookie: carriesSessionCookie })
+    && !isSameOriginRequest({
+      origin: request.headers.get("origin"),
+      secFetchSite: request.headers.get("sec-fetch-site"),
+      requestHost: request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
+    })
+  ) {
+    console.warn("[proxy] cross_origin_api_write_blocked", { pathname, method: request.method, requestId });
+    const blocked = NextResponse.json({ error: "Origem não permitida." }, { status: 403 });
+    blocked.headers.set("x-request-id", requestId);
+    return blocked;
+  }
+
   if (isNavigationPrefetch(request.headers)) {
     const response = NextResponse.next({ request: { headers: request.headers } });
     response.headers.set("x-request-id", requestId);
@@ -166,10 +190,7 @@ export async function proxy(request: NextRequest) {
   const supabaseStartMs = performance.now();
   const supabaseResponse = await getSafeSupabaseResponse(request);
   logMiddlewareSpan(timing, "middleware.supabase_session", supabaseStartMs);
-  const session = request.cookies.get("better-auth.session_token")
-    ?? request.cookies.get("__Secure-better-auth.session_token")
-    ?? request.cookies.get("better-auth.session_token.value")
-    ?? request.cookies.get("__Secure-better-auth.session_token.value");
+  const session = SESSION_COOKIE_NAMES.map((name) => request.cookies.get(name)).find(Boolean);
   const hasSessionCookie = Boolean(session?.value);
   // The cookie is signed ("token.signature"); the session table holds the token only.
   const sessionToken = session?.value ? await readSessionToken(session.value) : null;

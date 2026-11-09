@@ -5,9 +5,15 @@
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
 const CPF = /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g;
 const PHONE = /(?<!\d)(?:\+?55\s?)?(?:\(?\d{2}\)?[\s-]?)?9?\d{4}[\s-]?\d{4}\b/g;
+/** Boleto "linha digitável" (47 digits) or arrecadação (48), with or without dots and spaces. */
+const BOLETO_LINE = /(?<!\d)(?:\d[\s.]?){46,47}\d(?!\d)/g;
 
 export function maskPersonalData(text: string) {
-  return text.replace(EMAIL, "[e-mail]").replace(CPF, "[cpf]").replace(PHONE, "[telefone]");
+  return text
+    .replace(BOLETO_LINE, "[linha digitável]")
+    .replace(EMAIL, "[e-mail]")
+    .replace(CPF, "[cpf]")
+    .replace(PHONE, "[telefone]");
 }
 
 /** "Maria Souza Lima" -> "Maria S." (enough for the model, not enough to identify). */
