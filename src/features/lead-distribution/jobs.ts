@@ -51,6 +51,11 @@ function automaticQualificationFilter() {
  * policy's own column, so the job's pre-check read "true" whenever ANY queue held cold
  * leads (09/11: Venâncio Leads with the switch off never sent a cold lead).
  */
+/**
+ * Writes the lead columns with the table name ("leads"."queue_id"): in a select drizzle leaves them bare and
+ * the subquery would compare the policy with itself (09/11 bug: every cold PARTIAL lead was held). Callers must
+ * use the table as `leads`, never an alias.
+ */
 export function queueHoldsColdLeadsSql() {
   const leadColumn = (name: string) => sql`${schema.leads}.${sql.identifier(name)}`;
   return sql<boolean>`exists (select 1 from ${schema.leadDistributionPolicies} p where p.tenant_id = ${leadColumn(schema.leads.tenantId.name)} and p.queue_id = ${leadColumn(schema.leads.queueId.name)} and (p.policy->>'holdColdLeads') = 'true')`;
