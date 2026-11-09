@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, lt, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, like, lte, lt, ne, or } from "drizzle-orm";
 import { after } from "next/server";
 import { runGateway } from "@/features/ai-gateway/gateway";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
@@ -12,7 +12,7 @@ import { getFeatureFlag } from "@/features/system-settings/queries";
 import { POST_SALE_META_TEMPLATE } from "./template-contract";
 import { postSaleAlertReasons } from "./alert-rules";
 import { ensurePostSaleSurveyAlerts } from "./alert-service";
-import { businessHoursBetween, detectPostSaleKeywords, isActivePostSaleSurvey, postSaleAnswerSchema, postSaleNextTurn, type PostSaleAnswers } from "./conversation-rules";
+import { decidePostSaleNudge, detectPostSaleKeywords, isActivePostSaleSurvey, postSaleAnswerSchema, postSaleNextTurn, type PostSaleAnswers } from "./conversation-rules";
 import { postSaleMediaReply, requestPostSaleTextOnceAtStep, retryPostSaleOperation, runPostSaleOptOutTransaction, type PostSaleMessageKind } from "./conversation-operations";
 import { autoRuleNextTurn, autoRuleQuestionFocus, detectAutoRuleKeywords } from "./auto-rule-scripts";
 import { isAutoRuleKey } from "./auto-rules";
@@ -20,7 +20,6 @@ import { classifyR0AnswerByKeywords, r0AnswerSchema, r0NextTurn, r0TimelineSumma
 
 const ACTIVE_STATUSES = ["sent", "answering"] as const;
 const SURVEY_WINDOW_MS = 5 * 86_400_000;
-const REMINDER_BUSINESS_MS = 24 * 3_600_000;
 type PostSaleWriteExecutor = Pick<ReturnType<typeof getDatabase>, "insert" | "update">;
 
 export type PostSaleInbound = {
@@ -385,56 +384,71 @@ async function enqueueSurveyMediaPromptOnce(survey: typeof schema.postSaleSurvey
   });
 }
 
+/**
+ * Sends the reminder (or the manual "Retomar agora") of one survey. Before any answer it re-sends the
+ * opening (approved template on the official number, short text on WAHA); mid-conversation it repeats the
+ * last question as free text. The key always starts with "post-sale-reminder:<surveyId>:" so the outbox marks
+ * reminder_sent_at when it goes out.
+ */
+export async function sendPostSaleNudge(survey: typeof schema.postSaleSurveys.$inferSelect, kind: "opening" | "question", keySuffix: string) {
+  const db = getDatabase();
+  const key = `post-sale-reminder:${survey.id}:${keySuffix}`;
+  const [lead] = await db.select({ name: schema.leads.nome }).from(schema.leads).where(and(eq(schema.leads.id, survey.leadId), eq(schema.leads.tenantId, survey.tenantId))).limit(1);
+  const firstNameOf = (value: string | null | undefined, fallback: string) => (value ?? fallback).trim().split(/\s+/)[0] || fallback;
+  const leadName = firstNameOf(lead?.name, "Cliente");
+  if (kind === "opening") {
+    if (survey.channelType === "meta") {
+      const [tenant] = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, survey.tenantId)).limit(1);
+      const [broker] = survey.brokerId ? await db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, survey.brokerId)).limit(1) : [];
+      const requestedBy = await resolveSystemUserId(survey.tenantId);
+      return enqueueMetaTemplateMessage({ tenantId: survey.tenantId, channelId: survey.channelRef ?? undefined, recipientType: "lead", recipientId: survey.leadId, destinationPhone: survey.phone, purpose: "postSaleSurvey", variables: [leadName, tenant?.name ?? "nossa equipe", firstNameOf(broker?.name, "nosso corretor")], requestedBy, idempotencyKey: key, requireApprovedMetaTemplate: true, templateName: POST_SALE_META_TEMPLATE.name, strictSourceChannel: true });
+    }
+    return enqueueSurveyReply(survey, `Oi, ${leadName}! Passando para saber se você pode responder nossa pesquisa rápida de atendimento quando puder.`, key);
+  }
+  // The last question this survey asked (free-text replies of this survey).
+  const [lastQuestion] = await db.select({ variables: schema.whatsappOutboundMessages.variables, renderedBody: schema.whatsappOutboundMessages.renderedBody })
+    .from(schema.whatsappOutboundMessages)
+    .where(and(eq(schema.whatsappOutboundMessages.tenantId, survey.tenantId), eq(schema.whatsappOutboundMessages.recipientId, survey.leadId), eq(schema.whatsappOutboundMessages.purpose, "postSaleSurvey"), like(schema.whatsappOutboundMessages.idempotencyKey, `post-sale-reply:${survey.id}:%`)))
+    .orderBy(desc(schema.whatsappOutboundMessages.createdAt)).limit(1);
+  const fromVariables = Array.isArray(lastQuestion?.variables) && typeof lastQuestion.variables[0] === "string" ? lastQuestion.variables[0] : null;
+  const question = (lastQuestion?.renderedBody?.trim() || fromVariables?.trim() || "").replace(/^Obrigad[ao],?\s*[^!.]*[!.]\s*/i, "");
+  const body = question ? `Oi, ${leadName}! Só retomando: ${question}` : `Oi, ${leadName}! Só retomando nossa pesquisa rápida de atendimento. Pode me responder quando puder?`;
+  return enqueueSurveyReply(survey, body, key);
+}
+
 export async function runPostSaleReminderJob(now = new Date()) {
   if (await getFeatureFlag(FEATURE_FLAGS.POST_SALE_AUDIT).catch(() => "false") !== "true") return { enqueued: 0, completed: 0 };
   const db = getDatabase();
-  const active = await db.select().from(schema.postSaleSurveys).where(and(inArray(schema.postSaleSurveys.status, [...ACTIVE_STATUSES]), isNull(schema.postSaleSurveys.reminderSentAt), isNull(schema.postSaleSurveys.lastReplyAt), isNull(schema.postSaleSurveys.completedAt), lt(schema.postSaleSurveys.sentAt, new Date(now.getTime() - 24 * 3_600_000)))).orderBy(asc(schema.postSaleSurveys.sentAt)).limit(200);
+  const active = await db.select().from(schema.postSaleSurveys).where(and(
+    inArray(schema.postSaleSurveys.status, [...ACTIVE_STATUSES]),
+    isNull(schema.postSaleSurveys.completedAt),
+    lt(schema.postSaleSurveys.sentAt, new Date(now.getTime() - 3_600_000)),
+  )).orderBy(asc(schema.postSaleSurveys.sentAt)).limit(300);
   let enqueued = 0;
   let completed = 0;
   for (const survey of active) {
-    if (!survey.sentAt || businessHoursBetween(survey.sentAt, now) < REMINDER_BUSINESS_MS) continue;
-    // R0 é reativa a uma mensagem do cliente: sem lembrete (no Meta seria o template da pesquisa).
-    // Sem resposta em 24 h úteis, encerra como "sem resposta".
-    if (survey.ruleKey === R0_RULE_KEY) {
-      await db.update(schema.postSaleSurveys).set({ status: "no_reply", completedAt: now }).where(and(eq(schema.postSaleSurveys.id, survey.id), eq(schema.postSaleSurveys.tenantId, survey.tenantId), inArray(schema.postSaleSurveys.status, [...ACTIVE_STATUSES]), isNull(schema.postSaleSurveys.lastReplyAt)));
+    const decision = decidePostSaleNudge({ sentAt: survey.sentAt, lastReplyAt: survey.lastReplyAt, reminderSentAt: survey.reminderSentAt, channelType: survey.channelType, isR0: survey.ruleKey === R0_RULE_KEY, now });
+    if (decision.action === "none") continue;
+    if (decision.action === "close_no_reply") {
+      const reference = survey.reminderSentAt ?? survey.lastReplyAt ?? survey.sentAt!;
+      await db.update(schema.postSaleSurveys).set({ status: "no_reply", completedAt: now }).where(and(
+        eq(schema.postSaleSurveys.id, survey.id), eq(schema.postSaleSurveys.tenantId, survey.tenantId), inArray(schema.postSaleSurveys.status, [...ACTIVE_STATUSES]),
+        or(isNull(schema.postSaleSurveys.lastReplyAt), lte(schema.postSaleSurveys.lastReplyAt, reference)),
+      ));
       completed += 1;
       continue;
     }
-    const key = `post-sale-reminder:${survey.id}`;
-    const [existing] = await db.select({ id: schema.whatsappOutboundMessages.id, status: schema.whatsappOutboundMessages.status }).from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, survey.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, key))).limit(1);
-    if (!existing) {
-      const [lead] = await db.select({ name: schema.leads.nome }).from(schema.leads).where(and(eq(schema.leads.id, survey.leadId), eq(schema.leads.tenantId, survey.tenantId))).limit(1);
-      const [campaign] = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, survey.tenantId)).limit(1);
-      const [broker] = survey.brokerId ? await db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, survey.brokerId)).limit(1) : [];
-      try {
-        if (survey.channelType === "meta") {
-          const requestedBy = await resolveSystemUserId(survey.tenantId);
-          await enqueueMetaTemplateMessage({ tenantId: survey.tenantId, channelId: survey.channelRef ?? undefined, recipientType: "lead", recipientId: survey.leadId, destinationPhone: survey.phone, purpose: "postSaleSurvey", variables: [(lead?.name ?? "Cliente").split(/\s+/)[0]!, campaign?.name ?? "nossa equipe", (broker?.name ?? "nosso corretor").split(/\s+/)[0]!], requestedBy, idempotencyKey: key, requireApprovedMetaTemplate: true, templateName: POST_SALE_META_TEMPLATE.name, strictSourceChannel: true });
-        } else if (survey.channelType === "waha") {
-          await enqueueSurveyReply(survey, `Oi, ${(lead?.name ?? "Cliente").split(/\s+/)[0]}! Passando para saber se você pode responder nossa pesquisa rápida de atendimento quando puder.`, key);
-        }
+    const reference = survey.lastReplyAt ?? survey.sentAt!;
+    try {
+      const outbound = await sendPostSaleNudge(survey, decision.action === "remind_opening" ? "opening" : "question", String(reference.getTime()));
+      if (["failed", "cancelled", "expired", "skipped"].includes(outbound.status)) {
+        await db.update(schema.postSaleSurveys).set({ status: "no_reply", completedAt: now, skipReason: "lembrete não pôde ser entregue" }).where(and(eq(schema.postSaleSurveys.id, survey.id), eq(schema.postSaleSurveys.tenantId, survey.tenantId), inArray(schema.postSaleSurveys.status, [...ACTIVE_STATUSES])));
+        completed += 1;
+      } else if (!outbound.duplicate) {
         enqueued += 1;
-      } catch (error) {
-        console.error("[post-sale-audit] reminder_enqueue_failed", { surveyId: survey.id, error: error instanceof Error ? error.message.slice(0, 120) : "unknown" });
       }
-      continue;
-    }
-    if (existing && ["failed", "cancelled", "expired", "skipped"].includes(existing.status)) {
-      await db.update(schema.postSaleSurveys).set({ status: "no_reply", completedAt: now, skipReason: "lembrete não pôde ser entregue" }).where(and(eq(schema.postSaleSurveys.id, survey.id), eq(schema.postSaleSurveys.tenantId, survey.tenantId), inArray(schema.postSaleSurveys.status, [...ACTIVE_STATUSES])));
-      completed += 1;
-      continue;
-    }
-    const elapsed = survey.reminderSentAt ? businessHoursBetween(survey.reminderSentAt, now) : 0;
-    if (survey.reminderSentAt && elapsed >= REMINDER_BUSINESS_MS && (!survey.lastReplyAt || survey.lastReplyAt <= survey.reminderSentAt)) {
-      await db.update(schema.postSaleSurveys).set({ status: "no_reply", completedAt: now }).where(and(eq(schema.postSaleSurveys.id, survey.id), eq(schema.postSaleSurveys.tenantId, survey.tenantId), inArray(schema.postSaleSurveys.status, [...ACTIVE_STATUSES]), or(isNull(schema.postSaleSurveys.lastReplyAt), lte(schema.postSaleSurveys.lastReplyAt, survey.reminderSentAt))));
-      completed += 1;
-    }
-  }
-  const reminded = await db.select().from(schema.postSaleSurveys).where(and(inArray(schema.postSaleSurveys.status, [...ACTIVE_STATUSES]), isNotNull(schema.postSaleSurveys.reminderSentAt))).limit(200);
-  for (const survey of reminded) {
-    if (survey.reminderSentAt && businessHoursBetween(survey.reminderSentAt, now) >= REMINDER_BUSINESS_MS && (!survey.lastReplyAt || survey.lastReplyAt <= survey.reminderSentAt)) {
-      await db.update(schema.postSaleSurveys).set({ status: "no_reply", completedAt: now }).where(and(eq(schema.postSaleSurveys.id, survey.id), eq(schema.postSaleSurveys.tenantId, survey.tenantId), inArray(schema.postSaleSurveys.status, [...ACTIVE_STATUSES]), or(isNull(schema.postSaleSurveys.lastReplyAt), lte(schema.postSaleSurveys.lastReplyAt, survey.reminderSentAt))));
-      completed += 1;
+    } catch (error) {
+      console.error("[post-sale-audit] reminder_enqueue_failed", { surveyId: survey.id, error: error instanceof Error ? error.message.slice(0, 120) : "unknown" });
     }
   }
   return { enqueued, completed };

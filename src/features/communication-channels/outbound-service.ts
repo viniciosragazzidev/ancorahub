@@ -1001,7 +1001,8 @@ async function syncPostSaleSurveyOutbound(row: OutboundRow, result: { status: "s
   if (row.purpose !== "postSaleSurvey") return;
   const reminderPrefix = "post-sale-reminder:";
   if (row.idempotencyKey.startsWith(reminderPrefix)) {
-    const surveyId = row.idempotencyKey.slice(reminderPrefix.length);
+    // "post-sale-reminder:<surveyId>" or "post-sale-reminder:<surveyId>:<step reference>" (one reminder per step).
+    const surveyId = row.idempotencyKey.slice(reminderPrefix.length).split(":")[0];
     if (!surveyId) return;
     await getDatabase().update(schema.postSaleSurveys).set({
       ...(result.status === "sent" ? { reminderSentAt: new Date() } : {}),

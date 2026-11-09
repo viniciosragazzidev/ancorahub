@@ -112,3 +112,52 @@ export function businessHoursBetween(start: Date, end: Date) {
   }
   return total;
 }
+
+/** Reminder 4 business hours after the last step (09/11, Vinicios: "muda o lembrete para 4 horas"). */
+export const POST_SALE_REMINDER_AFTER_MS = 4 * 3_600_000;
+/** After a reminder, the survey closes as "sem resposta" when this passes without an answer. */
+export const POST_SALE_NO_REPLY_AFTER_MS = 24 * 3_600_000;
+/** Free text on the official number only inside the client's 24 h window (1 h margin). */
+const META_WINDOW_MS = 23 * 3_600_000;
+
+export type PostSaleNudgeDecision =
+  | { action: "none" }
+  | { action: "remind_opening" }
+  | { action: "remind_question" }
+  | { action: "close_no_reply" };
+
+/**
+ * What to do with an unanswered survey. The reference is the client's last answer (or the send when he
+ * never answered): one reminder per step, 4 business hours later; then "sem resposta" after 24 business
+ * hours. Mid-conversation on the official number the reminder is free text, so it needs the 24 h window.
+ * R0 never gets a reminder (it is reactive to the client's own message).
+ */
+export function decidePostSaleNudge(input: {
+  sentAt: Date | null;
+  lastReplyAt: Date | null;
+  reminderSentAt: Date | null;
+  channelType: string | null;
+  isR0: boolean;
+  now: Date;
+}): PostSaleNudgeDecision {
+  const reference = input.lastReplyAt ?? input.sentAt;
+  if (!reference) return { action: "none" };
+  const remindedThisStep = Boolean(input.reminderSentAt && input.reminderSentAt >= reference);
+  if (remindedThisStep) {
+    return businessHoursBetween(input.reminderSentAt!, input.now) >= POST_SALE_NO_REPLY_AFTER_MS ? { action: "close_no_reply" } : { action: "none" };
+  }
+  const waited = businessHoursBetween(reference, input.now);
+  if (input.isR0) return waited >= POST_SALE_NO_REPLY_AFTER_MS ? { action: "close_no_reply" } : { action: "none" };
+  if (waited < POST_SALE_REMINDER_AFTER_MS) return { action: "none" };
+  if (!input.lastReplyAt) return { action: "remind_opening" };
+  if (input.channelType === "meta" && input.now.getTime() - input.lastReplyAt.getTime() > META_WINDOW_MS) {
+    return waited >= POST_SALE_NO_REPLY_AFTER_MS ? { action: "close_no_reply" } : { action: "none" };
+  }
+  return { action: "remind_question" };
+}
+
+/** "Retomar agora" by hand: can it go out right now? (free text on the official number needs the window). */
+export function canResumePostSaleNow(input: { lastReplyAt: Date | null; channelType: string | null; now: Date }) {
+  if (!input.lastReplyAt) return true; // opening reminder: template on the official number, text on WAHA
+  return !(input.channelType === "meta" && input.now.getTime() - input.lastReplyAt.getTime() > META_WINDOW_MS);
+}

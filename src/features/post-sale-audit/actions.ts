@@ -18,6 +18,8 @@ import type { PostSaleBrokerReportRow } from "./reporting";
 import { firstName, findUnknownPostSaleOpeningVariables, renderPostSaleOpeningMessage } from "./rules";
 import { postSaleAudienceSchema, POST_SALE_CAMPAIGN_MAX_LEADS } from "./rules";
 import { resolvePostSaleAudience } from "./audience";
+import { canResumePostSaleNow } from "./conversation-rules";
+import { sendPostSaleNudge } from "./conversation";
 import { parseR0Settings, postSaleR0SettingKey, serializeR0Settings, type R0Settings } from "./r0-rules";
 import { POST_SALE_META_TEMPLATE, POST_SALE_WAHA_OPENING_DEFAULT } from "./template-contract";
 import { autoRuleSettingsInputSchema, parsePostSaleRuleFilter, type AutoRuleSettings, type PostSaleRuleFilter } from "./auto-rules";
@@ -499,6 +501,42 @@ export async function savePostSaleR0SettingsAction(raw: unknown): Promise<Action
     await setSystemSetting(postSaleR0SettingKey(context.tenantId), serializeR0Settings(settings));
     await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_rule", entityId: "R0", action: "post_sale.r0.settings_updated", metadata: { enabled: settings.enabled, queueCount: queueIds.length } });
     return { ok: true, data: settings };
+  } catch (error) {
+    return { ok: false, error: safeFailure(error) };
+  }
+}
+
+/**
+ * "Retomar agora" (09/11): sends the reminder of one unanswered survey right away (opening again, or the
+ * last question as free text). One per step: a second click on the same step returns the same message.
+ */
+export async function resumePostSaleSurveyAction(rawSurveyId: unknown): Promise<ActionResult<{ duplicate: boolean }>> {
+  try {
+    const context = await authorizedContext();
+    const surveyId = z.string().trim().min(1).max(80).parse(rawSurveyId);
+    const db = getDatabase();
+    const branchFilter = context.role === "manager" ? context.branchId : undefined;
+    const [row] = await db.select({ survey: schema.postSaleSurveys })
+      .from(schema.postSaleSurveys)
+      .innerJoin(schema.leads, and(eq(schema.leads.id, schema.postSaleSurveys.leadId), eq(schema.leads.tenantId, schema.postSaleSurveys.tenantId)))
+      .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
+      .where(and(
+        eq(schema.postSaleSurveys.id, surveyId),
+        eq(schema.postSaleSurveys.tenantId, context.tenantId),
+        branchFilter ? sql`coalesce(${schema.leads.branchId}, ${schema.leadQueues.branchId}) = ${branchFilter}` : undefined,
+      )).limit(1);
+    const survey = row?.survey;
+    if (!survey) throw new PostSaleActionError("Pesquisa não encontrada.");
+    if (!["sent", "answering"].includes(survey.status)) throw new PostSaleActionError("Esta pesquisa já foi encerrada.");
+    if (survey.ruleKey === "R0") throw new PostSaleActionError("A conversa \"Cliente voltou a escrever\" não tem retomada manual.");
+    if (!canResumePostSaleNow({ lastReplyAt: survey.lastReplyAt, channelType: survey.channelType, now: new Date() })) {
+      throw new PostSaleActionError("A janela de 24 h do número oficial fechou. Só dá para retomar quando o cliente escrever de novo.");
+    }
+    const reference = survey.lastReplyAt ?? survey.sentAt ?? survey.createdAt;
+    const outbound = await sendPostSaleNudge(survey, survey.lastReplyAt ? "question" : "opening", `manual:${reference.getTime()}`);
+    if (["failed", "cancelled", "expired", "skipped"].includes(outbound.status)) throw new PostSaleActionError("Não foi possível enviar pelo número de origem.");
+    await recordPostSaleAuditEvent({ tenantId: context.tenantId, userId: context.userId, entity: "post_sale_survey", entityId: survey.id, action: "post_sale_survey.resumed", metadata: { leadId: survey.leadId, duplicate: Boolean(outbound.duplicate) } });
+    return { ok: true, data: { duplicate: Boolean(outbound.duplicate) } };
   } catch (error) {
     return { ok: false, error: safeFailure(error) };
   }

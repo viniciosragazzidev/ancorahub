@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { getPostSaleSurveyMessagesAction } from "@/features/post-sale-audit/actions";
+import { getPostSaleSurveyMessagesAction, resumePostSaleSurveyAction } from "@/features/post-sale-audit/actions";
 import { matchesPostSaleRuleFilter, postSaleRuleLabel, POST_SALE_RULE_FILTERS, type PostSaleRuleFilter } from "@/features/post-sale-audit/auto-rules";
 import { answerChips, matchesSearch, paginate, RESPONSE_GROUP_LABELS, responseGroups, type AnswerChip, type ResponseGroup } from "@/features/post-sale-audit/responses-view";
 import { cn } from "@/lib/utils";
@@ -58,6 +58,16 @@ export function PostSaleResponses({ responses }: { responses: PostSaleResponseRo
     && (group === "all" || groupsById.get(row.id)?.includes(group))
     && matchesSearch([row.leadName, row.brokerName, typeof row.answers.comment === "string" ? row.answers.comment : null], query)), [responses, query, group, groupsById, rule]);
   const view = paginate(filtered, page);
+
+  const [resuming, setResuming] = useState<string | null>(null);
+  const [resumeNote, setResumeNote] = useState<Record<string, string>>({});
+  async function resume(row: PostSaleResponseRow) {
+    setResuming(row.id);
+    const result = await resumePostSaleSurveyAction(row.id);
+    setResuming(null);
+    setResumeNote((current) => ({ ...current, [row.id]: result.ok ? (result.data.duplicate ? "A retomada desta pergunta já tinha sido enviada." : "Retomada enviada ao cliente.") : result.error }));
+    if (result.ok) setMessages((current) => { const next = { ...current }; delete next[row.id]; return next; });
+  }
 
   async function toggle(row: PostSaleResponseRow) {
     if (open === row.id) return setOpen(null);
@@ -143,7 +153,13 @@ export function PostSaleResponses({ responses }: { responses: PostSaleResponseRo
                       ))
                       : <p className="text-sm text-muted-foreground">Nenhuma mensagem registrada desde o envio.</p>}
                   </div>
+                  {resumeNote[row.id] ? <p role="status" className="text-sm text-muted-foreground">{resumeNote[row.id]}</p> : null}
                   <div className="flex flex-wrap gap-2">
+                    {(row.status === "sent" || row.status === "answering") && !row.answers.r0 ? (
+                      <Button size="sm" variant="outline" disabled={resuming === row.id} onClick={() => void resume(row)}>
+                        {resuming === row.id ? "Enviando…" : "Retomar agora"}
+                      </Button>
+                    ) : null}
                     <Button render={<Link href={`/conversas?leadId=${row.leadId}`} />} size="sm">Abrir conversa</Button>
                     <Button render={<Link href={`/leads/${row.leadId}`} />} size="sm" variant="outline">Ver lead</Button>
                   </div>

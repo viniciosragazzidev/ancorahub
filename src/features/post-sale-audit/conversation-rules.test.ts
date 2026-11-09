@@ -48,3 +48,39 @@ describe("post-sale conversation rules", () => {
     expect(businessHoursBetween(new Date("2026-11-06T15:00:00Z"), new Date("2026-11-09T15:00:00Z"))).toBe(10 * 60 * 60_000);
   });
 });
+
+import { canResumePostSaleNow, decidePostSaleNudge } from "./conversation-rules";
+
+describe("lembrete da pesquisa (4 h úteis)", () => {
+  // Segunda 09/11/2026, horário de São Paulo (UTC-3).
+  const at = (hhmm: string) => new Date(`2026-11-09T${hhmm}:00-03:00`);
+  const base = { sentAt: at("08:04"), lastReplyAt: null as Date | null, reminderSentAt: null as Date | null, channelType: "meta", isR0: false };
+
+  it("sem resposta à abertura: lembrete depois de 4 h úteis", () => {
+    expect(decidePostSaleNudge({ ...base, now: at("11:00") }).action).toBe("none");
+    expect(decidePostSaleNudge({ ...base, now: at("12:10") }).action).toBe("remind_opening");
+  });
+
+  it("no meio da conversa: repete a pergunta 4 h úteis depois da última resposta (caso Dayana)", () => {
+    const dayana = { ...base, lastReplyAt: at("12:36") };
+    expect(decidePostSaleNudge({ ...dayana, now: at("15:00") }).action).toBe("none");
+    expect(decidePostSaleNudge({ ...dayana, now: at("16:40") }).action).toBe("remind_question");
+  });
+
+  it("um lembrete por etapa; depois fecha como sem resposta", () => {
+    const reminded = { ...base, lastReplyAt: at("12:36"), reminderSentAt: at("16:40") };
+    expect(decidePostSaleNudge({ ...reminded, now: at("17:00") }).action).toBe("none");
+    expect(decidePostSaleNudge({ ...reminded, now: new Date("2026-11-12T12:00:00-03:00") }).action).toBe("close_no_reply");
+  });
+
+  it("número oficial fora da janela de 24 h não manda texto livre", () => {
+    const old = { ...base, lastReplyAt: new Date("2026-11-06T09:00:00-03:00") };
+    expect(decidePostSaleNudge({ ...old, now: at("10:00") }).action).not.toBe("remind_question");
+    expect(canResumePostSaleNow({ lastReplyAt: old.lastReplyAt, channelType: "meta", now: at("10:00") })).toBe(false);
+    expect(canResumePostSaleNow({ lastReplyAt: old.lastReplyAt, channelType: "waha", now: at("10:00") })).toBe(true);
+  });
+
+  it("R0 não tem lembrete", () => {
+    expect(decidePostSaleNudge({ ...base, isR0: true, now: at("16:00") }).action).toBe("none");
+  });
+});
