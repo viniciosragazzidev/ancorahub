@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isBusinessDateKeyWithHolidays } from "@/shared/time/holidays";
 
 /**
  * Régua automática do pós-venda (Fase 4 do plano 2026-11-06): regras R1 a R5.
@@ -150,22 +151,22 @@ function utcNoonToKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+/** Dia útil da régua: seg a sex, fora dos feriados de `shared/time/holidays.ts`. */
 export function isBusinessDateKey(key: string) {
-  const weekday = keyToUtcNoon(key).getUTCDay();
-  return weekday >= 1 && weekday <= 5;
+  return isBusinessDateKeyWithHolidays(key);
 }
 
-/** O N-ésimo dia útil depois da data (N = 0 devolve a própria data, ou o próximo dia útil se cair no fim de semana). */
+/** O N-ésimo dia útil depois da data (N = 0 devolve a própria data, ou o próximo dia útil se cair no fim de semana ou feriado). */
 export function addBusinessDaysToDateKey(key: string, businessDays: number) {
   const cursor = keyToUtcNoon(key);
   if (businessDays <= 0) {
-    while (cursor.getUTCDay() === 0 || cursor.getUTCDay() === 6) cursor.setUTCDate(cursor.getUTCDate() + 1);
+    while (!isBusinessDateKey(utcNoonToKey(cursor))) cursor.setUTCDate(cursor.getUTCDate() + 1);
     return utcNoonToKey(cursor);
   }
   let left = businessDays;
   while (left > 0) {
     cursor.setUTCDate(cursor.getUTCDate() + 1);
-    if (cursor.getUTCDay() !== 0 && cursor.getUTCDay() !== 6) left -= 1;
+    if (isBusinessDateKey(utcNoonToKey(cursor))) left -= 1;
   }
   return utcNoonToKey(cursor);
 }
@@ -192,7 +193,8 @@ export function autoRuleTiming(input: { milestoneAt: Date; delayBusinessDays: nu
 /** Marco mais antigo que ainda pode estar no prazo no dia de envio (para limitar a busca). */
 export function autoRuleMilestoneFloor(sendDay: string, delayBusinessDays: number, graceBusinessDays: number = AUTO_RULE_LIMITS.graceBusinessDays) {
   const businessDays = delayBusinessDays + graceBusinessDays;
-  const calendarDays = Math.ceil(businessDays * 7 / 5) + 4;
+  // +4 de folga para fins de semana nas pontas e +4 para feriados no caminho.
+  const calendarDays = Math.ceil(businessDays * 7 / 5) + 8;
   const floor = keyToUtcNoon(sendDay);
   floor.setUTCDate(floor.getUTCDate() - calendarDays);
   return new Date(Date.UTC(floor.getUTCFullYear(), floor.getUTCMonth(), floor.getUTCDate()));

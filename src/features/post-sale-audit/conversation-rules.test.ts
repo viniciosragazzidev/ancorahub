@@ -46,6 +46,8 @@ describe("post-sale conversation rules", () => {
 
   it("counts weekday business time, excluding nights and weekends", () => {
     expect(businessHoursBetween(new Date("2026-11-06T15:00:00Z"), new Date("2026-11-09T15:00:00Z"))).toBe(10 * 60 * 60_000);
+    // Feriado (sexta 20/11/2026) não conta: quinta 12h até segunda 12h são 10 horas úteis.
+    expect(businessHoursBetween(new Date("2026-11-19T15:00:00Z"), new Date("2026-11-23T15:00:00Z"))).toBe(10 * 60 * 60_000);
   });
 });
 

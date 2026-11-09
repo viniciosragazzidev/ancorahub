@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isHolidayDateKey } from "@/shared/time/holidays";
 
 export const postSaleAnswerSchema = z.object({
   contacted: z.boolean().nullable().optional(),
@@ -98,7 +99,8 @@ export function businessHoursBetween(start: Date, end: Date) {
   let day = parts(start);
   const lastDay = parts(end);
   for (let index = 0; index < 370; index += 1) {
-    const businessDay = day.weekday >= 1 && day.weekday <= 5;
+    // Feriados de `shared/time/holidays.ts` não contam (09/11): o lembrete e o "sem resposta" esperam o próximo dia útil.
+    const businessDay = day.weekday >= 1 && day.weekday <= 5 && !isHolidayDateKey(`${day.year}-${String(day.month).padStart(2, "0")}-${String(day.day).padStart(2, "0")}`);
     if (businessDay) {
       // São Paulo is UTC-03:00 in 2026. Constructing the business window from
       // the local calendar date keeps this calculation O(days), not O(minutes).
