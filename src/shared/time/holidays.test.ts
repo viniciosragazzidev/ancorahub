@@ -51,3 +51,9 @@ describe("horário comercial com feriados (opt-in)", () => {
     expect(addBusinessMilliseconds(start, 2 * 3_600_000, { skipHolidays: true }).toISOString()).toBe("2026-11-23T12:00:00.000Z");
   });
 });
+
+describe("lista de feriados em dia", () => {
+  it("cobre o ano atual (acrescente o próximo ano em holidays.ts quando este teste falhar)", () => {
+    expect(new Date().getFullYear()).toBeLessThanOrEqual(2027);
+  });
+});

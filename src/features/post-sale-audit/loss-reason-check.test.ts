@@ -104,3 +104,13 @@ describe("alerta de motivo de perda diferente", () => {
     expect(turn.answers).toMatchObject({ reason: "ninguém me ligou", lossCategory: "not_attended" });
   });
 });
+
+describe("has_plan sem falso positivo (Vigia)", () => {
+  it("'já tenho interesse' e 'já fiz a cotação' não contam como já tem plano", async () => {
+    const { classifyLossReasonText } = await import("./loss-reason-check");
+    expect(classifyLossReasonText("já tenho interesse mas agora não")).not.toBe("has_plan");
+    expect(classifyLossReasonText("já fiz a cotação")).not.toBe("has_plan");
+    expect(classifyLossReasonText("já tenho plano pela empresa")).toBe("has_plan");
+    expect(classifyLossReasonText("já fechei com outra corretora")).toBe("has_plan");
+  });
+});
