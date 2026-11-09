@@ -10,7 +10,9 @@ import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { evaluatePostSaleEligibility, isPostSaleOptedOut, pickPostSaleSourceMessage, POST_SALE_EXCLUSION_LABELS, POST_SALE_SURVEY_COOLDOWN_DAYS, type PostSaleExclusionReason, type PostSaleAudience, pickPostSaleCompanyWaha, isPostSaleWahaNumberAllowed, choosePostSaleSource, type PostSaleDefaultSourceState } from "./rules";
 import { isApprovedPostSaleMetaTemplate } from "./template-contract";
 
-const META_PROVIDERS = [META_CLOUD_PROVIDER, "meta_cloud_api"];
+// "meta" is how the AI stores the messages it sent on the official number (09/11: 21 leads whose only
+// history was the AI on the 6404-1142 were wrongly "sem número de origem").
+const META_PROVIDERS = [META_CLOUD_PROVIDER, "meta_cloud_api", "meta"];
 const WAHA_STATUSES = ["active", "ready"];
 const META_TEMPLATE_NAME = "pos_venda_apresentacao";
 
