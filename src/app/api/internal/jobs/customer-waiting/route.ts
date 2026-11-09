@@ -17,6 +17,8 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
   // Each sweep fails alone: an error in "cliente aguardando" never stops the R0 sweep, and vice versa (Vigia).
+  // One deadline for the whole route (maxDuration 120 s): the régua only gets the time left (Vigia, 09/11).
+  const routeStartedAt = Date.now();
   const result = await runCustomerWaitingSweep().catch((error) => {
     console.error("[customer-waiting cron] failed", error instanceof Error ? error.message : "unknown_error");
     return null;
@@ -28,7 +30,8 @@ async function handle(request: NextRequest) {
   });
   // Pós-venda, régua automática R1 a R5 (Fase 4): só a cada 15 min (minutos 0 a 4 de cada quarto de hora),
   // desligada por empresa por padrão. Também falha sozinha.
-  const postSaleAuto = await runPostSaleAutoSweep().catch((error) => {
+  const remainingMs = 105_000 - (Date.now() - routeStartedAt);
+  const postSaleAuto = remainingMs < 5_000 ? { skipped: "route_time_exhausted" as const } : await runPostSaleAutoSweep(new Date(), { budgetMs: Math.min(40_000, remainingMs) }).catch((error) => {
     console.error("[post-sale-auto cron] failed", error instanceof Error ? error.message : "unknown_error");
     return null;
   });

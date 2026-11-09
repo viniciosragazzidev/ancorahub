@@ -177,3 +177,6 @@ Job a cada 15 min (rota interna de jobs existente). Para cada regra ligada: busc
 - Mensagem automática demais irrita o cliente: limite de 1 conversa a cada 30 dias e opt-out imediato.
 - Meta: conversa iniciada por template tem custo (Utility); o volume do piloto é baixo.
 - Corretor que atende pelo celular pessoal: a pesquisa com o cliente é justamente o que mostra se ele foi atendido; o alerta "não foi atendido" deve ser lido junto com o botão "Já respondi por fora" do cliente aguardando.
+
+### Cooldown da R0 (decisão de 09/11)
+A R0 não respeita os 30 dias da régua nem os 60 dias da campanha manual: ela só dispara quando o próprio cliente volta a escrever e fica sem resposta, então é recuperação de atendimento e não contato ativo. Mantém as próprias travas: uma R0 por lead a cada 7 dias e nenhuma com pesquisa ativa. Régua e manual continuam respeitando qualquer pesquisa (inclusive R0) dentro dos seus prazos.
