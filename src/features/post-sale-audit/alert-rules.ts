@@ -97,8 +97,13 @@ export function postSaleAlertMessage(reason: PostSaleAlertReason, answers: unkno
   return detail ? `${label}. ${detail}` : label;
 }
 
-export function postSaleAlertIdempotencyKey(surveyId: string, reason: PostSaleAlertReason, recipientUserId: string) {
-  return `post-sale-alert:${surveyId}:${reason}:${recipientUserId}`;
+/** Reasons that must notify again on every new client message (a second health emergency, a new
+ *  request to talk): the key carries the triggering message (Vigia, 09/11). */
+const REPEATABLE_ALERT_REASONS = new Set<PostSaleAlertReason>(["health_urgency", "wants_resume"]);
+
+export function postSaleAlertIdempotencyKey(surveyId: string, reason: PostSaleAlertReason, recipientUserId: string, triggerMessageId?: string | null) {
+  const base = `post-sale-alert:${surveyId}:${reason}:${recipientUserId}`;
+  return REPEATABLE_ALERT_REASONS.has(reason) && triggerMessageId ? `${base}:${triggerMessageId}` : base;
 }
 
 export function isPostSaleAlertOpen(state: PostSaleAlertState & { alertsHandledAt: Date | null }) {

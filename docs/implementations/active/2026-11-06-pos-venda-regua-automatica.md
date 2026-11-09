@@ -203,3 +203,6 @@ Pedido da direção: "faça o recomendado para abranger mais situações e se to
 
 ### Cooldown da R0 (decisão de 09/11)
 A R0 não respeita os 30 dias da régua nem os 60 dias da campanha manual: ela só dispara quando o próprio cliente volta a escrever e fica sem resposta, então é recuperação de atendimento e não contato ativo. Mantém as próprias travas: uma R0 por lead a cada 7 dias e nenhuma com pesquisa ativa. Régua e manual continuam respeitando qualquer pesquisa (inclusive R0) dentro dos seus prazos.
+
+### Número errado fora do pós-venda (decisão de 09/11)
+Quando o cliente diz na pesquisa que o número é errado, além de bloquear o pós-venda do lead (post_sale_opt_outs), o sistema marca `ai_conversations.wrong_number_at`. Isso também tira o número da qualificação por IA, da reativação e da requalificação de frios. Decisão: manter, porque é o mesmo número e qualquer mensagem automática chegaria a uma pessoa que não pediu contato. Se o lead tiver outro telefone, o corretor atualiza o cadastro.

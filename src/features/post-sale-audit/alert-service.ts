@@ -16,6 +16,8 @@ export async function ensurePostSaleSurveyAlerts(survey: {
   rating: number | null;
   answers: unknown;
   alertsHandledAt: Date | null;
+  /** Last client message: repeatable alerts (health, resume) notify again for each new message. */
+  lastInboundMessageId?: string | null;
 }) {
   if (await getFeatureFlag(FEATURE_FLAGS.POST_SALE_AUDIT).catch(() => "false") !== "true") return;
   if (survey.alertsHandledAt) return;
@@ -56,7 +58,7 @@ export async function ensurePostSaleSurveyAlerts(survey: {
       type: "post_sale_alert",
       title: "Atenção no pós-venda",
       message: postSaleAlertMessage(reason, survey.answers),
-      idempotencyKey: postSaleAlertIdempotencyKey(survey.id, reason, recipient.userId),
+      idempotencyKey: postSaleAlertIdempotencyKey(survey.id, reason, recipient.userId, survey.lastInboundMessageId),
       createdAt: now,
     }));
     await db.transaction(async (tx) => {
