@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, notInArray, sql } from "drizzle-orm";
 
 import { enqueueMetaTextMessage, enqueuePostSaleSurveyWahaMessage } from "@/features/communication-channels/outbound-service";
 import { loadCustomerWaitingLeads } from "@/features/customer-waiting/queries";
@@ -23,6 +23,7 @@ export type PostSaleR0SweepResult = {
   skipped: Partial<Record<R0SkipReason | "already_started" | "enqueue_failed", number>>;
   escalated: number;
   resolved: number;
+  recovered?: { retried: number; released: number };
   lease?: "busy";
 };
 
@@ -57,6 +58,64 @@ function bump(result: PostSaleR0SweepResult, reason: R0SkipReason | "already_sta
  * sem retorno da equipe em 15 min úteis vira alerta para a direção e o gestor da unidade.
  * Nunca avisa o corretor (pedido de 09/11).
  */
+/**
+ * Recovery (Vigia, 09/11): an R0 survey stored as "queued" without an outbound message means the process
+ * stopped between the insert and the enqueue. After 2 min it is retried with the same outbox key (never a
+ * second message); if the client's 24 h window or the channel is gone, the survey is marked "failed" so it
+ * no longer blocks the lead (active survey / 7-day cooldown).
+ */
+async function recoverStuckR0Surveys(tenantId: string, now: Date) {
+  const db = getDatabase();
+  const stuck = await db.select({
+    id: schema.postSaleSurveys.id,
+    campaignId: schema.postSaleSurveys.campaignId,
+    leadId: schema.postSaleSurveys.leadId,
+    phone: schema.postSaleSurveys.phone,
+    channelType: schema.postSaleSurveys.channelType,
+    channelRef: schema.postSaleSurveys.channelRef,
+    createdAt: schema.postSaleSurveys.createdAt,
+    answers: schema.postSaleSurveys.answers,
+  }).from(schema.postSaleSurveys).where(and(
+    eq(schema.postSaleSurveys.tenantId, tenantId),
+    eq(schema.postSaleSurveys.ruleKey, R0_RULE_KEY),
+    eq(schema.postSaleSurveys.status, "queued"),
+    isNull(schema.postSaleSurveys.outboundId),
+    lt(schema.postSaleSurveys.createdAt, new Date(now.getTime() - 2 * 60_000)),
+  )).limit(20);
+  let retried = 0;
+  let released = 0;
+  for (const survey of stuck) {
+    const release = async (reason: string) => {
+      await db.update(schema.postSaleSurveys).set({ status: "failed", skipReason: reason })
+        .where(and(eq(schema.postSaleSurveys.id, survey.id), eq(schema.postSaleSurveys.tenantId, tenantId), eq(schema.postSaleSurveys.status, "queued"), isNull(schema.postSaleSurveys.outboundId)));
+      released += 1;
+    };
+    // Free text only inside the client's 24 h window (R0 never uses a template).
+    if (now.getTime() - survey.createdAt.getTime() > 20 * 60 * 60_000 || !survey.channelType || !survey.channelRef) {
+      await release("envio interrompido; janela do cliente fechada");
+      continue;
+    }
+    try {
+      const r0 = (survey.answers as { r0?: { opening?: unknown } } | null)?.r0;
+      const body = typeof r0?.opening === "string" ? r0.opening : null;
+      if (!body) { await release("envio interrompido; texto de abertura indisponível"); continue; }
+      const systemUserId = await resolveSystemUserId(tenantId);
+      const idempotencyKey = `post-sale:${survey.campaignId}:${survey.leadId}`;
+      const outbound = survey.channelType === "waha"
+        ? await enqueuePostSaleSurveyWahaMessage({ tenantId, leadId: survey.leadId, wahaNumberId: survey.channelRef, destinationPhone: survey.phone, body, requestedBy: systemUserId, idempotencyKey })
+        : await enqueueMetaTextMessage({ tenantId, channelId: survey.channelRef, recipientType: "lead", recipientId: survey.leadId, destinationPhone: survey.phone, body, requestedBy: systemUserId, purpose: "postSaleSurvey", idempotencyKey });
+      const failed = ["failed", "cancelled", "expired", "skipped"].includes(outbound.status);
+      await db.update(schema.postSaleSurveys).set({ outboundId: outbound.id, ...(failed ? { status: "failed", skipReason: "falha ao reenviar a abertura" } : {}) })
+        .where(and(eq(schema.postSaleSurveys.id, survey.id), eq(schema.postSaleSurveys.tenantId, tenantId)));
+      retried += 1;
+    } catch (error) {
+      console.warn("[post-sale-r0] recovery_failed", { tenantId, surveyId: survey.id, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
+      await release("envio interrompido; canal indisponível");
+    }
+  }
+  return { retried, released };
+}
+
 export async function runPostSaleR0Sweep(now = new Date()): Promise<PostSaleR0SweepResult> {
   const empty: PostSaleR0SweepResult = { tenants: 0, waiting: 0, started: 0, skipped: {}, escalated: 0, resolved: 0 };
   if (await getFeatureFlag(FEATURE_FLAGS.POST_SALE_AUDIT).catch(() => "false") !== "true") return empty;
@@ -71,6 +130,11 @@ async function sweepAllTenants(now: Date): Promise<PostSaleR0SweepResult> {
   const tenants = await db.select({ id: schema.tenants.id, name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.status, "active"));
   for (const tenant of tenants) {
     const settings = parseR0Settings(await getSystemSetting(postSaleR0SettingKey(tenant.id)).catch(() => null));
+    // Envio interrompido entre a gravação e a fila: tenta de novo ou libera o lead (Vigia, 09/11).
+    const recovered = await recoverStuckR0Surveys(tenant.id, now).catch(() => null);
+    if (recovered && (recovered.retried || recovered.released)) {
+      result.recovered = { retried: (result.recovered?.retried ?? 0) + recovered.retried, released: (result.recovered?.released ?? 0) + recovered.released };
+    }
     // Escalada roda mesmo com a R0 desligada depois: uma conversa já iniciada não fica sem dono.
     await escalateTenant(tenant.id, now, result).catch((error) => console.error("[post-sale-r0] escalation_failed", { tenantId: tenant.id, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" }));
     if (!settings.enabled || !settings.queueIds.length) continue;
@@ -192,7 +256,8 @@ async function startTenant(tenant: { id: string; name: string | null }, settings
       phone: lead.phone,
       status: "queued",
       step: 0,
-      answers: { r0: { trigger: decision.reason, triggerMessageId: trigger.id } },
+      // The opening text is kept so an interrupted send can be retried with the same words.
+      answers: { r0: { trigger: decision.reason, triggerMessageId: trigger.id, opening } },
       channelType: source.type,
       channelRef: source.ref,
       ruleKey: R0_RULE_KEY,
@@ -228,17 +293,7 @@ async function startTenant(tenant: { id: string; name: string | null }, settings
     await db.update(schema.postSaleCampaigns).set({
       totals: sql`jsonb_set(coalesce(${schema.postSaleCampaigns.totals}, '{}'::jsonb), '{queued}', to_jsonb(coalesce((${schema.postSaleCampaigns.totals}->>'queued')::int, 0) + 1))`,
     }).where(and(eq(schema.postSaleCampaigns.id, campaignId), eq(schema.postSaleCampaigns.tenantId, tenant.id)));
-    await db.insert(schema.leadInteractions).values({
-      id: `post-sale-r0-start-${surveyId}`,
-      leadId: lead.id,
-      userId: systemUserId,
-      tipo: "note",
-      conteudo: decision.reason === "after_closing"
-        ? "Pós-venda R0: o cliente voltou a escrever depois de o atendimento ser encerrado. A equipe de qualidade puxou a conversa para entender o que ele precisa."
-        : `Pós-venda R0: o cliente voltou a escrever e ficou ${entry.assessment.waitingBusinessMinutes} min úteis sem resposta. A equipe de qualidade puxou a conversa para entender o que ele precisa.`,
-      metadata: { source: "post_sale_audit", ruleKey: R0_RULE_KEY, surveyId, trigger: decision.reason, triggerMessageId: trigger.id },
-      createdAt: now,
-    }).onConflictDoNothing();
+    // No timeline note: the broker reads the lead timeline (Vinicios, 09/11). Audit log below keeps the trail.
     await db.insert(schema.auditLogs).values({
       id: randomUUID(),
       userId: systemUserId,
@@ -344,15 +399,7 @@ async function escalateTenant(tenantId: string, now: Date, result: PostSaleR0Swe
     result.escalated += 1;
     await ensurePostSaleSurveyAlerts(updated);
     const userId = await resolveSystemUserId(tenantId);
-    await db.insert(schema.leadInteractions).values({
-      id: `post-sale-r0-escalated-${survey.id}`,
-      leadId: survey.leadId,
-      userId,
-      tipo: "note",
-      conteudo: `Pós-venda R0: o cliente respondeu e ficou ${R0_DEFAULTS.escalationMinutes} min úteis sem retorno da equipe. A direção e o gestor da unidade foram alertados para repassar ou retomar o lead.`,
-      metadata: { source: "post_sale_audit", ruleKey: R0_RULE_KEY, surveyId: survey.id, escalation: true },
-      createdAt: now,
-    }).onConflictDoNothing();
+    // No timeline note (hidden from the broker); the alert to direction/manager and the audit log carry it.
     await db.insert(schema.auditLogs).values({
       id: randomUUID(),
       userId,

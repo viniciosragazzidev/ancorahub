@@ -109,7 +109,8 @@ async function finalizeProcessedTurn(survey: typeof schema.postSaleSurveys.$infe
   if (survey.status === "opted_out") {
     await db.update(schema.aiConversations).set({ optOutAt: now, updatedAt: now }).where(and(eq(schema.aiConversations.tenantId, survey.tenantId), eq(schema.aiConversations.leadId, survey.leadId)));
   }
-  if (survey.status === "completed" || survey.status === "opted_out") {
+  // R0 leaves no note on the lead timeline: the broker reads it and must not notice the check (Vinicios, 09/11).
+  if ((survey.status === "completed" || survey.status === "opted_out") && survey.ruleKey !== R0_RULE_KEY) {
     const r0State = survey.ruleKey === R0_RULE_KEY ? readR0State(answers) : null;
     const summary = r0State ? r0TimelineSummary({
       outcome: (survey.status === "opted_out" ? "other" : survey.outcome ?? "r0_other") as Parameters<typeof r0TimelineSummary>[0]["outcome"],
