@@ -2,11 +2,13 @@
 
 import { Button } from "@/components/arc/button/button";
 
+import { aiSalePromptCopy, type AiSalePrompt } from "@/features/conversation-intelligence/sale-detection-core";
+
 import { stageLabel } from "./format";
 import type { LeadDetailController } from "./use-lead-detail";
 
 /** Current stage and the sale documentation flow (register, in review, approved, rejected). */
-export function SaleSection({ c, mode = "broker", aiSalePending = false }: { c: LeadDetailController; mode?: "broker" | "management"; aiSalePending?: boolean }) {
+export function SaleSection({ c, mode = "broker", aiSalePrompt = null }: { c: LeadDetailController; mode?: "broker" | "management"; aiSalePrompt?: AiSalePrompt | null }) {
   const {
     isDistributed,
     leadStatus,
@@ -19,6 +21,10 @@ export function SaleSection({ c, mode = "broker", aiSalePending = false }: { c: 
   } = c;
 
   if (isDistributed && mode === "broker") return null;
+
+  // "register" só com o lead Convertido; "confirm" e "check" só antes do desfecho.
+  const showSalePrompt = aiSalePrompt === "register" ? leadStatus === "converted" : aiSalePrompt !== null && leadStatus !== "converted" && leadStatus !== "lost";
+  const salePromptCopy = showSalePrompt && aiSalePrompt ? aiSalePromptCopy(aiSalePrompt) : null;
 
   const canRegisterSale =
     !approvedDocument &&
@@ -70,12 +76,10 @@ export function SaleSection({ c, mode = "broker", aiSalePending = false }: { c: 
         </div>
       ) : null}
 
-      {mode === "broker" && aiSalePending && leadStatus === "converted" ? (
+      {mode === "broker" && salePromptCopy ? (
         <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
-          <p className="text-sm font-medium text-(--success)">Parabéns! A venda foi concluída</p>
-          <p className="text-sm text-(--text-secondary)">
-            A IA viu a venda fechada na conversa. Complete o registro: valor, operadora e vidas, com a confirmação da operadora.
-          </p>
+          <p className="text-sm font-medium text-(--success)">{salePromptCopy.title}</p>
+          <p className="text-sm text-(--text-secondary)">{salePromptCopy.body}</p>
           <Button variant="secondary" onClick={() => setShowSaleConfirm(true)}>
             Registrar venda
           </Button>

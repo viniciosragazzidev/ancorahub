@@ -1,7 +1,8 @@
 import "server-only";
 
-import { and, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, notInArray, or } from "drizzle-orm";
 
+import { conversationMessageBody } from "@/features/conversations/message-media-text";
 import { changeLeadStatus } from "@/features/leads/change-lead-status";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { publishNotification } from "@/features/notifications/send-push-helper";
@@ -13,9 +14,13 @@ import {
   aiSaleDirectorNotice,
   aiSaleMissingItems,
   aiSaleNotificationKey,
+  aiSaleSuggestionNotice,
   decideAiSaleConversion,
+  saleEvidenceProven,
+  validateSaleEvidence,
   type AiSaleDetection,
   type SaleCompleted,
+  type SaleEvidenceMessage,
 } from "./sale-detection-core";
 
 type LeadForSale = {
@@ -27,21 +32,53 @@ type LeadForSale = {
   corretorId: string | null;
 };
 
+/** Janela de mensagens onde o trecho citado pela IA precisa estar. */
+const EVIDENCE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Mensagens reais do lead nos últimos 30 dias: texto, legenda e nome do arquivo. */
+async function loadEvidenceMessages(tenantId: string, leadId: string): Promise<SaleEvidenceMessage[]> {
+  const rows = await getDatabase()
+    .select({
+      direction: schema.whatsappMessages.direction,
+      senderRole: schema.whatsappMessages.senderRole,
+      body: schema.whatsappMessages.body,
+      mediaKind: schema.whatsappMessages.mediaKind,
+      mediaFilename: schema.whatsappMessages.mediaFilename,
+    })
+    .from(schema.whatsappMessages)
+    .where(and(
+      eq(schema.whatsappMessages.tenantId, tenantId),
+      eq(schema.whatsappMessages.leadId, leadId),
+      gt(schema.whatsappMessages.sentAt, new Date(Date.now() - EVIDENCE_WINDOW_MS)),
+    ))
+    .orderBy(desc(schema.whatsappMessages.sentAt))
+    .limit(500);
+  return rows.map((row) => ({
+    sender: row.direction === "incoming" ? "customer" : row.senderRole === "assistant" || row.senderRole === "system" ? "system" : "broker",
+    text: conversationMessageBody(row),
+  }));
+}
+
+export type AiSaleOutcome =
+  | { marker: AiSaleDetection; why?: undefined }
+  | { marker: null; why: string };
+
 /**
  * Venda detectada pela IA (10/11): confere as travas no banco (dono diretor, venda já registrada, pessoa que
- * tirou o lead de Convertido) e, se a regra pura deixar, move o lead para Convertido pelo mesmo serviço da
- * mudança manual (ator IA). Devolve o marcador a guardar em qualificationDetails.aiSaleDetected, ou null.
- * Nunca lança erro: um conflito (o corretor mudou a etapa durante a análise) só deixa de converter.
+ * tirou o lead de Convertido) e os trechos citados pela IA contra as mensagens reais. Com trecho real de
+ * pagamento ou de proposta transmitida: no modo automático move o lead para Convertido pelo mesmo serviço da
+ * mudança manual (ator IA); no modo sugestão só pede a confirmação. Sem trecho real: marca "unverified", sem
+ * aviso. Devolve o marcador a guardar em qualificationDetails.aiSaleDetected, ou null. Nunca lança erro.
  */
 export async function applyAiSaleDetection(input: {
   lead: LeadForSale;
   saleCompleted: SaleCompleted;
   mode: "auto" | "suggest" | "off";
   alreadyDetected: boolean;
+  alreadySuggested: boolean;
   recentlyUndone: boolean;
   actorUserId: string;
-  evidence: readonly string[];
-}): Promise<{ marker: AiSaleDetection } | { marker: null; why: string }> {
+}): Promise<AiSaleOutcome> {
   const { lead } = input;
   try {
     // Sem confirmação nem custa ir ao banco.
@@ -72,14 +109,33 @@ export async function applyAiSaleDetection(input: {
       hasBroker: Boolean(lead.corretorId),
       ownerIsDirector: ownerRole.some((row) => row.role === "director"),
       alreadyDetected: input.alreadyDetected,
+      alreadySuggested: input.alreadySuggested,
       personMovedOutOfConverted: revertedByPerson.length > 0,
       hasActiveSale: activeSale.length > 0,
       recentlyUndone: input.recentlyUndone,
     });
-    if (!decision.convert) return { marker: null, why: decision.why };
+    if (!decision.convert && !decision.suggest) return { marker: null, why: decision.why };
 
-    const quotes = input.saleCompleted.evidence.length ? input.saleCompleted.evidence : input.evidence;
-    const evidenceLine = quotes.length ? `\nTrechos da conversa: ${quotes.map((quote) => `"${quote}"`).join(" · ")}` : "";
+    // O trecho precisa existir na conversa (Vigia, 10/11): citação inventada ou mal lida nunca converte.
+    const validated = validateSaleEvidence(input.saleCompleted.evidence, await loadEvidenceMessages(lead.tenantId, lead.id));
+    const base = { at: new Date().toISOString(), fromStatus: lead.status, signals: decision.signals, registrationPending: false };
+    if (!saleEvidenceProven(validated)) {
+      return {
+        marker: {
+          ...base,
+          status: "unverified",
+          evidence: [...input.saleCompleted.evidence],
+          reason: "A IA viu a venda, mas o trecho de pagamento ou de proposta transmitida não foi encontrado na conversa. Confira antes de registrar.",
+        },
+      };
+    }
+    const quotes = validated.map((item) => item.quote);
+
+    if (decision.suggest) {
+      return { marker: { ...base, status: "suggested", evidence: quotes, reason: decision.reason } };
+    }
+
+    const evidenceLine = `\nTrechos da conversa: ${quotes.map((quote) => `"${quote}"`).join(" · ")}`;
     const systemContext: TenantContext = { userId: input.actorUserId, tenantId: lead.tenantId, role: "director", jobTitle: "system", branchId: null };
     await changeLeadStatus({ leadId: lead.id, newStatus: "converted", expectedVersion: lead.version }, systemContext, {
       actorUserId: input.actorUserId,
@@ -97,22 +153,41 @@ export async function applyAiSaleDetection(input: {
       },
     });
 
-    return {
-      marker: {
-        at: new Date().toISOString(),
-        fromStatus: lead.status,
-        signals: decision.signals,
-        evidence: [...quotes],
-        reason: decision.reason,
-        registrationPending: true,
-      },
-    };
+    return { marker: { ...base, status: "converted", evidence: quotes, reason: decision.reason, registrationPending: true } };
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 200) : "erro";
     console.warn("[ai-sale] not_converted", { leadId: lead.id, error: message });
     return { marker: null, why: `Conversão automática não aplicada (${message}).` };
   }
 }
+
+/** Modo sugestão: "A IA detectou a venda: confirmar?" ao corretor e aos diretores, uma vez por lead e pessoa. */
+export async function notifyAiSaleSuggested(input: { tenantId: string; leadId: string; leadName: string | null; brokerId: string | null; marker: AiSaleDetection }) {
+  try {
+    const directors = await getDatabase()
+      .select({ userId: schema.tenantMemberships.userId })
+      .from(schema.tenantMemberships)
+      .where(and(eq(schema.tenantMemberships.tenantId, input.tenantId), eq(schema.tenantMemberships.status, "active"), eq(schema.tenantMemberships.role, "director")))
+      .groupBy(schema.tenantMemberships.userId)
+      .limit(20);
+    const recipients = [...new Set([...(input.brokerId ? [input.brokerId] : []), ...directors.map((director) => director.userId)])];
+    const notice = aiSaleSuggestionNotice({ leadName: input.leadName, reason: input.marker.reason });
+    await Promise.allSettled(recipients.map((userId) => publishNotification({
+      capability: "lead_ai_insight",
+      tenantId: input.tenantId,
+      recipientUserId: userId,
+      leadId: input.leadId,
+      type: "lead_ai_insight",
+      ...notice,
+      url: `/leads/${input.leadId}`,
+      tag: `lead-${input.leadId}`,
+      idempotencyKey: `lead-ai-sale-suggested:${input.leadId}:${userId}`,
+    })));
+  } catch (error) {
+    console.error("[ai-sale] suggest_notify_failed", { leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
+  }
+}
+
 
 /** O que falta para registrar a venda: documentos obrigatórios, confirmação da operadora, valor, plano e vidas. */
 async function loadMissingItems(tenantId: string, leadId: string) {

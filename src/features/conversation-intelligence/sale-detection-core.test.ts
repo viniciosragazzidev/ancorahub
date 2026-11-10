@@ -6,8 +6,16 @@ import {
   aiSaleDirectorNotice,
   aiSaleMissingItems,
   aiSaleNotificationKey,
+  aiSaleMarkerStatus,
+  aiSalePrompt,
+  aiSalePromptCopy,
   aiSaleRegistrationPending,
+  aiSaleSuggestionNotice,
   decideAiSaleConversion,
+  normalizeEvidenceText,
+  saleEvidenceProven,
+  validateSaleEvidence,
+  type SaleEvidenceMessage,
   legacySaleSignals,
   readSaleCompleted,
   type AiSaleDecisionInput,
@@ -113,9 +121,17 @@ describe("decideAiSaleConversion", () => {
     expect(decideAiSaleConversion(input({ hasBroker: false })).convert).toBe(false);
   });
 
-  it("só no modo automático da empresa", () => {
-    expect(decideAiSaleConversion(input({ mode: "suggest" })).convert).toBe(false);
-    expect(decideAiSaleConversion(input({ mode: "off" })).convert).toBe(false);
+  it("modo sugestão pede confirmação em vez de converter, uma vez", () => {
+    const suggest = decideAiSaleConversion(input({ mode: "suggest" }));
+    expect(suggest).toMatchObject({ convert: false, suggest: true });
+    expect(decideAiSaleConversion(input({ mode: "suggest", alreadySuggested: true }))).toMatchObject({ convert: false, why: "A venda já foi sugerida ao corretor." });
+    expect(decideAiSaleConversion(input({ mode: "suggest", ownerIsDirector: true })).convert).toBe(false);
+  });
+
+  it("modo desligado não converte nem sugere", () => {
+    const off = decideAiSaleConversion(input({ mode: "off" }));
+    expect(off.convert).toBe(false);
+    expect("suggest" in off && off.suggest).toBeFalsy();
   });
 });
 
@@ -183,5 +199,74 @@ describe("legacySaleSignals (relatório)", () => {
   });
   it("intenção sozinha não conta", () => {
     expect(legacySaleSignals({ facts: ["Cliente quer fechar ainda hoje"], buyingSignals: ["Pediu o boleto"] }).signals).toEqual([]);
+  });
+});
+
+describe("conferência do trecho com a conversa real", () => {
+  const messages: SaleEvidenceMessage[] = [
+    { sender: "broker", text: "Me manda o comprovante do pix da adesão, por favor" },
+    { sender: "customer", text: "Pronto, já paguei a adesão agora! Segue o comprovante 🙏" },
+    { sender: "customer", text: "[documento: comprovante_pix.pdf]" },
+    { sender: "broker", text: "Sua proposta foi transmitida para a operadora hoje." },
+    { sender: "system", text: "Pagamento confirmado pelo robô" },
+    { sender: "customer", text: "[text]" },
+  ];
+
+  it("normaliza acento, pontuação e espaços", () => {
+    expect(normalizeEvidenceText("  Já PAGUEI a adesão!!  ")).toBe("ja paguei a adesao");
+  });
+
+  it("aceita trecho literal com quem disse, e marca o que prova", () => {
+    const validated = validateSaleEvidence(["Cliente: \"já paguei a adesão agora\"", "Corretor: sua proposta foi transmitida para a operadora"], messages);
+    expect(validated).toEqual([
+      { quote: "Cliente: \"já paguei a adesão agora\"", sender: "customer", proves: "payment" },
+      { quote: "Corretor: sua proposta foi transmitida para a operadora", sender: "broker", proves: "transmission" },
+    ]);
+    expect(saleEvidenceProven(validated)).toBe(true);
+  });
+
+  it("aceita trecho com 80% dos termos de uma mensagem", () => {
+    const validated = validateSaleEvidence(["Cliente: pronto ja paguei a adesao segue comprovante"], messages);
+    expect(validated).toHaveLength(1);
+    expect(validated[0]?.proves).toBe("payment");
+  });
+
+  it("aceita o nome do arquivo de comprovante", () => {
+    expect(validateSaleEvidence(["Cliente: [documento: comprovante_pix.pdf]"], messages)[0]).toMatchObject({ sender: "customer", proves: "payment" });
+  });
+
+  it("rejeita trecho inventado, mensagem do sistema e trecho curto", () => {
+    expect(validateSaleEvidence(["Cliente: paguei a primeira mensalidade no boleto ontem"], messages)).toEqual([]);
+    expect(validateSaleEvidence(["Pagamento confirmado pelo robô"], messages)).toEqual([]);
+    expect(validateSaleEvidence(["Cliente: ok", "sim", "[imagem]"], messages)).toEqual([]);
+  });
+
+  it("trecho real sem pagamento nem transmissão não prova a venda", () => {
+    const validated = validateSaleEvidence(["Corretor: me manda o comprovante do pix"], [{ sender: "broker", text: "Me manda o comprovante do pix" }]);
+    expect(validated).toHaveLength(1);
+    const onlyInterview = validateSaleEvidence(["Corretor: entrevista médica aprovada"], [{ sender: "broker", text: "Entrevista médica aprovada!" }]);
+    expect(saleEvidenceProven(onlyInterview)).toBe(false);
+  });
+});
+
+describe("marcador e card da ficha", () => {
+  it("lê o estado do marcador (antigo sem status conta como converted)", () => {
+    expect(aiSaleMarkerStatus({ aiSaleDetected: { registrationPending: true } })).toBe("converted");
+    expect(aiSaleMarkerStatus({ aiSaleDetected: { status: "suggested" } })).toBe("suggested");
+    expect(aiSaleMarkerStatus({ aiSaleDetected: { status: "unverified" } })).toBe("unverified");
+    expect(aiSaleMarkerStatus({})).toBeNull();
+  });
+
+  it("escolhe o card: registrar, confirmar ou conferir", () => {
+    expect(aiSalePrompt("converted", { aiSaleDetected: { status: "converted", registrationPending: true } })).toBe("register");
+    expect(aiSalePrompt("documentation_pending", { aiSaleDetected: { status: "suggested" } })).toBe("confirm");
+    expect(aiSalePrompt("under_analysis", { aiSaleDetected: { status: "unverified" } })).toBe("check");
+    expect(aiSalePrompt("converted", { aiSaleDetected: { status: "suggested" } })).toBeNull();
+    expect(aiSalePrompt("lost", { aiSaleDetected: { status: "unverified" } })).toBeNull();
+    expect(aiSalePromptCopy("confirm").title).toBe("A IA detectou a venda: confirmar?");
+  });
+
+  it("sugestão pergunta antes de converter", () => {
+    expect(aiSaleSuggestionNotice({ leadName: "Claudiana", reason: "Venda detectada pela IA: adesão paga" }).title).toBe("A IA detectou a venda de Claudiana: confirmar?");
   });
 });

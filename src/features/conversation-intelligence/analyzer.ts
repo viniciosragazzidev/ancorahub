@@ -24,8 +24,8 @@ import type { TenantContext } from "@/shared/auth/types";
 import { getAiStageMode } from "./stage-mode";
 import { conversationMessageBody } from "@/features/conversations/message-media-text";
 import { recentlyUndoneAiMove, type AiAutoMove } from "./ai-move";
-import { applyAiSaleDetection, notifyAiSaleDetected } from "./sale-detection";
-import { readSaleCompleted, type AiSaleDetection } from "./sale-detection-core";
+import { applyAiSaleDetection, notifyAiSaleDetected, notifyAiSaleSuggested } from "./sale-detection";
+import { aiSaleMarkerStatus, readSaleCompleted, type AiSaleDetection } from "./sale-detection-core";
 import {
   ConversationAssessmentSchema,
   type ConversationAssessment,
@@ -55,7 +55,7 @@ const ASSESSMENT_JSON_INSTRUCTION = `Responda SOMENTE com um objeto JSON válido
   "directorBrief": "leitura para a direção, até 2 frases",
   "directorAttention": "NONE|WATCH|ACT",
   "directorAction": "o que a direção deve fazer" ou null,
-  "saleCompleted": { "status": "confirmed|likely|no", "signals": ["payment|proposal_transmitted|contract_signed|card_or_proposal_number|medical_interview_approved"], "evidence": ["trecho literal que prova a venda (no máximo 5)"] },
+  "saleCompleted": { "status": "confirmed|likely|no", "signals": ["payment|proposal_transmitted|contract_signed|card_or_proposal_number|medical_interview_approved"], "evidence": ["Cliente: trecho copiado da mensagem", "Corretor: trecho copiado da mensagem"] },
   "facts": ["..."],
   "inferences": ["..."]
 }`;
@@ -210,7 +210,7 @@ Orientações:
 11. Nunca invente falas do cliente; se a transcrição não trouxer mensagens do cliente, declare isso no resumo.
 12. A leitura para a direção é para o diretor ou gestor, que NÃO conversa com o cliente: nada de orientar o atendimento. Em directorBrief diga, em até 2 frases e na terceira pessoa, em que pé está a venda, a chance real de fechar e como o corretor está conduzindo (respondendo no tempo, deixando o cliente sem retorno, insistindo demais, etc.). Em directorAttention use ACT quando a direção precisa agir agora (cliente sem resposta do corretor, cliente insatisfeito, venda grande travada, risco de perder por falha do atendimento), WATCH quando vale acompanhar e NONE quando está bem encaminhado. Em directorAction, só para ACT ou WATCH, diga a ação da direção (ex.: "Cobrar o corretor: o cliente pediu o valor há 2 dias e não teve resposta", "Aprovar desconto", "Repassar o lead"); para NONE use null.
 13. Arquivos aparecem como "[documento: nome do arquivo]", "[imagem]", "[áudio]". Um arquivo enviado pelo corretor com nome de cotação, cálculo, proposta, simulação ou tabela de preços conta como cotação apresentada (quote_sent), mesmo sem fala do cliente; nesse caso cite em evidence o nome do arquivo. Documentos pessoais enviados pelo cliente (RG, CPF, comprovante, carteirinha) depois da cotação indicam documentação.
-14. Venda concluída (saleCompleted): seja conservador, nunca conclua venda só pela intenção ou pelo "quero fechar". Use "confirmed" SOMENTE com prova explícita na conversa de que a venda aconteceu, marcando em signals cada prova encontrada: payment (adesão ou primeira mensalidade paga: o cliente diz "paguei", "pix feito", "já paguei a adesão", "segue o comprovante", ou envia "[imagem]"/"[documento]" de comprovante logo depois de o corretor pedir o pagamento da adesão, e a conversa liga esse arquivo ao pagamento), proposal_transmitted (o corretor diz que a proposta foi transmitida, implantada ou enviada à operadora), contract_signed (contrato ou proposta assinada), card_or_proposal_number (carteirinha ou número da proposta emitido), medical_interview_approved (entrevista médica aprovada). Use "likely" quando houver indício sem prova (ex.: imagem de comprovante sem contexto que a ligue ao pagamento, cliente dizendo que "vai pagar", proposta só preenchida). Use "no" nos demais casos. Em evidence cite os trechos literais (do cliente ou do corretor) que provam a venda. Proposta assinada ou entrevista aprovada sozinhas não bastam para "confirmed".${await buildPlaybookRules(lead.tenantId)}`;
+14. Venda concluída (saleCompleted): seja conservador, nunca conclua venda só pela intenção ou pelo "quero fechar". Use "confirmed" SOMENTE com prova explícita na conversa de que a venda aconteceu, marcando em signals cada prova encontrada: payment (adesão ou primeira mensalidade paga: o cliente diz "paguei", "pix feito", "já paguei a adesão", "segue o comprovante", ou envia "[imagem]"/"[documento]" de comprovante logo depois de o corretor pedir o pagamento da adesão, e a conversa liga esse arquivo ao pagamento), proposal_transmitted (o corretor diz que a proposta foi transmitida, implantada ou enviada à operadora), contract_signed (contrato ou proposta assinada), card_or_proposal_number (carteirinha ou número da proposta emitido), medical_interview_approved (entrevista médica aprovada). Use "likely" quando houver indício sem prova (ex.: imagem de comprovante sem contexto que a ligue ao pagamento, cliente dizendo que "vai pagar", proposta só preenchida). Use "no" nos demais casos. Em saleCompleted.evidence copie os trechos LITERALMENTE das mensagens da transcrição, palavra por palavra, sem resumir nem corrigir, começando por quem disse ("Cliente: paguei a adesão agora" ou "Corretor: sua proposta foi transmitida para a operadora"); um arquivo entra com o texto que aparece na transcrição (ex.: "Cliente: [documento: comprovante.pdf]"). Trecho que não está na conversa é descartado e a venda não é confirmada. Proposta assinada ou entrevista aprovada sozinhas não bastam para "confirmed".${await buildPlaybookRules(lead.tenantId)}`;
 
   const userPrompt = `Contexto do Lead:\n${compactContext.leadSummary}\n\nMemória Anterior:\n${compactContext.historicalMemory}\n\nTranscrição Recente:\n${compactContext.recentTranscript}`;
 
@@ -285,22 +285,25 @@ ${ASSESSMENT_JSON_INSTRUCTION}` },
   // and version the analysis saw, so a change made by the broker meanwhile wins.
   let autoMove: { fromStatus: string; toStatus: string; at: string; confidence: number } | null = null;
 
-  // 7.0 Venda detectada pela IA (10/11): prova explícita de venda (adesão paga, proposta transmitida) leva o
-  // lead para Convertido uma vez, antes de qualquer outro avanço. O corretor pode Desfazer em 24h.
-  let saleDetected: AiSaleDetection | null = null;
+  // 7.0 Venda detectada pela IA (10/11): prova explícita de venda (adesão paga, proposta transmitida), achada
+  // na conversa real, leva o lead para Convertido uma vez, antes de qualquer outro avanço (Desfazer em 24h).
+  // No modo sugestão só pede a confirmação; trecho não achado fica "unverified", sem aviso.
+  let saleMarker: AiSaleDetection | null = null;
+  const previousSaleMarker = aiSaleMarkerStatus(qualDetails);
   const sale = await applyAiSaleDetection({
     lead,
     saleCompleted: readSaleCompleted(assessment.saleCompleted),
     mode,
-    alreadyDetected: Boolean(qualDetails.aiSaleDetected),
+    alreadyDetected: previousSaleMarker === "converted",
+    alreadySuggested: previousSaleMarker === "suggested",
     recentlyUndone: recentlyUndoneAiMove(qualDetails.aiLastAutoMove as AiAutoMove | undefined),
     actorUserId,
-    evidence: assessment.evidence,
   });
-  if (sale.marker) {
-    saleDetected = sale.marker;
+  if (sale.marker) saleMarker = sale.marker;
+  const saleDetected = saleMarker?.status === "converted" ? saleMarker : null;
+  if (saleDetected) {
     autoMove = { fromStatus: lead.status, toStatus: "converted", at: now.toISOString(), confidence: assessment.statusConfidence };
-    policyResult = { ...policyResult, action: "INSIGHT_ONLY", transitionAllowed: false, targetStatus: "converted", reason: sale.marker.reason };
+    policyResult = { ...policyResult, action: "INSIGHT_ONLY", transitionAllowed: false, targetStatus: "converted", reason: saleDetected.reason };
   }
 
   if (!saleDetected && policyResult.action === "AUTO_TRANSITION" && policyResult.transitionAllowed && policyResult.targetStatus) {
@@ -363,7 +366,7 @@ ${ASSESSMENT_JSON_INSTRUCTION}` },
       aiLastAnalyzedAt: now.toISOString(),
       // What "Desfazer" reverts (24h, see actions.ts). An analysis without a move keeps the last one.
       ...(autoMove ? { aiLastAutoMove: autoMove } : {}),
-      ...(saleDetected ? { aiSaleDetected: saleDetected } : {}),
+      ...(saleMarker ? { aiSaleDetected: saleMarker } : {}),
       ...(news.writeNote ? { aiLastFeedbackNoteAt: now.toISOString() } : {}),
     };
 
@@ -409,9 +412,13 @@ ${ASSESSMENT_JSON_INSTRUCTION}` },
   if (saleDetected) {
     void notifyAiSaleDetected({ tenantId: lead.tenantId, leadId: lead.id, leadName: lead.nome, brokerId: lead.corretorId, marker: saleDetected });
   }
+  const saleSuggested = saleMarker?.status === "suggested" ? saleMarker : null;
+  if (saleSuggested) {
+    void notifyAiSaleSuggested({ tenantId: lead.tenantId, leadId: lead.id, leadName: lead.nome, brokerId: lead.corretorId, marker: saleSuggested });
+  }
 
   // 8.1 Notificar o corretor responsável com push + toast, só quando há novidade
-  if (lead.corretorId && news.notify && !saleDetected) {
+  if (lead.corretorId && news.notify && !saleDetected && !saleSuggested) {
     const targetLabel = policyResult.targetStatus ? LEAD_STATUS_LABELS[policyResult.targetStatus] ?? policyResult.targetStatus : "";
     const notifTitle = autoMove
       ? `IA moveu ${lead.nome} para ${targetLabel}`

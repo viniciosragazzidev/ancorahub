@@ -56,6 +56,12 @@ const NEGOTIATION_PROOF: readonly SaleSignal[] = ["payment", "proposal_transmitt
 
 /** O que fica em qualificationDetails.aiSaleDetected depois da conversão automática (uma vez por lead). */
 export type AiSaleDetection = {
+  /**
+   * converted: a IA moveu para Convertido (marcadores antigos sem status contam como converted).
+   * suggested: empresa no modo sugestão, a IA pede para confirmar a venda.
+   * unverified: a IA disse venda, mas o trecho não foi achado na conversa; sem aviso, só para conferência.
+   */
+  status?: "converted" | "suggested" | "unverified";
   at: string;
   fromStatus: string;
   signals: SaleSignal[];
@@ -73,8 +79,10 @@ export type AiSaleDecisionInput = {
   hasBroker: boolean;
   /** O dono do lead é diretor: a IA não mexe. */
   ownerIsDirector: boolean;
-  /** Já convertido pela IA antes (marcador aiSaleDetected): uma vez por lead. */
+  /** Já convertido pela IA antes (marcador aiSaleDetected converted): uma vez por lead. */
   alreadyDetected: boolean;
+  /** Venda já sugerida ao corretor (modo sugestão): não sugere de novo. */
+  alreadySuggested?: boolean;
   /** Uma pessoa já tirou este lead de Convertido: a IA não converte de novo. */
   personMovedOutOfConverted: boolean;
   /** Venda ativa já registrada para o lead. */
@@ -84,8 +92,9 @@ export type AiSaleDecisionInput = {
 };
 
 export type AiSaleDecision =
-  | { convert: true; signals: SaleSignal[]; reason: string }
-  | { convert: false; why: string };
+  | { convert: true; suggest?: false; signals: SaleSignal[]; reason: string }
+  | { convert: false; suggest: true; signals: SaleSignal[]; reason: string }
+  | { convert: false; suggest?: false; why: string };
 
 export function aiSaleReason(signals: readonly SaleSignal[]) {
   const labels = signals.map((signal) => SALE_SIGNAL_LABELS[signal]);
@@ -96,7 +105,7 @@ export function decideAiSaleConversion(input: AiSaleDecisionInput): AiSaleDecisi
   const sale = input.saleCompleted;
   if (sale.status !== "confirmed") return { convert: false, why: "A IA não confirmou a venda." };
   if (!sale.evidence.length) return { convert: false, why: "Venda sem trecho da conversa que comprove." };
-  if (input.mode !== "auto") return { convert: false, why: "A empresa não deixa a IA mudar a etapa sozinha." };
+  if (input.mode === "off") return { convert: false, why: "A empresa desligou a mudança de etapa pela IA." };
   if (input.status === "lost" || input.status === "converted") return { convert: false, why: "Lead já finalizado." };
   if (!input.hasBroker) return { convert: false, why: "Lead sem corretor." };
   if (input.ownerIsDirector) return { convert: false, why: "Lead de diretor: a IA não muda a etapa." };
@@ -112,6 +121,11 @@ export function decideAiSaleConversion(input: AiSaleDecisionInput): AiSaleDecisi
   }
   // Ordem fixa no motivo: o mais forte primeiro.
   const signals = SALE_SIGNALS.filter((signal) => sale.signals.includes(signal));
+  // Modo sugestão (implantação segura): a IA pede para confirmar a venda em vez de converter.
+  if (input.mode === "suggest") {
+    if (input.alreadySuggested) return { convert: false, why: "A venda já foi sugerida ao corretor." };
+    return { convert: false, suggest: true, signals, reason: aiSaleReason(signals) };
+  }
   return { convert: true, signals, reason: aiSaleReason(signals) };
 }
 
@@ -173,11 +187,93 @@ export function aiSaleDirectorNotice(input: { leadName: string | null; brokerNam
   };
 }
 
+/** Estado do marcador aiSaleDetected guardado no lead. */
+export function aiSaleMarkerStatus(details: unknown): AiSaleDetection["status"] | null {
+  if (!details || typeof details !== "object") return null;
+  const marker = (details as { aiSaleDetected?: Partial<AiSaleDetection> | null }).aiSaleDetected;
+  if (!marker || typeof marker !== "object") return null;
+  return marker.status === "suggested" || marker.status === "unverified" ? marker.status : "converted";
+}
+
+/**
+ * O que a ficha do lead mostra: "register" (convertido pela IA, falta o Registrar venda), "confirm" (a IA
+ * sugeriu a venda) ou "check" (a IA viu venda sem trecho comprovado). Registrar a venda confirma nos três.
+ */
+export function aiSalePrompt(status: string, details: unknown): "register" | "confirm" | "check" | null {
+  if (aiSaleRegistrationPending(status, details)) return "register";
+  if (status === "converted" || status === "lost") return null;
+  const marker = aiSaleMarkerStatus(details);
+  if (marker === "suggested") return "confirm";
+  if (marker === "unverified") return "check";
+  return null;
+}
+
 /** O card "Complete o registro da venda" aparece enquanto o lead segue Convertido pela IA sem venda registrada. */
 export function aiSaleRegistrationPending(status: string, details: unknown) {
   if (status !== "converted" || !details || typeof details !== "object") return false;
   const marker = (details as { aiSaleDetected?: Partial<AiSaleDetection> }).aiSaleDetected;
   return Boolean(marker?.registrationPending);
+}
+
+// ─── Conferência do trecho com a conversa real ───────────────────────
+
+export type SaleEvidenceMessage = { sender: "customer" | "broker" | "system"; text: string };
+export type ValidatedEvidence = { quote: string; sender: "customer" | "broker"; proves: "payment" | "transmission" | null };
+
+/** Minúsculas, sem acento, sem pontuação e sem espaço repetido. */
+export function normalizeEvidenceText(text: string) {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** Tira "Cliente:" / "Corretor:" e aspas do começo do trecho citado pela IA. */
+function stripSpeaker(quote: string) {
+  return quote.trim().replace(/^["'“”]+|["'“”]+$/g, "").replace(/^(cliente|corretora?|client|broker)\s*[:\-]\s*/i, "").replace(/^["'“”]+|["'“”]+$/g, "");
+}
+
+const PAYMENT_WORDS = /\b(paguei|pagou|pago|paga|pagamento efetuado|pix feito|pix enviado|fiz o pix|comprovante|transferi)\b/;
+const TRANSMISSION_WORDS = /\b(transmiti|transmitida|transmitido|transmitimos|implantada|implantado|implantacao feita|enviada (a|para a) operadora|enviei (a proposta )?(a|para a) operadora)\b/;
+
+/** Fração dos termos do trecho que aparecem na mensagem. */
+function tokenOverlap(quoteTokens: string[], messageTokens: Set<string>) {
+  if (!quoteTokens.length) return 0;
+  return quoteTokens.filter((token) => messageTokens.has(token)).length / quoteTokens.length;
+}
+
+/**
+ * Confere cada trecho citado pela IA com as mensagens reais (texto, legenda e nome do arquivo). Vale o trecho
+ * que está dentro de uma mensagem do cliente ou do corretor, ou que tem 80% ou mais dos termos de uma delas.
+ * Trechos curtos demais ("sim", "ok", "[imagem]") nunca valem sozinhos.
+ */
+export function validateSaleEvidence(evidence: readonly string[], messages: readonly SaleEvidenceMessage[]): ValidatedEvidence[] {
+  const candidates = messages
+    .filter((message): message is SaleEvidenceMessage & { sender: "customer" | "broker" } => message.sender !== "system")
+    .map((message) => {
+      const normalized = normalizeEvidenceText(message.text);
+      return { sender: message.sender, normalized, tokens: new Set(normalized.split(" ").filter(Boolean)) };
+    })
+    .filter((message) => message.normalized && message.normalized !== "text");
+  const validated: ValidatedEvidence[] = [];
+  for (const raw of evidence) {
+    const quote = normalizeEvidenceText(stripSpeaker(raw));
+    const quoteTokens = quote.split(" ").filter(Boolean);
+    if (quote.length < 8 || quoteTokens.length < 2) continue;
+    const match = candidates.find((message) => message.normalized.includes(quote))
+      ?? (quoteTokens.length >= 3 ? candidates.find((message) => tokenOverlap(quoteTokens, message.tokens) >= 0.8) : undefined);
+    if (!match) continue;
+    const proves = PAYMENT_WORDS.test(quote) ? "payment" : TRANSMISSION_WORDS.test(quote) ? "transmission" : null;
+    validated.push({ quote: raw.trim(), sender: match.sender, proves });
+  }
+  return validated;
+}
+
+/** Para converter (ou sugerir), ao menos um trecho real de pagamento ou de proposta transmitida. */
+export function saleEvidenceProven(validated: readonly ValidatedEvidence[]) {
+  return validated.some((item) => item.proves !== null);
 }
 
 // ─── Relatório (leitura antiga) ───────────────────────────────────────
@@ -214,4 +310,28 @@ export function legacySaleSignals(assessment: { facts?: unknown; buyingSignals?:
     }
   }
   return { signals: SALE_SIGNALS.filter((signal) => signals.has(signal)), evidence: evidence.slice(0, 5) };
+}
+
+/** Modo sugestão: a IA pede para confirmar a venda (registrar a venda confirma). */
+export function aiSaleSuggestionNotice(input: { leadName: string | null; reason: string }) {
+  const lead = input.leadName?.trim() || "Cliente";
+  return {
+    title: `A IA detectou a venda de ${lead}: confirmar?`,
+    message: `${input.reason}. Abra o lead e, se a venda fechou, use Registrar venda.`,
+    pushTitle: "Venda detectada: confirmar?",
+    pushBody: `${lead}: ${input.reason}.`,
+  };
+}
+
+export type AiSalePrompt = "register" | "confirm" | "check";
+
+/** Texto do card na ficha do lead para cada estado. */
+export function aiSalePromptCopy(prompt: AiSalePrompt) {
+  if (prompt === "register") {
+    return { title: "Parabéns! A venda foi concluída", body: "A IA viu a venda fechada na conversa. Complete o registro: valor, operadora e vidas, com a confirmação da operadora." };
+  }
+  if (prompt === "confirm") {
+    return { title: "A IA detectou a venda: confirmar?", body: "A conversa mostra pagamento ou proposta transmitida. Se a venda fechou, registre: valor, operadora e vidas." };
+  }
+  return { title: "A IA acha que a venda fechou", body: "Mas o trecho de pagamento ou de proposta transmitida não foi encontrado na conversa. Confira e, se fechou, registre a venda." };
 }
