@@ -120,6 +120,8 @@ const settingsSchema = z.object({
   cadence: z.boolean(),
   learn: z.boolean(),
   companyDisplayName: z.string().trim().max(60),
+  silenceFollowUp: z.boolean(),
+  silenceFollowUpChannel: z.enum(["same", "meta", "waha"]),
 });
 
 export async function updateTurboSettingsAction(input: TurboSettings) {
@@ -133,7 +135,7 @@ export async function updateTurboSettingsAction(input: TurboSettings) {
       userId: context.userId,
       entidade: "qualification_turbo",
       entidadeId: context.tenantId,
-      acao: `settings_updated:${parsed.data.enabled ? "on" : "off"}:${parsed.data.cadence ? "cadence" : "no_cadence"}:${parsed.data.learn ? "learn" : "fixed"}`,
+      acao: `settings_updated:${parsed.data.enabled ? "on" : "off"}:${parsed.data.cadence ? "cadence" : "no_cadence"}:${parsed.data.learn ? "learn" : "fixed"}:${parsed.data.silenceFollowUp ? `silence_followup_${parsed.data.silenceFollowUpChannel}` : "no_silence_followup"}`,
       createdAt: new Date(),
     });
     revalidatePath("/qualificacao/turbo");

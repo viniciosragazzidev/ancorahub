@@ -8,6 +8,7 @@ import { getDatabase, schema } from "@/shared/db";
 
 import { APPROACHES, isNightInSaoPaulo, NIGHT_TEMPLATE, qualificationTemplateVariables, requestedOperator, resolveApproach, type ApproachInput, type ApproachId } from "./approaches";
 import type { TurboState } from "./cadence";
+import type { SilenceFollowUpChannelSetting } from "@/features/ai-agent/silence-follow-up-rules";
 import { assignVariant, type VariantStats } from "./experiments";
 
 /**
@@ -24,9 +25,15 @@ export type TurboSettings = {
   learn: boolean;
   /** Name shown to the client in {{empresa}}; empty uses the company name. */
   companyDisplayName: string;
+  /** One light follow-up to whoever stopped answering mid-qualification (10/11); independent of `enabled`. */
+  silenceFollowUp: boolean;
+  /** Channel of that follow-up: the conversation's (with fallback to the other), or only Meta / only WAHA. */
+  silenceFollowUpChannel: SilenceFollowUpChannelSetting;
 };
 
-export const DEFAULT_TURBO_SETTINGS: TurboSettings = { enabled: true, cadence: true, learn: true, companyDisplayName: "" };
+export const DEFAULT_TURBO_SETTINGS: TurboSettings = { enabled: true, cadence: true, learn: true, companyDisplayName: "", silenceFollowUp: true, silenceFollowUpChannel: "same" };
+
+const SILENCE_CHANNELS: readonly SilenceFollowUpChannelSetting[] = ["same", "meta", "waha"];
 
 function settingKey(tenantId: string) {
   return `qualification_turbo_${tenantId}`;
@@ -41,6 +48,8 @@ export function parseTurboSettings(raw: string | null | undefined): TurboSetting
       cadence: value.cadence !== false,
       learn: value.learn !== false,
       companyDisplayName: typeof value.companyDisplayName === "string" ? value.companyDisplayName.slice(0, 60) : "",
+      silenceFollowUp: value.silenceFollowUp !== false,
+      silenceFollowUpChannel: SILENCE_CHANNELS.includes(value.silenceFollowUpChannel as SilenceFollowUpChannelSetting) ? value.silenceFollowUpChannel as SilenceFollowUpChannelSetting : "same",
     };
   } catch {
     return { ...DEFAULT_TURBO_SETTINGS };
