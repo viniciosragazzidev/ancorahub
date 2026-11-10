@@ -113,7 +113,7 @@ const CITY_PATTERNS = [
  * on the accent-free text. Anchored to the whole message: the plan extraction runs on every message
  * while the plan is unknown, and "manda pra mim o valor" or "só meu nome é Paula" are not an answer.
  */
-const INDIVIDUAL_PLAN_ANSWER = /^\s*(?:(?:e|seria|sera) )?(?:(?:um|o) )?(?:plano )?(?:(?:so|apenas|somente) )?(?:(?:pra|para|pro) mim(?: mesm[oa])?|(?:so|apenas|somente|plano) meu(?: mesmo)?)[\s.!]*$/i;
+const INDIVIDUAL_PLAN_ANSWER = /^\s*(?:(?:e|seria|sera) )?(?:(?:um|o) )?(?:plano )?(?:(?:so|apenas|somente) )?(?:(?:pra|para|pro) mim(?: mesm[oa])?|(?:so|apenas|somente|plano) meu(?: mesmo)?|(?:so|apenas|somente) eu(?: mesm[oa])?|eu mesm[oa]|(?:eu )?sozinh[oa])[\s.!]*$/i;
 
 const PLAN_TYPE_PATTERNS = [
   /\bpessoa\s+f(?:ísica|fisica)\b/i,
@@ -417,6 +417,35 @@ export function clearUnansweredTurnFacts(
  * Undefined when the answer is not clearly a quantity (e.g. "eu e meus
  * filhos", where the count is unknown).
  */
+/** People who can follow "eu e" / "pra mim e" in a family plan answer (accent-free). */
+const SELF_PLUS_PERSON = "esposa|esposo|marido|mulher|companheir[oa]|namorad[oa]|noiv[oa]|filh[oa]s?|mae|pai|irma|irmao|avo|net[oa]s?|sogr[oa]|entead[oa]s?|\\d{1,2}|dois|duas|tres";
+
+/**
+ * Facts the plan type implies, applied by every path that may change it (rules, the AI
+ * interpreter, the context analysis) and again by the engine before it picks the next
+ * question: an individual plan is one person, so the lives question is never asked.
+ * The implied 1 has confidence 0 (not said, so replies do not echo it); a family or
+ * company plan drops it, since that 1 no longer holds. Pure; returns the same object
+ * when nothing changes.
+ */
+export function applyImpliedQualificationFacts(memory: ConversationMemory): ConversationMemory {
+  const plan = memory.planType?.value;
+  const lives = memory.numberOfLives;
+  if (plan === "individual" && !lives?.value?.trim()) {
+    return {
+      ...memory,
+      numberOfLives: { value: "1", confidence: 0, sourceMessageId: memory.planType?.sourceMessageId },
+      collectedFields: memory.collectedFields.includes("numberOfLives") ? memory.collectedFields : [...memory.collectedFields, "numberOfLives"],
+    };
+  }
+  if (plan && plan !== "individual" && lives?.confidence === 0 && lives.value === "1" && !lives.confirmed) {
+    const next = { ...memory, collectedFields: memory.collectedFields.filter((field) => field !== "numberOfLives") };
+    delete next.numberOfLives;
+    return next;
+  }
+  return memory;
+}
+
 export function readLivesAnswer(message: string): number | undefined {
   let text = normalizeForMatching(message).replace(/[.!?;]+/g, " ").replace(/\s+/g, " ").trim();
   for (let guard = 0; guard < 6; guard += 1) {
@@ -633,10 +662,18 @@ export function extractFieldsFromMessage(
   if (!memory.planType) {
     const normalizedRelative = normalizeForMatching(trimmed);
     const relative = normalizedRelative.match(/\b(?:para|pra|pro|p\/)\s+(?:as?\s+|os?\s+)?(?:minha|meu|minhas|meus)\s+(filha|filho|filhas|filhos|mae|pai|esposa|marido|mulher|namorada|namorado|irma|irmao|avo|neta|neto|sobrinha|sobrinho|sogra|sogro|enteada|enteado)\b/);
-    const withSelf = /\b(?:pra mim e|para mim e|eu e (?:a |o )?(?:minha|meu))\b/.test(normalizedRelative);
+    // "Para mim é um plano só" loses its accent here and reads "para mim e um plano so": the "e" only
+    // adds someone when a person follows it (case Valter, 10/11).
+    const withSelf = new RegExp(`\\b(?:pra mim|para mim|eu) e (?:(?:a|o|as|os) )?(?:minha|meu|minhas|meus|mais|${SELF_PLUS_PERSON})\\b`).test(normalizedRelative);
     if (withSelf) {
       memory.planType = { value: "familiar", confidence: 1, sourceMessageId };
       addCollectedField(memory, "planType");
+      // "eu e minha esposa" also says how many people: the lives question is not asked.
+      const listedLives = !memory.numberOfLives ? readLivesAnswer(trimmed.replace(/^\s*(?:pra|para) mim\b/i, "eu")) : undefined;
+      if (listedLives && listedLives >= 2) {
+        memory.numberOfLives = { value: String(listedLives), confidence: 1, sourceMessageId };
+        addCollectedField(memory, "numberOfLives");
+      }
     } else if (relative && !/s$/.test(relative[1])) {
       memory.planType = { value: "individual", confidence: 1, sourceMessageId };
       memory.beneficiaryRelation = relative[1];
@@ -686,11 +723,11 @@ export function extractFieldsFromMessage(
     }
   }
 
-  // An individual plan covers one person: the lives question is skipped. The
-  // confidence 0 marks it as implied, not said, so replies do not echo it.
-  if (memory.planType?.value === "individual" && !memory.numberOfLives) {
-    memory.numberOfLives = { value: "1", confidence: 0, sourceMessageId: memory.planType.sourceMessageId };
-    addCollectedField(memory, "numberOfLives");
+  const implied = applyImpliedQualificationFacts(memory);
+  if (implied !== memory) {
+    if (implied.numberOfLives) memory.numberOfLives = implied.numberOfLives;
+    else delete memory.numberOfLives;
+    memory.collectedFields = implied.collectedFields;
   }
 
   // Number of lives

@@ -18,7 +18,7 @@ vi.mock("@/components/arc/switch/switch", () => ({
 import { TurboAdminLite } from "./turbo-admin-lite";
 
 const row = (name: string, status: string) => ({ name, label: name, touch: "t0", expectedCategory: "UTILITY", status, category: null, quality: null, rejectedReason: null, body: "Olá", buttons: ["Sim"] });
-const data = (canEdit: boolean) => ({ settings: { enabled: true, cadence: false, learn: false, companyDisplayName: "" }, templates: [row("primeira", "APPROVED"), row("lembrete", "MISSING"), row("reengajamento", "REJECTED")], metaConnected: true, canEdit }) as never;
+const data = (canEdit: boolean) => ({ settings: { enabled: true, cadence: false, learn: false, companyDisplayName: "", silenceFollowUp: true, silenceFollowUpChannel: "same" }, templates: [row("primeira", "APPROVED"), row("lembrete", "MISSING"), row("reengajamento", "REJECTED")], metaConnected: true, canEdit }) as never;
 
 afterEach(() => {
   cleanup();

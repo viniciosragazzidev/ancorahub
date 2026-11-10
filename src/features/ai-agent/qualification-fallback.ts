@@ -1,5 +1,5 @@
 import type { AiMemoryUpdate } from "./ai-response-schema";
-import { COLLECTIBLE_FIELDS, readAgeList, type ConversationMemory, type MemoryField } from "./memory";
+import { applyImpliedQualificationFacts, COLLECTIBLE_FIELDS, readAgeList, type ConversationMemory, type MemoryField } from "./memory";
 
 /**
  * The model is only an interpreter here. It cannot choose a stage or write
@@ -202,7 +202,8 @@ export function applyAiMemoryUpdates(
   }
 
   if (applied.length) next.updatedAt = new Date().toISOString();
-  return { memory: next, applied };
+  // A plan type read by the model carries its implied facts too (individual: 1 life).
+  return { memory: applied.length ? applyImpliedQualificationFacts(next) : next, applied };
 }
 
 export function buildQualificationFallbackPrompt(expectedField: string, expectedQuestion: string) {

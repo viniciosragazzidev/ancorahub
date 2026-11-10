@@ -9,11 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { AppSelect } from "@/components/ui/select";
 import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 
 import { submitRecommendedTemplatesAction, updateTurboSettingsAction, type TurboAdminData } from "../actions";
+import { SILENCE_FOLLOW_UP_CHANNEL_OPTIONS, SILENCE_FOLLOW_UP_DESCRIPTION } from "./silence-follow-up-copy";
 
 const TOUCH_LABEL: Record<string, string> = {
   t0: "1ª mensagem",
@@ -97,6 +99,24 @@ function SettingsSheet({ data }: { data: TurboAdminData }) {
             disabled={disabled || !settings.enabled}
             onChange={(value) => save({ ...settings, learn: value })}
           />
+          <SettingRow
+            title="Follow-up de quem parou de responder"
+            description={SILENCE_FOLLOW_UP_DESCRIPTION}
+            checked={settings.silenceFollowUp}
+            disabled={disabled}
+            onChange={(value) => save({ ...settings, silenceFollowUp: value })}
+          />
+          <div className="flex flex-col gap-1.5 rounded-[var(--radius-card)] border border-border p-3">
+            <span className="text-sm font-medium">Canal do follow-up</span>
+            <span className="text-xs leading-5 text-muted-foreground">No mesmo canal da conversa, se ele falhar tenta o outro. Meta só dentro de 24h da última mensagem do cliente; WAHA só se o lead tem número WAHA.</span>
+            <AppSelect
+              aria-label="Canal do follow-up"
+              value={settings.silenceFollowUpChannel}
+              options={SILENCE_FOLLOW_UP_CHANNEL_OPTIONS}
+              disabled={disabled || !settings.silenceFollowUp}
+              onValueChange={(value) => save({ ...settings, silenceFollowUpChannel: value as typeof settings.silenceFollowUpChannel })}
+            />
+          </div>
           <label className="flex flex-col gap-1.5 rounded-[var(--radius-card)] border border-border p-3">
             <span className="text-sm font-medium">Nome da empresa nas mensagens</span>
             <span className="text-xs leading-5 text-muted-foreground">Vazio usa o nome cadastrado em Configurações › Empresa.</span>

@@ -29,6 +29,8 @@ import { LightAvailabilitySection } from "@/features/broker-availability/compone
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightSettings } from "./_components/light-settings";
 import { LightWhatsappSection } from "./_components/light-whatsapp-section";
+import { LightUnitSection } from "./_components/light-unit-section";
+import { getOwnUnitChangeOptions } from "@/features/broker-unit-change/queries";
 
 import { RelatedActions } from "@/components/related-actions";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
@@ -157,11 +159,18 @@ export default async function SettingsPage() {
     const rankingMember = journeyEnabled ? await db.select({ optedOut: schema.tenantMemberships.rankingOptOut }).from(schema.tenantMemberships)
       .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, context.userId), eq(schema.tenantMemberships.status, "active"))).limit(1).catch(() => []) : [];
     const rankingSections: LightSettingsSection[] = journeyEnabled ? [{ id: "placar", title: "Placar", description: "Sua presença no placar da unidade", node: <RankingPreferences initialOptOut={rankingMember[0]?.optedOut ?? false} schemaReady={Boolean(rankingMember[0])} /> }] : [];
+    // Minha unidade (DEC-171): only while the global flag is on; the action checks it again.
+    const unitChangeEnabled = await getFeatureFlag(FEATURE_FLAGS.BROKER_SELF_UNIT_CHANGE).catch(() => "false") === "true";
+    const unitChange = unitChangeEnabled ? await getOwnUnitChangeOptions(context) : null;
+    const unitSections: LightSettingsSection[] = unitChange
+      ? [{ id: "unidade", title: "Minha unidade", description: unitChange.current?.name ?? "Você ainda não está em uma unidade", node: <LightUnitSection {...unitChange} /> }]
+      : [];
     return (
       <LightSettings
         sections={[
           ...rankingSections,
           { id: "conta", title: "Minha conta", description: "Seus dados de acesso e perfil", node: account },
+          ...unitSections,
           {
             id: "disponibilidade",
             title: "Disponibilidade",

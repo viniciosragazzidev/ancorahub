@@ -39,6 +39,7 @@ import {
   updateAttendanceFlowsSettingsAction,
   updateDutyMonthlySchedulingSettingsAction,
   updateDutyInactiveBrokersSettingsAction,
+  updateBrokerSelfUnitChangeSettingsAction,
   updateDutyOccurrenceHistorySettingsAction,
   updateBrokerDutyCalendarEnabledSettingsAction,
   updateBrokerNewsSettingsAction,
@@ -126,6 +127,7 @@ export default async function SuperAdminSettingsPage() {
     FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_SHIFT.key,
     FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.key,
     FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.key,
+    FEATURE_FLAGS.BROKER_SELF_UNIT_CHANGE.key,
     FEATURE_FLAGS.BROKER_DUTY_CALENDAR.key,
     FEATURE_FLAGS.RELATIONSHIP_CENTER.key,
     FEATURE_FLAGS.WHATSAPP_PLANTAO_NOTICE.key,
@@ -218,6 +220,7 @@ export default async function SuperAdminSettingsPage() {
     : FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.defaultValue;
   const dutyMonthlySchedulingEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key) ?? FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.defaultValue) === "true";
   const dutyInactiveBrokersEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.key) ?? FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.defaultValue) === "true";
+  const brokerSelfUnitChangeEnabled = (settingMap.get(FEATURE_FLAGS.BROKER_SELF_UNIT_CHANGE.key) ?? FEATURE_FLAGS.BROKER_SELF_UNIT_CHANGE.defaultValue) === "true";
   const attendanceFlowsEnabled = (settingMap.get(FEATURE_FLAGS.ATTENDANCE_FLOWS.key) ?? FEATURE_FLAGS.ATTENDANCE_FLOWS.defaultValue) === "true";
   const dutyOccurrenceHistoryEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key) ?? FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.defaultValue) === "true";
   const flagOn = (flag: { key: string; defaultValue: string }) => (settingMap.get(flag.key) ?? flag.defaultValue) === "true";
@@ -1324,6 +1327,24 @@ export default async function SuperAdminSettingsPage() {
                     </span>
                   </label>
                   <Button type="submit" variant="outline">Salvar política de inclusão</Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Troca de unidade pelo corretor</CardTitle>
+                <CardDescription>O corretor troca a própria unidade em Configurações (DEC-171).</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateBrokerSelfUnitChangeSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox name="brokerSelfUnitChangeEnabled" value="true" defaultChecked={brokerSelfUnitChangeEnabled} />
+                    <span>
+                      <span className="font-medium">Permitir que o corretor troque a própria unidade</span>
+                      <span className="block text-xs text-muted-foreground">Só para unidade ativa da mesma empresa. A troca vale na hora, é auditada e avisa os gestores; as vagas do corretor nos plantões da unidade antiga são encerradas e os leads continuam com ele.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar troca de unidade</Button>
                 </form>
               </CardContent>
             </Card>

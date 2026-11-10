@@ -815,3 +815,7 @@ O Kanban Full e Lite mostra no rodapé de cada coluna o total mensal e a soma de
 ## 2026-11-06 — Faixa de conexão do WhatsApp abaixo de diálogos
 
 Papel: corretor Lite; objetivo: confirmar presença no plantão ou obter o código de pareamento. A faixa de WhatsApp desconectado permanece visível no shell, mas fica abaixo do overlay/dialog compartilhado para não cobrir controles nem conteúdo modal. Sem novo token, componente ou movimento.
+
+## 2026-11-09 — Minha unidade no Lite do corretor
+
+Papel: corretor Lite; objetivo: trocar de unidade. Nova linha "Minha unidade" em Configurações com a unidade atual; a seção pergunta "Para qual unidade você quer ir?" com RadioCards em lista, um botão secundário e a confirmação em BottomSheet (único botão primário da folha) com as consequências: plantões que saem, leads que ficam, supervisão e aviso à gestão. Resultado na própria seção, sem toast. Estados: sem unidade atual, sem outra unidade, escolha, confirmação, envio, sucesso e erro. Reutiliza Arc RadioCards, Button e BottomSheet; sem novos tokens.
