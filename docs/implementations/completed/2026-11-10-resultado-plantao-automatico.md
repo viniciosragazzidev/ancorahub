@@ -14,7 +14,10 @@ exclusivo do diretor. Nenhum gestor ou corretor acessa o controle.
   defaults centralizados. O total externo é a soma de WhatsApp Externo e RD.
 - Tipos form e WhatsApp usam as chaves documentadas de `source_metadata`.
   Distribuição considera leads distintos com oferta aceita e `offered_at` na
-  janela; médias são calculadas por plantão e período e depois agregadas.
+  janela; para cada grupo e período, a média é a soma de leads distintos de
+  todos os plantões do grupo dividida pela soma de corretores distintos.
+- O grupo PME exige nome iniciado por `PME` e tem prioridade sobre os demais;
+  Online exige nome iniciado por `Premium`, sem busca parcial.
 - O grupo padrão e a busca usam `Fechamento Plantão Geral`, comparando nome
   normalizado (acentos e caixa ignorados), sem busca parcial. O `groupId` fica
   em cache no setting, mas o nome é confirmado na lista atual antes do envio.
@@ -22,10 +25,12 @@ exclusivo do diretor. Nenhum gestor ou corretor acessa o controle.
   separador ` · `, contagens sem zero à esquerda, médias com uma casa decimal e
   vírgula, e sem linha de telefone. Externo é WhatsApp Externo + RD; a data usa
   `shortDate` do relatório das 18h.
-- Envio manual e cron compartilham uma chave de idempotência por tenant e dia.
-  O envio manual consome a mesma cota diária; assim, o cron não replica a mensagem.
+- O cron usa a reserva `plantao-report:<tenant>:<dia>` e envia no máximo uma
+  vez por tenant/dia. Cada envio manual usa `plantao-report-manual:<tenant>:<dia>:<HHMMSS>`;
+  ele não cria nem consome a reserva diária do cron.
 - A reserva de envio fica em `system_settings` com prefixo `lease:` para ser
-  atômica e ficar fora da leitura de configurações. Falha permite nova tentativa;
+  atômica e ficar fora da leitura de configurações. Em falha após a reserva, ela
+  é liberada por chave e valor exatos para permitir retry;
   estado `sending` após queda do processo bloqueia duplicação até intervenção.
 - A flag global é o interruptor do Super-admin. O setting do tenant ausente
   permanece desligado.

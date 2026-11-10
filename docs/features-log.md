@@ -4,7 +4,7 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 
 ## 10/11/2026 - Resultado diário do plantão
 
-- Prévia e envio manual para Diretor, envio automático às 19h de São Paulo para o grupo WAHA Fechamento Plantão Geral, com escopo por tenant e idempotência compartilhada por dia.
+- Prévia e envio manual para Diretor, envio automático às 19h de São Paulo para o grupo WAHA Fechamento Plantão Geral, com escopo por tenant, chave manual por tentativa e reserva diária exclusiva do cron.
 - Métricas usam a primeira fila enfileirada, origem do formulário/WhatsApp e ofertas aceitas. A conferência somente leitura de 09/11 bateu com todos os valores esperados.
 - A flag global do Super-admin e o setting do tenant controlam o recurso. O script de ativação não foi executado.
 - Registro: [resultado do plantão automático](implementations/completed/2026-11-10-resultado-plantao-automatico.md).
