@@ -2,6 +2,13 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 10/11/2026 - Backfill e evidência de venda
+
+- Evidências de pagamento validadas permanecem no contexto da próxima análise, mesmo fora da janela de mensagens recentes.
+- A entrevista médica ou videochamada concluída passa a ser prova forte de venda; perguntas, tentativas, negativas e futuro continuam sem efeito.
+- Novo backfill em dry-run por padrão reúne mensagens recentes e provas históricas; conversão explícita usa o fluxo canônico. Diretor e gestor da unidade podem recuperar o aviso à direção, com idempotência por lead/telefone e auditoria.
+- Nenhum backfill foi aplicado. Registro: [backfill seguro e evidência de venda](implementations/active/2026-11-10-venda-detection-backfill.md).
+
 ## 10/11/2026 - Resultado diário do plantão
 
 - Prévia e envio manual para Diretor, envio automático às 19h de São Paulo para o grupo WAHA Fechamento Plantão Geral, com escopo por tenant, chave manual por tentativa e reserva diária exclusiva do cron.

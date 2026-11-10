@@ -7,7 +7,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { teamNoticeByKey } from "@/features/team-notices/catalog";
 import { getTeamNoticeSetting } from "@/features/team-notices/service";
 import { getDatabase, schema } from "@/shared/db";
-import { entersClosingStage } from "./closing-stage-notice-core";
+import { CLOSING_STAGE_STATUSES, entersClosingStage } from "./closing-stage-notice-core";
 import {
   CLOSING_DIRECTOR_NOTICE_KEY,
   CLOSING_DIRECTOR_PURPOSE,
@@ -57,8 +57,12 @@ export async function notifyDirectorsClosingStage(input: {
   leadId: string;
   previousStatus: string;
   newStatus: string;
+  /** Manual recovery for a lead that was already in closing before this notice existed. */
+  manual?: boolean;
 }) {
-  if (!entersClosingStage(input.previousStatus, input.newStatus)) return { notified: 0 };
+  if (input.manual
+    ? !CLOSING_STAGE_STATUSES.has(input.newStatus)
+    : !entersClosingStage(input.previousStatus, input.newStatus)) return { notified: 0 };
   try {
     const recipients = await getClosingDirectorRecipients(input.tenantId);
     if (!recipients.length) return { notified: 0 };
