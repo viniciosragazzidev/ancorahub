@@ -379,6 +379,13 @@ export const FEATURE_FLAGS = {
     description:
       "Habilita as análises da Central de Relatórios, incluindo qualidade/origem dos leads e drill-down explicável. Desativa as análises; a visão operacional do Dashboard permanece disponível.",
   },
+  PLANTAO_REPORT: {
+    key: "feature_plantao_report_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Interruptor global do relatório diário de resultado do plantão enviado ao WhatsApp.",
+  },
 
   NEGOTIATIONS_AREA: {
     key: "feature_negotiations_area_enabled",

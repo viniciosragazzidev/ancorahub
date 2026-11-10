@@ -138,6 +138,39 @@ export async function sendWahaRelayMessage(input: {
   return { messageId: fbData.messageId };
 }
 
+/** Envia para um grupo WAHA sem passar o JID pelo normalizador de telefones. */
+export async function sendWahaRelayGroupMessage(input: {
+  idempotencyKey: string;
+  sessionId: string;
+  groupId: string;
+  body: string;
+}) {
+  const groupId = input.groupId.replace(/@g\.us$/i, "");
+  if (!/^[\w.-]{3,160}$/.test(groupId)) throw new Error("WAHA_GROUP_ID_INVALID");
+  const config = relayConfig();
+  if (config.transport !== "fastify") throw new Error("WAHA_GROUP_REQUIRES_FASTIFY");
+  const response = await fetch(`${config.url}/internal/waha/messages/text`, {
+    method: "POST",
+    headers: getFastifyHeaders(config.secret, true),
+    body: JSON.stringify({
+      sessionName: input.sessionId,
+      chatId: `${groupId}@g.us`,
+      text: input.body,
+      idempotencyKey: input.idempotencyKey,
+    }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
+  });
+  const data = await response.json().catch(() => null) as { messageId?: string; error?: string; message?: string } | null;
+  if (!response.ok || !data?.messageId) {
+    const error = new Error(`O serviço WAHA não confirmou o envio ao grupo (${data?.error ?? data?.message ?? response.statusText ?? response.status}).`) as Error & { status?: number; code?: string };
+    error.status = response.status;
+    error.code = "relay_group_send_failed";
+    throw error;
+  }
+  return { messageId: data.messageId };
+}
+
 /** Recupera histórico limitado via Fastify; usado pelo cron de reconciliação. */
 export async function getWahaMessageHistory(input: {
   sessionName: string;
