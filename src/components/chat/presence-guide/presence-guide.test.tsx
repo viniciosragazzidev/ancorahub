@@ -114,6 +114,19 @@ describe("PresenceGuide (roteiro guiado de presença, 09/11)", () => {
     vi.unstubAllGlobals();
   });
 
+  it("só conectar (botão do topo): sem a presença, termina em conectado com Pronto", () => {
+    const onFinish = vi.fn();
+    const { rerender } = render(<PresenceGuide mode="connect" device="mobile" connection={connection({ started: false, code: null })} duty={duty} presence={presence({ onFinish })} onClose={vi.fn()} introAudio={null} />);
+    expect(screen.getByText("Vamos conectar o seu WhatsApp.")).toBeTruthy();
+    expect(screen.getByText("1 de 6")).toBeTruthy();
+    expect(screen.queryByText(/confirmar sua presença/)).toBeNull();
+    rerender(<PresenceGuide mode="connect" device="mobile" connection={connection({ ready: true, phase: "ready" })} duty={duty} presence={presence({ onFinish })} onClose={vi.fn()} introAudio={null} />);
+    expect(screen.getByText("6 de 6")).toBeTruthy();
+    expect(screen.getByText("Os leads do plantão já podem chegar no seu WhatsApp.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Pronto" }));
+    expect(onFinish).toHaveBeenCalled();
+  });
+
   it("lembra a etapa para retomar e esquece quando a presença sai", () => {
     const { rerender } = render(<PresenceGuide device="mobile" connection={connection()} duty={duty} presence={presence()} onClose={vi.fn()} />);
     expect(window.localStorage.getItem("ancora:presenca-guia:as1")).toContain("codigo");

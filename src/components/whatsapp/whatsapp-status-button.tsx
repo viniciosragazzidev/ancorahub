@@ -14,8 +14,9 @@ const CHECK_EVERY_MS = 120_000;
 
 /**
  * Round WhatsApp button for the top right of the Lite: green when the broker's
- * WhatsApp is connected, red with a cut when it is not. One tap opens the
- * connect dialog (QR code or code). Hidden when the connection cannot be read.
+ * WhatsApp is connected, red with a cut when it is not. Hidden when the connection cannot be read.
+ * Desconectado (10/11): o toque abre o mesmo roteiro guiado da presença, só para conectar (código no celular,
+ * QR no computador, com a tela inicial e os 4 toques). Conectado: o painel de sempre (status, desconectar).
  */
 export function WhatsAppStatusButton() {
   const [connection, setConnection] = useState<Connection | null>(null);
@@ -23,6 +24,8 @@ export function WhatsAppStatusButton() {
   // "Ver como": the proxy blocks server actions, so the status comes from a GET
   // and the button only shows it (the admin can't pair someone else's WhatsApp).
   const [viewOnly, setViewOnly] = useState<{ connected: boolean } | null>(null);
+  // Roteiro aberto: continua nele até fechar, mesmo depois de conectar (senão trocaria de tela no meio).
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -65,9 +68,13 @@ export function WhatsAppStatusButton() {
   }
   if (failed || !connection) return null;
   const connected = connection.status === "ready";
+  const guided = !connected || guideOpen;
   return (
     <WhatsAppConnectDialog
       initial={connection}
+      variant={guided ? "presence" : "default"}
+      guideMode="connect"
+      onOpenChange={(open) => setGuideOpen(open && guided)}
       onConnectionChanged={(next) => { if (next) setConnection(next as Connection); else void load(); }}
       trigger={(
         <button type="button" className={styles.button} data-connected={connected} aria-label={connected ? "WhatsApp conectado" : "WhatsApp desconectado: toque para conectar"} title={connected ? "WhatsApp conectado" : "Conectar o WhatsApp"}>

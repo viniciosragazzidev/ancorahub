@@ -347,3 +347,15 @@ Pedido do Vinicios: cada etapa clara, com texto simples; e uma voz de ~10 s no i
   bloquear o som (iPhone sem toque recente), fica o botão para ouvir.
 - Uso da voz: mesma condição do vídeo de boas-vindas (conta Free, uso interno; ver
   `docs/onboarding/creditos-video-boas-vindas.md`).
+
+## 14. Ajuste de 10/11: o botão do WhatsApp no topo também abre o roteiro
+
+Pedido do Vinicios: o roteiro guiado também quando o corretor toca no ícone do WhatsApp no topo da tela.
+
+- `whatsapp-status-button.tsx`: desconectado, o toque abre o mesmo roteiro (`variant="presence"`,
+  `guideMode="connect"`); conectado, continua o painel de sempre (status, chat interno, desconectar). Com o roteiro
+  aberto, ele não troca de tela ao conectar: fica até o corretor tocar em "Pronto".
+- Modo "só conectar" (`PresenceGuide mode="connect"`): título "Vamos conectar o seu WhatsApp.", sem falar de
+  presença; termina em "Pronto, seu WhatsApp está conectado!" com o botão "Pronto". Barra com 6 marcos no celular e
+  3 no computador. Mesma voz, mesmos passos (código, lista de Conversas, 4 toques), retomada separada da presença.
+- O protótipo `/dev/roteiro-presenca` tem a opção "Aberto por: Botão do WhatsApp no topo" (`?roteiro=conectar`).

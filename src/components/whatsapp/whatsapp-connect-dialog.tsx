@@ -93,7 +93,10 @@ export function WhatsAppConnectDialog({
   onReady,
   duty,
   presence,
+  guideMode = "presence",
 }: {
+  /** Roteiro guiado só para conectar, sem a presença (botão do WhatsApp no topo, 10/11). Só com variant="presence". */
+  guideMode?: "presence" | "connect";
   /** Roteiro guiado da presença (09/11): o plantão e onde a presença está. Só com variant="presence". */
   duty?: PresenceGuideDuty;
   presence?: PresenceGuidePresence;
@@ -732,14 +735,16 @@ export function WhatsAppConnectDialog({
   if (variant === "presence") {
     return (
       <Dialog open={open} onOpenChange={handleOpenChange}>
+        {trigger ? <DialogTrigger render={trigger} /> : null}
         <DialogPopup
           className="inset-0 left-0 top-0 h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-0 p-0 sm:w-full sm:p-0 md:left-1/2 md:top-1/2 md:h-[min(680px,calc(100dvh-2rem))] md:w-[560px] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-[var(--radius-surface)]"
         >
-          <DialogTitle className="sr-only">Conectar WhatsApp e confirmar presença</DialogTitle>
+          <DialogTitle className="sr-only">{guideMode === "connect" ? "Conectar WhatsApp" : "Conectar WhatsApp e confirmar presença"}</DialogTitle>
           <DialogDescription className="sr-only">Passo a passo para conectar o seu WhatsApp e confirmar a presença no plantão.</DialogDescription>
           <PresenceGuide
+            mode={guideMode}
             device={presenceDevice}
-            duty={duty ?? { key: "presenca", scheduleName: "Plantão", branchName: null, mode: "online", until: "" }}
+            duty={duty ?? { key: guideMode === "connect" ? "conectar" : "presenca", scheduleName: "Plantão", branchName: null, mode: "online", until: "" }}
             presence={presence ?? { stage: "connect", onConfirm: () => undefined, onFinish: () => handleOpenChange(false) }}
             onClose={() => handleOpenChange(false)}
             connection={{

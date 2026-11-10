@@ -102,6 +102,8 @@ function readParams() {
 export function RoteiroPresencaPreview() {
   const [device, setDevice] = React.useState<GuideDevice>("mobile");
   const [mode, setMode] = React.useState<Mode>("online");
+  // "conectar": o roteiro aberto pelo botão do WhatsApp no topo (sem a presença).
+  const [guideMode, setGuideMode] = React.useState<"presence" | "connect">("presence");
   const [bare, setBare] = React.useState(false);
   const [assume, setAssume] = React.useState(true);
   const [sim, setSim] = React.useState<Sim | null>(null);
@@ -134,6 +136,7 @@ export function RoteiroPresencaPreview() {
     /* eslint-disable react-hooks/set-state-in-effect -- lê a URL uma vez, só no protótipo */
     setDevice(nextDevice);
     if (p.get("modo") === "presencial") setMode("presencial");
+    if (p.get("roteiro") === "conectar") setGuideMode("connect");
     if (p.get("limpo") === "1") setBare(true);
     if (p.get("suposicoes") === "0") setAssume(false);
     const erro = p.get("erro") as Sim | null;
@@ -188,7 +191,8 @@ export function RoteiroPresencaPreview() {
 
   const guide = (
     <PresenceGuide
-      key={mount}
+      key={`${mount}-${guideMode}`}
+      mode={guideMode}
       device={device}
       connection={connection}
       duty={{ key: "prototipo", scheduleName: DUTY.name, branchName: DUTY.branch, mode, until: DUTY.until }}
@@ -237,6 +241,10 @@ export function RoteiroPresencaPreview() {
             <Group label="Aparelho">
               <Chip on={device === "mobile"} onClick={() => { setDevice("mobile"); apply(setup.screen, sim, "mobile"); }}>Celular</Chip>
               <Chip on={device === "desktop"} onClick={() => { setDevice("desktop"); apply(setup.screen, sim, "desktop"); }}>Computador</Chip>
+            </Group>
+            <Group label="Aberto por">
+              <Chip on={guideMode === "presence"} onClick={() => setGuideMode("presence")}>Confirmar presença</Chip>
+              <Chip on={guideMode === "connect"} onClick={() => setGuideMode("connect")}>Botão do WhatsApp no topo</Chip>
             </Group>
             <Group label="Plantão">
               <Chip on={mode === "online"} onClick={() => setMode("online")}>Online</Chip>

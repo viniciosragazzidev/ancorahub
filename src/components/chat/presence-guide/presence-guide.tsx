@@ -15,7 +15,7 @@ import {
 } from "./presence-guide-art";
 import {
   guideError, platformFromUserAgent, progressOf, readGuideMemory, resumeStep, visibleStep, writeGuideMemory,
-  type ConfirmStage, type GuideDevice, type GuideError, type GuidePlatform, type GuideStep, type LocalIssue,
+  type ConfirmStage, type GuideDevice, type GuideError, type GuideMode, type GuidePlatform, type GuideStep, type LocalIssue,
 } from "./presence-guide-steps";
 import styles from "./presence-guide.module.css";
 
@@ -68,7 +68,7 @@ export type PresenceGuidePreview = { step?: GuideStep; scene?: number; local?: L
 export const PRESENCE_GUIDE_INTRO_AUDIO = "/onboarding/narracao/presenca-whatsapp-intro.mp3";
 const VOICE_MUTE_KEY = "ancora:presenca-guia:voz-desligada";
 
-export function PresenceGuide({ device, connection, duty, presence, onClose, openWhatsApp, preview, introAudio = PRESENCE_GUIDE_INTRO_AUDIO }: {
+export function PresenceGuide({ device, connection, duty, presence, onClose, openWhatsApp, preview, introAudio = PRESENCE_GUIDE_INTRO_AUDIO, mode = "presence" }: {
   device: GuideDevice;
   connection: PresenceGuideConnection;
   duty: PresenceGuideDuty;
@@ -79,7 +79,10 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   preview?: PresenceGuidePreview;
   /** Áudio da introdução; null desliga a voz. */
   introAudio?: string | null;
+  /** "connect": só conectar (botão do WhatsApp no topo); termina em "conectado" com "Pronto". */
+  mode?: GuideMode;
 }) {
+  const connectOnly = mode === "connect";
   const reduce = useReducedMotion();
   const desktop = device === "desktop";
   const [localStep, setLocalStep] = React.useState<GuideStep>(preview?.step ?? (connection.started ? "codigo" : "boasvindas"));
@@ -269,7 +272,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
     }
   }
 
-  const { at, total, fill } = progressOf(step, device);
+  const { at, total, fill } = progressOf(step, device, mode);
 
   // ── Cenas ────────────────────────────────────────────────────────────
   let scene$: React.ReactNode;
@@ -293,7 +296,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
       case "boasvindas":
         scene$ = (
           <>
-            <Say title={presence.reconnect ? COPY.welcome.titleReconnect : COPY.welcome.title} sub={COPY.welcome.sub} state={speaking ? "working" : "idle"} />
+            <Say title={presence.reconnect ? COPY.welcome.titleReconnect : connectOnly ? COPY.connectOnly.title : COPY.welcome.title} sub={COPY.welcome.sub} state={speaking ? "working" : "idle"} />
             {introAudio ? (
               <button type="button" className={styles.voice} aria-pressed={speaking} onClick={toggleVoice}>
                 <SpeakerIcon on={speaking} /> {speaking ? COPY.welcome.stop : COPY.welcome.listen}
@@ -301,7 +304,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
             ) : null}
             <div className={styles.art}><WelcomeArt /></div>
             <div className={styles.benefits}>
-              {COPY.welcome.benefits.map((benefit) => <div key={benefit} className={styles.benefit}><span className={styles.benefitIcon}><CheckIcon size={14} /></span><span>{benefit}</span></div>)}
+              {(connectOnly ? COPY.connectOnly.benefits : COPY.welcome.benefits).map((benefit) => <div key={benefit} className={styles.benefit}><span className={styles.benefitIcon}><CheckIcon size={14} /></span><span>{benefit}</span></div>)}
             </div>
             <div className={styles.privacy}><LockIcon /><span><strong>{COPY.welcome.privacyTitle}</strong>{COPY.welcome.privacy}</span></div>
           </>
@@ -403,11 +406,13 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
       case "conectado":
         scene$ = (
           <>
-            <Say title={COPY.connected.title} sub={COPY.connected.sub} celebrate />
+            <Say title={COPY.connected.title} sub={connectOnly ? COPY.connectOnly.doneSub : COPY.connected.sub} celebrate />
             <div className={styles.art}><BigCheck /></div>
           </>
         );
-        cta$ = <button type="button" className={styles.cta} disabled>{COPY.connected.cta}</button>;
+        cta$ = connectOnly
+          ? <button type="button" className={styles.cta} onClick={presence.onFinish}>{COPY.connectOnly.doneCta}</button>
+          : <button type="button" className={styles.cta} disabled>{COPY.connected.cta}</button>;
         break;
       case "confirmar": {
         const text = duty.mode === "presencial" ? COPY.confirm.presencial : COPY.confirm.online;
@@ -442,7 +447,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
     }
   }
 
-  const finished = step === "pronto";
+  const finished = step === "pronto" || (connectOnly && step === "conectado");
   return (
     <div className={cn("arc-venancor", styles.root)} data-step={step} data-error={error ?? undefined} data-device={device}>
       <div className={styles.lesson}>

@@ -304,6 +304,13 @@ export const PRESENCE_GUIDE_COPY = {
     useQr: "Prefiro ler o QR Code",
   },
   connected: { title: "Pronto, seu WhatsApp está conectado!", sub: "Agora falta só confirmar sua presença.", cta: "Seguindo…" },
+  /** Só conectar, pelo botão do WhatsApp no topo (10/11): sem a parte da presença. */
+  connectOnly: {
+    title: "Vamos conectar o seu WhatsApp.",
+    benefits: ["Os leads chegam e você atende pelo seu WhatsApp.", "A IA te ajuda no atendimento.", "Fica conectado: não precisa repetir todo dia."],
+    doneSub: "Os leads do plantão já podem chegar no seu WhatsApp.",
+    doneCta: "Pronto",
+  },
   confirm: {
     online: { title: "Agora é só confirmar sua presença.", sub: "Um toque e os leads deste plantão podem chegar.", cta: "Confirmar presença" },
     presencial: { title: "Agora tire uma foto do local do plantão.", sub: "O diretor vê a foto e libera você.", cta: "Tirar foto do local" },
