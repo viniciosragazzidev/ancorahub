@@ -1,5 +1,3 @@
-import type { ConversationAssessment } from "./types";
-
 export interface ContextBuilderMessage {
   id: string;
   sender: "customer" | "broker" | "system";
@@ -21,6 +19,7 @@ export interface ContextBuilderInput {
     facts?: string[];
     objections?: string[];
     lastStage?: string;
+    validatedPaymentEvidence?: string[];
   } | null;
   recentMessages: ContextBuilderMessage[];
   maxRecentMessages?: number;
@@ -63,6 +62,9 @@ export function buildConversationIntelligenceContext(
   }
   if (input.previousMemory?.objections && input.previousMemory.objections.length > 0) {
     memoryParts.push(`Objeções conhecidas: ${input.previousMemory.objections.join(", ")}`);
+  }
+  if (input.previousMemory?.validatedPaymentEvidence?.length) {
+    memoryParts.push(`Pagamento validado em análise anterior: ${input.previousMemory.validatedPaymentEvidence.slice(0, 5).join(" · ")}`);
   }
 
   const historicalMemory = memoryParts.length > 0 ? memoryParts.join("\n") : "Nenhuma memória anterior.";

@@ -19,6 +19,9 @@ import {
   type SaleEvidenceMessage,
   legacySaleSignals,
   readSaleCompleted,
+  mergeSaleCompletedWithExplicitEvidence,
+  selectSaleDetectionTranscript,
+  readValidatedPaymentEvidence,
   type AiSaleDecisionInput,
 } from "./sale-detection-core";
 
@@ -89,9 +92,11 @@ describe("decideAiSaleConversion", () => {
     expect(decideAiSaleConversion(input({ saleCompleted: { ...confirmed, evidence: [] } })).convert).toBe(false);
   });
 
-  it("assinatura ou entrevista sozinhas não bastam", () => {
-    const weak = { status: "confirmed" as const, signals: ["contract_signed", "medical_interview_approved"] as const, evidence: ["assinei"] };
-    expect(decideAiSaleConversion(input({ saleCompleted: { ...weak, signals: [...weak.signals] } })).convert).toBe(false);
+  it("assinatura sozinha não basta e entrevista aprovada prova conclusão", () => {
+    const signature = { status: "confirmed" as const, signals: ["contract_signed"] as const, evidence: ["assinei"] };
+    expect(decideAiSaleConversion(input({ saleCompleted: { ...signature, signals: [...signature.signals] } })).convert).toBe(false);
+    const approvedInterview = { status: "confirmed" as const, signals: ["medical_interview_approved"] as const, evidence: ["entrevista aprovada"] };
+    expect(decideAiSaleConversion(input({ saleCompleted: { ...approvedInterview, signals: [...approvedInterview.signals] } })).convert).toBe(true);
   });
 
   it("em Negociação só com pagamento ou proposta transmitida", () => {
@@ -238,10 +243,86 @@ describe("conferência do trecho com a conversa real", () => {
     expect(validateSaleEvidence(["Cliente: ok", "sim"], messages)).toEqual([]);
   });
 
-  it("entrevista aprovada sozinha não prova a venda", () => {
+  it("entrevista médica concluída ou aprovada é evidência de entrevista", () => {
     const onlyInterview = validateSaleEvidence(["Corretor: entrevista médica aprovada"], [{ sender: "broker", text: "Entrevista médica aprovada!" }]);
     expect(onlyInterview).toHaveLength(1);
-    expect(saleEvidenceProven(onlyInterview)).toBe(false);
+    expect(onlyInterview[0]?.proves).toBe("interview");
+    expect(saleEvidenceProven(onlyInterview)).toBe(true);
+    expect(decideAiSaleConversion(input({ saleCompleted: {
+      status: "confirmed", signals: ["medical_interview_approved"], evidence: ["entrevista médica aprovada"],
+    } })).convert).toBe(true);
+  });
+
+  it("inclui provas antigas de pagamento e transmissão além das últimas mensagens", () => {
+    const transcript = selectSaleDetectionTranscript([
+      { id: "payment", sender: "customer", text: "Já fiz o pagamento via pix", timestamp: new Date("2026-11-04T13:11:19Z") },
+      { id: "transmission", sender: "broker", text: "Sua proposta foi transmitida para a operadora", timestamp: new Date("2026-11-04T13:12:00Z") },
+      { id: "interview", sender: "customer", text: "Consegui fazer o videio chamanda", timestamp: new Date("2026-11-09T17:23:00Z") },
+      ...Array.from({ length: 14 }, (_, index) => ({
+        id: `recent-${index}`,
+        sender: index % 2 ? "broker" as const : "customer" as const,
+        text: `Mensagem recente ${index}`,
+        timestamp: new Date(`2026-11-09T13:${String(index).padStart(2, "0")}:00Z`),
+      })),
+    ], 4);
+
+    expect(transcript.map((message) => message.id)).toContain("payment");
+    expect(transcript.map((message) => message.id)).toContain("transmission");
+    expect(transcript.map((message) => message.id)).toContain("interview");
+    expect(transcript.map((message) => message.id)).toContain("recent-13");
+    expect(transcript.map((message) => message.id)).not.toContain("recent-0");
+  });
+
+  it("considera entrevista concluída uma prova forte, com acentos e erros comuns", () => {
+    for (const phrase of [
+      "Consegui fazer o videio chamanda",
+      "fiz a entrevista",
+      "Já fiz a videochamada",
+      "entrevista feita",
+      "entrevista aprovada",
+    ]) {
+      expect(evidenceProves(phrase, "customer")).toBe("interview");
+      expect(evidenceProves(phrase, "broker")).toBe("interview");
+    }
+    expect(evidenceProves("vou fazer a entrevista", "customer")).toBeNull();
+    expect(evidenceProves("quando é a video chamada?", "customer")).toBeNull();
+    expect(evidenceProves("não consegui fazer a entrevista", "customer")).toBeNull();
+    expect(evidenceProves("vou tentar agora a chamada", "customer")).toBeNull();
+    expect(decideAiSaleConversion(input({ saleCompleted: {
+      status: "confirmed", signals: ["interview"], evidence: ["Cliente: Consegui fazer o videio chamanda"],
+    } })).convert).toBe(true);
+  });
+
+  it("recupera a classificação quando há prova explícita do pagamento ou entrevista", () => {
+    const recovered = mergeSaleCompletedWithExplicitEvidence(readSaleCompleted({ status: "no", signals: [], evidence: [] }), [
+      { sender: "customer", text: "Já fiz o pagamento via pix" },
+      { sender: "customer", text: "Consegui fazer o videio chamanda" },
+      { sender: "customer", text: "Vou tentar agora a chamada" },
+      { sender: "system", text: "Entrevista médica concluída" },
+    ]);
+
+    expect(recovered.status).toBe("confirmed");
+    expect(recovered.signals).toEqual(["payment", "interview"]);
+    expect(recovered.evidence).toEqual([
+      "Cliente: Já fiz o pagamento via pix",
+      "Cliente: Consegui fazer o videio chamanda",
+    ]);
+  });
+
+  it("recupera só evidência de pagamento validada em análises anteriores", () => {
+    expect(readValidatedPaymentEvidence({
+      aiSaleEvidence: { paymentEvidence: ["Cliente: Já fiz o pagamento via pix", "", 4] },
+      aiSaleDetected: { status: "unverified", signals: ["payment"], evidence: ["não validada"] },
+    })).toEqual(["Cliente: Já fiz o pagamento via pix"]);
+    expect(readValidatedPaymentEvidence({
+      aiSaleDetected: { status: "suggested", signals: ["payment"], evidence: ["Cliente: paguei a adesão"] },
+    })).toEqual(["Cliente: paguei a adesão"]);
+    expect(readValidatedPaymentEvidence({
+      aiSaleDetected: { status: "converted", signals: ["payment", "proposal_transmitted"], evidence: ["Cliente: paguei a adesão", "Corretor: sua proposta foi transmitida"] },
+    })).toEqual(["Cliente: paguei a adesão"]);
+    expect(readValidatedPaymentEvidence({
+      aiSaleDetected: { status: "unverified", signals: ["payment"], evidence: ["não validada"] },
+    })).toEqual([]);
   });
 });
 

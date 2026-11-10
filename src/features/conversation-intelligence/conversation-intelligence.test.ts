@@ -96,6 +96,25 @@ describe("Conversation Intelligence Engine (Etapa IA.1)", () => {
       expect(context.recentTranscript).toContain("Consigo algum desconto");
       expect(context.messageCount).toBe(3);
     });
+
+    it("retains validated payment proof outside the recent-message window", () => {
+      const context = buildConversationIntelligenceContext({
+        lead: { id: "lead-123", nome: "Maria Silva", status: "under_analysis" },
+        previousMemory: { validatedPaymentEvidence: ["Cliente: Já fiz o pagamento via pix"] },
+        recentMessages: Array.from({ length: 12 }, (_, index) => ({
+          id: `m${index}`,
+          sender: index % 2 ? "broker" as const : "customer" as const,
+          content: `Mensagem recente ${index}`,
+          timestamp: new Date(`2026-11-09T13:${String(index).padStart(2, "0")}:00Z`),
+        })),
+        maxRecentMessages: 3,
+      });
+
+      expect(context.historicalMemory).toContain("Pagamento validado em análise anterior");
+      expect(context.historicalMemory).toContain("Já fiz o pagamento via pix");
+      expect(context.recentTranscript).not.toContain("Mensagem recente 0");
+      expect(context.recentTranscript).toContain("Mensagem recente 11");
+    });
   });
 
   describe("Policy Executor & Safe Transitions", () => {

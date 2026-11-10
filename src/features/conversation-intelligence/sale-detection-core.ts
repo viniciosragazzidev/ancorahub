@@ -1,6 +1,6 @@
 /**
  * Venda detectada pela IA (10/11, pedido do Vinicios): quando a conversa prova que a venda aconteceu
- * (adesão paga, proposta transmitida, carteirinha ou nº da proposta emitido), o lead vai sozinho para
+ * (adesão paga, proposta transmitida, entrevista concluída, carteirinha ou nº da proposta emitido), o lead vai sozinho para
  * Convertido, o corretor é parabenizado e a direção é avisada. Regras puras, sem I/O.
  */
 import { z } from "zod";
@@ -11,6 +11,7 @@ export const SALE_SIGNALS = [
   "contract_signed",
   "card_or_proposal_number",
   "medical_interview_approved",
+  "interview",
 ] as const;
 export type SaleSignal = (typeof SALE_SIGNALS)[number];
 
@@ -20,6 +21,7 @@ export const SALE_SIGNAL_LABELS: Record<SaleSignal, string> = {
   contract_signed: "contrato assinado",
   card_or_proposal_number: "carteirinha ou nº da proposta emitido",
   medical_interview_approved: "entrevista médica aprovada",
+  interview: "entrevista da operadora concluída",
 };
 
 const NO_SALE = { status: "no" as const, signals: [] as SaleSignal[], evidence: [] as string[] };
@@ -47,12 +49,32 @@ export function readSaleCompleted(value: unknown): SaleCompleted {
   return value === undefined || value === null ? NO_SALE : SaleCompletedSchema.parse(value);
 }
 
+/** Explicit, completed statements can recover a missed model classification; quoted evidence is still revalidated before any state change. */
+export function mergeSaleCompletedWithExplicitEvidence(sale: SaleCompleted, messages: readonly SaleEvidenceMessage[]): SaleCompleted {
+  const explicit = messages.flatMap((message) => {
+    if (message.sender === "system") return [];
+    const proof = evidenceProves(message.text, message.sender);
+    if (!proof) return [];
+    const signal: SaleSignal = proof === "transmission" ? "proposal_transmitted" : proof;
+    const speaker = message.sender === "customer" ? "Cliente" : "Corretor";
+    return [{ signal, evidence: `${speaker}: ${message.text.trim().slice(0, 260)}` }];
+  });
+  if (!explicit.length) return sale;
+  const signals = new Set<SaleSignal>(sale.signals);
+  explicit.forEach((item) => signals.add(item.signal));
+  const evidence = [...new Set([...sale.evidence, ...explicit.map((item) => item.evidence)])].slice(0, 5);
+  return {
+    status: "confirmed",
+    signals: SALE_SIGNALS.filter((signal) => signals.has(signal)),
+    evidence,
+  };
+}
+
 /** Etapas de fechamento: Documentação e Em análise. */
 const CLOSING_STATUSES: ReadonlySet<string> = new Set(["documentation_pending", "under_analysis"]);
-/** No fechamento, a venda precisa de pagamento, transmissão ou carteirinha/nº da proposta. Assinatura e entrevista sozinhas não bastam. */
-const CLOSING_PROOF: readonly SaleSignal[] = ["payment", "proposal_transmitted", "card_or_proposal_number"];
-/** Em Negociação a prova é mais forte: pagamento ou proposta transmitida. */
-const NEGOTIATION_PROOF: readonly SaleSignal[] = ["payment", "proposal_transmitted"];
+/** No fechamento e em Negociação, pagamento, transmissão, entrevista concluída ou proposta emitida provam avanço. */
+const CLOSING_PROOF: readonly SaleSignal[] = ["payment", "proposal_transmitted", "interview", "medical_interview_approved", "card_or_proposal_number"];
+const NEGOTIATION_PROOF: readonly SaleSignal[] = ["payment", "proposal_transmitted", "interview", "medical_interview_approved"];
 
 /** O que fica em qualificationDetails.aiSaleDetected depois da conversão automática (uma vez por lead). */
 export type AiSaleDetection = {
@@ -66,6 +88,8 @@ export type AiSaleDetection = {
   fromStatus: string;
   signals: SaleSignal[];
   evidence: string[];
+  /** Pagamentos validados, preservados mesmo quando saem da janela recente da conversa. */
+  paymentEvidence?: string[];
   reason: string;
   /** O corretor ainda não completou o "Registrar venda" (valor, operadora, vidas). */
   registrationPending: boolean;
@@ -117,7 +141,7 @@ export function decideAiSaleConversion(input: AiSaleDecisionInput): AiSaleDecisi
   const proof = CLOSING_STATUSES.has(input.status) ? CLOSING_PROOF : input.status === "negotiation" ? NEGOTIATION_PROOF : null;
   if (!proof) return { convert: false, why: "Etapa ainda longe do fechamento." };
   if (!sale.signals.some((signal) => proof.includes(signal))) {
-    return { convert: false, why: "Falta prova de pagamento ou de proposta transmitida." };
+    return { convert: false, why: "Falta prova de pagamento, proposta transmitida, entrevista concluída ou proposta emitida." };
   }
   // Ordem fixa no motivo: o mais forte primeiro.
   const signals = SALE_SIGNALS.filter((signal) => sale.signals.includes(signal));
@@ -218,7 +242,9 @@ export function aiSaleRegistrationPending(status: string, details: unknown) {
 // ─── Conferência do trecho com a conversa real ───────────────────────
 
 export type SaleEvidenceMessage = { sender: "customer" | "broker" | "system"; text: string };
-export type ValidatedEvidence = { quote: string; sender: "customer" | "broker"; proves: "payment" | "transmission" | null };
+export type SaleEvidenceKind = "payment" | "transmission" | "interview";
+export type ValidatedEvidence = { quote: string; sender: "customer" | "broker"; proves: SaleEvidenceKind | null };
+export type SaleDetectionTranscriptMessage = SaleEvidenceMessage & { id: string; timestamp: Date };
 
 /** Minúsculas, sem acento, sem pontuação e sem espaço repetido. */
 export function normalizeEvidenceText(text: string) {
@@ -236,10 +262,10 @@ function stripSpeaker(quote: string) {
 }
 
 /** Pagamento dito pelo cliente: "paguei", "pix feito", "segue o comprovante". */
-const CLIENT_PAYMENT = /\b(paguei|pagamos|ja paguei|ta pago|esta pago|pix feito|fiz o pix|fiz a transferencia|transferi|segue o comprovante|segue comprovante|ai o comprovante|mandei o comprovante|enviei o comprovante|pagamento feito|pagamento efetuado)\b/;
+const CLIENT_PAYMENT = /\b(paguei|pagamos|ja paguei|ta pago|esta pago|pix feito|fiz o pix|fiz a transferencia|fiz o pagamento|fiz pagamento|transferi|segue o comprovante|segue comprovante|ai o comprovante|mandei o comprovante|enviei o comprovante|pagamento feito|pagamento efetuado)\b/;
 /** Pagamento dado como feito pelo corretor: "recebi o comprovante", "pagamento confirmado", "adesão paga". */
 const BROKER_PAYMENT_DONE = /\b(recebi o comprovante|recebi seu comprovante|recebi o pix|pix recebido|pagamento confirmado|pagamento recebido|confirmei o pagamento|adesao paga|adesao foi paga|adesao ja foi paga|adesao esta paga)\b/;
-const TRANSMISSION_WORDS = /\b(transmiti|transmitida|transmitido|transmitimos|implantada|implantado|implantacao feita|enviada (a|para a) operadora|enviei (a proposta )?(a|para a) operadora)\b/;
+const TRANSMISSION_WORDS = /\b(transmiti|transmitiu|transmitida|transmitido|transmitimos|implantada|implantado|implantacao feita|enviada (a|para a) operadora|enviei (a proposta )?(a|para a) operadora)\b/;
 /** Futuro, plano ou negativa: "vai ser transmitida", "será transmitida amanhã", "ainda não foi transmitida". */
 const NOT_DONE_YET = /\b(vai ser|vao ser|sera|serao|vamos|vou|iremos|ainda nao|nao foi|nao foram|amanha|depois|quando|assim que|aguardando|falta)\b/;
 /** Pedido ou promessa, nunca prova: "me manda o comprovante", "pode pagar", "vou te mandar o boleto". */
@@ -248,6 +274,9 @@ const REQUEST_WORDS = /\b(me manda|me mande|manda o|mande o|me envia|me envie|en
 const PAYMENT_TOPIC = /\b(comprovante|pix|pagamento|pagar|adesao|boleto|transferencia)\b/;
 /** Nome de arquivo de pagamento: comprovante, recibo, pix. */
 const PAYMENT_FILE = /\b(comprovante|recibo|pix|pagamento|pago|transferencia)\b/;
+const INTERVIEW_TOPIC = /\b(entrevista(?: medica)?|video ?chamada|videio ?chamada|video ?chamanda|videio ?chamanda|videochamada|chamada de video|chamanda de video)\b/;
+const INTERVIEW_DONE = /\b(consegui fazer|conseguimos fazer|fiz|fizemos|realizei|realizamos|feita|feito|aprovada|aprovado|conclui|concluida|concluido)\b/;
+const INTERVIEW_NOT_DONE = /\b(nao|nunca) (consegui|conclui|fiz|realizei|foi|deu|pude)\b/;
 /** Trecho que é só um arquivo: "[documento: comprovante.pdf]", "[imagem]". */
 const FILE_ONLY = /^\[[^\]]+\]$/;
 
@@ -258,14 +287,80 @@ function tokenOverlap(quoteTokens: string[], messageTokens: Set<string>) {
 }
 
 /** O que um trecho de texto prova, conforme quem disse. Pedido ou promessa nunca prova. */
-export function evidenceProves(quote: string, sender: "customer" | "broker"): ValidatedEvidence["proves"] {
+export function evidenceProves(quote: string, sender: "customer" | "broker"): SaleEvidenceKind | null {
   const text = normalizeEvidenceText(quote);
   if (REQUEST_WORDS.test(text)) return null;
   if (sender === "customer" && CLIENT_PAYMENT.test(text)) return "payment";
   if (sender === "broker" && BROKER_PAYMENT_DONE.test(text)) return "payment";
   // Transmission only as a done fact told by the broker: no questions, plans or negatives (Vigia, 09/11).
   if (sender === "broker" && !quote.includes("?") && !NOT_DONE_YET.test(text) && TRANSMISSION_WORDS.test(text)) return "transmission";
+  // Interview/video call is a strong signal only as a completed fact from either participant.
+  if (!quote.includes("?") && !NOT_DONE_YET.test(text) && !INTERVIEW_NOT_DONE.test(text) && INTERVIEW_TOPIC.test(text) && INTERVIEW_DONE.test(text)) return "interview";
   return null;
+}
+
+/**
+ * Seleciona uma janela recente mais todas as mensagens que podem provar pagamento ou transmissão.
+ * Uma mídia genérica só traz também o pedido de pagamento imediatamente anterior para validar o vínculo.
+ */
+export function selectSaleDetectionTranscript(
+  messages: readonly SaleDetectionTranscriptMessage[],
+  maxRecentMessages = 12,
+): SaleDetectionTranscriptMessage[] {
+  const chronological = [...messages].sort((left, right) => left.timestamp.getTime() - right.timestamp.getTime());
+  const selected = new Map<string, SaleDetectionTranscriptMessage>();
+  const recentLimit = Math.max(0, maxRecentMessages);
+  if (recentLimit > 0) for (const message of chronological.slice(-recentLimit)) selected.set(message.id, message);
+
+  for (let index = 0; index < chronological.length; index += 1) {
+    const message = chronological[index]!;
+    const normalized = normalizeEvidenceText(message.text);
+    const fileOnly = FILE_ONLY.test(message.text.trim());
+    const isPaymentFile = message.sender === "customer" && fileOnly && PAYMENT_FILE.test(normalized);
+    const isEvidence = message.sender !== "system" && evidenceProves(message.text, message.sender) !== null;
+    if (isEvidence || isPaymentFile) selected.set(message.id, message);
+
+    if (message.sender === "customer" && fileOnly) {
+      for (let previous = index - 1; previous >= Math.max(0, index - 3); previous -= 1) {
+        const candidate = chronological[previous]!;
+        if (candidate.sender !== "broker") continue;
+        const candidateText = normalizeEvidenceText(candidate.text);
+        if (REQUEST_WORDS.test(candidateText) && PAYMENT_TOPIC.test(candidateText)) {
+          selected.set(candidate.id, candidate);
+          selected.set(message.id, message);
+        }
+        break;
+      }
+    }
+  }
+
+  return [...selected.values()].sort((left, right) => left.timestamp.getTime() - right.timestamp.getTime());
+}
+
+/** Evidence already validated against real WhatsApp messages by an earlier server analysis. */
+export function readValidatedPaymentEvidence(details: unknown): string[] {
+  if (!details || typeof details !== "object") return [];
+  const root = details as Record<string, unknown>;
+  const stored = root.aiSaleEvidence && typeof root.aiSaleEvidence === "object"
+    ? (root.aiSaleEvidence as { paymentEvidence?: unknown }).paymentEvidence
+    : null;
+  if (Array.isArray(stored)) {
+    return [...new Set(stored.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean))].slice(0, 5);
+  }
+
+  // Markers written by sale detection were persisted only after quote validation.
+  const marker = root.aiSaleDetected && typeof root.aiSaleDetected === "object"
+    ? root.aiSaleDetected as { status?: unknown; signals?: unknown; paymentEvidence?: unknown; evidence?: unknown }
+    : null;
+  if (!marker || (marker.status !== "converted" && marker.status !== "suggested") || !Array.isArray(marker.signals) || !marker.signals.includes("payment")) return [];
+  const evidence = Array.isArray(marker.paymentEvidence) ? marker.paymentEvidence : marker.evidence;
+  return [...new Set((Array.isArray(evidence) ? evidence : [])
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => {
+      const sender = /^corretor(?:a)?\s*:/i.test(item) ? "broker" : "customer";
+      return evidenceProves(item, sender) === "payment";
+    }))].slice(0, 5);
 }
 
 /**

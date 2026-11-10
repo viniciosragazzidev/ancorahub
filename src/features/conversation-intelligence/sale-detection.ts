@@ -21,6 +21,7 @@ import {
   type AiSaleDetection,
   type SaleCompleted,
   type SaleEvidenceMessage,
+  type ValidatedEvidence,
 } from "./sale-detection-core";
 
 type LeadForSale = {
@@ -60,6 +61,12 @@ async function loadEvidenceMessages(tenantId: string, leadId: string): Promise<S
   }));
 }
 
+/** Validates model quotes against tenant-scoped WhatsApp history for analysis persistence and backfills. */
+export async function validateSaleCompletionForLead(tenantId: string, leadId: string, saleCompleted: SaleCompleted): Promise<ValidatedEvidence[]> {
+  if (!saleCompleted.evidence.length) return [];
+  return validateSaleEvidence(saleCompleted.evidence, await loadEvidenceMessages(tenantId, leadId));
+}
+
 export type AiSaleOutcome =
   | { marker: AiSaleDetection; why?: undefined }
   | { marker: null; why: string };
@@ -79,6 +86,7 @@ export async function applyAiSaleDetection(input: {
   alreadySuggested: boolean;
   recentlyUndone: boolean;
   actorUserId: string;
+  validatedEvidence?: readonly ValidatedEvidence[];
 }): Promise<AiSaleOutcome> {
   const { lead } = input;
   try {
@@ -118,7 +126,7 @@ export async function applyAiSaleDetection(input: {
     if (!decision.convert && !decision.suggest) return { marker: null, why: decision.why };
 
     // O trecho precisa existir na conversa (Vigia, 10/11): citação inventada ou mal lida nunca converte.
-    const validated = validateSaleEvidence(input.saleCompleted.evidence, await loadEvidenceMessages(lead.tenantId, lead.id));
+    const validated = input.validatedEvidence ?? await validateSaleCompletionForLead(lead.tenantId, lead.id, input.saleCompleted);
     const base = { at: new Date().toISOString(), fromStatus: lead.status, signals: decision.signals, registrationPending: false };
     if (!saleEvidenceProven(validated)) {
       return {
@@ -131,9 +139,10 @@ export async function applyAiSaleDetection(input: {
       };
     }
     const quotes = validated.map((item) => item.quote);
+    const paymentEvidence = validated.filter((item) => item.proves === "payment").map((item) => item.quote);
 
     if (decision.suggest) {
-      return { marker: { ...base, status: "suggested", evidence: quotes, reason: decision.reason } };
+      return { marker: { ...base, status: "suggested", evidence: quotes, paymentEvidence, reason: decision.reason } };
     }
 
     const evidenceLine = `\nTrechos da conversa: ${quotes.map((quote) => `"${quote}"`).join(" · ")}`;
@@ -154,7 +163,7 @@ export async function applyAiSaleDetection(input: {
       },
     });
 
-    return { marker: { ...base, status: "converted", evidence: quotes, reason: decision.reason, registrationPending: true } };
+    return { marker: { ...base, status: "converted", evidence: quotes, paymentEvidence, reason: decision.reason, registrationPending: true } };
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 200) : "erro";
     console.warn("[ai-sale] not_converted", { leadId: lead.id, error: message });
