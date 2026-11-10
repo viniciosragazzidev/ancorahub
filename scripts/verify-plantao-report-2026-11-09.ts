@@ -23,9 +23,9 @@ async function main() {
   try {
     const actual = await db.begin(async (tx) => {
       await tx`set transaction read only`;
-      const queueRowsRaw = await tx<{ queue_name: string | null; origin: string; has_form_answers: boolean; has_ctwa_clid: boolean; has_without_referral: boolean; count: number }[]>`
+      const queueRowsRaw = await tx<{ queue_name: string | null; has_form_answers: boolean; has_ctwa_clid: boolean; has_without_referral: boolean; count: number }[]>`
         with entrants as (
-          select l.id, l.origem::text as origin,
+          select l.id,
             coalesce(l.source_metadata, '{}'::jsonb) ? 'formAnswers' as has_form_answers,
             coalesce(l.source_metadata, '{}'::jsonb) ? 'ctwaClid' as has_ctwa_clid,
             coalesce(l.source_metadata, '{}'::jsonb) ? 'withoutReferral' as has_without_referral,
@@ -38,35 +38,41 @@ async function main() {
           ) first_queue on true
           where l.tenant_id = ${TENANT_ID} and l.created_at >= ${FROM} and l.created_at < ${UNTIL}
         )
-        select queue.name as queue_name, entrants.origin, entrants.has_form_answers,
+        select queue.name as queue_name, entrants.has_form_answers,
           entrants.has_ctwa_clid, entrants.has_without_referral, count(*)::int as count
         from entrants
         left join lead_queues queue on queue.id = entrants.to_queue_id and queue.tenant_id = ${TENANT_ID}
-        group by queue.name, entrants.origin, entrants.has_form_answers, entrants.has_ctwa_clid, entrants.has_without_referral
+        group by queue.name, entrants.has_form_answers, entrants.has_ctwa_clid, entrants.has_without_referral
       `;
-      const offersRaw = await tx<{ lead_id: string; broker_id: string; duty_schedule_id: string | null; duty_name: string | null; offered_at: Date }[]>`
+      const offersRaw = await tx<{ lead_id: string; broker_id: string; duty_schedule_id: string | null; duty_name: string | null; original_queue_name: string | null; offered_at: Date }[]>`
         select offer.lead_id, offer.broker_id, offer.duty_schedule_id,
-          schedule.name as duty_name, offer.offered_at
+          schedule.name as duty_name, original_queue.name as original_queue_name, offer.offered_at
         from lead_offers offer
         left join unit_duty_schedules schedule
           on schedule.id = offer.duty_schedule_id and schedule.tenant_id = offer.tenant_id
+        left join lateral (
+          select event.to_queue_id from lead_distribution_events event
+          where event.tenant_id = offer.tenant_id and event.lead_id = offer.lead_id and event.action = 'queued'
+          order by event.created_at asc, event.id asc limit 1
+        ) first_queue on true
+        left join lead_queues original_queue
+          on original_queue.id = first_queue.to_queue_id and original_queue.tenant_id = offer.tenant_id
         where offer.tenant_id = ${TENANT_ID} and offer.accepted_at is not null
           and offer.offered_at >= ${FROM} and offer.offered_at < ${UNTIL}
       `;
       const queueRows: PlantaoQueueRow[] = queueRowsRaw.map((row) => ({
         queueName: row.queue_name,
         kind: classifyPlantaoLead({ hasFormAnswers: row.has_form_answers, hasCtwaClid: row.has_ctwa_clid, hasWithoutReferral: row.has_without_referral }),
-        origin: row.origin,
         count: Number(row.count),
       }));
-      const offers: PlantaoOfferRow[] = offersRaw.map((row) => ({ leadId: row.lead_id, brokerId: row.broker_id, dutyScheduleId: row.duty_schedule_id, dutyName: row.duty_name, offeredAt: row.offered_at }));
+      const offers: PlantaoOfferRow[] = offersRaw.map((row) => ({ leadId: row.lead_id, brokerId: row.broker_id, dutyScheduleId: row.duty_schedule_id, dutyName: row.duty_name, originalQueueName: row.original_queue_name, offeredAt: row.offered_at }));
       return calculatePlantaoMetrics(queueRows, offers, DEFAULT_PLANTAO_REPORT_CONFIG);
     });
 
     const expected = {
       external: { whatsapp: 92, rd: 27, total: 119 },
       internal: { facebook: 118, whatsapp: 17, total: 135 },
-      indications: { morning: 86, afternoon: 48 },
+      indications: { morning: 82, afternoon: 48 },
       quantity: { pme: 9.5, onlineMorning: 4.2, onlineAfternoon: 1, inPersonMorning: 6.5, inPersonAfternoon: 6.7 },
     };
     const actualRounded = { ...actual, quantity: Object.fromEntries(Object.entries(actual.quantity).map(([key, value]) => [key, Number(value.toFixed(1))])) };

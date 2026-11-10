@@ -113,10 +113,19 @@ export async function loadPlantaoReport(tenantId: string, now = new Date(), conf
   `);
   const offerResult = await getDatabase().execute(sql`
     select offer.lead_id, offer.broker_id, offer.duty_schedule_id,
-      schedule.name as duty_name, offer.offered_at
+      schedule.name as duty_name, original_queue.name as original_queue_name, offer.offered_at
     from lead_offers offer
     left join unit_duty_schedules schedule
       on schedule.id = offer.duty_schedule_id and schedule.tenant_id = offer.tenant_id
+    left join lateral (
+      select event.to_queue_id
+      from lead_distribution_events event
+      where event.tenant_id = offer.tenant_id and event.lead_id = offer.lead_id and event.action = 'queued'
+      order by event.created_at asc, event.id asc
+      limit 1
+    ) first_queue on true
+    left join lead_queues original_queue
+      on original_queue.id = first_queue.to_queue_id and original_queue.tenant_id = offer.tenant_id
     where offer.tenant_id = ${tenantId}
       and offer.accepted_at is not null
       and offer.offered_at >= ${from}::timestamptz
@@ -124,8 +133,8 @@ export async function loadPlantaoReport(tenantId: string, now = new Date(), conf
   `);
   const queueRows = rowsOf<{ queue_name: string | null; has_form_answers: boolean; has_ctwa_clid: boolean; has_without_referral: boolean; count: number }>(queueResult)
     .map((row): PlantaoQueueRow => ({ queueName: row.queue_name, kind: classifyPlantaoLead({ hasFormAnswers: row.has_form_answers, hasCtwaClid: row.has_ctwa_clid, hasWithoutReferral: row.has_without_referral }), count: Number(row.count) }));
-  const offers = rowsOf<{ lead_id: string; broker_id: string; duty_schedule_id: string | null; duty_name: string | null; offered_at: Date | string }>(offerResult)
-    .map((row): PlantaoOfferRow => ({ leadId: row.lead_id, brokerId: row.broker_id, dutyScheduleId: row.duty_schedule_id, dutyName: row.duty_name, offeredAt: row.offered_at }));
+  const offers = rowsOf<{ lead_id: string; broker_id: string; duty_schedule_id: string | null; duty_name: string | null; original_queue_name: string | null; offered_at: Date | string }>(offerResult)
+    .map((row): PlantaoOfferRow => ({ leadId: row.lead_id, brokerId: row.broker_id, dutyScheduleId: row.duty_schedule_id, dutyName: row.duty_name, originalQueueName: row.original_queue_name, offeredAt: row.offered_at }));
   const metrics = calculatePlantaoMetrics(queueRows, offers, config);
   return { config, metrics, text: buildPlantaoReportText(metrics, now), day: plantaoReportDayKey(now) };
 }

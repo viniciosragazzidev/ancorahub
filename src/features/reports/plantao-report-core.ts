@@ -15,11 +15,13 @@ export type PlantaoReportConfig = {
     tatiana: string;
     facebook: string[];
     whatsappInternal: string;
+    indicationsExcludedQueue: string;
   };
   duties: {
     pmePrefix: string;
     premiumName: string;
     presencialPrefix: string;
+    indicationsExcludedPrefix: string;
   };
 };
 
@@ -33,11 +35,13 @@ export const DEFAULT_PLANTAO_REPORT_CONFIG: PlantaoReportConfig = {
     tatiana: "Fila TATIANA",
     facebook: ["Fila PF - Renan", "Fila PME - Renan"],
     whatsappInternal: "Whatsapp Renan",
+    indicationsExcludedQueue: "Alessandra Leads",
   },
   duties: {
     pmePrefix: "PME",
     premiumName: "Premium",
     presencialPrefix: "Presencial",
+    indicationsExcludedPrefix: "Plantão Plus",
   },
 };
 
@@ -52,6 +56,7 @@ export type PlantaoOfferRow = {
   brokerId: string;
   dutyScheduleId: string | null;
   dutyName: string | null;
+  originalQueueName: string | null;
   offeredAt: Date | string;
 };
 
@@ -100,11 +105,13 @@ export function parsePlantaoReportConfig(value: string | null | undefined): Plan
         tatiana: typeof queues?.tatiana === "string" && queues.tatiana.trim() ? queues.tatiana.trim() : DEFAULT_PLANTAO_REPORT_CONFIG.queues.tatiana,
         facebook: Array.isArray(queues?.facebook) ? queues.facebook.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).map((item) => item.trim()) : [...DEFAULT_PLANTAO_REPORT_CONFIG.queues.facebook],
         whatsappInternal: typeof queues?.whatsappInternal === "string" && queues.whatsappInternal.trim() ? queues.whatsappInternal.trim() : DEFAULT_PLANTAO_REPORT_CONFIG.queues.whatsappInternal,
+        indicationsExcludedQueue: typeof queues?.indicationsExcludedQueue === "string" && queues.indicationsExcludedQueue.trim() ? queues.indicationsExcludedQueue.trim() : DEFAULT_PLANTAO_REPORT_CONFIG.queues.indicationsExcludedQueue,
       },
       duties: {
         pmePrefix: typeof duties?.pmePrefix === "string" && duties.pmePrefix.trim() ? duties.pmePrefix.trim() : DEFAULT_PLANTAO_REPORT_CONFIG.duties.pmePrefix,
         premiumName: typeof duties?.premiumName === "string" && duties.premiumName.trim() ? duties.premiumName.trim() : DEFAULT_PLANTAO_REPORT_CONFIG.duties.premiumName,
         presencialPrefix: typeof duties?.presencialPrefix === "string" && duties.presencialPrefix.trim() ? duties.presencialPrefix.trim() : DEFAULT_PLANTAO_REPORT_CONFIG.duties.presencialPrefix,
+        indicationsExcludedPrefix: typeof duties?.indicationsExcludedPrefix === "string" && duties.indicationsExcludedPrefix.trim() ? duties.indicationsExcludedPrefix.trim() : DEFAULT_PLANTAO_REPORT_CONFIG.duties.indicationsExcludedPrefix,
       },
     };
   } catch {
@@ -170,7 +177,14 @@ export function calculatePlantaoMetrics(rows: readonly PlantaoQueueRow[], offers
 
   const morningLeads = new Set<string>();
   const afternoonLeads = new Set<string>();
-  for (const offer of offers) (isAfternoon(offer.offeredAt) ? afternoonLeads : morningLeads).add(offer.leadId);
+  const excludedQueue = normalizePlantaoLabel(config.queues.indicationsExcludedQueue);
+  const excludedDutyPrefix = normalizePlantaoLabel(config.duties.indicationsExcludedPrefix);
+  for (const offer of offers) {
+    const excludedByQueue = offer.originalQueueName && normalizePlantaoLabel(offer.originalQueueName) === excludedQueue;
+    const excludedByDuty = offer.dutyName && normalizePlantaoLabel(offer.dutyName).startsWith(excludedDutyPrefix);
+    if (excludedByQueue || excludedByDuty) continue;
+    (isAfternoon(offer.offeredAt) ? afternoonLeads : morningLeads).add(offer.leadId);
+  }
   const indications = { morning: morningLeads.size, afternoon: afternoonLeads.size };
 
   const isPme = (name: string) => name.startsWith(normalizePlantaoLabel(config.duties.pmePrefix));
@@ -192,8 +206,8 @@ function whole(value: number) {
   return String(Math.max(0, Math.trunc(value)));
 }
 
-function average(value: number) {
-  return Math.max(0, value).toFixed(1).replace(".", ",");
+function averageRoundedUp(value: number) {
+  return String(Math.max(0, Math.ceil(value)));
 }
 
 export function plantaoReportDayKey(now: Date) {
@@ -224,8 +238,8 @@ export function buildPlantaoReportText(metrics: PlantaoReportMetrics, now: Date)
     `🌅 Manhã: ${whole(metrics.indications.morning)} · 🌇 Tarde: ${whole(metrics.indications.afternoon)}`,
     "",
     "*Média de leads por corretor*",
-    `🏢 PME: ${average(metrics.quantity.pme)}`,
-    `💻 Online: manhã ${average(metrics.quantity.onlineMorning)} · tarde ${average(metrics.quantity.onlineAfternoon)}`,
-    `🧑‍💼 Presencial: manhã ${average(metrics.quantity.inPersonMorning)} · tarde ${average(metrics.quantity.inPersonAfternoon)}`,
+    `🏢 PME: ${averageRoundedUp(metrics.quantity.pme)}`,
+    `💻 Online: manhã ${averageRoundedUp(metrics.quantity.onlineMorning)} · tarde ${averageRoundedUp(metrics.quantity.onlineAfternoon)}`,
+    `🧑‍💼 Presencial: manhã ${averageRoundedUp(metrics.quantity.inPersonMorning)} · tarde ${averageRoundedUp(metrics.quantity.inPersonAfternoon)}`,
   ].join("\n");
 }
