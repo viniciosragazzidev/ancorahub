@@ -62,11 +62,11 @@ describe("Qualification Flow Unit Tests", () => {
       expect(next?.id).toBe("Q2");
     });
 
-    it("returns numberOfLives (Q3) when customerName and planType are collected", () => {
+    it("returns numberOfLives (Q3) when customerName and a family planType are collected", () => {
       const memory: ConversationMemory = {
         ...createEmptyMemory(),
         customerName: { value: "Carlos Silva", confidence: 1 },
-        planType: { value: "individual", confidence: 1 },
+        planType: { value: "familiar", confidence: 1 },
         collectedFields: ["customerName", "planType"],
       };
       const next = getNextQualificationQuestion(memory, policy);

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
-import { asksCurrentPlan, formatAgeList, groupAgeList, hasQuoteReadyData, type ConversationMemory } from "@/features/ai-agent/memory";
+import { applyImpliedQualificationFacts, asksCurrentPlan, formatAgeList, groupAgeList, hasQuoteReadyData, type ConversationMemory } from "@/features/ai-agent/memory";
 import { beneficiariesFromMemory, parseAgeValues } from "@/features/ai-agent/beneficiary-relations";
 import { deriveLeadQualificationStatus } from "@/features/leads/qualification-status";
 import { enqueueMetaQualificationConversion } from "@/features/meta-ads/meta-conversion-service";
@@ -168,6 +168,8 @@ export function getNextQualificationQuestion(
   _pastOutboundTexts?: Set<string>
 ): QualificationQuestionDefinition | null {
   void _pastOutboundTexts;
+  // Whatever path set the plan type, its implied facts hold here: an individual plan never gets the lives question.
+  memory = applyImpliedQualificationFacts(memory);
   const required = policy?.requiredFields ?? ["customerName", "planType", "numberOfLives", "age", "city", "email"];
 
   for (const field of required) {
@@ -216,6 +218,7 @@ export function resolveDeterministicQualificationTurn(input: {
   periodGreeting?: boolean;
   now?: Date;
 }): DeterministicQualificationTurn {
+  input = { ...input, memory: applyImpliedQualificationFacts(input.memory) };
   const evaluation = evaluateQualification(input.memory, input.policy);
   const nextQuestion = getNextQualificationQuestion(input.memory, input.policy, input.pastOutboundTexts);
 
@@ -278,6 +281,7 @@ export function evaluateQualification(
   policy?: AgentBehaviorPolicy,
   reason?: "human_requested" | "not_interested"
 ): QualificationEvaluation {
+  memory = applyImpliedQualificationFacts(memory);
   const required = policy?.requiredFields ?? ["customerName", "planType", "numberOfLives", "age", "city", "email"];
   const completedFields = required.filter((field) => {
     if (field === "age" && memory.planType?.value === "empresarial") return Boolean(memory.averageAge?.value);
