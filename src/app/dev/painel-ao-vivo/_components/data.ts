@@ -6,14 +6,23 @@
  * - lead recebido = oferta com corretor e não cancelada (`countsAsReceived`);
  * - presença confirmada pelo WhatsApp antes de receber (duty-presence*);
  * - média por corretor = leads ÷ corretores que receberam, como o "Resultado do Plantão" (plantao-report-core.ts);
- * - origens Tatiana/Renan × formulário/WhatsApp: mesmas filas e regra do "Resultado do Plantão"
- *   (`DEFAULT_PLANTAO_REPORT_CONFIG.queues` + `classifyPlantaoLead`).
+ * - filas (não são plantões): as mesmas do "Resultado do Plantão" (`DEFAULT_PLANTAO_REPORT_CONFIG.queues`),
+ *   e a Fila TATIANA separada em formulário e WhatsApp por `classifyPlantaoLead`.
  */
 
-/** Origem do lead: Fila TATIANA (form/WhatsApp), Fila PF/PME - Renan (form) e Whatsapp Renan. */
-export type OrigemKey = "tatianaForm" | "tatianaWhatsapp" | "renanForm" | "renanWhatsapp";
+/** Fila de entrada do lead. A fila diz de onde o lead veio; o plantão diz quem atende. */
+export type OrigemKey = "tatianaForm" | "tatianaWhatsapp" | "renanPf" | "renanPme" | "renanWhatsapp";
 export type Origens = Record<OrigemKey, number>;
-export const ORIGEM_KEYS: OrigemKey[] = ["tatianaForm", "tatianaWhatsapp", "renanForm", "renanWhatsapp"];
+export const ORIGEM_KEYS: OrigemKey[] = ["tatianaForm", "tatianaWhatsapp", "renanPf", "renanPme", "renanWhatsapp"];
+
+export type FilaColumn = { key: OrigemKey; group: "Tatiana" | "Renan"; short: string; label: string; queue: string };
+export const FILA_COLUMNS: FilaColumn[] = [
+  { key: "tatianaForm", group: "Tatiana", short: "Form", label: "Tatiana · Form", queue: "Fila TATIANA (formulário)" },
+  { key: "tatianaWhatsapp", group: "Tatiana", short: "WhatsApp", label: "Tatiana · WhatsApp", queue: "Fila TATIANA (WhatsApp)" },
+  { key: "renanPf", group: "Renan", short: "Form PF", label: "Renan · Form PF", queue: "Fila PF - Renan" },
+  { key: "renanPme", group: "Renan", short: "Form PME", label: "Renan · Form PME", queue: "Fila PME - Renan" },
+  { key: "renanWhatsapp", group: "Renan", short: "WhatsApp", label: "Renan · WhatsApp", queue: "Whatsapp Renan" },
+];
 
 export type TurnoKey = "manha" | "tarde" | "noite" | "extra";
 export type TurnoState = "encerrado" | "agora" | "depois";
@@ -24,10 +33,8 @@ export type Turno = {
   hours: string;
   startsAt: string;
   leads: number;
-  /** Leads do mesmo turno ontem até este horário (para a comparação simples). */
-  yesterday: number;
   state: TurnoState;
-  /** Leads do turno por origem. O que sobra de `leads` vem de outras origens (indicação, frios, outras filas). */
+  /** Leads do turno por fila. O que sobra de `leads` vem de outras origens (indicação, frios, outras filas). */
   origens: Origens;
 };
 
@@ -61,10 +68,10 @@ export const LIVE_EXAMPLE: LiveData = {
   startClock: { hour: 14, minute: 32 },
   dateLabel: "Terça, 10 de novembro",
   turnos: [
-    { key: "manha", label: "Manhã", hours: "08:00 às 13:30", startsAt: "08:00", leads: 86, yesterday: 79, state: "encerrado", origens: { tatianaForm: 14, tatianaWhatsapp: 37, renanForm: 21, renanWhatsapp: 7 } },
-    { key: "tarde", label: "Tarde", hours: "13:30 às 19:00", startsAt: "13:30", leads: 23, yesterday: 18, state: "agora", origens: { tatianaForm: 4, tatianaWhatsapp: 9, renanForm: 6, renanWhatsapp: 2 } },
-    { key: "noite", label: "Noite", hours: "19:00 às 23:00", startsAt: "19:00", leads: 0, yesterday: 0, state: "depois", origens: { tatianaForm: 0, tatianaWhatsapp: 0, renanForm: 0, renanWhatsapp: 0 } },
-    { key: "extra", label: "Extra da noite", hours: "23:00 às 02:00", startsAt: "23:00", leads: 0, yesterday: 0, state: "depois", origens: { tatianaForm: 0, tatianaWhatsapp: 0, renanForm: 0, renanWhatsapp: 0 } },
+    { key: "manha", label: "Manhã", hours: "08:00 às 13:30", startsAt: "08:00", leads: 86, state: "encerrado", origens: { tatianaForm: 14, tatianaWhatsapp: 37, renanPf: 12, renanPme: 9, renanWhatsapp: 7 } },
+    { key: "tarde", label: "Tarde", hours: "13:30 às 19:00", startsAt: "13:30", leads: 23, state: "agora", origens: { tatianaForm: 4, tatianaWhatsapp: 9, renanPf: 4, renanPme: 2, renanWhatsapp: 2 } },
+    { key: "noite", label: "Noite", hours: "19:00 às 23:00", startsAt: "19:00", leads: 0, state: "depois", origens: { tatianaForm: 0, tatianaWhatsapp: 0, renanPf: 0, renanPme: 0, renanWhatsapp: 0 } },
+    { key: "extra", label: "Extra da noite", hours: "23:00 às 02:00", startsAt: "23:00", leads: 0, state: "depois", origens: { tatianaForm: 0, tatianaWhatsapp: 0, renanPf: 0, renanPme: 0, renanWhatsapp: 0 } },
   ],
   plantoes: [
     { id: "pf-manha", name: "Pessoa física manhã", hours: "08:00 às 13:30", state: "encerrado", escalados: 14, confirmaram: 13, recebendo: 0, leads: 44, receberam: 12 },
@@ -94,8 +101,10 @@ export function percentChange(now: number, before: number) {
   return Math.round(((now - before) / before) * 100);
 }
 
-/** Sequência das origens na simulação (proporção parecida com a do dia; null = outra origem). */
-const ORIGEM_CYCLE: (OrigemKey | null)[] = ["tatianaWhatsapp", "renanForm", "tatianaWhatsapp", "tatianaForm", "renanForm", "tatianaWhatsapp", "renanWhatsapp", "tatianaWhatsapp", "tatianaForm", null];
+/** Sequência das filas na simulação (proporção parecida com a do dia; null = outra origem, como indicação). */
+const ORIGEM_CYCLE: (OrigemKey | null)[] = ["tatianaWhatsapp", "renanPf", "tatianaWhatsapp", "renanPme", "tatianaForm", "tatianaWhatsapp", "renanWhatsapp", "renanPf", "tatianaWhatsapp", null];
+/** Plantão que atende cada fila no exemplo (fila PME vai para o plantão PME; outra origem, para o presencial). */
+const PLANTAO_BY_FILA: Record<OrigemKey | "outra", string> = { tatianaForm: "pf-tarde", tatianaWhatsapp: "pf-tarde", renanPf: "pf-tarde", renanPme: "pme", renanWhatsapp: "pf-tarde", outra: "presencial" };
 
 const FIRST_NAMES = ["Bruno", "Camila", "Diego", "Fernanda", "Juliana", "Marcos", "Patrícia", "Rafael", "Tatiane", "Vitor"];
 
@@ -104,19 +113,17 @@ export type LiveEvent =
   | { kind: "presenca"; plantaoId: string; broker: string };
 
 /**
- * Próximo acontecimento da simulação. Na maioria das vezes chega um lead (sorteado pelo número de
- * corretores recebendo em cada plantão); de vez em quando um corretor que faltava confirma presença.
+ * Próximo acontecimento da simulação. Na maioria das vezes chega um lead numa fila e vai para o plantão que
+ * atende essa fila; de vez em quando um corretor que faltava confirma presença.
  */
 export function nextEvent(data: Pick<LiveData, "plantoes">, step: number): LiveEvent | null {
   const running = data.plantoes.filter((plantao) => plantao.state === "agora");
   if (!running.length) return null;
   const missing = running.find((plantao) => plantao.confirmaram < plantao.escalados);
   if (missing && step % 4 === 3) return { kind: "presenca", plantaoId: missing.id, broker: FIRST_NAMES[step % FIRST_NAMES.length] };
-  const weights = running.map((plantao) => plantao.recebendo);
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
-  let pick = (((step * 7919) % 97) / 97) * total;
-  const target = running.find((_, index) => (pick -= weights[index]) < 0) ?? running[0];
-  return { kind: "lead", plantaoId: target.id, turno: "tarde", firstContact: step % 3 === 0, origem: ORIGEM_CYCLE[step % ORIGEM_CYCLE.length] };
+  const origem = ORIGEM_CYCLE[step % ORIGEM_CYCLE.length];
+  const plantaoId = PLANTAO_BY_FILA[origem ?? "outra"];
+  return { kind: "lead", plantaoId: running.some((plantao) => plantao.id === plantaoId) ? plantaoId : running[0].id, turno: "tarde", firstContact: step % 3 === 0, origem };
 }
 
 export function applyEvent(data: LiveData, event: LiveEvent): LiveData {

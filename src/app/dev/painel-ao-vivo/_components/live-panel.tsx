@@ -1,27 +1,43 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion, type Transition } from "motion/react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, motion, useAnimate, useReducedMotion, type Transition } from "motion/react";
 import { ArrowDown, ArrowUp, Moon, MoonStar, Sun, Sunset, UserCheck, Zap } from "lucide-react";
 
 import { AnimatedCounter } from "@/components/arc/animated-counter/animated-counter";
 import { motionTokens as m } from "@/components/arc/motion-tokens";
 
-import { LIVE_EXAMPLE, ORIGEM_KEYS, applyEvent, sumOrigens, type OrigemKey, averagePerBroker, nextEvent, percentChange, totalLeads, type LiveData, type LiveEvent, type Plantao, type Turno, type TurnoKey } from "./data";
+import {
+  FILA_COLUMNS,
+  LIVE_EXAMPLE,
+  ORIGEM_KEYS,
+  applyEvent,
+  averagePerBroker,
+  nextEvent,
+  percentChange,
+  sumOrigens,
+  totalLeads,
+  type LiveData,
+  type LiveEvent,
+  type OrigemKey,
+  type Plantao,
+  type Turno,
+  type TurnoKey,
+} from "./data";
 import styles from "../painel.module.css";
 
 const enter: Transition = { duration: m.duration.considered, ease: [...m.ease.enter] };
-const ORIGEM_SHORT: Record<OrigemKey, string> = { tatianaForm: "Form", tatianaWhatsapp: "WhatsApp", renanForm: "Form", renanWhatsapp: "WhatsApp" };
-const ORIGEM_LABEL: Record<OrigemKey, string> = { tatianaForm: "Tatiana Form", tatianaWhatsapp: "Tatiana WhatsApp", renanForm: "Renan Form", renanWhatsapp: "Renan WhatsApp" };
-const sumAll = (origens: Record<OrigemKey, number>) => ORIGEM_KEYS.reduce((sum, key) => sum + origens[key], 0);
 const TURNO_ICON: Record<TurnoKey, typeof Sun> = { manha: Sun, tarde: Sunset, noite: Moon, extra: MoonStar };
+const FILA_BY_KEY = Object.fromEntries(FILA_COLUMNS.map((column) => [column.key, column])) as Record<OrigemKey, (typeof FILA_COLUMNS)[number]>;
+const sumAll = (origens: Record<OrigemKey, number>) => ORIGEM_KEYS.reduce((sum, key) => sum + origens[key], 0);
 
 /** Suposições: o que este exemplo usa e o design system do Diretor Lite não cobre. Aparecem na tela. */
 const ASSUMPTIONS = [
   "Números de destaque maiores que a escala de texto (máx. 48px no Diretor): crescem com a altura da tela, até 128px, para ler de longe ou na TV.",
   "Indicador \"Ao vivo\" com ponto pulsando em --success: o kit de movimento só tem o pulso único de atenção.",
   "Comparação com \"ontem neste horário\": a regra exata (mesmo horário, mesma unidade) fica para a implementação.",
-  "Aviso de lead novo reaproveita o aviso escuro do corretor (DS Lite 5.10) em pílula, fora do chat.",
+  "Aviso de lead novo reaproveita o aviso escuro do corretor (DS Lite 5.10) em pílula, fora do chat; no celular aparece embaixo.",
+  "Chegada de lead: o número dá um pulo curto (escala 1,08) e a célula da fila acende; o kit prevê 1,04 para atenção.",
   "Corretores desenhados como pontos (um por pessoa), com o azul de série em dois tons, como no gráfico de barras.",
   "No celular a página rola na vertical; sem rolagem vale para computador e TV.",
 ];
@@ -39,7 +55,7 @@ export function LivePanel({ intervalMs, openAssumptions }: { intervalMs: number;
   const dataRef = useRef(data);
   useEffect(() => { dataRef.current = data; }, [data]);
 
-  // Simulação: um acontecimento a cada intervalo (lead novo ou presença confirmada).
+  // Simulação: um acontecimento a cada intervalo (lead novo numa fila ou presença confirmada).
   useEffect(() => {
     if (intervalMs <= 0) return;
     let noticeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -50,10 +66,10 @@ export function LivePanel({ intervalMs, openAssumptions }: { intervalMs: number;
       setData((current) => applyEvent(current, event));
       setFlash({ id: step.current, plantaoId: event.plantaoId, turno: event.kind === "lead" ? event.turno : undefined, origem: event.kind === "lead" ? event.origem : undefined, kind: event.kind });
       setNotice(event.kind === "lead"
-        ? { id: step.current, kind: "lead", title: event.origem ? `Lead novo · ${ORIGEM_LABEL[event.origem]}` : "Lead novo", detail: `foi para ${plantao?.name ?? "o plantão"}` }
-        : { id: step.current, kind: "presenca", title: `${event.broker} confirmou presença`, detail: plantao?.name ?? "" });
+        ? { id: step.current, kind: "lead", title: event.origem ? `Lead novo na fila ${FILA_BY_KEY[event.origem].label}` : "Lead novo de outra origem", detail: event.origem ? FILA_BY_KEY[event.origem].queue : "indicação" }
+        : { id: step.current, kind: "presenca", title: `${event.broker} confirmou presença`, detail: plantao ? `plantão ${plantao.name}` : "" });
       clearTimeout(noticeTimer);
-      noticeTimer = setTimeout(() => setNotice(null), 3200);
+      noticeTimer = setTimeout(() => setNotice(null), 3600);
     };
     const first = setTimeout(tick, Math.min(3500, intervalMs));
     const every = setInterval(tick, intervalMs);
@@ -62,6 +78,7 @@ export function LivePanel({ intervalMs, openAssumptions }: { intervalMs: number;
 
   const total = totalLeads(data.turnos);
   const origens = sumOrigens(data.turnos);
+  const others = total - sumAll(origens);
   const change = percentChange(total, data.yesterdaySameTime);
   const running = data.plantoes.filter((plantao) => plantao.state === "agora");
   const receiving = running.reduce((sum, plantao) => sum + plantao.recebendo, 0);
@@ -69,6 +86,7 @@ export function LivePanel({ intervalMs, openAssumptions }: { intervalMs: number;
   const confirmed = running.reduce((sum, plantao) => sum + plantao.confirmaram, 0);
   const average = averagePerBroker(data.plantoes);
   const leadFlash = flash?.kind === "lead" ? flash.id : null;
+  const presenceFlash = flash?.kind === "presenca" ? flash.id : null;
 
   const rise = (index: number) => (reduce
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: m.duration.instant } }
@@ -97,7 +115,7 @@ export function LivePanel({ intervalMs, openAssumptions }: { intervalMs: number;
           <FlashRing id={leadFlash} reduce={reduce} />
           <h2 className={styles.cardLabel}>Leads recebidos hoje</h2>
           <div className={styles.bigRow}>
-            <span className={styles.big}><AnimatedCounter value={total} locale="pt-BR" animateOnView /></span>
+            <Bump id={leadFlash} reduce={reduce} className={styles.big}><AnimatedCounter value={total} locale="pt-BR" animateOnView /></Bump>
             <PlusOne id={leadFlash} reduce={reduce} />
           </div>
           {change !== null ? (
@@ -109,10 +127,10 @@ export function LivePanel({ intervalMs, openAssumptions }: { intervalMs: number;
         </motion.article>
 
         <motion.article className={styles.card} {...rise(2)}>
-          <FlashRing id={flash?.kind === "presenca" ? flash.id : null} reduce={reduce} />
+          <FlashRing id={presenceFlash} reduce={reduce} />
           <h2 className={styles.cardLabel}>Corretores recebendo agora</h2>
           <div className={styles.bigRow}>
-            <span className={styles.big}><AnimatedCounter value={receiving} locale="pt-BR" animateOnView /></span>
+            <Bump id={presenceFlash} reduce={reduce} className={styles.big}><AnimatedCounter value={receiving} locale="pt-BR" animateOnView /></Bump>
             <span className={styles.bigOf}>de {scheduled} escalados</span>
           </div>
           <p className={styles.cardNote}>
@@ -131,33 +149,37 @@ export function LivePanel({ intervalMs, openAssumptions }: { intervalMs: number;
       </section>
 
       <div className={styles.bottom}>
-        <motion.section className={styles.panel} aria-labelledby="turnos-title" {...rise(4)}>
+        <motion.section className={styles.panel} aria-labelledby="filas-title" {...rise(4)}>
           <header className={styles.panelHeader}>
-            <h2 id="turnos-title" className={styles.panelTitle}>Leads por turno</h2>
+            <h2 id="filas-title" className={styles.panelTitle}>Leads por fila em cada turno</h2>
           </header>
           <div className={`${styles.turnoGrid} ${styles.turnoHead}`} aria-hidden>
-            <span style={{ gridColumn: "3 / span 2" }} className={styles.groupLabel}>Tatiana</span>
-            <span style={{ gridColumn: "5 / span 2" }} className={styles.groupLabel}>Renan</span>
+            <span style={{ gridColumn: "3 / span 2" }} className={styles.groupLabel}>Fila Tatiana</span>
+            <span style={{ gridColumn: "5 / span 3" }} className={styles.groupLabel}>Filas Renan</span>
             <span style={{ gridColumn: "1 / span 2", gridRow: 2 }}>Turno</span>
-            {ORIGEM_KEYS.map((key, i) => <span key={key} style={{ gridColumn: 3 + i, gridRow: 2 }} className={styles.alignEnd}>{ORIGEM_SHORT[key]}</span>)}
-            <span style={{ gridColumn: 7, gridRow: 2 }} className={styles.alignEnd}>Total</span>
+            {FILA_COLUMNS.map((column, i) => (
+              <span key={column.key} style={{ gridColumn: 3 + i, gridRow: 2 }} className={`${styles.alignEnd} ${flash?.origem === column.key ? styles.headLit : ""}`}>{column.short}</span>
+            ))}
+            <span style={{ gridColumn: 8, gridRow: 2 }} className={styles.alignEnd}>Total</span>
           </div>
           <ul className={styles.turnos}>
-            {data.turnos.map((turno, index) => (
-              <TurnoRow key={turno.key} turno={turno} max={Math.max(...data.turnos.map((item) => Math.max(item.leads, item.yesterday)))} index={index} reduce={reduce} flash={flash?.turno === turno.key ? flash : null} />
+            {data.turnos.map((turno) => (
+              <TurnoRow key={turno.key} turno={turno} reduce={reduce} flash={flash?.kind === "lead" && flash.turno === turno.key ? flash : null} />
             ))}
           </ul>
           <div className={`${styles.turnoGrid} ${styles.turnoFoot}`}>
             <span className={styles.turnoFootLabel} style={{ gridColumn: "1 / span 2" }}>
               Total do dia
-              {total - sumAll(origens) > 0 ? <span className={styles.turnoFootNote}>inclui {total - sumAll(origens)} de outras origens</span> : null}
+              {others > 0 ? <span className={styles.turnoFootNote}>inclui {others} de outras origens</span> : null}
             </span>
-            {ORIGEM_KEYS.map((key) => (
-              <span key={key} className={`${styles.origemCell} ${styles.alignEnd}`} aria-label={`${ORIGEM_LABEL[key]}: ${origens[key]}`}>
-                <AnimatedCounter value={origens[key]} locale="pt-BR" animateOnView />
-              </span>
+            {FILA_COLUMNS.map((column) => (
+              <Cell key={column.key} flashId={flash?.origem === column.key ? flash.id : null} reduce={reduce} label={`${column.queue}, total do dia: ${origens[column.key]}`}>
+                <AnimatedCounter value={origens[column.key]} locale="pt-BR" animateOnView />
+              </Cell>
             ))}
-            <span className={`${styles.origemCell} ${styles.origemTotal} ${styles.alignEnd}`}><AnimatedCounter value={total} locale="pt-BR" animateOnView /></span>
+            <Cell flashId={leadFlash} reduce={reduce} strong label={`Total do dia: ${total}`}>
+              <AnimatedCounter value={total} locale="pt-BR" animateOnView />
+            </Cell>
           </div>
         </motion.section>
 
@@ -165,13 +187,13 @@ export function LivePanel({ intervalMs, openAssumptions }: { intervalMs: number;
           <header className={styles.panelHeader}>
             <h2 id="plantoes-title" className={styles.panelTitle}>Corretores por plantão</h2>
             <ul className={styles.legend} aria-label="Legenda">
-              <li><span className={`${styles.dot} ${styles.dotOn}`} aria-hidden />Recebendo agora</li>
-              <li><span className={`${styles.dot} ${styles.dotConfirmed}`} aria-hidden />Confirmou, sem receber</li>
+              <li><span className={`${styles.dot} ${styles.dotOn}`} aria-hidden />Recebendo</li>
+              <li><span className={`${styles.dot} ${styles.dotConfirmed}`} aria-hidden />Confirmou</li>
               <li><span className={`${styles.dot} ${styles.dotOff}`} aria-hidden />Não confirmou</li>
             </ul>
           </header>
           <div className={styles.plantaoHead} aria-hidden>
-            <span>Plantão</span><span>Corretores</span><span className={styles.alignEnd}>Recebendo</span><span className={styles.alignEnd}>Média</span>
+            <span>Plantão</span><span>Corretores</span><span className={styles.alignEnd}>Recebendo</span>
           </div>
           <ul className={styles.plantoes}>
             {data.plantoes.map((plantao, index) => (
@@ -204,98 +226,104 @@ export function LivePanel({ intervalMs, openAssumptions }: { intervalMs: number;
   );
 }
 
-function TurnoRow({ turno, max, index, reduce, flash }: { turno: Turno; max: number; index: number; reduce: boolean; flash: Flash | null }) {
+function TurnoRow({ turno, reduce, flash }: { turno: Turno; reduce: boolean; flash: Flash | null }) {
   const Icon = TURNO_ICON[turno.key];
-  const share = max ? turno.leads / max : 0;
-  const yesterdayShare = max ? turno.yesterday / max : 0;
   const later = turno.state === "depois";
   return (
     <li className={`${styles.turnoGrid} ${styles.turno}`} data-state={turno.state}>
-      <FlashRing id={flash && !flash.origem ? flash.id : null} reduce={reduce} />
-      <span className={styles.turnoIcon} aria-hidden><Icon size={20} strokeWidth={1.75} /></span>
+      <FlashRing id={flash?.id ?? null} reduce={reduce} soft />
+      <span className={styles.turnoIcon} aria-hidden><Icon size={18} strokeWidth={1.75} /></span>
       <div className={styles.turnoMain}>
         <p className={styles.turnoName}>
           {turno.label}
           {turno.state === "agora" ? <span className={styles.nowPill}><span className={styles.liveDotBlue} aria-hidden />Agora</span> : null}
         </p>
-        <p className={styles.turnoHours}>
-          {later ? `Começa às ${turno.startsAt}` : turno.hours}
-          {turno.yesterday ? ` · ontem ${turno.yesterday}` : null}
-        </p>
-        <div className={styles.track} aria-hidden>
-          {yesterdayShare ? <span className={styles.trackYesterday} style={{ width: `${yesterdayShare * 100}%` }} /> : null}
-          <motion.span
-            className={styles.trackFill}
-            initial={{ scaleX: reduce ? share : 0 }}
-            animate={{ scaleX: share }}
-            transition={reduce ? { duration: 0 } : { ...m.spring.smooth, delay: 0.2 + index * 0.06 }}
-          />
-        </div>
+        <p className={styles.turnoHours}>{later ? `Começa às ${turno.startsAt}` : turno.hours}</p>
       </div>
-      {ORIGEM_KEYS.map((key) => (
-        <span key={key} className={`${styles.origemCell} ${styles.alignEnd}`} data-empty={later ? "" : undefined} aria-label={`${ORIGEM_LABEL[key]}: ${turno.origens[key]}`}>
-          <FlashRing id={flash?.origem === key ? flash.id : null} reduce={reduce} />
-          {later ? "–" : <AnimatedCounter value={turno.origens[key]} locale="pt-BR" animateOnView />}
-        </span>
+      {FILA_COLUMNS.map((column) => (
+        <Cell key={column.key} flashId={flash && flash.origem === column.key ? flash.id : null} reduce={reduce} empty={later} label={`${turno.label}, ${column.queue}: ${turno.origens[column.key]}`}>
+          {later ? "–" : <AnimatedCounter value={turno.origens[column.key]} locale="pt-BR" animateOnView />}
+        </Cell>
       ))}
       <span className={`${styles.turnoNumber} ${styles.alignEnd}`} data-empty={later ? "" : undefined}>
-        {later ? "–" : <AnimatedCounter value={turno.leads} locale="pt-BR" animateOnView />}
+        {later ? "–" : <Bump id={flash?.id ?? null} reduce={reduce}><AnimatedCounter value={turno.leads} locale="pt-BR" animateOnView /></Bump>}
       </span>
     </li>
   );
 }
 
+/** Número de uma fila: acende e dá um pulo curto quando chega lead nela. */
+function Cell({ flashId, reduce, empty, strong, label, children }: { flashId: number | null; reduce: boolean; empty?: boolean; strong?: boolean; label: string; children: ReactNode }) {
+  return (
+    <span className={`${styles.origemCell} ${strong ? styles.origemTotal : ""} ${styles.alignEnd}`} data-empty={empty ? "" : undefined} data-lit={flashId !== null ? "" : undefined} aria-label={label}>
+      <FlashRing id={flashId} reduce={reduce} soft />
+      <Bump id={flashId} reduce={reduce}>{children}</Bump>
+    </span>
+  );
+}
+
 function PlantaoRow({ plantao, index, reduce, flashId }: { plantao: Plantao; index: number; reduce: boolean; flashId: number | null }) {
+  const [settled, setSettled] = useState(false);
+  useEffect(() => { const timer = setTimeout(() => setSettled(true), 1500); return () => clearTimeout(timer); }, []);
   const dots = useMemo(() => Array.from({ length: plantao.escalados }, (_, i) => (
     plantao.state !== "agora" ? (i < plantao.confirmaram ? "done" : "off") : i < plantao.recebendo ? "on" : i < plantao.confirmaram ? "confirmed" : "off"
   )), [plantao]);
-  const average = plantao.receberam ? Math.round((plantao.leads / plantao.receberam) * 10) / 10 : null;
   const status = plantao.state === "agora" ? null : plantao.state === "encerrado" ? `Encerrado · ${plantao.confirmaram} vieram` : `Começa às ${plantao.hours.slice(0, 5)}`;
   return (
     <li className={styles.plantao} data-state={plantao.state}>
-      <FlashRing id={flashId} reduce={reduce} />
+      <FlashRing id={flashId} reduce={reduce} soft />
       <div className={styles.plantaoName}>
         <p>{plantao.name}</p>
         <p className={styles.plantaoHours}>{status ?? plantao.hours}</p>
       </div>
       <div className={styles.dots} role="img" aria-label={`${plantao.escalados} escalados, ${plantao.confirmaram} confirmaram, ${plantao.recebendo} recebendo agora`}>
         {dots.map((kind, i) => (
+          // A chave inclui o estado: quando um corretor confirma, o ponto dele entra de novo com um pulo.
           <motion.span
-            key={i}
+            key={`${i}-${kind}`}
             className={`${styles.dot} ${styles.dotBig} ${kind === "on" ? styles.dotOn : kind === "confirmed" ? styles.dotConfirmed : kind === "done" ? styles.dotDone : styles.dotOff}`}
-            initial={reduce ? false : { opacity: 0, scale: 0.6 }}
+            initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.4 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={reduce ? { duration: 0 } : { ...m.spring.snappy, delay: 0.25 + index * 0.05 + Math.min(i, 15) * m.stagger.char }}
+            transition={reduce
+              ? { duration: m.duration.instant }
+              : { type: "spring", visualDuration: 0.36, bounce: 0.4, delay: !settled ? 0.25 + index * 0.05 + Math.min(i, 15) * m.stagger.char : 0 }}
           />
         ))}
       </div>
       <p className={`${styles.plantaoNumber} ${styles.alignEnd}`}>
         {plantao.state === "agora" ? (
           <>
-            <AnimatedCounter value={plantao.recebendo} locale="pt-BR" animateOnView />
+            <Bump id={flashId} reduce={reduce}><AnimatedCounter value={plantao.recebendo} locale="pt-BR" animateOnView /></Bump>
             <span className={styles.plantaoOf}>/{plantao.escalados}</span>
           </>
         ) : <span className={styles.plantaoMuted}>{plantao.escalados} escalados</span>}
-      </p>
-      <p className={`${styles.plantaoAverage} ${styles.alignEnd}`}>
-        {average !== null ? <AnimatedCounter value={average} decimals={1} locale="pt-BR" animateOnView /> : <span className={styles.plantaoMuted}>–</span>}
       </p>
     </li>
   );
 }
 
+/** Pulo curto do número quando o valor muda por um acontecimento ao vivo (nada com movimento reduzido). */
+function Bump({ id, reduce, className, children }: { id: number | null; reduce: boolean; className?: string; children: ReactNode }) {
+  const [scope, animate] = useAnimate<HTMLSpanElement>();
+  useEffect(() => {
+    if (id === null || reduce || !scope.current) return;
+    animate(scope.current, { scale: [1, 1.08, 1] }, { duration: 0.55, ease: [...m.ease.standard] });
+  }, [id, reduce, animate, scope]);
+  return <span ref={scope} className={`${styles.bump} ${className ?? ""}`}>{children}</span>;
+}
+
 /** Destaque de chegada: um anel azul suave que aparece e some uma vez (só opacidade com movimento reduzido). */
-function FlashRing({ id, reduce }: { id: number | null; reduce: boolean }) {
+function FlashRing({ id, reduce, soft }: { id: number | null; reduce: boolean; soft?: boolean }) {
   return (
     <AnimatePresence>
       {id !== null ? (
         <motion.span
           key={id}
-          className={styles.flash}
+          className={soft ? styles.flashSoft : styles.flash}
           aria-hidden
-          initial={{ opacity: m.attention.opacity + 0.3 }}
+          initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
-          transition={{ duration: reduce ? m.duration.considered : 1.4, ease: [...m.ease.standard] }}
+          transition={{ duration: reduce ? m.duration.considered : 1.8, ease: [...m.ease.standard] }}
         />
       ) : null}
     </AnimatePresence>
@@ -310,9 +338,9 @@ function PlusOne({ id, reduce }: { id: number | null; reduce: boolean }) {
           key={id}
           className={styles.plusOne}
           aria-hidden
-          initial={{ opacity: 0, y: reduce ? 0 : m.distance.md }}
-          animate={{ opacity: [0, 1, 1, 0], y: reduce ? 0 : -m.distance.lg }}
-          transition={{ duration: 1.6, times: [0, 0.15, 0.7, 1], ease: [...m.ease.standard] }}
+          initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.6, y: m.distance.sm }}
+          animate={reduce ? { opacity: [0, 1, 1, 0] } : { opacity: [0, 1, 1, 0], scale: [0.6, 1, 1, 1], y: [m.distance.sm, 0, 0, -m.distance.lg] }}
+          transition={{ duration: 2, times: [0, 0.12, 0.8, 1], ease: [...m.ease.standard] }}
         >
           +1
         </motion.span>
@@ -329,14 +357,16 @@ function LiveNotice({ notice, reduce }: { notice: Notice | null; reduce: boolean
           <motion.div
             key={notice.id}
             className={styles.notice}
-            initial={reduce ? { opacity: 0 } : { opacity: 0, y: -24, scale: 0.92 }}
+            initial={reduce ? { opacity: 0 } : { opacity: 0, y: -24, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: -16, transition: { duration: 0.22, ease: [...m.ease.exit] } }}
             transition={reduce ? { duration: m.duration.instant } : { type: "spring", stiffness: 420, damping: 34, mass: 0.9 }}
           >
-            <span className={styles.noticeIcon} aria-hidden>{notice.kind === "lead" ? <Zap size={14} /> : <UserCheck size={14} />}</span>
-            <strong>{notice.title}</strong>
-            <span className={styles.noticeDetail}>{notice.detail}</span>
+            <span className={styles.noticeIcon} aria-hidden>{notice.kind === "lead" ? <Zap size={16} /> : <UserCheck size={16} />}</span>
+            <span className={styles.noticeText}>
+              <strong>{notice.title}</strong>
+              <span className={styles.noticeDetail}>{notice.detail}</span>
+            </span>
             <span className={styles.noticeTime}>agora</span>
           </motion.div>
         ) : null}
@@ -357,4 +387,3 @@ function Clock({ start }: { start: { hour: number; minute: number } }) {
   const pad = (value: number) => String(value).padStart(2, "0");
   return <time className={styles.clock}>{pad(Math.floor(total / 3600) % 24)}:{pad(Math.floor(total / 60) % 60)}</time>;
 }
-
