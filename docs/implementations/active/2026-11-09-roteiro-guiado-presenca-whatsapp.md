@@ -359,3 +359,20 @@ Pedido do Vinicios: o roteiro guiado também quando o corretor toca no ícone do
   presença; termina em "Pronto, seu WhatsApp está conectado!" com o botão "Pronto". Barra com 6 marcos no celular e
   3 no computador. Mesma voz, mesmos passos (código, lista de Conversas, 4 toques), retomada separada da presença.
 - O protótipo `/dev/roteiro-presenca` tem a opção "Aberto por: Botão do WhatsApp no topo" (`?roteiro=conectar`).
+
+## 15. Ajuste de 10/11: narração em cada etapa
+
+Pedido do Vinicios: uma narração rápida (até 10 s) em cada etapa, simples, direta e amigável; a de abertura deixa
+claro que é uma vez só e que as mensagens pessoais ficam protegidas.
+
+- 18 áudios em `public/onboarding/narracao/presenca/{chave}.mp3` (3 a 9,9 s; a abertura tem 9,8 s), mesma voz Liam.
+  Textos em `PRESENCE_GUIDE_NARRATION` (`pairing-copy.ts`); gerar de novo com
+  `npx tsx scripts/generate-presence-guide-narration.ts` (só os que faltam, `--all` ou uma chave).
+- Abertura: "Oi! Vamos conectar o seu WhatsApp. Você só faz isso uma vez, e suas mensagens pessoais ficam
+  protegidas. É só seguir cada tela." A tela de boas-vindas também diz "Leva 1 minuto e você só faz isso uma vez."
+- Qual áudio toca: `narrationKey` (`presence-guide-steps.ts`): uma por etapa, uma por toque do caminho (o 1º muda
+  no iPhone), versões para o computador (QR ou código), presencial e "só conectar". Com erro na tela, a voz para.
+- Toca sozinha ao entrar em cada etapa; botão redondo de voz no topo de todas as etapas (e o "Ouvir a explicação"
+  nas boas-vindas). Quem para a voz não ouve as próximas sozinho, até tocar de novo para ouvir.
+- Conferido num navegador automático: o fluxo inteiro tocou boas-vindas → código → tela inicial → 4 toques →
+  esperando → conectado → confirmar → pronto.

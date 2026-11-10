@@ -14,7 +14,7 @@ import {
   Tiles, TilesSkeleton, WaIcon, WaitDots, WaitingMock, WelcomeArt,
 } from "./presence-guide-art";
 import {
-  guideError, platformFromUserAgent, progressOf, readGuideMemory, resumeStep, visibleStep, writeGuideMemory,
+  guideError, narrationKey, platformFromUserAgent, progressOf, readGuideMemory, resumeStep, visibleStep, writeGuideMemory,
   type ConfirmStage, type GuideDevice, type GuideError, type GuideMode, type GuidePlatform, type GuideStep, type LocalIssue,
 } from "./presence-guide-steps";
 import styles from "./presence-guide.module.css";
@@ -64,11 +64,14 @@ export type PresenceGuidePresence = {
 /** Só para o protótipo (/dev/roteiro-presenca) e testes: abre direto numa etapa ou estado. */
 export type PresenceGuidePreview = { step?: GuideStep; scene?: number; local?: LocalIssue | null; copied?: boolean; sheet?: "ajuda" | "sair" | "abrir" | null; platform?: GuidePlatform };
 
-/** Voz de introdução (ElevenLabs, ~11 s), tocada na tela de boas-vindas. O texto está em PRESENCE_GUIDE_COPY.welcome.voice. */
-export const PRESENCE_GUIDE_INTRO_AUDIO = "/onboarding/narracao/presenca-whatsapp-intro.mp3";
+/**
+ * Narração de cada etapa (10/11): um áudio curto (até ~10 s) por etapa, em {base}/{chave}.mp3. Textos em
+ * PRESENCE_GUIDE_NARRATION (pairing-copy.ts); a chave vem de narrationKey (presence-guide-steps.ts).
+ */
+export const PRESENCE_GUIDE_VOICE_BASE = "/onboarding/narracao/presenca";
 const VOICE_MUTE_KEY = "ancora:presenca-guia:voz-desligada";
 
-export function PresenceGuide({ device, connection, duty, presence, onClose, openWhatsApp, preview, introAudio = PRESENCE_GUIDE_INTRO_AUDIO, mode = "presence" }: {
+export function PresenceGuide({ device, connection, duty, presence, onClose, openWhatsApp, preview, voiceBase = PRESENCE_GUIDE_VOICE_BASE, mode = "presence" }: {
   device: GuideDevice;
   connection: PresenceGuideConnection;
   duty: PresenceGuideDuty;
@@ -77,8 +80,8 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   /** Troca o jeito de abrir o app (protótipo). Padrão: só abre o app, sem conversa. */
   openWhatsApp?: (onMissing: () => void) => void;
   preview?: PresenceGuidePreview;
-  /** Áudio da introdução; null desliga a voz. */
-  introAudio?: string | null;
+  /** Pasta dos áudios da narração; null desliga a voz. */
+  voiceBase?: string | null;
   /** "connect": só conectar (botão do WhatsApp no topo); termina em "conectado" com "Pronto". */
   mode?: GuideMode;
 }) {
@@ -96,7 +99,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   const [video, setVideo] = React.useState(false);
   const [showSteps, setShowSteps] = React.useState(false);
   const notOpenedTimer = React.useRef<number | null>(null);
-  // Voz da introdução: toca sozinha ao abrir (quando o navegador deixa) e o corretor pode parar ou ouvir de novo.
+  // Narração: cada etapa toca a sua sozinha (quando o navegador deixa); o corretor pode parar ou ouvir de novo.
   const voice = React.useRef<HTMLAudioElement | null>(null);
   const [speaking, setSpeaking] = React.useState(false);
 
@@ -118,13 +121,16 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   const step = visibleStep({ local: localStep, device, ready: connection.ready, stage: presence.stage });
 
   function playVoice() {
-    if (!introAudio || typeof Audio === "undefined") return;
+    if (!voiceBase || !narration || typeof Audio === "undefined") return;
+    const src = `${voiceBase}/${narration}.mp3`;
     if (!voice.current) {
-      const audio = new Audio(introAudio);
+      const audio = new Audio(src);
       audio.addEventListener("ended", () => setSpeaking(false));
       audio.addEventListener("pause", () => setSpeaking(false));
       audio.addEventListener("play", () => setSpeaking(true));
       voice.current = audio;
+    } else if (!voice.current.src.endsWith(src)) {
+      voice.current.src = src;
     }
     voice.current.currentTime = 0;
     try {
@@ -145,17 +151,25 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
     playVoice();
   }
 
-  // Abre nas boas-vindas: a voz começa sozinha, a não ser que o corretor tenha desligado antes.
+  const error: GuideError | null = guideError({ step, device, facts: connection, local, stage: presence.stage });
+  const narration = narrationKey({ step, scene, platform, device, mode, method: connection.method, dutyMode: duty.mode, stage: presence.stage, error });
+
+  // Ao entrar em cada etapa (e em cada toque do caminho), a narração dela começa sozinha, a não ser que o
+  // corretor tenha parado a voz antes. Com erro na tela, a voz para.
   React.useEffect(() => {
-    if (step !== "boasvindas") return;
+    if (!narration) {
+      voice.current?.pause();
+      return;
+    }
     let muted = false;
     try { muted = window.localStorage.getItem(VOICE_MUTE_KEY) === "1"; } catch { /* sem armazenamento */ }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- inicia o áudio (sistema externo); o estado vem dos eventos dele
     if (!muted) playVoice();
     return () => voice.current?.pause();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao entrar e sair das boas-vindas
-  }, [step === "boasvindas"]);
-  const error: GuideError | null = guideError({ step, device, facts: connection, local, stage: presence.stage });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- uma vez por narração
+  }, [narration]);
+  // Some da tela: a voz não fica tocando.
+  React.useEffect(() => () => voice.current?.pause(), []);
 
   // Lembra onde parou (até a presença sair); limpa ao terminar.
   React.useEffect(() => {
@@ -297,7 +311,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
         scene$ = (
           <>
             <Say title={presence.reconnect ? COPY.welcome.titleReconnect : connectOnly ? COPY.connectOnly.title : COPY.welcome.title} sub={COPY.welcome.sub} state={speaking ? "working" : "idle"} />
-            {introAudio ? (
+            {voiceBase ? (
               <button type="button" className={styles.voice} aria-pressed={speaking} onClick={toggleVoice}>
                 <SpeakerIcon on={speaking} /> {speaking ? COPY.welcome.stop : COPY.welcome.listen}
               </button>
@@ -457,6 +471,11 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
             <motion.div className={styles.fill} initial={false} animate={{ scaleX: fill }} transition={reduce ? { duration: 0 } : { duration: 0.45, ease: guideEase }} />
           </div>
           <span className={styles.count}>{COPY.progress(at, total)}</span>
+          {voiceBase && narration ? (
+            <button type="button" className={styles.voiceSmall} aria-pressed={speaking} aria-label={speaking ? COPY.welcome.stop : COPY.welcome.listenShort} title={speaking ? COPY.welcome.stop : COPY.welcome.listenShort} onClick={toggleVoice}>
+              <SpeakerIcon on={speaking} />
+            </button>
+          ) : null}
         </div>
 
         <div className={styles.body}>

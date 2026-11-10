@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import type * as React from "react";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,6 +10,8 @@ vi.mock("motion/react", async () => {
   // Sem espera de saída entre as cenas: o teste vê a próxima etapa na hora.
   return { ...actual, useReducedMotion: () => true, AnimatePresence: ({ children }: { children: React.ReactNode }) => children };
 });
+
+import { PRESENCE_GUIDE_NARRATION } from "@/features/waha-cadence/pairing-copy";
 
 import { PresenceGuide, type PresenceGuideConnection, type PresenceGuidePresence } from "./presence-guide";
 
@@ -94,33 +98,52 @@ describe("PresenceGuide (roteiro guiado de presença, 09/11)", () => {
     expect(screen.getByText("2 de 4")).toBeTruthy();
   });
 
-  it("a voz de introdução toca sozinha nas boas-vindas e o corretor pode parar (e fica parada da próxima vez)", async () => {
-    const play = vi.fn(function (this: EventTarget) { this.dispatchEvent(new Event("play")); return Promise.resolve(); });
+  it("cada etapa toca a sua narração; o corretor pode parar (e fica parada nas próximas)", async () => {
+    const sources: string[] = [];
+    const play = vi.fn(function (this: EventTarget & { src: string }) { sources.push(this.src); this.dispatchEvent(new Event("play")); return Promise.resolve(); });
     const pause = vi.fn(function (this: EventTarget) { this.dispatchEvent(new Event("pause")); });
     class FakeAudio extends EventTarget { currentTime = 0; constructor(public src: string) { super(); } play = play; pause = pause; }
     vi.stubGlobal("Audio", FakeAudio);
-    render(<PresenceGuide device="mobile" connection={connection({ started: false, code: null })} duty={duty} presence={presence()} onClose={vi.fn()} />);
+    render(<PresenceGuide device="mobile" connection={connection()} duty={duty} presence={presence()} onClose={vi.fn()} openWhatsApp={vi.fn()} preview={{ step: "telainicial" }} />);
     await act(async () => {});
-    expect(play).toHaveBeenCalledTimes(1);
+    expect(sources.at(-1)).toBe("/onboarding/narracao/presenca/tela-inicial.mp3");
+    fireEvent.click(screen.getByRole("button", { name: "Entendi, próximo passo" }));
+    await act(async () => {});
+    expect(sources.at(-1)).toBe("/onboarding/narracao/presenca/toque-1-android.mp3");
+    fireEvent.click(screen.getByRole("button", { name: "Próximo toque" }));
+    await act(async () => {});
+    expect(sources.at(-1)).toBe("/onboarding/narracao/presenca/toque-2.mp3");
+
     fireEvent.click(screen.getByRole("button", { name: /Parar a voz/ }));
     expect(pause).toHaveBeenCalled();
     expect(window.localStorage.getItem("ancora:presenca-guia:voz-desligada")).toBe("1");
-    expect(screen.getByRole("button", { name: /Ouvir a explicação/ })).toBeTruthy();
-    cleanup();
     play.mockClear();
-    render(<PresenceGuide device="mobile" connection={connection({ started: false, code: null })} duty={duty} presence={presence()} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Próximo toque" }));
     await act(async () => {});
     expect(play).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Ouvir a explicação desta etapa/ }));
+    expect(sources.at(-1)).toBe("/onboarding/narracao/presenca/toque-3.mp3");
     vi.unstubAllGlobals();
+  });
+
+  it("toda narração tem o seu áudio gerado", () => {
+    for (const key of Object.keys(PRESENCE_GUIDE_NARRATION)) {
+      expect(existsSync(join(process.cwd(), "public", "onboarding", "narracao", "presenca", `${key}.mp3`)), key).toBe(true);
+    }
+  });
+
+  it("a abertura fala que é uma vez só e que as mensagens pessoais ficam protegidas", () => {
+    expect(PRESENCE_GUIDE_NARRATION["boas-vindas"]).toMatch(/só faz isso uma vez/);
+    expect(PRESENCE_GUIDE_NARRATION["boas-vindas"]).toMatch(/mensagens pessoais ficam protegidas/);
   });
 
   it("só conectar (botão do topo): sem a presença, termina em conectado com Pronto", () => {
     const onFinish = vi.fn();
-    const { rerender } = render(<PresenceGuide mode="connect" device="mobile" connection={connection({ started: false, code: null })} duty={duty} presence={presence({ onFinish })} onClose={vi.fn()} introAudio={null} />);
+    const { rerender } = render(<PresenceGuide mode="connect" device="mobile" connection={connection({ started: false, code: null })} duty={duty} presence={presence({ onFinish })} onClose={vi.fn()} voiceBase={null} />);
     expect(screen.getByText("Vamos conectar o seu WhatsApp.")).toBeTruthy();
     expect(screen.getByText("1 de 6")).toBeTruthy();
     expect(screen.queryByText(/confirmar sua presença/)).toBeNull();
-    rerender(<PresenceGuide mode="connect" device="mobile" connection={connection({ ready: true, phase: "ready" })} duty={duty} presence={presence({ onFinish })} onClose={vi.fn()} introAudio={null} />);
+    rerender(<PresenceGuide mode="connect" device="mobile" connection={connection({ ready: true, phase: "ready" })} duty={duty} presence={presence({ onFinish })} onClose={vi.fn()} voiceBase={null} />);
     expect(screen.getByText("6 de 6")).toBeTruthy();
     expect(screen.getByText("Os leads do plantão já podem chegar no seu WhatsApp.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Pronto" }));
