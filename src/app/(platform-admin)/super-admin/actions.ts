@@ -1092,6 +1092,21 @@ export async function updateDutyInactiveBrokersSettingsAction(formData: FormData
   });
 }
 
+export async function updateBrokerSelfUnitChangeSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = z.enum(["true", "false"]).parse(formData.get("brokerSelfUnitChangeEnabled") ?? "false");
+  const now = new Date();
+  const key = FEATURE_FLAGS.BROKER_SELF_UNIT_CHANGE.key;
+  await setSystemSetting(key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId,
+    action: "broker_self_unit_change.settings_updated",
+    targetType: "system_settings", targetId: key,
+    metadata: { enabled: enabled === "true" }, createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+}
+
 export async function updateDutyOccurrenceHistorySettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("dutyOccurrenceHistoryEnabled") === "true" ? "true" : "false";
