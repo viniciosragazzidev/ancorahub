@@ -4,6 +4,8 @@
  */
 export type GuideStep = "boasvindas" | "numero" | "codigo" | "telainicial" | "caminho" | "esperando" | "conectado" | "confirmar" | "pronto";
 export type GuideDevice = "mobile" | "desktop";
+/** "presence": conectar e confirmar presença (cartão do plantão). "connect": só conectar (botão do WhatsApp no topo). */
+export type GuideMode = "presence" | "connect";
 export type GuidePlatform = "android" | "iphone";
 /** Onde a presença está depois de conectar: o cartão de presença decide e o roteiro só mostra. */
 export type ConfirmStage = "connect" | "confirm" | "sending" | "done" | "waiting" | "error";
@@ -48,14 +50,18 @@ export function guideError(input: { step: GuideStep; device: GuideDevice; facts:
   return null;
 }
 
-/** Marcos da barra: 7 no celular, 4 no computador. A última etapa enche a barra. */
-export function progressOf(step: GuideStep, device: GuideDevice): { at: number; total: number; fill: number } {
+/**
+ * Marcos da barra: 7 no celular, 4 no computador. A última etapa enche a barra.
+ * Só conectar (botão do WhatsApp no topo, 10/11): sem a presença, termina em "conectado" (6 e 3 marcos).
+ */
+export function progressOf(step: GuideStep, device: GuideDevice, mode: GuideMode = "presence"): { at: number; total: number; fill: number } {
   const marks: Partial<Record<GuideStep, number>> = device === "desktop"
     ? { boasvindas: 1, numero: 1, codigo: 2, telainicial: 2, caminho: 2, esperando: 2, conectado: 3, confirmar: 4, pronto: 4 }
     : { boasvindas: 1, numero: 1, codigo: 2, telainicial: 3, caminho: 4, esperando: 5, conectado: 6, confirmar: 7, pronto: 7 };
-  const total = device === "desktop" ? 4 : 7;
-  const at = marks[step] ?? 1;
-  return { at, total, fill: step === "pronto" ? 1 : (at - 0.5) / total };
+  const last: GuideStep = mode === "connect" ? "conectado" : "pronto";
+  const total = (device === "desktop" ? 4 : 7) - (mode === "connect" ? 1 : 0);
+  const at = Math.min(marks[step] ?? 1, total);
+  return { at, total, fill: step === last ? 1 : (at - 0.5) / total };
 }
 
 // ── Retomada ──────────────────────────────────────────────────────────
