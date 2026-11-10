@@ -3,6 +3,8 @@
  * of database imports so the queue preview can use the same rule in a client
  * component without pulling server-only code into the browser bundle.
  */
+import { compareEffectiveLoad } from "./plantao-priority-core";
+
 export type DayReceipt = {
   brokerId: string | null;
   leadId: string;
@@ -78,17 +80,22 @@ export function pickNextByReceivedInDay(
   orderedBrokerIds: readonly string[],
   receivedByBroker: ReadonlyMap<string, number>,
   tierByBroker: Readonly<Record<string, number>> = {},
+  /** Prioridade por tipo de plantão: fator da carga efetiva por corretor (ausente = regra anterior). */
+  factorByBroker?: Readonly<Record<string, number>> | null,
 ): string | null {
   let best: string | null = null;
   let bestTier = 0;
   let bestReceived = 0;
+  let bestFactor: number | undefined;
   for (const brokerId of orderedBrokerIds) {
     const tier = tierByBroker[brokerId] ?? 1;
     const received = receivedByBroker.get(brokerId) ?? 0;
-    if (best === null || tier < bestTier || (tier === bestTier && received < bestReceived)) {
+    const factor = factorByBroker ? factorByBroker[brokerId] : undefined;
+    if (best === null || tier < bestTier || (tier === bestTier && compareEffectiveLoad(received, factor, bestReceived, bestFactor) < 0)) {
       best = brokerId;
       bestTier = tier;
       bestReceived = received;
+      bestFactor = factor;
     }
   }
   return best;

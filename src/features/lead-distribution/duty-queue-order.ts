@@ -1,6 +1,7 @@
 import { resolveDistributionCandidate, type IntelligentDistributionPolicy, type RankedBroker } from "./domain";
 import type { AssignmentStrategy } from "./types";
 import { pickNextByReceivedInDay } from "./received-in-day-core";
+import { compareEffectiveLoad, effectiveLoadKey } from "./plantao-priority-core";
 
 export const DUTY_QUEUE_HISTORY_WINDOW_DAYS = 30;
 
@@ -164,10 +165,12 @@ export function chooseManualQueuePick(input: {
 
 function rankingTieKey(candidate: RankedBroker, policy: IntelligentDistributionPolicy, strategy: AssignmentStrategy) {
   if (!policy.ranking.enabled && strategy === "round_robin") return "created:" + candidate.createdAt.getTime();
-  if (!policy.ranking.enabled) return [Number(candidate.onDuty), candidate.receivedInDuty ?? 0, candidate.activeLeads].join(":");
+  // Carga efetiva (prioridade por tipo de plantão): sem fator, a chave é o número de antes.
+  const load = effectiveLoadKey(candidate.receivedInDuty ?? 0, candidate.loadFactor);
+  if (!policy.ranking.enabled) return [Number(candidate.onDuty), load, candidate.activeLeads].join(":");
   return [
     Number(candidate.onDuty),
-    candidate.receivedInDuty ?? 0,
+    load,
     candidate.unstartedLeads ?? 0,
     candidate.activeLeads,
     policy.ranking.enabled ? candidate.rankingScore : "ranking-off",
@@ -186,6 +189,8 @@ export function previewQueueOrder(input: {
   receivedByBroker?: ReadonlyMap<string, number>;
   tierByBroker?: Readonly<Record<string, number>>;
   manualBrokerIds?: readonly string[] | null;
+  /** Prioridade por tipo de plantão: mesmos fatores do ranking e da escolha sob trava. */
+  factorByBroker?: Readonly<Record<string, number>> | null;
 }): {
   order: DutyQueueCandidate[];
   blocked: Array<DutyQueueCandidate & { blockedReason: string }>;
@@ -197,9 +202,11 @@ export function previewQueueOrder(input: {
   const blocked = input.candidates
     .filter((candidate): candidate is DutyQueueCandidate & { blockedReason: string } => Boolean(candidate.blockedReason))
     .map((candidate) => ({ ...candidate, blockedReason: candidate.blockedReason! }));
-  const decision = resolveDistributionCandidate(ready, input.policy, input.strategy);
+  const factors = input.factorByBroker ?? null;
+  const weightedReady = factors ? ready.map((candidate) => ({ ...candidate, loadFactor: factors[candidate.id] })) : ready;
+  const decision = resolveDistributionCandidate(weightedReady, input.policy, input.strategy);
   const automaticNextId = input.receivedByBroker && input.strategy !== "round_robin"
-    ? pickNextByReceivedInDay(decision.eligible.map((candidate) => candidate.id), input.receivedByBroker, input.tierByBroker)
+    ? pickNextByReceivedInDay(decision.eligible.map((candidate) => candidate.id), input.receivedByBroker, input.tierByBroker, factors)
     : decision.selected?.id ?? null;
   const resolvedOrder = automaticNextId
     ? [automaticNextId, ...decision.eligible.map((candidate) => candidate.id).filter((id) => id !== automaticNextId)]
@@ -212,15 +219,16 @@ export function previewQueueOrder(input: {
     ? [...manualOrder.filter((id) => resolvedOrder.includes(id)), ...resolvedOrder.filter((id) => !manualOrder.includes(id))]
     : resolvedOrder;
   const byId = new Map(ready.map((candidate) => [candidate.id, candidate]));
+  const weightedById = new Map(weightedReady.map((candidate) => [candidate.id, candidate]));
   const order = visibleOrder.flatMap((id) => byId.has(id) ? [byId.get(id)!] : []);
   const nextBrokerId = order[0]?.id ?? null;
   const top = nextBrokerId ? byId.get(nextBrokerId) : null;
   const topTieGroup = !manualOrder && top
     ? order.filter((candidate) => input.receivedByBroker && input.strategy !== "round_robin"
       ? (input.tierByBroker?.[candidate.id] ?? 1) === (input.tierByBroker?.[top.id] ?? 1)
-        && (input.receivedByBroker.get(candidate.id) ?? 0) === (input.receivedByBroker.get(top.id) ?? 0)
-        && rankingTieKey(candidate, input.policy, input.strategy) === rankingTieKey(top, input.policy, input.strategy)
-      : rankingTieKey(candidate, input.policy, input.strategy) === rankingTieKey(top, input.policy, input.strategy)).map((candidate) => candidate.id)
+        && compareEffectiveLoad(input.receivedByBroker.get(candidate.id) ?? 0, factors?.[candidate.id], input.receivedByBroker.get(top.id) ?? 0, factors?.[top.id]) === 0
+        && rankingTieKey(weightedById.get(candidate.id) ?? candidate, input.policy, input.strategy) === rankingTieKey(weightedById.get(top.id) ?? top, input.policy, input.strategy)
+      : rankingTieKey(weightedById.get(candidate.id) ?? candidate, input.policy, input.strategy) === rankingTieKey(weightedById.get(top.id) ?? top, input.policy, input.strategy)).map((candidate) => candidate.id)
     : [];
   const tiedBrokerIds = topTieGroup.length > 1 ? topTieGroup : [];
   return { order, blocked, nextBrokerId, tiedBrokerIds, manual: Boolean(manualOrder) };

@@ -469,6 +469,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Lead de alta aptidão sai para o corretor no momento em que a IA o marca, sem esperar o fim da qualificação (DEC-153).",
   },
+  PLANTAO_PRIORITY: {
+    key: "feature_plantao_priority_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Prioridade leve por tipo de plantão (ex.: Premium) na distribuição de leads quentes e mornos. Desligada, a distribuição é idêntica à anterior; ligada, cada empresa escolhe off/sombra/on na política de distribuição.",
+  },
   DUTY_OVERNIGHT_EXTRA_SHIFT: {
     key: "feature_duty_overnight_extra_shift_enabled",
     scope: "global",

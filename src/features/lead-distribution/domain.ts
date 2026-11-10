@@ -1,4 +1,5 @@
 import type { AssignmentStrategy, DutyFallbackPolicy } from "./types";
+import { compareEffectiveLoad } from "./plantao-priority-core";
 
 export type EligibleBroker = { id: string; createdAt: Date; activeLeads: number; capacity: number | null };
 
@@ -90,6 +91,12 @@ export type RankedBroker = EligibleBroker & {
    * portfolio counts below only break ties.
    */
   receivedInDuty?: number;
+  /**
+   * Prioridade por tipo de plantão (2026-11-10): fator inteiro da carga efetiva
+   * (peso do tipo × minutos cumpridos, ver plantao-priority-core.ts). Ausente =
+   * regra anterior, comparação direta de receivedInDuty.
+   */
+  loadFactor?: number;
   conversionRate: number;
   slaRate: number;
   manualPriority: number;
@@ -203,9 +210,10 @@ export function rankBrokers(brokers: RankedBroker[], policy: IntelligentDistribu
       //    Antes a carga era a carteira inteira (leads ativos e não iniciados de
       //    qualquer data), e quem tinha leads antigos em aberto nunca recebia,
       //    mesmo com 0 leads no plantão.
-      const aDuty = a.receivedInDuty ?? 0;
-      const bDuty = b.receivedInDuty ?? 0;
-      if (aDuty !== bDuty) return aDuty - bDuty;
+      //    Com a prioridade por tipo de plantão ligada, compara recebidos ÷ fator
+      //    (mesma função da escolha sob trava e da prévia da fila).
+      const dutyLoad = compareEffectiveLoad(a.receivedInDuty ?? 0, a.loadFactor, b.receivedInDuty ?? 0, b.loadFactor);
+      if (dutyLoad !== 0) return dutyLoad;
       // 3. Menor quantidade de leads sem iniciar atendimento
       const aUnstarted = a.unstartedLeads ?? 0;
       const bUnstarted = b.unstartedLeads ?? 0;
@@ -236,7 +244,7 @@ export function calculateBrokerRankingScore(input: Pick<RankedBroker, "conversio
   return Math.round(input.conversionRate * weights.conversionWeight + input.slaRate * weights.slaWeight + input.manualPriority * weights.manualPriorityWeight);
 }
 
-export function chooseBroker<T extends EligibleBroker & { onDuty?: boolean; receivedInDuty?: number }>(brokers: T[], strategy: AssignmentStrategy, random: () => number = Math.random): T | null {
+export function chooseBroker<T extends EligibleBroker & { onDuty?: boolean; receivedInDuty?: number; loadFactor?: number }>(brokers: T[], strategy: AssignmentStrategy, random: () => number = Math.random): T | null {
   const eligible = brokers.filter((broker) => broker.capacity === null || broker.activeLeads < broker.capacity);
   if (!eligible.length) return null;
   // round_robin's whole point is "oldest account goes first" (deliberately,
@@ -248,7 +256,7 @@ export function chooseBroker<T extends EligibleBroker & { onDuty?: boolean; rece
   return shuffle(eligible, random).sort((a, b) => {
     if (strategy === "round_robin") return a.createdAt.getTime() - b.createdAt.getTime();
     if (Number(b.onDuty ?? false) !== Number(a.onDuty ?? false)) return Number(b.onDuty ?? false) - Number(a.onDuty ?? false);
-    const received = (a.receivedInDuty ?? 0) - (b.receivedInDuty ?? 0);
+    const received = compareEffectiveLoad(a.receivedInDuty ?? 0, a.loadFactor, b.receivedInDuty ?? 0, b.loadFactor);
     if (received !== 0) return received;
     return a.activeLeads - b.activeLeads;
   })[0] ?? null;
@@ -269,6 +277,25 @@ export function resolveDistributionCandidate(
   // matching ranked row so callers keep schedule and duty-load metadata.
   const selected = chosen ? eligible.find((broker) => broker.id === chosen.id) ?? null : null;
   return { eligible, selected };
+}
+
+/** Aleatório que mantém a ordem recebida no shuffle (j = i): empates ficam na ordem de entrada. */
+export const KEEP_ORDER_RANDOM = () => 1 - 1e-12;
+
+/**
+ * Prioridade por tipo de plantão: reordena a escolha de hoje (`baselineEligible`, já
+ * embaralhada e ordenada) com os fatores de carga. Sem sorteio novo, então quando o
+ * peso não muda nada a ordem é exatamente a de hoje, e a diferença registrada no
+ * modo sombra é só o efeito do peso.
+ */
+export function resolveWeightedDistributionCandidate(
+  baselineEligible: readonly RankedBroker[],
+  factorByBroker: Readonly<Record<string, number>>,
+  policy: IntelligentDistributionPolicy,
+  strategy: AssignmentStrategy,
+) {
+  const weighted = baselineEligible.map((broker) => ({ ...broker, loadFactor: factorByBroker[broker.id] }));
+  return resolveDistributionCandidate(weighted, policy, strategy, KEEP_ORDER_RANDOM);
 }
 
 export function isValidDutyWindow(dayOfWeek: number, startsAt: string, endsAt: string) {
