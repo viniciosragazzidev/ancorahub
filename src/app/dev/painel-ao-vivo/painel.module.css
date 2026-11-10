@@ -1,0 +1,193 @@
+/*
+ * Painel ao vivo do diretor (exemplo). Tokens do Diretor Lite (venancor-scope.css + director-skin.css).
+ * Fora dos tokens, marcado como suposição na tela: tamanhos dos números de destaque (--live-big, --live-mid),
+ * ponto "ao vivo" pulsando e os pontos por corretor.
+ */
+.page {
+  /* Suposição: números de destaque acima da escala (máx. --text-5xl 48px), crescem com a altura da tela. */
+  --live-big: clamp(56px, 11.5vh, 128px);
+  --live-mid: clamp(26px, 4.2vh, 52px);
+  --live-gap: clamp(12px, 2vh, 24px);
+  --live-pad: clamp(16px, 2.4vh, 32px);
+  --tracking-display: -0.03em;
+  --dot: clamp(9px, 1.3vh, 16px);
+  --dot-gap: clamp(3px, 0.45vh, 6px);
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: var(--live-gap);
+  min-height: 100dvh;
+  padding: var(--live-pad) clamp(16px, 2.6vw, 48px);
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Computador e TV: tudo numa tela, sem rolagem. */
+@media (min-width: 1024px) and (min-height: 640px) {
+  .page { height: 100dvh; overflow: hidden; }
+}
+
+/* ------------------------------------------------------------ cabeçalho */
+.header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-16, 16px); }
+.title { margin: 0; font-size: clamp(var(--text-xl), 3.6vh, var(--text-4xl)); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1.1; }
+.subtitle { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 0; color: var(--text-secondary); font-size: clamp(var(--text-sm), 1.9vh, var(--text-lg)); }
+.live { display: inline-flex; align-items: center; gap: 8px; color: var(--success); font-weight: 500; }
+.clock { color: var(--foreground); font-weight: 500; }
+.liveDot, .liveDotBlue { position: relative; width: 8px; height: 8px; border-radius: 9999px; background: var(--success); }
+.liveDotBlue { width: 6px; height: 6px; background: var(--series-1); }
+.liveDot::after, .liveDotBlue::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: inherit; animation: livePulse 1.8s var(--ease-enter, cubic-bezier(.16, 1, .3, 1)) infinite; }
+@keyframes livePulse { from { transform: scale(1); opacity: .6; } to { transform: scale(3); opacity: 0; } }
+
+.assumptionsToggle {
+  flex: none;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+.assumptionsToggle:hover { color: var(--foreground); }
+.assumptionsToggle:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* ------------------------------------------------------------ destaques */
+.hero { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--live-gap); }
+.card, .panel {
+  position: relative;
+  min-width: 0;
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow-resting);
+}
+.card { display: flex; flex-direction: column; gap: clamp(4px, 1vh, 12px); padding: var(--live-pad) clamp(20px, 2vw, 36px); overflow: hidden; }
+.cardLabel { margin: 0; color: var(--text-secondary); font-size: clamp(var(--text-sm), 2vh, var(--text-xl)); font-weight: 500; }
+.bigRow { position: relative; display: flex; align-items: baseline; gap: 12px; }
+.big { --text-3xl: var(--live-big); display: inline-flex; }
+.bigOf { color: var(--text-secondary); font-size: clamp(var(--text-base), 2.4vh, var(--text-2xl)); }
+.cardNote { margin: 0; color: var(--text-secondary); font-size: clamp(var(--text-sm), 1.8vh, var(--text-lg)); }
+.delta { display: inline-flex; align-self: flex-start; align-items: center; gap: 4px; margin: 0; padding: 4px 12px; border-radius: var(--radius-control); font-size: clamp(var(--text-sm), 1.8vh, var(--text-lg)); font-weight: 500; }
+.deltaUp { background: var(--success-subtle); color: var(--success); }
+.deltaDown { background: var(--surface-muted); color: var(--text-secondary); }
+.plusOne { position: absolute; left: 100%; top: 0; margin-left: -8px; color: var(--series-1-text); font-size: var(--live-mid); font-weight: 500; letter-spacing: var(--tracking-display); pointer-events: none; }
+.bigRow .plusOne { position: static; margin-left: 0; align-self: flex-start; }
+
+/* Destaque de chegada: anel azul que some sozinho. */
+.flash { position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 2px var(--series-1); background: var(--accent-subtle); pointer-events: none; }
+
+/* ------------------------------------------------------------ painéis */
+.bottom { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--live-gap); min-height: 0; }
+.panel { display: flex; flex-direction: column; min-height: 0; padding: var(--live-pad) clamp(20px, 2vw, 36px); }
+.panelHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: clamp(8px, 1.4vh, 16px); }
+.panelTitle { margin: 0; font-size: clamp(var(--text-base), 2.3vh, var(--text-2xl)); font-weight: 500; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; color: var(--text-muted); font-size: var(--text-xs); }
+.legend li { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Turnos */
+.turnos { display: flex; flex: 1; flex-direction: column; justify-content: space-between; gap: 4px; min-height: 0; margin: 0; padding: 0; list-style: none; }
+.turnoGrid { display: grid; grid-template-columns: auto minmax(0, 1fr) repeat(4, minmax(3em, 0.3fr)) minmax(2.6em, 0.34fr); align-items: center; column-gap: clamp(10px, 1.2vw, 20px); }
+.turnoHead { row-gap: 2px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle); color: var(--text-muted); font-size: var(--text-xs); }
+.groupLabel { grid-row: 1; justify-self: stretch; padding-bottom: 2px; border-bottom: 1px solid var(--border); color: var(--text-secondary); font-weight: 500; text-align: center; }
+.turno { position: relative; flex: 1; padding: 0 12px; margin: 0 -12px; border-radius: var(--radius-panel); }
+.origemCell { --text-3xl: clamp(18px, 2.7vh, 34px); position: relative; padding: 4px 6px; margin: -4px -6px; border-radius: 8px; font-size: clamp(18px, 2.7vh, 34px); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1; color: var(--text-secondary); }
+.origemCell[data-empty] { color: var(--neutral-5); }
+.origemTotal { color: var(--foreground); }
+.turnoFoot { padding-top: clamp(8px, 1.2vh, 14px); border-top: 1px solid var(--border); }
+.turnoFootLabel { display: flex; flex-direction: column; font-size: clamp(var(--text-sm), 1.9vh, var(--text-lg)); font-weight: 500; }
+.turnoFootNote { color: var(--text-muted); font-size: var(--text-xs); font-weight: 400; }
+.turno + .turno { border-top: 1px solid var(--border-subtle); border-top-left-radius: 0; border-top-right-radius: 0; }
+.turnoIcon { display: grid; place-items: center; width: clamp(36px, 5vh, 52px); height: clamp(36px, 5vh, 52px); border-radius: 9999px; background: var(--surface-muted); color: var(--text-secondary); }
+.turno[data-state="agora"] .turnoIcon { color: var(--series-1-text); background: var(--accent-subtle); }
+.turnoMain { min-width: 0; }
+.turnoName { display: flex; align-items: center; gap: 8px; margin: 0; font-size: clamp(var(--text-base), 2.1vh, var(--text-xl)); font-weight: 500; }
+.turnoHours { margin: 2px 0 6px; color: var(--text-muted); font-size: clamp(var(--text-xs), 1.6vh, var(--text-base)); }
+.track { position: relative; height: clamp(6px, 0.9vh, 10px); border-radius: 9999px; background: var(--surface-muted); overflow: hidden; }
+.trackYesterday { position: absolute; inset-block: 0; left: 0; border-radius: inherit; box-shadow: inset -2px 0 0 var(--border-strong); }
+.trackFill { position: absolute; inset: 0; border-radius: inherit; background: var(--series-1); transform-origin: left center; }
+.turno[data-state="encerrado"] .trackFill { background: color-mix(in oklab, var(--series-1) 45%, var(--surface)); }
+.turnoNumber { --text-3xl: var(--live-mid); min-width: 2ch; text-align: right; font-size: var(--live-mid); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1; }
+.turnoNumber[data-empty] { color: var(--neutral-5); }
+.turno[data-state="depois"] .turnoName { color: var(--text-secondary); }
+.nowPill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: var(--radius-control); background: var(--accent-subtle); color: var(--series-1-text); font-size: var(--text-xs); font-weight: 500; }
+
+/* Plantões */
+.plantaoHead, .plantao { display: grid; grid-template-columns: minmax(0, 1fr) calc(16 * (var(--dot) + var(--dot-gap))) clamp(64px, 9.5vh, 112px) clamp(40px, 6vh, 72px); align-items: center; gap: clamp(12px, 1.4vw, 24px); }
+.plantaoHead { padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle); color: var(--text-muted); font-size: var(--text-xs); }
+.alignEnd { text-align: right; justify-self: end; }
+.plantoes { display: flex; flex: 1; flex-direction: column; min-height: 0; margin: 0; padding: 0; list-style: none; }
+.plantao { position: relative; flex: 1; padding: 0 12px; margin: 0 -12px; border-radius: var(--radius-panel); }
+.plantao + .plantao { border-top: 1px solid var(--border-subtle); border-top-left-radius: 0; border-top-right-radius: 0; }
+.plantaoName p { margin: 0; font-size: clamp(var(--text-sm), 2vh, var(--text-xl)); font-weight: 500; }
+.plantaoName .plantaoHours { margin-top: 2px; color: var(--text-muted); font-size: clamp(var(--text-xs), 1.6vh, var(--text-base)); font-weight: 400; }
+.plantao[data-state="encerrado"] .plantaoName p:first-child, .plantao[data-state="depois"] .plantaoName p:first-child { color: var(--text-secondary); }
+.dots { display: flex; flex-wrap: wrap; gap: var(--dot-gap); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 9999px; }
+.dotBig { width: var(--dot); height: var(--dot); }
+.dotOn { background: var(--series-1); }
+.dotConfirmed { background: color-mix(in oklab, var(--series-1) 35%, var(--surface)); }
+.dotDone { background: var(--neutral-5); }
+.dotOff { background: transparent; box-shadow: inset 0 0 0 1.5px var(--neutral-5); }
+.plantaoNumber, .plantaoAverage { --text-3xl: clamp(22px, 3.4vh, 44px); margin: 0; font-size: clamp(22px, 3.4vh, 44px); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1; white-space: nowrap; }
+.plantaoAverage { color: var(--text-secondary); }
+.plantaoOf { color: var(--text-muted); font-size: 0.55em; letter-spacing: 0; }
+.plantaoMuted { color: var(--text-muted); font-size: var(--text-sm); letter-spacing: 0; font-weight: 400; }
+
+/* ------------------------------------------------------------ aviso de lead novo (DS Lite 5.10, em pílula) */
+.noticeSlot { position: fixed; top: calc(env(safe-area-inset-top) + 12px); left: 50%; z-index: 90; translate: -50% 0; pointer-events: none; }
+.notice { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 20px 0 8px; border-radius: 9999px; background: oklch(18% 0.01 260); color: oklch(98% 0 0); box-shadow: var(--shadow-floating); font-size: var(--text-sm); white-space: nowrap; }
+.notice strong { font-weight: 500; }
+.noticeIcon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9999px; background: var(--chat-action); color: #fff; }
+.noticeDetail { color: oklch(98% 0 0 / 0.72); }
+.noticeTime { color: oklch(98% 0 0 / 0.5); font-size: var(--text-xs); }
+
+/* ------------------------------------------------------------ suposições */
+.assumptions { position: fixed; right: clamp(16px, 2.6vw, 48px); bottom: var(--live-pad); z-index: 80; width: min(440px, calc(100vw - 32px)); padding: 16px 20px; border: 1px dashed var(--border-strong); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-floating); color: var(--text-secondary); font-size: var(--text-xs); }
+.assumptionsTitle { margin: 0 0 8px; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
+.assumptions ol { display: grid; gap: 6px; margin: 0; padding-left: 18px; }
+
+/* ------------------------------------------------------------ celular e tablet */
+@media (max-width: 1023px) {
+  .page { --live-big: 64px; --live-mid: 36px; grid-template-rows: none; height: 100dvh; overflow-y: auto; overscroll-behavior: contain; }
+  .header { flex-direction: column; align-items: flex-start; }
+  .hero { grid-template-columns: 1fr; }
+  .bottom { grid-template-columns: 1fr; }
+  .page { align-content: start; }
+  .bottom, .panel, .turnos, .plantoes { min-height: auto; }
+  .turnos, .plantoes { flex: none; }
+  .turno, .plantao { min-height: 76px; }
+  .turnoGrid { grid-template-columns: auto minmax(0, 1fr) repeat(4, minmax(2.6em, auto)) minmax(2.4em, auto); column-gap: 8px; }
+}
+@media (max-width: 640px) {
+  .page { --live-big: 56px; --live-mid: 30px; }
+  /* Celular: a barra e o horário saem da linha para as origens caberem. */
+  .turnoIcon { display: none; }
+  .turnoGrid { grid-template-columns: minmax(0, 1fr) repeat(4, minmax(2.2em, auto)) minmax(2.2em, auto); }
+  .turnoHead > span:first-child { grid-column: 2 / span 2 !important; }
+  .turnoHead > span:nth-child(2) { grid-column: 4 / span 2 !important; }
+  .turnoHead > span:nth-child(3), .turnoFootLabel { grid-column: 1 !important; }
+  .turnoHead > span:nth-child(n+4):nth-child(-n+7) { grid-column: auto !important; }
+  .turnoHead > span:last-child { grid-column: 6 !important; }
+  .origemCell { --text-3xl: 18px; font-size: 18px; }
+  .track, .turnoHours { display: none; }
+  .card { flex-direction: column; }
+  .plantaoHead { display: none; }
+  .plantao { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "name num avg" "dots dots dots"; row-gap: 8px; padding-block: 12px; }
+  .plantaoName { grid-area: name; }
+  .dots { grid-area: dots; }
+  .plantaoNumber { grid-area: num; }
+  .plantaoAverage { grid-area: avg; }
+  .plantaoAverage::before { content: "média "; color: var(--text-muted); font-size: var(--text-xs); letter-spacing: 0; font-weight: 400; }
+  .noticeSlot { width: calc(100vw - 16px); display: flex; justify-content: center; }
+  .notice { max-width: 100%; overflow: hidden; }
+  .noticeTime { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liveDot::after, .liveDotBlue::after { animation: none; }
+}
