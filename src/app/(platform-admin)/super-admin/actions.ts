@@ -38,6 +38,7 @@ import { SYSTEM_REPORT_DESTINATION_KEY, SYSTEM_REPORT_ENABLED_KEY } from "@/feat
 import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, META_OUTBOUND_STALE_AFTER_HOURS_SETTING } from "@/features/communication-channels/outbound-service";
 import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag";
 import { liveStatusSettingKey } from "@/features/live-status/flag";
+import { brokerAdContextSettingKey } from "@/features/leads/broker-ad-context-flag";
 import { customerWaitingSettingKey, customerWaitingSinceKey } from "@/features/customer-waiting/flag";
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import { aiAudioTranscriptionSettingKey } from "@/features/ai-agent/audio-transcription/flag";
@@ -419,6 +420,26 @@ export async function updateLiveStatusPilotAction(tenantId: string, formData: Fo
     id: crypto.randomUUID(),
     actorUserId: admin.userId,
     action: "live_status_strip.tenant_pilot_updated",
+    targetType: "tenant",
+    targetId: targetTenantId,
+    metadata: { enabled: input.enabled === "true" },
+    createdAt: now,
+  });
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
+}
+
+/** Corretor vê o anúncio do lead (10/11): cartão "De onde veio", liga e desliga por empresa, com auditoria. */
+export async function updateBrokerAdContextPilotAction(tenantId: string, formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
+  const now = new Date();
+
+  await setSystemSetting(brokerAdContextSettingKey(targetTenantId), input.enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "broker_ad_context.tenant_pilot_updated",
     targetType: "tenant",
     targetId: targetTenantId,
     metadata: { enabled: input.enabled === "true" },

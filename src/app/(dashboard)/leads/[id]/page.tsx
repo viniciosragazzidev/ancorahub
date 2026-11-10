@@ -71,6 +71,7 @@ import { getCachedLegacyPlans } from "@/features/leads/reference-data";
 import { LeadQuotesSection } from "@/features/leads/components/lead-quotes-section";
 import { legacyLeadLivesCount, resolveLeadCommercialValues } from "@/features/leads/commercial-values";
 
+import { loadBrokerAdContext } from "@/features/leads/broker-ad-context.server";
 import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 import { BeneficiariesSection } from "./beneficiaries-section";
 import { getLeadBeneficiaries } from "@/features/post-sale/queries";
@@ -361,6 +362,9 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
   if (isLightBroker) {
     // Phone and e-mail leave the server only after this broker accepted the lead.
     const lightContact = lightContactFields(lead, { status: lead.status, isCurrentBroker: lead.corretorId === context.userId });
+    // "De onde veio" (10/11): plano anunciado e o que o cliente viu; nunca nome de campanha, IDs ou verba.
+    // O lead já passou pela consulta autorizada acima (escopo do corretor ou oferta pendente para ele).
+    const adContextPromise = loadBrokerAdContext(context.tenantId, lead);
     // One wave for the whole Lite screen: the record (?ficha=1) needs the broker's
     // name; the conversation needs the timeline and the WhatsApp mirror.
     const [[redistributionNotice], brokerUserRows, lightBeneficiaries, lightRequirements, lightLeadDocs, lightCarriers, timelineRows, waMessages] = await Promise.all([
@@ -390,6 +394,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
         : Promise.resolve([]),
     ]);
     const [brokerUser] = brokerUserRows;
+    const adContext = await adContextPromise;
 
     const lightFormData = readFormData(lead.formData);
     const companyName = (await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1))[0]?.name ?? null;
@@ -430,6 +435,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       tipo: lead.tipo,
       origem: null,
       sourceCampaign: null,
+      adContext,
       tipoCnpj: metaLeadDetails.tipoCnpj,
       beneficiaries: lightBeneficiaries.map((b) => ({
         id: b.id,

@@ -1,3 +1,5 @@
+import { parseReferralCreative } from "@/features/meta-ads/ad-creative-parse";
+
 import type { MetaWebhookReferral } from "./types";
 
 /**
@@ -17,6 +19,8 @@ export function readCtwaAdReferral(referral: MetaWebhookReferral | undefined) {
     headline: referral?.headline?.trim().slice(0, 160) || null,
     sourceUrl: referral?.source_url?.trim().slice(0, 300) || null,
     ctwaClid: referral?.ctwa_clid?.trim().slice(0, 200) || null,
+    // O que o cliente viu (10/11/2026): vai para o cache do criativo, mostrado ao corretor.
+    creative: parseReferralCreative(referral ?? {}),
   };
 }
 

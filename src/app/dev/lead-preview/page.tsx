@@ -5,15 +5,36 @@ import { notFound } from "next/navigation";
 import { buildLeadConversationScript } from "@/features/broker-workspace/chat/lead-script";
 import { LeadConversation } from "@/features/broker-workspace/chat/lead-conversation";
 import { LightLeadDetail } from "@/features/broker-workspace/components/light-lead-detail";
+import type { BrokerAdContext } from "@/features/leads/broker-ad-context";
 
 /**
  * Dev-only print of the broker's lead screen (2026-10-17) with sample data, in two states:
  * /dev/lead-preview?state=aceite (waiting for acceptance) and ?state=atendimento (in contact, client replied 5 min ago).
  * Same frame as production: the conversation rail on the left on computers (.lite-split) and the real conversation.
+ * Cartão "De onde veio" (10/11/2026): &anuncio=formulario | whatsapp | plano | nenhum, e &ficha=1 para a ficha.
  */
-export default async function LeadPreviewPage({ searchParams }: { searchParams: Promise<{ state?: string }> }) {
+// Imagem sintética do anúncio (sem rede): o cartão mostra como mostraria a miniatura da Meta.
+const AD_IMAGE = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600"><rect width="600" height="600" fill="#dbe7f5"/><circle cx="300" cy="250" r="120" fill="#9fbbe0"/><rect x="120" y="420" width="360" height="56" rx="28" fill="#ffffff"/></svg>')}`;
+
+function adPreview(kind: string | undefined): BrokerAdContext | null {
+  if (!kind || kind === "nenhum") return null;
+  if (kind === "whatsapp") {
+    return {
+      entry: "whatsapp", offer: null, title: "Plano de saúde para MEI a partir de R$ 129",
+      body: "Tem CNPJ ou MEI? Contrate plano empresarial com até 40% de economia em relação ao individual. Rede ampla no Rio e em Niterói, consultas e exames sem coparticipação nos 3 primeiros meses. Chame no WhatsApp e receba a cotação na hora.",
+      mediaType: "video", imageUrl: AD_IMAGE,
+    };
+  }
+  if (kind === "plano") return { entry: "form", offer: "Bradesco PME, 2 a 29 vidas, custo-benefício", title: null, body: null, mediaType: null, imageUrl: null };
+  return {
+    entry: "form", offer: "Amil custo-benefício (linha Fácil), individual e familiar, a partir de R$ 89. Não oferecer linha 400 ou superior de saída.",
+    title: "Plano de saúde a partir de R$ 89", body: "Amil Fácil com rede no Rio. Faça a cotação em 1 minuto.", mediaType: "image", imageUrl: AD_IMAGE,
+  };
+}
+
+export default async function LeadPreviewPage({ searchParams }: { searchParams: Promise<{ state?: string; anuncio?: string; ficha?: string }> }) {
   if (process.env.NODE_ENV === "production") notFound();
-  const { state } = await searchParams;
+  const { state, anuncio, ficha } = await searchParams;
   const now = new Date();
   const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
 
@@ -29,6 +50,7 @@ export default async function LeadPreviewPage({ searchParams }: { searchParams: 
     assignedAt: minutesAgo(aceite ? 6 : 95),
     dutyName: "PRESENCIAL TARDE",
     isCurrentBroker: true,
+    adContext: adPreview(anuncio),
     tipo: "PME",
     livesCount: 4,
     city: "Niterói",
@@ -59,6 +81,14 @@ export default async function LeadPreviewPage({ searchParams }: { searchParams: 
       { id: "m5", body: "Perfeito, prefiro algo com rede boa em Niterói. Consegue me mandar hoje ainda?", direction: "inbound", sentAt: minutesAgo(5) },
     ],
   });
+
+  if (ficha) {
+    return (
+      <div className="arc-venancor min-h-[100dvh] bg-(--background) text-(--foreground)">
+        <LightLeadDetail lead={lead} requirements={[]} documents={[]} carriers={[]} />
+      </div>
+    );
+  }
 
   return (
     <div className="arc-venancor h-[100dvh] min-h-0 bg-(--surface) text-(--foreground)">

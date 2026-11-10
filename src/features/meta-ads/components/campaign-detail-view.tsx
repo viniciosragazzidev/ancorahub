@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency } from "@/features/quotes/utils";
 import { saveMetaCampaignQueueRouteAction } from "@/features/lead-distribution/actions";
 import type { MetaCampaignItem } from "../types";
+import { CampaignBrokerOfferCard } from "./campaign-broker-offer-card";
 
 export type CampaignAdItem = {
   id: string;
@@ -42,6 +43,8 @@ export function CampaignDetailView({
   initialCaptureEnabled = false,
   canConfigureCapture = false,
   canDisableCapture = false,
+  brokerOffer = null,
+  canEditBrokerOffer = false,
 }: {
   campaign: MetaCampaignItem;
   ads?: CampaignAdItem[];
@@ -51,6 +54,8 @@ export function CampaignDetailView({
   initialCaptureEnabled?: boolean;
   canConfigureCapture?: boolean;
   canDisableCapture?: boolean;
+  brokerOffer?: string | null;
+  canEditBrokerOffer?: boolean;
 }) {
   const router = useRouter();
   const [selectedQueueId, setSelectedQueueId] = useState<string>(initialQueueId ?? "");
@@ -195,6 +200,9 @@ export function CampaignDetailView({
           </div>
         </CardContent>
       </Card>
+
+      {/* Só para quem escreve o plano anunciado, ou quando já há um texto salvo. */}
+      {canEditBrokerOffer || brokerOffer ? <CampaignBrokerOfferCard campaignId={campaign.campaignId} initialOffer={brokerOffer} canEdit={canEditBrokerOffer} /> : null}
 
       {/* AI Performance Summary Card */}
       <Card className="border-primary/20 bg-primary/5 shadow-none rounded-xl">

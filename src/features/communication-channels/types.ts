@@ -17,6 +17,10 @@ export type MetaWebhookReferral = {
   headline?: string;
   body?: string;
   media_type?: string;
+  /** Mídia do anúncio no clique (10/11/2026): URLs da Meta, que expiram. */
+  image_url?: string;
+  video_url?: string;
+  thumbnail_url?: string;
   ctwa_clid?: string;
 };
 

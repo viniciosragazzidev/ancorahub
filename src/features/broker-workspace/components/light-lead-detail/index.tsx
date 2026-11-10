@@ -10,6 +10,7 @@ import { RegisterSalePanel } from "@/app/(dashboard)/leads/[id]/register-sale-pa
 import { LeadQuotesSection } from "@/features/leads/components/lead-quotes-section";
 
 import { LeadActionBar } from "./action-bar";
+import { AdOriginCard } from "./ad-origin-card";
 import { DeclineSheet } from "./decline-sheet";
 import { DetailsZone } from "./details-panel";
 import { stageLabel } from "./format";
@@ -106,6 +107,8 @@ export function LightLeadDetail({
           details={
             <div className="flex flex-col gap-4">
               <ClosingOutcomeCard lead={lead} c={c} />
+              {/* O plano anunciado antes dos dados: evita oferecer um plano mais caro do que o anúncio (10/11). */}
+              <AdOriginCard ad={lead.adContext} />
               <ClientInfoCard lead={lead} c={c} withSummary />
               <PeopleDataSection lead={lead} c={c} showRecordDetails={false} />
               <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} />
@@ -153,6 +156,7 @@ export function LightLeadDetail({
         <LeadNotices lead={lead} />
         <IdentityHeader lead={lead} c={c} />
         <ClosingOutcomeCard lead={lead} c={c} />
+        <AdOriginCard ad={lead.adContext} />
         <ClientInfoCard lead={lead} c={c} />
         <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} />
         <DetailsZone lead={lead} c={c} />

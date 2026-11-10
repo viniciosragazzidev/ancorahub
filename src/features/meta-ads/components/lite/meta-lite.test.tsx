@@ -7,6 +7,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, refres
 vi.mock("@/components/ui/sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
 vi.mock("../../actions", () => ({ setMetaGlobalCaptureModeAction: mocks.setMode, triggerManualMetaSync: mocks.sync, disconnectMetaConnection: mocks.disconnect, confirmMetaConnection: vi.fn(), getMetaMarketingAttemptAssets: vi.fn(), recordMetaMarketingOnboardingStep: vi.fn() }));
 vi.mock("@/features/lead-distribution/actions", () => ({ saveMetaCampaignQueueRouteAction: mocks.saveRoute }));
+vi.mock("../../broker-brief-actions", () => ({ saveCampaignBrokerOfferAction: vi.fn() }));
 vi.mock("../../meta-conversion-actions", () => ({ saveMetaConversionSettingsAction: mocks.saveConversions }));
 
 import { CampaignsDashboardView } from "../campaigns-dashboard-view";

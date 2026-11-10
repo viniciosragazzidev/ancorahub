@@ -1,4 +1,5 @@
 import type { AiAutoMove } from "@/features/conversation-intelligence/ai-move";
+import type { BrokerAdContext } from "@/features/leads/broker-ad-context";
 
 export type ConfirmationDocument = { id: string; filename: string; status: string };
 export type CarrierOption = { id: string; name: string };
@@ -41,6 +42,8 @@ export type LightLeadDetailData = {
   tipo?: string | null;
   origem?: string | null;
   sourceCampaign?: string | null;
+  /** "De onde veio" (10/11): plano anunciado e o que o cliente viu no anúncio, nunca o nome da campanha. */
+  adContext?: BrokerAdContext | null;
   tipoCnpj?: string | null;
   beneficiaries?: Array<{
     id: string;

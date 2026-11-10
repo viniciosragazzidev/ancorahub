@@ -8,6 +8,7 @@ import { generateWebhookToken, resolveRequestId } from "@/features/leads/webhook
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptMetaToken } from "@/features/meta-ads/meta-oauth";
+import { scheduleAdCreativeRefresh } from "@/features/meta-ads/ad-creative-cache";
 import { resolveMetaCampaignAttribution, resolveMetaCampaignQueueRoute } from "@/features/meta-ads/campaign-route-resolver";
 import { runLeadDistributionProcessor } from "@/features/lead-distribution/jobs";
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
@@ -453,6 +454,8 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
         // Conversions API for CRM: "Lead recebido". Never throws; a replayed
         // delivery hits the same (lead, stage) row and is ignored.
         await enqueueMetaConversionEvent({ tenantId: source.tenantId, leadId: result.leadId, stage: "lead_received", at: receivedAt });
+        // O criativo do anúncio (o que o cliente viu), para o corretor: em segundo plano (10/11/2026).
+        scheduleAdCreativeRefresh(source.tenantId, lead.adId);
         try {
           await processMetaLeadImmediately({ tenantId: source.tenantId, leadId: result.leadId });
         } catch (error) {
