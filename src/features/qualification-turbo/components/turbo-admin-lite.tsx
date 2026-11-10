@@ -15,9 +15,11 @@ import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
 import sections from "@/components/lite/page/lite-sections.module.css";
+import { AppSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 
 import { submitRecommendedTemplatesAction, updateTurboSettingsAction, type TurboAdminData } from "../actions";
+import { SILENCE_FOLLOW_UP_CHANNEL_OPTIONS, SILENCE_FOLLOW_UP_DESCRIPTION } from "./silence-follow-up-copy";
 
 type TemplateRow = TurboAdminData["templates"][number];
 
@@ -70,7 +72,19 @@ function TurboSettingsLite({ data }: { data: TurboAdminData }) {
       <SettingRow id="turbo-enabled" title="Primeira mensagem inteligente" description="Escolhe a mensagem pelo tipo de anúncio e testa variantes. Desligado, volta ao template configurado em Atendimento." checked={settings.enabled} disabled={disabled} onChange={(value) => save({ ...settings, enabled: value })} />
       <SettingRow id="turbo-cadence" title="Lembretes automáticos" description="Para quem não respondeu: 20 min, 3h, no dia seguinte e despedida em 3 dias, só entre 8h e 20h." checked={settings.cadence} disabled={disabled || !settings.enabled} onChange={(value) => save({ ...settings, cadence: value })} />
       <SettingRow id="turbo-learn" title="Aprender sozinho" description="Depois de 50 envios por variante, usa mais a mensagem que tem mais respostas e segue testando 10%." checked={settings.learn} disabled={disabled || !settings.enabled} onChange={(value) => save({ ...settings, learn: value })} />
+      <SettingRow id="turbo-silence-followup" title="Follow-up de quem parou de responder" description={SILENCE_FOLLOW_UP_DESCRIPTION} checked={settings.silenceFollowUp} disabled={disabled} onChange={(value) => save({ ...settings, silenceFollowUp: value })} />
       <div className={sections.formBody}>
+        <div className={form.field}>
+          <span id="turbo-silence-channel" className={form.label}>Canal do follow-up</span>
+          <AppSelect
+            aria-label="Canal do follow-up"
+            value={settings.silenceFollowUpChannel}
+            options={SILENCE_FOLLOW_UP_CHANNEL_OPTIONS}
+            disabled={disabled || !settings.silenceFollowUp}
+            onValueChange={(value) => save({ ...settings, silenceFollowUpChannel: value as typeof settings.silenceFollowUpChannel })}
+          />
+          <span className={form.hint}>No mesmo canal da conversa, se ele falhar tenta o outro. Meta só dentro de 24h da última mensagem do cliente; WAHA só se o lead tem número WAHA.</span>
+        </div>
         <label className={form.field}>
           <span className={form.label}>Nome da empresa nas mensagens</span>
           <input

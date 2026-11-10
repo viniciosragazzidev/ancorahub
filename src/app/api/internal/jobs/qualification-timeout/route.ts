@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { runQualificationTimeoutSweep } from "@/features/ai-agent/qualification-timeout-sweep";
 import { runUnansweredInboundRecovery } from "@/features/ai-agent/unanswered-recovery";
+import { runSilenceFollowUpSweep } from "@/features/ai-agent/silence-follow-up";
 import { runColdLeadRequalificationSweep } from "@/features/ai-qualification/cold-lead-requalification";
 import { runSlaSweep } from "@/features/leads/sla";
 import { flowEffectHandlers } from "@/features/attendance-flows/handlers";
@@ -43,6 +44,12 @@ async function handle(request: NextRequest) {
       console.error("[unanswered-recovery] failed", { message: error instanceof Error ? error.message.slice(0, 180) : "unknown" });
       return null;
     });
+    // One light follow-up to whoever stopped answering mid-qualification (10/11): after the timeout (cold has
+    // precedence) and after the recovery (a customer message still waiting for the AI is answered first).
+    const silenceFollowUp = await runSilenceFollowUpSweep({ deadlineAt: jobDeadlineAt }).catch((error) => {
+      console.error("[silence-follow-up] failed", { message: error instanceof Error ? error.message.slice(0, 180) : "unknown" });
+      return null;
+    });
     const [slaResult, attendanceRuns, coldLeadRequalification] = await Promise.all([
       runSlaSweep(),
       wakeAttendanceRuns().catch((error) => {
@@ -51,7 +58,7 @@ async function handle(request: NextRequest) {
       }),
       runColdLeadRequalificationSweep(),
     ]);
-    return NextResponse.json({ success: true, result, slaResult, attendanceRuns, coldLeadRequalification, unansweredRecovery });
+    return NextResponse.json({ success: true, result, slaResult, attendanceRuns, coldLeadRequalification, unansweredRecovery, silenceFollowUp });
   } catch (error) {
     const message = error instanceof Error ? error.message.replace(/[\r\n]+/g, " ").slice(0, 180) : "unknown_error";
     console.error("[qualification-timeout-job] failed", { message });

@@ -192,7 +192,7 @@ export function TurboShellScreen() {
     <>
       <DashboardHeader breadcrumb="Qualificação" title="Qualificação turbo" />
       <main className={litePage.stack}>
-        <TurboAdminLite data={{ settings: { enabled: true, cadence: true, learn: false, companyDisplayName: "Âncora Saúde" }, templates: [row("t0_lead_ads", "Primeira mensagem (Lead Ads)", "t0", "APPROVED", "UTILITY"), row("t1_reminder", "Lembrete de 20 minutos", "t1", "PENDING", "UTILITY"), row("t2_reengage", "Reengajamento de 3 horas", "t2", "REJECTED", "MARKETING"), row("t4_goodbye", "Despedida", "t4", "MISSING", null)], metaConnected: true, canEdit: true } as never} />
+        <TurboAdminLite data={{ settings: { enabled: true, cadence: true, learn: false, companyDisplayName: "Âncora Saúde", silenceFollowUp: true, silenceFollowUpChannel: "same" }, templates: [row("t0_lead_ads", "Primeira mensagem (Lead Ads)", "t0", "APPROVED", "UTILITY"), row("t1_reminder", "Lembrete de 20 minutos", "t1", "PENDING", "UTILITY"), row("t2_reengage", "Reengajamento de 3 horas", "t2", "REJECTED", "MARKETING"), row("t4_goodbye", "Despedida", "t4", "MISSING", null)], metaConnected: true, canEdit: true } as never} />
       </main>
     </>
   );
