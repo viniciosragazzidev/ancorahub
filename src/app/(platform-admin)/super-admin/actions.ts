@@ -40,6 +40,7 @@ import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag
 import { liveStatusSettingKey } from "@/features/live-status/flag";
 import { customerWaitingSettingKey, customerWaitingSinceKey } from "@/features/customer-waiting/flag";
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
+import { aiAudioTranscriptionSettingKey } from "@/features/ai-agent/audio-transcription/flag";
 import { qualificationContextAnalysisSettingKeys } from "@/features/ai-agent/qualification-context-analysis-settings";
 import { EXTENSION_PILOT_USERS_SETTING } from "@/features/browser-extension/pilot";
 
@@ -456,6 +457,20 @@ export async function updateDutyShiftReminderPilotAction(tenantId: string, formD
   await setSystemSetting(dutyShiftReminderSettingKey(targetTenantId), input.enabled, now);
   await getDatabase().insert(schema.platformAuditLogs).values({
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "duty_shift_reminder_24h.tenant_pilot_updated",
+    targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now,
+  });
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
+}
+
+/** Liga ou desliga, por empresa, a IA de qualificação ouvir os 2 primeiros áudios do lead. */
+export async function updateAiAudioTranscriptionAction(tenantId: string, formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
+  const now = new Date();
+  await setSystemSetting(aiAudioTranscriptionSettingKey(targetTenantId), input.enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "ai_audio_transcription.tenant_updated",
     targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now,
   });
   revalidatePath(`/super-admin/tenants/${targetTenantId}`);

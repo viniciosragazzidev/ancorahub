@@ -179,6 +179,13 @@ function MediaAudio({ media, isOutbound }: { media: MediaBubbleData; isOutbound:
         </div>
       </div>
       <MediaMetaLine media={media} isOutbound={isOutbound} />
+      {media.caption ? (
+        // Nota de voz não tem legenda no WhatsApp: texto aqui é a transcrição feita pela IA de qualificação.
+        <p className={cn("text-xs leading-5", isOutbound ? "text-primary-foreground/90" : "text-foreground/90")}>
+          <span className={cn("block text-[10px]", isOutbound ? "text-primary-foreground/70" : "text-muted-foreground")}>Transcrição</span>
+          {media.caption}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -1135,6 +1135,13 @@
                         "when":  1793900000000,
                         "tag":  "0219_etapas_e_funil",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  162,
+                        "version":  "7",
+                        "when":  1794300000000,
+                        "tag":  "0225_lead_audio_transcriptions",
+                        "breakpoints":  true
                     }
                 ]
 }

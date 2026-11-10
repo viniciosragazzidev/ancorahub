@@ -49,6 +49,8 @@ import { interpretQualificationTurn, shouldVerifyExtraction, VERIFIABLE_FIELDS, 
 import { applyQualificationCorrectionsToMemory, describeQualificationCorrections, detectQualificationCorrections } from "./qualification-corrections";
 import { generateLateralAnswer, isCustomerQuestion } from "./lateral-answer";
 import { canResumeDistributedQualification, distributedHandoffText } from "./distributed-resume";
+import { prepareQualificationAudio } from "./audio-transcription/service";
+import { AUDIO_DECLINE_TEXTS, isAudioDeclineText, type AudioDeclineReason } from "./audio-transcription/rules";
 import { analyzeAndMergeQualificationContext, isQualificationContextAnalysisEnabled, qualificationContextAnalysisSettingKeys, type ContextAnalysisOutcome } from "./context-analysis";
 
 
@@ -1415,6 +1417,53 @@ function handoffBodyFor(configured: string | null | undefined, defaultText: stri
   return isAfterHoursInSaoPaulo() ? afterHoursText(text, defaultText, afterHoursDefault) : text;
 }
 
+/**
+ * Áudio de lead em qualificação que a IA não ouviu (passou dos 2, longo demais ou falhou):
+ * uma mensagem curta pedindo para escrever, sem repetir se a última da IA já foi esse pedido.
+ * O fluxo de perguntas segue quando o cliente escrever.
+ */
+async function replyToUnheardAudio(input: {
+  tenantId: string;
+  leadId: string;
+  phone: string;
+  conversation: { id: string; status: string; lastProcessedMessageId: string | null };
+  reason: AudioDeclineReason;
+  sourceIdentifier: string | null | undefined;
+  communicationChannelId?: string | null;
+  transport: AiTransport;
+  openWaSessionId?: string | null;
+  wahaRunId?: string | null;
+}) {
+  const db = getDatabase();
+  const now = new Date();
+  const [lastReply] = await db.select({ body: schema.whatsappMessages.body }).from(schema.whatsappMessages)
+    .where(and(eq(schema.whatsappMessages.tenantId, input.tenantId), eq(schema.whatsappMessages.leadId, input.leadId), inArray(schema.whatsappMessages.direction, ["outbound", "outgoing"])))
+    .orderBy(desc(schema.whatsappMessages.sentAt)).limit(1);
+  const markProcessed = () => db.update(schema.aiConversations)
+    .set({ lastProcessedMessageId: input.sourceIdentifier ?? input.conversation.lastProcessedMessageId, lastActivityAt: now, updatedAt: now })
+    .where(and(eq(schema.aiConversations.id, input.conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
+  if (isAudioDeclineText(lastReply?.body)) {
+    await markProcessed();
+    console.info("[ai-audio] decline_suppressed", { tenantId: input.tenantId, leadId: input.leadId, reason: input.reason });
+    return { status: "audio_not_heard" as const, deliveryStatus: "suppressed_repeat" };
+  }
+  const body = AUDIO_DECLINE_TEXTS[input.reason];
+  const messageId = `ai_audio_${crypto.randomUUID()}`;
+  await db.insert(schema.whatsappMessages).values({ id: messageId, tenantId: input.tenantId, leadId: input.leadId, communicationChannelId: input.communicationChannelId ?? null, conversationId: input.conversation.id, senderRole: "assistant", provider: input.transport, phone: input.phone, direction: "outbound", body, sentAt: now });
+  let deliveryStatus = "failed";
+  try {
+    const sent = await sendAiOutbound({ tenantId: input.tenantId, leadId: input.leadId, phone: input.phone, body, transport: input.transport, openWaSessionId: input.openWaSessionId, wahaRunId: input.wahaRunId, currentMessageId: messageId });
+    deliveryStatus = sent.status;
+    if (sent.messageId) await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
+  } catch (error) {
+    await db.update(schema.whatsappMessages).set({ providerStatus: "failed" }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
+    console.error("[ai-audio] decline.outbound_failed", { tenantId: input.tenantId, leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
+  }
+  await markProcessed();
+  console.info("[ai-audio] decline_sent", { tenantId: input.tenantId, leadId: input.leadId, reason: input.reason, deliveryStatus });
+  return { status: "audio_not_heard" as const, deliveryStatus, reply: body };
+}
+
 type ProcessInboundAiInput = Parameters<typeof processInboundAiTurn>[0];
 
 /**
@@ -1479,7 +1528,7 @@ async function processInboundAiTurn({
   // continue with the next missing field instead of repeating the question
   // that preceded the attachment. The file contents are never guessed here.
   const inboundPlaceholderKind = userMessageBody.trim().match(/^\[(image|document|audio|video|sticker)\]$/i)?.[1]?.toLowerCase();
-  const effectiveMessageKind = (messageKind === "text" && inboundPlaceholderKind ? inboundPlaceholderKind : messageKind) as QuickReplyMessageKind;
+  let effectiveMessageKind = (messageKind === "text" && inboundPlaceholderKind ? inboundPlaceholderKind : messageKind) as QuickReplyMessageKind;
   let normalizedInboundMessage = (userMessageBody.trim() && !inboundPlaceholderKind ? userMessageBody.trim() : undefined) || (
     effectiveMessageKind === "image"
       ? "O cliente enviou uma imagem para análise (possivelmente uma carteirinha)."
@@ -1525,6 +1574,29 @@ async function processInboundAiTurn({
     conversation = latestConversation;
   } else {
     conversation = await getOrCreateAiConversation({ tenantId, leadId, communicationChannelId });
+  }
+
+  // Lead em qualificação mandou áudio: os 2 primeiros (até 2 min) viram texto e o turno segue
+  // como se o cliente tivesse escrito; os demais recebem um pedido gentil para escrever (10/11/2026).
+  let audioDeclineReason: AudioDeclineReason | null = null;
+  if (effectiveMessageKind === "audio") {
+    const audio = await prepareQualificationAudio({
+      tenantId,
+      leadId,
+      providerMessageId: providerMessageId || whatsappMessageId,
+      conversationId: conversation.id,
+      conversationStatus: conversation.status,
+      automationState: conversation.automationState,
+      correctionOnly,
+    });
+    if (audio.kind === "transcribed") {
+      userMessageBody = audio.text;
+      normalizedInboundMessage = audio.text;
+      messageKind = "text";
+      effectiveMessageKind = "text";
+    } else if (audio.kind === "declined") {
+      audioDeclineReason = audio.reason;
+    }
   }
 
   const nowReceived = new Date();
@@ -1633,6 +1705,10 @@ async function processInboundAiTurn({
   if (sourceIdentifier) {
     const [quickReplyEvent] = await db.select({ id: schema.aiQuickReplyEvents.id }).from(schema.aiQuickReplyEvents).where(and(eq(schema.aiQuickReplyEvents.tenantId, tenantId), eq(schema.aiQuickReplyEvents.sourceMessageId, sourceIdentifier), eq(schema.aiQuickReplyEvents.conversationId, conversation.id))).limit(1);
     if (quickReplyEvent || conversation.lastProcessedMessageId === sourceIdentifier) return { status: "ignored_duplicate" };
+  }
+
+  if (audioDeclineReason) {
+    return replyToUnheardAudio({ tenantId, leadId, phone, conversation, reason: audioDeclineReason, sourceIdentifier, communicationChannelId, transport, openWaSessionId, wahaRunId });
   }
 
   // 2. Verificar se a IA pode responder

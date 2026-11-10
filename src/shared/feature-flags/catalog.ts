@@ -228,6 +228,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["off", "observe"] as const,
     description: "Cliente aguardando o corretor: em \"observe\" registra no histórico do lead o que faria (IA acolhe, cobranças, troca de corretor) sem enviar nada e mostra a espera na Negociações. O Super-admin liga por empresa; a chave real é feature_customer_waiting_guard_<tenantId>.",
   },
+  AI_AUDIO_TRANSCRIPTION: {
+    key: "feature_ai_audio_transcription",
+    scope: "tenant",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "A IA de qualificação ouve (transcreve) os 2 primeiros áudios de cada lead em qualificação, até 2 minutos. O Super-admin liga por empresa; a chave real é feature_ai_audio_transcription_<tenantId>.",
+  },
   DUTY_SHIFT_REMINDER_24H: {
     key: "feature_duty_reminder_24h",
     scope: "tenant",
