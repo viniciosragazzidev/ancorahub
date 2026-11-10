@@ -2870,6 +2870,31 @@ export const aiAttendanceLogs = pgTable(
   ],
 );
 
+/** Áudios de lead em qualificação considerados pela IA (0225): a vez (slot 1 ou 2) é única por lead. */
+export const leadAudioTranscriptions = pgTable(
+  "lead_audio_transcriptions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    providerMessageId: text("provider_message_id").notNull(),
+    slot: integer("slot"),
+    status: text("status").notNull(),
+    durationSeconds: numeric("duration_seconds", { precision: 8, scale: 2 }),
+    provider: text("provider"),
+    model: text("model"),
+    estimatedCostUsd: numeric("estimated_cost_usd", { precision: 10, scale: 6 }),
+    error: text("error"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("lead_audio_transcriptions_lead_slot_unique").on(table.tenantId, table.leadId, table.slot).where(sql`${table.slot} IS NOT NULL`),
+    uniqueIndex("lead_audio_transcriptions_message_unique").on(table.tenantId, table.providerMessageId),
+    index("lead_audio_transcriptions_tenant_created_idx").on(table.tenantId, table.createdAt),
+  ],
+);
+
 export const webhookDeliveries = pgTable(
   "webhook_deliveries",
   {
