@@ -18,7 +18,10 @@ async function handle(request: NextRequest) {
   try {
     const result = await runDailyLeadsReportJob();
     // Falha de envio vira 500 para o heartbeat marcar erro (09/11 quebrou em silêncio com "ok").
-    const failed = !result.skipped && result.results.some((item) => item.reason === "failed");
+    // Vale também o envio no grupo (Resultado do Plantão): falhou lá, a task marca erro.
+    const plantaoFailed = !result.skipped && (result.plantao === null
+      || (!result.plantao.skipped && result.plantao.results.some((item) => item.state === "failed")));
+    const failed = !result.skipped && (plantaoFailed || result.results.some((item) => item.reason === "failed"));
     return NextResponse.json({ success: !failed, result }, { status: failed ? 500 : 200 });
   } catch (error) {
     console.error("[daily-report-job] failed", error instanceof Error ? { name: error.name, message: error.message.slice(0, 200) } : { name: "UnknownError" });
