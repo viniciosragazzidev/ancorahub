@@ -44,6 +44,13 @@ export function parseRecipientPhones(value: string | null | undefined): string[]
   return [...new Set(phones)].slice(0, MAX_CLOSING_DIRECTOR_RECIPIENTS);
 }
 
+/** Filters the configured numbers when a recovery action has only some missing outbox keys. */
+export function selectClosingDirectorRecipients(configured: string[], requested?: readonly string[]) {
+  if (!requested) return configured;
+  const selected = new Set(requested);
+  return configured.filter((phone) => selected.has(phone));
+}
+
 /** "5521964625966" → "(21) 96462-5966" (for the settings field and the message). */
 export function formatRecipientPhone(phone: string) {
   const local = phone.startsWith("55") && phone.length >= 12 ? phone.slice(2) : phone;

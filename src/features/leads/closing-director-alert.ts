@@ -16,6 +16,7 @@ import {
   closingDirectorRecipientsKey,
   noticeRecipientsKey,
   parseRecipientPhones,
+  selectClosingDirectorRecipients,
 } from "./closing-director-alert-core";
 
 /**
@@ -59,12 +60,15 @@ export async function notifyDirectorsClosingStage(input: {
   newStatus: string;
   /** Manual recovery for a lead that was already in closing before this notice existed. */
   manual?: boolean;
+  /** Manual recovery can target only recipients that have no outbox record yet. */
+  recipientPhones?: string[];
 }) {
   if (input.manual
     ? !CLOSING_STAGE_STATUSES.has(input.newStatus)
     : !entersClosingStage(input.previousStatus, input.newStatus)) return { notified: 0 };
   try {
-    const recipients = await getClosingDirectorRecipients(input.tenantId);
+    const configuredRecipients = await getClosingDirectorRecipients(input.tenantId);
+    const recipients = selectClosingDirectorRecipients(configuredRecipients, input.recipientPhones);
     if (!recipients.length) return { notified: 0 };
     // Switched off in Avisos da equipe: nothing goes out (the outbox would also skip it; this saves the lookups).
     const notice = teamNoticeByKey(CLOSING_DIRECTOR_NOTICE_KEY);

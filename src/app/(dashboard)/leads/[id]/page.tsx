@@ -14,8 +14,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LeadStatusSelector } from "@/features/leads/components/lead-status-selector";
-import { SendMissedClosingNoticeButton } from "@/features/leads/components/send-missed-closing-notice-button";
-import { SendMissedClosingDirectorNoticeButton } from "@/features/leads/components/send-missed-closing-director-notice-button";
+import { SendClosingNoticesRecoveryButton } from "@/features/leads/components/send-closing-notices-recovery-button";
 import { AwaitingReplyBanner } from "@/features/leads/components/awaiting-reply-banner";
 import { KeepStageButton } from "@/features/leads/components/keep-stage-button";
 import { canManagementRegisterSale } from "@/features/post-sale/register-sale-access";
@@ -32,11 +31,10 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { closingStageNoticeKey, CLOSING_STAGE_STATUSES } from "@/features/leads/closing-stage-notice-core";
-import { CLOSING_DIRECTOR_NOTICE_KEY, closingDirectorAlertKey } from "@/features/leads/closing-director-alert-core";
+import { closingDirectorAlertKey } from "@/features/leads/closing-director-alert-core";
 import { getClosingDirectorRecipients } from "@/features/leads/closing-director-alert";
+import { formatClosingNoticePreview, hasPendingClosingNoticeDelivery, type ClosingNoticeAttempt } from "@/features/leads/closing-notices-recovery-core";
 import { pendingClosingOutcome } from "@/features/leads/closing-outcome-core";
-import { teamNoticeByKey } from "@/features/team-notices/catalog";
-import { getTeamNoticeSetting } from "@/features/team-notices/service";
 import { getDatabase, schema } from "@/shared/db";
 import { brokerGreeting, greetingFactsFromLead } from "@/features/leads/broker-greeting";
 import { StartServiceButton } from "./start-service-button";
@@ -232,39 +230,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
 
   if (!lead) notFound();
 
-  const canSendMissedClosingNotice = context.role === "director"
-    && Boolean(lead.corretorId)
-    && CLOSING_STAGE_STATUSES.has(lead.status)
-    && await hasEffectiveCapability({
-      tenantId: context.tenantId,
-      role: context.role,
-      jobTitle: context.jobTitle,
-      customRoleId: context.customRoleId ?? null,
-      permission: "alterar_status_lead",
-    });
-  let showMissedClosingNoticeAction = false;
-  if (canSendMissedClosingNotice && lead.corretorId) {
-    const notice = teamNoticeByKey("LEAD_CLOSING_STAGE");
-    const setting = notice ? await getTeamNoticeSetting(context.tenantId, notice) : null;
-    if (setting?.enabled) {
-      const [brokerProfile] = await db.select({ phone: schema.brokerProfiles.phone })
-        .from(schema.brokerProfiles)
-        .where(and(
-          eq(schema.brokerProfiles.tenantId, context.tenantId),
-          eq(schema.brokerProfiles.userId, lead.corretorId),
-        )).limit(1);
-      if (brokerProfile?.phone?.trim()) {
-        const [existingNotice] = await db.select({ id: schema.whatsappOutboundMessages.id })
-          .from(schema.whatsappOutboundMessages)
-          .where(and(
-            eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
-            eq(schema.whatsappOutboundMessages.idempotencyKey, closingStageNoticeKey(lead.id, lead.corretorId)),
-          )).limit(1);
-        showMissedClosingNoticeAction = !existingNotice;
-      }
-    }
-  }
-  const canSendMissedClosingDirectorNotice = (context.role === "director" || context.role === "manager")
+  const canManageClosingNotices = (context.role === "director" || context.role === "manager")
     && CLOSING_STAGE_STATUSES.has(lead.status)
     && (context.role === "director" || Boolean(context.branchId && lead.branchId === context.branchId))
     && await hasEffectiveCapability({
@@ -274,21 +240,46 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       customRoleId: context.customRoleId ?? null,
       permission: "alterar_status_lead",
     });
-  let showMissedClosingDirectorNoticeAction = false;
-  if (canSendMissedClosingDirectorNotice) {
-    const notice = teamNoticeByKey(CLOSING_DIRECTOR_NOTICE_KEY);
-    const setting = notice ? await getTeamNoticeSetting(context.tenantId, notice) : null;
-    const recipients = setting?.enabled ? await getClosingDirectorRecipients(context.tenantId) : [];
-    if (recipients.length) {
-      const keys = recipients.map((phone) => closingDirectorAlertKey(lead.id, phone));
-      const existing = await db.select({ idempotencyKey: schema.whatsappOutboundMessages.idempotencyKey })
-        .from(schema.whatsappOutboundMessages)
-        .where(and(
-          eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
-          inArray(schema.whatsappOutboundMessages.idempotencyKey, keys),
-        )).limit(recipients.length);
-      showMissedClosingDirectorNoticeAction = existing.length < recipients.length;
-    }
+  let showClosingNoticesRecoveryAction = false;
+  let closingNoticesSummary = "";
+  let closingNoticesAllRegistered = false;
+  let closingNoticesAllSent = false;
+  if (canManageClosingNotices) {
+    const directorRecipients = await getClosingDirectorRecipients(context.tenantId);
+    const brokerKey = lead.corretorId ? closingStageNoticeKey(lead.id, lead.corretorId) : null;
+    const directorKeys = directorRecipients.map((phone) => ({ phone, key: closingDirectorAlertKey(lead.id, phone) }));
+    const allKeys = [...(brokerKey ? [brokerKey] : []), ...directorKeys.map(({ key }) => key)];
+    const rows = allKeys.length > 0
+      ? await db.select({
+        idempotencyKey: schema.whatsappOutboundMessages.idempotencyKey,
+        status: schema.whatsappOutboundMessages.status,
+        sentAt: schema.whatsappOutboundMessages.sentAt,
+        queuedAt: schema.whatsappOutboundMessages.queuedAt,
+        failedAt: schema.whatsappOutboundMessages.failedAt,
+        createdAt: schema.whatsappOutboundMessages.createdAt,
+      }).from(schema.whatsappOutboundMessages).where(and(
+        eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
+        inArray(schema.whatsappOutboundMessages.idempotencyKey, allKeys),
+      )).limit(allKeys.length)
+      : [];
+    const byKey = new Map(rows.map((row) => [row.idempotencyKey, row as ClosingNoticeAttempt & { idempotencyKey: string }]));
+    const congratulations = brokerKey ? byKey.get(brokerKey) ?? null : null;
+    const directorAttempts = directorKeys.map(({ phone, key }) => ({
+      label: `final ${phone.slice(-4)}`,
+      attempt: byKey.get(key) ?? null,
+    }));
+    const existingKeys = new Set(rows.map((row) => row.idempotencyKey));
+    const hasTarget = Boolean(brokerKey) || directorKeys.length > 0;
+    showClosingNoticesRecoveryAction = hasTarget;
+    closingNoticesAllRegistered = hasTarget && !hasPendingClosingNoticeDelivery({
+      brokerKey,
+      directorKeys: directorKeys.map(({ key }) => key),
+      existingKeys,
+    });
+    closingNoticesAllSent = Boolean(brokerKey && congratulations?.status === "sent")
+      && directorAttempts.length > 0
+      && directorAttempts.every(({ attempt }) => attempt?.status === "sent");
+    closingNoticesSummary = formatClosingNoticePreview({ congratulations, directorRecipients: directorAttempts });
   }
   if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
     const [timeline, supplements] = await Promise.all([
@@ -747,10 +738,15 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                   {canDirectorMarkLeadInService({ role: context.role, corretorId: lead.corretorId, status: lead.status }) ? (
                     <MarkLeadInServiceButton leadId={lead.id} brokerName={lead.corretorNome} />
                   ) : null}
-                  {showMissedClosingNoticeAction && lead.corretorNome ? (
-                    <SendMissedClosingNoticeButton leadId={lead.id} brokerName={lead.corretorNome} />
+                  {showClosingNoticesRecoveryAction ? (
+                    <SendClosingNoticesRecoveryButton
+                      leadId={lead.id}
+                      brokerName={lead.corretorNome}
+                      summary={closingNoticesSummary}
+                      allRegistered={closingNoticesAllRegistered}
+                      allSent={closingNoticesAllSent}
+                    />
                   ) : null}
-                  {showMissedClosingDirectorNoticeAction ? <SendMissedClosingDirectorNoticeButton leadId={lead.id} /> : null}
                   {lead.status === "awaiting_reply" && canKeepStage ? <KeepStageButton leadId={lead.id} previousLabel={awaitingPreviousLabel} size="xs" /> : null}
                   {(lead.corretorId ? (context.userId === lead.corretorId && lead.status !== "distributed") : (context.role !== "broker")) ? (
                     <LeadStatusSelector
@@ -902,10 +898,15 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
               {canDirectorMarkLeadInService({ role: context.role, corretorId: lead.corretorId, status: lead.status }) ? (
                 <MarkLeadInServiceButton leadId={lead.id} brokerName={lead.corretorNome} />
               ) : null}
-              {showMissedClosingNoticeAction && lead.corretorNome ? (
-                <SendMissedClosingNoticeButton leadId={lead.id} brokerName={lead.corretorNome} />
+              {showClosingNoticesRecoveryAction ? (
+                <SendClosingNoticesRecoveryButton
+                  leadId={lead.id}
+                  brokerName={lead.corretorNome}
+                  summary={closingNoticesSummary}
+                  allRegistered={closingNoticesAllRegistered}
+                  allSent={closingNoticesAllSent}
+                />
               ) : null}
-              {showMissedClosingDirectorNoticeAction ? <SendMissedClosingDirectorNoticeButton leadId={lead.id} /> : null}
               {lead.status === "awaiting_reply" && canKeepStage ? <KeepStageButton leadId={lead.id} previousLabel={awaitingPreviousLabel} /> : null}
               <Badge className={slaUrgent ? "border-warning/30 bg-warning/[0.08] text-warning" : "border-border/80"} variant="outline">
                 {lead.status === "distributed" ? `SLA: ${remainingMinutes > 0 ? `expira em ${remainingMinutes}min` : "expirado"}` : "SLA em acompanhamento"}

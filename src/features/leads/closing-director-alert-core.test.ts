@@ -10,6 +10,7 @@ import {
   formatRecipientPhone,
   normalizeRecipientPhone,
   parseRecipientPhones,
+  selectClosingDirectorRecipients,
 } from "./closing-director-alert-core";
 
 describe("fechamento para a direção", () => {
@@ -25,6 +26,14 @@ describe("fechamento para a direção", () => {
     expect(parseRecipientPhones(JSON.stringify(["5521964625966", "(21) 96462-5966", "x"]))).toEqual(["5521964625966"]);
     expect(parseRecipientPhones("21 96462-5966; 21 99999-0000")).toEqual(["5521964625966", "5521999990000"]);
     expect(parseRecipientPhones(null)).toEqual([]);
+  });
+
+  it("filtra a recuperação manual para os telefones sem registro", () => {
+    expect(selectClosingDirectorRecipients(
+      ["5521999990000", "5521888880000"],
+      ["5521888880000"],
+    )).toEqual(["5521888880000"]);
+    expect(selectClosingDirectorRecipients(["5521999990000"], undefined)).toEqual(["5521999990000"]);
   });
 
   it("uma chave por lead e número", () => {

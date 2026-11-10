@@ -518,3 +518,7 @@ Não avança a etapa global do redesign. Registro: `docs/implementations/complet
 ## 2026-11-06: pós-venda, relatório, alertas e seleção em lote
 
 Papéis e rotas: diretor e gestor com flag ativa em `/equipe/pos-venda`, `/equipe/[id]`, `/leads` e `/leads/[id]`; gestor limitado à unidade efetiva. Ações: consultar relatório por corretor, abrir lead, marcar alerta como tratado e levar até 300 leads selecionados à prévia da campanha manual. Estados: sem respostas, alerta aberto/tratado, carregamento, erro de consulta/ação, prévia elegível ou com exclusões. Disclosure nas seções do relatório e alertas e nos cartões de lead/perfil. Reutiliza Card, Button, AppSelect, Checkbox e tokens Lite existentes; sem token, primitive ou animação nova. Não avança a etapa global UX-M1.10. Registro: `docs/implementations/active/2026-11-06-pos-venda-regua-automatica.md`.
+
+## 2026-11-10: recuperação conjunta dos avisos de fechamento
+
+Na ficha `/leads/[id]`, Diretor e Gestor da unidade veem uma única ação contextual para recuperar parabéns ao corretor e aviso à direção. A confirmação revela o status e o horário de cada destino; o envio considera somente o que falta, e a resposta fica no próprio botão. Estados: carregando, enviado ou na fila por destino, falha parcial e já registrado com botão desabilitado. Reutiliza Button e Dialog; sem novo token, primitive ou animação. Gestor permanece na unidade efetiva. Não avança o gate global do redesign. Registro: DEC-173 e `docs/implementations/active/2026-11-10-venda-detection-backfill.md`.

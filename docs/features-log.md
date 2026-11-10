@@ -724,3 +724,7 @@ Envios aceitos da pesquisa de pós-venda são espelhados de forma idempotente no
 # 09/11/2026 - Corretor troca a própria unidade
 
 Em Configurações > Minha unidade (Lite), o corretor escolhe outra unidade ativa da empresa e confirma numa folha que diz o que muda. A troca é imediata e auditada: membership e perfil mudam juntos, a supervisão anterior sai, as vagas abertas nos plantões da unidade antiga são encerradas e os gestores das duas unidades são avisados. Leads continuam com o corretor. Flag global no Super-admin. DEC-171; implementação: docs/implementations/active/2026-11-09-corretor-troca-unidade.md.
+
+# 10/11/2026 - Recuperação conjunta dos avisos de fechamento
+
+Na ficha do lead em fechamento, Diretor e Gestor da unidade autorizados usam um único botão para enviar parabéns ao corretor e aviso à direção. A confirmação mostra o status e horário por envio, envia apenas destinos sem registro e atualiza o resultado no próprio botão. Cada destino preserva sua chave idempotente; operação auditada. DEC-173; implementação: docs/implementations/active/2026-11-10-venda-detection-backfill.md.
