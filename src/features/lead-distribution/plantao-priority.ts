@@ -34,8 +34,11 @@ import { NON_COUNTING_OFFER_STATUS } from "./received-in-day-core";
  * Qualquer erro aqui devolve null: a distribuição segue exatamente como hoje.
  */
 
+/** A flag é lida a cada lead distribuído: 30 s de cache evita 1 consulta por lead (revisão do Vigia, 10/11). */
+const flagCache = new TtlCache<boolean>(30_000, 1);
+
 export async function isPlantaoPriorityFlagOn() {
-  return (await getFeatureFlag(FEATURE_FLAGS.PLANTAO_PRIORITY).catch(() => "false")) === "true";
+  return flagCache.getOrLoad("flag", async () => (await getFeatureFlag(FEATURE_FLAGS.PLANTAO_PRIORITY).catch(() => "false")) === "true");
 }
 
 export async function getPlantaoPrioritySettings(tenantId: string): Promise<PlantaoPrioritySettings> {
