@@ -183,7 +183,7 @@ describe("SupervisorBrokerProfile WhatsApp connection", () => {
 
     const alert = screen.getByText(/WhatsApp não conectado/);
     expect(alert.getAttribute("data-alert")).toBe("true");
-    expect(alert.textContent).toContain("a partir de 20/10");
+    expect(alert.textContent).toContain("não confirma presença nem recebe leads do plantão");
   });
 
   it("hides the WhatsApp row when the viewer is outside the broker's scope", () => {

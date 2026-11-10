@@ -36,6 +36,17 @@ export function Tiles({ code, ok = false, big = false, small = false }: { code: 
   );
 }
 
+/** Carregamento do código (10/11): roda + texto, para não parecer que os quadradinhos ficaram vazios. */
+export function CodeLoading({ label, hint, compact = false }: { label: string; hint?: string; compact?: boolean }) {
+  return (
+    <div className={styles.codeLoading} role="status" aria-live="polite" data-compact={compact || undefined}>
+      <span className={styles.spinner} aria-hidden="true" />
+      <span className={styles.codeLoadingLabel}>{label}</span>
+      {hint ? <span className={styles.codeLoadingHint}>{hint}</span> : null}
+    </div>
+  );
+}
+
 export function TilesSkeleton() {
   const reduce = useReducedMotion();
   return (

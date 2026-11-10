@@ -265,6 +265,10 @@ export const PRESENCE_GUIDE_COPY = {
   phone: { title: "Qual é o número do WhatsApp deste celular?", sub: "É nele que você vai receber os leads.", label: "Número do WhatsApp com DDD", cta: "Continuar" },
   code: {
     generating: "Estou gerando o seu código…",
+    /** Carregamento enquanto o código não chega (10/11). */
+    loading: "Só um instante…",
+    loadingHint: "Pode levar até 30 segundos. Não feche esta tela.",
+    loadingQr: "Gerando o QR Code…",
     title: "Este é o seu código. Toque em Copiar código.",
     copiedTitle: "Pronto, código copiado!",
     sub: "Daqui a pouco você vai usar esse código dentro do WhatsApp.",
@@ -329,7 +333,7 @@ export const PRESENCE_GUIDE_COPY = {
   errors: {
     expired: { title: "Esse código venceu. Já fiz outro para você.", sub: "É só copiar de novo e colar no WhatsApp.", cta: "Copiar o novo código" },
     cooldown: { title: "Espere um pouquinho para eu pedir outro código.", sub: "O WhatsApp limita quantos códigos saem seguidos.", cta: "Gerar outro código", wait: (s: number) => `Aguarde ${s} s` },
-    issue: { title: "Não consegui gerar o código agora.", cta: "Tentar de novo" },
+    issue: { title: "Não consegui gerar o código agora.", sub: "Confira a internet do celular e toque em Tentar de novo.", cta: "Tentar de novo" },
     rejected: { title: "O WhatsApp não aceitou o código.", sub: (phone: string) => `O número tem que ser o do WhatsApp deste celular. O número cadastrado é ${phone}.`, cta: "Corrigir o número" },
     stalled: { title: "Está demorando. Deixe o WhatsApp aberto mais um pouco.", sub: "Se nada mudar, peça um código novo e tente outra vez.", cta: "Gerar outro código" },
     notOpened: { title: "Não abriu? Abra o WhatsApp pelo ícone na tela do celular.", sub: "Depois volte aqui, eu fico esperando.", cta: "Já abri" },

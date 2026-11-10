@@ -319,10 +319,22 @@ export async function getSupervisorLiteRecognitions(input: { context: TenantCont
 export async function getSupervisorLiteWhatsAppStatus(input: { context: TenantContext; memberId: string }): Promise<{ connected: boolean; connectedAt: string | null } | null> {
   const { context, memberId } = input;
   if (!(await isBrokerInLiteScope(context, memberId))) return null;
+  return readMemberWhatsAppStatus(context.tenantId, memberId);
+}
+
+/**
+ * WhatsApp do corretor no perfil do diretor (10/11). Só lê o status gravado da conexão; quem chama já checou o
+ * acesso ao perfil (getTeamMemberProfile devolve null fora do escopo).
+ */
+export async function getMemberProfileWhatsAppStatus(input: { tenantId: string; memberId: string }) {
+  return readMemberWhatsAppStatus(input.tenantId, input.memberId);
+}
+
+async function readMemberWhatsAppStatus(tenantId: string, memberId: string): Promise<{ connected: boolean; connectedAt: string | null }> {
   const [connection] = await getDatabase().select({ connectedAt: schema.whatsappConnections.connectedAt })
     .from(schema.whatsappConnections)
     .where(and(
-      eq(schema.whatsappConnections.tenantId, context.tenantId),
+      eq(schema.whatsappConnections.tenantId, tenantId),
       eq(schema.whatsappConnections.userId, memberId),
       eq(schema.whatsappConnections.status, "ready"),
     ))
