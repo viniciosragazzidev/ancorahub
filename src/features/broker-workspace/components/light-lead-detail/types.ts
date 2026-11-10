@@ -52,6 +52,8 @@ export type LightLeadDetailData = {
   formData?: Record<string, string | null> | null;
   consentimentoLgpd?: boolean;
   aiIntelligence?: any;
+  /** Venda vista pela IA (10/11): registrar (já convertido), confirmar (sugestão) ou conferir (trecho não achado). */
+  aiSalePrompt?: "register" | "confirm" | "check" | null;
   aiPolicyResult?: any;
   aiLastAutoMove?: AiAutoMove | null;
   redistributionNotice?: { reason: string | null; createdAt: Date | string } | null;

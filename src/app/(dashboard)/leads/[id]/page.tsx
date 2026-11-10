@@ -18,6 +18,7 @@ import { SendMissedClosingNoticeButton } from "@/features/leads/components/send-
 import { AwaitingReplyBanner } from "@/features/leads/components/awaiting-reply-banner";
 import { KeepStageButton } from "@/features/leads/components/keep-stage-button";
 import { canManagementRegisterSale } from "@/features/post-sale/register-sale-access";
+import { aiSalePrompt, aiSalePromptCopy, aiSaleRegistrationPending } from "@/features/conversation-intelligence/sale-detection-core";
 import { cargoAllowsRegisterSale } from "@/features/post-sale/register-sale-access-server";
 import { RegisterSaleButton } from "./register-sale-button";
 import { LeadTimeline } from "@/features/leads/components/lead-timeline";
@@ -442,6 +443,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       aiIntelligence: (lead.qualificationDetails as Record<string, unknown> | null)?.aiIntelligence ?? null,
       aiPolicyResult: (lead.qualificationDetails as Record<string, unknown> | null)?.aiPolicyResult ?? null,
       aiLastAutoMove: (lead.qualificationDetails as { aiLastAutoMove?: AiAutoMove } | null)?.aiLastAutoMove ?? null,
+      aiSalePrompt: aiSalePrompt(lead.status, lead.qualificationDetails),
       clientInfo: (() => {
         const info = buildLeadClientInfo({
           email: lightContact.email,
@@ -592,7 +594,11 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
   const beneficiaries = beneficiariesResult.status === "fulfilled" ? beneficiariesResult.value : [];
   const carriers = carriersResult.status === "fulfilled" ? carriersResult.value : [];
   // Director and manager register the sale of a broker's lead (04/11); the broker keeps the status selector.
-  const canRegisterSaleForBroker = canManagementRegisterSale({ role: context.role, userId: context.userId, branchId: context.branchId, lead: { corretorId: lead.corretorId, branchId: lead.branchId, status: lead.status } })
+  // Convertido pela IA sem venda registrada (10/11): corretor e gestão completam o "Registrar venda".
+  const aiSalePending = aiSaleRegistrationPending(lead.status, lead.qualificationDetails);
+  const salePrompt = aiSalePrompt(lead.status, lead.qualificationDetails);
+  const salePromptCopy = salePrompt ? aiSalePromptCopy(salePrompt) : null;
+  const canRegisterSaleForBroker = canManagementRegisterSale({ role: context.role, userId: context.userId, branchId: context.branchId, lead: { corretorId: lead.corretorId, branchId: lead.branchId, status: lead.status }, aiSalePending })
     && (await cargoAllowsRegisterSale(context));
   const saleDocuments = leadDocs.map((document) => ({ id: document.id, filename: document.filename, status: document.status }));
 
@@ -893,6 +899,13 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                 />
               ) : null}
               {canRegisterSaleForBroker ? <RegisterSaleButton leadId={lead.id} documents={saleDocuments} carriers={carriers} /> : null}
+              {salePromptCopy && context.userId === lead.corretorId ? (
+                <div className="flex w-full flex-col gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
+                  <p className="text-sm font-medium">{salePromptCopy.title}</p>
+                  <p className="text-xs text-muted-foreground">{salePromptCopy.body}</p>
+                  <RegisterSaleButton leadId={lead.id} documents={saleDocuments} carriers={carriers} />
+                </div>
+              ) : null}
             </div>
           </div>
         </Card>

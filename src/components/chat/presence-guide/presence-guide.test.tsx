@@ -79,6 +79,28 @@ describe("PresenceGuide (roteiro guiado de presença, 09/11)", () => {
     expect(onFinish).toHaveBeenCalled();
   });
 
+  it("enquanto o código não chega mostra o carregamento; se não vier, pede de novo e depois oferece Tentar de novo", async () => {
+    const onGenerate = vi.fn();
+    render(<PresenceGuide device="mobile" connection={connection({ code: null, onGenerate })} duty={duty} presence={presence()} onClose={vi.fn()} voiceBase={null} preview={{ step: "codigo" }} />);
+    expect(screen.getByText("Só um instante…")).toBeTruthy();
+    expect(screen.getByText(/Pode levar até 30 segundos/)).toBeTruthy();
+    await act(async () => { vi.advanceTimersByTime(2_600); });
+    expect(onGenerate).toHaveBeenCalledTimes(1);
+    await act(async () => { vi.advanceTimersByTime(2_600); });
+    expect(onGenerate).toHaveBeenCalledTimes(2);
+    await act(async () => { vi.advanceTimersByTime(2_600); });
+    expect(screen.getByText("Não consegui gerar o código agora.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    expect(onGenerate).toHaveBeenCalledTimes(3);
+    expect(screen.getByText("Só um instante…")).toBeTruthy();
+  });
+
+  it("esperando o código há mais de 45 s, troca o carregamento por Tentar de novo", async () => {
+    render(<PresenceGuide device="mobile" connection={connection({ code: null, generating: true })} duty={duty} presence={presence()} onClose={vi.fn()} voiceBase={null} preview={{ step: "codigo" }} />);
+    await act(async () => { vi.advanceTimersByTime(46_000); });
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+  });
+
   it("código vencido mostra o conserto e gera outro", () => {
     const onGenerate = vi.fn();
     render(<PresenceGuide device="mobile" connection={connection({ code: null, expired: true, onGenerate })} duty={duty} presence={presence()} onClose={vi.fn()} preview={{ step: "codigo" }} />);

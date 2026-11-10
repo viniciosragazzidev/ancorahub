@@ -201,7 +201,7 @@ function DutySection({ days, now }: { days: DutyDay[]; now: Date }) {
   );
 }
 
-export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, ranking, scopeNote, canExportLeads = false, postSaleEvaluation, now }: {
+export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, ranking, scopeNote, canExportLeads = false, postSaleEvaluation, whatsapp = null, now }: {
   profile: Profile;
   /** MEMBER_PROFILE_LEADS_LIMIT: acima disso a lista avisa que considera só os mais recentes. */
   leadsLimit: number;
@@ -212,6 +212,8 @@ export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, r
   scopeNote: boolean;
   canExportLeads?: boolean;
   postSaleEvaluation?: ReactNode;
+  /** WhatsApp do corretor (10/11): conectado ou não. null = não é corretor ou não deu para ler. */
+  whatsapp?: { connected: boolean; connectedAt: string | null } | null;
   now: string;
 }) {
   const at = useMemo(() => new Date(now), [now]);
@@ -241,6 +243,12 @@ export function MemberProfileLite({ profile, leadsLimit, notes, showFeedbacks, r
             {canExportLeads && isBroker ? <BrokerLeadsExportButton brokerId={member.userId} compact /> : null}
           </div>
           <dl className={styles.facts}>
+            {whatsapp ? (
+              <div>
+                <dt>WhatsApp</dt>
+                <dd><span className={page.badge} data-tone={whatsapp.connected ? "success" : "warning"}>{whatsapp.connected ? "Conectado" : "Não conectado"}</span>{whatsapp.connected && whatsapp.connectedAt ? <span className={page.cellSub}> desde {longDate.format(new Date(whatsapp.connectedAt))}</span> : null}</dd>
+              </div>
+            ) : null}
             <div><dt>Disponibilidade</dt><dd>{AVAILABILITY[member.availabilityStatus] ?? member.availabilityStatus}</dd></div>
             <div><dt>No time desde</dt><dd>{longDate.format(new Date(member.joinedAt))}</dd></div>
             {member.brokerCode ? <div><dt>Código</dt><dd className={page.numeric}>{member.brokerCode}</dd></div> : null}

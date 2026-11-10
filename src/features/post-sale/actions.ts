@@ -15,6 +15,7 @@ import { publishNotification } from "@/features/notifications/send-push-helper";
 import { publishDomainInvalidation } from "@/features/notifications/realtime-sync";
 import { buildCustomerRenewalStatusScope } from "./customer-renewal-scope";
 import { enqueueMetaConversionEvent } from "@/features/meta-ads/meta-conversion-service";
+import { aiSaleRegistrationPending } from "@/features/conversation-intelligence/sale-detection-core";
 
 const registerSaleInput = z.object({
   leadId: z.string().min(1),
@@ -60,7 +61,7 @@ function subtractDays(dateStr: string, days: number): string {
 async function assertLeadScope(leadId: string) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
-  const [lead] = await db.select({ id: schema.leads.id, tenantId: schema.leads.tenantId, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, planId: schema.leads.planId, nome: schema.leads.nome, telefone: schema.leads.telefone, email: schema.leads.email, status: schema.leads.status }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
+  const [lead] = await db.select({ id: schema.leads.id, tenantId: schema.leads.tenantId, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, planId: schema.leads.planId, nome: schema.leads.nome, telefone: schema.leads.telefone, email: schema.leads.email, status: schema.leads.status, qualificationDetails: schema.leads.qualificationDetails }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) throw new Error("Lead não encontrado.");
   if (context.role === "broker" && lead.corretorId !== context.userId) throw new Error("Você só pode operar seus próprios leads.");
   if (context.role === "manager" && lead.branchId !== context.branchId) throw new Error("Este lead não pertence à sua unidade.");
@@ -135,7 +136,9 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
   const { context, db, lead } = await assertLeadScope(input.leadId);
   if (!hasPermission(context.role, "alterar_status_lead")) return { error: "Você não pode registrar vendas." };
   if (!lead.corretorId && context.role === "broker") return { error: "O lead precisa ter um corretor responsável." };
-  if (lead.status === "converted") return { error: "A venda deste lead já foi registrada." };
+  // Convertido pela IA (venda detectada, 10/11) e ainda sem venda registrada: o corretor completa o registro.
+  const completingAiSale = aiSaleRegistrationPending(lead.status, lead.qualificationDetails);
+  if (lead.status === "converted" && !completingAiSale) return { error: "A venda deste lead já foi registrada." };
   if (lead.status === "lost") return { error: "Este lead está perdido. Reabra o lead antes de registrar a venda." };
   if (input.expirationDate && input.expirationDate <= input.coverageStartDate) return { error: "O vencimento precisa ser depois do início da vigência." };
 
@@ -186,11 +189,13 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
   let soldFrom: { status: string; stageEnteredAt: Date | null } | null = null;
   await db.transaction(async (tx) => {
     // Lock the lead and check again inside the transaction: two concurrent submits register one sale.
-    const [locked] = await tx.select({ status: schema.leads.status, stageEnteredAt: schema.leads.stageEnteredAt }).from(schema.leads)
+    const [locked] = await tx.select({ status: schema.leads.status, stageEnteredAt: schema.leads.stageEnteredAt, qualificationDetails: schema.leads.qualificationDetails }).from(schema.leads)
       .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId))).limit(1).for("update");
-    if (!locked || locked.status === "converted") throw new SaleAlreadyRegisteredError("A venda deste lead já foi registrada.");
+    const lockedAiSale = Boolean(locked) && aiSaleRegistrationPending(locked!.status, locked!.qualificationDetails);
+    if (!locked || (locked.status === "converted" && !lockedAiSale)) throw new SaleAlreadyRegisteredError("A venda deste lead já foi registrada.");
     if (locked.status === "lost") throw new SaleAlreadyRegisteredError("Este lead está perdido. Reabra o lead antes de registrar a venda.");
-    soldFrom = { status: locked.status, stageEnteredAt: locked.stageEnteredAt ?? null };
+    // Já convertido pela IA: a etapa não muda de novo e o desfecho já foi avisado na conversão.
+    soldFrom = lockedAiSale ? null : { status: locked.status, stageEnteredAt: locked.stageEnteredAt ?? null };
     const [activeSale] = await tx.select({ id: schema.sales.id }).from(schema.sales)
       .where(and(eq(schema.sales.leadId, lead.id), eq(schema.sales.tenantId, context.tenantId), eq(schema.sales.status, "active"))).limit(1);
     if (activeSale) throw new SaleAlreadyRegisteredError("Este lead já tem uma venda ativa registrada.");
@@ -264,9 +269,20 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
       });
     }
 
-    await tx.update(schema.leads).set({ status: "converted", stageEnteredAt: now, updatedAt: now, version: sql`${schema.leads.version} + 1` }).where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
-    // Histórico de etapas (05/11): a venda registrada fecha o funil do lead.
-    await recordStageChangeForLead(tx, { tenantId: context.tenantId, leadId: lead.id, fromStatus: locked.status, toStatus: "converted", changedAt: now, actorType: stageActorType({ role: context.role }), actorUserId: context.userId, reason: "Venda registrada", previousStageEnteredAt: locked.stageEnteredAt ?? null });
+    if (lockedAiSale) {
+      // Registro concluído: o card "Complete o registro da venda" some.
+      const details = (locked.qualificationDetails as Record<string, unknown> | null) ?? {};
+      const marker = (details.aiSaleDetected as Record<string, unknown> | undefined) ?? {};
+      await tx.update(schema.leads).set({
+        qualificationDetails: { ...details, aiSaleDetected: { ...marker, registrationPending: false, registeredAt: now.toISOString(), registeredBy: context.userId } },
+        updatedAt: now,
+        version: sql`${schema.leads.version} + 1`,
+      }).where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+    } else {
+      await tx.update(schema.leads).set({ status: "converted", stageEnteredAt: now, updatedAt: now, version: sql`${schema.leads.version} + 1` }).where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+      // Histórico de etapas (05/11): a venda registrada fecha o funil do lead.
+      await recordStageChangeForLead(tx, { tenantId: context.tenantId, leadId: lead.id, fromStatus: locked.status, toStatus: "converted", changedAt: now, actorType: stageActorType({ role: context.role }), actorUserId: context.userId, reason: "Venda registrada", previousStageEnteredAt: locked.stageEnteredAt ?? null });
+    }
     const metadata: Record<string, unknown> = {
       saleId,
       policyNumber: input.policyNumber,

@@ -48,3 +48,21 @@ describe("MemberProfileLite", () => {
     expect(screen.getByText("Você está vendo apenas dados e leads da sua unidade.")).toBeInTheDocument();
   });
 });
+
+describe("MemberProfileLite: WhatsApp do corretor (10/11)", () => {
+  it("mostra conectado com a data, ou não conectado", () => {
+    renderProfile({ whatsapp: { connected: true, connectedAt: "2026-11-06T12:00:00.000Z" } });
+    expect(screen.getByText("WhatsApp")).toBeInTheDocument();
+    expect(screen.getByText("Conectado")).toHaveAttribute("data-tone", "success");
+    expect(screen.getByText(/^desde .*2026/)).toBeInTheDocument();
+    cleanup();
+    renderProfile({ whatsapp: { connected: false, connectedAt: null } });
+    expect(screen.getByText("Não conectado")).toHaveAttribute("data-tone", "warning");
+  });
+
+  it("sem o dado (não é corretor), não mostra a linha", () => {
+    renderProfile();
+    expect(screen.queryByText("Não conectado")).not.toBeInTheDocument();
+    expect(screen.queryByText("Conectado")).not.toBeInTheDocument();
+  });
+});

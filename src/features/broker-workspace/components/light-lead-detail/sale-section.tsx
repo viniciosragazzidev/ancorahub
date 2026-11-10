@@ -2,11 +2,13 @@
 
 import { Button } from "@/components/arc/button/button";
 
+import { aiSalePromptCopy, type AiSalePrompt } from "@/features/conversation-intelligence/sale-detection-core";
+
 import { stageLabel } from "./format";
 import type { LeadDetailController } from "./use-lead-detail";
 
 /** Current stage and the sale documentation flow (register, in review, approved, rejected). */
-export function SaleSection({ c, mode = "broker" }: { c: LeadDetailController; mode?: "broker" | "management" }) {
+export function SaleSection({ c, mode = "broker", aiSalePrompt = null }: { c: LeadDetailController; mode?: "broker" | "management"; aiSalePrompt?: AiSalePrompt | null }) {
   const {
     isDistributed,
     leadStatus,
@@ -19,6 +21,10 @@ export function SaleSection({ c, mode = "broker" }: { c: LeadDetailController; m
   } = c;
 
   if (isDistributed && mode === "broker") return null;
+
+  // "register" só com o lead Convertido; "confirm" e "check" só antes do desfecho.
+  const showSalePrompt = aiSalePrompt === "register" ? leadStatus === "converted" : aiSalePrompt !== null && leadStatus !== "converted" && leadStatus !== "lost";
+  const salePromptCopy = showSalePrompt && aiSalePrompt ? aiSalePromptCopy(aiSalePrompt) : null;
 
   const canRegisterSale =
     !approvedDocument &&
@@ -67,6 +73,16 @@ export function SaleSection({ c, mode = "broker" }: { c: LeadDetailController; m
         <div className="border-t border-(--border) pt-4">
           <p className="text-sm font-medium text-(--foreground)">Documentação em análise</p>
           <p className="mt-1 text-sm text-(--text-secondary)">Aguardando aprovação do supervisor.</p>
+        </div>
+      ) : null}
+
+      {mode === "broker" && salePromptCopy ? (
+        <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
+          <p className="text-sm font-medium text-(--success)">{salePromptCopy.title}</p>
+          <p className="text-sm text-(--text-secondary)">{salePromptCopy.body}</p>
+          <Button variant="secondary" onClick={() => setShowSaleConfirm(true)}>
+            Registrar venda
+          </Button>
         </div>
       ) : null}
 

@@ -10,8 +10,8 @@ import { PRESENCE_GUIDE_COPY as COPY } from "@/features/waha-cadence/pairing-cop
 import { cn } from "@/utils/core/cn";
 
 import {
-  AttentionArt, BeforeOpenArt, BigCheck, SpeakerIcon, CameraIcon, CheckIcon, CloseIcon, CopyIcon, guideEase, HomeScreenArt, LockIcon, PhoneMock,
-  Tiles, TilesSkeleton, WaIcon, WaitDots, WaitingMock, WelcomeArt,
+  AttentionArt, BeforeOpenArt, BigCheck, CodeLoading, SpeakerIcon, CameraIcon, CheckIcon, CloseIcon, CopyIcon, guideEase, HomeScreenArt, LockIcon, PhoneMock,
+  Tiles, WaIcon, WaitDots, WaitingMock, WelcomeArt,
 } from "./presence-guide-art";
 import {
   guideError, narrationKey, platformFromUserAgent, progressOf, readGuideMemory, resumeStep, visibleStep, writeGuideMemory,
@@ -154,6 +154,35 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   const error: GuideError | null = guideError({ step, device, facts: connection, local, stage: presence.stage });
   const narration = narrationKey({ step, scene, platform, device, mode, method: connection.method, dutyMode: duty.mode, stage: presence.stage, error });
 
+  // Vigia do código (10/11): se o código não chega e nada está sendo pedido, pede de novo sozinho (até 2 vezes);
+  // se mesmo assim não vier, ou passar de 45 s esperando, a tela troca o carregamento por "Tentar de novo".
+  const waitingCode = !error && step === "codigo" && connection.started && !connection.code && (!desktop || connection.method === "code");
+  const codeKicks = React.useRef(0);
+  React.useEffect(() => {
+    if (!waitingCode) {
+      codeKicks.current = 0;
+      return;
+    }
+    if (connection.generating || (connection.phoneChecked && !connection.phoneValid) || !connection.phoneChecked) return;
+    // A cada 2,5 s parado sem código: pede de novo (2 vezes) e depois desiste com "Tentar de novo".
+    const timer = window.setInterval(() => {
+      if (codeKicks.current >= 2) {
+        window.clearInterval(timer);
+        setLocal("codeTimeout");
+        return;
+      }
+      codeKicks.current += 1;
+      connection.onGenerate();
+    }, 2_500);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando muda a espera ou o pedido em andamento
+  }, [waitingCode, connection.generating, connection.phoneChecked, connection.phoneValid]);
+  React.useEffect(() => {
+    if (!waitingCode) return;
+    const timer = window.setTimeout(() => setLocal("codeTimeout"), 45_000);
+    return () => window.clearTimeout(timer);
+  }, [waitingCode]);
+
   // Ao entrar em cada etapa (e em cada toque do caminho), a narração dela começa sozinha, a não ser que o
   // corretor tenha parado a voz antes. Com erro na tela, a voz para.
   React.useEffect(() => {
@@ -257,6 +286,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
 
   function regenerate() {
     setLocal(null);
+    codeKicks.current = 0;
     setCopied(false);
     setLocalStep("codigo");
     connection.onGenerate();
@@ -264,7 +294,12 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
 
   function onErrorCta() {
     switch (error) {
-      case "expired": case "cooldown": case "issue": case "stalled": regenerate(); return;
+      case "issue":
+        // Sem número válido, o código nunca sai: leva para a tela do número.
+        if (!connection.phoneValid) { setLocal(null); setLocalStep("numero"); return; }
+        regenerate();
+        return;
+      case "expired": case "cooldown": case "stalled": regenerate(); return;
       case "rejected": setLocal(null); setLocalStep("numero"); return;
       case "notOpened": setLocal(null); setLocalStep("esperando"); return;
       case "copyBlocked": setLocal(null); setLocalStep("telainicial"); return;
@@ -346,8 +381,8 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
               <div className={styles.art} style={{ gridTemplateColumns: "auto 1fr", alignItems: "center", gap: 24, justifyItems: "start" }}>
                 {qr
                   // eslint-disable-next-line @next/next/no-img-element -- QR dinâmico em base64
-                  ? connection.qrCode ? <img className={styles.qrImg} alt="QR Code para conectar o WhatsApp" src={connection.qrCode.startsWith("data:") ? connection.qrCode : `data:image/png;base64,${connection.qrCode}`} /> : <span className={styles.qrSkeleton} aria-label="Gerando o QR Code" />
-                  : connection.code ? <Tiles code={connection.code} big /> : <TilesSkeleton />}
+                  ? connection.qrCode ? <img className={styles.qrImg} alt="QR Code para conectar o WhatsApp" src={connection.qrCode.startsWith("data:") ? connection.qrCode : `data:image/png;base64,${connection.qrCode}`} /> : <CodeLoading label={COPY.code.loadingQr} compact />
+                  : connection.code ? <Tiles code={connection.code} big /> : <CodeLoading label={COPY.code.loading} compact />}
                 <ol className={styles.list}>
                   {COPY.desktop.steps(qr, platform).map((text, index) => <li key={text} className={styles.listItem} data-on={index === 0}><span className={styles.listNum}>{index + 1}</span>{text}</li>)}
                 </ol>
@@ -366,7 +401,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
           <>
             <Say title={!connection.code ? COPY.code.generating : copied ? COPY.code.copiedTitle : COPY.code.title} sub={connection.code ? COPY.code.sub : undefined} state={connection.code ? "idle" : "working"} />
             <div className={styles.art}>
-              {connection.code ? <Tiles code={connection.code} ok={copied} /> : <TilesSkeleton />}
+              {connection.code ? <Tiles code={connection.code} ok={copied} /> : <CodeLoading label={COPY.code.loading} hint={COPY.code.loadingHint} />}
               <span className={styles.copied} role="status">{copied ? <><CheckIcon size={16} /> {COPY.code.copied}</> : null}</span>
             </div>
           </>
@@ -555,7 +590,7 @@ function errorView(error: GuideError, context: { phone: string; message: string 
   switch (error) {
     case "expired": return e.expired;
     case "cooldown": return e.cooldown;
-    case "issue": return { title: e.issue.title, cta: e.issue.cta };
+    case "issue": return e.issue;
     case "rejected": return { title: e.rejected.title, sub: e.rejected.sub(context.phone), cta: e.rejected.cta };
     case "stalled": return e.stalled;
     case "notOpened": return e.notOpened;

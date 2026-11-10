@@ -22,7 +22,8 @@ import { rankHeadline, type RankPosition } from "@/features/engagement/ranking";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { listBrokerNotes } from "@/features/supervisor-workspace/notes-actions";
 import { SupervisorBrokerProfile, SupervisorNoteHistory } from "@/features/supervisor-workspace/broker-profile/supervisor-broker-profile";
-import { getSupervisorLiteMemberPulse, getSupervisorLiteNextTask, getSupervisorLiteRecognitions, getSupervisorLiteWhatsAppStatus } from "@/features/supervisor-workspace/lite-queries";
+import { getMemberProfileWhatsAppStatus, getSupervisorLiteMemberPulse, getSupervisorLiteNextTask, getSupervisorLiteRecognitions, getSupervisorLiteWhatsAppStatus } from "@/features/supervisor-workspace/lite-queries";
+import { DsStatusBadge } from "@/components/ui/ds-status-badge";
 import { getManagerLiteTeam } from "@/features/manager-workspace/manager-lite-team-queries";
 import { LiteBrokerProfileActions } from "@/features/manager-workspace/manager-lite-profile-actions";
 import { getTeamMetrics, type TeamMetricsResult } from "@/features/team-management/metrics";
@@ -237,6 +238,8 @@ export default async function TeamMemberProfilePage({
     : await getMemberOfferRanking(context.tenantId, member.userId).catch(() => null);
   const roleName = member.customRoleName ?? ({ director: "Diretor", manager: "Gestor", supervisor: "Supervisor", broker: "Corretor" }[member.role]);
   const firstContactRate = metrics.leads.total > 0 ? Math.round(((metrics.leads.total - metrics.leads.withoutFirstContact) / metrics.leads.total) * 100) : 0;
+  // WhatsApp do corretor (10/11): sem ele não confirma presença nem recebe leads do plantão. O acesso ao perfil já foi checado acima.
+  const whatsapp = isBroker ? await getMemberProfileWhatsAppStatus({ tenantId: context.tenantId, memberId: member.userId }).catch(() => null) : null;
 
   if (await isDirectorLitePageOnServer(context, "/equipe/[id]")) {
     return (
@@ -252,6 +255,7 @@ export default async function TeamMemberProfilePage({
             scopeNote={context.role === "manager"}
             canExportLeads={canExportLeads}
             postSaleEvaluation={postSaleEvaluation}
+            whatsapp={whatsapp}
             now={new Date().toISOString()}
           />
         </main>
@@ -273,7 +277,7 @@ export default async function TeamMemberProfilePage({
               <p className="mt-2 truncate text-sm text-muted-foreground">{member.email}</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs sm:text-right"><div><p className="text-muted-foreground">Disponibilidade</p><p className="mt-1 font-medium capitalize">{member.availabilityStatus}</p></div><div><p className="text-muted-foreground">No time desde</p><p className="mt-1 font-medium">{date.format(member.joinedAt)}</p></div>{member.brokerCode ? <div><p className="text-muted-foreground">Código</p><p className="mt-1 font-mono font-medium">{member.brokerCode}</p></div> : null}{member.brokerLifecycleStatus ? <div><p className="text-muted-foreground">Cadastro</p><p className="mt-1 font-medium capitalize">{member.brokerLifecycleStatus.toLowerCase()}</p></div> : null}</div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs sm:text-right">{whatsapp ? <div><p className="text-muted-foreground">WhatsApp</p><p className="mt-1"><DsStatusBadge status={whatsapp.connected ? "success" : "warning"} label={whatsapp.connected ? `Conectado${whatsapp.connectedAt ? ` desde ${date.format(new Date(whatsapp.connectedAt))}` : ""}` : "Não conectado"} /></p></div> : null}<div><p className="text-muted-foreground">Disponibilidade</p><p className="mt-1 font-medium capitalize">{member.availabilityStatus}</p></div><div><p className="text-muted-foreground">No time desde</p><p className="mt-1 font-medium">{date.format(member.joinedAt)}</p></div>{member.brokerCode ? <div><p className="text-muted-foreground">Código</p><p className="mt-1 font-mono font-medium">{member.brokerCode}</p></div> : null}{member.brokerLifecycleStatus ? <div><p className="text-muted-foreground">Cadastro</p><p className="mt-1 font-medium capitalize">{member.brokerLifecycleStatus.toLowerCase()}</p></div> : null}</div>
         </CardContent>
       </Card>
 

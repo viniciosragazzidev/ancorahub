@@ -201,6 +201,7 @@ export function MembroShellScreen() {
       <main className={litePage.stack}>
         <MemberProfileLite
           profile={MEMBER_PROFILE_FIXTURE}
+          whatsapp={{ connected: false, connectedAt: null }}
           leadsLimit={200}
           notes={[{ id: "n1", kind: "elogio", body: "Ótimo ritmo na semana: respondeu todas as ofertas do plantão em menos de 2 min.", createdAt: "2026-10-23T15:00:00.000Z", followUpAt: "2026-10-30T15:00:00.000Z" }] as unknown as Parameters<typeof MemberProfileLite>[0]["notes"]}
           showFeedbacks
