@@ -15,13 +15,13 @@ export type OrigemKey = "tatianaForm" | "tatianaWhatsapp" | "renanPf" | "renanPm
 export type Origens = Record<OrigemKey, number>;
 export const ORIGEM_KEYS: OrigemKey[] = ["tatianaForm", "tatianaWhatsapp", "renanPf", "renanPme", "renanWhatsapp"];
 
-export type FilaColumn = { key: OrigemKey; group: "Tatiana" | "Renan"; short: string; label: string; queue: string };
+export type FilaColumn = { key: OrigemKey; group: "Tatiana" | "Renan"; short: string; tile: string; label: string; queue: string };
 export const FILA_COLUMNS: FilaColumn[] = [
-  { key: "tatianaForm", group: "Tatiana", short: "Form", label: "Tatiana · Form", queue: "Fila TATIANA (formulário)" },
-  { key: "tatianaWhatsapp", group: "Tatiana", short: "WhatsApp", label: "Tatiana · WhatsApp", queue: "Fila TATIANA (WhatsApp)" },
-  { key: "renanPf", group: "Renan", short: "Form PF", label: "Renan · Form PF", queue: "Fila PF - Renan" },
-  { key: "renanPme", group: "Renan", short: "Form PME", label: "Renan · Form PME", queue: "Fila PME - Renan" },
-  { key: "renanWhatsapp", group: "Renan", short: "WhatsApp", label: "Renan · WhatsApp", queue: "Whatsapp Renan" },
+  { key: "tatianaForm", group: "Tatiana", short: "Form", tile: "Formulário", label: "Tatiana · Form", queue: "Fila TATIANA (formulário)" },
+  { key: "tatianaWhatsapp", group: "Tatiana", short: "WhatsApp", tile: "WhatsApp", label: "Tatiana · WhatsApp", queue: "Fila TATIANA (WhatsApp)" },
+  { key: "renanPf", group: "Renan", short: "Form PF", tile: "Formulário PF", label: "Renan · Form PF", queue: "Fila PF - Renan" },
+  { key: "renanPme", group: "Renan", short: "Form PME", tile: "Formulário PME", label: "Renan · Form PME", queue: "Fila PME - Renan" },
+  { key: "renanWhatsapp", group: "Renan", short: "WhatsApp", tile: "WhatsApp", label: "Renan · WhatsApp", queue: "Whatsapp Renan" },
 ];
 
 export type TurnoKey = "manha" | "tarde" | "noite" | "extra";

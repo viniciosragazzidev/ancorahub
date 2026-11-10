@@ -149,38 +149,42 @@ export function LivePanel({ intervalMs, openAssumptions }: { intervalMs: number;
       </section>
 
       <div className={styles.bottom}>
-        <motion.section className={styles.panel} aria-labelledby="filas-title" {...rise(4)}>
+        <motion.section className={styles.panel} aria-labelledby="leads-title" {...rise(4)}>
           <header className={styles.panelHeader}>
-            <h2 id="filas-title" className={styles.panelTitle}>Leads por fila em cada turno</h2>
+            <h2 id="leads-title" className={styles.panelTitle}>Leads de hoje</h2>
           </header>
-          <div className={`${styles.turnoGrid} ${styles.turnoHead}`} aria-hidden>
-            <span style={{ gridColumn: "3 / span 2" }} className={styles.groupLabel}>Fila Tatiana</span>
-            <span style={{ gridColumn: "5 / span 3" }} className={styles.groupLabel}>Filas Renan</span>
-            <span style={{ gridColumn: "1 / span 2", gridRow: 2 }}>Turno</span>
-            {FILA_COLUMNS.map((column, i) => (
-              <span key={column.key} style={{ gridColumn: 3 + i, gridRow: 2 }} className={`${styles.alignEnd} ${flash?.origem === column.key ? styles.headLit : ""}`}>{column.short}</span>
-            ))}
-            <span style={{ gridColumn: 8, gridRow: 2 }} className={styles.alignEnd}>Total</span>
-          </div>
-          <ul className={styles.turnos}>
+
+          <p className={styles.sectionLabel}>Por turno</p>
+          <ul className={styles.turnoStrip}>
             {data.turnos.map((turno) => (
-              <TurnoRow key={turno.key} turno={turno} reduce={reduce} flash={flash?.kind === "lead" && flash.turno === turno.key ? flash : null} />
+              <TurnoBlock key={turno.key} turno={turno} reduce={reduce} flashId={flash?.kind === "lead" && flash.turno === turno.key ? flash.id : null} />
             ))}
           </ul>
-          <div className={`${styles.turnoGrid} ${styles.turnoFoot}`}>
-            <span className={styles.turnoFootLabel} style={{ gridColumn: "1 / span 2" }}>
-              Total do dia
-              {others > 0 ? <span className={styles.turnoFootNote}>inclui {others} de outras origens</span> : null}
-            </span>
-            {FILA_COLUMNS.map((column) => (
-              <Cell key={column.key} flashId={flash?.origem === column.key ? flash.id : null} reduce={reduce} label={`${column.queue}, total do dia: ${origens[column.key]}`}>
-                <AnimatedCounter value={origens[column.key]} locale="pt-BR" animateOnView />
-              </Cell>
-            ))}
-            <Cell flashId={leadFlash} reduce={reduce} strong label={`Total do dia: ${total}`}>
-              <AnimatedCounter value={total} locale="pt-BR" animateOnView />
-            </Cell>
+
+          <p className={styles.sectionLabel}>Por fila</p>
+          <div className={styles.filaGroups}>
+            {(["Tatiana", "Renan"] as const).map((group) => {
+              const columns = FILA_COLUMNS.filter((column) => column.group === group);
+              const groupTotal = columns.reduce((sum, column) => sum + origens[column.key], 0);
+              const lit = columns.some((column) => column.key === flash?.origem);
+              return (
+                <div key={group} className={styles.filaGroup}>
+                  <p className={styles.filaGroupName}>
+                    {group}
+                    <span className={lit ? styles.filaGroupTotalLit : styles.filaGroupTotal}>
+                      <Bump id={lit ? flash?.id ?? null : null} reduce={reduce}><AnimatedCounter value={groupTotal} locale="pt-BR" animateOnView /></Bump> leads
+                    </span>
+                  </p>
+                  <div className={styles.filaTiles} style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
+                    {columns.map((column) => (
+                      <FilaTile key={column.key} column={column} turnos={data.turnos} total={origens[column.key]} reduce={reduce} flashId={flash?.origem === column.key ? flash.id : null} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
+          {others > 0 ? <p className={styles.filaNote}>Mais {others} leads de outras origens (indicação, leads frios).</p> : null}
         </motion.section>
 
         <motion.section className={styles.panel} aria-labelledby="plantoes-title" {...rise(5)}>
@@ -226,39 +230,38 @@ export function LivePanel({ intervalMs, openAssumptions }: { intervalMs: number;
   );
 }
 
-function TurnoRow({ turno, reduce, flash }: { turno: Turno; reduce: boolean; flash: Flash | null }) {
+function TurnoBlock({ turno, reduce, flashId }: { turno: Turno; reduce: boolean; flashId: number | null }) {
   const Icon = TURNO_ICON[turno.key];
   const later = turno.state === "depois";
   return (
-    <li className={`${styles.turnoGrid} ${styles.turno}`} data-state={turno.state}>
-      <FlashRing id={flash?.id ?? null} reduce={reduce} soft />
-      <span className={styles.turnoIcon} aria-hidden><Icon size={18} strokeWidth={1.75} /></span>
-      <div className={styles.turnoMain}>
-        <p className={styles.turnoName}>
-          {turno.label}
-          {turno.state === "agora" ? <span className={styles.nowPill}><span className={styles.liveDotBlue} aria-hidden />Agora</span> : null}
-        </p>
-        <p className={styles.turnoHours}>{later ? `Começa às ${turno.startsAt}` : turno.hours}</p>
-      </div>
-      {FILA_COLUMNS.map((column) => (
-        <Cell key={column.key} flashId={flash && flash.origem === column.key ? flash.id : null} reduce={reduce} empty={later} label={`${turno.label}, ${column.queue}: ${turno.origens[column.key]}`}>
-          {later ? "–" : <AnimatedCounter value={turno.origens[column.key]} locale="pt-BR" animateOnView />}
-        </Cell>
-      ))}
-      <span className={`${styles.turnoNumber} ${styles.alignEnd}`} data-empty={later ? "" : undefined}>
-        {later ? "–" : <Bump id={flash?.id ?? null} reduce={reduce}><AnimatedCounter value={turno.leads} locale="pt-BR" animateOnView /></Bump>}
-      </span>
+    <li className={styles.turnoBlock} data-state={turno.state} aria-label={later ? `${turno.label}: começa às ${turno.startsAt}` : `${turno.label}: ${turno.leads} leads`}>
+      <FlashRing id={flashId} reduce={reduce} soft />
+      <p className={styles.turnoBlockName}>
+        <Icon size={16} strokeWidth={1.75} aria-hidden />
+        {turno.label}
+        {turno.state === "agora" ? <span className={styles.nowPill}><span className={styles.liveDotBlue} aria-hidden />Agora</span> : null}
+      </p>
+      {later ? (
+        <p className={styles.turnoBlockLater}>começa às {turno.startsAt}</p>
+      ) : (
+        <p className={styles.turnoBlockNumber}><Bump id={flashId} reduce={reduce}><AnimatedCounter value={turno.leads} locale="pt-BR" animateOnView /></Bump></p>
+      )}
     </li>
   );
 }
 
-/** Número de uma fila: acende e dá um pulo curto quando chega lead nela. */
-function Cell({ flashId, reduce, empty, strong, label, children }: { flashId: number | null; reduce: boolean; empty?: boolean; strong?: boolean; label: string; children: ReactNode }) {
+/** Uma fila: total do dia grande e, embaixo, quanto veio em cada turno que já começou. */
+function FilaTile({ column, turnos, total, reduce, flashId }: { column: (typeof FILA_COLUMNS)[number]; turnos: Turno[]; total: number; reduce: boolean; flashId: number | null }) {
+  const started = turnos.filter((turno) => turno.state !== "depois");
   return (
-    <span className={`${styles.origemCell} ${strong ? styles.origemTotal : ""} ${styles.alignEnd}`} data-empty={empty ? "" : undefined} data-lit={flashId !== null ? "" : undefined} aria-label={label}>
-      <FlashRing id={flashId} reduce={reduce} soft />
-      <Bump id={flashId} reduce={reduce}>{children}</Bump>
-    </span>
+    <div className={styles.filaTile} data-lit={flashId !== null ? "" : undefined} aria-label={`${column.queue}: ${total} leads hoje`}>
+      <FlashRing id={flashId} reduce={reduce} />
+      <p className={styles.filaTileName}>{column.tile}</p>
+      <p className={styles.filaTileNumber}><Bump id={flashId} reduce={reduce}><AnimatedCounter value={total} locale="pt-BR" animateOnView /></Bump></p>
+      <p className={styles.filaTileSplit}>
+        {started.map((turno) => <span key={turno.key}>{turno.label.toLowerCase()} {turno.origens[column.key]}</span>)}
+      </p>
+    </div>
   );
 }
 

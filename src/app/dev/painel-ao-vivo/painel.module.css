@@ -7,6 +7,7 @@
   /* Suposição: números de destaque acima da escala (máx. --text-5xl 48px), crescem com a altura da tela. */
   --live-big: clamp(56px, 11.5vh, 128px);
   --live-mid: clamp(26px, 4.2vh, 52px);
+  --live-tile: clamp(28px, 6vh, 72px);
   --live-gap: clamp(12px, 2vh, 24px);
   --live-pad: clamp(16px, 2.4vh, 32px);
   --tracking-display: -0.03em;
@@ -94,30 +95,29 @@
 .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; color: var(--text-muted); font-size: var(--text-xs); }
 .legend li { display: inline-flex; align-items: center; gap: 6px; }
 
-/* Filas por turno: ícone | turno | 5 filas | total */
-.turnoGrid { display: grid; grid-template-columns: auto minmax(0, 1fr) repeat(5, minmax(3.2em, 0.3fr)) minmax(2.8em, 0.34fr); align-items: center; column-gap: clamp(10px, 1.2vw, 20px); }
-.turnoHead { row-gap: 2px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle); color: var(--text-muted); font-size: var(--text-xs); }
-.turnoHead > span { white-space: nowrap; transition: color var(--duration-fast, 250ms) ease; }
-.headLit { color: var(--series-1-text); font-weight: 500; }
-.groupLabel { grid-row: 1; justify-self: stretch; padding-bottom: 2px; border-bottom: 1px solid var(--border); color: var(--text-secondary); font-weight: 500; text-align: center; }
-.turnos { display: flex; flex: 1; flex-direction: column; justify-content: space-between; min-height: 0; margin: 0; padding: 0; list-style: none; }
-.turno { position: relative; flex: 1; padding: 0 12px; margin: 0 -12px; border-radius: var(--radius-panel); }
-.turno + .turno { border-top: 1px solid var(--border-subtle); border-top-left-radius: 0; border-top-right-radius: 0; }
-.turnoIcon { display: grid; place-items: center; width: clamp(32px, 4.4vh, 44px); height: clamp(32px, 4.4vh, 44px); border-radius: 9999px; background: var(--surface-muted); color: var(--text-secondary); }
-.turno[data-state="agora"] .turnoIcon { color: var(--series-1-text); background: var(--accent-subtle); }
-.turnoMain { min-width: 0; }
-.turnoName { display: flex; align-items: center; gap: 8px; margin: 0; font-size: clamp(var(--text-base), 2.1vh, var(--text-xl)); font-weight: 500; }
-.turno[data-state="depois"] .turnoName { color: var(--text-secondary); }
-.turnoHours { margin: 2px 0 0; color: var(--text-muted); font-size: clamp(var(--text-xs), 1.6vh, var(--text-base)); }
-.turnoNumber { --text-3xl: var(--live-mid); min-width: 2ch; font-size: var(--live-mid); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1; }
-.turnoNumber[data-empty], .origemCell[data-empty] { color: var(--neutral-5); }
-.origemCell { --text-3xl: clamp(18px, 2.8vh, 36px); position: relative; padding: 6px 8px; margin: -6px -8px; border-radius: 8px; font-size: clamp(18px, 2.8vh, 36px); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1; color: var(--text-secondary); transition: color var(--duration-fast, 250ms) ease; }
-.origemCell[data-lit] { color: var(--series-1-text); }
-.origemTotal { color: var(--foreground); }
-.turnoFoot { padding-top: clamp(8px, 1.2vh, 14px); border-top: 1px solid var(--border); }
-.turnoFootLabel { display: flex; flex-direction: column; font-size: clamp(var(--text-sm), 1.9vh, var(--text-lg)); font-weight: 500; }
-.turnoFootNote { color: var(--text-muted); font-size: var(--text-xs); font-weight: 400; }
-.nowPill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: var(--radius-control); background: var(--accent-subtle); color: var(--series-1-text); font-size: var(--text-xs); font-weight: 500; }
+/* Leads de hoje: faixa por turno + cartões por fila */
+.sectionLabel { margin: 0 0 8px; color: var(--text-muted); font-size: clamp(var(--text-xs), 1.6vh, var(--text-sm)); }
+.turnoStrip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(8px, 1vw, 12px); margin: 0 0 clamp(12px, 2.2vh, 24px); padding: 0; list-style: none; }
+.turnoBlock { position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 4px; min-height: clamp(76px, 13vh, 150px); padding: clamp(10px, 1.4vh, 16px) clamp(12px, 1.2vw, 16px); border-radius: 16px; background: var(--surface-muted); }
+.turnoBlock[data-state="agora"] { background: var(--accent-subtle); }
+.turnoBlockName { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; color: var(--text-secondary); font-size: clamp(var(--text-sm), 1.8vh, var(--text-lg)); font-weight: 500; }
+.turnoBlock[data-state="agora"] .turnoBlockName { color: var(--series-1-text); }
+.turnoBlockNumber { --text-3xl: var(--live-tile); margin: 0; font-size: var(--live-tile); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1; }
+.turnoBlockLater { margin: 0; color: var(--text-muted); font-size: clamp(var(--text-sm), 1.8vh, var(--text-lg)); }
+.nowPill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: var(--radius-control); background: var(--surface); color: var(--series-1-text); font-size: var(--text-xs); font-weight: 500; }
+
+.filaGroups { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: clamp(12px, 1.4vw, 20px); flex: 1; min-height: 0; }
+.filaGroup { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.filaGroupName { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); font-size: clamp(var(--text-base), 2.1vh, var(--text-xl)); font-weight: 500; }
+.filaGroupTotal, .filaGroupTotalLit { --text-3xl: clamp(var(--text-sm), 1.9vh, var(--text-lg)); display: inline-flex; align-items: baseline; gap: 4px; color: var(--text-secondary); font-size: clamp(var(--text-sm), 1.9vh, var(--text-lg)); font-weight: 400; transition: color var(--duration-fast, 250ms) ease; }
+.filaGroupTotalLit { color: var(--series-1-text); }
+.filaTiles { display: grid; gap: clamp(8px, 1vw, 12px); flex: 1; }
+.filaTile { position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: clamp(10px, 1.4vh, 16px) clamp(10px, 1vw, 14px); border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.filaTileName { margin: 0; color: var(--text-secondary); font-size: clamp(var(--text-xs), 1.7vh, var(--text-base)); font-weight: 500; line-height: 1.25; }
+.filaTileNumber { --text-3xl: var(--live-tile); margin: auto 0 0; font-size: var(--live-tile); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1; transition: color var(--duration-fast, 250ms) ease; }
+.filaTile[data-lit] .filaTileNumber { color: var(--series-1-text); }
+.filaTileSplit { display: flex; flex-wrap: wrap; gap: 0 8px; margin: 0; color: var(--text-muted); font-size: clamp(11px, 1.5vh, var(--text-sm)); }
+.filaNote { margin: clamp(8px, 1.4vh, 14px) 0 0; color: var(--text-muted); font-size: clamp(var(--text-xs), 1.6vh, var(--text-sm)); }
 
 /* Plantões: nome | pontos | recebendo */
 .plantaoHead, .plantao { display: grid; grid-template-columns: minmax(0, 1fr) calc(16 * (var(--dot) + var(--dot-gap))) clamp(64px, 9.5vh, 112px); align-items: center; gap: clamp(12px, 1.4vw, 24px); }
@@ -157,28 +157,17 @@
 
 /* ------------------------------------------------------------ celular e tablet */
 @media (max-width: 1023px) {
-  .page { --live-big: 64px; --live-mid: 36px; grid-template-rows: none; align-content: start; height: 100dvh; overflow-y: auto; overscroll-behavior: contain; }
+  .page { --live-big: 64px; --live-mid: 36px; --live-tile: 36px; grid-template-rows: none; align-content: start; height: 100dvh; overflow-y: auto; overscroll-behavior: contain; }
   .header { flex-direction: column; align-items: flex-start; }
   .hero, .bottom { grid-template-columns: 1fr; }
-  .bottom, .panel, .turnos, .plantoes { min-height: auto; }
-  .turnos, .plantoes { flex: none; }
-  .turno, .plantao { min-height: 72px; }
-  .turnoGrid { column-gap: 8px; }
+  .bottom, .panel, .plantoes, .filaGroups { min-height: auto; }
+  .plantoes { flex: none; }
+  .plantao { min-height: 72px; }
+  .filaGroups { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
   .page { --live-big: 56px; --live-mid: 26px; }
-  /* Celular: ícone e horário saem da linha para as cinco filas caberem. */
-  .turnoIcon, .turnoHours { display: none; }
-  .turnoGrid { grid-template-columns: minmax(0, 1fr) repeat(5, minmax(1.9em, auto)) minmax(2.4em, auto); column-gap: 9px; }
-  .turnoHead { font-size: 10px; }
-  .turnoHead > span:nth-child(1) { grid-column: 2 / span 2 !important; }
-  .turnoHead > span:nth-child(2) { grid-column: 4 / span 3 !important; }
-  .turnoHead > span:nth-child(3), .turnoFootLabel { grid-column: 1 !important; }
-  .turnoHead > span:nth-child(n+4):nth-child(-n+8) { grid-column: auto !important; }
-  .turnoHead > span:last-child { grid-column: 7 !important; }
-  .origemCell { --text-3xl: 17px; font-size: 17px; padding: 4px; margin: -4px; }
-  .turnoName { font-size: var(--text-sm); }
-  .nowPill { padding: 1px 6px; }
+  .turnoStrip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .plantaoHead { display: none; }
   .plantao { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name num" "dots dots"; row-gap: 8px; padding-block: 12px; }
   .plantaoName { grid-area: name; }
