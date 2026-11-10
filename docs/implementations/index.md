@@ -1,6 +1,8 @@
 # Índice de Implementações
 
 | Data | Registro | Estado | Resumo |
+| --- | --- | --- | --- |
+| 2026-11-10 | `completed/2026-11-10-resultado-plantao-automatico.md` | concluído | Prévia e envio idempotente do Resultado do Plantão às 19h, com configuração por tenant e tela exclusiva do Diretor. Ativação e cron no Coolify aguardam o operador. |
 | 2026-10-30 | `completed/2026-10-30-valor-vidas-funil.md` | concluído no código; SQL 0215 pendente de aplicação | Kanbans somam valor mensal e vidas; ficha e drawer permitem cotação vinculada e edição manual sob flag auditada, com prioridade de venda/proposta. |
 | 2026-10-24 | `completed/2026-10-24-diretor-lite-f2.md` | implementado; aprovação visual pendente | Chrome do diretor condicionado à chave, com sidebar, header, camadas globais, estados de rota, abas em chips e menu Mais móvel. |
 | 2026-10-16 | completed/2026-10-16-qualification-timeout-valid-response.md | implementado; testes focados e type-check passaram; build bloqueado pelo ambiente | Timeout agora exige dado valido de resposta para classificar como morno, grava estado parcial e reinicia o prazo na reabertura manual. |

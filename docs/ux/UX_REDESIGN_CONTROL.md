@@ -1,3 +1,7 @@
+## 2026-11-10: prévia e envio do Resultado do Plantão
+
+Papel: Diretor, em `/settings/resultado-plantao`. Ação principal: conferir a prévia e enviar agora; ação secundária: ativar/desativar o envio diário. Estados: recurso global desligado, agendamento do tenant desligado, prévia indisponível, tentativa em andamento, enviado hoje, falha e tentativa diária já registrada. Reutiliza Card e Button compartilhados, sem novo token, primitive ou animação. Não avança UX-M1.10.
+
 ## 2026-11-04: disparo manual de aviso de fechamento
 
 Papel: Direção na ficha `/leads/[id]`. Objetivo: recuperar o aviso de parabéns ao corretor responsável quando o lead já está em fechamento e o envio automático não foi registrado. Ação contextual secundária, com confirmação antes de disparar. Estados: ação disponível, confirmação, envio, enviado/em fila e erro. Reutiliza botão e diálogo compartilhados; sem novos tokens, primitives ou movimento. Não avança a etapa global do redesign.

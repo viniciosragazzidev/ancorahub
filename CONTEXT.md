@@ -82,6 +82,7 @@
 - **Drill-down**: caminho de um número agregado até a população exata de registros que o compõe, respeitando o escopo da sessão. Todo número de relatório precisa ter um drill-down explicável.
 - **Item de atenção**: contagem derivada de fatos persistidos (não de opinião) que aponta uma pendência operacional atual, com threshold configurável pelo Diretor e população recuperável por drill-down.
 - **Janela anterior equivalente**: período imediatamente anterior ao selecionado, com a mesma duração, usado para comparação. Diferenças entre taxas são apresentadas em pontos percentuais, nunca como variação percentual.
+- **Resultado do plantão**: resumo diário de leads por fila original e ofertas aceitas, calculado no dia civil de São Paulo; não é um retrato da fila atual.
 
 ## Engenharia
 
