@@ -1,4 +1,5 @@
 import "server-only";
+import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
@@ -36,6 +37,8 @@ const DIRECTOR_LITE_EXCLUDED_ROLES: ReadonlySet<string> = new Set(["broker", "su
 export async function shouldUseDirectorLiteStyle(context: TenantContext) {
   // Corretor e supervisor ficam exatamente como hoje em qualquer modo (inclusive NORMAL): fora da lista do dono (25/10).
   if (DIRECTOR_LITE_EXCLUDED_ROLES.has(context.role)) return false;
+  // Gestor de unidade na versão antiga (10/11): fora do visual Lite. Marketing e financeiro (papel manager) seguem.
+  if (isOutsideManagerScope(context.role, context.jobTitle)) return false;
   if (!(await isDirectorLiteStyleEnabled(context.tenantId))) return false;
   const { getLiteAudience } = await import("@/features/broker-workspace/lite-audience");
   const audience = await getLiteAudience(context).catch(() => "broker" as const);

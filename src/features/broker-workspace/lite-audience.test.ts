@@ -7,8 +7,8 @@ vi.mock("@/features/system-settings/queries", () => ({ FEATURE_FLAGS: { MANAGER_
 import { getLiteAudience } from "./lite-audience";
 
 describe("Lite audience", () => {
-  it("resolves the manager audience only through the manager flag", async () => {
+  it("o gestor nunca entra no Lite, nem com a chave do Lite do gestor ligada (versão antiga, 10/11)", async () => {
     const context: TenantContext = { userId: "manager-1", tenantId: "tenant-1", role: "manager", jobTitle: "manager", branchId: "branch-1" };
-    await expect(getLiteAudience(context)).resolves.toBe("manager");
+    await expect(getLiteAudience(context)).resolves.toBeNull();
   });
 });

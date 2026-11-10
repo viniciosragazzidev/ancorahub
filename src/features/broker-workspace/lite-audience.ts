@@ -11,11 +11,13 @@ export async function isSupervisorLiteAvailable(context: TenantContext) {
   return (await getFeatureFlag(FEATURE_FLAGS.SUPERVISOR_LITE).catch(() => "false")) === "true";
 }
 
-/** Lite screens apply to this user: a broker in LIGHT, or a supervisor with the supervisor Lite in LIGHT. */
-export async function isManagerLiteAvailable(context: TenantContext) {
-  if (context.role !== "manager") return false;
-  const { FEATURE_FLAGS, getFeatureFlag } = await import("@/features/system-settings/queries");
-  return (await getFeatureFlag(FEATURE_FLAGS.MANAGER_LITE).catch(() => "false")) === "true";
+/**
+ * Lite do gestor: desligado desde 10/11 (o gestor voltou para a versão antiga, só com a gestão da unidade; ver
+ * src/features/manager-scope/manager-routes.ts). A chave feature_manager_lite_enabled deixou de valer; as telas Lite
+ * do gestor ficam no código para uma volta futura.
+ */
+export async function isManagerLiteAvailable(_context: TenantContext): Promise<boolean> {
+  return false;
 }
 
 export async function getLiteAudience(context: TenantContext): Promise<"broker" | "supervisor" | "manager" | null> {

@@ -56,10 +56,8 @@ export async function getExperienceMode(customContext?: TenantContext): Promise<
     // If reading cookies fails outside request context, proceed to context check
   }
 
-  if (context?.role === "manager") {
-    const { FEATURE_FLAGS, getFeatureFlag } = await import("@/features/system-settings/queries");
-    if ((await getFeatureFlag(FEATURE_FLAGS.MANAGER_LITE).catch(() => "false")) === "true") return "LIGHT";
-  }
+  // Gestor na versão antiga (10/11): sempre o modo normal, sem o Lite do gestor, com cookie ou preferência antigos.
+  if (context.role === "manager") return "NORMAL";
 
   if (cookieVal === "LIGHT" || cookieVal === "NORMAL") return cookieVal;
 
@@ -105,11 +103,8 @@ export async function setExperienceModeAction(newMode: ExperienceMode): Promise<
       return { success: false, mode: "LIGHT", error: "O modo Lite é obrigatório para corretores. O modo normal foi desativado." };
     }
 
-    if (context.role === "manager" && mode === "NORMAL") {
-      const { FEATURE_FLAGS, getFeatureFlag } = await import("@/features/system-settings/queries");
-      if ((await getFeatureFlag(FEATURE_FLAGS.MANAGER_LITE).catch(() => "false")) === "true") {
-        return { success: false, mode: "LIGHT", error: "O modo Lite é obrigatório para gestores neste momento." };
-      }
+    if (context.role === "manager" && mode === "LIGHT") {
+      return { success: false, mode: "NORMAL", error: "O gestor usa a versão completa do sistema." };
     }
 
     try {

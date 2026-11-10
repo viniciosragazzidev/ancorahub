@@ -60,10 +60,17 @@ describe("visual Lite das telas internas (chave por empresa + modo normal)", () 
     expect(getExperienceMode).not.toHaveBeenCalled();
   });
 
-  it("chave ligada: verdadeiro para diretor, marketing, financeiro, cargo personalizado e gestor no modo normal", async () => {
+  it("chave ligada: verdadeiro para diretor, marketing e financeiro no modo normal", async () => {
     setup({ key: true, mode: "NORMAL" });
-    for (const context of [director, marketing, finance, customRole, normalManager]) {
+    for (const context of [director, marketing, finance]) {
       await expect(shouldUseDirectorLiteStyle(context)).resolves.toBe(true);
+    }
+  });
+
+  it("gestor de unidade (com ou sem cargo) fica na versão antiga, sem o visual Lite (10/11)", async () => {
+    setup({ key: true, mode: "NORMAL" });
+    for (const context of [customRole, normalManager]) {
+      await expect(shouldUseDirectorLiteStyle(context)).resolves.toBe(false);
     }
   });
 
@@ -82,9 +89,9 @@ describe("visual Lite das telas internas (chave por empresa + modo normal)", () 
     expect(getSystemSetting).not.toHaveBeenCalled();
   });
 
-  it("gestor sem o Lite de gestor continua no visual Lite das telas internas", async () => {
+  it("gestor sem o Lite de gestor também fica fora do visual Lite das telas internas (10/11)", async () => {
     setup({ key: true, mode: "NORMAL", managerLite: false });
-    await expect(shouldUseDirectorLiteStyle(normalManager)).resolves.toBe(true);
+    await expect(shouldUseDirectorLiteStyle(normalManager)).resolves.toBe(false);
   });
 
   it("ver como: a regra segue o papel visto (o contexto já é o do usuário visto)", async () => {

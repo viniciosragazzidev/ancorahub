@@ -110,11 +110,12 @@ describe("getExperienceMode", () => {
     expect(state.setCookie).toHaveBeenCalledWith("ancora_experience_mode", "NORMAL", expect.any(Object));
   });
 
-  it("forces a flagged manager to LIGHT before a NORMAL cookie or preference can win", async () => {
+  it("gestor fica no modo normal (versão antiga, 10/11) mesmo com a chave do Lite do gestor e cookie LIGHT", async () => {
     state.managerFlag = "true";
-    state.cookieMode = "NORMAL";
+    state.cookieMode = "LIGHT";
+    state.preferredMode = "LIGHT";
     const context: TenantContext = { userId: "manager-1", tenantId: "tenant-1", role: "manager", jobTitle: "manager", branchId: "branch-1" };
-    expect(await getExperienceMode(context)).toBe("LIGHT");
+    expect(await getExperienceMode(context)).toBe("NORMAL");
   });
 
   it("keeps the normal preference available while the manager flag is off", async () => {
@@ -132,17 +133,18 @@ describe("getExperienceMode", () => {
     state.contextFailure = false;
   });
 
-  it("still forces a flagged manager to LIGHT when a NORMAL cookie is present", async () => {
+  it("gestor resolvido pela sessão também fica no normal com a chave ligada", async () => {
     state.managerFlag = "true";
     state.contextFailure = false;
-    state.cookieMode = "NORMAL";
-    expect(await getExperienceMode()).toBe("LIGHT");
+    state.cookieMode = "LIGHT";
+    expect(await getExperienceMode()).toBe("NORMAL");
   });
 
-  it("rejects a manager request for NORMAL while the flag is on", async () => {
+  it("aceita o pedido de NORMAL do gestor com a chave ligada e recusa LIGHT", async () => {
     state.managerFlag = "true";
-    const result = await setExperienceModeAction("NORMAL");
-    expect(result).toMatchObject({ success: false, mode: "LIGHT" });
+    expect(await setExperienceModeAction("NORMAL")).toMatchObject({ success: true, mode: "NORMAL" });
+    state.setCookie.mockClear();
+    expect(await setExperienceModeAction("LIGHT")).toMatchObject({ success: false, mode: "NORMAL" });
     expect(state.setCookie).not.toHaveBeenCalled();
   });
 });
