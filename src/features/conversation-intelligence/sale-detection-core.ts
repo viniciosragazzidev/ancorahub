@@ -240,6 +240,8 @@ const CLIENT_PAYMENT = /\b(paguei|pagamos|ja paguei|ta pago|esta pago|pix feito|
 /** Pagamento dado como feito pelo corretor: "recebi o comprovante", "pagamento confirmado", "adesão paga". */
 const BROKER_PAYMENT_DONE = /\b(recebi o comprovante|recebi seu comprovante|recebi o pix|pix recebido|pagamento confirmado|pagamento recebido|confirmei o pagamento|adesao paga|adesao foi paga|adesao ja foi paga|adesao esta paga)\b/;
 const TRANSMISSION_WORDS = /\b(transmiti|transmitida|transmitido|transmitimos|implantada|implantado|implantacao feita|enviada (a|para a) operadora|enviei (a proposta )?(a|para a) operadora)\b/;
+/** Futuro, plano ou negativa: "vai ser transmitida", "será transmitida amanhã", "ainda não foi transmitida". */
+const NOT_DONE_YET = /\b(vai ser|vao ser|sera|serao|vamos|vou|iremos|ainda nao|nao foi|nao foram|amanha|depois|quando|assim que|aguardando|falta)\b/;
 /** Pedido ou promessa, nunca prova: "me manda o comprovante", "pode pagar", "vou te mandar o boleto". */
 const REQUEST_WORDS = /\b(me manda|me mande|manda o|mande o|me envia|me envie|envia o|envie o|pode pagar|pode fazer o pix|pode fazer a transferencia|vou te mandar|vou mandar|vou enviar|vou te enviar|vou pagar|vou fazer o pix|precisa pagar|falta pagar|aguardo o comprovante|assim que pagar|quando pagar|depois que pagar|consegue pagar)\b/;
 /** O que liga um pedido ao pagamento. */
@@ -261,7 +263,8 @@ export function evidenceProves(quote: string, sender: "customer" | "broker"): Va
   if (REQUEST_WORDS.test(text)) return null;
   if (sender === "customer" && CLIENT_PAYMENT.test(text)) return "payment";
   if (sender === "broker" && BROKER_PAYMENT_DONE.test(text)) return "payment";
-  if (TRANSMISSION_WORDS.test(text)) return "transmission";
+  // Transmission only as a done fact told by the broker: no questions, plans or negatives (Vigia, 09/11).
+  if (sender === "broker" && !quote.includes("?") && !NOT_DONE_YET.test(text) && TRANSMISSION_WORDS.test(text)) return "transmission";
   return null;
 }
 

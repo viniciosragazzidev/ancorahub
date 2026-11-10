@@ -345,3 +345,15 @@ describe("marcador e card da ficha", () => {
     expect(aiSaleSuggestionNotice({ leadName: "Claudiana", reason: "Venda detectada pela IA: adesão paga" }).title).toBe("A IA detectou a venda de Claudiana: confirmar?");
   });
 });
+
+describe("transmissão só como fato dito pelo corretor", () => {
+  it("aceita o corretor dizendo que transmitiu; recusa pergunta, futuro, negativa e cliente", async () => {
+    const { evidenceProves } = await import("./sale-detection-core");
+    expect(evidenceProves("Corretor: Proposta transmitida para a operadora", "broker")).toBe("transmission");
+    expect(evidenceProves("Corretor: a proposta vai ser transmitida amanhã", "broker")).toBeNull();
+    expect(evidenceProves("Corretor: será transmitida depois da entrevista", "broker")).toBeNull();
+    expect(evidenceProves("Corretor: ainda não foi transmitida", "broker")).toBeNull();
+    expect(evidenceProves("Cliente: já transmitiram?", "customer")).toBeNull();
+    expect(evidenceProves("Cliente: a proposta foi transmitida", "customer")).toBeNull();
+  });
+});
