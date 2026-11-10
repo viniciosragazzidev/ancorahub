@@ -92,6 +92,43 @@ describe("resultado do plantão", () => {
     expect(text).not.toContain("WhatsApp Externo: 092");
   });
 
+  it("agrega leads e corretores dos plantões PME antes de dividir", () => {
+    const offers: PlantaoOfferRow[] = Array.from({ length: 10 }, (_, index) => ({
+      leadId: `pme-a-lead-${index}`,
+      brokerId: `broker-${index % 2}`,
+      dutyScheduleId: "pme-a",
+      dutyName: "PME Rio",
+      offeredAt: new Date("2026-11-09T12:00:00.000Z"),
+    }));
+    offers.push({
+      leadId: "pme-b-lead-1",
+      brokerId: "broker-0",
+      dutyScheduleId: "pme-b",
+      dutyName: "PME São Paulo",
+      offeredAt: new Date("2026-11-09T15:00:00.000Z"),
+    });
+
+    const metrics = calculatePlantaoMetrics([], offers, DEFAULT_PLANTAO_REPORT_CONFIG);
+    expect(metrics.quantity.pme).toBe(5.5);
+  });
+
+  it("classifica por prefixo e mantém PME fora de outros grupos", () => {
+    const offers: PlantaoOfferRow[] = [
+      { leadId: "premium-1", brokerId: "b1", dutyScheduleId: "premium-1", dutyName: "Premium 09/11", offeredAt: new Date("2026-11-09T12:00:00.000Z") },
+      { leadId: "premium-2", brokerId: "b1", dutyScheduleId: "premium-1", dutyName: "Premium 09/11", offeredAt: new Date("2026-11-09T12:00:00.000Z") },
+      { leadId: "not-prefix-1", brokerId: "b1", dutyScheduleId: "not-prefix", dutyName: "Online Premium", offeredAt: new Date("2026-11-09T12:00:00.000Z") },
+      { leadId: "not-prefix-2", brokerId: "b1", dutyScheduleId: "not-prefix", dutyName: "Online Premium", offeredAt: new Date("2026-11-09T12:00:00.000Z") },
+      { leadId: "pme-premium-1", brokerId: "b2", dutyScheduleId: "pme-premium", dutyName: "PME Premium Especial", offeredAt: new Date("2026-11-09T12:00:00.000Z") },
+      { leadId: "pme-premium-2", brokerId: "b2", dutyScheduleId: "pme-premium", dutyName: "PME Premium Especial", offeredAt: new Date("2026-11-09T12:00:00.000Z") },
+      { leadId: "presencial-1", brokerId: "b3", dutyScheduleId: "presencial", dutyName: "Presencial · Manhã", offeredAt: new Date("2026-11-09T12:00:00.000Z") },
+    ];
+
+    const metrics = calculatePlantaoMetrics([], offers, DEFAULT_PLANTAO_REPORT_CONFIG);
+    expect(metrics.quantity.pme).toBe(2);
+    expect(metrics.quantity.onlineMorning).toBe(2);
+    expect(metrics.quantity.inPersonMorning).toBe(1);
+  });
+
   it("usa zeros preenchidos e 0,0 quando não há ofertas aceitas", () => {
     const text = buildPlantaoReportText(calculatePlantaoMetrics([], [], DEFAULT_PLANTAO_REPORT_CONFIG), start);
     expect(text).toContain("📊 *Resultado do Plantão* · 09/11");

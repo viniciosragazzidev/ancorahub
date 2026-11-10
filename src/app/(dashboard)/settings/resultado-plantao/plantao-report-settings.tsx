@@ -69,7 +69,7 @@ export function PlantaoReportSettings({ data }: { data: PageData }) {
         {data.previewError ? <p role="alert" className="text-sm text-destructive">{data.previewError}</p> : null}
         {feedback ? <p role="status" aria-live="polite" className={`text-sm ${feedback.tone === "error" ? "text-destructive" : "text-muted-foreground"}`}>{feedback.message}</p> : null}
         {data.preview ? <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-muted/40 p-4 font-sans text-sm leading-6">{data.preview.text}</pre> : null}
-        <p className="text-xs text-muted-foreground">Um envio manual também consome o envio do dia e impede a duplicação do cron. A prévia usa as filas originais dos leads e as ofertas aceitas até agora.</p>
+        <p className="text-xs text-muted-foreground">O envio manual usa uma chave própria e não bloqueia o envio automático do dia. O cron mantém um envio por dia. A prévia usa as filas originais dos leads e as ofertas aceitas até agora.</p>
       </CardContent>
     </Card>
   </div>;

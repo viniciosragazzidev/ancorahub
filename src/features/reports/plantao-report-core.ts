@@ -141,20 +141,17 @@ function isAfternoon(value: Date | string) {
 type ScheduleBucket = { leads: Set<string>; brokers: Set<string> };
 
 function averagesFor(rows: readonly PlantaoOfferRow[], predicate: (name: string, row: PlantaoOfferRow) => boolean, period: "morning" | "afternoon" | "all") {
-  const schedules = new Map<string, ScheduleBucket>();
+  const totals: ScheduleBucket = { leads: new Set<string>(), brokers: new Set<string>() };
   for (const row of rows) {
     if (!row.dutyScheduleId || !row.dutyName) continue;
     const normalized = normalizePlantaoLabel(row.dutyName);
     if (!predicate(normalized, row)) continue;
     if (period === "morning" && isAfternoon(row.offeredAt)) continue;
     if (period === "afternoon" && !isAfternoon(row.offeredAt)) continue;
-    const bucket = schedules.get(row.dutyScheduleId) ?? { leads: new Set<string>(), brokers: new Set<string>() };
-    bucket.leads.add(row.leadId);
-    bucket.brokers.add(row.brokerId);
-    schedules.set(row.dutyScheduleId, bucket);
+    totals.leads.add(row.leadId);
+    totals.brokers.add(row.brokerId);
   }
-  const perDuty = [...schedules.values()].filter((bucket) => bucket.brokers.size > 0).map((bucket) => bucket.leads.size / bucket.brokers.size);
-  return perDuty.length ? perDuty.reduce((sum, average) => sum + average, 0) / perDuty.length : 0;
+  return totals.brokers.size ? totals.leads.size / totals.brokers.size : 0;
 }
 
 export function calculatePlantaoMetrics(rows: readonly PlantaoQueueRow[], offers: readonly PlantaoOfferRow[], config: PlantaoReportConfig): PlantaoReportMetrics {
@@ -177,10 +174,10 @@ export function calculatePlantaoMetrics(rows: readonly PlantaoQueueRow[], offers
   const indications = { morning: morningLeads.size, afternoon: afternoonLeads.size };
 
   const isPme = (name: string) => name.startsWith(normalizePlantaoLabel(config.duties.pmePrefix));
-  const isPremium = (name: string) => name.includes(normalizePlantaoLabel(config.duties.premiumName));
+  const isPremium = (name: string) => !isPme(name) && name.startsWith(normalizePlantaoLabel(config.duties.premiumName));
   const presencialPrefix = normalizePlantaoLabel(config.duties.presencialPrefix);
-  const isPresencialMorning = (name: string) => name.startsWith(presencialPrefix) && name.includes("manha");
-  const isPresencialAfternoon = (name: string) => name.startsWith(presencialPrefix) && name.includes("tarde");
+  const isPresencialMorning = (name: string) => !isPme(name) && name.startsWith(presencialPrefix) && name.includes("manha");
+  const isPresencialAfternoon = (name: string) => !isPme(name) && name.startsWith(presencialPrefix) && name.includes("tarde");
   const quantity = {
     pme: averagesFor(offers, (name) => isPme(name), "all"),
     onlineMorning: averagesFor(offers, (name) => isPremium(name), "morning"),

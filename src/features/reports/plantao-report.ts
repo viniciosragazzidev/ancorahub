@@ -19,6 +19,7 @@ import {
   type PlantaoOfferRow,
   type PlantaoQueueRow,
 } from "./plantao-report-core";
+import { deliverPlantaoReport } from "./plantao-report-delivery";
 
 export const PLANTAO_REPORT_SETTING_PREFIX = "plantao_report_";
 const PLANTAO_REPORT_STATUS_PREFIX = "heartbeat:plantao-report-status:";
@@ -199,6 +200,13 @@ async function markDailySendSent(reservation: { key: string; token: string; expi
   `);
 }
 
+async function releaseDailySendReservation(reservation: { key: string; value: string }) {
+  await getDatabase().execute(sql`
+    delete from system_settings
+    where key = ${reservation.key} and value = ${reservation.value}
+  `);
+}
+
 function localError(error: unknown) {
   if (error instanceof Error && error.message.startsWith("O número WAHA configurado")) return error.message;
   if (error instanceof Error && error.message.startsWith("WAHA_CHATS_FAILED")) return "Não foi possível consultar os grupos conectados ao número WAHA. Confira a conexão e tente novamente.";
@@ -218,7 +226,6 @@ export async function sendPlantaoReportForTenant(tenantId: string, options: { no
   }
   const { text, day } = await loadPlantaoReport(tenantId, now, config);
 
-  let reservationAcquired = false;
   try {
     const number = await resolveWahaNumber(tenantId, config);
     const chats = await getWahaChats({ sessionName: number.relaySessionId, limit: 500, kind: "group" });
@@ -229,30 +236,32 @@ export async function sendPlantaoReportForTenant(tenantId: string, options: { no
       await writeConfig(tenantId, { ...latestConfig, groupId });
     }
 
-    const reservation = await reserveDailySend(tenantId, day, now);
-    if (!reservation) {
-      return { tenantId, state: "duplicate" as const, reason: "already_sent_today" };
-    }
-    reservationAcquired = true;
-    await writeStatus(tenantId, { state: "sending", day, attemptedAt: now.toISOString() });
-
-    const idempotencyKey = `plantao-report:${tenantId}:${day}`;
-    const sent = await sendWahaRelayGroupMessage({ idempotencyKey, sessionId: number.relaySessionId, groupId, body: text });
-    const status: PlantaoReportStatus = { state: "sent", day, attemptedAt: now.toISOString(), sentAt: now.toISOString(), messageId: sent.messageId };
-    await markDailySendSent(reservation, sent.messageId).catch((error) => console.error("[plantao-report] reservation_update_failed", { tenantId, day, error: error instanceof Error ? error.message.slice(0, 140) : "unknown" }));
-    await writeStatus(tenantId, status).catch((error) => console.error("[plantao-report] status_write_failed", { tenantId, day, error: error instanceof Error ? error.message.slice(0, 140) : "unknown" }));
-    if (options.actorUserId) {
-      await getDatabase().insert(schema.auditLogs).values({
-        id: randomUUID(), userId: options.actorUserId, entidade: "plantao_report", entidadeId: tenantId,
-        acao: "plantao_report.sent_manually", metadata: { source: "dashboard", tenantId, day, messageId: sent.messageId },
-      }).catch((error) => console.error("[plantao-report] audit_write_failed", { tenantId, day, error: error instanceof Error ? error.message.slice(0, 140) : "unknown" }));
-    }
-    return { tenantId, state: "sent" as const, messageId: sent.messageId };
+    const delivery = await deliverPlantaoReport({ tenantId, day, now, manual: options.manual === true }, {
+      reserveDaily: () => reserveDailySend(tenantId, day, now),
+      markDailySent: markDailySendSent,
+      releaseDaily: releaseDailySendReservation,
+      send: (idempotencyKey) => sendWahaRelayGroupMessage({ idempotencyKey, sessionId: number.relaySessionId, groupId, body: text }),
+      onSending: () => writeStatus(tenantId, { state: "sending", day, attemptedAt: now.toISOString() }),
+      onSent: async (sent) => {
+        const status: PlantaoReportStatus = { state: "sent", day, attemptedAt: now.toISOString(), sentAt: now.toISOString(), messageId: sent.messageId };
+        await writeStatus(tenantId, status).catch((error) => console.error("[plantao-report] status_write_failed", { tenantId, day, error: error instanceof Error ? error.message.slice(0, 140) : "unknown" }));
+        if (options.actorUserId) {
+          await getDatabase().insert(schema.auditLogs).values({
+            id: randomUUID(), userId: options.actorUserId, entidade: "plantao_report", entidadeId: tenantId,
+            acao: "plantao_report.sent_manually", metadata: { source: "dashboard", tenantId, day, messageId: sent.messageId },
+          }).catch((error) => console.error("[plantao-report] audit_write_failed", { tenantId, day, error: error instanceof Error ? error.message.slice(0, 140) : "unknown" }));
+        }
+      },
+      onSideEffectError: (effect, error) => console.error(`[plantao-report] ${effect}`, { tenantId, day, error: error instanceof Error ? error.message.slice(0, 140) : "unknown" }),
+    });
+    if (delivery.state === "duplicate") return { tenantId, state: "duplicate" as const, reason: delivery.reason };
+    if (delivery.state === "failed") throw delivery.error;
+    return { tenantId, state: "sent" as const, messageId: delivery.messageId };
   } catch (error) {
     const message = error instanceof Error && error.message.startsWith("Grupo ")
       ? error.message
       : localError(error);
-    console.error("[plantao-report] send_failed", { tenantId, day, reserved: reservationAcquired, error: error instanceof Error ? error.message.slice(0, 180) : "unknown" });
+    console.error("[plantao-report] send_failed", { tenantId, day, error: error instanceof Error ? error.message.slice(0, 180) : "unknown" });
     await writeStatus(tenantId, { state: "failed", day, attemptedAt: now.toISOString(), error: message });
     if (options.actorUserId) {
       await getDatabase().insert(schema.auditLogs).values({
