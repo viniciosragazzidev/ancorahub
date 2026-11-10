@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 10/11/2026 - Prioridade por tipo de plantão (parcial: modo sombra)
+
+- Peso leve por tipo de plantão (ex.: Premium 1,15) na carga do ranking, só para leads quentes e mornos, com teto de fatia, guarda de expiração e nivelamento por horas cumpridas; uma função pura compartilhada por ranking, escolha sob trava e prévia da fila (DEC-172).
+- Modo sombra registra a escolha ponderada no `offer_sent` sem mudar a distribuição; modo on usa o peso. Flag global `feature_plantao_priority_enabled` e setting `plantao_priority_<tenant>` (padrão off); seção "Prioridade por tipo de plantão" só para o Diretor, com auditoria.
+- Scripts: `scripts/set-plantao-priority-setting.ts` (dry-run/--apply) e `scripts/plantao-priority-shadow-report.ts` (somente leitura). Nada foi gravado em produção. Falta: rodar o modo sombra e decidir o modo on; o adaptativo espera vendas registradas.
+
 ## 10/11/2026 - Resultado diário do plantão
 
 - Prévia e envio manual para Diretor, envio automático às 19h de São Paulo para o grupo WAHA Fechamento Plantão Geral, com escopo por tenant, chave manual por tentativa e reserva diária exclusiva do cron.
