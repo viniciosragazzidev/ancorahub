@@ -21,4 +21,8 @@ describe("canManagementRegisterSale", () => {
     expect(canManagementRegisterSale({ role: "director", userId: "d1", branchId: null, lead: { ...lead, status: "converted" } })).toBe(false);
     expect(canManagementRegisterSale({ role: "director", userId: "d1", branchId: null, lead: { ...lead, status: "lost" } })).toBe(false);
   });
+  it("lets management complete a sale the IA converted (10/11)", () => {
+    expect(canManagementRegisterSale({ role: "director", userId: "d1", branchId: null, lead: { ...lead, status: "converted" }, aiSalePending: true })).toBe(true);
+    expect(canManagementRegisterSale({ role: "director", userId: "d1", branchId: null, lead: { ...lead, status: "lost" }, aiSalePending: true })).toBe(false);
+  });
 });

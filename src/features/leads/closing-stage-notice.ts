@@ -25,10 +25,15 @@ async function deliverBrokerClosingStageNotice(input: {
   leadName: string | null;
   brokerId: string | null;
   requestedBy?: string | null;
+  /** Outro envio do mesmo pedido (venda detectada pela IA): chave própria, para não colidir com o aviso de entrada. */
+  idempotencyKey?: string;
+  /** Texto do app e do push no lugar do padrão (o WhatsApp segue o texto do aviso). */
+  inApp?: { title: string; message: string; pushTitle: string; pushBody: string };
+  capability?: "lead_closing_stage" | "lead_converted";
 }) {
   const brokerId = input.brokerId;
   if (!brokerId) return { notified: false as const };
-  const key = closingStageNoticeKey(input.leadId, brokerId);
+  const key = input.idempotencyKey ?? closingStageNoticeKey(input.leadId, brokerId);
   try {
     const [broker] = await getDatabase()
       .select({ name: schema.user.name, phone: schema.brokerProfiles.phone })
@@ -37,7 +42,7 @@ async function deliverBrokerClosingStageNotice(input: {
       .where(eq(schema.user.id, brokerId))
       .limit(1);
     const phone = broker?.phone?.trim();
-    const inApp = closingStageInAppNotice(input.leadName);
+    const inApp = input.inApp ?? closingStageInAppNotice(input.leadName);
     const settled = await Promise.allSettled([
       phone
         ? enqueueMetaTemplateMessage({
@@ -55,11 +60,11 @@ async function deliverBrokerClosingStageNotice(input: {
           : processMetaOutboundBatch(1, input.tenantId, queued.id)))
         : Promise.resolve(null),
       publishNotification({
-        capability: "lead_closing_stage",
+        capability: input.capability ?? "lead_closing_stage",
         tenantId: input.tenantId,
         recipientUserId: brokerId,
         leadId: input.leadId,
-        type: "lead_closing_stage",
+        type: input.capability ?? "lead_closing_stage",
         ...inApp,
         url: `/leads/${input.leadId}`,
         tag: `lead-${input.leadId}`,
@@ -97,4 +102,20 @@ export async function manuallyNotifyBrokerClosingStage(input: {
   requestedBy: string;
 }) {
   return deliverBrokerClosingStageNotice(input);
+}
+
+/**
+ * Venda detectada pela IA (10/11): o mesmo pedido de registro que a direção manda à mão (WhatsApp do aviso
+ * "Lead na etapa de fechamento" + app), com os parabéns pela venda e o que falta. Uma vez por lead e corretor
+ * pela chave própria.
+ */
+export async function notifyBrokerAiSaleDocuments(input: {
+  tenantId: string;
+  leadId: string;
+  leadName: string | null;
+  brokerId: string | null;
+  idempotencyKey: string;
+  inApp: { title: string; message: string; pushTitle: string; pushBody: string };
+}) {
+  return deliverBrokerClosingStageNotice({ ...input, capability: "lead_converted" });
 }

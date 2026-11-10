@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { MOTIVOS_PERDA } from "@/features/leads/lead-status-constants";
 
+import { SaleCompletedSchema } from "./sale-detection-core";
+
 export const ConversationStageEnum = z.enum([
   "INITIAL_CONTACT",
   "DISCOVERY",
@@ -71,6 +73,8 @@ export const ConversationAssessmentSchema = z.object({
   directorAttention: z.enum(["NONE", "WATCH", "ACT"]).nullable().optional().catch(null),
   /** What the director/manager should do, only when directorAttention is ACT or WATCH. */
   directorAction: z.string().trim().max(300).nullable().optional(),
+  /** Venda concluída (10/11): "confirmed" só com prova explícita na conversa; análises antigas leem "no". */
+  saleCompleted: SaleCompletedSchema.optional(),
   facts: z.array(z.string()).default([]),
   inferences: z.array(z.string()).default([]),
 });

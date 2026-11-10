@@ -6,7 +6,7 @@ import { stageLabel } from "./format";
 import type { LeadDetailController } from "./use-lead-detail";
 
 /** Current stage and the sale documentation flow (register, in review, approved, rejected). */
-export function SaleSection({ c, mode = "broker" }: { c: LeadDetailController; mode?: "broker" | "management" }) {
+export function SaleSection({ c, mode = "broker", aiSalePending = false }: { c: LeadDetailController; mode?: "broker" | "management"; aiSalePending?: boolean }) {
   const {
     isDistributed,
     leadStatus,
@@ -67,6 +67,18 @@ export function SaleSection({ c, mode = "broker" }: { c: LeadDetailController; m
         <div className="border-t border-(--border) pt-4">
           <p className="text-sm font-medium text-(--foreground)">Documentação em análise</p>
           <p className="mt-1 text-sm text-(--text-secondary)">Aguardando aprovação do supervisor.</p>
+        </div>
+      ) : null}
+
+      {mode === "broker" && aiSalePending && leadStatus === "converted" ? (
+        <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
+          <p className="text-sm font-medium text-(--success)">Parabéns! A venda foi concluída</p>
+          <p className="text-sm text-(--text-secondary)">
+            A IA viu a venda fechada na conversa. Complete o registro: valor, operadora e vidas, com a confirmação da operadora.
+          </p>
+          <Button variant="secondary" onClick={() => setShowSaleConfirm(true)}>
+            Registrar venda
+          </Button>
         </div>
       ) : null}
 

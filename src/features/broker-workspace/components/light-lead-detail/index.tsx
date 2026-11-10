@@ -108,7 +108,7 @@ export function LightLeadDetail({
               <ClosingOutcomeCard lead={lead} c={c} />
               <ClientInfoCard lead={lead} c={c} withSummary />
               <PeopleDataSection lead={lead} c={c} showRecordDetails={false} />
-              <SaleSection c={c} />
+              <SaleSection c={c} aiSalePending={lead.aiSaleRegistrationPending} />
               {commercialValuesEnabled ? <LeadQuotesSection key={lead.id} leadId={lead.id} leadName={lead.nome} leadPhone={lead.telefone} beneficiaryCount={lead.livesCount} plans={quotePlans} monthlyValue={lead.monthlyValue} livesCount={lead.livesCount} commercialValueSource={lead.commercialValueSource} canDeleteQuotes={isManagement} /> : null}
             </div>
           }
@@ -154,7 +154,7 @@ export function LightLeadDetail({
         <IdentityHeader lead={lead} c={c} />
         <ClosingOutcomeCard lead={lead} c={c} />
         <ClientInfoCard lead={lead} c={c} />
-        <SaleSection c={c} />
+        <SaleSection c={c} aiSalePending={lead.aiSaleRegistrationPending} />
         <DetailsZone lead={lead} c={c} />
         <PeopleDataSection lead={lead} c={c} />
         {commercialValuesEnabled ? <LeadQuotesSection key={lead.id} leadId={lead.id} leadName={lead.nome} leadPhone={lead.telefone} beneficiaryCount={lead.livesCount} plans={quotePlans} monthlyValue={lead.monthlyValue} livesCount={lead.livesCount} commercialValueSource={lead.commercialValueSource} canDeleteQuotes={isManagement} /> : null}
