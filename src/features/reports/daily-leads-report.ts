@@ -8,9 +8,11 @@ import { teamNoticeByKey } from "@/features/team-notices/catalog";
 import { getTeamNoticeSetting } from "@/features/team-notices/service";
 import { getDatabase } from "@/shared/db";
 
+import { loadPlantaoReport, runPlantaoReportJob } from "./plantao-report";
+
 import {
-  buildDailyLeadsReport,
   DAILY_LEADS_REPORT_HOUR,
+  isSaoPauloWeekend,
   DAILY_LEADS_REPORT_NOTICE_KEY,
   DAILY_LEADS_REPORT_PURPOSE,
   dailyLeadsReportKey,
@@ -43,13 +45,14 @@ export async function loadQueueDayRows(tenantId: string, now: Date): Promise<Que
     .map((row) => ({ queueName: row.queue_name, leads: Number(row.leads), hot: Number(row.hot), warm: Number(row.warm), cold: Number(row.cold) }));
 }
 
-/** Uma empresa: monta o texto e põe na fila de envio para cada número (uma vez por dia e número). */
+/** Uma empresa: monta o texto (Resultado do Plantão) e põe na fila de envio para cada número (uma vez por dia e número). */
 export async function sendDailyLeadsReport(tenantId: string, now = new Date()) {
   const notice = teamNoticeByKey(DAILY_LEADS_REPORT_NOTICE_KEY);
   if (!notice || !(await getTeamNoticeSetting(tenantId, notice)).enabled) return { tenantId, sent: 0, reason: "disabled" as const };
   const recipients = await getNoticeRecipients(tenantId, DAILY_LEADS_REPORT_NOTICE_KEY);
   if (!recipients.length) return { tenantId, sent: 0, reason: "no_recipients" as const };
-  const report = buildDailyLeadsReport(await loadQueueDayRows(tenantId, now));
+  // 10/11 (Vinicios): a direção recebe o Resultado do Plantão no lugar do resumo por fila; ele já traz os leads que importam.
+  const report = (await loadPlantaoReport(tenantId, now)).text;
   const dayKey = saoPauloDayKey(now);
   const settled = await Promise.allSettled(recipients.map((phone) => enqueueMetaTemplateMessage({
     tenantId,
@@ -67,12 +70,17 @@ export async function sendDailyLeadsReport(tenantId: string, now = new Date()) {
     if (item.status === "fulfilled" && item.value) sent += 1;
     if (item.status === "rejected") console.warn("[daily-leads-report] send_failed", { tenantId, error: item.reason instanceof Error ? item.reason.message.slice(0, 200) : "unknown" });
   }
+  // 09/11: o texto passou de 512 e todas as tentativas quebraram em silêncio (heartbeat "ok"). Agora a falha aparece.
+  const failed = settled.filter((item) => item.status === "rejected").length;
+  if (failed && failed === settled.length) return { tenantId, sent, reason: "failed" as const };
   return { tenantId, sent, reason: "ok" as const };
 }
 
 /** Job das 18h (Coolify, 21:00 UTC): todas as empresas com o aviso ligado. Antes das 18h de SP não envia. */
 export async function runDailyLeadsReportJob(now = new Date()) {
   if (saoPauloHour(now) < DAILY_LEADS_REPORT_HOUR) return { skipped: true as const, reason: "before_18h" };
+  // Sábado e domingo não tem relatório (Vinicios, 10/11).
+  if (isSaoPauloWeekend(now)) return { skipped: true as const, reason: "weekend" };
   const tenants = rowsOf<{ id: string }>(await getDatabase().execute(sql`select id from tenants`));
   const results = [];
   for (const tenant of tenants) {
@@ -82,5 +90,10 @@ export async function runDailyLeadsReportJob(now = new Date()) {
       console.error("[daily-leads-report] tenant_failed", { tenantId: tenant.id, error: error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200) });
     }
   }
-  return { skipped: false as const, results };
+  // A mesma task do Coolify manda também o Resultado do Plantão no grupo (sem task nova; ele respeita a hora e o liga/desliga dele).
+  const plantao = await runPlantaoReportJob(now).catch((error) => {
+    console.error("[daily-leads-report] plantao_report_failed", { error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
+    return null;
+  });
+  return { skipped: false as const, results, plantao };
 }

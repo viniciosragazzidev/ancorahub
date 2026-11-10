@@ -77,3 +77,26 @@ describe("funil profissional", () => {
     expect(campaignRow({ key: "_none", name: null, leads: 10, qualified: 4, sales: 1 })).toEqual({ key: "_none", name: "Sem campanha", leads: 10, qualified: 4, sales: 1, qualifiedRate: 0.4, saleRate: 0.1 });
   });
 });
+
+describe("isSaoPauloWeekend (sem relatório no fim de semana)", () => {
+  it("sábado e domingo em São Paulo, inclusive perto da meia-noite UTC", async () => {
+    const { isSaoPauloWeekend } = await import("./daily-leads-report-core");
+    expect(isSaoPauloWeekend(new Date("2026-11-07T21:00:00Z"))).toBe(true); // sábado 18h SP
+    expect(isSaoPauloWeekend(new Date("2026-11-08T22:00:00Z"))).toBe(true); // domingo 19h SP
+    expect(isSaoPauloWeekend(new Date("2026-11-09T22:00:00Z"))).toBe(false); // segunda 19h SP
+    expect(isSaoPauloWeekend(new Date("2026-11-07T02:30:00Z"))).toBe(false); // sexta 23h30 SP
+  });
+});
+
+describe("Resultado do Plantão cabe na variável do aviso (máx. 512)", () => {
+  it("com números de 4 dígitos fica abaixo de 512 caracteres", async () => {
+    const { buildPlantaoReportText } = await import("./plantao-report-core");
+    const text = buildPlantaoReportText({
+      external: { whatsapp: 9999, rd: 9999, total: 9999 },
+      internal: { facebook: 9999, whatsapp: 9999, total: 9999 },
+      indications: { morning: 9999, afternoon: 9999 },
+      quantity: { pme: 99.9, onlineMorning: 99.9, onlineAfternoon: 99.9, inPersonMorning: 99.9, inPersonAfternoon: 99.9 },
+    }, new Date("2026-11-10T22:00:00Z"));
+    expect(text.trim().length).toBeLessThanOrEqual(512);
+  });
+});

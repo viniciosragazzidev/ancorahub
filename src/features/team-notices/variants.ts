@@ -139,6 +139,8 @@ export function builtInNoticeVariants(fields: NoticeFields, hour: number): strin
     }
     case "dailyLeadsReport": {
       const { date, report, link } = fields;
+      // 10/11: o texto já é o Resultado do Plantão completo (com título e data); vai como está.
+      if (report.startsWith("📊 *Resultado do Plantão*")) return [`${report}${tail(link, "👉 ")}`];
       return [
         `📊 *Leads de ${date}*\n\n${report}${tail(link, "👉 *Funil no CRM:* ")}`,
         `${hi}! Fechamento do dia (${date}) 📊\n\n${report}${tail(link, "Funil: ")}`,

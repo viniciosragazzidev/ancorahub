@@ -20,6 +20,12 @@ export function saoPauloHour(now: Date) {
   return Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(now));
 }
 
+/** Sábado ou domingo em São Paulo: os relatórios do dia não saem (Vinicios, 10/11). */
+export function isSaoPauloWeekend(now: Date) {
+  const day = new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, weekday: "short" }).format(now);
+  return day === "Sat" || day === "Sun";
+}
+
 /** Meia-noite de hoje em São Paulo (UTC-3, sem horário de verão desde 2019). */
 export function saoPauloDayStart(now: Date) {
   return new Date(`${saoPauloDayKey(now)}T03:00:00.000Z`);
