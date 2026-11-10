@@ -102,3 +102,35 @@ export function writeGuideMemory(key: string, memory: GuideMemory | null) {
 export function platformFromUserAgent(userAgent: string): GuidePlatform {
   return /iphone|ipad|ipod/i.test(userAgent) ? "iphone" : "android";
 }
+
+// ── Narração por etapa (10/11) ────────────────────────────────────────
+
+/** Um áudio curto (até ~10 s) por etapa; os textos estão em PRESENCE_GUIDE_NARRATION (pairing-copy.ts). */
+export type NarrationKey =
+  | "boas-vindas" | "numero" | "codigo" | "codigo-computador-qr" | "codigo-computador-numero" | "tela-inicial"
+  | "toque-1-android" | "toque-1-iphone" | "toque-2" | "toque-3" | "toque-4" | "esperando"
+  | "conectado" | "conectado-so-conectar" | "confirmar" | "confirmar-presencial" | "pronto" | "pronto-presencial";
+
+/** Qual narração toca agora. Com erro na tela não há narração (o texto do erro já diz o que fazer). */
+export function narrationKey(input: {
+  step: GuideStep; scene: number; platform: GuidePlatform; device: GuideDevice; mode: GuideMode;
+  method: "qr" | "code"; dutyMode: "online" | "presencial"; stage: ConfirmStage; error: GuideError | null;
+}): NarrationKey | null {
+  if (input.error) return null;
+  switch (input.step) {
+    case "boasvindas": return "boas-vindas";
+    case "numero": return "numero";
+    case "codigo":
+      if (input.device === "desktop") return input.method === "qr" ? "codigo-computador-qr" : "codigo-computador-numero";
+      return "codigo";
+    case "telainicial": return "tela-inicial";
+    case "caminho":
+      if (input.scene <= 0) return input.platform === "iphone" ? "toque-1-iphone" : "toque-1-android";
+      return input.scene === 1 ? "toque-2" : input.scene === 2 ? "toque-3" : "toque-4";
+    case "esperando": return "esperando";
+    case "conectado": return input.mode === "connect" ? "conectado-so-conectar" : "conectado";
+    case "confirmar": return input.stage === "sending" ? null : input.dutyMode === "presencial" ? "confirmar-presencial" : "confirmar";
+    case "pronto": return input.stage === "waiting" ? "pronto-presencial" : "pronto";
+    default: return null;
+  }
+}

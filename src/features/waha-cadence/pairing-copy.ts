@@ -250,11 +250,13 @@ export const PRESENCE_GUIDE_COPY = {
   welcome: {
     title: "Para receber leads hoje, conecte o seu WhatsApp.",
     titleReconnect: "Seu WhatsApp desconectou. Vamos conectar de novo, é rápido.",
-    sub: "Leva 1 minuto. Você não precisa baixar nada.",
-    /** Texto da voz de introdução (ElevenLabs, voz Liam, ~11 s): public/onboarding/narracao/presenca-whatsapp-intro.mp3. */
-    voice: "Oi! Vamos conectar o seu WhatsApp para você receber os leads do plantão. É rapidinho: leia cada tela e toque no botão de baixo. Eu te ajudo em cada passo.",
+    sub: "Leva 1 minuto e você só faz isso uma vez.",
+    /** Texto da voz de introdução (igual a PRESENCE_GUIDE_NARRATION["boas-vindas"]). */
+    voice: "Oi! Vamos conectar o seu WhatsApp. Você só faz isso uma vez, e suas mensagens pessoais ficam protegidas. É só seguir cada tela.",
     listen: "Ouvir a explicação",
     stop: "Parar a voz",
+    /** Botão pequeno da voz, no topo de todas as etapas. */
+    listenShort: "Ouvir a explicação desta etapa",
     benefits: ["Os leads chegam e você atende pelo seu WhatsApp.", "A IA te ajuda no atendimento.", "Depois é só confirmar sua presença."],
     privacyTitle: "Suas conversas pessoais são só suas",
     privacy: "Ninguém lê nem salva. Só as conversas com os seus leads e clientes ficam no sistema.",
@@ -358,4 +360,31 @@ export const PRESENCE_GUIDE_COPY = {
   },
   progress: (at: number, total: number) => `${at} de ${total}`,
   close: "Sair do roteiro",
+} as const;
+
+/**
+ * Narração de cada etapa do roteiro guiado (10/11): simples, direta e amigável, até ~10 s cada.
+ * Áudios em public/onboarding/narracao/presenca/{chave}.mp3, gerados com
+ * `npx tsx scripts/generate-presence-guide-narration.ts` (ElevenLabs, voz Liam, pt-BR, uso interno).
+ * Mudou um texto? Gere de novo o áudio dele.
+ */
+export const PRESENCE_GUIDE_NARRATION = {
+  "boas-vindas": "Oi! Vamos conectar o seu WhatsApp. Você só faz isso uma vez, e suas mensagens pessoais ficam protegidas. É só seguir cada tela.",
+  numero: "Agora digite o número do WhatsApp deste celular, com o DDD. Depois é só tocar em Continuar.",
+  codigo: "Esse é o seu código. Toque em Copiar código. Daqui a pouco você vai usar ele no WhatsApp.",
+  "codigo-computador-qr": "Pegue o seu celular e abra o WhatsApp. Siga os passos ao lado e aponte a câmera para esse código.",
+  "codigo-computador-numero": "Pegue o seu celular e abra o WhatsApp. Siga os passos ao lado e digite esse código no celular.",
+  "tela-inicial": "Antes de abrir o WhatsApp, veja o caminho. Primeiro, vá para a lista de Conversas. Se cair numa conversa, é só tocar na seta de voltar.",
+  "toque-1-android": "Na lista de Conversas, toque nos três pontinhos, lá no canto de cima, à direita.",
+  "toque-1-iphone": "Na lista de Conversas, toque em Configurações, lá no canto de baixo, à direita.",
+  "toque-2": "Agora toque em Dispositivos conectados.",
+  "toque-3": "Depois, toque no botão Conectar dispositivo.",
+  "toque-4": "Por último, toque em Conectar com número de telefone e digite o seu código. Agora é só tocar em Abrir o WhatsApp.",
+  esperando: "Digitou o código? Agora é só esperar uns segundinhos. Pode deixar essa tela aberta, que eu sigo sozinho.",
+  conectado: "Prontinho, seu WhatsApp está conectado!",
+  "conectado-so-conectar": "Prontinho, seu WhatsApp está conectado! Agora os leads do plantão podem chegar para você.",
+  confirmar: "Agora é só tocar em Confirmar presença, e os leads começam a chegar.",
+  "confirmar-presencial": "Agora tire uma foto do local do plantão. O diretor vê a foto e libera você.",
+  pronto: "Presença confirmada! Os leads do plantão já podem chegar para você. Bom plantão!",
+  "pronto-presencial": "Foto enviada! Agora é só esperar o diretor liberar você. Bom plantão!",
 } as const;

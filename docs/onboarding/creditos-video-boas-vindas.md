@@ -19,5 +19,5 @@ Fora do git (`/video/` no `.gitignore`): `video/boas-vindas/hf-v3/` (HyperFrames
 
 ## Voz da introdução do roteiro de presença (09/11/2026)
 
-`public/onboarding/narracao/presenca-whatsapp-intro.mp3`: mesma voz ("Liam", `eleven_multilingual_v2`), mesma conta
+`public/onboarding/narracao/presenca/*.mp3` (abertura e uma narração por etapa, 10/11): mesma voz ("Liam", `eleven_multilingual_v2`), mesma conta
 Free e mesma condição de uso interno. Se o roteiro for usado fora da Âncora, gerar de novo num plano pago.

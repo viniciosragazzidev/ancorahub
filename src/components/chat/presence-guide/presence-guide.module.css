@@ -20,7 +20,7 @@
 
 /* ---------- Roteiro (lição) ---------- */
 .lesson { position: absolute; inset: 0; display: grid; grid-template-rows: auto 1fr auto; }
-.top { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 12px; padding: calc(env(safe-area-inset-top) + 16px) 20px 8px; }
+.top { display: grid; grid-template-columns: 40px 1fr auto auto; align-items: center; gap: 12px; padding: calc(env(safe-area-inset-top) + 16px) 20px 8px; }
 .close { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 9999px; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
 .close:hover { background: var(--surface-muted); }
 .track { position: relative; height: 8px; border-radius: 9999px; background: var(--surface-muted); overflow: hidden; }
@@ -136,3 +136,8 @@
 .voice { justify-self: start; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; margin-left: 64px; padding: 0 14px; border-radius: 9999px; border: 1px solid var(--border); background: var(--surface); font: inherit; font-size: 14px; color: var(--text-secondary); cursor: pointer; }
 .voice:hover { background: var(--surface-muted); }
 .voice[aria-pressed="true"] { color: var(--chat-action-strong); border-color: color-mix(in oklab, var(--chat-action) 40%, var(--border)); }
+
+/* Voz em todas as etapas: botão redondo no topo, ao lado da contagem */
+.voiceSmall { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 9999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); cursor: pointer; }
+.voiceSmall:hover { background: var(--surface-muted); }
+.voiceSmall[aria-pressed="true"] { color: var(--chat-action-strong); border-color: color-mix(in oklab, var(--chat-action) 40%, var(--border)); }
