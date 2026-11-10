@@ -12,6 +12,7 @@ import {
   aiSaleRegistrationPending,
   aiSaleSuggestionNotice,
   decideAiSaleConversion,
+  evidenceProves,
   normalizeEvidenceText,
   saleEvidenceProven,
   validateSaleEvidence,
@@ -231,21 +232,95 @@ describe("conferência do trecho com a conversa real", () => {
     expect(validated[0]?.proves).toBe("payment");
   });
 
-  it("aceita o nome do arquivo de comprovante", () => {
-    expect(validateSaleEvidence(["Cliente: [documento: comprovante_pix.pdf]"], messages)[0]).toMatchObject({ sender: "customer", proves: "payment" });
-  });
-
   it("rejeita trecho inventado, mensagem do sistema e trecho curto", () => {
     expect(validateSaleEvidence(["Cliente: paguei a primeira mensalidade no boleto ontem"], messages)).toEqual([]);
     expect(validateSaleEvidence(["Pagamento confirmado pelo robô"], messages)).toEqual([]);
-    expect(validateSaleEvidence(["Cliente: ok", "sim", "[imagem]"], messages)).toEqual([]);
+    expect(validateSaleEvidence(["Cliente: ok", "sim"], messages)).toEqual([]);
   });
 
-  it("trecho real sem pagamento nem transmissão não prova a venda", () => {
-    const validated = validateSaleEvidence(["Corretor: me manda o comprovante do pix"], [{ sender: "broker", text: "Me manda o comprovante do pix" }]);
-    expect(validated).toHaveLength(1);
+  it("entrevista aprovada sozinha não prova a venda", () => {
     const onlyInterview = validateSaleEvidence(["Corretor: entrevista médica aprovada"], [{ sender: "broker", text: "Entrevista médica aprovada!" }]);
+    expect(onlyInterview).toHaveLength(1);
     expect(saleEvidenceProven(onlyInterview)).toBe(false);
+  });
+});
+
+describe("quem disse o pagamento", () => {
+  it("cliente: paguei, pix feito, segue o comprovante", () => {
+    expect(evidenceProves("paguei a adesão", "customer")).toBe("payment");
+    expect(evidenceProves("Pix feito!", "customer")).toBe("payment");
+    expect(evidenceProves("segue o comprovante", "customer")).toBe("payment");
+  });
+
+  it("corretor só quando dá o pagamento como feito", () => {
+    expect(evidenceProves("Recebi o comprovante, obrigado", "broker")).toBe("payment");
+    expect(evidenceProves("Pagamento confirmado!", "broker")).toBe("payment");
+    expect(evidenceProves("Adesão paga, agora é aguardar", "broker")).toBe("payment");
+    expect(evidenceProves("Proposta transmitida para a operadora", "broker")).toBe("transmission");
+  });
+
+  it("pedido ou promessa nunca prova", () => {
+    for (const text of ["Me manda o comprovante do pix", "Pode pagar a adesão hoje", "Vou te mandar o boleto", "Assim que pagar me avisa", "Vou fazer o pix amanhã"]) {
+      expect(evidenceProves(text, "broker")).toBeNull();
+      expect(evidenceProves(text, "customer")).toBeNull();
+    }
+  });
+
+  it("corretor dizendo 'paguei' ou cliente dizendo 'pagamento confirmado' não valem", () => {
+    expect(evidenceProves("paguei a adesão", "broker")).toBeNull();
+    expect(evidenceProves("pagamento confirmado", "customer")).toBeNull();
+  });
+
+  it("pedido real na conversa é conferido mas não prova", () => {
+    const validated = validateSaleEvidence(["Corretor: me manda o comprovante do pix"], [{ sender: "broker", text: "Me manda o comprovante do pix" }]);
+    expect(validated).toEqual([{ quote: "Corretor: me manda o comprovante do pix", sender: "broker", proves: null }]);
+    expect(saleEvidenceProven(validated)).toBe(false);
+  });
+});
+
+describe("arquivo sozinho como prova", () => {
+  it("vale quando o cliente envia arquivo com nome de pagamento", () => {
+    const validated = validateSaleEvidence(["Cliente: [documento: comprovante_pix.pdf]"], [
+      { sender: "broker", text: "Oi, tudo bem?" },
+      { sender: "customer", text: "[documento: comprovante_pix.pdf]" },
+    ]);
+    expect(validated).toEqual([{ quote: "Cliente: [documento: comprovante_pix.pdf]", sender: "customer", proves: "payment" }]);
+  });
+
+  it("vale quando o cliente envia o arquivo logo depois do pedido de pagamento", () => {
+    const validated = validateSaleEvidence(["Cliente: [imagem]"], [
+      { sender: "broker", text: "Pode fazer o pix da adesão e me manda o comprovante" },
+      { sender: "customer", text: "[imagem]" },
+    ]);
+    expect(validated[0]?.proves).toBe("payment");
+  });
+
+  it("não vale sem pedido antes nem nome de pagamento", () => {
+    const validated = validateSaleEvidence(["Cliente: [imagem]", "Cliente: [documento: rg_frente.jpg]"], [
+      { sender: "broker", text: "Me manda seu RG, por favor" },
+      { sender: "customer", text: "[documento: rg_frente.jpg]" },
+      { sender: "customer", text: "[imagem]" },
+    ]);
+    expect(validated.map((item) => item.proves)).toEqual([null, null]);
+    expect(saleEvidenceProven(validated)).toBe(false);
+  });
+
+  it("não vale quando o arquivo foi enviado pelo corretor", () => {
+    const validated = validateSaleEvidence(["Corretor: [documento: comprovante.pdf]"], [
+      { sender: "broker", text: "[documento: comprovante.pdf]" },
+    ]);
+    expect(validated).toEqual([]);
+  });
+
+  it("pedido muito antes do arquivo não conta", () => {
+    const validated = validateSaleEvidence(["Cliente: [imagem]"], [
+      { sender: "broker", text: "Me manda o comprovante do pix" },
+      { sender: "customer", text: "Amanhã eu vejo" },
+      { sender: "broker", text: "Combinado" },
+      { sender: "customer", text: "Qual a carência?" },
+      { sender: "customer", text: "[imagem]" },
+    ]);
+    expect(validated[0]?.proves).toBeNull();
   });
 });
 

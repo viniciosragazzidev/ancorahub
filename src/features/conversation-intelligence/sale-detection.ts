@@ -53,7 +53,8 @@ async function loadEvidenceMessages(tenantId: string, leadId: string): Promise<S
     ))
     .orderBy(desc(schema.whatsappMessages.sentAt))
     .limit(500);
-  return rows.map((row) => ({
+  // Ordem cronológica: o arquivo do cliente é lido junto do pedido de pagamento que veio antes.
+  return rows.reverse().map((row) => ({
     sender: row.direction === "incoming" ? "customer" : row.senderRole === "assistant" || row.senderRole === "system" ? "system" : "broker",
     text: conversationMessageBody(row),
   }));

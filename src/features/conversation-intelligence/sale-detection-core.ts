@@ -235,8 +235,19 @@ function stripSpeaker(quote: string) {
   return quote.trim().replace(/^["'“”]+|["'“”]+$/g, "").replace(/^(cliente|corretora?|client|broker)\s*[:\-]\s*/i, "").replace(/^["'“”]+|["'“”]+$/g, "");
 }
 
-const PAYMENT_WORDS = /\b(paguei|pagou|pago|paga|pagamento efetuado|pix feito|pix enviado|fiz o pix|comprovante|transferi)\b/;
+/** Pagamento dito pelo cliente: "paguei", "pix feito", "segue o comprovante". */
+const CLIENT_PAYMENT = /\b(paguei|pagamos|ja paguei|ta pago|esta pago|pix feito|fiz o pix|fiz a transferencia|transferi|segue o comprovante|segue comprovante|ai o comprovante|mandei o comprovante|enviei o comprovante|pagamento feito|pagamento efetuado)\b/;
+/** Pagamento dado como feito pelo corretor: "recebi o comprovante", "pagamento confirmado", "adesão paga". */
+const BROKER_PAYMENT_DONE = /\b(recebi o comprovante|recebi seu comprovante|recebi o pix|pix recebido|pagamento confirmado|pagamento recebido|confirmei o pagamento|adesao paga|adesao foi paga|adesao ja foi paga|adesao esta paga)\b/;
 const TRANSMISSION_WORDS = /\b(transmiti|transmitida|transmitido|transmitimos|implantada|implantado|implantacao feita|enviada (a|para a) operadora|enviei (a proposta )?(a|para a) operadora)\b/;
+/** Pedido ou promessa, nunca prova: "me manda o comprovante", "pode pagar", "vou te mandar o boleto". */
+const REQUEST_WORDS = /\b(me manda|me mande|manda o|mande o|me envia|me envie|envia o|envie o|pode pagar|pode fazer o pix|pode fazer a transferencia|vou te mandar|vou mandar|vou enviar|vou te enviar|vou pagar|vou fazer o pix|precisa pagar|falta pagar|aguardo o comprovante|assim que pagar|quando pagar|depois que pagar|consegue pagar)\b/;
+/** O que liga um pedido ao pagamento. */
+const PAYMENT_TOPIC = /\b(comprovante|pix|pagamento|pagar|adesao|boleto|transferencia)\b/;
+/** Nome de arquivo de pagamento: comprovante, recibo, pix. */
+const PAYMENT_FILE = /\b(comprovante|recibo|pix|pagamento|pago|transferencia)\b/;
+/** Trecho que é só um arquivo: "[documento: comprovante.pdf]", "[imagem]". */
+const FILE_ONLY = /^\[[^\]]+\]$/;
 
 /** Fração dos termos do trecho que aparecem na mensagem. */
 function tokenOverlap(quoteTokens: string[], messageTokens: Set<string>) {
@@ -244,10 +255,22 @@ function tokenOverlap(quoteTokens: string[], messageTokens: Set<string>) {
   return quoteTokens.filter((token) => messageTokens.has(token)).length / quoteTokens.length;
 }
 
+/** O que um trecho de texto prova, conforme quem disse. Pedido ou promessa nunca prova. */
+export function evidenceProves(quote: string, sender: "customer" | "broker"): ValidatedEvidence["proves"] {
+  const text = normalizeEvidenceText(quote);
+  if (REQUEST_WORDS.test(text)) return null;
+  if (sender === "customer" && CLIENT_PAYMENT.test(text)) return "payment";
+  if (sender === "broker" && BROKER_PAYMENT_DONE.test(text)) return "payment";
+  if (TRANSMISSION_WORDS.test(text)) return "transmission";
+  return null;
+}
+
 /**
- * Confere cada trecho citado pela IA com as mensagens reais (texto, legenda e nome do arquivo). Vale o trecho
- * que está dentro de uma mensagem do cliente ou do corretor, ou que tem 80% ou mais dos termos de uma delas.
- * Trechos curtos demais ("sim", "ok", "[imagem]") nunca valem sozinhos.
+ * Confere cada trecho citado pela IA com as mensagens reais, em ordem cronológica (texto, legenda e nome do
+ * arquivo). Vale o trecho que está dentro de uma mensagem do cliente ou do corretor, ou que tem 80% ou mais
+ * dos termos de uma delas; trechos curtos ("sim", "ok") nunca valem. Pagamento só prova quando o cliente diz
+ * que pagou ou o corretor dá o pagamento como feito. Um arquivo sozinho só prova pagamento quando o cliente
+ * o enviou e o nome fala de pagamento, ou logo depois de o corretor pedir o pagamento.
  */
 export function validateSaleEvidence(evidence: readonly string[], messages: readonly SaleEvidenceMessage[]): ValidatedEvidence[] {
   const candidates = messages
@@ -257,16 +280,37 @@ export function validateSaleEvidence(evidence: readonly string[], messages: read
       return { sender: message.sender, normalized, tokens: new Set(normalized.split(" ").filter(Boolean)) };
     })
     .filter((message) => message.normalized && message.normalized !== "text");
+  const askedForPaymentBefore = (index: number) => {
+    // A mensagem anterior (até 3 antes) é do corretor pedindo o pagamento.
+    for (let previous = index - 1; previous >= Math.max(0, index - 3); previous -= 1) {
+      const message = candidates[previous]!;
+      if (message.sender !== "broker") continue;
+      return REQUEST_WORDS.test(message.normalized) && PAYMENT_TOPIC.test(message.normalized);
+    }
+    return false;
+  };
   const validated: ValidatedEvidence[] = [];
   for (const raw of evidence) {
-    const quote = normalizeEvidenceText(stripSpeaker(raw));
+    const stripped = stripSpeaker(raw).trim();
+    const quote = normalizeEvidenceText(stripped);
+    if (!quote) continue;
+
+    if (FILE_ONLY.test(stripped)) {
+      const files = candidates
+        .map((message, index) => ({ message, index }))
+        .filter(({ message }) => message.sender === "customer" && message.normalized.startsWith(quote));
+      if (!files.length) continue;
+      const proving = files.find(({ message, index }) => PAYMENT_FILE.test(message.normalized) || askedForPaymentBefore(index));
+      validated.push({ quote: raw.trim(), sender: "customer", proves: proving ? "payment" : null });
+      continue;
+    }
+
     const quoteTokens = quote.split(" ").filter(Boolean);
     if (quote.length < 8 || quoteTokens.length < 2) continue;
     const match = candidates.find((message) => message.normalized.includes(quote))
       ?? (quoteTokens.length >= 3 ? candidates.find((message) => tokenOverlap(quoteTokens, message.tokens) >= 0.8) : undefined);
     if (!match) continue;
-    const proves = PAYMENT_WORDS.test(quote) ? "payment" : TRANSMISSION_WORDS.test(quote) ? "transmission" : null;
-    validated.push({ quote: raw.trim(), sender: match.sender, proves });
+    validated.push({ quote: raw.trim(), sender: match.sender, proves: evidenceProves(quote, match.sender) });
   }
   return validated;
 }
