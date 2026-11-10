@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { companyEvidence, normalizeCompanyText } from "@/features/leads/company-lead-detection";
-import { isCompanyDenial, type ConversationMemory, type MemoryField } from "./memory";
+import { applyImpliedQualificationFacts, isCompanyDenial, type ConversationMemory, type MemoryField } from "./memory";
 import { isGroundedInMessage } from "./qualification-fallback";
 export { isQualificationContextAnalysisEnabled, qualificationContextAnalysisSettingKeys } from "./qualification-context-analysis-settings";
 
@@ -270,7 +270,8 @@ export function mergeQualificationContextAnalysis(input: {
   }
 
   if (applied.size) memory.updatedAt = new Date().toISOString();
-  return { memory, appliedFields: [...applied] };
+  // A plan type corrected here carries its implied facts too (individual: 1 life; case Valter, 10/11).
+  return { memory: applyImpliedQualificationFacts(memory), appliedFields: [...applied] };
 }
 
 const NAME_ACCENT_VARIANTS: Record<string, string> = {
