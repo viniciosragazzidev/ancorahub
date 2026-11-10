@@ -254,7 +254,7 @@ describe("registro no offer_sent", () => {
 
   it("modo sombra: a oferta real é a de hoje; a ponderada só é registrada", () => {
     expect(buildPlantaoPriorityOfferMetadata({ decision, offeredBrokerId: "b", baselineBrokerId: "b", weightedBrokerId: "a" })).toEqual({
-      mode: "shadow", w: 1.2, chosenScheduleId: "premium", baselineScheduleId: "presencial", chosenTypeId: "t-premium", baselineTypeId: "t-presencial", changed: true, reason: "peso_base", hoursLeveling: false,
+      mode: "shadow", w: 1.2, chosenScheduleId: "premium", baselineScheduleId: "presencial", chosenTypeId: "t-premium", baselineTypeId: "t-presencial", changed: true, reason: "peso_base", hoursLeveling: false, temperature: null,
     });
     expect(buildPlantaoPriorityOfferMetadata({ decision, offeredBrokerId: "b", baselineBrokerId: "b", weightedBrokerId: "b" }).changed).toBe(false);
   });

@@ -24,6 +24,7 @@ import { postSaleTransferAuditAction } from "./post-sale-transfer";
 import { traceLeadStep } from "./distribution-trace";
 import { loadReceivedInDayByBroker, pickNextByReceivedInDay, type ReceiptGap } from "./received-in-day";
 import { chooseManualQueuePick, manualQueueSettingKey, manualQueueSettingKeyForBroker, parseManualQueueValue } from "./duty-queue-order";
+import { buildPlantaoPriorityOfferMetadata, type PlantaoPriorityOfferInput } from "./plantao-priority-core";
 import { parseTurnCredit, turnCreditSettingKey } from "./duty-approval-catchup";
 import { tryDistributionPickLock, tryDistributionPickLockOnce } from "./distribution-pick-lock";
 
@@ -111,6 +112,27 @@ export function orderByPreference<T extends { id: string }>(rows: readonly T[], 
   return [...rows].sort((left, right) => (rank.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(right.id) ?? Number.MAX_SAFE_INTEGER));
 }
 
+/** Registro da prioridade por tipo de plantão no offer_sent; erro = sem registro, nunca sem oferta. */
+function plantaoPriorityMetadata(
+  decision: PlantaoPriorityOfferInput | undefined,
+  offeredBrokerId: string,
+  picks: { baseline: string | null; weighted: string | null } | null,
+) {
+  if (!decision) return {};
+  try {
+    return {
+      plantaoPriority: buildPlantaoPriorityOfferMetadata({
+        decision,
+        offeredBrokerId,
+        baselineBrokerId: picks?.baseline ?? decision.baselineFirstBrokerId,
+        weightedBrokerId: picks?.weighted ?? decision.weightedFirstBrokerId,
+      }),
+    };
+  } catch {
+    return {};
+  }
+}
+
 export async function createLeadOffersForBrokers(input: {
   tenantId: string;
   leadId: string;
@@ -146,6 +168,12 @@ export async function createLeadOffersForBrokers(input: {
     /** Plantão rotation (29/10): the queue exists for every occurrence, created from the arrival order. */
     rotation?: boolean;
   };
+  /**
+   * Prioridade por tipo de plantão (2026-11-10). Modo "on": a escolha sob trava usa
+   * os fatores de carga. Modo "shadow": a escolha fica a de hoje e a ponderada só vai
+   * para o metadata do offer_sent. Ausente: comportamento anterior.
+   */
+  plantaoPriority?: PlantaoPriorityOfferInput;
 }) {
   const db = getDatabase();
   // Same bounds as the "SLA de Aceite" setting (1–1440 min).
@@ -251,6 +279,10 @@ export async function createLeadOffersForBrokers(input: {
     let destinationPhone = broker.phone;
     const offerId = randomUUID();
     let manualRotation: { key: string; nextOrder: string[]; credit?: { key: string; value: Record<string, number> } } | null = null;
+    // Sem escolha sob trava (rodízio), o plantão sai do primeiro do pré-ranking: usa o do serviço.
+    let priorityPicks: { baseline: string | null; weighted: string | null } | null = input.plantaoPriority
+      ? { baseline: input.plantaoPriority.baselineFirstBrokerId, weighted: input.plantaoPriority.weightedFirstBrokerId }
+      : null;
     const claimStatus = await db.transaction(async (tx) => {
       let pickLockAcquired = false;
       let automaticBrokerId: string | null = pending[0]?.id ?? null;
@@ -266,7 +298,19 @@ export async function createLeadOffersForBrokers(input: {
         if (!pickLockAcquired) pickLockBusy = true;
         const pendingIds = pending.map((candidate) => candidate.id);
         const received = await loadReceivedInDayByBroker(tx, input.tenantId, pendingIds, input.fairPick.since, input.fairPick.scheduleIdByBroker, input.fairPick.gap);
-        automaticBrokerId = pickNextByReceivedInDay(pendingIds, received, input.fairPick.tierByBroker);
+        const baselinePick = pickNextByReceivedInDay(pendingIds, received, input.fairPick.tierByBroker);
+        automaticBrokerId = baselinePick;
+        if (input.plantaoPriority) {
+          // Mesma regra do ranking (plantao-priority-core). Erro aqui nunca trava a oferta.
+          let weightedPick = baselinePick;
+          try {
+            if (input.plantaoPriority.factorByBroker) weightedPick = pickNextByReceivedInDay(pendingIds, received, input.fairPick.tierByBroker, input.plantaoPriority.factorByBroker);
+          } catch {
+            weightedPick = baselinePick;
+          }
+          if (input.plantaoPriority.mode === "on") automaticBrokerId = weightedPick;
+          priorityPicks = { baseline: baselinePick, weighted: weightedPick };
+        }
         broker = pending.find((candidate) => candidate.id === automaticBrokerId) ?? broker;
         destinationPhone = broker.phone;
       } else if (input.manualPick && manualQueueMayBeActive && !pickLockBusy) {
@@ -472,7 +516,7 @@ export async function createLeadOffersForBrokers(input: {
             ? "Responsabilidade provisória transferida ao próximo corretor elegível."
             : "Responsabilidade provisória atribuída ao primeiro corretor elegível.",
           actorId: input.requestedBy ?? broker.id,
-          metadata: { offeredBrokerId: broker.id, provisionalOwnership: true, offerId, ...(input.postSaleExemptionQueueName ? { assignmentScope: "post_sale_transfer_exemption", exemptionQueueName: input.postSaleExemptionQueueName } : {}), ...(input.dutyScheduleIdByBroker?.[broker.id] ? { dutyScheduleId: input.dutyScheduleIdByBroker[broker.id] } : {}), ...(exactOccurrence ?? {}) },
+          metadata: { offeredBrokerId: broker.id, provisionalOwnership: true, offerId, ...plantaoPriorityMetadata(input.plantaoPriority, broker.id, priorityPicks), ...(input.postSaleExemptionQueueName ? { assignmentScope: "post_sale_transfer_exemption", exemptionQueueName: input.postSaleExemptionQueueName } : {}), ...(input.dutyScheduleIdByBroker?.[broker.id] ? { dutyScheduleId: input.dutyScheduleIdByBroker[broker.id] } : {}), ...(exactOccurrence ?? {}) },
           createdAt: now,
         });
         if (input.requestedBy) {

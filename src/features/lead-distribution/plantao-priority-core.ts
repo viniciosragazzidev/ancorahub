@@ -306,6 +306,8 @@ export type PlantaoPriorityDecision = {
   reasonBySchedule: Record<string, PlantaoWeightReason>;
   typeIdBySchedule: Record<string, string | null>;
   hoursLeveling: boolean;
+  /** Temperatura do lead no momento da escolha (o relatório filtra por ela). */
+  temperature?: string | null;
 };
 
 export type PlantaoPriorityOfferInput = PlantaoPriorityDecision & {
@@ -324,6 +326,7 @@ export type PlantaoPriorityOfferMetadata = {
   changed: boolean;
   reason: PlantaoWeightReason | null;
   hoursLeveling: boolean;
+  temperature: string | null;
 };
 
 /**
@@ -351,5 +354,6 @@ export function buildPlantaoPriorityOfferMetadata(input: {
     changed: chosenScheduleId !== baselineScheduleId,
     reason: chosenScheduleId ? decision.reasonBySchedule[chosenScheduleId] ?? null : null,
     hoursLeveling: decision.hoursLeveling,
+    temperature: decision.temperature ?? null,
   };
 }
