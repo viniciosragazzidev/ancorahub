@@ -89,6 +89,7 @@ import { shouldShowExpiredOfferLanding } from "@/features/lead-distribution/expi
 import { ExpiredOfferLandingScreen } from "@/features/lead-distribution/components/expired-offer-landing-screen";
 import { UnavailableLeadView } from "@/features/broker-workspace/components/light-lead-detail/unavailable-view";
 import { PostSaleLeadCard } from "@/features/post-sale-audit/components/post-sale-lead-card";
+import { SaleDetailsCard } from "@/features/leads/components/sale-details-card";
 
 function getCurrentTimestamp() {
   return Date.now();
@@ -765,6 +766,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
               ),
               nextBestAction: <NextBestActionCard action={leadNextBestAction} />,
               postSale: postSaleEnabled ? <PostSaleLeadCard leadId={lead.id} /> : null,
+              saleDetails: <SaleDetailsCard leadId={lead.id} />,
               supervision: isManagement ? (
                 <SupervisionPanel
                   leadId={lead.id}
@@ -1023,6 +1025,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
 
               <TabsContent value="service" className="mt-4 space-y-5">
                 {postSaleEnabled ? <PostSaleLeadCard leadId={lead.id} /> : null}
+                <SaleDetailsCard leadId={lead.id} />
                 {isManagement && (
                   <SupervisionPanel
                     leadId={lead.id}

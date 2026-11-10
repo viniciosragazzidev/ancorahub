@@ -728,3 +728,7 @@ Em Configurações > Minha unidade (Lite), o corretor escolhe outra unidade ativ
 # 10/11/2026 - Recuperação conjunta dos avisos de fechamento
 
 Na ficha do lead em fechamento, Diretor e Gestor da unidade autorizados usam um único botão para enviar parabéns ao corretor e aviso à direção. A confirmação mostra o status e horário por envio, envia apenas destinos sem registro e atualiza o resultado no próprio botão. Cada destino preserva sua chave idempotente; operação auditada. DEC-173; implementação: docs/implementations/active/2026-11-10-venda-detection-backfill.md.
+
+# 10/11/2026 - Dados da venda na ficha do lead
+
+O bloco aparece quando o lead entra em fechamento ou a venda é confirmada. Reúne titular, CPF conforme papel, dependentes e idades, operadora, plano, valores, forma/data de pagamento, proposta, entrevista, corretor, marcos e evidências. Fontes do CRM/proposta/venda são identificadas; dados de IA exigem citação literal encontrada na conversa e ficam “a confirmar”. Diretor vê CPF completo; Gestor da unidade e corretor do lead veem o CPF mascarado. Arquivos recebidos da conversa e documentos do CRM usam links autenticados. A consulta é escopada e auditada; a flag global `feature_conversation_intelligence_enabled` controla o bloco e sua atualização por IA. DEC-174; implementação: docs/implementations/active/2026-11-10-venda-detection-backfill.md.

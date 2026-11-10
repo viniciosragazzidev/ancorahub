@@ -6,6 +6,10 @@ Papel: Diretor, em `/settings/resultado-plantao`. Ação principal: conferir a p
 
 Papéis: Diretor ou Gestor autorizado na ficha `/leads/[id]`; o gestor atua só na unidade vinculada. Ação contextual secundária, ao lado do reenvio de parabéns ao corretor, com confirmação antes de enviar aos números configurados. Estados: ação disponível, confirmação, enviado/em fila, já registrado e erro. Reutiliza Button e Dialog compartilhados, sem token, primitive ou movimento novo. Não avança UX-M1.10. Registro: DEC-172.
 
+## 2026-11-10: bloco Dados da venda na ficha
+
+Papéis: Diretor, Gestor da unidade efetiva e corretor atual do lead em `/leads/[id]`. Objetivo: consultar rapidamente cadastro, proposta, venda, marcos e evidências; a ação principal contextual é copiar o resumo. Disclosure: dados consolidados primeiro, evidências e arquivos em grupos próprios; CPF completo somente para diretor e mascarado para os demais papéis. Estados: dados registrados, campos ausentes, campos de IA “a confirmar”, sem evidências e flag global desligada. Reutiliza Card e Button compartilhados, sem tokens, primitives ou animação novos. Não avança UX-M1.10. Registro: DEC-174.
+
 ## 2026-11-04: disparo manual de aviso de fechamento
 
 Papel: Direção na ficha `/leads/[id]`. Objetivo: recuperar o aviso de parabéns ao corretor responsável quando o lead já está em fechamento e o envio automático não foi registrado. Ação contextual secundária, com confirmação antes de disparar. Estados: ação disponível, confirmação, envio, enviado/em fila e erro. Reutiliza botão e diálogo compartilhados; sem novos tokens, primitives ou movimento. Não avança a etapa global do redesign.

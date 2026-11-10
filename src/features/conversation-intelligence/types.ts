@@ -3,6 +3,7 @@ import { z } from "zod";
 import { MOTIVOS_PERDA } from "@/features/leads/lead-status-constants";
 
 import { SaleCompletedSchema } from "./sale-detection-core";
+import { SaleDetailsStoredSchema } from "@/features/leads/sale-details-core";
 
 export const ConversationStageEnum = z.enum([
   "INITIAL_CONTACT",
@@ -75,6 +76,8 @@ export const ConversationAssessmentSchema = z.object({
   directorAction: z.string().trim().max(300).nullable().optional(),
   /** Venda concluída (10/11): "confirmed" só com prova explícita na conversa; análises antigas leem "no". */
   saleCompleted: SaleCompletedSchema.optional(),
+  /** Dados da venda extraídos da conversa inteira; só são aceitos com citação validada no servidor. */
+  saleDetails: SaleDetailsStoredSchema.optional(),
   facts: z.array(z.string()).default([]),
   inferences: z.array(z.string()).default([]),
 });

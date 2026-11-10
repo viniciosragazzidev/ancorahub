@@ -5,6 +5,8 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { getAiEngineSettings } from "@/features/ai/engine";
 import { runGateway } from "@/features/ai-gateway/gateway";
+import { maskPersonalData } from "@/features/ai-gateway/privacy";
+import { buildSaleDetailsTranscript, validateAndMergeSaleDetails, type SaleDetailsTranscriptMessage } from "@/features/leads/sale-details-core";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -56,6 +58,7 @@ const ASSESSMENT_JSON_INSTRUCTION = `Responda SOMENTE com um objeto JSON válido
   "directorAttention": "NONE|WATCH|ACT",
   "directorAction": "o que a direção deve fazer" ou null,
   "saleCompleted": { "status": "confirmed|likely|no", "signals": ["payment|proposal_transmitted|contract_signed|card_or_proposal_number|medical_interview_approved|interview"], "evidence": ["Cliente: trecho copiado da mensagem", "Corretor: trecho copiado da mensagem"] },
+  "saleDetails": { "fields": [{ "field": "holderBirthDate|holderAge|livesCount|dependentAges|dependentDetails|operator|plan|monthlyValue|enrollmentValue|firstInstallmentValue|paymentMethod|paymentDate|proposalNumber|medicalInterviewDate", "value": "valor explícito", "evidenceQuote": "trecho literal da mensagem" }] },
   "facts": ["..."],
   "inferences": ["..."]
 }`;
@@ -138,6 +141,22 @@ async function runLeadConversationAnalysis(
     .orderBy(desc(schema.whatsappMessages.sentAt))
     .limit(conversationIntelligenceDomainRoot.defaults.maxRecentMessagesInContext);
 
+  // A extração dos dados da venda considera o histórico completo. O prompt recebe
+  // todas as mensagens comerciais relevantes, com trechos adjacentes para contexto.
+  const saleMessages = await db
+    .select({
+      id: schema.whatsappMessages.id,
+      direction: schema.whatsappMessages.direction,
+      body: schema.whatsappMessages.body,
+      sentAt: schema.whatsappMessages.sentAt,
+      senderRole: schema.whatsappMessages.senderRole,
+      mediaKind: schema.whatsappMessages.mediaKind,
+      mediaFilename: schema.whatsappMessages.mediaFilename,
+    })
+    .from(schema.whatsappMessages)
+    .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.leadId, leadId)))
+    .orderBy(schema.whatsappMessages.sentAt);
+
   if (messages.length === 0) {
     return { analyzed: false, reason: "Nenhuma mensagem de WhatsApp registrada para o lead." };
   }
@@ -154,12 +173,22 @@ async function runLeadConversationAnalysis(
     content: conversationMessageBody(m),
     timestamp: m.sentAt,
   }));
+  const saleDetailMessages: SaleDetailsTranscriptMessage[] = saleMessages.map((m) => ({
+    id: m.id,
+    sender: senderOf(m),
+    content: conversationMessageBody(m),
+    timestamp: m.sentAt,
+  }));
   const customerMessageCount = contextMessages.filter((m) => m.sender === "customer").length;
   const brokerMessageCount = contextMessages.filter((m) => m.sender === "broker").length;
 
   // 4. Extrair memória anterior se existir
   const qualDetails = (lead.qualificationDetails as Record<string, any>) || {};
   const previousAssessment = qualDetails.aiIntelligence as ConversationAssessment | undefined;
+  const saleDetailsTranscript = buildSaleDetailsTranscript(saleDetailMessages);
+  const previousSaleDetails = previousAssessment?.saleDetails?.fields?.length
+    ? previousAssessment.saleDetails.fields.map((field) => `${field.field}: ${maskPersonalData(field.value)}`).join("; ")
+    : "Nenhum dado de venda consolidado anteriormente.";
 
   const previousPaymentEvidence = readValidatedPaymentEvidence(qualDetails);
   const previousMemory = previousAssessment || previousPaymentEvidence.length
@@ -213,9 +242,10 @@ Orientações:
 12. A leitura para a direção é para o diretor ou gestor, que NÃO conversa com o cliente: nada de orientar o atendimento. Em directorBrief diga, em até 2 frases e na terceira pessoa, em que pé está a venda, a chance real de fechar e como o corretor está conduzindo (respondendo no tempo, deixando o cliente sem retorno, insistindo demais, etc.). Em directorAttention use ACT quando a direção precisa agir agora (cliente sem resposta do corretor, cliente insatisfeito, venda grande travada, risco de perder por falha do atendimento), WATCH quando vale acompanhar e NONE quando está bem encaminhado. Em directorAction, só para ACT ou WATCH, diga a ação da direção (ex.: "Cobrar o corretor: o cliente pediu o valor há 2 dias e não teve resposta", "Aprovar desconto", "Repassar o lead"); para NONE use null.
 13. Arquivos aparecem como "[documento: nome do arquivo]", "[imagem]", "[áudio]". Um arquivo enviado pelo corretor com nome de cotação, cálculo, proposta, simulação ou tabela de preços conta como cotação apresentada (quote_sent), mesmo sem fala do cliente; nesse caso cite em evidence o nome do arquivo. Documentos pessoais enviados pelo cliente (RG, CPF, comprovante, carteirinha) depois da cotação indicam documentação.
 13a. No saleCompleted, o sinal "interview" significa que cliente ou corretor afirmou como fato consumado que a entrevista médica ou videochamada da operadora foi concluída. Pergunta, tentativa, negativa e futuro não contam. O sinal "medical_interview_approved" continua significando aprovação explícita.
-14. Venda concluída (saleCompleted): seja conservador, nunca conclua venda só pela intenção ou pelo "quero fechar". Use "confirmed" SOMENTE com prova explícita na conversa de que a venda aconteceu, marcando em signals cada prova encontrada: payment (adesão ou primeira mensalidade paga: o cliente diz "paguei", "pix feito", "já paguei a adesão", "segue o comprovante", ou envia "[imagem]"/"[documento]" de comprovante logo depois de o corretor pedir o pagamento da adesão, e a conversa liga esse arquivo ao pagamento), proposal_transmitted (o corretor diz que a proposta foi transmitida, implantada ou enviada à operadora), contract_signed (contrato ou proposta assinada), card_or_proposal_number (carteirinha ou número da proposta emitido), medical_interview_approved (entrevista médica aprovada). Use "likely" quando houver indício sem prova (ex.: imagem de comprovante sem contexto que a ligue ao pagamento, cliente dizendo que "vai pagar", proposta só preenchida). Use "no" nos demais casos. Em saleCompleted.evidence copie os trechos LITERALMENTE das mensagens da transcrição, palavra por palavra, sem resumir nem corrigir, começando por quem disse ("Cliente: paguei a adesão agora" ou "Corretor: sua proposta foi transmitida para a operadora"); um arquivo entra com o texto que aparece na transcrição (ex.: "Cliente: [documento: comprovante.pdf]"). Trecho que não está na conversa é descartado e a venda não é confirmada. Proposta assinada sozinha não basta para "confirmed"; entrevista concluída ou aprovada conta como sinal "interview".${await buildPlaybookRules(lead.tenantId)}`;
+14. Venda concluída (saleCompleted): seja conservador, nunca conclua venda só pela intenção ou pelo "quero fechar". Use "confirmed" SOMENTE com prova explícita na conversa de que a venda aconteceu, marcando em signals cada prova encontrada: payment (adesão ou primeira mensalidade paga: o cliente diz "paguei", "pix feito", "já paguei a adesão", "segue o comprovante", ou envia "[imagem]"/"[documento]" de comprovante logo depois de o corretor pedir o pagamento da adesão, e a conversa liga esse arquivo ao pagamento), proposal_transmitted (o corretor diz que a proposta foi transmitida, implantada ou enviada à operadora), contract_signed (contrato ou proposta assinada), card_or_proposal_number (carteirinha ou número da proposta emitido), medical_interview_approved (entrevista médica aprovada). Use "likely" quando houver indício sem prova (ex.: imagem de comprovante sem contexto que a ligue ao pagamento, cliente dizendo que "vai pagar", proposta só preenchida). Use "no" nos demais casos. Em saleCompleted.evidence copie os trechos LITERALMENTE das mensagens da transcrição, palavra por palavra, sem resumir nem corrigir, começando por quem disse ("Cliente: paguei a adesão agora" ou "Corretor: sua proposta foi transmitida para a operadora"); um arquivo entra com o texto que aparece na transcrição (ex.: "Cliente: [documento: comprovante.pdf]"). Trecho que não está na conversa é descartado e a venda não é confirmada. Proposta assinada sozinha não basta para "confirmed"; entrevista concluída ou aprovada conta como sinal "interview".
+15. Extração de Dados da venda: use as mensagens comerciais de TODO o histórico fornecido, não só a janela recente. Retorne apenas fatos explícitos em saleDetails.fields. Nunca extraia CPF, telefone ou e-mail. Para cada fato, copie evidenceQuote literalmente, sem corrigir texto, e informe a chave e valor. Ignore hipóteses e perguntas do corretor; se um campo não estiver explícito, não o inclua. Campos: holderBirthDate (data de nascimento do titular), holderAge (idade do titular), livesCount, dependentAges, dependentDetails, operator, plan, monthlyValue, enrollmentValue, firstInstallmentValue, paymentMethod, paymentDate, proposalNumber e medicalInterviewDate. Para vidas e idades, inclua todos os integrantes que aparecem, sem contar a mesma pessoa duas vezes. Para valores, preserve moeda e período quando aparecerem. Não converta data de registro da venda em data de pagamento.${await buildPlaybookRules(lead.tenantId)}`;
 
-  const userPrompt = `Contexto do Lead:\n${compactContext.leadSummary}\n\nMemória Anterior:\n${compactContext.historicalMemory}\n\nTranscrição Recente:\n${compactContext.recentTranscript}`;
+  const userPrompt = `Contexto do Lead:\n${compactContext.leadSummary}\n\nMemória Anterior:\n${compactContext.historicalMemory}\n\nTranscrição Recente:\n${compactContext.recentTranscript}\n\nDados de venda consolidados anteriormente:\n${previousSaleDetails}\n\nMensagens comerciais relevantes de TODA a conversa, em ordem cronológica e com data e hora:\n${saleDetailsTranscript}`;
 
   const result = await runGateway({
     profile: "json-structured",
@@ -249,6 +279,11 @@ ${ASSESSMENT_JSON_INSTRUCTION}` },
     };
   }
   const assessment: ConversationAssessment = result.value;
+  assessment.saleDetails = validateAndMergeSaleDetails({
+    previous: previousAssessment?.saleDetails,
+    extracted: assessment.saleDetails,
+    messages: saleDetailMessages,
+  });
   const modelUsed = `${result.model.provider}/${result.model.model}`;
   const saleCompleted = mergeSaleCompletedWithExplicitEvidence(
     readSaleCompleted(assessment.saleCompleted),

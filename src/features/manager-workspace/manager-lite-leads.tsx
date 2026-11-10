@@ -15,6 +15,7 @@ import { SupervisorLeadDetail } from "@/features/supervisor-workspace/supervisor
 import { PostSaleLeadCard } from "@/features/post-sale-audit/components/post-sale-lead-card";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { SaleDetailsCard } from "@/features/leads/components/sale-details-card";
 
 export async function ManagerLiteLeadsPage({ postSaleEnabled = false }: { postSaleEnabled?: boolean }) {
   const context = await getRequiredTenantContext();
@@ -54,6 +55,7 @@ export async function ManagerLiteLeadDetailPage({ leadId }: { leadId: string }) 
     tasks={data.tasks}
     documents={data.documents}
     postSaleCard={postSaleEnabled ? <PostSaleLeadCard leadId={data.lead.id} /> : null}
+    saleDetailsCard={<SaleDetailsCard leadId={data.lead.id} />}
     saleAction={canRegisterSale ? <RegisterSaleButton leadId={data.lead.id} documents={data.leadDocuments} carriers={carriers} /> : undefined}
   />;
 }
