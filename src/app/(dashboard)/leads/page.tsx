@@ -32,7 +32,6 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
-import { ManagerLiteLeadsPage } from "@/features/manager-workspace/manager-lite-leads";
 import { getSupervisorLiteRadar } from "@/features/supervisor-workspace/lite-queries";
 import { SupervisorLeadsRadar } from "@/features/supervisor-workspace/supervisor-leads-radar";
 import { withRadarSignals } from "@/features/supervisor-workspace/radar-signals";
@@ -40,6 +39,7 @@ import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import type { TenantContext } from "@/shared/auth/types";
 import { LightLeadsList, type LightLeadItem } from "@/features/broker-workspace/components/light-leads-list";
 import { stripLeadOriginForRole } from "@/features/leads/broker-visibility";
+import { isOutsideManagerScope, MANAGER_HOME_PATH } from "@/features/manager-scope/manager-routes";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getDatabase, schema } from "@/shared/db";
@@ -111,6 +111,8 @@ async function LeadsPageContent({
 }) {
   await connection();
   const context = await withPerfSpan("tenant_context.resolve", () => getRequiredTenantContext());
+  // Gestor na versão antiga (10/11): sem a lista geral de leads; os leads da unidade aparecem no perfil do corretor.
+  if (isOutsideManagerScope(context.role, context.jobTitle)) redirect(MANAGER_HOME_PATH);
   const postSaleEnabled = (context.role === "director" || context.role === "manager")
     && await getFeatureFlag(FEATURE_FLAGS.POST_SALE_AUDIT).catch(() => "false") === "true";
   // Mesma regra do useDirectorLitePage, no servidor: chave do diretor ligada e /leads fora do opt-out.
@@ -139,10 +141,6 @@ async function LeadsPageContent({
     !(await capabilityPromise)
   )
     redirect("/access-denied");
-
-  if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
-    return <ManagerLiteLeadsPage postSaleEnabled={postSaleEnabled} />;
-  }
 
   if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
     const params = await searchParams;

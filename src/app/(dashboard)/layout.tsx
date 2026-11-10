@@ -6,6 +6,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AppShell } from "@/components/app-shell";
 import { ContextualIllustrationsProvider } from "@/components/illustrations/contextual-illustration";
 import { isLightRouteAllowed } from "@/components/light/light-routes";
+import { isManagerRouteAllowed, isOutsideManagerScope, MANAGER_HOME_PATH } from "@/features/manager-scope/manager-routes";
 import { getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { getDatabase, schema } from "@/shared/db";
 import { TenantOnboardingDialogLoader } from "@/features/onboarding/components/tenant-onboarding-dialog-loader";
@@ -213,6 +214,11 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     }
   }
 
+  // Gestor na versão antiga (10/11): só as rotas da gestão da unidade; o resto volta para a equipe.
+  if (isOutsideManagerScope(context.role, context.jobTitle) && pathname !== "" && !isManagerRouteAllowed(pathname)) {
+    redirect(MANAGER_HOME_PATH);
+  }
+
   if (!hasPermission(context.role, "acessar_conversas")) {
     if (pathname === "/conversas" || pathname.startsWith("/conversas/")) {
       redirect("/minha-fila");
@@ -307,7 +313,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
                 só ao confirmar presença no plantão (presence-callout). */}
             {!isLightManager && <CommandPalette />}
             {!isLightBroker && !isLightManager && <SystemFeedbackDrawer />}
-            {!isLightBroker && !isLightManager && <AgentDrawer />}
+            {!isLightBroker && !isLightManager && !isOutsideManagerScope(context.role, context.jobTitle) && <AgentDrawer />}
             <BrokerProfileViewerProvider viewerRole={context.role} teamBrokerIds={brokerProfileTeamIds}>{children}</BrokerProfileViewerProvider>
           </NotificationCountProvider>
         </RealtimeSyncProvider>

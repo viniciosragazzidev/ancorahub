@@ -1,5 +1,6 @@
 import { AccessibilityPreferences } from "@/features/assist/components/accessibility-preferences";
 import { and, count, eq, inArray } from "drizzle-orm";
+import { isOutsideManagerScope, MANAGER_SETTINGS_TABS } from "@/features/manager-scope/manager-routes";
 import { getManagerUnitScope } from "@/features/broker-workspace/manager-unit-scope";
 import { ManagerLiteSettingsFooter, ManagerLiteSettingsHeader, ManagerLiteUnitSection } from "@/features/manager-workspace/manager-lite-settings-parts";
 import { PushNotificationManager } from "@/features/notifications/components/push-notification-manager";
@@ -58,7 +59,8 @@ export default async function SettingsPage() {
     return <SupervisorLiteSettings user={{ name: user?.name ?? "Supervisor", image: user?.image ?? null }} branchName={branch?.name ?? null} team={team ?? null} />;
   }
   const extensionPilot = await isExtensionPilotUser(context.userId);
-  const canViewIntegrations = context.role === "director" || await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null, permission: "ver_importacoes_meta" });
+  // Gestor na versão antiga (10/11): Ajustes só com a própria conta e a segurança, sem integrações nem atendimento.
+  const canViewIntegrations = context.role === "director" || !isOutsideManagerScope(context.role, context.jobTitle) && await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null, permission: "ver_importacoes_meta" });
   const db = getDatabase();
   const [tenant, user] = await Promise.all([
     db.select({ name: schema.tenants.name, legalName: schema.tenants.legalName, cnpj: schema.tenants.cnpj, logoUrl: schema.tenants.logoUrl, brandColor: schema.tenants.brandColor }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1),
@@ -78,10 +80,10 @@ export default async function SettingsPage() {
 
   const integrations = canViewIntegrations ? await getIntegrationsData() : null;
   const brokerAvailability = context.role === "broker" ? await getBrokerAvailabilityProfile(context) : null;
-  const baseTabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "whatsapp", "integracoes", "seguranca"] : canViewIntegrations ? ["conta", "integracoes", "whatsapp", "seguranca"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca"] : ["conta", "disponibilidade", "whatsapp", "seguranca"];
-  const tabIds: TabId[] = extensionPilot ? [...baseTabIds, "extensao"] : baseTabIds;
+  const baseTabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "whatsapp", "integracoes", "seguranca"] : isOutsideManagerScope(context.role, context.jobTitle) ? [...MANAGER_SETTINGS_TABS] : canViewIntegrations ? ["conta", "integracoes", "whatsapp", "seguranca"] : ["conta", "disponibilidade", "whatsapp", "seguranca"];
+  const tabIds: TabId[] = extensionPilot && !isOutsideManagerScope(context.role, context.jobTitle) ? [...baseTabIds, "extensao"] : baseTabIds;
 
-  const canEditFeedback = context.role === "director" || context.role === "manager";
+  const canEditFeedback = context.role === "director";
   const aiStageMode = context.role === "director" ? await getAiStageMode(context.tenantId) : null;
   const atendimento = canEditFeedback ? (
     <div className="space-y-6">

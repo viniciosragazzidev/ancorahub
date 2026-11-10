@@ -12,8 +12,9 @@ export async function updateFeedbackSettingsAction(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const context = await getRequiredTenantContext();
-    if (context.role !== "director" && context.role !== "manager") {
-      return { success: false, error: "Apenas diretores e gestores podem alterar a configuração de feedback." };
+    // Configuração da empresa toda: só o diretor (o gestor deixou de mexer em configuração do sistema em 10/11).
+    if (context.role !== "director") {
+      return { success: false, error: "Apenas diretores podem alterar a configuração de feedback." };
     }
 
     const interval = Number.parseInt(String(formData.get("feedbackReminderInterval") ?? "30"), 10);

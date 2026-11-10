@@ -1,5 +1,9 @@
 import type { TenantRole } from "@/shared/db/schema";
 
+/**
+ * Gestor na versão antiga (10/11): sem configuração do sistema, distribuição, atendimento IA, marketing e
+ * integrações (docs/implementations/active/2026-11-10-gestor-versao-antiga-escopo-unidade.md).
+ */
 export const PERMISSIONS = {
   acessar_conversas: ["broker", "supervisor", "manager", "director"],
   acessar_leads: ["broker", "supervisor", "manager", "director"],
@@ -10,7 +14,7 @@ export const PERMISSIONS = {
   acessar_vendas: ["broker", "supervisor", "manager", "director"],
   acessar_dashboard: ["broker", "supervisor", "manager", "director"],
   acessar_relatorios: ["supervisor", "manager", "director"],
-  acessar_qualificacao_ia: ["supervisor", "manager", "director"],
+  acessar_qualificacao_ia: ["supervisor", "director"],
   acessar_catalogo: ["broker", "supervisor", "manager", "director"],
   acessar_configuracoes: ["broker", "supervisor", "manager", "director"],
   acessar_configuracoes_pessoais: ["broker", "supervisor", "manager", "director"],
@@ -48,23 +52,23 @@ export const PERMISSIONS = {
   alterar_status_lead: ["broker", "manager", "director"],
   reabrir_lead_perdido: ["manager", "director"],
   leads_view_all: ["director"],
-  leads_route_to_unit: ["director", "manager"],
+  leads_route_to_unit: ["director"],
   leads_assign: ["director", "manager"],
   leads_reassign: ["director", "manager"],
-  leads_bulk_assign: ["director", "manager"],
-  lead_queues_view: ["director", "manager"],
-  lead_queues_manage: ["director", "manager"],
-  distribution_settings_manage: ["director", "manager"],
-  duty_schedules_manage: ["director", "manager"],
-  distribution_audit_view: ["director", "manager"],
+  leads_bulk_assign: ["director"],
+  lead_queues_view: ["director"],
+  lead_queues_manage: ["director"],
+  distribution_settings_manage: ["director"],
+  duty_schedules_manage: ["director"],
+  distribution_audit_view: ["director"],
   ver_perfil_unidade: ["director", "manager", "broker"],
   acessar_materiais_divulgacao: ["broker", "manager", "director"],
-  gerenciar_materiais_divulgacao: ["manager", "director"],
-  importar_planilhas: ["manager", "director"],
-  importar_leads_meta: ["manager", "director"],
-  ver_importacoes_meta: ["manager", "director"],
-  acessar_campanhas_meta: ["manager", "director"],
-  acessar_integracao_meta: ["manager", "director"],
+  gerenciar_materiais_divulgacao: ["director"],
+  importar_planilhas: ["director"],
+  importar_leads_meta: ["director"],
+  ver_importacoes_meta: ["director"],
+  acessar_campanhas_meta: ["director"],
+  acessar_integracao_meta: ["director"],
   acessar_ferramentas_vendas: ["broker", "manager", "director"],
   acessar_ferramentas: ["manager", "director"],
 } as const satisfies Record<string, readonly TenantRole[]>;

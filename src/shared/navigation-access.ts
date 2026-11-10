@@ -1,6 +1,7 @@
 import type { PermissionKey } from "@/shared/auth/permissions";
 import type { TenantRole } from "@/shared/db/schema";
 import { routePermissionForPath } from "@/features/custom-roles/routes";
+import { isManagerRouteAllowed, isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 
 export type NavigationAccessItem = {
   url: string;
@@ -21,10 +22,6 @@ const marketingHiddenPaths = [
   "/filiais", "/unidades", "/gestor", "/diretor",
 ];
 const brokerHiddenPaths = ["/cotacao", "/automacoes", "/filiais", "/unidades"];
-const managerHiddenPaths = [
-  "/marketing", "/integrations", "/inteligencia", "/qualificacao", "/atendimento",
-  "/leads/distribuicao", "/automacoes",
-];
 
 function pathnameOf(url: string) {
   return url.split(/[?#]/, 1)[0] || "/";
@@ -42,7 +39,8 @@ export function canShowNavigationItem(item: NavigationAccessItem, user: Navigati
   if (item.requires === "relationshipCenter" && (!user.relationshipCenterEnabled || roleKey === "broker")) return false;
   if (user.jobTitle === "marketing" && marketingHiddenPaths.some((path) => matchesHiddenPath(pathname, path))) return false;
   if (roleKey === "broker" && brokerHiddenPaths.some((path) => matchesHiddenPath(pathname, path))) return false;
-  if (roleKey === "manager" && managerHiddenPaths.some((path) => matchesHiddenPath(pathname, path))) return false;
+  // Gestor na versão antiga (10/11): o menu mostra só as rotas que o servidor libera para ele.
+  if (isOutsideManagerScope(roleKey, user.jobTitle) && !isManagerRouteAllowed(pathname)) return false;
 
   const permissions = user.permissions ?? [];
   const routePermission = routePermissionForPath(pathname);

@@ -114,6 +114,7 @@ export const NAV_AREAS: readonly NavArea[] = [
     section: "Operação",
     tabs: [
       { id: "pessoas", label: "Pessoas", href: "/equipe", permission: "convidar_corretor", paths: ["/equipe", "/filiais", "/unidades"] },
+      { id: "plantoes-unidade", label: "Plantões da unidade", href: "/equipe/plantoes", permission: "convidar_corretor", roles: ["manager"], paths: ["/plantoes/corretor"] },
       { id: "relacionamento", label: "Relacionamento", href: "/relacionamento", permission: "convidar_corretor", requires: "relationshipCenter" },
       { id: "pos-venda", label: "Pós-venda", href: "/equipe/pos-venda", permission: "acessar_leads", roles: ["director", "manager"], requires: "postSaleAudit" },
     ],
