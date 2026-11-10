@@ -1,3 +1,4 @@
+import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 import { NextResponse } from "next/server";
 import { streamText, tool, type ModelMessage } from "ai";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -12,6 +13,8 @@ import { answerIfOperatorQuestion, lastUserText } from "@/features/operator-cata
 export async function POST(req: Request) {
   try {
     const context = await getRequiredTenantContext();
+    // Gestor sem o Agente IA desde 10/11: as ferramentas liam filas e plantões de outras unidades.
+    if (isOutsideManagerScope(context.role, context.jobTitle)) return NextResponse.json({ error: "O Agente IA não está disponível para o gestor." }, { status: 403 });
     const guard = await readChatRequest(req, context);
     if (!guard.ok) {
       return NextResponse.json({ error: guard.error }, { status: guard.status, headers: guard.retryAfterSeconds ? { "Retry-After": String(guard.retryAfterSeconds) } : undefined });

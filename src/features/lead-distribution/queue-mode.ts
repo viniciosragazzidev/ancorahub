@@ -1,3 +1,5 @@
+import { isOutsideManagerScope, MANAGER_DISTRIBUTION_REFUSAL } from "@/features/manager-scope/manager-routes";
+
 export type UnitQueueMode = { id: string; name: string; mode: "automatic" | "manual" };
 
 /**
@@ -9,6 +11,8 @@ export function queueModeProblem(input: {
   actorBranchId: string | null;
   queue: { branchId: string | null; status: string } | null;
 }): string | null {
+  // Gestor fora da distribuição desde 10/11 (versão antiga do gestor).
+  if (isOutsideManagerScope(input.role)) return MANAGER_DISTRIBUTION_REFUSAL;
   if (input.role !== "director" && input.role !== "manager") return "Sem permissão para mudar a distribuição da fila.";
   if (!input.queue) return "Fila não encontrada.";
   if (input.queue.status !== "active") return "Ative a fila antes de mudar a distribuição.";

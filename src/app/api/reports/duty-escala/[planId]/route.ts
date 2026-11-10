@@ -1,3 +1,4 @@
+import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { hasCapability } from "@/shared/auth/permissions";
@@ -15,6 +16,8 @@ function fileSlug(value: string) {
 export async function GET(request: Request, { params }: { params: Promise<{ planId: string }> }) {
   try {
     const context = await getRequiredTenantContext();
+    // Escala mensal: gestão de plantão, fora do gestor desde 10/11.
+    if (isOutsideManagerScope(context.role, context.jobTitle)) return NextResponse.json({ error: "Relatório indisponível para o gestor." }, { status: 403 });
     if ((context.role !== "director" && context.role !== "manager") || !hasCapability(context.role, "exportar_relatorios_operacionais", context.jobTitle)) {
       return NextResponse.json({ error: "Sem permissão para exportar a escala." }, { status: 403 });
     }

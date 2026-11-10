@@ -1,5 +1,6 @@
 "use server";
 
+import { isOutsideManagerScope, MANAGER_DISTRIBUTION_REFUSAL } from "@/features/manager-scope/manager-routes";
 import { requireCargoCapability } from "@/shared/auth/authorization";
 import { assertScheduleInManagerUnit } from "./manager-unit-scope-server";
 import { randomUUID } from "node:crypto";
@@ -17,6 +18,7 @@ type Result = { success: true } | { success: false; error: string };
 async function scheduleInScope(scheduleId: string) {
   const context = await getRequiredTenantContext();
   await requireCargoCapability(context, "duty_schedules_manage");
+  if (isOutsideManagerScope(context.role, context.jobTitle)) throw new Error(MANAGER_DISTRIBUTION_REFUSAL);
   if (context.role !== "director" && context.role !== "manager") throw new Error("Sem permissão.");
   const [schedule] = await getDatabase()
     .select({ id: schema.unitDutySchedules.id, branchId: schema.unitDutySchedules.branchId, status: schema.unitDutySchedules.status })

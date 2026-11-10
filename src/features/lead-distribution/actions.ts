@@ -1,5 +1,6 @@
 "use server";
 
+import { isOutsideManagerScope, MANAGER_DISTRIBUTION_REFUSAL } from "@/features/manager-scope/manager-routes";
 import { requireCargoCapability } from "@/shared/auth/authorization";
 import { aliasedTable, and, desc, eq, gte, inArray, isNull, ne, or } from "drizzle-orm";
 import { z } from "zod";
@@ -309,6 +310,7 @@ export async function retryLeadEffectAction(formData: FormData) {
   if (!parsed.success) throw new Error("Efeito inválido.");
   const context = await getRequiredTenantContext();
   await requireCargoCapability(context, "leads_assign");
+  if (isOutsideManagerScope(context.role, context.jobTitle)) throw new Error(MANAGER_DISTRIBUTION_REFUSAL);
   if (context.role !== "director" && context.role !== "manager")
     throw new Error("Sem permissão para reprocessar efeitos.");
   const [effect] = await getDatabase()
@@ -606,6 +608,7 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
   try {
     const context = await getRequiredTenantContext();
     await requireCargoCapability(context, "leads_assign");
+    if (isOutsideManagerScope(context.role, context.jobTitle)) return { mutationId, error: MANAGER_DISTRIBUTION_REFUSAL };
     if (context.role !== "director" && context.role !== "manager") {
       return { mutationId, error: "Você não pode iniciar a distribuição de todos os leads." };
     }

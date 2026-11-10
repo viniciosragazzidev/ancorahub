@@ -53,10 +53,12 @@ export async function exclusiveScheduleIdsForManager(db: Db, context: ManagerCon
   return new Set([...facts].filter(([, fact]) => isScheduleExclusiveToUnit(fact, context.branchId)).map(([id]) => id));
 }
 
-/** Diretor passa; gestor só passa em plantão exclusivo da unidade dele; os demais papéis não passam. */
-export async function assertScheduleInManagerUnit(db: Db, context: ManagerContext, scheduleId: string) {
+/**
+ * Mexer num plantão: só o diretor. Desde 10/11 o gestor (versão antiga) só acompanha os plantões da unidade, sem
+ * alterar; a regra de exclusividade acima continua servindo às leituras.
+ */
+export async function assertScheduleInManagerUnit(_db: Db, context: ManagerContext, _scheduleId: string) {
   if (context.role === "director") return;
-  if (context.role !== "manager") throw new Error("Sem permissão.");
-  const allowed = await exclusiveScheduleIdsForManager(db, context, [scheduleId]);
-  if (!allowed.has(scheduleId)) throw new Error(MANAGER_SCOPE_ERROR);
+  if (context.role === "manager") throw new Error(MANAGER_SCOPE_ERROR);
+  throw new Error("Sem permissão.");
 }

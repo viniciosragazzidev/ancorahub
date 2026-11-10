@@ -1,3 +1,4 @@
+import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 import { NextResponse } from "next/server";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasCapability } from "@/shared/auth/permissions";
@@ -7,6 +8,8 @@ export async function GET(request: Request) {
   try {
     const context = await getRequiredTenantContext();
 
+    // Comissões são da área Comercial, fora do gestor desde 10/11.
+    if (isOutsideManagerScope(context.role, context.jobTitle)) return NextResponse.json({ error: "Exportação indisponível para o gestor." }, { status: 403 });
     if (!hasCapability(context.role, "exportar_relatorios", context.jobTitle)) {
       return NextResponse.json({ error: "Sem permissão para exportar relatórios." }, { status: 403 });
     }

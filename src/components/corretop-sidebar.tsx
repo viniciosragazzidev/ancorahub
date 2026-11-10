@@ -1,5 +1,6 @@
 "use client";
 
+import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
@@ -319,8 +320,8 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
       {/* Footer: AI Agent & User Profile */}
       <SidebarFooter className={cn("gap-1 border-t border-sidebar-border/70 p-2 pb-3", isMobile && "gap-2 px-3 pb-[max(0.75rem,var(--mobile-safe-bottom))]")}>
         <TooltipProvider delay={150}>
-          {/* AI Agent Trigger */}
-          <Tooltip>
+          {/* AI Agent Trigger (o gestor ficou sem o Agente IA em 10/11, versão antiga só com a gestão da unidade) */}
+          {!isOutsideManagerScope(roleKey ?? "", user?.jobTitle) ? <Tooltip>
             <TooltipTrigger
               render={
                 <Button
@@ -343,7 +344,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
             <TooltipContent side="right" className="border-sidebar-border bg-popover text-xs font-semibold text-popover-foreground shadow-none">
               Agente IA (Ctrl+J)
             </TooltipContent>
-          </Tooltip>
+          </Tooltip> : null}
 
           {/* User Profile Avatar */}
           <DropdownMenu>

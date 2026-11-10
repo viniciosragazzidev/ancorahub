@@ -1,5 +1,6 @@
 "use server";
 
+import { isOutsideManagerScope, MANAGER_DISTRIBUTION_REFUSAL } from "@/features/manager-scope/manager-routes";
 import { requireCargoCapability } from "@/shared/auth/authorization";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -17,6 +18,7 @@ import {
 } from "./routing-engine";
 
 function assertAdminRole(role: string) {
+  if (isOutsideManagerScope(role)) throw new Error(MANAGER_DISTRIBUTION_REFUSAL);
   if (role !== "director" && role !== "manager") {
     throw new Error("Apenas Diretores ou Gestores podem modificar as regras de roteamento.");
   }

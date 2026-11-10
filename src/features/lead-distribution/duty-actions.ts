@@ -1,5 +1,6 @@
 "use server";
 
+import { isOutsideManagerScope, MANAGER_DISTRIBUTION_REFUSAL } from "@/features/manager-scope/manager-routes";
 import { requireCargoCapability } from "@/shared/auth/authorization";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, gt, gte, inArray, isNull, lt, ne, notInArray, or, sql } from "drizzle-orm";
@@ -30,6 +31,7 @@ export type DutyActionState = { success?: boolean; error?: string; message?: str
 async function assertBatchDutyAccess() {
   const context = await getRequiredTenantContext();
   await requireCargoCapability(context, "duty_schedules_manage");
+  if (isOutsideManagerScope(context.role, context.jobTitle)) throw new Error(MANAGER_DISTRIBUTION_REFUSAL);
   if (context.role === "manager") {
     if (!context.branchId) throw new Error("A unidade do Gestor não está definida.");
   } else if (context.role !== "director") throw new Error("Apenas Diretores e Gestores podem criar plantões.");
@@ -203,6 +205,7 @@ async function findScheduleForMutation(scheduleId: string) {
     .where(and(eq(schema.unitDutySchedules.id, scheduleId), eq(schema.unitDutySchedules.tenantId, context.tenantId)))
     .limit(1);
   if (!schedule) throw new Error("Plantão não encontrado.");
+  if (isOutsideManagerScope(context.role, context.jobTitle)) throw new Error(MANAGER_DISTRIBUTION_REFUSAL);
   if (context.role !== "director" && context.role !== "manager") throw new Error("Sem permissão.");
   // Gestor (05/11): só plantão exclusivo da unidade dele; plantão da empresa toda ou com outra unidade fica fora.
   await assertScheduleInManagerUnit(db, context, schedule.id);

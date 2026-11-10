@@ -1,5 +1,6 @@
 "use server";
 
+import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 import { randomUUID } from "node:crypto";
 import { recordStageChange, stageActorType } from "@/features/leads/stage-history";
 import { and, eq, inArray } from "drizzle-orm";
@@ -51,6 +52,7 @@ export async function bulkReassignLeadsAction(
 
   try {
     const context = await getRequiredTenantContext();
+    if (isOutsideManagerScope(context.role, context.jobTitle)) return { mutationId, error: "Ação em lote de leads é feita pelo diretor." };
     if (context.role !== "director" && context.role !== "manager") {
       return { mutationId, error: "Apenas diretores e gestores podem reatribuir leads." };
     }
@@ -265,6 +267,7 @@ export async function bulkChangeLeadStatusAction(
 
   try {
     const context = await getRequiredTenantContext();
+    if (isOutsideManagerScope(context.role, context.jobTitle)) return { mutationId, error: "Ação em lote de leads é feita pelo diretor." };
     if (context.role !== "director" && context.role !== "manager") {
       return { mutationId, error: "Apenas diretores e gestores podem alterar status em lote." };
     }
@@ -325,6 +328,7 @@ export async function bulkReassignBranchAction(
 
   try {
     const context = await getRequiredTenantContext();
+    if (isOutsideManagerScope(context.role, context.jobTitle)) return { mutationId, error: "Ação em lote de leads é feita pelo diretor." };
     if (context.role !== "director" && context.role !== "manager") {
       return { mutationId, error: "Apenas diretores e gestores podem transferir leads de unidade." };
     }
@@ -412,6 +416,7 @@ export async function bulkRevertToQualificationAction(
 
   try {
     const context = await getRequiredTenantContext();
+    if (isOutsideManagerScope(context.role, context.jobTitle)) return { mutationId, error: "Ação em lote de leads é feita pelo diretor." };
     if (context.role !== "director" && context.role !== "manager") {
       return { mutationId, error: "Apenas diretores e gestores podem devolver leads à fila de qualificação." };
     }

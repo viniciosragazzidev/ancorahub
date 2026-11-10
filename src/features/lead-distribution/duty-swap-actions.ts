@@ -1,5 +1,6 @@
 "use server";
 
+import { isOutsideManagerScope, MANAGER_DISTRIBUTION_REFUSAL } from "@/features/manager-scope/manager-routes";
 import { requireCargoCapability } from "@/shared/auth/authorization";
 import { exclusiveScheduleIdsForManager } from "./manager-unit-scope-server";
 import { MANAGER_SCOPE_ERROR } from "./manager-unit-scope";
@@ -147,6 +148,7 @@ export async function listDutySwapCandidatesAction(assignmentId: string): Promis
     const id = z.string().min(1).max(120).parse(assignmentId);
     const context = await getRequiredTenantContext();
     await requireCargoCapability(context, "duty_schedules_manage");
+    if (isOutsideManagerScope(context.role, context.jobTitle)) return { ok: false, reason: MANAGER_DISTRIBUTION_REFUSAL };
     if (!canManageSwaps(context.role)) return { ok: false, reason: "Apenas Diretores e Gestores podem trocar corretores da escala." };
     const actor = { role: context.role, branchId: context.branchId ?? null };
     const db = getDatabase();
@@ -225,6 +227,7 @@ export async function swapDutyAssignmentsAction(input: unknown): Promise<DutySwa
     const { sourceAssignmentId, targetAssignmentId } = parsed.data;
     const context = await getRequiredTenantContext();
     await requireCargoCapability(context, "duty_schedules_manage");
+    if (isOutsideManagerScope(context.role, context.jobTitle)) return { ok: false, reason: MANAGER_DISTRIBUTION_REFUSAL };
     if (!canManageSwaps(context.role)) return { ok: false, reason: "Apenas Diretores e Gestores podem trocar corretores da escala." };
     const actor = { role: context.role, branchId: context.branchId ?? null };
     const db = getDatabase();

@@ -1,5 +1,6 @@
 "use server";
 
+import { isOutsideManagerScope, MANAGER_DISTRIBUTION_REFUSAL } from "@/features/manager-scope/manager-routes";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -170,6 +171,7 @@ export async function toggleAutoDistributeAction(
 
   try {
     const accessContext = await resolveAccessContext();
+    if (isOutsideManagerScope(accessContext.role)) return { error: MANAGER_DISTRIBUTION_REFUSAL };
     const db = getDatabase();
     const [branch] = await db
       .select({

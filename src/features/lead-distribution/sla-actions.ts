@@ -1,5 +1,6 @@
 "use server";
 
+import { isOutsideManagerScope, MANAGER_DISTRIBUTION_REFUSAL } from "@/features/manager-scope/manager-routes";
 import { requireCargoCapability } from "@/shared/auth/authorization";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
@@ -23,6 +24,7 @@ export async function saveBrokerAcceptanceSlaAction(
   try {
     const context = await getRequiredTenantContext();
     await requireCargoCapability(context, "distribution_settings_manage");
+    if (isOutsideManagerScope(context.role, context.jobTitle)) return { success: false, error: MANAGER_DISTRIBUTION_REFUSAL };
     if (context.role !== "director" && context.role !== "manager") {
       return { success: false, error: "Permissão insuficiente para alterar configurações de distribuição." };
     }

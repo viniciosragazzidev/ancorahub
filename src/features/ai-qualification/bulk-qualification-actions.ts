@@ -1,5 +1,6 @@
 "use server";
 
+import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNotNull, isNull, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -33,6 +34,8 @@ const FIRST_MESSAGE_FAILED_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
 
 export async function getCandidateLeadsForBulkQualification(filterType: string = "all_unqualified") {
   const context = await getRequiredTenantContext();
+  // Gestor fora do atendimento IA e da lista geral de leads desde 10/11 (a lista vinha da empresa toda).
+  if (isOutsideManagerScope(context.role, context.jobTitle)) throw new AuthorizationError("A qualificação em massa é feita pelo diretor.");
   if (context.role !== "director" && context.role !== "manager") {
     throw new AuthorizationError("Apenas diretores e gestores podem realizar disparos em massa.");
   }
@@ -104,6 +107,7 @@ export async function getCandidateLeadsForBulkQualification(filterType: string =
 export async function triggerBulkQualificationAction(input: BulkQualificationFilter) {
   try {
     const context = await getRequiredTenantContext();
+    if (isOutsideManagerScope(context.role, context.jobTitle)) return { success: false, error: "A qualificação em massa é feita pelo diretor." };
     if (context.role !== "director" && context.role !== "manager") {
       return { success: false, error: "Permissão negada. Apenas diretores e gestores podem realizar disparos de qualificação em massa." };
     }

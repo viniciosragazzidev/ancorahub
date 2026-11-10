@@ -1,5 +1,6 @@
 "use server";
 
+import { isOutsideManagerScope, MANAGER_DISTRIBUTION_REFUSAL } from "@/features/manager-scope/manager-routes";
 import { requireCargoCapability } from "@/shared/auth/authorization";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
@@ -77,6 +78,7 @@ const PLANTAO_PATH = "/leads/distribuicao";
 async function readScope() {
   const context = await getRequiredTenantContext();
   await requireCargoCapability(context, "duty_schedules_manage");
+  if (isOutsideManagerScope(context.role, context.jobTitle)) throw new Error(MANAGER_DISTRIBUTION_REFUSAL);
   if (context.role !== "director" && context.role !== "manager") throw new Error("Apenas Diretores e Gestores podem ver a escala mensal.");
   if (context.role === "manager" && !context.branchId) throw new Error("A unidade do Gestor não está definida.");
   return context;
@@ -96,6 +98,7 @@ async function writeScope() {
  */
 async function seatScope() {
   const context = await readScope();
+  if (isOutsideManagerScope(context.role, context.jobTitle)) throw new Error(MANAGER_DISTRIBUTION_REFUSAL);
   if (context.role !== "director" && context.role !== "manager") throw new Error("Sem permissão.");
   if ((await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) !== "true") throw new Error("A escala mensal está desativada pelo Super-admin.");
   return context;

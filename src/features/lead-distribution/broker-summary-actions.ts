@@ -1,11 +1,13 @@
 "use server";
 
+import { isOutsideManagerScope, MANAGER_DISTRIBUTION_REFUSAL } from "@/features/manager-scope/manager-routes";
 import { requireCargoCapability } from "@/shared/auth/authorization";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { fetchBrokerDailySummary, type BrokerDailySummaryAggregate } from "./broker-summary-service";
 
 function assertAdminRole(role: string) {
+  if (isOutsideManagerScope(role)) throw new Error(MANAGER_DISTRIBUTION_REFUSAL);
   if (role !== "director" && role !== "manager") {
     throw new Error("Apenas Diretores ou Gestores podem visualizar o resumo de desempenho.");
   }

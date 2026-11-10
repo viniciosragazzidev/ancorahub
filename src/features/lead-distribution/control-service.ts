@@ -1,4 +1,5 @@
 import "server-only";
+import { isOutsideManagerScope, MANAGER_DISTRIBUTION_REFUSAL } from "@/features/manager-scope/manager-routes";
 
 import { randomUUID } from "node:crypto";
 import { and, asc, count, desc, eq, gt, inArray, isNull, lte, ne, or } from "drizzle-orm";
@@ -90,6 +91,7 @@ const adQueueRouteInput = z.object({
 });
 
 function assertManager(context: TenantContext, branchId?: string | null) {
+  if (isOutsideManagerScope(context.role, context.jobTitle)) throw new AuthorizationError(MANAGER_DISTRIBUTION_REFUSAL);
   if (context.role !== "director" && context.role !== "manager") {
     throw new AuthorizationError("Sem permissão para administrar filas.");
   }

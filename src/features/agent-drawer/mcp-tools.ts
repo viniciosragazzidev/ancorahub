@@ -127,7 +127,7 @@ export const getBranchQueueSummaryTool: McpToolDefinition = {
   parameters: z.object({
     branchId: z.string().optional(),
   }),
-  allowedRoles: ["supervisor", "manager", "director"],
+  allowedRoles: ["supervisor", "director"],
   execute: async ({ branchId }, context) => {
     const db = getDatabase();
     const targetBranch = branchId || context.branchId;
@@ -177,7 +177,7 @@ export const getBranchOnDutyBrokersTool: McpToolDefinition = {
   name: "get_branch_on_duty_brokers",
   description: "Lista os corretores que estão atualmente em plantão de atendimento ao vivo.",
   parameters: z.object({}),
-  allowedRoles: ["supervisor", "manager", "director"],
+  allowedRoles: ["supervisor", "director"],
   execute: async (_, context) => {
     const db = getDatabase();
     const brokers = await db
@@ -212,7 +212,7 @@ export const executeLeadReassignmentTool: McpToolDefinition = {
     targetBrokerId: z.string().uuid(),
     reason: z.string().min(3).optional(),
   }),
-  allowedRoles: ["supervisor", "manager", "director"],
+  allowedRoles: ["supervisor", "director"],
   execute: async ({ leadId, targetBrokerId, reason }, context) => {
     const strategy = context.role === "director" ? "manual_director" : "manual_manager";
     const result = await assignLeadToBroker(
@@ -239,7 +239,7 @@ export const getTenantFunnelMetricsTool: McpToolDefinition = {
   name: "get_tenant_funnel_metrics",
   description: "Obtém as métricas gerais do funil de vendas, taxa de conversão e volume de propostas da corretora.",
   parameters: z.object({}),
-  allowedRoles: ["manager", "director"],
+  allowedRoles: ["director"],
   execute: async (_, context) => {
     const db = getDatabase();
 
@@ -271,7 +271,7 @@ export const getAiSystemHealthTool: McpToolDefinition = {
   name: "get_ai_system_health",
   description: "Mapeia o status de funcionamento da IA, conexões do WhatsApp e alertas operacionais.",
   parameters: z.object({}),
-  allowedRoles: ["manager", "director"],
+  allowedRoles: ["director"],
   execute: async (_, context) => {
     const alerts = await getQualificationAlerts(context.tenantId);
     return {
