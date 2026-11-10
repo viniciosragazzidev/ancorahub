@@ -15,6 +15,7 @@ import { MemberLeadsTabs } from "./_components/member-leads-tabs";
 import { MemberOffersPanel, MemberTemperaturePanel } from "./_components/member-temperature";
 import { MemberRankingPanel } from "./_components/member-ranking";
 import { getMemberOfferRanking, getScopedMemberOfferRanking } from "@/features/engagement/broker-stats";
+import { getUnitBrokerIds } from "@/features/manager-scope/unit-brokers";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getCachedSupervisorWorkspaceData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { rankHeadline, type RankPosition } from "@/features/engagement/ranking";
@@ -230,7 +231,10 @@ export default async function TeamMemberProfilePage({
     ? await listBrokerNotes(member.userId).catch(() => [])
     : [];
   // Behind the journey flag (inside): off, the profile shows nothing new and runs no query.
-  const ranking = isBroker ? await getMemberOfferRanking(context.tenantId, member.userId).catch(() => null) : null;
+  // Gestor (10/11): o placar compara só com os corretores da unidade dele, nunca com a empresa toda.
+  const ranking = !isBroker ? null : context.role === "manager"
+    ? await getUnitBrokerIds(context.tenantId, context.branchId ?? null).then((ids) => getScopedMemberOfferRanking(context.tenantId, ids, member.userId)).catch(() => null)
+    : await getMemberOfferRanking(context.tenantId, member.userId).catch(() => null);
   const roleName = member.customRoleName ?? ({ director: "Diretor", manager: "Gestor", supervisor: "Supervisor", broker: "Corretor" }[member.role]);
   const firstContactRate = metrics.leads.total > 0 ? Math.round(((metrics.leads.total - metrics.leads.withoutFirstContact) / metrics.leads.total) * 100) : 0;
 

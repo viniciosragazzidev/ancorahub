@@ -22,14 +22,16 @@ export async function GET(request: Request) {
   const [row] = await getDatabase().select({
     brokerId: schema.dutyPresenceConfirmations.brokerId,
     photoStorageKey: schema.dutyPresenceConfirmations.photoStorageKey,
-    branchId: schema.unitDutySchedules.branchId,
+    brokerBranchId: schema.tenantMemberships.branchId,
   }).from(schema.dutyPresenceConfirmations)
     .innerJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.dutyPresenceConfirmations.scheduleId), eq(schema.unitDutySchedules.tenantId, schema.dutyPresenceConfirmations.tenantId)))
+    .leftJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.dutyPresenceConfirmations.brokerId), eq(schema.tenantMemberships.tenantId, schema.dutyPresenceConfirmations.tenantId)))
     .where(and(eq(schema.dutyPresenceConfirmations.id, id.data), eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId)))
     .limit(1);
   const allowed = row && (
     context.role === "director"
-    || (context.role === "manager" && (!row.branchId || !context.branchId || context.branchId === row.branchId))
+    // Gestor (10/11): só a foto de corretor da própria unidade, pela unidade atual do corretor (o plantão é da empresa toda).
+    || (context.role === "manager" && Boolean(context.branchId) && row.brokerBranchId === context.branchId)
     || (context.role === "broker" && row.brokerId === context.userId)
   );
   if (!row?.photoStorageKey || !allowed || !row.photoStorageKey.startsWith(`duty-presence/${context.tenantId}/`)) {

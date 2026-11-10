@@ -1,3 +1,4 @@
+import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 import { and, eq, ilike, isNull, or } from "drizzle-orm";
 import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/supervisor-scope";
 import { NextRequest } from "next/server";
@@ -6,7 +7,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getUserDisplayInfo } from "@/shared/auth/actions";
 import { canShowNavigationItem } from "@/shared/navigation-access";
 import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
-import { FEATURE_FLAGS, getFeatureFlag, getSystemSetting } from "@/features/system-settings/queries";
+import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 
 import type { TenantRole } from "@/shared/db/schema";
@@ -47,8 +48,9 @@ export async function GET(request: NextRequest) {
   }).slice(0, 6);
 
   // A manager without an authenticated unit has no operational search scope.
-  const managerLiteEnabled = context.role === "manager" && (await getFeatureFlag(FEATURE_FLAGS.MANAGER_LITE).catch(() => "false")) === "true";
-  if (managerLiteEnabled && !context.branchId) {
+  // Gestor (10/11): sem unidade, só funcionalidades; com unidade, só leads e pessoas da unidade (clientes e tarefas
+  // ficaram fora da área dele).
+  if (context.role === "manager" && !context.branchId) {
     return Response.json({ enabled: true, groups: matchingFeatures.length ? [{
       type: "features", label: "Funcionalidades & Módulos", items: matchingFeatures.map((feature) => ({
         id: feature.id, title: feature.title, subtitle: `${feature.domain} · ${feature.description}`, href: feature.url,
@@ -64,11 +66,11 @@ export async function GET(request: NextRequest) {
       .from(schema.leads)
       .where(and(scope, or(ilike(schema.leads.nome, pattern), ilike(schema.leads.telefone, pattern), ilike(schema.leads.email, pattern))))
       .limit(6),
-    db.select({ id: schema.clients.id, title: schema.clients.nome, subtitle: schema.clients.email, leadId: schema.clients.leadId })
+    isOutsideManagerScope(context.role, context.jobTitle) ? Promise.resolve([]) : db.select({ id: schema.clients.id, title: schema.clients.nome, subtitle: schema.clients.email, leadId: schema.clients.leadId })
       .from(schema.clients)
       .where(and(eq(schema.clients.tenantId, context.tenantId), ...(context.role === "manager" && context.branchId ? [eq(schema.clients.branchId, context.branchId)] : []), ...(context.role === "broker" ? [eq(schema.clients.corretorId, context.userId)] : []), ...(teamScoped ? [inSupervisorTeam(schema.clients.corretorId, context.tenantId, context.userId)] : []), or(ilike(schema.clients.nome, pattern), ilike(schema.clients.telefone, pattern), ilike(schema.clients.email, pattern))))
       .limit(6),
-    db.select({ id: schema.leadTasks.id, title: schema.leadTasks.title, subtitle: schema.leads.nome, leadId: schema.leadTasks.leadId })
+    isOutsideManagerScope(context.role, context.jobTitle) ? Promise.resolve([]) : db.select({ id: schema.leadTasks.id, title: schema.leadTasks.title, subtitle: schema.leads.nome, leadId: schema.leadTasks.leadId })
       .from(schema.leadTasks)
       .innerJoin(schema.leads, eq(schema.leadTasks.leadId, schema.leads.id))
       .where(and(eq(schema.leadTasks.tenantId, context.tenantId), scope, or(ilike(schema.leadTasks.title, pattern), ilike(schema.leadTasks.description, pattern), ilike(schema.leads.nome, pattern))))

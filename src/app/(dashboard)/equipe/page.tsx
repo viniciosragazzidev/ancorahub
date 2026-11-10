@@ -192,7 +192,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
     getDatabase()
       .select({ month: sql<string>`to_char(${schema.tenantMemberships.createdAt}, 'YYYY-MM')`, count: sql<number>`count(*)::int` })
       .from(schema.tenantMemberships)
-      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), sql`${schema.tenantMemberships.createdAt} >= ${sixMonthsAgo.toISOString()}`))
+      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), branchScope, sql`${schema.tenantMemberships.createdAt} >= ${sixMonthsAgo.toISOString()}`))
       .groupBy(sql`to_char(${schema.tenantMemberships.createdAt}, 'YYYY-MM')`),
     getDatabase()
       .select({ month: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM')`, count: sql<number>`count(*)::int` })

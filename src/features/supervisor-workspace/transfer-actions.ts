@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
@@ -35,16 +35,8 @@ export type TransferActionResult = { ok: true } | { ok: false; reason: string };
 async function canManageBranch(context: Awaited<ReturnType<typeof getRequiredTenantContext>>, branchId: string) {
   if (context.role === "director") return true;
   if (context.role !== "manager") return false;
-  if ((await getLiteAudience(context)) === "manager") return Boolean(context.branchId && context.branchId === branchId);
-  if (context.branchId === branchId) return true;
-  const [scope] = await getDatabase().select({ id: schema.tenantManagerBranches.id })
-    .from(schema.tenantManagerBranches)
-    .where(and(
-      eq(schema.tenantManagerBranches.tenantId, context.tenantId),
-      eq(schema.tenantManagerBranches.userId, context.userId),
-      eq(schema.tenantManagerBranches.branchId, branchId),
-    )).limit(1);
-  return Boolean(scope);
+  // Gestor: só a unidade da sessão (10/11). A tabela tenant_manager_branches não existe em produção.
+  return Boolean(context.branchId && context.branchId === branchId);
 }
 
 export async function getBrokerTransferCandidatesAction(): Promise<TransferCandidate[]> {
@@ -99,11 +91,9 @@ async function notifyRequestRecipients(tenantId: string, branchId: string, oldSu
       eq(schema.user.active, true),
       or(eq(schema.tenantMemberships.role, "director"), eq(schema.tenantMemberships.role, "manager")),
     ));
-  const branchManagerScopes = await getDatabase().select({ userId: schema.tenantManagerBranches.userId })
-    .from(schema.tenantManagerBranches)
-    .where(and(eq(schema.tenantManagerBranches.tenantId, tenantId), eq(schema.tenantManagerBranches.branchId, branchId)));
-  const scopedManagers = new Set(branchManagerScopes.map((row) => row.userId));
-  const recipients = new Set(managers.filter((row) => row.role === "director" || row.branchId === branchId || scopedManagers.has(row.userId)).map((row) => row.userId));
+  // Gestor da unidade pela unidade do vínculo (10/11): a tabela tenant_manager_branches não existe em produção e
+  // a consulta derrubava o aviso para todo mundo, diretores incluídos.
+  const recipients = new Set(managers.filter((row) => row.role === "director" || row.branchId === branchId).map((row) => row.userId));
   recipients.add(oldSupervisorId);
   await Promise.all([...recipients].map((recipientUserId) => publishNotification({
     capability: "supervisor_transfer",
@@ -209,18 +199,9 @@ export async function getPendingBrokerTransferRequestsAction(): Promise<PendingT
   const requestedTo = alias(schema.user, "transfer_to_supervisor");
   const conditions = [eq(schema.supervisorTransferRequests.tenantId, context.tenantId), eq(schema.supervisorTransferRequests.status, "pending")];
   if (context.role === "manager") {
-    if ((await getLiteAudience(context)) === "manager") {
-      if (!context.branchId) return [];
-      conditions.push(eq(schema.supervisorTransferRequests.branchId, context.branchId));
-    } else {
-    const scopes = await getDatabase().select({ branchId: schema.tenantManagerBranches.branchId })
-      .from(schema.tenantManagerBranches)
-      .where(and(eq(schema.tenantManagerBranches.tenantId, context.tenantId), eq(schema.tenantManagerBranches.userId, context.userId)));
-    const branchIds = new Set(scopes.map((row) => row.branchId));
-    if (context.branchId) branchIds.add(context.branchId);
-    if (!branchIds.size) return [];
-    conditions.push(inArray(schema.supervisorTransferRequests.branchId, [...branchIds]));
-    }
+    // Gestor: só a unidade da sessão (10/11). tenant_manager_branches não existe em produção e derrubava o painel.
+    if (!context.branchId) return [];
+    conditions.push(eq(schema.supervisorTransferRequests.branchId, context.branchId));
   }
   const rows = await getDatabase().select({
     id: schema.supervisorTransferRequests.id,

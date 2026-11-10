@@ -44,7 +44,8 @@ export async function createTeamUser(rawInput: unknown) {
   const liteAudience = context.role === "manager" || context.role === "supervisor"
     ? await getLiteAudience(context)
     : null;
-  if (context.role === "manager" && liteAudience === "manager" && input.branchId !== context.branchId) {
+  // Gestor (qualquer modo, 10/11): só cria acesso na própria unidade, e precisa ter unidade.
+  if (context.role === "manager" && (!context.branchId || input.branchId !== context.branchId)) {
     throw new Error("Gestores só podem criar acessos na própria unidade.");
   }
   if (context.role === "supervisor" && (

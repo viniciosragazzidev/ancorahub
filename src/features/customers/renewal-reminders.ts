@@ -144,9 +144,10 @@ export async function createClientRenewalReminders(now = new Date()) {
         or(
           client.corretorId ? eq(schema.tenantMemberships.userId, client.corretorId) : undefined,
           eq(schema.tenantMemberships.role, "director"),
+          // Sem unidade: só o diretor (gestor só recebe a própria unidade desde 10/11).
           client.branchId
             ? and(eq(schema.tenantMemberships.role, "manager"), eq(schema.tenantMemberships.branchId, client.branchId))
-            : eq(schema.tenantMemberships.role, "manager"),
+            : sql`false`,
         ),
       ));
 

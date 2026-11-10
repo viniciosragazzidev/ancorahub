@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import * as XLSX from "xlsx";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { and, asc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getSupervisedBrokerIds } from "@/features/team/supervisor-service";
@@ -87,7 +87,8 @@ async function supervisedIds(context: TenantContext) {
 
 function scopeFor(context: TenantContext, brokerIds: string[] | null, targetBranchId?: string) {
   if (context.role === "supervisor") return brokerIds?.length ? inArray(schema.leads.corretorId, brokerIds) : eq(schema.leads.id, "__no_supervised_leads__");
-  if (context.role === "manager" && context.branchId) return eq(schema.leads.branchId, context.branchId);
+  // Gestor sem unidade não exporta a empresa toda (10/11): sem unidade, nada.
+  if (context.role === "manager") return context.branchId ? eq(schema.leads.branchId, context.branchId) : sql`false`;
   if (context.role === "director" && targetBranchId && targetBranchId !== "all") return eq(schema.leads.branchId, targetBranchId);
   return undefined;
 }

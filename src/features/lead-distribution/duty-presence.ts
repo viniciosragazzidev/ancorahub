@@ -554,7 +554,10 @@ export async function confirmOwnDutyPresence(input: { tenantId: string; brokerId
   return { ok: true, confirmationId: row.id, awaitingRelease: presencial };
 }
 
-/** Who validates an in-person photo: the tenant's directors and the managers of the plantão's branch (all managers when the plantão has no branch). */
+/**
+ * Who validates an in-person photo: the tenant's directors. Since 10/11 the manager only follows the plantões of
+ * his unit (no presence review), so managers are no longer reviewers.
+ */
 export async function getDutyPhotoReviewers(tenantId: string, scheduleId: string) {
   const db = getDatabase();
   const [schedule] = await db.select({ branchId: schema.unitDutySchedules.branchId, name: schema.unitDutySchedules.name })
@@ -564,7 +567,7 @@ export async function getDutyPhotoReviewers(tenantId: string, scheduleId: string
     .from(schema.tenantMemberships)
     .where(and(eq(schema.tenantMemberships.tenantId, tenantId), eq(schema.tenantMemberships.status, "active"), inArray(schema.tenantMemberships.role, ["director", "manager"])));
   const reviewerIds = members
-    .filter((member) => member.role === "director" || !schedule.branchId || !member.branchId || member.branchId === schedule.branchId)
+    .filter((member) => member.role === "director")
     .map((member) => member.userId);
   return { scheduleName: schedule.name, reviewerIds: [...new Set(reviewerIds)] };
 }

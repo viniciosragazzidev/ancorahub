@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, count, eq, isNull, or } from "drizzle-orm";
+import { and, count, eq, isNull, or, sql } from "drizzle-orm";
 import webpush from "web-push";
 
 import { enqueueAndProcessBrokerLeadNotification } from "./broker-lead-delivery";
@@ -282,9 +282,10 @@ export async function notifyNewLead(
             eq(schema.tenantMemberships.status, "active"),
             or(
               eq(schema.tenantMemberships.role, "director"),
+              // Gestor só recebe o que é da unidade dele (10/11): lead sem unidade vai só para o diretor.
               branchId
                 ? and(eq(schema.tenantMemberships.role, "manager"), eq(schema.tenantMemberships.branchId, branchId))
-                : eq(schema.tenantMemberships.role, "manager")
+                : sql`false`
             )
           )
         );
@@ -387,9 +388,10 @@ export async function notifyLeadArrived(leadId: string, tenantId: string, branch
         eq(schema.tenantMemberships.status, "active"),
         or(
           eq(schema.tenantMemberships.role, "director"),
+          // Gestor só recebe o que é da unidade dele (10/11): lead sem unidade vai só para o diretor.
           branchId
             ? and(eq(schema.tenantMemberships.role, "manager"), eq(schema.tenantMemberships.branchId, branchId))
-            : eq(schema.tenantMemberships.role, "manager")
+            : sql`false`
         )
       )
     );

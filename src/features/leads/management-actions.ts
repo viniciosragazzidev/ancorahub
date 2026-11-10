@@ -14,6 +14,7 @@ import { enqueueLeadEffectTx, runLeadEffectOutboxProcessor } from "@/features/le
 import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { withServerActionTiming } from "@/shared/observability/request-timing";
 import { canRemoveLeadAssignment, getLeadAssignmentBlockedReason } from "./assignment-domain";
+import { getUnitBrokerIds } from "@/features/manager-scope/unit-brokers";
 import { findBrokerRunningDutyScheduleId, getActiveQueueDutyRoster } from "@/features/lead-distribution/active-queue-duty-roster";
 import { findPostSaleExemptionQueueName, postSaleTransferAuditAction } from "@/features/lead-distribution/post-sale-transfer";
 import { ensureDefaultQueue, offerLeadToBrokerManually, routeLeadToBranch } from "@/features/lead-distribution/service";
@@ -114,6 +115,8 @@ export async function getLeadDutyReassignmentOptions(leadId: string) {
           eq(schema.tenantMemberships.status, "active"),
           eq(schema.user.active, true),
           eq(schema.user.status, "active"),
+          // Gestor (10/11): só corretores da própria unidade, nunca a lista da empresa toda.
+          context.role === "manager" ? eq(schema.tenantMemberships.branchId, context.branchId ?? "") : undefined,
         )).orderBy(asc(schema.user.name));
       // Livre movimentação (2026-10-08): qualquer unidade do tenant, sem exigir ativa/aceitando leads.
       const branches = await db.select({ id: schema.branches.id, name: schema.branches.name })
@@ -129,7 +132,11 @@ export async function getLeadDutyReassignmentOptions(leadId: string) {
       queueId: lead.queueId,
       webhookCredentialId: lead.webhookCredentialId,
     });
-    return { success: true as const, leadId: parsedLeadId, isPostSale: false, branches: [], ...roster };
+    // Gestor (10/11): o plantão da fila mistura unidades; ele vê só os corretores da unidade dele.
+    // Pela unidade ATUAL do corretor (a escala guarda a unidade da época).
+    const unitBrokers = context.role === "manager" ? new Set(await getUnitBrokerIds(context.tenantId, context.branchId ?? null)) : null;
+    const scopedRoster = unitBrokers ? { ...roster, brokers: roster.brokers.filter((broker) => unitBrokers.has(broker.id)) } : roster;
+    return { success: true as const, leadId: parsedLeadId, isPostSale: false, branches: [], ...scopedRoster };
   } catch (error) {
     return {
       success: false as const,

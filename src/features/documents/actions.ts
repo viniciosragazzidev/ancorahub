@@ -3,7 +3,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -290,9 +290,10 @@ export async function confirmDocumentUploadAction({
           eq(schema.tenantMemberships.status, "active"),
           or(
             eq(schema.tenantMemberships.role, "director"),
+            // Sem unidade: só o diretor (gestor só recebe a própria unidade desde 10/11).
             lead.branchId
               ? and(eq(schema.tenantMemberships.role, "manager"), eq(schema.tenantMemberships.branchId, lead.branchId))
-              : eq(schema.tenantMemberships.role, "manager")
+              : sql`false`
           )
         )
       );

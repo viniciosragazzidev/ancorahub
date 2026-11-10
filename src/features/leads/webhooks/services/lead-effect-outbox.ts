@@ -115,7 +115,8 @@ async function claimNext(workerId: string, leaseSeconds: number, tenantId?: stri
 async function notifyException(effect: typeof schema.leadEffectOutbox.$inferSelect) {
   const recipients = await getDatabase().select({ userId: schema.tenantMemberships.userId })
     .from(schema.tenantMemberships)
-    .where(and(eq(schema.tenantMemberships.tenantId, effect.tenantId), eq(schema.tenantMemberships.status, "active"), inArray(schema.tenantMemberships.role, ["director", "manager"])));
+    .where(and(eq(schema.tenantMemberships.tenantId, effect.tenantId), eq(schema.tenantMemberships.status, "active"), eq(schema.tenantMemberships.role, "director")));
+  // Fila de exceções é da distribuição: só o diretor (o gestor saiu da distribuição em 10/11).
   await Promise.all(recipients.map(({ userId }) => publishNotification({
     capability: "lead_arrived", tenantId: effect.tenantId, recipientUserId: userId, leadId: effect.leadId,
     type: "lead.intake_exception", title: "Ação de lead exige revisão", message: "Uma ação automática não pôde ser concluída e foi enviada para a fila de exceções.",

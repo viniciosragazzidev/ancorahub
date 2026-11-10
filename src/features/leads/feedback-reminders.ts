@@ -272,7 +272,8 @@ export async function createLeadFeedbackReminders(tenantId?: string): Promise<Fe
           and(
             eq(schema.tenantMemberships.tenantId, tenant.id),
             eq(schema.tenantMemberships.status, "active"),
-            inArray(schema.tenantMemberships.role, ["manager", "director"]),
+            // Contagem da empresa toda: só o diretor (o gestor só vê a própria unidade desde 10/11).
+            eq(schema.tenantMemberships.role, "director"),
           ),
         )
         .groupBy(schema.tenantMemberships.userId)
