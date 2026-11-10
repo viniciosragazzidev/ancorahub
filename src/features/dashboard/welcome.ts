@@ -36,6 +36,8 @@ export type DashboardWelcome = {
  */
 export async function getDashboardWelcome(context: TenantContext, now = new Date(), options: { branchId?: string | null } = {}): Promise<DashboardWelcome> {
   const db = getDatabase();
+  // Gestor só vê plantões e filas da unidade dele, mesmo sem filtro pedido (Vigia, 10/11).
+  if (context.role === "manager") options = { ...options, branchId: context.branchId ?? "__sem_unidade__" };
   const [userRows, tenantSchedules, queues] = await Promise.all([
     db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1),
     db
