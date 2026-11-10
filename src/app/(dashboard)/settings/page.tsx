@@ -224,6 +224,7 @@ export default async function SettingsPage() {
                 { label: "Equipe e corretores", href: "/equipe", description: "Convites de usuários e permissões" },
                 { label: "Regras de distribuição", href: "/leads?tab=distribuicao", description: "Roleta de atendimento e prioridades" },
                 { label: "Guia e manual do sistema", href: "/guia", description: "Tours e definições de domínio" },
+                ...(context.role === "director" ? [{ label: "Resultado do plantão", href: "/settings/resultado-plantao", description: "Prévia e envio diário pelo WhatsApp" }] : []),
               ]}
             />
           ) : null}
@@ -258,6 +259,7 @@ export default async function SettingsPage() {
               { label: "Equipe & Corretores", href: "/equipe", description: "Convites de usuários e permissões" },
               { label: "Regras de Distribuição", href: "/leads?tab=distribuicao", description: "Roleta de atendimento e prioridades" },
               { label: "Guia & Manual do Sistema", href: "/guia", description: "Tours e definições de domínio" },
+              ...(context.role === "director" ? [{ label: "Resultado do plantão", href: "/settings/resultado-plantao", description: "Prévia e envio diário pelo WhatsApp" }] : []),
             ]}
           />
         )}
