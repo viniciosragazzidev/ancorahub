@@ -60,10 +60,10 @@ describe("manager search without a unit", () => {
     state.displayUser.permissions = [];
   });
 
-  it("preserves the pre-Lite search when the manager flag is off", async () => {
+  it("gestor sem unidade nunca consulta a base, com ou sem a chave do Lite (10/11)", async () => {
     const response = await GET(new NextRequest("http://localhost/api/search?q=lead"));
     expect(response.status).toBe(200);
-    expect(state.select).toHaveBeenCalled();
+    expect(state.select).not.toHaveBeenCalled();
   });
 
   it("limits the no-unit empty search behavior to enabled Manager Lite", async () => {
@@ -73,13 +73,13 @@ describe("manager search without a unit", () => {
     expect(state.select).not.toHaveBeenCalled();
   });
 
-  it("keeps the pre-Lite feature results when the director Lite key is off", async () => {
+  it("gestor: o filtro do menu vale mesmo com a chave do diretor desligada (10/11)", async () => {
     state.displayUser.permissions = ["acessar_leads"];
     const response = await GET(new NextRequest("http://localhost/api/search?q=lead"));
     const payload = await response.json() as { groups: Array<{ type: string; items: Array<{ title: string }> }> };
     const features = payload.groups.find((group) => group.type === "features")?.items ?? [];
 
-    expect(features.some((item) => item.title === "Regras de Distribuição de Leads")).toBe(true);
+    expect(features.some((item) => item.title === "Regras de Distribuição de Leads")).toBe(false);
   });
 
   it("returns only feature results permitted by the menu access policy", async () => {
@@ -89,7 +89,8 @@ describe("manager search without a unit", () => {
     const payload = await response.json() as { groups: Array<{ type: string; items: Array<{ title: string }> }> };
     const features = payload.groups.find((group) => group.type === "features")?.items ?? [];
 
-    expect(features.some((item) => item.title === "Gestão de Leads")).toBe(true);
+    // Gestor (10/11): a lista geral de leads e a distribuição saíram do menu dele.
+    expect(features.some((item) => item.title === "Gestão de Leads")).toBe(false);
     expect(features.some((item) => item.title === "Regras de Distribuição de Leads")).toBe(false);
   });
 

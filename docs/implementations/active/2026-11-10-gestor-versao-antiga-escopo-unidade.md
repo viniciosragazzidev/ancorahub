@@ -42,6 +42,11 @@ antes de 25/10.
   configuração para manter, e o toggle de modo hoje não aparece em lugar nenhum (`dashboard-header.tsx:66`, prop
   `showModeToggle` sem chamador).
 
+**Quem é "gestor" aqui:** papel `manager` fora das funções marketing e financeiro (que também usam o papel
+`manager`, ver `style-flag.test.ts`). Helper `isOutsideManagerScope(role, jobTitle)` em `manager-scope/manager-routes.ts`.
+Sem a função informada conta como gestor (fail closed). Em produção nenhum `manager` tem função marketing/financeiro;
+a outra empresa tem 9 gestores com função `broker`, que contam como gestor.
+
 ## 2. O que o gestor VÊ e o que NÃO vê mais
 
 Fonte única: `src/features/manager-scope/manager-routes.ts` (`MANAGER_ALLOWED_ROUTES`). Fail closed: rota fora da
@@ -163,7 +168,12 @@ relatório (`reports/report-export-service.ts:88-92`), comissões, busca.
   diretor mantém as áreas, capacidades removidas só do gestor.
 - `manager-scope/unit-duty-domain.test.ts`: plantão da empresa toda com corretor da unidade aparece só com ele;
   sem corretor da unidade não aparece; escala mensal vence a semanal; validade e pausa; sem nome de outra unidade.
-- Testes existentes ajustados onde a regra mudou (Lite do gestor desligado, skin, ações que aceitavam o gestor).
+- `manager-scope/deny-manager.test.ts`: layout das áreas bloqueadas (gestor com e sem unidade vai para `/equipe`;
+  diretor, supervisor, corretor, marketing e financeiro passam).
+- Testes existentes ajustados onde a regra mudou: experience-mode, lite-audience, style-flag, navigation-access,
+  nav-registry (pós-venda), busca, modo da fila, escala e corretor online no plantão.
+- Resultado (10/11): `tsc --noEmit` limpo; eslint sem erros nos arquivos tocados; vitest completo com as mesmas
+  falhas da base `ec46ff0d` (14 arquivos, nenhuma nova).
 - Matriz manual antes do merge (papel x unidade): diretor (tudo), gestor Matriz 7° Andar, gestor Niterói 1, gestor
   sem unidade (tudo vazio), supervisor e corretor (sem mudança).
 

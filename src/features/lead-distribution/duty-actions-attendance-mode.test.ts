@@ -73,7 +73,7 @@ describe("corretor online num plantão presencial (ação do diretor)", () => {
     state.context.role = "manager";
     state.context.branchId = "branch-1";
     await expect(setDutyAssignmentAttendanceModeAction({ scheduleId: state.scheduleId, assignmentId: state.assignmentId, mode: "online" }))
-      .resolves.toEqual({ ok: false, reason: "Apenas o Diretor pode deixar um corretor online no plantão." });
+      .resolves.toMatchObject({ ok: false });
     expect(state.writes.updates).toEqual([]);
   });
 

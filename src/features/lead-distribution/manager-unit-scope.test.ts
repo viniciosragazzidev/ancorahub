@@ -55,18 +55,16 @@ describe("plantão exclusivo da unidade do gestor", () => {
 describe("modo da fila (automática ou manual)", () => {
   const unitQueue = { branchId: UNIT, status: "active" };
 
-  it("gestor troca só fila ativa da unidade dele", () => {
-    expect(queueModeProblem({ role: "manager", actorBranchId: UNIT, queue: unitQueue })).toBeNull();
-    expect(queueModeProblem({ role: "manager", actorBranchId: UNIT, queue: { branchId: OTHER, status: "active" } })).toMatch(/sua unidade/);
-    expect(queueModeProblem({ role: "manager", actorBranchId: UNIT, queue: { branchId: null, status: "active" } })).toMatch(/sua unidade/);
-    expect(queueModeProblem({ role: "manager", actorBranchId: null, queue: unitQueue })).toMatch(/sua unidade/);
-    expect(queueModeProblem({ role: "manager", actorBranchId: UNIT, queue: { branchId: UNIT, status: "paused" } })).toMatch(/Ative a fila/);
+  it("gestor não troca o modo de nenhuma fila desde 10/11 (distribuição só do diretor)", () => {
+    expect(queueModeProblem({ role: "manager", actorBranchId: UNIT, queue: unitQueue })).toMatch(/diretor/);
+    expect(queueModeProblem({ role: "manager", actorBranchId: null, queue: unitQueue })).toMatch(/diretor/);
+    expect(queueModeProblem({ role: "manager", actorBranchId: UNIT, queue: null })).toMatch(/diretor/);
   });
 
   it("diretor troca qualquer fila; os demais papéis não", () => {
     expect(queueModeProblem({ role: "director", actorBranchId: null, queue: { branchId: OTHER, status: "active" } })).toBeNull();
     expect(queueModeProblem({ role: "supervisor", actorBranchId: UNIT, queue: unitQueue })).toMatch(/Sem permissão/);
     expect(queueModeProblem({ role: "broker", actorBranchId: UNIT, queue: unitQueue })).toMatch(/Sem permissão/);
-    expect(queueModeProblem({ role: "manager", actorBranchId: UNIT, queue: null })).toMatch(/não encontrada/);
+    expect(queueModeProblem({ role: "director", actorBranchId: null, queue: null })).toMatch(/não encontrada/);
   });
 });

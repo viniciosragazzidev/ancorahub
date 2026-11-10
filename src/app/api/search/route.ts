@@ -36,7 +36,8 @@ export async function GET(request: NextRequest) {
 
   // The menu-permission filter belongs to the director Lite palette; with the key off the results stay as before.
   const directorLite = await shouldUseDirectorLiteStyle(context);
-  const displayUser = directorLite ? await getUserDisplayInfo() : null;
+  // Gestor de unidade (10/11): o filtro do menu vale sempre, para a busca não apontar áreas que saíram dele.
+  const displayUser = directorLite || isOutsideManagerScope(context.role, context.jobTitle) ? await getUserDisplayInfo() : null;
   const qLower = query.toLowerCase();
   const matchingFeatures = FEATURE_SEARCH_INDEX.filter((feat) => {
     const matchesQuery = (

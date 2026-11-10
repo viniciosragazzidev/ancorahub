@@ -168,12 +168,12 @@ describe("nav-registry", () => {
     expect(canShowNavTab(cargos, manager)).toBe(false);
   });
 
-  it("shows the post-sale workspace only to directors and unit managers when enabled", () => {
+  it("shows the post-sale workspace only to directors when enabled (gestor sem pós-venda desde 10/11)", () => {
     const team = NAV_AREAS.find((area) => area.id === "equipe")!;
     const postSale = team.tabs.find((tab) => tab.id === "pos-venda")!;
     expect(canShowNavTab(postSale, director)).toBe(false);
     expect(canShowNavTab(postSale, { ...director, postSaleAuditEnabled: true })).toBe(true);
-    expect(canShowNavTab(postSale, { ...director, roleKey: "manager", postSaleAuditEnabled: true })).toBe(true);
+    expect(canShowNavTab(postSale, { ...director, roleKey: "manager", postSaleAuditEnabled: true })).toBe(false);
     expect(canShowNavTab(postSale, { ...director, roleKey: "broker", postSaleAuditEnabled: true })).toBe(false);
   });
 

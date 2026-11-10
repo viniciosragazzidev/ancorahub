@@ -116,9 +116,9 @@ describe("inactive brokers in duty planning", () => {
     expect(queries).toHaveLength(0);
   });
 
-  it("keeps a manager within their unit", async () => {
+  it("refuses a manager: the roster is the director's since 10/11", async () => {
     mocks.context.mockResolvedValue({ ...context, role: "manager", branchId: "outside-branch" });
-    expect((await createRosterAssignmentAction({}, assignment())).error).toMatch(/sua unidade/);
+    expect((await createRosterAssignmentAction({}, assignment())).error).toMatch(/diretor/);
     expect(queries.some((q) => q.sql.startsWith("insert"))).toBe(false);
   });
 
