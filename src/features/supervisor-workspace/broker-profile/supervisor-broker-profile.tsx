@@ -295,7 +295,7 @@ export function SupervisorBrokerProfile({
                       {situation.whatsapp.connected ? (
                         <span>{`Conectado${situation.whatsapp.connectedAt ? ` desde ${shortDateFormat.format(new Date(situation.whatsapp.connectedAt))}` : ""}`}</span>
                       ) : (
-                        <span className={styles.whatsappAlert} data-alert="true">WhatsApp não conectado. É obrigatório para receber leads do plantão a partir de 20/10.</span>
+                        <span className={styles.whatsappAlert} data-alert="true">WhatsApp não conectado. Sem ele, o corretor não confirma presença nem recebe leads do plantão.</span>
                       )}
                     </dd>
                   </div>
