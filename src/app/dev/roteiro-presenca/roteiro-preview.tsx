@@ -17,7 +17,7 @@ import styles from "./roteiro.module.css";
  */
 type Mode = "online" | "presencial";
 type Screen = "cartao" | "retomar" | "fim" | GuideStep | "codigo-copiado";
-type Sim = "expirado" | "espera" | "falhou" | "recusado" | "demorando" | "naoabriu" | "copia" | "instavel" | "desconectou" | "atrasado" | "confirmar-erro";
+type Sim = "carregando" | "expirado" | "espera" | "falhou" | "recusado" | "demorando" | "naoabriu" | "copia" | "instavel" | "desconectou" | "atrasado" | "confirmar-erro";
 
 const CODE_A = "K7QM2XPD";
 const CODE_B = "P4RT9WQZ";
@@ -39,6 +39,7 @@ const SCREENS: { id: Screen; label: string }[] = [
   { id: "retomar", label: "Retomar" },
 ];
 const SIMS: { id: Sim; label: string }[] = [
+  { id: "carregando", label: "Gerando código" },
   { id: "expirado", label: "Código venceu" },
   { id: "espera", label: "Muitos pedidos" },
   { id: "falhou", label: "Código não saiu" },
@@ -79,6 +80,7 @@ function setupFor(screen: Screen, sim: Sim | null, device: GuideDevice): Setup {
     default:
   }
   switch (sim) {
+    case "carregando": step("codigo"); facts.code = null; facts.generating = true; break;
     case "expirado": step("codigo"); facts.code = null; facts.expired = true; break;
     case "espera": step("codigo"); facts.code = null; facts.cooldownSeconds = 24; break;
     case "falhou": step("codigo"); facts.code = null; facts.issue = "O WhatsApp demorou para liberar o código."; break;

@@ -376,3 +376,19 @@ claro que é uma vez só e que as mensagens pessoais ficam protegidas.
   nas boas-vindas). Quem para a voz não ouve as próximas sozinho, até tocar de novo para ouvir.
 - Conferido num navegador automático: o fluxo inteiro tocou boas-vindas → código → tela inicial → 4 toques →
   esperando → conectado → confirmar → pronto.
+
+## 16. Ajuste de 10/11: carregamento do código e WhatsApp no perfil do corretor
+
+Pedido do Vinicios: um indicativo de carregamento enquanto o código é gerado (os quadradinhos ficavam vazios e o
+código não aparecia); e mostrar no perfil do corretor se o WhatsApp dele está conectado.
+
+- **Carregamento:** no lugar dos quadradinhos vazios, uma roda girando com "Só um instante…" e "Pode levar até 30
+  segundos. Não feche esta tela." (no computador, "Gerando o QR Code…").
+- **Vigia do código:** se o código não chega e nada está sendo pedido, o roteiro pede de novo sozinho (a cada 2,5 s,
+  até 2 vezes); se ainda assim não vier, ou passar de 45 s esperando, troca o carregamento por "Não consegui gerar o
+  código agora. Confira a internet do celular e toque em Tentar de novo." Sem número válido, "Tentar de novo" leva à
+  tela do número.
+- **Perfil do corretor (diretor):** linha "WhatsApp" com "Conectado desde …" (verde) ou "Não conectado" (amarelo),
+  na tela Lite do diretor e na tela normal. Lê o status gravado da conexão (`getMemberProfileWhatsAppStatus`), depois
+  da checagem de acesso ao perfil. Gestor e supervisor (Lite) já mostravam; o aviso deles deixou de citar "a partir
+  de 20/10" e agora diz que sem WhatsApp o corretor não confirma presença nem recebe leads do plantão.

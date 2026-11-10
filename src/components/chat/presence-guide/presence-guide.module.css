@@ -141,3 +141,12 @@
 .voiceSmall { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 9999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); cursor: pointer; }
 .voiceSmall:hover { background: var(--surface-muted); }
 .voiceSmall[aria-pressed="true"] { color: var(--chat-action-strong); border-color: color-mix(in oklab, var(--chat-action) 40%, var(--border)); }
+
+/* Carregamento do código (10/11) */
+.codeLoading { display: grid; justify-items: center; gap: 8px; min-height: 120px; align-content: center; text-align: center; }
+.codeLoading[data-compact] { min-height: 180px; min-width: 180px; border-radius: 16px; background: var(--surface-muted); padding: 12px; }
+.spinner { width: 36px; height: 36px; border-radius: 9999px; border: 4px solid var(--chat-action-soft); border-top-color: var(--chat-action); animation: guideSpin 0.8s linear infinite; }
+.codeLoadingLabel { font-size: 16px; font-weight: 500; color: var(--foreground); }
+.codeLoadingHint { font-size: 14px; color: var(--text-muted); max-width: 260px; line-height: 1.5; }
+@keyframes guideSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }

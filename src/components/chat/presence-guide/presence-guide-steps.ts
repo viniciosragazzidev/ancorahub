@@ -11,7 +11,7 @@ export type GuidePlatform = "android" | "iphone";
 export type ConfirmStage = "connect" | "confirm" | "sending" | "done" | "waiting" | "error";
 export type GuideError = "expired" | "cooldown" | "issue" | "rejected" | "stalled" | "notOpened" | "copyBlocked" | "unstable" | "confirm";
 /** Erros que só o navegador percebe (o app não abriu, a cópia foi bloqueada). */
-export type LocalIssue = "notOpened" | "copyBlocked";
+export type LocalIssue = "notOpened" | "copyBlocked" | "codeTimeout";
 
 export type GuideConnectionFacts = {
   ready: boolean;
@@ -40,6 +40,8 @@ export function guideError(input: { step: GuideStep; device: GuideDevice; facts:
   if (step === "confirmar") return input.stage === "error" ? "confirm" : null;
   if (!CONNECT_STEPS.includes(step)) return null;
   if (input.local === "copyBlocked" && step === "codigo") return "copyBlocked";
+  // O código não chegou mesmo pedindo de novo (10/11): em vez de quadradinhos vazios para sempre, "Tentar de novo".
+  if (input.local === "codeTimeout" && step === "codigo" && !facts.code) return "issue";
   if (input.local === "notOpened" && (step === "telainicial" || step === "caminho" || step === "esperando")) return "notOpened";
   if (facts.connectivity) return "unstable";
   if (facts.expired && !facts.code) return "expired";
