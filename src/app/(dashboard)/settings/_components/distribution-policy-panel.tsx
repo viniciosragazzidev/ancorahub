@@ -9,6 +9,7 @@ import { Gear } from "@/components/huge-icons";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { saveDistributionPolicyAction } from "@/features/lead-distribution/actions";
+import { PlantaoPrioritySection, type PlantaoPrioritySectionData } from "./plantao-priority-section";
 
 type Policy = {
   excludedBrokerIds?: string[];
@@ -24,10 +25,13 @@ export function DistributionPolicyPanel({
   canEdit,
   brokers,
   policy,
+  plantaoPriority,
 }: {
   canEdit: boolean;
   brokers: { id: string; name: string }[];
   policy: unknown;
+  /** Só o Diretor recebe estes dados (o servidor manda null para os demais). */
+  plantaoPriority?: PlantaoPrioritySectionData | null;
 }) {
   const current = (policy ?? {}) as Policy;
   const [excludedBrokerIds, setExcludedBrokerIds] = useState(current.excludedBrokerIds ?? []);
@@ -117,6 +121,7 @@ export function DistributionPolicyPanel({
             {saving ? "Salvando…" : "Salvar distribuição"}
           </Button>
         ) : null}
+        {canEdit && plantaoPriority ? <PlantaoPrioritySection data={plantaoPriority} /> : null}
       </CardContent>
     </Card>
   );
