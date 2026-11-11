@@ -6,14 +6,26 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/arc/button/button";
 import { PeopleEmpty, PeoplePage, PeopleRow, PeopleSection } from "@/components/light/people-list/people-list";
 import { LightClientDetail } from "@/features/broker-workspace/components/light-client-detail";
-import { LightClientsList } from "@/features/broker-workspace/components/light-clients-list";
+import { BrokerClientWallet } from "@/features/broker-workspace/components/broker-client-wallet";
+import type { BrokerClientWalletFilters, BrokerClientWalletResult } from "@/features/customers/broker-client-wallet";
 import styles from "./preview.module.css";
 
-const clients = [
-  { id: "fixture-1", name: "Marina Alves", phone: "11900000001", email: "marina@example.com", convertedAt: "2026-10-20T12:00:00.000Z" },
-  { id: "fixture-2", name: "Carlos Mendes", phone: "11900000002", email: null, convertedAt: "2026-10-17T12:00:00.000Z" },
-  { id: "fixture-3", name: "Juliana Prado", phone: null, email: null, convertedAt: "2026-10-12T12:00:00.000Z" },
-];
+const walletFilters: BrokerClientWalletFilters = { view: "all", page: 1 };
+const wallet: BrokerClientWalletResult = {
+  rows: [
+    { id: "fixture-1", leadId: "lead-fixture-1", name: "Marina Alves", phone: "11900000001", email: "marina@example.com", convertedAt: new Date("2026-10-20T12:00:00.000Z"), origin: "manual", contractStatus: "active", renewalWindowStartDate: "2026-11-20", nextTask: { id: "task-fixture-1", title: "Revisar a proposta enviada", dueAt: new Date("2026-11-10T13:30:00.000Z"), priority: "normal" }, attentionReason: "overdue_return" },
+    { id: "fixture-2", leadId: "lead-fixture-2", name: "Carlos Mendes", phone: "11900000002", email: null, convertedAt: new Date("2026-10-17T12:00:00.000Z"), origin: "webhook", contractStatus: null, renewalWindowStartDate: null, nextTask: null, attentionReason: null },
+    { id: "fixture-3", leadId: "lead-fixture-3", name: "Juliana Prado", phone: null, email: null, convertedAt: new Date("2026-10-12T12:00:00.000Z"), origin: "manual", contractStatus: "cancelled", renewalWindowStartDate: null, nextTask: { id: "task-fixture-3", title: "Confirmar recebimento", dueAt: new Date("2026-11-12T13:30:00.000Z"), priority: "low" }, attentionReason: null },
+  ],
+  page: 1,
+  pageSize: 20,
+  totalPages: 1,
+  totalCount: 3,
+  walletCount: 3,
+  counts: { all: 3, attention: 1, renewals: 1 },
+  hasRenewalData: true,
+  origins: ["manual", "webhook"],
+};
 
 const detail = {
   client: { id: "fixture-1", leadId: "lead-fixture-1", name: "Marina Alves", phone: "11900000001", email: "marina@example.com", convertedAt: "2026-10-20T12:00:00.000Z", branchName: null, brokerName: "Corretor de demonstração" },
@@ -32,11 +44,11 @@ export default async function BrokerClientWalletPreview({ searchParams }: { sear
   const view: PreviewView = rawView === "ficha" || rawView === "retorno" || rawView === "estados" ? rawView : "carteira";
 
   return (
-    <main className="arc-venancor min-h-dvh bg-(--surface-muted) px-4 py-6 sm:px-6">
+    <main className="arc-venancor h-dvh overflow-y-auto bg-(--surface-muted) px-4 py-6 sm:px-6">
       <div className="mx-auto grid w-full max-w-5xl gap-5">
         <header className="grid gap-3 rounded-(--radius-panel) border border-(--border-subtle) bg-(--surface) p-4 sm:flex sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-(--text-muted)">Prévia C0 · somente dados sintéticos</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-(--text-muted)">{view === "carteira" ? "Prévia C1" : "Prévia C0"} · somente dados sintéticos</p>
             <h1 className="mt-1 text-xl font-semibold">Carteira do corretor Lite</h1>
             <p className="mt-1 text-sm text-(--text-muted)">Nenhuma ação desta tela grava dados.</p>
           </div>
@@ -49,7 +61,7 @@ export default async function BrokerClientWalletPreview({ searchParams }: { sear
           </nav>
         </header>
 
-        {view === "carteira" ? <LightClientsList clients={clients} /> : null}
+        {view === "carteira" ? <BrokerClientWallet wallet={wallet} filters={walletFilters} hideTitle={false} /> : null}
         {view === "ficha" ? (
           <>
             <section className="grid gap-3 rounded-(--radius-panel) border border-(--border-subtle) bg-(--surface) p-4 sm:grid-cols-[1fr_auto] sm:items-center">

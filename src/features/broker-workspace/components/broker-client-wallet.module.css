@@ -1,0 +1,182 @@
+.page {
+  --wallet-gap: 14px;
+}
+
+.controls {
+  display: grid;
+  gap: var(--wallet-gap);
+  min-width: 0;
+}
+
+.controls > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.segments :global([data-slot="segmented-control-item"]) {
+  padding-inline: 8px;
+}
+
+.count {
+  margin-left: 6px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.controlRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.searchForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.searchForm > :first-of-type {
+  min-width: 0;
+}
+
+.searchButton,
+.filterButton {
+  min-height: 44px;
+}
+
+.filterForm {
+  display: grid;
+  gap: 16px;
+  padding: 8px 4px 18px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.selectTrigger {
+  width: 100%;
+  min-height: 48px;
+  background: var(--surface);
+}
+
+.selectTrigger:focus-visible,
+.pagination a:focus-visible,
+.whatsapp:focus-visible,
+.resetButton:focus-visible,
+.resetLink:focus-visible {
+  outline: 2px solid var(--chat-action-text, #2563eb);
+  outline-offset: 2px;
+}
+
+.sheetActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.resetLink {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.whatsapp,
+.resetButton {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.whatsapp {
+  padding: 0 14px;
+}
+
+.resetButton {
+  padding: 0 18px;
+}
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.pagination a,
+.pagination > span:first-child,
+.pagination > span:last-child {
+  display: inline-flex;
+  min-width: 88px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.pagination span[aria-disabled="true"] {
+  opacity: .48;
+}
+
+.pageLabel {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .segments :global([data-slot="segmented-control-item"]) {
+    padding-inline: 4px;
+    font-size: var(--text-xs);
+  }
+
+  .segments .count {
+    margin-left: 2px;
+    font-size: var(--text-xs);
+  }
+
+  .controlRow {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .filterButton {
+    width: 100%;
+  }
+}

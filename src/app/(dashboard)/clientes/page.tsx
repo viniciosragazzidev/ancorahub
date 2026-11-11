@@ -15,13 +15,29 @@ import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { LightClientsList } from "@/features/broker-workspace/components/light-clients-list";
+import { BrokerClientWallet } from "@/features/broker-workspace/components/broker-client-wallet";
+import {
+  getBrokerClientWallet,
+  normalizeBrokerClientWalletFilters,
+} from "@/features/customers/broker-client-wallet";
+import { getFeatureFlag } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 
 export const dynamic = "force-dynamic";
 
 export default async function CustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string; branch?: string }>;
+  searchParams: Promise<{
+    period?: string;
+    branch?: string;
+    view?: string;
+    page?: string;
+    q?: string;
+    origin?: string;
+    contract?: string;
+    return?: string;
+  }>;
 }) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
@@ -66,6 +82,19 @@ export default async function CustomersPage({
   }
 
   if (experienceMode === "LIGHT" && context.role === "broker") {
+    if (await getFeatureFlag(FEATURE_FLAGS.BROKER_CLIENT_WALLET_LITE) === "true") {
+      const filters = normalizeBrokerClientWalletFilters({
+        view: resolvedSearchParams.view as "all" | "attention" | "renewals",
+        page: Number(resolvedSearchParams.page),
+        query: resolvedSearchParams.q,
+        origin: resolvedSearchParams.origin,
+        contractStatus: resolvedSearchParams.contract as "active" | "cancelled",
+        returnStatus: resolvedSearchParams.return as "overdue" | "today" | "future" | "none",
+      });
+      const wallet = await getBrokerClientWallet(context, filters);
+      return <BrokerClientWallet wallet={wallet} filters={filters} />;
+    }
+
     const clients = await db
       .select({
         id: schema.clients.id,
