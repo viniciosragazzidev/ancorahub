@@ -758,3 +758,7 @@ O bloco aparece quando o lead entra em fechamento ou a venda é confirmada. Reú
 ## 11/11/2026 - Cotação Lite em fluxo guiado (prévia)
 
 Nova tela de cotação para o corretor Lite em passos (modalidade, município, vidas, refino), uma pergunta por tela, com resultados em cartões. Planos pendentes mostram a condição a confirmar em texto claro, e a proposta em PDF só aparece nos planos prontos. Ainda é uma prévia em /dev/cotacao-lite com dados falsos, só em desenvolvimento: não está ligada à rota de cotação nem ao catálogo real. Prints em reports/agent/cotacao-lite/. Sem alteração de banco, migration ou contrato.
+
+## 11/11/2026 - Cotação Lite no piloto do corretor (fluxo guiado)
+
+A cotação do corretor piloto abre no fluxo guiado Lite: uma pergunta por tela, com perfil da empresa para PME, resultados em cartões, comparação de até três planos e detalhe do plano com condições, coberturas e rede. O formulário completo continua disponível em `/cotacao?completo=1`. A tela pausada segue o mesmo padrão. Sem alteração de banco, migration ou contrato do catálogo; a liberação continua a do piloto. Prints em reports/agent/cotacao-lite/ (prefixo v2).
