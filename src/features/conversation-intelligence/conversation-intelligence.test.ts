@@ -212,7 +212,8 @@ describe("Conversation Intelligence Engine (Etapa IA.1)", () => {
       });
 
       it("never moves a sold or lost lead by itself", () => {
-        expect(evaluateAssessmentPolicy({ assessment: { ...sampleAssessment, suggestedLeadStatus: "under_analysis" }, currentLeadStatus: "converted", ...talked, config }).action).toBe("SUGGEST");
+        // 11/11: a sold lead gets no suggestion either (Andrea: "move to Documentação" right after the sale).
+        expect(evaluateAssessmentPolicy({ assessment: { ...sampleAssessment, suggestedLeadStatus: "under_analysis" }, currentLeadStatus: "converted", ...talked, config }).action).toBe("INSIGHT_ONLY");
         expect(evaluateAssessmentPolicy({ assessment: { ...sampleAssessment, suggestedLeadStatus: "in_contact" }, currentLeadStatus: "lost", ...talked, config }).action).toBe("SUGGEST");
       });
 

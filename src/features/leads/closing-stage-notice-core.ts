@@ -7,6 +7,9 @@
 /** The funnel's closing stage: the same statuses the negotiations radar reads as closing. */
 export const CLOSING_STAGE_STATUSES: ReadonlySet<string> = new Set(["documentation_pending", "under_analysis"]);
 
+/** Filter value for "Fechamento" in /leads (?status=closing): the two closing statuses together. */
+export const CLOSING_STAGE_FILTER = "closing";
+
 /** Entering the stage from outside it; moving inside it (Documentação → Em análise) or re-saving is not an entry. */
 export function entersClosingStage(previousStatus: string, newStatus: string) {
   return CLOSING_STAGE_STATUSES.has(newStatus) && !CLOSING_STAGE_STATUSES.has(previousStatus);

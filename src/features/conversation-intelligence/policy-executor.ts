@@ -73,6 +73,19 @@ export function evaluateAssessmentPolicy(
     };
   }
 
+  // 1.1 Lead já vendido (Convertido): a IA não sugere nem move de volta (11/11, Andrea: 5 min depois da
+  // venda detectada a IA sugeriu "Documentação Pendente"). Só o corretor ou a direção mudam uma venda.
+  if (currentLeadStatus === "converted") {
+    return {
+      action: "INSIGHT_ONLY",
+      transitionAllowed: false,
+      fromStatus: currentLeadStatus,
+      targetStatus: null,
+      confidence,
+      reason: "Lead convertido: a IA não sugere mudança de etapa depois da venda.",
+    };
+  }
+
   const transitionPair = `${currentLeadStatus}->${suggestedStatus}`;
   const genericWildcardPair = `any->${suggestedStatus}`;
 

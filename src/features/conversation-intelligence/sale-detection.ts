@@ -202,7 +202,7 @@ export async function notifyAiSaleSuggested(input: { tenantId: string; leadId: s
 
 
 /** O que falta para registrar a venda: documentos obrigatórios, confirmação da operadora, valor, plano e vidas. */
-async function loadMissingItems(tenantId: string, leadId: string) {
+export async function loadSaleMissingItems(tenantId: string, leadId: string) {
   const db = getDatabase();
   const [lead] = await db
     .select({ planId: schema.leads.planId, monthlyValue: schema.leads.monthlyValue, livesCount: schema.leads.livesCount })
@@ -252,7 +252,7 @@ export async function notifyAiSaleDetected(input: {
 }) {
   try {
     const db = getDatabase();
-    const missing = await loadMissingItems(input.tenantId, input.leadId).catch(() => [] as string[]);
+    const missing = await loadSaleMissingItems(input.tenantId, input.leadId).catch(() => [] as string[]);
     const [broker] = input.brokerId
       ? await db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, input.brokerId)).limit(1)
       : [];
@@ -288,6 +288,7 @@ export async function notifyAiSaleDetected(input: {
         idempotencyKey: aiSaleNotificationKey(input.leadId, director.userId),
       })),
     ]);
+    // WhatsApp à direção: sai na conversão, em changeLeadStatus ("Venda fechada para a direção", DEC-179).
     settled.forEach((item) => {
       if (item.status === "rejected") console.warn("[ai-sale] notice_failed", { leadId: input.leadId, error: item.reason instanceof Error ? item.reason.message.slice(0, 200) : "unknown" });
     });
