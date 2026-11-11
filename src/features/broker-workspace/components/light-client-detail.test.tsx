@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// O painel do corretor importa ações de servidor; no teste elas não rodam.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("@/features/carteira/retorno-actions", () => ({ agendarRetornoAction: vi.fn(), reagendarRetornoAction: vi.fn() }));
+vi.mock("@/features/leads/task-actions", () => ({ setLeadTaskDoneAction: vi.fn() }));
 
 import { LightClientDetail, type LightClientDetailData } from "./light-client-detail";
 

@@ -192,3 +192,15 @@ Validação da UI: capturas C1 em reports/agent/carteira-corretor-lite/c1-cartei
 Entregue: proposta funcional, mapa de cobertura, fontes locais consultadas, contrato de design/movimento, fases, critérios de aceite, decisões pendentes e estratégia de validação/rollback. Nenhum código, schema, regra aprovada, feature flag ou configuração de produção foi alterado. A descoberta do benchmark segue limitada à conta vazia e não comprova estados preenchidos.
 
 Validação desta versão documental: ver evidência em `reports/agent/verification/2026-11-11-carteira-corretor-lite-plano.md`.
+
+### Registro de execução C2 (2026-11-11, branch feat/carteira-ficha-lite)
+
+Entregue atrás da flag `feature_broker_client_wallet_lite_enabled` (padrão desligada):
+
+- `src/features/carteira/proxima-acao-core.ts`: classificação da próxima ação pelo dia civil de São Paulo (atrasado, hoje, futuro, sem prazo, nenhum), validação do prazo (futuro, até 365 dias) e detecção de repetição idêntica em 2 minutos.
+- `src/features/carteira/retorno-servico.ts` e `retorno-queries.ts`: agendar, reagendar e ler a próxima ação para o corretor dono. Usa `autorizarTarefaDoLead` e `criarTarefaDoLead` (tarefa canônica). Reagendar grava só se a tarefa segue aberta e do corretor, com auditoria `reagendou`. Gestor e diretor não usam essas ações.
+- `src/features/carteira/retorno-actions.ts`: server actions que revalidam a ficha e o Início.
+- `light-client-next-action.tsx`: bloco Próxima ação (Agendar, Reagendar, Já falei). Concluir reusa `setLeadTaskDoneAction`. Erro mantém data e observação. WhatsApp não registra contato.
+- `clientes/[clientId]/page.tsx`: o corretor Lite recebe a ficha Lite só com a flag ligada; com a flag desligada a rota segue como antes.
+
+Pendências: prints mobile 390 e desktop 1440 da ficha real (exigem sessão autenticada); repetição concorrente entre duas requisições simultâneas é best-effort (sem índice único, que exigiria migração não autorizada); cobertura de banco real ainda não executada, apenas testes com dependências simuladas.
