@@ -5,14 +5,9 @@ import type { QuoteInput, QuoteResult } from "../contracts";
  * Sem I/O e sem contrato novo: o que chega ao servidor continua sendo QuoteInput.
  */
 
-export const ETAPAS = ["quem", "regiao", "planos"] as const;
-export type Etapa = (typeof ETAPAS)[number];
-
-export const ETAPA_ROTULO: Record<Etapa, string> = {
-  quem: "Quem vai no plano",
-  regiao: "Região e filtros",
-  planos: "Planos",
-};
+/** Passos do fluxo guiado Lite, uma pergunta por tela (padrão "fluxo guiado" do design Lite). */
+export const PASSOS = ["modalidade", "cidade", "vidas", "refino"] as const;
+export type Passo = (typeof PASSOS)[number];
 
 export type Vida = { key: number; age: string; holder: boolean; relationship: string };
 
