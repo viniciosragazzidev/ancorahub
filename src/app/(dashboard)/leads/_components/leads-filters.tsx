@@ -217,6 +217,7 @@ function LeadsFiltersClassic({ trailing: _trailing, ...props }: LeadsFiltersProp
                       { value: "documentation_pending", label: "Documento pendente" },
                       { value: "under_analysis", label: "Em análise" },
                       { value: "awaiting_reply", label: "Aguardando retorno" },
+                      { value: "closing", label: "Fechamento (documento pendente e em análise)" },
                       { value: "converted", label: "Convertidos" },
                       { value: "lost", label: "Perdidos" },
                     ]}
@@ -358,6 +359,7 @@ function LeadsFiltersClassic({ trailing: _trailing, ...props }: LeadsFiltersProp
           { id: "in_contact", label: "Em Atendimento", dot: "bg-warning" },
           { id: "quote_sent", label: "Cotação Enviada", dot: "bg-primary" },
           { id: "negotiation", label: "Em Negociação", dot: "bg-warning" },
+          { id: "closing", label: "Fechamento", dot: "bg-warning" },
           { id: "converted", label: "Convertidos", dot: "bg-success" },
           { id: "lost", label: "Perdidos", dot: "bg-destructive" },
         ].map((pill) => {

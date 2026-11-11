@@ -27,6 +27,7 @@ const STATUS_PILLS = [
   { id: "in_contact", label: "Em atendimento" },
   { id: "quote_sent", label: "Cotação enviada" },
   { id: "negotiation", label: "Em negociação" },
+  { id: "closing", label: "Fechamento" },
   { id: "converted", label: "Convertidos" },
   { id: "lost", label: "Perdidos" },
 ];
@@ -41,6 +42,7 @@ const STATUS_OPTIONS = [
   { value: "documentation_pending", label: "Documento pendente" },
   { value: "under_analysis", label: "Em análise" },
   { value: "awaiting_reply", label: "Aguardando retorno" },
+  { value: "closing", label: "Fechamento (documento pendente e em análise)" },
   { value: "converted", label: "Convertidos" },
   { value: "lost", label: "Perdidos" },
 ];

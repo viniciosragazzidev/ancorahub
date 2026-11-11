@@ -1,4 +1,5 @@
 import { getReturnedUnacceptedLeadIds } from "@/features/lead-distribution/returned-unaccepted";
+import { CLOSING_STAGE_FILTER, CLOSING_STAGE_STATUSES } from "@/features/leads/closing-stage-notice-core";
 import { and, count, desc, eq, gte, ilike, inArray, notInArray, isNull, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -307,6 +308,8 @@ async function LeadsPageContent({
           ]),
           lt(schema.leads.stageEnteredAt, stalledSince)
         )
+      : filters.status === CLOSING_STAGE_FILTER
+      ? inArray(schema.leads.status, [...CLOSING_STAGE_STATUSES] as (typeof schema.leadStatusValues)[number][])
       : isValidStatus
       ? eq(schema.leads.status, filters.status as (typeof schema.leadStatusValues)[number])
       : null;

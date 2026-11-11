@@ -492,6 +492,10 @@ export async function convertProposalToSaleAction(
       saleValue: approvedValue,
     });
 
+    // Retorno para a direção no WhatsApp (11/11, Keyla): venda registrada, uma vez por lead e número.
+    const { notifyDirectorsSale } = await import("@/features/leads/closing-director-alert");
+    void notifyDirectorsSale({ tenantId: context.tenantId, leadId: lead.id, kind: "sale_registered" });
+
     // Conversions API for CRM: "Venda" (Lead Ads leads only, never throws).
     await enqueueMetaConversionEvent({ tenantId: context.tenantId, leadId: lead.id, stage: "sale", at: now });
 

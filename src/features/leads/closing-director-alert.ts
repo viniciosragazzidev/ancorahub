@@ -14,6 +14,9 @@ import {
   closingDirectorAlertKey,
   closingDirectorAlertVariables,
   closingDirectorRecipientsKey,
+  directorSaleAlertKey,
+  directorSaleSummary,
+  type DirectorSaleKind,
   noticeRecipientsKey,
   parseRecipientPhones,
   selectClosingDirectorRecipients,
@@ -73,52 +76,13 @@ export async function notifyDirectorsClosingStage(input: {
     // Switched off in Avisos da equipe: nothing goes out (the outbox would also skip it; this saves the lookups).
     const notice = teamNoticeByKey(CLOSING_DIRECTOR_NOTICE_KEY);
     if (!notice || !(await getTeamNoticeSetting(input.tenantId, notice)).enabled) return { notified: 0 };
-    const db = getDatabase();
-    const [lead] = await db
-      .select({
-        nome: schema.leads.nome,
-        telefone: schema.leads.telefone,
-        tipo: schema.leads.tipo,
-        livesCount: schema.leads.livesCount,
-        monthlyValue: schema.leads.monthlyValue,
-        qualificationDetails: schema.leads.qualificationDetails,
-        brokerName: schema.user.name,
-        legacyPlanName: schema.carrierPlans.name,
-        globalPlanName: schema.globalPlans.name,
-        tenantPrivatePlanName: schema.tenantPrivatePlans.name,
-      })
-      .from(schema.leads)
-      .leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId))
-      .leftJoin(schema.carrierPlans, and(eq(schema.leads.planId, schema.carrierPlans.id), eq(schema.carrierPlans.tenantId, input.tenantId)))
-      .leftJoin(schema.globalPlans, eq(schema.leads.planId, schema.globalPlans.id))
-      .leftJoin(schema.tenantPrivatePlans, and(eq(schema.leads.planId, schema.tenantPrivatePlans.id), eq(schema.tenantPrivatePlans.tenantId, input.tenantId)))
-      .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
-      .limit(1);
-    if (!lead) return { notified: 0 };
-    const variables = closingDirectorAlertVariables({
-      leadId: input.leadId,
-      leadName: lead.nome,
-      leadPhone: lead.telefone,
-      leadType: lead.tipo,
-      livesCount: lead.livesCount,
-      monthlyValue: lead.monthlyValue,
-      planName: lead.legacyPlanName ?? lead.globalPlanName ?? lead.tenantPrivatePlanName ?? null,
-      brokerName: lead.brokerName,
-      stage: input.newStatus,
-      summary: readSummary(lead.qualificationDetails),
-    });
-    const settled = await Promise.allSettled(recipients.map((phone) => enqueueMetaTemplateMessage({
+    const settled = await sendDirectorAlert({
       tenantId: input.tenantId,
-      recipientType: "user",
-      destinationPhone: phone,
-      purpose: CLOSING_DIRECTOR_PURPOSE,
-      variables,
-      requestedBy: null,
-      idempotencyKey: closingDirectorAlertKey(input.leadId, phone),
-    }).then((queued) => (queued.duplicate || (queued.status as string) === "skipped"
-      ? false
-      // Exact-id dispatch: an older queued message never takes this one's place.
-      : processMetaOutboundBatch(1, input.tenantId, queued.id).then(() => true)))));
+      leadId: input.leadId,
+      recipients,
+      stage: input.newStatus,
+      keyFor: (phone) => closingDirectorAlertKey(input.leadId, phone),
+    });
     let notified = 0;
     for (const item of settled) {
       if (item.status === "fulfilled" && item.value) notified += 1;
@@ -127,6 +91,103 @@ export async function notifyDirectorsClosingStage(input: {
     return { notified };
   } catch (error) {
     console.error("[closing-director] failed", { leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
+    return { notified: 0 };
+  }
+}
+
+/** Client, broker, deal and summary to each number, one outbox record per key. Shared by closing and sale notices. */
+async function sendDirectorAlert(input: {
+  tenantId: string;
+  leadId: string;
+  recipients: string[];
+  stage: string;
+  keyFor: (phone: string) => string;
+  /** Texto no lugar do resumo da IA (venda): recebe o resumo da conversa, se houver. */
+  summary?: (conversationSummary: string | null) => string;
+}): Promise<PromiseSettledResult<boolean>[]> {
+  const db = getDatabase();
+  const [lead] = await db
+    .select({
+      nome: schema.leads.nome,
+      telefone: schema.leads.telefone,
+      tipo: schema.leads.tipo,
+      livesCount: schema.leads.livesCount,
+      monthlyValue: schema.leads.monthlyValue,
+      qualificationDetails: schema.leads.qualificationDetails,
+      brokerName: schema.user.name,
+      legacyPlanName: schema.carrierPlans.name,
+      globalPlanName: schema.globalPlans.name,
+      tenantPrivatePlanName: schema.tenantPrivatePlans.name,
+    })
+    .from(schema.leads)
+    .leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId))
+    .leftJoin(schema.carrierPlans, and(eq(schema.leads.planId, schema.carrierPlans.id), eq(schema.carrierPlans.tenantId, input.tenantId)))
+    .leftJoin(schema.globalPlans, eq(schema.leads.planId, schema.globalPlans.id))
+    .leftJoin(schema.tenantPrivatePlans, and(eq(schema.leads.planId, schema.tenantPrivatePlans.id), eq(schema.tenantPrivatePlans.tenantId, input.tenantId)))
+    .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
+    .limit(1);
+  if (!lead) return [];
+  const conversationSummary = readSummary(lead.qualificationDetails);
+  const variables = closingDirectorAlertVariables({
+    leadId: input.leadId,
+    leadName: lead.nome,
+    leadPhone: lead.telefone,
+    leadType: lead.tipo,
+    livesCount: lead.livesCount,
+    monthlyValue: lead.monthlyValue,
+    planName: lead.legacyPlanName ?? lead.globalPlanName ?? lead.tenantPrivatePlanName ?? null,
+    brokerName: lead.brokerName,
+    stage: input.stage,
+    summary: input.summary ? input.summary(conversationSummary) : conversationSummary,
+  });
+  return Promise.allSettled(input.recipients.map((phone) => enqueueMetaTemplateMessage({
+    tenantId: input.tenantId,
+    recipientType: "user",
+    destinationPhone: phone,
+    purpose: CLOSING_DIRECTOR_PURPOSE,
+    variables,
+    requestedBy: null,
+    idempotencyKey: input.keyFor(phone),
+  }).then((queued) => (queued.duplicate || (queued.status as string) === "skipped"
+    ? false
+    // Exact-id dispatch: an older queued message never takes this one's place.
+    : processMetaOutboundBatch(1, input.tenantId, queued.id).then(() => true)))));
+}
+
+/**
+ * Retorno de venda para a direção (11/11, Keyla): quando o lead vira Convertido pela IA e quando o
+ * corretor registra a venda, os números do "Fechamento para a direção" recebem o aviso com título de
+ * venda. Mesmo liga/desliga e mesmos números do aviso de fechamento. Uma vez por lead, tipo e número.
+ * Nunca lança: a venda já está salva.
+ */
+export async function notifyDirectorsSale(input: {
+  tenantId: string;
+  leadId: string;
+  kind: DirectorSaleKind;
+  reason?: string | null;
+  evidence?: readonly string[];
+}) {
+  try {
+    const recipients = await getClosingDirectorRecipients(input.tenantId);
+    if (!recipients.length) return { notified: 0 };
+    const notice = teamNoticeByKey(CLOSING_DIRECTOR_NOTICE_KEY);
+    if (!notice || !(await getTeamNoticeSetting(input.tenantId, notice)).enabled) return { notified: 0 };
+    const settled = await sendDirectorAlert({
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      recipients,
+      stage: input.kind,
+      keyFor: (phone) => directorSaleAlertKey(input.kind, input.leadId, phone),
+      summary: (conversationSummary) => directorSaleSummary({ kind: input.kind, reason: input.reason, evidence: input.evidence, conversationSummary }),
+    });
+    let notified = 0;
+    for (const item of settled) {
+      if (item.status === "fulfilled" && item.value) notified += 1;
+      if (item.status === "rejected") console.warn("[sale-director] notice_failed", { leadId: input.leadId, error: item.reason instanceof Error ? item.reason.message.slice(0, 200) : "unknown" });
+    }
+    return { notified };
+  } catch (error) {
+    console.error("[sale-director] failed", { leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
     return { notified: 0 };
   }
 }

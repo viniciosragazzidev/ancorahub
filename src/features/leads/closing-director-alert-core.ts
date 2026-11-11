@@ -64,10 +64,43 @@ export function closingDirectorAlertKey(leadId: string, phone: string) {
   return `lead-closing-director:${leadId}:${phone}`;
 }
 
+export type DirectorSaleKind = "sale_detected" | "sale_registered";
+
+/** "Venda" no lugar da etapa: o mesmo aviso da direção, com título de venda (11/11, retorno para a Keyla). */
+export const SALE_STAGE_LABELS: Record<DirectorSaleKind, string> = {
+  sale_detected: "Venda fechada (vista pela IA na conversa)",
+  sale_registered: "Venda registrada pelo corretor",
+};
+
 const STAGE_LABELS: Record<string, string> = {
   documentation_pending: "Documentação",
   under_analysis: "Em análise",
+  ...SALE_STAGE_LABELS,
 };
+
+/** Uma vez por lead, tipo de venda e número (separado do aviso de entrada no fechamento). */
+export function directorSaleAlertKey(kind: DirectorSaleKind, leadId: string, phone: string) {
+  return `lead-sale-director:${kind}:${leadId}:${phone}`;
+}
+
+/** O texto do aviso usa título de venda quando a "etapa" é uma venda. */
+export function isSaleStageLabel(stage: string) {
+  return stage.startsWith("Venda ");
+}
+
+/** Resumo da venda: motivo e trecho da conversa (IA) ou o registro do corretor, mais o resumo da conversa. */
+export function directorSaleSummary(input: { kind: DirectorSaleKind; reason?: string | null; evidence?: readonly string[]; conversationSummary?: string | null }) {
+  const parts: string[] = [];
+  if (input.kind === "sale_detected") {
+    if (input.reason?.trim()) parts.push(`${input.reason.trim().replace(/\.$/, "")}.`);
+    if (input.evidence?.[0]?.trim()) parts.push(`Trecho: "${input.evidence[0].trim().slice(0, 160)}".`);
+    parts.push("O corretor foi parabenizado e lembrado de registrar a venda.");
+  } else {
+    parts.push("O corretor concluiu o Registrar venda no CRM.");
+  }
+  if (input.conversationSummary?.trim()) parts.push(input.conversationSummary.trim());
+  return parts.join(" ");
+}
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
