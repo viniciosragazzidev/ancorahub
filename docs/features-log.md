@@ -9,6 +9,12 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 - Novo backfill em dry-run por padrão reúne mensagens recentes e provas históricas; conversão explícita usa o fluxo canônico. Diretor e gestor da unidade podem recuperar o aviso à direção, com idempotência por lead/telefone e auditoria.
 - Nenhum backfill foi aplicado. Registro: [backfill seguro e evidência de venda](implementations/active/2026-11-10-venda-detection-backfill.md).
 
+## 10/11/2026 - Prioridade por tipo de plantão (parcial: modo sombra)
+
+- Peso leve por tipo de plantão (ex.: Premium 1,15) na carga do ranking, só para leads quentes e mornos, com teto de fatia, guarda de expiração e nivelamento por horas cumpridas; uma função pura compartilhada por ranking, escolha sob trava e prévia da fila (DEC-172).
+- Modo sombra registra a escolha ponderada no `offer_sent` sem mudar a distribuição; modo on usa o peso. Flag global `feature_plantao_priority_enabled` e setting `plantao_priority_<tenant>` (padrão off); seção "Prioridade por tipo de plantão" só para o Diretor, com auditoria.
+- Scripts: `scripts/set-plantao-priority-setting.ts` (dry-run/--apply) e `scripts/plantao-priority-shadow-report.ts` (somente leitura). Nada foi gravado em produção. Falta: rodar o modo sombra e decidir o modo on; o adaptativo espera vendas registradas.
+
 ## 10/11/2026 - Resultado diário do plantão
 
 - Prévia e envio manual para Diretor, envio automático às 19h de São Paulo para o grupo WAHA Fechamento Plantão Geral, com escopo por tenant, chave manual por tentativa e reserva diária exclusiva do cron.
@@ -727,8 +733,8 @@ Em Configurações > Minha unidade (Lite), o corretor escolhe outra unidade ativ
 
 # 10/11/2026 - Recuperação conjunta dos avisos de fechamento
 
-Na ficha do lead em fechamento, Diretor e Gestor da unidade autorizados usam um único botão para enviar parabéns ao corretor e aviso à direção. A confirmação mostra o status e horário por envio, envia apenas destinos sem registro e atualiza o resultado no próprio botão. Cada destino preserva sua chave idempotente; operação auditada. DEC-173; implementação: docs/implementations/active/2026-11-10-venda-detection-backfill.md.
+Na ficha do lead em fechamento, Diretor e Gestor da unidade autorizados usam um único botão para enviar parabéns ao corretor e aviso à direção. A confirmação mostra o status e horário por envio, envia apenas destinos sem registro e atualiza o resultado no próprio botão. Cada destino preserva sua chave idempotente; operação auditada. DEC-174; implementação: docs/implementations/active/2026-11-10-venda-detection-backfill.md.
 
 # 10/11/2026 - Dados da venda na ficha do lead
 
-O bloco aparece quando o lead entra em fechamento ou a venda é confirmada. Reúne titular, CPF conforme papel, dependentes e idades, operadora, plano, valores, forma/data de pagamento, proposta, entrevista, corretor, marcos e evidências. Fontes do CRM/proposta/venda são identificadas; dados de IA exigem citação literal encontrada na conversa e ficam “a confirmar”. Diretor vê CPF completo; Gestor da unidade e corretor do lead veem o CPF mascarado. Arquivos recebidos da conversa e documentos do CRM usam links autenticados. A consulta é escopada e auditada; a flag global `feature_conversation_intelligence_enabled` controla o bloco e sua atualização por IA. DEC-174; implementação: docs/implementations/active/2026-11-10-venda-detection-backfill.md.
+O bloco aparece quando o lead entra em fechamento ou a venda é confirmada. Reúne titular, CPF conforme papel, dependentes e idades, operadora, plano, valores, forma/data de pagamento, proposta, entrevista, corretor, marcos e evidências. Fontes do CRM/proposta/venda são identificadas; dados de IA exigem citação literal encontrada na conversa e ficam “a confirmar”. Diretor vê CPF completo; Gestor da unidade e corretor do lead veem o CPF mascarado. Arquivos recebidos da conversa e documentos do CRM usam links autenticados. A consulta é escopada e auditada; a flag global `feature_conversation_intelligence_enabled` controla o bloco e sua atualização por IA. DEC-175; implementação: docs/implementations/active/2026-11-10-venda-detection-backfill.md.

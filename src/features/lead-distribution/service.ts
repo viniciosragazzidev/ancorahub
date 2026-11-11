@@ -6,8 +6,10 @@ import { operationDayStart } from "./broker-day-history";
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
-import { automaticDistributionHoldReason, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, isHeldByRunningQualification, isPlantaoOnlyBranch, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, shouldHoldColdLead, type IntelligentDistributionPolicy } from "./domain";
+import { automaticDistributionHoldReason, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, isHeldByRunningQualification, isPlantaoOnlyBranch, resolveDistributionCandidate, resolveWeightedDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, shouldHoldColdLead, type IntelligentDistributionPolicy } from "./domain";
 import { isHotLeadEarlyDistributionEnabled } from "./qualification-hold";
+import { resolvePlantaoPriority } from "./plantao-priority";
+import type { PlantaoPriorityOfferInput } from "./plantao-priority-core";
 import { traceLeadStep } from "./distribution-trace";
 import type { AssignmentSource, DutyFallbackPolicy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
@@ -1497,11 +1499,11 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   }
   const pacedOut = candidates.filter((candidate) => pacingDecisions.get(candidate.id)?.allowed === false);
   const paceableCandidates = pacedOut.length ? candidates.filter((candidate) => pacingDecisions.get(candidate.id)?.allowed !== false) : candidates;
-  const decision = resolveDistributionCandidate(paceableCandidates, intelligentPolicy.value, queue?.strategy === "round_robin" ? "round_robin" : "capacity");
+  const distributionStrategy = queue?.strategy === "round_robin" ? "round_robin" : "capacity";
+  const baselineDecision = resolveDistributionCandidate(paceableCandidates, intelligentPolicy.value, distributionStrategy);
   // Capacity is a hard per-queue limit. When every eligible broker is full,
   // keep this lead queued rather than assigning above the configured limit.
-  const chosen = decision.selected;
-  if (!chosen) {
+  if (!baselineDecision.selected) {
     // Only paced-out brokers still have room: wait for the earliest release
     // instead of reporting a capacity/eligibility problem.
     const waitingForPacing = pacedOut.filter((candidate) => candidate.capacity === null || candidate.activeLeads < candidate.capacity);
@@ -1521,6 +1523,33 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
         : "Nenhum corretor elegível nesta unidade.",
     };
   }
+  // Prioridade por tipo de plantão (2026-11-10). A escolha de hoje (baselineDecision) fica
+  // intacta; a ponderada só reordena a mesma lista. Modo sombra: só registra; modo on: usa.
+  // Flag desligada, modo off ou qualquer erro: plantaoPriority = null e nada muda.
+  let decision = baselineDecision;
+  let plantaoPriority: PlantaoPriorityOfferInput | undefined;
+  const priorityDecision = await resolvePlantaoPriority({
+    tenantId: context.tenantId,
+    temperature: lead.qualificationStatus,
+    scheduleIdByBroker,
+    brokerIds: paceableCandidates.map((candidate) => candidate.id),
+    dutySince,
+    countsPerSchedule: Boolean(exclusiveScheduleIds?.length),
+  });
+  if (priorityDecision) {
+    try {
+      const weighted = priorityDecision.factorByBroker
+        ? resolveWeightedDistributionCandidate(baselineDecision.eligible, priorityDecision.factorByBroker, intelligentPolicy.value, distributionStrategy)
+        : baselineDecision;
+      if (priorityDecision.mode === "on" && weighted.selected) decision = weighted;
+      plantaoPriority = { ...priorityDecision, baselineFirstBrokerId: baselineDecision.selected.id, weightedFirstBrokerId: weighted.selected?.id ?? null };
+    } catch (error) {
+      console.error("[plantao-priority] weighted.failed", { leadId, error: error instanceof Error ? error.name : "unknown_error" });
+      decision = baselineDecision;
+      plantaoPriority = undefined;
+    }
+  }
+  const chosen = decision.selected ?? baselineDecision.selected;
   const chosenBranchId = remainingBrokers.find((broker) => broker.id === chosen.id)?.branchId ?? lead.branchId;
   if (!chosenBranchId) return { status: "queued", leadId, reason: "A unidade do corretor selecionado não foi encontrada." };
 
@@ -1555,6 +1584,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       branchIdByBroker: Object.fromEntries(remainingBrokers.flatMap((broker) => broker.branchId ? [[broker.id, broker.branchId]] : [])),
       scheduleIdByBroker: countingScheduleIdByBroker,
     },
+    plantaoPriority,
     manualPick: scheduleIdByBroker.size ? {
       dutyDateBySchedule: Object.fromEntries([...new Set(scheduleIdByBroker.values())].map((scheduleId) => [scheduleId, dutyDateBySchedule.get(scheduleId) ?? getSaoPauloDateKey(new Date())])),
       scheduleIdByBroker: Object.fromEntries(scheduleIdByBroker),

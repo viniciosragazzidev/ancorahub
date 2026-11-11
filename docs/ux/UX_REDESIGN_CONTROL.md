@@ -4,11 +4,11 @@ Papel: Diretor, em `/settings/resultado-plantao`. Ação principal: conferir a p
 
 ## 2026-11-10: recuperação do aviso à direção em lead no fechamento
 
-Papéis: Diretor ou Gestor autorizado na ficha `/leads/[id]`; o gestor atua só na unidade vinculada. Ação contextual secundária, ao lado do reenvio de parabéns ao corretor, com confirmação antes de enviar aos números configurados. Estados: ação disponível, confirmação, enviado/em fila, já registrado e erro. Reutiliza Button e Dialog compartilhados, sem token, primitive ou movimento novo. Não avança UX-M1.10. Registro: DEC-172.
+Papéis: Diretor ou Gestor autorizado na ficha `/leads/[id]`; o gestor atua só na unidade vinculada. Ação contextual secundária, ao lado do reenvio de parabéns ao corretor, com confirmação antes de enviar aos números configurados. Estados: ação disponível, confirmação, enviado/em fila, já registrado e erro. Reutiliza Button e Dialog compartilhados, sem token, primitive ou movimento novo. Não avança UX-M1.10. Registro: DEC-173.
 
 ## 2026-11-10: bloco Dados da venda na ficha
 
-Papéis: Diretor, Gestor da unidade efetiva e corretor atual do lead em `/leads/[id]`. Objetivo: consultar rapidamente cadastro, proposta, venda, marcos e evidências; a ação principal contextual é copiar o resumo. Disclosure: dados consolidados primeiro, evidências e arquivos em grupos próprios; CPF completo somente para diretor e mascarado para os demais papéis. Estados: dados registrados, campos ausentes, campos de IA “a confirmar”, sem evidências e flag global desligada. Reutiliza Card e Button compartilhados, sem tokens, primitives ou animação novos. Não avança UX-M1.10. Registro: DEC-174.
+Papéis: Diretor, Gestor da unidade efetiva e corretor atual do lead em `/leads/[id]`. Objetivo: consultar rapidamente cadastro, proposta, venda, marcos e evidências; a ação principal contextual é copiar o resumo. Disclosure: dados consolidados primeiro, evidências e arquivos em grupos próprios; CPF completo somente para diretor e mascarado para os demais papéis. Estados: dados registrados, campos ausentes, campos de IA “a confirmar”, sem evidências e flag global desligada. Reutiliza Card e Button compartilhados, sem tokens, primitives ou animação novos. Não avança UX-M1.10. Registro: DEC-175.
 
 ## 2026-11-04: disparo manual de aviso de fechamento
 
@@ -525,4 +525,4 @@ Papéis e rotas: diretor e gestor com flag ativa em `/equipe/pos-venda`, `/equip
 
 ## 2026-11-10: recuperação conjunta dos avisos de fechamento
 
-Na ficha `/leads/[id]`, Diretor e Gestor da unidade veem uma única ação contextual para recuperar parabéns ao corretor e aviso à direção. A confirmação revela o status e o horário de cada destino; o envio considera somente o que falta, e a resposta fica no próprio botão. Estados: carregando, enviado ou na fila por destino, falha parcial e já registrado com botão desabilitado. Reutiliza Button e Dialog; sem novo token, primitive ou animação. Gestor permanece na unidade efetiva. Não avança o gate global do redesign. Registro: DEC-173 e `docs/implementations/active/2026-11-10-venda-detection-backfill.md`.
+Na ficha `/leads/[id]`, Diretor e Gestor da unidade veem uma única ação contextual para recuperar parabéns ao corretor e aviso à direção. A confirmação revela o status e o horário de cada destino; o envio considera somente o que falta, e a resposta fica no próprio botão. Estados: carregando, enviado ou na fila por destino, falha parcial e já registrado com botão desabilitado. Reutiliza Button e Dialog; sem novo token, primitive ou animação. Gestor permanece na unidade efetiva. Não avança o gate global do redesign. Registro: DEC-174 e `docs/implementations/active/2026-11-10-venda-detection-backfill.md`.

@@ -41,6 +41,8 @@ import { resolveDistributionView, visibleDistributionViews, type DistributionVie
 import { getEffectiveAccess } from "@/features/custom-roles/service";
 import { getHoldDisqualifiedLeads } from "@/features/lead-distribution/disqualified-routing-settings";
 import { getDddRoutingSettings } from "@/features/lead-distribution/ddd-routing-settings";
+import { getPlantaoPriorityOverview } from "@/features/lead-distribution/plantao-priority";
+import { operationDayStart } from "@/features/lead-distribution/broker-day-history";
 import { DisqualifiedLeadsRoutingPanel } from "./_components/disqualified-leads-routing-panel";
 import { ColdLeadRequalificationPanel } from "./_components/cold-lead-requalification-panel";
 import { getColdLeadRequalificationReview } from "@/features/ai-qualification/cold-lead-requalification";
@@ -560,6 +562,21 @@ export default async function LeadDistributionPage({
     getDddRoutingSettings(context.tenantId),
   ]);
 
+  // Prioridade por tipo de plantão: só o Diretor vê e altera (gestor nunca recebe estes dados).
+  const plantaoPriority = context.role === "director"
+    ? await getPlantaoPriorityOverview(context.tenantId, operationDayStart(new Date()))
+      .then((overview) => ({
+        flagOn: overview.flagOn,
+        mode: overview.settings.mode,
+        levelByHours: overview.settings.levelByHours,
+        types: overview.types.map((type) => ({ typeId: type.typeId, name: type.name, base: type.base, adaptive: type.adaptive, effectiveWeight: type.effectiveWeight, reason: type.reason })),
+      }))
+      .catch((error: unknown) => {
+        console.error("[distribuicao] plantao_priority_failed", { tenantId: context.tenantId, error: error instanceof Error ? error.name : "unknown_error" });
+        return null;
+      })
+    : null;
+
   const activeBrokerLeadsMap = new Map(
     activeBrokerLeads.map((entry) => [entry.brokerId, Number(entry.count)]),
   );
@@ -775,6 +792,7 @@ export default async function LeadDistributionPage({
                 canEdit={context.role === "director"}
                 brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
                 policy={globalPolicy.find((policy) => !policy.queueId)?.policy ?? {}}
+                plantaoPriority={plantaoPriority}
               />
               <aside className={directorDistributionStyles.note}>
                 O roteamento segue entrada, unidade, fila, corretor e SLA.
@@ -898,6 +916,7 @@ export default async function LeadDistributionPage({
                             canEdit={context.role === "director"}
                             brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
                             policy={globalPolicy.find((p) => !p.queueId)?.policy ?? {}}
+                            plantaoPriority={plantaoPriority}
                           />
                         ),
                       },

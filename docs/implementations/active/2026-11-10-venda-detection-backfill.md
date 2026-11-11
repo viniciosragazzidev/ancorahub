@@ -14,7 +14,7 @@ Recuperar leads em fechamento para os quais a detecção de venda não rodou, ma
 
 ## Decisões e estado
 
-Decisões registradas em DEC-172/DEC-173/DEC-174 e BR-093/BR-094/BR-095. O backfill permanece dry-run por padrão; nenhum lead foi convertido com `--apply`. O bloco “Dados da venda” foi implementado em commit separado: consolida dados de CRM, qualificação, formulário, proposta, venda e conversa; valida citação literal de cada dado de IA, preserva análises anteriores, mostra fonte e marca IA como “a confirmar”, protege CPF por papel, limita acesso por tenant/unidade/carteira, audita a leitura e permite copiar o resumo. O analyzer já executa quando chega mensagem nova e usa a flag global existente `feature_conversation_intelligence_enabled`. Arquivos usam somente URLs autenticadas.
+Decisões registradas em DEC-173/DEC-174/DEC-175 e BR-093/BR-094/BR-095. O backfill permanece dry-run por padrão; nenhum lead foi convertido com `--apply`. O bloco “Dados da venda” foi implementado em commit separado: consolida dados de CRM, qualificação, formulário, proposta, venda e conversa; valida citação literal de cada dado de IA, preserva análises anteriores, mostra fonte e marca IA como “a confirmar”, protege CPF por papel, limita acesso por tenant/unidade/carteira, audita a leitura e permite copiar o resumo. O analyzer já executa quando chega mensagem nova e usa a flag global existente `feature_conversation_intelligence_enabled`. Arquivos usam somente URLs autenticadas.
 
 ## Arquivos principais
 

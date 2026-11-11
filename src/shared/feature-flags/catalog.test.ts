@@ -73,3 +73,14 @@ describe("lead commercial values feature flag", () => {
     });
   });
 });
+
+describe("plantão priority feature flag", () => {
+  it("is globally controlled and disabled by default", () => {
+    expect(FEATURE_FLAGS.PLANTAO_PRIORITY).toMatchObject({
+      key: "feature_plantao_priority_enabled",
+      scope: "global",
+      defaultValue: "false",
+      allowedValues: ["true", "false"],
+    });
+  });
+});
