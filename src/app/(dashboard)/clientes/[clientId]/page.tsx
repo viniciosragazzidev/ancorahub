@@ -22,7 +22,9 @@ import { PersonRecordDetails } from "@/features/customer-record/components/perso
 
 import { buildClientScopeWhere } from "@/features/customers/customer-authorization";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
-import { LightClientDetail } from "@/features/broker-workspace/components/light-client-detail";
+import { LightClientDetail, type LightClientDetailActions } from "@/features/broker-workspace/components/light-client-detail";
+import { carregarProximaAcao, carteiraFichaLiteLigada } from "@/features/carteira/retorno-servico";
+import { fichaAcoesCorretor } from "@/features/carteira/ficha-acoes-core";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { ClientDetailLite } from "./client-detail-lite";
@@ -63,8 +65,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
   if (!client) notFound();
 
   // Gestor and supervisor Lite: the Lite ficha, read through the same scoped client lookup above.
+  // Corretor Lite: a mesma ficha com a próxima ação, só com a flag da carteira ligada (C2, 11/11).
   const liteAudience = await getLiteAudience(context);
-  if (liteAudience === "supervisor" || liteAudience === "manager") {
+  const brokerWalletLite = liteAudience === "broker" && (await carteiraFichaLiteLigada());
+  if (liteAudience === "supervisor" || liteAudience === "manager" || brokerWalletLite) {
     const [liteSales, liteActiveCustomer, timeline, documents, beneficiaries] = await Promise.all([
       db
         .select({
@@ -102,6 +106,38 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
       getLeadBeneficiaries(client.leadId),
     ]);
 
+    // Próxima ação só para o corretor dono (serviço revalida o escopo). Falha vira estado de erro na ficha, não quebra a página.
+    const nextAction = brokerWalletLite
+      ? await carregarProximaAcao(context, client.leadId).catch(() => null)
+      : null;
+    // Ações da ficha do corretor (regra em ficha-acoes-core): lead transferido ou estado desconhecido fica só de leitura.
+    const acoes = fichaAcoesCorretor({
+      walletOn: brokerWalletLite,
+      nextState: nextAction?.state ?? null,
+      canConversas: hasPermission(context.role, "acessar_conversas"),
+    });
+    const [brokerRequirements, brokerChecklist] = acoes?.documents
+      ? await Promise.all([getRequirementsForLead(client.leadId), getLeadDocumentChecklist(client.leadId)])
+      : [null, null];
+    const brokerActions: LightClientDetailActions | undefined = !acoes
+      ? undefined
+      : {
+        ...(acoes.documents && brokerRequirements && brokerChecklist ? {
+          documents: (
+            <LeadDocumentsSection
+              leadId={client.leadId}
+              clientId={client.id}
+              requirements={brokerRequirements}
+              documents={documents}
+              checklist={brokerChecklist}
+              beneficiaries={beneficiaries.map((b) => ({ id: b.id, name: b.name, isHolder: b.isHolder }))}
+            />
+          ),
+        } : {}),
+        conversationHref: acoes.conversation ? `/conversas?leadId=${encodeURIComponent(client.leadId)}` : null,
+        saleLinks: acoes.saleLinks,
+      };
+
     return (
       <LightClientDetail
         data={{
@@ -112,6 +148,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
           documents: documents.map((document) => ({ id: document.id, filename: document.filename, status: document.status, requirementName: document.requirementName })),
           timeline: timeline ?? [],
         }}
+        {...(brokerWalletLite ? { broker: { nextAction } } : {})}
+        {...(brokerActions ? { actions: brokerActions } : {})}
       />
     );
   }

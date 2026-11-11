@@ -10,6 +10,7 @@ const fixtures = vi.hoisted(() => ({
   liteStyle: { current: false },
 }));
 
+vi.mock("@/features/carteira/retorno-servico", () => ({ carregarProximaAcao: async () => null, carteiraFichaLiteLigada: async () => false }));
 vi.mock("@/shared/db", async () => {
   const data = await import("./client-detail-fixtures");
   const chain = (result: unknown): unknown => {

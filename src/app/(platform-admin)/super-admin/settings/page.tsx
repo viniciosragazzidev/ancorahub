@@ -8,6 +8,7 @@ import {
   updateCentralAtencaoSettingsAction,
   updateGlobalSearchSettingsAction,
   updateBrokerWorkspaceSettingsAction,
+  updateBrokerClientWalletLiteSettingsAction,
   updateBrokerAvailabilityOnboardingSettingsAction,
   updateWorkflowAutomationSettingsAction,
   updateCleanUiOperationalSettingsAction,
@@ -144,6 +145,7 @@ export default async function SuperAdminSettingsPage() {
     FEATURE_FLAGS.WELCOME_VIDEO.key,
     FEATURE_FLAGS.ENGAGEMENT_CAMPAIGNS.key,
     FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.key,
+    FEATURE_FLAGS.BROKER_CLIENT_WALLET_LITE.key,
     FEATURE_FLAGS.ATTENDANCE_FLOWS.key,
     FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key,
     FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key,
@@ -186,6 +188,7 @@ export default async function SuperAdminSettingsPage() {
   const stagnantDays = settingMap.get("feature_central_atencao_stagnant_days") ?? "3";
   const globalSearchEnabled = settingMap.get("feature_global_search_enabled") !== "false";
   const brokerWorkspaceEnabled = settingMap.get("feature_broker_workspace_enabled") !== "false";
+  const brokerClientWalletLiteEnabled = settingMap.get(FEATURE_FLAGS.BROKER_CLIENT_WALLET_LITE.key) === "true";
   const brokerAvailabilityOnboardingEnabled = settingMap.get("feature_broker_availability_onboarding_enabled") !== "false";
   const workflowAutomationEnabled =
     settingMap.get("feature_workflow_automation_enabled") === "true";
@@ -356,6 +359,28 @@ export default async function SuperAdminSettingsPage() {
                   </label>
                   <Button type="submit" variant={brokerWorkspaceEnabled ? "outline" : "default"}>
                     {brokerWorkspaceEnabled ? "Salvar controle" : "Liberar Workspace"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Carteira avançada do Corretor Lite</CardTitle>
+                <CardDescription>
+                  Habilita a carteira paginada, filtros pessoais e retornos na ficha do cliente. Desligar restaura a lista atual e preserva os retornos já registrados.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateBrokerClientWalletLiteSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="enabled" value="true" defaultChecked={brokerClientWalletLiteEnabled} className="size-4" />
+                    <span>
+                      <span className="font-medium">Habilitar carteira avançada e retornos</span>
+                      <span className="block text-xs text-muted-foreground">Piloto global, desligado por padrão e reversível. A mudança fica auditada.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant={brokerClientWalletLiteEnabled ? "outline" : "default"}>
+                    {brokerClientWalletLiteEnabled ? "Salvar controle" : "Liberar piloto"}
                   </Button>
                 </form>
               </CardContent>

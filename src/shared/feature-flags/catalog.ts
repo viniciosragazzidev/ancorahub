@@ -554,6 +554,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["1", "3", "6", "12"] as const,
     description: "Define por quantos meses a agenda de plantões do Corretor Lite exibe ocorrências futuras.",
   },
+  BROKER_CLIENT_WALLET_LITE: {
+    key: "feature_broker_client_wallet_lite_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita a carteira avançada e os retornos de clientes do Corretor Lite.",
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<string>>;
 
 // ─── Tipo utilitário ──────────────────────────────────────────────────────────

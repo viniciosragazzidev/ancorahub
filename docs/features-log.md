@@ -8,6 +8,13 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 - Novo aviso em Avisos da equipe: crítico, ligado por padrão, números próprios com fallback para os do Fechamento para a direção. Uma vez por lead e número; falha de envio não afeta a conversão (DEC-179).
 - Registrar venda depois de a venda já ter sido avisada (ex.: IA converteu antes) manda só a mensagem curta "Venda registrada no CRM" com valor e plano registrados, uma vez por lead e número. A venda pelo aviso de fechamento (726d1893) saiu: fica só este modelo.
 
+## 11/11/2026 - Cotador real exclusivo do corretor Vinicios
+
+- Catálogo privado de 4.922 planos, cálculo real por idade no servidor e seis modalidades. Condições e rede completas com busca, filtros e comparação de até três alternativas.
+- Restrição por usuário, tenant e papel, controle reversível no Super-admin e revisão comercial auditada. Pendências bloqueiam PDF final; produtos prontos são recalculados e preservam snapshot privado. Nenhum produto foi homologado automaticamente.
+- Formulário operacional único substitui demonstrações na rota. O plano amplo ainda tem etapas pendentes de integração ao lead, chat e regras comerciais não interpretadas.
+- Validação: 5.292 totais sem divergência, 27 testes específicos e QA desktop/celular aprovado. Registro: [cotador real](implementations/active/2026-11-11-cotador-corretor-catalogo-real.md), DEC-178/BR-098.
+
 ## 10/11/2026 - Backfill e evidência de venda
 
 - Evidências de pagamento validadas permanecem no contexto da próxima análise, mesmo fora da janela de mensagens recentes.
@@ -744,3 +751,6 @@ Na ficha do lead em fechamento, Diretor e Gestor da unidade autorizados usam um 
 # 10/11/2026 - Dados da venda na ficha do lead
 
 O bloco aparece quando o lead entra em fechamento ou a venda é confirmada. Reúne titular, CPF conforme papel, dependentes e idades, operadora, plano, valores, forma/data de pagamento, proposta, entrevista, corretor, marcos e evidências. Fontes do CRM/proposta/venda são identificadas; dados de IA exigem citação literal encontrada na conversa e ficam “a confirmar”. Diretor vê CPF completo; Gestor da unidade e corretor do lead veem o CPF mascarado. Arquivos recebidos da conversa e documentos do CRM usam links autenticados. A consulta é escopada e auditada; a flag global `feature_conversation_intelligence_enabled` controla o bloco e sua atualização por IA. DEC-175; implementação: docs/implementations/active/2026-11-10-venda-detection-backfill.md.
+## 11/11/2026 - Carteira Lite do corretor, C1
+
+`/clientes` no corretor Lite usa consulta paginada no servidor, escopo pelo tenant e corretor autenticados, recortes Todos/Precisa de atenção/Renovações condicionais a contrato ativo, elegível e não expirado, busca por nome/telefone e filtros por origem, contrato e prazo do retorno. A URL preserva os parâmetros, view=renewals sem dados elegíveis normaliza para all e próxima ação fica visível na lista. A flag global `feature_broker_client_wallet_lite_enabled` protege a nova superfície e, em falha de leitura, mantém a lista antiga. SQL do índice `active_customers_tenant_client_idx` está em `drizzle/0227_active_customers_tenant_client_idx.sql`, não executado. Registro: `docs/implementations/active/2026-11-11-carteira-corretor-lite.md`.

@@ -84,3 +84,14 @@ describe("plantão priority feature flag", () => {
     });
   });
 });
+
+describe("broker client wallet Lite feature flag", () => {
+  it("is globally controlled, disabled by default, and reversible", () => {
+    expect(FEATURE_FLAGS.BROKER_CLIENT_WALLET_LITE).toMatchObject({
+      key: "feature_broker_client_wallet_lite_enabled",
+      scope: "global",
+      defaultValue: "false",
+      allowedValues: ["true", "false"],
+    });
+  });
+});

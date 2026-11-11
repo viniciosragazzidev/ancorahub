@@ -3751,6 +3751,7 @@ export const activeCustomers = pgTable(
   (table) => [
     uniqueIndex("active_customers_sale_unique").on(table.saleId),
     index("active_customers_tenant_status_idx").on(table.tenantId, table.status),
+    index("active_customers_tenant_client_idx").on(table.tenantId, table.clientId),
     index("active_customers_branch_idx").on(table.branchId),
     index("active_customers_expiration_idx").on(table.expirationDate),
     index("active_customers_renewal_window_idx").on(table.renewalWindowStartDate),

@@ -1,4 +1,5 @@
 import { and, count, desc, eq, gte, countDistinct } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { PeriodSelect } from "@/components/period-select";
 import { BranchSelect } from "@/components/branch-select";
@@ -15,13 +16,30 @@ import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { LightClientsList } from "@/features/broker-workspace/components/light-clients-list";
+import { BrokerClientWallet } from "@/features/broker-workspace/components/broker-client-wallet";
+import {
+  getBrokerClientWallet,
+  normalizeBrokerClientWalletFilters,
+  shouldUseBrokerClientWalletLite,
+} from "@/features/customers/broker-client-wallet";
+import { serializeBrokerClientWalletFilters } from "@/features/customers/broker-client-wallet-url";
+import { carteiraFichaLiteLigada } from "@/features/carteira/retorno-servico";
 
 export const dynamic = "force-dynamic";
 
 export default async function CustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string; branch?: string }>;
+  searchParams: Promise<{
+    period?: string;
+    branch?: string;
+    view?: string;
+    page?: string;
+    q?: string;
+    origin?: string;
+    contract?: string;
+    return?: string;
+  }>;
 }) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
@@ -65,7 +83,25 @@ export default async function CustomersPage({
     return <LightClientsList clients={clients} management />;
   }
 
-  if (experienceMode === "LIGHT" && context.role === "broker") {
+  const isLightBroker = experienceMode === "LIGHT" && context.role === "broker";
+  if (isLightBroker) {
+    const flagEnabled = await carteiraFichaLiteLigada();
+    if (shouldUseBrokerClientWalletLite({ isLightBroker, flagEnabled })) {
+      const filters = normalizeBrokerClientWalletFilters({
+        view: resolvedSearchParams.view as "all" | "attention" | "renewals",
+        page: Number(resolvedSearchParams.page),
+        query: resolvedSearchParams.q,
+        origin: resolvedSearchParams.origin,
+        contractStatus: resolvedSearchParams.contract as "active" | "cancelled",
+        returnStatus: resolvedSearchParams.return as "overdue" | "today" | "future" | "none",
+      });
+      const wallet = await getBrokerClientWallet(context, filters);
+      if (wallet.filters.view !== filters.view) {
+        redirect(`/clientes?${serializeBrokerClientWalletFilters(wallet.filters)}`);
+      }
+      return <BrokerClientWallet wallet={wallet} filters={wallet.filters} />;
+    }
+
     const clients = await db
       .select({
         id: schema.clients.id,
