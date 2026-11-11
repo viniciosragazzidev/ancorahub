@@ -12,6 +12,7 @@ import styles from "./preview.module.css";
 
 const walletFilters: BrokerClientWalletFilters = { view: "all", page: 1 };
 const wallet: BrokerClientWalletResult = {
+  filters: walletFilters,
   rows: [
     { id: "fixture-1", leadId: "lead-fixture-1", name: "Marina Alves", phone: "11900000001", email: "marina@example.com", convertedAt: new Date("2026-10-20T12:00:00.000Z"), origin: "manual", contractStatus: "active", renewalWindowStartDate: "2026-11-20", nextTask: { id: "task-fixture-1", title: "Revisar a proposta enviada", dueAt: new Date("2026-11-10T13:30:00.000Z"), priority: "normal" }, attentionReason: "overdue_return" },
     { id: "fixture-2", leadId: "lead-fixture-2", name: "Carlos Mendes", phone: "11900000002", email: null, convertedAt: new Date("2026-10-17T12:00:00.000Z"), origin: "webhook", contractStatus: null, renewalWindowStartDate: null, nextTask: null, attentionReason: null },

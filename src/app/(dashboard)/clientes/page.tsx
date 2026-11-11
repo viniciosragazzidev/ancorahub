@@ -1,4 +1,5 @@
 import { and, count, desc, eq, gte, countDistinct } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { PeriodSelect } from "@/components/period-select";
 import { BranchSelect } from "@/components/branch-select";
@@ -19,9 +20,10 @@ import { BrokerClientWallet } from "@/features/broker-workspace/components/broke
 import {
   getBrokerClientWallet,
   normalizeBrokerClientWalletFilters,
+  shouldUseBrokerClientWalletLite,
 } from "@/features/customers/broker-client-wallet";
-import { getFeatureFlag } from "@/features/system-settings/queries";
-import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { serializeBrokerClientWalletFilters } from "@/features/customers/broker-client-wallet-url";
+import { carteiraFichaLiteLigada } from "@/features/carteira/retorno-servico";
 
 export const dynamic = "force-dynamic";
 
@@ -81,8 +83,10 @@ export default async function CustomersPage({
     return <LightClientsList clients={clients} management />;
   }
 
-  if (experienceMode === "LIGHT" && context.role === "broker") {
-    if (await getFeatureFlag(FEATURE_FLAGS.BROKER_CLIENT_WALLET_LITE) === "true") {
+  const isLightBroker = experienceMode === "LIGHT" && context.role === "broker";
+  if (isLightBroker) {
+    const flagEnabled = await carteiraFichaLiteLigada();
+    if (shouldUseBrokerClientWalletLite({ isLightBroker, flagEnabled })) {
       const filters = normalizeBrokerClientWalletFilters({
         view: resolvedSearchParams.view as "all" | "attention" | "renewals",
         page: Number(resolvedSearchParams.page),
@@ -92,7 +96,10 @@ export default async function CustomersPage({
         returnStatus: resolvedSearchParams.return as "overdue" | "today" | "future" | "none",
       });
       const wallet = await getBrokerClientWallet(context, filters);
-      return <BrokerClientWallet wallet={wallet} filters={filters} />;
+      if (wallet.filters.view !== filters.view) {
+        redirect(`/clientes?${serializeBrokerClientWalletFilters(wallet.filters)}`);
+      }
+      return <BrokerClientWallet wallet={wallet} filters={wallet.filters} />;
     }
 
     const clients = await db

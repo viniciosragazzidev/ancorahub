@@ -11,11 +11,12 @@ import { SearchField } from "@/components/arc/search-field/search-field";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { PeopleEmpty, PeoplePage, PeopleRow, PeopleSection } from "@/components/light/people-list/people-list";
 import { AppSelect } from "@/components/ui/select";
-import type {
-  BrokerClientWalletFilters,
-  BrokerClientWalletResult,
-  BrokerClientWalletView,
+import {
+  type BrokerClientWalletFilters,
+  type BrokerClientWalletResult,
+  type BrokerClientWalletView,
 } from "@/features/customers/broker-client-wallet";
+import { serializeBrokerClientWalletFilters } from "@/features/customers/broker-client-wallet-url";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 
 import styles from "./broker-client-wallet.module.css";
@@ -46,15 +47,7 @@ const originLabels: Record<string, string> = {
 };
 
 function buildQuery(filters: BrokerClientWalletFilters, overrides: Partial<BrokerClientWalletFilters> = {}) {
-  const next = { ...filters, ...overrides };
-  const params = new URLSearchParams();
-  params.set("view", next.view);
-  params.set("page", String(next.page));
-  if (next.query) params.set("q", next.query);
-  if (next.origin) params.set("origin", next.origin);
-  if (next.contractStatus) params.set("contract", next.contractStatus);
-  if (next.returnStatus) params.set("return", next.returnStatus);
-  return params.toString();
+  return serializeBrokerClientWalletFilters({ ...filters, ...overrides });
 }
 
 function buildHref(filters: BrokerClientWalletFilters, overrides: Partial<BrokerClientWalletFilters> = {}) {
@@ -182,7 +175,6 @@ function ClientWalletControls({
 
 export function BrokerClientWallet({ wallet, filters, hideTitle = true }: { wallet: BrokerClientWalletResult; filters: BrokerClientWalletFilters; hideTitle?: boolean }) {
   const effectiveFilters = { ...filters, page: wallet.page };
-  const currentQuery = buildQuery(effectiveFilters);
   const countLabel = wallet.walletCount === 1 ? "1 cliente na carteira" : `${wallet.walletCount} clientes na carteira`;
   const visibleCount = wallet.totalCount === 1 ? "1 resultado" : `${wallet.totalCount} resultados`;
   const pageLabel = wallet.totalPages > 0 ? `Página ${wallet.page} de ${wallet.totalPages}` : "Sem páginas";
@@ -196,8 +188,7 @@ export function BrokerClientWallet({ wallet, filters, hideTitle = true }: { wall
           {wallet.rows.map((client, index) => {
             const status = client.contractStatus ? contractLabels[client.contractStatus] : null;
             const whatsappUrl = buildWhatsAppUrl(client.phone);
-            const back = currentQuery ? `/clientes?${currentQuery}` : "/clientes";
-            const href = `/clientes/${encodeURIComponent(client.id)}?back=${encodeURIComponent(back)}`;
+            const href = `/clientes/${encodeURIComponent(client.id)}`;
             const chips = [
               status ? <Badge key="contract" tone={status.tone} size="sm">{status.text}</Badge> : null,
               client.attentionReason ? <Badge key="attention" tone={attentionTones[client.attentionReason]} size="sm">{attentionLabels[client.attentionReason]}</Badge> : null,
@@ -211,7 +202,7 @@ export function BrokerClientWallet({ wallet, filters, hideTitle = true }: { wall
                 chip={chips.length ? <span className={styles.badges}>{chips}</span> : undefined}
                 preview={describeAction(client)}
                 meta={shortDate.format(new Date(client.convertedAt))}
-                action={whatsappUrl ? <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className={styles.whatsapp}>WhatsApp</a> : undefined}
+                action={whatsappUrl ? <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className={styles.whatsapp} aria-label={`WhatsApp de ${client.name}`}>WhatsApp</a> : undefined}
               />
             );
           })}

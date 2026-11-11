@@ -43,6 +43,7 @@ const filters: BrokerClientWalletFilters = {
 };
 
 const wallet: BrokerClientWalletResult = {
+  filters,
   rows: [{
     id: "client-a",
     leadId: "lead-a",
@@ -73,7 +74,7 @@ describe("broker client wallet UI contract", () => {
     expect(push).toHaveBeenCalledWith("/clientes?view=attention&page=1&q=Ana&origin=manual&contract=active&return=today");
   });
 
-  it("renders a GET search, real filter options, the next action and restorable detail links", () => {
+  it("renders a GET search, real filters, the next action and accessible links", () => {
     render(<BrokerClientWallet wallet={wallet} filters={filters} />);
 
     const search = screen.getByRole("searchbox", { name: "Buscar cliente" });
@@ -85,9 +86,9 @@ describe("broker client wallet UI contract", () => {
     expect(screen.getByText("Retorno hoje")).toBeInTheDocument();
     expect(screen.getByText(/Próxima ação: Revisar proposta/)).toBeInTheDocument();
 
-    const details = screen.getByRole("link", { name: /Ana Souza/ });
-    expect(details.getAttribute("href")).toContain("/clientes/client-a?back=");
-    expect(decodeURIComponent(details.getAttribute("href") ?? "")).toContain("view=all&page=2&q=Ana&origin=manual&contract=active&return=today");
+    const details = screen.getAllByRole("link", { name: /Ana Souza/ }).find((link) => link.getAttribute("href") === "/clientes/client-a");
+    expect(details).toHaveAttribute("href", "/clientes/client-a");
+    expect(screen.getByRole("link", { name: "WhatsApp de Ana Souza" })).toHaveAttribute("href", "https://web.whatsapp.com/send?phone=5511999999999");
     expect(screen.getByRole("link", { name: "Próxima" }).getAttribute("href")).toContain("page=3");
   });
 
