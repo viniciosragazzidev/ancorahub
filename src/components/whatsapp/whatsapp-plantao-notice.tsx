@@ -177,6 +177,8 @@ export function WhatsAppPlantaoNotice({
             {dialogInitial ? (
               <WhatsAppConnectDialog
                 initial={dialogInitial}
+                variant="presence"
+                guideMode="connect"
                 open={dialogOpen}
                 onOpenChange={setDialogOpen}
                 onConnectionChanged={() => {
@@ -233,6 +235,8 @@ export function WhatsAppPlantaoNotice({
       {dialogInitial && mode === "sticky" ? (
         <WhatsAppConnectDialog
           initial={dialogInitial}
+          variant="presence"
+          guideMode="connect"
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           onConnectionChanged={() => {
