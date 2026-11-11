@@ -492,13 +492,14 @@ export async function convertProposalToSaleAction(
       saleValue: approvedValue,
     });
 
-    // Venda fechada para a direção (11/11): WhatsApp aos números da direção, uma vez por lead e número.
+    // Venda para a direção no WhatsApp (DEC-179): aviso principal, ou a mensagem curta se o lead já estava Convertido.
     const { notifyDirectorsLeadConverted } = await import("@/features/leads/lead-converted-director-alert");
     void notifyDirectorsLeadConverted({
       tenantId: context.tenantId,
       leadId: lead.id,
       previousStatus: lead.status,
       newStatus: "converted",
+      registration: true,
       previousStageEnteredAt: lead.stageEnteredAt ?? null,
       convertedAt: now,
       origin: { kind: "person", actorUserId: context.userId },

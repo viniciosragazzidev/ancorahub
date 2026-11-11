@@ -28,6 +28,8 @@ export type TeamNotice = {
   chat?: boolean;
   /** Goes to the WhatsApp numbers the director types (not to a team member): the card shows the field. */
   phoneRecipients?: boolean;
+  /** Other outbox purposes governed by this notice (same switch, channel and numbers; built-in text only). */
+  extraPurposes?: readonly string[];
 };
 
 export const TEAM_NOTICES: readonly TeamNotice[] = [
@@ -108,12 +110,14 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     key: "LEAD_CONVERTED_DIRECTOR",
     purpose: "leadConvertedDirectorAlert",
     label: "Venda fechada para a direção",
-    description: "Quando um lead vira venda (pela IA ou por uma pessoa), manda para os números abaixo: cliente, negócio, corretor, dias no fechamento, como a venda foi confirmada e o que falta no CRM. Sem números próprios, usa os do Fechamento para a direção. Uma vez por lead e número.",
+    description: "Quando um lead vira venda (pela IA ou por uma pessoa), manda para os números abaixo: cliente, negócio, corretor, dias no fechamento, como a venda foi confirmada e o que falta no CRM. Se a venda já tinha sido avisada e o corretor conclui o Registrar venda depois, sai uma mensagem curta com o que foi registrado. Sem números próprios, usa os do Fechamento para a direção. Uma vez por lead e número.",
     // A sale just closed: goes out at once, any day.
     class: "critical",
     defaultEnabled: true,
     defaultChannel: "company_number",
     phoneRecipients: true,
+    // "Venda registrada no CRM": o registro depois do aviso, mesmo interruptor e números (DEC-179).
+    extraPurposes: ["leadSaleRegisteredDirectorAlert"],
   },
   {
     key: "DAILY_LEADS_REPORT",
@@ -200,7 +204,7 @@ export function teamNoticesFor(dutyReminderEnabled: boolean) {
   return TEAM_NOTICES.filter((notice) => dutyReminderEnabled || notice.key !== "DUTY_SHIFT_REMINDER");
 }
 
-const byPurpose = new Map(TEAM_NOTICES.map((notice) => [notice.purpose, notice]));
+const byPurpose = new Map(TEAM_NOTICES.flatMap((notice) => [notice.purpose, ...(notice.extraPurposes ?? [])].map((purpose) => [purpose, notice] as const)));
 const byKey = new Map(TEAM_NOTICES.map((notice) => [notice.key, notice]));
 
 export function teamNoticeForPurpose(purpose: string) {

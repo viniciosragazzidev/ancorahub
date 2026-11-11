@@ -29,6 +29,7 @@ export type NoticeFields =
     missing: string | null;
     link: string | null;
   }
+  | { purpose: "leadSaleRegisteredDirectorAlert"; lead: string; broker: string; deal: string; link: string | null }
   | { purpose: "taskReminder"; name: string; task: string; when: string }
   | { purpose: "brokerAccountActivated"; name: string; company: string; loginUrl: string }
   | { purpose: "dutyPresenceConfirmation"; broker: string; hour: string; link: string | null }
@@ -165,6 +166,17 @@ export function builtInNoticeVariants(fields: NoticeFields, hour: number): strin
         `${hi}! Mais uma venda fechada 🎉\n\n${body}${tail(link, "Abrir no CRM: ")}`,
         `🏆 *Venda confirmada!*\n\n${body}${tail(link, "👉 ")}`,
         `🎉 *Nova venda da equipe*\n\n${body}${tail(link, "Lead: ")}`,
+      ];
+    }
+    case "leadSaleRegisteredDirectorAlert": {
+      // Venda já avisada à direção; agora o corretor concluiu o Registrar venda (DEC-179).
+      const { lead, broker, deal, link } = fields;
+      const body = `👤 *Cliente:* ${lead}\n🧑‍💼 *Corretor:* ${broker}\n📋 ${deal}`;
+      return [
+        `📝 *Venda registrada no CRM*\n\n${body}${tail(link, "👉 *Abrir no CRM:* ")}`,
+        `${hi}! A venda de *${lead}* foi registrada no CRM 📝\n\n${body}${tail(link, "Abrir no CRM: ")}`,
+        `📝 *Registro de venda concluído*\n\n${body}${tail(link, "👉 ")}`,
+        `✅ *Venda registrada*\n\n${body}${tail(link, "Lead: ")}`,
       ];
     }
     case "dailyLeadsReport": {

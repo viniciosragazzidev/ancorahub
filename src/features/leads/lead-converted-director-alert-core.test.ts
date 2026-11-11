@@ -9,8 +9,11 @@ import {
   dispatchLeadConvertedDirectorAlert,
   leadConvertedDirectorAlertKey,
   leadConvertedDirectorAlertVariables,
+  directorSaleMessageKind,
+  leadSaleRegisteredDirectorAlertVariables,
   missingInCrm,
   saleSignalsSentence,
+  type DirectorSaleMessageKind,
   type LeadConvertedAlertInput,
   type LeadConvertedDispatchDeps,
 } from "./lead-converted-director-alert-core";
@@ -174,7 +177,7 @@ describe("venda fechada para a direção: disparo", () => {
   /** Outbox falsa: a chave idempotente repetida não manda de novo, como a de verdade. */
   function fakeDeps(overrides: Partial<LeadConvertedDispatchDeps> = {}) {
     const outbox = new Map<string, string[]>();
-    const send = vi.fn(async (_phone: string, variables: string[], key: string) => {
+    const send = vi.fn(async (_phone: string, _kind: DirectorSaleMessageKind, variables: string[], key: string) => {
       if (outbox.has(key)) return false;
       outbox.set(key, variables);
       return true;
@@ -182,7 +185,9 @@ describe("venda fechada para a direção: disparo", () => {
     const deps: LeadConvertedDispatchDeps = {
       recipients: async () => ["5521964625966", "5521999990000"],
       enabled: async () => true,
-      variables: async () => leadConvertedDirectorAlertVariables(andrea),
+      variables: async (kind) => (kind === "sale"
+        ? leadConvertedDirectorAlertVariables(andrea)
+        : leadSaleRegisteredDirectorAlertVariables({ ...andrea, monthlyValue: "890.5", planName: "Amil 400" })),
       send,
       log: vi.fn(),
       ...overrides,
@@ -209,6 +214,49 @@ describe("venda fechada para a direção: disparo", () => {
     expect(await dispatchLeadConvertedDirectorAlert({ ...trigger, previousStatus: "under_analysis" }, deps)).toEqual({ notified: 0 });
     expect(send).toHaveBeenCalledTimes(4);
     expect(leadConvertedDirectorAlertKey("lead-andrea", "5521964625966")).toBe("lead-converted-director:lead-andrea:5521964625966");
+  });
+
+  it("IA converteu e depois o corretor registrou: aviso principal e a mensagem curta, uma vez cada", async () => {
+    const { deps, outbox } = fakeDeps();
+    // IA: changeLeadStatus Em análise → Convertido.
+    expect(await dispatchLeadConvertedDirectorAlert(trigger, deps)).toEqual({ notified: 2 });
+    // Registrar venda com o lead já Convertido.
+    const registration = { ...trigger, previousStatus: "converted", registration: true };
+    expect(await dispatchLeadConvertedDirectorAlert(registration, deps)).toEqual({ notified: 2 });
+    // Repetir o registro (proposta convertida depois) não manda de novo.
+    expect(await dispatchLeadConvertedDirectorAlert(registration, deps)).toEqual({ notified: 0 });
+    expect([...outbox.keys()].sort()).toEqual([
+      "lead-converted-director:lead-andrea:5521964625966",
+      "lead-converted-director:lead-andrea:5521999990000",
+      "lead-sale-registered-director:lead-andrea:5521964625966",
+      "lead-sale-registered-director:lead-andrea:5521999990000",
+    ]);
+  });
+
+  it("registrou primeiro: só o aviso principal, sem a mensagem curta", async () => {
+    const { deps, outbox } = fakeDeps();
+    expect(await dispatchLeadConvertedDirectorAlert({ ...trigger, registration: true }, deps)).toEqual({ notified: 2 });
+    expect([...outbox.keys()].every((key) => key.startsWith("lead-converted-director:"))).toBe(true);
+    expect(directorSaleMessageKind({ previousStatus: "under_analysis", newStatus: "converted", registration: true })).toBe("sale");
+    expect(directorSaleMessageKind({ previousStatus: "converted", newStatus: "converted", registration: true })).toBe("registered");
+    expect(directorSaleMessageKind({ previousStatus: "converted", newStatus: "converted" })).toBeNull();
+  });
+
+  it("mensagem curta da venda registrada", () => {
+    const variables = leadSaleRegisteredDirectorAlertVariables({ ...andrea, monthlyValue: "890.5", planName: "Amil 400" });
+    const [text] = resolveNoticeTextVariants("leadSaleRegisteredDirectorAlert", variables, new Date("2026-11-11T13:00:00.000Z"));
+    expect(text!.replace(/ /g, " ")).toBe([
+      "📝 *Venda registrada no CRM*",
+      "",
+      "👤 *Cliente:* Andrea",
+      "🧑‍💼 *Corretor:* Carlos Eduardo 10961",
+      "📋 Pessoa física · 1 vida · Amil 400 · R$ 890,50/mês",
+      "",
+      `👉 *Abrir no CRM:* ${LINK}`,
+    ].join("\n"));
+    expect(teamNoticeForPurpose("leadSaleRegisteredDirectorAlert")?.key).toBe("LEAD_CONVERTED_DIRECTOR");
+    const long = leadSaleRegisteredDirectorAlertVariables({ ...andrea, leadName: "A".repeat(900), brokerName: "B".repeat(900), planName: "P".repeat(900) });
+    expect(long.every((value) => value.length >= 1 && value.length <= 512)).toBe(true);
   });
 
   it("já estava convertido, ou não virou venda: nada sai", async () => {

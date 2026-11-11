@@ -71,10 +71,12 @@ export async function renderTeamNoticeText(input: {
   builtIn: readonly string[];
   seed: string;
   recipientId: string | null;
+  /** Purpose of the message. A secondary purpose of the notice (`extraPurposes`) has its own text: no library message. */
+  purpose?: string;
 }): Promise<{ text: string; variant: string } | null> {
   const db = getDatabase();
   let pool: Array<{ key: string; text: string }> = [];
-  if (input.setting.freeMessageIds.length) {
+  if (input.setting.freeMessageIds.length && (!input.purpose || input.purpose === input.notice.purpose)) {
     const event = getMessageEventByPurpose(input.notice.purpose);
     const messages = await db.select({ id: schema.messageTemplates.id, content: schema.messageTemplates.content }).from(schema.messageTemplates)
       .where(and(inArray(schema.messageTemplates.id, input.setting.freeMessageIds), eq(schema.messageTemplates.tenantId, input.tenantId), eq(schema.messageTemplates.active, true)));

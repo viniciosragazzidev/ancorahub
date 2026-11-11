@@ -11,9 +11,12 @@ import { getNoticeRecipients } from "./closing-director-alert";
 import {
   closingEnteredAt,
   dispatchLeadConvertedDirectorAlert,
+  type DirectorSaleMessageKind,
   LEAD_CONVERTED_DIRECTOR_NOTICE_KEY,
   LEAD_CONVERTED_DIRECTOR_PURPOSE,
+  LEAD_SALE_REGISTERED_DIRECTOR_PURPOSE,
   leadConvertedDirectorAlertVariables,
+  leadSaleRegisteredDirectorAlertVariables,
 } from "./lead-converted-director-alert-core";
 
 export type LeadConvertedOrigin =
@@ -33,7 +36,7 @@ async function loadVariables(input: {
   previousStageEnteredAt: Date | null;
   convertedAt: Date;
   origin: LeadConvertedOrigin;
-}) {
+}, kind: DirectorSaleMessageKind) {
   const db = getDatabase();
   const [lead] = await db
     .select({
@@ -85,6 +88,18 @@ async function loadVariables(input: {
       : Promise.resolve([] as Array<{ name: string | null }>),
   ]);
   const sale = sales[0];
+  if (kind === "registered") {
+    // O que acabou de ser registrado vale mais que o que estava no lead.
+    return leadSaleRegisteredDirectorAlertVariables({
+      leadId: input.leadId,
+      leadName: lead.nome,
+      brokerName: lead.brokerName,
+      leadType: lead.tipo,
+      livesCount: lead.livesCount,
+      monthlyValue: sale?.approvedValue ?? sale?.saleValue ?? lead.monthlyValue,
+      planName: sale?.carrierPlanName ?? lead.legacyPlanName ?? lead.globalPlanName ?? lead.tenantPrivatePlanName ?? null,
+    });
+  }
   const monthlyValue = positive(lead.monthlyValue) ? lead.monthlyValue : sale?.approvedValue ?? sale?.saleValue ?? null;
   return leadConvertedDirectorAlertVariables({
     leadId: input.leadId,
@@ -109,13 +124,17 @@ async function loadVariables(input: {
 /**
  * "Venda fechada para a direção" (11/11): o lead virou venda, pela IA ou por uma pessoa. Manda aos números do
  * aviso (sem lista própria, os do Fechamento para a direção) pelo número da empresa. Uma vez por lead e número
- * (chave idempotente na outbox). Nunca lança erro: a conversão já está salva.
+ * (chave idempotente na outbox). Quando o Registrar venda chega com o lead já Convertido (a venda já foi avisada),
+ * sai só a mensagem curta "Venda registrada no CRM", também uma vez por lead e número. Nunca lança erro: a
+ * conversão já está salva.
  */
 export async function notifyDirectorsLeadConverted(input: {
   tenantId: string;
   leadId: string;
   previousStatus: string | null;
   newStatus: string;
+  /** Veio do Registrar venda ou da proposta convertida em venda. */
+  registration?: boolean;
   /** Quando o lead entrou na etapa de onde saiu para Convertido (fallback dos dias no fechamento). */
   previousStageEnteredAt: Date | null;
   convertedAt: Date;
@@ -128,13 +147,13 @@ export async function notifyDirectorsLeadConverted(input: {
       const notice = teamNoticeByKey(LEAD_CONVERTED_DIRECTOR_NOTICE_KEY);
       return Boolean(notice && (await getTeamNoticeSetting(input.tenantId, notice)).enabled);
     },
-    variables: () => loadVariables(input),
-    send: async (phone, variables, idempotencyKey) => {
+    variables: (kind) => loadVariables(input, kind),
+    send: async (phone, kind, variables, idempotencyKey) => {
       const queued = await enqueueMetaTemplateMessage({
         tenantId: input.tenantId,
         recipientType: "user",
         destinationPhone: phone,
-        purpose: LEAD_CONVERTED_DIRECTOR_PURPOSE,
+        purpose: kind === "sale" ? LEAD_CONVERTED_DIRECTOR_PURPOSE : LEAD_SALE_REGISTERED_DIRECTOR_PURPOSE,
         variables,
         requestedBy: null,
         idempotencyKey,

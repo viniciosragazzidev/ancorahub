@@ -458,7 +458,7 @@ export async function enqueueMetaTemplateMessage(input: {
   // Rotation seed: the idempotency key, so a re-enqueue of the same notice keeps its text.
   const noticeText = (setting: Parameters<typeof renderTeamNoticeText>[0]["setting"]) => renderTeamNoticeText({
     tenantId: input.tenantId, notice: teamNotice!, setting, variables,
-    builtIn: resolveNoticeTextVariants(input.purpose, variables), seed: input.idempotencyKey, recipientId: input.recipientId ?? null,
+    builtIn: resolveNoticeTextVariants(input.purpose, variables), seed: input.idempotencyKey, recipientId: input.recipientId ?? null, purpose: input.purpose,
   });
   if (teamNotice) {
     const [setting, number] = await Promise.all([getTeamNoticeSetting(input.tenantId, teamNotice), getCompanyNumberState(input.tenantId)]);
@@ -950,6 +950,16 @@ function noticeTextFields(purpose: string, rawVariables: string[], urlButtonPara
       link: leadId ? `${baseUrl}/leads/${leadId}` : null,
     };
   }
+  if (purpose === "leadSaleRegisteredDirectorAlert") {
+    const leadId = rawVariables[3]?.trim();
+    return {
+      purpose,
+      lead: rawVariables[0]?.trim() || "Cliente",
+      broker: rawVariables[1]?.trim() || "Sem corretor",
+      deal: rawVariables[2]?.trim() || "Sem valor e vidas registrados ainda",
+      link: leadId ? `${baseUrl}/leads/${leadId}` : null,
+    };
+  }
   if (purpose === "leadClientReturned") {
     const leadId = rawVariables[3]?.trim();
     return {
@@ -1160,7 +1170,7 @@ async function sendNoticeByCompanyNumber(row: OutboundRow, metaError: unknown, e
   const variables = stringList(row.variables);
   const rendered = await renderTeamNoticeText({
     tenantId: row.tenantId, notice, setting: await getTeamNoticeSetting(row.tenantId, notice), variables,
-    builtIn: resolveNoticeTextVariants(row.purpose, variables), seed: row.idempotencyKey, recipientId: row.recipientId,
+    builtIn: resolveNoticeTextVariants(row.purpose, variables), seed: row.idempotencyKey, recipientId: row.recipientId, purpose: row.purpose,
   });
   if (!rendered) return false;
   let text = rendered.text;

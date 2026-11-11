@@ -23,6 +23,23 @@ export function leadConvertedDirectorAlertKey(leadId: string, phone: string) {
   return `lead-converted-director:${leadId}:${phone}`;
 }
 
+/** "Venda registrada no CRM": a mensagem curta, quando o registro chega depois do aviso da venda. */
+export const LEAD_SALE_REGISTERED_DIRECTOR_PURPOSE = "leadSaleRegisteredDirectorAlert";
+
+export function leadSaleRegisteredDirectorAlertKey(leadId: string, phone: string) {
+  return `lead-sale-registered-director:${leadId}:${phone}`;
+}
+
+/** Variáveis da mensagem curta: cliente, corretor, negócio (com valor e plano registrados) e o id do lead. */
+export function leadSaleRegisteredDirectorAlertVariables(input: Pick<LeadConvertedAlertInput, "leadId" | "leadName" | "brokerName" | "leadType" | "livesCount" | "monthlyValue" | "planName">) {
+  return [
+    clip(input.leadName || "Cliente", 120),
+    clip(input.brokerName || "Sem corretor", 120),
+    clip(closingDealLine(input), 200),
+    input.leadId,
+  ];
+}
+
 /** Só a primeira entrada em Convertido avisa (re-salvar em Convertido não é venda nova). */
 export function becomesConverted(previousStatus: string | null | undefined, newStatus: string) {
   return newStatus === "converted" && previousStatus !== "converted";
@@ -164,34 +181,54 @@ export type LeadConvertedTrigger = {
   leadId: string;
   previousStatus: string | null;
   newStatus: string;
+  /** Veio do Registrar venda (ou da proposta convertida em venda). */
+  registration?: boolean;
 };
+
+/**
+ * Qual mensagem sai: "sale" (o aviso principal) na primeira entrada em Convertido, venha de onde vier;
+ * "registered" (a mensagem curta) quando o Registrar venda acontece com o lead já Convertido, isto é, a venda
+ * já tinha sido avisada. Re-salvar Convertido sem registro: nada.
+ */
+export function directorSaleMessageKind(trigger: Pick<LeadConvertedTrigger, "previousStatus" | "newStatus" | "registration">): DirectorSaleMessageKind | null {
+  if (becomesConverted(trigger.previousStatus, trigger.newStatus)) return "sale";
+  if (trigger.registration && trigger.newStatus === "converted" && trigger.previousStatus === "converted") return "registered";
+  return null;
+}
+
+export type DirectorSaleMessageKind = "sale" | "registered";
+
+export function directorSaleMessageKey(kind: DirectorSaleMessageKind, leadId: string, phone: string) {
+  return kind === "sale" ? leadConvertedDirectorAlertKey(leadId, phone) : leadSaleRegisteredDirectorAlertKey(leadId, phone);
+}
 
 export type LeadConvertedDispatchDeps = {
   /** Números do aviso (com fallback para os do Fechamento para a direção). */
   recipients: () => Promise<string[]>;
-  /** Aviso ligado em Avisos da equipe. */
+  /** Aviso ligado em Avisos da equipe (o mesmo interruptor para as duas mensagens). */
   enabled: () => Promise<boolean>;
-  /** Dados do lead já convertidos em variáveis; null quando o lead não existe no tenant. */
-  variables: () => Promise<string[] | null>;
+  /** Dados do lead já convertidos nas variáveis da mensagem; null quando o lead não existe no tenant. */
+  variables: (kind: DirectorSaleMessageKind) => Promise<string[] | null>;
   /** Enfileira e despacha; true só quando saiu uma mensagem nova (chave repetida ou desligado: false). */
-  send: (phone: string, variables: string[], idempotencyKey: string) => Promise<boolean>;
+  send: (phone: string, kind: DirectorSaleMessageKind, variables: string[], idempotencyKey: string) => Promise<boolean>;
   log?: (event: string, data: Record<string, unknown>) => void;
 };
 
 /**
- * Manda o aviso a cada número configurado, uma vez por lead e número. Nunca lança erro: a conversão já está
- * salva. O log leva só o id do lead (sem nome nem telefone).
+ * Manda a mensagem a cada número configurado, uma vez por lead, mensagem e número. Nunca lança erro: a conversão
+ * já está salva. O log leva só o id do lead (sem nome nem telefone).
  */
 export async function dispatchLeadConvertedDirectorAlert(trigger: LeadConvertedTrigger, deps: LeadConvertedDispatchDeps) {
   const log = deps.log ?? ((event, data) => console.warn(`[lead-converted-director] ${event}`, data));
-  if (!becomesConverted(trigger.previousStatus, trigger.newStatus)) return { notified: 0 };
+  const kind = directorSaleMessageKind(trigger);
+  if (!kind) return { notified: 0 };
   try {
     const recipients = await deps.recipients();
     if (!recipients.length) return { notified: 0 };
     if (!(await deps.enabled())) return { notified: 0 };
-    const variables = await deps.variables();
+    const variables = await deps.variables(kind);
     if (!variables) return { notified: 0 };
-    const settled = await Promise.allSettled(recipients.map((phone) => deps.send(phone, variables, leadConvertedDirectorAlertKey(trigger.leadId, phone))));
+    const settled = await Promise.allSettled(recipients.map((phone) => deps.send(phone, kind, variables, directorSaleMessageKey(kind, trigger.leadId, phone))));
     let notified = 0;
     for (const item of settled) {
       if (item.status === "fulfilled" && item.value) notified += 1;
