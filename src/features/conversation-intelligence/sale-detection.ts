@@ -152,6 +152,8 @@ export async function applyAiSaleDetection(input: {
       actorType: "ai",
       expectedStatus: lead.status,
       reason: decision.reason,
+      // Aviso à direção no WhatsApp: os sinais e, de preferência, o trecho do pagamento.
+      saleEvidence: { signals: decision.signals, quote: paymentEvidence[0] ?? quotes[0] ?? null },
       auditAction: `ai_sale_detected:${lead.status}->converted`,
       interactionContent: `Status alterado automaticamente pela IA: ${LEAD_STATUS_LABELS[lead.status] ?? lead.status} → ${LEAD_STATUS_LABELS.converted}.\n${decision.reason}.${evidenceLine}\nFalta o corretor completar o Registrar venda (valor, operadora e vidas).`,
       interactionMetadata: {

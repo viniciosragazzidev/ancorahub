@@ -60,6 +60,8 @@ export type SystemStatusChange = {
   reason?: string;
   /** "Manter na etapa": a regra de chat parado não mexe no lead até esta data. */
   holdUntil?: Date | null;
+  /** Venda vista pela IA: sinais e trecho da conversa, para o aviso "Venda fechada para a direção". */
+  saleEvidence?: { signals: readonly string[]; quote: string | null };
 };
 
 export type ChangeLeadStatusResult = {
@@ -534,6 +536,23 @@ export async function changeLeadStatus(
     // And the direction (numbers set in Avisos da equipe): client, broker and the conversation summary.
     const { notifyDirectorsClosingStage } = await import("./closing-director-alert");
     void notifyDirectorsClosingStage({ tenantId: lead.tenantId, leadId: lead.id, previousStatus, newStatus });
+  }
+
+  // Venda fechada para a direção (11/11): virou Convertido, pela IA ou por uma pessoa; uma vez por lead e número.
+  if (newStatus === "converted" && previousStatus !== "converted") {
+    const { notifyDirectorsLeadConverted } = await import("./lead-converted-director-alert");
+    const byAi = Boolean(system) && (system!.actorType ?? "ai") === "ai";
+    void notifyDirectorsLeadConverted({
+      tenantId: lead.tenantId,
+      leadId: lead.id,
+      previousStatus,
+      newStatus,
+      previousStageEnteredAt: lead.stageEnteredAt ?? null,
+      convertedAt: now,
+      origin: byAi
+        ? { kind: "ai", signals: system!.saleEvidence?.signals ?? [], quote: system!.saleEvidence?.quote ?? null }
+        : { kind: "person", actorUserId },
+    });
   }
 
   // Desfecho do fechamento (09/11): saiu de Documentação ou Em análise por uma pessoa, a direção fica sabendo.

@@ -323,6 +323,17 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
       previousStageEnteredAt: closedFrom.stageEnteredAt,
       saleValue: input.approvedValue,
     });
+    // Venda fechada para a direção (11/11). A venda que a IA já converteu (lockedAiSale) avisou na conversão.
+    const { notifyDirectorsLeadConverted } = await import("@/features/leads/lead-converted-director-alert");
+    void notifyDirectorsLeadConverted({
+      tenantId: context.tenantId,
+      leadId: lead.id,
+      previousStatus: closedFrom.status,
+      newStatus: "converted",
+      previousStageEnteredAt: closedFrom.stageEnteredAt,
+      convertedAt: now,
+      origin: { kind: "person", actorUserId: context.userId },
+    });
   }
 
   // Only after the commit: a rolled-back sale never fires the "venda realizada" automation.

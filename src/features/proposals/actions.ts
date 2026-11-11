@@ -492,6 +492,18 @@ export async function convertProposalToSaleAction(
       saleValue: approvedValue,
     });
 
+    // Venda fechada para a direção (11/11): WhatsApp aos números da direção, uma vez por lead e número.
+    const { notifyDirectorsLeadConverted } = await import("@/features/leads/lead-converted-director-alert");
+    void notifyDirectorsLeadConverted({
+      tenantId: context.tenantId,
+      leadId: lead.id,
+      previousStatus: lead.status,
+      newStatus: "converted",
+      previousStageEnteredAt: lead.stageEnteredAt ?? null,
+      convertedAt: now,
+      origin: { kind: "person", actorUserId: context.userId },
+    });
+
     // Conversions API for CRM: "Venda" (Lead Ads leads only, never throws).
     await enqueueMetaConversionEvent({ tenantId: context.tenantId, leadId: lead.id, stage: "sale", at: now });
 
