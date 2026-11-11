@@ -65,9 +65,10 @@ export async function agendarRetorno(
   if (!due.ok) throw new CarteiraRetornoError(due.reason);
   await autorizarTarefaDoLead(context, input.leadId);
 
-  return withReturnCreateLock(context.tenantId, input.leadId, context.userId, async () => {
+  // Trava, busca do gêmeo e criação na mesma transação e conexão (ver withReturnCreateLock).
+  return withReturnCreateLock(context.tenantId, input.leadId, context.userId, async (tx) => {
     const since = new Date(now.getTime() - RETORNO_REPEAT_WINDOW_MS);
-    const twin = await findRecentEquivalentReturn({ tenantId: context.tenantId, leadId: input.leadId, title: RETORNO_TITULO_PADRAO, dueAt: due.dueAt, since });
+    const twin = await findRecentEquivalentReturn(tx, { tenantId: context.tenantId, leadId: input.leadId, title: RETORNO_TITULO_PADRAO, dueAt: due.dueAt, since });
     if (twin && isRecentEquivalentReturn(twin, { title: RETORNO_TITULO_PADRAO, dueAt: due.dueAt }, now)) {
       return { taskId: twin.id, repeated: true };
     }
@@ -79,7 +80,7 @@ export async function agendarRetorno(
       dueAt: due.dueAt.toISOString(),
       priority: "normal",
       assigneeIds: [context.userId],
-    });
+    }, tx);
     return { taskId, repeated: false };
   });
 }

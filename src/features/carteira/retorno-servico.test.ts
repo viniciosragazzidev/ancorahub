@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({
   twin: null as null | Record<string, unknown>,
   task: null as null | Record<string, unknown>,
   updated: true,
+  tx: { marker: "tx-da-trava" } as Record<string, unknown>,
 }));
 
 vi.mock("server-only", () => ({}));
@@ -24,7 +25,7 @@ vi.mock("./retorno-queries", () => ({
   findRecentEquivalentReturn: vi.fn(async () => state.twin),
   loadReturnTask: vi.fn(async () => state.task),
   updateReturnDueAt: vi.fn(async () => state.updated),
-  withReturnCreateLock: vi.fn(async (_t: string, _l: string, _u: string, work: () => Promise<unknown>) => work()),
+  withReturnCreateLock: vi.fn(async (_t: string, _l: string, _u: string, work: (tx: unknown) => Promise<unknown>) => work(state.tx)),
 }));
 
 const { agendarRetorno, carregarProximaAcao, reagendarRetorno, CarteiraRetornoError } = await import("./retorno-servico");
@@ -96,7 +97,7 @@ describe("data sem fuso", () => {
 
   it("data com fuso explícito é aceita", async () => {
     await agendarRetorno(corretor, { leadId: "lead-a", dueAt: "2026-11-12T10:30:00-03:00" }, now);
-    expect(criarTarefaDoLead).toHaveBeenCalledWith(corretor, expect.objectContaining({ dueAt: "2026-11-12T13:30:00.000Z" }));
+    expect(criarTarefaDoLead).toHaveBeenCalledWith(corretor, expect.objectContaining({ dueAt: "2026-11-12T13:30:00.000Z" }), state.tx);
   });
 });
 
@@ -110,7 +111,7 @@ describe("agendar", () => {
     const result = await agendarRetorno(corretor, { leadId: "lead-a", dueAt: futuro, note: " ligar depois " }, now);
     expect(result).toEqual({ taskId: "nova-tarefa", repeated: false });
     expect(withReturnCreateLock).toHaveBeenCalledWith("t1", "lead-a", "corretor-a", expect.any(Function));
-    expect(criarTarefaDoLead).toHaveBeenCalledWith(corretor, expect.objectContaining({ leadId: "lead-a", title: "Retorno", assigneeIds: ["corretor-a"], description: "ligar depois" }));
+    expect(criarTarefaDoLead).toHaveBeenCalledWith(corretor, expect.objectContaining({ leadId: "lead-a", title: "Retorno", assigneeIds: ["corretor-a"], description: "ligar depois" }), state.tx);
   });
 
   it("repetição de tarefa igual criada há pouco não cria outra", async () => {

@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
 
+import type { TarefaExecutor } from "@/features/leads/tarefa-servico";
 import { getDatabase, schema } from "@/shared/db";
 
 export type OpenReturn = { id: string; title: string; dueAt: Date | null; createdAt: Date; createdBy: string; completedAt: Date | null };
@@ -63,8 +64,8 @@ export async function loadLeadOwner(tenantId: string, leadId: string): Promise<{
 }
 
 /** Tarefa aberta igual (mesmo título e prazo) criada dentro da janela: a repetição do mesmo agendamento. */
-export async function findRecentEquivalentReturn(input: { tenantId: string; leadId: string; title: string; dueAt: Date; since: Date }) {
-  const [row] = await getDatabase().select({
+export async function findRecentEquivalentReturn(executor: TarefaExecutor, input: { tenantId: string; leadId: string; title: string; dueAt: Date; since: Date }) {
+  const [row] = await executor.select({
     id: schema.leadTasks.id,
     title: schema.leadTasks.title,
     dueAt: schema.leadTasks.dueAt,
@@ -82,12 +83,13 @@ export async function findRecentEquivalentReturn(input: { tenantId: string; lead
 }
 
 /**
- * Serializa a criação do retorno para (tenant, lead, corretor) com trava de transação: duas requisições
- * simultâneas esperam uma pela outra, e a segunda já enxerga a tarefa criada pela primeira.
+ * Serializa a criação do retorno para (tenant, lead, corretor). A trava, a busca do gêmeo e a inserção rodam
+ * na MESMA transação e na MESMA conexão (`work` recebe o tx). Duas requisições simultâneas esperam uma pela
+ * outra, e a segunda já enxerga a tarefa criada pela primeira.
  */
-export async function withReturnCreateLock<T>(tenantId: string, leadId: string, userId: string, work: () => Promise<T>): Promise<T> {
+export async function withReturnCreateLock<T>(tenantId: string, leadId: string, userId: string, work: (tx: TarefaExecutor) => Promise<T>): Promise<T> {
   return getDatabase().transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`carteira-retorno:${tenantId}:${leadId}:${userId}`}))`);
-    return work();
+    return work(tx);
   });
 }
