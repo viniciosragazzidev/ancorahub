@@ -11,10 +11,11 @@ export type TenantGlobalPlanAvailabilityOverride = {
 export function resolveTenantGlobalPlanVisibility<T extends { planId: string }>(
   plans: readonly T[],
   overrides: readonly TenantGlobalPlanAvailabilityOverride[],
+  restrictedPlanIds: ReadonlySet<string> = new Set(),
 ): T[] {
   const hiddenPlanIds = new Set(
     overrides.filter((override) => !override.enabled).map((override) => override.globalPlanId),
   );
 
-  return plans.filter((plan) => !hiddenPlanIds.has(plan.planId));
+  return plans.filter((plan) => !hiddenPlanIds.has(plan.planId) && !restrictedPlanIds.has(plan.planId));
 }

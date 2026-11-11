@@ -65,7 +65,7 @@ export async function listAvailableCatalogPlans(
         ),
       );
     const restrictedPlanIds = new Set(restrictions.map((restriction) => restriction.globalPlanId));
-    allowedGlobalRows = globalRows.filter((row) => !restrictedPlanIds.has(row.planId));
+    allowedGlobalRows = resolveTenantGlobalPlanVisibility(globalRows, availabilityOverrides, restrictedPlanIds);
   }
 
   const privateRows = privateEnabled

@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-11T18:56:33.118074+00:00",
+  "title": "Design System: AncoraHub / Conversa / Arc",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Índigo Venancor, controles Arc"
+      },
+      "chat-action": {
+        "role": "primary",
+        "displayName": "Azul de ação Conversa"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Superfície branca"
+      },
+      "surface-muted": {
+        "role": "neutral",
+        "displayName": "Superfície de apoio"
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Texto principal"
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Revisado"
+      },
+      "warning": {
+        "role": "semantic",
+        "displayName": "Revisão necessária"
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Incompatível"
+      }
+    },
+    "typographyMeta": {
+      "body": {
+        "displayName": "Corpo",
+        "purpose": "Família de produção fornecida pelo shell; fixtures Arial não são autoridade tipográfica."
+      },
+      "label": {
+        "displayName": "Rótulo de controle",
+        "purpose": "Rótulos e botões Arc medium; não generaliza pesos locais de headings."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-resting",
+        "value": "0 1px 2px rgb(16 16 40 / 0.04), 0 8px 24px rgb(16 16 40 / 0.05)",
+        "purpose": "Override Venancor existente, incluindo hover de botões Arc."
+      },
+      {
+        "name": "shadow-floating",
+        "value": "0 16px 40px rgb(16 16 40 / 0.14)",
+        "purpose": "Camadas flutuantes Arc no escopo Venancor."
+      },
+      {
+        "name": "shadow-dialog",
+        "value": "0 16px 48px rgb(9 9 11 / 0.12)",
+        "purpose": "Sheet compartilhado conforme globals.css; não equivale a shadow-floating."
+      }
+    ],
+    "motion": [
+      {
+        "name": "duration-fast",
+        "value": "160ms",
+        "purpose": "Feedback Arc existente, escopado em venancor-scope.css."
+      },
+      {
+        "name": "duration-standard",
+        "value": "240ms",
+        "purpose": "Feedback de cor do Badge Arc existente."
+      },
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(.22,1,.36,1)",
+        "purpose": "Easing de feedback Arc existente, sem nova animação."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sheet-fullscreen-max",
+        "value": "559px"
+      },
+      {
+        "name": "lite-field-mobile-max",
+        "value": "767px"
+      },
+      {
+        "name": "lite-rail-min",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Arc Button existente, variante primary.",
+      "html": "<button class=\"ds-button-primary\" type=\"button\">Buscar planos</button>",
+      "css": ".ds-button-primary{position:relative;display:inline-flex;min-height:var(--control-height-md,2.75rem);align-items:center;justify-content:center;gap:var(--space-2,.5rem);border:1px solid transparent;border-radius:var(--radius-control,9999px);padding:0 var(--space-4,1rem);font-family:var(--font-jakarta-sans),ui-sans-serif,system-ui,sans-serif;font-size:var(--text-sm,.875rem);font-weight:500;line-height:var(--leading-body,1.4);white-space:nowrap;cursor:pointer;transition:color var(--duration-fast,160ms) var(--ease-standard,cubic-bezier(.22,1,.36,1)),background var(--duration-fast,160ms) var(--ease-standard,cubic-bezier(.22,1,.36,1)),opacity var(--duration-fast,160ms) var(--ease-standard,cubic-bezier(.22,1,.36,1));color:var(--background,#f7f7f9);background:var(--foreground,#0b0b12);border-color:var(--foreground,#0b0b12);}@media(hover:hover) and (pointer:fine){.ds-button-primary:hover:not(:disabled){opacity:.91;box-shadow:var(--shadow-resting);}}.ds-button-primary:focus-visible{outline:2px solid color-mix(in oklab,var(--accent-strong,#2a1fd1) 72%,transparent);outline-offset:2px;}.ds-button-primary:active:not(:disabled){opacity:.84;}.ds-button-primary:disabled{cursor:not-allowed;opacity:.52;}@media(prefers-reduced-motion:reduce){.ds-button-primary{transition:none;}}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Arc Button existente, variante secondary.",
+      "html": "<button class=\"ds-button-secondary\" type=\"button\">Condições e documentos</button>",
+      "css": ".ds-button-secondary{position:relative;display:inline-flex;min-height:var(--control-height-md,2.75rem);align-items:center;justify-content:center;gap:var(--space-2,.5rem);border:1px solid transparent;border-radius:var(--radius-control,9999px);padding:0 var(--space-4,1rem);font-family:var(--font-jakarta-sans),ui-sans-serif,system-ui,sans-serif;font-size:var(--text-sm,.875rem);font-weight:500;line-height:var(--leading-body,1.4);white-space:nowrap;cursor:pointer;transition:color var(--duration-fast,160ms) var(--ease-standard,cubic-bezier(.22,1,.36,1)),background var(--duration-fast,160ms) var(--ease-standard,cubic-bezier(.22,1,.36,1)),opacity var(--duration-fast,160ms) var(--ease-standard,cubic-bezier(.22,1,.36,1));color:var(--foreground,#0b0b12);background:var(--surface,#ffffff);border-color:var(--border,rgb(16 16 40 / .08));}@media(hover:hover) and (pointer:fine){.ds-button-secondary:hover:not(:disabled){background:var(--surface-muted,#f1f1f5);box-shadow:var(--shadow-resting);}}.ds-button-secondary:focus-visible{outline:2px solid color-mix(in oklab,var(--accent-strong,#2a1fd1) 72%,transparent);outline-offset:2px;}.ds-button-secondary:active:not(:disabled){background:var(--surface-muted,#f1f1f5);}.ds-button-secondary:disabled{cursor:not-allowed;opacity:.52;}@media(prefers-reduced-motion:reduce){.ds-button-secondary{transition:none;}}.ds-button-secondary:disabled{opacity:1;color:var(--text-muted,#666674);background:var(--surface-muted,#f1f1f5);border-color:var(--border,rgb(16 16 40 / .08));}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Arc Button existente, variante ghost.",
+      "html": "<button class=\"ds-button-ghost\" type=\"button\">Ver rede</button>",
+      "css": ".ds-button-ghost{position:relative;display:inline-flex;min-height:var(--control-height-md,2.75rem);align-items:center;justify-content:center;gap:var(--space-2,.5rem);border:1px solid transparent;border-radius:var(--radius-control,9999px);padding:0 var(--space-4,1rem);font-family:var(--font-jakarta-sans),ui-sans-serif,system-ui,sans-serif;font-size:var(--text-sm,.875rem);font-weight:500;line-height:var(--leading-body,1.4);white-space:nowrap;cursor:pointer;transition:color var(--duration-fast,160ms) var(--ease-standard,cubic-bezier(.22,1,.36,1)),background var(--duration-fast,160ms) var(--ease-standard,cubic-bezier(.22,1,.36,1)),opacity var(--duration-fast,160ms) var(--ease-standard,cubic-bezier(.22,1,.36,1));color:var(--text-secondary,#4b4b59);background:transparent;}@media(hover:hover) and (pointer:fine){.ds-button-ghost:hover:not(:disabled){color:var(--foreground,#0b0b12);background:var(--surface-muted,#f1f1f5);}}.ds-button-ghost:focus-visible{outline:2px solid color-mix(in oklab,var(--accent-strong,#2a1fd1) 72%,transparent);outline-offset:2px;}.ds-button-ghost:active:not(:disabled){color:var(--foreground,#0b0b12);background:var(--surface-muted,#f1f1f5);}.ds-button-ghost:disabled{cursor:not-allowed;opacity:.52;}@media(prefers-reduced-motion:reduce){.ds-button-ghost{transition:none;}}.ds-button-ghost:disabled{opacity:1;color:var(--text-muted,#666674);}"
+    },
+    {
+      "name": "Campo com rótulo",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Arc Input no escopo claro do corretor; foco pela borda.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-label\">Município de comercialização</span><input class=\"ds-input\" placeholder=\"Ex.: Rio de Janeiro\" /></label>",
+      "css": ".ds-field{display:grid;min-width:0;font-family:var(--font-jakarta-sans),ui-sans-serif,system-ui,sans-serif;}.ds-label{margin-bottom:var(--space-2,.5rem);color:var(--foreground,#0b0b12);font-size:var(--text-sm,.875rem);font-weight:500;line-height:var(--leading-body,1.4);}.ds-input{width:100%;min-height:var(--control-height-md,2.75rem);padding:0 var(--space-3,.75rem);border:1px solid var(--border-strong,rgb(16 16 40 / .18));border-radius:var(--radius-control,9999px);background:var(--surface,#ffffff);color:var(--foreground,#0b0b12);font-family:var(--font-jakarta-sans),ui-sans-serif,system-ui,sans-serif;font-size:var(--text-sm,.875rem);line-height:var(--leading-body,1.4);letter-spacing:var(--tracking-body,-.01em);outline:none;transition:border-color var(--duration-fast,160ms) var(--ease-standard,cubic-bezier(.22,1,.36,1));}.ds-input::placeholder{color:var(--text-muted,#666674);}.ds-input:focus-visible{border-color:var(--foreground,#0b0b12);}.ds-input[aria-invalid=\"true\"]{border-color:var(--danger,#d4263a);}.ds-input:disabled{cursor:not-allowed;opacity:.5;background:var(--surface-muted,#f1f1f5);}@media(hover:hover) and (pointer:fine){.ds-input:hover:not(:disabled,[aria-invalid=\"true\"]){border-color:var(--foreground,#0b0b12);}}@media(max-width:767px){.ds-input{font-size:16px;}}@media(prefers-reduced-motion:reduce){.ds-input{transition-duration:.01ms;}}"
+    },
+    {
+      "name": "Selo informativo",
+      "kind": "chip",
+      "refersTo": "badge-info",
+      "description": "Arc Badge info identifica o piloto; não concede elegibilidade.",
+      "html": "<span class=\"ds-badge-info\">Vinicios Ragazzi</span>",
+      "css": ".ds-badge-info{display:inline-flex;min-height:26px;align-items:center;border:1px solid color-mix(in oklab,var(--accent,#3b2dff) 24%,var(--border,rgb(16 16 40 / .08)));border-radius:var(--radius-pill,9999px);padding:0 10px;color:var(--accent-strong,#2a1fd1);background:var(--accent-subtle,rgb(59 45 255 / .1));font-family:var(--font-jakarta-sans),ui-sans-serif,system-ui,sans-serif;font-size:var(--text-xs,.75rem);font-weight:500;letter-spacing:-.01em;line-height:1;white-space:nowrap;overflow:clip;transition:border-color var(--duration-standard,240ms) var(--ease-standard,cubic-bezier(.22,1,.36,1)),background-color var(--duration-standard,240ms) var(--ease-standard,cubic-bezier(.22,1,.36,1));}@media(hover:hover) and (pointer:fine){.ds-badge-info:hover{border-color:color-mix(in oklab,var(--accent,#3b2dff) 32%,var(--border,rgb(16 16 40 / .08)));background:color-mix(in oklab,var(--accent,#3b2dff) 10%,var(--surface,#ffffff));}}@media(prefers-reduced-motion:reduce){.ds-badge-info{transition-duration:var(--duration-instant,120ms);}}"
+    },
+    {
+      "name": "Card compartilhado padrão",
+      "kind": "card",
+      "refersTo": "card-default",
+      "description": "Card padrão usado no cotador sem a pele data-skin diretor; não é clicável.",
+      "html": "<section class=\"ds-card\"><div class=\"ds-card-title\">Quem vai entrar no plano?</div><p class=\"ds-card-description\">Informe as vidas e idades completas.</p></section>",
+      "css": ".ds-card{display:flex;min-width:0;flex-direction:column;gap:var(--size-spacing-04,16px);border:1px solid var(--border,rgb(16 16 40 / .08));border-radius:var(--radius-card,1rem);background:var(--card,#ffffff);padding:var(--size-spacing-05,24px);color:var(--card-foreground,#0b0b12);box-shadow:none;font-family:var(--font-jakarta-sans),ui-sans-serif,system-ui,sans-serif;}.ds-card-title{font-size:1rem;font-weight:600;letter-spacing:-.025em;color:var(--foreground,#0b0b12);}.ds-card-description{font-size:.75rem;color:var(--muted-foreground,#666674);}"
+    },
+    {
+      "name": "Visões do produto",
+      "kind": "nav",
+      "description": "Botões Arc do Sheet para condições e rede; preview estático, sem recriar o diálogo.",
+      "html": "<nav class=\"ds-product-nav\" aria-label=\"Visões do produto\"><button type=\"button\" class=\"ds-view ds-view-active\" aria-pressed=\"true\">Condições</button><button type=\"button\" class=\"ds-view ds-view-idle\" aria-pressed=\"false\">Rede credenciada</button></nav>",
+      "css": ".ds-product-nav{display:flex;gap:.5rem;border-bottom:1px solid var(--border,rgb(16 16 40 / .08));padding:1rem;}.ds-view{position:relative;display:inline-flex;min-height:var(--control-height-md,2.75rem);align-items:center;justify-content:center;gap:var(--space-2,.5rem);border:1px solid transparent;border-radius:var(--radius-control,9999px);padding:0 var(--space-4,1rem);font-family:var(--font-jakarta-sans),ui-sans-serif,system-ui,sans-serif;font-size:var(--text-sm,.875rem);font-weight:500;line-height:var(--leading-body,1.4);white-space:nowrap;cursor:pointer;transition:color var(--duration-fast,160ms) var(--ease-standard,cubic-bezier(.22,1,.36,1)),background var(--duration-fast,160ms) var(--ease-standard,cubic-bezier(.22,1,.36,1)),opacity var(--duration-fast,160ms) var(--ease-standard,cubic-bezier(.22,1,.36,1));}.ds-view-active{color:var(--background,#f7f7f9);background:var(--foreground,#0b0b12);border-color:var(--foreground,#0b0b12);}.ds-view-idle{color:var(--text-secondary,#4b4b59);background:transparent;}.ds-view:focus-visible{outline:2px solid color-mix(in oklab,var(--accent-strong,#2a1fd1) 72%,transparent);outline-offset:2px;}.ds-view-active:active{opacity:.84;}.ds-view-idle:active{color:var(--foreground,#0b0b12);background:var(--surface-muted,#f1f1f5);}@media(hover:hover) and (pointer:fine){.ds-view-active:hover{opacity:.91;box-shadow:var(--shadow-resting);}.ds-view-idle:hover{color:var(--foreground,#0b0b12);background:var(--surface-muted,#f1f1f5);}}@media(prefers-reduced-motion:reduce){.ds-view{transition:none;}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Conversa",
+    "overview": "Registro em scan mode do mundo já implementado: linguagem profissional, discreta e orientada à próxima ação. O cotador estende o repertório Conversa/Arc do corretor Lite com um formulário comercial e leitura progressiva dos resultados. Não estabelece uma nova direção visual.\n\nEste arquivo descreve a implementação observada em 11/11/2026. O frontmatter registra somente o recorte claro de `.arc-venancor`, após os overrides Venancor em `src/components/arc/venancor-scope.css`, e os componentes compartilhados consumidos pelo cotador. Não é uma paleta global, nem autorização para importar `foundation.css` no `:root` da plataforma.\n\nAutoridade normativa: [contrato UX](docs/ux/UX_REDESIGN_CONTRACT.md), [controle da etapa](docs/ux/UX_REDESIGN_CONTROL.md), [design system e exceções](docs/design-system.md) e [Conversa/Lite](docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md). O registro do piloto no controle não avança o gate global UX-M1.10. Em conflito, reconciliar este inventário com essas fontes e o código; não alterar contratos para acomodar uma captura.",
+    "keyCharacteristics": [
+      "Próxima decisão legível antes do detalhe comercial.",
+      "Superfícies claras, controles em pílula e cor com função explícita.",
+      "Componentes compartilhados e tokens restritos ao escopo correto.",
+      "Pendências e indisponibilidade expressas por texto, além de cor."
+    ],
+    "rules": [
+      {
+        "name": "The Scope Rule",
+        "body": "Aplicar o conjunto de tokens somente na superfície que já possui o escopo Arc correspondente; nunca usar a paleta do corretor como redefinição global de papéis.",
+        "section": "colors"
+      },
+      {
+        "name": "The Next Decision Rule",
+        "body": "Mostrar primeiro o que permite escolher o próximo passo; revelar informação densa perto do plano, condição ou unidade a que pertence.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "**Do** reutilizar Arc Button/Input/Badge e Card/AppSelect/Sheet compartilhados com seus tokens e escopos existentes.",
+      "**Do** apresentar preço total e valores por vida com números tabulares, estados nomeados e motivos consultáveis.",
+      "**Do** manter leitura em tela estreita, foco de teclado, campos legíveis e reduced motion nos componentes existentes.",
+      "**Do** consultar contrato, controle da etapa e a exceção do papel antes de estender uma superfície."
+    ],
+    "donts": [
+      "**Don't** aplicar a pele do corretor ao gestor, Super-admin ou Diretor sem sua exceção aprovada.",
+      "**Don't** inventar tokens, primitives, fontes, rampas cromáticas ou animações para preencher este inventário.",
+      "**Don't** adicionar overline decorativo acima do título da tarefa ou usar cor como substituto do estado textual.",
+      "**Don't** tratar dados sintéticos, Arial da fixture ou pesos locais da rota como novas decisões globais de identidade."
+    ]
+  }
+}

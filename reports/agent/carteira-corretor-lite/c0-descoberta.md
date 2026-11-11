@@ -18,7 +18,7 @@ Escopo: fontes, serviços, permissões e prévia sintética. Nenhuma escrita em 
 
 ## Decisões adotadas pelo recomendado
 
-- DEC-178 e BR-098: preservar as definições de Leads e Clientes e usar tarefa canônica como retorno.
+- DEC-180 e BR-099: preservar as definições de Leads e Clientes e usar tarefa canônica como retorno.
 - “Precisa de atenção” será fato persistido: retorno vencido/hoje ou janela contratual nos próximos 30 dias. Sem tarefa ou contrato, não dizer que está em dia.
 - Só mostrar Renovações se houver cliente ativo com `renewalWindowStartDate`.
 - Etiquetas, histórico importado, clientes antigos, comissões, cadastro novo e outras áreas do benchmark ficam fora de C0-C2.

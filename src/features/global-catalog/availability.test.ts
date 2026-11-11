@@ -18,4 +18,9 @@ describe("resolveTenantGlobalPlanVisibility", () => {
       { globalPlanId: "global-plan-b", enabled: true },
     ])).toEqual([{ planId: "global-plan-b", carrierName: "Operadora B" }]);
   });
+  it("preserves tenant hides when branch restrictions are applied", () => {
+    expect(resolveTenantGlobalPlanVisibility(plans, [{ globalPlanId: "global-plan-a", enabled: false }], new Set())).toEqual([plans[1]]);
+    expect(resolveTenantGlobalPlanVisibility(plans, [{ globalPlanId: "global-plan-a", enabled: false }], new Set(["global-plan-b"]))).toEqual([]);
+    expect(resolveTenantGlobalPlanVisibility(plans, [{ globalPlanId: "global-plan-a", enabled: true }], new Set(["global-plan-a"]))).toEqual([plans[1]]);
+  });
 });

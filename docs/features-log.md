@@ -2,6 +2,13 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 11/11/2026 - Cotador real exclusivo do corretor Vinicios
+
+- Catálogo privado de 4.922 planos, cálculo real por idade no servidor e seis modalidades. Condições e rede completas com busca, filtros e comparação de até três alternativas.
+- Restrição por usuário, tenant e papel, controle reversível no Super-admin e revisão comercial auditada. Pendências bloqueiam PDF final; produtos prontos são recalculados e preservam snapshot privado. Nenhum produto foi homologado automaticamente.
+- Formulário operacional único substitui demonstrações na rota. O plano amplo ainda tem etapas pendentes de integração ao lead, chat e regras comerciais não interpretadas.
+- Validação: 5.292 totais sem divergência, 27 testes específicos e QA desktop/celular aprovado. Registro: [cotador real](implementations/active/2026-11-11-cotador-corretor-catalogo-real.md), DEC-178/BR-098.
+
 ## 10/11/2026 - Backfill e evidência de venda
 
 - Evidências de pagamento validadas permanecem no contexto da próxima análise, mesmo fora da janela de mensagens recentes.

@@ -145,7 +145,7 @@ Primeiro corte publicável: **C0 → C1 → C2**. C3–C6 entram em lotes própr
 | Contrato e renovação | `active_customers.status`, `renewal_window_start_date`, `contract_anniversary`, `expiration_date` | Recorte Renovações e sinal de atenção apenas com contrato ativo e janela persistida. |
 | Permissão e governança | `getRequiredTenantContext`, `buildClientScopeWhere`, `FEATURE_FLAGS`, `platformAuditLogs` | Tenant/corretor sempre derivados no servidor; feature flag global e auditada pelo Super-admin. |
 
-Decisão adotada pelo recomendado: preservar a identidade e os fluxos canônicos, usar tarefas existentes como retorno e não inferir atenção a partir de ausência de dado (DEC-178, BR-098). Pesquisa confirma que etiquetas, base importada, clientes antigos, comissão e outros estados não têm contrato autorizado em C0-C2; permanecem fora. Não há migration necessária. A prévia sintética fica em `/dev/carteira-corretor-lite`, bloqueada em produção.
+Decisão adotada pelo recomendado: preservar a identidade e os fluxos canônicos, usar tarefas existentes como retorno e não inferir atenção a partir de ausência de dado (DEC-180, BR-099). Pesquisa confirma que etiquetas, base importada, clientes antigos, comissão e outros estados não têm contrato autorizado em C0-C2; permanecem fora. Não há migration necessária. A prévia sintética fica em `/dev/carteira-corretor-lite`, bloqueada em produção.
 
 ### Organização sugerida das alterações
 
