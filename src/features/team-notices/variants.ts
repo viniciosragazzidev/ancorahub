@@ -130,6 +130,15 @@ export function builtInNoticeVariants(fields: NoticeFields, hour: number): strin
     case "leadClosingDirectorAlert": {
       const { lead, phone, deal, broker, stage, summary, link } = fields;
       const body = `👤 *Cliente:* ${lead}\n📞 ${phone}\n📋 ${deal}\n🧑‍💼 *Corretor:* ${broker}\n📍 *Etapa:* ${stage}\n\n📝 *Resumo da conversa:*\n${summary}`;
+      // Venda (11/11, retorno para a direção): o mesmo aviso, com título de venda.
+      if (stage.startsWith("Venda ")) {
+        return [
+          `🎉 *Venda fechada*\n\n${body}${tail(link, "👉 *Abrir no CRM:* ")}`,
+          `${hi}! Mais uma venda da equipe 🎉\n\n${body}${tail(link, "Abrir no CRM: ")}`,
+          `🏆 *Venda da equipe*\n\n${body}${tail(link, "👉 ")}`,
+          `🎉 *Nova venda*\n\n${body}${tail(link, "Lead: ")}`,
+        ];
+      }
       return [
         `🏁 *Lead em fechamento*\n\n${body}${tail(link, "👉 *Abrir no CRM:* ")}`,
         `${hi}! Mais um lead chegou ao fechamento 🙌\n\n${body}${tail(link, "Abrir no CRM: ")}`,

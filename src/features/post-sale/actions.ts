@@ -325,6 +325,10 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
     });
   }
 
+  // Retorno para a direção no WhatsApp (11/11, Keyla): venda registrada, uma vez por lead e número.
+  const { notifyDirectorsSale } = await import("@/features/leads/closing-director-alert");
+  void notifyDirectorsSale({ tenantId: context.tenantId, leadId: lead.id, kind: "sale_registered" });
+
   // Only after the commit: a rolled-back sale never fires the "venda realizada" automation.
   const { triggerInstantAutomation } = await import("@/features/automations/engine");
   void triggerInstantAutomation(context.tenantId, lead.id, "venda_realizada").catch(console.error);

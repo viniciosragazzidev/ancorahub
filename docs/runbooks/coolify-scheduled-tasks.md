@@ -53,7 +53,7 @@ sem rodar, avisar que o robô parou. Mudou o caminho ou a frequência aqui, mude
 | `/api/internal/jobs/waha-sync` | `* * * * *` | Reconciliação de mensagens WAHA das conexões dos corretores | `coolify-waha-message-sync-scheduler.md` |
 | `/api/internal/jobs/lead-effects` | `* * * * *` | Efeitos pós-entrada do lead (outbox durável) | |
 | `/api/internal/jobs/purge` | `* * * * *` | Expurgo agendado de dados | |
-| `/api/internal/sla` | `*/5 * * * *` | SLA de primeiro contato: avisa gestores e diretores | |
+| `/api/internal/sla` | `*/5 * * * *` | SLA de primeiro contato: avisa gestores e diretores. Também lembra o corretor de registrar a venda de lead Convertido (1, 3 e 5 dias depois, das 9h às 19h) | |
 | `/api/internal/reminders` | `*/5 * * * *` | Lembretes de notificações e aviso "Cliente voltou a chamar" (lead distribuído há 24 h ou mais que manda mensagem no número oficial da empresa, uma vez por lead); segundo aviso da foto do plantão presencial esperando liberação há 5 min | |
 | `/api/internal/jobs/meta-conversions` | `*/5 * * * *` | API de Conversões para CRM: envia as etapas dos leads de Lead Ads (Lead recebido, Qualificado, Quente, Venda) para a fonte de dados escolhida na tela da Meta | Só envia para empresas com o envio ligado (diretor, em Integrações › Meta). Limite da Meta deixa a fila pendente e para a rodada. Aplicar `drizzle/0208_meta_conversion_events.sql` antes. Plano: `docs/implementations/active/2026-10-20-meta-conversoes-crm.md` |
 | `/api/internal/jobs/meta-sync` | `0 * * * *` | Sincronização com a Meta | O código também limita a sincronização automática a uma vez por hora e aplica espera progressiva quando a Meta retorna limite de chamadas. |

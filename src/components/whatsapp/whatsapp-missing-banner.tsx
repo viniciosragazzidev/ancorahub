@@ -19,9 +19,20 @@ const CHECK_EVERY_MS = 120_000;
  */
 export function WhatsAppMissingBanner() {
   const [connection, setConnection] = useState<Connection | null>(null);
+  // Com o roteiro aberto a faixa fica montada: ao conectar ela sumiria e fecharia o roteiro antes do "Pronto".
+  const [guideOpen, setGuideOpen] = useState(false);
   const stripRef = useRef<HTMLDivElement>(null);
   const missing = Boolean(connection && connection.status !== "ready");
-  useTopStrip(stripRef, missing);
+  const visible = missing || guideOpen;
+  useTopStrip(stripRef, visible);
+
+  const refreshStatus = () => {
+    void getWhatsAppSessionStatus()
+      .then((result) => {
+        if (result.success && result.status) setConnection((current) => (current ? { ...current, status: result.status as string } : current));
+      })
+      .catch(() => undefined);
+  };
 
   useEffect(() => {
     let alive = true;
@@ -36,16 +47,20 @@ export function WhatsAppMissingBanner() {
     return () => { alive = false; window.clearInterval(timer); };
   }, []);
 
-  if (!connection || !missing) return null;
+  if (!connection || !visible) return null;
   return (
     <div ref={stripRef} className={styles.banner} role="status">
       <span className={styles.icon} aria-hidden="true">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Z" /></svg>
       </span>
       <span className={styles.text}><strong>Seu WhatsApp não está conectado.</strong> Conecte para receber os leads do plantão.</span>
+      {/* Faixa do topo (11/11): abre o roteiro guiado de conexão, como o ícone do WhatsApp no topo. */}
       <WhatsAppConnectDialog
         initial={connection}
-        onConnectionChanged={(next) => { if (next) setConnection(next as Connection); }}
+        variant="presence"
+        guideMode="connect"
+        onOpenChange={(open) => { setGuideOpen(open); if (!open) refreshStatus(); }}
+        onConnectionChanged={(next) => { if (next) setConnection(next as Connection); else refreshStatus(); }}
         trigger={<button type="button" className={styles.action}>Conectar agora</button>}
       />
     </div>

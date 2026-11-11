@@ -22,6 +22,8 @@ import {
  * WhatsApp: o aviso "Fechamento para a direção" é um template com variáveis fixas de entrada no fechamento
  * (cliente, telefone, negócio, corretor, etapa, resumo). Reaproveitá-lo para o desfecho mandaria um texto errado,
  * e um aviso novo exige template aprovado. Por isso o desfecho sai só no app.
+ * A venda em si (IA ou registro) vai para esses números em `notifyDirectorsSale` (11/11), com título de venda
+ * no número da empresa; no template da Meta (alternativa) a etapa aparece como "Venda ...".
  */
 export async function notifyDirectorsClosingOutcome(input: {
   tenantId: string;

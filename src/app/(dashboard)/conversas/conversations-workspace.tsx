@@ -196,7 +196,7 @@ export type ConversationItem = {
   tags?: LeadTag[];
 };
 
-type ViewFilter = "all" | "qualified" | "closing" | "ai_active" | "human_active" | "with_messages" | "without_messages";
+type ViewFilter = "all" | "qualified" | "closing" | "converted" | "ai_active" | "human_active" | "with_messages" | "without_messages";
 
 const CONVERSATIONS_REFRESH_TIMING: VisibleRefreshTiming = { coalesceMs: 3_000, maxWaitMs: 10_000, minGapMs: 15_000 };
 const isConversationInvalidation = (detail: RealtimeSyncBrowserDetail | undefined) =>
@@ -281,7 +281,7 @@ export function ConversationsWorkspace({
         );
       const matchesFilter =
         filter === "all" ||
-        (filter === "closing" ? conversation.inClosing === true : filter === "qualified"
+        (filter === "closing" ? conversation.inClosing === true : filter === "converted" ? conversation.status === "converted" : filter === "qualified"
           ? conversation.status === "distributed" ||
             conversation.aiConversation?.status === "CLOSED" ||
             ["hot", "warm", "cold", "qualified", "disqualified"].includes(conversation.status)
@@ -337,6 +337,7 @@ export function ConversationsWorkspace({
     { value: "all", label: "Todos", count: conversations.length },
     { value: "qualified", label: "Qualificados", count: conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length },
     { value: "closing", label: "Fechamento", count: conversations.filter((c) => c.inClosing === true).length },
+    { value: "converted", label: "Convertidos", count: conversations.filter((c) => c.status === "converted").length },
     { value: "ai_active", label: "Atendente Virtual", count: conversations.filter((c) => Boolean(c.aiConversation) && (c.hasIncoming ?? c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound")))).length },
     { value: "human_active", label: "Atendimento Humano", count: conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length },
   ];
