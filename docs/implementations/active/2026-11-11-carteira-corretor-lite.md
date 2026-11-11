@@ -135,6 +135,18 @@ Desativar somente uma superfície não deve cancelar tarefa já confirmada nem a
 
 Primeiro corte publicável: **C0 → C1 → C2**. C3–C6 entram em lotes próprios. Publicar por capacidade/tenant após validação; nenhum cronograma de dias é assumido sem estimar C0.
 
+### Registro de execução C0 (2026-11-11)
+
+| Campo | Fonte real | Uso nesta entrega |
+|---|---|---|
+| Identidade do cliente e proprietário | `clients.id`, `tenant_id`, `lead_id`, `corretor_id`, `branch_id`, `nome`, `telefone`, `email`, `converted_at` | Lista/ficha do corretor no tenant e usuário da sessão; nome/telefone na busca. |
+| Origem e estágio comercial | `leads.origem`, `leads.status`, `leads.tenant_id`, `leads.corretor_id` | Leitura contextual e filtro de origem, sempre sem alterar o funil. |
+| Próxima ação | `lead_tasks.lead_id`, `tenant_id`, `title`, `due_at`, `completed_at`, `priority` | Uma única tarefa aberta mais próxima por lead; serviço canônico para criar, concluir e reagendar. |
+| Contrato e renovação | `active_customers.status`, `renewal_window_start_date`, `contract_anniversary`, `expiration_date` | Recorte Renovações e sinal de atenção apenas com contrato ativo e janela persistida. |
+| Permissão e governança | `getRequiredTenantContext`, `buildClientScopeWhere`, `FEATURE_FLAGS`, `platformAuditLogs` | Tenant/corretor sempre derivados no servidor; feature flag global e auditada pelo Super-admin. |
+
+Decisão adotada pelo recomendado: preservar a identidade e os fluxos canônicos, usar tarefas existentes como retorno e não inferir atenção a partir de ausência de dado (DEC-178, BR-098). Pesquisa confirma que etiquetas, base importada, clientes antigos, comissão e outros estados não têm contrato autorizado em C0-C2; permanecem fora. Não há migration necessária. A prévia sintética fica em `/dev/carteira-corretor-lite`, bloqueada em produção.
+
 ### Organização sugerida das alterações
 
 Cada fase deve separar commits revisáveis: (1) contrato/decisão e governança, (2) serviço/consulta com validações, (3) composição UI usando base compartilhada, (4) validação/evidência/documentação. Cada commit de código precisa permanecer coerente; migrações, quando aprovadas, têm pré-requisitos de deploy e compatibilidade documentados.

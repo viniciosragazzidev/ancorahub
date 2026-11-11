@@ -526,3 +526,7 @@ Papéis e rotas: diretor e gestor com flag ativa em `/equipe/pos-venda`, `/equip
 ## 2026-11-10: recuperação conjunta dos avisos de fechamento
 
 Na ficha `/leads/[id]`, Diretor e Gestor da unidade veem uma única ação contextual para recuperar parabéns ao corretor e aviso à direção. A confirmação revela o status e o horário de cada destino; o envio considera somente o que falta, e a resposta fica no próprio botão. Estados: carregando, enviado ou na fila por destino, falha parcial e já registrado com botão desabilitado. Reutiliza Button e Dialog; sem novo token, primitive ou animação. Gestor permanece na unidade efetiva. Não avança o gate global do redesign. Registro: DEC-174 e `docs/implementations/active/2026-11-10-venda-detection-backfill.md`.
+
+## 2026-11-11: Carteira Lite do corretor, C0
+
+Rota de prévia: `/dev/carteira-corretor-lite` (somente desenvolvimento, fixtures sintéticas e sem gravação). Papel: corretor; ação principal: localizar cliente e resolver a próxima ação. Estados demonstrados: carteira, ficha, agendar retorno, vazio de base, busca sem resultado, carregamento, erro e movimento reduzido. Disclosure: busca e recortes na lista; detalhes e tarefa junto à ficha. Reutiliza `PeoplePage`, `PeopleRow`, `PeopleEmpty`, `LightClientsList`, `LightClientDetail` e botões Arc existentes, sem token, primitive ou animação nova. Decisão adotada pelo recomendado em DEC-178; capacidade controlada por flag global auditada. UX-M1.10 continua pendente e não é avançada por esta prévia.

@@ -1,0 +1,4 @@
+.navLink,.navActive{display:inline-flex;min-height:2.75rem;align-items:center;justify-content:center;border-radius:9999px;padding:0 1rem;font-size:.875rem;font-weight:600}
+.navLink{background:var(--surface-muted);color:var(--foreground)}
+.navActive{background:var(--chat-action);color:var(--chat-action-text)}
+.reducedMotion,.reducedMotion *{animation:none!important;transition:none!important;scroll-behavior:auto!important}

@@ -159,6 +159,23 @@ export async function updateBrokerWorkspaceSettingsAction(formData: FormData) {
   });
 }
 
+export async function updateBrokerClientWalletLiteSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const now = new Date();
+  const flag = FEATURE_FLAGS.BROKER_CLIENT_WALLET_LITE;
+  await setSystemSetting(flag.key, input.enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "broker_client_wallet_lite.global_feature_updated",
+    targetType: "system_settings",
+    targetId: flag.key,
+    metadata: { enabled: input.enabled === "true" },
+    createdAt: now,
+  });
+}
+
 export async function updateConversationMediaSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("conversationMediaEnabled") === "true" ? "true" : "false";
