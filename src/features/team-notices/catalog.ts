@@ -105,6 +105,17 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     phoneRecipients: true,
   },
   {
+    key: "LEAD_CONVERTED_DIRECTOR",
+    purpose: "leadConvertedDirectorAlert",
+    label: "Venda fechada para a direção",
+    description: "Quando um lead vira venda (pela IA ou por uma pessoa), manda para os números abaixo: cliente, negócio, corretor, dias no fechamento, como a venda foi confirmada e o que falta no CRM. Sem números próprios, usa os do Fechamento para a direção. Uma vez por lead e número.",
+    // A sale just closed: goes out at once, any day.
+    class: "critical",
+    defaultEnabled: true,
+    defaultChannel: "company_number",
+    phoneRecipients: true,
+  },
+  {
     key: "DAILY_LEADS_REPORT",
     purpose: "dailyLeadsReport",
     label: "Relatório das 18h",

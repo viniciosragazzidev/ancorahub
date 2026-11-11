@@ -929,6 +929,27 @@ function noticeTextFields(purpose: string, rawVariables: string[], urlButtonPara
       link: leadId ? `${baseUrl}/leads/${leadId}` : null,
     };
   }
+  if (purpose === "leadConvertedDirectorAlert") {
+    // "-" marca linha omitida (o envio não aceita variável vazia).
+    const line = (index: number) => {
+      const value = rawVariables[index]?.trim() ?? "";
+      return value && value !== "-" ? value : null;
+    };
+    const leadId = line(9);
+    return {
+      purpose,
+      lead: line(0) ?? "Cliente",
+      phone: line(1) ?? "Sem telefone",
+      deal: line(2) ?? "Sem valor e vidas registrados ainda",
+      broker: line(3) ?? "Sem corretor",
+      closingTime: line(4),
+      confirmedBy: line(5),
+      registeredBy: line(6),
+      quote: line(7),
+      missing: line(8),
+      link: leadId ? `${baseUrl}/leads/${leadId}` : null,
+    };
+  }
   if (purpose === "leadClientReturned") {
     const leadId = rawVariables[3]?.trim();
     return {

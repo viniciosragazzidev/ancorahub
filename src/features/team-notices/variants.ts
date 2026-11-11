@@ -15,6 +15,20 @@ export type NoticeFields =
   | { purpose: "leadClosingStage"; broker: string; lead: string; link: string | null }
   | { purpose: "leadClosingDirectorAlert"; lead: string; phone: string; deal: string; broker: string; stage: string; summary: string; link: string | null }
   | { purpose: "dailyLeadsReport"; date: string; report: string; link: string | null }
+  | {
+    purpose: "leadConvertedDirectorAlert";
+    lead: string;
+    phone: string;
+    deal: string;
+    broker: string;
+    /** Linhas opcionais: null some do texto. */
+    closingTime: string | null;
+    confirmedBy: string | null;
+    registeredBy: string | null;
+    quote: string | null;
+    missing: string | null;
+    link: string | null;
+  }
   | { purpose: "taskReminder"; name: string; task: string; when: string }
   | { purpose: "brokerAccountActivated"; name: string; company: string; loginUrl: string }
   | { purpose: "dutyPresenceConfirmation"; broker: string; hour: string; link: string | null }
@@ -135,6 +149,22 @@ export function builtInNoticeVariants(fields: NoticeFields, hour: number): strin
         `${hi}! Mais um lead chegou ao fechamento 🙌\n\n${body}${tail(link, "Abrir no CRM: ")}`,
         `🏁 *Fechamento em andamento*\n\n${body}${tail(link, "👉 ")}`,
         `📈 *Novo lead em fechamento*\n\n${body}${tail(link, "Lead: ")}`,
+      ];
+    }
+    case "leadConvertedDirectorAlert": {
+      const { lead, phone, deal, broker, closingTime, confirmedBy, registeredBy, quote, missing, link } = fields;
+      const facts = [`👤 *Cliente:* ${lead}`, `📞 ${phone}`, `📋 ${deal}`, `🧑‍💼 *Corretor:* ${broker}`];
+      if (closingTime) facts.push(`⏱️ ${closingTime}`);
+      // Venda vista pela IA: os sinais e o trecho da conversa. Venda de uma pessoa: quem registrou, sem trecho.
+      const how = confirmedBy
+        ? [`✅ *Como a venda foi confirmada:* ${confirmedBy}`, ...(quote ? [`💬 _"${quote}"_`] : [])]
+        : [`✅ *Registrada por:* ${registeredBy ?? "Equipe"}`];
+      const body = [facts.join("\n"), how.join("\n"), ...(missing ? [`⚠️ *Falta no CRM:* ${missing}`] : [])].join("\n\n");
+      return [
+        `🎉 *Venda fechada!*\n\n${body}${tail(link, "👉 *Abrir no CRM:* ")}`,
+        `${hi}! Mais uma venda fechada 🎉\n\n${body}${tail(link, "Abrir no CRM: ")}`,
+        `🏆 *Venda confirmada!*\n\n${body}${tail(link, "👉 ")}`,
+        `🎉 *Nova venda da equipe*\n\n${body}${tail(link, "Lead: ")}`,
       ];
     }
     case "dailyLeadsReport": {
