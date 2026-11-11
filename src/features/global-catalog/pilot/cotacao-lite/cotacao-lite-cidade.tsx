@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { useEffect, useState } from "react";
+import { Command as CommandPrimitive } from "cmdk";
+import { Check, ChevronsUpDown, Search } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -54,14 +55,18 @@ function ListaCidades({ cidades, valor, onEscolher }: { cidades: string[]; valor
   const [busca, setBusca] = useState("");
   return (
     <Command filter={cidadeCombina} className="bg-transparent">
-      <CommandInput
-        placeholder="Buscar município"
-        aria-label="Buscar município"
-        value={busca}
-        onValueChange={setBusca}
-        className="h-12 text-base"
-      />
-      <CommandList className="max-h-72">
+      {/* Caixa própria com a lupa dentro. O input não tem ring nem outline: o foco aparece na borda da caixa, sem cortes. */}
+      <div className="flex h-12 items-center gap-2 rounded-2xl border border-border bg-background px-4 focus-within:border-primary">
+        <Search aria-hidden strokeWidth={1.5} className="size-4 shrink-0 text-muted-foreground" />
+        <CommandPrimitive.Input
+          placeholder="Buscar município"
+          aria-label="Buscar município"
+          value={busca}
+          onValueChange={setBusca}
+          className="h-full min-w-0 flex-1 bg-transparent text-base !outline-none !shadow-none !ring-0 focus:!outline-none focus:!shadow-none focus:!ring-0 focus-visible:!outline-none focus-visible:!shadow-none focus-visible:!ring-0 placeholder:text-muted-foreground"
+        />
+      </div>
+      <CommandList className="mt-2 max-h-72 px-1">
         <CommandEmpty>Nenhum município encontrado</CommandEmpty>
         <CommandGroup>
           {cidades.map(cidade => (
@@ -92,6 +97,19 @@ function ListaCidades({ cidades, valor, onEscolher }: { cidades: string[]; valor
 export function CidadeCombobox({ cidades, populares, valor, obrigatorio, onEscolher }: CidadeComboboxProps) {
   const [aberto, setAberto] = useState(false);
   const mobile = useIsMobile();
+  // Com o teclado aberto, o visor encolhe e a gaveta sobe junto: ela não fica escondida atrás do teclado.
+  const [visor, setVisor] = useState<{ alto: number; cobertoPorTeclado: number } | null>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const atualiza = () => setVisor({ alto: vv.height, cobertoPorTeclado: Math.max(0, window.innerHeight - vv.height - vv.offsetTop) });
+    vv.addEventListener("resize", atualiza);
+    vv.addEventListener("scroll", atualiza);
+    return () => {
+      vv.removeEventListener("resize", atualiza);
+      vv.removeEventListener("scroll", atualiza);
+    };
+  }, []);
   const gatilho = (
     <>
       <span className={`min-w-0 flex-1 truncate ${valor ? "" : "text-muted-foreground"}`}>
@@ -135,12 +153,14 @@ export function CidadeCombobox({ cidades, populares, valor, obrigatorio, onEscol
             {gatilho}
           </button>
           <Drawer open={aberto} onOpenChange={setAberto}>
-            <DrawerContent>
+            <DrawerContent
+              style={visor ? { maxHeight: `${Math.round(visor.alto * 0.9)}px`, marginBottom: `${Math.round(visor.cobertoPorTeclado)}px` } : undefined}
+            >
               <DrawerHeader>
                 <DrawerTitle>Município de comercialização</DrawerTitle>
                 <DrawerDescription>Busque pelo nome da cidade e toque para escolher.</DrawerDescription>
               </DrawerHeader>
-              <div className="px-4 pb-6">
+              <div className="min-h-0 overflow-y-auto px-4 pb-6">
                 <ListaCidades cidades={cidades} valor={valor} onEscolher={escolher} />
               </div>
             </DrawerContent>
@@ -154,7 +174,7 @@ export function CidadeCombobox({ cidades, populares, valor, obrigatorio, onEscol
           >
             {gatilho}
           </PopoverTrigger>
-          <PopoverContent className="w-[min(28rem,calc(100vw-2rem))] p-2">
+          <PopoverContent className="w-(--anchor-width) min-w-64 p-2">
             <ListaCidades cidades={cidades} valor={valor} onEscolher={escolher} />
           </PopoverContent>
         </Popover>
