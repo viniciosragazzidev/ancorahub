@@ -6,6 +6,7 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 
 - Lead que vira Convertido (pela IA ou por uma pessoa: mudança de etapa, Registrar venda ou proposta convertida) gera o aviso "Venda fechada para a direção" no WhatsApp da empresa, com cliente, negócio, corretor, dias no fechamento, como a venda foi confirmada (sinais e trecho da IA, ou quem registrou) e o que falta no CRM.
 - Novo aviso em Avisos da equipe: crítico, ligado por padrão, números próprios com fallback para os do Fechamento para a direção. Uma vez por lead e número; falha de envio não afeta a conversão (DEC-179).
+- Registrar venda depois de a venda já ter sido avisada (ex.: IA converteu antes) manda só a mensagem curta "Venda registrada no CRM" com valor e plano registrados, uma vez por lead e número. A venda pelo aviso de fechamento (726d1893) saiu: fica só este modelo.
 
 ## 10/11/2026 - Backfill e evidência de venda
 
