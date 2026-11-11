@@ -23,7 +23,7 @@ export type OfferPacingConfig = { intervalMinutes: number; maxPending: number };
 export type PacingOffer = { status: string; offeredAt: Date; expiresAt: Date };
 export type OfferPacingDecision =
   | { allowed: true; retryAt: null; rule: null }
-  | { allowed: false; retryAt: Date; rule: "interval" | "pending" };
+  | { allowed: false; retryAt: Date; rule: "interval" | "pending" | "duty_start" };
 
 function normalizeCount(value: number | null | undefined, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : fallback;

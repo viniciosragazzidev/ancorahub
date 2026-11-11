@@ -23,6 +23,7 @@ import { StepSheet } from "./step-sheet";
 import type { CarrierOption, ConfirmationDocument, LightLeadDetailData, LiteRequirement } from "./types";
 import { UnavailableLeadView } from "./unavailable-view";
 import { useLeadDetail } from "./use-lead-detail";
+import { WhatsAppHandoff, handoffLeadFrom } from "@/features/broker-workspace/whatsapp-handoff/whatsapp-handoff";
 
 export type { LightLeadDetailData, LiteRequirement } from "./types";
 
@@ -126,6 +127,7 @@ export function LightLeadDetail({
           onRegistered={c.markConverted}
         />
         {c.successOverlay}
+      {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={c.handoffUrl} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} onClose={c.closeHandoff} /> : null}
       </>
     );
   }
@@ -173,6 +175,7 @@ export function LightLeadDetail({
         onRegistered={c.markConverted}
       />
       {c.successOverlay}
+      {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={c.handoffUrl} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} onClose={c.closeHandoff} /> : null}
     </div>
   );
 }

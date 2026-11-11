@@ -46,7 +46,7 @@ export async function getPresenceEligibleAssignments(input: {
   schedules: PresenceSchedule[];
   now: Date;
 }) {
-  if (!input.assignments.length) return { eligibleAssignmentIds: new Set<string>(), confirmedPresenceAssignmentIds: new Set<string>(), arrivedAtByAssignment: new Map<string, Date>() };
+  if (!input.assignments.length) return { eligibleAssignmentIds: new Set<string>(), confirmedPresenceAssignmentIds: new Set<string>(), arrivedAtByAssignment: new Map<string, Date>(), pendingAssignmentIds: new Set<string>(), occurrenceStartsAtByAssignment: new Map<string, Date>() };
   const presenceRequired = await isDutyPresenceConfirmationEnabled();
 
   const scheduleById = new Map(input.schedules.map((schedule) => [schedule.id, schedule]));
@@ -56,7 +56,7 @@ export async function getPresenceEligibleAssignments(input: {
     const window = getWindow({ ...schedule, dayOfWeek: assignment.dayOfWeek, startsAt: assignment.startsAt, endsAt: assignment.endsAt, validFrom: assignment.validFrom, validUntil: assignment.validUntil }, input.now);
     return window && isDutyWindowActive(window, input.now) ? [{ assignment, schedule, window }] : [];
   });
-  if (!occurrences.length) return { eligibleAssignmentIds: new Set<string>(), confirmedPresenceAssignmentIds: new Set<string>(), arrivedAtByAssignment: new Map<string, Date>() };
+  if (!occurrences.length) return { eligibleAssignmentIds: new Set<string>(), confirmedPresenceAssignmentIds: new Set<string>(), arrivedAtByAssignment: new Map<string, Date>(), pendingAssignmentIds: new Set<string>(), occurrenceStartsAtByAssignment: new Map<string, Date>() };
 
   const confirmationRows = await getDatabase()
     .select({
@@ -83,8 +83,17 @@ export async function getPresenceEligibleAssignments(input: {
       return isDutyBrokerEligible({ attendanceMode, presenceRequired, status: confirmation?.status ?? null, confirmedBy: confirmation?.confirmedBy ?? null })
         && (!(presenceRequired || attendanceMode === "presencial") || isConfirmationForActiveOccurrence({ confirmation, assignment, window, now: input.now }));
     });
+  const eligibleIds = new Set(eligible.map(({ assignment }) => assignment.id));
   return {
-    eligibleAssignmentIds: new Set(eligible.map(({ assignment }) => assignment.id)),
+    eligibleAssignmentIds: eligibleIds,
+    // Intervalo de início (11/11): escalados da ocorrência que ainda não podem receber e não foram
+    // marcados ausentes. O presencial com foto aguardando aprovação conta aqui (ainda não recebe).
+    pendingAssignmentIds: new Set(occurrences.filter(({ assignment, window }) => {
+      if (eligibleIds.has(assignment.id)) return false;
+      const confirmation = findDutyOccurrenceConfirmation({ confirmations: confirmationRows, assignment, window, now: input.now });
+      return confirmation?.status !== "absent";
+    }).map(({ assignment }) => assignment.id)),
+    occurrenceStartsAtByAssignment: new Map(occurrences.map(({ assignment, window }) => [assignment.id, window.startsAt] as const)),
     confirmedPresenceAssignmentIds: new Set(eligible.flatMap(({ assignment, window }) => {
       const confirmation = findDutyOccurrenceConfirmation({ confirmations: confirmationRows, assignment, window, now: input.now });
       return confirmation?.status === "confirmed" && confirmation.confirmedBy ? [assignment.id] : [];

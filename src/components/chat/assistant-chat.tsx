@@ -11,6 +11,7 @@ import type { AgentId } from "@/features/ai-gateway/agents";
 import { ASSISTANTS, JACK_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
 
 import { prepareWhatsAppWindow } from "@/lib/whatsapp-open";
+import { rememberWhatsAppHandoff, useAcceptHandoffEnabled } from "@/features/broker-workspace/whatsapp-handoff/handoff-store";
 
 import { ChatScreen } from "./chat-screen";
 import type { Mention } from "./composer";
@@ -20,6 +21,8 @@ import type { ChatBlock, ChatScript, MascotShape } from "./types";
 export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false }: { identity: { name: string; shape: MascotShape; hue: number | null }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Jack's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean }) {
   const router = useRouter();
   const assist = useAssist();
+  // Aceite com contador (11/11): ligado, o WhatsApp abre na tela do lead depois de 30 s.
+  const handoff = useAcceptHandoffEnabled();
   const ask = async (text: string): Promise<ChatBlock[]> => {
     if (agentId) return (await askAssistantAction({ agentId, question: text })).blocks;
     return [{ type: "assistant", id: `free-answer-${Date.now()}`, text: "Não achei isso. Tente com outras palavras ou toque em \"?\" no topo para a ajuda da tela." }];
@@ -37,7 +40,8 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
       topNotice={topNotice}
       runAction={async (action) => {
         // Accepting opens the client's WhatsApp in the same tap: the tab opens before the await (popup blockers).
-        const whatsapp = action.name === "lead.accept" || action.name === "lead.registerContact" ? prepareWhatsAppWindow() : null;
+        const handoffAccept = handoff && action.name === "lead.accept";
+        const whatsapp = !handoffAccept && (action.name === "lead.accept" || action.name === "lead.registerContact") ? prepareWhatsAppWindow() : null;
         let result: Awaited<ReturnType<typeof runChatServerAction>>;
         try {
           result = await runChatServerAction(action.name, action.payload);
@@ -49,6 +53,12 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
         const opened = Boolean(whatsapp && result.ok && whatsappHref && whatsapp.go(whatsappHref));
         if (!opened) whatsapp?.cancel();
         if (action.name === "lead.accept" && result.ok && result.href?.startsWith("/") && !result.href.startsWith("//")) {
+          if (handoffAccept && whatsappHref) {
+            const leadId = result.href.split("/").filter(Boolean).pop()?.split("?")[0];
+            if (leadId) rememberWhatsAppHandoff(leadId, whatsappHref);
+            router.push(result.href);
+            return { ok: true, message: "Aceito. Veja quem é o cliente antes de chamar.", warning: result.warning, followUp: [] };
+          }
           router.push(result.href);
           return { ok: true, message: opened ? "Aceito. Abrindo o WhatsApp do cliente." : "Aceito. Abrindo o lead agora.", warning: result.warning, followUp: [] };
         }

@@ -15,6 +15,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { buildBrokerWorkspaceTodayMetrics, getSaoPauloDayBounds } from "./workspace-data-domain";
 import { buildDutySummary, loadBrokerDutyRows } from "./duty-summary";
+import { listSchedulesInDutyStartInterval } from "@/features/lead-distribution/duty-start-interval-server";
 import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
 
 const activeLeadStatuses = [
@@ -40,6 +41,8 @@ export type DutyPresenceAsk = {
   status: "pending" | "awaiting_release" | "confirmed";
   /** Confirmation id when a photo exists (the broker sees his own photo while waiting). */
   photoId: string | null;
+  /** Intervalo de início de plantão (11/11): um lead a cada 8 min enquanto os colegas confirmam. */
+  startInterval?: boolean;
 };
 
 export type BrokerActiveDuty = { scheduleId: string; scheduleName: string; queueName: string | null; branchName: string | null; dutyDate: string; startsAt: Date; endsAt: Date; paused: boolean; presenceStatus: "confirmed" | "pending" | "not_required"; attendanceMode?: string };
@@ -328,6 +331,16 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
     })
     .slice(0, 50)
     .map((lead) => ({ id: lead.id, name: lead.name, status: lead.status, source: lead.source, arrivedAt: arrivalOf(lead), nextAction: priorityByLead.get(lead.id) ?? null }));
+
+  // Intervalo de início de plantão (11/11): só olha os plantões já confirmados e em andamento.
+  const confirmedRunning = (duty?.presences ?? []).filter((presence) => presence.status === "confirmed" && presence.startsAt <= now);
+  if (duty && confirmedRunning.length) {
+    const inInterval = await listSchedulesInDutyStartInterval({ tenantId: context.tenantId, scheduleIds: [...new Set(confirmedRunning.map((presence) => presence.scheduleId))], now });
+    if (inInterval.size) {
+      duty.presences = duty.presences?.map((presence) => inInterval.has(presence.scheduleId) && presence.status === "confirmed" ? { ...presence, startInterval: true } : presence);
+      duty.presence = duty.presences?.[0] ?? duty.presence;
+    }
+  }
 
   return {
     viewer: {

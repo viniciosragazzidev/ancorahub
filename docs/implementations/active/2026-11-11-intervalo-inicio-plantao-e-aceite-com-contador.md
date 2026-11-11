@@ -1,6 +1,18 @@
 # Intervalo de 8 min no início do plantão e aceite com contador para o WhatsApp
 
-Status: plano para revisão (11/11/2026). Nada foi implementado.
+Status: aprovado com as opções recomendadas e implementado em 11/11/2026 (DEC-177, BR-097), branch `feat/intervalo-plantao-e-aceite-contador`. As duas flags começam desligadas.
+
+## O que mudou na implementação, em relação ao plano
+
+- **Âncora do intervalo:** a última **oferta** do corretor (exceto CANCELLED) em qualquer fila, e não "oferta ou atribuição do mesmo plantão". Motivo: aceitar a oferta grava `assignedAt` e empurraria o intervalo para depois do aceite; e oferta de fila não exclusiva não guarda o plantão.
+- **Sem rastreio novo em `distribution-trace`:** fica o passo `duty_start_interval:<n>` no trace por lead e o motivo novo do lead parado ("Aguardando intervalo de início de plantão…"). O simulador (`control-service.ts`) não mostra o intervalo.
+- **Contagem fora da tela do plantão:** o aviso do corretor usa `listSchedulesInDutyStartInterval` (mesma regra, sem o filtro por unidade), chamado só quando ele tem plantão confirmado em andamento.
+- **Aceite com contador:** em vez de `?chamar=1`, o botão de aceite deixa o link do WhatsApp no `sessionStorage` da aba (válido por 2 min, lido e apagado pela tela do lead). Recarregar não repete o contador.
+- **"Ficar aqui" fecha o quadro e a pílula**: a tela do lead já tem o próprio botão do WhatsApp. Com isso não há estado "parado" da pílula.
+- **A pílula do Início não foi trocada** pelo `FloatingPill` novo (mesmas classes; trocar ficou de fora para não mexer no Início).
+- **Linha "Anúncio"** fica pronta no quadro (`advertisedPlan`), mas só aparece quando a branch `feat/corretor-anuncio-do-lead` passar o dado.
+- **Teste em aparelhos reais:** não feito. A detecção de falha (página continua visível em 1,5 s; `window.open` nulo) está coberta por testes unitários; o comportamento real em Android, iPhone e computador precisa ser conferido no piloto.
+- Prévia só em desenvolvimento: `/dev/aceite-contador?tela=aceite|presenca|diretor&estado=contando|falhou`.
 
 Pedido do Vinicios em 11/11/2026: "todo início de plantão se tiver corretores pendentes ainda para aceitar o plantão, o corretor que está aceito (1 a 3) deve entrar um timeout entre ofertas de 8 minutos automaticamente só nesses casos para evitar que muitas indicações vá para um só corretor sem que os outros tenham tempo de aceitar; Ao clicar em aceitar lead e abrir no whatsapp deve mostrar as informações do lead, iniciar um botão com um contador de 30 segundos em um botão flutuante centralizado no bottom da tela, contador esse que mostra o tempo para que o whatsapp abra automaticamente, e ao clicar no botão abre imediatamente".
 

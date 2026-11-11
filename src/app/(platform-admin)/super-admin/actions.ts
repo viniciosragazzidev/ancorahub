@@ -37,6 +37,7 @@ import { REALTIME_SYNC_FEATURE } from "@/features/notifications/realtime-sync";
 import { SYSTEM_REPORT_DESTINATION_KEY, SYSTEM_REPORT_ENABLED_KEY } from "@/features/system-report/message";
 import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, META_OUTBOUND_STALE_AFTER_HOURS_SETTING } from "@/features/communication-channels/outbound-service";
 import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag";
+import { acceptHandoffSettingKey } from "@/features/broker-workspace/whatsapp-handoff/flag";
 import { liveStatusSettingKey } from "@/features/live-status/flag";
 import { customerWaitingSettingKey, customerWaitingSinceKey } from "@/features/customer-waiting/flag";
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
@@ -419,6 +420,26 @@ export async function updateLiveStatusPilotAction(tenantId: string, formData: Fo
     id: crypto.randomUUID(),
     actorUserId: admin.userId,
     action: "live_status_strip.tenant_pilot_updated",
+    targetType: "tenant",
+    targetId: targetTenantId,
+    metadata: { enabled: input.enabled === "true" },
+    createdAt: now,
+  });
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
+}
+
+/** Aceite com contador no Lite (11/11): piloto por empresa, com auditoria. */
+export async function updateAcceptHandoffPilotAction(tenantId: string, formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
+  const now = new Date();
+
+  await setSystemSetting(acceptHandoffSettingKey(targetTenantId), input.enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "lite_accept_handoff.tenant_pilot_updated",
     targetType: "tenant",
     targetId: targetTenantId,
     metadata: { enabled: input.enabled === "true" },
@@ -1029,6 +1050,21 @@ export async function updateDutyOvernightExtraSettingsAction(formData: FormData)
     action: "duty_overnight_extra_shift.settings_updated",
     targetType: "system_settings", targetId: FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_SHIFT.key,
     metadata: { enabled: enabled === "true", startsAt: startsAtRaw }, createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+}
+
+/** Intervalo de início de plantão (11/11): liga/desliga global, com auditoria. */
+export async function updateDutyStartOfferIntervalAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("dutyStartOfferIntervalEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting(FEATURE_FLAGS.DUTY_START_OFFER_INTERVAL.key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId,
+    action: "duty_start_offer_interval.settings_updated",
+    targetType: "system_settings", targetId: FEATURE_FLAGS.DUTY_START_OFFER_INTERVAL.key,
+    metadata: { enabled: enabled === "true" }, createdAt: now,
   });
   revalidatePath("/super-admin/settings");
 }

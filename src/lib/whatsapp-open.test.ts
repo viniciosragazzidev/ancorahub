@@ -69,3 +69,19 @@ describe("prepareWhatsAppWindow", () => {
     expect(open).not.toHaveBeenCalled();
   });
 });
+
+describe("tryOpenWhatsAppWithoutGesture", () => {
+  it("no computador, pop-up barrado é falha", async () => {
+    const { tryOpenWhatsAppWithoutGesture } = await import("./whatsapp-open");
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
+    await expect(tryOpenWhatsAppWithoutGesture("https://web.whatsapp.com/send?phone=5521999999999", "desktop")).resolves.toBe("failed");
+    openSpy.mockRestore();
+  });
+
+  it("no computador, aba aberta é sucesso", async () => {
+    const { tryOpenWhatsAppWithoutGesture } = await import("./whatsapp-open");
+    const openSpy = vi.spyOn(window, "open").mockReturnValue({ opener: null } as unknown as Window);
+    await expect(tryOpenWhatsAppWithoutGesture("https://web.whatsapp.com/send?phone=5521999999999", "desktop")).resolves.toBe("opened");
+    openSpy.mockRestore();
+  });
+});

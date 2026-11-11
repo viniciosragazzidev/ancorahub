@@ -10,6 +10,7 @@ const STATUS_UI: Record<BrokerLiveOfferStatus, { label: string; status: Animated
   ready: { label: "Pronto para receber", status: "success", pulse: true },
   offer_pending: { label: "Oferta enviada", status: "info", pulse: true },
   cooldown: { label: "Próximo lead em", status: "warning", pulse: false },
+  start_interval: { label: "Intervalo de início", status: "info", pulse: false },
   capacity_full: { label: "Limite da fila atingido", status: "neutral", pulse: false },
   blocked: { label: "Indisponível", status: "danger", pulse: false },
 };
