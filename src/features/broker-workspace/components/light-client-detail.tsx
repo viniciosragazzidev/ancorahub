@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 
@@ -70,7 +70,13 @@ function money(value: string | null) {
 }
 
 /** Ficha do cliente no visual Lite (gestor e supervisor). Os dados chegam já filtrados pelo escopo. */
-export function LightClientDetail({ data, broker }: { data: LightClientDetailData; broker?: { nextAction: NextActionView | null } }) {
+/**
+ * Ações extras da ficha do corretor (C2): montadas no servidor com o mesmo escopo e autorização da ficha antiga.
+ * `documents` substitui a lista somente leitura; `conversationHref` e `saleLinks` são links de navegação.
+ */
+export type LightClientDetailActions = { documents?: ReactNode; conversationHref?: string | null; saleLinks?: boolean };
+
+export function LightClientDetail({ data, broker, actions }: { data: LightClientDetailData; broker?: { nextAction: NextActionView | null }; actions?: LightClientDetailActions }) {
   const { client, activeCustomer, sales, beneficiaries, documents, timeline } = data;
   const [section, setSection] = useState<Section>("dados");
   const reduce = useReducedMotion();
@@ -102,6 +108,9 @@ export function LightClientDetail({ data, broker }: { data: LightClientDetailDat
           {renewalSoon ? <span className={styles.badgeAccent}>Renovação em {daysToRenewal} dias</span> : null}
         </div>
         <div className={styles.actions}>
+          {actions?.conversationHref ? (
+            <Link href={actions.conversationHref} className={styles.secondaryAction}>Enviar mensagem</Link>
+          ) : null}
           {waUrl ? (
             <a href={waUrl} target="_blank" rel="noopener noreferrer" className={styles.secondaryAction}>WhatsApp</a>
           ) : null}
@@ -198,6 +207,9 @@ export function LightClientDetail({ data, broker }: { data: LightClientDetailDat
                           {sale.policyNumber ? ` · Apólice ${sale.policyNumber}` : ""}
                           {formatDay(sale.saleDate) ? ` · ${formatDay(sale.saleDate)}` : ""}
                         </small>
+                        {actions?.saleLinks ? (
+                          <Link href={`/vendas/${encodeURIComponent(sale.id)}`} className={styles.secondaryAction}>Ver detalhes</Link>
+                        ) : null}
                       </LiteListItem>
                     ))}
                   </LiteList>
@@ -211,7 +223,7 @@ export function LightClientDetail({ data, broker }: { data: LightClientDetailDat
           {section === "documentos" ? (
             <section className={styles.panel} aria-labelledby="client-documents-title">
               <h2 id="client-documents-title">Documentos ({documents.length})</h2>
-              {documents.length ? (
+              {actions?.documents ? actions.documents : documents.length ? (
                 <LiteList className={styles.list} label="Documentos">
                   {documents.map((document) => (
                     <LiteListItem key={document.id}>
