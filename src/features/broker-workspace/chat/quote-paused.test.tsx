@@ -18,6 +18,7 @@ describe("QuotePaused", () => {
     expect(screen.getByRole("heading", { name: "A Cotação está de folga" })).toBeTruthy();
     expect(screen.getAllByText("Em pausa").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /Ver meus leads/ })).toBeTruthy();
-    expect((screen.getByRole("combobox") as HTMLTextAreaElement).disabled).toBe(true);
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByRole("button", { name: /Voltar ao Início/ })).toBeTruthy();
   });
 });
