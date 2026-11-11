@@ -754,3 +754,7 @@ O bloco aparece quando o lead entra em fechamento ou a venda é confirmada. Reú
 ## 11/11/2026 - Carteira Lite do corretor, C1
 
 `/clientes` no corretor Lite usa consulta paginada no servidor, escopo pelo tenant e corretor autenticados, recortes Todos/Precisa de atenção/Renovações condicionais a contrato ativo, elegível e não expirado, busca por nome/telefone e filtros por origem, contrato e prazo do retorno. A URL preserva os parâmetros, view=renewals sem dados elegíveis normaliza para all e próxima ação fica visível na lista. A flag global `feature_broker_client_wallet_lite_enabled` protege a nova superfície e, em falha de leitura, mantém a lista antiga. SQL do índice `active_customers_tenant_client_idx` está em `drizzle/0227_active_customers_tenant_client_idx.sql`, não executado. Registro: `docs/implementations/active/2026-11-11-carteira-corretor-lite.md`.
+
+## 11/11/2026 - Cotação Lite em fluxo guiado (prévia)
+
+Nova tela de cotação para o corretor Lite em passos (modalidade, município, vidas, refino), uma pergunta por tela, com resultados em cartões. Planos pendentes mostram a condição a confirmar em texto claro, e a proposta em PDF só aparece nos planos prontos. Ainda é uma prévia em /dev/cotacao-lite com dados falsos, só em desenvolvimento: não está ligada à rota de cotação nem ao catálogo real. Prints em reports/agent/cotacao-lite/. Sem alteração de banco, migration ou contrato.
