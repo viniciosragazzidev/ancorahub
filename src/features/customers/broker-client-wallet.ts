@@ -166,6 +166,7 @@ export function buildBrokerClientWalletWhere(
   const conditions: (SQL | undefined)[] = [
     buildClientScopeWhere(context),
     eq(schema.clients.tenantId, context.tenantId),
+    sql`exists (select 1 from ${schema.leads} where ${schema.leads.id} = ${schema.clients.leadId} and ${schema.leads.tenantId} = ${context.tenantId})`,
   ];
 
   if (filters.query) {

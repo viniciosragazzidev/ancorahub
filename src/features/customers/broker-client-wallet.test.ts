@@ -29,6 +29,7 @@ describe("broker client wallet query contract", () => {
     for (const query of [list, attentionCount]) {
       expect(query.sql).toContain('"clients"."tenant_id"');
       expect(query.sql).toContain('"clients"."corretor_id"');
+      expect(query.sql).toContain('"leads"."tenant_id"');
       expect(query.params).toContain("tenant-a");
       expect(query.params).toContain("broker-a");
       expect(query.params).not.toContain("tenant-b");
