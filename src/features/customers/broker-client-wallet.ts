@@ -208,14 +208,6 @@ export function buildBrokerClientWalletWhere(
   return and(...conditions)!;
 }
 
-async function countClients(context: WalletContext, filters: BrokerClientWalletFilters, now: Date) {
-  const [result] = await getDatabase()
-    .select({ value: count() })
-    .from(schema.clients)
-    .where(buildBrokerClientWalletWhere(context, filters, now));
-  return Number(result?.value ?? 0);
-}
-
 export async function getBrokerClientWallet(
   context: WalletContext,
   rawFilters: Partial<BrokerClientWalletFilters>,
@@ -228,35 +220,32 @@ export async function getBrokerClientWallet(
 
   const common = { ...filters, view: "all" as const };
   const db = getDatabase();
-  const [
-    selectedCount,
-    walletCount,
-    allCount,
-    attentionCount,
-    renewalCount,
-    renewalDataCount,
-    origins,
-  ] = await Promise.all([
-    countClients(context, filters, now),
-    countClients(context, { ...common, query: undefined, origin: undefined, contractStatus: undefined, returnStatus: undefined }, now),
-    countClients(context, common, now),
-    countClients(context, { ...common, view: "attention" }, now),
-    countClients(context, { ...common, view: "renewals" }, now),
-    db.select({ value: count() }).from(schema.activeCustomers)
-      .innerJoin(schema.clients, and(eq(schema.activeCustomers.clientId, schema.clients.id), eq(schema.activeCustomers.tenantId, schema.clients.tenantId)))
-      .where(and(
-        buildClientScopeWhere(context),
-        eq(schema.activeCustomers.tenantId, context.tenantId),
-        eq(schema.activeCustomers.status, "active"),
-        isNotNull(schema.activeCustomers.renewalWindowStartDate),
-      ))
-      .then(([result]) => Number(result?.value ?? 0)),
+  const scopeFilters = normalizeBrokerClientWalletFilters({ view: "all", page: 1 });
+  const [aggregates, origins] = await Promise.all([
+    db.select({
+      walletCount: count(),
+      selectedCount: sql<number>`count(*) filter (where ${buildBrokerClientWalletWhere(context, filters, now)})`,
+      allCount: sql<number>`count(*) filter (where ${buildBrokerClientWalletWhere(context, common, now)})`,
+      attentionCount: sql<number>`count(*) filter (where ${buildBrokerClientWalletWhere(context, { ...common, view: "attention" }, now)})`,
+      renewalCount: sql<number>`count(*) filter (where ${buildBrokerClientWalletWhere(context, { ...common, view: "renewals" }, now)})`,
+      renewalDataCount: sql<number>`count(*) filter (where ${activeContractExists(context, { status: "active", hasRenewalDate: true })})`,
+    })
+      .from(schema.clients)
+      .where(buildBrokerClientWalletWhere(context, scopeFilters, now)),
     db.selectDistinct({ origin: schema.leads.origem })
       .from(schema.leads)
       .innerJoin(schema.clients, and(eq(schema.clients.leadId, schema.leads.id), eq(schema.clients.tenantId, schema.leads.tenantId)))
       .where(and(buildClientScopeWhere(context), eq(schema.leads.tenantId, context.tenantId), isNotNull(schema.leads.origem)))
       .orderBy(asc(schema.leads.origem)),
   ]);
+
+  const counts = aggregates[0];
+  const selectedCount = Number(counts?.selectedCount ?? 0);
+  const walletCount = Number(counts?.walletCount ?? 0);
+  const allCount = Number(counts?.allCount ?? 0);
+  const attentionCount = Number(counts?.attentionCount ?? 0);
+  const renewalCount = Number(counts?.renewalCount ?? 0);
+  const renewalDataCount = Number(counts?.renewalDataCount ?? 0);
 
   const totalPages = Math.ceil(selectedCount / BROKER_CLIENT_WALLET_PAGE_SIZE);
   const page = totalPages > 0 ? Math.min(filters.page, totalPages) : 1;
