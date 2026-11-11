@@ -187,6 +187,7 @@ export function Composer({
               {progress.title}
             </span>
             <span className={styles.progressCount}>{progress.done} de {progress.total}</span>
+            <ProgressTrack done={progress.done} total={progress.total} />
           </div>
         ) : null}
         <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); if (menuOpen) pick(matches[active]); else submit(); }}>
@@ -242,5 +243,28 @@ export function Composer({
         </form>
       </div>
     </div>
+  );
+}
+
+/**
+ * Guided flows (Cotação, 11/11): one segment per step, like a lesson. The step just answered
+ * fills with a spring and gives a small pop; with reduced motion it simply appears filled.
+ */
+function ProgressTrack({ done, total }: { done: number; total: number }) {
+  const reduce = useReducedMotion();
+  if (total <= 0) return null;
+  return (
+    <span className={styles.progressTrack} aria-hidden="true">
+      {Array.from({ length: total }, (_, index) => (
+        <span key={index} className={styles.progressSegment}>
+          <motion.span
+            className={styles.progressFill}
+            initial={false}
+            animate={{ scaleX: index < done ? 1 : 0, scaleY: reduce || index !== done - 1 ? 1 : [1, 1.6, 1] }}
+            transition={reduce ? { duration: 0 } : { scaleX: { type: "spring", visualDuration: 0.4, bounce: 0.2 }, scaleY: { duration: 0.36, delay: 0.18 } }}
+          />
+        </span>
+      ))}
+    </span>
   );
 }

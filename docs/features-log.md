@@ -2,6 +2,13 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 11/11/2026 - Cotador real na conversa guiada do Lite
+
+- `/cotacao` volta a ser a conversa da Cotação (mascote, uma pergunta por vez, opções A..G ou resposta digitada), agora sobre o catálogo real do piloto: tipo (saúde ou odonto), público, município, idades, entidade (adesão), tipo e tempo de empresa (PME), acomodação e coparticipação, com "Tanto faz" e a contagem de planos em cada opção.
+- Progresso em trilha de lição no composer; o mascote procura entre os planos da modalidade; resultado com funil animado (catálogo, modalidade, perfil), números que sobem, pódio dos 3 mais em conta com selo "Menor preço", valor por vida e pontos para conferir.
+- Depois do resultado: ver mais 3, comparar até 3 (botão no topo e painel lado a lado), só uma operadora, teto por mês, tirar filtros e refazer. Condições e rede abrem num painel Lite; PDF continua bloqueado até a revisão comercial, com comemoração quando liberado. A busca em formulário fica em `?completo=1`.
+- Kit de chat: bloco `custom`, mascote trabalhando com frase também em respostas locais e digitadas, perguntas deixadas para trás fecham (`closePassedQuestions`) e trilha de progresso por etapa. Preview dev: `/dev/cotador`.
+
 ## 11/11/2026 - Venda fechada para a direção no WhatsApp
 
 - Lead que vira Convertido (pela IA ou por uma pessoa: mudança de etapa, Registrar venda ou proposta convertida) gera o aviso "Venda fechada para a direção" no WhatsApp da empresa, com cliente, negócio, corretor, dias no fechamento, como a venda foi confirmada (sinais e trecho da IA, ou quem registrou) e o que falta no CRM.

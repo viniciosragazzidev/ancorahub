@@ -89,6 +89,8 @@ export type ChatBlock =
   /** A whole assistant switched off for now: a calm hero with its mascot "resting". */
   | { type: "paused"; id: string; title: string; text: string; shape: MascotShape; hue: number }
   | { type: "question"; id: string; prompt: string; choices: ChatChoice[] }
+  /** A block drawn by the screen itself (ChatScreen renderCustom), e.g. the quote's plan cards. Data stays plain JSON. */
+  | { type: "custom"; id: string; kind: string; data: unknown }
   /** A real link as a button (WhatsApp): opened by the tap itself, so phones never block it. */
   | { type: "button"; id: string; text?: string; label: string; href: string; tone?: "whatsapp" | "action" };
 

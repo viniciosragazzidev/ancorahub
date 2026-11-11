@@ -258,6 +258,7 @@ O modo Diretor segue este design system quando a flag por empresa `feature_direc
 Em 2026-10-09 a pele do Lite chegou a ser aplicada ao modo normal e foi desfeita a pedido do Vinicios no mesmo dia. O histórico dessa tentativa está nos commits `3fdd31a0` a `c78cb73b` da branch `feat/diretor-visual-lite`.
 
 ## 11. Histórico
+- 2026-11-11 · Cotação com o catálogo real: bloco `custom` (cartões de plano da tela), trilha de progresso por etapa no composer, mascote trabalhando com frase em respostas locais e digitadas, `closePassedQuestions` para fluxos guiados.
 - 2026-10-24 · escopo do modo Diretor reaberto por decisão DEC-149, atrás da flag por empresa `feature_director_lite_style`.
 - 2026-10-09 · v1.2 · aplicação no modo normal desfeita a pedido do Vinicios; vale só para o Lite.
 - 2026-10-09 · v1.1 · vira o único design system; §10 reescrita: no modo normal só a camada visual.

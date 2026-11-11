@@ -63,6 +63,9 @@ export function ChatScreen({
   fill = false,
   embedded = false,
   emptyText,
+  renderCustom,
+  localWorkingLabel,
+  closePassedQuestions = false,
 }: {
   identity: Identity;
   /**
@@ -98,6 +101,15 @@ export function ChatScreen({
   /** History-like threads (Âncora): show everything at once, already scrolled to the newest. */
   instant?: boolean;
   tourTargets?: { conversation?: string; composer?: string };
+  /** Draws "custom" blocks (the quote's plan cards). `local` answers like a reply with a local action. */
+  renderCustom?: (block: Extract<ChatBlock, { type: "custom" }>, api: CustomBlockApi) => ReactNode;
+  /** A local reply that takes a while (a search): the mascot works with this line until the answer comes. */
+  localWorkingLabel?: (value: string) => string | null;
+  /**
+   * Guided flows (Cotação): a question the broker left behind (answered by typing, or followed by
+   * another reply) closes, so an old option can never overwrite a later answer.
+   */
+  closePassedQuestions?: boolean;
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
@@ -207,7 +219,22 @@ export function ChatScreen({
       return;
     }
     if (action.kind === "local") {
-      if (onLocalChoice) enqueue(await onLocalChoice(choice, action.value));
+      if (!onLocalChoice) return;
+      const label = localWorkingLabel?.(action.value) ?? null;
+      if (!label) { enqueue(await onLocalChoice(choice, action.value)); return; }
+      setWorking(true);
+      setWorkingLabel(label);
+      setStatus({ label: "Trabalhando...", tone: "working" });
+      try {
+        enqueue(await onLocalChoice(choice, action.value));
+        setStatus({ label: "Pronto", tone: "idle" });
+      } catch {
+        enqueue([{ type: "assistant", id: `error-${question.id}`, text: "Não consegui concluir agora. Tente de novo em instantes." }]);
+        setStatus({ label: "Esperando você", tone: "waiting" });
+      } finally {
+        setWorking(false);
+        setWorkingLabel(null);
+      }
       return;
     }
     if (!runAction) return;
@@ -233,7 +260,7 @@ export function ChatScreen({
     } finally {
       setWorking(false);
     }
-  }, [answers, copyQuestion, enqueue, onLocalChoice, router, runAction, script.blocks, script.replayAfterAction]);
+  }, [answers, copyQuestion, enqueue, localWorkingLabel, onLocalChoice, router, runAction, script.blocks, script.replayAfterAction]);
 
   // A list row swiped away (Agenda: cancel a return): it leaves at once, the action runs as a reply.
   const swipeItem = useCallback((item: ChatListItem) => {
@@ -296,15 +323,30 @@ export function ChatScreen({
   }, [enqueue, onFreeText, working]);
 
   // Rows are memoized: they get stable handlers that always call the latest ones.
-  const latest = useRef({ choose, swipeItem, onButtonOpen, mention, consent });
-  useEffect(() => { latest.current = { choose, swipeItem, onButtonOpen, mention, consent }; });
+  const latest = useRef({ choose, swipeItem, onButtonOpen, mention, consent, renderCustom });
+  useEffect(() => { latest.current = { choose, swipeItem, onButtonOpen, mention, consent, renderCustom }; });
   const rowHandlers = useMemo<RowHandlers>(() => ({
     choose: (question, choice) => { void latest.current.choose(question, choice); },
     swipe: (item) => latest.current.swipeItem(item),
     buttonOpen: (block, event) => latest.current.onButtonOpen?.(block, event),
     lead: (row) => { void latest.current.mention({ handle: `lead:${row.leadId}`, label: `@${row.name}`, note: "", group: "leads" }); },
     consent: (block, allow) => latest.current.consent(block, allow),
+    custom: (block) => latest.current.renderCustom?.(block, {
+      local: (label, value, reply) => { void latest.current.choose({ type: "question", id: `custom-${block.id}-${Date.now()}`, prompt: "", choices: [] }, { id: value, label, reply, action: { kind: "local", value } }); },
+    }) ?? null,
   }), []);
+
+  const passed = useMemo(() => {
+    const ids = new Set<string>();
+    if (!closePassedQuestions) return ids;
+    let replied = false;
+    for (let index = shown.length - 1; index >= 0; index -= 1) {
+      const block = shown[index];
+      if (block.type === "user") replied = true;
+      else if (block.type === "question" && replied) ids.add(block.id);
+    }
+    return ids;
+  }, [closePassedQuestions, shown]);
 
   const answeredCount = Object.keys(answers).length;
   const progress = progressOverride !== undefined
@@ -341,7 +383,7 @@ export function ChatScreen({
         <div data-tour={tourTargets?.conversation} className={styles.thread_}>
           {embedded && emptyText && !shown.length ? <p className={styles.emptyThread}>{emptyText}</p> : null}
           {shown.map((block) => (
-            <BlockRow key={block.id} block={block} chosenId={block.type === "question" ? answers[block.id] ?? null : null} working={working} handlers={rowHandlers} />
+            <BlockRow key={block.id} block={block} chosenId={block.type === "question" ? answers[block.id] ?? (passed.has(block.id) ? "__passed" : null) : null} working={working} handlers={rowHandlers} />
           ))}
           <AnimatePresence>{typing ? <MessageEnter key="typing"><TypingIndicator /></MessageEnter> : null}</AnimatePresence>
           {working ? (
@@ -368,7 +410,9 @@ export function ChatScreen({
           setShown((current) => [...current, { type: "user", id: `free-${Date.now()}`, text, at: nowLabel() }]);
           if (!onFreeText) return;
           setWorking(true);
-          try { enqueue(await onFreeText(text)); } finally { setWorking(false); }
+          // Guided flows may name the wait ("Procurando entre 2.681 planos…") when the typed answer starts a search.
+          setWorkingLabel(localWorkingLabel?.(`text:${text}`) ?? null);
+          try { enqueue(await onFreeText(text)); } finally { setWorking(false); setWorkingLabel(null); }
         }}
         onMention={mention}
       />}
@@ -376,7 +420,11 @@ export function ChatScreen({
   );
 }
 
+/** What a custom block may do: answer like a tapped reply ("Gerar a proposta"), handled by onLocalChoice. */
+export type CustomBlockApi = { local: (label: string, value: string, reply?: string) => void };
+
 type RowHandlers = {
+  custom: (block: Extract<ChatBlock, { type: "custom" }>) => ReactNode;
   choose: (question: Extract<ChatBlock, { type: "question" }>, choice: ChatChoice) => void;
   swipe: (item: ChatListItem) => void;
   buttonOpen: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void;
@@ -393,7 +441,7 @@ function sameBlock(a: ChatBlock, b: ChatBlock) {
 const BlockRow = memo(function BlockRow({ block, chosenId, working, handlers }: { block: ChatBlock; chosenId: string | null; working: boolean; handlers: RowHandlers }) {
   return (
     <MessageEnter>
-      {block.type === "question"
+      {block.type === "custom" ? handlers.custom(block) : block.type === "question"
         ? <ChoiceList block={block} chosenId={chosenId} disabled={working} onChoose={(choice) => handlers.choose(block, choice)} />
         : <ChatBlockView block={block} onButtonOpen={handlers.buttonOpen} onItemSwipe={handlers.swipe} swipeDisabled={working} onLeadOpen={handlers.lead} onConsent={handlers.consent} onSystemAction={(system) => { if (system.action) handlers.choose({ type: "question", id: `sys-${system.id}`, prompt: "", choices: [] }, { id: system.id, label: system.action.label, action: system.action.choiceAction }); }} />}
     </MessageEnter>
