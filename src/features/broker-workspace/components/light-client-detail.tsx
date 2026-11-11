@@ -9,6 +9,9 @@ import { Button } from "@/components/arc/button/button";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { LitePageEnter, LiteList, LiteListItem } from "@/components/light/light-motion";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
+import type { NextActionView } from "@/features/carteira/proxima-acao-core";
+
+import { LightNextActionPanel } from "./light-client-next-action";
 
 import styles from "./light-client-detail.module.css";
 
@@ -67,7 +70,7 @@ function money(value: string | null) {
 }
 
 /** Ficha do cliente no visual Lite (gestor e supervisor). Os dados chegam já filtrados pelo escopo. */
-export function LightClientDetail({ data }: { data: LightClientDetailData }) {
+export function LightClientDetail({ data, broker }: { data: LightClientDetailData; broker?: { nextAction: NextActionView | null } }) {
   const { client, activeCustomer, sales, beneficiaries, documents, timeline } = data;
   const [section, setSection] = useState<Section>("dados");
   const reduce = useReducedMotion();
@@ -117,6 +120,8 @@ export function LightClientDetail({ data }: { data: LightClientDetailData }) {
           </BottomSheet>
         </div>
       </header>
+
+      {broker ? <LightNextActionPanel clientId={client.id} leadId={client.leadId} nextAction={broker.nextAction} /> : null}
 
       <SegmentedControl
         label="Seções do cliente"

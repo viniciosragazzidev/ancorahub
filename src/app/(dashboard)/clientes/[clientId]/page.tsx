@@ -23,6 +23,7 @@ import { PersonRecordDetails } from "@/features/customer-record/components/perso
 import { buildClientScopeWhere } from "@/features/customers/customer-authorization";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { LightClientDetail } from "@/features/broker-workspace/components/light-client-detail";
+import { carregarProximaAcao, carteiraFichaLiteLigada } from "@/features/carteira/retorno-servico";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { ClientDetailLite } from "./client-detail-lite";
@@ -63,8 +64,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
   if (!client) notFound();
 
   // Gestor and supervisor Lite: the Lite ficha, read through the same scoped client lookup above.
+  // Corretor Lite: a mesma ficha com a próxima ação, só com a flag da carteira ligada (C2, 11/11).
   const liteAudience = await getLiteAudience(context);
-  if (liteAudience === "supervisor" || liteAudience === "manager") {
+  const brokerWalletLite = liteAudience === "broker" && (await carteiraFichaLiteLigada());
+  if (liteAudience === "supervisor" || liteAudience === "manager" || brokerWalletLite) {
     const [liteSales, liteActiveCustomer, timeline, documents, beneficiaries] = await Promise.all([
       db
         .select({
@@ -102,6 +105,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
       getLeadBeneficiaries(client.leadId),
     ]);
 
+    // Próxima ação só para o corretor dono (serviço revalida o escopo). Falha vira estado de erro na ficha, não quebra a página.
+    const nextAction = brokerWalletLite
+      ? await carregarProximaAcao(context, client.leadId).catch(() => null)
+      : null;
+
     return (
       <LightClientDetail
         data={{
@@ -112,6 +120,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
           documents: documents.map((document) => ({ id: document.id, filename: document.filename, status: document.status, requirementName: document.requirementName })),
           timeline: timeline ?? [],
         }}
+        {...(brokerWalletLite ? { broker: { nextAction } } : {})}
       />
     );
   }
