@@ -160,10 +160,16 @@ export async function sendClosingNoticesRecoveryAction(rawLeadId: string): Promi
     if (success) revalidatePath(`/leads/${lead.id}`);
     return { success, summary, ...(error ? { error } : {}) };
   } catch (error) {
+    const reference = randomUUID().slice(0, 8);
+    // Erro bruto (pode trazer parâmetros da query) fica só no log, com a referência.
+    console.error("[closing-notices-recovery] failed", {
+      reference,
+      error: error instanceof Error ? error.message.split("params:")[0].slice(0, 200) : "unknown",
+    });
     return {
       success: false,
       summary: "",
-      error: error instanceof Error ? error.message : "Não foi possível enviar os avisos de fechamento.",
+      error: `Não foi possível enviar os avisos de fechamento. Tente de novo; se repetir, informe a referência ${reference}.`,
     };
   }
 }
