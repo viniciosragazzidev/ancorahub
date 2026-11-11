@@ -178,6 +178,7 @@ Avatar + três pontos 6px `--neutral-6`.
 
 ### 5.8 FloatingPill
 Fixa no pé (`safe-area + 20px`), centralizada, 50px de altura, padding 22, gradiente vertical `chat-action → chat-action-strong`, texto 16/500 branco, sombra azul. Conteúdo é a próxima ação ("Atender Maria") ou "Novo atendimento". Só no celular.
+Exceção aprovada em 11/11/2026 (DEC-177): a pílula "Abrir WhatsApp · 0:30" do aceite com contador aparece também no computador e usa o verde do WhatsApp (`oklch(64% .17 150)`), como o botão "Abrir WhatsApp". Componente: `src/components/chat/floating-pill.tsx`.
 
 ### 5.9 BottomSheet e SegmentedControl (Arc, `src/components/arc/`)
 Sheet para menus e ações ("O que você quer fazer?": itens com título 16/500 + descrição 14 muted, raio control, hover muted). Segmented para 2 a 5 visões ("Assistentes | Leads"), com contador azul (18px, texto 11) quando há espera.

@@ -18,6 +18,8 @@ import { inferLegacyLeadDutyScheduleId, selectLeadsForDutySchedule } from "./sha
 import { readColdAgeRelease } from "./cold-age-release";
 import { coldReleaseCutoff, todayKeyInSaoPaulo } from "./cold-age-release-rules";
 import { effectiveSwapDate } from "./duty-swap";
+import { dutyStartIntervalReleaseAt, resolveDutyStartInterval } from "./duty-start-interval";
+import { isDutyStartOfferIntervalEnabled, loadDutyStartIntervalAnchors } from "./duty-start-interval-server";
 
 // Upper bound on how far back a lead can show even when the schedule has no
 // completed occurrence yet (brand-new schedule) — keeps the query sane.
@@ -513,7 +515,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     if (list) list.push(offer); else offersByBrokerQueue.set(key, [offer]);
   }
 
-  return {
+  const profile = {
     schedule: {
       ...schedule,
       queueName: schedule.legacyQueueName ?? (linkedQueues.length ? linkedQueues.map((queue) => queue.name).join(", ") : "Nenhuma fila vinculada"),
@@ -596,4 +598,55 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     leadsUpcomingStartsAt: upcomingStartsAt,
     liveStatusEnabled: Boolean(operatingQueue) || sharedWaitingQueues.length > 0,
   };
+  // Intervalo de início de plantão (11/11): mesma regra da distribuição, para o cartão bater com ela.
+  const startInterval = await resolveProfileDutyStartInterval({
+    tenantId: context.tenantId,
+    now,
+    rows: profile.roster.map((row) => ({
+      id: row.id,
+      brokerId: row.brokerId,
+      paused: Boolean(row.pausedAt),
+      presenceStatus: row.presenceStatus,
+      blocked: Boolean(row.blockedReason) || row.onSitePending,
+      occurrence: occurrenceByAssignment.get(row.id) ?? null,
+    })),
+  });
+  return {
+    ...profile,
+    startInterval: startInterval ? { endsAt: startInterval.endsAt, confirmed: startInterval.confirmed, pending: startInterval.pending } : null,
+    roster: profile.roster.map((row) => {
+      const retryAt = startInterval?.retryAtByBroker.get(row.brokerId);
+      return retryAt && (row.liveStatus === "ready" || row.liveStatus === "cooldown")
+        ? { ...row, liveStatus: "start_interval" as const, nextEventAt: retryAt }
+        : row;
+    }),
+  };
+}
+
+/** Confirmados e pendentes da ocorrência rodando agora, e quem está no intervalo de início. Fail-open. */
+async function resolveProfileDutyStartInterval(input: {
+  tenantId: string;
+  now: Date;
+  rows: { id: string; brokerId: string; paused: boolean; presenceStatus: string; blocked: boolean; occurrence: { startsAt: Date; endsAt: Date } | null }[];
+}) {
+  try {
+    const running = input.rows.filter((row) => !row.paused && row.occurrence && row.occurrence.startsAt <= input.now && row.occurrence.endsAt > input.now);
+    if (!running.length || !(await isDutyStartOfferIntervalEnabled())) return null;
+    const confirmed = running.filter((row) => !row.blocked && row.presenceStatus !== "absent");
+    const pending = running.filter((row) => row.blocked && row.presenceStatus === "pending");
+    const startsAt = running.reduce((earliest, row) => (row.occurrence!.startsAt < earliest ? row.occurrence!.startsAt : earliest), running[0].occurrence!.startsAt);
+    const state = resolveDutyStartInterval({ occurrenceStartsAt: startsAt, now: input.now, confirmedCount: confirmed.length, pendingCount: pending.length });
+    if (!state.active) return null;
+    const anchors = await loadDutyStartIntervalAnchors(getDatabase(), { tenantId: input.tenantId, brokerIds: confirmed.map((row) => row.brokerId), now: input.now });
+    const retryAtByBroker = new Map<string, Date>();
+    for (const row of confirmed) {
+      const anchor = anchors.get(row.brokerId);
+      const retryAt = anchor ? dutyStartIntervalReleaseAt({ ...anchor, now: input.now, intervalEndsAt: state.endsAt }) : null;
+      if (retryAt) retryAtByBroker.set(row.brokerId, retryAt);
+    }
+    return { endsAt: state.endsAt, confirmed: state.confirmedCount, pending: state.pendingCount, retryAtByBroker };
+  } catch (error) {
+    console.error("[plantao] start_interval_profile_failed", { error: error instanceof Error ? error.name : "UnknownError" });
+    return null;
+  }
 }

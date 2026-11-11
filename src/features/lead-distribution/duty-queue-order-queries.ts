@@ -53,6 +53,7 @@ function getBlockedReason(status: string, reason: string | null, availability: s
     case "capacity_full": return "Limite de leads atingido";
     case "offer_pending": return "Oferta aguardando resposta";
     case "cooldown": return "Intervalo entre ofertas";
+    case "start_interval": return "Intervalo de início de plantão";
     default: return null;
   }
 }

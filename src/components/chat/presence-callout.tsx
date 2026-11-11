@@ -246,7 +246,9 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
           <span className={styles.presenceTitle}>{done ? "Presença confirmada" : waiting ? "Foto enviada" : "Confirme sua presença"}</span>
           <span className={styles.presenceDetail}>
             {done
-              ? "Pronto. Você já pode receber leads deste plantão."
+              ? ask.startInterval
+                ? "Pronto. Enquanto seus colegas confirmam, você recebe um lead a cada 8 min."
+                : "Pronto. Você já pode receber leads deste plantão."
               : waiting
                 ? "Agora o diretor valida a foto e libera você. Até lá você fica pausado, sem receber leads."
               : presencial

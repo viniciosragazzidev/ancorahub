@@ -27,6 +27,8 @@ import { findBrokerRunningDutyScheduleId, getActiveQueueDutyRoster } from "./act
 import { countReceivedInDayByBroker, getDutyScheduleReceiptScope, NON_COUNTING_OFFER_STATUS, overnightExtraReceiptGap } from "./received-in-day";
 import { filterPausedDutyAssignmentsBeforeResolution, getSaoPauloDateKey, resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getOvernightExtraShiftSettings, getPresenceEligibleAssignments, isDutyRotationEnabled } from "./duty-presence";
+import { leadWaitsDutyStartInterval } from "./duty-start-interval";
+import { resolveDutyStartIntervalHolds, type DutyStartPresenceCount } from "./duty-start-interval-server";
 import { rotationArrivalOrder } from "./duty-rotation";
 import { extraShiftWindow, findRunningDutySchedule, getRelevantDutyWindow, isExtraShiftRecord, isOvernightLead, MORNING_SHIFT_STARTS_BEFORE, OVERNIGHT_LEADS_UNTIL } from "./duty-presence-domain";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -55,6 +57,8 @@ type RosterResolution = {
   /** Rotation (29/10): eligible escalados of each plantão in order of arrival (presence confirmation). */
   rotationRosterBrokerIdsBySchedule?: Map<string, string[]>;
   dutyDateBySchedule?: Map<string, string>;
+  /** Intervalo de início (11/11): confirmados e pendentes de cada ocorrência desta unidade. */
+  startPresenceBySchedule?: Map<string, DutyStartPresenceCount>;
 };
 
 async function getRosterBrokerIds(
@@ -201,7 +205,17 @@ async function getRosterBrokerIds(
     eligibleAfterCap,
     presence.confirmedPresenceAssignmentIds,
   );
-  return { brokerIds: new Set(scheduleIdByBroker.keys()), hasActiveSelectedSchedule: true, scheduleIdByBroker, brokersStoppedByDutyCap, manualRosterBrokerIdsBySchedule, rotationRosterBrokerIdsBySchedule, dutyDateBySchedule };
+  const startPresenceBySchedule = new Map<string, DutyStartPresenceCount>();
+  for (const assignment of effectiveAssignments) {
+    const startsAt = presence.occurrenceStartsAtByAssignment.get(assignment.id);
+    if (!startsAt) continue;
+    const count = startPresenceBySchedule.get(assignment.scheduleId) ?? { startsAt, confirmed: 0, pending: 0 };
+    if (startsAt < count.startsAt) count.startsAt = startsAt;
+    if (eligibleBeforeCap.has(assignment.id)) count.confirmed += 1;
+    else if (presence.pendingAssignmentIds.has(assignment.id)) count.pending += 1;
+    startPresenceBySchedule.set(assignment.scheduleId, count);
+  }
+  return { brokerIds: new Set(scheduleIdByBroker.keys()), hasActiveSelectedSchedule: true, scheduleIdByBroker, brokersStoppedByDutyCap, manualRosterBrokerIdsBySchedule, rotationRosterBrokerIdsBySchedule, dutyDateBySchedule, startPresenceBySchedule };
 }
 
 /**
@@ -1090,7 +1104,15 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     const manualRosterBrokerIdsBySchedule = new Map<string, string[]>();
     const rotationRosterBrokerIdsBySchedule = new Map<string, string[]>();
     const dutyDateBySchedule = new Map<string, string>();
+    const startPresenceBySchedule = new Map<string, DutyStartPresenceCount>();
     for (const [, result] of rosterResults) {
+      // Um plantão de várias unidades soma as contagens de cada uma (as escalas não se repetem).
+      for (const [scheduleId, count] of result.startPresenceBySchedule ?? []) {
+        const current = startPresenceBySchedule.get(scheduleId);
+        startPresenceBySchedule.set(scheduleId, current
+          ? { startsAt: count.startsAt < current.startsAt ? count.startsAt : current.startsAt, confirmed: current.confirmed + count.confirmed, pending: current.pending + count.pending }
+          : { ...count });
+      }
       for (const [scheduleId, brokerIds] of result.manualRosterBrokerIdsBySchedule ?? []) {
         const roster = manualRosterBrokerIdsBySchedule.get(scheduleId) ?? [];
         for (const brokerId of brokerIds) if (!roster.includes(brokerId)) roster.push(brokerId);
@@ -1110,11 +1132,11 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       if (!rosterBrokerIds && broker.branchId && rosterOnlyBranchIds.has(broker.branchId)) return false;
       return (!rosterBrokerIds || rosterBrokerIds.has(broker.id)) && broker.id !== brokerToExclude && !intelligentPolicy.value.excludedBrokerIds.includes(broker.id) && (!allowedBrokerSet || allowedBrokerSet.has(broker.id));
     });
-    return { brokers: rosterBrokers, rosterByBranch, scheduleIdByBroker, manualRosterBrokerIdsBySchedule, rotationRosterBrokerIdsBySchedule, dutyDateBySchedule, hasActiveSelectedSchedule };
+    return { brokers: rosterBrokers, rosterByBranch, scheduleIdByBroker, manualRosterBrokerIdsBySchedule, rotationRosterBrokerIdsBySchedule, dutyDateBySchedule, startPresenceBySchedule, hasActiveSelectedSchedule };
   };
 
   traceLeadStep(leadId, "eligible_brokers");
-  let { brokers, rosterByBranch, scheduleIdByBroker, manualRosterBrokerIdsBySchedule, rotationRosterBrokerIdsBySchedule, dutyDateBySchedule, hasActiveSelectedSchedule } = await loadEligibleBrokers(targetBranchIds);
+  let { brokers, rosterByBranch, scheduleIdByBroker, manualRosterBrokerIdsBySchedule, rotationRosterBrokerIdsBySchedule, dutyDateBySchedule, startPresenceBySchedule, hasActiveSelectedSchedule } = await loadEligibleBrokers(targetBranchIds);
   // Everyone on duty reached this plantão's cap: the lead waits (the queue's
   // "no broker" rules are for an empty roster, not for a full one).
   if (!brokers.length && brokersStoppedByDutyCap > 0) {
@@ -1198,6 +1220,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
         manualRosterBrokerIdsBySchedule = fallback.manualRosterBrokerIdsBySchedule;
         rotationRosterBrokerIdsBySchedule = fallback.rotationRosterBrokerIdsBySchedule;
         dutyDateBySchedule = fallback.dutyDateBySchedule;
+        startPresenceBySchedule = fallback.startPresenceBySchedule;
         hasActiveSelectedSchedule = fallback.hasActiveSelectedSchedule;
         fallbackUnitUsed = true;
       }
@@ -1497,6 +1520,17 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     }
     for (const brokerId of ids) pacingDecisions.set(brokerId, evaluateBrokerOfferPacing(recentOffers.get(brokerId) ?? [], pacing, pacingNow, lastAssignedAtByBroker.get(brokerId) ?? null));
   }
+  // Intervalo de início de plantão (11/11): na primeira hora, com 1 a 3 confirmados e colegas por
+  // confirmar, cada confirmado recebe um lead a cada 8 min. O quente não espera. Fail-open.
+  const startInterval = leadWaitsDutyStartInterval(lead.qualificationStatus)
+    ? await resolveDutyStartIntervalHolds({ tenantId: context.tenantId, brokerIds: ids, scheduleIdByBroker, startPresenceBySchedule })
+    : null;
+  const startIntervalHolds = startInterval?.holds ?? new Map<string, { retryAt: Date }>();
+  for (const [brokerId, hold] of startIntervalHolds) {
+    const current = pacingDecisions.get(brokerId);
+    if (!current || current.allowed || current.retryAt < hold.retryAt) pacingDecisions.set(brokerId, { allowed: false, retryAt: hold.retryAt, rule: "duty_start" });
+  }
+  if (startIntervalHolds.size) traceLeadStep(leadId, `duty_start_interval:${startIntervalHolds.size}`);
   const pacedOut = candidates.filter((candidate) => pacingDecisions.get(candidate.id)?.allowed === false);
   const paceableCandidates = pacedOut.length ? candidates.filter((candidate) => pacingDecisions.get(candidate.id)?.allowed !== false) : candidates;
   const distributionStrategy = queue?.strategy === "round_robin" ? "round_robin" : "capacity";
@@ -1508,10 +1542,13 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     // instead of reporting a capacity/eligibility problem.
     const waitingForPacing = pacedOut.filter((candidate) => candidate.capacity === null || candidate.activeLeads < candidate.capacity);
     if (waitingForPacing.length) {
+      const startInterval = waitingForPacing.some((candidate) => pacingDecisions.get(candidate.id)?.rule === "duty_start");
       return {
         status: "queued",
         leadId,
-        reason: "Aguardando intervalo entre ofertas: os corretores elegíveis receberam um lead há pouco ou ainda têm oferta pendente.",
+        reason: startInterval
+          ? "Aguardando intervalo de início de plantão: os corretores confirmados receberam um lead há menos de 8 min e há colegas por confirmar presença."
+          : "Aguardando intervalo entre ofertas: os corretores elegíveis receberam um lead há pouco ou ainda têm oferta pendente.",
         retryAt: earliestPacingRetryAt(waitingForPacing.map((candidate) => pacingDecisions.get(candidate.id)!)) ?? undefined,
       };
     }
@@ -1572,6 +1609,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     queueId: lead.queueId,
     capacityPerBroker: queue?.capacityEnabled ? queue.capacity ?? null : null,
     pacing,
+    startIntervalBrokerIds: startInterval?.activeBrokerIds.size ? [...startInterval.activeBrokerIds] : undefined,
     dutyScheduleIds: exclusiveScheduleIds ?? undefined,
     dutyScheduleIdByBroker: exclusiveScheduleIds?.length ? Object.fromEntries([...scheduleIdByBroker].filter(([brokerId]) => ids.includes(brokerId))) : undefined,
     // DEC-154: the pick is redone under a per-tenant lock with fresh counts, so leads

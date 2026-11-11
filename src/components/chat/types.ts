@@ -105,6 +105,8 @@ export type PresenceAskView = {
   endsAt: string;
   status: "pending" | "awaiting_release" | "confirmed";
   photoId: string | null;
+  /** Intervalo de início de plantão (11/11): um lead a cada 8 min enquanto os colegas confirmam. */
+  startInterval?: boolean;
 };
 
 /** The operator answer card (same shape as OperatorCard in features/operator-catalog/operator-card.ts). */

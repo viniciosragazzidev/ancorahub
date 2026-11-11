@@ -228,6 +228,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Mostra a faixa \"Agora na operação\" (status vivos) no Painel e na Distribuição desta empresa. O Super-admin liga por empresa; a chave real é feature_live_status_strip_<tenantId>.",
   },
+  LITE_ACCEPT_HANDOFF: {
+    key: "feature_lite_accept_handoff",
+    scope: "tenant",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Aceite com contador no Lite: ao aceitar o lead, o corretor vê as informações dele e o WhatsApp abre sozinho em 30 s (ou na hora, tocando no botão). A chave real é feature_lite_accept_handoff_<tenantId>.",
+  },
   CUSTOMER_WAITING_GUARD: {
     key: "feature_customer_waiting_guard",
     scope: "tenant",
@@ -468,6 +475,13 @@ export const FEATURE_FLAGS = {
     defaultValue: "true",
     allowedValues: ["true", "false"] as const,
     description: "Rodízio no plantão: cada corretor tem sua vez, na ordem em que confirmou presença; quem chega depois entra no fim. Oferta expirada ou recusada gasta a vez e conta como pulo; no 3º pulo o corretor é pausado e o supervisor avisado. Desligado, volta o nivelamento por leads recebidos.",
+  },
+  DUTY_START_OFFER_INTERVAL: {
+    key: "feature_duty_start_offer_interval_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Intervalo de início de plantão: na primeira hora, enquanto há escalados por confirmar presença e só 1 a 3 confirmaram, cada confirmado recebe no máximo um lead a cada 8 minutos. Lead quente não espera. Exceção à DEC-151.",
   },
   HOT_LEAD_EARLY_DISTRIBUTION: {
     key: "feature_hot_lead_early_distribution_enabled",

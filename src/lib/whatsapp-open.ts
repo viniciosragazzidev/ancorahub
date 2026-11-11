@@ -95,3 +95,51 @@ export function prepareWhatsAppWindow(device: WhatsAppDevice = currentWhatsAppDe
     },
   };
 }
+
+export type AutoOpenResult = "opened" | "failed";
+
+/**
+ * Aceite com contador (11/11): abre o WhatsApp sem um toque recente (depois dos 30 s). Os navegadores
+ * costumam barrar: no computador `window.open` volta nulo; no celular a página continua visível
+ * (o app não abriu). Em `failed`, a tela pede um toque, que sempre funciona.
+ */
+export function tryOpenWhatsAppWithoutGesture(href: string, device: WhatsAppDevice = currentWhatsAppDevice(), waitMs = 1500): Promise<AutoOpenResult> {
+  const target = toDeviceWhatsAppUrl(href, device);
+  if (!target || typeof window === "undefined") return Promise.resolve("failed");
+  if (device === "desktop") {
+    let tab: Window | null = null;
+    try {
+      tab = window.open(target, WHATSAPP_WEB_TARGET);
+    } catch {
+      tab = null;
+    }
+    if (!tab) return Promise.resolve("failed");
+    try {
+      tab.opener = null;
+    } catch {
+      /* cross-origin tab: nothing to detach */
+    }
+    return Promise.resolve("opened");
+  }
+  return new Promise((resolve) => {
+    let left = false;
+    const onHide = () => {
+      if (document.visibilityState === "hidden") left = true;
+    };
+    const onPageHide = () => { left = true; };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("blur", onPageHide);
+    try {
+      window.location.href = target;
+    } catch {
+      /* blocked: resolved as failed below */
+    }
+    window.setTimeout(() => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("blur", onPageHide);
+      resolve(left ? "opened" : "failed");
+    }, waitMs);
+  });
+}

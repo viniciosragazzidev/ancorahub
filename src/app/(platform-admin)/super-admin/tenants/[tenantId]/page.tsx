@@ -11,6 +11,7 @@ import {
   updateDirectorLiteStylePilotAction,
   updateLiveStatusPilotAction,
   updateBrokerAdContextPilotAction,
+  updateAcceptHandoffPilotAction,
   updateDutyShiftReminderPilotAction,
   updateAiAudioTranscriptionAction,
   updateCustomerWaitingModeAction,
@@ -32,6 +33,7 @@ import { getSystemSettings } from "@/features/system-settings/queries";
 import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag";
 import { liveStatusSettingKey } from "@/features/live-status/flag";
 import { brokerAdContextSettingKey } from "@/features/leads/broker-ad-context-flag";
+import { acceptHandoffSettingKey } from "@/features/broker-workspace/whatsapp-handoff/flag";
 import { customerWaitingSettingKey, parseCustomerWaitingMode } from "@/features/customer-waiting/flag";
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import { aiAudioTranscriptionSettingKey } from "@/features/ai-agent/audio-transcription/flag";
@@ -92,6 +94,7 @@ export default async function SuperAdminTenantDetailPage({
       directorLiteStyleSettingKey(tenantId.data),
       liveStatusSettingKey(tenantId.data),
       brokerAdContextSettingKey(tenantId.data),
+      acceptHandoffSettingKey(tenantId.data),
       dutyShiftReminderSettingKey(tenantId.data),
       aiAudioTranscriptionSettingKey(tenantId.data),
       customerWaitingSettingKey(tenantId.data),
@@ -115,6 +118,7 @@ export default async function SuperAdminTenantDetailPage({
   const directorLiteEnabled = settingMap.get(directorLiteStyleSettingKey(tenant.id)) === "true";
   const liveStatusEnabled = settingMap.get(liveStatusSettingKey(tenant.id)) === "true";
   const brokerAdContextEnabled = settingMap.get(brokerAdContextSettingKey(tenant.id)) === "true";
+  const acceptHandoffEnabled = settingMap.get(acceptHandoffSettingKey(tenant.id)) === "true";
   const dutyShiftReminderEnabled = settingMap.get(dutyShiftReminderSettingKey(tenant.id)) === "true";
   const aiAudioEnabled = settingMap.get(aiAudioTranscriptionSettingKey(tenant.id)) === "true";
   const customerWaitingObserving = parseCustomerWaitingMode(settingMap.get(customerWaitingSettingKey(tenant.id))) === "observe";
@@ -130,6 +134,7 @@ export default async function SuperAdminTenantDetailPage({
   const directorLiteAction = updateDirectorLiteStylePilotAction.bind(null, tenant.id);
   const liveStatusAction = updateLiveStatusPilotAction.bind(null, tenant.id);
   const brokerAdContextAction = updateBrokerAdContextPilotAction.bind(null, tenant.id);
+  const acceptHandoffAction = updateAcceptHandoffPilotAction.bind(null, tenant.id);
   const dutyShiftReminderAction = updateDutyShiftReminderPilotAction.bind(null, tenant.id);
   const aiAudioAction = updateAiAudioTranscriptionAction.bind(null, tenant.id);
   const customerWaitingAction = updateCustomerWaitingModeAction.bind(null, tenant.id);
@@ -236,6 +241,21 @@ export default async function SuperAdminTenantDetailPage({
                   <input name="enabled" type="hidden" value={brokerAdContextEnabled ? "false" : "true"} />
                   <Button type="submit" variant={brokerAdContextEnabled ? "outline" : "default"}>
                     {brokerAdContextEnabled ? "Desligar" : "Ligar"}
+                  </Button>
+                </form>
+              </div>
+              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="max-w-2xl">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-medium">Aceite com contador (Lite)</h3>
+                    <Badge variant={acceptHandoffEnabled ? "success" : "outline"}>{acceptHandoffEnabled ? "Ligado" : "Desligado"}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">Ao aceitar o lead, o corretor vê nome, o que o cliente quer, plano e vidas, e o WhatsApp abre sozinho em 30 segundos (ou na hora, tocando no botão).</p>
+                </div>
+                <form action={acceptHandoffAction}>
+                  <input name="enabled" type="hidden" value={acceptHandoffEnabled ? "false" : "true"} />
+                  <Button type="submit" variant={acceptHandoffEnabled ? "outline" : "default"}>
+                    {acceptHandoffEnabled ? "Desligar" : "Ligar"}
                   </Button>
                 </form>
               </div>

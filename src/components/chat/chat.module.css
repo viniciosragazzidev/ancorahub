@@ -243,7 +243,16 @@
   0%, 100% { background: transparent; }
   50% { background: color-mix(in oklch, var(--chat-action) 12%, transparent); }
 }
-@media (prefers-reduced-motion: reduce) { .pillPulse, .thread[data-attention="true"] { animation: none; } }
+/* "Abrir WhatsApp" (aceite com contador, 11/11): o verde do WhatsApp, como o .linkButtonWhatsapp. */
+.pillWhatsapp { background: oklch(64% 0.17 150); box-shadow: 0 10px 24px oklch(52% 0.15 150 / 0.3); }
+.pillPulseWhatsapp { animation: acceptPulseWhatsapp 1.8s var(--ease-standard, ease-out) infinite; }
+@keyframes acceptPulseWhatsapp {
+  0% { box-shadow: 0 10px 24px oklch(52% 0.15 150 / 0.3), 0 0 0 0 oklch(64% 0.17 150 / 0.55); }
+  70% { box-shadow: 0 10px 24px oklch(52% 0.15 150 / 0.3), 0 0 0 14px oklch(64% 0.17 150 / 0); }
+  100% { box-shadow: 0 10px 24px oklch(52% 0.15 150 / 0.3), 0 0 0 0 oklch(64% 0.17 150 / 0); }
+}
+.pillCount { font-variant-numeric: tabular-nums; opacity: 0.9; }
+@media (prefers-reduced-motion: reduce) { .pillPulse, .pillPulseWhatsapp, .thread[data-attention="true"] { animation: none; } }
 
 @media (prefers-reduced-motion: reduce) {
   .thread, .choice { transition: none; }

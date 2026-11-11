@@ -13,6 +13,7 @@ import { confirmDocumentUploadAction } from "@/features/documents/actions";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { brokerGreeting } from "@/features/leads/broker-greeting";
 import { openWhatsApp, prepareWhatsAppWindow } from "@/lib/whatsapp-open";
+import { takeWhatsAppHandoff, useAcceptHandoffEnabled } from "@/features/broker-workspace/whatsapp-handoff/handoff-store";
 import { quickReminderAction } from "@/features/leads/reminder-actions";
 import { buildFollowUpWhen, type FollowUpOptionValue } from "@/features/broker-workspace/follow-up-options";
 import { STEP_OPTIONS, type ConfirmationDocument, type LightLeadDetailData, type LiteRequirement } from "./types";
@@ -98,6 +99,15 @@ export function useLeadDetail({
     }, [selectedStep, leadStatus]);
 
     const [whatsappOpenedAt, setWhatsappOpenedAt] = useState<string | null>(null);
+    // Aceite com contador (11/11): o link do WhatsApp enquanto o quadro "Antes de chamar" está aberto.
+    const handoffEnabled = useAcceptHandoffEnabled();
+    const [handoffUrl, setHandoffUrl] = useState<string | null>(null);
+    useEffect(() => {
+      // Aceite feito no Início, na lista ou no chat: o botão deixou o link para esta tela.
+      if (!lead.isCurrentBroker) return;
+      const handoff = takeWhatsAppHandoff(lead.id);
+      if (handoff?.url) setHandoffUrl(handoff.url);
+    }, [lead.id, lead.isCurrentBroker]);
     const [requestingSale, startRequestSaleTransition] = useTransition();
     const brokerIntro = lead.brokerGreeting || brokerGreeting({ leadName: lead.nome, brokerName: lead.corretorNome, tipo: lead.tipo, planName: lead.planName, livesCount: lead.livesCount, city: lead.city });
     const externalWhatsAppUrl = buildWhatsAppUrl(lead.telefone, brokerIntro);
@@ -140,7 +150,8 @@ export function useLeadDetail({
       if (accepting || accepted) return;
       const formData = new FormData();
       formData.append("leadId", lead.id);
-      const whatsapp = prepareWhatsAppWindow();
+      // Aceite com contador (11/11): ligado, nada abre no clique; o quadro conta 30 s e abre.
+      const whatsapp = handoffEnabled ? { go: () => false, cancel: () => {} } : prepareWhatsAppWindow();
 
       startAcceptTransition(async () => {
         let res;
@@ -159,12 +170,17 @@ export function useLeadDetail({
         }
 
         setAccepted(true);
-        celebrateSuccess("Lead aceito");
         setLeadStatus("in_contact");
         // The phone is not in the payload before acceptance: reload so WhatsApp and Ligar get it.
         router.refresh();
 
         const url = res.whatsappUrl;
+        if (handoffEnabled && url) {
+          // O quadro "Antes de chamar" já confirma o aceite: sem overlay nem toast (LITE §7).
+          setHandoffUrl(url);
+          return;
+        }
+        celebrateSuccess("Lead aceito");
         if (url && whatsapp.go(url)) {
           setWhatsappOpenedAt(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
           toast.success("Lead aceito. Abrindo o WhatsApp do cliente.", { action: { label: "Abrir de novo", onClick: () => openWhatsApp(url) } });
@@ -385,6 +401,8 @@ export function useLeadDetail({
   return {
     accepted,
     leadStatus,
+    handoffUrl,
+    closeHandoff: () => setHandoffUrl(null),
     /** After the sale is registered: the screen leaves "Confirmar venda" at once (no second tap). */
     markConverted: () => setLeadStatus("converted"),
     detailsExpanded,

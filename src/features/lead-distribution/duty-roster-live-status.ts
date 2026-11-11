@@ -6,7 +6,8 @@ import { evaluateBrokerOfferPacing, type OfferPacingConfig, type PacingOffer } f
  * feeds it offers/capacity and gets back a status plus the one timestamp
  * (`nextEventAt`) the client needs to run its own countdown.
  */
-export type BrokerLiveOfferStatus = "paused" | "blocked" | "capacity_full" | "offer_pending" | "cooldown" | "ready";
+/** `start_interval`: intervalo de início de plantão (11/11), aplicado por cima pela página do plantão. */
+export type BrokerLiveOfferStatus = "paused" | "blocked" | "capacity_full" | "offer_pending" | "cooldown" | "start_interval" | "ready";
 
 export type BrokerLiveOfferState = {
   status: BrokerLiveOfferStatus;

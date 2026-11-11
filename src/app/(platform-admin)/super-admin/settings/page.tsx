@@ -36,6 +36,7 @@ import {
   updateManualLeadAssignmentOfferChoiceSettingsAction,
   updateDutyPresenceConfirmationSettingsAction,
   updateDutyOvernightExtraSettingsAction,
+  updateDutyStartOfferIntervalAction,
   updateAttendanceFlowsSettingsAction,
   updateDutyMonthlySchedulingSettingsAction,
   updateDutyInactiveBrokersSettingsAction,
@@ -126,6 +127,7 @@ export default async function SuperAdminSettingsPage() {
     FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key,
     FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_SHIFT.key,
     FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.key,
+    FEATURE_FLAGS.DUTY_START_OFFER_INTERVAL.key,
     FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.key,
     FEATURE_FLAGS.BROKER_SELF_UNIT_CHANGE.key,
     FEATURE_FLAGS.BROKER_DUTY_CALENDAR.key,
@@ -213,6 +215,7 @@ export default async function SuperAdminSettingsPage() {
     settingMap.get("feature_lead_management_actions_enabled") !== "false";
   const manualLeadAssignmentOfferChoiceEnabled = settingMap.get("feature_manual_lead_assignment_offer_choice_enabled") !== "false";
   const dutyPresenceConfirmationEnabled = settingMap.get(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key) === "true";
+  const dutyStartOfferIntervalEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_START_OFFER_INTERVAL.key) ?? FEATURE_FLAGS.DUTY_START_OFFER_INTERVAL.defaultValue) === "true";
   const dutyOvernightExtraEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_SHIFT.key) ?? FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_SHIFT.defaultValue) === "true";
   const savedOvernightExtraStartsAt = settingMap.get(FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.key) ?? FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.defaultValue;
   const dutyOvernightExtraStartsAt = FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.allowedValues.includes(savedOvernightExtraStartsAt as (typeof FEATURE_FLAGS.DUTY_OVERNIGHT_EXTRA_STARTS_AT.allowedValues)[number])
@@ -1526,6 +1529,24 @@ export default async function SuperAdminSettingsPage() {
                       </select>
                     </label>
                   </div>
+                  <Button type="submit" variant="outline">Salvar configuração</Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Intervalo de início de plantão</CardTitle>
+                <CardDescription>
+                  Na primeira hora do plantão, enquanto há escalados por confirmar presença e só 1 a 3 confirmaram, cada confirmado recebe no máximo um lead a cada 8 minutos. Lead quente não espera. O intervalo acaba quando todos confirmam, quando o 4º confirma ou 1 hora depois do início.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateDutyStartOfferIntervalAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="dutyStartOfferIntervalEnabled" value="true" defaultChecked={dutyStartOfferIntervalEnabled} className="size-4 accent-primary" />
+                    <span className="font-medium">Intervalo de início ligado</span>
+                  </label>
                   <Button type="submit" variant="outline">Salvar configuração</Button>
                 </form>
               </CardContent>

@@ -8,6 +8,7 @@ import { toast } from "@/components/ui/sonner";
 
 import { acceptLeadOfferAction } from "@/features/leads/accept-offer-action";
 import { openWhatsApp, prepareWhatsAppWindow } from "@/lib/whatsapp-open";
+import { rememberWhatsAppHandoff, useAcceptHandoffEnabled } from "@/features/broker-workspace/whatsapp-handoff/handoff-store";
 
 /**
  * "Aceitar e chamar no WhatsApp" in the Lite workspace: one tap accepts the
@@ -20,10 +21,12 @@ export function AcceptLeadButton({ leadId, className, children, style, "data-tou
   const router = useRouter();
   const reduce = useReducedMotion();
   const [pending, startTransition] = useTransition();
+  // Aceite com contador (11/11): ligado, nada abre no clique; a tela do lead conta 30 s e abre.
+  const handoff = useAcceptHandoffEnabled();
 
   function handleClick() {
     if (pending) return;
-    const whatsapp = prepareWhatsAppWindow();
+    const whatsapp = handoff ? { go: () => false, cancel: () => {} } : prepareWhatsAppWindow();
     startTransition(async () => {
       let result: Awaited<ReturnType<typeof acceptLeadOfferAction>>;
       try {
@@ -38,7 +41,9 @@ export function AcceptLeadButton({ leadId, className, children, style, "data-tou
         return;
       }
       const url = result.whatsappUrl;
-      if (url && whatsapp.go(url)) {
+      if (handoff && url) {
+        rememberWhatsAppHandoff(leadId, url);
+      } else if (url && whatsapp.go(url)) {
         toast.success("Lead aceito. Abrindo o WhatsApp do cliente.", { action: { label: "Abrir de novo", onClick: () => openWhatsApp(url) } });
       } else {
         whatsapp.cancel();

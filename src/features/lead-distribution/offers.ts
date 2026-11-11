@@ -12,6 +12,7 @@ import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy"
 import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-message";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { reserveQueueCapacitySlot } from "./queue-capacity";
+import { loadDutyStartIntervalAnchors } from "./duty-start-interval-server";
 import { evaluateBrokerOfferPacing, isOfferPacingEnabled, type OfferPacingConfig, type PacingOffer } from "./offer-pacing";
 
 import { normalizePhone } from "@/shared/utils/phone";
@@ -146,6 +147,8 @@ export async function createLeadOffersForBrokers(input: {
   capacityPerBroker?: number | null;
   /** Automatic offers only: interval / max-pending rules per broker (see offer-pacing.ts). */
   pacing?: OfferPacingConfig | null;
+  /** Intervalo de início de plantão (11/11): corretores cujo plantão está no intervalo; checado de novo sob trava. */
+  startIntervalBrokerIds?: string[];
   assignmentSource?: "automatic_offer" | "manual_offer";
   /** Resolved by the manual service from the lead's current queue, never client input. */
   postSaleExemptionQueueName?: string;
@@ -419,6 +422,17 @@ export async function createLeadOffersForBrokers(input: {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.tenantId}), hashtext(${`${input.queueId}:${broker.id}`}))`);
         const recent = await loadBrokerPacingOffers(tx as unknown as DatabaseLike, { tenantId: input.tenantId, queueId: input.queueId, brokerIds: [broker.id], intervalMinutes: input.pacing.intervalMinutes, now });
         if (!evaluateBrokerOfferPacing(recent.get(broker.id) ?? [], input.pacing, now).allowed) {
+          pacingBlocked = true;
+          return null;
+        }
+      }
+
+      // Intervalo de início de plantão: a mesma checagem sob trava por corretor, para dois
+      // processos não entregarem dois leads ao mesmo corretor dentro dos 8 minutos.
+      if (input.startIntervalBrokerIds?.includes(broker.id) && input.assignmentSource !== "manual_offer") {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.tenantId}), hashtext(${`duty-start:${broker.id}`}))`);
+        const anchors = await loadDutyStartIntervalAnchors(tx as unknown as DatabaseLike, { tenantId: input.tenantId, brokerIds: [broker.id], now });
+        if (anchors.has(broker.id)) {
           pacingBlocked = true;
           return null;
         }

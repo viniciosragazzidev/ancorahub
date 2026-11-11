@@ -18,6 +18,7 @@ const LIVE_STATUS_LABELS: Record<BrokerLiveOfferStatus, string> = {
   ready: "Pronto para receber",
   offer_pending: "Oferta aguardando resposta",
   cooldown: "Aguardando intervalo entre ofertas",
+  start_interval: "Intervalo de início de plantão (8 min)",
   capacity_full: "Limite da fila atingido",
   blocked: "Indisponível",
 };
