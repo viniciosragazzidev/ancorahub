@@ -166,6 +166,16 @@ Arquivos candidatos: `src/app/(dashboard)/clientes/page.tsx`, `src/app/(dashboar
 
 Uma decisão acima só vira aprovada após validação com Vinicios e registro. Não alterar `CONTEXT.md` nem criar ADR como se esses termos/contratos já tivessem sido aceitos. Na revisão, resolver um assunto por vez, com recomendação e exemplo concreto, conforme `grill-with-docs`/`domain-modeling`.
 
+## Registro de execução C1 (2026-11-11)
+
+A carteira Lite do corretor passa a consultar somente clientes do tenant e do corretor autenticados, com verificação adicional de que o lead vinculado pertence ao mesmo tenant. A consulta retorna 20 por página, ordena pelas conversões mais recentes e usa o mesmo resolvedor de predicados para lista, contagens e recortes. Busca limitada a nome e telefone; filtros somente por origem real do lead, status real do contrato e prazo real de tarefa.
+
+Recortes: Todos; Precisa de atenção, quando houver retorno vencido/hoje ou janela de renovação persistida até 30 dias; Renovações, exibido somente com ao menos um contrato ativo que tenha renewal_window_start_date. A lista mostra motivo e próxima tarefa, sem converter falta de dado em estado positivo. URL guarda busca, recorte, filtros e página; a URL da ficha recebe o caminho de retorno para a integração C2.
+
+A rota nova só aparece para corretor Lite quando feature_broker_client_wallet_lite_enabled está ligada. Com a flag desligada, o ramo antigo de /clientes permanece intacto. A prévia C1 usa fixtures sintéticas; C2 continua fora desta branch. Nenhuma migration foi necessária e não houve escrita em dados operacionais.
+
+Validação da UI: capturas C1 em reports/agent/carteira-corretor-lite/c1-carteira-360.png, c1-carteira-390.png e c1-carteira-1440.png; c1-filtros-390.png mostra o sheet. As capturas -fim mostram o fim da lista com rolagem vertical em 360/390. c1-layout.json registra dimensões da viewport e do scroller, ausência de overflow horizontal e erros de console vazios nas três larguras; os rótulos dos três recortes cabem no controle em 360/390. Resultado de testes e build: reports/agent/verification/2026-11-11-carteira-corretor-lite-c1.md. O registro do preview inclui uma divergência pré-existente de hidratação na ficha C0 em light-client-detail, fora do escopo C1 e reservada à revisão/fase da ficha.
+
 ## Validação, rollout e rollback
 
 - Cenários sintéticos: novo corretor sem carteira, busca vazia, 1.000+ registros paginados, cliente sem contrato, contrato cancelado, retorno atrasado/hoje/futuro, falta de permissão, canal indisponível, erro de rede, duplo clique/retry, troca de owner, dois tenants e duas carteiras da mesma unidade.

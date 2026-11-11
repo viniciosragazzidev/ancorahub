@@ -1,0 +1,58 @@
+[
+  {
+    "file": "c1-carteira-360.png",
+    "width": 360,
+    "height": 800,
+    "documentWidth": 360,
+    "documentHeight": 800,
+    "listScrollHeight": 1084,
+    "listViewportHeight": 800,
+    "segmentScrollWidth": 272,
+    "segmentViewportWidth": 272,
+    "noHorizontalOverflow": true,
+    "hasVerticalListScroll": true,
+    "errors": []
+  },
+  {
+    "file": "c1-carteira-390.png",
+    "width": 390,
+    "height": 844,
+    "documentWidth": 390,
+    "documentHeight": 844,
+    "listScrollHeight": 1037,
+    "listViewportHeight": 844,
+    "segmentScrollWidth": 272,
+    "segmentViewportWidth": 272,
+    "noHorizontalOverflow": true,
+    "hasVerticalListScroll": true,
+    "errors": []
+  },
+  {
+    "file": "c1-carteira-1440.png",
+    "width": 1440,
+    "height": 960,
+    "documentWidth": 1440,
+    "documentHeight": 960,
+    "listScrollHeight": 960,
+    "listViewportHeight": 960,
+    "segmentScrollWidth": 357,
+    "segmentViewportWidth": 357,
+    "noHorizontalOverflow": true,
+    "hasVerticalListScroll": false,
+    "errors": []
+  },
+  {
+    "file": "c1-filtros-390.png",
+    "width": 390,
+    "height": 844,
+    "documentWidth": 390,
+    "documentHeight": 844,
+    "listScrollHeight": 1037,
+    "listViewportHeight": 844,
+    "segmentScrollWidth": 272,
+    "segmentViewportWidth": 272,
+    "noHorizontalOverflow": true,
+    "hasVerticalListScroll": true,
+    "errors": []
+  }
+]
