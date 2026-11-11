@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 
@@ -50,5 +50,44 @@ export async function updateReturnDueAt(input: { tenantId: string; taskId: strin
     if (!updated.length) return false;
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.actorId, entidade: "lead_task", entidadeId: input.taskId, acao: "reagendou" });
     return true;
+  });
+}
+
+/** Dono atual do lead (para separar "não é mais seu" de falha técnica). */
+export async function loadLeadOwner(tenantId: string, leadId: string): Promise<{ corretorId: string | null } | null> {
+  const [row] = await getDatabase().select({ corretorId: schema.leads.corretorId }).from(schema.leads).where(and(
+    eq(schema.leads.id, leadId),
+    eq(schema.leads.tenantId, tenantId),
+  )).limit(1);
+  return row ?? null;
+}
+
+/** Tarefa aberta igual (mesmo título e prazo) criada dentro da janela: a repetição do mesmo agendamento. */
+export async function findRecentEquivalentReturn(input: { tenantId: string; leadId: string; title: string; dueAt: Date; since: Date }) {
+  const [row] = await getDatabase().select({
+    id: schema.leadTasks.id,
+    title: schema.leadTasks.title,
+    dueAt: schema.leadTasks.dueAt,
+    createdAt: schema.leadTasks.createdAt,
+    completedAt: schema.leadTasks.completedAt,
+  }).from(schema.leadTasks).where(and(
+    eq(schema.leadTasks.tenantId, input.tenantId),
+    eq(schema.leadTasks.leadId, input.leadId),
+    eq(schema.leadTasks.title, input.title),
+    eq(schema.leadTasks.dueAt, input.dueAt),
+    isNull(schema.leadTasks.completedAt),
+    gte(schema.leadTasks.createdAt, input.since),
+  )).limit(1);
+  return row ?? null;
+}
+
+/**
+ * Serializa a criação do retorno para (tenant, lead, corretor) com trava de transação: duas requisições
+ * simultâneas esperam uma pela outra, e a segunda já enxerga a tarefa criada pela primeira.
+ */
+export async function withReturnCreateLock<T>(tenantId: string, leadId: string, userId: string, work: () => Promise<T>): Promise<T> {
+  return getDatabase().transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`carteira-retorno:${tenantId}:${leadId}:${userId}`}))`);
+    return work();
   });
 }

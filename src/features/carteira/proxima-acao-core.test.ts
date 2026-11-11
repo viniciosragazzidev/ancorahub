@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyNextAction,
-  isRepeatedReturn,
+  isRecentEquivalentReturn,
   RETORNO_MAX_DAYS_AHEAD,
   spCalendarDaysBetween,
   spDayKey,
@@ -51,9 +51,14 @@ describe("classifyNextAction", () => {
 });
 
 describe("validateReturnDueAt", () => {
-  it("aceita um horário futuro dentro da janela", () => {
-    const result = validateReturnDueAt("2026-11-12T10:30", now);
-    expect(result.ok).toBe(true);
+  it("aceita um horário futuro dentro da janela, com fuso explícito", () => {
+    expect(validateReturnDueAt("2026-11-12T10:30:00-03:00", now).ok).toBe(true);
+    expect(validateReturnDueAt("2026-11-12T13:30:00Z", now).ok).toBe(true);
+  });
+
+  it("recusa data sem fuso, que o servidor leria em UTC", () => {
+    expect(validateReturnDueAt("2026-11-12T10:30", now).ok).toBe(false);
+    expect(validateReturnDueAt("2026-11-12T10:30:00", now).ok).toBe(false);
   });
 
   it("recusa prazo vazio, inválido e no passado", () => {
@@ -68,19 +73,19 @@ describe("validateReturnDueAt", () => {
   });
 });
 
-describe("isRepeatedReturn", () => {
+describe("isRecentEquivalentReturn", () => {
   const dueAt = new Date("2026-11-12T13:00:00.000Z");
-  const base = { title: "Retorno", dueAt, createdAt: new Date(now.getTime() - 30_000), createdBy: "broker-1", completedAt: null };
+  const base = { title: "Retorno", dueAt, createdAt: new Date(now.getTime() - 30_000), completedAt: null };
 
-  it("repetição idêntica dentro da janela não cria outra", () => {
-    expect(isRepeatedReturn(base, { title: "Retorno", dueAt, userId: "broker-1" }, now)).toBe(true);
+  it("tarefa aberta igual criada há pouco é repetição, de qualquer autor", () => {
+    expect(isRecentEquivalentReturn(base, { title: "Retorno", dueAt }, now)).toBe(true);
   });
 
-  it("outro usuário, outro prazo, tarefa concluída ou fora da janela criam normalmente", () => {
-    expect(isRepeatedReturn(base, { title: "Retorno", dueAt, userId: "broker-2" }, now)).toBe(false);
-    expect(isRepeatedReturn(base, { title: "Retorno", dueAt: new Date("2026-11-13T13:00:00.000Z"), userId: "broker-1" }, now)).toBe(false);
-    expect(isRepeatedReturn({ ...base, completedAt: now }, { title: "Retorno", dueAt, userId: "broker-1" }, now)).toBe(false);
-    expect(isRepeatedReturn({ ...base, createdAt: new Date(now.getTime() - 10 * 60_000) }, { title: "Retorno", dueAt, userId: "broker-1" }, now)).toBe(false);
+  it("outro prazo, outro título, tarefa concluída ou fora da janela não são repetição", () => {
+    expect(isRecentEquivalentReturn(base, { title: "Retorno", dueAt: new Date("2026-11-13T13:00:00.000Z") }, now)).toBe(false);
+    expect(isRecentEquivalentReturn(base, { title: "Outro", dueAt }, now)).toBe(false);
+    expect(isRecentEquivalentReturn({ ...base, completedAt: now }, { title: "Retorno", dueAt }, now)).toBe(false);
+    expect(isRecentEquivalentReturn({ ...base, createdAt: new Date(now.getTime() - 10 * 60_000) }, { title: "Retorno", dueAt }, now)).toBe(false);
   });
 });
 

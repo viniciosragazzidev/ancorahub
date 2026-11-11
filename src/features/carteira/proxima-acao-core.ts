@@ -11,7 +11,8 @@ export const RETORNO_REPEAT_WINDOW_MS = 2 * 60_000;
 /** Prazo máximo de um retorno agendado a partir de agora. */
 export const RETORNO_MAX_DAYS_AHEAD = 365;
 
-export type NextActionState = "none" | "overdue" | "today" | "upcoming";
+/** `not_owner`: o lead saiu da carteira do corretor (transferência). Não é falha técnica e não tem ações. */
+export type NextActionState = "none" | "overdue" | "today" | "upcoming" | "not_owner";
 
 export type NextActionView = {
   state: NextActionState;
@@ -59,6 +60,10 @@ export function classifyNextAction(task: { id: string; title: string; dueAt: Dat
 export function validateReturnDueAt(raw: string | null | undefined, now: Date): { ok: true; dueAt: Date } | { ok: false; reason: string } {
   const value = (raw ?? "").trim();
   if (!value) return { ok: false, reason: "Informe a data e a hora do retorno." };
+  // Sem fuso explícito o servidor leria em UTC: exige "Z" ou deslocamento (ex.: -03:00).
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/i.test(value)) {
+    return { ok: false, reason: "Data ou hora sem fuso. Escolha de novo o horário do retorno." };
+  }
   const dueAt = new Date(value);
   if (!Number.isFinite(dueAt.getTime())) return { ok: false, reason: "Data ou hora inválida." };
   if (dueAt.getTime() <= now.getTime()) return { ok: false, reason: "O retorno precisa ser em um horário futuro." };
@@ -67,16 +72,16 @@ export function validateReturnDueAt(raw: string | null | undefined, now: Date): 
 }
 
 /**
- * Repetição do mesmo agendamento (duplo clique ou retry de rede): a tarefa aberta criada pelo mesmo usuário,
- * com o mesmo título e prazo, dentro da janela. Nesse caso não se cria outra.
+ * Repetição do mesmo agendamento (duplo clique ou retry de rede): tarefa aberta com o mesmo título e prazo,
+ * criada dentro da janela, independente de quem criou. Nesse caso não se cria outra.
  */
-export function isRepeatedReturn(
-  existing: { title: string; dueAt: Date | null; createdAt: Date; createdBy: string; completedAt: Date | null } | null | undefined,
-  input: { title: string; dueAt: Date | null; userId: string },
+export function isRecentEquivalentReturn(
+  existing: { title: string; dueAt: Date | null; createdAt: Date; completedAt: Date | null },
+  input: { title: string; dueAt: Date },
   now: Date,
 ): boolean {
-  if (!existing || existing.completedAt) return false;
-  if (existing.createdBy !== input.userId || existing.title !== input.title) return false;
-  if ((existing.dueAt?.getTime() ?? null) !== (input.dueAt?.getTime() ?? null)) return false;
+  if (existing.completedAt) return false;
+  if (existing.title !== input.title) return false;
+  if (existing.dueAt?.getTime() !== input.dueAt.getTime()) return false;
   return now.getTime() - existing.createdAt.getTime() <= RETORNO_REPEAT_WINDOW_MS;
 }
