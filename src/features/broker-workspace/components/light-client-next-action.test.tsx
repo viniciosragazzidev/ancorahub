@@ -37,6 +37,14 @@ describe("próxima ação do corretor", () => {
     expect(screen.queryByRole("button", { name: "Já falei" })).toBeNull();
   });
 
+  it("lead transferido mostra só o aviso, sem ações nem alerta de falha", () => {
+    render(<LightNextActionPanel clientId="c1" leadId="l1" nextAction={{ state: "not_owner", taskId: null, title: null, dueAt: null, reason: "Este cliente não está mais na sua carteira." }} />);
+    expect(screen.getByText("Este cliente não está mais na sua carteira.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Já falei" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Agendar retorno" })).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("retorno atrasado oferece concluir e reagendar", () => {
     render(<LightNextActionPanel clientId="c1" leadId="l1" nextAction={{ state: "overdue", taskId: "t1", title: "Retorno", dueAt: "2026-11-10T15:00:00.000Z", reason: "Retorno atrasado há 1 dia." }} />);
     expect(screen.getByRole("button", { name: "Já falei" })).toBeTruthy();

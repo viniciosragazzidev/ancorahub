@@ -44,7 +44,8 @@ export function LightNextActionPanel({ clientId, leadId, nextAction }: { clientI
   function openSheet(kind: "agendar" | "reagendar") {
     setError(null);
     setFeedback(null);
-    if (kind === "reagendar" && nextAction?.dueAt) setDraftDate(instantToSaoPauloInput(nextAction.dueAt));
+    // Reagendar sempre parte do prazo atual; sem prazo, limpa o rascunho antigo.
+    if (kind === "reagendar") setDraftDate(nextAction?.dueAt ? instantToSaoPauloInput(nextAction.dueAt) : "");
     setSheet(kind);
   }
 
@@ -98,6 +99,9 @@ export function LightNextActionPanel({ clientId, leadId, nextAction }: { clientI
           <p role="alert" className={styles.empty}>Não foi possível carregar o retorno agora.</p>
           <Button variant="secondary" onClick={() => router.refresh()}>Tentar de novo</Button>
         </>
+      ) : nextAction.state === "not_owner" ? (
+        // Transferido para outro corretor: sem ações e sem falha técnica.
+        <p className={styles.empty}>{nextAction.reason}</p>
       ) : nextAction.state === "none" ? (
         <>
           <p className={styles.empty}>{nextAction.reason}</p>
