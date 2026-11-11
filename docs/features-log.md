@@ -2,6 +2,11 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 11/11/2026 - Venda fechada para a direção no WhatsApp
+
+- Lead que vira Convertido (pela IA ou por uma pessoa: mudança de etapa, Registrar venda ou proposta convertida) gera o aviso "Venda fechada para a direção" no WhatsApp da empresa, com cliente, negócio, corretor, dias no fechamento, como a venda foi confirmada (sinais e trecho da IA, ou quem registrou) e o que falta no CRM.
+- Novo aviso em Avisos da equipe: crítico, ligado por padrão, números próprios com fallback para os do Fechamento para a direção. Uma vez por lead e número; falha de envio não afeta a conversão (DEC-179).
+
 ## 10/11/2026 - Backfill e evidência de venda
 
 - Evidências de pagamento validadas permanecem no contexto da próxima análise, mesmo fora da janela de mensagens recentes.
