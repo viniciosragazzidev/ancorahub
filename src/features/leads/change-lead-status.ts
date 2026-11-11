@@ -541,7 +541,8 @@ export async function changeLeadStatus(
   // Venda fechada para a direção (11/11): virou Convertido, pela IA ou por uma pessoa; uma vez por lead e número.
   if (newStatus === "converted" && previousStatus !== "converted") {
     const { notifyDirectorsLeadConverted } = await import("./lead-converted-director-alert");
-    const byAi = Boolean(system) && (system!.actorType ?? "ai") === "ai";
+    // Só a detecção de venda da IA manda saleEvidence; aceitar a sugestão "Convertido" é ato da pessoa.
+    const byAi = Boolean(system?.saleEvidence);
     void notifyDirectorsLeadConverted({
       tenantId: lead.tenantId,
       leadId: lead.id,
