@@ -6,6 +6,8 @@ import { CampaignDetailLite } from "@/features/meta-ads/components/lite/campaign
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { getTenantMetaCampaignsPerformance } from "@/features/meta-ads/meta-analytics-service";
+import { canEditCampaignBrokerOffer } from "@/features/meta-ads/broker-brief-policy";
+import { readCampaignBrokerOffer } from "@/features/leads/broker-ad-context.server";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireCapability } from "@/shared/auth/authorization";
 import { getDatabase, schema } from "@/shared/db";
@@ -202,6 +204,10 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
       : undefined;
   const canConfigureCapture = context.role === "director" || context.role === "manager" || context.jobTitle === "marketing";
 
+  // "Plano anunciado" para o corretor (10/11/2026). Sem a migração, a tela abre sem o texto.
+  const brokerOffer = await readCampaignBrokerOffer(context.tenantId, campaign.campaignId).catch(() => null);
+  const canEditBrokerOffer = canEditCampaignBrokerOffer(context);
+
   const detailProps = {
     campaign,
     ads: campaignAds,
@@ -211,6 +217,8 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
     initialCaptureEnabled: currentRoute?.enabled ?? false,
     canConfigureCapture,
     canDisableCapture: context.role === "director",
+    brokerOffer,
+    canEditBrokerOffer,
   };
 
   if (await isDirectorLitePageOnServer(context, "/marketing/campanhas/[id]")) {
@@ -237,6 +245,8 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
           initialCaptureEnabled={currentRoute?.enabled ?? false}
           canConfigureCapture={canConfigureCapture}
           canDisableCapture={context.role === "director"}
+          brokerOffer={brokerOffer}
+          canEditBrokerOffer={canEditBrokerOffer}
         />
       </main>
     </>

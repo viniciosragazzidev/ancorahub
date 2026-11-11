@@ -214,6 +214,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Habilita o visual Lite somente para o Diretor desta empresa. O Super-admin controla cada piloto.",
   },
+  BROKER_AD_CONTEXT: {
+    key: "feature_broker_ad_context",
+    scope: "tenant",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Mostra ao corretor o cartão \"De onde veio\": o plano anunciado pela campanha e o título, o texto e a imagem do anúncio. Nunca o nome da campanha, IDs ou verba. O Super-admin liga por empresa; a chave real é feature_broker_ad_context_<tenantId>.",
+  },
   LIVE_STATUS_STRIP: {
     key: "feature_live_status_strip",
     scope: "tenant",

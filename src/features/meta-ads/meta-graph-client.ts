@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { GraphAdCreative } from "./ad-creative-parse";
 import type { MetaDiscoveredAssets } from "./types";
 import { isMetaAdAccountId, isMetaObjectId, isMetaPageId, normalizeMetaAdAccountId } from "./meta-id-validation";
 
@@ -398,6 +399,23 @@ export class MetaGraphClient {
       fields: "id,name",
     });
     return rawDatasets.map((dataset) => ({ id: dataset.id, name: dataset.name || `Dataset ${dataset.id}` }));
+  }
+
+  /**
+   * O criativo do anúncio (o que o cliente viu), 10/11/2026. Duas leituras: o
+   * anúncio dá o id do criativo e o criativo vem com a miniatura em 600 px.
+   * Nunca pede nome, verba ou público.
+   */
+  async fetchAdCreative(adId: string): Promise<GraphAdCreative | null> {
+    this.assertMetaObjectId(adId, "anúncio");
+    const ad = await this.fetchApi<{ creative?: { id?: string } }>(`/${adId}`, { fields: "creative{id}" });
+    const creativeId = ad.creative?.id;
+    if (!creativeId || !isMetaObjectId(creativeId)) return null;
+    return this.fetchApi<GraphAdCreative>(`/${creativeId}`, {
+      fields: "title,body,image_url,thumbnail_url,video_id,object_type,object_story_spec,asset_feed_spec",
+      thumbnail_width: "600",
+      thumbnail_height: "600",
+    });
   }
 
   /** Busca detalhes de um lead gerado via Lead Ads */

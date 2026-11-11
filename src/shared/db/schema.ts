@@ -2099,6 +2099,57 @@ export const metaAds = pgTable(
   ],
 );
 
+/**
+ * O que o cliente viu no anúncio (10/11/2026): título, texto e imagem do criativo.
+ * Cache por empresa e anúncio, preenchido pelo referral do WhatsApp e pela Graph.
+ * Só conteúdo público: sem nome interno, sem verba. Plano: 2026-11-10-corretor-ve-anuncio-do-lead.md.
+ */
+export const metaAdCreatives = pgTable(
+  "meta_ad_creatives",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    adId: text("ad_id").notNull(),
+    title: text("title"),
+    body: text("body"),
+    /** image | video | carousel */
+    mediaType: text("media_type"),
+    /** URL da Meta: expira, por isso a Graph renova depois de 24 h. */
+    imageUrl: text("image_url"),
+    /** graph | referral */
+    source: text("source").notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }),
+    fetchError: text("fetch_error"),
+    fetchAttempts: integer("fetch_attempts").notNull().default(0),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_ad_creatives_tenant_ad_unique").on(table.tenantId, table.adId),
+  ],
+);
+
+/**
+ * O plano que a campanha anuncia, escrito pela gestão para o corretor (10/11/2026):
+ * "Custo-benefício Amil a partir de R$ 89, individual". Separado de meta_campaigns
+ * para o sync da Meta nunca apagar o texto.
+ */
+export const metaCampaignBrokerBriefs = pgTable(
+  "meta_campaign_broker_briefs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    campaignId: text("campaign_id").notNull(),
+    offer: text("offer").notNull(),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_campaign_broker_briefs_tenant_campaign_unique").on(table.tenantId, table.campaignId),
+  ],
+);
+
 /** Formulários Lead Ads */
 export const metaLeadForms = pgTable(
   "meta_lead_forms",

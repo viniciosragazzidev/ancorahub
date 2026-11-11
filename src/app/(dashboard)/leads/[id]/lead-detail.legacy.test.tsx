@@ -87,6 +87,7 @@ vi.mock("@/features/conversation-intelligence", async () => ({
   AiConversationInsightCard: (await import("@/features/conversation-intelligence/components/ai-conversation-insight-card")).AiConversationInsightCard,
 }));
 vi.mock("@/features/leads/lead-authorization", () => ({ buildLeadScopeWhere: () => undefined }));
+vi.mock("@/features/leads/broker-ad-context.server", () => ({ loadBrokerAdContext: async () => null }));
 vi.mock("@/features/supervisor-workspace/team-lead-detail-presentation", () => ({ buildTeamLeadLightDetail: vi.fn(), getTeamLeadPresentationSupplements: vi.fn() }));
 // O cabeçalho é do chrome (outra frente): aqui só confere o título e a migalha que a página passa.
 vi.mock("@/components/dashboard-header", () => ({

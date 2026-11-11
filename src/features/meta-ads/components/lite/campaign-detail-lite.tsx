@@ -20,6 +20,7 @@ import { saveMetaCampaignQueueRouteAction } from "@/features/lead-distribution/a
 import { formatCurrency } from "@/features/quotes/utils";
 import type { MetaCampaignItem } from "../../types";
 import type { CampaignAdItem, CampaignFormItem } from "../campaign-detail-view";
+import { CampaignBrokerOfferLite } from "./campaign-broker-offer-lite";
 import styles from "./meta-lite.module.css";
 import detail from "./campaign-detail-lite.module.css";
 
@@ -35,6 +36,8 @@ export function CampaignDetailLite({
   initialCaptureEnabled = false,
   canConfigureCapture = false,
   canDisableCapture = false,
+  brokerOffer = null,
+  canEditBrokerOffer = false,
 }: {
   campaign: MetaCampaignItem;
   ads?: CampaignAdItem[];
@@ -44,6 +47,9 @@ export function CampaignDetailLite({
   initialCaptureEnabled?: boolean;
   canConfigureCapture?: boolean;
   canDisableCapture?: boolean;
+  /** "Plano anunciado" mostrado ao corretor (10/11/2026). */
+  brokerOffer?: string | null;
+  canEditBrokerOffer?: boolean;
 }) {
   const router = useRouter();
   const [selectedQueueId, setSelectedQueueId] = useState<string>(initialQueueId ?? "");
@@ -162,6 +168,9 @@ export function CampaignDetailLite({
           </div>
         </div>
       </section>
+
+      {/* Só para quem escreve o plano anunciado, ou quando já há um texto salvo. */}
+      {canEditBrokerOffer || brokerOffer ? <CampaignBrokerOfferLite campaignId={campaign.campaignId} initialOffer={brokerOffer} canEdit={canEditBrokerOffer} /> : null}
 
       <section className={detail.summary} aria-labelledby="campaign-summary-title">
         <h2 id="campaign-summary-title" className={detail.summaryTitle}>Resumo de desempenho por IA</h2>

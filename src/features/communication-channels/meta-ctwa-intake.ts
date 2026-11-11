@@ -6,6 +6,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { createLeadFromWebhookSync } from "@/features/leads/webhooks/services/create-lead-from-webhook-sync";
 import { resolveMetaCapturePolicy, type MetaCaptureMode } from "@/features/meta-ads/meta-capture-policy";
 import { resolveMetaCampaignQueueRoute } from "@/features/meta-ads/campaign-route-resolver";
+import { saveReferralAdCreative, scheduleAdCreativeRefresh } from "@/features/meta-ads/ad-creative-cache";
+import { hasAdContent } from "@/features/meta-ads/ad-creative-parse";
 import { shouldUseChannelIntakeForCtwa } from "./ctwa-channel-intake-fallback";
 import { decryptMetaToken } from "@/features/meta-ads/meta-oauth";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -150,6 +152,12 @@ export async function ingestCtwaLead(input: {
     return { status: "ignored", reason: "rejected" };
   }
   await db.update(schema.metaLeadAdSources).set({ lastLeadAt: input.receivedAt, updatedAt: new Date() }).where(eq(schema.metaLeadAdSources.id, source.id));
+  // O que o cliente viu no anúncio, para o corretor (10/11/2026). Nunca derruba a entrada do lead.
+  if (hasAdContent(input.referral.creative)) {
+    await saveReferralAdCreative(input.tenantId, input.referral.adId, input.referral.creative)
+      .catch((error) => console.warn("[meta-ctwa] creative.save_failed", { tenantId: input.tenantId, error: error instanceof Error ? error.message : String(error) }));
+  }
+  scheduleAdCreativeRefresh(input.tenantId, input.referral.adId);
   return { status: result.duplicate ? "existing" : "created", leadId: result.leadId };
 }
 

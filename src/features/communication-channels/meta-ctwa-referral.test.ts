@@ -6,7 +6,23 @@ describe("click-to-WhatsApp referral", () => {
   it("reads the ad of a first message from an ad", () => {
     expect(readCtwaAdReferral({ source_type: "ad", source_id: "120212345678901234", headline: " Plano de saúde ", ctwa_clid: "ARAkLk" })).toEqual({
       adId: "120212345678901234", headline: "Plano de saúde", sourceUrl: null, ctwaClid: "ARAkLk",
+      creative: { title: "Plano de saúde", body: null, mediaType: null, imageUrl: null },
     });
+  });
+
+  it("keeps what the customer saw in the ad: text, media type and an https image", () => {
+    const read = readCtwaAdReferral({
+      source_type: "ad", source_id: "120212345678901234", headline: "Amil custo-benefício",
+      body: "Planos a partir de R$ 89\r\n\r\n\r\nSó no Rio", media_type: "image",
+      image_url: "https://scontent.xx.fbcdn.net/v/full.jpg", thumbnail_url: "https://scontent.xx.fbcdn.net/v/thumb.jpg",
+    });
+    expect(read?.creative).toEqual({
+      title: "Amil custo-benefício",
+      body: "Planos a partir de R$ 89\n\nSó no Rio",
+      mediaType: "image",
+      imageUrl: "https://scontent.xx.fbcdn.net/v/thumb.jpg",
+    });
+    expect(readCtwaAdReferral({ source_type: "ad", source_id: "120212345678901234", image_url: "http://insecure/x.jpg" })?.creative.imageUrl).toBeNull();
   });
 
   it("keeps a post, a missing referral or a malformed id as conversation only", () => {

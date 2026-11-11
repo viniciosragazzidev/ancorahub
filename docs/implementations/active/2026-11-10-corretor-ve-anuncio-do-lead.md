@@ -1,8 +1,75 @@
 # Corretor vê o anúncio que trouxe o lead
 
-Status: plano para revisão (10/11/2026). Nada foi implementado.
+Status: decidido em 10/11/2026 (DEC-176, BR-096). Conversa e ficha do Lite implementadas na branch `feat/corretor-anuncio-do-lead`, sem push nem merge, aguardando a revisão visual. Aviso de lead novo e oferta pelo WhatsApp ficam para a próxima etapa.
 
 Pedido do Vinicios em 10/11/2026: "Adicione um plano para que o corretor receba informações do anuncio que o lead dele foi gerado".
+
+## Decisões (10/11/2026)
+
+O Vinicios: "deve mostrar os dados da campanha e não o nome dela, entende? O corretor tem que saber o conteúdo da campanha, plano etc para evitar oferecer um plano mais caro quando a campanha é de um plano custo e benefício".
+
+1. **Pergunta 1: sim.** Exceção estreita à regra de 16/10. Nome de campanha, conjunto e anúncio, IDs, verba e gasto continuam ocultos.
+2. **O objetivo principal é o plano anunciado.** O corretor precisa saber qual plano ou oferta a campanha promete (custo-benefício, faixa de preço, operadora, PME ou individual) para não oferecer um plano mais caro.
+   - Por isso a pergunta 4 passou a **sim**: a gestão escreve o "Plano anunciado" por campanha.
+   - O cartão abre com esse texto, antes do criativo.
+3. Nas demais perguntas valem as opções recomendadas.
+   - Exceção na pergunta 6: a imagem fica na URL da Meta, renovada a cada 24 h, e não no armazenamento próprio. Ver "Desvios".
+
+## Implementação (10/11/2026, conversa e ficha do Lite)
+
+| Peça | Onde |
+| --- | --- |
+| Migração 0226: `meta_ad_creatives` (criativo por empresa e anúncio) e `meta_campaign_broker_briefs` (plano anunciado por campanha) | `drizzle/0226_meta_ad_creatives_broker_briefs.sql`, `src/shared/db/schema.ts` |
+| Leitura do criativo na Graph (`/{ad}?fields=creative{id}` e o criativo com miniatura de 600 px) | `MetaGraphClient.fetchAdCreative`, `src/features/meta-ads/ad-creative-parse.ts` |
+| Cache: 24 h; 3 falhas seguidas pausam por 7 dias; sempre em segundo plano | `src/features/meta-ads/ad-creative-cache.ts` |
+| WhatsApp do anúncio: o `referral` passa a guardar texto, tipo de mídia e imagem | `meta-ctwa-referral.ts`, `meta-ctwa-intake.ts`, `types.ts` |
+| Formulário: busca o criativo depois de criar o lead | `meta-lead-ads.ts` |
+| Projeção fechada para o corretor | `src/features/leads/broker-ad-context.ts` (+ `.server.ts`) |
+| Flag `feature_broker_ad_context_<tenantId>` e o liga/desliga no Super-admin, com auditoria | `catalog.ts`, `broker-ad-context-flag.ts`, `super-admin/actions.ts`, `super-admin/tenants/[tenantId]/page.tsx` |
+| Cartão "De onde veio" | `light-lead-detail/ad-origin-card.tsx`, na conversa (`variant="panel"`, coluna de dados e "Ver dados" no celular) e na ficha (`?ficha=1`) |
+| "Plano anunciado" na tela da campanha (Lite e visual normal), editado por diretor, gestor e marketing, com auditoria | `broker-brief-actions.ts`, `broker-brief-policy.ts`, `lite/campaign-broker-offer-lite.tsx`, `campaign-broker-offer-card.tsx` |
+| Registro da decisão | DEC-176 em `docs/decision-log.md`, BR-096 em `docs/business-rules.md` |
+
+**Como o cartão se comporta:**
+- Abre com "Plano anunciado" (o texto da gestão) e depois mostra "O que o cliente viu": miniatura 56 px, título e texto em 2 linhas, com "Ver texto completo".
+- Vídeo aparece com a capa e um ícone de play.
+- Imagem que não carrega (URL vencida) some, sem deixar buraco.
+- Só com o plano anunciado, ou só com o criativo, o cartão aparece com o que houver.
+- Sem nada, não há cartão.
+
+**Validação:**
+- `tsc --noEmit` sem erros.
+- 41 testes nos arquivos novos e alterados passaram:
+  - `ad-creative-parse`, `ad-creative-cache`, `broker-ad-context` (inclui um teste de que nenhum nome, ID ou resposta do formulário sai para o corretor), `ad-origin-card`, `campaign-broker-offer-lite`, `meta-ctwa-referral` e `meta-lite`.
+- ESLint sem erros nos arquivos tocados.
+- Duas falhas são anteriores a esta mudança e estão em arquivos que ela não toca:
+  - `meta-capture-controls.test.tsx` falha também sozinho.
+  - `lead-detail.legacy.test.tsx` não resolve `server-only` em `closing-stage-notice.ts`.
+- Prints da prévia `/dev/lead-preview?anuncio=formulario|whatsapp|plano&ficha=1`, com dados sintéticos, em `2026-11-10-corretor-anuncio-prints/`:
+  - conversa no computador;
+  - WhatsApp do anúncio com o texto aberto;
+  - ficha;
+  - celular em "Ver dados" só com o plano.
+- O aviso "1 Issue" nos prints é a falta de `DATABASE_URL` no servidor da prévia, sem relação com o cartão.
+
+**Desvios do plano:**
+- **Imagem:** fica na URL da Meta, renovada pela Graph depois de 24 h. Não é copiada para o armazenamento próprio.
+  - Se a URL vencer antes da renovação, a imagem some e o título e o texto continuam.
+  - A cópia para o armazenamento próprio fica para a próxima etapa, se a imagem sumir com frequência.
+- **Auditoria:** a visualização pelo corretor (`lead.ad_context.viewed`) não foi gravada nesta etapa. Grava-se só a edição do plano anunciado.
+
+**Antes de ligar em produção:**
+1. Aplicar a migração 0226.
+2. A gestão escreve o "Plano anunciado" nas campanhas ativas.
+3. O Super-admin liga a flag para a empresa.
+4. Conferir com 2 ou 3 leads reais se o token da conexão lê o criativo (`ads_read`).
+   - Se não ler, o cartão mostra só o plano anunciado e, no WhatsApp do anúncio, o título.
+
+**Próxima etapa (não feita):**
+- Linha do anúncio no aviso de lead novo (F3).
+- Oferta pelo WhatsApp: a variável no WAHA e o template novo `new_lead_broker_anuncio` (F4).
+  - O template da Meta é fixo e depende de nova aprovação: é um passo separado.
+  - Nas duas, a linha recomendada é o plano anunciado (ou o título do anúncio, se não houver), em uma linha de até 60 caracteres.
 
 ## Resumo
 
@@ -191,6 +258,8 @@ O cartão vale para leads novos e para os já existentes com `metaAdId` ou `adHe
 Não há job novo obrigatório: a nova tentativa pode ir no job de sync da Meta que já existe. Se virar job próprio, entra em `docs/runbooks/coolify-scheduled-tasks.md`.
 
 ## Perguntas em aberto
+
+Respondidas em 10/11/2026 (ver "Decisões"): a 1 e a 4 com **sim**; as demais com a opção recomendada; a 6 com o desvio descrito.
 
 1. **Rever a regra "a origem do lead fica oculta ao corretor" (16/10/2026)?**
    - Recomendado: exceção só para o conteúdo público do anúncio (imagem, título, texto e tipo de entrada). Nome de campanha, IDs, data de captura e custos seguem ocultos.
