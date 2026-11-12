@@ -8,7 +8,7 @@ import { stageLabel } from "./format";
 import type { LeadDetailController } from "./use-lead-detail";
 
 /** Current stage and the sale documentation flow (register, in review, approved, rejected). */
-export function SaleSection({ c, mode = "broker", aiSalePrompt = null }: { c: LeadDetailController; mode?: "broker" | "management"; aiSalePrompt?: AiSalePrompt | null }) {
+export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrationV2Enabled = false, hasActiveSale = false }: { c: LeadDetailController; mode?: "broker" | "management"; aiSalePrompt?: AiSalePrompt | null; registrationV2Enabled?: boolean; hasActiveSale?: boolean }) {
   const {
     isDistributed,
     leadStatus,
@@ -32,6 +32,7 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null }: { c: Le
     leadStatus !== "converted" &&
     leadStatus !== "lost" &&
     leadStatus !== "documentation_pending";
+  const canStartV2Registration = !hasActiveSale && leadStatus !== "lost" && (leadStatus !== "converted" || aiSalePrompt === "register");
 
   return (
     <section aria-labelledby="stage-heading" className="arc-venancor flex flex-col gap-4 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
@@ -45,7 +46,17 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null }: { c: Le
         ) : null}
       </div>
 
-      {mode === "broker" && approvedDocument && leadStatus !== "converted" ? (
+      {registrationV2Enabled && mode === "broker" && !isDistributed && canStartV2Registration ? (
+        <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
+          <p className="text-sm font-medium text-(--foreground)">{aiSalePrompt === "register" ? "Venda detectada pela IA" : "Registrar venda"}</p>
+          <p className="text-sm text-(--text-secondary)">Revise as pessoas, os dados do plano e envie os documentos que ainda faltam. A confirmação da operadora precisa estar aprovada para concluir.</p>
+          <Button variant="secondary" onClick={() => setShowSaleConfirm(true)}>
+            {leadStatus === "documentation_pending" ? "Continuar registro" : "Registrar venda"}
+          </Button>
+        </div>
+      ) : null}
+
+      {!registrationV2Enabled && mode === "broker" && approvedDocument && leadStatus !== "converted" ? (
         <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
           <p className="text-sm font-medium text-(--success)">Documentação aprovada pelo supervisor</p>
           <p className="text-sm text-(--text-secondary)">
@@ -57,7 +68,7 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null }: { c: Le
         </div>
       ) : null}
 
-      {mode === "broker" && !approvedDocument && rejectedDocument && leadStatus !== "converted" ? (
+      {!registrationV2Enabled && mode === "broker" && !approvedDocument && rejectedDocument && leadStatus !== "converted" ? (
         <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
           <p className="text-sm font-medium text-(--warning)">Documentação rejeitada pelo supervisor</p>
           <p className="text-sm text-(--text-secondary)">
@@ -69,14 +80,14 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null }: { c: Le
         </div>
       ) : null}
 
-      {mode === "broker" && !approvedDocument && !rejectedDocument && leadStatus === "documentation_pending" ? (
+      {!registrationV2Enabled && mode === "broker" && !approvedDocument && !rejectedDocument && leadStatus === "documentation_pending" ? (
         <div className="border-t border-(--border) pt-4">
           <p className="text-sm font-medium text-(--foreground)">Documentação em análise</p>
           <p className="mt-1 text-sm text-(--text-secondary)">Aguardando aprovação do supervisor.</p>
         </div>
       ) : null}
 
-      {mode === "broker" && salePromptCopy ? (
+      {!registrationV2Enabled && mode === "broker" && salePromptCopy ? (
         <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
           <p className="text-sm font-medium text-(--success)">{salePromptCopy.title}</p>
           <p className="text-sm text-(--text-secondary)">{salePromptCopy.body}</p>
@@ -86,7 +97,7 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null }: { c: Le
         </div>
       ) : null}
 
-      {mode === "broker" && canRegisterSale ? (
+      {!registrationV2Enabled && mode === "broker" && canRegisterSale ? (
         <div className="border-t border-(--border) pt-4">
           <Button variant="secondary" onClick={handleRequestSale} loading={requestingSale} disabled={requestingSale}>
             Registrar venda

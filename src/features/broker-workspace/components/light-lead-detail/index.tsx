@@ -7,6 +7,7 @@ import { LeadHeaderBar, NextStepCard } from "@/features/broker-workspace/chat/le
 import { arrivalView, nextStepFor } from "@/features/broker-workspace/chat/lead-arrival";
 import { LeadSocialLayout } from "@/features/broker-workspace/chat/lead-social-layout";
 import { RegisterSalePanel } from "@/app/(dashboard)/leads/[id]/register-sale-panel";
+import { RegisterSaleWizard } from "@/app/(dashboard)/leads/[id]/register-sale-wizard";
 import { LeadQuotesSection } from "@/features/leads/components/lead-quotes-section";
 
 import { LeadActionBar } from "./action-bar";
@@ -49,6 +50,7 @@ export function LightLeadDetail({
   conversation,
   commercialValuesEnabled = false,
   quotePlans = [],
+  saleRegistrationV2Enabled = false,
 }: {
   lead: LightLeadDetailData;
   /** Kept for the page contract; the responsible broker is no longer printed on this screen. */
@@ -64,6 +66,7 @@ export function LightLeadDetail({
   conversation?: ReactNode;
   commercialValuesEnabled?: boolean;
   quotePlans?: Array<{ id: string; name: string }>;
+  saleRegistrationV2Enabled?: boolean;
 }) {
   const isManagement = mode === "management";
   const c = useLeadDetail({ lead, requirements, documents, initialDetailsExpanded: isManagement });
@@ -112,7 +115,7 @@ export function LightLeadDetail({
               <AdOriginCard ad={lead.adContext} />
               <ClientInfoCard lead={lead} c={c} withSummary />
               <PeopleDataSection lead={lead} c={c} showRecordDetails={false} />
-              <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} />
+              <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} registrationV2Enabled={saleRegistrationV2Enabled} hasActiveSale={lead.hasActiveSale} />
               {commercialValuesEnabled ? <LeadQuotesSection key={lead.id} leadId={lead.id} leadName={lead.nome} leadPhone={lead.telefone} beneficiaryCount={lead.livesCount} plans={quotePlans} monthlyValue={lead.monthlyValue} livesCount={lead.livesCount} commercialValueSource={lead.commercialValueSource} canDeleteQuotes={isManagement} /> : null}
             </div>
           }
@@ -120,15 +123,10 @@ export function LightLeadDetail({
         />
         <DeclineSheet lead={lead} c={c} />
         <StepSheet c={c} />
-        <SaleDocSheet lead={lead} c={c} requirements={requirements} />
-        <RegisterSalePanel
-          leadId={lead.id}
-          documents={documents}
-          carriers={carriers}
-          open={c.showSaleConfirm}
-          onOpenChange={c.setShowSaleConfirm}
-          onRegistered={c.markConverted}
-        />
+        {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={c.markConverted} /> : <>
+          <SaleDocSheet lead={lead} c={c} requirements={requirements} />
+          <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={c.markConverted} />
+        </>}
         {c.successOverlay}
       {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={c.handoffUrl} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} onClose={c.closeHandoff} /> : null}
       </>
@@ -160,7 +158,7 @@ export function LightLeadDetail({
         <ClosingOutcomeCard lead={lead} c={c} />
         <AdOriginCard ad={lead.adContext} />
         <ClientInfoCard lead={lead} c={c} />
-        <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} />
+        <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} registrationV2Enabled={saleRegistrationV2Enabled} hasActiveSale={lead.hasActiveSale} />
         <DetailsZone lead={lead} c={c} />
         <PeopleDataSection lead={lead} c={c} />
         {commercialValuesEnabled ? <LeadQuotesSection key={lead.id} leadId={lead.id} leadName={lead.nome} leadPhone={lead.telefone} beneficiaryCount={lead.livesCount} plans={quotePlans} monthlyValue={lead.monthlyValue} livesCount={lead.livesCount} commercialValueSource={lead.commercialValueSource} canDeleteQuotes={isManagement} /> : null}
@@ -169,15 +167,10 @@ export function LightLeadDetail({
       <LeadActionBar lead={lead} c={c} />
       <DeclineSheet lead={lead} c={c} />
       <StepSheet c={c} />
-      <SaleDocSheet lead={lead} c={c} requirements={requirements} />
-      <RegisterSalePanel
-        leadId={lead.id}
-        documents={documents}
-        carriers={carriers}
-        open={c.showSaleConfirm}
-        onOpenChange={c.setShowSaleConfirm}
-        onRegistered={c.markConverted}
-      />
+      {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={c.markConverted} /> : <>
+        <SaleDocSheet lead={lead} c={c} requirements={requirements} />
+        <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={c.markConverted} />
+      </>}
       {c.successOverlay}
       {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={c.handoffUrl} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} onClose={c.closeHandoff} /> : null}
     </div>

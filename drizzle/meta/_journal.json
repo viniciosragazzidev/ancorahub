@@ -1156,6 +1156,13 @@
                         "when":  1794500000000,
                         "tag":  "0228_auto_sale",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  165,
+                        "version":  "7",
+                        "when":  1794508063820,
+                        "tag":  "0229_lead_beneficiaries_identity_fields",
+                        "breakpoints":  true
                     }
                 ]
 }

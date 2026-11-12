@@ -198,6 +198,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       proposalMonthlyValue: sql<string | null>`(select ${schema.proposals.totalMonthly} from ${schema.proposals} where ${schema.proposals.tenantId} = ${schema.leads.tenantId} and ${schema.proposals.leadId} = ${schema.leads.id} and ${schema.proposals.status} in ('rascunho', 'em_revisao', 'enviada', 'visualizada', 'negociacao', 'aprovada') order by ${schema.proposals.createdAt} desc limit 1)`,
       proposalLivesCount: sql<number | null>`(select ${schema.proposals.beneficiaryCount} from ${schema.proposals} where ${schema.proposals.tenantId} = ${schema.leads.tenantId} and ${schema.proposals.leadId} = ${schema.leads.id} and ${schema.proposals.status} in ('rascunho', 'em_revisao', 'enviada', 'visualizada', 'negociacao', 'aprovada') order by ${schema.proposals.createdAt} desc limit 1)`.mapWith(schema.proposals.beneficiaryCount),
       activeSaleMonthlyValue: sql<string | null>`(select coalesce(nullif(${schema.sales.approvedValue}, 0), ${schema.sales.saleValue}) from ${schema.sales} where ${schema.sales.tenantId} = ${schema.leads.tenantId} and ${schema.sales.leadId} = ${schema.leads.id} and ${schema.sales.status} = 'active' order by ${schema.sales.createdAt} desc limit 1)`,
+      activeSaleExists: sql<boolean>`exists (select 1 from ${schema.sales} where ${schema.sales.tenantId} = ${schema.leads.tenantId} and ${schema.sales.leadId} = ${schema.leads.id} and ${schema.sales.status} = 'active')`.mapWith(Boolean),
       corretorId: schema.leads.corretorId,
       branchId: schema.leads.branchId,
       planId: schema.leads.planId,
@@ -339,6 +340,9 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
   });
   // Lite broker: resolved once per request (cached); the Meta names below only feed the full screen.
   const isLightBroker = context.role === "broker" && (await getExperienceMode(context)) === "LIGHT";
+  const saleRegistrationV2Enabled = isLightBroker
+    ? (await getSystemSetting(FEATURE_FLAGS.BROKER_SALE_REGISTRATION_V2.key).catch(() => null)) === "true"
+    : false;
   const [metaCampaign, metaAd, metaForm] = isLightBroker ? [[], [], []] : await Promise.all([
     lead.metaCampaignId
       ? db.select({ name: schema.metaCampaigns.name }).from(schema.metaCampaigns)
@@ -443,6 +447,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       summary: qualificationDetails?.resumoAtendimento || qualificationDetails?.resumoNecessidade || null,
       planName: lead.productName,
       livesCount: commercialValues.livesCount,
+      hasActiveSale: Boolean(lead.activeSaleExists),
       monthlyValue: commercialValues.monthlyValue == null ? null : String(commercialValues.monthlyValue),
       commercialValueSource: commercialValues.source,
       urgency: qualificationDetails?.urgenciaContratacao || null,
@@ -462,6 +467,9 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
         id: b.id,
         name: b.name,
         birthDate: b.birthDate,
+        age: b.age,
+        cpf: b.cpf,
+        hasCpf: b.hasCpf,
         relationship: b.relationship,
         isHolder: b.isHolder,
       })),
@@ -550,7 +558,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
             required: Boolean(req.required),
             appliesPerBeneficiary: Boolean(req.appliesPerBeneficiary),
           }))}
-          documents={lightLeadDocs.map((doc) => ({ id: doc.id, filename: doc.filename, status: doc.status }))}
+          documents={lightLeadDocs.map((doc) => ({ id: doc.id, filename: doc.filename, status: doc.status, category: doc.category, requirementId: doc.requirementId, requirementName: doc.requirementName, beneficiaryId: doc.beneficiaryId }))}
           carriers={lightCarriers}
           activity={{
             lastClientAt: lastClient?.sentAt ? new Date(lastClient.sentAt as Date | string) : null,
@@ -561,6 +569,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
           conversation={<LeadConversation leadId={lead.id} name={lead.nome} initials={leadInitials} canWrite={lightLead.isCurrentBroker} script={script} />}
           commercialValuesEnabled={commercialValuesEnabled}
           quotePlans={quotePlans}
+          saleRegistrationV2Enabled={saleRegistrationV2Enabled}
         />
         </>
       );
@@ -583,10 +592,15 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
           id: doc.id,
           filename: doc.filename,
           status: doc.status,
+          category: doc.category,
+          requirementId: doc.requirementId,
+          requirementName: doc.requirementName,
+          beneficiaryId: doc.beneficiaryId,
         }))}
         carriers={lightCarriers}
         commercialValuesEnabled={commercialValuesEnabled}
         quotePlans={quotePlans}
+          saleRegistrationV2Enabled={saleRegistrationV2Enabled}
       />
       </>
     );

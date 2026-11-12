@@ -22,7 +22,7 @@
   border: 1px solid var(--border);
   border-bottom: 0;
   border-radius: var(--radius-surface) var(--radius-surface) 0 0;
-  background: var(--surface-raised);
+  background: var(--surface-elevated, var(--popover));
   color: var(--foreground);
   box-shadow: var(--shadow-floating);
   font-family: var(--font-body);
