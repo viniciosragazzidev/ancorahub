@@ -6,8 +6,9 @@ import { and, asc, count, eq, gte, inArray, lte, or, isNull } from "drizzle-orm"
 
 import { uploadMetaMediaObject } from "@/features/communication-channels/conversation-media";
 import { sendMetaCloudMediaMessage } from "@/features/communication-channels/meta-media-send";
-import { brokerMetaWindowOpen, enqueueMetaTextMessage } from "@/features/communication-channels/outbound-service";
+import { brokerMetaWindowOpen, enqueueMetaTextMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getPreferredMetaCloudChannel } from "@/features/communication-channels/service";
+import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getDatabase, schema } from "@/shared/db";
 import { downloadR2Object } from "@/shared/storage/r2-storage";
 
@@ -50,6 +51,31 @@ async function enqueueWahaText(row: OutboxRow, deal: { leadId: string; wahaNumbe
     renderedBody: row.body ?? "", status: "queued", idempotencyKey: row.idempotencyKey, queuedAt: now, requestedBy: deal.chosenBy, createdAt: now, updatedAt: now,
   }).onConflictDoNothing();
   return id;
+}
+
+/**
+ * Texto sai na hora (12/11, caso Alex): antes ficava na fila da Meta esperando o robô do WhatsApp e não entrava na
+ * conversa do CRM. Agora processa a linha já, grava na conversa (como a qualificação faz) e falha de verdade vira erro.
+ * Ainda na fila (nova tentativa da Meta): segue pelo robô do WhatsApp.
+ */
+async function deliverTextNow(row: OutboxRow, deal: { tenantId: string; leadId: string }, phone: string, outboundId: string) {
+  const db = getDatabase();
+  await processMetaOutboundBatch(1, deal.tenantId, outboundId).catch((error) => console.warn("[auto-sale] text_delivery_deferred", { outboundId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" }));
+  const [delivery] = await db.select({
+    status: schema.whatsappOutboundMessages.status, providerMessageId: schema.whatsappOutboundMessages.providerMessageId,
+    channelId: schema.whatsappOutboundMessages.channelId, deliveryRoute: schema.whatsappOutboundMessages.deliveryRoute,
+    wahaNumberId: schema.whatsappOutboundMessages.wahaNumberId, error: schema.whatsappOutboundMessages.providerErrorMessage,
+  }).from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.id, outboundId), eq(schema.whatsappOutboundMessages.tenantId, deal.tenantId))).limit(1);
+  if (!delivery) return outboundId;
+  if (["failed", "cancelled", "skipped"].includes(delivery.status)) throw new Error(delivery.error ?? `Envio ${delivery.status}.`);
+  if (!["sent", "delivered", "read"].includes(delivery.status)) return outboundId;
+  const viaWaha = delivery.deliveryRoute === "waha_direct";
+  await db.insert(schema.whatsappMessages).values({
+    id: randomUUID(), tenantId: deal.tenantId, leadId: deal.leadId, communicationChannelId: viaWaha ? null : delivery.channelId,
+    wahaNumberId: viaWaha ? delivery.wahaNumberId : null, senderRole: "assistant", provider: viaWaha ? "waha" : META_CLOUD_PROVIDER, providerStatus: "sent",
+    messageId: delivery.providerMessageId ?? undefined, phone, direction: "outbound", body: row.body ?? "", sentAt: new Date(),
+  }).onConflictDoNothing();
+  return delivery.providerMessageId ?? outboundId;
 }
 
 async function sendMedia(row: OutboxRow, deal: { tenantId: string; leadId: string; chosenBy: string }, phone: string) {
@@ -100,12 +126,13 @@ export async function dispatchAutoSaleOutbox(now = new Date(), limit = 20, onlyD
       let providerId: string | null = null;
       if (row.kind === "text") {
         if (deal.channel === "waha") {
-          providerId = await enqueueWahaText(row, deal, phone);
-          if (!providerId) { await hold(row, HOLD_REASONS.channel); await callManager(deal, "channel_unavailable"); result.held += 1; continue; }
+          const outboundId = await enqueueWahaText(row, deal, phone);
+          if (!outboundId) { await hold(row, HOLD_REASONS.channel); await callManager(deal, "channel_unavailable"); result.held += 1; continue; }
+          providerId = await deliverTextNow(row, deal, phone, outboundId);
         } else {
           if (!metaWindow) { await hold(row, HOLD_REASONS.window); result.held += 1; continue; }
           const queued = await enqueueMetaTextMessage({ tenantId: deal.tenantId, recipientType: "lead", recipientId: deal.leadId, destinationPhone: phone, body: row.body ?? "", idempotencyKey: row.idempotencyKey, purpose: "autoSale", requestedBy: row.approvedBy ?? deal.chosenBy });
-          providerId = queued.id;
+          providerId = await deliverTextNow(row, deal, phone, queued.id);
         }
       } else {
         if (!metaWindow) { await hold(row, deal.channel === "waha" ? HOLD_REASONS.wahaMedia : HOLD_REASONS.window); result.held += 1; continue; }

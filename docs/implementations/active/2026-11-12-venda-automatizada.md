@@ -306,3 +306,10 @@ Limites conhecidos do piloto: WAHA não envia PDF nem imagem; Autopiloto não co
 - Autopiloto: a abertura sai na hora (início manual, "Pegar o próximo quente" e captura), sem esperar a rodada do robô.
 - Botão "Continuar atendimento" no painel da negociação: devolve ao agente se pausada ou chamando o gestor, traz as mensagens do cliente que não viraram turno, responde o que está sem resposta, tenta de novo o que ficou retido e despacha o aprovado. Copiloto continua pedindo aprovação. Nada muda o dono do lead.
 - A tela avisa quando o robô `auto-sale` (Coolify, `* * * * *`) não roda (heartbeat).
+
+## Adendo 12/11 (noite, caso Alex): texto sai na hora e entra na conversa
+
+- O texto da assistente entrava na fila da Meta e só saía na rodada do robô do WhatsApp, sem aparecer na conversa do CRM. Agora a linha é processada na hora; enviada, é gravada na conversa (como a qualificação faz). Falha de verdade conta como falha (3 tentativas e chama o gestor).
+- Cidade que é resposta solta ("Só para mim", "Sim", "2 pessoas") não vira cidade, nem vinda da qualificação nem do modelo. A frase da abertura ficou certa sem idades ("plano de saúde em Niterói").
+- O painel mostra os dois lados da conversa (cliente e o que a assistente enviou) e a situação de cada mensagem não é mais cortada no celular.
+- Playbook 2026-11-12.3: depois da abertura não cumprimenta de novo; com "sim", pergunta só o que falta.

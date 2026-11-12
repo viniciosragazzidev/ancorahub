@@ -6,7 +6,7 @@
 import { z } from "zod";
 
 import { dealFactsSchema, MANAGER_CALL_REASONS, type AutoSaleStage, type DealFacts, type ManagerCallReason, type OfferSnapshot } from "./contracts";
-import { mergeFacts, missingForQuote, type MissingFact } from "./facts";
+import { mergeFacts, missingForQuote, plausibleCity, type MissingFact } from "./facts";
 import { checkOutgoingMessages, classifyInbound, sanitizeMessage, type GuardViolation, allowedMoneyFromOffers, extractMoneyCents } from "./guardrails";
 import { documentsRequestMessages, HOLD_MESSAGE, MISUNDERSTOOD_MESSAGE, OPT_OUT_MESSAGE } from "./quote-messages";
 import { AGENT_ACTIONS, nextStage, requiresOffer, type AgentAction } from "./state-machine";
@@ -22,6 +22,8 @@ export function cleanModelFacts(raw: unknown): Partial<DealFacts> {
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
     if (value === null || value === undefined || !(key in shape)) continue;
     const parsed = shape[key].safeParse(value);
+    if (key === "city" && typeof value === "string" && !plausibleCity(value)) continue;
+    if (key === "city" && typeof value === "string" && !plausibleCity(value)) continue;
     if (parsed.success && parsed.data !== undefined) clean[key] = parsed.data;
   }
   return clean as Partial<DealFacts>;

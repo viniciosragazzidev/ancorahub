@@ -28,6 +28,16 @@ function asText(value: unknown): string | undefined {
   return undefined;
 }
 
+/** Resposta solta gravada como cidade na qualificação ("Só para mim", "Sim", "2 pessoas") não vira cidade (12/11, caso Alex). */
+const NOT_A_CITY = /\b(para|pra|mim|eu|so|somente|apenas|sim|nao|familia|esposa|marido|filho|filha|filhos|vida|vidas|pessoa|pessoas|anos|plano|quero|individual|empresa)\b/;
+
+export function plausibleCity(text: string) {
+  const value = fold(text);
+  if (!value || value.length > 60 || /\d/.test(value)) return false;
+  if (value.split(/\s+/).length > 5) return false;
+  return !NOT_A_CITY.test(value);
+}
+
 export function modalityFromText(text: string | undefined): DealFacts["modality"] {
   const value = fold(text ?? "");
   if (!value) return undefined;
@@ -61,7 +71,7 @@ export function factsFromQualification(input: {
   const first = input.nome.trim().split(/\s+/)[0];
   if (first && first.length <= 60) facts.firstName = first.charAt(0).toLocaleUpperCase("pt-BR") + first.slice(1).toLocaleLowerCase("pt-BR");
   const city = asText(pick(bags, ["city", "cidade", "municipio"]));
-  if (city) facts.city = city.slice(0, 120);
+  if (city && plausibleCity(city)) facts.city = city.slice(0, 120);
   const neighborhood = asText(pick(bags, ["bairro", "neighborhood", "regiao"]));
   if (neighborhood) facts.neighborhood = neighborhood.slice(0, 120);
   const agesRaw = pick(bags, ["ages", "idades", "idade", "faixa_etaria"]);

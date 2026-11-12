@@ -101,7 +101,11 @@ export async function getDealDetail(context: TenantContext, dealId: string) {
       createdAt: deal.createdAt.toISOString(), endedReason: deal.endedReason, handedTo, facts: deal.facts as Record<string, unknown>,
     },
     lead: { name: lead?.nome ?? "Cliente", phone: lead?.telefone ?? "", status: lead?.status ?? "" },
-    conversation: turns.filter((turn) => turn.direction === "in" || (turn.direction === "out" && turn.body)).map((turn) => ({ id: turn.id, direction: turn.direction, kind: turn.kind, body: turn.body ?? "", at: turn.createdAt.toISOString() })),
+    // A conversa mostra os dois lados (12/11, caso Alex): o que o cliente mandou e o que a assistente enviou de fato.
+    conversation: [
+      ...turns.filter((turn) => turn.direction === "in").map((turn) => ({ id: turn.id, direction: turn.direction, kind: turn.kind, body: turn.body ?? "", at: turn.createdAt.toISOString() })),
+      ...outbox.filter((item) => item.status === "sent" || item.status === "simulated").map((item) => ({ id: item.id, direction: "out", kind: item.kind === "text" ? "message" : `media:${item.kind}`, body: item.body || item.mediaFilename || "", at: (item.sentAt ?? item.createdAt).toISOString() })),
+    ].sort((a, b) => a.at.localeCompare(b.at)),
     decisions: turns.filter((turn) => turn.kind === "decision" || turn.kind === "manager_called" || turn.kind === "link_viewed").map((turn) => ({ id: turn.id, kind: turn.kind, intent: turn.intent, objection: turn.objection, decision: turn.decision as Record<string, unknown> | null, guard: turn.guard as unknown[] | null, model: turn.model, body: turn.body, at: turn.createdAt.toISOString() })),
     outbox: outbox.map((item) => ({ id: item.id, kind: item.kind, body: item.body ?? "", status: item.status, holdReason: item.holdReason, mediaFilename: item.mediaFilename, offerId: item.offerId, at: item.createdAt.toISOString(), sentAt: item.sentAt?.toISOString() ?? null })),
     offers: offers.map(({ snapshot, row }) => ({ id: snapshot.id, version: snapshot.version, plans: snapshot.plans.map((plan) => ({ id: plan.id, operator: plan.operator, name: plan.name, totalCents: plan.totalCents, state: plan.state })), recommendedPlanId: snapshot.recommendedPlanId, reason: snapshot.recommendationReason, relaxed: snapshot.relaxed?.label ?? null, hasPdf: Boolean(row.pdfKey), linkViews: row.publicViewCount ?? 0, at: row.createdAt.toISOString() })),
