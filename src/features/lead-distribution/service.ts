@@ -811,6 +811,13 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (await isLeadInActiveAutoSale(context.tenantId, leadId)) {
     return { status: "manual_required", leadId, reason: "Lead na Venda Automatizada: só o gestor entrega a um corretor." };
   }
+  // Venda Automatizada aguardando o próximo quente: captura antes de oferecer a qualquer corretor.
+  if (lead.qualificationStatus === "hot" && !lead.corretorId) {
+    const { tryCaptureHotLead } = await import("@/features/auto-sale/watch");
+    if (await tryCaptureHotLead(context.tenantId, leadId)) {
+      return { status: "manual_required", leadId, reason: "Lead quente capturado pela Venda Automatizada." };
+    }
+  }
   const qualificationHoldReason = automaticDistributionHoldReason(lead.qualificationStatus, lead.qualificationState, await queueHoldsColdLeads(context.tenantId, lead.queueId, lead.qualificationStatus));
   if (qualificationHoldReason) {
     return { status: "manual_required", leadId, reason: qualificationHoldReason };

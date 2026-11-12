@@ -8,6 +8,7 @@ import { isUndefinedTableError } from "@/shared/db/postgres-errors";
 
 import { MANAGER_CALL_REASONS, OPEN_DEAL_STATUSES, type AutoSaleChannel, type AutoSaleMode, type AutoSaleStage, type AutoSaleStatus, type ManagerCallReason } from "./contracts";
 import { readAutoSaleFlags } from "./flag";
+import { readAutoSaleWatch } from "./watch";
 import { dealMetrics } from "./metrics";
 import { getDeal, listOffers, listOutbox, listTurns } from "./repository";
 
@@ -18,7 +19,7 @@ export type DealListRow = {
 
 export type AutoSaleOverview =
   | { state: "migration_pending" }
-  | { state: "ready"; deals: DealListRow[]; openDealId: string | null; autopilotAllowed: boolean; globalEnabled: boolean; catalogReady: boolean; summary: { total: number; documentsRequested: number; managerCalls: number } };
+  | { state: "ready"; deals: DealListRow[]; openDealId: string | null; autopilotAllowed: boolean; globalEnabled: boolean; catalogReady: boolean; watchingSince: string | null; summary: { total: number; documentsRequested: number; managerCalls: number } };
 
 async function aiCostByLead(tenantId: string, leadIds: string[], since: Date) {
   if (!leadIds.length) return new Map<string, number>();
@@ -42,6 +43,7 @@ export async function getAutoSaleOverview(context: TenantContext): Promise<AutoS
     const oldest = rows.at(-1)?.deal.createdAt ?? new Date();
     const costs = await aiCostByLead(context.tenantId, rows.map((row) => row.deal.leadId), oldest);
     const flags = await readAutoSaleFlags(context.tenantId);
+    const watch = await readAutoSaleWatch(context.tenantId);
     const { loadPilotForTenant } = await import("@/features/global-catalog/pilot/server");
     const catalogReady = Boolean(await loadPilotForTenant(context.tenantId).catch(() => null));
     const openDeal = rows.find((row) => (OPEN_DEAL_STATUSES as readonly string[]).includes(row.deal.status));
@@ -57,6 +59,7 @@ export async function getAutoSaleOverview(context: TenantContext): Promise<AutoS
       autopilotAllowed: flags.autopilot,
       globalEnabled: flags.global,
       catalogReady,
+      watchingSince: watch?.since ?? null,
       summary: {
         total: rows.length,
         documentsRequested: rows.filter((row) => row.deal.documentsRequestedAt).length,
