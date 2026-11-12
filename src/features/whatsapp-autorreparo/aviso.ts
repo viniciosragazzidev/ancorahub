@@ -10,16 +10,9 @@ import {
   horaAvisoValida,
 } from "./decisao";
 import { escaladosSemWhatsapp } from "./escala";
+import { MENSAGEM_AVISO_RECONEXAO, TITULO_AVISO_RECONEXAO } from "./texto";
 
 export const TIPO_AVISO_RECONEXAO = "whatsapp_reconexao";
-/**
- * Texto do aviso. Rascunho: revisar com o Vinicios antes de ligar a flag.
- * Sem travessão, tom de colega.
- */
-export const TITULO_AVISO_RECONEXAO = "Reconecte seu WhatsApp";
-export const MENSAGEM_AVISO_RECONEXAO =
-  "Você está de plantão amanhã e seu WhatsApp não está conectado. Reconecte hoje pelo roteiro de conexão para ficar pronto para o plantão.";
-
 export type ResumoAviso =
   | { ativo: false }
   | { ativo: true; antesDaHora: true; horaAviso: number }
