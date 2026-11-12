@@ -170,7 +170,7 @@ function callManager(state: TurnState, reason: ManagerCallReason, base: Pick<Tur
 }
 
 /** Contexto que o modelo recebe (dados, não instruções). Minimiza dado pessoal: só o primeiro nome. */
-export function buildTurnContext(input: { facts: DealFacts; stage: AutoSaleStage; offers: readonly OfferSnapshot[]; promotions: readonly string[]; history: readonly { direction: "in" | "out"; body: string }[]; inbound: readonly string[] }) {
+export function buildTurnContext(input: { facts: DealFacts; stage: AutoSaleStage; offers: readonly OfferSnapshot[]; promotions: readonly string[]; history: readonly { direction: "in" | "out"; body: string }[]; qualificationHistory?: readonly { direction: "in" | "out"; body: string }[]; inbound: readonly string[] }) {
   const current = input.offers.at(-1);
   return JSON.stringify({
     etapa: input.stage,
@@ -182,7 +182,9 @@ export function buildTurnContext(input: { facts: DealFacts; stage: AutoSaleStage
       motivo: current.recommendationReason,
     } : null,
     promocoesVigentes: input.promotions,
-    historico: input.history.slice(-12).map((turn) => `${turn.direction === "in" ? "Cliente" : "Você"}: ${turn.body}`),
+    // O que o cliente já respondeu à qualificação (antes desta negociação): fonte de fatos, nunca repetir a pergunta.
+    conversaDaQualificacao: (input.qualificationHistory ?? []).slice(-30).map((turn) => `${turn.direction === "in" ? "Cliente" : "Qualificação"}: ${turn.body}`),
+    historico: input.history.slice(-16).map((turn) => `${turn.direction === "in" ? "Cliente" : "Você"}: ${turn.body}`),
     mensagensNovasDoCliente: input.inbound,
   });
 }

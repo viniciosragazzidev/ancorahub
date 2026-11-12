@@ -313,3 +313,8 @@ Limites conhecidos do piloto: WAHA não envia PDF nem imagem; Autopiloto não co
 - Cidade que é resposta solta ("Só para mim", "Sim", "2 pessoas") não vira cidade, nem vinda da qualificação nem do modelo. A frase da abertura ficou certa sem idades ("plano de saúde em Niterói").
 - O painel mostra os dois lados da conversa (cliente e o que a assistente enviou) e a situação de cada mensagem não é mais cortada no celular.
 - Playbook 2026-11-12.3: depois da abertura não cumprimenta de novo; com "sim", pergunta só o que falta.
+
+## Adendo 12/11 (noite): a assistente lê a conversa da qualificação
+
+- O turno passa ao modelo `conversaDaQualificacao` (últimas 30 mensagens do lead antes da negociação) e um histórico da venda com os dois lados (mensagens do cliente e o que a assistente enviou, tirado do outbox). Antes ela só via o cliente: cumprimentava de novo e perguntava idade e modalidade já respondidas.
+- Playbook 2026-11-12.4: tirar os fatos da conversa da qualificação e nunca repetir pergunta já respondida lá.
