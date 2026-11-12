@@ -54,7 +54,7 @@ describe.skipIf(!enabled)("ERP services against isolated PostgreSQL", () => {
     await db.insert(schema.leads).values([1, 2, 3, 4].map((n) => ({ id: id(`lead${n}`), tenantId: n === 4 ? id("b") : id("a"), nome: `Negócio sintético ${n}`, telefone: "00000000000", branchId: n === 4 ? id("b1") : n === 2 ? id("a2") : id("a1"), corretorId: n === 4 ? id("other") : n === 2 ? id("broker2") : id("broker1"), status: "documentation_pending" as const })));
     await db.insert(schema.sales).values({ id: id("sale"), tenantId: id("a"), leadId: id("lead1"), brokerId: id("broker1"), saleDate: new Date("2026-11-12T12:00:00Z"), saleValue: "150.00", createdBy: id("director") });
     const { FEATURE_FLAGS } = await import("@/shared/feature-flags/catalog");
-    for (const [key, value] of [[FEATURE_FLAGS.ERP_OPERATIONAL.key, "true"], [FEATURE_FLAGS.ERP_MODULES.key, JSON.stringify(["implantations", "imports", "finance"])]]) await db.insert(schema.systemSettings).values({ key, value }).onConflictDoUpdate({ target: schema.systemSettings.key, set: { value } });
+    for (const [key, value] of [[FEATURE_FLAGS.ERP_OPERATIONAL.key, "true"], [FEATURE_FLAGS.ERP_MODULES.key, JSON.stringify(["implantations", "finance", "imports", "referrals", "incentives", "analytics", "tv"])]]) await db.insert(schema.systemSettings).values({ key, value }).onConflictDoUpdate({ target: schema.systemSettings.key, set: { value } });
     for (const tenantId of [id("a"), id("b")]) await db.insert(schema.erpModuleSettings).values(["implantations", "imports", "finance"].map((moduleKey) => ({ tenantId, moduleKey, enabled: true, roles: ["director", "manager", "supervisor", "broker", "finance"], updatedBy: id("director") })));
   }, 30000);
   let dbFactory: typeof import("@/shared/db").getDatabase;

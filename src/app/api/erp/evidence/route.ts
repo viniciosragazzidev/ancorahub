@@ -10,10 +10,10 @@ export async function POST(request: Request) {
   try {
     await getRequiredTenantContext();
     const form = await readBoundedFormData(request, 6 * 1024 * 1024);
-    const allowed = new Set(["module", "leadId", "entryId", "file"]);
+    const allowed = new Set(["module", "leadId", "entryId", "payoutId", "file"]);
     for (const key of form.keys()) if (!allowed.has(key) || form.getAll(key).length !== 1) throw new ErpError("Confira os campos enviados.");
     const file = form.get("file"); if (!(file instanceof File)) throw new ErpError("Selecione um arquivo.");
-    const id = await uploadErpEvidence({ module: form.get("module"), leadId: form.get("leadId") || null, entryId: form.get("entryId") || null }, file);
+    const id = await uploadErpEvidence({ module: form.get("module"), leadId: form.get("leadId") || null, entryId: form.get("entryId") || null, payoutId: form.get("payoutId") || null }, file);
     return NextResponse.json({ ok: true, id, message: "Evidência enviada. Confira os dados antes de aprovar." });
   } catch (error) {
     return NextResponse.json({ ok: false, message: error instanceof ErpError || error instanceof MultipartLimitError ? error.message : "Não foi possível enviar a evidência. Confira o arquivo e seu acesso ao módulo." }, { status: 400 });

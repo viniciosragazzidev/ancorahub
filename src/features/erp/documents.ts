@@ -5,13 +5,14 @@ import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { uploadR2Object, downloadR2Object } from "@/shared/storage/r2-storage";
 import { isR2StorageEnabled } from "@/features/storage/r2-storage-feature";
-import { auditErp, canSeeAgencyBooks, getErpEffectiveAccess, requireErpAccess } from "./access";
+import { auditErp, canSeeAgencyBooks, erpScopeSql, getErpEffectiveAccess, requireErpAccess } from "./access";
 import { ErpError, recordIdSchema } from "./contracts";
 import { scopedEvidence, scopedFinancialEntry, scopedLead } from "./records";
 
 const targetSchema = z.discriminatedUnion("module", [
-  z.object({ module: z.literal("implantations"), leadId: recordIdSchema, entryId: z.null() }).strict(),
-  z.object({ module: z.literal("finance"), leadId: z.null(), entryId: z.string().uuid() }).strict(),
+  z.object({ module: z.literal("implantations"), leadId: recordIdSchema, entryId: z.null(), payoutId: z.null().default(null) }).strict(),
+  z.object({ module: z.literal("finance"), leadId: z.null(), entryId: z.string().uuid(), payoutId: z.null().default(null) }).strict(),
+  z.object({ module: z.literal("payout"), leadId: z.null(), entryId: z.null(), payoutId: z.string().uuid() }).strict(),
 ]);
 
 export function evidenceMime(bytes: Uint8Array): { mime: string; extension: string } {
@@ -24,28 +25,32 @@ export function evidenceMime(bytes: Uint8Array): { mime: string; extension: stri
 export async function uploadErpEvidence(rawTarget: unknown, file: File) {
   const target = targetSchema.parse(rawTarget);
   if (!(file instanceof File) || file.size < 1 || file.size > 5 * 1024 * 1024) throw new ErpError("Envie um arquivo de até 5 MB.");
-  const capability = target.module === "finance" ? "erp_prepare_finance" : "erp_manage_operations";
-  const auth = await requireErpAccess(target.module, capability);
+  const moduleKey = target.module === "implantations" ? "implantations" : "finance";
+  const capability = moduleKey === "finance" ? "erp_prepare_finance" : "erp_manage_operations";
+  const auth = await requireErpAccess(moduleKey, capability);
   if (!(await isR2StorageEnabled())) throw new ErpError("O armazenamento está desativado. Solicite a liberação ao administrador.");
   if (target.module === "implantations" && !target.leadId) throw new ErpError("Selecione o negócio da evidência.");
   const lead = target.leadId ? await scopedLead(getDatabase(), auth, target.leadId) : null;
   const entry = target.entryId ? await scopedFinancialEntry(getDatabase(), auth, target.entryId) : null;
   if (target.module === "finance" && !entry) throw new ErpError("Selecione o lançamento antes de enviar a evidência.");
+  const [payout] = target.payoutId ? await getDatabase().select({ id: schema.erpPayouts.id, beneficiaryId: schema.erpPayouts.beneficiaryId, branchId: schema.erpPayouts.branchId, status: schema.erpPayouts.status }).from(schema.erpPayouts)
+    .where(and(eq(schema.erpPayouts.tenantId, auth.context.tenantId), eq(schema.erpPayouts.id, target.payoutId), erpScopeSql(auth.scope, schema.erpPayouts.branchId, schema.erpPayouts.beneficiaryId))).limit(1) : [];
+  if (target.module === "payout" && (!payout || payout.status !== "approved" || !canSeeAgencyBooks(auth.context) || auth.scope.mode === "owners")) throw new ErpError("Envie o comprovante de um repasse aprovado no seu escopo.");
   const bytes = Buffer.from(await file.arrayBuffer());
   const media = evidenceMime(bytes); const id = crypto.randomUUID();
   const objectKey = `documents/${auth.context.tenantId}/erp/${id}.${media.extension}`;
   await getDatabase().transaction(async (tx) => {
-    await requireErpAccess(target.module, capability, tx);
-    await tx.insert(schema.erpDocuments).values({ id, tenantId: auth.context.tenantId, moduleKey: target.module,
-      ownerId: lead?.brokerId ?? entry?.ownerId ?? auth.context.userId, branchId: lead?.branchId ?? entry?.branchId ?? null,
+    await requireErpAccess(moduleKey, capability, tx);
+    await tx.insert(schema.erpDocuments).values({ id, tenantId: auth.context.tenantId, moduleKey,
+      ownerId: lead?.brokerId ?? entry?.ownerId ?? payout?.beneficiaryId ?? auth.context.userId, branchId: lead?.branchId ?? entry?.branchId ?? payout?.branchId ?? null,
       leadId: lead?.id ?? null, financialEntryId: entry?.id ?? null, saleId: entry?.saleId ?? null,
       objectKey, fileName: file.name.replace(/[\r\n\\/]/g, "_").slice(0, 180) || `evidencia.${media.extension}`,
       contentType: media.mime, byteLength: bytes.byteLength, sha256: createHash("sha256").update(bytes).digest("hex"), createdBy: auth.context.userId });
-    await auditErp(tx, { tenantId: auth.context.tenantId, actorId: auth.context.userId, action: "erp.document.upload_started", entityType: "erp_document", entityId: id, metadata: { module: target.module, byteLength: bytes.byteLength } });
+    await auditErp(tx, { tenantId: auth.context.tenantId, actorId: auth.context.userId, action: "erp.document.upload_started", entityType: "erp_document", entityId: id, metadata: { module: target.module, byteLength: bytes.byteLength, payoutId: payout?.id ?? null } });
   });
   await uploadR2Object(objectKey, bytes, media.mime);
   await getDatabase().transaction(async (tx) => {
-    const current = await requireErpAccess(target.module, capability, tx);
+    const current = await requireErpAccess(moduleKey, capability, tx);
     const currentLead = lead ? await scopedLead(tx, current, lead.id, true) : null;
     const currentEntry = entry ? await scopedFinancialEntry(tx, current, entry.id, true) : null;
     if (entry && currentEntry?.version !== entry.version) throw new ErpError("O lançamento mudou durante o envio. Confira os valores antes de anexar novamente.");

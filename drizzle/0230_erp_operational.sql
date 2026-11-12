@@ -136,3 +136,78 @@ DROP TRIGGER IF EXISTS erp_settlements_immutable ON erp_settlements;
 CREATE TRIGGER erp_settlements_immutable BEFORE UPDATE OR DELETE ON erp_settlements FOR EACH ROW EXECUTE FUNCTION erp_protect_financial_fact();
 DROP TRIGGER IF EXISTS erp_offsets_immutable ON erp_offsets;
 CREATE TRIGGER erp_offsets_immutable BEFORE UPDATE OR DELETE ON erp_offsets FOR EACH ROW EXECUTE FUNCTION erp_protect_financial_fact();
+--> statement-breakpoint
+-- Lote 2 (12/11): repasses e recibos, indicações, incentivos e parâmetros de módulo.
+ALTER TABLE erp_module_settings ADD COLUMN IF NOT EXISTS params jsonb NOT NULL DEFAULT '{}';
+ALTER TABLE erp_settlements ADD COLUMN IF NOT EXISTS payout_id text;
+CREATE TABLE IF NOT EXISTS erp_payouts (
+  id text PRIMARY KEY, tenant_id text NOT NULL REFERENCES tenants(id), request_id text NOT NULL,
+  beneficiary_id text NOT NULL REFERENCES "user"(id), branch_id text REFERENCES branches(id), competence text NOT NULL,
+  status text NOT NULL DEFAULT 'prepared', gross_cents bigint NOT NULL, net_cents bigint NOT NULL,
+  evidence_document_id text REFERENCES erp_documents(id), occurred_on date, reason text NOT NULL DEFAULT '',
+  receipt jsonb, receipt_number text, receipt_digest text,
+  prepared_by text NOT NULL REFERENCES "user"(id), approved_by text REFERENCES "user"(id), approved_at timestamptz,
+  paid_by text REFERENCES "user"(id), settled_by text REFERENCES "user"(id), settled_at timestamptz,
+  version integer NOT NULL DEFAULT 1, created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT erp_payouts_tenant_id_unique UNIQUE(tenant_id,id),
+  CONSTRAINT erp_payouts_positive CHECK(net_cents > 0 AND gross_cents >= net_cents AND gross_cents <= 100000000000),
+  CONSTRAINT erp_payouts_independent_approval CHECK(approved_by IS NULL OR approved_by <> prepared_by),
+  CONSTRAINT erp_payouts_independent_settlement CHECK(settled_by IS NULL OR settled_by <> paid_by)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS erp_payouts_tenant_request_unique ON erp_payouts(tenant_id,request_id);
+CREATE UNIQUE INDEX IF NOT EXISTS erp_payouts_tenant_receipt_unique ON erp_payouts(tenant_id,receipt_number) WHERE receipt_number IS NOT NULL;
+CREATE INDEX IF NOT EXISTS erp_payouts_tenant_beneficiary_idx ON erp_payouts(tenant_id,beneficiary_id,competence);
+CREATE TABLE IF NOT EXISTS erp_payout_items (
+  tenant_id text NOT NULL REFERENCES tenants(id), payout_id text NOT NULL, entry_id text NOT NULL, balance_cents bigint NOT NULL CHECK(balance_cents > 0),
+  PRIMARY KEY (payout_id, entry_id),
+  CONSTRAINT erp_payout_items_payout_fk FOREIGN KEY(tenant_id,payout_id) REFERENCES erp_payouts(tenant_id,id),
+  CONSTRAINT erp_payout_items_entry_fk FOREIGN KEY(tenant_id,entry_id) REFERENCES erp_financial_entries(tenant_id,id)
+);
+CREATE INDEX IF NOT EXISTS erp_payout_items_entry_idx ON erp_payout_items(tenant_id,entry_id);
+CREATE OR REPLACE FUNCTION erp_protect_payout() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'DELETE' OR OLD.status IN ('settled', 'cancelled') THEN RAISE EXCEPTION 'Settled or cancelled ERP payouts are immutable'; END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS erp_payouts_immutable ON erp_payouts;
+CREATE TRIGGER erp_payouts_immutable BEFORE UPDATE OR DELETE ON erp_payouts FOR EACH ROW EXECUTE FUNCTION erp_protect_payout();
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS erp_referrals (
+  id text PRIMARY KEY, tenant_id text NOT NULL REFERENCES tenants(id), request_id text NOT NULL,
+  referrer_name text NOT NULL, referrer_user_id text REFERENCES "user"(id), referrer_contact text NOT NULL DEFAULT '',
+  channel text NOT NULL, referred_name text NOT NULL, referred_phone text NOT NULL, phone_digits text NOT NULL,
+  consent boolean NOT NULL DEFAULT false, notes text NOT NULL DEFAULT '',
+  branch_id text REFERENCES branches(id), owner_id text NOT NULL REFERENCES "user"(id), lead_id text REFERENCES leads(id),
+  status text NOT NULL DEFAULT 'registered', lost_reason text NOT NULL DEFAULT '', version integer NOT NULL DEFAULT 1,
+  created_by text NOT NULL REFERENCES "user"(id), updated_by text NOT NULL REFERENCES "user"(id),
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS erp_referrals_tenant_request_unique ON erp_referrals(tenant_id,request_id);
+CREATE INDEX IF NOT EXISTS erp_referrals_tenant_phone_idx ON erp_referrals(tenant_id,phone_digits);
+CREATE INDEX IF NOT EXISTS erp_referrals_tenant_status_idx ON erp_referrals(tenant_id,status,created_at);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS erp_incentive_campaigns (
+  id text PRIMARY KEY, tenant_id text NOT NULL REFERENCES tenants(id), name text NOT NULL, regulation text NOT NULL,
+  metric text NOT NULL, starts_on date NOT NULL, ends_on date NOT NULL, branch_ids text[] NOT NULL DEFAULT ARRAY[]::text[],
+  prize text NOT NULL DEFAULT '', show_names boolean NOT NULL DEFAULT false, status text NOT NULL DEFAULT 'draft',
+  reason text NOT NULL DEFAULT '', version integer NOT NULL DEFAULT 1,
+  created_by text NOT NULL REFERENCES "user"(id), approved_by text REFERENCES "user"(id), approved_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT erp_incentive_period CHECK(ends_on >= starts_on),
+  CONSTRAINT erp_incentive_independent_approval CHECK(approved_by IS NULL OR approved_by <> created_by)
+);
+CREATE INDEX IF NOT EXISTS erp_incentive_campaigns_tenant_idx ON erp_incentive_campaigns(tenant_id,status,starts_on);
+CREATE TABLE IF NOT EXISTS erp_incentive_results (
+  id text PRIMARY KEY, tenant_id text NOT NULL REFERENCES tenants(id), campaign_id text NOT NULL REFERENCES erp_incentive_campaigns(id),
+  kind text NOT NULL DEFAULT 'preliminary', campaign_version integer NOT NULL, snapshot jsonb NOT NULL, digest text NOT NULL,
+  created_by text NOT NULL REFERENCES "user"(id), created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS erp_incentive_results_campaign_idx ON erp_incentive_results(tenant_id,campaign_id,created_at);
+DROP TRIGGER IF EXISTS erp_incentive_results_append_only ON erp_incentive_results;
+CREATE TRIGGER erp_incentive_results_append_only BEFORE UPDATE OR DELETE ON erp_incentive_results FOR EACH ROW EXECUTE FUNCTION erp_reject_event_mutation();
+ALTER TABLE erp_payouts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE erp_payout_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE erp_referrals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE erp_incentive_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE erp_incentive_results ENABLE ROW LEVEL SECURITY;

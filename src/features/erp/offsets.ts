@@ -4,7 +4,8 @@ import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { auditErp, canSeeAgencyBooks, erpScopeSql, getErpEffectiveAccess, requireErpAccess, type ErpDatabase } from "./access";
 import { assertIndependentReview, ErpError, moneyCentsSchema } from "./contracts";
-import { assertOpenPeriods, entryMovements, financialTransaction } from "./finance";
+import { activePayoutFor, assertOpenPeriods, entryMovements, financialTransaction } from "./finance";
+import { syncLegacyInstallment } from "./legacy-sync";
 import { assertOccurredByToday, assertPaymentCapacity, checkedCents, requireSameRequest, settledCents } from "./ledger";
 import { getEntryOffsets } from "./offset-balances";
 import { scopedFinancialEntry, type ErpAccess } from "./records";
@@ -19,6 +20,7 @@ async function sources(db: ErpDatabase, auth: ErpAccess, advanceId: string, comm
 }
 export async function assertOffsetCapacity(db: ErpDatabase, auth: ErpAccess, input: z.infer<typeof offsetInput>) {
   const { advance, commission } = await sources(db, auth, input.advanceEntryId, input.commissionEntryId);
+  if (await activePayoutFor(db, auth.context.tenantId, commission.id)) throw new ErpError("A comissão está em um repasse em andamento. Conclua ou cancele o repasse antes de compensar.");
   await assertOpenPeriods(db, auth.context.tenantId, [advance.competence, commission.competence, input.occurredOn]);
   const [advanceCash, commissionCash, advanceOffsets, commissionOffsets] = await Promise.all([entryMovements(db, auth.context.tenantId, advance.id), entryMovements(db, auth.context.tenantId, commission.id), getEntryOffsets(db, auth.context.tenantId, advance.id), getEntryOffsets(db, auth.context.tenantId, commission.id)]);
   const funded = settledCents(advanceCash);
@@ -79,6 +81,10 @@ export async function reviewOffset(raw: unknown) {
     }
     await tx.update(schema.erpOffsets).set({ status: input.decision === "confirm" ? "confirmed" : "rejected", reviewedBy: auth.context.userId, reviewedAt: new Date() }).where(and(eq(schema.erpOffsets.tenantId, auth.context.tenantId), eq(schema.erpOffsets.id, row.id)));
     await auditErp(tx, { tenantId: auth.context.tenantId, actorId: auth.context.userId, action: `erp.offset.${input.decision}`, entityType: "erp_offset", entityId: row.id, metadata: { reason: input.reason } });
+    if (input.decision === "confirm") {
+      const offsets = await getEntryOffsets(tx, auth.context.tenantId, commission.id);
+      await syncLegacyInstallment(tx, auth.context.tenantId, auth.context.userId, commission, settledCents(await entryMovements(tx, auth.context.tenantId, commission.id)) + offsets.confirmed);
+    }
     return row.id;
   });
 }

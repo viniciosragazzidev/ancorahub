@@ -41,6 +41,10 @@ const REGRAS: readonly Regra[] = [
   ["src/features/erp/governance-actions", cap("erp_manage_modules")],
   ["src/features/erp/import-actions", cap("erp_import_data")],
   ["src/features/erp/implantation-actions", cap("erp_manage_operations")],
+  ["src/features/erp/payout-actions", cap("erp_view_finance")],
+  ["src/features/erp/commission-actions", cap("erp_prepare_finance")],
+  ["src/features/erp/referral-actions", cap("erp_manage_referrals")],
+  ["src/features/erp/incentive-actions", cap("erp_view_analytics")],
   ["src/features/erp/finance-actions", cap("erp_view_finance")],
 
   // Telas do tenant.

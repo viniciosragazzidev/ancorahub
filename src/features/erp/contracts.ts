@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const ERP_MODULE_KEYS = ["implantations", "finance", "imports", "referrals", "incentives", "analytics", "tv"] as const;
 export type ErpModuleKey = (typeof ERP_MODULE_KEYS)[number];
-export const ERP_IMPLEMENTED_MODULES: ReadonlySet<ErpModuleKey> = new Set(["implantations", "imports", "finance"]);
+export const ERP_IMPLEMENTED_MODULES: ReadonlySet<ErpModuleKey> = new Set(ERP_MODULE_KEYS);
 export const IMPORT_STATUS = { preview: "A conferir", applied: "Aplicado", rejected: "Rejeitado" };
 export const erpModuleKeySchema = z.enum(ERP_MODULE_KEYS);
 export const ERP_ROLES = ["director", "manager", "supervisor", "broker"] as const;

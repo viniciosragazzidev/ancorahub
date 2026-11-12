@@ -8,6 +8,13 @@ import { assertOccurredByToday, assertPaymentCapacity, checkedCents, requireSame
 import { scopedEvidence, scopedFinancialEntry, type ErpAccess } from "./records";
 import { scopeIncludes } from "./scope";
 import { getEntryOffsets } from "./offset-balances";
+import { syncLegacyInstallment } from "./legacy-sync";
+
+export async function activePayoutFor(db: ErpDatabase, tenantId: string, entryId: string) {
+  const [row] = await db.select({ id: schema.erpPayouts.id }).from(schema.erpPayoutItems).innerJoin(schema.erpPayouts, and(eq(schema.erpPayouts.tenantId, tenantId), eq(schema.erpPayouts.id, schema.erpPayoutItems.payoutId)))
+    .where(and(eq(schema.erpPayoutItems.tenantId, tenantId), eq(schema.erpPayoutItems.entryId, entryId), inArray(schema.erpPayouts.status, ["prepared", "approved", "paying"]))).limit(1);
+  return row?.id ?? null;
+}
 
 const uuid = z.string().uuid();
 const period = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
@@ -106,6 +113,7 @@ export async function prepareSettlement(raw: unknown) {
       .where(and(eq(schema.erpSettlements.tenantId, auth.context.tenantId), eq(schema.erpSettlements.requestId, input.requestId))).limit(1);
     if (existing) { if (existing.entryId !== entry.id) throw new ErpError("A identificação desta operação já foi usada."); return existing.id; }
     if (entry.status !== "approved") throw new ErpError("A liquidação exige um lançamento aprovado.");
+    if (await activePayoutFor(tx, auth.context.tenantId, entry.id)) throw new ErpError("Este lançamento está em um repasse em andamento. Registre a liquidação pelo repasse.");
     await assertOpenPeriods(tx, auth.context.tenantId, [entry.competence, input.occurredOn]);
     await scopedEvidence(tx, auth, input.evidenceDocumentId, { entryId: entry.id });
     const movements = await entryMovements(tx, auth.context.tenantId, entry.id);
@@ -147,6 +155,7 @@ export async function reviewSettlement(raw: unknown) {
     if (!movement) throw new ErpError("Liquidação não encontrada.");
     const entry = await scopedFinancialEntry(tx, auth, movement.entryId, true);
     if (movement.status !== "pending") throw new ErpError("Esta liquidação já foi revisada.");
+    if (movement.payoutId) throw new ErpError("Esta liquidação pertence a um repasse. Confira-a pela tela do repasse.");
     assertIndependentReview(auth.context.userId, movement.createdBy);
     await assertOpenPeriods(tx, auth.context.tenantId, [entry.competence, movement.occurredOn]);
     if (input.decision === "confirm") {
@@ -165,6 +174,10 @@ export async function reviewSettlement(raw: unknown) {
     await tx.update(schema.erpSettlements).set({ status: input.decision === "confirm" ? "confirmed" : "rejected", reviewedBy: auth.context.userId, reviewedAt: new Date() })
       .where(and(eq(schema.erpSettlements.id, movement.id), eq(schema.erpSettlements.tenantId, auth.context.tenantId)));
     await auditErp(tx, { tenantId: auth.context.tenantId, actorId: auth.context.userId, action: `erp.settlement.${input.decision}`, entityType: "erp_settlement", entityId: movement.id, metadata: { entryId: entry.id, reason: input.reason, kind: movement.kind } });
+    if (input.decision === "confirm" && entry.kind === "broker_commission") {
+      const offsets = await getEntryOffsets(tx, auth.context.tenantId, entry.id);
+      await syncLegacyInstallment(tx, auth.context.tenantId, auth.context.userId, entry, settledCents(await entryMovements(tx, auth.context.tenantId, entry.id)) + offsets.confirmed);
+    }
     return entry.id;
   });
 }

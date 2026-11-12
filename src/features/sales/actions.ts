@@ -10,6 +10,7 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import { buildStrictRoleLeadScope } from "@/features/leads/strict-role-scope";
+import { isInstallmentControlledByErp } from "@/features/erp/commissions";
 
 export type SaleActionState = { success?: boolean; error?: string };
 export type BulkExportState = { csvData?: string; count?: number; error?: string };
@@ -107,6 +108,8 @@ function formatDateShort(date: Date): string {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" }).format(date);
 }
 
+const ERP_CONTROLLED_MESSAGE = "Esta parcela é conferida no Financeiro (ERP). Registre a liquidação ou o estorno na ficha do lançamento.";
+
 // ─── Mark schedule item as paid ────────────────────────────────────────────
 
 export async function markCommissionPaidAction(
@@ -141,6 +144,7 @@ export async function markCommissionPaidAction(
 
     if (!item) return { error: "Parcela não encontrada." };
     if (item.status !== "pending") return { error: "Esta parcela já foi paga ou cancelada." };
+    if (await isInstallmentControlledByErp(context.tenantId, scheduleId)) return { error: ERP_CONTROLLED_MESSAGE };
 
     const notes = formData.get("notes");
     await db
@@ -196,6 +200,7 @@ export async function markCommissionUnpaidAction(
 
     if (!item) return { error: "Parcela não encontrada." };
     if (item.status !== "paid") return { error: "Esta parcela ainda não foi paga." };
+    if (await isInstallmentControlledByErp(context.tenantId, scheduleId)) return { error: ERP_CONTROLLED_MESSAGE };
 
     await db
       .update(schema.commissionSchedule)
