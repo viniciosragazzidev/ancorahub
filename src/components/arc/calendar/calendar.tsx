@@ -11,6 +11,12 @@ import styles from "./calendar.module.css";
 
 export type CalendarDateMatcher = (date: Date) => boolean;
 
+export type CalendarLabels = {
+  today: string;
+  previousMonth: string;
+  nextMonth: string;
+};
+
 export interface CalendarProps {
   value?: Date;
   onChange?: (date: Date) => void;
@@ -20,6 +26,7 @@ export interface CalendarProps {
   maxDate?: Date;
   disabledDates?: CalendarDateMatcher;
   locale?: string;
+  labels?: Partial<CalendarLabels>;
   className?: string;
   /** Adds a Today button that slides back to the current month and selects today when it is available. */
   showToday?: boolean;
@@ -111,9 +118,15 @@ export function Calendar({
   maxDate,
   disabledDates,
   locale = "en-US",
+  labels,
   className,
   showToday = false,
 }: CalendarProps) {
+  const calendarLabels: CalendarLabels = {
+    today: labels?.today ?? "Today",
+    previousMonth: labels?.previousMonth ?? "Previous month",
+    nextMonth: labels?.nextMonth ?? "Next month",
+  };
   const titleId = useId();
   const today = useToday();
   // Motion preference only counts after hydration, so server and client markup agree.
@@ -297,9 +310,9 @@ export function Calendar({
         </h2>
         <span className={styles.srOnly} aria-live="polite">{direction ? monthLabel : ""}</span>
         <div className={styles.navigation}>
-          {showToday && <button type="button" className={styles.todayButton} aria-disabled={todayIdle || undefined} aria-label={today ? `Today, ${today.toLocaleDateString(locale, { dateStyle: "full" })}` : "Today"} onClick={goToToday}>Today</button>}
-          <button type="button" className={styles.navButton} aria-label="Previous month" aria-disabled={previousDisabled || undefined} onClick={() => { if (!previousDisabled && previousMonth) changeMonth(previousMonth); }}><ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" /></button>
-          <button type="button" className={styles.navButton} aria-label="Next month" aria-disabled={nextDisabled || undefined} onClick={() => { if (!nextDisabled && nextMonth) changeMonth(nextMonth); }}><ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" /></button>
+          {showToday && <button type="button" className={styles.todayButton} aria-disabled={todayIdle || undefined} aria-label={today ? `${calendarLabels.today}, ${today.toLocaleDateString(locale, { dateStyle: "full" })}` : calendarLabels.today} onClick={goToToday}>{calendarLabels.today}</button>}
+          <button type="button" className={styles.navButton} aria-label={calendarLabels.previousMonth} aria-disabled={previousDisabled || undefined} onClick={() => { if (!previousDisabled && previousMonth) changeMonth(previousMonth); }}><ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" /></button>
+          <button type="button" className={styles.navButton} aria-label={calendarLabels.nextMonth} aria-disabled={nextDisabled || undefined} onClick={() => { if (!nextDisabled && nextMonth) changeMonth(nextMonth); }}><ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" /></button>
         </div>
       </div>
       <div className={styles.weekdays} aria-hidden="true">{weekdays.map((day, index) => <span key={`${day}-${index}`}>{day.slice(0, 2)}</span>)}</div>

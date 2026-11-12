@@ -561,6 +561,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Habilita a carteira avançada e os retornos de clientes do Corretor Lite.",
   },
+  BROKER_SALE_REGISTRATION_V2: {
+    key: "feature_broker_sale_registration_v2_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita o novo fluxo Lite de registro de venda para corretores.",
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<string>>;
 
 // ─── Tipo utilitário ──────────────────────────────────────────────────────────

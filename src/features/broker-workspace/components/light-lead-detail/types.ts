@@ -1,7 +1,15 @@
 import type { AiAutoMove } from "@/features/conversation-intelligence/ai-move";
 import type { BrokerAdContext } from "@/features/leads/broker-ad-context";
 
-export type ConfirmationDocument = { id: string; filename: string; status: string };
+export type ConfirmationDocument = {
+  id: string;
+  filename: string;
+  status: string;
+  category?: string | null;
+  requirementId?: string | null;
+  requirementName?: string | null;
+  beneficiaryId?: string | null;
+};
 export type CarrierOption = { id: string; name: string };
 
 export type LiteRequirement = {
@@ -28,6 +36,7 @@ export type LightLeadDetailData = {
   planName?: string | null;
   carrierName?: string | null;
   livesCount?: number | null;
+  hasActiveSale?: boolean;
   monthlyValue?: string | null;
   commercialValueSource?: "sale" | "proposal" | "lead" | null;
   city?: string | null;
@@ -48,7 +57,10 @@ export type LightLeadDetailData = {
   beneficiaries?: Array<{
     id: string;
     name: string;
-    birthDate: string;
+    birthDate: string | null;
+    age?: number | null;
+    cpf?: string | null;
+    hasCpf?: boolean;
     relationship: string;
     isHolder: boolean;
   }>;

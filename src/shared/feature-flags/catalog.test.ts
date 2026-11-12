@@ -95,3 +95,14 @@ describe("broker client wallet Lite feature flag", () => {
     });
   });
 });
+
+describe("broker sale registration v2 feature flag", () => {
+  it("is globally controlled and disabled by default", () => {
+    expect(FEATURE_FLAGS.BROKER_SALE_REGISTRATION_V2).toMatchObject({
+      key: "feature_broker_sale_registration_v2_enabled",
+      scope: "global",
+      defaultValue: "false",
+      allowedValues: ["true", "false"],
+    });
+  });
+});

@@ -9,6 +9,8 @@ import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
 import { getDatabase, schema } from "@/shared/db";
+import { getSystemSetting } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { recordStageChangeForLead, stageActorType } from "@/features/leads/stage-history";
 import { generateCommissionSchedule } from "@/features/commissions/commission-rules-service";
 import { publishNotification } from "@/features/notifications/send-push-helper";
@@ -16,6 +18,8 @@ import { publishDomainInvalidation } from "@/features/notifications/realtime-syn
 import { buildCustomerRenewalStatusScope } from "./customer-renewal-scope";
 import { enqueueMetaConversionEvent } from "@/features/meta-ads/meta-conversion-service";
 import { aiSaleRegistrationPending } from "@/features/conversation-intelligence/sale-detection-core";
+import { isValidCpf } from "@/features/leads/sale-details-core";
+import { deriveAgeFromBirthDate, leadIdentityFromSources, saleRegistrationBlockedReason } from "./sale-registration-v2-core";
 
 const registerSaleInput = z.object({
   leadId: z.string().min(1),
@@ -35,10 +39,14 @@ const registerSaleInput = z.object({
 const beneficiaryInput = z.object({
   leadId: z.string().min(1),
   name: z.string().trim().min(2).max(160),
-  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data de nascimento."),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe uma data de nascimento válida.").nullable().optional(),
+  age: z.number().int().min(0).max(120).nullable().optional(),
+  cpf: z.string().trim().max(20).nullable().optional(),
   relationship: z.enum(schema.beneficiaryRelationshipValues),
   isHolder: z.boolean().default(false),
 });
+
+const updateBeneficiaryInput = beneficiaryInput.omit({ isHolder: true }).extend({ beneficiaryId: z.string().min(1) });
 
 function addYears(value: string, years: number) {
   const date = new Date(`${value}T12:00:00Z`);
@@ -61,7 +69,7 @@ function subtractDays(dateStr: string, days: number): string {
 async function assertLeadScope(leadId: string) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
-  const [lead] = await db.select({ id: schema.leads.id, tenantId: schema.leads.tenantId, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, planId: schema.leads.planId, nome: schema.leads.nome, telefone: schema.leads.telefone, email: schema.leads.email, status: schema.leads.status, qualificationDetails: schema.leads.qualificationDetails }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
+  const [lead] = await db.select({ id: schema.leads.id, tenantId: schema.leads.tenantId, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, planId: schema.leads.planId, nome: schema.leads.nome, telefone: schema.leads.telefone, email: schema.leads.email, status: schema.leads.status, qualificationDetails: schema.leads.qualificationDetails, formData: schema.leads.formData }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt))).limit(1);
   if (!lead) throw new Error("Lead não encontrado.");
   if (context.role === "broker" && lead.corretorId !== context.userId) throw new Error("Você só pode operar seus próprios leads.");
   if (context.role === "manager" && lead.branchId !== context.branchId) throw new Error("Este lead não pertence à sua unidade.");
@@ -71,20 +79,108 @@ async function assertLeadScope(leadId: string) {
 export async function addLeadBeneficiaryAction(rawInput: z.input<typeof beneficiaryInput>) {
   const input = beneficiaryInput.parse(rawInput);
   const { context, db } = await assertLeadScope(input.leadId);
+  const cpf = input.cpf?.replace(/\D/g, "") || null;
+  const age = input.birthDate ? deriveAgeFromBirthDate(input.birthDate) ?? input.age ?? null : input.age ?? null;
+  if (cpf && !isValidCpf(cpf)) return { error: "Informe um CPF válido." };
+  if (!input.birthDate && input.age == null) return { error: "Informe a data de nascimento ou a idade." };
 
-  const [holder] = await db.select({ id: schema.leadBeneficiaries.id }).from(schema.leadBeneficiaries).where(and(eq(schema.leadBeneficiaries.leadId, input.leadId), eq(schema.leadBeneficiaries.tenantId, context.tenantId), eq(schema.leadBeneficiaries.isHolder, true))).limit(1);
-  if (!holder && !input.isHolder) return { error: "O primeiro beneficiário precisa ser o titular." };
+  return db.transaction(async (tx) => {
+    const [lockedLead] = await tx.select({ id: schema.leads.id, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId }).from(schema.leads)
+      .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt))).limit(1).for("update");
+    if (!lockedLead) return { error: "Lead não encontrado." };
+    if (context.role === "broker" && lockedLead.corretorId !== context.userId) return { error: "Você só pode operar seus próprios leads." };
+    if (context.role === "manager" && lockedLead.branchId !== context.branchId) return { error: "Este lead não pertence à sua unidade." };
+    const [holder] = await tx.select({ id: schema.leadBeneficiaries.id }).from(schema.leadBeneficiaries).where(and(eq(schema.leadBeneficiaries.leadId, input.leadId), eq(schema.leadBeneficiaries.tenantId, context.tenantId), eq(schema.leadBeneficiaries.isHolder, true))).limit(1);
+    if (!holder && !input.isHolder) return { error: "O primeiro beneficiário precisa ser o titular." };
+    if (input.isHolder) await tx.update(schema.leadBeneficiaries).set({ isHolder: false, updatedAt: new Date() }).where(and(eq(schema.leadBeneficiaries.leadId, input.leadId), eq(schema.leadBeneficiaries.tenantId, context.tenantId)));
+    const [created] = await tx.insert(schema.leadBeneficiaries).values({
+      id: randomUUID(), tenantId: context.tenantId, leadId: input.leadId, name: input.name,
+      birthDate: input.birthDate ?? null, age, cpf,
+      relationship: input.isHolder ? "titular" : input.relationship, isHolder: input.isHolder,
+    }).returning({ id: schema.leadBeneficiaries.id });
+    await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_beneficiary", entidadeId: created.id, acao: "criou" });
+    return { success: true, id: created.id };
+  });
+}
 
-  if (input.isHolder) {
-    await db.update(schema.leadBeneficiaries).set({ isHolder: false, updatedAt: new Date() }).where(and(eq(schema.leadBeneficiaries.leadId, input.leadId), eq(schema.leadBeneficiaries.tenantId, context.tenantId)));
-  }
+/** Creates the titular once from the lead identity when the v2 registration flow opens. */
+export async function ensureLeadHolderAction(leadId: string) {
+  const { context, db, lead } = await assertLeadScope(leadId);
+  const v2Enabled = (await getSystemSetting(FEATURE_FLAGS.BROKER_SALE_REGISTRATION_V2.key).catch(() => null)) === "true";
+  if (!v2Enabled) return { error: "O novo registro de venda está desativado." };
+  if (context.role !== "broker" || lead.corretorId !== context.userId) return { error: "Só o corretor responsável pode iniciar este registro." };
+  if (lead.status === "lost") return { error: "Este lead está perdido. Reabra o lead antes de registrar a venda." };
+  if (lead.status === "converted" && !aiSaleRegistrationPending(lead.status, lead.qualificationDetails)) return { error: "A venda deste lead já foi registrada." };
 
-  const [created] = await db.insert(schema.leadBeneficiaries).values({
-    id: randomUUID(), tenantId: context.tenantId, leadId: input.leadId, name: input.name,
-    birthDate: input.birthDate, relationship: input.isHolder ? "titular" : input.relationship, isHolder: input.isHolder,
-  }).returning({ id: schema.leadBeneficiaries.id });
-  await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_beneficiary", entidadeId: created.id, acao: "criou" });
-  return { success: true, id: created.id };
+  return db.transaction(async (tx) => {
+    const [lockedLead] = await tx.select({ id: schema.leads.id, nome: schema.leads.nome, qualificationDetails: schema.leads.qualificationDetails, formData: schema.leads.formData }).from(schema.leads)
+      .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt))).limit(1).for("update");
+    if (!lockedLead) return { error: "Lead não encontrado." };
+    const [holder] = await tx.select({ id: schema.leadBeneficiaries.id, name: schema.leadBeneficiaries.name, birthDate: schema.leadBeneficiaries.birthDate, age: schema.leadBeneficiaries.age, cpf: schema.leadBeneficiaries.cpf }).from(schema.leadBeneficiaries).where(and(
+      eq(schema.leadBeneficiaries.tenantId, context.tenantId), eq(schema.leadBeneficiaries.leadId, lead.id), eq(schema.leadBeneficiaries.isHolder, true),
+    )).limit(1);
+    const identity = leadIdentityFromSources({ qualificationDetails: lockedLead.qualificationDetails, formData: lockedLead.formData });
+    const safeIdentity = { ...identity, cpf: identity.cpf && isValidCpf(identity.cpf) ? identity.cpf : null };
+    if (holder) {
+      const changes = {
+        ...(holder.birthDate == null && identity.birthDate ? { birthDate: identity.birthDate } : {}),
+        ...(holder.age == null && identity.age != null ? { age: identity.age } : {}),
+        ...(holder.cpf == null && safeIdentity.cpf ? { cpf: safeIdentity.cpf } : {}),
+        ...(!holder.name.trim() ? { name: lockedLead.nome } : {}),
+      };
+      if (!Object.keys(changes).length) return { success: true, created: false, updated: false };
+      await tx.update(schema.leadBeneficiaries).set({ ...changes, updatedAt: new Date() }).where(and(
+        eq(schema.leadBeneficiaries.id, holder.id), eq(schema.leadBeneficiaries.tenantId, context.tenantId),
+      ));
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_beneficiary", entidadeId: holder.id, acao: "completou_titular_do_lead" });
+      return { success: true, created: false, updated: true };
+    }
+    const id = randomUUID();
+    await tx.insert(schema.leadBeneficiaries).values({
+      id, tenantId: context.tenantId, leadId: lead.id, name: lockedLead.nome,
+      birthDate: safeIdentity.birthDate, age: safeIdentity.age, cpf: safeIdentity.cpf,
+      relationship: "titular", isHolder: true,
+    });
+    await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_beneficiary", entidadeId: id, acao: "criou_titular_do_lead" });
+    return { success: true, created: true, updated: false };
+  });
+}
+
+export async function updateLeadBeneficiaryAction(rawInput: z.input<typeof updateBeneficiaryInput>) {
+  const parsed = updateBeneficiaryInput.safeParse(rawInput);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Confira os dados da pessoa." };
+  const input = parsed.data;
+  const { context, db } = await assertLeadScope(input.leadId);
+  const cpf = input.cpf?.replace(/\D/g, "") || null;
+  const age = input.birthDate ? deriveAgeFromBirthDate(input.birthDate) ?? input.age ?? null : input.age ?? null;
+  if (cpf && !isValidCpf(cpf)) return { error: "Informe um CPF válido." };
+  if (!input.birthDate && input.age == null) return { error: "Informe a data de nascimento ou a idade." };
+  const updated = await db.transaction(async (tx) => {
+    const [lockedLead] = await tx.select({ id: schema.leads.id, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId }).from(schema.leads)
+      .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt))).limit(1).for("update");
+    if (!lockedLead || (context.role === "broker" && lockedLead.corretorId !== context.userId) || (context.role === "manager" && lockedLead.branchId !== context.branchId)) return null;
+    const [existing] = await tx.select({ id: schema.leadBeneficiaries.id, isHolder: schema.leadBeneficiaries.isHolder }).from(schema.leadBeneficiaries).where(and(
+      eq(schema.leadBeneficiaries.id, input.beneficiaryId), eq(schema.leadBeneficiaries.leadId, input.leadId), eq(schema.leadBeneficiaries.tenantId, context.tenantId),
+    )).limit(1);
+    if (!existing) return null;
+    const [saved] = await tx.update(schema.leadBeneficiaries).set({
+      name: input.name,
+      birthDate: input.birthDate ?? null,
+      age,
+      ...(cpf ? { cpf } : {}),
+      relationship: existing.isHolder ? "titular" : input.relationship,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(schema.leadBeneficiaries.id, input.beneficiaryId),
+      eq(schema.leadBeneficiaries.leadId, input.leadId),
+      eq(schema.leadBeneficiaries.tenantId, context.tenantId),
+    )).returning({ id: schema.leadBeneficiaries.id });
+    if (!saved) return null;
+    await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_beneficiary", entidadeId: saved.id, acao: "alterou" });
+    return saved;
+  });
+  if (!updated) return { error: "Pessoa não encontrada neste lead." };
+  return { success: true };
 }
 
 export async function removeLeadBeneficiaryAction(beneficiaryId: string) {
@@ -138,8 +234,9 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
   if (!lead.corretorId && context.role === "broker") return { error: "O lead precisa ter um corretor responsável." };
   // Convertido pela IA (venda detectada, 10/11) e ainda sem venda registrada: o corretor completa o registro.
   const completingAiSale = aiSaleRegistrationPending(lead.status, lead.qualificationDetails);
-  if (lead.status === "converted" && !completingAiSale) return { error: "A venda deste lead já foi registrada." };
-  if (lead.status === "lost") return { error: "Este lead está perdido. Reabra o lead antes de registrar a venda." };
+  const initialBlock = saleRegistrationBlockedReason({ status: lead.status, aiRegistrationPending: completingAiSale, hasActiveSale: false });
+  if (initialBlock === "already_registered") return { error: "A venda deste lead já foi registrada." };
+  if (initialBlock === "lost") return { error: "Este lead está perdido. Reabra o lead antes de registrar a venda." };
   if (input.expirationDate && input.expirationDate <= input.coverageStartDate) return { error: "O vencimento precisa ser depois do início da vigência." };
 
   const beneficiaries = await db.select().from(schema.leadBeneficiaries).where(and(eq(schema.leadBeneficiaries.leadId, lead.id), eq(schema.leadBeneficiaries.tenantId, context.tenantId)));
@@ -192,15 +289,25 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
     const [locked] = await tx.select({ status: schema.leads.status, stageEnteredAt: schema.leads.stageEnteredAt, qualificationDetails: schema.leads.qualificationDetails }).from(schema.leads)
       .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId))).limit(1).for("update");
     const lockedAiSale = Boolean(locked) && aiSaleRegistrationPending(locked!.status, locked!.qualificationDetails);
-    if (!locked || (locked.status === "converted" && !lockedAiSale)) throw new SaleAlreadyRegisteredError("A venda deste lead já foi registrada.");
-    if (locked.status === "lost") throw new SaleAlreadyRegisteredError("Este lead está perdido. Reabra o lead antes de registrar a venda.");
-    // Já convertido pela IA: a etapa não muda de novo e o desfecho já foi avisado na conversão.
-    soldFrom = lockedAiSale ? null : { status: locked.status, stageEnteredAt: locked.stageEnteredAt ?? null };
     const [activeSale] = await tx.select({ id: schema.sales.id }).from(schema.sales)
       .where(and(eq(schema.sales.leadId, lead.id), eq(schema.sales.tenantId, context.tenantId), eq(schema.sales.status, "active"))).limit(1);
-    if (activeSale) throw new SaleAlreadyRegisteredError("Este lead já tem uma venda ativa registrada.");
+    if (!locked) throw new SaleAlreadyRegisteredError("A venda deste lead já foi registrada.");
+    const block = saleRegistrationBlockedReason({ status: locked.status, aiRegistrationPending: lockedAiSale, hasActiveSale: Boolean(activeSale) });
+    if (block === "lost") throw new SaleAlreadyRegisteredError("Este lead está perdido. Reabra o lead antes de registrar a venda.");
+    if (block === "already_registered") throw new SaleAlreadyRegisteredError(activeSale ? "Este lead já tem uma venda ativa registrada." : "A venda deste lead já foi registrada.");
+    // Já convertido pela IA: a etapa não muda de novo e o desfecho já foi avisado na conversão.
+    soldFrom = lockedAiSale ? null : { status: locked.status, stageEnteredAt: locked.stageEnteredAt ?? null };
 
-    await tx.insert(schema.clients).values({ id: clientId, tenantId: context.tenantId, leadId: lead.id, branchId: lead.branchId, corretorId: lead.corretorId ?? context.userId, nome: lead.nome, telefone: lead.telefone, email: lead.email, convertedAt: now }).onConflictDoNothing({ target: schema.clients.leadId });
+    const [existingClient] = await tx.select({ id: schema.clients.id, branchId: schema.clients.branchId, corretorId: schema.clients.corretorId }).from(schema.clients)
+      .where(and(eq(schema.clients.leadId, lead.id), eq(schema.clients.tenantId, context.tenantId))).limit(1);
+    if (existingClient) {
+      await tx.update(schema.clients).set({
+        ...(existingClient.branchId == null && lead.branchId ? { branchId: lead.branchId } : {}),
+        ...(existingClient.corretorId == null ? { corretorId: lead.corretorId ?? context.userId } : {}),
+      }).where(and(eq(schema.clients.id, existingClient.id), eq(schema.clients.tenantId, context.tenantId)));
+    } else {
+      await tx.insert(schema.clients).values({ id: clientId, tenantId: context.tenantId, leadId: lead.id, branchId: lead.branchId, corretorId: lead.corretorId ?? context.userId, nome: lead.nome, telefone: lead.telefone, email: lead.email, convertedAt: now }).onConflictDoNothing({ target: schema.clients.leadId });
+    }
     const [client] = await tx.select({ id: schema.clients.id }).from(schema.clients).where(and(eq(schema.clients.leadId, lead.id), eq(schema.clients.tenantId, context.tenantId))).limit(1);
 
     await tx.insert(schema.sales).values({
@@ -357,11 +464,13 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
     await publishDomainInvalidation([...targets].map((userId) => ({ tenantId: context.tenantId, userId })), "leads");
   })().catch(() => { /* non-blocking */ });
 
-  // Conversions API for CRM: "Venda" (Lead Ads leads only, never throws).
-  await enqueueMetaConversionEvent({ tenantId: context.tenantId, leadId: lead.id, stage: "sale", at: now });
+  // A IA já publicou o evento principal ao converter. Registrar a venda não repete essa conversão.
+  if (!completingAiSale) {
+    await enqueueMetaConversionEvent({ tenantId: context.tenantId, leadId: lead.id, stage: "sale", at: now });
+  }
 
-  // Notify via push (outside transaction — non-blocking)
-  if (lead.corretorId) {
+  // A conversão feita pela IA já enviou a notificação principal ao corretor.
+  if (!completingAiSale && lead.corretorId) {
 
     void publishNotification({
       capability: "lead_converted",
