@@ -8,6 +8,12 @@
   ],
   "domains": [
     {
+      "id": "erp-operacional",
+      "keywords": ["erp", "implantação", "implantacao", "adiantamento", "recebíveis", "recebiveis", "conciliação", "conciliacao"],
+      "paths": ["src/features/erp"],
+      "documents": ["docs/product/erp-operacional/README.md", "docs/product/erp-operacional/acessos-e-rotas.md", "docs/product/erp-operacional/plano-de-implementacao.md", "docs/access-control-capability-plan.md", "docs/product/financeiro-role-based-plan.md", "docs/agent/SECURITY_RULES.md"]
+    },
+    {
       "id": "leads",
       "keywords": ["lead", "funil", "qualificação", "qualificacao", "carteira", "tarefa", "timeline"],
       "paths": ["src/features/leads", "src/app/(dashboard)/leads"],

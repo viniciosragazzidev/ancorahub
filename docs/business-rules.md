@@ -221,6 +221,10 @@ Na Gestao Lite, os destaques automaticos usam as metricas canonicas dos ultimos 
 
 O resumo in-app roda segunda-feira as 08h de Sao Paulo pelo cron de engajamento existente, com lock transacional e chave idempotente semanal. A tabela `broker_metric_daily` recebe snapshots noturnos e preenchimento de 90 dias por eventos em janela canonica de sete dias. Conversao segue `commercial.conversion_rate` (coorte DEC-090). A timeline mensal usa o ultimo snapshot do mes; metricas de estado atual nao reconstruidas por eventos ficam nulas no backfill historico. A migration 0202 e entregue em SQL e nao e aplicada por esta tarefa.
 
+## BR-100 - Rotas planejadas do ERP não concedem acesso
+
+Quando uma rota estiver reservada para um módulo do ERP ainda planejado, a resolução de acesso deve negá-la para todos os papéis, inclusive Diretor e cargo com chave de rota recebida indevidamente. O bloqueio prevalece sobre a permissão do caminho pai e a permissão de fallback. Reservas ficam fora do catálogo atribuível, do destino inicial do cargo e da navegação operacional. O mapeamento de público planejado não constitui concessão a uma pessoa. Fonte: DEC-183.
+
 ## BR-098 - Catálogo real do corretor e bloqueio comercial
 
 A consulta do piloto exige, no servidor, configuração ativa e correspondência exata entre usuário, tenant e papel corretor. Sem configuração válida, o acesso falha fechado. Valores usam centavos inteiros, faixas, vigência e prioridade da fonte; não há desconto ou multiplicador fictício. Produto com pendência fica visível com o motivo, mas não gera proposta final ou PDF comercial. A revisão administrativa é auditada e não elimina pendências específicas do perfil, vínculos ou critérios ainda não interpretados. Cada proposta liberada é recalculada no servidor e preserva snapshot privado com hash e referência do lote. Fonte: DEC-178.

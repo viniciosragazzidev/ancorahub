@@ -9,7 +9,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getAssignableCapabilities, type CustomRoleScope } from "./catalog";
-import { isRoutePermission, routeCatalog, routePermissionKey, type RouteDefinition } from "./routes";
+import { getRouteDefinitionByKey, isRoutePermission, routeCatalog, routePermissionKey, type RouteDefinition } from "./routes";
 import { AREAS_SEM_CORTE_FINO } from "./presets";
 import { canAccessRoute, resolveEffectiveAccess, type CargoAtribuido, type EffectiveAccess } from "./effective-access";
 import { hasCapability, type PermissionKey } from "@/shared/auth/permissions";
@@ -86,7 +86,7 @@ export async function listEffectiveRoutes(input: { tenantId: string; customRoleI
 }
 
 export async function hasEffectiveRouteAccess(input: AccessInput & { routeKey: string; fallbackPermission?: PermissionKey }) {
-  const definition = routeCatalog.find((route) => route.key === input.routeKey) as RouteDefinition | undefined;
+  const definition = getRouteDefinitionByKey(input.routeKey);
   return canAccessRoute(await getEffectiveAccess(input), definition ?? (input.fallbackPermission ? {
     key: input.routeKey, path: "", label: "", description: "", category: "", fallbackPermission: input.fallbackPermission,
   } : undefined));

@@ -1,5 +1,13 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-183 - Escopo do ERP operacional e reservas sem concessão de acesso
+
+**Estado:** aceita para planejamento e fundação de rotas. **Data:** 2026-11-12.
+
+Vinicios pediu a pausa do desenvolvimento do cotador interno para priorizar a expansão do AncoraHub, usando a LP pública de New Master BI como referência. A pausa não desliga o cotador publicado. Na validação da sessão, confirmou ERP operacional primeiro (comercial, implantação, financeiro, comissões, pessoas/metas, incentivos, indicações, BI e administração), com fiscal, folha e notas em etapa posterior. Confirmou separar implantação de contrato, pagamento de mensalidade pelo cliente e comissão recebida pela Âncora, mantendo pendente a adoção da regra da LP sobre a segunda parcela e as regras financeiras definitivas.
+
+A fundação registra públicos planejados e reserva rotas ainda não implementadas. Reservas são negadas pelo resolvedor canônico para qualquer papel, mesmo com cargo forjado, e não entram no catálogo de rotas atribuíveis ou na navegação. A lista de públicos é intenção de produto, nunca uma capacidade de autorização. Nenhum membro recebe cargo, acesso financeiro ou promoção por esta entrega; nenhuma allowlist do Gestor é ampliada. A liberação futura exige implementação real, capacidade/escopo, auditoria, governança do Super-admin e validação do módulo. DEC-004 e DEC-012 não são substituídas. Plano: `docs/product/erp-operacional/README.md`.
+
 ## DEC-098 — Mídia oficial nas conversas (áudio, imagem, documento e vídeo)
 
 **Estado:** Aceita

@@ -1,4 +1,5 @@
 import type { PermissionKey } from "@/shared/auth/permissions";
+import { ERP_ROUTE_RESERVATIONS } from "@/features/erp/route-reservations";
 
 export const ROUTE_PERMISSION_PREFIX = "route:";
 
@@ -10,6 +11,8 @@ export type RouteDefinition = {
   category: string;
   /** Permissão base do papel: o piso da rota, para quem tem cargo ou não. */
   fallbackPermission: PermissionKey;
+  /** A reservation is recognized but never assignable, navigable or accessible. */
+  readiness?: "planned";
   /**
    * Rota que entrou no catálogo em 04/11: para quem NÃO tem cargo ela segue aberta como antes (cada página
    * já faz a própria checagem); para quem tem cargo vale a chave `route:<key>` + o piso do papel.
@@ -166,10 +169,17 @@ const routeAliases: readonly { path: string; key: string }[] = [
   { path: "/leads/distribuicao", key: "distribuicao" },
 ];
 
+const resolvedRoutes: readonly RouteDefinition[] = [...routeCatalog, ...ERP_ROUTE_RESERVATIONS];
+
+/** Includes blocked reservations; use routeCatalog when offering assignable routes. */
+export function getRouteDefinitionByKey(key: string): RouteDefinition | undefined {
+  return resolvedRoutes.find((route) => route.key === key);
+}
+
 /** Rota pelo prefixo mais longo: `/leads/distribuicao/...` é Distribuição, não Leads. */
 export function getRouteDefinition(pathname: string): RouteDefinition | undefined {
   let melhor: RouteDefinition | undefined;
-  for (const route of routeCatalog as readonly RouteDefinition[]) {
+  for (const route of resolvedRoutes) {
     if (pathname !== route.path && !pathname.startsWith(`${route.path}/`)) continue;
     if (!melhor || route.path.length > melhor.path.length) melhor = route;
   }

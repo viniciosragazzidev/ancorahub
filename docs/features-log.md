@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 12/11/2026 - Planejamento do ERP operacional e reservas de rotas
+
+- Inventário das 17 famílias da LP New Master BI, comparação com a base real, matriz de cargos/ações/escopos e plano de 15 pacotes em M0 a M8, em `docs/product/erp-operacional/`.
+- Reservas de rotas do ERP identificadas pelo resolvedor canônico e bloqueadas enquanto planejadas. Não aparecem como concessões no editor de cargos nem como navegação operacional; nenhuma atribuição de pessoa é executada.
+- Escopo operacional aprovado e fatos financeiros separados; regra de segunda parcela, fórmulas, alçadas e novas permissões financeiras permanecem pendentes. Cotador interno pausado no desenvolvimento, sem desligar o publicado. Estado dos módulos: planejados. DEC-183 e registro `docs/implementations/active/2026-11-12-erp-operacional-foundation.md`.
+
 ## 11/11/2026 - Cotador real na conversa guiada do Lite
 
 - `/cotacao` volta a ser a conversa da Cotação (mascote, uma pergunta por vez, opções A..G ou resposta digitada), agora sobre o catálogo real do piloto: tipo (saúde ou odonto), público, município, idades, entidade (adesão), tipo e tempo de empresa (PME), acomodação e coparticipação, com "Tanto faz" e a contagem de planos em cada opção.
