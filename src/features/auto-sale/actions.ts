@@ -8,13 +8,14 @@ import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { postgresErrorCode } from "@/shared/db/postgres-errors";
 
 import { OPEN_DEAL_STATUSES, type DealFacts } from "./contracts";
 import { readAutoSaleFlags } from "./flag";
 import { allowedMoneyFromOffers, checkOutgoingMessages, sanitizeMessage, type GuardViolation } from "./guardrails";
 import { getDealDetail, listPromotions, wahaNumbersForLead } from "./queries";
 import { getDeal, listOffers } from "./repository";
-import { assertManager, audit, AutoSaleError, endDeal, handOffToBroker, listBrokersForHandOff, searchLeadsForAutoSale, setDealMode, setDealPaused, startDeal, takeOverDeal } from "./service";
+import { assertManager, audit, AutoSaleError, endDeal, handOffToBroker, listBrokersForHandOff, searchLeadsForAutoSale, setDealMode, setDealPaused, startDeal, startNextHotDeal, takeOverDeal } from "./service";
 
 type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 const PATH = "/vendas/automatizada";
@@ -25,7 +26,10 @@ async function guarded<T>(work: () => Promise<T>): Promise<Result<T>> {
   } catch (error) {
     if (error instanceof AutoSaleError) return { ok: false, error: error.message };
     if (error instanceof z.ZodError) return { ok: false, error: error.issues[0]?.message ?? "Dados inválidos." };
-    console.error("[auto-sale] action_failed", error instanceof Error ? error.message.slice(0, 200) : "unknown");
+    const code = postgresErrorCode(error);
+    console.error("[auto-sale] action_failed", { code, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
+    // Regra do banco recusou (ex.: o motivo "auto_sale" da 0228 atualizada) ou tabela ausente: diz o que falta.
+    if (code === "23514" || code === "42P01" || code === "42703") return { ok: false, error: "O banco ainda não tem a atualização da Venda Automatizada. Rode o SQL da migração 0228 e tente de novo." };
     return { ok: false, error: "Não foi possível concluir agora. Tente novamente." };
   }
 }
@@ -55,6 +59,15 @@ export async function startAutoSaleDealAction(input: unknown) {
   return guarded(async () => {
     const parsed = z.object({ leadId: id, channel: z.enum(["meta", "waha"]), wahaNumberId: id.nullable().default(null), mode: z.enum(["simulation", "copilot", "autopilot"]) }).parse(input);
     const result = await startDeal(await managerContext(), parsed);
+    revalidatePath(PATH);
+    return result;
+  });
+}
+
+export async function startNextHotDealAction(input: unknown) {
+  return guarded(async () => {
+    const parsed = z.object({ mode: z.enum(["simulation", "copilot", "autopilot"]).default("copilot") }).parse(input ?? {});
+    const result = await startNextHotDeal(await managerContext(), parsed);
     revalidatePath(PATH);
     return result;
   });

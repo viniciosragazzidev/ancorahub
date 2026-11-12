@@ -198,6 +198,21 @@ export async function startDeal(context: TenantContext, input: { leadId: string;
   return { dealId };
 }
 
+/**
+ * "Pegar o próximo quente" (pedido do Vinicios, 12/11): um clique escolhe o lead quente mais recente que
+ * ainda pode entrar (nenhum corretor aceitou; oferta pendente é cancelada na escolha) e já inicia a
+ * negociação pela Meta oficial. Mesmas travas da escolha manual (`startDeal` confere tudo de novo).
+ */
+export async function startNextHotDeal(context: TenantContext, input: { mode: AutoSaleMode }) {
+  assertManager(context);
+  const candidates = await searchLeadsForAutoSale(context, { query: "", onlyHot: true });
+  const next = candidates.find((lead) => lead.reasons.length === 0);
+  if (!next) throw new AutoSaleError("Nenhum lead quente disponível agora: todos já têm corretor, estão sem base legal ou já estão numa negociação.");
+  const { dealId } = await startDeal(context, { leadId: next.id, channel: "meta", wahaNumberId: null, mode: input.mode });
+  await audit(context.userId, dealId, "auto_sale.next_hot_picked", { leadId: next.id, mode: input.mode });
+  return { dealId, leadName: next.nome };
+}
+
 // ─── Turnos e outbox ─────────────────────────────────────────────────────────
 
 export async function recordTurn(deal: Pick<DealRow, "id" | "tenantId">, input: { direction: "in" | "out" | "system"; kind: string; body: string | null; providerMessageId?: string | null; intent?: string | null; objection?: string | null; facts?: unknown; decision?: unknown; guard?: unknown; model?: string | null; processedAt?: Date | null }) {
