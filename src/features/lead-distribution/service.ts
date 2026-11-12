@@ -806,6 +806,11 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (lead.distributionStatus === "manual_hold") {
     return { status: "manual_required", leadId, reason: "A atribuição foi removida manualmente; o lead aguarda uma nova ação manual." };
   }
+  // Venda Automatizada (DEC-182): enquanto a negociação está aberta, só o gestor entrega o lead.
+  const { isLeadInActiveAutoSale } = await import("@/features/auto-sale/repository");
+  if (await isLeadInActiveAutoSale(context.tenantId, leadId)) {
+    return { status: "manual_required", leadId, reason: "Lead na Venda Automatizada: só o gestor entrega a um corretor." };
+  }
   const qualificationHoldReason = automaticDistributionHoldReason(lead.qualificationStatus, lead.qualificationState, await queueHoldsColdLeads(context.tenantId, lead.queueId, lead.qualificationStatus));
   if (qualificationHoldReason) {
     return { status: "manual_required", leadId, reason: qualificationHoldReason };

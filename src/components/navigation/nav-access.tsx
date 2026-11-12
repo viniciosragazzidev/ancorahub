@@ -34,6 +34,7 @@ export function useNavUser(initialUser?: UserDisplayInfo | null) {
 type NavFlags = {
   negotiationsEnabled: boolean;
   postSaleAuditEnabled?: boolean;
+  autoSaleEnabled?: boolean;
   /** Usuário e caminho já conhecidos (só nas prévias de desenvolvimento, como no menu lateral). */
   initialUser?: UserDisplayInfo | null;
   previewPathname?: string;
@@ -41,8 +42,8 @@ type NavFlags = {
 
 const NavFlagsContext = createContext<NavFlags>({ negotiationsEnabled: false });
 
-export function NavFlagsProvider({ negotiationsEnabled, postSaleAuditEnabled, initialUser, previewPathname, children }: NavFlags & { children: ReactNode }) {
-  return <NavFlagsContext.Provider value={{ negotiationsEnabled, postSaleAuditEnabled, initialUser, previewPathname }}>{children}</NavFlagsContext.Provider>;
+export function NavFlagsProvider({ negotiationsEnabled, postSaleAuditEnabled, autoSaleEnabled, initialUser, previewPathname, children }: NavFlags & { children: ReactNode }) {
+  return <NavFlagsContext.Provider value={{ negotiationsEnabled, postSaleAuditEnabled, autoSaleEnabled, initialUser, previewPathname }}>{children}</NavFlagsContext.Provider>;
 }
 
 export function useNavFlags() {

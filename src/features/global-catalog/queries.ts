@@ -6,6 +6,7 @@ import { unstable_cache } from "next/cache";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
+import { postgresErrorCode } from "@/shared/db/postgres-errors";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { resolveTenantGlobalPlanVisibility } from "./availability";
 import type { AvailableCatalogPlan } from "./types";
@@ -143,12 +144,15 @@ const getTenantPrivatePlans = (tenantId: string) => unstable_cache(
   { revalidate: 30 },
 )();
 
-export async function getGlobalCatalogAdminData() {
+/**
+ * Operadoras do Super-admin. `description` e `logo_url` vêm da migração 0065, que ficou fora do journal e
+ * não existe em todo banco (produção, 12/11): sem as colunas (42703), lista sem descrição e logotipo em vez
+ * de derrubar a página do catálogo inteira.
+ */
+async function listGlobalCarriersForAdmin() {
   const db = getDatabase();
-  const [enabled, privateEnabled, carriers] = await Promise.all([
-    isGlobalCatalogEnabled(),
-    isTenantPrivateCatalogEnabled(),
-    db
+  try {
+    return await db
       .select({
         id: schema.globalCarriers.id,
         name: schema.globalCarriers.name,
@@ -158,7 +162,22 @@ export async function getGlobalCatalogAdminData() {
         status: schema.globalCarriers.status,
       })
       .from(schema.globalCarriers)
-      .orderBy(asc(schema.globalCarriers.name)),
+      .orderBy(asc(schema.globalCarriers.name));
+  } catch (error) {
+    if (postgresErrorCode(error) !== "42703") throw error;
+    const rows = await db
+      .select({ id: schema.globalCarriers.id, name: schema.globalCarriers.name, ansCode: schema.globalCarriers.ansCode, status: schema.globalCarriers.status })
+      .from(schema.globalCarriers)
+      .orderBy(asc(schema.globalCarriers.name));
+    return rows.map((row) => ({ ...row, description: null as string | null, logoUrl: null as string | null }));
+  }
+}
+
+export async function getGlobalCatalogAdminData() {
+  const [enabled, privateEnabled, carriers] = await Promise.all([
+    isGlobalCatalogEnabled(),
+    isTenantPrivateCatalogEnabled(),
+    listGlobalCarriersForAdmin(),
   ]);
 
   return { enabled, privateEnabled, carriers };

@@ -2,6 +2,15 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 12/11/2026 - Venda Automatizada (piloto)
+
+- Nova área Comercial › Venda Automatizada: o diretor escolhe um lead quente por vez e a assistente virtual da corretora conduz a venda pelo WhatsApp: confirma os dados, cota com o catálogo real, manda 2 ou 3 opções com PDF personalizado e imagem por plano, recomenda uma, trata objeções, busca a opção mais em conta, pede o fechamento e a lista de documentos.
+- Nunca passa o lead a um corretor sozinha: chama só o gestor que escolheu a negociação, que devolve ao agente, assume ou entrega a um corretor que ele escolhe. Simulação e Copiloto (aprovar, editar e enviar); Autopiloto atrás de flag própria.
+- Preço só do retrato da cotação, guardrails de promoção, rede, promessa e saúde, parada imediata em opt-out, pedido de pessoa, irritação ou Procon. Transcrição de áudio liberada na negociação, follow-up em 45 min, 20 h, D+2 e D+5, job no Coolify.
+- Cotação também por link de uma página pública do sistema (sem login, válida até a validade da cotação, com o PDF para baixar e o botão para responder no WhatsApp); funciona pelo WAHA e o gestor vê quando o cliente abriu.
+- Cota todos os tipos do catálogo: PF, adesão (acha a entidade pela sigla, nome ou profissão), PME (tipo e tempo de CNPJ) e odonto; conferência de documento deixa de bloquear o Autopiloto.
+- Desligada por empresa até o Super-admin ligar; migration 0228 ainda não aplicada. Registro: [Venda Automatizada](implementations/active/2026-11-12-venda-automatizada.md), DEC-182.
+
 ## 11/11/2026 - Cotador real na conversa guiada do Lite
 
 - `/cotacao` volta a ser a conversa da Cotação (mascote, uma pergunta por vez, opções A..G ou resposta digitada), agora sobre o catálogo real do piloto: tipo (saúde ou odonto), público, município, idades, entidade (adesão), tipo e tempo de empresa (PME), acomodação e coparticipação, com "Tanto faz" e a contagem de planos em cada opção.

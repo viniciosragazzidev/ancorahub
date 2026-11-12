@@ -20,6 +20,14 @@ export async function requirePilot() {
   if (!config || !canUsePilot(context, config)) throw new Error("Cotador não liberado para este acesso.");
   return { context, config };
 }
+/**
+ * Catálogo sem sessão, para o job e o agente da Venda Automatizada (DEC-182): o catálogo é privado
+ * da empresa do piloto; outra empresa recebe null. O tenant vem da negociação, nunca do cliente.
+ */
+export async function loadPilotForTenant(tenantId: string): Promise<PilotConfig | null> {
+  const config = await readPilotConfig();
+  return config?.enabled && config.tenantId === tenantId ? config : null;
+}
 async function readObject(key: string, hash: string) {
   const blob = await downloadR2Object(key); const compressed = Buffer.from(await blob.arrayBuffer());
   if (createHash("sha256").update(compressed).digest("hex") !== hash) throw new Error("Falha de integridade no catálogo. Tente novamente ou contate a administração.");

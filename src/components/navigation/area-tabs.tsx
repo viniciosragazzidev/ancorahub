@@ -32,13 +32,13 @@ export function AreaTabs() {
   const currentPathname = usePathname();
   const searchParams = useSearchParams();
   const directorLite = useArcScopeEnabled();
-  const { negotiationsEnabled, postSaleAuditEnabled, initialUser, previewPathname } = useNavFlags();
+  const { negotiationsEnabled, postSaleAuditEnabled, autoSaleEnabled, initialUser, previewPathname } = useNavFlags();
   const user = useNavUser(initialUser);
 
   // Na prévia de desenvolvimento o endereço simulado (com a query) vem do shell.
   const location = previewPathname ? resolveNavLocation(previewPathname) : resolveNavLocation(currentPathname, searchParams);
   if (!location || !user) return null;
-  const tabs = visibleNavTabs(location.area, { ...user, negotiationsEnabled, postSaleAuditEnabled });
+  const tabs = visibleNavTabs(location.area, { ...user, negotiationsEnabled, postSaleAuditEnabled, autoSaleEnabled });
   if (tabs.length < 2 || !tabs.some((tab) => tab.id === location.tab.id)) return null;
 
   const items = tabs.map((tab) => ({ id: tab.id, label: tab.label, href: tab.href }));

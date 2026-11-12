@@ -21,7 +21,7 @@ export type NavTab = {
   /** Só estes papéis enxergam a aba (a página também barra os outros). */
   roles?: readonly TenantRole[];
   /** Escondida enquanto a chave correspondente estiver desligada. */
-  requires?: "negotiations" | "relationshipCenter" | "postSaleAudit";
+  requires?: "negotiations" | "relationshipCenter" | "postSaleAudit" | "autoSale";
   /** Outros valores de query que abrem a mesma aba (links antigos), ex.: { tab: ["alerts"] }. */
   aliases?: Readonly<Record<string, readonly string[]>>;
   /**
@@ -101,6 +101,8 @@ export const NAV_AREAS: readonly NavArea[] = [
       { id: "vendas", label: "Vendas", href: "/vendas", permission: "acessar_vendas" },
       { id: "propostas", label: "Propostas", href: "/propostas", permission: "acessar_vendas" },
       { id: "negociacoes", label: "Negociações", href: "/negociacoes", permission: "ver_dashboard_equipe", requires: "negotiations" },
+      // Venda Automatizada (piloto, DEC-182): só com feature_auto_sale_<tenantId> ligada.
+      { id: "venda-automatizada", label: "Venda Automatizada", href: "/vendas/automatizada", permission: "acessar_vendas", roles: ["director", "manager"], requires: "autoSale" },
       { id: "clientes", label: "Clientes", href: "/clientes", permission: "acessar_clientes" },
       { id: "documentos", label: "Documentos", href: "/documentos", permission: "acessar_documentos" },
       { id: "comissoes", label: "Comissões", href: "/configuracoes/comissoes", permission: "ver_comissionamento", roles: ["director", "manager"] },
@@ -227,13 +229,14 @@ export function resolveNavLocation(pathname: string, search: NavSearch | null = 
   return found;
 }
 
-export type NavAccessUser = NavigationAccessUser & { negotiationsEnabled?: boolean; postSaleAuditEnabled?: boolean };
+export type NavAccessUser = NavigationAccessUser & { negotiationsEnabled?: boolean; postSaleAuditEnabled?: boolean; autoSaleEnabled?: boolean };
 
 export function canShowNavTab(tab: NavTab, user: NavAccessUser | null) {
   if (!user?.roleKey) return false;
   if (tab.roles && !tab.roles.includes(user.roleKey)) return false;
   if (tab.requires === "negotiations" && !user.negotiationsEnabled) return false;
   if (tab.requires === "postSaleAudit" && !user.postSaleAuditEnabled) return false;
+  if (tab.requires === "autoSale" && !user.autoSaleEnabled) return false;
   // Cargo (04/11, F2): as permissões trazem rotas "route:" só para quem tem cargo; aí a aba exige a capacidade.
   const permissions = user.permissions ?? [];
   const hasCargo = permissions.some((permission) => permission.startsWith("route:"));

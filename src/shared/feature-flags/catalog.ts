@@ -43,6 +43,26 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Mostra aos corretores sem WhatsApp conectado o aviso sobre os leads do plantão a partir de 20/10.",
   },
+  WHATSAPP_AUTOREPARO: {
+    key: "feature_whatsapp_autoreparo_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Auto-reparo das conexões WhatsApp dos corretores: sincroniza o status pelo relay e envia o aviso de reconexão na véspera do plantão. Padrão desligado.",
+  },
+  WHATSAPP_AUTOREPARO_START: {
+    key: "feature_whatsapp_autoreparo_start_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Permite ao vigia reiniciar (start) sessões que já conectaram e estão em erro. Nunca apaga sessão. Exige a rota de start no relay. Padrão desligado.",
+  },
+  WHATSAPP_AUTOREPARO_AVISO_HORA: {
+    key: "feature_whatsapp_autoreparo_aviso_hora",
+    scope: "global",
+    defaultValue: "18",
+    description: "Hora (0 a 23, horário de São Paulo) do aviso de reconexão na véspera do plantão. Valor a confirmar com o Vinicios.",
+  },
   // ── WhatsApp / WAHA ──────────────────────────────────────────────────────
   WAHA_CONNECTIONS: {
     key: "feature_waha_connections_enabled",
@@ -248,6 +268,27 @@ export const FEATURE_FLAGS = {
     defaultValue: "false",
     allowedValues: ["true", "false"] as const,
     description: "A IA de qualificação ouve (transcreve) os 2 primeiros áudios de cada lead em qualificação, até 2 minutos. O Super-admin liga por empresa; a chave real é feature_ai_audio_transcription_<tenantId>.",
+  },
+  AUTO_SALE: {
+    key: "feature_auto_sale",
+    scope: "tenant",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Venda Automatizada (piloto, DEC-182): a IA conduz a venda de um lead quente por vez, escolhido pelo gestor, em Simulação ou Copiloto. Nunca passa o lead a um corretor sozinha. Inclui a transcrição de áudio na negociação. O Super-admin liga por empresa; a chave real é feature_auto_sale_<tenantId>.",
+  },
+  AUTO_SALE_AUTOPILOT: {
+    key: "feature_auto_sale_autopilot",
+    scope: "tenant",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Libera o modo Autopiloto da Venda Automatizada (a IA envia sozinha, com limites, só planos revisados). O gestor ainda escolhe o modo por negociação. A chave real é feature_auto_sale_autopilot_<tenantId>.",
+  },
+  AUTO_SALE_GLOBAL: {
+    key: "feature_auto_sale_global_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Kill switch da Venda Automatizada para todas as empresas. Desligado, o robô não responde nem envia e as negociações ficam pausadas pela plataforma.",
   },
   DUTY_SHIFT_REMINDER_24H: {
     key: "feature_duty_reminder_24h",

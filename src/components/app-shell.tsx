@@ -73,6 +73,7 @@ export function AppShell({
   directorLiteEnabled = false,
   negotiationsEnabled = false,
   postSaleAuditEnabled = false,
+  autoSaleEnabled = false,
   initialSidebarUser,
   initialSidebarPathname,
   initialSidebarOnDuty,
@@ -101,6 +102,8 @@ export function AppShell({
   directorLiteEnabled?: boolean;
   negotiationsEnabled?: boolean;
   postSaleAuditEnabled?: boolean;
+  /** Venda Automatizada ligada para esta empresa (aba em Comercial). */
+  autoSaleEnabled?: boolean;
   /** Só usado pela prévia de desenvolvimento, sem consultar dados de usuário. */
   initialSidebarUser?: UserDisplayInfo | null;
   /** Só usado pela prévia de desenvolvimento para destacar a rota representada. */
@@ -290,7 +293,7 @@ export function AppShell({
             ...(directorLiteEnabled && !directorLiteRouteOptedOut ? directorSkinStyle : {}),
           }}
         >
-          <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col"><NavFlagsProvider negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} initialUser={initialSidebarUser} previewPathname={initialSidebarPathname}>{children}</NavFlagsProvider></div>
+          <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col"><NavFlagsProvider negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} autoSaleEnabled={autoSaleEnabled} initialUser={initialSidebarUser} previewPathname={initialSidebarPathname}>{children}</NavFlagsProvider></div>
         </SidebarInset>
         <OnboardingWelcomeDialog />
       </SidebarProvider>

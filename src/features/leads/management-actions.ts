@@ -285,7 +285,8 @@ export async function removeLeadAssignmentAction(_prev: ManagementActionState, f
 
 const removalSchema = z.object({
   leadId: z.string().uuid(),
-  reason: z.enum(Object.keys(DISTRIBUTION_REMOVAL_REASONS) as [DistributionRemovalReason, ...DistributionRemovalReason[]], { message: "Escolha o motivo da remoção." }),
+  // "auto_sale" é só da Venda Automatizada: o formulário manual não usa.
+  reason: z.enum(Object.keys(DISTRIBUTION_REMOVAL_REASONS).filter((key) => key !== "auto_sale") as [DistributionRemovalReason, ...DistributionRemovalReason[]], { message: "Escolha o motivo da remoção." }),
   note: z.string().trim().max(DISTRIBUTION_REMOVAL_NOTE_MAX, `A observação pode ter até ${DISTRIBUTION_REMOVAL_NOTE_MAX} caracteres.`).optional(),
 });
 

@@ -16,7 +16,7 @@ Unificar o registro de venda no Lite, aceitar a conclusão de venda já detectad
 
 ## Banco
 
-A tabela `lead_beneficiaries` atualmente obriga data de nascimento e não guarda idade avulsa ou CPF. Para cumprir o cadastro sem inventar datas, a migration `drizzle/0228_lead_beneficiaries_identity_fields.sql` torna `birth_date` opcional e adiciona `age` e `cpf` opcionais. O SQL é entregue como arquivo e nunca executado nesta tarefa.
+A tabela `lead_beneficiaries` atualmente obriga data de nascimento e não guarda idade avulsa ou CPF. Para cumprir o cadastro sem inventar datas, a migration `drizzle/0229_lead_beneficiaries_identity_fields.sql` torna `birth_date` opcional e adiciona `age` e `cpf` opcionais. O SQL é entregue como arquivo e nunca executado nesta tarefa.
 
 ## Decisões adotadas
 
@@ -53,7 +53,7 @@ Tenant, lead, corretor e unidade sempre vêm da sessão/consulta no servidor. Re
 
 ## Correções da revisão Vigia em 2026-11-12
 
-- Entrada `0228_lead_beneficiaries_identity_fields` registrada em `drizzle/meta/_journal.json`. O repositório não mantém snapshots novos para as migrations SQL recentes; não foi criado snapshot. Vinicios confirmou que a 0228 já foi aplicada em produção, sem operação de banco nesta tarefa.
+- Entrada `0229_lead_beneficiaries_identity_fields` registrada em `drizzle/meta/_journal.json`. O repositório não mantém snapshots novos para as migrations SQL recentes; não foi criado snapshot. Vinicios confirmou que a 0228 já foi aplicada em produção, sem operação de banco nesta tarefa.
 - `findIdentityValue` agora lê somente chaves titulares diretamente da raiz de `formData`; objetos aninhados e `qualificationDetails` não são fontes de CPF/idade, para nunca copiar dados de dependentes.
 - `ensureLeadHolderAction` verifica rota, permissão efetiva e escopo canônico do lead. Diretor, gestor da unidade/unidades e supervisor com equipe habilitada podem iniciar dentro do próprio escopo; corretor continua limitado aos próprios leads. O lead é revalidado no bloqueio transacional.
 - Teste transacional com mocks confirma reutilização do cliente existente em lead convertido pela IA, sem histórico de etapa, evento Meta `sale` ou push de conversão duplicados. O aviso curto idempotente da DEC-179 continua sendo o aviso de registro.
