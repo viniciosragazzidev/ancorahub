@@ -5,7 +5,8 @@ import { simulate } from "@/features/global-catalog/pilot/engine";
 
 import { entityFacets, resolveEntity } from "./entity-match";
 import { businessProfileFromText, catalogModality, mergeFacts, missingForQuote, quoteInputFromFacts } from "./facts";
-import { allowedForMode, isReadyExceptDocuments } from "./offer-strategy";
+import { allPages, allowedForMode, isReadyExceptDocuments, offerablePool, selectOptions } from "./offer-strategy";
+import { result } from "./test-fixtures";
 import { entityQuestion } from "./turn-engine";
 
 function catalogPlan(overrides: Partial<CatalogPlan>): CatalogPlan {
@@ -87,5 +88,30 @@ describe("pendência: bloqueante x conferência de documento", () => {
     const unconfirmed = run(catalogPlan({ modality: "ADESAO", entity: "OAB/RJ", eligibilityConfirmed: false }), family);
     expect(allowedForMode(unconfirmed, "autopilot")).toBe(false);
     expect(allowedForMode(unconfirmed, "copilot")).toBe(true);
+  });
+});
+
+describe("só planos conferidos quando houver", () => {
+  const date = "2026-11-12";
+  const input = quoteInputFromFacts({ ages: [35], city: "Niterói", modality: "PESSOA_FISICA" })!;
+  const cheapUnreviewed = catalogPlan({ id: "barato", prices: [{ id: "x", cents: 10000, min: 0, max: null, active: true, from: null, to: null, priority: 1, lives: null }] });
+  const noCity = catalogPlan({ id: "semcidade", cities: [], prices: [{ id: "y", cents: 9000, min: 0, max: null, active: true, from: null, to: null, priority: 1, lives: null }] });
+  const reviewedPlan = catalogPlan({ id: "revisado" });
+  const results = simulate([cheapUnreviewed, noCity, reviewedPlan], input, date, new Set(["revisado", "semcidade"]), new Set(), "cotadorfm-2026-11-11-abcdefabcdef").results;
+
+  it("com plano revisado no perfil, o mais barato não revisado e o sem município ficam de fora", () => {
+    expect(offerablePool(results, "copilot").map((plan) => plan.id)).toEqual(["revisado"]);
+    expect(selectOptions(results, {}, "copilot").plans.map((plan) => plan.id)).toEqual(["revisado"]);
+  });
+
+  it("sem nenhum revisado, o não revisado entra como último recurso; sem município, nunca", () => {
+    const onlyUnreviewed = simulate([cheapUnreviewed, noCity], input, date, new Set(), new Set(), "cotadorfm-2026-11-11-abcdefabcdef").results;
+    expect(offerablePool(onlyUnreviewed, "copilot").map((plan) => plan.id)).toEqual(["barato"]);
+    expect(offerablePool(onlyUnreviewed, "autopilot")).toEqual([]);
+  });
+
+  it("junta todas as páginas do simulate", () => {
+    const pages = [{ results: [result("a", 1)], pages: 3 }, { results: [result("b", 2)], pages: 3 }, { results: [result("c", 3)], pages: 3 }];
+    expect(allPages((page) => pages[page - 1]).map((plan) => plan.id)).toEqual(["a", "b", "c"]);
   });
 });

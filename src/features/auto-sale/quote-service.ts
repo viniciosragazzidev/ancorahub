@@ -12,7 +12,7 @@ import { uploadR2Object } from "@/shared/storage/r2-storage";
 
 import type { AutoSaleMode, DealFacts, OfferSnapshot, Promotion } from "./contracts";
 import { quoteInputFromFacts } from "./facts";
-import { CHEAPER_RELAXATIONS, pickCheaper, recommendationReason, relaxInput, selectOptions, toOfferPlan } from "./offer-strategy";
+import { allPages, CHEAPER_RELAXATIONS, pickCheaper, recommendationReason, relaxInput, selectOptions, toOfferPlan } from "./offer-strategy";
 import { renderQuotePdf, type NetworkHighlight } from "./pdf";
 import { renderPlanImage } from "./plan-image";
 import { createPublicToken, publicLinkExpiresAt, publicQuoteUrl } from "./public-link";
@@ -75,7 +75,8 @@ export async function createOfferForDeal(input: {
   }
   const date = catalogToday();
   const reviewed = new Set(config.reviewedPlanIds), hidden = new Set(config.hiddenPlanIds);
-  const run = (value: typeof quoteInput) => simulate(index.plans, value, date, reviewed, hidden, config.release).results;
+  // Todas as páginas (o simulate pagina de 24 em 24, do mais barato): o plano conferido pode estar além da 1ª.
+  const run = (value: typeof quoteInput) => allPages((page) => simulate(index.plans, { ...value, page }, date, reviewed, hidden, config.release));
 
   let plans: QuoteResult[] = [];
   let usedInput = quoteInput;
@@ -83,9 +84,10 @@ export async function createOfferForDeal(input: {
   let recommendedId: string | null = null;
   let reason: string | null = null;
   if (input.kind === "new") {
-    const selection = selectOptions(run(quoteInput), input.deal.facts, input.deal.mode);
+    const results = run(quoteInput);
+    const selection = selectOptions(results, input.deal.facts, input.deal.mode);
     if (!selection.plans.length) throw new QuoteUnavailableError("no_options");
-    const byId = new Map(run(quoteInput).map((result) => [result.id, result]));
+    const byId = new Map(results.map((result) => [result.id, result]));
     plans = selection.plans.map((plan) => byId.get(plan.id)!).filter(Boolean);
     recommendedId = selection.recommendedPlanId;
     reason = selection.recommendationReason;

@@ -77,7 +77,9 @@ describe("escolha das opções", () => {
   it("Autopiloto só cota plano revisado; incompatível nunca", () => {
     const results = [result("a", 30000, { state: "pending" }), result("b", 35000, { state: "incompatible" }), result("c", 40000)];
     expect(selectOptions(results, {}, "autopilot").plans.map((plan) => plan.id)).toEqual(["c"]);
-    expect(selectOptions(results, {}, "copilot").plans.map((plan) => plan.id)).toEqual(["a", "c"]);
+    // Havendo plano pronto, o Copiloto também só oferece o pronto (12/11); o pendente fica de último recurso.
+    expect(selectOptions(results, {}, "copilot").plans.map((plan) => plan.id)).toEqual(["c"]);
+    expect(selectOptions(results.filter((plan) => plan.id !== "c"), {}, "copilot").plans.map((plan) => plan.id)).toEqual(["a"]);
   });
   it("mais em conta só traz o que custa menos que a oferta anterior", () => {
     expect(pickCheaper([result("a", 30000), result("b", 50000)], 40000, "copilot").map((plan) => plan.id)).toEqual(["a"]);

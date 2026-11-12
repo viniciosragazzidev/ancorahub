@@ -74,10 +74,23 @@ export function toOfferPlan(result: QuoteResult): OfferPlan {
 
 export type OfferSelection = { plans: OfferPlan[]; recommendedPlanId: string | null; recommendationReason: string | null };
 
+/** O motor põe este motivo quando o plano não informa municípios: nada garante que é vendido na cidade do cliente. */
+export const NO_CITY_REASON = "Confirmar município de comercialização.";
+
+/**
+ * Planos que o agente pode oferecer (12/11, pedido do Vinicios): nunca plano sem município (a cidade do
+ * cliente é sempre conhecida ao cotar) e, havendo algum conferido (revisado, ou só com conferência de
+ * documento), só os conferidos. Os demais entram apenas como último recurso, marcados "em conferência".
+ */
+export function offerablePool(results: readonly QuoteResult[], mode: AutoSaleMode) {
+  const allowed = results.filter((result) => allowedForMode(result, mode) && !result.reasons.includes(NO_CITY_REASON));
+  const verified = allowed.filter((result) => isReadyExceptDocuments(result));
+  return verified.length ? verified : allowed;
+}
+
 /** Até 3 opções, em ordem de preço, preferindo operadoras diferentes; a recomendada é a de melhor encaixe. */
 export function selectOptions(results: readonly QuoteResult[], facts: DealFacts, mode: AutoSaleMode): OfferSelection {
-  const pool = results
-    .filter((result) => allowedForMode(result, mode))
+  const pool = offerablePool(results, mode)
     .filter((result) => { const budget = totalBudgetCents(facts); return budget === null || result.totalCents <= budget; })
     .slice(0, 24);
   if (!pool.length) return { plans: [], recommendedPlanId: null, recommendationReason: null };
@@ -122,9 +135,17 @@ export function relaxInput(input: QuoteInput, filter: (typeof CHEAPER_RELAXATION
 
 /** O mais barato que custa menos que a oferta anterior; null quando não há nada mais em conta. */
 export function pickCheaper(results: readonly QuoteResult[], previousCheapestCents: number, mode: AutoSaleMode): QuoteResult[] {
-  return results.filter((result) => allowedForMode(result, mode) && result.totalCents < previousCheapestCents).slice(0, AUTO_SALE_LIMITS.maxOptions);
+  return offerablePool(results.filter((result) => result.totalCents < previousCheapestCents), mode).slice(0, AUTO_SALE_LIMITS.maxOptions);
 }
 
 export function savingsLine(previousCents: number, nextCents: number) {
   return previousCents > nextCents ? `${formatCents(previousCents - nextCents)} a menos por mês` : null;
+}
+
+/** Junta todas as páginas do `simulate` (até 40 páginas, ~960 planos) na ordem de preço. */
+export function allPages(runPage: (page: number) => { results: QuoteResult[]; pages: number }) {
+  const first = runPage(1);
+  const results = [...first.results];
+  for (let page = 2; page <= Math.min(first.pages, 40); page += 1) results.push(...runPage(page).results);
+  return results;
 }

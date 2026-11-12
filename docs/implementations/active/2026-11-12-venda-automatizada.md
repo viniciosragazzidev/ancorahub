@@ -284,3 +284,9 @@ Limites conhecidos do piloto: WAHA não envia PDF nem imagem; Autopiloto não co
 - `global-catalog/pilot/review-check.ts` confere cada plano nos dados do lote: vigência, preço ativo em cada faixa etária da ANS (respeitando os limites de idade do plano), preço duplicado na mesma faixa, município de comercialização e critérios confirmados na fonte (idade, elegibilidade; perfil de empresa na PME).
 - Super-admin › Catálogo ganhou "Conferir e revisar em lote": por operadora ou todas, mostra quantos passam, quantos já estão revisados e os motivos de quem não passa; "Registrar revisão dos N que passaram" revisa só esses, com o motivo obrigatório. A lista é recalculada no servidor (`reviewPassingPlansAction`), sob lock, com uma linha de auditoria com a contagem, o motivo e os planos. Cada plano da lista mostra o resultado da conferência.
 - Quem não passa precisa de correção na origem do catálogo (novo lote) ou de revisão individual consciente.
+
+## Só planos conferidos na oferta (pedido do Vinicios, 12/11)
+
+- Depois da revisão em lote (1.666 planos), o agente passa a oferecer só planos conferidos (revisados, ou pendentes apenas de conferência de documento) quando houver algum no perfil e no orçamento, em qualquer modo. Os não conferidos entram só como último recurso, sempre marcados "em conferência" no PDF, na página e no painel (Copiloto e Simulação; o Autopiloto nunca usa).
+- Plano sem município de comercialização nunca é oferecido (a cidade do cliente é sempre conhecida ao cotar).
+- A cotação passou a olhar todas as páginas do `simulate` (antes só as 24 mais baratas), para achar o conferido mesmo que não esteja entre os mais baratos. Vale também para a "opção mais em conta".
