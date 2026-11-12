@@ -18,7 +18,7 @@ export const TIPO_AVISO_RECONEXAO = "whatsapp_reconexao";
  */
 export const TITULO_AVISO_RECONEXAO = "Reconecte seu WhatsApp";
 export const MENSAGEM_AVISO_RECONEXAO =
-  "Você está de plantão amanhã e seu WhatsApp não está conectado. Reconecte hoje pelo roteiro de conexão para receber os leads do plantão.";
+  "Você está de plantão amanhã e seu WhatsApp não está conectado. Reconecte hoje pelo roteiro de conexão para ficar pronto para o plantão.";
 
 export type ResumoAviso =
   | { ativo: false }
