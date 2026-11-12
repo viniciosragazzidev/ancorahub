@@ -3,7 +3,7 @@
  * idades cotadas; nunca telefone, e-mail, sobrenome ou dado de saúde. Valores só do snapshot.
  */
 import { formatCents, type DealFacts, type OfferSnapshot, type Promotion } from "./contracts";
-import { copartKind } from "./offer-strategy";
+import { copartKind, isReadyExceptDocuments } from "./offer-strategy";
 import { brDate, offerValidUntil, type NetworkHighlight } from "./pdf";
 import { DUE_DAYS } from "./playbook";
 import { documentsChecklist } from "./quote-messages";
@@ -66,7 +66,9 @@ export function buildPublicQuoteView(input: {
     profile: `${lives.length === 1 ? "1 pessoa" : `${lives.length} pessoas`} (${lives.map((life) => `${life.age} anos`).join(", ")}) · ${offer.input.city} · ${modalityLabel(offer)}`,
     relaxedNote: offer.relaxed ? `Para baixar o valor, ${offer.relaxed.label}.` : null,
     savingsNote: offer.previousTotalCents != null && cheapest != null && offer.previousTotalCents > cheapest ? `${formatCents(offer.previousTotalCents - cheapest)} a menos por mês que a cotação anterior.` : null,
-    pendingNote: offer.plans.some((plan) => plan.state !== "ready") ? "Valores da tabela da operadora; condições do produto em conferência pela corretora." : null,
+    pendingNote: offer.plans.some((plan) => !isReadyExceptDocuments(plan))
+      ? "Valores da tabela da operadora; condições do produto em conferência pela corretora."
+      : offer.plans.some((plan) => plan.state !== "ready") ? "Vínculo, entidade ou tempo de empresa são conferidos na documentação, como em toda contratação." : null,
     plans: offer.plans.map((plan) => ({
       id: plan.id,
       operator: plan.operator,

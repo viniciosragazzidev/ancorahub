@@ -6,7 +6,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
 import { AUTO_SALE_LIMITS, formatCents, type DealFacts, type OfferSnapshot, type Promotion } from "./contracts";
-import { copartKind } from "./offer-strategy";
+import { copartKind, isReadyExceptDocuments } from "./offer-strategy";
 import { DUE_DAYS } from "./playbook";
 import { documentsChecklist } from "./quote-messages";
 
@@ -143,8 +143,10 @@ export async function renderQuotePdf(input: QuotePdfInput): Promise<Buffer> {
   if (input.offer.previousTotalCents != null && input.offer.plans[0] && input.offer.previousTotalCents > input.offer.plans[0].totalCents) {
     text(`Em relação à cotação anterior: ${formatCents(input.offer.previousTotalCents - input.offer.plans[0].totalCents)} a menos por mês.`, { color: COLOR.secondary });
   }
-  if (input.offer.plans.some((plan) => plan.state !== "ready")) {
+  if (input.offer.plans.some((plan) => !isReadyExceptDocuments(plan))) {
     text("Valores da tabela da operadora; condições do produto em conferência pela corretora.", { size: 9, color: COLOR.secondary });
+  } else if (input.offer.plans.some((plan) => plan.state !== "ready")) {
+    text("Vínculo, entidade ou tempo de empresa são conferidos na documentação, como em toda contratação.", { size: 9, color: COLOR.secondary });
   }
 
   // Rede perto do cliente (só com fonte do catálogo)

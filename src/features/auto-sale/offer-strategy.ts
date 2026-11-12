@@ -25,10 +25,31 @@ function accommodationKind(plan: Pick<QuoteResult, "accommodation">) {
   return "outro";
 }
 
-/** Planos que o modo permite cotar (D4): Autopiloto só `ready`; os outros, `ready` ou `pending`. */
+/**
+ * Pendências do cotador que são só conferência de documento: o motor as põe SEMPRE em PME, adesão e
+ * dependentes, e o pedido de documentos do fechamento confere exatamente isso. As demais (plano não
+ * revisado, critério sem confirmação na fonte, preço ambíguo, município, limites de vidas e idade,
+ * perfil ou tempo de empresa não informados) bloqueiam. Texto igual ao do `simulate` (teste confere).
+ */
+export const DOCUMENTARY_PENDING_REASONS: ReadonlySet<string> = new Set([
+  "Exigências de tempo de empresa, vínculo e formação do grupo precisam de conferência para este perfil.",
+  "Confirmar vínculo e documentação de cada dependente nas condições do produto.",
+  "Confirmar profissão, entidade e documentação de adesão.",
+]);
+
+/** O plano só depende de conferir documentos (ou já está pronto)? */
+export function isReadyExceptDocuments(result: Pick<QuoteResult, "state" | "reasons">) {
+  if (result.state === "ready") return true;
+  return result.state === "pending" && result.reasons.length > 0 && result.reasons.every((reason) => DOCUMENTARY_PENDING_REASONS.has(reason));
+}
+
+/**
+ * Planos que o modo permite cotar (D4, revisto em 12/11): Autopiloto cota o que está pronto ou só depende
+ * de conferir documentos (assim adesão, PME e família entram); Copiloto e Simulação, qualquer não incompatível.
+ */
 export function allowedForMode(result: QuoteResult, mode: AutoSaleMode) {
   if (result.state === "incompatible") return false;
-  return mode === "autopilot" ? result.state === "ready" : true;
+  return mode === "autopilot" ? isReadyExceptDocuments(result) : true;
 }
 
 function preferenceScore(plan: QuoteResult, facts: DealFacts) {
@@ -39,7 +60,7 @@ function preferenceScore(plan: QuoteResult, facts: DealFacts) {
   else if (facts.coparticipation === "parcial") score += copart === "parcial" ? 3 : copart === "sem" ? 2 : 0;
   else if (facts.coparticipation === "total") score += copart === "total" ? 3 : 1;
   if (facts.accommodation && facts.accommodation !== "indiferente" && accommodationKind(plan) === facts.accommodation) score += 1;
-  if (plan.state === "ready") score += 1;
+  if (isReadyExceptDocuments(plan)) score += 1;
   return score;
 }
 

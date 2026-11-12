@@ -24,9 +24,18 @@ export type AgentTurnDecision = z.infer<typeof agentTurnSchema>;
 export const QUESTION_FOR: Record<MissingFact, string> = {
   ages: "Para eu cotar certinho: qual a idade de cada pessoa que vai entrar no plano?",
   city: "E em qual cidade e bairro vocês moram?",
-  modality: "Você tem CNPJ ou MEI aberto, ou seria no seu CPF?",
+  modality: "Você tem CNPJ ou MEI aberto, ou seria no seu CPF? Se for por profissão (OAB, CREA, conselho), me conta também.",
+  entity: "Qual a sua profissão ou a entidade de classe? Por exemplo OAB, CREA ou CRM.",
+  businessProfile: "Sua empresa é MEI, ME, EPP ou LTDA?",
   businessMonths: "Há quanto tempo o CNPJ está aberto?",
 };
+
+/** Adesão: pergunta a entidade, mostrando até 3 do catálogo quando o que o cliente disse bate com várias. */
+export function entityQuestion(options: readonly string[]) {
+  if (!options.length) return QUESTION_FOR.entity;
+  const list = options.slice(0, 3);
+  return `Por qual entidade seria: ${list.length > 1 ? `${list.slice(0, -1).join(", ")} ou ${list.at(-1)}` : list[0]}?`;
+}
 
 export type TurnState = {
   stage: AutoSaleStage;

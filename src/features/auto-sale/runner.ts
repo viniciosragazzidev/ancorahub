@@ -17,7 +17,7 @@ import { activePromotionLines, AUDIO_DECLINE_MESSAGE, followUpMessage, imageCapt
 import { catalogToday, createOfferForDeal, QuoteUnavailableError } from "./quote-service";
 import { listOffers, listTurns, type DealRow } from "./repository";
 import { activePromotions, brokerageInfo, callManager, cancelPendingOutgoing, dealRuntime, endDealBySystem, moveLeadForStage, queueOutgoing, recordTurn, type OutgoingItem } from "./service";
-import { planTurn, QUESTION_FOR } from "./turn-engine";
+import { entityQuestion, planTurn, QUESTION_FOR } from "./turn-engine";
 import { quoteLinkMessage } from "./public-link";
 import { missingForQuote } from "./facts";
 
@@ -133,12 +133,22 @@ export async function runDealTurn(seen: DealRow, options: { model?: AgentModel; 
         });
         if ((await pdfCount(deal.id)) < AUTO_SALE_LIMITS.pdfPerDeal) items.push({ kind: "document", body: pdfCaption(), mediaKey: created.pdf.key, mediaFilename: created.pdf.filename, mediaMime: "application/pdf", offerId: created.snapshot.id });
       }
-      await db.update(schema.autoSaleDeals).set({ firstQuoteAt: deal.firstQuoteAt ?? new Date(), limits: { ...runtime, networkSourced: created.networkSourced } }).where(eq(schema.autoSaleDeals.id, deal.id));
+      await db.update(schema.autoSaleDeals).set({
+        firstQuoteAt: deal.firstQuoteAt ?? new Date(), limits: { ...runtime, networkSourced: created.networkSourced },
+        // Adesão: guarda a entidade exata do catálogo (as próximas cotações e os documentos usam ela).
+        ...(created.resolvedEntity ? { facts: { ...plan.facts, entity: created.resolvedEntity } } : {}),
+      }).where(eq(schema.autoSaleDeals.id, deal.id));
     } catch (error) {
       const code = error instanceof QuoteUnavailableError ? error.code : "catalog_unavailable";
       if (!(error instanceof QuoteUnavailableError)) console.error("[auto-sale] quote_failed", { dealId: deal.id, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
       if (code === "missing_facts") items.push({ kind: "text", body: QUESTION_FOR[missingForQuote(plan.facts)[0] ?? "ages"] });
       else if (code === "no_cheaper") items.push({ kind: "text", body: NO_CHEAPER_MESSAGE });
+      else if (code === "entity_options" || code === "entity_unknown") {
+        // Adesão sem entidade clara: pergunta (com as opções do catálogo, quando há) e esquece o que não casou.
+        const options = error instanceof QuoteUnavailableError ? error.options : [];
+        items.push({ kind: "text", body: entityQuestion(options) });
+        await db.update(schema.autoSaleDeals).set({ facts: { ...plan.facts, entity: undefined } }).where(eq(schema.autoSaleDeals.id, deal.id));
+      }
       else managerReason = "price_off_catalog";
       stage = deal.stage;
     }

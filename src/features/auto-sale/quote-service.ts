@@ -16,9 +16,10 @@ import { CHEAPER_RELAXATIONS, pickCheaper, recommendationReason, relaxInput, sel
 import { renderQuotePdf, type NetworkHighlight } from "./pdf";
 import { renderPlanImage } from "./plan-image";
 import { createPublicToken, publicLinkExpiresAt, publicQuoteUrl } from "./public-link";
+import { entityFacets, resolveEntity } from "./entity-match";
 
 export class QuoteUnavailableError extends Error {
-  constructor(public readonly code: "catalog_unavailable" | "missing_facts" | "no_options" | "no_cheaper") {
+  constructor(public readonly code: "catalog_unavailable" | "missing_facts" | "no_options" | "no_cheaper" | "entity_options" | "entity_unknown", public readonly options: string[] = []) {
     super(code);
   }
 }
@@ -56,12 +57,22 @@ export async function createOfferForDeal(input: {
   customerName: string;
   brokerage: { name: string; phone: string | null; units: string[] };
   promotions: Promotion[];
-}): Promise<{ snapshot: OfferSnapshot; pdf: { key: string; filename: string } ; images: { key: string; planId: string }[]; networkSourced: boolean; publicUrl: string }> {
+}): Promise<{ snapshot: OfferSnapshot; pdf: { key: string; filename: string } ; images: { key: string; planId: string }[]; networkSourced: boolean; publicUrl: string; resolvedEntity: string | null }> {
   const config = await loadPilotForTenant(input.deal.tenantId);
   if (!config) throw new QuoteUnavailableError("catalog_unavailable");
-  const quoteInput = quoteInputFromFacts(input.deal.facts);
-  if (!quoteInput) throw new QuoteUnavailableError("missing_facts");
+  const parsedInput = quoteInputFromFacts(input.deal.facts);
+  if (!parsedInput) throw new QuoteUnavailableError("missing_facts");
   const index = await loadPilotIndex(config);
+  // Adesão: a profissão ou sigla dita pelo cliente vira a entidade exata do catálogo; na dúvida, pergunta.
+  let quoteInput = parsedInput;
+  let resolvedEntity: string | null = null;
+  if (parsedInput.modality.startsWith("ADESAO")) {
+    const resolution = resolveEntity(parsedInput.entity, entityFacets(index.plans, parsedInput.modality), index.options.professions ?? []);
+    if ("options" in resolution) throw new QuoteUnavailableError("entity_options", resolution.options);
+    if ("unknown" in resolution) throw new QuoteUnavailableError("entity_unknown");
+    resolvedEntity = resolution.entity;
+    quoteInput = { ...parsedInput, entity: resolution.entity };
+  }
   const date = catalogToday();
   const reviewed = new Set(config.reviewedPlanIds), hidden = new Set(config.hiddenPlanIds);
   const run = (value: typeof quoteInput) => simulate(index.plans, value, date, reviewed, hidden, config.release).results;
@@ -132,5 +143,5 @@ export async function createOfferForDeal(input: {
   await db.update(schema.autoSaleOffers).set({ pdfKey, pdfSha256: sha256, imageKeys: images, network, publicTokenHash: publicToken.hash, publicExpiresAt: publicLinkExpiresAt(snapshot) })
     .where(and(eq(schema.autoSaleOffers.id, offerId), eq(schema.autoSaleOffers.tenantId, input.deal.tenantId), isNull(schema.autoSaleOffers.pdfKey)));
   const filename = `cotacao-${input.brokerage.name.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${version}.pdf`;
-  return { snapshot, pdf: { key: pdfKey, filename }, images, networkSourced: Boolean(network), publicUrl: publicQuoteUrl(publicToken.token) };
+  return { snapshot, pdf: { key: pdfKey, filename }, images, networkSourced: Boolean(network), publicUrl: publicQuoteUrl(publicToken.token), resolvedEntity };
 }

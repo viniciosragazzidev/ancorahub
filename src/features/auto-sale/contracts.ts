@@ -41,8 +41,15 @@ export const dealFactsSchema = z.object({
   neighborhood: z.string().max(120).optional(),
   ages: z.array(z.number().int().min(0).max(120)).max(30).optional(),
   modality: z.enum(["PESSOA_FISICA", "ADESAO", "PME_EMPRESARIAL"]).optional(),
+  /** Saúde (padrão) ou só odonto: odonto usa as modalidades *_ODONTO do catálogo. */
+  product: z.enum(["saude", "odonto"]).optional(),
+  /** Saúde com odonto incluso no mesmo plano. */
+  dentalIncluded: z.boolean().optional(),
+  /** Adesão: profissão ou entidade dita pelo cliente; vira o nome exato da entidade do catálogo ao cotar. */
   entity: z.string().max(200).optional(),
   hasCnpj: z.boolean().optional(),
+  /** PME: perfil do catálogo (MEI, ME, EPP, LTDA, S_A, EI...). */
+  businessProfile: z.string().max(60).optional(),
   businessMonths: z.number().int().min(0).max(2400).optional(),
   budgetCents: z.number().int().positive().max(99_999_999).optional(),
   /** "300 por pessoa" é por pessoa; sem indicação, o orçamento é o total da família. */

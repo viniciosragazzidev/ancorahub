@@ -74,6 +74,12 @@ export function factsFromQualification(input: {
   if (modality) facts.modality = modality;
   const cnpj = asText(pick(bags, ["cnpj", "mei", "tem_cnpj"]));
   if (cnpj) facts.hasCnpj = !/^(nao|n|no|false)$/.test(fold(cnpj));
+  const businessProfile = businessProfileFromText(asText(pick(bags, ["tipo_empresa", "porte", "perfil_empresa", "cnpj", "mei"])));
+  if (businessProfile) facts.businessProfile = businessProfile;
+  const entity = asText(pick(bags, ["entidade", "profissao", "profession", "entity"]));
+  if (entity) facts.entity = entity.slice(0, 200);
+  const product = fold(asText(pick(bags, ["produto", "tipo_plano", "plano"])) ?? "");
+  if (/odonto|dental/.test(product) && !/saude/.test(product)) facts.product = "odonto";
   const budget = asText(pick(bags, ["budget", "orcamento", "valor_mensal", "quanto_pode_pagar"]));
   if (budget) {
     // "600 por pessoa", "até R$ 1.500": o parser do guia quer só o valor.
@@ -104,18 +110,38 @@ export function mergeFacts(current: DealFacts, update: Partial<DealFacts>): Deal
     if (Array.isArray(value) && value.length === 0) continue;
     merged[key] = value;
   }
+  // O modelo pode escrever "microempresa" ou "ltda": guarda o código do catálogo.
+  if (typeof update.businessProfile === "string") merged.businessProfile = businessProfileFromText(update.businessProfile) ?? update.businessProfile.toUpperCase().slice(0, 60);
   const parsed = dealFactsSchema.safeParse(merged);
   return parsed.success ? parsed.data : current;
 }
 
-export type MissingFact = "city" | "ages" | "modality" | "businessMonths";
+export type MissingFact = "city" | "ages" | "modality" | "entity" | "businessProfile" | "businessMonths";
 
-/** O que falta para cotar, na ordem em que o agente pergunta (no máximo 4 perguntas). */
+/** Perfil de empresa dito pelo cliente no código do catálogo (MEI, ME, EPP, LTDA, S_A, EI). */
+export function businessProfileFromText(text: string | undefined): string | undefined {
+  const value = fold(text ?? "").replace(/[.\s/]/g, "");
+  if (!value) return undefined;
+  if (/^(mei|microempreendedor)/.test(value)) return "MEI";
+  if (/^(epp|empresadepequenoporte)/.test(value)) return "EPP";
+  if (/^(me|microempresa)$/.test(value) || value.startsWith("microempresa")) return "ME";
+  if (/^ltda|limitada/.test(value)) return "LTDA";
+  if (/^(sa|sociedadeanonima)$/.test(value)) return "S_A";
+  if (/^(ei|empresarioindividual)/.test(value)) return "EI";
+  return undefined;
+}
+
+/**
+ * O que falta para cotar, na ordem em que o agente pergunta. Adesão precisa da profissão ou entidade;
+ * PME, do tipo de empresa e do tempo de CNPJ (os planos mudam por perfil e tempo).
+ */
 export function missingForQuote(facts: DealFacts): MissingFact[] {
   const missing: MissingFact[] = [];
   if (!facts.ages?.length) missing.push("ages");
   if (!facts.city) missing.push("city");
   if (!facts.modality) missing.push("modality");
+  if (facts.modality === "ADESAO" && !facts.entity) missing.push("entity");
+  if (facts.modality === "PME_EMPRESARIAL" && !facts.businessProfile) missing.push("businessProfile");
   if (facts.modality === "PME_EMPRESARIAL" && facts.businessMonths === undefined) missing.push("businessMonths");
   return missing;
 }
@@ -126,25 +152,33 @@ export function totalBudgetCents(facts: DealFacts): number | null {
   return facts.budgetBasis === "per_person" ? facts.budgetCents * Math.max(1, facts.ages?.length ?? 1) : facts.budgetCents;
 }
 
-/** Monta o QuoteInput do cotador. null enquanto faltar dado obrigatório. */
+/** Modalidade do catálogo: saúde ou só odonto (`*_ODONTO`), em PF, adesão ou PME. */
+export function catalogModality(facts: DealFacts): QuoteInput["modality"] | null {
+  if (!facts.modality) return null;
+  return (facts.product === "odonto" ? `${facts.modality}_ODONTO` : facts.modality) as QuoteInput["modality"];
+}
+
+/** Monta o QuoteInput do cotador. null enquanto faltar dado obrigatório. A entidade já vem resolvida no catálogo. */
 export function quoteInputFromFacts(facts: DealFacts): QuoteInput | null {
   if (missingForQuote(facts).length) return null;
   const ages = facts.ages!;
+  const pme = facts.modality === "PME_EMPRESARIAL";
   return {
-    modality: facts.modality!,
+    modality: catalogModality(facts)!,
     city: facts.city!,
     lives: ages.map((age, index) => ({ age, holder: index === 0, relationship: index === 0 ? "Titular" : "Dependente" })),
     operator: "",
     administrator: "",
     profession: "",
     entity: facts.modality === "ADESAO" ? facts.entity ?? "" : "",
-    businessProfile: facts.modality === "PME_EMPRESARIAL" ? "MEI" : "",
-    businessMonths: facts.modality === "PME_EMPRESARIAL" ? facts.businessMonths ?? null : null,
+    businessProfile: pme ? facts.businessProfile ?? "" : "",
+    businessMonths: pme ? facts.businessMonths ?? null : null,
     accommodation: "",
     // O filtro do catálogo usa o texto exato da operadora; a preferência entra na ordenação (offer-strategy).
     coparticipation: "",
     coverage: "",
-    dental: "",
+    // Saúde com odonto incluso: só planos com odonto. Só odonto já é a modalidade *_ODONTO.
+    dental: facts.product !== "odonto" && facts.dentalIncluded ? "yes" : "",
     query: "",
     budgetCents: totalBudgetCents(facts),
     includeIncompatible: false,
