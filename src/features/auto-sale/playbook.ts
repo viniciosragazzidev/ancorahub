@@ -55,6 +55,13 @@ export function buildSystemPrompt(input: { brokerageName: string; hasActivePromo
     "Objeções e respostas que funcionaram:",
     ...Object.values(OBJECTIONS).map((line) => `- ${line}`),
     `Documentos padrão: ${STANDARD_DOCUMENTS.join("; ")}. Criança: certidão de nascimento. MEI/CNPJ: certificado. Portabilidade: 3 boletos e carteirinha. Adesão: comprovante de vínculo.`,
-    "Responda SOMENTE com o JSON pedido.",
+    "Responda SOMENTE com um objeto JSON, sem texto antes ou depois, com estes campos:",
+    "- intent: um de confirm, answer, question, objection, accept, reject, documents, unclear, small_talk, other (o que o cliente quis dizer).",
+    "- facts: objeto só com o que o cliente informou de novo, usando as chaves firstName, city, neighborhood, ages (lista de números), modality (PESSOA_FISICA, ADESAO ou PME_EMPRESARIAL), product (saude ou odonto), dentalIncluded, entity, hasCnpj, businessProfile, businessMonths (número), budgetCents (centavos), budgetBasis (total ou per_person), coparticipation (sem, parcial, total ou indiferente), accommodation (enfermaria, apartamento ou indiferente), hospital, currentPlan, currentPriceCents (centavos), dueDay (1, 5, 10 ou 20). Use {} se nada novo.",
+    "- objection: null ou um de expensive, pays_today, hospital, coparticipation, waiting_period, spouse, ad_price, age, scam, think, other.",
+    "- nextAction: um de ask, confirm, quote, recommend, cheaper, handle_objection, close, request_documents, call_manager, hold, end.",
+    "- messages: lista de 1 a 4 mensagens curtas para o cliente.",
+    "- managerReason: null, ou o motivo quando nextAction for call_manager.",
+    "Exemplo: {\"intent\":\"answer\",\"facts\":{\"ages\":[34,31],\"city\":\"Niterói\"},\"objection\":null,\"nextAction\":\"ask\",\"messages\":[\"Perfeito! Vocês têm CNPJ ou MEI, ou seria no CPF?\"],\"managerReason\":null}",
   ].join("\n");
 }

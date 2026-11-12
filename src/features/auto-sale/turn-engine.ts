@@ -11,15 +11,45 @@ import { checkOutgoingMessages, classifyInbound, sanitizeMessage, type GuardViol
 import { documentsRequestMessages, HOLD_MESSAGE, MISUNDERSTOOD_MESSAGE, OPT_OUT_MESSAGE } from "./quote-messages";
 import { AGENT_ACTIONS, nextStage, requiresOffer, type AgentAction } from "./state-machine";
 
+/**
+ * Fatos que o modelo mandou: guarda só os campos válidos (null, texto fora do formato ou campo
+ * desconhecido são descartados um a um), em vez de recusar a resposta inteira.
+ */
+export function cleanModelFacts(raw: unknown): Partial<DealFacts> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const shape = dealFactsSchema.shape as Record<string, z.ZodType<unknown>>;
+  const clean: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (value === null || value === undefined || !(key in shape)) continue;
+    const parsed = shape[key].safeParse(value);
+    if (parsed.success && parsed.data !== undefined) clean[key] = parsed.data;
+  }
+  return clean as Partial<DealFacts>;
+}
+
+/**
+ * Decisão do modelo (12/11: tolerante). Campo fora do formato vira o valor seguro em vez de derrubar o
+ * turno: intenção "other", ação "ask", objeção e motivo nulos, mensagens cortadas em 4 de até 600 caracteres.
+ */
+// Sem transform no formato: ele vira o json_schema que o Claude recebe (tipos claros); a limpeza é depois.
 export const agentTurnSchema = z.object({
-  intent: z.enum(["confirm", "answer", "question", "objection", "accept", "reject", "documents", "unclear", "small_talk", "other"]),
-  facts: dealFactsSchema.partial().default({}),
-  objection: z.enum(["expensive", "pays_today", "hospital", "coparticipation", "waiting_period", "spouse", "ad_price", "age", "scam", "think", "other"]).nullable().default(null),
-  nextAction: z.enum(AGENT_ACTIONS),
-  messages: z.array(z.string().max(600)).max(6).default([]),
-  managerReason: z.enum(Object.keys(MANAGER_CALL_REASONS) as [ManagerCallReason, ...ManagerCallReason[]]).nullable().default(null),
+  intent: z.enum(["confirm", "answer", "question", "objection", "accept", "reject", "documents", "unclear", "small_talk", "other"]).catch("other"),
+  facts: z.record(z.string(), z.unknown()).catch({}),
+  objection: z.enum(["expensive", "pays_today", "hospital", "coparticipation", "waiting_period", "spouse", "ad_price", "age", "scam", "think", "other"]).nullable().catch(null),
+  nextAction: z.enum(AGENT_ACTIONS).catch("ask"),
+  messages: z.array(z.string()).catch([]),
+  managerReason: z.enum(Object.keys(MANAGER_CALL_REASONS) as [ManagerCallReason, ...ManagerCallReason[]]).nullable().catch(null),
 });
-export type AgentTurnDecision = z.infer<typeof agentTurnSchema>;
+export type AgentTurnDecision = Omit<z.infer<typeof agentTurnSchema>, "facts"> & { facts: Partial<DealFacts> };
+
+/** Resposta validada do modelo para a decisão do turno: só fatos válidos, até 4 mensagens de até 600 caracteres. */
+export function normalizeDecision(raw: z.infer<typeof agentTurnSchema>): AgentTurnDecision {
+  return {
+    ...raw,
+    facts: cleanModelFacts(raw.facts),
+    messages: raw.messages.filter((message) => message.trim().length > 0).slice(0, 4).map((message) => message.slice(0, 600)),
+  };
+}
 
 export const QUESTION_FOR: Record<MissingFact, string> = {
   ages: "Para eu cotar certinho: qual a idade de cada pessoa que vai entrar no plano?",

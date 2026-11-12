@@ -101,14 +101,16 @@ export function AutoSaleWorkspace({ overview, lite, isDirector, preview }: { ove
   // Um clique: pega o lead quente mais recente que ainda pode entrar e já começa em Copiloto (nada sai sem aprovar).
   // Sem lead quente disponível (ou com negociação aberta), liga a espera: a distribuição entrega o próximo que ficar quente.
   const pickNext = () => startingNext(async () => {
-    const result = await startNextHotDealAction({ mode: "copilot" });
+    const result = await startNextHotDealAction({});
     if (!result.ok) { toast.error(result.error); return; }
     if (result.data.kind === "watching") {
-      toast.success("Aguardando o próximo lead quente. Ele entra aqui em Copiloto antes de ir para corretor.");
+      toast.success(`Aguardando o próximo lead quente. Ele entra aqui em ${MODE_LABEL[result.data.mode]} antes de ir para corretor.`);
       router.refresh();
       return;
     }
-    toast.success(`Negociação com ${result.data.leadName} começou em Copiloto. Aprove a primeira mensagem.`);
+    toast.success(result.data.mode === "autopilot"
+      ? `Negociação com ${result.data.leadName} começou em Autopiloto: a assistente já está enviando.`
+      : `Negociação com ${result.data.leadName} começou em ${MODE_LABEL[result.data.mode]}. Aprove a primeira mensagem.`);
     router.refresh();
     setDealId(result.data.dealId);
   });

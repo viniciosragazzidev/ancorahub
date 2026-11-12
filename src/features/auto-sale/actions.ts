@@ -10,7 +10,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { postgresErrorCode } from "@/shared/db/postgres-errors";
 
-import { OPEN_DEAL_STATUSES, type DealFacts } from "./contracts";
+import { OPEN_DEAL_STATUSES, type AutoSaleMode, type DealFacts } from "./contracts";
 import { readAutoSaleFlags } from "./flag";
 import { allowedMoneyFromOffers, checkOutgoingMessages, sanitizeMessage, type GuardViolation } from "./guardrails";
 import { getDealDetail, listPromotions, wahaNumbersForLead } from "./queries";
@@ -69,23 +69,25 @@ export async function startAutoSaleDealAction(input: unknown) {
  * "Pegar o próximo quente": havendo lead quente disponível e nenhuma negociação aberta, começa já; senão
  * liga a espera, e a distribuição entrega à Venda Automatizada o próximo lead que ficar quente.
  */
-export async function startNextHotDealAction(input: unknown): Promise<Result<{ kind: "started"; dealId: string; leadName: string } | { kind: "watching" }>> {
+export async function startNextHotDealAction(input: unknown): Promise<Result<{ kind: "started"; dealId: string; leadName: string; mode: AutoSaleMode } | { kind: "watching"; mode: AutoSaleMode }>> {
   return guarded(async () => {
-    const parsed = z.object({ mode: z.enum(["simulation", "copilot", "autopilot"]).default("copilot") }).parse(input ?? {});
+    const asked = z.object({ mode: z.enum(["simulation", "copilot", "autopilot"]).optional() }).parse(input ?? {});
     const context = await managerContext();
+    // Sem modo pedido: Autopiloto quando liberado para a empresa (não espera você), senão Copiloto.
+    const parsed = { mode: asked.mode ?? ((await readAutoSaleFlags(context.tenantId)).autopilot ? "autopilot" as const : "copilot" as const) };
     const hasOpenDeal = (await leadIdsInActiveAutoSale(context.tenantId)).size > 0;
     if (!hasOpenDeal) {
       try {
         const started = await startNextHotDeal(context, parsed);
         revalidatePath(PATH);
-        return { kind: "started" as const, ...started };
+        return { kind: "started" as const, ...started, mode: parsed.mode };
       } catch (error) {
         if (!(error instanceof AutoSaleError)) throw error;
       }
     }
     await setAutoSaleWatch(context, { armed: true, mode: parsed.mode });
     revalidatePath(PATH);
-    return { kind: "watching" as const };
+    return { kind: "watching" as const, mode: parsed.mode };
   });
 }
 

@@ -17,7 +17,7 @@ import { autoSaleIneligibleReasons, ELIGIBLE_LEAD_STATUSES, IN_QUALIFICATION_STA
 import { factsFromQualification } from "./facts";
 import { readAutoSaleFlags } from "./flag";
 import { managerSummary } from "./manager-summary";
-import { openingMessages } from "./quote-messages";
+import { HOLD_MESSAGE, openingMessages } from "./quote-messages";
 import { getDeal, getOpenDealForLead, listOffers, listTurns, type DealRow } from "./repository";
 import { leadStatusForStage, shouldMoveLead } from "./state-machine";
 
@@ -332,16 +332,43 @@ async function loadDealForManager(context: TenantContext, dealId: string) {
 export async function setDealPaused(context: TenantContext, dealId: string, paused: boolean) {
   const deal = await loadDealForManager(context, dealId);
   if (!["active", "paused", "waiting_manager"].includes(deal.status)) throw new AutoSaleError("A negociação já foi encerrada.");
-  await getDatabase().update(schema.autoSaleDeals).set({ status: paused ? "paused" : "active", replyDueAt: paused ? null : deal.replyDueAt, managerCallReason: paused ? deal.managerCallReason : null, stage: !paused && deal.stage === "manager_called" ? "objections" : deal.stage, updatedAt: new Date() })
-    .where(and(eq(schema.autoSaleDeals.id, deal.id), eq(schema.autoSaleDeals.tenantId, context.tenantId)));
-  await audit(context.userId, deal.id, paused ? "auto_sale.paused" : "auto_sale.resumed", { leadId: deal.leadId });
+  const db = getDatabase();
+  const now = new Date();
+  let reopened = 0;
+  if (!paused) {
+    // Devolver ao agente (12/11): as mensagens do cliente ainda sem resposta enviada voltam para a fila do turno,
+    // e o "Vou confirmar isso e já te retorno." que ficou pendente sai da fila (a resposta de verdade vem agora).
+    const since = deal.lastAgentMessageAt ?? deal.createdAt;
+    const turns = await db.update(schema.autoSaleTurns).set({ processedAt: null })
+      .where(and(eq(schema.autoSaleTurns.dealId, deal.id), eq(schema.autoSaleTurns.tenantId, context.tenantId), eq(schema.autoSaleTurns.direction, "in"), gte(schema.autoSaleTurns.createdAt, since)))
+      .returning({ id: schema.autoSaleTurns.id });
+    reopened = turns.length;
+    await db.update(schema.autoSaleOutbox).set({ status: "cancelled", holdReason: "Gestor devolveu ao agente", updatedAt: now })
+      .where(and(eq(schema.autoSaleOutbox.dealId, deal.id), eq(schema.autoSaleOutbox.tenantId, context.tenantId), inArray(schema.autoSaleOutbox.status, ["draft", "held"]), eq(schema.autoSaleOutbox.body, HOLD_MESSAGE)));
+  }
+  await db.update(schema.autoSaleDeals).set({
+    status: paused ? "paused" : "active",
+    replyDueAt: paused ? null : reopened ? now : deal.replyDueAt,
+    managerCallReason: paused ? deal.managerCallReason : null,
+    misunderstoodCount: paused ? deal.misunderstoodCount : 0,
+    stage: !paused && deal.stage === "manager_called" ? (deal.firstQuoteAt ? "objections" : "confirming") : deal.stage,
+    updatedAt: now,
+  }).where(and(eq(schema.autoSaleDeals.id, deal.id), eq(schema.autoSaleDeals.tenantId, context.tenantId)));
+  await audit(context.userId, deal.id, paused ? "auto_sale.paused" : "auto_sale.resumed", { leadId: deal.leadId, reopenedTurns: reopened });
 }
 
 export async function setDealMode(context: TenantContext, dealId: string, mode: AutoSaleMode) {
   const deal = await loadDealForManager(context, dealId);
   if (mode === "autopilot" && !(await readAutoSaleFlags(context.tenantId)).autopilot) throw new AutoSaleError("O Autopiloto ainda não foi liberado.");
-  await getDatabase().update(schema.autoSaleDeals).set({ mode, updatedAt: new Date() }).where(and(eq(schema.autoSaleDeals.id, deal.id), eq(schema.autoSaleDeals.tenantId, context.tenantId)));
-  await audit(context.userId, deal.id, "auto_sale.mode_changed", { from: deal.mode, to: mode });
+  const db = getDatabase();
+  const now = new Date();
+  await db.update(schema.autoSaleDeals).set({ mode, updatedAt: now }).where(and(eq(schema.autoSaleDeals.id, deal.id), eq(schema.autoSaleDeals.tenantId, context.tenantId)));
+  // Autopiloto não espera você (12/11): o que estava em "Para aprovar" passa a sair, como aprovado por quem trocou o modo.
+  const approved = mode === "autopilot"
+    ? await db.update(schema.autoSaleOutbox).set({ status: "approved", approvedBy: context.userId, approvedAt: now, scheduledAt: now, updatedAt: now })
+      .where(and(eq(schema.autoSaleOutbox.dealId, deal.id), eq(schema.autoSaleOutbox.tenantId, context.tenantId), eq(schema.autoSaleOutbox.status, "draft"))).returning({ id: schema.autoSaleOutbox.id })
+    : [];
+  await audit(context.userId, deal.id, "auto_sale.mode_changed", { from: deal.mode, to: mode, approvedDrafts: approved.length });
 }
 
 type RestoreState = { distributionStatus?: string | null; conversationId?: string | null; automationState?: string | null };
