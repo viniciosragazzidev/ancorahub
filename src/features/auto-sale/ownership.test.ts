@@ -49,4 +49,18 @@ describe("o agente nunca passa o lead a um corretor", () => {
     expect(body).toContain("recipientId: deal.chosenBy");
     expect(body).not.toMatch(/corretorId|brokerId/);
   });
+
+  it("na qualificação, a venda pega o lead quente antes da despedida que promete um corretor", () => {
+    const machine = readFileSync(join(process.cwd(), "src/features/ai-agent/conversation-state-machine.ts"), "utf8");
+    const turn = machine.slice(machine.indexOf("async function completeDeterministicQualificationTurn"));
+    const capture = turn.indexOf("tryCaptureHotLead(input.tenantId, input.leadId)");
+    expect(capture).toBeGreaterThan(0);
+    expect(capture).toBeLessThan(turn.indexOf("ai_msg_qualification_"));
+    expect(capture).toBeLessThan(turn.indexOf("= await distributeQualifiedLead("));
+  });
+
+  it("continuar atendimento não muda o dono do lead", () => {
+    expect(read("continue.ts")).not.toMatch(OWNER_CHANGERS);
+    expect(read("continue.ts")).toContain("loadDealForManager(context, dealId)");
+  });
 });

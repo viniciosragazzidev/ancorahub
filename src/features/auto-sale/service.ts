@@ -321,7 +321,7 @@ export async function callManager(deal: DealRow, reason: ManagerCallReason) {
   await recordTurn(deal, { direction: "system", kind: "manager_called", body: MANAGER_CALL_REASONS[reason], decision: { reason } });
 }
 
-async function loadDealForManager(context: TenantContext, dealId: string) {
+export async function loadDealForManager(context: TenantContext, dealId: string) {
   assertManager(context);
   const deal = await getDeal(context.tenantId, dealId);
   if (!deal) throw new AutoSaleError("Negociação não encontrada.");

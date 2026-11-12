@@ -72,13 +72,13 @@ async function sendMedia(row: OutboxRow, deal: { tenantId: string; leadId: strin
  * Despacha o outbox aprovado (§9): horário de envio, limites por hora e dia, janela de 24 h da Meta
  * conferida por canal na hora do envio, número WAHA conectado. O que não pode sair fica `held` com o motivo.
  */
-export async function dispatchAutoSaleOutbox(now = new Date(), limit = 20) {
+export async function dispatchAutoSaleOutbox(now = new Date(), limit = 20, onlyDealId?: string) {
   const db = getDatabase();
   const candidates = await db.select({ row: schema.autoSaleOutbox, deal: schema.autoSaleDeals, phone: schema.leads.telefone })
     .from(schema.autoSaleOutbox)
     .innerJoin(schema.autoSaleDeals, eq(schema.autoSaleDeals.id, schema.autoSaleOutbox.dealId))
     .innerJoin(schema.leads, eq(schema.leads.id, schema.autoSaleDeals.leadId))
-    .where(and(eq(schema.autoSaleOutbox.status, "approved"), or(isNull(schema.autoSaleOutbox.scheduledAt), lte(schema.autoSaleOutbox.scheduledAt, now)), inArray(schema.autoSaleDeals.status, [...OPEN_DEAL_STATUSES])))
+    .where(and(eq(schema.autoSaleOutbox.status, "approved"), or(isNull(schema.autoSaleOutbox.scheduledAt), lte(schema.autoSaleOutbox.scheduledAt, now)), inArray(schema.autoSaleDeals.status, [...OPEN_DEAL_STATUSES]), onlyDealId ? eq(schema.autoSaleDeals.id, onlyDealId) : undefined))
     .orderBy(asc(schema.autoSaleOutbox.createdAt)).limit(limit);
   const result = { sent: 0, held: 0, failed: 0, deferred: 0 };
   const flagCache = new Map<string, Awaited<ReturnType<typeof readAutoSaleFlags>>>();

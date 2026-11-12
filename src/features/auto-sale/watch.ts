@@ -72,6 +72,11 @@ export async function tryCaptureHotLead(tenantId: string, leadId: string): Promi
     const mode = watch.mode === "autopilot" && !flags.autopilot ? "copilot" : watch.mode;
     const { dealId } = await startDeal(context, { leadId, channel: "meta", wahaNumberId: null, mode });
     await audit(watch.userId, dealId, "auto_sale.watch_captured", { leadId, mode });
+    // Autopiloto: a abertura sai já, sem esperar a próxima rodada do robô (a conversa não fica muda).
+    if (mode === "autopilot") {
+      const { dispatchAutoSaleOutbox } = await import("./dispatch");
+      await dispatchAutoSaleOutbox(new Date(Date.now() + 10_000), 10, dealId).catch((error) => console.warn("[auto-sale] watch_opening_dispatch_failed", { dealId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" }));
+    }
     const [lead] = await getDatabase().select({ nome: schema.leads.nome }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId))).limit(1);
     await getDatabase().insert(schema.notifications).values({
       id: randomUUID(), tenantId, recipientUserId: watch.userId, leadId, type: "auto_sale_notice",

@@ -19,7 +19,7 @@ export type DealListRow = {
 
 export type AutoSaleOverview =
   | { state: "migration_pending" }
-  | { state: "ready"; deals: DealListRow[]; openDealId: string | null; autopilotAllowed: boolean; globalEnabled: boolean; catalogReady: boolean; watchingSince: string | null; summary: { total: number; documentsRequested: number; managerCalls: number } };
+  | { state: "ready"; deals: DealListRow[]; openDealId: string | null; autopilotAllowed: boolean; globalEnabled: boolean; catalogReady: boolean; watchingSince: string | null; robot: { health: "ok" | "atrasado" | "desconhecido"; lastRunAt: string | null }; summary: { total: number; documentsRequested: number; managerCalls: number } };
 
 async function aiCostByLead(tenantId: string, leadIds: string[], since: Date) {
   if (!leadIds.length) return new Map<string, number>();
@@ -46,6 +46,9 @@ export async function getAutoSaleOverview(context: TenantContext): Promise<AutoS
     const watch = await readAutoSaleWatch(context.tenantId);
     const { loadPilotForTenant } = await import("@/features/global-catalog/pilot/server");
     const catalogReady = Boolean(await loadPilotForTenant(context.tenantId).catch(() => null));
+    const { readJobHeartbeats } = await import("@/features/live-status/heartbeat");
+    const { jobHealth } = await import("@/features/live-status/heartbeat-format");
+    const heartbeat = (await readJobHeartbeats().catch(() => new Map())).get("auto-sale") ?? null;
     const openDeal = rows.find((row) => (OPEN_DEAL_STATUSES as readonly string[]).includes(row.deal.status));
     return {
       state: "ready",
@@ -60,6 +63,7 @@ export async function getAutoSaleOverview(context: TenantContext): Promise<AutoS
       globalEnabled: flags.global,
       catalogReady,
       watchingSince: watch?.since ?? null,
+      robot: { health: jobHealth("auto-sale", heartbeat, new Date()), lastRunAt: heartbeat?.finishedAt ?? null },
       summary: {
         total: rows.length,
         documentsRequested: rows.filter((row) => row.deal.documentsRequestedAt).length,
