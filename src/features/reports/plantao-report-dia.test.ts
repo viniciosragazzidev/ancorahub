@@ -3,69 +3,85 @@ import {
   buildPlantaoReportText,
   calculatePlantaoMetrics,
   DEFAULT_PLANTAO_REPORT_CONFIG,
-  plantaoReportTitleDay,
+  plantaoReportTitle,
   plantaoReportWindow,
+  plantaoSendsOn,
   type PlantaoQueueRow,
 } from "./plantao-report-core";
 
-// São Paulo é UTC-3 o ano todo. Envio às 08h SP = 11h UTC.
-const envio = (dia: string) => new Date(`${dia}T11:00:00Z`);
+// Envio às 19h SP = 22h UTC. São Paulo é UTC-3 o ano todo.
+const envio = (dia: string) => new Date(`${dia}T22:00:00Z`);
 
-describe("dia relatado: dia anterior de calendário (00h-23h59 SP)", () => {
-  it("terça 08h relata a segunda inteira", () => {
-    const w = plantaoReportWindow(envio("2026-11-10")); // ter 08h → relata seg 09/11
-    expect(w.reportedDayKey).toBe("2026-11-09");
-    expect(w.since.toISOString()).toBe("2026-11-09T03:00:00.000Z");
-    expect(w.until.toISOString()).toBe("2026-11-10T03:00:00.000Z");
+describe("janela: ontem 19h → hoje 19h (igual à tela de Qualidade), enviada às 19h", () => {
+  it("terça 10/11 19h cobre seg 09/11 19h → ter 10/11 19h", () => {
+    const w = plantaoReportWindow(envio("2026-11-10"));
+    expect(w.reportedDayKey).toBe("2026-11-10");
+    expect(w.since.toISOString()).toBe("2026-11-09T22:00:00.000Z");
+    expect(w.until.toISOString()).toBe("2026-11-10T22:00:00.000Z");
   });
 
-  it("segunda 08h relata o domingo (fim de semana também é relatado)", () => {
-    expect(plantaoReportWindow(envio("2026-11-16")).reportedDayKey).toBe("2026-11-15");
+  it("segunda 16/11 19h cobre sexta 13/11 19h → segunda 16/11 19h (fim de semana entra na janela da segunda)", () => {
+    const w = plantaoReportWindow(envio("2026-11-16"));
+    expect(w.since.toISOString()).toBe("2026-11-13T22:00:00.000Z");
+    expect(w.until.toISOString()).toBe("2026-11-16T22:00:00.000Z");
   });
 
-  it("sábado 08h relata sexta, e domingo 08h relata sábado", () => {
-    expect(plantaoReportWindow(envio("2026-11-14")).reportedDayKey).toBe("2026-11-13");
-    expect(plantaoReportWindow(envio("2026-11-15")).reportedDayKey).toBe("2026-11-14");
+  it("janelas consecutivas não se sobrepõem nem deixam buraco", () => {
+    const terca = plantaoReportWindow(envio("2026-11-10"));
+    const quarta = plantaoReportWindow(envio("2026-11-11"));
+    expect(quarta.since.getTime()).toBe(terca.until.getTime());
   });
 
-  it("título com a data do dia relatado", () => {
-    expect(plantaoReportTitleDay("2026-11-10")).toBe("terça, 10/11");
-    expect(plantaoReportTitleDay("2026-11-15")).toBe("domingo, 15/11");
+  it("sábado e domingo não são enviados; de segunda a sexta sim", () => {
+    expect(plantaoSendsOn(envio("2026-11-14"))).toBe(false); // sábado
+    expect(plantaoSendsOn(envio("2026-11-15"))).toBe(false); // domingo
+    expect(plantaoSendsOn(envio("2026-11-16"))).toBe(true); // segunda
+    expect(plantaoSendsOn(envio("2026-11-13"))).toBe(true); // sexta
   });
 });
 
-// Filas de entrada do dia (00-24, calendário), iguais à tela de Qualidade em produção.
+describe("título com o período coberto", () => {
+  it("Resultado do plantão · 12/11 (11/11 19h → 12/11 19h)", () => {
+    expect(plantaoReportTitle("2026-11-12")).toBe("Resultado do plantão · 12/11 (11/11 19h → 12/11 19h)");
+  });
+
+  it("segunda: Resultado do plantão · 16/11 (13/11 19h → 16/11 19h)", () => {
+    expect(plantaoReportTitle("2026-11-16")).toBe("Resultado do plantão · 16/11 (13/11 19h → 16/11 19h)");
+  });
+});
+
+// Números por fila de entrada, 19h→19h, iguais à tela de Qualidade em produção.
 const dia10 = (): PlantaoQueueRow[] => [
-  { queueName: "FILA TATIANA", kind: "whatsapp", count: 124 },
-  { queueName: "FILA PF - RENAN", kind: "form", count: 49 },
-  { queueName: "FILA PME - RENAN", kind: "form", count: 27 },
-  { queueName: "Whatsapp Renan", kind: "whatsapp", count: 27 },
+  { queueName: "FILA TATIANA", kind: "whatsapp", count: 125 },
+  { queueName: "FILA PF - RENAN", kind: "form", count: 56 },
+  { queueName: "FILA PME - RENAN", kind: "form", count: 30 },
+  { queueName: "Whatsapp Renan", kind: "whatsapp", count: 24 },
   { queueName: "Venâncio Leads", kind: "form", count: 8 },
-  { queueName: "Alessandra Leads", kind: "whatsapp", count: 4 },
+  { queueName: "Alessandra Leads", kind: "whatsapp", count: 3 },
 ];
 
-describe("linhas do relatório por fila de entrada (10/11 = tela de Qualidade)", () => {
-  it("10/11: Tatiana 124, Interno 103 (49+27+27), Outras 12, Total 239", () => {
+describe("linhas por fila de entrada, iguais à tela de Qualidade", () => {
+  it("10/11: Tatiana 125, Interno 110 (56+30+24), Outras 11, Total 246", () => {
     const m = calculatePlantaoMetrics(dia10(), [], DEFAULT_PLANTAO_REPORT_CONFIG);
-    expect(m.generated.total).toBe(239);
-    expect(m.external.total).toBe(124);
-    expect(m.internal.total).toBe(103);
-    expect(m.internal.queues.map((q) => q.count)).toEqual([49, 27, 27]);
-    expect(m.others.total).toBe(12);
+    expect(m.generated.total).toBe(246);
+    expect(m.external.total).toBe(125);
+    expect(m.internal.total).toBe(110);
+    expect(m.internal.queues.map((q) => q.count)).toEqual([56, 30, 24]);
+    expect(m.others.total).toBe(11);
     expect(m.external.total + m.internal.total + m.others.total).toBe(m.generated.total);
   });
 
-  it("11/11 (00-24): Tatiana 103, Interno 139 (89+47+3), Outras 9, Total 251", () => {
+  it("11/11: Tatiana 105, Interno 113 (71+34+8), Outras 9, Total 227", () => {
     const rows: PlantaoQueueRow[] = [
-      { queueName: "FILA TATIANA", kind: "whatsapp", count: 103 },
-      { queueName: "FILA PF - RENAN", kind: "form", count: 89 },
-      { queueName: "FILA PME - RENAN", kind: "form", count: 47 },
-      { queueName: "Whatsapp Renan", kind: "whatsapp", count: 3 },
+      { queueName: "FILA TATIANA", kind: "whatsapp", count: 105 },
+      { queueName: "FILA PF - RENAN", kind: "form", count: 71 },
+      { queueName: "FILA PME - RENAN", kind: "form", count: 34 },
+      { queueName: "Whatsapp Renan", kind: "whatsapp", count: 8 },
       { queueName: "Venâncio Leads", kind: "form", count: 5 },
       { queueName: "Alessandra Leads", kind: "whatsapp", count: 4 },
     ];
     const m = calculatePlantaoMetrics(rows, [], DEFAULT_PLANTAO_REPORT_CONFIG);
-    expect([m.external.total, m.internal.total, m.others.total, m.generated.total]).toEqual([103, 139, 9, 251]);
+    expect([m.external.total, m.internal.total, m.others.total, m.generated.total]).toEqual([105, 113, 9, 227]);
   });
 
   it("detalhe WhatsApp/RD da Tatiana só aparece se somar o total da fila", () => {
@@ -81,13 +97,13 @@ describe("linhas do relatório por fila de entrada (10/11 = tela de Qualidade)",
     expect(naoSoma.external.details).toBeNull();
   });
 
-  it("o texto mostra título, período, total, filas e outras filas", () => {
+  it("o texto traz o título com o período, o total, as filas e as outras filas", () => {
     const m = calculatePlantaoMetrics(dia10(), [], DEFAULT_PLANTAO_REPORT_CONFIG);
-    const text = buildPlantaoReportText(m, envio("2026-11-11")); // envio de 11/11 relata 10/11
-    expect(text).toContain("📊 *Resultado de terça, 10/11* · 00h às 23h59 de 10/11");
-    expect(text).toContain("*Total gerado* · 239 leads");
-    expect(text).toContain("*EXTERNO* · 124 leads");
-    expect(text).toContain("*INTERNO* · 103 leads");
-    expect(text).toContain("*Outras filas* · 12 leads");
+    const text = buildPlantaoReportText(m, envio("2026-11-10"));
+    expect(text).toContain("*Resultado do plantão · 10/11 (09/11 19h → 10/11 19h)*");
+    expect(text).toContain("*Total gerado* · 246 leads");
+    expect(text).toContain("*EXTERNO* · 125 leads");
+    expect(text).toContain("*INTERNO* · 110 leads");
+    expect(text).toContain("*Outras filas* · 11 leads");
   });
 });

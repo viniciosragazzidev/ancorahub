@@ -25,7 +25,7 @@ export const JOB_SCHEDULE = {
   "customer-waiting": { path: "/api/internal/jobs/customer-waiting", cron: "*/5 * * * *", label: "Cliente aguardando o corretor" },
   "auto-sale": { path: "/api/internal/jobs/auto-sale", cron: "* * * * *", label: "Venda Automatizada" },
   "stale-stages": { path: "/api/internal/jobs/stale-stages", cron: "0 12 * * *", label: "Regra de chat parado" },
-  "daily-report": { path: "/api/internal/jobs/daily-report", cron: "0 11 * * *", label: "Relatório das 8h" },
+  "daily-report": { path: "/api/internal/jobs/daily-report", cron: "0 21 * * *", label: "Relatório das 18h" },
   "plantao-report": { path: "/api/internal/jobs/plantao-report", cron: "0 22 * * *", label: "Resultado do plantão" },
   // 02:55 UTC = 23:55 em São Paulo: a foto sai com o dia de SP que está terminando.
   // Auto-reparo WhatsApp (flags desligadas por padrão). Horário em UTC; o aviso de véspera confere a hora de São Paulo.

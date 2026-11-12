@@ -11,7 +11,9 @@ import { getDatabase } from "@/shared/db";
 import { loadPlantaoReport, runPlantaoReportJob } from "./plantao-report";
 
 import {
-  DAILY_LEADS_REPORT_HOUR,  DAILY_LEADS_REPORT_NOTICE_KEY,
+  DAILY_LEADS_REPORT_HOUR,
+  DAILY_LEADS_REPORT_NOTICE_KEY,
+  isSaoPauloWeekend,
   DAILY_LEADS_REPORT_PURPOSE,
   dailyLeadsReportKey,
   saoPauloDayKey,
@@ -74,10 +76,11 @@ export async function sendDailyLeadsReport(tenantId: string, now = new Date()) {
   return { tenantId, sent, reason: "ok" as const };
 }
 
-/** Job das 08h (Coolify, 11:00 UTC): todas as empresas com o aviso ligado. Antes das 08h de SP não envia. Relata o dia anterior. */
+/** Job das 19h (cron existente): todas as empresas com o aviso ligado. Antes das 19h de SP não envia. */
 export async function runDailyLeadsReportJob(now = new Date()) {
-  if (saoPauloHour(now) < DAILY_LEADS_REPORT_HOUR) return { skipped: true as const, reason: "before_8h" };
-  // Todo dia é relatado uma vez, inclusive sábado e domingo (Vinicios, mudança final: 08h, dia anterior).
+  if (saoPauloHour(now) < DAILY_LEADS_REPORT_HOUR) return { skipped: true as const, reason: "before_19h" };
+  // Sábado e domingo não têm relatório (Vinicios): o job pula esses dias.
+  if (isSaoPauloWeekend(now)) return { skipped: true as const, reason: "weekend" };
   const tenants = rowsOf<{ id: string }>(await getDatabase().execute(sql`select id from tenants`));
   const results = [];
   for (const tenant of tenants) {

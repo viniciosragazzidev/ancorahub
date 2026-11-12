@@ -18,6 +18,7 @@ import {
   plantaoReportWindow,
   type PlantaoOfferRow,
   PLANTAO_REPORT_HOUR,
+  plantaoSendsOn,
   type PlantaoQueueRow,
 } from "./plantao-report-core";
 import { deliverPlantaoReport } from "./plantao-report-delivery";
@@ -285,7 +286,8 @@ export async function sendPlantaoReportForTenant(tenantId: string, options: { no
 export async function runPlantaoReportJob(now = new Date()) {
   if (await getFeatureFlag(FEATURE_FLAGS.PLANTAO_REPORT) !== "true") return { skipped: true as const, reason: "feature_disabled" };
   // Sábado e domingo não tem relatório (Vinicios, 10/11). O "Enviar agora" da tela continua funcionando.
-  // Todo dia é relatado uma vez, inclusive sábado e domingo (o relatório de cada um sai no dia seguinte, 08h).
+  // Sábado e domingo não têm relatório (Vinicios): sem envio nesses dias.
+  if (!plantaoSendsOn(now)) return { skipped: true as const, reason: "weekend" };
   const tenants = await getDatabase().select({ id: schema.tenants.id }).from(schema.tenants).where(eq(schema.tenants.status, "active"));
   const results = [];
   for (const tenant of tenants) {

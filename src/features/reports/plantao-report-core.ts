@@ -1,6 +1,6 @@
 
 
-export const PLANTAO_REPORT_HOUR = 8;
+export const PLANTAO_REPORT_HOUR = 19;
 export const PLANTAO_REPORT_GROUP_DEFAULT = "Fechamento Plantão Geral";
 export const PLANTAO_REPORT_WAHA_NUMBER_ID = "003a8720-68a0-4b58-88a2-06cb35470f2d";
 
@@ -233,32 +233,48 @@ export function calculatePlantaoMetrics(rows: readonly PlantaoQueueRow[], offers
 }
 
 const PLANTAO_DAY_MS = 24 * 60 * 60 * 1000;
+/** Dia de operação: vai de 19h a 19h (SP), igual à tela de Qualidade. */
+export const PLANTAO_WINDOW_CUT_HOUR = 19;
 
-function previousDayKey(key: string) {
+function shiftDayKey(key: string, days: number) {
   const [year, month, day] = key.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day - 1)).toISOString().slice(0, 10);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+/** 19h de uma data (SP) como instante UTC. São Paulo não tem horário de verão: UTC-3 o ano todo. */
+function cutAt(key: string) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, PLANTAO_WINDOW_CUT_HOUR + 3));
+}
+
+function weekdayIndex(key: string) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay();
 }
 
 /**
- * Dia relatado: o DIA ANTERIOR de calendário (00:00 a 23:59, São Paulo). O envio é às 08:00 do dia seguinte,
- * então cada dia é relatado uma vez, inclusive sábado e domingo (sábado relata sexta, domingo relata sábado,
- * segunda relata domingo). Mesma janela e mesma fila de entrada da tela de Qualidade (calendário).
+ * Janela do relatório enviado hoje às 19h: do último 19h anterior até 19h de hoje.
+ * Terça a sexta: ontem 19h → hoje 19h. Segunda: sexta 19h → segunda 19h (sábado e domingo não são enviados).
  */
 export function plantaoReportWindow(now: Date): { since: Date; until: Date; reportedDayKey: string } {
-  const reportedDayKey = previousDayKey(plantaoReportDayKey(now));
-  const [year, month, day] = reportedDayKey.split("-").map(Number);
-  // São Paulo não tem horário de verão: 00:00 local é 03:00 UTC o ano todo.
-  const since = new Date(Date.UTC(year, month - 1, day, 3));
-  return { since, until: new Date(since.getTime() + PLANTAO_DAY_MS), reportedDayKey };
+  const reportedDayKey = plantaoReportDayKey(now);
+  const startsDaysBack = weekdayIndex(reportedDayKey) === 1 ? 3 : 1;
+  const until = cutAt(reportedDayKey);
+  return { since: cutAt(shiftDayKey(reportedDayKey, -startsDaysBack)), until, reportedDayKey };
 }
 
-const WEEKDAY_PT = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+/** Sábado e domingo não têm relatório: o envio é pulado nesses dias. */
+export function plantaoSendsOn(now: Date) {
+  const day = weekdayIndex(plantaoReportDayKey(now));
+  return day !== 0 && day !== 6;
+}
 
-/** "terça, 10/11" para o título do relatório do dia relatado. */
-export function plantaoReportTitleDay(reportedDayKey: string) {
-  const [year, month, day] = reportedDayKey.split("-").map(Number);
-  const weekday = WEEKDAY_PT[new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay()];
-  return `${weekday}, ${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}`;
+/** "Resultado do plantão · 12/11 (11/11 19h → 12/11 19h)": título com o período coberto. */
+export function plantaoReportTitle(reportedDayKey: string) {
+  const window = plantaoReportWindow(new Date(`${reportedDayKey}T12:00:00-03:00`));
+  const [, sinceMonth, sinceDay] = plantaoReportDayKey(window.since).split("-");
+  const [, month, day] = reportedDayKey.split("-");
+  return `Resultado do plantão · ${day}/${month} (${sinceDay}/${sinceMonth} 19h → ${day}/${month} 19h)`;
 }
 
 function whole(value: number) {
@@ -288,9 +304,8 @@ function shortQueueName(name: string) {
 
 export function buildPlantaoReportText(metrics: PlantaoReportMetrics, now: Date) {
   const reported = plantaoReportWindow(now).reportedDayKey;
-  const [, month, day] = reported.split("-");
   const lines = [
-    `📊 *Resultado de ${plantaoReportTitleDay(reported)}* · 00h às 23h59 de ${day}/${month}`,
+    `📊 *${plantaoReportTitle(reported)}*`,
     "",
     `*Total gerado* · ${whole(metrics.generated.total)} leads`,
     `*EXTERNO* · ${whole(metrics.external.total)} leads`,
