@@ -17,3 +17,18 @@ export function canManagementRegisterSale(input: {
   if (role === "director") return true;
   return role === "manager" && Boolean(branchId) && lead.branchId === branchId;
 }
+
+/**
+ * A titular may be initialized by the owner or by management inside the
+ * authenticated lead scope. Scope is resolved separately on the server query.
+ */
+export function canEnsureLeadHolder(input: {
+  role: string;
+  userId: string;
+  lead: { corretorId: string | null };
+  isInScope: boolean;
+}) {
+  if (!input.isInScope) return false;
+  if (input.role === "broker") return input.lead.corretorId === input.userId;
+  return input.role === "director" || input.role === "manager" || input.role === "supervisor";
+}

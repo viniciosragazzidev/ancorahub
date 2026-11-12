@@ -20,6 +20,10 @@ import { enqueueMetaConversionEvent } from "@/features/meta-ads/meta-conversion-
 import { aiSaleRegistrationPending } from "@/features/conversation-intelligence/sale-detection-core";
 import { isValidCpf } from "@/features/leads/sale-details-core";
 import { deriveAgeFromBirthDate, leadIdentityFromSources, saleRegistrationBlockedReason } from "./sale-registration-v2-core";
+import { resolveAccessContext } from "@/shared/auth/access-context";
+import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
+import { canEnsureLeadHolder } from "./register-sale-access";
+import { hasEffectiveRouteAccess } from "@/features/custom-roles/service";
 
 const registerSaleInput = z.object({
   leadId: z.string().min(1),
@@ -105,16 +109,26 @@ export async function addLeadBeneficiaryAction(rawInput: z.input<typeof benefici
 
 /** Creates the titular once from the lead identity when the v2 registration flow opens. */
 export async function ensureLeadHolderAction(leadId: string) {
-  const { context, db, lead } = await assertLeadScope(leadId);
+  const context = await getRequiredTenantContext();
+  const db = getDatabase();
+  const access = await resolveAccessContext(context);
+  const leadsRouteAllowed = await hasEffectiveRouteAccess({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null, routeKey: "leads" });
+  if (!leadsRouteAllowed) return { error: "Seu perfil não pode acessar a área de leads." };
+  if (context.role === "supervisor" && !access.scope.teamScoped) return { error: "Este supervisor não tem uma equipe ativa no escopo." };
+  if (!access.permissions.has("acessar_leads")) return { error: "Seu perfil não pode acessar leads." };
+  const scopeWhere = buildLeadScopeWhere(access);
+  const [lead] = await db.select({ id: schema.leads.id, tenantId: schema.leads.tenantId, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, planId: schema.leads.planId, nome: schema.leads.nome, telefone: schema.leads.telefone, email: schema.leads.email, status: schema.leads.status, qualificationDetails: schema.leads.qualificationDetails, formData: schema.leads.formData }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), scopeWhere)).limit(1);
+  if (!lead) return { error: "Este lead não está no seu escopo." };
+  if (!canEnsureLeadHolder({ role: context.role, userId: context.userId, lead, isInScope: true })) return { error: "Seu perfil não pode iniciar o registro deste lead." };
   const v2Enabled = (await getSystemSetting(FEATURE_FLAGS.BROKER_SALE_REGISTRATION_V2.key).catch(() => null)) === "true";
   if (!v2Enabled) return { error: "O novo registro de venda está desativado." };
-  if (context.role !== "broker" || lead.corretorId !== context.userId) return { error: "Só o corretor responsável pode iniciar este registro." };
+  if (context.role !== "supervisor" && !access.permissions.has("alterar_status_lead")) return { error: "Seu perfil não pode iniciar o registro deste lead." };
   if (lead.status === "lost") return { error: "Este lead está perdido. Reabra o lead antes de registrar a venda." };
   if (lead.status === "converted" && !aiSaleRegistrationPending(lead.status, lead.qualificationDetails)) return { error: "A venda deste lead já foi registrada." };
 
   return db.transaction(async (tx) => {
     const [lockedLead] = await tx.select({ id: schema.leads.id, nome: schema.leads.nome, qualificationDetails: schema.leads.qualificationDetails, formData: schema.leads.formData }).from(schema.leads)
-      .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt))).limit(1).for("update");
+      .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), scopeWhere)).limit(1).for("update");
     if (!lockedLead) return { error: "Lead não encontrado." };
     const [holder] = await tx.select({ id: schema.leadBeneficiaries.id, name: schema.leadBeneficiaries.name, birthDate: schema.leadBeneficiaries.birthDate, age: schema.leadBeneficiaries.age, cpf: schema.leadBeneficiaries.cpf }).from(schema.leadBeneficiaries).where(and(
       eq(schema.leadBeneficiaries.tenantId, context.tenantId), eq(schema.leadBeneficiaries.leadId, lead.id), eq(schema.leadBeneficiaries.isHolder, true),

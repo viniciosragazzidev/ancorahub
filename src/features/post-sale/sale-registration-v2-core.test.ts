@@ -19,23 +19,31 @@ describe("sale registration v2 rollout and eligibility", () => {
 });
 
 describe("identity details used for the sale holder", () => {
-  it("reads Brazilian birth date, age and CPF from form data and qualification", () => {
+  it("reads titular birth date, age and CPF from direct form fields", () => {
     expect(leadIdentityFromSources({
       formData: { dataNascimento: "14/03/1988", cpf: "529.982.247-25" },
       qualificationDetails: { idade: 38 },
     }, new Date("2026-11-12T12:00:00Z"))).toEqual({ birthDate: "1988-03-14", age: 38, cpf: "52998224725" });
   });
 
-  it("keeps age when no date was supplied and never invents an invalid date or CPF", () => {
-    expect(leadIdentityFromSources({ qualificationDetails: { idade: "42", cpf: "123" } })).toEqual({ birthDate: null, age: 42, cpf: null });
+  it("keeps direct form age when no date was supplied and never invents an invalid date or CPF", () => {
+    expect(leadIdentityFromSources({ formData: { idade: "42" }, qualificationDetails: { cpf: "529.982.247-25" } })).toEqual({ birthDate: null, age: 42, cpf: null });
     expect(leadIdentityFromSources({ formData: { nascimento: "31/02/1988" } }).birthDate).toBeNull();
   });
 
-  it("reads nested qualification and saved sale-analysis facts", () => {
+  it("never copies CPF or age from dependent or nested analysis data", () => {
     expect(leadIdentityFromSources({
-      formData: { cadastro: { cpfTitular: "529.982.247-25" } },
-      qualificationDetails: { saleDetails: { fields: [{ field: "holderAge", value: "42 anos" }] } },
-    })).toEqual({ birthDate: null, age: 42, cpf: "52998224725" });
+      formData: {
+        dependents: [{ cpf: "529.982.247-25", age: 42 }],
+        cadastro: { cpfTitular: "529.982.247-25", idade: 42 },
+      },
+      qualificationDetails: { saleDetails: { fields: [{ field: "holderAge", value: "42 anos" }, { field: "cpf", value: "529.982.247-25" }] } },
+    })).toEqual({ birthDate: null, age: null, cpf: null });
+  });
+
+  it("accepts explicitly named titular identity fields only at the form root", () => {
+    expect(leadIdentityFromSources({ formData: { cpfTitular: "529.982.247-25", holderAge: "42 anos" } }))
+      .toEqual({ birthDate: null, age: 42, cpf: "52998224725" });
   });
 
   it("derives age from a valid birth date", () => {

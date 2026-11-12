@@ -23,13 +23,13 @@ A tabela `lead_beneficiaries` atualmente obriga data de nascimento e não guarda
 - **Confirmação da operadora:** requisito continua anexado e aprovado em todos os registros, inclusive venda convertida pela IA. Decisão explícita de Vinicios em 2026-11-12; não altera regra de negócio.
 - **Compatibilidade e rollout:** adotada a recomendação de flag global auditada no Super-admin, desligada por padrão, com fluxo legado preservado. A decisão operacional do piloto fica **a confirmar**.
 - **Rascunho:** dados permanecem ao navegar entre os quatro passos; persistência após fechar/recarregar fica **a confirmar**.
-- **Identidade:** formulário/qualificação preenchem data, idade e CPF somente quando o valor for explícito e válido. Para pessoas sem data, idade avulsa é suficiente; a ficha não inventa nascimento.
+- **Identidade:** o titular recebe data, idade e CPF somente de chaves diretas do `formData`; objetos aninhados e `qualificationDetails` não são fontes de CPF/idade, para nunca copiar dados de dependentes. Para pessoas sem data, idade avulsa é suficiente; a ficha não inventa nascimento.
 
 ## Implementação
 
 - `RegisterSaleWizard` é apresentado apenas no Corretor Lite com a flag ativa e para o lead do corretor. Leads convertidos pela IA com registro pendente entram no mesmo fluxo; leads perdidos, já registrados e vendas ativas continuam bloqueados.
 - O passo Documentos lista requisitos pendentes/rejeitados, distingue aprovação pendente e aceita upload no próprio fluxo. A etapa do lead só avança para Documentação em leads ainda não convertidos; conversão da IA não é revertida.
-- O titular é criado ou completado idempotentemente ao abrir o fluxo, dentro de transação e com auditoria. Nome/contato vêm do lead; atributos pessoais vêm apenas de formulário/qualificação. CPF completo só é entregue à direção.
+- O titular é criado ou completado idempotentemente ao abrir o fluxo, dentro de transação e com auditoria. Nome/contato vêm do lead; atributos pessoais vêm apenas de chaves diretas do `formData`. CPF completo só é entregue à direção.
 - Beneficiários podem ser incluídos, editados e removidos na ficha. Quando a quantidade do cadastro ficar abaixo das vidas declaradas, o fluxo sugere quantas pessoas faltam sem criar dependentes automaticamente.
 - O wizard usa barra compacta de progresso e passos Pessoas, Plano, Documentos e Revisão. O Arc DatePicker em português abre como BottomSheet abaixo de 768 px, com padding lateral do sheet e título igual ao campo, e como popover ancorado em telas maiores. A data de nascimento aparece como dd/mm/aaaa; a vigência incompleta aparece somente como “A definir”. Os passos Pessoas e Documentos obrigatórios não têm cartões aninhados; a faixa da IA aparece somente em Pessoas. Cada requisito pendente tem ação Enviar/Corrigir que direciona o upload no próprio passo.
 - Mensagens de quantidade usam singular e plural explícitos, sem “(s)”. O fluxo não apresenta input nativo `date`.
@@ -50,6 +50,14 @@ A tabela `lead_beneficiaries` atualmente obriga data de nascimento e não guarda
 ## Papéis, segurança e auditoria
 
 Tenant, lead, corretor e unidade sempre vêm da sessão/consulta no servidor. Revalidar permissão, lead ativo e documento aprovado dentro da operação; mutações de beneficiários são escopadas e auditadas sem inserir CPF ou outros valores na auditoria. A trava do lead e a verificação da venda ativa permanecem no mesmo fluxo transacional.
+
+## Correções da revisão Vigia em 2026-11-12
+
+- Entrada `0228_lead_beneficiaries_identity_fields` registrada em `drizzle/meta/_journal.json`. O repositório não mantém snapshots novos para as migrations SQL recentes; não foi criado snapshot. Vinicios confirmou que a 0228 já foi aplicada em produção, sem operação de banco nesta tarefa.
+- `findIdentityValue` agora lê somente chaves titulares diretamente da raiz de `formData`; objetos aninhados e `qualificationDetails` não são fontes de CPF/idade, para nunca copiar dados de dependentes.
+- `ensureLeadHolderAction` verifica rota, permissão efetiva e escopo canônico do lead. Diretor, gestor da unidade/unidades e supervisor com equipe habilitada podem iniciar dentro do próprio escopo; corretor continua limitado aos próprios leads. O lead é revalidado no bloqueio transacional.
+- Teste transacional com mocks confirma reutilização do cliente existente em lead convertido pela IA, sem histórico de etapa, evento Meta `sale` ou push de conversão duplicados. O aviso curto idempotente da DEC-179 continua sendo o aviso de registro.
+- Verificação desta correção: Vitest focado, 3 arquivos/19 testes; `npx tsc --noEmit --pretty false`; ESLint focado; `npx next build --webpack` com sucesso e 139/139 páginas geradas. Avisos existentes: `unpdf` acessa `import.meta` e rotas dinâmicas registram uso de `headers` na coleta estática. Nenhum teste ou comando escreveu no banco.
 
 ## Estado
 

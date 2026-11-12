@@ -13,38 +13,15 @@ function normalizeKey(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function findIdentityValue(sources: LeadIdentitySources, keys: string[]) {
+function findIdentityValue(formData: unknown, keys: string[]) {
   const normalizedKeys = new Set(keys.map(normalizeKey));
-  const visit = (value: unknown, depth: number): string | null => {
-    if (depth > 4) return null;
-    if (Array.isArray(value)) {
-      for (const entry of value) {
-        const record = asRecord(entry);
-        if (typeof record.field === "string" && normalizedKeys.has(normalizeKey(record.field))) {
-          const candidate = record.value;
-          if (typeof candidate === "string" || typeof candidate === "number") return String(candidate).trim() || null;
-        }
-      }
-      return null;
+  // These keys are the titular's identity fields in the lead form. Do not walk
+  // nested objects or analysis fields: those can contain a dependent's CPF/age.
+  for (const [key, entry] of Object.entries(asRecord(formData))) {
+    if (normalizedKeys.has(normalizeKey(key)) && (typeof entry === "string" || typeof entry === "number")) {
+      const candidate = String(entry).trim();
+      if (candidate) return candidate;
     }
-    const source = asRecord(value);
-    for (const [key, entry] of Object.entries(source)) {
-      if (normalizedKeys.has(normalizeKey(key)) && (typeof entry === "string" || typeof entry === "number")) {
-        const candidate = String(entry).trim();
-        if (candidate) return candidate;
-      }
-    }
-    for (const entry of Object.values(source)) {
-      if (entry && typeof entry === "object") {
-        const nested = visit(entry, depth + 1);
-        if (nested) return nested;
-      }
-    }
-    return null;
-  };
-  for (const source of [sources.formData, sources.qualificationDetails]) {
-    const result = visit(source, 0);
-    if (result) return result;
   }
   return null;
 }
@@ -72,12 +49,12 @@ export function deriveAgeFromBirthDate(birthDate: string, now = new Date()): num
 }
 
 export function leadIdentityFromSources(sources: LeadIdentitySources, now = new Date()) {
-  const birthDate = parseIdentityBirthDate(findIdentityValue(sources, ["birthDate", "dataNascimento", "nascimento", "holderBirthDate"]));
-  const ageRaw = findIdentityValue(sources, ["age", "idade", "holderAge"]);
+  const birthDate = parseIdentityBirthDate(findIdentityValue(sources.formData, ["birthDate", "dataNascimento", "nascimento", "holderBirthDate"]));
+  const ageRaw = findIdentityValue(sources.formData, ["age", "idade", "holderAge"]);
   const parsedAgeText = ageRaw?.match(/\b(\d{1,3})\b/)?.[1] ?? null;
   const parsedAge = parsedAgeText ? Number(parsedAgeText) : null;
   const age = birthDate ? deriveAgeFromBirthDate(birthDate, now) : parsedAge !== null && parsedAge <= 120 ? parsedAge : null;
-  const cpfRaw = findIdentityValue(sources, ["cpf", "holderCpf", "titularCpf", "cpfTitular"]);
+  const cpfRaw = findIdentityValue(sources.formData, ["cpf", "holderCpf", "titularCpf", "cpfTitular"]);
   const cpfDigits = cpfRaw?.replace(/\D/g, "") ?? "";
   return {
     birthDate,
