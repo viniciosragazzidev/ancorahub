@@ -290,3 +290,8 @@ Limites conhecidos do piloto: WAHA não envia PDF nem imagem; Autopiloto não co
 - Depois da revisão em lote (1.666 planos), o agente passa a oferecer só planos conferidos (revisados, ou pendentes apenas de conferência de documento) quando houver algum no perfil e no orçamento, em qualquer modo. Os não conferidos entram só como último recurso, sempre marcados "em conferência" no PDF, na página e no painel (Copiloto e Simulação; o Autopiloto nunca usa).
 - Plano sem município de comercialização nunca é oferecido (a cidade do cliente é sempre conhecida ao cotar).
 - A cotação passou a olhar todas as páginas do `simulate` (antes só as 24 mais baratas), para achar o conferido mesmo que não esteja entre os mais baratos. Vale também para a "opção mais em conta".
+
+## "Pegar o próximo quente" (pedido do Vinicios, 12/11)
+
+- Botão principal da área: um clique escolhe o lead quente mais recente que ainda pode entrar (nenhum corretor aceitou; oferta pendente é cancelada na escolha, então o lead não vai mais para corretor) e já inicia a negociação em Copiloto pela Meta oficial, abrindo o painel. "Escolher lead" vira ação secundária. Mesmas travas da escolha manual; auditoria `auto_sale.next_hot_picked`.
+- Correção em produção: a regra `leads_distribution_removal_reason_check` (0168) só aceitava dois motivos e a escolha falhava; a 0228 agora troca a regra para aceitar `auto_sale`. Erro de regra ou tabela do banco passa a dizer que falta o SQL da 0228.
