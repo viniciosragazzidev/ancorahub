@@ -226,7 +226,7 @@ export function DealSheet({ dealId, onClose, autopilotAllowed, previewDetail }: 
                     ))}
                   </ol>
                 ) : <p className="text-sm text-muted-foreground">Ainda sem mensagens.</p>}
-                {detail.outbox.some((item) => item.status === "simulated") ? <p className="text-xs text-muted-foreground">Em Simulação, as mensagens da assistente aparecem em &ldquo;Enviadas e simuladas&rdquo; abaixo.</p> : null}
+                {detail.outbox.some((item) => item.status === "simulated") ? <p className="text-xs text-muted-foreground">Em Simulação, as mensagens da assistente aparecem aqui, mas não saem para o cliente.</p> : null}
               </Section>
 
               <Section title="Ofertas" description="Cada oferta é um retrato da cotação: os valores saem dele e do PDF, nunca da IA.">
@@ -265,9 +265,9 @@ export function DealSheet({ dealId, onClose, autopilotAllowed, previewDetail }: 
               </Section>
 
               <Section title="Enviadas e simuladas">
-                <ul className="grid gap-1 text-xs">
+                <ul className="grid min-w-0 grid-cols-1 gap-1 text-xs">
                   {detail.outbox.filter((item) => !["draft", "held"].includes(item.status)).slice(-30).map((item) => (
-                    <li key={item.id} className="flex justify-between gap-3">
+                    <li key={item.id} className="flex min-w-0 justify-between gap-3">
                       <span className="min-w-0 truncate">{KIND_LABEL[item.kind]}: {item.body || item.mediaFilename}</span>
                       <span className="shrink-0 text-muted-foreground">{OUTBOX_LABEL[item.status]}</span>
                     </li>

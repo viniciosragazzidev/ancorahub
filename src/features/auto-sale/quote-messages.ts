@@ -22,10 +22,9 @@ export function planLine(plan: OfferSnapshot["plans"][number], index: number) {
 
 export function openingMessages(input: { brokerageName: string; facts: DealFacts }) {
   const name = input.facts.firstName ? `, ${input.facts.firstName}` : "";
-  const known: string[] = [];
-  if (input.facts.ages?.length) known.push(livesLabel(input.facts.ages.length));
-  if (input.facts.city) known.push(`em ${input.facts.city}`);
-  const summary = known.length ? `Vi que você procura um plano de saúde para ${known.join(" ")}. Está certo?` : "Vi que você procura um plano de saúde. Posso te ajudar a escolher?";
+  const lives = input.facts.ages?.length ? ` para ${livesLabel(input.facts.ages.length)}` : "";
+  const city = input.facts.city ? ` em ${input.facts.city}` : "";
+  const summary = lives || city ? `Vi que você procura um plano de saúde${lives}${city}. Está certo?` : "Vi que você procura um plano de saúde. Posso te ajudar a escolher?";
   return [`Oi${name}! Aqui é a assistente virtual da ${input.brokerageName}.`, summary];
 }
 
