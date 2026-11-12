@@ -132,8 +132,8 @@ describe("entrada do cliente", () => {
 describe("ritmo e horário", () => {
   it("limita mensagens por hora e por dia", () => {
     const now = new Date("2026-11-12T15:00:00Z");
-    expect(withinRateLimits(Array.from({ length: 5 }, () => new Date(now.getTime() - 60_000)), now)).toBe(true);
-    expect(withinRateLimits(Array.from({ length: 6 }, () => new Date(now.getTime() - 60_000)), now)).toBe(false);
+    expect(withinRateLimits(Array.from({ length: 11 }, () => new Date(now.getTime() - 60_000)), now)).toBe(true);
+    expect(withinRateLimits(Array.from({ length: 12 }, () => new Date(now.getTime() - 60_000)), now)).toBe(false);
   });
   it("envia em dia útil das 8h às 21h de São Paulo; sábado não", () => {
     expect(isWithinSendWindow(new Date("2026-11-12T13:00:00Z"))).toBe(true); // quinta 10h

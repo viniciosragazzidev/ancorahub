@@ -260,3 +260,13 @@ Verificação:
 - Não verificado: fluxo real contra banco (migração não aplicada), envio real pela Meta e pelo WAHA, chamada real ao modelo e à transcrição.
 
 Limites conhecidos do piloto: WAHA não envia PDF nem imagem; Autopiloto não cota adesão, PME nem família (sempre `pending` no catálogo); promoção sem valor calculado; expurgo dos turnos (D15) fica para a próxima fase.
+
+## Link público da cotação (pedido do Vinicios, 12/11)
+
+- Cada oferta gera um token (24 bytes aleatórios; só o hash SHA-256 fica em `auto_sale_offers.public_token_hash`) e um link `/compartilhado/cotacao/<token>`, já liberado sem login pelo proxy (`/compartilhado`). Vale até o fim do último dia de validade da cotação (7 dias ou o fim da vigência do preço), é revogado no opt-out e para de abrir com a Venda Automatizada desligada na empresa ou o kill switch.
+- A página mostra o mesmo conteúdo do PDF, só do snapshot: opções lado a lado com o valor por idade, a recomendada e o motivo, a rede perto do cliente (gravada em `auto_sale_offers.network`), carências, promoção vigente, documentos e próximo passo. Um CTA primário: "Responder no WhatsApp" (número da corretora: o WAHA da negociação ou o canal oficial); o PDF é secundário (`/compartilhado/cotacao/<token>/pdf`). Dado pessoal mínimo: primeiro nome e idades; sem telefone, e-mail ou sobrenome. `noindex` e `no-store`.
+- Envio: com `quoteLink` ligado (padrão, editável no Super-admin), a cotação vai como texto mais a mensagem com o link, em qualquer canal, inclusive WAHA; imagens e PDF no chat só com `quoteLink` desligado. Isso resolve o limite do WAHA (só texto) e evita despejar mídia no chat.
+- O gestor vê no painel quantas vezes o cliente abriu o link, e a primeira abertura entra nas decisões ("Cliente abriu a cotação").
+- Limite por hora passou de 6 para 12: a cotação sozinha já são 4 ou 5 mensagens curtas, e 6 por hora retinha a própria cotação.
+- Migration: colunas novas na `0228_auto_sale.sql` (ainda não aplicada em lugar nenhum).
+- Verificação: `public-link.test.ts` (token, validade, revogação, mensagem sem valor, página sem contato do cliente, botão do WhatsApp); prévia `/dev/cotacao-publica-preview` no celular e no computador, sem erro de hidratação; token inválido cai no 404.

@@ -17,6 +17,8 @@ export const autoSaleSettingsSchema = z.object({
   audioMaxSeconds: z.number().int().min(30).max(600),
   /** Horas sem ação do gestor (pausada ou aguardando) antes de devolver o lead à distribuição. */
   idleManagerHours: z.number().int().min(4).max(168),
+  /** Cotação vai por link da página pública (com o PDF lá); desligado, vão imagens e o PDF no chat. */
+  quoteLink: z.boolean(),
 }).refine((value) => value.sendEndHour > value.sendStartHour, { message: "O fim do horário precisa ser depois do início.", path: ["sendEndHour"] });
 
 export type AutoSaleSettings = z.infer<typeof autoSaleSettingsSchema>;
@@ -30,6 +32,7 @@ export const DEFAULT_AUTO_SALE_SETTINGS: AutoSaleSettings = {
   audioPerDealPerDay: AUTO_SALE_LIMITS.audioPerDealPerDay,
   audioMaxSeconds: AUTO_SALE_LIMITS.audioMaxSeconds,
   idleManagerHours: 72,
+  quoteLink: true,
 };
 
 /** Valor salvo inválido ou ausente cai no padrão do plano (nunca trava o robô). */

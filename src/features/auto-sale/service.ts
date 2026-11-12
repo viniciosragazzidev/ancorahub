@@ -370,6 +370,9 @@ export async function endDealBySystem(deal: DealRow, reason: "opt_out" | "manage
       await db.update(schema.aiConversations).set({ optOutAt: new Date(), updatedAt: new Date() })
         .where(and(eq(schema.aiConversations.id, restore.conversationId), eq(schema.aiConversations.tenantId, deal.tenantId)));
     }
+    // Os links públicos da cotação deixam de abrir (LGPD: o cliente pediu para parar).
+    await db.update(schema.autoSaleOffers).set({ publicRevokedAt: new Date() })
+      .where(and(eq(schema.autoSaleOffers.dealId, deal.id), eq(schema.autoSaleOffers.tenantId, deal.tenantId), isNull(schema.autoSaleOffers.publicRevokedAt)));
     await db.update(schema.leads).set({ distributionRemovalNote: "Pediu para não receber mensagens (Venda Automatizada)", updatedAt: new Date() })
       .where(and(eq(schema.leads.id, deal.leadId), eq(schema.leads.tenantId, deal.tenantId)));
   }

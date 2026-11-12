@@ -60,6 +60,7 @@ export async function updateAutoSaleParamsAction(tenantId: string, formData: For
     burstWaitSeconds: number("burstWaitSeconds"), messagesPerHour: number("messagesPerHour"), messagesPerDay: number("messagesPerDay"),
     sendStartHour: number("sendStartHour"), sendEndHour: number("sendEndHour"), audioPerDealPerDay: number("audioPerDealPerDay"),
     audioMaxSeconds: number("audioMaxSeconds"), idleManagerHours: number("idleManagerHours"),
+    quoteLink: formData.get("quoteLink") === "on",
   });
   await setSystemSetting(autoSaleParamsSettingKey(targetTenantId), JSON.stringify(settings), new Date());
   await auditPlatform(admin.userId, targetTenantId, "auto_sale.params_updated", settings);

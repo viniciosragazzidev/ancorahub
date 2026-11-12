@@ -52,7 +52,7 @@ export function dealDetailFixture(): NonNullable<DealDetail> {
         { id: "p1", operator: "Assim", name: "Essencial", totalCents: 71980, state: "ready" },
         { id: "p2", operator: "Klini", name: "200", totalCents: 83960, state: "ready" },
         { id: "p3", operator: "Leve", name: "Top 400", totalCents: 95420, state: "pending" },
-      ], recommendedPlanId: "p2", reason: "Eu indicaria o Klini 200 porque não tem coparticipação e cabe no seu orçamento.", relaxed: null, hasPdf: true, at: iso(40) },
+      ], recommendedPlanId: "p2", reason: "Eu indicaria o Klini 200 porque não tem coparticipação e cabe no seu orçamento.", relaxed: null, hasPdf: true, linkViews: 2, at: iso(40) },
     ],
     metrics: { minutesToFirstMessage: 2, minutesToFirstQuote: 12, hoursToDocuments: null, documentsRequested: false, proposalSigned: false, customerReplies: 2, offers: 1, pdfsSent: 0, managerCalls: 1, managerCallReasons: ["Cliente pediu para falar com uma pessoa"], costUsd: 0.0312 },
   };

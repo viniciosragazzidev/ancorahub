@@ -15,6 +15,7 @@ import { quoteInputFromFacts } from "./facts";
 import { CHEAPER_RELAXATIONS, pickCheaper, recommendationReason, relaxInput, selectOptions, toOfferPlan } from "./offer-strategy";
 import { renderQuotePdf, type NetworkHighlight } from "./pdf";
 import { renderPlanImage } from "./plan-image";
+import { createPublicToken, publicLinkExpiresAt, publicQuoteUrl } from "./public-link";
 
 export class QuoteUnavailableError extends Error {
   constructor(public readonly code: "catalog_unavailable" | "missing_facts" | "no_options" | "no_cheaper") {
@@ -55,7 +56,7 @@ export async function createOfferForDeal(input: {
   customerName: string;
   brokerage: { name: string; phone: string | null; units: string[] };
   promotions: Promotion[];
-}): Promise<{ snapshot: OfferSnapshot; pdf: { key: string; filename: string } ; images: { key: string; planId: string }[]; networkSourced: boolean }> {
+}): Promise<{ snapshot: OfferSnapshot; pdf: { key: string; filename: string } ; images: { key: string; planId: string }[]; networkSourced: boolean; publicUrl: string }> {
   const config = await loadPilotForTenant(input.deal.tenantId);
   if (!config) throw new QuoteUnavailableError("catalog_unavailable");
   const quoteInput = quoteInputFromFacts(input.deal.facts);
@@ -126,8 +127,10 @@ export async function createOfferForDeal(input: {
     await uploadR2Object(key, png, "image/png");
     images.push({ key, planId: plan.id });
   }
-  await db.update(schema.autoSaleOffers).set({ pdfKey, pdfSha256: sha256, imageKeys: images })
+  // Link público (página da cotação): só o hash fica no banco; vale até a validade da cotação.
+  const publicToken = createPublicToken();
+  await db.update(schema.autoSaleOffers).set({ pdfKey, pdfSha256: sha256, imageKeys: images, network, publicTokenHash: publicToken.hash, publicExpiresAt: publicLinkExpiresAt(snapshot) })
     .where(and(eq(schema.autoSaleOffers.id, offerId), eq(schema.autoSaleOffers.tenantId, input.deal.tenantId), isNull(schema.autoSaleOffers.pdfKey)));
   const filename = `cotacao-${input.brokerage.name.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${version}.pdf`;
-  return { snapshot, pdf: { key: pdfKey, filename }, images, networkSourced: Boolean(network) };
+  return { snapshot, pdf: { key: pdfKey, filename }, images, networkSourced: Boolean(network), publicUrl: publicQuoteUrl(publicToken.token) };
 }

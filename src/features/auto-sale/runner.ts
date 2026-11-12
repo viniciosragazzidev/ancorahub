@@ -18,6 +18,7 @@ import { catalogToday, createOfferForDeal, QuoteUnavailableError } from "./quote
 import { listOffers, listTurns, type DealRow } from "./repository";
 import { activePromotions, brokerageInfo, callManager, cancelPendingOutgoing, dealRuntime, endDealBySystem, moveLeadForStage, queueOutgoing, recordTurn, type OutgoingItem } from "./service";
 import { planTurn, QUESTION_FOR } from "./turn-engine";
+import { quoteLinkMessage } from "./public-link";
 import { missingForQuote } from "./facts";
 
 const NO_CHEAPER_MESSAGE = "Essa já é a opção mais em conta para o seu perfil. Quer que eu te explique o que cada uma cobre?";
@@ -117,12 +118,21 @@ export async function runDealTurn(seen: DealRow, options: { model?: AgentModel; 
   if (plan.quote) {
     try {
       const created = await createOfferForDeal({ deal: { id: deal.id, tenantId: deal.tenantId, leadId: deal.leadId, mode: deal.mode, facts: plan.facts }, kind: plan.quote, previous: offers.at(-1) ?? null, customerName: plan.facts.firstName ?? "cliente", brokerage, promotions });
-      for (const body of quoteMessages(created.snapshot)) items.push({ kind: "text", body });
-      created.images.forEach((image, index) => {
-        const plan_ = created.snapshot.plans.find((item) => item.id === image.planId);
-        if (plan_) items.push({ kind: "image", body: imageCaption(plan_, index, created.snapshot.plans.length), mediaKey: image.key, mediaMime: "image/png", offerId: created.snapshot.id });
-      });
-      if ((await pdfCount(deal.id)) < AUTO_SALE_LIMITS.pdfPerDeal) items.push({ kind: "document", body: pdfCaption(), mediaKey: created.pdf.key, mediaFilename: created.pdf.filename, mediaMime: "application/pdf", offerId: created.snapshot.id });
+      const quoteTexts = quoteMessages(created.snapshot);
+      if (flags.settings.quoteLink) {
+        // Link da página pública (pedido de 12/11): sai como texto em qualquer canal, inclusive WAHA; o PDF fica na página.
+        const question = quoteTexts.pop()!;
+        for (const body of quoteTexts) items.push({ kind: "text", body });
+        items.push({ kind: "text", body: quoteLinkMessage(created.publicUrl), offerId: created.snapshot.id });
+        items.push({ kind: "text", body: question });
+      } else {
+        for (const body of quoteTexts) items.push({ kind: "text", body });
+        created.images.forEach((image, index) => {
+          const plan_ = created.snapshot.plans.find((item) => item.id === image.planId);
+          if (plan_) items.push({ kind: "image", body: imageCaption(plan_, index, created.snapshot.plans.length), mediaKey: image.key, mediaMime: "image/png", offerId: created.snapshot.id });
+        });
+        if ((await pdfCount(deal.id)) < AUTO_SALE_LIMITS.pdfPerDeal) items.push({ kind: "document", body: pdfCaption(), mediaKey: created.pdf.key, mediaFilename: created.pdf.filename, mediaMime: "application/pdf", offerId: created.snapshot.id });
+      }
       await db.update(schema.autoSaleDeals).set({ firstQuoteAt: deal.firstQuoteAt ?? new Date(), limits: { ...runtime, networkSourced: created.networkSourced } }).where(eq(schema.autoSaleDeals.id, deal.id));
     } catch (error) {
       const code = error instanceof QuoteUnavailableError ? error.code : "catalog_unavailable";

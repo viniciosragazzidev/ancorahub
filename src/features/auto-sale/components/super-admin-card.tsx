@@ -62,6 +62,10 @@ export async function AutoSaleSuperAdminCard({ tenantId }: { tenantId: string })
             </div>
           ))}
         </div>
+        <label className="flex min-h-11 items-center gap-2 text-sm">
+          <input type="checkbox" name="quoteLink" defaultChecked={flags.settings.quoteLink} />
+          Mandar a cotação por link da página pública (o PDF fica lá). Desligado, vão imagens e PDF no chat.
+        </label>
         <div><Button type="submit" variant="outline" size="sm">Salvar parâmetros</Button></div>
       </form>
     </div>

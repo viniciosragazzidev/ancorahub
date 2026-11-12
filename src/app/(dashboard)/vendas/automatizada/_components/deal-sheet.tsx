@@ -232,6 +232,7 @@ export function DealSheet({ dealId, onClose, autopilotAllowed, previewDetail }: 
                       ))}
                     </ul>
                     {offer.reason ? <p className="text-xs text-muted-foreground">{offer.reason}</p> : null}
+                    <p className="text-xs text-muted-foreground">{offer.linkViews ? `Cliente abriu o link ${offer.linkViews === 1 ? "1 vez" : `${offer.linkViews} vezes`}.` : "Cliente ainda não abriu o link."}</p>
                   </div>
                 )) : <p className="text-sm text-muted-foreground">Ainda sem cotação.</p>}
               </Section>
@@ -241,7 +242,7 @@ export function DealSheet({ dealId, onClose, autopilotAllowed, previewDetail }: 
                   <ol className="grid gap-1.5 text-xs">
                     {detail.decisions.slice(-20).reverse().map((turn) => (
                       <li key={turn.id} className="grid gap-0.5 border-b border-border/60 pb-1.5">
-                        <span className="font-medium">{turn.kind === "manager_called" ? `Chamou você: ${turn.body}` : `A assistente ${ACTION_LABEL[String(turn.decision?.action ?? "")] ?? "decidiu"}${turn.intent ? `; cliente ${INTENT_LABEL[turn.intent] ?? turn.intent}` : ""}${turn.objection ? `; objeção: ${OBJECTION_LABEL[turn.objection] ?? turn.objection}` : ""}`}</span>
+                        <span className="font-medium">{turn.kind === "link_viewed" ? turn.body : turn.kind === "manager_called" ? `Chamou você: ${turn.body}` : `A assistente ${ACTION_LABEL[String(turn.decision?.action ?? "")] ?? "decidiu"}${turn.intent ? `; cliente ${INTENT_LABEL[turn.intent] ?? turn.intent}` : ""}${turn.objection ? `; objeção: ${OBJECTION_LABEL[turn.objection] ?? turn.objection}` : ""}`}</span>
                         {turn.guard?.length ? <span className="text-muted-foreground">Barrado pelas regras: {turn.guard.map((item) => (item as { rule?: string }).rule).join(", ")}</span> : null}
                         <span className="tabular-nums text-muted-foreground">{formatWhen(turn.at)}{turn.model ? ` · ${turn.model}` : ""}</span>
                       </li>

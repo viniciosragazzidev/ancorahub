@@ -5590,10 +5590,17 @@ export const autoSaleOffers = pgTable(
     pdfKey: text("pdf_key"),
     pdfSha256: text("pdf_sha256"),
     imageKeys: jsonb("image_keys").notNull().default([]),
+    network: jsonb("network"),
+    publicTokenHash: text("public_token_hash"),
+    publicExpiresAt: timestamp("public_expires_at", { withTimezone: true }),
+    publicRevokedAt: timestamp("public_revoked_at", { withTimezone: true }),
+    publicViewCount: integer("public_view_count").notNull().default(0),
+    publicLastViewedAt: timestamp("public_last_viewed_at", { withTimezone: true }),
     createdAt,
   },
   (table) => [
     uniqueIndex("auto_sale_offers_deal_version_unique").on(table.dealId, table.version),
+    uniqueIndex("auto_sale_offers_public_token_unique").on(table.publicTokenHash).where(sql`${table.publicTokenHash} is not null`),
     index("auto_sale_offers_tenant_created_idx").on(table.tenantId, table.createdAt),
   ],
 );

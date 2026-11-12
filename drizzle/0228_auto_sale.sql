@@ -89,10 +89,19 @@ CREATE TABLE IF NOT EXISTS "auto_sale_offers" (
   "pdf_key" text,
   "pdf_sha256" text,
   "image_keys" jsonb NOT NULL DEFAULT '[]'::jsonb,
+  -- Rede perto do cliente usada no PDF (só do catálogo), para a página pública mostrar o mesmo.
+  "network" jsonb,
+  -- Link público da cotação: só o hash do token fica no banco; vale até a validade da cotação.
+  "public_token_hash" text,
+  "public_expires_at" timestamp with time zone,
+  "public_revoked_at" timestamp with time zone,
+  "public_view_count" integer NOT NULL DEFAULT 0,
+  "public_last_viewed_at" timestamp with time zone,
   "created_at" timestamp with time zone NOT NULL DEFAULT now()
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS "auto_sale_offers_deal_version_unique" ON "auto_sale_offers" ("deal_id", "version");
+CREATE UNIQUE INDEX IF NOT EXISTS "auto_sale_offers_public_token_unique" ON "auto_sale_offers" ("public_token_hash") WHERE "public_token_hash" IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "auto_sale_offers_tenant_created_idx" ON "auto_sale_offers" ("tenant_id", "created_at");
 
 CREATE TABLE IF NOT EXISTS "auto_sale_outbox" (
