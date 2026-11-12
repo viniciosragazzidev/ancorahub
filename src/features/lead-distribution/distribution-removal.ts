@@ -6,6 +6,8 @@
 export const DISTRIBUTION_REMOVAL_REASONS = {
   disqualified_no_value: { label: "Lead desqualificado e sem valor", tag: "Desqualificado sem valor" },
   external_broker_transfer: { label: "Transferência de lead para corretor externo", tag: "Corretor externo" },
+  // Venda Automatizada (DEC-182): só a própria negociação põe e tira este motivo; não aparece no formulário manual.
+  auto_sale: { label: "Na Venda Automatizada", tag: "Venda Automatizada" },
 } as const;
 
 export type DistributionRemovalReason = keyof typeof DISTRIBUTION_REMOVAL_REASONS;

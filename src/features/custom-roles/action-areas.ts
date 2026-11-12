@@ -70,6 +70,9 @@ const REGRAS: readonly Regra[] = [
   ["src/features/quotes/", rota("cotacao")],
   ["src/features/proposals/", rota("propostas")],
   ["src/features/sales/", rota("vendas")],
+  // Venda Automatizada (DEC-182): ações do diretor na área de vendas; as do Super-admin têm a própria guarda.
+  ["src/features/auto-sale/super-admin-actions", livre],
+  ["src/features/auto-sale/", rota("vendas")],
   ["src/features/sales-tools/", rota("ferramentas")],
   ["src/features/promotional-materials/", rota("ferramentas")],
   ["src/features/relationship/", rota("relacionamento")],

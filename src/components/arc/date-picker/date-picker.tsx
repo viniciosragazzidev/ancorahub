@@ -5,7 +5,8 @@ import type { ButtonHTMLAttributes, FocusEvent, KeyboardEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { Variants } from "motion/react";
 import { CalendarDays, ChevronDown } from "lucide-react";
-import { Calendar, type CalendarDateMatcher } from "../calendar/calendar";
+import { BottomSheet } from "../bottom-sheet/bottom-sheet";
+import { Calendar, type CalendarDateMatcher, type CalendarLabels } from "../calendar/calendar";
 import { motionTokens } from "../lib/motion-tokens";
 import styles from "./date-picker.module.css";
 
@@ -19,9 +20,17 @@ export interface DatePickerProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   maxDate?: Date;
   disabledDates?: CalendarDateMatcher;
   locale?: string;
+  labels?: Partial<DatePickerLabels>;
   format?: Intl.DateTimeFormatOptions;
   /** Adds a Today button to the calendar header. */
   showToday?: boolean;
+}
+
+export interface DatePickerLabels extends CalendarLabels {
+  clear: string;
+  chooseDate: string;
+  selectedDate: string;
+  calendar: string;
 }
 
 const monthStart = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1);
@@ -42,17 +51,29 @@ const statusRise: Variants = {
   exit: { opacity: 0, y: "-0.3em", filter: `blur(${blur.subtle}px)`, transition: { duration: 0.14, ease: ease.standard } },
 };
 
-export function DatePicker({ label, value, onChange, description, placeholder = "Select a date", minDate, maxDate, disabledDates, locale = "en-US", format = { month: "short", day: "numeric", year: "numeric" }, showToday, id, className, disabled, ...buttonProps }: DatePickerProps) {
+export function DatePicker({ label, value, onChange, description, placeholder = "Select a date", minDate, maxDate, disabledDates, locale = "en-US", format = { month: "short", day: "numeric", year: "numeric" }, showToday, labels, id, className, disabled, ...buttonProps }: DatePickerProps) {
   const generatedId = useId();
   const controlId = id ?? generatedId;
   const hintId = description ? `${controlId}-description` : undefined;
   const [open, setOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [month, setMonth] = useState(monthStart(value ?? new Date()));
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const mobileContentRef = useRef<HTMLDivElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<number | undefined>(undefined);
   const formatter = new Intl.DateTimeFormat(locale, format);
+  const localizedLabels: DatePickerLabels = {
+    clear: labels?.clear ?? (locale.toLowerCase().startsWith("pt") ? "Limpar" : "Clear"),
+    chooseDate: labels?.chooseDate ?? (locale.toLowerCase().startsWith("pt") ? "Escolha uma data" : "Choose a day"),
+    selectedDate: labels?.selectedDate ?? (locale.toLowerCase().startsWith("pt") ? "Data selecionada:" : "Selected"),
+    calendar: labels?.calendar ?? (locale.toLowerCase().startsWith("pt") ? "calendário" : "calendar"),
+    today: labels?.today ?? (locale.toLowerCase().startsWith("pt") ? "Hoje" : "Today"),
+    previousMonth: labels?.previousMonth ?? (locale.toLowerCase().startsWith("pt") ? "Mês anterior" : "Previous month"),
+    nextMonth: labels?.nextMonth ?? (locale.toLowerCase().startsWith("pt") ? "Próximo mês" : "Next month"),
+  };
   const reduce = useReducedMotion() ?? false;
   const time = value?.getTime() ?? null;
   const [previousTime, setPreviousTime] = useState(time);
@@ -64,20 +85,35 @@ export function DatePicker({ label, value, onChange, description, placeholder = 
   const partMotion = reduce ? { duration: 0 } : { duration: duration.standard, ease: ease.enter };
 
   useEffect(() => {
-    const onPointerDown = (event: PointerEvent) => { if (!rootRef.current?.contains(event.target as Node)) { window.clearTimeout(closeTimer.current); setOpen(false); } };
+    if (typeof window.matchMedia !== "function") return;
+    const breakpoint = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(breakpoint.matches);
+    update();
+    breakpoint.addEventListener("change", update);
+    return () => breakpoint.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (isMobile || rootRef.current?.contains(event.target as Node)) return;
+      window.clearTimeout(closeTimer.current);
+      setOpen(false);
+    };
     document.addEventListener("pointerdown", onPointerDown);
     return () => { document.removeEventListener("pointerdown", onPointerDown); window.clearTimeout(closeTimer.current); };
-  }, []);
+  }, [isMobile]);
 
   /** Opening moves focus to the day that owns the tab stop, so arrows work at once; a pointer open shows no ring. */
   useEffect(() => {
-    if (open) popoverRef.current?.querySelector<HTMLButtonElement>("[data-present] [data-date][tabindex=\"0\"]")?.focus({ preventScroll: true });
-  }, [open]);
+    if (!open) return;
+    const frame = window.requestAnimationFrame(() => calendarRef.current?.querySelector<HTMLButtonElement>("[data-present] [data-date][tabindex=\"0\"]")?.focus({ preventScroll: true }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [isMobile, open]);
 
   /** Closing hands focus back to the trigger when it was inside the calendar, so keyboard users never land on the page body. */
   const close = () => {
     window.clearTimeout(closeTimer.current);
-    if (popoverRef.current?.contains(document.activeElement)) triggerRef.current?.focus();
+    if (popoverRef.current?.contains(document.activeElement) || mobileContentRef.current?.contains(document.activeElement)) triggerRef.current?.focus();
     setOpen(false);
   };
   /** The calendar always opens on the month of the current value, or today's month. */
@@ -95,9 +131,17 @@ export function DatePicker({ label, value, onChange, description, placeholder = 
   };
   /** Tabbing past the popover closes it; focus moving within the field keeps it open. */
   const onBlur = (event: FocusEvent<HTMLDivElement>) => {
+    if (isMobile) return;
     const next = event.relatedTarget as Node | null;
     if (open && next && !rootRef.current?.contains(next)) { window.clearTimeout(closeTimer.current); setOpen(false); }
   };
+
+  const calendarContent = <>
+    <div ref={calendarRef}>
+      <Calendar value={value} onChange={selectDate} month={month} onMonthChange={setMonth} minDate={minDate} maxDate={maxDate} disabledDates={disabledDates} locale={locale} labels={localizedLabels} showToday={showToday} />
+    </div>
+    <div className={styles.footer}><button type="button" onClick={() => selectDate(undefined)} disabled={!value}>{localizedLabels.clear}</button><span className={styles.status}><AnimatePresence initial={false}><motion.span key={time ?? "none"} variants={reduce ? valueFade : statusRise} initial="enter" animate="center" exit="exit">{value ? `${localizedLabels.selectedDate} ${formatter.format(value)}` : localizedLabels.chooseDate}</motion.span></AnimatePresence></span></div>
+  </>;
 
   return <div className={[styles.field, className].filter(Boolean).join(" ")} ref={rootRef} onBlur={onBlur}>
     <label className={styles.label} htmlFor={controlId}>{label}</label>
@@ -116,15 +160,17 @@ export function DatePicker({ label, value, onChange, description, placeholder = 
         </span>
         <ChevronDown className={styles.chevron} size={16} strokeWidth={1.75} aria-hidden="true" />
       </button>
-      <AnimatePresence>
-        {open && <motion.div ref={popoverRef} className={styles.popover} role="dialog" aria-label={`${label} calendar`} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}
+      {!isMobile ? <AnimatePresence>
+        {open && <motion.div ref={popoverRef} className={styles.popover} role="dialog" aria-label={`${label} ${localizedLabels.calendar}`} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: .95 }}
           animate={{ opacity: 1, y: 0, scale: 1, transition: reduce ? instant : { ...spring.snappy, opacity: { duration: duration.fast, ease: ease.enter } } }}
           exit={{ opacity: 0, ...(reduce ? {} : { y: -6, scale: .97 }), transition: { duration: 0.14, ease: ease.standard } }}>
-          <Calendar value={value} onChange={selectDate} month={month} onMonthChange={setMonth} minDate={minDate} maxDate={maxDate} disabledDates={disabledDates} locale={locale} showToday={showToday} />
-          <div className={styles.footer}><button type="button" onClick={() => selectDate(undefined)} disabled={!value}>Clear</button><span className={styles.status}><AnimatePresence initial={false}><motion.span key={time ?? "none"} variants={reduce ? valueFade : statusRise} initial="enter" animate="center" exit="exit">{value ? `Selected ${formatter.format(value)}` : "Choose a day"}</motion.span></AnimatePresence></span></div>
+          {calendarContent}
         </motion.div>}
-      </AnimatePresence>
+      </AnimatePresence> : null}
+      {isMobile ? <BottomSheet open={open} onOpenChange={(nextOpen) => { if (!nextOpen) close(); }} title={label} description={description} detents={[0.62, 0.92]} initialDetent={0} closeLabel="Fechar">
+        <div ref={mobileContentRef}>{calendarContent}</div>
+      </BottomSheet> : null}
     </div>
     {description && <span id={hintId} className={styles.description}>{description}</span>}
   </div>;

@@ -2,7 +2,7 @@ import { CalendarBlank, CheckCircle, FileText, UserList } from "@/components/hug
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-type Dependent = { id: string; name: string; birthDate: string; relationship: string; isHolder: boolean };
+type Dependent = { id: string; name: string; birthDate: string | null; relationship: string; isHolder: boolean };
 
 type FormDataInfo = {
   dependentes?: string | null;

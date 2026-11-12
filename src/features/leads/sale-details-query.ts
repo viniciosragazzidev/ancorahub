@@ -169,6 +169,7 @@ export async function getSaleDetailsCard(leadId: string): Promise<SaleDetailsCar
       id: schema.leadBeneficiaries.id,
       name: schema.leadBeneficiaries.name,
       birthDate: schema.leadBeneficiaries.birthDate,
+      age: schema.leadBeneficiaries.age,
       relationship: schema.leadBeneficiaries.relationship,
       isHolder: schema.leadBeneficiaries.isHolder,
     }).from(schema.leadBeneficiaries)
@@ -223,7 +224,7 @@ export async function getSaleDetailsCard(leadId: string): Promise<SaleDetailsCar
     : qualification.birthDate || qualification.dataNascimento ? "Qualificação"
     : form.birthDate || form.dataNascimento ? "Formulário"
     : aiSource(aiField(storedFields, "holderBirthDate"));
-  const holderAge = birthDate ? ageOnDate(birthDate, now) : null;
+  const holderAge = birthDate ? ageOnDate(birthDate, now) : holder?.age ?? null;
   const ai = (key: string) => aiField(storedFields, key);
   const livesFromCrm = lead.livesCount ?? (Number(qualification.numberOfLives ?? qualification.qtdVidas ?? form.qtdVidas ?? form.vidas) || null);
   const livesCount = Number.isInteger(livesFromCrm) && Number(livesFromCrm) > 0
@@ -241,10 +242,10 @@ export async function getSaleDetailsCard(leadId: string): Promise<SaleDetailsCar
   const planName = firstText(sale?.planName, lead.leadPlanName, qualification.planName, qualification.plano, ai("plan")?.value);
   const planSource = sale?.planName ? "Venda registrada" : lead.leadPlanName ? "CRM" : qualification.planName || qualification.plano ? "Qualificação" : aiSource(ai("plan"));
   const dependentList = beneficiaries.filter((person) => !person.isHolder).map((person) => {
-    const age = ageOnDate(person.birthDate, now);
+    const age = person.birthDate ? ageOnDate(person.birthDate, now) : person.age ?? null;
     return `${relationshipLabel(person.relationship)}: ${person.name}${age === null ? "" : ` (${age} anos) `}`.trim();
   });
-  const beneficiaryAges = beneficiaries.map((person) => ageOnDate(person.birthDate, now)).filter((age): age is number => age !== null);
+  const beneficiaryAges = beneficiaries.map((person) => person.birthDate ? ageOnDate(person.birthDate, now) : person.age ?? null).filter((age): age is number => age !== null);
   const agesValue = beneficiaryAges.length
     ? beneficiaryAges.join(", ")
     : ai("dependentAges")?.value ?? firstText(qualification.individualAges, qualification.idades, form.idades);

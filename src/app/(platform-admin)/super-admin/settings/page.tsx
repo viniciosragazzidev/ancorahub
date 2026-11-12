@@ -9,6 +9,7 @@ import {
   updateGlobalSearchSettingsAction,
   updateBrokerWorkspaceSettingsAction,
   updateBrokerClientWalletLiteSettingsAction,
+  updateBrokerSaleRegistrationV2SettingsAction,
   updateBrokerAvailabilityOnboardingSettingsAction,
   updateWorkflowAutomationSettingsAction,
   updateCleanUiOperationalSettingsAction,
@@ -146,6 +147,7 @@ export default async function SuperAdminSettingsPage() {
     FEATURE_FLAGS.ENGAGEMENT_CAMPAIGNS.key,
     FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.key,
     FEATURE_FLAGS.BROKER_CLIENT_WALLET_LITE.key,
+    FEATURE_FLAGS.BROKER_SALE_REGISTRATION_V2.key,
     FEATURE_FLAGS.ATTENDANCE_FLOWS.key,
     FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key,
     FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key,
@@ -189,6 +191,7 @@ export default async function SuperAdminSettingsPage() {
   const globalSearchEnabled = settingMap.get("feature_global_search_enabled") !== "false";
   const brokerWorkspaceEnabled = settingMap.get("feature_broker_workspace_enabled") !== "false";
   const brokerClientWalletLiteEnabled = settingMap.get(FEATURE_FLAGS.BROKER_CLIENT_WALLET_LITE.key) === "true";
+  const brokerSaleRegistrationV2Enabled = settingMap.get(FEATURE_FLAGS.BROKER_SALE_REGISTRATION_V2.key) === "true";
   const brokerAvailabilityOnboardingEnabled = settingMap.get("feature_broker_availability_onboarding_enabled") !== "false";
   const workflowAutomationEnabled =
     settingMap.get("feature_workflow_automation_enabled") === "true";
@@ -381,6 +384,28 @@ export default async function SuperAdminSettingsPage() {
                   </label>
                   <Button type="submit" variant={brokerClientWalletLiteEnabled ? "outline" : "default"}>
                     {brokerClientWalletLiteEnabled ? "Salvar controle" : "Liberar piloto"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Registro de venda v2 do Corretor Lite</CardTitle>
+                <CardDescription>
+                  Libera o fluxo em etapas para corretores Lite. A confirmação da operadora continua obrigatória e precisa estar aprovada.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateBrokerSaleRegistrationV2SettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="enabled" value="true" defaultChecked={brokerSaleRegistrationV2Enabled} className="size-4" />
+                    <span>
+                      <span className="font-medium">Habilitar novo registro de venda</span>
+                      <span className="block text-xs text-muted-foreground">Piloto global, desligado por padrão e reversível. A alteração fica auditada.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant={brokerSaleRegistrationV2Enabled ? "outline" : "default"}>
+                    {brokerSaleRegistrationV2Enabled ? "Salvar controle" : "Liberar piloto"}
                   </Button>
                 </form>
               </CardContent>

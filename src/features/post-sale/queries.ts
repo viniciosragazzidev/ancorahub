@@ -6,7 +6,20 @@ import { getDatabase, schema } from "@/shared/db";
 
 export async function getLeadBeneficiaries(leadId: string) {
   const context = await getRequiredTenantContext();
-  return getDatabase().select({ id: schema.leadBeneficiaries.id, name: schema.leadBeneficiaries.name, birthDate: schema.leadBeneficiaries.birthDate, relationship: schema.leadBeneficiaries.relationship, isHolder: schema.leadBeneficiaries.isHolder }).from(schema.leadBeneficiaries).where(and(eq(schema.leadBeneficiaries.leadId, leadId), eq(schema.leadBeneficiaries.tenantId, context.tenantId), context.role === "broker" ? eq(schema.leads.corretorId, context.userId) : context.role === "manager" ? eq(schema.leads.branchId, context.branchId ?? "") : undefined)).innerJoin(schema.leads, eq(schema.leadBeneficiaries.leadId, schema.leads.id)).orderBy(desc(schema.leadBeneficiaries.isHolder), asc(schema.leadBeneficiaries.name));
+  const rows = await getDatabase().select({
+    id: schema.leadBeneficiaries.id,
+    name: schema.leadBeneficiaries.name,
+    birthDate: schema.leadBeneficiaries.birthDate,
+    age: schema.leadBeneficiaries.age,
+    cpf: schema.leadBeneficiaries.cpf,
+    relationship: schema.leadBeneficiaries.relationship,
+    isHolder: schema.leadBeneficiaries.isHolder,
+  }).from(schema.leadBeneficiaries).where(and(
+    eq(schema.leadBeneficiaries.leadId, leadId),
+    eq(schema.leadBeneficiaries.tenantId, context.tenantId),
+    context.role === "broker" ? eq(schema.leads.corretorId, context.userId) : context.role === "manager" ? eq(schema.leads.branchId, context.branchId ?? "") : undefined,
+  )).innerJoin(schema.leads, eq(schema.leadBeneficiaries.leadId, schema.leads.id)).orderBy(desc(schema.leadBeneficiaries.isHolder), asc(schema.leadBeneficiaries.name));
+  return rows.map(({ cpf, ...row }) => ({ ...row, cpf: context.role === "director" ? cpf : null, hasCpf: Boolean(cpf) }));
 }
 
 export async function getPostSaleSettings() {
