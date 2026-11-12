@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import "@/components/arc/venancor-scope.css";
 import { RegisterSaleV2PreviewClient } from "@/app/dev/registrar-venda-v2-preview/preview-client";
 import type { LightLeadDetailData, LiteRequirement } from "@/features/broker-workspace/components/light-lead-detail/types";
 import type { ConfirmationDocument } from "@/features/broker-workspace/components/light-lead-detail/types";

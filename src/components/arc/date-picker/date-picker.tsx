@@ -168,7 +168,7 @@ export function DatePicker({ label, value, onChange, description, placeholder = 
           {calendarContent}
         </motion.div>}
       </AnimatePresence> : null}
-      {isMobile ? <BottomSheet open={open} onOpenChange={(nextOpen) => { if (!nextOpen) close(); }} title={`${label} ${localizedLabels.calendar}`} description={description} detents={[0.62, 0.92]} initialDetent={0} closeLabel="Fechar">
+      {isMobile ? <BottomSheet open={open} onOpenChange={(nextOpen) => { if (!nextOpen) close(); }} title={label} description={description} detents={[0.62, 0.92]} initialDetent={0} closeLabel="Fechar">
         <div ref={mobileContentRef}>{calendarContent}</div>
       </BottomSheet> : null}
     </div>
