@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { isUndefinedTableError } from "@/shared/db/postgres-errors";
@@ -84,6 +84,32 @@ export async function listTurns(tenantId: string, dealId: string, limit = 80) {
     .where(and(eq(schema.autoSaleTurns.tenantId, tenantId), eq(schema.autoSaleTurns.dealId, dealId)))
     .orderBy(desc(schema.autoSaleTurns.createdAt)).limit(limit);
   return rows.reverse();
+}
+
+type HistoryLine = { direction: "in" | "out"; body: string };
+
+/**
+ * A conversa que a assistente lê (12/11, caso Alex): o que o cliente falou com a qualificação antes da negociação
+ * e, nesta negociação, o que o cliente mandou e o que a assistente enviou de fato (os textos ficam no outbox).
+ * Antes ela só via as mensagens do cliente: cumprimentava de novo e repetia perguntas já respondidas.
+ */
+export async function conversationForTurn(deal: Pick<DealRow, "id" | "tenantId" | "leadId" | "createdAt">, skipTurnIds: readonly string[]) {
+  const db = getDatabase();
+  const before = await db.select({ direction: schema.whatsappMessages.direction, body: schema.whatsappMessages.body, sentAt: schema.whatsappMessages.sentAt })
+    .from(schema.whatsappMessages)
+    .where(and(eq(schema.whatsappMessages.tenantId, deal.tenantId), eq(schema.whatsappMessages.leadId, deal.leadId), lt(schema.whatsappMessages.sentAt, deal.createdAt)))
+    .orderBy(desc(schema.whatsappMessages.sentAt)).limit(30);
+  const qualification: HistoryLine[] = before.reverse()
+    .filter((row) => row.body?.trim() && !row.body.startsWith("["))
+    .map((row) => ({ direction: row.direction === "incoming" || row.direction === "inbound" ? "in" : "out", body: row.body.slice(0, 600) }));
+  const skip = new Set(skipTurnIds);
+  const turns = (await listTurns(deal.tenantId, deal.id, 40)).filter((turn) => turn.direction === "in" && turn.body && !skip.has(turn.id));
+  const sent = (await listOutbox(deal.tenantId, deal.id)).filter((item) => (item.status === "sent" || item.status === "simulated") && item.body);
+  const sale: HistoryLine[] = [
+    ...turns.map((turn) => ({ at: turn.createdAt, line: { direction: "in" as const, body: turn.body! } })),
+    ...sent.map((item) => ({ at: item.sentAt ?? item.createdAt, line: { direction: "out" as const, body: item.body! } })),
+  ].sort((a, b) => a.at.getTime() - b.at.getTime()).map((entry) => entry.line);
+  return { qualification, sale };
 }
 
 export async function listOutbox(tenantId: string, dealId: string) {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { factsFromQualification, plausibleCity } from "./facts";
 import { openingMessages } from "./quote-messages";
-import { cleanModelFacts } from "./turn-engine";
+import { buildTurnContext, cleanModelFacts } from "./turn-engine";
 
 describe("abertura e cidade (caso Alex, 12/11)", () => {
   it("resposta solta gravada como cidade não vira cidade", () => {
@@ -16,6 +16,17 @@ describe("abertura e cidade (caso Alex, 12/11)", () => {
     expect(facts.city).toBeUndefined();
     expect(cleanModelFacts({ city: "só para mim" })).toEqual({});
     expect(cleanModelFacts({ city: "Niterói" })).toEqual({ city: "Niterói" });
+  });
+
+  it("a assistente lê a conversa da qualificação e o que ela mesma enviou", () => {
+    const context = JSON.parse(buildTurnContext({
+      facts: {}, stage: "confirming", offers: [], promotions: [],
+      history: [{ direction: "out", body: "Vi que você procura um plano de saúde. Posso te ajudar a escolher?" }],
+      qualificationHistory: [{ direction: "out", body: "Qual a idade de cada pessoa?" }, { direction: "in", body: "34 anos, só para mim" }],
+      inbound: ["Sim"],
+    })) as { conversaDaQualificacao: string[]; historico: string[] };
+    expect(context.conversaDaQualificacao).toEqual(["Qualificação: Qual a idade de cada pessoa?", "Cliente: 34 anos, só para mim"]);
+    expect(context.historico[0]).toMatch(/^Você: Vi que você procura/);
   });
 
   it("a frase da abertura fica certa com ou sem idades e cidade", () => {

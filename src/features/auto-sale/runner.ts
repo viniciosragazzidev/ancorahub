@@ -15,7 +15,7 @@ import { followUpNeedsTemplate, nextFollowUpAt, stepForNow } from "./follow-up";
 import { isWithinSendWindow, nextSendWindowStart } from "./guardrails";
 import { activePromotionLines, AUDIO_DECLINE_MESSAGE, followUpMessage, imageCaption, pdfCaption, quoteMessages } from "./quote-messages";
 import { catalogToday, createOfferForDeal, QuoteUnavailableError } from "./quote-service";
-import { listOffers, listTurns, type DealRow } from "./repository";
+import { conversationForTurn, listOffers, type DealRow } from "./repository";
 import { activePromotions, brokerageInfo, callManager, cancelPendingOutgoing, dealRuntime, endDealBySystem, moveLeadForStage, queueOutgoing, recordTurn, type OutgoingItem } from "./service";
 import { entityQuestion, planTurn, QUESTION_FOR } from "./turn-engine";
 import { quoteLinkMessage } from "./public-link";
@@ -94,10 +94,10 @@ export async function runDealTurn(seen: DealRow, options: { model?: AgentModel; 
   const today = catalogToday();
   const promotions = await activePromotions(deal.tenantId, today);
   const brokerage = await brokerageInfo(deal.tenantId);
-  const history = (await listTurns(deal.tenantId, deal.id, 24)).filter((turn) => (turn.direction === "in" || turn.direction === "out") && turn.body && !inbound.some((item) => item.id === turn.id)).map((turn) => ({ direction: turn.direction as "in" | "out", body: turn.body! }));
+  const { qualification: qualificationHistory, sale: history } = await conversationForTurn(deal, inbound.map((turn) => turn.id));
   const model = options.model ?? gatewayAgentModel({ tenantId: deal.tenantId, userId: deal.chosenBy, leadId: deal.leadId });
   const facts = deal.facts as DealFacts;
-  const { decision, model: modelName } = await decideTurn(model, { facts, stage: deal.stage, offers, promotions: activePromotionLines(promotions), history, inbound: texts, brokerageName: brokerage.name, mode: deal.mode }).catch(() => ({ decision: null, model: null }));
+  const { decision, model: modelName } = await decideTurn(model, { facts, stage: deal.stage, offers, promotions: activePromotionLines(promotions), history, qualificationHistory, inbound: texts, brokerageName: brokerage.name, mode: deal.mode }).catch(() => ({ decision: null, model: null }));
   const plan = planTurn({ stage: deal.stage, facts, misunderstoodCount: deal.misunderstoodCount, offers, hasActivePromotion: promotions.length > 0, networkSourced: runtime.networkSourced }, texts, decision);
   const turnId = await recordTurn(deal, {
     direction: "system", kind: "decision", body: null, intent: plan.intent, objection: plan.objection, facts: plan.facts, model: modelName,
