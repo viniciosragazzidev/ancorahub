@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { WhatsappLogo } from "@/components/huge-icons";
 import { toast } from "@/components/ui/sonner";
+import { isOutdatedDeploymentError, reloadForNewDeployment } from "@/shared/http/outdated-deployment";
 import { Button } from "@/components/ui/button";
 import { DsSegmentedControl } from "@/components/ui/ds-segmented-control";
 import { DsStatusBadge, type DsStatusBadgeStatus } from "@/components/ui/ds-status-badge";
@@ -161,6 +162,7 @@ export function WhatsAppConnectDialog({
   const connectingRef = useRef(false);
   const acting = useRef(false);
   const polling = useRef(false);
+  const outdatedNoticeShown = useRef(false);
   const pollingFailures = useRef(0);
   const autoRestarts = useRef(0);
   const lastStartAt = useRef(0);
@@ -234,9 +236,19 @@ export function WhatsAppConnectDialog({
 
   function recoverFromOutdatedAction(error: unknown): boolean {
     const message = error instanceof Error ? error.message : "";
-    if (!/failed to find server action|older or newer deployment|fetch failed|failed to fetch/i.test(message)) return false;
-    toast.info("O CorreTop foi atualizado. Carregando a versão atual da página...");
-    window.setTimeout(() => window.location.reload(), 500);
+    const outdated = isOutdatedDeploymentError(error);
+    if (!outdated && !/fetch failed|failed to fetch/i.test(message)) return false;
+    // Um aviso só, mesmo com o polling e o código falhando juntos.
+    if (outdatedNoticeShown.current) return true;
+    outdatedNoticeShown.current = true;
+    if (reloadForNewDeployment()) {
+      toast.info("O CorreTop foi atualizado. Carregando a versão atual da página...");
+    } else if (outdated) {
+      toast.error("O CorreTop foi atualizado. Feche o app e abra de novo para continuar.", { duration: 12_000 });
+    } else {
+      outdatedNoticeShown.current = false;
+      return false;
+    }
     return true;
   }
 

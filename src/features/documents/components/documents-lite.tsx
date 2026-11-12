@@ -7,6 +7,7 @@
  * formulário de novo requisito. Mesmas Server Actions, mensagens e o tratamento de versão nova do sistema.
  */
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { isOutdatedDeploymentError } from "@/shared/http/outdated-deployment";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ExternalLink, RefreshCw, Search, Trash2, XCircle } from "lucide-react";
@@ -55,8 +56,7 @@ type StatusFilter = "pending" | "approved" | "rejected" | "all";
 const sentAt = liteDateFormatter({ day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 function isVersionSkewError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return /failed to find server action|older or newer deployment|version skew/i.test(message);
+  return isOutdatedDeploymentError(error);
 }
 
 function reloadAfterDeploymentUpdate() {

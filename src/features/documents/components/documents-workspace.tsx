@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { isOutdatedDeploymentError } from "@/shared/http/outdated-deployment";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -66,8 +67,7 @@ type PendingDoc = {
 };
 
 function isVersionSkewError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return /failed to find server action|older or newer deployment|version skew/i.test(message);
+  return isOutdatedDeploymentError(error);
 }
 
 function reloadAfterDeploymentUpdate() {
