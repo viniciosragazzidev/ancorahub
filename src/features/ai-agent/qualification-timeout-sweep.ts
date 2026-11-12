@@ -110,7 +110,11 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
 
     const systemUserId = anyMember?.userId || (await resolveSystemUserId(tenant.id));
 
+    // Venda Automatizada (DEC-182): lead em negociação não tem a qualificação encerrada por tempo nem é distribuído.
+    const { leadIdsInActiveAutoSale } = await import("@/features/auto-sale/repository");
+    const autoSaleLeads = await leadIdsInActiveAutoSale(tenant.id).catch(() => new Set<string>());
     for (const lead of qualifyingLeads) {
+      if (autoSaleLeads.has(lead.id)) continue;
       // 1. Localizar conversa de IA ativa (se houver)
       const [aiConv] = await db
         .select({

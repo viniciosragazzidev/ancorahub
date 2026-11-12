@@ -22,6 +22,10 @@ describe("elegibilidade", () => {
   it("recusa lead com corretor, frio, sem base legal, em pós-venda ou com opt-out", () => {
     expect(autoSaleIneligibleReasons({ ...eligible, corretorId: "u1" })).toContain("has_broker");
     expect(autoSaleIneligibleReasons({ ...eligible, qualificationStatus: "cold" })).toContain("not_hot");
+    expect(autoSaleIneligibleReasons({ ...eligible, qualificationStatus: "warm" })).toContain("not_hot");
+    // Ainda na qualificação da IA: a venda pode assumir no meio.
+    expect(autoSaleIneligibleReasons({ ...eligible, qualificationStatus: "qualifying" })).toEqual([]);
+    expect(autoSaleIneligibleReasons({ ...eligible, qualificationStatus: "pending" })).toEqual([]);
     expect(autoSaleIneligibleReasons({ ...eligible, consentimentoLgpd: false })).toContain("no_consent");
     expect(autoSaleIneligibleReasons({ ...eligible, status: "converted" })).toContain("post_sale");
     expect(autoSaleIneligibleReasons({ ...eligible, optOutAt: new Date() })).toContain("opt_out");

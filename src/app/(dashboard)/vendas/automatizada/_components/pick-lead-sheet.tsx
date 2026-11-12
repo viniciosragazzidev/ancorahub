@@ -13,7 +13,7 @@ import type { AutoSaleChannel, AutoSaleMode } from "@/features/auto-sale/contrac
 import { INELIGIBLE_LABEL } from "@/features/auto-sale/eligibility";
 import type { EligibleLead } from "@/features/auto-sale/service";
 
-const TEMPERATURE: Record<string, string> = { hot: "Quente", warm: "Morno", cold: "Frio" };
+const TEMPERATURE: Record<string, string> = { hot: "Quente", warm: "Morno", cold: "Frio", pending: "Em qualificação", qualifying: "Em qualificação" };
 
 /** Escolher lead quente: busca, "Só quentes" ligado, motivo de quem não pode, canal e modo explícitos. */
 export function PickLeadSheet({ open, onOpenChange, autopilotAllowed, onStarted, previewLeads }: { open: boolean; onOpenChange: (open: boolean) => void; autopilotAllowed: boolean; onStarted: (dealId: string) => void; previewLeads?: EligibleLead[] }) {
@@ -72,7 +72,7 @@ export function PickLeadSheet({ open, onOpenChange, autopilotAllowed, onStarted,
       <SheetContent className="data-[side=right]:w-[min(100vw-1rem,38rem)]">
         <SheetHeader>
           <SheetTitle>Escolher lead quente</SheetTitle>
-          <SheetDescription>Só entra lead sem corretor, com telefone e base legal. Enquanto a negociação estiver aberta, ele sai da distribuição e a IA de qualificação para.</SheetDescription>
+          <SheetDescription>Lead quente ou ainda na qualificação da IA, sem corretor, com telefone e base legal. Em qualificação, a venda assume a conversa de onde a IA parou. Enquanto a negociação estiver aberta, ele sai da distribuição e a IA de qualificação para.</SheetDescription>
         </SheetHeader>
         <SheetBody>
           {!selected ? (
@@ -81,15 +81,15 @@ export function PickLeadSheet({ open, onOpenChange, autopilotAllowed, onStarted,
                 <div className="flex w-full flex-wrap items-center gap-3">
                   <Input className="min-w-0 flex-1 basis-full sm:basis-0" value={query} placeholder="Nome ou telefone" aria-label="Buscar lead" onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); search(); } }} />
                   <label className="flex items-center gap-2 text-sm">
-                    <Switch checked={onlyHot} onCheckedChange={(checked) => { setOnlyHot(checked); search(query, checked); }} aria-label="Só quentes" />
-                    Só quentes
+                    <Switch checked={onlyHot} onCheckedChange={(checked) => { setOnlyHot(checked); search(query, checked); }} aria-label="Quentes e em qualificação" />
+                    Quentes e em qualificação
                   </label>
                   <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => search()}>{loading ? "Buscando…" : "Buscar"}</Button>
                 </div>
               </SheetSectionHeader>
               <ul className="grid gap-2 p-4" aria-live="polite" aria-busy={loading}>
                 {leads === null ? <li className="text-sm text-muted-foreground">Carregando…</li> : null}
-                {leads?.length === 0 ? <li className="text-sm text-muted-foreground">Nenhum lead encontrado. Tire o filtro &ldquo;Só quentes&rdquo; ou busque pelo nome.</li> : null}
+                {leads?.length === 0 ? <li className="text-sm text-muted-foreground">Nenhum lead encontrado. Tire o filtro &ldquo;Quentes e em qualificação&rdquo; ou busque pelo nome.</li> : null}
                 {leads?.map((lead) => {
                   const blocked = lead.reasons.length > 0;
                   return (
