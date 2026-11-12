@@ -18,7 +18,7 @@ import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { toast } from "@/components/ui/sonner";
-import { startNextHotDealAction } from "@/features/auto-sale/actions";
+import { startNextHotDealAction, stopAutoSaleWatchAction } from "@/features/auto-sale/actions";
 import { CHANNEL_LABEL, MODE_LABEL, STAGE_LABEL, STATUS_LABEL } from "@/features/auto-sale/contracts";
 import { BASELINE, formatUsd } from "@/features/auto-sale/metrics";
 import type { AutoSaleOverview, DealDetail, DealListRow } from "@/features/auto-sale/queries";
@@ -89,25 +89,47 @@ export function AutoSaleWorkspace({ overview, lite, isDirector, preview }: { ove
     );
   }
   const data: Ready = overview;
-  const blockedReason = !data.globalEnabled ? "Pausada pela plataforma." : !data.catalogReady ? "O catálogo de planos ainda não está liberado para esta empresa." : data.openDealId ? "Já existe uma negociação aberta. Encerre ou entregue a atual para escolher outro lead." : null;
+  const platformBlock = !data.globalEnabled ? "Pausada pela plataforma." : !data.catalogReady ? "O catálogo de planos ainda não está liberado para esta empresa." : null;
+  const blockedReason = platformBlock ?? (data.openDealId ? "Já existe uma negociação aberta. Encerre ou entregue a atual para escolher outro lead." : null);
+  const watching = Boolean(data.watchingSince);
+  const watchText = data.watchingSince
+    ? `Aguardando o próximo lead quente desde ${formatWhen(data.watchingSince)}: quando um lead ficar quente, ele entra aqui antes de ir para corretor${data.openDealId ? ", assim que a negociação aberta terminar" : ""}.`
+    : null;
+  const statusText = platformBlock ?? watchText ?? blockedReason;
   const description = `Um lead quente por vez. A assistente virtual cota com o catálogo real, manda as opções com o PDF e chama você quando precisa de uma pessoa. Base atual: ${BASELINE.firstMessageMinutes} min até a 1ª mensagem e ${BASELINE.quoteAfterMinutes} min até a cotação.`;
-  const empty = "Nenhuma negociação ainda. Escolha um lead quente para começar.";
+  const empty = "Nenhuma negociação ainda. Use “Pegar o próximo quente”: se não houver lead quente agora, a área aguarda o próximo.";
   // Um clique: pega o lead quente mais recente que ainda pode entrar e já começa em Copiloto (nada sai sem aprovar).
+  // Sem lead quente disponível (ou com negociação aberta), liga a espera: a distribuição entrega o próximo que ficar quente.
   const pickNext = () => startingNext(async () => {
     const result = await startNextHotDealAction({ mode: "copilot" });
     if (!result.ok) { toast.error(result.error); return; }
+    if (result.data.kind === "watching") {
+      toast.success("Aguardando o próximo lead quente. Ele entra aqui em Copiloto antes de ir para corretor.");
+      router.refresh();
+      return;
+    }
     toast.success(`Negociação com ${result.data.leadName} começou em Copiloto. Aprove a primeira mensagem.`);
     router.refresh();
     setDealId(result.data.dealId);
+  });
+  const stopWatching = () => startingNext(async () => {
+    const result = await stopAutoSaleWatchAction();
+    if (!result.ok) { toast.error(result.error); return; }
+    toast.success("Parou de aguardar. Os próximos leads quentes seguem para os corretores.");
+    router.refresh();
   });
   const cta = (
     <>
       <Button type="button" variant="outline" onClick={() => setPicking(true)} disabled={Boolean(blockedReason) || nextPending}>
         <Plus className="size-4" /> Escolher lead
       </Button>
-      <Button type="button" onClick={pickNext} disabled={Boolean(blockedReason) || nextPending} title={blockedReason ?? undefined}>
-        <Flame className="size-4" /> {nextPending ? "Pegando…" : "Pegar o próximo quente"}
-      </Button>
+      {watching ? (
+        <Button type="button" variant="outline" onClick={stopWatching} disabled={nextPending}>Parar de aguardar</Button>
+      ) : (
+        <Button type="button" onClick={pickNext} disabled={Boolean(platformBlock) || nextPending} title={platformBlock ?? undefined}>
+          <Flame className="size-4" /> {nextPending ? "Pegando…" : "Pegar o próximo quente"}
+        </Button>
+      )}
     </>
   );
   const menu = isDirector ? (
@@ -139,11 +161,13 @@ export function AutoSaleWorkspace({ overview, lite, isDirector, preview }: { ove
             <p className={page.cardDescription}>{description}</p>
           </header>
           <div className={page.toolbar}>
-            <span className={page.cardDescription} style={{ flex: "1 1 220px" }}>{blockedReason ?? summary}</span>
+            <span className={page.cardDescription} style={{ flex: "1 1 220px" }} aria-live="polite">{statusText ?? summary}</span>
             <div className={page.toolbarEnd}>
               {menu}
               <button type="button" className={page.button} onClick={() => setPicking(true)} disabled={Boolean(blockedReason) || nextPending}>Escolher lead</button>
-              <button type="button" className={page.primaryButton} onClick={pickNext} disabled={Boolean(blockedReason) || nextPending}>{nextPending ? "Pegando…" : "Pegar o próximo quente"}</button>
+              {watching
+                ? <button type="button" className={page.button} onClick={stopWatching} disabled={nextPending}>Parar de aguardar</button>
+                : <button type="button" className={page.primaryButton} onClick={pickNext} disabled={Boolean(platformBlock) || nextPending}>{nextPending ? "Pegando…" : "Pegar o próximo quente"}</button>}
             </div>
           </div>
           <LiteResponsiveData caption="Negociações da Venda Automatizada" columns={liteColumns} rows={data.deals} rowKey={(row) => row.id} onRowOpen={(row) => setDealId(row.id)} empty={empty} rowTone={(row) => (row.status === "waiting_manager" ? "warning" : undefined)} />
@@ -158,7 +182,7 @@ export function AutoSaleWorkspace({ overview, lite, isDirector, preview }: { ove
       <Card className="gap-0 overflow-hidden py-0">
         <SectionCardHeader icon={<Flame />} title="Venda Automatizada" badge={<Badge variant="outline">Piloto</Badge>} description={description} actions={<>{menu}{cta}</>} />
         <div className="grid gap-3 p-4">
-          <p className="text-xs text-muted-foreground">{blockedReason ?? summary}</p>
+          <p className="text-xs text-muted-foreground" aria-live="polite">{statusText ?? summary}</p>
           <DataTable columns={columns} data={data.deals} showColumnToggle={false} pageSize={10} emptyState={<p className="py-8 text-center text-sm text-muted-foreground">{empty}</p>} onRowClick={(row: DealListRow) => setDealId(row.id)} />
         </div>
       </Card>

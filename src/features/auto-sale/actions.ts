@@ -14,7 +14,8 @@ import { OPEN_DEAL_STATUSES, type DealFacts } from "./contracts";
 import { readAutoSaleFlags } from "./flag";
 import { allowedMoneyFromOffers, checkOutgoingMessages, sanitizeMessage, type GuardViolation } from "./guardrails";
 import { getDealDetail, listPromotions, wahaNumbersForLead } from "./queries";
-import { getDeal, listOffers } from "./repository";
+import { getDeal, leadIdsInActiveAutoSale, listOffers } from "./repository";
+import { setAutoSaleWatch } from "./watch";
 import { assertManager, audit, AutoSaleError, endDeal, handOffToBroker, listBrokersForHandOff, searchLeadsForAutoSale, setDealMode, setDealPaused, startDeal, startNextHotDeal, takeOverDeal } from "./service";
 
 type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
@@ -64,12 +65,35 @@ export async function startAutoSaleDealAction(input: unknown) {
   });
 }
 
-export async function startNextHotDealAction(input: unknown) {
+/**
+ * "Pegar o próximo quente": havendo lead quente disponível e nenhuma negociação aberta, começa já; senão
+ * liga a espera, e a distribuição entrega à Venda Automatizada o próximo lead que ficar quente.
+ */
+export async function startNextHotDealAction(input: unknown): Promise<Result<{ kind: "started"; dealId: string; leadName: string } | { kind: "watching" }>> {
   return guarded(async () => {
     const parsed = z.object({ mode: z.enum(["simulation", "copilot", "autopilot"]).default("copilot") }).parse(input ?? {});
-    const result = await startNextHotDeal(await managerContext(), parsed);
+    const context = await managerContext();
+    const hasOpenDeal = (await leadIdsInActiveAutoSale(context.tenantId)).size > 0;
+    if (!hasOpenDeal) {
+      try {
+        const started = await startNextHotDeal(context, parsed);
+        revalidatePath(PATH);
+        return { kind: "started" as const, ...started };
+      } catch (error) {
+        if (!(error instanceof AutoSaleError)) throw error;
+      }
+    }
+    await setAutoSaleWatch(context, { armed: true, mode: parsed.mode });
     revalidatePath(PATH);
-    return result;
+    return { kind: "watching" as const };
+  });
+}
+
+export async function stopAutoSaleWatchAction() {
+  return guarded(async () => {
+    await setAutoSaleWatch(await managerContext(), { armed: false, mode: "copilot" });
+    revalidatePath(PATH);
+    return undefined;
   });
 }
 
