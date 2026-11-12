@@ -522,8 +522,14 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   }
 
   // ── 8. AI processing (optional, background, only for inbound to relay numbers) ──────────
-  let handledByPostSale = false;
-  if (!contentless && !isOutgoing && source.kind === "number" && leadId && tenantId) {
+  // Venda Automatizada (DEC-182): com negociação aberta, a mensagem é do agente de venda (nem pós-venda, nem IA de qualificação).
+  let handledByAutoSale = false;
+  if (!contentless && !isOutgoing && leadId && tenantId) {
+    const { routeAutoSaleInbound } = await import("@/features/auto-sale/inbound");
+    handledByAutoSale = await routeAutoSaleInbound({ tenantId, leadId, providerMessageId, body: event.message.body, messageKind: event.message.type });
+  }
+  let handledByPostSale = handledByAutoSale;
+  if (!handledByAutoSale && !contentless && !isOutgoing && source.kind === "number" && leadId && tenantId) {
     const inboundMessage = event.message;
     const { routePostSaleInboundSafely } = await import("@/features/post-sale-audit/conversation-operations");
     handledByPostSale = await routePostSaleInboundSafely(async () => {

@@ -14,6 +14,7 @@
 | DG-010 | RESOLVIDO — composição de formulário. | `Field`, `FieldLabel`, `FieldDescription` e `FieldError` já existem; controls continuam independentes. | FormField é a composição desses elementos; schema e regra de negócio ficam fora. | Design System + Engenharia |
 | DG-011 | RESOLVIDO — taxonomia de overlays. | Dialog, Drawer, Sheet, Popover, DropdownMenu e Tooltip já têm primitives distintos. | Consumidores usam Dialog, Drawer, Popover, DropdownMenu e Tooltip; Sheet é compatibilidade interna/legada e não é novo conceito de consumo. | Design System + Engenharia |
 | DG-012 | RESOLVIDO para a migração Venancor — `venancor.md` substitui a paleta, fonte e escala de raios da versão 1.2.0 do contrato. | Evita que agentes restaurem Inter, CTA escura ou controles de 10px de raio na branch atual. | O runtime usa tokens Venancor; o contrato 1.2.0 aguarda convergência editorial. | Vinicios + Design System |
+| DG-013 | ABERTO: peças para o cliente fora da tela (PDF de cotação e imagem do plano da Venda Automatizada, DEC-182) não têm regra no design system. | Sem fonte embutida aprovada, o PDF usa Helvetica (WinAnsi, com acentos) e a imagem usa Helvetica/Arial; cores tiradas dos tokens do Lite (ação, texto, apoio, superfície, borda) sem token novo. | Visual do PDF e da imagem é provisório até o Vinicios aprovar; nada institucionalizado. | Vinicios + Design System |
 
 ## Template de resolução
 

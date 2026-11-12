@@ -5492,3 +5492,166 @@ export const attendanceRunSteps = pgTable("attendance_run_steps", {
   detail: jsonb("detail"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Venda Automatizada (piloto, 12/11/2026, DEC-182) ─────────────────────────
+// SQL: drizzle/0228_auto_sale.sql. Leitores toleram tabela ausente (42P01).
+
+export const autoSaleDealStageValues = ["chosen", "confirming", "preferences", "quoted", "recommending", "objections", "closing", "documents", "manager_called", "handed_off", "won", "lost"] as const;
+export const autoSaleDealStatusValues = ["active", "paused", "waiting_manager", "handed_off", "won", "lost", "cancelled"] as const;
+export const autoSaleModeValues = ["simulation", "copilot", "autopilot"] as const;
+export const autoSaleChannelValues = ["meta", "waha"] as const;
+export const autoSaleOutboxStatusValues = ["draft", "simulated", "approved", "sending", "sent", "held", "failed", "cancelled"] as const;
+
+export const autoSaleDeals = pgTable(
+  "auto_sale_deals",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    stage: text("stage", { enum: autoSaleDealStageValues }).notNull().default("chosen"),
+    status: text("status", { enum: autoSaleDealStatusValues }).notNull().default("active"),
+    mode: text("mode", { enum: autoSaleModeValues }).notNull().default("copilot"),
+    channel: text("channel", { enum: autoSaleChannelValues }).notNull().default("meta"),
+    wahaNumberId: text("waha_number_id").references(() => wahaNumbers.id, { onDelete: "set null" }),
+    chosenBy: text("chosen_by").notNull().references(() => user.id),
+    handedToUserId: text("handed_to_user_id").references(() => user.id, { onDelete: "set null" }),
+    handedAt: timestamp("handed_at", { withTimezone: true }),
+    facts: jsonb("facts").notNull().default({}),
+    limits: jsonb("limits").notNull().default({}),
+    managerCallReason: text("manager_call_reason"),
+    managerCalledAt: timestamp("manager_called_at", { withTimezone: true }),
+    misunderstoodCount: integer("misunderstood_count").notNull().default(0),
+    followUpStep: integer("follow_up_step").notNull().default(0),
+    nextFollowUpAt: timestamp("next_follow_up_at", { withTimezone: true }),
+    replyDueAt: timestamp("reply_due_at", { withTimezone: true }),
+    lastCustomerMessageAt: timestamp("last_customer_message_at", { withTimezone: true }),
+    lastAgentMessageAt: timestamp("last_agent_message_at", { withTimezone: true }),
+    firstQuoteAt: timestamp("first_quote_at", { withTimezone: true }),
+    documentsRequestedAt: timestamp("documents_requested_at", { withTimezone: true }),
+    aiCostUsd: numeric("ai_cost_usd", { precision: 10, scale: 6 }).notNull().default("0"),
+    transcriptionCostUsd: numeric("transcription_cost_usd", { precision: 10, scale: 6 }).notNull().default("0"),
+    aiConversationPaused: boolean("ai_conversation_paused").notNull().default(false),
+    restoreState: jsonb("restore_state").notNull().default({}),
+    endedReason: text("ended_reason"),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("auto_sale_deals_one_active_per_tenant").on(table.tenantId).where(sql`${table.status} in ('active', 'paused', 'waiting_manager')`),
+    uniqueIndex("auto_sale_deals_one_active_per_lead").on(table.tenantId, table.leadId).where(sql`${table.status} in ('active', 'paused', 'waiting_manager')`),
+    index("auto_sale_deals_tenant_created_idx").on(table.tenantId, table.createdAt),
+    index("auto_sale_deals_reply_due_idx").on(table.replyDueAt).where(sql`${table.replyDueAt} is not null`),
+    index("auto_sale_deals_follow_up_idx").on(table.nextFollowUpAt).where(sql`${table.nextFollowUpAt} is not null`),
+  ],
+);
+
+export const autoSaleTurns = pgTable(
+  "auto_sale_turns",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    dealId: text("deal_id").notNull().references(() => autoSaleDeals.id, { onDelete: "cascade" }),
+    direction: text("direction", { enum: ["in", "out", "system"] }).notNull(),
+    kind: text("kind").notNull(),
+    providerMessageId: text("provider_message_id"),
+    body: text("body"),
+    intent: text("intent"),
+    objection: text("objection"),
+    facts: jsonb("facts"),
+    decision: jsonb("decision"),
+    guard: jsonb("guard"),
+    model: text("model"),
+    aiCostUsd: numeric("ai_cost_usd", { precision: 10, scale: 6 }),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("auto_sale_turns_message_unique").on(table.tenantId, table.providerMessageId).where(sql`${table.providerMessageId} is not null`),
+    index("auto_sale_turns_deal_created_idx").on(table.dealId, table.createdAt),
+  ],
+);
+
+export const autoSaleOffers = pgTable(
+  "auto_sale_offers",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    dealId: text("deal_id").notNull().references(() => autoSaleDeals.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    input: jsonb("input").notNull(),
+    plans: jsonb("plans").notNull(),
+    recommendedPlanId: text("recommended_plan_id"),
+    recommendationReason: text("recommendation_reason"),
+    relaxed: jsonb("relaxed"),
+    previousOfferId: text("previous_offer_id"),
+    release: text("release").notNull(),
+    catalogDate: text("catalog_date").notNull(),
+    pdfKey: text("pdf_key"),
+    pdfSha256: text("pdf_sha256"),
+    imageKeys: jsonb("image_keys").notNull().default([]),
+    network: jsonb("network"),
+    publicTokenHash: text("public_token_hash"),
+    publicExpiresAt: timestamp("public_expires_at", { withTimezone: true }),
+    publicRevokedAt: timestamp("public_revoked_at", { withTimezone: true }),
+    publicViewCount: integer("public_view_count").notNull().default(0),
+    publicLastViewedAt: timestamp("public_last_viewed_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("auto_sale_offers_deal_version_unique").on(table.dealId, table.version),
+    uniqueIndex("auto_sale_offers_public_token_unique").on(table.publicTokenHash).where(sql`${table.publicTokenHash} is not null`),
+    index("auto_sale_offers_tenant_created_idx").on(table.tenantId, table.createdAt),
+  ],
+);
+
+export const autoSaleOutbox = pgTable(
+  "auto_sale_outbox",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    dealId: text("deal_id").notNull().references(() => autoSaleDeals.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["text", "document", "image"] }).notNull(),
+    body: text("body"),
+    mediaKey: text("media_key"),
+    mediaFilename: text("media_filename"),
+    mediaMime: text("media_mime"),
+    offerId: text("offer_id").references(() => autoSaleOffers.id, { onDelete: "set null" }),
+    status: text("status", { enum: autoSaleOutboxStatusValues }).notNull(),
+    holdReason: text("hold_reason"),
+    channel: text("channel", { enum: autoSaleChannelValues }).notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    approvedBy: text("approved_by").references(() => user.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    providerMessageId: text("provider_message_id"),
+    error: text("error"),
+    attempts: integer("attempts").notNull().default(0),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("auto_sale_outbox_idempotency_unique").on(table.tenantId, table.idempotencyKey),
+    index("auto_sale_outbox_status_idx").on(table.status, table.scheduledAt),
+    index("auto_sale_outbox_deal_idx").on(table.dealId, table.createdAt),
+  ],
+);
+
+export const autoSalePromotions = pgTable(
+  "auto_sale_promotions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    operator: text("operator").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on").notNull(),
+    active: boolean("active").notNull().default(true),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [index("auto_sale_promotions_tenant_active_idx").on(table.tenantId, table.active, table.endsOn)],
+);

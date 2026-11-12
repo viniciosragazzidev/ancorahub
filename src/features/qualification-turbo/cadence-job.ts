@@ -134,8 +134,12 @@ async function runCadence(now: Date): Promise<CadenceRunResult> {
     return value;
   };
 
+  // Venda Automatizada (DEC-182): lead em negociação não recebe lembrete do turbo (uma consulta só).
+  const { leadIdsInActiveAutoSale } = await import("@/features/auto-sale/repository");
+  const autoSaleLeads = await leadIdsInActiveAutoSale(null).catch(() => new Set<string>());
   for (const lead of leads) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
+    if (autoSaleLeads.has(lead.id)) continue;
     const state = readTurboState(lead.qualificationDetails);
     if (!state) continue;
     const tenant = await tenantContext(lead.tenantId);

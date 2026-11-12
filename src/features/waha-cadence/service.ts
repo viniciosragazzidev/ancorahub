@@ -191,7 +191,10 @@ async function processDelivery(row: typeof schema.wahaDeliveryOutbox.$inferSelec
   const phone = await resolveRecipientPhone(row.tenantId, { type: run.recipientType as Recipient["type"], id: run.recipientId });
   const [suppression] = await db.select({ id: schema.wahaSuppressions.id }).from(schema.wahaSuppressions).where(eq(schema.wahaSuppressions.phoneHash, phoneHash(phone))).limit(1);
   if (suppression) throw new Error("Contato suprimido.");
-  if (!cadenceCanSendNow(definition, new Date())) {
+  // Venda Automatizada (DEC-182): lead em negociação não recebe a régua; espera a negociação acabar.
+  const { isLeadInActiveAutoSale } = await import("@/features/auto-sale/repository");
+  const inAutoSale = run.recipientType === "lead" && await isLeadInActiveAutoSale(row.tenantId, run.recipientId);
+  if (inAutoSale || !cadenceCanSendNow(definition, new Date())) {
     await db.update(schema.wahaDeliveryOutbox).set({ status: "pending", runAfter: new Date(Date.now() + 60 * 60 * 1_000), lockedAt: null, lockedBy: null, leaseExpiresAt: null, updatedAt: new Date() }).where(eq(schema.wahaDeliveryOutbox.id, row.id));
     return "deferred" as const;
   }

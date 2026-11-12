@@ -1149,6 +1149,13 @@
                         "when":  1794400000000,
                         "tag":  "0226_meta_ad_creatives_broker_briefs",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  164,
+                        "version":  "7",
+                        "when":  1794500000000,
+                        "tag":  "0228_auto_sale",
+                        "breakpoints":  true
                     }
                 ]
 }

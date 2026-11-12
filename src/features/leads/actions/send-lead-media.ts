@@ -17,10 +17,7 @@ import {
 import {
   getPreferredMetaCloudChannel,
 } from "@/features/communication-channels/service";
-import type { MetaChannelBlock } from "@/features/communication-channels/meta-channel-routing-domain";
-import { formatE164Phone } from "@/features/communication-channels/meta-cloud-client";
-import { decryptChannelSecret } from "@/features/communication-channels/secret-crypto";
-import { getMetaCloudServerConfig } from "@/features/communication-channels/meta-cloud-config";
+import { sendMetaCloudMediaMessage } from "@/features/communication-channels/meta-media-send";
 import { publishConversationInvalidation } from "@/features/notifications/realtime-sync";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -43,7 +40,6 @@ export type SendLeadMediaResult = {
   };
 };
 
-const MEDIA_MESSAGES_ENDPOINT = "https://graph.facebook.com/v23.0";
 
 /**
  * Sends one media file from management to a lead through the tenant's official
@@ -212,45 +208,4 @@ export async function sendLeadMediaAction(
           : "Não foi possível enviar a mídia agora. Tente novamente.",
     };
   }
-}
-
-async function sendMetaCloudMediaMessage(input: {
-  channel: Exclude<Awaited<ReturnType<typeof getPreferredMetaCloudChannel>>, null | MetaChannelBlock>;
-  to: string;
-  kind: ConversationMediaKind;
-  providerMediaId: string;
-  caption?: string;
-  filename?: string;
-}) {
-  if (!input.channel) throw new Error("Canal oficial indisponível.");
-  const accessToken = decryptChannelSecret(
-    input.channel.accessTokenCiphertext ?? "",
-    getMetaCloudServerConfig().tokenEncryptionKey,
-  );
-
-  const mediaPayload: Record<string, unknown> = { link: undefined, id: input.providerMediaId };
-  if (input.caption) mediaPayload.caption = input.caption;
-  if (input.filename) mediaPayload.filename = input.filename;
-
-  const response = await fetch(`${MEDIA_MESSAGES_ENDPOINT}/${encodeURIComponent(input.channel.phoneNumberId ?? "")}/messages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: formatE164Phone(input.to),
-      type: input.kind,
-      [input.kind]: mediaPayload,
-    }),
-    cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
-  });
-  const payload = (await response.json().catch(() => ({}))) as {
-    messages?: Array<{ id: string }>;
-    error?: { message?: string };
-  };
-  if (!response.ok || !payload.messages?.[0]?.id) {
-    throw new Error(payload.error?.message ?? "A Meta recusou o envio da mídia.");
-  }
-  return { messageId: payload.messages[0].id };
 }
