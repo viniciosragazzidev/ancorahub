@@ -95,7 +95,11 @@ export function AutoSaleWorkspace({ overview, lite, isDirector, preview }: { ove
   const watchText = data.watchingSince
     ? `Aguardando o próximo lead quente desde ${formatWhen(data.watchingSince)}: quando um lead ficar quente, ele entra aqui antes de ir para corretor${data.openDealId ? ", assim que a negociação aberta terminar" : ""}.`
     : null;
-  const statusText = platformBlock ?? watchText ?? blockedReason;
+  // O robô agendado (Coolify, a cada minuto) responde às mensagens do cliente; parado, a conversa fica muda.
+  const robotWarning = data.robot.health === "ok" ? null : data.robot.lastRunAt
+    ? `O robô da Venda Automatizada não roda desde ${formatWhen(data.robot.lastRunAt)}: as respostas ficam paradas. Confira a tarefa agendada auto-sale no Coolify ou use "Continuar atendimento" na negociação.`
+    : `O robô da Venda Automatizada ainda não rodou: as respostas ficam paradas. Crie a tarefa agendada auto-sale no Coolify ou use "Continuar atendimento" na negociação.`;
+  const statusText = [robotWarning, platformBlock ?? watchText ?? blockedReason].filter(Boolean).join(" ") || null;
   const description = `Um lead quente por vez. A assistente virtual cota com o catálogo real, manda as opções com o PDF e chama você quando precisa de uma pessoa. Base atual: ${BASELINE.firstMessageMinutes} min até a 1ª mensagem e ${BASELINE.quoteAfterMinutes} min até a cotação.`;
   const empty = "Nenhuma negociação ainda. Use “Pegar o próximo quente”: se não houver lead quente agora, a área aguarda o próximo.";
   // Um clique: pega o lead quente mais recente que ainda pode entrar e já começa em Copiloto (nada sai sem aprovar).

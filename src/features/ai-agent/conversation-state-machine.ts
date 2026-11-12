@@ -1062,6 +1062,16 @@ async function completeDeterministicQualificationTurn(input: {
     }
   }
 
+  // Venda Automatizada aguardando o próximo quente (DEC-182): o lead quente entra lá antes desta resposta.
+  // Sem isso a qualificação se despedia ("um corretor fala com você") e a venda chegava depois, muda (12/11, Silvio).
+  if (persistedQualification.qualificationStatus === "hot" && (isHandoff || persistedQualification.state === "IN_PROGRESS")) {
+    const { tryCaptureHotLead } = await import("@/features/auto-sale/watch");
+    if (await tryCaptureHotLead(input.tenantId, input.leadId)) {
+      console.info("[qualification] captured_by_auto_sale", { tenantId: input.tenantId, leadId: input.leadId, mode: input.turn.kind });
+      return { status: "captured_by_auto_sale", deliveryStatus: "skipped", reply: input.turn.reply };
+    }
+  }
+
   const messageId = `ai_msg_qualification_${crypto.randomUUID()}`;
   await db.insert(schema.whatsappMessages).values({
     id: messageId,

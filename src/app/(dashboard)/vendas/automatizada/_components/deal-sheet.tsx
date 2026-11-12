@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetSection, SheetSectionHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "@/components/ui/sonner";
 import { Textarea } from "@/components/ui/textarea";
-import { approveAutoSaleMessageAction, discardAutoSaleMessageAction, getAutoSaleDealAction, searchHandOffBrokersAction, updateAutoSaleDealAction } from "@/features/auto-sale/actions";
+import { approveAutoSaleMessageAction, continueAutoSaleDealAction, discardAutoSaleMessageAction, getAutoSaleDealAction, searchHandOffBrokersAction, updateAutoSaleDealAction } from "@/features/auto-sale/actions";
 import { CHANNEL_LABEL, formatCents, MODE_LABEL, STAGE_LABEL, STATUS_LABEL, type AutoSaleMode } from "@/features/auto-sale/contracts";
 import { formatUsd } from "@/features/auto-sale/metrics";
 import type { DealDetail } from "@/features/auto-sale/queries";
@@ -148,6 +148,19 @@ export function DealSheet({ dealId, onClose, autopilotAllowed, previewDetail }: 
     load();
   });
 
+  // Continuar atendimento: a assistente responde e envia agora, sem esperar o robô agendado.
+  const continueNow = (id: string) => startTransition(async () => {
+    const result = await continueAutoSaleDealAction(id);
+    if (!result.ok) { toast.error(result.error); return; }
+    const { answered, sent, drafts, held, waitingCustomer } = result.data;
+    if (held.length) toast.warning(`Não saiu: ${held.join(" ")}`);
+    else if (drafts) toast.success(`${answered ? "A assistente respondeu. " : ""}${drafts === 1 ? "Uma mensagem espera" : `${drafts} mensagens esperam`} sua aprovação.`);
+    else if (sent) toast.success(`${sent === 1 ? "Uma mensagem enviada" : `${sent} mensagens enviadas`}. A assistente segue no atendimento.`);
+    else if (waitingCustomer) toast.success("A assistente segue no atendimento. Nada sem resposta agora: ela responde a próxima mensagem do cliente.");
+    else toast.success("A assistente segue no atendimento.");
+    load();
+  });
+
   const deal = detail?.deal;
   const open = deal ? ["active", "paused", "waiting_manager"].includes(deal.status) : false;
   const pendingItems = detail?.outbox.filter((item) => item.status === "draft" || item.status === "held") ?? [];
@@ -266,11 +279,10 @@ export function DealSheet({ dealId, onClose, autopilotAllowed, previewDetail }: 
         </SheetBody>
         {deal && open ? (
           <SheetFooter>
-            {deal.status === "paused" || deal.status === "waiting_manager" ? (
-              <Button type="button" variant="outline" disabled={pending} onClick={() => run({ op: "resume", dealId: deal.id }, "A assistente voltou a conduzir.")}>{deal.status === "waiting_manager" ? "Devolver ao agente" : "Retomar"}</Button>
-            ) : (
+            {deal.status === "active" ? (
               <Button type="button" variant="outline" disabled={pending} onClick={() => run({ op: "pause", dealId: deal.id }, "Negociação pausada.")}>Pausar</Button>
-            )}
+            ) : null}
+            <Button type="button" variant="outline" disabled={pending} onClick={() => continueNow(deal.id)}>{pending ? "Continuando…" : "Continuar atendimento"}</Button>
             <Button type="button" disabled={pending} onClick={() => run({ op: "take_over", dealId: deal.id }, "Você assumiu. A assistente parou e o lead segue com você em Conversas.")}>Assumir</Button>
           </SheetFooter>
         ) : null}

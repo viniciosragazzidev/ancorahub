@@ -12,6 +12,7 @@ export function autoSaleOverviewFixture(): AutoSaleOverview {
     globalEnabled: true,
     catalogReady: true,
     watchingSince: null,
+    robot: { health: "ok" as const, lastRunAt: null },
     summary: { total: 3, documentsRequested: 1, managerCalls: 2 },
     deals: [
       { id: "deal-1", leadId: "lead-1", leadName: "Joana Ribeiro", stage: "manager_called", status: "waiting_manager", mode: "copilot", channel: "meta", managerCallReason: "Cliente pediu para falar com uma pessoa", pendingApprovals: 2, updatedAt: iso(4), createdAt: iso(52), costUsd: 0.0312 },

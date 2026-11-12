@@ -11,11 +11,13 @@ import { getDatabase, schema } from "@/shared/db";
 import { postgresErrorCode } from "@/shared/db/postgres-errors";
 
 import { OPEN_DEAL_STATUSES, type AutoSaleMode, type DealFacts } from "./contracts";
+import { dispatchAutoSaleOutbox } from "./dispatch";
 import { readAutoSaleFlags } from "./flag";
 import { allowedMoneyFromOffers, checkOutgoingMessages, sanitizeMessage, type GuardViolation } from "./guardrails";
 import { getDealDetail, listPromotions, wahaNumbersForLead } from "./queries";
 import { getDeal, leadIdsInActiveAutoSale, listOffers } from "./repository";
 import { setAutoSaleWatch } from "./watch";
+import { continueDeal, type ContinueOutcome } from "./continue";
 import { assertManager, audit, AutoSaleError, endDeal, handOffToBroker, listBrokersForHandOff, searchLeadsForAutoSale, setDealMode, setDealPaused, startDeal, startNextHotDeal, takeOverDeal } from "./service";
 
 type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
@@ -45,6 +47,12 @@ async function managerContext() {
 
 const id = z.string().min(1).max(80);
 
+/** Autopiloto: a abertura sai na hora, sem esperar a próxima rodada do robô agendado. */
+async function sendOpeningNow(dealId: string) {
+  await dispatchAutoSaleOutbox(new Date(Date.now() + 10_000), 10, dealId)
+    .catch((error) => console.warn("[auto-sale] opening_dispatch_failed", { dealId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" }));
+}
+
 export async function searchAutoSaleLeadsAction(input: unknown) {
   return guarded(async () => {
     const parsed = z.object({ query: z.string().max(80).default(""), onlyHot: z.boolean().default(true) }).parse(input);
@@ -60,6 +68,7 @@ export async function startAutoSaleDealAction(input: unknown) {
   return guarded(async () => {
     const parsed = z.object({ leadId: id, channel: z.enum(["meta", "waha"]), wahaNumberId: id.nullable().default(null), mode: z.enum(["simulation", "copilot", "autopilot"]) }).parse(input);
     const result = await startDeal(await managerContext(), parsed);
+    if (parsed.mode === "autopilot") await sendOpeningNow(result.dealId);
     revalidatePath(PATH);
     return result;
   });
@@ -79,6 +88,7 @@ export async function startNextHotDealAction(input: unknown): Promise<Result<{ k
     if (!hasOpenDeal) {
       try {
         const started = await startNextHotDeal(context, parsed);
+        if (parsed.mode === "autopilot") await sendOpeningNow(started.dealId);
         revalidatePath(PATH);
         return { kind: "started" as const, ...started, mode: parsed.mode };
       } catch (error) {
@@ -170,6 +180,15 @@ export async function updateAutoSaleDealAction(input: unknown) {
     else await handOffToBroker(context, parsed.dealId, parsed.brokerId);
     revalidatePath(PATH);
     return undefined;
+  });
+}
+
+/** "Continuar atendimento": a assistente responde e envia agora, sem esperar o robô agendado. */
+export async function continueAutoSaleDealAction(dealId: unknown): Promise<Result<ContinueOutcome>> {
+  return guarded(async () => {
+    const outcome = await continueDeal(await managerContext(), id.parse(dealId));
+    revalidatePath(PATH);
+    return outcome;
   });
 }
 
