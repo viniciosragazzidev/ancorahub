@@ -12,17 +12,19 @@ import { CatalogStatusBadge } from "@/features/global-catalog/components/catalog
 import { getGlobalCatalogAdminData } from "@/features/global-catalog/queries";
 import { readPilotConfig, loadPilotIndex } from "@/features/global-catalog/pilot/server";
 import { PilotAdminPanel } from "@/features/global-catalog/pilot/admin-panel";
+import { reviewIssues } from "@/features/global-catalog/pilot/review-check";
 
 export default async function SuperAdminCatalogPage() {
   const { enabled, privateEnabled, carriers } = await getGlobalCatalogAdminData();
   const pilot = await readPilotConfig();
   const pilotIndex = pilot ? await loadPilotIndex(pilot).catch(() => null) : null;
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 
   return (
     <>
       <PlatformAdminHeader breadcrumb="CorreTop / Admin" title="Catálogo global" />
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
-        {pilot && pilotIndex ? <PilotAdminPanel config={pilot} plans={pilotIndex.plans.map(({ id, name, operator }) => ({ id, name, operator }))} /> : pilot ? <p role="alert" className="text-sm text-destructive">O lote do cotador não pôde ser carregado. O acesso permanece sujeito à validação de integridade.</p> : null}
+        {pilot && pilotIndex ? <PilotAdminPanel config={pilot} plans={pilotIndex.plans.map((plan) => ({ id: plan.id, name: plan.name, operator: plan.operator, operatorId: plan.operatorId, issues: reviewIssues(plan, today) }))} /> : pilot ? <p role="alert" className="text-sm text-destructive">O lote do cotador não pôde ser carregado. O acesso permanece sujeito à validação de integridade.</p> : null}
         <section className="flex flex-col gap-2">
           <p className="text-xs font-medium text-primary">GOVERNANÇA COMERCIAL</p>
           <h1 className="text-2xl font-semibold tracking-tight">Operadoras oficiais</h1>
