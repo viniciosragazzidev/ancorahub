@@ -150,6 +150,11 @@ CREATE TABLE IF NOT EXISTS "auto_sale_promotions" (
 
 CREATE INDEX IF NOT EXISTS "auto_sale_promotions_tenant_active_idx" ON "auto_sale_promotions" ("tenant_id", "active", "ends_on");
 
+-- O lead em negociação sai da distribuição com o motivo "auto_sale" (a regra da 0168 só aceitava dois motivos).
+ALTER TABLE "leads" DROP CONSTRAINT IF EXISTS "leads_distribution_removal_reason_check";
+ALTER TABLE "leads" ADD CONSTRAINT "leads_distribution_removal_reason_check"
+  CHECK ("distribution_removal_reason" IS NULL OR "distribution_removal_reason" IN ('disqualified_no_value', 'external_broker_transfer', 'auto_sale'));
+
 -- RLS como as demais tabelas públicas: só o servidor acessa.
 ALTER TABLE "auto_sale_deals" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "auto_sale_turns" ENABLE ROW LEVEL SECURITY;
