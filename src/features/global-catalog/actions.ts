@@ -122,8 +122,9 @@ export async function createGlobalCarrierAction(formData: FormData): Promise<Cat
     await getDatabase().insert(schema.globalCarriers).values({
       id,
       name: input.name,
-      description: input.description || null,
-      logoUrl: input.logoUrl || null,
+      // Só manda as colunas da 0065 quando há valor: sem a migração, criar operadora sem logotipo continua funcionando.
+      ...(input.description ? { description: input.description } : {}),
+      ...(input.logoUrl ? { logoUrl: input.logoUrl } : {}),
       ansCode: input.ansCode || null,
       status: "draft",
       createdBy: admin.userId,

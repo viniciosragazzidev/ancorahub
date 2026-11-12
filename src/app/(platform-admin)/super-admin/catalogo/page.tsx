@@ -87,6 +87,8 @@ export default async function SuperAdminCatalogPage() {
                           fill
                           sizes="40px"
                           src={carrier.logoUrl}
+                          // O logotipo é uma URL livre do cadastro: sem otimizar, domínio fora da lista do next.config não derruba a página.
+                          unoptimized
                         />
                       </div>
                     ) : (
