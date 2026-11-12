@@ -16,11 +16,11 @@ describe("modelos de cargo", () => {
         if (isRoutePermission(key)) {
           expect(rotas.has(key)).toBe(true);
           const rota = routeCatalog.find((route) => routePermissionKey(route.key) === key)!;
-          expect(hasCapability(modelo.papel, rota.fallbackPermission, modelo.papel)).toBe(true);
+          expect(hasCapability(modelo.papel, rota.fallbackPermission, modelo.jobTitle ?? modelo.papel)).toBe(true);
         }
         else {
           expect(assignable.has(key as PermissionKey)).toBe(true);
-          expect(hasCapability(modelo.papel, key as PermissionKey, modelo.papel)).toBe(true);
+          expect(hasCapability(modelo.papel, key as PermissionKey, modelo.jobTitle ?? modelo.papel)).toBe(true);
         }
       }
       for (const [rota, permissoes] of Object.entries(AREAS_SEM_CORTE_FINO)) {

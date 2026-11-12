@@ -52,6 +52,7 @@ export function LightChrome({
   audience = "broker",
   initialChatRail = null,
   initialAvailability = "available",
+  erpLinks = [],
 }: {
   children: ReactNode;
   mainRef?: RefObject<HTMLElement | null>;
@@ -70,6 +71,7 @@ export function LightChrome({
   initialChatRail?: ChatRailData | null;
   initialAvailability?: LightAvailability;
   queueBadgeCount?: number;
+  erpLinks?: readonly { href: string; label: string }[];
 }) {
   const { pathname, chat } = useLightRoute();
   // The sheet belongs to the screen it was opened on: navigating closes it without an effect.
@@ -81,6 +83,7 @@ export function LightChrome({
 
   const sheet = (
     <LightMoreSheet
+      erpLinks={erpLinks}
       open={moreOpen}
       onOpenChange={setMoreOpen}
       user={user}

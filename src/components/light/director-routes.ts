@@ -22,6 +22,15 @@ const detail = (pattern: RegExp, title: string, parent: (pathname: string) => st
 });
 
 const ROUTES: readonly RouteRule[] = [
+  detail(/^\/financeiro\/lancamentos\/[^/]+$/, "Lançamento financeiro", () => "/financeiro"),
+  detail(/^\/administracao\/importacoes\/[^/]+$/, "Conferir lote", () => "/administracao/importacoes"),
+  { test: exact("/implantacoes"), route: { title: "Implantação", parentHref: null } },
+  { test: exact("/financeiro"), route: { title: "Financeiro", parentHref: null } },
+  { test: exact("/financeiro/adiantamentos"), route: { title: "Adiantamentos", parentHref: "/financeiro" } },
+  { test: exact("/financeiro/fluxo-caixa"), route: { title: "Movimentação de caixa", parentHref: "/financeiro" } },
+  { test: exact("/financeiro/fechamentos"), route: { title: "Fechamentos", parentHref: "/financeiro" } },
+  { test: exact("/administracao/importacoes"), route: { title: "Importações", parentHref: null } },
+  { test: exact("/administracao/erp"), route: { title: "Módulos ERP", parentHref: null } },
   detail(/^\/leads\/[^/]+\/feedback$/, "Atualização do lead", (path) => path.replace(/\/feedback$/, "")),
   detailSegment(/^\/leads\/(?!arquivados$|dashboard$|distribuicao$)[^/]+$/, "Lead", "/leads"),
   detail(/^\/clientes\/[^/]+$/, "Cliente", () => "/clientes"),

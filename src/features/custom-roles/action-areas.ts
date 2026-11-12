@@ -37,6 +37,11 @@ const REGRAS: readonly Regra[] = [
   ["src/app/(platform-admin)/", livre],
   ["src/features/super-admin/", livre],
   ["src/features/system-report/", livre],
+  ["src/features/erp/platform-actions", livre],
+  ["src/features/erp/governance-actions", cap("erp_manage_modules")],
+  ["src/features/erp/import-actions", cap("erp_import_data")],
+  ["src/features/erp/implantation-actions", cap("erp_manage_operations")],
+  ["src/features/erp/finance-actions", cap("erp_view_finance")],
 
   // Telas do tenant.
   ["src/app/(dashboard)/equipe/", rota("equipe")],

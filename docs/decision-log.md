@@ -1,5 +1,15 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-184 - Execução do ERP com valores conferidos e aprovação independente
+
+**Estado:** aceita para implementação incremental. **Data:** 2026-11-12.
+
+Após o plano do ERP, Vinicios solicitou execução de ponta a ponta. Confirmou na sessão que o financeiro começa com valores e evidências conferidos, preparação e aprovação por pessoas distintas; cálculo automático somente com regra cadastrada e validada. A regra da segunda parcela continua desativada, sem reinterpretar métricas existentes ou substituir DEC-004/DEC-012 nos pontos pendentes. Registro de liquidação não inicia transferência bancária. Reversões preservam o fato original.
+
+Cada módulo exige liberação global pelo Super-admin, ativação e públicos escolhidos pela direção da empresa, capacidade efetiva e escopo do servidor. Padrão: desligado, público Diretor. Habilitar um perfil não amplia o cargo nem o teto de dados do papel: Gestor permanece na unidade, Supervisor não recebe valores de colegas e Corretor consulta seu próprio financeiro. A função Financeiro só opera dados de unidade/empresa com cargo explícito e capacidades ERP delegadas; separar preparo e aprovação nos modelos. A função Operações recebe capacidades específicas de implantação, sem finanças. Nenhuma pessoa é promovida ou recebe cargo automaticamente.
+
+A fila de implantação começa no lead em fechamento e se vincula ao contrato registrado posteriormente, preservando o requisito atual de evidência da operadora antes do registro final de venda. Sem API externa nova, sem automação de dinheiro por suposição e sem migração ou publicação de produção nesta etapa de desenvolvimento.
+
 ## DEC-183 - Escopo do ERP operacional e reservas sem concessão de acesso
 
 **Estado:** aceita para planejamento e fundação de rotas. **Data:** 2026-11-12.

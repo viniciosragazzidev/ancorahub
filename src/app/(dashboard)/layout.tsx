@@ -4,6 +4,8 @@ import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import { AuthorizationError, AuthenticationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AppShell } from "@/components/app-shell";
+import { canEnterErpRoute } from "@/features/erp/route-access";
+import { getErpNavigation } from "@/features/erp/navigation";
 import { ContextualIllustrationsProvider } from "@/components/illustrations/contextual-illustration";
 import { isLightRouteAllowed } from "@/components/light/light-routes";
 import { isManagerRouteAllowed, isOutsideManagerScope, MANAGER_HOME_PATH } from "@/features/manager-scope/manager-routes";
@@ -213,16 +215,18 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const initialChatRail = isLightManager ? await getChatRailData() : null;
 
   const pathname = headersList.get("x-pathname") || "";
+  const erpRouteAllowed = await canEnterErpRoute(pathname.split("?")[0]);
+  const erpLinks = await getErpNavigation();
 
   if (isLightBroker && brokerJourneyFlag !== "true" && (pathname === "/jornada" || pathname === "/dashboard/c/jornada")) redirect("/dashboard");
   if (isLightBroker || isLightSupervisor || isLightManager) {
-    if (!isLightRouteAllowed(pathname, liteAudience) && pathname !== "") {
+    if (!isLightRouteAllowed(pathname, liteAudience) && !erpRouteAllowed && pathname !== "") {
       redirect("/dashboard");
     }
   }
 
   // Gestor na versão antiga (10/11): só as rotas da gestão da unidade; o resto volta para a equipe.
-  if (isOutsideManagerScope(context.role, context.jobTitle) && pathname !== "" && !isManagerRouteAllowed(pathname)) {
+  if (isOutsideManagerScope(context.role, context.jobTitle) && pathname !== "" && !isManagerRouteAllowed(pathname) && !erpRouteAllowed) {
     redirect(MANAGER_HOME_PATH);
   }
 
@@ -275,6 +279,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         negotiationsEnabled={negotiationsAreaSetting === "true" && negotiationsRouteAccess}
         postSaleAuditEnabled={postSaleAuditFlag === "true"}
         autoSaleEnabled={autoSaleFlag}
+        erpLinks={erpLinks}
         isLightBroker={isLightBroker || isLightSupervisor || isLightManager}
         liteAudience={liteAudience}
         initialChatRail={initialChatRail}

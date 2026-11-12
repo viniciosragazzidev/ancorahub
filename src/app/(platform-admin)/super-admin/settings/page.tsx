@@ -78,6 +78,7 @@ import { Input } from "@/components/ui/input";
 import { AppSelect } from "@/components/ui/select";
 import { SuperAdminSettingsTabs } from "./super-admin-settings-tabs";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { ErpPlatformPanel } from "@/features/erp/components/platform-panel";
 import { updateContextualIllustrationsAction } from "../illustration-actions";
 
 export const dynamic = "force-dynamic";
@@ -332,6 +333,7 @@ export default async function SuperAdminSettingsPage() {
           }
         >
           <SuperAdminSettingsTabs>
+            <section data-settings-tab="platform"><ErpPlatformPanel /></section>
             <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Workspace do Corretor</CardTitle>

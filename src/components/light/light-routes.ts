@@ -282,6 +282,12 @@ const FALLBACK_ROUTE: LightRoute = { title: "Ancora", tab: "inicio", isRoot: fal
 /** Resolves title, active tab and parent for a pathname; only a few rules read the query (Insights). */
 export function resolveLightRoute(pathname: string, search: LightSearchParams | null = null): LightRoute {
   const path = pathname.split("?")[0].replace(/(.)\/+$/, "$1");
+  if (path === "/implantacoes") return { title: "Implantação", tab: "mais", isRoot: false, parentHref: "/dashboard" };
+  if (path === "/financeiro") return { title: "Financeiro", tab: "mais", isRoot: false, parentHref: "/dashboard" };
+  if (/^\/financeiro\/lancamentos\/[^/]+$/.test(path)) return { title: "Lançamento financeiro", tab: "mais", isRoot: false, parentHref: "/financeiro", backToParent: true };
+  if (path === "/financeiro/adiantamentos") return { title: "Adiantamentos", tab: "mais", isRoot: false, parentHref: "/financeiro", backToParent: true };
+  if (path === "/administracao/importacoes") return { title: "Importações", tab: "mais", isRoot: false, parentHref: "/dashboard" };
+  if (/^\/administracao\/importacoes\/[^/]+$/.test(path)) return { title: "Conferir lote", tab: "mais", isRoot: false, parentHref: "/administracao/importacoes", backToParent: true };
   const rule = RULES.find((candidate) => candidate.test(path));
   if (!rule) return FALLBACK_ROUTE;
   return typeof rule.route === "function" ? rule.route(path, search) : rule.route;

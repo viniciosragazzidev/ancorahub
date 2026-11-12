@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  bigint,
   check,
   customType,
   date,
@@ -17,6 +18,7 @@ import {
   unique,
   uniqueIndex,
   jsonb,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 const vector = customType<{ data: number[]; driverData: string }>({
@@ -5657,3 +5659,127 @@ export const autoSalePromotions = pgTable(
   },
   (table) => [index("auto_sale_promotions_tenant_active_idx").on(table.tenantId, table.active, table.endsOn)],
 );
+
+// ERP operational facts. Values are entered/conferred facts, never inferred premiums or commissions.
+export const erpModuleSettings = pgTable("erp_module_settings", {
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  moduleKey: text("module_key").notNull(),
+  enabled: boolean("enabled").notNull().default(false),
+  roles: text("roles").array().notNull().default(sql`ARRAY['director']::text[]`),
+  maxImportRows: integer("max_import_rows").notNull().default(100),
+  version: integer("version").notNull().default(1),
+  updatedBy: text("updated_by").notNull().references(() => user.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.tenantId, table.moduleKey] }), check("erp_module_rows_limit", sql`${table.maxImportRows} BETWEEN 1 AND 500`)]);
+
+export const erpEvents = pgTable("erp_events", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  actorId: text("actor_id").notNull(), action: text("action").notNull(),
+  entityType: text("entity_type").notNull(), entityId: text("entity_id").notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("erp_events_tenant_created_idx").on(table.tenantId, table.createdAt)]);
+
+export const erpDocuments = pgTable("erp_documents", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  branchId: text("branch_id").references(() => branches.id), ownerId: text("owner_id").notNull().references(() => user.id),
+  moduleKey: text("module_key").notNull(), state: text("state").notNull().default("uploading"),
+  leadId: text("lead_id").references(() => leads.id), financialEntryId: text("financial_entry_id").references((): AnyPgColumn => erpFinancialEntries.id),
+  nativeDocumentId: text("native_document_id").references(() => leadDocuments.id),
+  saleId: text("sale_id").references(() => sales.id), objectKey: text("object_key").notNull(),
+  fileName: text("file_name").notNull(), contentType: text("content_type").notNull(),
+  byteLength: integer("byte_length").notNull(), sha256: text("sha256").notNull(),
+  createdBy: text("created_by").notNull().references(() => user.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [unique("erp_documents_tenant_id_unique").on(table.tenantId, table.id), uniqueIndex("erp_documents_tenant_native_unique").on(table.tenantId, table.nativeDocumentId), index("erp_documents_tenant_owner_idx").on(table.tenantId, table.ownerId)]);
+
+export const erpImports = pgTable("erp_imports", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  domain: text("domain").notNull(), fileName: text("file_name").notNull(), sha256: text("sha256").notNull(),
+  layoutVersion: integer("layout_version").notNull().default(1), status: text("status").notNull().default("preview"),
+  payload: jsonb("payload").$type<unknown>().notNull(), rowCount: integer("row_count").notNull(),
+  branchIds: text("branch_ids").array().notNull().default(sql`ARRAY[]::text[]`), containsUnassigned: boolean("contains_unassigned").notNull().default(true),
+  createdBy: text("created_by").notNull().references(() => user.id), reviewedBy: text("reviewed_by").references(() => user.id),
+  reviewReason: text("review_reason"), version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+}, (table) => [uniqueIndex("erp_imports_tenant_hash_domain_unique").on(table.tenantId, table.sha256, table.domain), index("erp_imports_tenant_created_idx").on(table.tenantId, table.createdAt)]);
+
+export const erpImplantations = pgTable("erp_implantations", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  leadId: text("lead_id").notNull().references(() => leads.id), saleId: text("sale_id").references(() => sales.id), branchId: text("branch_id").references(() => branches.id),
+  brokerId: text("broker_id").notNull().references(() => user.id), status: text("status").notNull().default("review"),
+  reference: text("reference").notNull().default(""), policyNumber: text("policy_number").notNull().default(""),
+  coverageStartsOn: date("coverage_starts_on"), evidenceDocumentId: text("evidence_document_id").references(() => erpDocuments.id),
+  reason: text("reason").notNull().default(""), version: integer("version").notNull().default(1),
+  createdBy: text("created_by").notNull().references(() => user.id), updatedBy: text("updated_by").notNull().references(() => user.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("erp_implantations_tenant_sale_unique").on(table.tenantId, table.saleId), uniqueIndex("erp_implantations_tenant_lead_unique").on(table.tenantId, table.leadId), index("erp_implantations_tenant_status_idx").on(table.tenantId, table.status)]);
+
+export const erpFinancialEntries = pgTable("erp_financial_entries", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  kind: text("kind").notNull(), reference: text("reference").notNull(), requestId: text("request_id").notNull(),
+  saleId: text("sale_id").references(() => sales.id), branchId: text("branch_id").references(() => branches.id),
+  beneficiaryId: text("beneficiary_id").references(() => user.id), ownerId: text("owner_id").notNull().references(() => user.id),
+  description: text("description").notNull(), currency: text("currency").notNull().default("BRL"),
+  amountCents: bigint("amount_cents", { mode: "number" }).notNull(), dueOn: date("due_on").notNull(), competence: text("competence").notNull(),
+  status: text("status").notNull().default("submitted"), evidenceDocumentId: text("evidence_document_id").references(() => erpDocuments.id),
+  originCommissionId: text("origin_commission_id").references(() => commissionSchedule.id),
+  createdBy: text("created_by").notNull().references(() => user.id), approvedBy: text("approved_by").references(() => user.id),
+  approvedAt: timestamp("approved_at", { withTimezone: true }), version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  unique("erp_financial_entries_tenant_id_unique").on(table.tenantId, table.id),
+  uniqueIndex("erp_financial_entries_tenant_request_unique").on(table.tenantId, table.requestId),
+  uniqueIndex("erp_financial_entries_tenant_reference_kind_unique").on(table.tenantId, table.reference, table.kind),
+  uniqueIndex("erp_financial_entries_origin_commission_unique").on(table.tenantId, table.originCommissionId),
+  index("erp_financial_entries_tenant_due_idx").on(table.tenantId, table.dueOn),
+  check("erp_financial_entries_positive_amount", sql`${table.amountCents} > 0 AND ${table.amountCents} <= 100000000000`),
+  check("erp_financial_entries_independent_approval", sql`${table.approvedBy} IS NULL OR ${table.approvedBy} <> ${table.createdBy}`),
+]);
+
+export const erpSettlements = pgTable("erp_settlements", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  entryId: text("entry_id").notNull(), requestId: text("request_id").notNull(),
+  kind: text("kind").notNull().default("payment"), reversesId: text("reverses_id"),
+  amountCents: bigint("amount_cents", { mode: "number" }).notNull(), occurredOn: date("occurred_on").notNull(),
+  evidenceDocumentId: text("evidence_document_id").notNull().references(() => erpDocuments.id), reason: text("reason").notNull(),
+  status: text("status").notNull().default("pending"), createdBy: text("created_by").notNull().references(() => user.id),
+  reviewedBy: text("reviewed_by").references(() => user.id), reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  unique("erp_settlements_tenant_id_unique").on(table.tenantId, table.id),
+  uniqueIndex("erp_settlements_tenant_request_unique").on(table.tenantId, table.requestId),
+  uniqueIndex("erp_settlements_reversal_unique").on(table.tenantId, table.reversesId).where(sql`${table.status} <> 'rejected'`),
+  foreignKey({ columns: [table.tenantId, table.entryId], foreignColumns: [erpFinancialEntries.tenantId, erpFinancialEntries.id] }),
+  index("erp_settlements_tenant_entry_idx").on(table.tenantId, table.entryId),
+  check("erp_settlements_positive_amount", sql`${table.amountCents} > 0 AND ${table.amountCents} <= 100000000000`),
+  check("erp_settlements_independent_approval", sql`${table.reviewedBy} IS NULL OR ${table.reviewedBy} <> ${table.createdBy}`),
+]);
+
+export const erpClosings = pgTable("erp_closings", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id), competence: text("competence").notNull(),
+  status: text("status").notNull().default("pending"), snapshot: jsonb("snapshot").$type<unknown>().notNull(),
+  reason: text("reason").notNull(), preparedBy: text("prepared_by").notNull().references(() => user.id),
+  closedBy: text("closed_by").references(() => user.id),
+  closedAt: timestamp("closed_at", { withTimezone: true }).notNull().defaultNow(), version: integer("version").notNull().default(1),
+}, (table) => [uniqueIndex("erp_closings_tenant_competence_unique").on(table.tenantId, table.competence)]);
+
+export const erpOffsets = pgTable("erp_offsets", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  advanceEntryId: text("advance_entry_id").notNull(), commissionEntryId: text("commission_entry_id").notNull(),
+  requestId: text("request_id").notNull(), kind: text("kind").notNull().default("allocation"), reversesId: text("reverses_id"),
+  amountCents: bigint("amount_cents", { mode: "number" }).notNull(), occurredOn: date("occurred_on").notNull(), reason: text("reason").notNull(),
+  status: text("status").notNull().default("pending"), createdBy: text("created_by").notNull().references(() => user.id),
+  reviewedBy: text("reviewed_by").references(() => user.id), reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  unique("erp_offsets_tenant_id_unique").on(table.tenantId, table.id),
+  uniqueIndex("erp_offsets_tenant_request_unique").on(table.tenantId, table.requestId),
+  uniqueIndex("erp_offsets_tenant_reversal_unique").on(table.tenantId, table.reversesId).where(sql`${table.status} <> 'rejected'`),
+  index("erp_offsets_tenant_advance_idx").on(table.tenantId, table.advanceEntryId),
+  index("erp_offsets_tenant_commission_idx").on(table.tenantId, table.commissionEntryId),
+  foreignKey({ columns: [table.tenantId, table.advanceEntryId], foreignColumns: [erpFinancialEntries.tenantId, erpFinancialEntries.id] }),
+  foreignKey({ columns: [table.tenantId, table.commissionEntryId], foreignColumns: [erpFinancialEntries.tenantId, erpFinancialEntries.id] }),
+  check("erp_offsets_positive_amount", sql`${table.amountCents} > 0 AND ${table.amountCents} <= 100000000000`),
+  check("erp_offsets_independent_approval", sql`${table.reviewedBy} IS NULL OR ${table.reviewedBy} <> ${table.createdBy}`),
+]);

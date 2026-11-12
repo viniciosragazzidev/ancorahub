@@ -5,6 +5,16 @@ import type { TenantRole } from "@/shared/db/schema";
  * integrações (docs/implementations/active/2026-11-10-gestor-versao-antiga-escopo-unidade.md).
  */
 export const PERMISSIONS = {
+  erp_manage_modules: ["director"],
+  erp_view_operations: ["broker", "supervisor", "manager", "director"],
+  erp_manage_operations: ["director"],
+  erp_view_finance: ["broker", "supervisor", "manager", "director"],
+  erp_prepare_finance: ["director"],
+  erp_approve_finance: ["director"],
+  erp_import_data: ["director"],
+  erp_view_analytics: ["broker", "supervisor", "manager", "director"],
+  erp_manage_incentives: ["director"],
+  erp_manage_referrals: ["broker", "supervisor", "manager", "director"],
   acessar_conversas: ["broker", "supervisor", "manager", "director"],
   acessar_leads: ["broker", "supervisor", "manager", "director"],
   acessar_tarefas: ["broker", "supervisor", "manager", "director"],
@@ -75,9 +85,10 @@ export const PERMISSIONS = {
 
 export type PermissionKey = keyof typeof PERMISSIONS;
 
-export type JobTitleCapability = "marketing" | "finance";
+export type JobTitleCapability = "marketing" | "finance" | "operations";
 
 export const JOB_TITLE_CAPABILITIES: Record<JobTitleCapability, readonly PermissionKey[]> = {
+  operations: ["erp_view_operations", "erp_manage_operations", "erp_import_data"],
   marketing: [
     "importar_planilhas",
     "importar_leads_meta",
@@ -90,6 +101,7 @@ export const JOB_TITLE_CAPABILITIES: Record<JobTitleCapability, readonly Permiss
     "acessar_configuracoes_pessoais",
   ],
   finance: [
+    "erp_view_finance", "erp_prepare_finance", "erp_approve_finance", "erp_import_data",
     "acessar_financeiro",
     "ver_fluxo_caixa",
     "ver_resultado_corretor",

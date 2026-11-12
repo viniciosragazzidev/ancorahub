@@ -87,9 +87,10 @@ const areaPresentation: Record<NavAreaId, Pick<NavItemConfig, "icon" | "iconTone
   "atendimento-ia": { icon: Sparkle, iconTone: "text-fuchsia-600 dark:text-fuchsia-300" },
   marketing: { icon: Megaphone, iconTone: "text-blue-600 dark:text-blue-300" },
   configuracoes: { icon: SlidersHorizontal, iconTone: "text-slate-600 dark:text-slate-300" },
+  erp: { icon: ShieldCheck, iconTone: "text-primary" },
 };
 
-export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initialOnDuty, negotiationsEnabled = false, postSaleAuditEnabled = false }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string; initialOnDuty?: boolean; negotiationsEnabled?: boolean; postSaleAuditEnabled?: boolean }) {
+export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initialOnDuty, negotiationsEnabled = false, postSaleAuditEnabled = false, erpPaths = [] }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string; initialOnDuty?: boolean; negotiationsEnabled?: boolean; postSaleAuditEnabled?: boolean; erpPaths?: readonly string[] }) {
   const currentPathname = usePathname();
   const pathname = initialPathname ?? currentPathname;
   const { isMobile, setOpenMobile } = useSidebar();
@@ -114,7 +115,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
     pathname.startsWith("/leads/distribuicao/plantao");
 
   const activeAreaId = resolveNavLocation(pathname)?.area.id ?? null;
-  const visibleItems: NavItemConfig[] = visibleNavAreas(user ? { ...user, negotiationsEnabled, postSaleAuditEnabled } : null).map(({ area, href }) => ({
+  const visibleItems: NavItemConfig[] = visibleNavAreas(user ? { ...user, negotiationsEnabled, postSaleAuditEnabled, erpPaths } : null).map(({ area, href }) => ({
     id: area.id,
     label: area.label,
     fullLabel: area.fullLabel,

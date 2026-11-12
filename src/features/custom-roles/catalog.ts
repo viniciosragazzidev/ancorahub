@@ -11,6 +11,7 @@ export type CapabilityDefinition = {
 };
 
 const blocked = new Set<PermissionKey>([
+  "erp_manage_modules",
   "gerenciar_financeiro",
   "gerenciar_comissoes",
   "gerenciar_filiais",
@@ -21,6 +22,16 @@ const blocked = new Set<PermissionKey>([
 ]);
 
 const labels: Record<PermissionKey, [string, string, string]> = {
+  erp_manage_modules: ["Administrar módulos ERP", "Ativar módulos e públicos da empresa. Restrito à direção sem cargo restritivo.", "ERP"],
+  erp_view_operations: ["Consultar implantação", "Acompanhar as implantações no escopo da pessoa.", "ERP"],
+  erp_manage_operations: ["Conferir implantação", "Atualizar etapas e comprovar cobertura no escopo permitido.", "ERP"],
+  erp_view_finance: ["Consultar financeiro ERP", "Consultar valores autorizados; corretor e supervisor veem apenas seus repasses.", "ERP"],
+  erp_prepare_finance: ["Preparar financeiro ERP", "Preparar valores e evidências, sem autoaprovação ou transferência bancária.", "ERP"],
+  erp_approve_finance: ["Aprovar financeiro ERP", "Aprovar fatos preparados por outra pessoa; não concede escopo além do papel.", "ERP"],
+  erp_import_data: ["Conferir importações ERP", "Enviar arquivos e revisar lotes autorizados.", "ERP"],
+  erp_view_analytics: ["Consultar inteligência ERP", "Consultar indicadores e suas origens dentro do escopo autorizado.", "ERP"],
+  erp_manage_incentives: ["Administrar incentivos", "Preparar regulamentos e revisar apurações.", "ERP"],
+  erp_manage_referrals: ["Acompanhar indicações", "Registrar e acompanhar indicações do próprio escopo.", "ERP"],
   // Comercial & Leads
   acessar_leads: [
     "Consultar leads",
