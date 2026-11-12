@@ -19,7 +19,7 @@ export type EligibilityInput = {
 export type IneligibleReason = "not_hot" | "stage" | "no_phone" | "no_consent" | "has_broker" | "removed" | "opt_out" | "meta_blocked" | "post_sale" | "open_deal";
 
 export const INELIGIBLE_LABEL: Record<IneligibleReason, string> = {
-  not_hot: "Não está quente",
+  not_hot: "Não está quente nem em qualificação",
   stage: "Etapa fora do piloto",
   no_phone: "Sem telefone válido",
   no_consent: "Sem base legal (consentimento ou mensagem do cliente)",
@@ -31,6 +31,12 @@ export const INELIGIBLE_LABEL: Record<IneligibleReason, string> = {
   open_deal: "Já está numa negociação",
 };
 
+/** Status da qualificação que a venda aceita: quente, ou a IA ainda qualificando (a venda assume no meio). */
+export const IN_QUALIFICATION_STATUSES = ["pending", "qualifying"] as const;
+export function isAutoSaleTemperature(qualificationStatus: string | null) {
+  return qualificationStatus === "hot" || (IN_QUALIFICATION_STATUSES as readonly string[]).includes(qualificationStatus ?? "");
+}
+
 export function hasValidPhone(value: string | null) {
   const digits = (value ?? "").replace(/\D/g, "");
   return digits.length >= 10 && digits.length <= 13;
@@ -40,7 +46,8 @@ export function hasValidPhone(value: string | null) {
 export function autoSaleIneligibleReasons(input: EligibilityInput): IneligibleReason[] {
   const reasons: IneligibleReason[] = [];
   if (input.deletedAt || input.archivedAt) reasons.push("removed");
-  if (input.qualificationStatus !== "hot") reasons.push("not_hot");
+  // Quente, ou ainda na qualificação da IA (12/11, pedido do Vinicios): a venda assume a conversa no meio.
+  if (!isAutoSaleTemperature(input.qualificationStatus)) reasons.push("not_hot");
   if (input.status === "converted") reasons.push("post_sale");
   else if (!(ELIGIBLE_LEAD_STATUSES as readonly string[]).includes(input.status)) reasons.push("stage");
   if (input.postSaleOptOut && !reasons.includes("post_sale")) reasons.push("post_sale");

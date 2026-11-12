@@ -13,7 +13,7 @@ import type { TenantContext } from "@/shared/auth/types";
 import { postgresErrorCode } from "@/shared/db/postgres-errors";
 
 import { MANAGER_CALL_REASONS, OPEN_DEAL_STATUSES, type AutoSaleChannel, type AutoSaleMode, type DealFacts, type ManagerCallReason, type Promotion } from "./contracts";
-import { autoSaleIneligibleReasons, ELIGIBLE_LEAD_STATUSES, type IneligibleReason } from "./eligibility";
+import { autoSaleIneligibleReasons, ELIGIBLE_LEAD_STATUSES, IN_QUALIFICATION_STATUSES, type IneligibleReason } from "./eligibility";
 import { factsFromQualification } from "./facts";
 import { readAutoSaleFlags } from "./flag";
 import { managerSummary } from "./manager-summary";
@@ -75,7 +75,7 @@ export async function searchLeadsForAutoSale(context: TenantContext, input: { qu
     eq(schema.leads.tenantId, context.tenantId),
     isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt),
     inArray(schema.leads.status, [...ELIGIBLE_LEAD_STATUSES]),
-    input.onlyHot ? eq(schema.leads.qualificationStatus, "hot") : undefined,
+    input.onlyHot ? inArray(schema.leads.qualificationStatus, ["hot", ...IN_QUALIFICATION_STATUSES]) : undefined,
     context.branchId && context.role !== "director" ? eq(schema.leads.branchId, context.branchId) : undefined,
     query ? or(ilike(schema.leads.nome, `%${query.replace(/[%_]/g, "")}%`), digits.length >= 4 ? ilike(schema.leads.telefone, `%${digits}%`) : undefined) : undefined,
   )).orderBy(desc(schema.leads.createdAt)).limit(30);
@@ -169,6 +169,13 @@ export async function startDeal(context: TenantContext, input: { leadId: string;
         distributionStatus: "removed", distributionRemovedAt: now, distributionRemovalReason: "auto_sale",
         distributionRemovalNote: "Na Venda Automatizada", distributionRemovedBy: context.userId, distributionUpdatedAt: now, updatedAt: now,
       }).where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+      // A venda assume a conversa (inclusive no meio da qualificação): o que a qualificação ainda tinha na fila
+      // para o cliente não sai mais. Avisos para a equipe não são tocados.
+      await tx.update(schema.whatsappOutboundMessages).set({ status: "cancelled", updatedAt: now }).where(and(
+        eq(schema.whatsappOutboundMessages.tenantId, context.tenantId), eq(schema.whatsappOutboundMessages.recipientType, "lead"),
+        eq(schema.whatsappOutboundMessages.recipientId, lead.id), inArray(schema.whatsappOutboundMessages.status, ["pending", "queued"]),
+        sql`${schema.whatsappOutboundMessages.purpose} <> 'autoSale'`,
+      ));
       if (conversation) {
         await tx.update(schema.aiConversations).set({ automationState: "PAUSED", pausedByUserId: context.userId, updatedAt: now })
           .where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, context.tenantId)));
@@ -206,7 +213,8 @@ export async function startDeal(context: TenantContext, input: { leadId: string;
 export async function startNextHotDeal(context: TenantContext, input: { mode: AutoSaleMode }) {
   assertManager(context);
   const candidates = await searchLeadsForAutoSale(context, { query: "", onlyHot: true });
-  const next = candidates.find((lead) => lead.reasons.length === 0);
+  // Só quente aqui: lead em qualificação entra pela escolha manual, não pelo "próximo quente".
+  const next = candidates.find((lead) => lead.qualificationStatus === "hot" && lead.reasons.length === 0);
   if (!next) throw new AutoSaleError("Nenhum lead quente disponível agora: todos já têm corretor, estão sem base legal ou já estão numa negociação.");
   const { dealId } = await startDeal(context, { leadId: next.id, channel: "meta", wahaNumberId: null, mode: input.mode });
   await audit(context.userId, dealId, "auto_sale.next_hot_picked", { leadId: next.id, mode: input.mode });
