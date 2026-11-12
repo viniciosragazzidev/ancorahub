@@ -14,13 +14,14 @@ import {
   findPlantaoReportGroupId,
   parsePlantaoReportConfig,
   plantaoReportDayKey,
-  plantaoReportDayStart,
   plantaoReportLocalHour,
+  plantaoReportWindow,
   type PlantaoOfferRow,
+  PLANTAO_REPORT_HOUR,
   type PlantaoQueueRow,
 } from "./plantao-report-core";
 import { deliverPlantaoReport } from "./plantao-report-delivery";
-import { isSaoPauloWeekend } from "./daily-leads-report-core";
+import { leadEntryQueueExpression } from "./metrics/lead-quality-service";
 
 export const PLANTAO_REPORT_SETTING_PREFIX = "plantao_report_";
 const PLANTAO_REPORT_STATUS_PREFIX = "heartbeat:plantao-report-status:";
@@ -84,26 +85,23 @@ async function writeConfig(tenantId: string, config: ReturnType<typeof parsePlan
 
 export async function loadPlantaoReport(tenantId: string, now = new Date(), configOverride?: ReturnType<typeof parsePlantaoReportConfig>) {
   const config = configOverride ?? await readConfig(tenantId);
-  const from = plantaoReportDayStart(now).toISOString();
-  const until = now.toISOString();
+  // Dia de calendário relatado (00h-23h59 SP), igual à tela de Qualidade. Mesma fila de entrada dela.
+  const janela = plantaoReportWindow(now);
+  const from = janela.since.toISOString();
+  const until = janela.until.toISOString();
   const queueResult = await getDatabase().execute(sql`
     with entrants as (
-      select l.id,
-        coalesce(l.source_metadata, '{}'::jsonb) ? 'formAnswers' as has_form_answers,
-        coalesce(l.source_metadata, '{}'::jsonb) ? 'ctwaClid' as has_ctwa_clid,
-        coalesce(l.source_metadata, '{}'::jsonb) ? 'withoutReferral' as has_without_referral,
-        first_queue.to_queue_id
-      from leads l
-      left join lateral (
-        select event.to_queue_id
-        from lead_distribution_events event
-        where event.tenant_id = l.tenant_id and event.lead_id = l.id and event.action = 'queued'
-        order by event.created_at asc, event.id asc
-        limit 1
-      ) first_queue on true
-      where l.tenant_id = ${tenantId}
-        and l.created_at >= ${from}::timestamptz
-        and l.created_at < ${until}::timestamptz
+      select leads.id,
+        coalesce(leads.source_metadata, '{}'::jsonb) ? 'formAnswers' as has_form_answers,
+        coalesce(leads.source_metadata, '{}'::jsonb) ? 'ctwaClid' as has_ctwa_clid,
+        coalesce(leads.source_metadata, '{}'::jsonb) ? 'withoutReferral' as has_without_referral,
+        ${leadEntryQueueExpression()} as to_queue_id
+      from leads
+      where leads.tenant_id = ${tenantId}
+        and leads.deleted_at is null
+        and leads.archived_at is null
+        and leads.created_at >= ${from}::timestamptz
+        and leads.created_at < ${until}::timestamptz
     )
     select queue.name as queue_name, entrants.has_form_answers,
       entrants.has_ctwa_clid, entrants.has_without_referral, count(*)::int as count
@@ -231,7 +229,8 @@ export async function sendPlantaoReportForTenant(tenantId: string, options: { no
   if (await getFeatureFlag(FEATURE_FLAGS.PLANTAO_REPORT) !== "true") return { tenantId, state: "disabled" as const, reason: "feature_disabled" };
   const config = await readConfig(tenantId);
   if (!config.enabled) return { tenantId, state: "disabled" as const, reason: "tenant_disabled" };
-  if (!options.manual && plantaoReportLocalHour(now) < config.hour) {
+  // Hora fixa do envio (08h), e não a hora salva na configuração antiga (19h).
+  if (!options.manual && plantaoReportLocalHour(now) < PLANTAO_REPORT_HOUR) {
     return { tenantId, state: "before_schedule" as const, reason: "before_schedule" };
   }
   const { text, day } = await loadPlantaoReport(tenantId, now, config);
@@ -286,7 +285,7 @@ export async function sendPlantaoReportForTenant(tenantId: string, options: { no
 export async function runPlantaoReportJob(now = new Date()) {
   if (await getFeatureFlag(FEATURE_FLAGS.PLANTAO_REPORT) !== "true") return { skipped: true as const, reason: "feature_disabled" };
   // Sábado e domingo não tem relatório (Vinicios, 10/11). O "Enviar agora" da tela continua funcionando.
-  if (isSaoPauloWeekend(now)) return { skipped: true as const, reason: "weekend" };
+  // Todo dia é relatado uma vez, inclusive sábado e domingo (o relatório de cada um sai no dia seguinte, 08h).
   const tenants = await getDatabase().select({ id: schema.tenants.id }).from(schema.tenants).where(eq(schema.tenants.status, "active"));
   const results = [];
   for (const tenant of tenants) {

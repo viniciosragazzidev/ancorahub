@@ -6,7 +6,7 @@
 export const DAILY_LEADS_REPORT_NOTICE_KEY = "DAILY_LEADS_REPORT";
 export const DAILY_LEADS_REPORT_PURPOSE = "dailyLeadsReport";
 /** Hora de São Paulo a partir da qual o relatório sai. */
-export const DAILY_LEADS_REPORT_HOUR = 18;
+export const DAILY_LEADS_REPORT_HOUR = 8;
 
 export type QueueDayRow = { queueName: string | null; leads: number; hot: number; warm: number; cold: number };
 

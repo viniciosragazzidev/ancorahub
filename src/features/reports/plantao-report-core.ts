@@ -1,6 +1,6 @@
-import { shortDate } from "./daily-leads-report-core";
 
-export const PLANTAO_REPORT_HOUR = 19;
+
+export const PLANTAO_REPORT_HOUR = 8;
 export const PLANTAO_REPORT_GROUP_DEFAULT = "Fechamento Plantão Geral";
 export const PLANTAO_REPORT_WAHA_NUMBER_ID = "003a8720-68a0-4b58-88a2-06cb35470f2d";
 
@@ -60,9 +60,17 @@ export type PlantaoOfferRow = {
   offeredAt: Date | string;
 };
 
+export type PlantaoLine = { name: string; count: number };
+
 export type PlantaoReportMetrics = {
-  external: { whatsapp: number; rd: number; total: number };
-  internal: { facebook: number; whatsapp: number; total: number };
+  /** Total gerado: todos os leads do dia relatado, pela fila de entrada (mesmo critério da tela de Qualidade). */
+  generated: { total: number };
+  /** EXTERNO = Fila Tatiana. `details` (WhatsApp e RD) só existe quando somam exatamente o total da fila. */
+  external: { total: number; details: { whatsapp: number; rd: number } | null };
+  /** INTERNO = PF, PME e Whatsapp Renan, com o detalhe de cada fila. */
+  internal: { total: number; queues: PlantaoLine[] };
+  /** Outras filas: Venâncio, Alessandra e qualquer fila fora das categorias. */
+  others: { total: number; queues: PlantaoLine[] };
   indications: { morning: number; afternoon: number };
   quantity: { pme: number; onlineMorning: number; onlineAfternoon: number; inPersonMorning: number; inPersonAfternoon: number };
 };
@@ -125,10 +133,6 @@ export function classifyPlantaoLead(input: { hasFormAnswers: boolean; hasCtwaCli
   return "other";
 }
 
-function countMatching(rows: readonly PlantaoQueueRow[], queueNames: readonly string[], kind: PlantaoQueueRow["kind"] | null) {
-  const names = new Set(queueNames.map(normalizePlantaoLabel));
-  return rows.filter((row) => row.queueName && names.has(normalizePlantaoLabel(row.queueName)) && (!kind || row.kind === kind)).reduce((total, row) => total + row.count, 0);
-}
 
 function localHour(value: Date | string) {
   return Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23" }).format(new Date(value)));
@@ -162,19 +166,35 @@ function averagesFor(rows: readonly PlantaoOfferRow[], predicate: (name: string,
 }
 
 export function calculatePlantaoMetrics(rows: readonly PlantaoQueueRow[], offers: readonly PlantaoOfferRow[], config: PlantaoReportConfig): PlantaoReportMetrics {
-  const external = {
-    whatsapp: countMatching(rows, [config.queues.tatiana], "whatsapp"),
-    rd: countMatching(rows, [config.queues.tatiana], "form"),
-    total: 0,
+  const sumFor = (name: string, kind?: PlantaoQueueRow["kind"]) => {
+    const key = normalizePlantaoLabel(name);
+    return rows.filter((row) => row.queueName && normalizePlantaoLabel(row.queueName) === key && (!kind || row.kind === kind)).reduce((total, row) => total + row.count, 0);
   };
-  external.total = external.whatsapp + external.rd;
-  const internal = {
-    facebook: countMatching(rows, config.queues.facebook, "form"),
-    whatsapp: countMatching(rows, [config.queues.whatsappInternal], "whatsapp"),
-    total: 0,
-  };
-  internal.total = internal.facebook + internal.whatsapp;
+  const generatedTotal = rows.reduce((total, row) => total + row.count, 0);
 
+  // EXTERNO: a Fila Tatiana inteira, como na tela de Qualidade. O detalhe WhatsApp/RD só entra se fechar a soma.
+  const externalTotal = sumFor(config.queues.tatiana);
+  const whatsapp = sumFor(config.queues.tatiana, "whatsapp");
+  const rd = sumFor(config.queues.tatiana, "form");
+  const details = whatsapp + rd === externalTotal ? { whatsapp, rd } : null;
+
+  // INTERNO: PF, PME e Whatsapp Renan.
+  const internalNames = [...config.queues.facebook, config.queues.whatsappInternal];
+  const internalQueues = internalNames.map((name) => ({ name, count: sumFor(name) }));
+  const internalTotal = internalQueues.reduce((total, line) => total + line.count, 0);
+
+  // OUTRAS FILAS: qualquer nome fora das categorias (inclui quem não tem fila).
+  const categoryKeys = new Set([config.queues.tatiana, ...internalNames].map(normalizePlantaoLabel));
+  const otherByName = new Map<string, number>();
+  for (const row of rows) {
+    const name = row.queueName ?? "Sem fila";
+    if (categoryKeys.has(normalizePlantaoLabel(name))) continue;
+    otherByName.set(name, (otherByName.get(name) ?? 0) + row.count);
+  }
+  const others = [...otherByName.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+  const othersTotal = others.reduce((total, line) => total + line.count, 0);
+
+  // Indicações e média: ofertas aceitas na mesma janela, sem as filas de indicação excluídas.
   const morningLeads = new Set<string>();
   const afternoonLeads = new Set<string>();
   const excludedQueue = normalizePlantaoLabel(config.queues.indicationsExcludedQueue);
@@ -199,7 +219,46 @@ export function calculatePlantaoMetrics(rows: readonly PlantaoQueueRow[], offers
     inPersonMorning: averagesFor(offers, (name) => isPresencialMorning(name), "morning"),
     inPersonAfternoon: averagesFor(offers, (name) => isPresencialAfternoon(name), "afternoon"),
   };
-  return { external, internal, indications, quantity };
+
+  // EXTERNO + INTERNO + OUTRAS = TOTAL GERADO: cada lead cai numa única fila de entrada.
+  if (externalTotal + internalTotal + othersTotal !== generatedTotal) throw new Error("plantao_report_total_mismatch");
+  return {
+    generated: { total: generatedTotal },
+    external: { total: externalTotal, details },
+    internal: { total: internalTotal, queues: internalQueues },
+    others: { total: othersTotal, queues: others },
+    indications,
+    quantity,
+  };
+}
+
+const PLANTAO_DAY_MS = 24 * 60 * 60 * 1000;
+
+function previousDayKey(key: string) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day - 1)).toISOString().slice(0, 10);
+}
+
+/**
+ * Dia relatado: o DIA ANTERIOR de calendário (00:00 a 23:59, São Paulo). O envio é às 08:00 do dia seguinte,
+ * então cada dia é relatado uma vez, inclusive sábado e domingo (sábado relata sexta, domingo relata sábado,
+ * segunda relata domingo). Mesma janela e mesma fila de entrada da tela de Qualidade (calendário).
+ */
+export function plantaoReportWindow(now: Date): { since: Date; until: Date; reportedDayKey: string } {
+  const reportedDayKey = previousDayKey(plantaoReportDayKey(now));
+  const [year, month, day] = reportedDayKey.split("-").map(Number);
+  // São Paulo não tem horário de verão: 00:00 local é 03:00 UTC o ano todo.
+  const since = new Date(Date.UTC(year, month - 1, day, 3));
+  return { since, until: new Date(since.getTime() + PLANTAO_DAY_MS), reportedDayKey };
+}
+
+const WEEKDAY_PT = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+
+/** "terça, 10/11" para o título do relatório do dia relatado. */
+export function plantaoReportTitleDay(reportedDayKey: string) {
+  const [year, month, day] = reportedDayKey.split("-").map(Number);
+  const weekday = WEEKDAY_PT[new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay()];
+  return `${weekday}, ${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}`;
 }
 
 function whole(value: number) {
@@ -222,24 +281,36 @@ export function plantaoReportLocalHour(now: Date) {
   return Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23" }).format(now));
 }
 
+/** Nome curto da fila no relatório: sem o prefixo "FILA " (o aviso tem limite de 512 caracteres). */
+function shortQueueName(name: string) {
+  return name.replace(/^fila\s+/i, "");
+}
+
 export function buildPlantaoReportText(metrics: PlantaoReportMetrics, now: Date) {
-  return [
-    `📊 *Resultado do Plantão* · ${shortDate(now)}`,
+  const reported = plantaoReportWindow(now).reportedDayKey;
+  const [, month, day] = reported.split("-");
+  const lines = [
+    `📊 *Resultado de ${plantaoReportTitleDay(reported)}* · 00h às 23h59 de ${day}/${month}`,
     "",
+    `*Total gerado* · ${whole(metrics.generated.total)} leads`,
     `*EXTERNO* · ${whole(metrics.external.total)} leads`,
-    `💬 WhatsApp Externo: ${whole(metrics.external.whatsapp)}`,
-    `📝 RD: ${whole(metrics.external.rd)}`,
+  ];
+  if (metrics.external.details) {
+    // Só as partes com leads: sem "RD 0" quando a fila é toda WhatsApp.
+    const parts = [
+      metrics.external.details.whatsapp > 0 ? `WhatsApp ${whole(metrics.external.details.whatsapp)}` : null,
+      metrics.external.details.rd > 0 ? `RD ${whole(metrics.external.details.rd)}` : null,
+    ].filter((part): part is string => part !== null);
+    if (parts.length) lines.push(parts.join(" · "));
+  }
+  lines.push(`*INTERNO* · ${whole(metrics.internal.total)} leads`);
+  for (const queue of metrics.internal.queues) lines.push(`${shortQueueName(queue.name)}: ${whole(queue.count)}`);
+  lines.push(`*Outras filas* · ${whole(metrics.others.total)} leads`);
+  for (const queue of metrics.others.queues) lines.push(`${shortQueueName(queue.name)}: ${whole(queue.count)}`);
+  lines.push(
     "",
-    `*INTERNO* · ${whole(metrics.internal.total)} leads`,
-    `📘 Facebook: ${whole(metrics.internal.facebook)}`,
-    `💬 WhatsApp Interno: ${whole(metrics.internal.whatsapp)}`,
-    "",
-    "*Indicações*",
-    `🌅 Manhã: ${whole(metrics.indications.morning)} · 🌇 Tarde: ${whole(metrics.indications.afternoon)}`,
-    "",
-    "*Média de leads por corretor*",
-    `🏢 PME: ${averageRoundedUp(metrics.quantity.pme)}`,
-    `💻 Online: manhã ${averageRoundedUp(metrics.quantity.onlineMorning)} · tarde ${averageRoundedUp(metrics.quantity.onlineAfternoon)}`,
-    `🧑‍💼 Presencial: manhã ${averageRoundedUp(metrics.quantity.inPersonMorning)} · tarde ${averageRoundedUp(metrics.quantity.inPersonAfternoon)}`,
-  ].join("\n");
+    `*Indicações* 🌅 ${whole(metrics.indications.morning)} · 🌇 ${whole(metrics.indications.afternoon)}`,
+    `*Média por corretor* PME ${averageRoundedUp(metrics.quantity.pme)} · Online ${averageRoundedUp(metrics.quantity.onlineMorning)}/${averageRoundedUp(metrics.quantity.onlineAfternoon)} · Presencial ${averageRoundedUp(metrics.quantity.inPersonMorning)}/${averageRoundedUp(metrics.quantity.inPersonAfternoon)}`,
+  );
+  return lines.join("\n");
 }

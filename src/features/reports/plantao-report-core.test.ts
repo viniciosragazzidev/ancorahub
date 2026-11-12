@@ -8,22 +8,11 @@ import {
   findPlantaoReportGroupId,
   parsePlantaoReportConfig,
   type PlantaoOfferRow,
-  type PlantaoQueueRow,
   type PlantaoReportMetrics,
 } from "./plantao-report-core";
 
 const start = new Date("2026-11-09T12:00:00.000Z");
 
-function offersFor(input: { prefix: string; count: number; brokers: number; name: string; schedule: string; time: string; originalQueueName?: string }): PlantaoOfferRow[] {
-  return Array.from({ length: input.count }, (_, index) => ({
-    leadId: `${input.prefix}-lead-${index}`,
-    brokerId: `${input.prefix}-broker-${index % input.brokers}`,
-    dutyScheduleId: input.schedule,
-    dutyName: input.name,
-    originalQueueName: input.originalQueueName ?? null,
-    offeredAt: new Date(`${input.time.slice(0, 10)}T${input.time.slice(11)}Z`),
-  }));
-}
 
 describe("resultado do plantão", () => {
   it("usa o grupo padrão exato e busca por nome completo normalizado", () => {
@@ -43,57 +32,6 @@ describe("resultado do plantão", () => {
     expect(classifyPlantaoLead({ hasFormAnswers: false, hasCtwaClid: true, hasWithoutReferral: false })).toBe("whatsapp");
     expect(classifyPlantaoLead({ hasFormAnswers: false, hasCtwaClid: false, hasWithoutReferral: true })).toBe("whatsapp");
     expect(classifyPlantaoLead({ hasFormAnswers: false, hasCtwaClid: false, hasWithoutReferral: false })).toBe("other");
-  });
-
-  it("reproduz os totais da conferência de 09/11 e monta o formato atualizado", () => {
-    const queues: PlantaoQueueRow[] = [
-      { queueName: "Fila TATIANA", kind: "whatsapp", count: 92 },
-      { queueName: "Fila TATIANA", kind: "form", count: 27 },
-      { queueName: "Fila PF - Renan", kind: "form", count: 60 },
-      { queueName: "Fila PME - Renan", kind: "form", count: 58 },
-      { queueName: "Whatsapp Renan", kind: "whatsapp", count: 17 },
-      { queueName: null, kind: "other", count: 4 },
-    ];
-    const offers = [
-      ...offersFor({ prefix: "pme", count: 19, brokers: 2, name: "PME Rio", schedule: "pme", time: "2026-11-09T09:00:00" }),
-      ...offersFor({ prefix: "online-am", count: 21, brokers: 5, name: "Premium", schedule: "premium-am", time: "2026-11-09T10:00:00" }),
-      ...offersFor({ prefix: "online-pm", count: 3, brokers: 3, name: "Premium", schedule: "premium-pm", time: "2026-11-09T17:00:00" }),
-      ...offersFor({ prefix: "presencial-am", count: 13, brokers: 2, name: "Presencial 09/11 · Manhã", schedule: "presencial-am", time: "2026-11-09T11:00:00" }),
-      ...offersFor({ prefix: "presencial-pm", count: 20, brokers: 3, name: "Presencial 09/11 · Tarde", schedule: "presencial-pm", time: "2026-11-09T17:00:00" }),
-      ...offersFor({ prefix: "other-am", count: 33, brokers: 1, name: "Plantão Plus", schedule: "other-am", time: "2026-11-09T10:00:00" }),
-      ...offersFor({ prefix: "other-pm", count: 25, brokers: 1, name: "Alessandra Leads", schedule: "other-pm", time: "2026-11-09T18:00:00", originalQueueName: "Alessandra Leads" }),
-      ...offersFor({ prefix: "general-am", count: 29, brokers: 1, name: "Atendimento Geral", schedule: "general-am", time: "2026-11-09T11:00:00" }),
-      ...offersFor({ prefix: "general-pm", count: 25, brokers: 1, name: "Atendimento Geral", schedule: "general-pm", time: "2026-11-09T18:00:00" }),
-    ];
-    const metrics = calculatePlantaoMetrics(queues, offers, DEFAULT_PLANTAO_REPORT_CONFIG);
-    expect(metrics).toEqual({
-      external: { whatsapp: 92, rd: 27, total: 119 },
-      internal: { facebook: 118, whatsapp: 17, total: 135 },
-      indications: { morning: 82, afternoon: 48 },
-      quantity: { pme: 9.5, onlineMorning: 4.2, onlineAfternoon: 1, inPersonMorning: 6.5, inPersonAfternoon: 20 / 3 },
-    });
-    expect(buildPlantaoReportText(metrics, new Date("2026-11-10T02:00:00.000Z"))).toBe([
-      "📊 *Resultado do Plantão* · 09/11",
-      "",
-      "*EXTERNO* · 119 leads",
-      "💬 WhatsApp Externo: 92",
-      "📝 RD: 27",
-      "",
-      "*INTERNO* · 135 leads",
-      "📘 Facebook: 118",
-      "💬 WhatsApp Interno: 17",
-      "",
-      "*Indicações*",
-      "🌅 Manhã: 82 · 🌇 Tarde: 48",
-      "",
-      "*Média de leads por corretor*",
-      "🏢 PME: 10",
-      "💻 Online: manhã 5 · tarde 1",
-      "🧑‍💼 Presencial: manhã 7 · tarde 7",
-    ].join("\n"));
-    const text = buildPlantaoReportText(metrics, new Date("2026-11-10T02:00:00.000Z"));
-    expect(text).not.toContain("Telefone");
-    expect(text).not.toContain("WhatsApp Externo: 092");
   });
 
   it("agrega leads e corretores dos plantões PME antes de dividir", () => {
@@ -174,24 +112,21 @@ describe("resultado do plantão", () => {
 
   it("arredonda cada média para cima e preserva zero", () => {
     const metrics: PlantaoReportMetrics = {
-      external: { whatsapp: 0, rd: 0, total: 0 },
-      internal: { facebook: 0, whatsapp: 0, total: 0 },
+      generated: { total: 0 },
+      external: { total: 0, details: null },
+      internal: { total: 0, queues: [] },
+      others: { total: 0, queues: [] },
       indications: { morning: 0, afternoon: 0 },
       quantity: { pme: 5.5, onlineMorning: 1.6, onlineAfternoon: 0, inPersonMorning: 0, inPersonAfternoon: 0 },
     };
     const text = buildPlantaoReportText(metrics, start);
-    expect(text).toContain("🏢 PME: 6");
-    expect(text).toContain("💻 Online: manhã 2 · tarde 0");
-    expect(text).toContain("🧑‍💼 Presencial: manhã 0 · tarde 0");
-    expect(text).not.toContain(",");
+    expect(text).toContain("PME 6 · Online 2/0 · Presencial 0/0");
+    expect(text).not.toMatch(/\d,\d/);
   });
 
   it("usa zeros preenchidos e 0,0 quando não há ofertas aceitas", () => {
     const text = buildPlantaoReportText(calculatePlantaoMetrics([], [], DEFAULT_PLANTAO_REPORT_CONFIG), start);
-    expect(text).toContain("📊 *Resultado do Plantão* · 09/11");
     expect(text).toContain("*EXTERNO* · 0 leads");
-    expect(text).toContain("🏢 PME: 0");
-    expect(text).toContain("💻 Online: manhã 0 · tarde 0");
-    expect(text).toContain("🧑‍💼 Presencial: manhã 0 · tarde 0");
+    expect(text).toContain("PME 0 · Online 0/0 · Presencial 0/0");
   });
 });
