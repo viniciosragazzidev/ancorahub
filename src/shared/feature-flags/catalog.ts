@@ -43,6 +43,26 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Mostra aos corretores sem WhatsApp conectado o aviso sobre os leads do plantão a partir de 20/10.",
   },
+  WHATSAPP_AUTOREPARO: {
+    key: "feature_whatsapp_autoreparo_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Auto-reparo das conexões WhatsApp dos corretores: sincroniza o status pelo relay e envia o aviso de reconexão na véspera do plantão. Padrão desligado.",
+  },
+  WHATSAPP_AUTOREPARO_START: {
+    key: "feature_whatsapp_autoreparo_start_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Permite ao vigia reiniciar (start) sessões que já conectaram e estão em erro. Nunca apaga sessão. Exige a rota de start no relay. Padrão desligado.",
+  },
+  WHATSAPP_AUTOREPARO_AVISO_HORA: {
+    key: "feature_whatsapp_autoreparo_aviso_hora",
+    scope: "global",
+    defaultValue: "18",
+    description: "Hora (0 a 23, horário de São Paulo) do aviso de reconexão na véspera do plantão. Valor a confirmar com o Vinicios.",
+  },
   // ── WhatsApp / WAHA ──────────────────────────────────────────────────────
   WAHA_CONNECTIONS: {
     key: "feature_waha_connections_enabled",

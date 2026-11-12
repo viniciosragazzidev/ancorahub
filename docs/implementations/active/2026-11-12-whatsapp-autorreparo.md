@@ -56,3 +56,27 @@ Conclusão de leitura: **o CRM e o relay concordam**. Não há status desatualiz
 - Consultas SELECT via `postgres` (pacote do `ancorahub`), sessão com `default_transaction_read_only = on`, URL lida do `.env.local` do repo principal sem cópia.
 - `GET {VPS_API_URL}/internal/waha/connections/{sessão}/status` para as 95 + 66 + 1 sessões com nome.
 - Scripts em `scratchpad` (fora do repo): `diag1.mjs`, `diag2.mjs`, `relay.mjs`, `body.mjs`.
+
+## 6. Implementação (12/11, código pronto, tudo desligado)
+
+**Flags globais** (catálogo `src/shared/feature-flags/catalog.ts`, padrão `false`):
+- `feature_whatsapp_autoreparo_enabled`: liga o vigia de saúde e o aviso de véspera.
+- `feature_whatsapp_autoreparo_start_enabled`: liga o `start` do vigia. Só funciona com a rota de start publicada no relay.
+- `feature_whatsapp_autoreparo_aviso_hora`: hora do aviso (padrão 18, horário de São Paulo, **a confirmar** com o Vinicios).
+
+**Módulo** `src/features/whatsapp-autorreparo/`:
+- `decisao.ts`: regras puras (decisão do vigia, backoff 1, 5, 15 min, limite de 3 starts por dia, datas em São Paulo, chave do aviso). 16 testes.
+- `relay.ts`: só GET de status e POST de start. Não há chamada a recover nem a delete.
+- `vigia.ts`: sincroniza `ready` quando o relay diz CONNECTED. Com a flag de start, tenta `start` em sessão que já conectou e está em ERROR ou DISCONNECTED. Cada tentativa vira linha em `audit_logs` (ação `whatsapp.autorreparo.start`) e conta para o limite diário.
+- `aviso.ts`: a partir da hora configurada do dia anterior, avisa cada corretor escalado no plantão de amanhã que não tem WhatsApp `ready`. Um aviso por corretor por plantão, com chave idempotente em `notifications` (índice único já existente). Texto em rascunho, a revisar pelo Vinicios.
+- `escala.ts`: quem está escalado sem WhatsApp em uma data (base para a visão do supervisor, ainda sem tela).
+- Rota `src/app/api/internal/jobs/whatsapp-autorreparo/route.ts` (CRON_SECRET), registrada em `job-schedule.ts` e no runbook do Coolify com cron `0 * * * *` (UTC). **O job no Coolify ainda não foi criado.**
+
+**Relay** (`corretop-infra`, branch `feat/waha-start-route`, commit `7a515ab`, **local, sem push e sem deploy**): nova rota `POST /internal/waha/connections/:id/start`. Só inicia sessão ERROR ou DISCONNECTED. Sessão inexistente responde 404 e sessão pareando responde 409. Não cria, não apaga e não faz logout. 62/62 testes do relay passam.
+
+**Não feito (depende do Vinicios):** nenhum `start` real em produção (decisão 1), e a leitura dos logs do Coolify para confirmar o reinício do WAHA em 10/11 (decisão 2). Nenhum banco de teste foi executado.
+
+**Pendências técnicas:**
+- Criar o job `whatsapp-autorreparo` no Coolify, de preferência só depois de ligar a flag.
+- Publicar a rota de start no relay (exige push e deploy do corretop-infra, decisão do Vinicios).
+- Tela para o supervisor ver quem está sem WhatsApp na escala.
