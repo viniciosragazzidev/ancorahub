@@ -124,6 +124,11 @@ async function runLeadConversationAnalysis(
   if (!lead) {
     return { analyzed: false, reason: "Lead não encontrado." };
   }
+  // Venda Automatizada (DEC-182): a etapa e a venda do lead em negociação são do agente e do gestor.
+  const { isLeadInActiveAutoSale } = await import("@/features/auto-sale/repository");
+  if (await isLeadInActiveAutoSale(tenantId, leadId)) {
+    return { analyzed: false, reason: "Lead na Venda Automatizada." };
+  }
 
   // 3. Buscar mensagens recentes de WhatsApp do lead
   const messages = await db

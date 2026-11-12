@@ -249,6 +249,27 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "A IA de qualificação ouve (transcreve) os 2 primeiros áudios de cada lead em qualificação, até 2 minutos. O Super-admin liga por empresa; a chave real é feature_ai_audio_transcription_<tenantId>.",
   },
+  AUTO_SALE: {
+    key: "feature_auto_sale",
+    scope: "tenant",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Venda Automatizada (piloto, DEC-182): a IA conduz a venda de um lead quente por vez, escolhido pelo gestor, em Simulação ou Copiloto. Nunca passa o lead a um corretor sozinha. Inclui a transcrição de áudio na negociação. O Super-admin liga por empresa; a chave real é feature_auto_sale_<tenantId>.",
+  },
+  AUTO_SALE_AUTOPILOT: {
+    key: "feature_auto_sale_autopilot",
+    scope: "tenant",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Libera o modo Autopiloto da Venda Automatizada (a IA envia sozinha, com limites, só planos revisados). O gestor ainda escolhe o modo por negociação. A chave real é feature_auto_sale_autopilot_<tenantId>.",
+  },
+  AUTO_SALE_GLOBAL: {
+    key: "feature_auto_sale_global_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Kill switch da Venda Automatizada para todas as empresas. Desligado, o robô não responde nem envia e as negociações ficam pausadas pela plataforma.",
+  },
   DUTY_SHIFT_REMINDER_24H: {
     key: "feature_duty_reminder_24h",
     scope: "tenant",

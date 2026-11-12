@@ -403,8 +403,15 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           }
         }
 
-        let handledByPostSale = false;
+        // Venda Automatizada (DEC-182): com negociação aberta, a mensagem é do agente de venda (sem qualificação).
+        let handledByAutoSale = false;
         if (activeLeadId && !unsupported) {
+          const { routeAutoSaleInbound } = await import("@/features/auto-sale/inbound");
+          handledByAutoSale = await routeAutoSaleInbound({ tenantId: channel.tenantId, leadId: activeLeadId, providerMessageId: message.id, body: text, messageKind });
+        }
+
+        let handledByPostSale = false;
+        if (activeLeadId && !unsupported && !handledByAutoSale) {
           const { routePostSaleInboundSafely } = await import("@/features/post-sale-audit/conversation-operations");
           handledByPostSale = await routePostSaleInboundSafely(async () => {
             const { handlePostSaleInbound } = await import("@/features/post-sale-audit/conversation");
@@ -412,7 +419,9 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           }, { tenantId: channel.tenantId, leadId: activeLeadId, channelType: "meta" });
         }
 
-        if (handledByPostSale) {
+        if (handledByAutoSale) {
+          console.info("[auto-sale] meta_inbound_routed", { tenantId: channel.tenantId, leadId: activeLeadId });
+        } else if (handledByPostSale) {
           console.info("[post-sale-audit] meta_inbound_routed", { tenantId: channel.tenantId, leadId: activeLeadId });
         } else if (unsupported) {
           console.info("[ai-wpp] inbound.ignored_unsupported_message", { tenantId: channel.tenantId, leadId: activeLeadId ?? null });

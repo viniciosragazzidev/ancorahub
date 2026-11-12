@@ -28,6 +28,7 @@ import { isManagerLiteAvailable, isSupervisorLiteAvailable } from "@/features/br
 import { isTeamManagementEnabled } from "@/features/team-management-ui/flag";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
+import { isAutoSaleEnabled } from "@/features/auto-sale/flag";
 import { WhatsAppLinkHandler } from "@/components/whatsapp/whatsapp-link-handler";
 import { hasPermission } from "@/shared/auth/permissions";
 import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
@@ -83,6 +84,10 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const postSaleAuditFlagPromise = context.role === "director" || context.role === "manager"
     ? getFeatureFlag(FEATURE_FLAGS.POST_SALE_AUDIT).catch(() => "false")
     : Promise.resolve("false");
+  // Venda Automatizada (DEC-182): chave por empresa; a aba some com ela desligada.
+  const autoSaleFlagPromise = context.role === "director" || context.role === "manager"
+    ? isAutoSaleEnabled(context.tenantId).catch(() => false)
+    : Promise.resolve(false);
   const headersPromise = headers();
   // Tenant branding, the signed-in user and their membership in one round trip:
   // the layout renders on every navigation and every realtime refresh, and the
@@ -177,6 +182,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     negotiationsRouteAccess,
     postSaleAuditFlag,
     illustrationsSetting,
+    autoSaleFlag,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -194,6 +200,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     negotiationsRouteAccessPromise,
     postSaleAuditFlagPromise,
     illustrationsPromise,
+    autoSaleFlagPromise,
   ]);
 
   // Flag criada no G0 (feature_team_management_enabled): só libera o item Gestão do gestor Lite.
@@ -267,6 +274,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         directorLiteEnabled={directorLiteStyleEnabled}
         negotiationsEnabled={negotiationsAreaSetting === "true" && negotiationsRouteAccess}
         postSaleAuditEnabled={postSaleAuditFlag === "true"}
+        autoSaleEnabled={autoSaleFlag}
         isLightBroker={isLightBroker || isLightSupervisor || isLightManager}
         liteAudience={liteAudience}
         initialChatRail={initialChatRail}

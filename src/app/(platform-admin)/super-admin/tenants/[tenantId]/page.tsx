@@ -37,6 +37,7 @@ import { acceptHandoffSettingKey } from "@/features/broker-workspace/whatsapp-ha
 import { customerWaitingSettingKey, parseCustomerWaitingMode } from "@/features/customer-waiting/flag";
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import { aiAudioTranscriptionSettingKey } from "@/features/ai-agent/audio-transcription/flag";
+import { AutoSaleSuperAdminCard } from "@/features/auto-sale/components/super-admin-card";
 import { qualificationContextAnalysisSettingKeys } from "@/features/ai-agent/qualification-context-analysis-settings";
 import { CLEAN_UI_FEATURE, getCleanUiOperationalLegacyTenantIds } from "@/features/clean-ui/feature";
 import { getMetaLeadAdsPilotTenantIds } from "@/features/communication-channels/meta-lead-ads-platform";
@@ -274,6 +275,7 @@ export default async function SuperAdminTenantDetailPage({
                   </Button>
                 </form>
               </div>
+              <AutoSaleSuperAdminCard tenantId={tenant.id} />
               <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-2xl">
                   <div className="flex flex-wrap items-center gap-2">
