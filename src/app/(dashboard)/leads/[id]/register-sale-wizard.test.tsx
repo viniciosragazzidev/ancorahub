@@ -10,8 +10,13 @@ vi.mock("next/navigation", () => {
 vi.mock("@/components/motion/success-overlay", () => ({ useSuccessOverlay: () => ({ celebrate: vi.fn(), node: null }) }));
 vi.mock("@/components/arc/file-dropzone/file-dropzone", () => ({ FileDropzone: () => <div>Escolher arquivo de teste</div> }));
 vi.mock("@/components/arc/date-picker/date-picker", () => ({ DatePicker: ({ label }: { label: string }) => <button type="button" aria-label={label}>{label}</button> }));
-vi.mock("@/app/(dashboard)/leads/[id]/beneficiaries-section", () => ({ BeneficiariesSection: () => <div>Pessoas cadastradas</div> }));
-vi.mock("@/features/post-sale/actions", () => ({ ensureLeadHolderAction: vi.fn().mockResolvedValue({ success: true, created: false }), registerSaleAction: vi.fn() }));
+vi.mock("@/features/post-sale/actions", () => ({
+  ensureLeadHolderAction: vi.fn().mockResolvedValue({ success: true, created: false }),
+  registerSaleAction: vi.fn(),
+  addLeadBeneficiaryAction: vi.fn(),
+  removeLeadBeneficiaryAction: vi.fn(),
+  updateLeadBeneficiaryAction: vi.fn(),
+}));
 vi.mock("@/features/documents/actions", () => ({ confirmDocumentUploadAction: vi.fn() }));
 vi.mock("@/app/(dashboard)/leads/status-actions", () => ({ changeLeadStatusAction: vi.fn() }));
 
@@ -31,6 +36,8 @@ describe("RegisterSaleWizard", () => {
     expect(screen.getByText(/Venda detectada pela IA/)).toBeTruthy();
     expect(screen.getByText("Passo 1 de 4 · Pessoas")).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("Falta cadastrar 1 pessoa");
+    expect(screen.getByText(/14\/03\/1988/)).toBeTruthy();
+    expect(screen.queryByText(/1988-03-14/)).toBeNull();
   });
 
   it("uses the Arc date picker in Portuguese instead of native date inputs", () => {
@@ -80,5 +87,14 @@ describe("RegisterSaleWizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     expect(screen.getByText(/2 requisitos ainda precisam ser aprovados/)).toBeTruthy();
+  });
+
+  it("shows a single placeholder when the coverage range is empty", () => {
+    render(<RegisterSaleWizard lead={lead} documents={[]} requirements={[]} carriers={[]} open onOpenChange={() => undefined} previewMode />);
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    expect(screen.getByText("A definir")).toBeTruthy();
+    expect(screen.queryByText("A definir a A definir")).toBeNull();
   });
 });

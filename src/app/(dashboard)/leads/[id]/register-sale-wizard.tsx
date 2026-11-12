@@ -75,8 +75,9 @@ function requirementCountMessage(count: number): string {
 
 function dateLabel(value: string) {
   if (!value) return "A definir";
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   const date = new Date(`${value}T12:00:00Z`);
-  return Number.isNaN(date.getTime()) ? "A definir" : new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "UTC" }).format(date);
+  return !match || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value ? "A definir" : `${match[3]}/${match[2]}/${match[1]}`;
 }
 
 function currencyLabel(value: string) {
@@ -151,6 +152,7 @@ export function RegisterSaleWizard({
   const beneficiariesVersion = people.map((person) => [person.id, person.name, person.birthDate ?? "", person.age ?? "", person.hasCpf ?? Boolean(person.cpf)].join(":")).join("|");
   const missingPeople = lead.livesCount == null ? 0 : Math.max(0, lead.livesCount - people.length);
   const computedExpirationDate = useMemo(() => customExpirationDate || addMonths(coverageStartDate, contractTermMonths), [customExpirationDate, coverageStartDate, contractTermMonths]);
+  const coverageRangeLabel = coverageStartDate && computedExpirationDate ? `${dateLabel(coverageStartDate)} a ${dateLabel(computedExpirationDate)}` : "A definir";
   const approvedConfirmationDocuments = documents.filter((document) => document.status === "approved");
   const missingDocuments = requiredDocumentsStillMissing({ requirements, beneficiaries: people, documents });
   const hasApprovedConfirmation = approvedConfirmationDocuments.some((document) => document.id === confirmationDocumentId);
@@ -294,7 +296,7 @@ export function RegisterSaleWizard({
     const status = requirementStatus(requirement, personId, documents);
     const personName = personId ? people.find((person) => person.id === personId)?.name ?? "Pessoa" : null;
     return (
-      <div key={`${requirement.id}-${personId ?? "lead"}`} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+      <div key={`${requirement.id}-${personId ?? "lead"}`} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm first:pt-0 last:pb-0">
         <span className="min-w-0">{requirement.name}{personName ? ` · ${personName}` : ""}</span>
         <div className="flex shrink-0 items-center gap-2">
           <Badge variant={status === "approved" ? "secondary" : "outline"}>{documentStatusLabel(status)}</Badge>
@@ -338,7 +340,7 @@ export function RegisterSaleWizard({
                   <div><p className="text-xs text-muted-foreground">E-mail</p><p className="mt-1 break-all font-medium">{lead.email || "Não informado"}</p></div>
                 </div>
                 {missingPeople > 0 ? <p role="status" className="rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">O lead indica {lead.livesCount} vidas. {missingPeople === 1 ? "Falta cadastrar 1 pessoa" : "Faltam " + missingPeople + " pessoas para cadastrar"}, se fizerem parte da contratação.</p> : null}
-                <BeneficiariesSection key={lead.id + ":" + beneficiariesVersion} leadId={lead.id} contactName={lead.nome} initialBeneficiaries={people.map((person) => ({ ...person, age: person.age ?? null, cpf: person.cpf ?? null, hasCpf: person.hasCpf ?? Boolean(person.cpf) }))} onChanged={() => router.refresh()} />
+                <BeneficiariesSection key={lead.id + ":" + beneficiariesVersion} leadId={lead.id} contactName={lead.nome} initialBeneficiaries={people.map((person) => ({ ...person, age: person.age ?? null, cpf: person.cpf ?? null, hasCpf: person.hasCpf ?? Boolean(person.cpf) }))} onChanged={() => router.refresh()} embedded />
                 {!holder ? <p role="status" className="text-sm text-amber-700 dark:text-amber-300">Os dados do titular estão sendo preparados. Se faltarem nascimento ou idade, complete nesta etapa.</p> : null}
               </section>
             ) : null}
@@ -382,11 +384,13 @@ export function RegisterSaleWizard({
                     <AppSelect id="sale-v2-confirmation" value={confirmationDocumentId} onValueChange={setConfirmationDocumentId} placeholder="Selecione o documento aprovado" triggerClassName="min-h-11" options={approvedConfirmationDocuments.map((document) => ({ value: document.id, label: document.filename }))} />
                   </div>
                   {requiredRequirements.length ? (
-                    <div className="space-y-3 rounded-xl border border-border p-3">
+                    <div className="space-y-2 border-t border-border pt-3">
                       <p className="text-sm font-medium">Documentos obrigatórios</p>
-                      {requiredRequirements.flatMap((requirement) => requirement.appliesPerBeneficiary
-                        ? people.map((person) => renderRequirement(requirement, person.id))
-                        : [renderRequirement(requirement, null)])}
+                      <div className="divide-y divide-border">
+                        {requiredRequirements.flatMap((requirement) => requirement.appliesPerBeneficiary
+                          ? people.map((person) => renderRequirement(requirement, person.id))
+                          : [renderRequirement(requirement, null)])}
+                      </div>
                     </div>
                   ) : null}
                   {missingDocuments.length ? <p className="text-sm text-muted-foreground">{requirementCountMessage(missingDocuments.length)}</p> : null}
@@ -413,7 +417,7 @@ export function RegisterSaleWizard({
                     <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Plano e operadora</p><p className="mt-1 font-medium">{lead.planName || "Plano do lead"}</p><p className="text-xs text-muted-foreground">{carriers.find((carrier) => carrier.id === carrierId)?.name || "Operadora não alterada"}</p></div>
                     <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Mensalidade</p><p className="mt-1 font-medium">{currencyLabel(approvedValue)}</p></div>
                     <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Apólice ou contrato</p><p className="mt-1 font-medium">{policyNumber || "A informar"}</p></div>
-                    <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Vigência</p><p className="mt-1 font-medium">{dateLabel(coverageStartDate)} a {dateLabel(computedExpirationDate)}</p></div>
+                    <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Vigência</p><p className="mt-1 font-medium">{coverageRangeLabel}</p></div>
                     <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Pagamento</p><p className="mt-1 font-medium">{paymentOptions.find((option) => option.value === paymentMethod)?.label}</p></div>
                     <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Confirmação</p><p className="mt-1 font-medium">{approvedConfirmationDocuments.find((document) => document.id === confirmationDocumentId)?.filename || "Pendente de aprovação"}</p></div>
                   </div>
