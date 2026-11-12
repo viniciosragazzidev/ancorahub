@@ -527,7 +527,8 @@ export function resolveDutyFallbackDecision(input: {
   hasActiveSelectedSchedule: boolean;
 }): DutyFallbackDecision {
   if (!input.hasExplicitSchedule || input.hasActiveSelectedSchedule) return "use_selected_duty";
-  if (input.policy === "unit_roster") return "use_unit_roster";
+  // 12/11 (corretores recebendo lead de madrugada): fila com plantão escolhido só distribui no plantão.
+  // "Usar a disponibilidade da unidade" foi desativada; filas antigas com ela gravada aguardam o próximo.
   if (input.policy === "fallback_queue") return "fallback_queue";
   return "wait_next_duty";
 }

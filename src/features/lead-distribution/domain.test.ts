@@ -136,12 +136,12 @@ describe("automatic unit routing", () => {
 });
 
 describe("duty fallback policy", () => {
-  it("uses the normal unit roster when an explicit duty is inactive and continuity is selected", () => {
+  it("a queue with a selected duty never falls back to the whole unit, even with the old option saved", () => {
     expect(resolveDutyFallbackDecision({
       policy: "unit_roster",
       hasExplicitSchedule: true,
       hasActiveSelectedSchedule: false,
-    })).toBe("use_unit_roster");
+    })).toBe("wait_next_duty");
   });
 
   it("keeps strict queues waiting when no selected duty is active", () => {

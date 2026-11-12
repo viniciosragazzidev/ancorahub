@@ -372,7 +372,8 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     branchId: input.branchId || null,
     exclusiveDutyScheduleId: dutyScheduleIds[0] ?? null,
     exclusiveDutyScheduleIds: dutyScheduleIds,
-    dutyFallbackPolicy: input.dutyFallbackPolicy,
+    // 12/11: fila com plantão só distribui no plantão; o pedido antigo de "usar a unidade" vira aguardar.
+    dutyFallbackPolicy: dutyScheduleIds.length && input.dutyFallbackPolicy === "unit_roster" ? "wait_next_duty" as const : input.dutyFallbackPolicy,
     dutyFallbackQueueId: input.dutyFallbackPolicy === "fallback_queue" ? input.dutyFallbackQueueId ?? null : null,
     name: input.name,
     assignmentMode: input.assignmentMode,

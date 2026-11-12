@@ -315,8 +315,9 @@ export function QueueControlCenter({
         ...(queue.exclusiveDutyScheduleIds ?? []),
         ...(queue.exclusiveDutyScheduleId ? [queue.exclusiveDutyScheduleId] : []),
       ])),
-      dutyFallbackPolicy: queue.dutyFallbackPolicy === "fallback_queue" || queue.dutyFallbackPolicy === "wait_next_duty" || queue.dutyFallbackPolicy === "unit_roster"
-        ? queue.dutyFallbackPolicy
+      // 12/11: fila com plantão só distribui no plantão; "usar a disponibilidade da unidade" foi desativada.
+      dutyFallbackPolicy: queue.dutyFallbackPolicy === "fallback_queue"
+        ? "fallback_queue"
         : (queue.exclusiveDutyScheduleIds?.length || queue.exclusiveDutyScheduleId ? "wait_next_duty" : "unit_roster"),
       dutyFallbackQueueId: queue.dutyFallbackQueueId ?? "",
       allowedBranchIds: queue.allowedBranchIds ?? [],
@@ -417,7 +418,7 @@ export function QueueControlCenter({
       branchId: form.branchId || null,
       exclusiveDutyScheduleId: form.exclusiveDutyScheduleIds[0] ?? null,
       exclusiveDutyScheduleIds: form.exclusiveDutyScheduleIds,
-      dutyFallbackPolicy: form.exclusiveDutyScheduleIds.length ? form.dutyFallbackPolicy : "unit_roster",
+      dutyFallbackPolicy: !form.exclusiveDutyScheduleIds.length ? "unit_roster" : form.dutyFallbackPolicy === "fallback_queue" ? "fallback_queue" : "wait_next_duty",
       dutyFallbackQueueId: form.exclusiveDutyScheduleIds.length && form.dutyFallbackPolicy === "fallback_queue" ? form.dutyFallbackQueueId || null : null,
       allowedBranchIds: effectiveAllowedBranchIds,
       allowedBrokerIds: finalAllowedBrokerIds,
@@ -710,15 +711,10 @@ export function QueueControlCenter({
                       Quando nenhum plantão selecionado estiver ativo
                     </legend>
                     <p className="text-[11px] leading-relaxed text-muted-foreground">
-                      Escolha o destino do lead fora dos horários dessas escalas. A primeira opção é a recomendada para manter a distribuição contínua.
+                      Fora do horário dessas escalas, nenhum corretor recebe lead desta fila. Escolha se o lead aguarda o próximo plantão ou vai para outra fila.
                     </p>
                     <div className="grid gap-2">
                       {[
-                        {
-                          value: "unit_roster" as const,
-                          title: "Usar disponibilidade normal da unidade",
-                          description: "Continua distribuindo para corretores disponíveis da unidade.",
-                        },
                         {
                           value: "wait_next_duty" as const,
                           title: "Aguardar o próximo plantão selecionado",
