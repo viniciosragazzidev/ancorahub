@@ -39,15 +39,19 @@ describe("digest input", () => {
 });
 
 describe("visibleRanking", () => {
-  const rows = rankIncentiveFacts([fact("1", "me", "2026-11-01", 500), fact("2", "other", "2026-11-01", 900)]);
-  const names = new Map([["me", "Ana"], ["other", "Bruno"]]);
+  const rows = rankIncentiveFacts([fact("1", "me", "2026-11-01", 500), fact("2", "other", "2026-11-01", 900), fact("3", "far", "2026-11-01", 100, "u2")]);
+  const names = new Map([["me", "Ana"], ["other", "Bruno"], ["far", "Caio"]]);
   it("hides names and colleagues' money unless allowed", () => {
-    const view = visibleRanking(rows, { userId: "me", showNames: false, metric: "sales_value_cents", names, canSeeValue: () => false });
-    expect(view).toEqual([{ position: 1, label: "Corretor 1", isViewer: false, value: null }, { position: 2, label: "Você", isViewer: true, value: 500 }]);
+    const view = visibleRanking(rows, { userId: "me", metric: "sales_value_cents", names, canSeeName: () => false, canSeeValue: () => false });
+    expect(view).toEqual([
+      { position: 1, label: "Corretor 1", isViewer: false, value: null },
+      { position: 2, label: "Você", isViewer: true, value: 500 },
+      { position: 3, label: "Corretor 3", isViewer: false, value: null },
+    ]);
   });
-  it("shows names when the campaign allows and counts to everyone", () => {
-    const view = visibleRanking(rows, { userId: "me", showNames: true, metric: "sales_count", names, canSeeValue: () => false });
-    expect(view.map((row) => [row.label, row.value])).toEqual([["Bruno", 900], ["Ana (você)", 500]]);
+  it("shows only the names the viewer may see and always labels the own row as Você", () => {
+    const view = visibleRanking(rows, { userId: "me", metric: "sales_count", names, canSeeName: (row) => row.branchId === "u1", canSeeValue: () => false });
+    expect(view.map((row) => [row.label, row.value])).toEqual([["Bruno", 900], ["Você", 500], ["Corretor 3", 100]]);
   });
 });
 

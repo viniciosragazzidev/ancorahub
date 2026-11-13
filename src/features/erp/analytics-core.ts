@@ -1,25 +1,18 @@
 import { ErpError } from "./contracts";
+import { currentPeriod, ERP_TIME_ZONE, todayInSaoPaulo } from "./shared";
 
 /** Pure analytics helpers: calendar in America/Sao_Paulo, YoY and BigInt-safe sums. No I/O. */
-export const ANALYTICS_TIME_ZONE = "America/Sao_Paulo";
+export const ANALYTICS_TIME_ZONE = ERP_TIME_ZONE;
 const MONTH = /^(\d{4})-(0[1-9]|1[0-2])$/;
-
-function localParts(now: Date) {
-  const parts = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: ANALYTICS_TIME_ZONE }).formatToParts(now);
-  const part = (key: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === key)?.value ?? "";
-  return { year: part("year"), month: part("month"), day: part("day") };
-}
 
 /** Calendar month (YYYY-MM) of an instant in São Paulo. */
 export function monthKey(now: Date = new Date()) {
-  const { year, month } = localParts(now);
-  return `${year}-${month}`;
+  return currentPeriod(now);
 }
 
 /** Calendar day (YYYY-MM-DD) of an instant in São Paulo. */
 export function dayKey(now: Date = new Date()) {
-  const { year, month, day } = localParts(now);
-  return `${year}-${month}-${day}`;
+  return todayInSaoPaulo(now);
 }
 
 export function isMonth(value: unknown): value is string {

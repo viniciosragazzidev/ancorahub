@@ -66,10 +66,12 @@ export function ErpRowMenu({ label, items }: { label: string; items: ErpMenuItem
   const skin = useErpSkin();
   const router = useRouter();
   if (!items.length) return null;
-  if (skin === "lite") return <LiteMenu label={label} items={items} />;
-  return <DropdownMenu><DropdownMenuTrigger render={<Button aria-label={label} size="icon-sm" variant="ghost"><DotsThreeVertical size={15} /></Button>} />
+  // The row itself opens the drawer: clicks on the menu (and on its portal items, which bubble through React) must not.
+  const stop = (event: { stopPropagation: () => void }) => event.stopPropagation();
+  if (skin === "lite") return <span onClick={stop} onKeyDown={stop}><LiteMenu label={label} items={items} /></span>;
+  return <span onClick={stop} onKeyDown={stop}><DropdownMenu><DropdownMenuTrigger render={<Button type="button" aria-label={label} size="icon-sm" variant="ghost"><DotsThreeVertical size={15} /></Button>} />
     <DropdownMenuContent align="end" className="w-52">{items.map((item) => <DropdownMenuItem key={item.id} variant={item.tone === "danger" ? "destructive" : "default"} disabled={"disabled" in item ? item.disabled : undefined}
-      onClick={() => { if (item.href) router.push(item.href); else item.onSelect?.(); }}>{item.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>;
+      onClick={() => { if (item.href) router.push(item.href); else item.onSelect?.(); }}>{item.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu></span>;
 }
 
 /** Page-level extras ("Configurações ▾"): auxiliary settings and explainers, never the primary action. */
@@ -115,6 +117,12 @@ export function ErpPager({ page: current, total, pageSize, label = "Paginação"
   if (skin === "lite") return <LitePagination page={current} totalPages={totalPages} totalItems={total} pageSize={pageSize} pending={pending} label={label} onPageChange={(target) => start(() => router.push(href(target)))} />;
   return <nav aria-label={label} className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span>{total} registro(s) · página {current} de {totalPages}</span>
     <div className="flex gap-2">{current > 1 ? <Button variant="outline" size="sm" render={<Link href={href(current - 1)} />}>Anterior</Button> : null}{current < totalPages ? <Button variant="outline" size="sm" render={<Link href={href(current + 1)} />}>Próxima</Button> : null}</div></nav>;
+}
+
+/** Row of KPI tiles (`StatCard` children) in the grid of the viewer's skin. */
+export function ErpStats({ children }: { children: ReactNode }) {
+  const skin = useErpSkin();
+  return <div className={skin === "lite" ? page.stats : "grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4"}>{children}</div>;
 }
 
 /** Filter bar above a list. */

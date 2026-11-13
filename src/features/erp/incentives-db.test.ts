@@ -126,7 +126,16 @@ describe.skipIf(!testUrl)("ERP incentives against isolated PostgreSQL", () => {
     expect(managerView.latest?.ranking.map((row) => row.value)).toEqual([16000, 10000]);
     await expect(as("broker3", () => incentives.contestIncentiveResult({ resultId, note: "Não participei mas quero contestar" }))).rejects.toThrow("participantes");
     await as("broker1", () => incentives.contestIncentiveResult({ resultId, note: "Faltou uma venda minha de novembro" }));
-    expect((await as("director", () => incentives.getIncentiveCampaign(campaignId))).contestations.map((row) => row.note)).toEqual(["Faltou uma venda minha de novembro"]);
+    const [contested] = await db.select().from(schema.erpEvents)
+      .where(and(eq(schema.erpEvents.tenantId, id("a")), eq(schema.erpEvents.action, "erp.incentive.contested"), eq(schema.erpEvents.entityId, campaignId)));
+    expect(contested).toMatchObject({ entityType: "erp_incentive_campaign", metadata: expect.objectContaining({ resultId }) });
+    // Older contestations were stored on the result entity; they are still read.
+    await db.insert(schema.erpEvents).values({ id: crypto.randomUUID(), tenantId: id("a"), actorId: id("broker1"), action: "erp.incentive.contested",
+      entityType: "erp_incentive_result", entityId: resultId, metadata: { campaignId, note: "Contestação no formato antigo", position: 1 } });
+    const contestations = (await as("director", () => incentives.getIncentiveCampaign(campaignId))).contestations;
+    expect(contestations.map((row) => row.note).sort()).toEqual(["Contestação no formato antigo", "Faltou uma venda minha de novembro"]);
+    expect(contestations.every((row) => row.resultId === resultId)).toBe(true);
+    expect((await as("broker1", () => incentives.getIncentiveCampaign(campaignId))).contestations.map((row) => row.author)).toEqual(["Você", "Você"]);
     const [stored] = await db.select().from(schema.erpIncentiveResults).where(and(eq(schema.erpIncentiveResults.tenantId, id("a")), eq(schema.erpIncentiveResults.id, resultId)));
     expect(stored.kind).toBe("preliminary");
     const future = await approved({ endsOn: "2099-12-31" });

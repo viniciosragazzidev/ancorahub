@@ -1,14 +1,17 @@
 import "server-only";
-import { and, count, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
-import { auditErp, canSeeAgencyBooks, erpScopeSql, getErpEffectiveAccess, requireErpAccess, type ErpDatabase, type ErpTransaction } from "./access";
+import { auditActor, auditErp, erpScopeSql, hasAgencyScope, getErpEffectiveAccess, requireErpAccess, type ErpDatabase, type ErpTransaction } from "./access";
 import { ErpError, FINANCIAL_KINDS, assertIndependentReview, assertNotBeneficiary, financialInputSchema, settlementInputSchema } from "./contracts";
 import { assertOccurredByToday, assertPaymentCapacity, checkedCents, requireSameRequest, settledCents } from "./ledger";
 import { scopedEvidence, scopedFinancialEntry, type ErpAccess } from "./records";
 import { scopeIncludes } from "./scope";
 import { getEntryOffsets } from "./offset-balances";
 import { syncLegacyInstallment } from "./legacy-sync";
+import { confirmedSettledSql } from "./balances";
+import { PAGE_SIZE, pageSchema, periodSchema, uuidSchema } from "./shared";
 
 export async function activePayoutFor(db: ErpDatabase, tenantId: string, entryId: string) {
   const [row] = await db.select({ id: schema.erpPayouts.id }).from(schema.erpPayoutItems).innerJoin(schema.erpPayouts, and(eq(schema.erpPayouts.tenantId, tenantId), eq(schema.erpPayouts.id, schema.erpPayoutItems.payoutId)))
@@ -16,8 +19,8 @@ export async function activePayoutFor(db: ErpDatabase, tenantId: string, entryId
   return row?.id ?? null;
 }
 
-const uuid = z.string().uuid();
-const period = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
+const uuid = uuidSchema;
+const period = periodSchema;
 const reviewSchema = z.object({ id: uuid, expectedVersion: z.number().int().positive(), decision: z.enum(["approve", "reject"]), reason: z.string().trim().min(5).max(300) }).strict();
 
 export async function lockErpTenant(tx: ErpTransaction, tenantId: string) {
@@ -186,44 +189,135 @@ export async function reviewSettlement(raw: unknown) {
   });
 }
 
-const filtersSchema = z.object({ kind: z.enum(["all", ...FINANCIAL_KINDS]).default("all"), status: z.enum(["all", "submitted", "approved", "rejected"]).default("all"), competence: period.optional(), page: z.coerce.number().int().min(1).max(10000).default(1) });
+const ENTRY_FILTER_STATUSES = ["all", "submitted", "approved", "rejected"] as const;
+const filtersSchema = z.object({
+  kind: z.enum(["all", ...FINANCIAL_KINDS]).default("all"),
+  status: z.enum(ENTRY_FILTER_STATUSES).default("all"),
+  competence: periodSchema.optional(),
+  page: pageSchema,
+});
+
 export async function getFinancialEntries(raw: unknown) {
-  const filters = filtersSchema.parse(raw); const auth = await requireErpAccess("finance", "erp_view_finance"); const db = getDatabase();
-  const agency = canSeeAgencyBooks(auth.context) && auth.scope.mode !== "owners";
-  const conditions = and(eq(schema.erpFinancialEntries.tenantId, auth.context.tenantId), erpScopeSql(auth.scope, schema.erpFinancialEntries.branchId, schema.erpFinancialEntries.ownerId),
-    agency ? undefined : inArray(schema.erpFinancialEntries.kind, ["broker_commission", "advance"]), !agency && auth.scope.mode !== "owners" ? eq(schema.erpFinancialEntries.status, "approved") : undefined, filters.kind === "all" ? undefined : eq(schema.erpFinancialEntries.kind, filters.kind), filters.status === "all" ? undefined : eq(schema.erpFinancialEntries.status, filters.status), filters.competence ? eq(schema.erpFinancialEntries.competence, filters.competence) : undefined);
+  const filters = filtersSchema.parse(raw);
+  const auth = await requireErpAccess("finance", "erp_view_finance");
+  const db = getDatabase();
+  const agency = hasAgencyScope(auth);
+  const entries = schema.erpFinancialEntries;
+  const conditions = and(
+    eq(entries.tenantId, auth.context.tenantId),
+    erpScopeSql(auth.scope, entries.branchId, entries.ownerId),
+    agency ? undefined : inArray(entries.kind, ["broker_commission", "advance"]),
+    !agency && auth.scope.mode !== "owners" ? eq(entries.status, "approved") : undefined,
+    filters.kind === "all" ? undefined : eq(entries.kind, filters.kind),
+    filters.status === "all" ? undefined : eq(entries.status, filters.status),
+    filters.competence ? eq(entries.competence, filters.competence) : undefined,
+  );
   const [rows, total, access] = await Promise.all([
-    db.select().from(schema.erpFinancialEntries).where(conditions).orderBy(desc(schema.erpFinancialEntries.createdAt), schema.erpFinancialEntries.id).limit(25).offset((filters.page - 1) * 25),
-    db.select({ value: count() }).from(schema.erpFinancialEntries).where(conditions), getErpEffectiveAccess(auth.context),
+    // The join also makes Drizzle qualify the outer columns, which the correlated subquery of confirmedSettledSql needs.
+    db.select({ entry: entries, beneficiaryName: schema.user.name, settledCents: confirmedSettledSql(auth.context.tenantId) }).from(entries)
+      .leftJoin(schema.user, eq(schema.user.id, entries.beneficiaryId)).where(conditions)
+      .orderBy(desc(entries.createdAt), entries.id).limit(PAGE_SIZE).offset((filters.page - 1) * PAGE_SIZE),
+    db.select({ value: count() }).from(entries).where(conditions),
+    getErpEffectiveAccess(auth.context),
   ]);
-  const ids = rows.map((row) => row.id);
-  const movements = ids.length ? await db.select().from(schema.erpSettlements).where(and(eq(schema.erpSettlements.tenantId, auth.context.tenantId), inArray(schema.erpSettlements.entryId, ids))) : [];
-  const offsets = ids.length ? await db.select().from(schema.erpOffsets).where(and(eq(schema.erpOffsets.tenantId, auth.context.tenantId), inArray(schema.erpOffsets.commissionEntryId, ids))) : [];
-  await auditErp(db, { tenantId: auth.context.tenantId, actorId: auth.context.viewAs?.adminUserId ?? auth.context.userId, action: "erp.finance.viewed", entityType: "erp_access", entityId: "financial_entries", metadata: { count: rows.length, page: filters.page } });
-  return { filters, total: Number(total[0]?.value ?? 0), agency, canPrepare: agency && !auth.context.viewAs && access.capabilities.has("erp_prepare_finance"), rows: rows.map((row) => ({ id: row.id, kind: z.enum(FINANCIAL_KINDS).parse(row.kind), reference: row.reference, description: row.description, amountCents: row.amountCents, dueOn: row.dueOn, competence: row.competence, status: row.status, version: row.version, settledCents: settledCents(movements.filter((movement) => movement.entryId === row.id)) + (row.kind === "broker_commission" ? settledCents(offsets.filter((offset) => offset.commissionEntryId === row.id)) : 0) })) };
-}
-export async function getFinancialEntry(id: string) {
-  uuid.parse(id); const auth = await requireErpAccess("finance", "erp_view_finance"); const db = getDatabase(); const entry = await scopedFinancialEntry(db, auth, id);
-  const agency = canSeeAgencyBooks(auth.context) && auth.scope.mode !== "owners"; const access = await getErpEffectiveAccess(auth.context);
-  const movements = await entryMovements(db, auth.context.tenantId, id);
-  const offsets = await getEntryOffsets(db, auth.context.tenantId, id);
-  const documents = agency ? await db.select({ id: schema.erpDocuments.id, fileName: schema.erpDocuments.fileName }).from(schema.erpDocuments)
-    .where(and(eq(schema.erpDocuments.tenantId, auth.context.tenantId), eq(schema.erpDocuments.financialEntryId, id), eq(schema.erpDocuments.state, "ready"))) : [];
-  await auditErp(db, { tenantId: auth.context.tenantId, actorId: auth.context.viewAs?.adminUserId ?? auth.context.userId, action: "erp.finance.entry_viewed", entityType: "erp_financial_entry", entityId: id });
-  return { entry: { id: entry.id, kind: z.enum(FINANCIAL_KINDS).parse(entry.kind), reference: entry.reference, description: entry.description, amountCents: entry.amountCents, dueOn: entry.dueOn, competence: entry.competence, status: entry.status, version: entry.version, evidenceDocumentId: agency ? entry.evidenceDocumentId : null },
-    documents, settledCents: settledCents(movements) + (entry.kind === "broker_commission" ? offsets.confirmed : 0), cashCents: settledCents(movements), offsetCents: offsets.confirmed, agency,
-    canPrepare: agency && !auth.context.viewAs && access.capabilities.has("erp_prepare_finance"), canApprove: agency && !auth.context.viewAs && access.capabilities.has("erp_approve_finance") && entry.createdBy !== auth.context.userId,
-    movements: movements.map((row) => ({ id: row.id, kind: row.kind, amountCents: row.amountCents, occurredOn: row.occurredOn, status: row.status,
-      evidenceDocumentId: agency ? row.evidenceDocumentId : null, reason: agency ? row.reason : null,
-      canReview: agency && !auth.context.viewAs && access.capabilities.has("erp_approve_finance") && row.createdBy !== auth.context.userId && row.status === "pending" })) };
+  await auditErp(db, {
+    tenantId: auth.context.tenantId, actorId: auditActor(auth.context), action: "erp.finance.viewed", entityType: "erp_access",
+    entityId: "financial_entries", metadata: { count: rows.length, page: filters.page },
+  });
+  return {
+    filters, pageSize: PAGE_SIZE, total: Number(total[0]?.value ?? 0), agency,
+    canPrepare: agency && !auth.context.viewAs && access.capabilities.has("erp_prepare_finance"),
+    rows: rows.map(({ entry, beneficiaryName, settledCents: settled }) => ({
+      id: entry.id, kind: z.enum(FINANCIAL_KINDS).parse(entry.kind), reference: entry.reference, description: entry.description, beneficiaryName,
+      amountCents: entry.amountCents, dueOn: entry.dueOn, competence: entry.competence, status: entry.status, version: entry.version,
+      settledCents: checkedCents(settled),
+    })),
+  };
 }
 
-export async function getFinanceSelectors() {
-  const auth = await requireErpAccess("finance", "erp_prepare_finance"); const db = getDatabase();
-  const [branches, beneficiaries, sales] = await Promise.all([
-    db.select({ id: schema.branches.id, name: schema.branches.name }).from(schema.branches).where(and(eq(schema.branches.tenantId, auth.context.tenantId), eq(schema.branches.status, "active"), erpScopeSql(auth.scope, schema.branches.id, schema.branches.id))).orderBy(schema.branches.name).limit(200),
-    db.select({ id: schema.user.id, name: schema.user.name, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId)).where(and(eq(schema.tenantMemberships.tenantId, auth.context.tenantId), eq(schema.tenantMemberships.status, "active"), erpScopeSql(auth.scope, schema.tenantMemberships.branchId, schema.tenantMemberships.userId))).orderBy(schema.user.name).limit(500),
-    db.select({ id: schema.sales.id, name: schema.leads.nome, brokerId: schema.sales.brokerId, branchId: schema.leads.branchId }).from(schema.sales).innerJoin(schema.leads, and(eq(schema.leads.id, schema.sales.leadId), eq(schema.leads.tenantId, auth.context.tenantId), isNull(schema.leads.deletedAt))).where(and(eq(schema.sales.tenantId, auth.context.tenantId), eq(schema.sales.status, "active"), erpScopeSql(auth.scope, schema.leads.branchId, schema.sales.brokerId))).orderBy(desc(schema.sales.createdAt)).limit(200),
+export async function getFinancialEntry(id: string) {
+  uuidSchema.parse(id);
+  const auth = await requireErpAccess("finance", "erp_view_finance");
+  const db = getDatabase();
+  const entry = await scopedFinancialEntry(db, auth, id);
+  const agency = hasAgencyScope(auth);
+  const [access, movements, offsets] = await Promise.all([
+    getErpEffectiveAccess(auth.context), entryMovements(db, auth.context.tenantId, id), getEntryOffsets(db, auth.context.tenantId, id),
   ]);
-  return { branches, beneficiaries, sales };
+  const documents = agency
+    ? await db.select({ id: schema.erpDocuments.id, fileName: schema.erpDocuments.fileName }).from(schema.erpDocuments)
+      .where(and(eq(schema.erpDocuments.tenantId, auth.context.tenantId), eq(schema.erpDocuments.financialEntryId, id), eq(schema.erpDocuments.state, "ready")))
+    : [];
+  await auditErp(db, {
+    tenantId: auth.context.tenantId, actorId: auditActor(auth.context), action: "erp.finance.entry_viewed", entityType: "erp_financial_entry", entityId: id,
+  });
+  const operator = agency && !auth.context.viewAs;
+  const canApproveFinance = operator && access.capabilities.has("erp_approve_finance");
+  return {
+    entry: {
+      id: entry.id, kind: z.enum(FINANCIAL_KINDS).parse(entry.kind), reference: entry.reference, description: entry.description,
+      amountCents: entry.amountCents, dueOn: entry.dueOn, competence: entry.competence, status: entry.status, version: entry.version,
+      evidenceDocumentId: agency ? entry.evidenceDocumentId : null,
+    },
+    documents,
+    settledCents: settledCents(movements) + (entry.kind === "broker_commission" ? offsets.confirmed : 0),
+    cashCents: settledCents(movements), offsetCents: offsets.confirmed, agency,
+    canPrepare: operator && access.capabilities.has("erp_prepare_finance"),
+    canApprove: canApproveFinance && entry.createdBy !== auth.context.userId,
+    movements: movements.map((row) => ({
+      id: row.id, kind: row.kind, amountCents: row.amountCents, occurredOn: row.occurredOn, status: row.status,
+      evidenceDocumentId: agency ? row.evidenceDocumentId : null, reason: agency ? row.reason : null,
+      canReview: canApproveFinance && row.createdBy !== auth.context.userId && row.status === "pending",
+    })),
+  };
+}
+
+/** Branches for the preparation form. Sales and beneficiaries are searched on demand (search functions below). */
+export async function getFinanceSelectors() {
+  const auth = await requireErpAccess("finance", "erp_prepare_finance");
+  const branches = await getDatabase().select({ id: schema.branches.id, name: schema.branches.name }).from(schema.branches)
+    .where(and(
+      eq(schema.branches.tenantId, auth.context.tenantId), eq(schema.branches.status, "active"),
+      erpScopeSql(auth.scope, schema.branches.id, schema.branches.id),
+    ))
+    .orderBy(schema.branches.name).limit(200);
+  return { branches };
+}
+
+const SEARCH_LIMIT = 20;
+const searchQuerySchema = z.string().trim().min(2, "Digite pelo menos 2 letras.").max(80, "Use até 80 caracteres.");
+/** `%term%` for ILIKE, with the user's own wildcards escaped. */
+function containsPattern(term: string) {
+  return `%${term.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+}
+
+/** Active sales in the preparer's scope whose lead name matches (same tenant and scope rules as the preparation). */
+export async function searchFinanceSales(query: string) {
+  const term = searchQuerySchema.parse(query);
+  const auth = await requireErpAccess("finance", "erp_prepare_finance");
+  const broker = alias(schema.user, "sale_broker");
+  return getDatabase().select({
+    id: schema.sales.id, name: schema.leads.nome, brokerId: schema.sales.brokerId, brokerName: broker.name, branchId: schema.leads.branchId,
+  }).from(schema.sales)
+    .innerJoin(schema.leads, and(eq(schema.leads.id, schema.sales.leadId), eq(schema.leads.tenantId, auth.context.tenantId), isNull(schema.leads.deletedAt)))
+    .leftJoin(broker, eq(broker.id, schema.sales.brokerId))
+    .where(and(
+      eq(schema.sales.tenantId, auth.context.tenantId), eq(schema.sales.status, "active"),
+      erpScopeSql(auth.scope, schema.leads.branchId, schema.sales.brokerId), ilike(schema.leads.nome, containsPattern(term)),
+    ))
+    .orderBy(desc(schema.sales.createdAt)).limit(SEARCH_LIMIT);
+}
+
+/** Active members in the preparer's scope whose name matches. */
+export async function searchFinanceBeneficiaries(query: string) {
+  const term = searchQuerySchema.parse(query);
+  const auth = await requireErpAccess("finance", "erp_prepare_finance");
+  return getDatabase().select({ id: schema.user.id, name: schema.user.name, branchId: schema.tenantMemberships.branchId })
+    .from(schema.tenantMemberships)
+    .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, auth.context.tenantId), eq(schema.tenantMemberships.status, "active"),
+      erpScopeSql(auth.scope, schema.tenantMemberships.branchId, schema.tenantMemberships.userId), ilike(schema.user.name, containsPattern(term)),
+    ))
+    .orderBy(schema.user.name).limit(SEARCH_LIMIT);
 }

@@ -1,8 +1,11 @@
 import "server-only";
-import { and, desc, eq, ne, or } from "drizzle-orm";
+import { and, count, desc, eq, ne, sql, type SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
-import { auditErp, canSeeAgencyBooks, erpScopeSql, getErpEffectiveAccess, requireErpAccess, type ErpDatabase } from "./access";
+import { auditActor, auditErp, erpScopeSql, getErpEffectiveAccess, hasAgencyScope, requireErpAccess, type ErpDatabase } from "./access";
+import { confirmedSettledSql, notInOpenPayoutSql, openBalanceSql } from "./balances";
+import { PAGE_SIZE, pageSchema } from "./shared";
 import { assertIndependentReview, ErpError, moneyCentsSchema } from "./contracts";
 import { activePayoutFor, assertOpenPeriods, entryMovements, financialTransaction } from "./finance";
 import { syncLegacyInstallment } from "./legacy-sync";
@@ -89,13 +92,79 @@ export async function reviewOffset(raw: unknown) {
   });
 }
 
-export async function getOffsets() {
-  const auth = await requireErpAccess("finance", "erp_view_finance"); const db = getDatabase(); const access = await getErpEffectiveAccess(auth.context);
-  const agency = canSeeAgencyBooks(auth.context) && auth.scope.mode !== "owners";
-  const rows = await db.select({ id: schema.erpOffsets.id, advanceEntryId: schema.erpOffsets.advanceEntryId, commissionEntryId: schema.erpOffsets.commissionEntryId, kind: schema.erpOffsets.kind, amountCents: schema.erpOffsets.amountCents, occurredOn: schema.erpOffsets.occurredOn, status: schema.erpOffsets.status, createdBy: schema.erpOffsets.createdBy, reason: schema.erpOffsets.reason })
-    .from(schema.erpOffsets).innerJoin(schema.erpFinancialEntries, and(eq(schema.erpFinancialEntries.tenantId, auth.context.tenantId), eq(schema.erpFinancialEntries.id, schema.erpOffsets.commissionEntryId)))
-    .where(and(eq(schema.erpOffsets.tenantId, auth.context.tenantId), erpScopeSql(auth.scope, schema.erpFinancialEntries.branchId, schema.erpFinancialEntries.ownerId))).orderBy(desc(schema.erpOffsets.createdAt)).limit(100);
-  const choices = agency ? await db.select({ id: schema.erpFinancialEntries.id, reference: schema.erpFinancialEntries.reference, kind: schema.erpFinancialEntries.kind }).from(schema.erpFinancialEntries).where(and(eq(schema.erpFinancialEntries.tenantId, auth.context.tenantId), eq(schema.erpFinancialEntries.status, "approved"), or(eq(schema.erpFinancialEntries.kind, "advance"), eq(schema.erpFinancialEntries.kind, "broker_commission")), erpScopeSql(auth.scope, schema.erpFinancialEntries.branchId, schema.erpFinancialEntries.ownerId))).orderBy(desc(schema.erpFinancialEntries.createdAt)).limit(500) : [];
-  await auditErp(db, { tenantId: auth.context.tenantId, actorId: auth.context.viewAs?.adminUserId ?? auth.context.userId, action: "erp.offset.viewed", entityType: "erp_access", entityId: "offsets", metadata: { count: rows.length } });
-  return { choices, canPrepare: agency && !auth.context.viewAs && access.capabilities.has("erp_prepare_finance"), rows: rows.map(({ createdBy, reason, ...row }) => ({ ...row, reason: agency ? reason : null, canReview: agency && !auth.context.viewAs && access.capabilities.has("erp_approve_finance") && createdBy !== auth.context.userId && row.status === "pending" })) };
+/**
+ * Offsettable amount of an advance, in SQL (same rule as `assertOffsetCapacity`): confirmed cash − pending cash reversals
+ * − confirmed offsets (reversals give back) − pending offset allocations.
+ */
+function advanceAvailableSql(tenantId: string): SQL<number> {
+  const entryId = schema.erpFinancialEntries.id;
+  return sql<number>`(${confirmedSettledSql(tenantId)}
+    - coalesce((SELECT sum(s.amount_cents) FROM erp_settlements s
+      WHERE s.tenant_id = ${tenantId} AND s.entry_id = ${entryId} AND s.status = 'pending' AND s.kind = 'reversal'), 0)
+    - coalesce((SELECT sum(CASE WHEN o.status = 'confirmed' AND o.kind = 'reversal' THEN -o.amount_cents
+        WHEN o.status = 'confirmed' OR (o.status = 'pending' AND o.kind = 'allocation') THEN o.amount_cents ELSE 0 END)
+      FROM erp_offsets o WHERE o.tenant_id = ${tenantId} AND o.advance_entry_id = ${entryId}), 0))::bigint`.mapWith(Number);
+}
+
+const OFFSET_CHOICE_LIMIT = 200;
+const offsetFiltersSchema = z.object({ page: pageSchema });
+
+/** Approved advances and commissions that can still take part in an offset, with their open amount and beneficiary. */
+async function offsetChoices(auth: ErpAccess) {
+  const db = getDatabase();
+  const entries = schema.erpFinancialEntries;
+  const tenantId = auth.context.tenantId;
+  const base = and(eq(entries.tenantId, tenantId), eq(entries.status, "approved"), erpScopeSql(auth.scope, entries.branchId, entries.ownerId));
+  const columns = (available: SQL<number>) => ({
+    id: entries.id, reference: entries.reference, kind: entries.kind, beneficiaryId: entries.beneficiaryId,
+    beneficiaryName: schema.user.name, availableCents: available,
+  });
+  const [advances, commissions] = await Promise.all([
+    db.select(columns(advanceAvailableSql(tenantId))).from(entries).leftJoin(schema.user, eq(schema.user.id, entries.beneficiaryId))
+      .where(and(base, eq(entries.kind, "advance"), sql`${advanceAvailableSql(tenantId)} > 0`))
+      .orderBy(desc(entries.createdAt)).limit(OFFSET_CHOICE_LIMIT),
+    db.select(columns(openBalanceSql(tenantId))).from(entries).leftJoin(schema.user, eq(schema.user.id, entries.beneficiaryId))
+      .where(and(base, eq(entries.kind, "broker_commission"), sql`${openBalanceSql(tenantId)} > 0`, notInOpenPayoutSql(tenantId)))
+      .orderBy(desc(entries.createdAt)).limit(OFFSET_CHOICE_LIMIT),
+  ]);
+  return [...advances, ...commissions];
+}
+
+export async function getOffsets(raw: unknown = {}) {
+  const filters = offsetFiltersSchema.parse(raw);
+  const auth = await requireErpAccess("finance", "erp_view_finance");
+  const db = getDatabase();
+  const agency = hasAgencyScope(auth);
+  const commission = schema.erpFinancialEntries;
+  const advance = alias(schema.erpFinancialEntries, "offset_advance");
+  const joinCommission = and(eq(commission.tenantId, auth.context.tenantId), eq(commission.id, schema.erpOffsets.commissionEntryId));
+  const conditions = and(eq(schema.erpOffsets.tenantId, auth.context.tenantId), erpScopeSql(auth.scope, commission.branchId, commission.ownerId));
+  const [rows, total, access] = await Promise.all([
+    db.select({
+      id: schema.erpOffsets.id, advanceEntryId: schema.erpOffsets.advanceEntryId, commissionEntryId: schema.erpOffsets.commissionEntryId,
+      advanceReference: advance.reference, commissionReference: commission.reference, kind: schema.erpOffsets.kind,
+      amountCents: schema.erpOffsets.amountCents, occurredOn: schema.erpOffsets.occurredOn, status: schema.erpOffsets.status,
+      createdBy: schema.erpOffsets.createdBy, reason: schema.erpOffsets.reason,
+    }).from(schema.erpOffsets)
+      .innerJoin(commission, joinCommission)
+      .leftJoin(advance, and(eq(advance.tenantId, auth.context.tenantId), eq(advance.id, schema.erpOffsets.advanceEntryId)))
+      .where(conditions).orderBy(desc(schema.erpOffsets.createdAt), schema.erpOffsets.id)
+      .limit(PAGE_SIZE).offset((filters.page - 1) * PAGE_SIZE),
+    db.select({ value: count() }).from(schema.erpOffsets).innerJoin(commission, joinCommission).where(conditions),
+    getErpEffectiveAccess(auth.context),
+  ]);
+  const operator = agency && !auth.context.viewAs;
+  const canPrepare = operator && access.capabilities.has("erp_prepare_finance");
+  const choices = canPrepare ? await offsetChoices(auth) : [];
+  await auditErp(db, {
+    tenantId: auth.context.tenantId, actorId: auditActor(auth.context), action: "erp.offset.viewed", entityType: "erp_access", entityId: "offsets",
+    metadata: { count: rows.length, page: filters.page },
+  });
+  return {
+    page: filters.page, pageSize: PAGE_SIZE, total: Number(total[0]?.value ?? 0), choices, canPrepare,
+    rows: rows.map(({ createdBy, reason, ...row }) => ({
+      ...row, reason: agency ? reason : null,
+      canReview: operator && access.capabilities.has("erp_approve_finance") && createdBy !== auth.context.userId && row.status === "pending",
+    })),
+  };
 }

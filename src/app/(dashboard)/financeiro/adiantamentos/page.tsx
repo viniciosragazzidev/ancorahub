@@ -1,10 +1,35 @@
-import { DashboardHeader } from "@/components/dashboard-header";
 import { getOffsets } from "@/features/erp/offsets";
 import { getFinancialEntries, getFinanceSelectors } from "@/features/erp/finance";
-import { NewFinancialEntry, FinancialEntriesTable } from "@/features/erp/components/finance-workspace";
-import { OffsetPreparation, OffsetsList } from "@/features/erp/components/finance-controls";
-import page from "@/components/lite/page/lite-page.module.css";
-export default async function AdvancesPage() {
-  const entries = await getFinancialEntries({ kind: "advance" }); const offsets = await getOffsets(); const selectors = entries.canPrepare ? await getFinanceSelectors() : null;
-  return <><DashboardHeader breadcrumb="Financeiro" title="Adiantamentos e compensações" /><main className={page.stack}><div className={page.toolbar}><p className="text-sm text-muted-foreground">A concessão altera o caixa quando liquidada. A compensação usa o saldo comprovado do adiantamento e reduz o valor a repassar, sem uma segunda saída.</p>{selectors ? <NewFinancialEntry selectors={selectors} /> : null}</div><FinancialEntriesTable data={entries} />{entries.total > 25 ? <p className="text-sm text-muted-foreground">Mostrando 25 adiantamentos recentes. Consulte os demais no Financeiro com filtro de tipo.</p> : null}{offsets.canPrepare ? <details><summary className="cursor-pointer text-sm font-medium">Preparar compensação autorizada</summary><OffsetPreparation data={offsets} /></details> : null}<OffsetsList data={offsets} /></main></>;
+import { FinanceLedger } from "@/features/erp/components/finance-workspace";
+import { OffsetPrepareButton, OffsetsList } from "@/features/erp/components/finance-controls";
+import { ErpPage } from "@/features/erp/ui/erp-page";
+import { ErpNote, ErpToolbar, ErpUrlFilter } from "@/features/erp/ui/erp-kit";
+
+const VIEW_OPTIONS = [
+  { value: "advances", label: "Adiantamentos" },
+  { value: "offsets", label: "Compensações" },
+];
+
+type Search = { view?: string; page?: string };
+
+/** One list per view (advances or offsets), each paginated by URL; "Preparar compensação" is the screen's primary CTA. */
+export default async function AdvancesPage({ searchParams }: { searchParams: Promise<Search> }) {
+  const raw = await searchParams;
+  const view = raw.view === "offsets" ? "offsets" : "advances";
+  const [offsets, entries] = await Promise.all([
+    getOffsets({ page: view === "offsets" ? raw.page : undefined }),
+    view === "advances" ? getFinancialEntries({ kind: "advance", page: raw.page }) : Promise.resolve(null),
+  ]);
+  const selectors = entries?.canPrepare ? await getFinanceSelectors() : null;
+  return <ErpPage pathname="/financeiro/adiantamentos" breadcrumb="Financeiro" title="Adiantamentos e compensações"
+    actions={<OffsetPrepareButton data={offsets} />}>
+    <ErpNote>
+      A concessão altera o caixa quando liquidada. A compensação usa o saldo comprovado do adiantamento e reduz o valor a repassar, sem uma segunda saída.
+    </ErpNote>
+    <ErpToolbar>
+      <ErpUrlFilter label="Lista" param="view" value={view} defaultValue="advances" options={VIEW_OPTIONS} />
+    </ErpToolbar>
+    {entries ? <FinanceLedger data={entries} branches={selectors?.branches ?? null} title="Adiantamentos" defaultKind="advance" ctaVariant="outline"
+      emptyTitle="Nenhum adiantamento" emptyText="Nenhum adiantamento foi preparado no seu escopo." /> : <OffsetsList data={offsets} />}
+  </ErpPage>;
 }

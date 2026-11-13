@@ -14,7 +14,7 @@ export async function getErpGovernance() {
     db.select({ id: schema.erpEvents.id, action: schema.erpEvents.action, entityId: schema.erpEvents.entityId, createdAt: schema.erpEvents.createdAt, actor: schema.user.name })
       .from(schema.erpEvents).leftJoin(schema.user, eq(schema.erpEvents.actorId, schema.user.id))
       .where(and(eq(schema.erpEvents.tenantId, context.tenantId), eq(schema.erpEvents.entityType, "erp_module")))
-      .orderBy(desc(schema.erpEvents.createdAt)).limit(20),
+      .orderBy(desc(schema.erpEvents.createdAt)).limit(50),
   ]);
   return {
     platform, events,

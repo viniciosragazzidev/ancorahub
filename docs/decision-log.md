@@ -1,5 +1,37 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-186 - ERP nas duas peles do design system e endurecimento de cargos
+
+**Estado:** aceita. **Data:** 2026-11-12.
+
+Vinicios pediu o ERP integrado ao design system, com regras de negócio, cargos, permissões, escalabilidade e manutenção revistos.
+
+**Interface.** Toda tela do ERP passa pelo kit `src/features/erp/ui`:
+- `ErpPage`, `ErpList`, `ErpPanel`, `ErpRowMenu`, `ErpSettingsMenu`, filtros e paginação por URL.
+- A pele é escolhida por uma regra única (`getErpSkin`): os públicos Lite (corretor, supervisor e gestor Lite) e o Diretor com `feature_director_lite_style` veem o sistema Lite; os demais veem o sistema padrão de "Product Density" (`Card overview` + `SectionCardHeader` + `DataTable`, `Sheet`, `⋯`).
+- Lista de entidades é uma tabela, e o clique na linha abre o painel lateral.
+- Ações secundárias ficam em menus, com um único botão principal por tela e busca com "+" para itens relacionados.
+- As telas não recriam essas peças.
+
+**Cargos e segregação:**
+- Quem recebe um valor não o aprova, não o paga e não confere o comprovante.
+- Quem aprova o repasse não registra o pagamento.
+- O lançamento importado mantém o autor do arquivo como preparador.
+- O Gestor deixa de abrir os livros da corretora só pelo papel; para isso precisa da função Financeiro com cargo delegado. Sem ela, vê na unidade apenas comissões e adiantamentos aprovados (matriz "L/U só se aprovado").
+- O comprovante de repasse fica preso ao repasse.
+- O estorno de um pagamento de repasse mantém o vínculo: o recibo continua como emitido e mostra o valor estornado depois.
+- Itens de um repasse respeitam períodos fechados.
+
+**Escala:**
+- O acesso ao ERP é resolvido uma vez por requisição.
+- Saldos em aberto são calculados em SQL.
+- As filas são ordenadas e avisam quando cortam.
+- Os filtros por mês usam faixas de data indexáveis.
+- A apuração de incentivo tem trava própria.
+- A TV audita no máximo uma vez por hora.
+- Índices novos estão na 0230.
+- As suítes com banco rodam num projeto do Vitest sem paralelismo.
+
 ## DEC-185 - Repasse em quatro mãos, cronograma subordinado ao ERP e assistente sem dados no modelo
 
 **Estado:** aceita para implementação. **Data:** 2026-11-12.

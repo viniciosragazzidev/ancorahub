@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { auditErp, canSeeAgencyBooks, erpScopeSql, getErpEffectiveAccess, requireErpAccess, type ErpDatabase } from "./access";
@@ -12,10 +12,10 @@ import { assertOccurredByToday, assertPaymentCapacity, checkedCents, settledCent
 import { getEntryOffsets } from "./offset-balances";
 import { scopedEvidence, scopedFinancialEntry, type ErpAccess } from "./records";
 import { syncLegacyInstallment } from "./legacy-sync";
+import { PAGE_SIZE, PAYOUT_STATUSES, pageSchema, periodSchema, uuidSchema } from "./shared";
 
-const uuid = z.string().uuid();
-const period = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
-export const PAYOUT_STATUS_LABELS: Record<string, string> = { prepared: "Aguardando aprovação", approved: "Aprovado para pagamento", paying: "Pagamento a conferir", settled: "Liquidado", cancelled: "Cancelado" };
+const uuid = uuidSchema;
+const period = periodSchema;
 
 export const receiptSchema = z.object({
   version: z.literal(1), number: z.string(), issuedAt: z.string(), competence: period, occurredOn: z.string(),
@@ -221,19 +221,33 @@ export async function confirmPayoutPayment(raw: unknown) {
   });
 }
 
-const listSchema = z.object({ status: z.enum(["all", "prepared", "approved", "paying", "settled", "cancelled"]).default("all"), competence: period.optional() });
+const listSchema = z.object({ status: z.enum(["all", ...PAYOUT_STATUSES]).default("all"), competence: period.optional(), page: pageSchema });
 export async function getPayouts(raw: unknown) {
   const filters = listSchema.parse(raw);
   const auth = await requireErpAccess("finance", "erp_view_finance"); const db = getDatabase();
   const agency = canSeeAgencyBooks(auth.context) && auth.scope.mode !== "owners"; const access = await getErpEffectiveAccess(auth.context);
-  const rows = await db.select({ payout: schema.erpPayouts, beneficiaryName: schema.user.name }).from(schema.erpPayouts).leftJoin(schema.user, eq(schema.user.id, schema.erpPayouts.beneficiaryId))
-    .where(and(eq(schema.erpPayouts.tenantId, auth.context.tenantId), erpScopeSql(auth.scope, schema.erpPayouts.branchId, schema.erpPayouts.beneficiaryId),
-      agency ? undefined : eq(schema.erpPayouts.beneficiaryId, auth.context.userId), agency ? undefined : eq(schema.erpPayouts.status, "settled"),
-      filters.status === "all" ? undefined : eq(schema.erpPayouts.status, filters.status), filters.competence ? eq(schema.erpPayouts.competence, filters.competence) : undefined))
-    .orderBy(desc(schema.erpPayouts.createdAt)).limit(100);
-  await auditErp(db, { tenantId: auth.context.tenantId, actorId: auth.context.viewAs?.adminUserId ?? auth.context.userId, action: "erp.payout.viewed", entityType: "erp_access", entityId: "payouts", metadata: { count: rows.length } });
-  return { filters, agency, canPrepare: agency && !auth.context.viewAs && access.capabilities.has("erp_prepare_finance"),
-    rows: rows.map(({ payout, beneficiaryName }) => ({ id: payout.id, beneficiaryName: beneficiaryName ?? "Sem nome", competence: payout.competence, status: payout.status, netCents: payout.netCents, grossCents: payout.grossCents, receiptNumber: payout.receiptNumber, occurredOn: payout.occurredOn })) };
+  const where = and(eq(schema.erpPayouts.tenantId, auth.context.tenantId), erpScopeSql(auth.scope, schema.erpPayouts.branchId, schema.erpPayouts.beneficiaryId),
+    agency ? undefined : eq(schema.erpPayouts.beneficiaryId, auth.context.userId), agency ? undefined : eq(schema.erpPayouts.status, "settled"),
+    filters.status === "all" ? undefined : eq(schema.erpPayouts.status, filters.status), filters.competence ? eq(schema.erpPayouts.competence, filters.competence) : undefined);
+  const [rows, total] = await Promise.all([
+    db.select({ payout: schema.erpPayouts, beneficiaryName: schema.user.name }).from(schema.erpPayouts).leftJoin(schema.user, eq(schema.user.id, schema.erpPayouts.beneficiaryId))
+      .where(where).orderBy(desc(schema.erpPayouts.createdAt), desc(schema.erpPayouts.id)).limit(PAGE_SIZE).offset((filters.page - 1) * PAGE_SIZE),
+    db.select({ value: count() }).from(schema.erpPayouts).where(where),
+  ]);
+  await auditErp(db, { tenantId: auth.context.tenantId, actorId: auth.context.viewAs?.adminUserId ?? auth.context.userId, action: "erp.payout.viewed", entityType: "erp_access", entityId: "payouts",
+    metadata: { count: rows.length, page: filters.page } });
+  return { filters, agency, total: Number(total[0]?.value ?? 0), pageSize: PAGE_SIZE,
+    canPrepare: agency && !auth.context.viewAs && access.capabilities.has("erp_prepare_finance"),
+    rows: rows.map(({ payout, beneficiaryName }) => ({ id: payout.id, beneficiaryName: beneficiaryName ?? "Sem nome", competence: payout.competence, status: payout.status,
+      netCents: payout.netCents, grossCents: payout.grossCents, receiptNumber: payout.receiptNumber, occurredOn: payout.occurredOn })) };
+}
+
+/** Confirmed reversals of this payout's settlements (they keep `payoutId`). The receipt stays as issued; this shows what came back later. */
+async function reversedCents(db: ErpDatabase, tenantId: string, payoutId: string) {
+  const [row] = await db.select({ value: sql<number>`coalesce(sum(${schema.erpSettlements.amountCents}), 0)::bigint`.mapWith(Number) }).from(schema.erpSettlements)
+    .where(and(eq(schema.erpSettlements.tenantId, tenantId), eq(schema.erpSettlements.payoutId, payoutId), eq(schema.erpSettlements.kind, "reversal"),
+      eq(schema.erpSettlements.status, "confirmed")));
+  return row?.value ?? 0;
 }
 
 export async function getPayout(id: string) {
@@ -241,14 +255,14 @@ export async function getPayout(id: string) {
   const agency = canSeeAgencyBooks(auth.context) && auth.scope.mode !== "owners"; const access = await getErpEffectiveAccess(auth.context);
   const payout = await scopedPayout(db, auth, id);
   if (!agency && (payout.beneficiaryId !== auth.context.userId || payout.status !== "settled")) throw new ErpError("Repasse não encontrado no seu escopo.");
-  const items = await payoutItems(db, auth.context.tenantId, payout.id);
+  const [items, reversed] = await Promise.all([payoutItems(db, auth.context.tenantId, payout.id), reversedCents(db, auth.context.tenantId, payout.id)]);
   const [beneficiary] = await db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, payout.beneficiaryId)).limit(1);
   const documents = agency && ["approved", "paying"].includes(payout.status) ? await db.select({ id: schema.erpDocuments.id, fileName: schema.erpDocuments.fileName }).from(schema.erpDocuments)
     .where(and(eq(schema.erpDocuments.tenantId, auth.context.tenantId), eq(schema.erpDocuments.moduleKey, "finance"), eq(schema.erpDocuments.state, "ready"), eq(schema.erpDocuments.payoutId, payout.id))).orderBy(desc(schema.erpDocuments.createdAt)).limit(20) : [];
   await auditErp(db, { tenantId: auth.context.tenantId, actorId: auth.context.viewAs?.adminUserId ?? auth.context.userId, action: "erp.payout.detail_viewed", entityType: "erp_payout", entityId: payout.id });
   const editable = agency && !auth.context.viewAs;
   return { id: payout.id, status: payout.status, version: payout.version, competence: payout.competence, beneficiaryName: beneficiary?.name ?? "Sem nome", grossCents: payout.grossCents, netCents: payout.netCents,
-    occurredOn: payout.occurredOn, reason: agency ? payout.reason : null, receiptNumber: payout.receiptNumber, agency, documents,
+    occurredOn: payout.occurredOn, reason: agency ? payout.reason : null, receiptNumber: payout.receiptNumber, agency, documents, reversedCents: reversed,
     items: items.map((item) => ({ entryId: item.entryId, reference: item.entry.reference, description: item.entry.description, amountCents: item.entry.amountCents, balanceCents: item.balanceCents })),
     canApprove: editable && access.capabilities.has("erp_approve_finance") && payout.status === "prepared" && payout.preparedBy !== auth.context.userId,
     canCancel: editable && access.capabilities.has("erp_prepare_finance") && ["prepared", "approved"].includes(payout.status),
@@ -263,5 +277,5 @@ export async function getReceipt(id: string) {
   const agency = canSeeAgencyBooks(auth.context) && auth.scope.mode !== "owners";
   if (payout.status !== "settled" || !payout.receipt || (!agency && payout.beneficiaryId !== auth.context.userId)) throw new ErpError("Recibo não encontrado no seu escopo.");
   await auditErp(db, { tenantId: auth.context.tenantId, actorId: auth.context.viewAs?.adminUserId ?? auth.context.userId, action: "erp.receipt.viewed", entityType: "erp_payout", entityId: payout.id, metadata: { receiptNumber: payout.receiptNumber } });
-  return { receipt: receiptSchema.parse(payout.receipt), digest: payout.receiptDigest ?? "" };
+  return { id: payout.id, receipt: receiptSchema.parse(payout.receipt), digest: payout.receiptDigest ?? "", reversedCents: await reversedCents(db, auth.context.tenantId, payout.id) };
 }

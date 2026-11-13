@@ -75,21 +75,25 @@ export function incentiveDigestInput(snapshot: IncentiveSnapshot): string {
   return canonicalJson({ ...stable, branchIds: [...stable.branchIds].sort(compareText) });
 }
 
-export function todayInSaoPaulo(now = new Date()): string {
-  const parts = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: INCENTIVE_TIME_ZONE }).formatToParts(now);
-  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
-  return `${part("year")}-${part("month")}-${part("day")}`;
-}
+/** Calendar day in São Paulo; one shared implementation for every ERP module. */
+export { todayInSaoPaulo } from "./shared";
 
-export type RankingViewer = { userId: string; showNames: boolean; metric: IncentiveMetric; canSeeValue: (row: IncentiveRankingRow) => boolean; names: ReadonlyMap<string, string> };
+export type RankingViewer = {
+  userId: string;
+  metric: IncentiveMetric;
+  names: ReadonlyMap<string, string>;
+  /** Whether the viewer may see this participant's name (campaign exposure policy and viewer scope). */
+  canSeeName: (row: IncentiveRankingRow) => boolean;
+  canSeeValue: (row: IncentiveRankingRow) => boolean;
+};
 export type VisibleRankingRow = { position: number; label: string; isViewer: boolean; value: number | null };
 
-/** Exposure policy: names only when the campaign allows it; money of colleagues only for whom the viewer may see. */
+/** Exposure policy: the viewer's own row is always "Você"; names and colleagues' money only where the viewer may see them. */
 export function visibleRanking(rows: readonly IncentiveRankingRow[], viewer: RankingViewer): VisibleRankingRow[] {
   return rows.map((row) => {
     const isViewer = row.brokerId === viewer.userId;
-    const name = viewer.showNames ? viewer.names.get(row.brokerId) ?? `Corretor ${row.position}` : `Corretor ${row.position}`;
-    const label = isViewer ? (viewer.showNames ? `${name} (você)` : "Você") : name;
+    const anonymous = `Corretor ${row.position}`;
+    const label = isViewer ? "Você" : viewer.canSeeName(row) ? viewer.names.get(row.brokerId) ?? anonymous : anonymous;
     const value = viewer.metric !== "sales_value_cents" || isViewer || viewer.canSeeValue(row) ? row.value : null;
     return { position: row.position, label, isViewer, value };
   });

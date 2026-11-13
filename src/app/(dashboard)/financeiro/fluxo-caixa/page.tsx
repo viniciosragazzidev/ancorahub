@@ -1,10 +1,27 @@
-import { DashboardHeader } from "@/components/dashboard-header";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { StatCard } from "@/components/dashboard/metric-card";
 import { getCashMovements } from "@/features/erp/closing";
 import { formatCents } from "@/features/erp/contracts";
-import page from "@/components/lite/page/lite-page.module.css";
+import { currentPeriod, periodSchema } from "@/features/erp/shared";
+import { ErpPage } from "@/features/erp/ui/erp-page";
+import { ErpMonthFilter, ErpNote, ErpSection, ErpToolbar } from "@/features/erp/ui/erp-kit";
+
 export default async function CashPage({ searchParams }: { searchParams: Promise<{ competence?: string }> }) {
-  const params = await searchParams; const period = params.competence || new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", timeZone: "America/Sao_Paulo" }).format(new Date()).split("-").slice(0, 2).join("-"); const data = await getCashMovements(period);
-  return <><DashboardHeader breadcrumb="Financeiro" title="Movimentação de caixa" /><main className={page.stack}><form action="/financeiro/fluxo-caixa" className={page.toolbar}><Input name="competence" type="month" defaultValue={data.competence} aria-label="Mês dos movimentos" required /><Button variant="outline" type="submit">Consultar</Button></form><p className="text-sm text-muted-foreground">Somente liquidações confirmadas, com estornos compensatórios. Mensalidades pagas à operadora e compensações internas não entram como movimento de caixa da Âncora.</p>{data.movementCount ? <dl className="grid gap-4 sm:grid-cols-3"><div><dt className="text-sm text-muted-foreground">Entradas</dt><dd className="text-lg font-semibold">{formatCents(data.incoming)}</dd></div><div><dt className="text-sm text-muted-foreground">Saídas</dt><dd className="text-lg font-semibold">{formatCents(data.outgoing)}</dd></div><div><dt className="text-sm text-muted-foreground">Variação líquida no mês</dt><dd className="text-lg font-semibold">{formatCents(data.net)}</dd></div></dl> : <p className="text-sm text-muted-foreground">Nenhum movimento confirmado informado neste mês e escopo.</p>}<p className="text-sm text-muted-foreground">Saldo inicial não informado. A variação líquida não representa o saldo bancário.</p></main></>;
+  const params = await searchParams;
+  const requested = periodSchema.safeParse(params.competence);
+  const data = await getCashMovements(requested.success ? requested.data : currentPeriod());
+  return <ErpPage pathname="/financeiro/fluxo-caixa" breadcrumb="Financeiro" title="Movimentação de caixa">
+    <ErpToolbar><ErpMonthFilter label="Mês dos movimentos" value={data.competence} /></ErpToolbar>
+    <ErpNote>
+      Somente liquidações confirmadas, com estornos compensatórios. Mensalidades pagas à operadora e compensações internas não entram como movimento
+      de caixa da Âncora.
+    </ErpNote>
+    <ErpSection title={`Competência ${data.competence}`} description={`${data.movementCount} movimento(s) confirmado(s)`}>
+      {data.movementCount ? <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
+        <StatCard label="Entradas" value={formatCents(data.incoming)} sublabel="recebíveis liquidados" />
+        <StatCard label="Saídas" value={formatCents(data.outgoing)} sublabel="comissões, despesas e adiantamentos" />
+        <StatCard label="Variação líquida no mês" value={formatCents(data.net)} sublabel="entradas menos saídas" />
+      </div> : <ErpNote>Nenhum movimento confirmado informado neste mês e escopo.</ErpNote>}
+    </ErpSection>
+    <ErpNote>Saldo inicial não informado. A variação líquida não representa o saldo bancário.</ErpNote>
+  </ErpPage>;
 }

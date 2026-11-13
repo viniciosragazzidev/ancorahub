@@ -1,0 +1,148 @@
+// @vitest-environment jsdom
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
+  usePathname: () => "/financeiro/recebiveis",
+  useSearchParams: () => new URLSearchParams(),
+}));
+const detail = vi.hoisted(() => ({
+  entry: {
+    id: "e1", kind: "agency_receivable" as const, reference: "REC-1", description: "Recebível sintético", amountCents: 15000, dueOn: "2026-11-30",
+    competence: "2026-11", status: "approved", version: 2, evidenceDocumentId: "d1",
+  },
+  documents: [{ id: "d1", fileName: "comprovante.pdf" }], settledCents: 5000, cashCents: 5000, offsetCents: 0, agency: true,
+  canPrepare: true, canApprove: false,
+  movements: [
+    { id: "m1", kind: "payment", amountCents: 5000, occurredOn: "2026-11-10", status: "confirmed", evidenceDocumentId: "d1", reason: "Pago", canReview: false },
+    { id: "m2", kind: "payment", amountCents: 1000, occurredOn: "2026-11-11", status: "pending", evidenceDocumentId: "d1", reason: "Parcial", canReview: true },
+  ],
+}));
+const actions = vi.hoisted(() => ({
+  loadFinancialEntryAction: vi.fn(async () => ({ ok: true, data: detail })),
+  searchFinanceSalesAction: vi.fn(async () => ({ ok: true, data: [] })),
+  searchFinanceBeneficiariesAction: vi.fn(async () => ({ ok: true, data: [] })),
+  prepareFinancialEntryAction: vi.fn(async () => ({ ok: true, message: "" })),
+  reviewFinancialEntryAction: vi.fn(async () => ({ ok: true, message: "" })),
+  prepareSettlementAction: vi.fn(async () => ({ ok: true, message: "" })),
+  reviewSettlementAction: vi.fn(async () => ({ ok: true, message: "" })),
+  reverseSettlementAction: vi.fn(async () => ({ ok: true, message: "" })),
+  prepareOffsetAction: vi.fn(async () => ({ ok: true, message: "" })),
+  reviewOffsetAction: vi.fn(async () => ({ ok: true, message: "" })),
+  reverseOffsetAction: vi.fn(async () => ({ ok: true, message: "" })),
+  prepareClosingAction: vi.fn(async () => ({ ok: true, message: "" })),
+  reviewClosingAction: vi.fn(async () => ({ ok: true, message: "" })),
+}));
+vi.mock("../finance-actions", () => actions);
+vi.mock("../client-file-request", () => ({ submitErpFile: vi.fn(async () => ({ ok: true, message: "" })) }));
+
+import { ErpSkinProvider } from "../ui/skin-context";
+import type { ErpSkin } from "../ui/skin";
+import { FinanceLedger, type EntryDetail } from "./finance-workspace";
+import { ClosingsWorkspace, OffsetPrepareButton, OffsetsList } from "./finance-controls";
+import { FinancialEntryDetail } from "./ledger-entry-detail";
+import { activeSection } from "./ledger-section-tabs";
+
+afterEach(cleanup);
+
+const SKINS: ErpSkin[] = ["standard", "lite"];
+const mount = (skin: ErpSkin, ui: ReactElement) => render(<ErpSkinProvider skin={skin}>{ui}</ErpSkinProvider>);
+const openRow = (text: string) => act(() => { fireEvent.click(screen.getAllByText(text)[0]); });
+
+const entries = {
+  filters: { kind: "agency_receivable" as const, status: "all" as const, competence: undefined, page: 1 }, pageSize: 25, total: 2, agency: true, canPrepare: true,
+  rows: [
+    { id: "e1", kind: "agency_receivable" as const, reference: "REC-1", description: "Recebível sintético", amountCents: 15000, dueOn: "2026-11-30",
+      competence: "2026-11", status: "approved", version: 2, settledCents: 5000, beneficiaryName: null },
+    { id: "e2", kind: "agency_receivable" as const, reference: "REC-2", description: "Outro recebível", amountCents: 9000, dueOn: "2026-12-10",
+      competence: "2026-12", status: "submitted", version: 1, settledCents: 0, beneficiaryName: "Ana Souza" },
+  ],
+};
+const offsets = {
+  page: 1, pageSize: 25, total: 2, canPrepare: true,
+  choices: [
+    { id: "a1", reference: "ADV-1", kind: "advance", beneficiaryId: "u1", beneficiaryName: "Ana Souza", availableCents: 3000 },
+    { id: "c1", reference: "COM-1", kind: "broker_commission", beneficiaryId: "u1", beneficiaryName: "Ana Souza", availableCents: 8000 },
+  ],
+  rows: [
+    { id: "o1", advanceEntryId: "a1", commissionEntryId: "c1", advanceReference: "ADV-1", commissionReference: "COM-1", kind: "allocation",
+      amountCents: 2000, occurredOn: "2026-11-05", status: "pending", reason: "Acordo assinado", canReview: true },
+    { id: "o2", advanceEntryId: "a1", commissionEntryId: "c2", advanceReference: "ADV-1", commissionReference: "COM-2", kind: "allocation",
+      amountCents: 1000, occurredOn: "2026-10-05", status: "confirmed", reason: "Acordo", canReview: false },
+  ],
+};
+const snapshot = {
+  version: 1 as const, competence: "2026-10", digest: "x", entryCount: 3, movementCount: 2, offsetCount: 1, cashInCents: 10000, cashOutCents: 4000,
+  externalCents: 0, calculatedAt: "2026-11-01T12:00:00.000Z",
+};
+const closings = {
+  canPrepare: true,
+  rows: [
+    { id: "k1", competence: "2026-10", status: "pending", reason: "Prévia do mês", version: 1, snapshot, canReview: true, canReopen: true },
+    { id: "k2", competence: "2026-09", status: "closed", reason: "Fechado", version: 2, snapshot: { ...snapshot, competence: "2026-09" }, canReview: true, canReopen: true },
+  ],
+};
+
+describe.each(SKINS)("ERP ledger screens (%s skin)", (skin) => {
+  it("entries: rows, one primary CTA, row opens the drawer with the entry and its actions", async () => {
+    mount(skin, <FinanceLedger data={entries} branches={[{ id: "b1", name: "Centro" }]} title="Recebíveis" defaultKind="agency_receivable" emptyText="Vazio" />);
+    expect(screen.getAllByText("REC-2").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Novo lançamento" })).toHaveLength(1);
+    openRow("REC-1");
+    await waitFor(() => expect(screen.getByRole("link", { name: "Abrir ficha completa" })).toHaveAttribute("href", "/financeiro/lancamentos/e1"));
+    expect(actions.loadFinancialEntryAction).toHaveBeenCalledWith("e1");
+    expect(screen.getByRole("button", { name: "Preparar liquidação para revisão" })).toHaveAttribute("type", "submit");
+    expect(screen.getByRole("button", { name: "Enviar evidência" })).toBeInTheDocument();
+  });
+
+  it("new entry opens the preparation drawer with server search for the sale", () => {
+    mount(skin, <FinanceLedger data={entries} branches={[]} title="Recebíveis" defaultKind="agency_receivable" emptyText="Vazio" />);
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Novo lançamento" })); });
+    expect(screen.getByPlaceholderText("Buscar venda pelo nome do cliente")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /Venda/ })).toBeNull();
+  });
+
+  it("entries: empty list and no CTA without preparation rights", () => {
+    mount(skin, <FinanceLedger data={{ ...entries, rows: [], total: 0, canPrepare: false }} branches={null} title="Recebíveis"
+      defaultKind="agency_receivable" emptyText="Falta de registro não é inadimplência." />);
+    expect(screen.getAllByText("Falta de registro não é inadimplência.").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Novo lançamento" })).toBeNull();
+  });
+
+  it("entry record: KPIs and movements list, row opens the review drawer", () => {
+    mount(skin, <FinancialEntryDetail detail={detail as EntryDetail} />);
+    expect(screen.getAllByText("Saldo a liquidar").length).toBeGreaterThan(0);
+    expect(document.querySelector("details")).toBeNull();
+    act(() => { fireEvent.click(screen.getAllByText("R$ 10,00")[0]); });
+    expect(screen.getByRole("button", { name: "Confirmar liquidação" })).toBeInTheDocument();
+  });
+
+  it("offsets: rows, primary CTA opens the preparation, row opens the review", () => {
+    mount(skin, <><OffsetPrepareButton data={offsets} /><OffsetsList data={offsets} /></>);
+    expect(screen.getAllByText("COM-2").length).toBeGreaterThan(0);
+    openRow("COM-1");
+    expect(screen.getByRole("button", { name: "Confirmar compensação" })).toBeInTheDocument();
+    cleanup();
+    mount(skin, <><OffsetPrepareButton data={offsets} /><OffsetsList data={offsets} /></>);
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Preparar compensação" })); });
+    expect(screen.getByPlaceholderText("Buscar adiantamento ou beneficiário")).toBeInTheDocument();
+  });
+
+  it("closings: rows, one primary CTA, row opens the snapshot with the close form", () => {
+    mount(skin, <ClosingsWorkspace data={closings} />);
+    expect(screen.getAllByText("2026-09").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Preparar competência" })).toHaveLength(1);
+    openRow("2026-10");
+    expect(screen.getByRole("button", { name: "Aprovar e fechar período" })).toHaveAttribute("type", "submit");
+  });
+});
+
+describe("finance section tabs", () => {
+  it("marks the longest matching section", () => {
+    const sections = [{ href: "/financeiro", label: "Financeiro" }, { href: "/financeiro/recibos", label: "Recibos" }];
+    expect(activeSection(sections, "/financeiro/recibos/r1")).toBe("/financeiro/recibos");
+    expect(activeSection(sections, "/financeiro/lancamentos/e1")).toBe("/financeiro");
+  });
+});

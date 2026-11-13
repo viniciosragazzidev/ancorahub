@@ -2,15 +2,18 @@ import "server-only";
 import { and, asc, eq, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { confirmedSettledSql, openBalanceSql } from "./balances";
 import { todayInSaoPaulo } from "./shared";
-
-const QUEUE_LIMIT = 300;
 import { getDatabase, schema } from "@/shared/db";
 import { auditErp, canSeeAgencyBooks, erpScopeSql, requireErpAccess } from "./access";
 import { ErpError, FINANCIAL_KINDS, FINANCIAL_LABELS, type FinancialKind } from "./contracts";
 import { DIVERGENCE_LABELS, legacyDivergence } from "./commission-core";
 
-export type ReconciliationIssue = { key: string; group: "evidence" | "approval" | "movement" | "overdue" | "legacy"; title: string; detail: string; href: string; amountCents: number | null };
-export const ISSUE_GROUPS: Record<ReconciliationIssue["group"], string> = {
+/** Oldest items per group; `truncated` tells the screen when a group has more. */
+export const QUEUE_LIMIT = 300;
+
+export const ISSUE_GROUP_KEYS = ["evidence", "approval", "movement", "overdue", "legacy"] as const;
+export type ReconciliationGroup = (typeof ISSUE_GROUP_KEYS)[number];
+export type ReconciliationIssue = { key: string; group: ReconciliationGroup; title: string; detail: string; href: string; amountCents: number | null };
+export const ISSUE_GROUPS: Record<ReconciliationGroup, string> = {
   evidence: "Sem evidência", approval: "Aguardando aprovação", movement: "Liquidação ou compensação a conferir", overdue: "Vencido sem liquidação registrada", legacy: "Divergência com o cronograma",
 };
 

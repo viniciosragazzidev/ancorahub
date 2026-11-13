@@ -1,1 +1,5 @@
-export default function Loading() { return <p className="text-sm text-muted-foreground" role="status">Carregando indicadores…</p>; }
+import { RouteLoading } from "@/components/route-loading";
+
+export default function Loading() {
+  return <RouteLoading />;
+}

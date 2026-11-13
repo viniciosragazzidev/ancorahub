@@ -138,4 +138,25 @@ describe.skipIf(!testUrl)("ERP analytics against isolated PostgreSQL", () => {
     const named = await as(context("director"), () => tv.getTvBoard());
     expect(named.tiles.some((tile) => tile.id === "brokers")).toBe(true);
   });
+
+  it("audits the TV at most once per person per hour", async () => {
+    const broker2 = context("broker2", "broker", id("a"), id("a2"));
+    await as(broker2, () => tv.getTvBoard());
+    await as(broker2, () => tv.getTvBoard());
+    const [events] = await db.select({ total: sql<number>`count(*)::int` }).from(schema.erpEvents)
+      .where(and(eq(schema.erpEvents.tenantId, id("a")), eq(schema.erpEvents.actorId, id("broker2")), eq(schema.erpEvents.action, tv.TV_AUDIT_ACTION)));
+    expect(events.total).toBe(1);
+  });
+
+  it("buckets implantations by coverage start, falling back to the update date", async () => {
+    const before = await as(context("director"), () => analytics.getProductionReport({ from: previous, to: current }));
+    const base = { tenantId: id("a"), branchId: id("a1"), brokerId: id("broker1"), status: "implanted", createdBy: id("director"), updatedBy: id("director") };
+    await db.insert(schema.erpImplantations).values([
+      { ...base, id: id("impl1"), saleId: id("sale1"), leadId: id("lead1"), coverageStartsOn: `${previous}-15` },
+      { ...base, id: id("impl2"), saleId: id("sale5"), leadId: id("lead5"), coverageStartsOn: null },
+    ]);
+    const report = await as(context("director"), () => analytics.getProductionReport({ from: previous, to: current }));
+    expect(monthRow(report.rows, previous)!.implanted - monthRow(before.rows, previous)!.implanted).toBe(1);
+    expect(monthRow(report.rows, current)!.implanted - monthRow(before.rows, current)!.implanted).toBe(1);
+  });
 });

@@ -1,15 +1,12 @@
-import { DashboardHeader } from "@/components/dashboard-header";
 import { getProductionReport } from "@/features/erp/analytics";
-import { AnalyticsNav, PeriodFilters, ProductionView, SourceNote } from "@/features/erp/components/analytics-views";
-import page from "@/components/lite/page/lite-page.module.css";
+import { AnalyticsSettings, ProductionView } from "@/features/erp/components/analytics-views";
+import { ErpPage } from "@/features/erp/ui/erp-page";
 
 export default async function ProductionPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string; unit?: string }> }) {
   const report = await getProductionReport(await searchParams);
-  return <><DashboardHeader breadcrumb="Inteligência" title="Produção" /><main className={page.stack}>
-    <AnalyticsNav current="/relatorios/producao" />
-    <p className="text-sm text-muted-foreground">Produção, implantação e recebimento são fatos separados: venda não comprova implantação, e implantação não comprova recebimento.</p>
-    <PeriodFilters action="/relatorios/producao" from={report.from} to={report.to} unit={report.unit} units={report.units} />
+  const links = report.drillHref ? [{ id: "vendas", label: "Abrir lista de vendas", href: report.drillHref }] : [];
+  const settings = <AnalyticsSettings metrics={report.metrics} generatedAt={report.generatedAt} links={links} />;
+  return <ErpPage pathname="/relatorios/producao" breadcrumb="Inteligência" title="Produção" actions={settings}>
     <ProductionView report={report} />
-    <SourceNote generatedAt={report.generatedAt} metrics={report.metrics} />
-  </main></>;
+  </ErpPage>;
 }

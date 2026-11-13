@@ -1,22 +1,31 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { and, arrayContained, desc, eq, sql } from "drizzle-orm";
+import { and, arrayContained, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
-import { auditErp, canSeeAgencyBooks, requireErpAccess, type ErpDatabase } from "./access";
-import { ErpError, IMPLANTATION_STATUSES, assertImplantationTransition, assertIndependentReview, financialInputSchema, implantationInputSchema, parseMoneyCents, type ErpModuleKey, type FinancialKind } from "./contracts";
+import { auditErp, canSeeAgencyBooks, erpScopeSql, requireErpAccess, type ErpDatabase } from "./access";
+import {
+  ErpError, IMPLANTATION_STATUSES, assertImplantationTransition, assertIndependentReview, financialInputSchema, implantationInputSchema, parseMoneyCents,
+  type ErpModuleKey, type FinancialKind,
+} from "./contracts";
 import { deterministicUuid } from "./commission-core";
 import { assertOpenPeriods, prepareFinancialEntryInTransaction, resolveEntryParties } from "./finance";
-import { scopedLead, scopedEvidence, type ErpAccess } from "./records";
+import type { ErpAccess } from "./records";
 import { parseImportFile, type ImportDomain } from "./import-parser";
-import { saveImplantationInTransaction } from "./implantations";
+import { CLOSING_LEAD_STATUSES, saveImplantationInTransaction } from "./implantations";
 
 const batchIdSchema = z.string().uuid();
 const payloadSchema = z.object({ domain: z.literal("implantations"), rows: z.array(implantationInputSchema).min(1).max(500) }).strict();
+export const IMPORT_BATCH_STATUSES = ["preview", "applied", "rejected"] as const;
+const importBatchStatusSchema = z.enum(IMPORT_BATCH_STATUSES);
+/** Neutral answer when the same file exists in a batch outside the viewer's scope: never reveal its id, author or content. */
+export const EXISTING_BATCH_OUTSIDE_SCOPE = "Este arquivo já foi enviado em outro lote. Peça a conferência a quem administra as importações da empresa.";
 
 async function importContext(domain: ImportDomain, db: ErpDatabase = getDatabase()) {
   const imports = await requireErpAccess("imports", "erp_import_data", db);
-  const target = domain === "finance" ? await requireErpAccess("finance", "erp_prepare_finance", db) : await requireErpAccess("implantations", "erp_manage_operations", db);
+  const target = domain === "finance"
+    ? await requireErpAccess("finance", "erp_prepare_finance", db)
+    : await requireErpAccess("implantations", "erp_manage_operations", db);
   if (domain === "finance" && !canSeeAgencyBooks(target.context)) throw new ErpError("A importação financeira exige delegação financeira.");
   if (target.scope.mode !== "tenant" && target.scope.mode !== "units") throw new ErpError("A importação exige um cargo delegado para a unidade ou empresa.");
   return { ...target, maxRows: imports.setting.maxImportRows };
@@ -27,28 +36,73 @@ function batchScope(auth: ErpAccess) {
     ? and(eq(schema.erpImports.containsUnassigned, false), arrayContained(schema.erpImports.branchIds, [...auth.scope.unitIds])) : sql`false`;
 }
 
+/** Same rule as `batchScope`, for a batch already loaded tenant-wide. */
+function batchInScope(auth: ErpAccess, batch: { branchIds: readonly string[]; containsUnassigned: boolean }) {
+  if (auth.scope.mode === "tenant") return true;
+  if (auth.scope.mode !== "units") return false;
+  const units = new Set(auth.scope.unitIds);
+  return !batch.containsUnassigned && batch.branchIds.every((branchId) => units.has(branchId));
+}
+
+type ImplantationRow = z.infer<typeof implantationInputSchema>;
+
+/** Loads every lead, implantation, evidence and active sale of the batch once (inArray), then checks the rows in file order. */
 async function validateRows(db: ErpDatabase, auth: ErpAccess, raw: unknown, refreshVersions: boolean, preflight = false) {
-  const payload = payloadSchema.parse(raw); const rows: z.infer<typeof implantationInputSchema>[] = []; const branches = new Set<string>(); let containsUnassigned = false;
-  const seen = new Set<string>();
+  const payload = payloadSchema.parse(raw);
+  const tenantId = auth.context.tenantId;
+  const leadIds = [...new Set(payload.rows.map((row) => row.leadId))];
+  const evidenceIds = [...new Set(payload.rows.flatMap((row) => row.evidenceDocumentId ? [row.evidenceDocumentId] : []))];
+  const closingIds = preflight ? [...new Set(payload.rows.filter((row) => ["cancelled", "refused"].includes(row.status)).map((row) => row.leadId))] : [];
+  const leads = new Map((await db.select({ id: schema.leads.id, name: schema.leads.nome, branchId: schema.leads.branchId, status: schema.leads.status })
+    .from(schema.leads)
+    .where(and(inArray(schema.leads.id, leadIds), eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt),
+      erpScopeSql(auth.scope, schema.leads.branchId, schema.leads.corretorId))))
+    .map((lead) => [lead.id, lead]));
+  const scopedLeadIds = [...leads.keys()];
+  const implantations = new Map(scopedLeadIds.length
+    ? (await db.select({ leadId: schema.erpImplantations.leadId, version: schema.erpImplantations.version, status: schema.erpImplantations.status })
+      .from(schema.erpImplantations)
+      .where(and(eq(schema.erpImplantations.tenantId, tenantId), inArray(schema.erpImplantations.leadId, scopedLeadIds))))
+      .map((row) => [row.leadId, row])
+    : []);
+  const evidence = new Map(evidenceIds.length
+    ? (await db.select({ id: schema.erpDocuments.id, moduleKey: schema.erpDocuments.moduleKey, leadId: schema.erpDocuments.leadId }).from(schema.erpDocuments)
+      .where(and(eq(schema.erpDocuments.tenantId, tenantId), inArray(schema.erpDocuments.id, evidenceIds), eq(schema.erpDocuments.state, "ready"))))
+      .map((document) => [document.id, document])
+    : []);
+  const activeSales = new Set(closingIds.length
+    ? (await db.select({ leadId: schema.sales.leadId }).from(schema.sales)
+      .where(and(eq(schema.sales.tenantId, tenantId), inArray(schema.sales.leadId, closingIds), eq(schema.sales.status, "active"))))
+      .map((sale) => sale.leadId)
+    : []);
+  const rows: ImplantationRow[] = []; const branches = new Set<string>(); const seen = new Set<string>(); let containsUnassigned = false;
   for (const [index, candidate] of payload.rows.entries()) {
-    if (seen.has(candidate.leadId)) throw new ErpError(`O negócio da linha ${index + 2} está repetido no lote.`); seen.add(candidate.leadId);
-    const lead = await scopedLead(db, auth, candidate.leadId);
+    const line = index + 2;
+    if (seen.has(candidate.leadId)) throw new ErpError(`O negócio da linha ${line} está repetido no lote.`);
+    seen.add(candidate.leadId);
+    const lead = leads.get(candidate.leadId);
+    if (!lead) throw new ErpError("Negócio não encontrado no seu escopo.");
     if (lead.branchId) branches.add(lead.branchId); else containsUnassigned = true;
-    const [current] = await db.select({ version: schema.erpImplantations.version, status: schema.erpImplantations.status }).from(schema.erpImplantations)
-      .where(and(eq(schema.erpImplantations.tenantId, auth.context.tenantId), eq(schema.erpImplantations.leadId, lead.id))).limit(1);
-    if (candidate.evidenceDocumentId) await scopedEvidence(db, auth, candidate.evidenceDocumentId, { leadId: lead.id });
+    const current = implantations.get(lead.id);
+    if (candidate.evidenceDocumentId) {
+      const document = evidence.get(candidate.evidenceDocumentId);
+      if (!document) throw new ErpError("Evidência não encontrada no seu escopo.");
+      if (document.moduleKey !== "implantations" || document.leadId !== lead.id) throw new ErpError("A evidência não pertence a este negócio.");
+    }
     if (preflight) {
       assertImplantationTransition(z.enum(IMPLANTATION_STATUSES).parse(current?.status ?? "review"), candidate);
-      if (!refreshVersions && candidate.expectedVersion !== (current?.version ?? 0)) throw new ErpError(`A linha ${index + 2} mudou desde a prévia. Revalide o lote.`);
-      if (!["documentation_pending", "under_analysis", "converted"].includes(lead.status) && !["cancelled", "refused"].includes(candidate.status)) throw new ErpError(`O negócio da linha ${index + 2} precisa estar em fechamento.`);
-      if (["cancelled", "refused"].includes(candidate.status)) {
-        const [sale] = await db.select({ id: schema.sales.id }).from(schema.sales).where(and(eq(schema.sales.tenantId, auth.context.tenantId), eq(schema.sales.leadId, lead.id), eq(schema.sales.status, "active"))).limit(1);
-        if (sale) throw new ErpError(`A linha ${index + 2} possui contrato ativo. Trate o cancelamento na ficha do contrato.`);
+      if (!refreshVersions && candidate.expectedVersion !== (current?.version ?? 0)) throw new ErpError(`A linha ${line} mudou desde a prévia. Revalide o lote.`);
+      if (!CLOSING_LEAD_STATUSES.includes(lead.status) && !["cancelled", "refused"].includes(candidate.status)) {
+        throw new ErpError(`O negócio da linha ${line} precisa estar em fechamento.`);
+      }
+      if (["cancelled", "refused"].includes(candidate.status) && activeSales.has(lead.id)) {
+        throw new ErpError(`A linha ${line} possui contrato ativo. Trate o cancelamento na ficha do contrato.`);
       }
     }
     rows.push({ ...candidate, expectedVersion: refreshVersions ? current?.version ?? 0 : candidate.expectedVersion });
   }
-  return { payload: { domain: "implantations" as const, rows }, branchIds: [...branches], containsUnassigned };
+  const leadNames = Object.fromEntries([...leads.values()].map((lead) => [lead.id, lead.name]));
+  return { payload: { domain: "implantations" as const, rows }, branchIds: [...branches], containsUnassigned, leadNames };
 }
 
 const FINANCE_KIND_ALIASES: Record<string, FinancialKind> = {
@@ -61,18 +115,32 @@ const normalizedKind = (value: string) => value.normalize("NFD").replace(/[̀-ͯ
 const financePayloadSchema = z.object({ domain: z.literal("finance"), rows: z.array(financialInputSchema).min(1).max(500) }).strict();
 type FinanceRow = z.infer<typeof financialInputSchema>;
 
-/** Finance rows never approve or settle: each becomes a submitted entry that still needs evidence and an independent review. */
+/**
+ * Finance rows never approve or settle: each becomes a submitted entry that still needs evidence and an independent review.
+ * Existing references and closed periods are loaded once per batch; parties are resolved once per distinct sale/unit/beneficiary.
+ */
 async function validateFinanceRows(db: ErpDatabase, auth: ErpAccess, raw: unknown) {
-  const payload = financePayloadSchema.parse(raw); const branches = new Set<string>(); let containsUnassigned = false; const seen = new Set<string>();
+  const payload = financePayloadSchema.parse(raw);
+  const references = [...new Set(payload.rows.map((row) => row.reference))];
+  const existing = new Set((await db.select({ kind: schema.erpFinancialEntries.kind, reference: schema.erpFinancialEntries.reference })
+    .from(schema.erpFinancialEntries)
+    .where(and(eq(schema.erpFinancialEntries.tenantId, auth.context.tenantId), inArray(schema.erpFinancialEntries.reference, references))))
+    .map((entry) => `${entry.kind}:${entry.reference}`));
+  const seen = new Set<string>();
   for (const [index, row] of payload.rows.entries()) {
     const key = `${row.kind}:${row.reference}`;
-    if (seen.has(key)) throw new ErpError(`A referência da linha ${index + 2} está repetida no lote.`); seen.add(key);
-    const [existing] = await db.select({ id: schema.erpFinancialEntries.id }).from(schema.erpFinancialEntries)
-      .where(and(eq(schema.erpFinancialEntries.tenantId, auth.context.tenantId), eq(schema.erpFinancialEntries.reference, row.reference), eq(schema.erpFinancialEntries.kind, row.kind))).limit(1);
-    if (existing) throw new ErpError(`A referência da linha ${index + 2} já foi lançada. Corrija o lançamento existente na ficha financeira.`);
-    await assertOpenPeriods(db, auth.context.tenantId, [row.competence]);
-    const parties = await resolveEntryParties(db, auth, row);
-    if (parties.branchId) branches.add(parties.branchId); else containsUnassigned = true;
+    if (seen.has(key)) throw new ErpError(`A referência da linha ${index + 2} está repetida no lote.`);
+    seen.add(key);
+    if (existing.has(key)) throw new ErpError(`A referência da linha ${index + 2} já foi lançada. Corrija o lançamento existente na ficha financeira.`);
+  }
+  await assertOpenPeriods(db, auth.context.tenantId, payload.rows.map((row) => row.competence));
+  const parties = new Map<string, Awaited<ReturnType<typeof resolveEntryParties>>>();
+  const branches = new Set<string>(); let containsUnassigned = false;
+  for (const row of payload.rows) {
+    const key = JSON.stringify([row.kind, row.saleId, row.branchId, row.beneficiaryId]);
+    const resolved = parties.get(key) ?? await resolveEntryParties(db, auth, row);
+    parties.set(key, resolved);
+    if (resolved.branchId) branches.add(resolved.branchId); else containsUnassigned = true;
   }
   return { payload: { domain: "finance" as const, rows: payload.rows }, branchIds: [...branches], containsUnassigned };
 }
@@ -103,42 +171,73 @@ export async function previewErpImport(domain: ImportDomain, file: File) {
     return row.data;
   });
   const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const fileName = file.name.replace(/[\r\n\\/]/g, "_").slice(0, 180);
   return getDatabase().transaction(async (tx) => {
     const currentAuth = await importContext(domain, tx);
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`erp:${auth.context.tenantId}`}, 0))`);
-    const [existing] = await tx.select({ id: schema.erpImports.id, status: schema.erpImports.status }).from(schema.erpImports)
-      .where(and(eq(schema.erpImports.tenantId, auth.context.tenantId), eq(schema.erpImports.domain, domain), eq(schema.erpImports.sha256, sha256), batchScope(currentAuth))).limit(1);
-    if (existing) return { id: existing.id, alreadyApplied: existing.status === "applied" };
-    const validated = domain === "finance" ? await validateFinanceRows(tx, currentAuth, { domain, rows }) : await validateRows(tx, currentAuth, { domain, rows }, true, true);
+    const tenantId = auth.context.tenantId;
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`erp:${tenantId}`}, 0))`);
+    // Tenant-wide lookup (the hash is unique per tenant and domain), then the scope rule: a batch outside the scope gets a neutral answer.
+    const [existing] = await tx.select({ id: schema.erpImports.id, status: schema.erpImports.status, version: schema.erpImports.version,
+      createdBy: schema.erpImports.createdBy, branchIds: schema.erpImports.branchIds, containsUnassigned: schema.erpImports.containsUnassigned })
+      .from(schema.erpImports)
+      .where(and(eq(schema.erpImports.tenantId, tenantId), eq(schema.erpImports.domain, domain), eq(schema.erpImports.sha256, sha256)))
+      .limit(1).for("update");
+    if (existing && !batchInScope(currentAuth, existing)) throw new ErpError(EXISTING_BATCH_OUTSIDE_SCOPE);
+    if (existing && existing.status !== "rejected") return { id: existing.id, alreadyApplied: existing.status === "applied", superseded: false };
+    const validated = domain === "finance"
+      ? await validateFinanceRows(tx, currentAuth, { domain, rows })
+      : await validateRows(tx, currentAuth, { domain, rows }, true, true);
+    const values = { fileName, payload: validated.payload, rowCount: rows.length, branchIds: validated.branchIds, containsUnassigned: validated.containsUnassigned };
+    if (existing) {
+      // A rejected file sent again becomes a new preview of the same batch: new version, new author, review cleared; the audit keeps the previous round.
+      const version = existing.version + 1;
+      await tx.update(schema.erpImports)
+        .set({ ...values, status: "preview", createdBy: auth.context.userId, createdAt: new Date(), reviewedBy: null, reviewedAt: null, reviewReason: null, version })
+        .where(and(eq(schema.erpImports.id, existing.id), eq(schema.erpImports.tenantId, tenantId), eq(schema.erpImports.status, "rejected")));
+      await auditErp(tx, { tenantId, actorId: auth.context.userId, action: "erp.import.superseded", entityType: "erp_import", entityId: existing.id,
+        metadata: { domain, rowCount: rows.length, sha256, version, previousVersion: existing.version, previousCreatedBy: existing.createdBy } });
+      return { id: existing.id, alreadyApplied: false, superseded: true };
+    }
     const id = crypto.randomUUID();
-    await tx.insert(schema.erpImports).values({ id, tenantId: auth.context.tenantId, domain, fileName: file.name.replace(/[\r\n\\/]/g, "_").slice(0, 180),
-      sha256, payload: validated.payload, rowCount: rows.length, branchIds: validated.branchIds, containsUnassigned: validated.containsUnassigned, createdBy: auth.context.userId });
-    await auditErp(tx, { tenantId: auth.context.tenantId, actorId: auth.context.userId, action: "erp.import.previewed", entityType: "erp_import", entityId: id, metadata: { domain, rowCount: rows.length, sha256 } });
-    return { id, alreadyApplied: false };
+    await tx.insert(schema.erpImports).values({ id, tenantId, domain, sha256, createdBy: auth.context.userId, ...values });
+    await auditErp(tx, { tenantId, actorId: auth.context.userId, action: "erp.import.previewed", entityType: "erp_import", entityId: id, metadata: { domain, rowCount: rows.length, sha256 } });
+    return { id, alreadyApplied: false, superseded: false };
   });
 }
 
 async function availableDomains() {
   const domains: { domain: ImportDomain; auth: Awaited<ReturnType<typeof importContext>> }[] = [];
-  for (const domain of ["implantations", "finance"] as const) { try { domains.push({ domain, auth: await importContext(domain) }); } catch { /* Domain not delegated to this profile. */ } }
+  for (const domain of ["implantations", "finance"] as const) {
+    try {
+      domains.push({ domain, auth: await importContext(domain) });
+    } catch {
+      // Domain not delegated to this profile.
+    }
+  }
   if (!domains.length) await importContext("implantations");
   return domains;
 }
 
 export async function getErpImports() {
   const domains = await availableDomains();
-  const rows = (await Promise.all(domains.map(({ domain, auth }) => getDatabase().select({ id: schema.erpImports.id, fileName: schema.erpImports.fileName, domain: schema.erpImports.domain,
-    status: schema.erpImports.status, rowCount: schema.erpImports.rowCount, createdAt: schema.erpImports.createdAt,
-    createdBy: schema.user.name }).from(schema.erpImports).leftJoin(schema.user, eq(schema.erpImports.createdBy, schema.user.id))
-    .where(and(eq(schema.erpImports.tenantId, auth.context.tenantId), eq(schema.erpImports.domain, domain), batchScope(auth))).orderBy(desc(schema.erpImports.createdAt)).limit(50)))).flat()
-    .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime()).slice(0, 50);
+  const rows = (await Promise.all(domains.map(({ domain, auth }) => getDatabase().select({
+    id: schema.erpImports.id, fileName: schema.erpImports.fileName, domain: schema.erpImports.domain,
+    status: schema.erpImports.status, rowCount: schema.erpImports.rowCount, createdAt: schema.erpImports.createdAt, createdBy: schema.user.name,
+  }).from(schema.erpImports).leftJoin(schema.user, eq(schema.erpImports.createdBy, schema.user.id))
+    .where(and(eq(schema.erpImports.tenantId, auth.context.tenantId), eq(schema.erpImports.domain, domain), batchScope(auth)))
+    .orderBy(desc(schema.erpImports.createdAt)).limit(50))))
+    .flat()
+    .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+    .slice(0, 50)
+    .map((row) => ({ ...row, domain: isImportDomain(row.domain) ? row.domain : "implantations" as const, status: importBatchStatusSchema.catch("preview").parse(row.status) }));
   return { rows, maxRows: Math.min(...domains.map(({ auth }) => auth.maxRows)), domains: domains.map(({ domain }) => domain) };
 }
 
 async function batchDomain(id: string) {
   const { getRequiredTenantContext } = await import("@/shared/auth/tenant-context");
   const context = await getRequiredTenantContext();
-  const [row] = await getDatabase().select({ domain: schema.erpImports.domain }).from(schema.erpImports).where(and(eq(schema.erpImports.id, id), eq(schema.erpImports.tenantId, context.tenantId))).limit(1);
+  const [row] = await getDatabase().select({ domain: schema.erpImports.domain }).from(schema.erpImports)
+    .where(and(eq(schema.erpImports.id, id), eq(schema.erpImports.tenantId, context.tenantId))).limit(1);
   if (!row || !isImportDomain(row.domain)) throw new ErpError("Lote não encontrado no seu escopo.");
   return row.domain;
 }
@@ -147,14 +246,28 @@ export async function getErpImport(id: string) {
   batchIdSchema.parse(id);
   const domain = await batchDomain(id);
   const auth = await importContext(domain);
-  const [batch] = await getDatabase().select().from(schema.erpImports).where(and(eq(schema.erpImports.id, id), eq(schema.erpImports.tenantId, auth.context.tenantId), eq(schema.erpImports.domain, domain), batchScope(auth))).limit(1);
-  if (!batch) throw new ErpError("Lote não encontrado no seu escopo.");
-  const base = { id, fileName: batch.fileName, status: z.enum(["preview", "applied", "rejected"]).parse(batch.status),
-    createdAt: batch.createdAt, version: batch.version, createdBy: batch.createdBy, reviewReason: batch.reviewReason, canApprove: auth.context.userId !== batch.createdBy };
-  const result = domain === "finance"
-    ? { ...base, domain: "finance" as const, rows: [] as z.infer<typeof implantationInputSchema>[], financeRows: (batch.status === "applied" ? financePayloadSchema.parse(batch.payload) : (await validateFinanceRows(getDatabase(), auth, batch.payload)).payload).rows }
-    : { ...base, domain: "implantations" as const, rows: (await validateRows(getDatabase(), auth, batch.payload, false)).payload.rows, financeRows: [] as FinanceRow[] };
-  await auditErp(getDatabase(), { tenantId: auth.context.tenantId, actorId: auth.context.userId, action: "erp.import.viewed", entityType: "erp_import", entityId: id, metadata: { domain, count: result.rows.length + result.financeRows.length } });
+  const [found] = await getDatabase().select({ batch: schema.erpImports, createdByName: schema.user.name }).from(schema.erpImports)
+    .leftJoin(schema.user, eq(schema.erpImports.createdBy, schema.user.id))
+    .where(and(eq(schema.erpImports.id, id), eq(schema.erpImports.tenantId, auth.context.tenantId), eq(schema.erpImports.domain, domain), batchScope(auth))).limit(1);
+  if (!found) throw new ErpError("Lote não encontrado no seu escopo.");
+  const { batch } = found;
+  const base = {
+    id, fileName: batch.fileName, status: importBatchStatusSchema.parse(batch.status), createdAt: batch.createdAt, version: batch.version,
+    createdBy: batch.createdBy, createdByName: found.createdByName, reviewReason: batch.reviewReason, reviewedAt: batch.reviewedAt,
+    canApprove: auth.context.userId !== batch.createdBy,
+  };
+  let result;
+  if (domain === "finance") {
+    const financeRows = batch.status === "applied"
+      ? financePayloadSchema.parse(batch.payload).rows
+      : (await validateFinanceRows(getDatabase(), auth, batch.payload)).payload.rows;
+    result = { ...base, domain: "finance" as const, rows: [] as ImplantationRow[], leadNames: {} as Record<string, string>, financeRows };
+  } else {
+    const validated = await validateRows(getDatabase(), auth, batch.payload, false);
+    result = { ...base, domain: "implantations" as const, rows: validated.payload.rows, leadNames: validated.leadNames, financeRows: [] as FinanceRow[] };
+  }
+  await auditErp(getDatabase(), { tenantId: auth.context.tenantId, actorId: auth.context.userId, action: "erp.import.viewed", entityType: "erp_import", entityId: id,
+    metadata: { domain, count: result.rows.length + result.financeRows.length } });
   return result;
 }
 

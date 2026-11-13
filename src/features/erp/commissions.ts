@@ -4,12 +4,12 @@ import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { auditErp, canSeeAgencyBooks, erpScopeSql, getErpEffectiveAccess, requireErpAccess } from "./access";
 import { ErpError, recordIdSchema } from "./contracts";
-import { deterministicUuid, legacyDivergence, numericToCents, scheduleDueOn } from "./commission-core";
+import { deterministicUuid, DIVERGENCE_LABELS, legacyDivergence, numericToCents, scheduleDueOn } from "./commission-core";
 import { financialTransaction, prepareFinancialEntryInTransaction } from "./finance";
 import { settledCents } from "./ledger";
+import { PAGE_SIZE, pageSchema, periodSchema } from "./shared";
 
-const period = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
-const filtersSchema = z.object({ competence: period.optional(), page: z.coerce.number().int().min(1).max(10_000).default(1) });
+const filtersSchema = z.object({ competence: periodSchema.optional(), page: pageSchema });
 
 /** Legacy schedule (previsto) side by side with the conferred ERP fact (conferido/pago). */
 export async function getCommissionOverview(raw: unknown) {
@@ -23,13 +23,21 @@ export async function getCommissionOverview(raw: unknown) {
     .from(schema.commissionSchedule).innerJoin(schema.sales, and(eq(schema.sales.id, schema.commissionSchedule.saleId), eq(schema.sales.tenantId, auth.context.tenantId)))
     .innerJoin(schema.leads, and(eq(schema.leads.id, schema.sales.leadId), eq(schema.leads.tenantId, auth.context.tenantId), isNull(schema.leads.deletedAt)))
     .leftJoin(schema.user, eq(schema.user.id, schema.sales.brokerId));
-  const [rows, total] = await Promise.all([
-    base.where(conditions).orderBy(desc(schema.commissionSchedule.referenceMonth), asc(schema.leads.nome), asc(schema.commissionSchedule.monthNumber)).limit(50).offset((filters.page - 1) * 50),
-    db.select({ value: count() }).from(schema.commissionSchedule).innerJoin(schema.sales, and(eq(schema.sales.id, schema.commissionSchedule.saleId), eq(schema.sales.tenantId, auth.context.tenantId)))
-      .innerJoin(schema.leads, and(eq(schema.leads.id, schema.sales.leadId), eq(schema.leads.tenantId, auth.context.tenantId), isNull(schema.leads.deletedAt))).where(conditions),
-  ]);
+  // One extra row tells whether a next page exists; the 3-table count only runs when the first page is full or on later pages.
+  const fetched = await base.where(conditions).orderBy(desc(schema.commissionSchedule.referenceMonth), asc(schema.leads.nome), asc(schema.commissionSchedule.monthNumber), asc(schema.commissionSchedule.id))
+    .limit(PAGE_SIZE + 1).offset((filters.page - 1) * PAGE_SIZE);
+  const rows = fetched.slice(0, PAGE_SIZE);
+  const needsCount = filters.page > 1 || fetched.length > PAGE_SIZE;
+  const countQuery = needsCount ? db.select({ value: count() }).from(schema.commissionSchedule)
+    .innerJoin(schema.sales, and(eq(schema.sales.id, schema.commissionSchedule.saleId), eq(schema.sales.tenantId, auth.context.tenantId)))
+    .innerJoin(schema.leads, and(eq(schema.leads.id, schema.sales.leadId), eq(schema.leads.tenantId, auth.context.tenantId), isNull(schema.leads.deletedAt))).where(conditions) : null;
   const ids = rows.map((row) => row.id);
-  const entries = ids.length ? await db.select().from(schema.erpFinancialEntries).where(and(eq(schema.erpFinancialEntries.tenantId, auth.context.tenantId), inArray(schema.erpFinancialEntries.originCommissionId, ids))) : [];
+  const [counted, entries] = await Promise.all([
+    countQuery ?? Promise.resolve(null),
+    ids.length ? db.select().from(schema.erpFinancialEntries)
+      .where(and(eq(schema.erpFinancialEntries.tenantId, auth.context.tenantId), inArray(schema.erpFinancialEntries.originCommissionId, ids))) : Promise.resolve([]),
+  ]);
+  const total = counted ? Number(counted[0]?.value ?? 0) : rows.length;
   const entryIds = entries.map((entry) => entry.id);
   const [movements, offsets] = entryIds.length ? await Promise.all([
     db.select().from(schema.erpSettlements).where(and(eq(schema.erpSettlements.tenantId, auth.context.tenantId), inArray(schema.erpSettlements.entryId, entryIds))),
@@ -39,13 +47,15 @@ export async function getCommissionOverview(raw: unknown) {
   const agency = canSeeAgencyBooks(auth.context) && auth.scope.mode !== "owners";
   const canBring = agency && !auth.context.viewAs && access.capabilities.has("erp_prepare_finance");
   await auditErp(db, { tenantId: auth.context.tenantId, actorId: auth.context.viewAs?.adminUserId ?? auth.context.userId, action: "erp.commissions.viewed", entityType: "erp_access", entityId: "commissions", metadata: { count: rows.length, page: filters.page } });
-  return { filters, total: Number(total[0]?.value ?? 0), agency, canBring, rows: rows.map((row) => {
-    const entry = entries.find((candidate) => candidate.originCommissionId === row.id);
+  const entryByCommission = new Map(entries.map((entry) => [entry.originCommissionId, entry]));
+  return { filters, total, pageSize: PAGE_SIZE, agency, canBring, rows: rows.map((row) => {
+    const entry = entryByCommission.get(row.id);
     const paid = entry ? settledCents(movements.filter((movement) => movement.entryId === entry.id)) : 0;
     const offset = entry ? settledCents(offsets.filter((item) => item.commissionEntryId === entry.id)) : 0;
     const expected = numericToCents(row.amount);
-    return { ...row, expectedCents: expected, entry: entry ? { id: entry.id, status: entry.status, amountCents: entry.amountCents } : null,
-      paidCents: paid, offsetCents: offset, divergence: legacyDivergence(row.legacyStatus, entry ? { status: entry.status, amountCents: entry.amountCents, settledCents: paid + offset } : null) };
+    const divergence = legacyDivergence(row.legacyStatus, entry ? { status: entry.status, amountCents: entry.amountCents, settledCents: paid + offset } : null);
+    return { ...row, expectedCents: expected, entry: entry ? { id: entry.id, reference: entry.reference, status: entry.status, amountCents: entry.amountCents } : null,
+      paidCents: paid, offsetCents: offset, divergence, divergenceLabel: divergence ? DIVERGENCE_LABELS[divergence] : null };
   }) };
 }
 

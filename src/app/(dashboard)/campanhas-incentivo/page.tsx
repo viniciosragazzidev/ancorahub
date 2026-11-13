@@ -1,13 +1,21 @@
-import { DashboardHeader } from "@/components/dashboard-header";
 import { getIncentiveCampaigns } from "@/features/erp/incentives";
-import { IncentivesList, NewIncentiveCampaign } from "@/features/erp/components/incentives-workspace";
-import page from "@/components/lite/page/lite-page.module.css";
+import { INCENTIVE_STATUSES, INCENTIVE_STATUS_LABELS } from "@/features/erp/incentive-core";
+import { IncentivesWorkspace } from "@/features/erp/components/incentives-workspace";
+import { ErpNote, ErpToolbar, ErpUrlFilter } from "@/features/erp/ui/erp-kit";
+import { ErpPage } from "@/features/erp/ui/erp-page";
 
-export default async function IncentiveCampaignsPage() {
-  const data = await getIncentiveCampaigns();
-  return <><DashboardHeader breadcrumb="Inteligência" title="Campanhas de incentivo" rightSlot={data.canManage ? <NewIncentiveCampaign branches={data.branches} /> : undefined} /><main className={page.stack}>
-    <p className="text-sm text-muted-foreground">Regulamento aprovado por outra pessoa, apuração reproduzível e ranking conforme a política de exposição. Não se confunde com campanhas de marketing nem com pontos da Jornada, e não gera pagamento.</p>
-    <IncentivesList data={data} />
-    {data.rows.length >= 100 ? <p className="text-sm text-muted-foreground">Mostrando as 100 campanhas mais recentes.</p> : null}
-  </main></>;
+type SearchParams = { status?: string; page?: string };
+
+export default async function IncentiveCampaignsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const data = await getIncentiveCampaigns(await searchParams);
+  const statusOptions = [{ value: "all", label: "Todas as situações" }, ...INCENTIVE_STATUSES.map((value) => ({ value, label: INCENTIVE_STATUS_LABELS[value] }))];
+  return <ErpPage pathname="/campanhas-incentivo" breadcrumb="Inteligência" title="Campanhas de incentivo">
+    <ErpNote>
+      Não se confunde com campanhas de marketing nem com pontos da Jornada, e não gera pagamento.
+    </ErpNote>
+    <ErpToolbar>
+      <ErpUrlFilter label="Situação da campanha" param="status" value={data.filters.status} defaultValue="all" options={statusOptions} />
+    </ErpToolbar>
+    <IncentivesWorkspace key={`${data.filters.status}-${data.filters.page}`} data={data} />
+  </ErpPage>;
 }

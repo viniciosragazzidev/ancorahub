@@ -1,1 +1,5 @@
-export default function ReferralsLoading() { return <p className="text-sm text-muted-foreground" role="status">Carregando indicações…</p>; }
+import { RouteLoading } from "@/components/route-loading";
+
+export default function ReferralsLoading() {
+  return <RouteLoading />;
+}

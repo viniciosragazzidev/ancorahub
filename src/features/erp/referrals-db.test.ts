@@ -127,8 +127,10 @@ describe.skipIf(!testUrl)("ERP referrals against isolated PostgreSQL", () => {
       .where(and(eq(schema.erpEvents.tenantId, id("a")), eq(schema.erpEvents.entityType, "erp_referral"), eq(schema.erpEvents.entityId, referralId)));
     expect(events.map((event) => event.action).sort()).toEqual(["erp.referral.lead_linked", "erp.referral.registered", "erp.referral.status_changed", "erp.referral.status_changed", "erp.referral.status_changed"]);
     expect(events.find((event) => (event.metadata as { after?: { status?: string } }).after?.status === "converted")?.metadata).toMatchObject({ before: { status: "opportunity", version: 4 }, after: { status: "converted", version: 5 } });
-    const timeline = (await as(broker1(), () => referrals.getReferrals({ id: referralId }))).rows[0].timeline;
-    expect(timeline).toHaveLength(5);
+    const timeline = await as(broker1(), () => referrals.getReferralTimeline({ id: referralId, page: 1 }));
+    expect(timeline.total).toBe(5);
+    expect(timeline.items.map((item) => item.label)[0]).toBe("Etapa alterada");
+    await expect(as(broker2(), () => referrals.getReferralTimeline({ id: referralId, page: 1 }))).rejects.toThrow("escopo");
   });
 
   it("requires a reason to lose and reopen, and blocks reopening over an active contact", async () => {
@@ -138,5 +140,30 @@ describe.skipIf(!testUrl)("ERP referrals against isolated PostgreSQL", () => {
     const replacement = await as(broker1(), () => referrals.registerReferral(payload(40)));
     expect(replacement).not.toBe(referralId);
     await expect(as(broker1(), () => referrals.changeReferralStatus({ id: referralId, expectedVersion: 2, status: "validated", reason: "Retomou o interesse", leadId: null }))).rejects.toThrow("outra indicação");
+  });
+
+  it("lets the database decide two concurrent links of the same lead, with a clear message", async () => {
+    await db.insert(schema.leads).values({
+      id: id("lead-race"), tenantId: id("a"), nome: "Negócio sintético concorrente", telefone: phone(150), branchId: id("a1"), corretorId: id("broker1"), status: "negotiation" as const,
+    });
+    const first = await as(broker1(), () => referrals.registerReferral(payload(51)));
+    const second = await as(broker1(), () => referrals.registerReferral(payload(52)));
+    const racing = await as(broker1(), () => Promise.allSettled([
+      referrals.linkReferralLead({ id: first, expectedVersion: 1, leadId: id("lead-race") }),
+      referrals.linkReferralLead({ id: second, expectedVersion: 1, leadId: id("lead-race") }),
+    ]));
+    expect(racing.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = racing.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    expect(rejected?.reason).toBeInstanceOf(Error);
+    expect((rejected?.reason as Error).message).toBe(referrals.REFERRAL_LEAD_TAKEN_MESSAGE);
+    const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(schema.erpReferrals)
+      .where(and(eq(schema.erpReferrals.tenantId, id("a")), eq(schema.erpReferrals.leadId, id("lead-race"))));
+    expect(total).toBe(1);
+  });
+
+  it("maps a raw unique violation of the active-lead index to the same message", async () => {
+    const error = { message: "failed query", cause: { code: "23505", constraint_name: "erp_referrals_tenant_active_lead_unique" } };
+    expect(referrals.isActiveLeadConflict(error)).toBe(true);
+    expect(referrals.isActiveLeadConflict({ code: "23505", constraint_name: "other_unique" })).toBe(false);
   });
 });

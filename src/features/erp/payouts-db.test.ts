@@ -114,8 +114,24 @@ describe.skipIf(!testUrl)("ERP commissions, payouts and receipts against isolate
     await as(context("reviewer"), () => finance.reviewSettlement({ id: reversal, decision: "confirm", reason: "Devolução conferida" }));
     const [reversed] = await db.select().from(schema.erpSettlements).where(and(eq(schema.erpSettlements.tenantId, id("a")), eq(schema.erpSettlements.id, reversal)));
     expect(reversed.payoutId).toBe(payoutId);
+    // Single-table query (no join): the balance subqueries must still correlate to the entry row.
+    const { openBalanceSql, confirmedSettledSql } = await import("./balances");
+    const balances = await db.select({ id: schema.erpFinancialEntries.id, open: openBalanceSql(id("a")), settled: confirmedSettledSql(id("a")) }).from(schema.erpFinancialEntries)
+      .where(and(eq(schema.erpFinancialEntries.tenantId, id("a")), inArray(schema.erpFinancialEntries.id, ids)));
+    const reversedEntry = entries.find((entry) => entry.id === ids[0])!; const paidEntry = entries.find((entry) => entry.id === ids[1])!;
+    expect(balances.find((row) => row.id === ids[0])).toMatchObject({ open: reversedEntry.amountCents, settled: 0 });
+    expect(balances.find((row) => row.id === ids[1])).toMatchObject({ open: 0, settled: paidEntry.amountCents });
     expect((await as(context("director"), () => payouts.getPayoutCandidates({}))).groups.flatMap((group) => group.items.map((item) => item.id))).toContain(ids[0]);
-    expect((await as(broker("broker1"), () => payouts.getReceipt(payoutId))).receipt.netCents).toBe(15025);
+    const afterReversal = await as(broker("broker1"), () => payouts.getReceipt(payoutId));
+    expect(afterReversal.receipt.netCents).toBe(15025);
+    expect(afterReversal.reversedCents).toBe(paid.amountCents);
+    expect((await as(context("director"), () => payouts.getPayout(payoutId))).reversedCents).toBe(paid.amountCents);
+
+    const listed = await as(context("director"), () => payouts.getPayouts({ status: "settled", page: 1 }));
+    expect(listed.total).toBeGreaterThanOrEqual(1); expect(listed.pageSize).toBe(25);
+    expect((await as(context("director"), () => payouts.getPayouts({ status: "settled", page: 2 }))).rows).toHaveLength(Math.max(0, listed.total - 25));
+    const directorOverview = await as(context("director"), () => commissions.getCommissionOverview({}));
+    expect(directorOverview.total).toBe(directorOverview.rows.length);
   });
 
   it("refuses approving money addressed to the approver", async () => {

@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     if (domain !== "implantations" && domain !== "finance") throw new ErpError("Tipo de importação indisponível.");
     const file = form.get("file"); if (!(file instanceof File)) throw new ErpError("Selecione um arquivo.");
     const result = await previewErpImport(domain, file);
-    return NextResponse.json({ ok: true, id: result.id, message: result.alreadyApplied ? "Este arquivo já foi aplicado. Consulte o lote existente." : "Prévia pronta. Outra pessoa autorizada deve conferir e aplicar o lote." });
+    return NextResponse.json({ ok: true, id: result.id, message: result.alreadyApplied ? "Este arquivo já foi aplicado. Consulte o lote existente." : result.superseded ? "Prévia reaberta para nova conferência. Outra pessoa autorizada deve conferir e aplicar o lote." : "Prévia pronta. Outra pessoa autorizada deve conferir e aplicar o lote." });
   } catch (error) {
     return NextResponse.json({ ok: false, message: error instanceof ErpError || error instanceof MultipartLimitError ? error.message : "Não foi possível preparar o arquivo. Confira seu acesso e o modelo." }, { status: 400 });
   }

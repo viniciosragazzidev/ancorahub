@@ -1,12 +1,39 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { erpAction } from "./action-result";
-import { parseMoneyCents, type ErpActionResult } from "./contracts";
-import { prepareFinancialEntry, prepareSettlement, prepareSettlementReversal, reviewFinancialEntry, reviewSettlement } from "./finance";
+import { z } from "zod";
+import { erpAction, erpValidationMessage } from "./action-result";
+import { ErpError, parseMoneyCents, type ErpActionResult } from "./contracts";
+import {
+  getFinancialEntry, prepareFinancialEntry, prepareSettlement, prepareSettlementReversal, reviewFinancialEntry, reviewSettlement,
+  searchFinanceBeneficiaries, searchFinanceSales,
+} from "./finance";
 import { prepareOffset, prepareOffsetReversal, reviewOffset } from "./offsets";
 import { prepareClosing, reviewClosing } from "./closing";
 
 function refresh(id?: string) { revalidatePath("/financeiro", "layout"); if (id) revalidatePath(`/financeiro/lancamentos/${id}`); }
+
+export type ErpReadResult<T> = { ok: true; data: T } | { ok: false; message: string };
+/** Read-only server calls used by drawers and searches: the service checks access; errors come back as pt-BR text. */
+async function erpRead<T>(work: () => Promise<T>): Promise<ErpReadResult<T>> {
+  try {
+    return { ok: true, data: await work() };
+  } catch (error) {
+    if (error instanceof ErpError) return { ok: false, message: error.message };
+    if (error instanceof z.ZodError) return { ok: false, message: erpValidationMessage(error) };
+    console.error("erp.read_failed", { errorType: error instanceof Error ? error.name : "unknown" });
+    return { ok: false, message: "Não foi possível carregar. Atualize a página e tente novamente." };
+  }
+}
+
+export async function loadFinancialEntryAction(id: string) {
+  return erpRead(() => getFinancialEntry(id));
+}
+export async function searchFinanceSalesAction(query: string) {
+  return erpRead(() => searchFinanceSales(query));
+}
+export async function searchFinanceBeneficiariesAction(query: string) {
+  return erpRead(() => searchFinanceBeneficiaries(query));
+}
 export async function prepareFinancialEntryAction(_previous: ErpActionResult, form: FormData): Promise<ErpActionResult> {
   return erpAction(async () => { const id = await prepareFinancialEntry({ requestId: form.get("requestId"), reference: form.get("reference"), kind: form.get("kind"), saleId: form.get("saleId") || null, branchId: form.get("branchId") || null, beneficiaryId: form.get("beneficiaryId") || null, amountCents: parseMoneyCents(String(form.get("amount") ?? "")), dueOn: form.get("dueOn"), competence: form.get("competence"), description: form.get("description"), evidenceDocumentId: null }); refresh(id); return { id, message: "Lançamento preparado. Envie a evidência e solicite aprovação independente." }; });
 }
