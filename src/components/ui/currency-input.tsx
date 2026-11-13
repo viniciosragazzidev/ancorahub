@@ -15,6 +15,8 @@ type CurrencyInputProps = {
   name?: string;
   required?: boolean;
   "aria-label"?: string;
+  /** "hero" exibe o valor grande e centralizado, sem borda, para telas de lançamento. */
+  size?: "default" | "hero";
 };
 
 /**
@@ -57,6 +59,7 @@ export function CurrencyInput({
   name,
   required,
   ["aria-label"]: ariaLabel,
+  size = "default",
 }: CurrencyInputProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -89,6 +92,43 @@ export function CurrencyInput({
     const pos = input.value.length;
     input.setSelectionRange(pos, pos);
   }, [displayValue]);
+
+  if (size === "hero") {
+    const visibleLength = Math.max((displayValue || placeholder).length, 4);
+    return (
+      <div
+        className={cn(
+          "flex items-baseline justify-center gap-2 text-foreground",
+          disabled && "opacity-50",
+        )}
+      >
+        <span aria-hidden="true" className="select-none text-2xl font-medium text-muted-foreground">
+          R$
+        </span>
+        <input
+          ref={inputRef}
+          id={id}
+          name={name}
+          type="text"
+          inputMode="decimal"
+          value={displayValue}
+          onChange={handleChange}
+          disabled={disabled}
+          required={required}
+          placeholder={placeholder}
+          aria-label={ariaLabel}
+          style={{ width: `${visibleLength + 0.5}ch` }}
+          className={cn(
+            "min-w-0 max-w-full rounded-[var(--radius-control)] border-0 bg-transparent p-0 text-center text-5xl font-semibold tracking-tight tabular-nums outline-none",
+            "placeholder:text-muted-foreground/60",
+            "focus-visible:ring-3 focus-visible:ring-ring/50",
+            "disabled:cursor-not-allowed",
+            className,
+          )}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="relative">
