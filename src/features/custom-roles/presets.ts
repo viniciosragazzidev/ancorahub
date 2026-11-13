@@ -27,11 +27,27 @@ export type CargoModelo = {
   scope: "tenant" | "branch" | "own" | "none";
   /** Papel que a pessoa precisa ter (o cargo só corta o que o papel dá). */
   papel: "director" | "manager" | "supervisor" | "broker";
+  jobTitle?: "finance" | "operations";
   permissions: readonly string[];
 };
 
 /** Modelos prontos para começar um cargo. Decisões em docs/implementations/active/2026-11-04-cargos-e-permissoes.md. */
 export const CARGO_MODELOS: readonly CargoModelo[] = [
+  {
+    id: "erp-operacoes", name: "Operações ERP", description: "Implantação e importação conferida. Use função Operações e papel Gestor; ajuste o escopo antes de atribuir.",
+    scope: "branch", papel: "manager", jobTitle: "operations",
+    permissions: [routePermissionKey("erp-implantacoes"), routePermissionKey("erp-importacoes"), "erp_view_operations", "erp_manage_operations", "erp_import_data", "acessar_documentos", "aprovar_documentos", "acessar_configuracoes_pessoais"],
+  },
+  {
+    id: "erp-financeiro-preparacao", name: "Financeiro: preparação", description: "Prepara valores e evidências, sem aprovar. Exige função Financeiro e delegação explícita; não altera o papel de ninguém.",
+    scope: "tenant", papel: "broker", jobTitle: "finance",
+    permissions: [routePermissionKey("erp-financeiro"), "erp_view_finance", "erp_prepare_finance", "acessar_configuracoes_pessoais"],
+  },
+  {
+    id: "erp-financeiro-aprovacao", name: "Financeiro: aprovação", description: "Confere lançamentos e liquidações preparados por outra pessoa. Exige função Financeiro e delegação explícita.",
+    scope: "tenant", papel: "broker", jobTitle: "finance",
+    permissions: [routePermissionKey("erp-financeiro"), "erp_view_finance", "erp_approve_finance", "acessar_configuracoes_pessoais"],
+  },
   {
     id: "plantoes",
     name: "Plantões",

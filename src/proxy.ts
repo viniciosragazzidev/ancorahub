@@ -24,7 +24,8 @@ const protectedPathPrefixes = [
   "/corretor", "/super-admin", "/checklist", "/materiais-divulgacao", "/marketing",
   "/conversas", "/qualificacao", "/atendimento", "/automacoes", "/inteligencia", "/integrations",
   "/vendas", "/cotacao", "/empresas", "/tarefas", "/agentes-ia", "/assistente",
-  "/noc", "/guia", "/propostas", "/ferramentas-vendas", "/ferramentas", "/jornada", "/relacionamento"
+  "/noc", "/guia", "/propostas", "/ferramentas-vendas", "/ferramentas", "/jornada", "/relacionamento",
+  "/implantacoes", "/administracao", "/indicacoes", "/campanhas-incentivo", "/tv"
 ] as const;
 const publicPaths = ["/compartilhado", "/api/public", "/confirm_presence", "/health"] as const;
 const authPaths = ["/login", "/verify", "/admin/login"] as const;

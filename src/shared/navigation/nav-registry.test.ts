@@ -75,6 +75,13 @@ const director: NavAccessUser = {
 };
 
 describe("nav-registry", () => {
+  it("shows ERP only for server-resolved paths without widening the old manager menu", () => {
+    const tab = NAV_AREAS.find((area) => area.id === "erp")!.tabs[0];
+    const manager: NavAccessUser = { roleKey: "manager", jobTitle: "manager", permissions: ["erp_view_operations", "acessar_vendas"] };
+    expect(canShowNavTab(tab, manager)).toBe(false);
+    expect(canShowNavTab(tab, { ...manager, erpPaths: ["/implantacoes"] })).toBe(true);
+    expect(visibleNavAreas({ ...manager, erpPaths: ["/implantacoes"] }).some((row) => row.area.id === "comercial")).toBe(false);
+  });
   it("every dashboard page belongs to an area or is listed outside on purpose", () => {
     const loose = dashboardPages()
       .filter((page) => !OUTSIDE_AREAS[page])

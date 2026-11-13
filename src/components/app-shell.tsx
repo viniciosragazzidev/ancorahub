@@ -74,6 +74,7 @@ export function AppShell({
   negotiationsEnabled = false,
   postSaleAuditEnabled = false,
   autoSaleEnabled = false,
+  erpLinks = [],
   initialSidebarUser,
   initialSidebarPathname,
   initialSidebarOnDuty,
@@ -104,6 +105,7 @@ export function AppShell({
   postSaleAuditEnabled?: boolean;
   /** Venda Automatizada ligada para esta empresa (aba em Comercial). */
   autoSaleEnabled?: boolean;
+  erpLinks?: readonly { href: string; label: string }[];
   /** Só usado pela prévia de desenvolvimento, sem consultar dados de usuário. */
   initialSidebarUser?: UserDisplayInfo | null;
   /** Só usado pela prévia de desenvolvimento para destacar a rota representada. */
@@ -214,6 +216,7 @@ export function AppShell({
         <ViewAsBanner viewingAs={viewAs.viewingAs} />
         {liteAudience === "broker" && !viewAs.viewingAs ? <WhatsAppMissingBanner /> : null}
         <LightChrome
+          erpLinks={erpLinks}
           viewAs={viewAs}
           mainRef={canvasRef}
           branding={branding}
@@ -276,10 +279,10 @@ export function AppShell({
         {directorLiteEnabled ? <div className="arc-venancor director-view-as-banner" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}><ViewAsBanner viewingAs={viewAs.viewingAs} /></div> : <ViewAsBanner viewingAs={viewAs.viewingAs} />}
         {directorLiteEnabled ? (
           <div className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}>
-            <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} />
+            <CorreTopSidebar erpPaths={erpLinks.map((link) => link.href)} logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} />
           </div>
         ) : (
-          <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} />
+          <CorreTopSidebar erpPaths={erpLinks.map((link) => link.href)} logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} />
         )}
         {directorLiteEnabled ? <div id={DIRECTOR_LITE_PORTAL_ROOT_ID} className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }} /> : null}
         <SidebarInset
@@ -293,7 +296,7 @@ export function AppShell({
             ...(directorLiteEnabled && !directorLiteRouteOptedOut ? directorSkinStyle : {}),
           }}
         >
-          <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col"><NavFlagsProvider negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} autoSaleEnabled={autoSaleEnabled} initialUser={initialSidebarUser} previewPathname={initialSidebarPathname}>{children}</NavFlagsProvider></div>
+          <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col"><NavFlagsProvider erpPaths={erpLinks.map((link) => link.href)} negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} autoSaleEnabled={autoSaleEnabled} initialUser={initialSidebarUser} previewPathname={initialSidebarPathname}>{children}</NavFlagsProvider></div>
         </SidebarInset>
         <OnboardingWelcomeDialog />
       </SidebarProvider>

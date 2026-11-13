@@ -7,7 +7,12 @@ describe("usesPostgresJsDriver", () => {
     expect(usesPostgresJsDriver("postgresql://user:password@aws-1-us-east-2.pooler.supabase.com:6543/postgres")).toBe(true);
   });
 
-  it("keeps the Neon adapter for non-Supabase database URLs", () => {
+  it("uses native PostgreSQL for local databases without changing hosted Neon selection", () => {
+    for (const host of ["localhost", "127.0.0.1", "[::1]"]) {
+      expect(usesPostgresJsDriver(`postgres://erp_test@${host}:5442/erp_test`)).toBe(true);
+    }
+    expect(usesPostgresJsDriver("https://localhost:5442/erp_test")).toBe(false);
+    expect(usesPostgresJsDriver("postgres://user@localhost.evil.example/db")).toBe(false);
     expect(usesPostgresJsDriver("postgresql://user:password@ep-example.us-east-2.aws.neon.tech/neondb")).toBe(false);
     expect(usesPostgresJsDriver("not-a-database-url")).toBe(false);
   });

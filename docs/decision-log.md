@@ -1,5 +1,70 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-186 - ERP nas duas peles do design system e endurecimento de cargos
+
+**Estado:** aceita. **Data:** 2026-11-12.
+
+Vinicios pediu o ERP integrado ao design system, com regras de negócio, cargos, permissões, escalabilidade e manutenção revistos.
+
+**Interface.** Toda tela do ERP passa pelo kit `src/features/erp/ui`:
+- `ErpPage`, `ErpList`, `ErpPanel`, `ErpRowMenu`, `ErpSettingsMenu`, filtros e paginação por URL.
+- A pele é escolhida por uma regra única (`getErpSkin`): os públicos Lite (corretor, supervisor e gestor Lite) e o Diretor com `feature_director_lite_style` veem o sistema Lite; os demais veem o sistema padrão de "Product Density" (`Card overview` + `SectionCardHeader` + `DataTable`, `Sheet`, `⋯`).
+- Lista de entidades é uma tabela, e o clique na linha abre o painel lateral.
+- Ações secundárias ficam em menus, com um único botão principal por tela e busca com "+" para itens relacionados.
+- As telas não recriam essas peças.
+
+**Cargos e segregação:**
+- Quem recebe um valor não o aprova, não o paga e não confere o comprovante.
+- Quem aprova o repasse não registra o pagamento.
+- O lançamento importado mantém o autor do arquivo como preparador.
+- O Gestor deixa de abrir os livros da corretora só pelo papel; para isso precisa da função Financeiro com cargo delegado. Sem ela, vê na unidade apenas comissões e adiantamentos aprovados (matriz "L/U só se aprovado").
+- O comprovante de repasse fica preso ao repasse.
+- O estorno de um pagamento de repasse mantém o vínculo: o recibo continua como emitido e mostra o valor estornado depois.
+- Itens de um repasse respeitam períodos fechados.
+
+**Escala:**
+- O acesso ao ERP é resolvido uma vez por requisição.
+- Saldos em aberto são calculados em SQL.
+- As filas são ordenadas e avisam quando cortam.
+- Os filtros por mês usam faixas de data indexáveis.
+- A apuração de incentivo tem trava própria.
+- A TV audita no máximo uma vez por hora.
+- Índices novos estão na 0230.
+- As suítes com banco rodam num projeto do Vitest sem paralelismo.
+
+## DEC-185 - Repasse em quatro mãos, cronograma subordinado ao ERP e assistente sem dados no modelo
+
+**Estado:** aceita para implementação. **Data:** 2026-11-12.
+
+Ao concluir o ERP a pedido do Vinicios ("terminar da forma mais completa possível"), foram adotadas as opções recomendadas do plano:
+
+- **Repasse:** quem prepara não aprova, e quem registra o pagamento não confere o comprovante (checagens no código e no banco). O recibo nasce só na conferência, como versão fixa e imutável. Registrar pagamento nunca inicia transferência bancária.
+- **Cronograma de comissão:** depois que uma parcela entra no ERP, as telas antigas não a marcam como paga ou não paga. O cronograma acompanha a liquidação conferida, nunca o contrário. Cancelamento e chargeback feitos no pós-venda aparecem como divergência na conciliação, sem correção automática.
+- **Importação financeira:** cria apenas lançamentos a conferir. Uma referência já lançada é recusada, para não esconder diferença de valor.
+- **Indicação:** não cria lead automaticamente, porque a titularidade ainda está pendente. A indicação é vinculada a um negócio existente e só conta como convertida com venda real.
+- **Incentivos:** a premiação é texto e não gera obrigação financeira.
+- **Modo TV:** mostra nomes só quando a empresa permite, e nunca mostra remuneração.
+- **Assistente:** perguntas de indicador são respondidas pelo catálogo de métricas, no escopo da sessão e sem passar dados ao modelo.
+- **Relatórios novos:** ficam fora do bloqueio do gestor em `/relatorios`, protegidos pelo módulo e pelo escopo do ERP.
+
+## DEC-184 - Execução do ERP com valores conferidos e aprovação independente
+
+**Estado:** aceita para implementação incremental. **Data:** 2026-11-12.
+
+Após o plano do ERP, Vinicios solicitou execução de ponta a ponta. Confirmou na sessão que o financeiro começa com valores e evidências conferidos, preparação e aprovação por pessoas distintas; cálculo automático somente com regra cadastrada e validada. A regra da segunda parcela continua desativada, sem reinterpretar métricas existentes ou substituir DEC-004/DEC-012 nos pontos pendentes. Registro de liquidação não inicia transferência bancária. Reversões preservam o fato original.
+
+Cada módulo exige liberação global pelo Super-admin, ativação e públicos escolhidos pela direção da empresa, capacidade efetiva e escopo do servidor. Padrão: desligado, público Diretor. Habilitar um perfil não amplia o cargo nem o teto de dados do papel: Gestor permanece na unidade, Supervisor não recebe valores de colegas e Corretor consulta seu próprio financeiro. A função Financeiro só opera dados de unidade/empresa com cargo explícito e capacidades ERP delegadas; separar preparo e aprovação nos modelos. A função Operações recebe capacidades específicas de implantação, sem finanças. Nenhuma pessoa é promovida ou recebe cargo automaticamente.
+
+A fila de implantação começa no lead em fechamento e se vincula ao contrato registrado posteriormente, preservando o requisito atual de evidência da operadora antes do registro final de venda. Sem API externa nova, sem automação de dinheiro por suposição e sem migração ou publicação de produção nesta etapa de desenvolvimento.
+
+## DEC-183 - Escopo do ERP operacional e reservas sem concessão de acesso
+
+**Estado:** aceita para planejamento e fundação de rotas. **Data:** 2026-11-12.
+
+Vinicios pediu a pausa do desenvolvimento do cotador interno para priorizar a expansão do AncoraHub, usando a LP pública de New Master BI como referência. A pausa não desliga o cotador publicado. Na validação da sessão, confirmou ERP operacional primeiro (comercial, implantação, financeiro, comissões, pessoas/metas, incentivos, indicações, BI e administração), com fiscal, folha e notas em etapa posterior. Confirmou separar implantação de contrato, pagamento de mensalidade pelo cliente e comissão recebida pela Âncora, mantendo pendente a adoção da regra da LP sobre a segunda parcela e as regras financeiras definitivas.
+
+A fundação registra públicos planejados e reserva rotas ainda não implementadas. Reservas são negadas pelo resolvedor canônico para qualquer papel, mesmo com cargo forjado, e não entram no catálogo de rotas atribuíveis ou na navegação. A lista de públicos é intenção de produto, nunca uma capacidade de autorização. Nenhum membro recebe cargo, acesso financeiro ou promoção por esta entrega; nenhuma allowlist do Gestor é ampliada. A liberação futura exige implementação real, capacidade/escopo, auditoria, governança do Super-admin e validação do módulo. DEC-004 e DEC-012 não são substituídas. Plano: `docs/product/erp-operacional/README.md`.
+
 ## DEC-098 — Mídia oficial nas conversas (áudio, imagem, documento e vídeo)
 
 **Estado:** Aceita

@@ -11,7 +11,7 @@ import type {
   TenantContext,
 } from "./types";
 import { listEffectiveCapabilities } from "@/features/custom-roles/service";
-import { getDatabase, schema } from "@/shared/db";
+import { getDatabase, schema, type DatabaseExecutor } from "@/shared/db";
 import { withPerfSpan } from "@/shared/observability/request-timing";
 
 export type { AccessScopeType };
@@ -49,6 +49,7 @@ export function toLegacyTenantContext(context: AccessContext): TenantContext {
  */
 export async function resolveAccessContext(
   existingContext?: TenantContext,
+  database?: DatabaseExecutor,
 ): Promise<AccessContext> {
   return withPerfSpan("access_context.resolve", async () => {
     const context = existingContext ?? (await getRequiredTenantContext());
@@ -59,7 +60,7 @@ export async function resolveAccessContext(
         role: context.role,
         jobTitle: context.jobTitle,
         customRoleId: context.customRoleId ?? null,
-      }),
+      }, database),
     );
 
     const permissions = new Set<PermissionKey>(permissionList);
@@ -94,7 +95,7 @@ export async function resolveAccessContext(
       // Resolução canônica de filiais vinculadas via tenant_manager_branches
       const managerBranches = await withPerfSpan("scope.manager_branches", async () => {
         try {
-          return await getDatabase()
+          return await (database ?? getDatabase())
             .select({ branchId: schema.tenantManagerBranches.branchId })
             .from(schema.tenantManagerBranches)
             .innerJoin(
@@ -141,7 +142,7 @@ export async function resolveAccessContext(
     // One rule everywhere (lists, detail, search): the team scope wins over any custom role scope.
     const teamScoped = context.role === "supervisor" && Boolean(context.supervisorTeamScope);
     const teamIds = teamScoped
-      ? await getDatabase().select({ userId: schema.tenantMemberships.userId }).from(schema.tenantMemberships)
+      ? await (database ?? getDatabase()).select({ userId: schema.tenantMemberships.userId }).from(schema.tenantMemberships)
         .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.supervisorId, context.userId), eq(schema.tenantMemberships.status, "active")))
         .then((rows) => rows.map((row) => row.userId))
         .catch(() => [] as string[])

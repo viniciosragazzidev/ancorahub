@@ -282,6 +282,18 @@ const FALLBACK_ROUTE: LightRoute = { title: "Ancora", tab: "inicio", isRoot: fal
 /** Resolves title, active tab and parent for a pathname; only a few rules read the query (Insights). */
 export function resolveLightRoute(pathname: string, search: LightSearchParams | null = null): LightRoute {
   const path = pathname.split("?")[0].replace(/(.)\/+$/, "$1");
+  if (path === "/implantacoes") return { title: "Implantação", tab: "mais", isRoot: false, parentHref: "/dashboard" };
+  if (path === "/financeiro") return { title: "Financeiro", tab: "mais", isRoot: false, parentHref: "/dashboard" };
+  if (/^\/financeiro\/lancamentos\/[^/]+$/.test(path)) return { title: "Lançamento financeiro", tab: "mais", isRoot: false, parentHref: "/financeiro", backToParent: true };
+  if (path === "/financeiro/adiantamentos") return { title: "Adiantamentos", tab: "mais", isRoot: false, parentHref: "/financeiro", backToParent: true };
+  const erpFinance: Record<string, string> = { "/financeiro/comissoes": "Comissões", "/financeiro/recebiveis": "Recebíveis", "/financeiro/despesas": "Despesas", "/financeiro/conciliacao": "Conciliação", "/financeiro/repasses": "Repasses", "/financeiro/recibos": "Recibos", "/financeiro/fluxo-caixa": "Fluxo de caixa", "/financeiro/fechamentos": "Fechamentos" };
+  if (erpFinance[path]) return { title: erpFinance[path], tab: "mais", isRoot: false, parentHref: "/financeiro", backToParent: true };
+  if (/^\/financeiro\/(repasses|recibos)\/[^/]+$/.test(path)) return { title: path.includes("recibos") ? "Recibo" : "Repasse", tab: "mais", isRoot: false, parentHref: path.includes("recibos") ? "/financeiro/recibos" : "/financeiro/repasses", backToParent: true };
+  const erpAreas: Record<string, string> = { "/indicacoes": "Indicações", "/metas": "Metas", "/campanhas-incentivo": "Incentivos", "/tv": "Modo TV", "/relatorios/producao": "Produção", "/relatorios/operadoras": "Operadoras", "/relatorios/crescimento": "Crescimento", "/relatorios/diario": "Análise diária" };
+  if (erpAreas[path]) return { title: erpAreas[path], tab: "mais", isRoot: false, parentHref: path.startsWith("/relatorios/") ? "/relatorios" : "/dashboard", backToParent: path.startsWith("/relatorios/") };
+  if (/^\/campanhas-incentivo\/[^/]+$/.test(path)) return { title: "Campanha de incentivo", tab: "mais", isRoot: false, parentHref: "/campanhas-incentivo", backToParent: true };
+  if (path === "/administracao/importacoes") return { title: "Importações", tab: "mais", isRoot: false, parentHref: "/dashboard" };
+  if (/^\/administracao\/importacoes\/[^/]+$/.test(path)) return { title: "Conferir lote", tab: "mais", isRoot: false, parentHref: "/administracao/importacoes", backToParent: true };
   const rule = RULES.find((candidate) => candidate.test(path));
   if (!rule) return FALLBACK_ROUTE;
   return typeof rule.route === "function" ? rule.route(path, search) : rule.route;

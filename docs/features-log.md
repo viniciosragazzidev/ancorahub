@@ -2,6 +2,19 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 12/11/2026 - ERP operacional: financeiro completo, indicações, incentivos, BI e TV
+
+- Comissões do cronograma da venda entram no ERP para conferência (previsto, conferido e pago ao corretor lado a lado); telas antigas deixam de marcar como paga uma parcela controlada pelo ERP.
+- Repasses com aprovação e conferência por pessoas diferentes e recibo versionado (`RP-AAAA-NNNNNN`); recebíveis, despesas, conciliação e importação financeira por planilha.
+- Indicações (`/indicacoes`) com deduplicação por telefone, campanhas de incentivo (`/campanhas-incentivo`) com apuração reproduzível, relatórios de produção, operadoras, crescimento e diário, metas, Modo TV (`/tv`) e assistente respondendo indicadores pelo catálogo de métricas.
+- Tudo desligado por padrão, por empresa e por módulo; migration 0230 (aditiva) ainda não aplicada. Registro: [execução do ERP](implementations/active/2026-11-12-erp-operacional-execucao.md), DEC-185.
+
+## 12/11/2026 - Planejamento do ERP operacional e reservas de rotas
+
+- Inventário das 17 famílias da LP New Master BI, comparação com a base real, matriz de cargos/ações/escopos e plano de 15 pacotes em M0 a M8, em `docs/product/erp-operacional/`.
+- Reservas de rotas do ERP identificadas pelo resolvedor canônico e bloqueadas enquanto planejadas. Não aparecem como concessões no editor de cargos nem como navegação operacional; nenhuma atribuição de pessoa é executada.
+- Escopo operacional aprovado e fatos financeiros separados; regra de segunda parcela, fórmulas, alçadas e novas permissões financeiras permanecem pendentes. Cotador interno pausado no desenvolvimento, sem desligar o publicado. Estado dos módulos: planejados. DEC-183 e registro `docs/implementations/active/2026-11-12-erp-operacional-foundation.md`.
+
 ## 12/11/2026 - Venda Automatizada (piloto)
 
 - Nova área Comercial › Venda Automatizada: o diretor escolhe um lead quente por vez e a assistente virtual da corretora conduz a venda pelo WhatsApp: confirma os dados, cota com o catálogo real, manda 2 ou 3 opções com PDF personalizado e imagem por plano, recomenda uma, trata objeções, busca a opção mais em conta, pede o fechamento e a lista de documentos.

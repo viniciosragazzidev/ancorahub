@@ -6,10 +6,10 @@ import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { getDatabase, schema } from "@/shared/db";
+import { getDatabase, schema, type DatabaseExecutor } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getAssignableCapabilities, type CustomRoleScope } from "./catalog";
-import { isRoutePermission, routeCatalog, routePermissionKey, type RouteDefinition } from "./routes";
+import { getRouteDefinitionByKey, isRoutePermission, routeCatalog, routePermissionKey, type RouteDefinition } from "./routes";
 import { AREAS_SEM_CORTE_FINO } from "./presets";
 import { canAccessRoute, resolveEffectiveAccess, type CargoAtribuido, type EffectiveAccess } from "./effective-access";
 import { hasCapability, type PermissionKey } from "@/shared/auth/permissions";
@@ -46,8 +46,7 @@ import type { TenantRole } from "@/shared/db/schema";
  * atribuído, mesmo com o piloto desligado (desligar não pode soltar quem tem restrição); o piloto só
  * controla criar e editar cargos na tela.
  */
-const loadCargo = cache(async (tenantId: string, customRoleId: string): Promise<CargoAtribuido> => {
-  const db = getDatabase();
+async function readCargo(tenantId: string, customRoleId: string, db: DatabaseExecutor): Promise<CargoAtribuido> {
   const [role] = await db.select({ id: schema.customRoles.id, status: schema.customRoles.status })
     .from(schema.customRoles)
     .where(and(eq(schema.customRoles.id, customRoleId), eq(schema.customRoles.tenantId, tenantId)))
@@ -58,7 +57,8 @@ const loadCargo = cache(async (tenantId: string, customRoleId: string): Promise<
     .from(schema.customRolePermissions)
     .where(eq(schema.customRolePermissions.customRoleId, role.id));
   return { status: role.status, permissions: grants.map((grant) => grant.key) };
-});
+}
+const loadCargo = cache((tenantId: string, customRoleId: string) => readCargo(tenantId, customRoleId, getDatabase()));
 
 /** F2 no ar (04/11): ações de equipe, distribuição, plantões e importação checam o cargo; POST fora das telas do cargo é negado. */
 export const CARGO_PROTEGE_ACOES = true;
@@ -66,8 +66,8 @@ export const CARGO_PROTEGE_ACOES = true;
 type AccessInput = { tenantId: string; role: TenantRole; jobTitle: string; customRoleId: string | null };
 
 /** Fonte única do acesso efetivo no servidor: papel, ou papel ∩ cargo. */
-export async function getEffectiveAccess(input: AccessInput): Promise<EffectiveAccess> {
-  const cargo = input.customRoleId ? await loadCargo(input.tenantId, input.customRoleId) : null;
+export async function getEffectiveAccess(input: AccessInput, db?: DatabaseExecutor): Promise<EffectiveAccess> {
+  const cargo = input.customRoleId ? await (db ? readCargo(input.tenantId, input.customRoleId, db) : loadCargo(input.tenantId, input.customRoleId)) : null;
   return resolveEffectiveAccess({ role: input.role, jobTitle: input.jobTitle, cargo });
 }
 
@@ -75,8 +75,8 @@ export async function hasEffectiveCapability(input: AccessInput & { permission: 
   return (await getEffectiveAccess(input)).capabilities.has(input.permission);
 }
 
-export async function listEffectiveCapabilities(input: AccessInput) {
-  return [...(await getEffectiveAccess(input)).capabilities];
+export async function listEffectiveCapabilities(input: AccessInput, db?: DatabaseExecutor) {
+  return [...(await getEffectiveAccess(input, db)).capabilities];
 }
 
 export async function listEffectiveRoutes(input: { tenantId: string; customRoleId: string | null }) {
@@ -86,7 +86,7 @@ export async function listEffectiveRoutes(input: { tenantId: string; customRoleI
 }
 
 export async function hasEffectiveRouteAccess(input: AccessInput & { routeKey: string; fallbackPermission?: PermissionKey }) {
-  const definition = routeCatalog.find((route) => route.key === input.routeKey) as RouteDefinition | undefined;
+  const definition = getRouteDefinitionByKey(input.routeKey);
   return canAccessRoute(await getEffectiveAccess(input), definition ?? (input.fallbackPermission ? {
     key: input.routeKey, path: "", label: "", description: "", category: "", fallbackPermission: input.fallbackPermission,
   } : undefined));

@@ -84,6 +84,11 @@
 - **Janela anterior equivalente**: período imediatamente anterior ao selecionado, com a mesma duração, usado para comparação. Diferenças entre taxas são apresentadas em pontos percentuais, nunca como variação percentual.
 - **Resultado do plantão**: resumo diário de leads por fila original e ofertas aceitas, calculado no dia civil de São Paulo; não é um retrato da fila atual.
 
+- **Implantação de contrato**: ativação do contrato na operadora, comprovada pela informação de aprovação e início da cobertura. Não comprova pagamento.
+- **Pagamento de mensalidade**: liquidação, pelo cliente, da parcela devida à operadora. Não equivale à entrada de comissão na corretora.
+- **Comissão recebida pela corretora**: entrada efetiva da remuneração devida à corretora pela operação comercial. É diferente do valor vendido e do repasse ao corretor.
+- **Repasse ao corretor**: liquidação da remuneração devida ao corretor, identificando as obrigações e compensações que compõem o valor.
+
 ## Engenharia
 
 - **Engineering Harness**: contrato versionado que orienta descoberta de contexto, execução limitada, verificação e registro de evidências para mudanças no CorreTop.

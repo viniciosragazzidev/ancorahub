@@ -29,6 +29,15 @@ export type FeatureFlagDefinition<T extends string = string> = {
 // ─── Feature Flags Globais (Super-admin) ─────────────────────────────────────
 
 export const FEATURE_FLAGS = {
+  ERP_OPERATIONAL: {
+    key: "feature_erp_operational_enabled", scope: "global", defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita o ERP operacional. Cada módulo exige liberação global e ativação na empresa; desligar preserva dados e bloqueia novas operações.",
+  },
+  ERP_MODULES: {
+    key: "feature_erp_operational_modules", scope: "global", defaultValue: "[]",
+    description: "Módulos ERP liberados pelo Super-admin. Lista validada e auditada no painel ERP.",
+  },
   UI_CONTEXTUAL_ILLUSTRATIONS: {
     key: "feature_ui_contextual_illustrations",
     scope: "global",

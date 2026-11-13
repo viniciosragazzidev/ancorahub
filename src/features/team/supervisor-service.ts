@@ -1,4 +1,4 @@
-import { getDatabase, schema } from "@/shared/db";
+import { getDatabase, schema, type DatabaseExecutor } from "@/shared/db";
 import { and, eq } from "drizzle-orm";
 
 export type SupervisorOption = {
@@ -41,9 +41,10 @@ export async function getBranchSupervisors(
  */
 export async function getSupervisedBrokerIds(
   tenantId: string,
-  supervisorUserId: string
+  supervisorUserId: string,
+  database?: DatabaseExecutor,
 ): Promise<string[]> {
-  const db = getDatabase();
+  const db = database ?? getDatabase();
   const rows = await db
     .select({ brokerUserId: schema.tenantMemberships.userId })
     .from(schema.tenantMemberships)

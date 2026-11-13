@@ -35,6 +35,7 @@ export function LightMoreSheet({
   availability,
   availabilityPending,
   onChangeAvailability,
+  erpLinks = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -51,6 +52,7 @@ export function LightMoreSheet({
   availability: LightAvailability;
   availabilityPending: boolean;
   onChangeAvailability: (next: "available" | "paused") => void;
+  erpLinks?: readonly { href: string; label: string }[];
 }) {
   const destinations = getLightMoreDestinations({ quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship, negotiations: showNegotiations, journey: journeyEnabled, teamRanking: teamRankingEnabled, teamManagement: teamManagementEnabled }, audience);
   // The supervisor does not receive leads: no availability, and the tour is the broker's.
@@ -77,7 +79,7 @@ export function LightMoreSheet({
 
         <nav aria-label="Mais destinos">
           <ul className="overflow-hidden rounded-3xl bg-(--surface-muted)">
-            {destinations.map((item) => (
+            {[...destinations, ...erpLinks].map((item) => (
               <li key={item.href} className="border-b border-(--border) last:border-b-0">
                 <Link
                   href={item.href}

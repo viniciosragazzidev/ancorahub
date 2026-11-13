@@ -7,6 +7,7 @@ import { callDbQueryHook } from "@/shared/observability/db-hook";
 import { isInBackgroundPool } from "./background-pool";
 
 type Database = ReturnType<typeof drizzlePostgres<typeof schema>>;
+export type DatabaseExecutor = Database | Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 /**
  * Os pools moram no processo, não no módulo (26/10). O build de produção inclui este módulo em
@@ -78,8 +79,10 @@ function getDatabaseUrl(): string {
  */
 export function usesPostgresJsDriver(databaseUrl: string): boolean {
   try {
-    const hostname = new URL(databaseUrl).hostname.toLowerCase();
-    return hostname.endsWith(".supabase.com");
+    const url = new URL(databaseUrl);
+    if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") return false;
+    const hostname = url.hostname.toLowerCase();
+    return hostname.endsWith(".supabase.com") || ["localhost", "127.0.0.1", "[::1]"].includes(hostname);
   } catch {
     return false;
   }

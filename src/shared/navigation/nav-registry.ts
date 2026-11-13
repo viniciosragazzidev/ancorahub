@@ -7,7 +7,7 @@ import type { PermissionKey } from "@/shared/auth/permissions";
 import type { TenantRole } from "@/shared/db/schema";
 import { canShowNavigationItem, type NavigationAccessUser } from "@/shared/navigation-access";
 
-export type NavAreaId = "inicio" | "conversas" | "leads" | "distribuicao" | "comercial" | "equipe" | "atendimento-ia" | "marketing" | "configuracoes";
+export type NavAreaId = "inicio" | "conversas" | "leads" | "distribuicao" | "comercial" | "erp" | "equipe" | "atendimento-ia" | "marketing" | "configuracoes";
 
 export type NavSection = "Principal" | "Operação" | "Crescimento" | "Sistema";
 
@@ -21,7 +21,7 @@ export type NavTab = {
   /** Só estes papéis enxergam a aba (a página também barra os outros). */
   roles?: readonly TenantRole[];
   /** Escondida enquanto a chave correspondente estiver desligada. */
-  requires?: "negotiations" | "relationshipCenter" | "postSaleAudit" | "autoSale";
+  requires?: "negotiations" | "relationshipCenter" | "postSaleAudit" | "autoSale" | "erp";
   /** Outros valores de query que abrem a mesma aba (links antigos), ex.: { tab: ["alerts"] }. */
   aliases?: Readonly<Record<string, readonly string[]>>;
   /**
@@ -107,6 +107,19 @@ export const NAV_AREAS: readonly NavArea[] = [
       { id: "documentos", label: "Documentos", href: "/documentos", permission: "acessar_documentos" },
       { id: "comissoes", label: "Comissões", href: "/configuracoes/comissoes", permission: "ver_comissionamento", roles: ["director", "manager"] },
       { id: "ferramentas", label: "Ferramentas", href: "/ferramentas", permission: "acessar_ferramentas", paths: ["/ferramentas/validador-comprovante"] },
+    ],
+  },
+  {
+    id: "erp", label: "Operação ERP", fullLabel: "Implantação, financeiro e gestão operacional", section: "Operação",
+    tabs: [
+      { id: "implantacao", label: "Implantação", href: "/implantacoes", permission: "erp_view_operations", requires: "erp" },
+      { id: "financeiro", label: "Financeiro", href: "/financeiro", permission: "erp_view_finance", requires: "erp" },
+      { id: "indicacoes", label: "Indicações", href: "/indicacoes", permission: "erp_manage_referrals", requires: "erp" },
+      { id: "metas", label: "Metas", href: "/metas", permission: "erp_view_analytics", requires: "erp" },
+      { id: "incentivos", label: "Incentivos", href: "/campanhas-incentivo", permission: "erp_view_analytics", requires: "erp" },
+      { id: "tv", label: "Modo TV", href: "/tv", permission: "erp_view_analytics", requires: "erp" },
+      { id: "importacoes", label: "Importações", href: "/administracao/importacoes", permission: "erp_import_data", requires: "erp" },
+      { id: "governanca", label: "Módulos", href: "/administracao/erp", permission: "erp_manage_modules", requires: "erp", roles: ["director"], noCargo: true },
     ],
   },
   {
@@ -229,11 +242,14 @@ export function resolveNavLocation(pathname: string, search: NavSearch | null = 
   return found;
 }
 
-export type NavAccessUser = NavigationAccessUser & { negotiationsEnabled?: boolean; postSaleAuditEnabled?: boolean; autoSaleEnabled?: boolean };
+export type NavAccessUser = NavigationAccessUser & { negotiationsEnabled?: boolean; postSaleAuditEnabled?: boolean; autoSaleEnabled?: boolean; erpPaths?: readonly string[] };
 
 export function canShowNavTab(tab: NavTab, user: NavAccessUser | null) {
   if (!user?.roleKey) return false;
   if (tab.roles && !tab.roles.includes(user.roleKey)) return false;
+  // This allowlist is built by the server's module + cargo + resource-scope guards.
+  // It is also the narrow exception to the manager's unchanged legacy menu boundary.
+  if (tab.requires === "erp") return user.erpPaths?.includes(pathOf(tab.href)) === true;
   if (tab.requires === "negotiations" && !user.negotiationsEnabled) return false;
   if (tab.requires === "postSaleAudit" && !user.postSaleAuditEnabled) return false;
   if (tab.requires === "autoSale" && !user.autoSaleEnabled) return false;

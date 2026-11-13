@@ -55,6 +55,8 @@ export function isAlwaysAllowedPath(pathname: string) {
  * dizer fora do catálogo: aberta para quem não tem cargo (comportamento de sempre), negada para quem tem.
  */
 export function canAccessRoute(access: EffectiveAccess, definition: RouteDefinition | undefined): boolean {
+  if (definition?.readiness === "planned") return false;
+  if (definition?.noCargo && access.hasCargo) return false;
   if (!access.hasCargo) {
     if (!definition || definition.legacyOpen) return true;
     return access.capabilities.has(definition.fallbackPermission);

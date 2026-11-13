@@ -2,7 +2,7 @@
 
 import "server-only";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -10,6 +10,7 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import { buildStrictRoleLeadScope } from "@/features/leads/strict-role-scope";
+import { isInstallmentControlledByErp } from "@/features/erp/commissions";
 
 export type SaleActionState = { success?: boolean; error?: string };
 export type BulkExportState = { csvData?: string; count?: number; error?: string };
@@ -107,6 +108,9 @@ function formatDateShort(date: Date): string {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" }).format(date);
 }
 
+const notControlledByErp = (tenantId: string) => sql`NOT EXISTS (SELECT 1 FROM erp_financial_entries e WHERE e.tenant_id = ${tenantId} AND e.origin_commission_id = ${schema.commissionSchedule.id} AND e.status IN ('submitted', 'approved'))`;
+const ERP_CONTROLLED_MESSAGE = "Esta parcela é conferida no Financeiro (ERP). Registre a liquidação ou o estorno na ficha do lançamento.";
+
 // ─── Mark schedule item as paid ────────────────────────────────────────────
 
 export async function markCommissionPaidAction(
@@ -141,9 +145,10 @@ export async function markCommissionPaidAction(
 
     if (!item) return { error: "Parcela não encontrada." };
     if (item.status !== "pending") return { error: "Esta parcela já foi paga ou cancelada." };
+    if (await isInstallmentControlledByErp(context.tenantId, scheduleId)) return { error: ERP_CONTROLLED_MESSAGE };
 
     const notes = formData.get("notes");
-    await db
+    const marked = await db
       .update(schema.commissionSchedule)
       .set({
         status: "paid",
@@ -151,9 +156,9 @@ export async function markCommissionPaidAction(
         paidBy: context.userId,
         notes: notes && typeof notes === "string" ? notes.trim() || null : null,
       })
-      .where(eq(schema.commissionSchedule.id, scheduleId));
-
-    // Revalidar paths relevantes
+      .where(and(eq(schema.commissionSchedule.id, scheduleId), eq(schema.commissionSchedule.status, "pending"), notControlledByErp(context.tenantId)))
+      .returning({ id: schema.commissionSchedule.id });
+    if (!marked.length) return { error: ERP_CONTROLLED_MESSAGE };
 
     return { success: true };
   } catch (error) {
@@ -196,8 +201,9 @@ export async function markCommissionUnpaidAction(
 
     if (!item) return { error: "Parcela não encontrada." };
     if (item.status !== "paid") return { error: "Esta parcela ainda não foi paga." };
+    if (await isInstallmentControlledByErp(context.tenantId, scheduleId)) return { error: ERP_CONTROLLED_MESSAGE };
 
-    await db
+    const reverted = await db
       .update(schema.commissionSchedule)
       .set({
         status: "pending",
@@ -205,7 +211,9 @@ export async function markCommissionUnpaidAction(
         paidBy: null,
         notes: null,
       })
-      .where(eq(schema.commissionSchedule.id, scheduleId));
+      .where(and(eq(schema.commissionSchedule.id, scheduleId), eq(schema.commissionSchedule.status, "paid"), notControlledByErp(context.tenantId)))
+      .returning({ id: schema.commissionSchedule.id });
+    if (!reverted.length) return { error: ERP_CONTROLLED_MESSAGE };
 
 
     return { success: true };
