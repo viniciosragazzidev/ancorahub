@@ -70,3 +70,13 @@ describe("team notice text rotation", () => {
     expect(localHour(new Date("2026-09-29T12:00:00Z"))).toBe(9);
   });
 });
+
+describe("Resultado do Plantão no aviso diário", () => {
+  it("vai exatamente como o relatório foi montado, sem cabeçalho extra", () => {
+    const report = "📊 *Resultado do Plantão* · 13/11\n\n*EXTERNO* · 1 leads";
+    const fields = { purpose: "dailyLeadsReport", date: "13/11", report, link: "" } as NoticeFields;
+    expect(builtInNoticeVariants(fields, 19)).toEqual([report]);
+    const lower = "📊 *Resultado do plantão · 12/11*\n\nx";
+    expect(builtInNoticeVariants({ ...fields, report: lower } as NoticeFields, 19)).toEqual([lower]);
+  });
+});
