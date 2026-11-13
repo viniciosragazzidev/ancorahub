@@ -86,6 +86,8 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { Sparkles, RefreshCw, PanelRightClose, PanelRightOpen, ChevronDown, UserCheck, Bot } from "lucide-react";
+import { startAutoSaleFromConversationAction } from "@/features/auto-sale/actions";
+import { isAutoSaleTemperature } from "@/features/auto-sale/eligibility";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -745,6 +747,29 @@ function ConversationHeader({
     }
   }
 
+  // Venda Automatizada (13/11): diretor ou gestor passa a conversa em qualificação (ou quente) para a venda, que começa na hora.
+  const canStartAutoSale = (role === "director" || role === "manager") && !client.id.startsWith("unassigned-") && !client.corretorId && isAutoSaleTemperature(client.qualificationStatus ?? null);
+
+  async function handleStartAutoSale() {
+    setIsPending(true);
+    const toastId = toast.loading("Passando para a Venda Automatizada...");
+    try {
+      const result = await startAutoSaleFromConversationAction(client.id);
+      if (!result.ok) { toast.error(result.error, { id: toastId }); return; }
+      toast.success(result.data.mode === "autopilot"
+        ? "A Venda Automatizada assumiu esta conversa e já mandou a primeira mensagem."
+        : "A Venda Automatizada assumiu esta conversa em Copiloto. Aprove a primeira mensagem em Vendas › Venda Automatizada.", {
+        id: toastId,
+        action: { label: "Acompanhar", onClick: () => router.push("/vendas/automatizada") },
+      });
+      router.refresh();
+    } catch {
+      toast.error("Não foi possível passar para a Venda Automatizada agora.", { id: toastId });
+    } finally {
+      setIsPending(false);
+    }
+  }
+
   async function handleTakeover() {
     if (!client.aiConversation?.id) return;
     onUpdateConversation?.(client.id, {
@@ -946,6 +971,21 @@ function ConversationHeader({
                   <span className="text-[10px] text-muted-foreground">Retoma a qualificação automática por IA</span>
                 </div>
               </DropdownMenuItem>
+
+              {/* VENDA AUTOMATIZADA */}
+              {canStartAutoSale ? (
+                <DropdownMenuItem
+                  onClick={() => void handleStartAutoSale()}
+                  disabled={isPending}
+                  className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] focus:bg-muted"
+                >
+                  <Flame className="size-4 shrink-0 text-primary mt-0.5" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-foreground">Passar para a Venda Automatizada</span>
+                    <span className="text-[10px] text-muted-foreground">A assistente de vendas assume e responde já</span>
+                  </div>
+                </DropdownMenuItem>
+              ) : null}
 
               {/* ASSUMIR E PAUSAR AUTOMAÇÃO */}
               {client.aiConversation?.id && (
