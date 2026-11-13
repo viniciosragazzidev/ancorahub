@@ -3,7 +3,19 @@
 import { useEffect, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import {
+  Accessibility,
+  Bell,
+  Building2,
+  CalendarClock,
+  ChevronRight,
+  MessageCircle,
+  Puzzle,
+  ShieldCheck,
+  Trophy,
+  User,
+  type LucideIcon,
+} from "lucide-react";
 
 import styles from "./light-settings.module.css";
 
@@ -13,6 +25,38 @@ export type LightSettingsSection = {
   description: string;
   node: ReactNode;
 };
+
+type SectionId = LightSettingsSection["id"];
+
+const SECTION_ICONS: Record<SectionId, LucideIcon> = {
+  conta: User,
+  unidade: Building2,
+  seguranca: ShieldCheck,
+  disponibilidade: CalendarClock,
+  whatsapp: MessageCircle,
+  notificacoes: Bell,
+  placar: Trophy,
+  acessibilidade: Accessibility,
+  extensao: Puzzle,
+};
+
+// Groups of the list, like a phone settings screen. Order inside a group follows the order the page sends.
+const SECTION_GROUPS: { title: string; ids: SectionId[] }[] = [
+  { title: "Conta", ids: ["conta", "unidade", "seguranca"] },
+  { title: "Atendimento", ids: ["disponibilidade", "whatsapp", "notificacoes", "placar"] },
+  { title: "Preferências", ids: ["acessibilidade", "extensao"] },
+];
+
+function groupSections(sections: LightSettingsSection[]) {
+  const grouped = SECTION_GROUPS.map((group) => ({
+    title: group.title,
+    sections: sections.filter((section) => group.ids.includes(section.id)),
+  }));
+  const known = new Set(SECTION_GROUPS.flatMap((group) => group.ids));
+  const others = sections.filter((section) => !known.has(section.id));
+  if (others.length) grouped.push({ title: "Outros", sections: others });
+  return grouped.filter((group) => group.sections.length > 0);
+}
 
 /**
  * Configurações of the Lite app (broker and manager). Without ?tab it lists the sections as cards;
@@ -50,19 +94,40 @@ export function LightSettings({ sections, intro = "Sua conta, sua disponibilidad
       <h1 className="sr-only">Configurações</h1>
       {header ? <div {...enter(0)} className={styles.enter}>{header}</div> : null}
       <p {...enter(header ? 1 : 0)} data-tour="micro-settings-intro" className={`${styles.enter} text-sm text-(--text-secondary)`}>{intro}</p>
-      <ul data-tour="micro-settings-sections" className="overflow-hidden rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
-        {sections.map((section, index) => (
-          <li key={section.id} {...enter(index + 2)} data-tour={index === 0 ? "micro-settings-account" : undefined} className={`${styles.enter} border-b border-(--border) last:border-b-0`}>
-            <Link href={`/settings?tab=${section.id}`} className="group flex min-h-16 items-center justify-between gap-3 px-5 py-4 transition-colors duration-150 hover:bg-(--surface-muted) active:bg-(--surface-muted) motion-reduce:transition-none">
-              <span className="min-w-0">
-                <span className="block text-base font-semibold text-(--foreground)">{section.title}</span>
-                <span className="block text-sm text-(--text-secondary)">{section.description}</span>
-              </span>
-              <ChevronRight className="size-4 shrink-0 text-(--text-muted) transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
-            </Link>
-          </li>
+      <div data-tour="micro-settings-sections" className="flex flex-col gap-5">
+        {groupSections(sections).map((group, groupIndex) => (
+          <section key={group.title} aria-labelledby={`settings-group-${groupIndex}`} className="flex flex-col gap-2">
+            <h2 id={`settings-group-${groupIndex}`} className="px-1 text-sm font-semibold text-(--text-secondary)">
+              {group.title}
+            </h2>
+            <ul className="overflow-hidden rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
+              {group.sections.map((section) => {
+                const index = sections.indexOf(section);
+                const Icon = SECTION_ICONS[section.id];
+                return (
+                  <li
+                    key={section.id}
+                    {...enter(index + 2)}
+                    data-tour={index === 0 ? "micro-settings-account" : undefined}
+                    className={`${styles.enter} relative after:absolute after:bottom-0 after:left-19 after:right-0 after:h-px after:bg-(--border) last:after:hidden`}
+                  >
+                    <Link href={`/settings?tab=${section.id}`} className="group flex min-h-16 items-center gap-4 px-4 py-3.5 transition-colors duration-150 hover:bg-(--surface-muted) active:bg-(--surface-muted) motion-reduce:transition-none">
+                      <span aria-hidden="true" className="grid size-11 shrink-0 place-items-center rounded-2xl bg-(--chat-action-soft) text-(--chat-action-text)">
+                        <Icon className="size-5" strokeWidth={1.9} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-base font-semibold text-(--foreground)">{section.title}</span>
+                        <span className="block text-sm text-(--text-secondary)">{section.description}</span>
+                      </span>
+                      <ChevronRight className="size-4 shrink-0 text-(--text-muted) transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         ))}
-      </ul>
+      </div>
       {footer}
     </div>
   );
