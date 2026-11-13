@@ -211,3 +211,23 @@ ALTER TABLE erp_payout_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE erp_referrals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE erp_incentive_campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE erp_incentive_results ENABLE ROW LEVEL SECURITY;
+--> statement-breakpoint
+-- Lote 3 (12/11): índices para as consultas reais do ERP (fila de conciliação, repasses, linha do tempo, BI).
+CREATE INDEX IF NOT EXISTS erp_financial_entries_tenant_kind_status_idx ON erp_financial_entries(tenant_id,kind,status,competence);
+CREATE INDEX IF NOT EXISTS erp_financial_entries_tenant_created_idx ON erp_financial_entries(tenant_id,created_at);
+CREATE INDEX IF NOT EXISTS erp_financial_entries_tenant_status_due_idx ON erp_financial_entries(tenant_id,status,due_on);
+CREATE INDEX IF NOT EXISTS erp_settlements_tenant_payout_idx ON erp_settlements(tenant_id,payout_id) WHERE payout_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS erp_settlements_tenant_status_idx ON erp_settlements(tenant_id,status);
+CREATE INDEX IF NOT EXISTS erp_offsets_tenant_status_idx ON erp_offsets(tenant_id,status);
+CREATE INDEX IF NOT EXISTS erp_payouts_tenant_created_idx ON erp_payouts(tenant_id,created_at);
+CREATE INDEX IF NOT EXISTS erp_payouts_tenant_status_idx ON erp_payouts(tenant_id,status);
+CREATE INDEX IF NOT EXISTS erp_events_tenant_entity_idx ON erp_events(tenant_id,entity_type,entity_id,created_at);
+CREATE INDEX IF NOT EXISTS erp_documents_tenant_lead_idx ON erp_documents(tenant_id,lead_id) WHERE lead_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS erp_documents_tenant_entry_idx ON erp_documents(tenant_id,financial_entry_id) WHERE financial_entry_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS sales_tenant_sale_date_idx ON sales(tenant_id,sale_date);
+CREATE INDEX IF NOT EXISTS commission_schedule_tenant_ref_month_idx ON commission_schedule(tenant_id,reference_month);
+--> statement-breakpoint
+-- Lote 4 (12/11): comprovante preso ao repasse; uma indicação ativa por negócio.
+ALTER TABLE erp_documents ADD COLUMN IF NOT EXISTS payout_id text;
+CREATE INDEX IF NOT EXISTS erp_documents_tenant_payout_idx ON erp_documents(tenant_id,payout_id) WHERE payout_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS erp_referrals_tenant_active_lead_unique ON erp_referrals(tenant_id,lead_id) WHERE lead_id IS NOT NULL AND status NOT IN ('lost','duplicate');

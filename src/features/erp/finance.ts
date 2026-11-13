@@ -3,7 +3,7 @@ import { and, count, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm"
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { auditErp, canSeeAgencyBooks, erpScopeSql, getErpEffectiveAccess, requireErpAccess, type ErpDatabase, type ErpTransaction } from "./access";
-import { ErpError, FINANCIAL_KINDS, assertIndependentReview, financialInputSchema, settlementInputSchema } from "./contracts";
+import { ErpError, FINANCIAL_KINDS, assertIndependentReview, assertNotBeneficiary, financialInputSchema, settlementInputSchema } from "./contracts";
 import { assertOccurredByToday, assertPaymentCapacity, checkedCents, requireSameRequest, settledCents } from "./ledger";
 import { scopedEvidence, scopedFinancialEntry, type ErpAccess } from "./records";
 import { scopeIncludes } from "./scope";
@@ -66,7 +66,8 @@ export async function resolveEntryParties(db: ErpDatabase, auth: ErpAccess, inpu
   return { branchId, ownerId };
 }
 
-export async function prepareFinancialEntryInTransaction(tx: ErpTransaction, auth: ErpAccess, raw: unknown, originCommissionId: string | null = null) {
+/** `preparedBy` is the person who authored the values (e.g. the import author), kept apart from the approver. */
+export async function prepareFinancialEntryInTransaction(tx: ErpTransaction, auth: ErpAccess, raw: unknown, originCommissionId: string | null = null, preparedBy: string = auth.context.userId) {
   const input = financialInputSchema.parse(raw);
   const [existing] = await tx.select({ id: schema.erpFinancialEntries.id, requestId: schema.erpFinancialEntries.requestId }).from(schema.erpFinancialEntries)
     .where(and(eq(schema.erpFinancialEntries.tenantId, auth.context.tenantId), or(eq(schema.erpFinancialEntries.requestId, input.requestId), and(eq(schema.erpFinancialEntries.reference, input.reference), eq(schema.erpFinancialEntries.kind, input.kind))))).limit(1);
@@ -75,7 +76,7 @@ export async function prepareFinancialEntryInTransaction(tx: ErpTransaction, aut
   const parties = await resolveEntryParties(tx, auth, input); const id = crypto.randomUUID();
   // Evidence is uploaded against the newly created entry, then checked at approval.
   if (input.evidenceDocumentId) throw new ErpError("Prepare o lançamento e envie a evidência na ficha financeira.");
-  await tx.insert(schema.erpFinancialEntries).values({ id, tenantId: auth.context.tenantId, ...input, ...parties, originCommissionId, createdBy: auth.context.userId });
+  await tx.insert(schema.erpFinancialEntries).values({ id, tenantId: auth.context.tenantId, ...input, ...parties, originCommissionId, createdBy: preparedBy });
   await auditErp(tx, { tenantId: auth.context.tenantId, actorId: auth.context.userId, action: "erp.finance.prepared", entityType: "erp_financial_entry", entityId: id, metadata: { kind: input.kind, amountCents: input.amountCents, competence: input.competence, source: originCommissionId ? "legacy_schedule_conferred" : "conferred" } });
   return id;
 }
@@ -88,6 +89,7 @@ export async function reviewFinancialEntry(raw: unknown) {
     if (entry.version !== input.expectedVersion) throw new ErpError("O lançamento mudou. Atualize e confira novamente.");
     if (entry.status !== "submitted") throw new ErpError("Este lançamento já foi revisado.");
     assertIndependentReview(auth.context.userId, entry.createdBy);
+    if (input.decision === "approve") assertNotBeneficiary(auth.context.userId, entry.beneficiaryId);
     await assertOpenPeriods(tx, auth.context.tenantId, [entry.competence]);
     if (input.decision === "approve") {
       if (!entry.evidenceDocumentId) throw new ErpError("A aprovação exige evidência do valor conferido.");
@@ -135,6 +137,7 @@ export async function prepareSettlementReversal(raw: unknown) {
     const [prior] = await tx.select().from(schema.erpSettlements).where(and(eq(schema.erpSettlements.tenantId, auth.context.tenantId), eq(schema.erpSettlements.reversesId, original.id), ne(schema.erpSettlements.status, "rejected"))).limit(1);
     if (prior) { requireSameRequest(prior, input.requestId); return prior.id; }
     if (original.status !== "confirmed" || original.kind !== "payment") throw new ErpError("Somente uma liquidação confirmada pode ser estornada.");
+    // A payout reversal keeps the link: the receipt stays as issued and shows the reversed amount; the commission becomes payable again.
     if (input.occurredOn < original.occurredOn) throw new ErpError("O estorno não pode anteceder a liquidação.");
     await assertOpenPeriods(tx, auth.context.tenantId, [entry.competence, original.occurredOn, input.occurredOn]);
     await scopedEvidence(tx, auth, input.evidenceDocumentId, { entryId: entry.id });
@@ -143,7 +146,7 @@ export async function prepareSettlementReversal(raw: unknown) {
       const cash = settledCents(await entryMovements(tx, auth.context.tenantId, entry.id));
       if (cash - original.amountCents < offsets.confirmed + offsets.reserved) throw new ErpError("Reverta as compensações vinculadas antes de estornar o adiantamento.");
     }
-    const id = crypto.randomUUID(); await tx.insert(schema.erpSettlements).values({ id, tenantId: auth.context.tenantId, entryId: entry.id, requestId: input.requestId, kind: "reversal", reversesId: original.id, amountCents: original.amountCents, occurredOn: input.occurredOn, evidenceDocumentId: input.evidenceDocumentId, reason: input.reason, createdBy: auth.context.userId });
+    const id = crypto.randomUUID(); await tx.insert(schema.erpSettlements).values({ id, tenantId: auth.context.tenantId, entryId: entry.id, requestId: input.requestId, payoutId: original.payoutId, kind: "reversal", reversesId: original.id, amountCents: original.amountCents, occurredOn: input.occurredOn, evidenceDocumentId: input.evidenceDocumentId, reason: input.reason, createdBy: auth.context.userId });
     await auditErp(tx, { tenantId: auth.context.tenantId, actorId: auth.context.userId, action: "erp.settlement.reversal_prepared", entityType: "erp_settlement", entityId: id, metadata: { reversesId: original.id, amountCents: original.amountCents } });
     return id;
   });
@@ -155,7 +158,8 @@ export async function reviewSettlement(raw: unknown) {
     if (!movement) throw new ErpError("Liquidação não encontrada.");
     const entry = await scopedFinancialEntry(tx, auth, movement.entryId, true);
     if (movement.status !== "pending") throw new ErpError("Esta liquidação já foi revisada.");
-    if (movement.payoutId) throw new ErpError("Esta liquidação pertence a um repasse. Confira-a pela tela do repasse.");
+    if (movement.payoutId && movement.kind === "payment") throw new ErpError("Esta liquidação pertence a um repasse. Confira-a pela tela do repasse.");
+    if (input.decision === "confirm") assertNotBeneficiary(auth.context.userId, entry.beneficiaryId);
     assertIndependentReview(auth.context.userId, movement.createdBy);
     await assertOpenPeriods(tx, auth.context.tenantId, [entry.competence, movement.occurredOn]);
     if (input.decision === "confirm") {
@@ -187,7 +191,7 @@ export async function getFinancialEntries(raw: unknown) {
   const filters = filtersSchema.parse(raw); const auth = await requireErpAccess("finance", "erp_view_finance"); const db = getDatabase();
   const agency = canSeeAgencyBooks(auth.context) && auth.scope.mode !== "owners";
   const conditions = and(eq(schema.erpFinancialEntries.tenantId, auth.context.tenantId), erpScopeSql(auth.scope, schema.erpFinancialEntries.branchId, schema.erpFinancialEntries.ownerId),
-    agency ? undefined : inArray(schema.erpFinancialEntries.kind, ["broker_commission", "advance"]), filters.kind === "all" ? undefined : eq(schema.erpFinancialEntries.kind, filters.kind), filters.status === "all" ? undefined : eq(schema.erpFinancialEntries.status, filters.status), filters.competence ? eq(schema.erpFinancialEntries.competence, filters.competence) : undefined);
+    agency ? undefined : inArray(schema.erpFinancialEntries.kind, ["broker_commission", "advance"]), !agency && auth.scope.mode !== "owners" ? eq(schema.erpFinancialEntries.status, "approved") : undefined, filters.kind === "all" ? undefined : eq(schema.erpFinancialEntries.kind, filters.kind), filters.status === "all" ? undefined : eq(schema.erpFinancialEntries.status, filters.status), filters.competence ? eq(schema.erpFinancialEntries.competence, filters.competence) : undefined);
   const [rows, total, access] = await Promise.all([
     db.select().from(schema.erpFinancialEntries).where(conditions).orderBy(desc(schema.erpFinancialEntries.createdAt), schema.erpFinancialEntries.id).limit(25).offset((filters.page - 1) * 25),
     db.select({ value: count() }).from(schema.erpFinancialEntries).where(conditions), getErpEffectiveAccess(auth.context),

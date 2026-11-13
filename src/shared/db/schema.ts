@@ -3695,6 +3695,7 @@ export const sales = pgTable(
     index("sales_lead_idx").on(table.leadId),
     index("sales_broker_idx").on(table.brokerId),
     index("sales_expiration_idx").on(table.expirationDate),
+    index("sales_tenant_sale_date_idx").on(table.tenantId, table.saleDate),
   ],
 );
 
@@ -3725,6 +3726,7 @@ export const commissionSchedule = pgTable(
     index("commission_schedule_sale_idx").on(table.saleId),
     index("commission_schedule_ref_month_idx").on(table.referenceMonth),
     index("commission_schedule_status_idx").on(table.status),
+  index("commission_schedule_tenant_ref_month_idx").on(table.tenantId, table.referenceMonth),
   ],
 );
 
@@ -5679,7 +5681,7 @@ export const erpEvents = pgTable("erp_events", {
   entityType: text("entity_type").notNull(), entityId: text("entity_id").notNull(),
   metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [index("erp_events_tenant_created_idx").on(table.tenantId, table.createdAt)]);
+}, (table) => [index("erp_events_tenant_created_idx").on(table.tenantId, table.createdAt), index("erp_events_tenant_entity_idx").on(table.tenantId, table.entityType, table.entityId, table.createdAt)]);
 
 export const erpDocuments = pgTable("erp_documents", {
   id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id),
@@ -5687,12 +5689,12 @@ export const erpDocuments = pgTable("erp_documents", {
   moduleKey: text("module_key").notNull(), state: text("state").notNull().default("uploading"),
   leadId: text("lead_id").references(() => leads.id), financialEntryId: text("financial_entry_id").references((): AnyPgColumn => erpFinancialEntries.id),
   nativeDocumentId: text("native_document_id").references(() => leadDocuments.id),
-  saleId: text("sale_id").references(() => sales.id), objectKey: text("object_key").notNull(),
+  saleId: text("sale_id").references(() => sales.id), payoutId: text("payout_id"), objectKey: text("object_key").notNull(),
   fileName: text("file_name").notNull(), contentType: text("content_type").notNull(),
   byteLength: integer("byte_length").notNull(), sha256: text("sha256").notNull(),
   createdBy: text("created_by").notNull().references(() => user.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [unique("erp_documents_tenant_id_unique").on(table.tenantId, table.id), uniqueIndex("erp_documents_tenant_native_unique").on(table.tenantId, table.nativeDocumentId), index("erp_documents_tenant_owner_idx").on(table.tenantId, table.ownerId)]);
+}, (table) => [unique("erp_documents_tenant_id_unique").on(table.tenantId, table.id), uniqueIndex("erp_documents_tenant_native_unique").on(table.tenantId, table.nativeDocumentId), index("erp_documents_tenant_owner_idx").on(table.tenantId, table.ownerId), index("erp_documents_tenant_payout_idx").on(table.tenantId, table.payoutId).where(sql`${table.payoutId} IS NOT NULL`), index("erp_documents_tenant_lead_idx").on(table.tenantId, table.leadId).where(sql`${table.leadId} IS NOT NULL`), index("erp_documents_tenant_entry_idx").on(table.tenantId, table.financialEntryId).where(sql`${table.financialEntryId} IS NOT NULL`)]);
 
 export const erpImports = pgTable("erp_imports", {
   id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id),
@@ -5734,6 +5736,7 @@ export const erpFinancialEntries = pgTable("erp_financial_entries", {
   uniqueIndex("erp_financial_entries_tenant_reference_kind_unique").on(table.tenantId, table.reference, table.kind),
   uniqueIndex("erp_financial_entries_origin_commission_unique").on(table.tenantId, table.originCommissionId),
   index("erp_financial_entries_tenant_due_idx").on(table.tenantId, table.dueOn),
+  index("erp_financial_entries_tenant_kind_status_idx").on(table.tenantId, table.kind, table.status, table.competence), index("erp_financial_entries_tenant_created_idx").on(table.tenantId, table.createdAt), index("erp_financial_entries_tenant_status_due_idx").on(table.tenantId, table.status, table.dueOn),
   check("erp_financial_entries_positive_amount", sql`${table.amountCents} > 0 AND ${table.amountCents} <= 100000000000`),
   check("erp_financial_entries_independent_approval", sql`${table.approvedBy} IS NULL OR ${table.approvedBy} <> ${table.createdBy}`),
 ]);
@@ -5754,6 +5757,7 @@ export const erpSettlements = pgTable("erp_settlements", {
   uniqueIndex("erp_settlements_reversal_unique").on(table.tenantId, table.reversesId).where(sql`${table.status} <> 'rejected'`),
   foreignKey({ columns: [table.tenantId, table.entryId], foreignColumns: [erpFinancialEntries.tenantId, erpFinancialEntries.id] }),
   index("erp_settlements_tenant_entry_idx").on(table.tenantId, table.entryId),
+  index("erp_settlements_tenant_payout_idx").on(table.tenantId, table.payoutId).where(sql`${table.payoutId} IS NOT NULL`), index("erp_settlements_tenant_status_idx").on(table.tenantId, table.status),
   check("erp_settlements_positive_amount", sql`${table.amountCents} > 0 AND ${table.amountCents} <= 100000000000`),
   check("erp_settlements_independent_approval", sql`${table.reviewedBy} IS NULL OR ${table.reviewedBy} <> ${table.createdBy}`),
 ]);
@@ -5780,6 +5784,7 @@ export const erpOffsets = pgTable("erp_offsets", {
   uniqueIndex("erp_offsets_tenant_reversal_unique").on(table.tenantId, table.reversesId).where(sql`${table.status} <> 'rejected'`),
   index("erp_offsets_tenant_advance_idx").on(table.tenantId, table.advanceEntryId),
   index("erp_offsets_tenant_commission_idx").on(table.tenantId, table.commissionEntryId),
+  index("erp_offsets_tenant_status_idx").on(table.tenantId, table.status),
   foreignKey({ columns: [table.tenantId, table.advanceEntryId], foreignColumns: [erpFinancialEntries.tenantId, erpFinancialEntries.id] }),
   foreignKey({ columns: [table.tenantId, table.commissionEntryId], foreignColumns: [erpFinancialEntries.tenantId, erpFinancialEntries.id] }),
   check("erp_offsets_positive_amount", sql`${table.amountCents} > 0 AND ${table.amountCents} <= 100000000000`),
@@ -5800,6 +5805,7 @@ export const erpPayouts = pgTable("erp_payouts", {
   uniqueIndex("erp_payouts_tenant_request_unique").on(table.tenantId, table.requestId),
   uniqueIndex("erp_payouts_tenant_receipt_unique").on(table.tenantId, table.receiptNumber).where(sql`${table.receiptNumber} IS NOT NULL`),
   index("erp_payouts_tenant_beneficiary_idx").on(table.tenantId, table.beneficiaryId, table.competence),
+  index("erp_payouts_tenant_created_idx").on(table.tenantId, table.createdAt), index("erp_payouts_tenant_status_idx").on(table.tenantId, table.status),
   check("erp_payouts_positive", sql`${table.netCents} > 0 AND ${table.grossCents} >= ${table.netCents} AND ${table.grossCents} <= 100000000000`),
   check("erp_payouts_independent_approval", sql`${table.approvedBy} IS NULL OR ${table.approvedBy} <> ${table.preparedBy}`),
   check("erp_payouts_independent_settlement", sql`${table.settledBy} IS NULL OR ${table.settledBy} <> ${table.paidBy}`),
@@ -5829,6 +5835,7 @@ export const erpReferrals = pgTable("erp_referrals", {
   uniqueIndex("erp_referrals_tenant_request_unique").on(table.tenantId, table.requestId),
   index("erp_referrals_tenant_phone_idx").on(table.tenantId, table.phoneDigits),
   index("erp_referrals_tenant_status_idx").on(table.tenantId, table.status, table.createdAt),
+  uniqueIndex("erp_referrals_tenant_active_lead_unique").on(table.tenantId, table.leadId).where(sql`${table.leadId} IS NOT NULL AND ${table.status} NOT IN ('lost','duplicate')`),
 ]);
 
 export const erpIncentiveCampaigns = pgTable("erp_incentive_campaigns", {

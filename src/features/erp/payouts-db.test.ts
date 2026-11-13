@@ -56,9 +56,9 @@ describe.skipIf(!testUrl)("ERP commissions, payouts and receipts against isolate
   }, 30000);
   afterAll(async () => { if (db) await db.$client.end({ timeout: 5 }); });
 
-  async function proof(input: { entryId?: string; ownerId: string }) {
+  async function proof(input: { entryId?: string; ownerId: string; payoutId?: string }) {
     const documentId = crypto.randomUUID();
-    await db.insert(schema.erpDocuments).values({ id: documentId, tenantId: id("a"), ownerId: input.ownerId, branchId: id("a1"), moduleKey: "finance", financialEntryId: input.entryId ?? null, state: "ready", objectKey: `documents/${id("a")}/erp/${documentId}.pdf`, fileName: "comprovante-sintetico.pdf", contentType: "application/pdf", byteLength: 20, sha256: "0".repeat(64), createdBy: id("director") });
+    await db.insert(schema.erpDocuments).values({ id: documentId, tenantId: id("a"), ownerId: input.ownerId, branchId: id("a1"), moduleKey: "finance", financialEntryId: input.entryId ?? null, payoutId: input.payoutId ?? null, state: "ready", objectKey: `documents/${id("a")}/erp/${documentId}.pdf`, fileName: "comprovante-sintetico.pdf", contentType: "application/pdf", byteLength: 20, sha256: "0".repeat(64), createdBy: id("director") });
     if (input.entryId) await db.update(schema.erpFinancialEntries).set({ evidenceDocumentId: documentId }).where(and(eq(schema.erpFinancialEntries.id, input.entryId), eq(schema.erpFinancialEntries.tenantId, id("a"))));
     return documentId;
   }
@@ -82,10 +82,13 @@ describe.skipIf(!testUrl)("ERP commissions, payouts and receipts against isolate
     const payoutId = await as(context("director"), () => payouts.preparePayout({ requestId, beneficiaryId: id("broker1"), competence: "2026-11", entryIds: ids }));
     expect(await as(context("director"), () => payouts.preparePayout({ requestId, beneficiaryId: id("broker1"), competence: "2026-11", entryIds: ids }))).toBe(payoutId);
     await expect(as(context("director"), () => payouts.preparePayout({ requestId: crypto.randomUUID(), beneficiaryId: id("broker1"), competence: "2026-11", entryIds: [ids[0]] }))).rejects.toThrow("outro repasse");
-    const evidence = await proof({ ownerId: id("broker1") });
+    const loose = await proof({ ownerId: id("broker1") });
+    const evidence = await proof({ ownerId: id("broker1"), payoutId });
     await expect(as(context("director"), () => finance.prepareSettlement({ requestId: crypto.randomUUID(), entryId: ids[0], amountCents: 100, occurredOn: "2026-11-12", evidenceDocumentId: evidence, reason: "Pagamento avulso" }))).rejects.toThrow("repasse");
     await expect(as(context("director"), () => payouts.reviewPayout({ id: payoutId, expectedVersion: 1, decision: "approve", reason: "Autoaprovação de teste" }))).rejects.toThrow("outra pessoa");
     await as(context("reviewer"), () => payouts.reviewPayout({ id: payoutId, expectedVersion: 1, decision: "approve", reason: "Repasse conferido" }));
+    await expect(as(context("reviewer"), () => payouts.registerPayoutPayment({ id: payoutId, expectedVersion: 2, requestId: crypto.randomUUID(), occurredOn: "2026-11-12", evidenceDocumentId: evidence, reason: "Aprovador pagando" }))).rejects.toThrow("aprovou");
+    await expect(as(context("director"), () => payouts.registerPayoutPayment({ id: payoutId, expectedVersion: 2, requestId: crypto.randomUUID(), occurredOn: "2026-11-12", evidenceDocumentId: loose, reason: "Comprovante solto" }))).rejects.toThrow("comprovante");
     const payment = { id: payoutId, expectedVersion: 2, requestId: crypto.randomUUID(), occurredOn: "2026-11-12", evidenceDocumentId: evidence, reason: "Pagamento sintético" };
     await as(context("director"), () => payouts.registerPayoutPayment(payment));
     expect(await as(context("director"), () => payouts.registerPayoutPayment(payment))).toBe(payoutId);
@@ -104,6 +107,21 @@ describe.skipIf(!testUrl)("ERP commissions, payouts and receipts against isolate
     await expect(as(context("other", "director", id("b")), () => payouts.getReceipt(payoutId))).rejects.toThrow("escopo");
     await expect(db.update(schema.erpPayouts).set({ netCents: 1 }).where(and(eq(schema.erpPayouts.tenantId, id("a")), eq(schema.erpPayouts.id, payoutId)))).rejects.toThrow();
     expect((await as(broker("broker1"), () => payouts.getPayouts({}))).rows.map((row) => row.id)).toEqual([payoutId]);
+
+    // Reversal of a payout settlement keeps the payout link; the receipt stays as issued and the commission is payable again.
+    const [paid] = await db.select().from(schema.erpSettlements).where(and(eq(schema.erpSettlements.tenantId, id("a")), eq(schema.erpSettlements.payoutId, payoutId), eq(schema.erpSettlements.entryId, ids[0])));
+    const reversal = await as(context("director"), () => finance.prepareSettlementReversal({ settlementId: paid.id, requestId: crypto.randomUUID(), occurredOn: "2026-11-12", evidenceDocumentId: evidence, reason: "Pagamento devolvido pelo banco" }));
+    await as(context("reviewer"), () => finance.reviewSettlement({ id: reversal, decision: "confirm", reason: "Devolução conferida" }));
+    const [reversed] = await db.select().from(schema.erpSettlements).where(and(eq(schema.erpSettlements.tenantId, id("a")), eq(schema.erpSettlements.id, reversal)));
+    expect(reversed.payoutId).toBe(payoutId);
+    expect((await as(context("director"), () => payouts.getPayoutCandidates({}))).groups.flatMap((group) => group.items.map((item) => item.id))).toContain(ids[0]);
+    expect((await as(broker("broker1"), () => payouts.getReceipt(payoutId))).receipt.netCents).toBe(15025);
+  });
+
+  it("refuses approving money addressed to the approver", async () => {
+    const entryId = await as(context("director"), () => finance.prepareFinancialEntry({ requestId: crypto.randomUUID(), reference: crypto.randomUUID(), kind: "advance", saleId: null, branchId: null, beneficiaryId: id("reviewer"), amountCents: 5000, dueOn: "2026-11-12", competence: "2026-11", description: "Adiantamento ao revisor", evidenceDocumentId: null }));
+    await proof({ entryId, ownerId: id("reviewer") });
+    await expect(as(context("reviewer"), () => finance.reviewFinancialEntry({ id: entryId, expectedVersion: 1, decision: "approve", reason: "Aprovando o próprio valor" }))).rejects.toThrow("Quem recebe");
   });
 
   it("lists legacy divergences in the reconciliation queue", async () => {

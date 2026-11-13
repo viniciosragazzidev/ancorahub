@@ -4,7 +4,8 @@ import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { auditErp, canSeeAgencyBooks, erpScopeSql, getErpEffectiveAccess, requireErpAccess, type ErpDatabase } from "./access";
-import { assertIndependentReview, ErpError } from "./contracts";
+import { assertIndependentReview, assertNotBeneficiary, ErpError } from "./contracts";
+import { notInOpenPayoutSql, openBalanceSql } from "./balances";
 import { deterministicUuid } from "./commission-core";
 import { activePayoutFor, assertOpenPeriods, entryMovements, financialTransaction } from "./finance";
 import { assertOccurredByToday, assertPaymentCapacity, checkedCents, settledCents } from "./ledger";
@@ -49,25 +50,28 @@ async function payoutItems(db: ErpDatabase, tenantId: string, payoutId: string) 
     .where(and(eq(schema.erpPayoutItems.tenantId, tenantId), eq(schema.erpPayoutItems.payoutId, payoutId))).orderBy(asc(schema.erpFinancialEntries.reference));
 }
 
-/** Approved commissions with balance, grouped by beneficiary, that are not in another open payout. */
+/** Approved commissions with open balance, grouped by beneficiary, not in another open payout (balance computed in SQL). */
 export async function getPayoutCandidates(raw: unknown) {
   const input = z.object({ competence: period.optional() }).parse(raw);
   const auth = await requireErpAccess("finance", "erp_prepare_finance"); agencyOnly(auth); const db = getDatabase();
-  const entries = await db.select({ entry: schema.erpFinancialEntries, beneficiaryName: schema.user.name }).from(schema.erpFinancialEntries).leftJoin(schema.user, eq(schema.user.id, schema.erpFinancialEntries.beneficiaryId))
+  const balance = openBalanceSql(auth.context.tenantId);
+  const rows = await db.select({ id: schema.erpFinancialEntries.id, beneficiaryId: schema.erpFinancialEntries.beneficiaryId, reference: schema.erpFinancialEntries.reference, description: schema.erpFinancialEntries.description,
+    competence: schema.erpFinancialEntries.competence, dueOn: schema.erpFinancialEntries.dueOn, amountCents: schema.erpFinancialEntries.amountCents, beneficiaryName: schema.user.name, balanceCents: balance })
+    .from(schema.erpFinancialEntries).leftJoin(schema.user, eq(schema.user.id, schema.erpFinancialEntries.beneficiaryId))
     .where(and(eq(schema.erpFinancialEntries.tenantId, auth.context.tenantId), eq(schema.erpFinancialEntries.kind, "broker_commission"), eq(schema.erpFinancialEntries.status, "approved"), isNotNull(schema.erpFinancialEntries.beneficiaryId),
       erpScopeSql(auth.scope, schema.erpFinancialEntries.branchId, schema.erpFinancialEntries.ownerId), input.competence ? eq(schema.erpFinancialEntries.competence, input.competence) : undefined,
-      sql`NOT EXISTS (SELECT 1 FROM erp_payout_items i JOIN erp_payouts p ON p.tenant_id = i.tenant_id AND p.id = i.payout_id WHERE i.tenant_id = ${auth.context.tenantId} AND i.entry_id = ${schema.erpFinancialEntries.id} AND p.status IN ('prepared','approved','paying'))`))
-    .orderBy(asc(schema.user.name), asc(schema.erpFinancialEntries.dueOn)).limit(500);
+      notInOpenPayoutSql(auth.context.tenantId), sql`${balance} > 0`))
+    .orderBy(asc(schema.user.name), asc(schema.erpFinancialEntries.dueOn)).limit(CANDIDATE_LIMIT + 1);
   const groups = new Map<string, { beneficiaryId: string; name: string; items: { id: string; reference: string; description: string; competence: string; dueOn: string; amountCents: number; balanceCents: number }[] }>();
-  for (const { entry, beneficiaryName } of entries) {
-    const balance = await entryBalance(db, auth.context.tenantId, entry);
-    if (balance.balance <= 0 || !entry.beneficiaryId) continue;
-    const group = groups.get(entry.beneficiaryId) ?? { beneficiaryId: entry.beneficiaryId, name: beneficiaryName ?? "Sem nome", items: [] };
-    group.items.push({ id: entry.id, reference: entry.reference, description: entry.description, competence: entry.competence, dueOn: entry.dueOn, amountCents: entry.amountCents, balanceCents: balance.balance });
-    groups.set(entry.beneficiaryId, group);
+  for (const row of rows.slice(0, CANDIDATE_LIMIT)) {
+    if (!row.beneficiaryId) continue;
+    const group = groups.get(row.beneficiaryId) ?? { beneficiaryId: row.beneficiaryId, name: row.beneficiaryName ?? "Sem nome", items: [] };
+    group.items.push({ id: row.id, reference: row.reference, description: row.description, competence: row.competence, dueOn: row.dueOn, amountCents: row.amountCents, balanceCents: row.balanceCents });
+    groups.set(row.beneficiaryId, group);
   }
-  return { competence: input.competence ?? null, groups: [...groups.values()] };
+  return { competence: input.competence ?? null, groups: [...groups.values()], truncated: rows.length > CANDIDATE_LIMIT };
 }
+const CANDIDATE_LIMIT = 500;
 
 const prepareSchema = z.object({ requestId: uuid, beneficiaryId: z.string().trim().min(1).max(100), competence: period, entryIds: z.array(uuid).min(1).max(200).refine((ids) => new Set(ids).size === ids.length, "Itens repetidos.") }).strict();
 export async function preparePayout(raw: unknown) {
@@ -87,6 +91,7 @@ export async function preparePayout(raw: unknown) {
       const balance = await entryBalance(tx, auth.context.tenantId, entry);
       if (balance.reserved > 0) throw new ErpError(`A comissão ${entry.reference} possui liquidação ou compensação aguardando revisão.`);
       if (balance.balance <= 0) throw new ErpError(`A comissão ${entry.reference} não possui saldo a repassar.`);
+      await assertOpenPeriods(tx, auth.context.tenantId, [entry.competence]);
       gross += BigInt(entry.amountCents); net += BigInt(balance.balance); items.push({ entryId: entry.id, balanceCents: balance.balance });
     }
     const id = crypto.randomUUID();
@@ -116,7 +121,8 @@ export async function reviewPayout(raw: unknown) {
     if (input.decision === "approve") {
       if (payout.status !== "prepared") throw new ErpError("Somente um repasse aguardando aprovação pode ser aprovado.");
       assertIndependentReview(auth.context.userId, payout.preparedBy);
-      await assertOpenPeriods(tx, auth.context.tenantId, [payout.competence]);
+      assertNotBeneficiary(auth.context.userId, payout.beneficiaryId);
+      await assertOpenPeriods(tx, auth.context.tenantId, [payout.competence, ...await itemCompetences(tx, auth.context.tenantId, payout.id)]);
       await assertItemsUnchanged(tx, auth.context.tenantId, payout.id);
       await tx.update(schema.erpPayouts).set({ status: "approved", approvedBy: auth.context.userId, approvedAt: new Date(), reason: input.reason, version: payout.version + 1 }).where(and(eq(schema.erpPayouts.tenantId, auth.context.tenantId), eq(schema.erpPayouts.id, payout.id)));
     } else {
@@ -140,9 +146,11 @@ export async function registerPayoutPayment(raw: unknown) {
     if (payout.status === "paying" && payout.paidBy) return payout.id;
     if (payout.version !== input.expectedVersion) throw new ErpError("O repasse mudou. Atualize e confira novamente.");
     if (payout.status !== "approved") throw new ErpError("Registre o pagamento somente de um repasse aprovado.");
-    await assertOpenPeriods(tx, auth.context.tenantId, [payout.competence, input.occurredOn]);
+    if (payout.approvedBy === auth.context.userId) throw new ErpError("Quem aprovou o repasse não registra o pagamento. Peça a outra pessoa autorizada.");
+    assertNotBeneficiary(auth.context.userId, payout.beneficiaryId);
+    await assertOpenPeriods(tx, auth.context.tenantId, [payout.competence, input.occurredOn, ...await itemCompetences(tx, auth.context.tenantId, payout.id)]);
     const evidence = await scopedEvidence(tx, auth, input.evidenceDocumentId, { entryId: "payout" });
-    if (evidence.financialEntryId !== null || evidence.ownerId !== payout.beneficiaryId) throw new ErpError("Use o comprovante enviado para este repasse.");
+    if (evidence.financialEntryId !== null || evidence.payoutId !== payout.id) throw new ErpError("Use o comprovante enviado para este repasse.");
     await assertItemsUnchanged(tx, auth.context.tenantId, payout.id);
     for (const item of await payoutItems(tx, auth.context.tenantId, payout.id)) {
       const balance = await entryBalance(tx, auth.context.tenantId, item.entry);
@@ -157,8 +165,14 @@ export async function registerPayoutPayment(raw: unknown) {
 }
 
 async function nextReceiptNumber(db: ErpDatabase, tenantId: string, year: string) {
-  const [row] = await db.select({ value: sql<number>`count(*)::int` }).from(schema.erpPayouts).where(and(eq(schema.erpPayouts.tenantId, tenantId), isNotNull(schema.erpPayouts.receiptNumber), sql`${schema.erpPayouts.receiptNumber} LIKE ${`RP-${year}-%`}`));
+  // Runs under the tenant advisory lock; the unique index on (tenant_id, receipt_number) is the final guard.
+  const [row] = await db.select({ value: sql<number>`coalesce(max(substring(${schema.erpPayouts.receiptNumber} from 9)::int), 0)`.mapWith(Number) }).from(schema.erpPayouts)
+    .where(and(eq(schema.erpPayouts.tenantId, tenantId), sql`${schema.erpPayouts.receiptNumber} LIKE ${`RP-${year}-%`}`));
   return `RP-${year}-${String((row?.value ?? 0) + 1).padStart(6, "0")}`;
+}
+
+async function itemCompetences(db: ErpDatabase, tenantId: string, payoutId: string) {
+  return [...new Set((await payoutItems(db, tenantId, payoutId)).map((item) => item.entry.competence))];
 }
 
 const confirmSchema = z.object({ id: uuid, expectedVersion: z.number().int().positive(), decision: z.enum(["confirm", "reject"]), reason: z.string().trim().min(5).max(300) }).strict();
@@ -171,7 +185,8 @@ export async function confirmPayoutPayment(raw: unknown) {
     if (payout.version !== input.expectedVersion) throw new ErpError("O repasse mudou. Atualize e confira novamente.");
     if (payout.status !== "paying" || !payout.paidBy || !payout.occurredOn || !payout.evidenceDocumentId) throw new ErpError("Não há pagamento registrado para conferir.");
     assertIndependentReview(auth.context.userId, payout.paidBy);
-    await assertOpenPeriods(tx, auth.context.tenantId, [payout.competence, payout.occurredOn]);
+    if (input.decision === "confirm") assertNotBeneficiary(auth.context.userId, payout.beneficiaryId);
+    await assertOpenPeriods(tx, auth.context.tenantId, [payout.competence, payout.occurredOn, ...await itemCompetences(tx, auth.context.tenantId, payout.id)]);
     const movements = await tx.select().from(schema.erpSettlements).where(and(eq(schema.erpSettlements.tenantId, auth.context.tenantId), eq(schema.erpSettlements.payoutId, payout.id), eq(schema.erpSettlements.status, "pending"))).for("update");
     if (input.decision === "reject") {
       if (movements.length) await tx.update(schema.erpSettlements).set({ status: "rejected", reviewedBy: auth.context.userId, reviewedAt: new Date() }).where(and(eq(schema.erpSettlements.tenantId, auth.context.tenantId), inArray(schema.erpSettlements.id, movements.map((row) => row.id))));
@@ -229,7 +244,7 @@ export async function getPayout(id: string) {
   const items = await payoutItems(db, auth.context.tenantId, payout.id);
   const [beneficiary] = await db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, payout.beneficiaryId)).limit(1);
   const documents = agency && ["approved", "paying"].includes(payout.status) ? await db.select({ id: schema.erpDocuments.id, fileName: schema.erpDocuments.fileName }).from(schema.erpDocuments)
-    .where(and(eq(schema.erpDocuments.tenantId, auth.context.tenantId), eq(schema.erpDocuments.moduleKey, "finance"), eq(schema.erpDocuments.state, "ready"), eq(schema.erpDocuments.ownerId, payout.beneficiaryId), sql`${schema.erpDocuments.financialEntryId} IS NULL`)).orderBy(desc(schema.erpDocuments.createdAt)).limit(20) : [];
+    .where(and(eq(schema.erpDocuments.tenantId, auth.context.tenantId), eq(schema.erpDocuments.moduleKey, "finance"), eq(schema.erpDocuments.state, "ready"), eq(schema.erpDocuments.payoutId, payout.id))).orderBy(desc(schema.erpDocuments.createdAt)).limit(20) : [];
   await auditErp(db, { tenantId: auth.context.tenantId, actorId: auth.context.viewAs?.adminUserId ?? auth.context.userId, action: "erp.payout.detail_viewed", entityType: "erp_payout", entityId: payout.id });
   const editable = agency && !auth.context.viewAs;
   return { id: payout.id, status: payout.status, version: payout.version, competence: payout.competence, beneficiaryName: beneficiary?.name ?? "Sem nome", grossCents: payout.grossCents, netCents: payout.netCents,

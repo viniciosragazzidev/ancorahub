@@ -21,9 +21,6 @@ export async function POST(req: Request) {
     // Operators, plans, prices, carências: only the imported material answers, never the free model.
     const operatorAnswer = await answerIfOperatorQuestion({ tenantId: context.tenantId, userId: context.userId, question: lastUserText(messages) }).catch(() => null);
     if (operatorAnswer) return new Response(operatorAnswer, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
-    // Indicadores do ERP: resposta determinística do catálogo de métricas, no escopo da sessão; o modelo não vê os dados.
-    const metricAnswer = await answerIfErpMetricQuestion(lastUserText(messages)).catch(() => null);
-    if (metricAnswer) return new Response(metricAnswer, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
     const settings = await getAiEngineSettings();
 
     if (!settings.enabled) {
@@ -32,6 +29,10 @@ export async function POST(req: Request) {
         { status: 403 }
       );
     }
+
+    // Indicadores do ERP: resposta determinística do catálogo de métricas, no escopo da sessão; o modelo não vê os dados.
+    const metricAnswer = await answerIfErpMetricQuestion(lastUserText(messages)).catch(() => null);
+    if (metricAnswer) return new Response(metricAnswer, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
 
     const keys = {
       groqKey: settings.groqApiKey,

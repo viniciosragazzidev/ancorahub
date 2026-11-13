@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 
 import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
@@ -57,27 +58,56 @@ export async function requireErpAdmin(db: ErpDatabase = getDatabase()) {
   return context;
 }
 
-export async function requireErpAccess(module: ErpModuleKey, capability: PermissionKey, db: ErpDatabase = getDatabase()) {
+/**
+ * Everything ERP authorization needs about the viewer, loaded once. Outside a transaction it is memoized for the
+ * request (navigation, layout and page share it); inside a transaction it is always reloaded with that connection.
+ */
+async function loadErpBase(db: ErpDatabase) {
   const context = await freshErpContext(db);
-  const platform = await getErpPlatformState(db);
+  const [platform, settings, access, trusted, supervisedIds] = await Promise.all([
+    getErpPlatformState(db),
+    db.select().from(schema.erpModuleSettings).where(eq(schema.erpModuleSettings.tenantId, context.tenantId)),
+    getErpEffectiveAccess(context, db),
+    resolveAccessContext(context, db),
+    context.role === "supervisor" ? getSupervisedBrokerIds(context.tenantId, context.userId, db) : Promise.resolve([] as string[]),
+  ]);
+  return { context, platform, settings, access, cargo: trusted.scope, supervisedIds };
+}
+const requestErpBase = cache(() => loadErpBase(getDatabase()));
+export type ErpBase = Awaited<ReturnType<typeof loadErpBase>>;
+
+/** Pure decision on a loaded base: module, audience, dependencies, capability, support view and data scope. */
+export function decideErpAccess(base: ErpBase, module: ErpModuleKey, capability: PermissionKey) {
+  const { context, platform, settings, access } = base;
   if (!platform.enabled || !platform.modules.includes(module)) throw new ErpError("Este módulo está desativado. Solicite a ativação ao administrador.");
-  const settings = await db.select().from(schema.erpModuleSettings).where(eq(schema.erpModuleSettings.tenantId, context.tenantId));
   const setting = settings.find((row) => row.moduleKey === module);
   const roles = roleListSchema.safeParse(setting?.roles);
   const audience = context.jobTitle || context.role;
   if (!setting?.enabled || !roles.success || !roles.data.some((role) => role === audience)) throw new ErpError("Este módulo não está liberado para seu perfil nesta empresa.");
   const dependencies = ERP_MODULES.find((definition) => definition.key === module)?.dependencies ?? [];
   if (dependencies.some((dependency) => !platform.modules.includes(dependency) || !settings.some((row) => row.moduleKey === dependency && row.enabled && row.roles.includes(audience)))) throw new ErpError("Uma capacidade necessária está desativada para seu perfil.");
-  const access = await getErpEffectiveAccess(context, db);
   if (!access.capabilities.has(capability)) throw new ErpError("Seu cargo não permite esta operação.");
-  if (context.viewAs && !["erp_view_finance", "erp_view_operations", "erp_view_analytics"].includes(capability)) throw new ErpError("A visualização de suporte é somente leitura.");
-  const trusted = await resolveAccessContext(context, db);
-  const supervisedIds = context.role === "supervisor" ? await getSupervisedBrokerIds(context.tenantId, context.userId, db) : [];
-  const scope = resolveErpScope({ context, financial: module === "finance" || (context.jobTitle === "finance" && ["analytics", "imports", "tv"].includes(module)), supervisedIds, cargo: trusted.scope });
+  if (context.viewAs && !ERP_READ_CAPABILITIES.has(capability)) throw new ErpError("A visualização de suporte é somente leitura.");
+  const scope = resolveErpScope({ context, financial: module === "finance" || (context.jobTitle === "finance" && ["analytics", "imports", "tv"].includes(module)), supervisedIds: base.supervisedIds, cargo: base.cargo });
   if (scope.mode === "none") throw new ErpError("Seu perfil não possui um escopo de dados para esta operação.");
   if (module === "finance" && capability !== "erp_view_finance" && (!canSeeAgencyBooks(context) || scope.mode === "owners")) throw new ErpError("A operação financeira exige um cargo delegado para a unidade ou empresa.");
-  return { context, scope, setting };
+  return { context, scope, setting, access };
 }
+
+export async function requireErpAccess(module: ErpModuleKey, capability: PermissionKey, db?: ErpDatabase) {
+  return decideErpAccess(db ? await loadErpBase(db) : await requestErpBase(), module, capability);
+}
+
+/** Read-only capabilities a support view-as session may use. */
+export const ERP_READ_CAPABILITIES: ReadonlySet<PermissionKey> = new Set<PermissionKey>(["erp_view_finance", "erp_view_operations", "erp_view_analytics"]);
+
+/** Agency books (receivables, expenses, cash, reconciliation) need a delegated finance profile on unit or tenant scope. */
+export function hasAgencyScope(auth: { context: TenantContext; scope: ErpScope }) {
+  return canSeeAgencyBooks(auth.context) && auth.scope.mode !== "owners";
+}
+
+/** Audit actor: during support view-as, the administrator is recorded, never the impersonated person. */
+export function auditActor(context: TenantContext) { return context.viewAs?.adminUserId ?? context.userId; }
 
 /** Every caller ALSO filters the actual table's tenantId. */
 export function erpScopeSql(scope: ErpScope, branch: AnyPgColumn, owner: AnyPgColumn): SQL {
@@ -92,5 +122,6 @@ export async function auditErp(db: ErpDatabase, input: { tenantId: string; actor
 }
 
 export function canSeeAgencyBooks(context: Awaited<ReturnType<typeof getRequiredTenantContext>>) {
-  return context.role === "director" || context.role === "manager" || (context.jobTitle === "finance" && !!context.customRoleId && ["branch", "tenant"].includes(context.customRoleScope ?? ""));
+  // DEC-185: the Gestor role alone does not open the agency books; it needs the finance function with a delegated cargo.
+  return context.role === "director" || (context.jobTitle === "finance" && !!context.customRoleId && ["branch", "tenant"].includes(context.customRoleScope ?? ""));
 }

@@ -176,7 +176,7 @@ export async function reviewErpImport(raw: unknown) {
       if (batch.status !== "preview") throw new ErpError("Revalide o lote antes de aplicar.");
       if (domain === "finance") {
         const valid = await validateFinanceRows(tx, auth, batch.payload);
-        for (const row of [...valid.payload.rows].sort((left, right) => left.reference.localeCompare(right.reference))) await prepareFinancialEntryInTransaction(tx, auth, row);
+        for (const row of [...valid.payload.rows].sort((left, right) => left.reference.localeCompare(right.reference))) await prepareFinancialEntryInTransaction(tx, auth, row, null, batch.createdBy);
       } else {
         const valid = await validateRows(tx, auth, batch.payload, false, true);
         for (const row of [...valid.payload.rows].sort((left, right) => left.leadId.localeCompare(right.leadId))) await saveImplantationInTransaction(tx, auth, row, true);

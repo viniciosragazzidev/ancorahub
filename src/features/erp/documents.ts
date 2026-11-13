@@ -43,7 +43,7 @@ export async function uploadErpEvidence(rawTarget: unknown, file: File) {
     await requireErpAccess(moduleKey, capability, tx);
     await tx.insert(schema.erpDocuments).values({ id, tenantId: auth.context.tenantId, moduleKey,
       ownerId: lead?.brokerId ?? entry?.ownerId ?? payout?.beneficiaryId ?? auth.context.userId, branchId: lead?.branchId ?? entry?.branchId ?? payout?.branchId ?? null,
-      leadId: lead?.id ?? null, financialEntryId: entry?.id ?? null, saleId: entry?.saleId ?? null,
+      leadId: lead?.id ?? null, financialEntryId: entry?.id ?? null, saleId: entry?.saleId ?? null, payoutId: payout?.id ?? null,
       objectKey, fileName: file.name.replace(/[\r\n\\/]/g, "_").slice(0, 180) || `evidencia.${media.extension}`,
       contentType: media.mime, byteLength: bytes.byteLength, sha256: createHash("sha256").update(bytes).digest("hex"), createdBy: auth.context.userId });
     await auditErp(tx, { tenantId: auth.context.tenantId, actorId: auth.context.userId, action: "erp.document.upload_started", entityType: "erp_document", entityId: id, metadata: { module: target.module, byteLength: bytes.byteLength, payoutId: payout?.id ?? null } });

@@ -108,5 +108,9 @@ export const settlementInputSchema = z.object({
 export function assertIndependentReview(actorId: string, preparedBy: string) {
   if (actorId === preparedBy) throw new ErpError("A aprovação precisa ser feita por outra pessoa autorizada.");
 }
+/** Nobody approves, pays or confirms money addressed to themselves. */
+export function assertNotBeneficiary(actorId: string, beneficiaryId: string | null | undefined) {
+  if (beneficiaryId && actorId === beneficiaryId) throw new ErpError("Quem recebe o valor não pode aprová-lo, pagá-lo ou conferi-lo. Peça a outra pessoa autorizada.");
+}
 
 export type ErpActionResult = { ok: true; message: string; id?: string } | { ok: false; message: string };

@@ -19,7 +19,8 @@ export async function scopedLead(db: ErpDatabase, auth: ErpAccess, id: string, l
 export async function scopedFinancialEntry(db: ErpDatabase, auth: ErpAccess, id: string, lock = false) {
   const query = db.select().from(schema.erpFinancialEntries).where(and(eq(schema.erpFinancialEntries.id, id), eq(schema.erpFinancialEntries.tenantId, auth.context.tenantId),
     erpScopeSql(auth.scope, schema.erpFinancialEntries.branchId, schema.erpFinancialEntries.ownerId),
-    canSeeAgencyBooks(auth.context) && auth.scope.mode !== "owners" ? undefined : inArray(schema.erpFinancialEntries.kind, ["broker_commission", "advance"]))).limit(1);
+    canSeeAgencyBooks(auth.context) && auth.scope.mode !== "owners" ? undefined : inArray(schema.erpFinancialEntries.kind, ["broker_commission", "advance"]),
+    !canSeeAgencyBooks(auth.context) && auth.scope.mode !== "owners" ? eq(schema.erpFinancialEntries.status, "approved") : undefined)).limit(1);
   const [entry] = lock ? await query.for("update") : await query;
   if (!entry) throw new ErpError("Lançamento não encontrado no seu escopo.");
   return entry;
