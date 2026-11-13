@@ -86,16 +86,17 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
       .then(async (flag) => flag === "true"
         ? { enabled: true, data: await getCachedBrokerJourneyData(context.tenantId, context.userId).catch(() => null) }
         : { enabled: false, data: null });
-    const [data, dutyCalendarFlag, journeyResult] = await Promise.all([
+    const [data, dutyCalendarFlag, journeyResult, homeV2Flag] = await Promise.all([
       getCachedBrokerWorkspaceData(),
       getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR).catch(() => "false"),
       journeyPromise,
+      getFeatureFlag(FEATURE_FLAGS.BROKER_NAV_REORG).catch(() => FEATURE_FLAGS.BROKER_NAV_REORG.defaultValue),
     ]);
     const dutyCalendar = dutyCalendarFlag === "true";
     const now = new Date();
     const journeyEnabled = journeyResult.enabled;
     const journey = journeyResult.data;
-    const capabilities = { quoteSimulator: true, dutyCalendar, journey: journeyEnabled };
+    const capabilities = { quoteSimulator: true, dutyCalendar, journey: journeyEnabled, homeV2: homeV2Flag === "true" };
     return {
       viewerName: data.viewer.name,
       assistants: buildAssistantThreads({ data, capabilities, journey, now }),

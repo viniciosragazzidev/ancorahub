@@ -49,6 +49,17 @@ Dica de voz: tom de colega, animado e calmo, 150 a 165 palavras por minuto; cada
 
 > Este é o assistente de Leads. Ele avisa quando chega um lead novo, quando o prazo do primeiro contato está apertando e quando um cliente respondeu. Para aceitar, recusar ou chamar no WhatsApp, é só tocar na resposta.
 
+## 03b-carteira.mp3 · Minha carteira: seus clientes
+
+- Tipo: spotlight · destaque: `thread-carteira` · 10 XP · só com o Início reorganizado (`feature_broker_navigation_reorg_enabled`)
+- Texto na tela: Clientes conquistados e contatos que você acompanha, com o histórico e os contratos de cada um.
+- Duração estimada: 10s (28 palavras)
+- Áudio pendente: enquanto o arquivo não existir, o passo segue sem narração.
+
+**Narração:**
+
+> Em Minha carteira ficam os seus clientes e os contatos que você acompanha. Abra uma pessoa para ver o histórico, os contratos e o que falta fazer.
+
 ## 04-plantao.mp3 · Plantão: seu plantão
 
 - Tipo: spotlight · destaque: `thread-plantao` · 10 XP

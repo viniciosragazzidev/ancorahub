@@ -134,6 +134,18 @@ export const TOUR_STEPS: TourStep[] = [
     mascot: { shape: "mochi", hue: 212 },
   },
   {
+    // Início reorganizado (BROKER_NAV_REORG): só entra no tour quando a linha existe no Início.
+    id: "03b-carteira",
+    kind: "spotlight",
+    target: "thread-carteira",
+    title: "Minha carteira: seus clientes",
+    body: "Clientes conquistados e contatos que você acompanha, com o histórico e os contratos de cada um.",
+    narration:
+      "Em Minha carteira ficam os seus clientes e os contatos que você acompanha. Abra uma pessoa para ver o histórico, os contratos e o que falta fazer.",
+    xp: 10,
+    mascot: { shape: "salte", hue: 190 },
+  },
+  {
     id: "04-plantao",
     kind: "spotlight",
     target: "thread-plantao",

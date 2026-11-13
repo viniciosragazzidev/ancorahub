@@ -46,6 +46,7 @@ export function LightChrome({
   showRelationship = false,
   showNegotiations = false,
   journeyEnabled = false,
+  homeV2Enabled = false,
   welcomeVideoEnabled = false,
   brokerHomeRedesign = false,
   showHomeLearning = true,
@@ -66,6 +67,7 @@ export function LightChrome({
   showRelationship?: boolean;
   showNegotiations?: boolean;
   journeyEnabled?: boolean;
+  homeV2Enabled?: boolean;
   welcomeVideoEnabled?: boolean;
   brokerHomeRedesign?: boolean;
   showHomeLearning?: boolean;
@@ -98,6 +100,7 @@ export function LightChrome({
       showRelationship={showRelationship}
       showNegotiations={showNegotiations}
       journeyEnabled={journeyEnabled}
+      homeV2Enabled={homeV2Enabled}
       viewAs={viewAs}
       teamRankingEnabled={teamRankingEnabled}
       teamManagementEnabled={teamManagementEnabled}

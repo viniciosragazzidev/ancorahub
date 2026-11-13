@@ -57,6 +57,7 @@ export function AppShell({
   showDutyCalendar = false,
   showRelationship = false,
   journeyEnabled = false,
+  homeV2Enabled = false,
   welcomeVideoEnabled = false,
   brokerHomeRedesign = false,
   showHomeLearning = true,
@@ -85,6 +86,8 @@ export function AppShell({
   showDutyCalendar?: boolean;
   showRelationship?: boolean;
   journeyEnabled?: boolean;
+  /** Início do corretor reorganizado (BROKER_NAV_REORG): menu Mais novo e sem a faixa fixa do WhatsApp. */
+  homeV2Enabled?: boolean;
   /** Welcome video on the broker's first access (Super-admin flag). */
   welcomeVideoEnabled?: boolean;
   brokerHomeRedesign?: boolean;
@@ -224,6 +227,7 @@ export function AppShell({
           showDutyCalendar={showDutyCalendar}
           showRelationship={showRelationship}
           journeyEnabled={journeyEnabled}
+          homeV2Enabled={homeV2Enabled}
           welcomeVideoEnabled={welcomeVideoEnabled}
           brokerHomeRedesign={brokerHomeRedesign}
           showHomeLearning={showHomeLearning}

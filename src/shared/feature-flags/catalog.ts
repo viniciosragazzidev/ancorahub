@@ -217,6 +217,11 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Mostra o vídeo de boas-vindas (1 min) no primeiro acesso do corretor ao app Lite.",
   },
+  BROKER_NAV_REORG: {
+    key: "feature_broker_navigation_reorg_enabled", scope: "global", defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Início do corretor reorganizado (plano do modo corretor, etapa 1): sem Dicas de Atendimento e Jornada no Início, Minha carteira entre os acessos, Jornada dentro de Desempenho e sem a faixa fixa do WhatsApp. Desligada, volta ao Início anterior.",
+  },
   BROKER_JOURNEY: {
     key: "feature_broker_journey_enabled", scope: "global", defaultValue: "false",
     allowedValues: ["true", "false"] as const,

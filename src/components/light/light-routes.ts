@@ -149,8 +149,23 @@ export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/settings", label: "Configurações" },
 ];
 
-export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean; journey?: boolean; teamRanking?: boolean; teamManagement?: boolean; negotiations?: boolean }, audience: "broker" | "supervisor" | "manager" = "broker") {
-  const list = audience === "manager" ? LIGHT_MANAGER_DESTINATIONS : audience === "supervisor" ? LIGHT_SUPERVISOR_DESTINATIONS : LIGHT_MORE_DESTINATIONS;
+/**
+ * "Mais" do corretor com o Início reorganizado (BROKER_NAV_REORG): Minha carteira em destaque, Agenda e Desempenho
+ * com caminho próprio e a Jornada dentro do Desempenho (sai daqui).
+ */
+export const LIGHT_MORE_DESTINATIONS_V2: readonly LightMoreDestination[] = [
+  { href: "/clientes", label: "Minha carteira" },
+  { href: "/plantoes", label: "Plantões", requires: "dutyCalendar" },
+  { href: "/agenda", label: "Agenda" },
+  { href: "/desempenho", label: "Desempenho" },
+  { href: "/cotacao", label: "Cotação", requires: "quoteSimulator" },
+  { href: "/relacionamento", label: "Mural da gestão", requires: "relationshipCenter" },
+  { href: "/notificacoes", label: "Notificações" },
+  { href: "/settings", label: "Configurações" },
+];
+
+export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean; journey?: boolean; teamRanking?: boolean; teamManagement?: boolean; negotiations?: boolean; homeV2?: boolean }, audience: "broker" | "supervisor" | "manager" = "broker") {
+  const list = audience === "manager" ? LIGHT_MANAGER_DESTINATIONS : audience === "supervisor" ? LIGHT_SUPERVISOR_DESTINATIONS : capabilities.homeV2 ? LIGHT_MORE_DESTINATIONS_V2 : LIGHT_MORE_DESTINATIONS;
   return list.filter((item) => !item.requires || capabilities[item.requires]);
 }
 
@@ -194,7 +209,8 @@ const SETTINGS_SECTIONS: Record<string, { title: string; hidesTabBar?: boolean }
 // Order matters: first match wins, most specific first.
 const RULES: readonly RouteRule[] = [
   { test: exact("/negociacoes"), route: { title: "Negociações", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
-  { test: exact("/jornada"), route: { title: "Minha jornada", tab: "mais", isRoot: false, parentHref: "/dashboard", hidesTabBar: true } },
+  // Aberta pelo Desempenho (Início reorganizado), a seta volta para lá.
+  { test: exact("/jornada"), route: (_path, search) => ({ title: "Minha jornada", tab: "mais", isRoot: false, parentHref: search?.get("de") === "desempenho" ? "/desempenho" : "/dashboard", hidesTabBar: true }) },
   { test: exact("/agenda"), route: { title: "Agenda", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/desempenho"), route: { title: "Desempenho", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/dashboard"), route: { title: "Início", tab: "inicio", isRoot: true, parentHref: null, chat: true, hidesTabBar: true } },

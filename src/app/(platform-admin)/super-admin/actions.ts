@@ -1241,6 +1241,7 @@ const BROKER_NEWS_FLAGS = [
   { field: "teamManagementEnabled", flag: FEATURE_FLAGS.TEAM_MANAGEMENT },
   { field: "brokerPerformanceLiteEnabled", flag: FEATURE_FLAGS.BROKER_PERFORMANCE_LITE },
   { field: "brokerJourneyEnabled", flag: FEATURE_FLAGS.BROKER_JOURNEY },
+  { field: "brokerNavReorgEnabled", flag: FEATURE_FLAGS.BROKER_NAV_REORG },
   { field: "teamRankingEnabled", flag: FEATURE_FLAGS.TEAM_RANKING },
   { field: "engagementCampaignsEnabled", flag: FEATURE_FLAGS.ENGAGEMENT_CAMPAIGNS },
   { field: "welcomeVideoEnabled", flag: FEATURE_FLAGS.WELCOME_VIDEO },

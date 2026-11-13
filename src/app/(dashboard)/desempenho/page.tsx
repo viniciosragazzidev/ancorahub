@@ -8,6 +8,20 @@ import { getBrokerPerformance, isBrokerPerformanceLiteEnabled } from "@/features
 import { getBrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { getCachedBrokerJourneyData } from "@/features/broker-workspace/chat/chat-rail-data";
+import { JourneyEntryCard } from "@/features/journey/components/journey-entry-card";
+import { getFeatureFlag } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+
+/** Início reorganizado: a Jornada sai do Início e passa a abrir por aqui (precisa das duas chaves ligadas). */
+async function journeyEntry(tenantId: string, userId: string) {
+  const [homeV2, journey] = await Promise.all([
+    getFeatureFlag(FEATURE_FLAGS.BROKER_NAV_REORG).catch(() => FEATURE_FLAGS.BROKER_NAV_REORG.defaultValue),
+    getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false"),
+  ]);
+  if (homeV2 !== "true" || journey !== "true") return null;
+  return <JourneyEntryCard journey={await getCachedBrokerJourneyData(tenantId, userId).catch(() => null)} />;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -18,15 +32,16 @@ export default async function BrokerPerformancePage({ searchParams }: { searchPa
   // Flag do Super-admin: desligada, o corretor continua com o resumo do dia abaixo.
   if (await isBrokerPerformanceLiteEnabled()) {
     const period = parseBrokerPerformancePeriod((await searchParams).periodo);
-    const data = await getBrokerPerformance(context, { period, now: new Date() });
+    const [data, journey] = await Promise.all([getBrokerPerformance(context, { period, now: new Date() }), journeyEntry(context.tenantId, context.userId)]);
     return (
-      <main className="arc-venancor lite-page flex min-h-full flex-col bg-(--surface) text-(--foreground)">
+      <main className="arc-venancor lite-page flex min-h-full flex-col gap-6 bg-(--surface) text-(--foreground)">
         <BrokerPerformanceLite view={buildBrokerPerformanceView(data)} />
+        {journey}
       </main>
     );
   }
 
-  const data = await getBrokerWorkspaceData();
+  const [data, journey] = await Promise.all([getBrokerWorkspaceData(), journeyEntry(context.tenantId, context.userId)]);
   const { receivedToday, acceptedToday, inServiceNow, slaAtRiskNow } = data.today;
   const summary = slaAtRiskNow > 0
     ? `${slaAtRiskNow} ${slaAtRiskNow === 1 ? "lead está" : "leads estão"} com o primeiro contato atrasando.`
@@ -71,6 +86,8 @@ export default async function BrokerPerformancePage({ searchParams }: { searchPa
           </div>
         </section>
       ) : null}
+
+      {journey}
 
       <nav aria-label="Atalhos do desempenho" className="flex flex-wrap gap-3">
         <Link href="/minha-fila" className="inline-flex min-h-11 items-center text-sm font-medium text-(--accent-strong)">Ver meus leads</Link>

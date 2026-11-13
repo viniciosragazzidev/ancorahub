@@ -14,6 +14,21 @@ function journey(): BrokerJourneyData {
 }
 const dailySummary: JourneyCelebration = { id: "summary-1", userId: "broker-1", kind: "daily_summary", payload: { kind: "daily_summary", date: "2026-10-08", received: 6, onTimeContacts: 5, points: 85 }, priority: 10, createdAt: "2026-10-08T22:00:00Z", seenAt: "2026-10-08T22:10:00Z" };
 
+describe("Início reorganizado (BROKER_NAV_REORG)", () => {
+  it("keeps Jack on top and the plan's order, without Dicas de Atendimento and Jornada, with Minha carteira", () => {
+    const threads = buildAssistantThreads({ data: workspace({ queue: [lead()] }), now, journey: journey(), capabilities: { quoteSimulator: true, dutyCalendar: true, journey: true, homeV2: true } });
+    expect(threads.map((t) => t.assistant)).toEqual(["ancora", "leads", "carteira", "plantao", "agenda", "desempenho", "cotacao"]);
+    expect(threads.find((t) => t.assistant === "carteira")).toMatchObject({ name: "Minha carteira", href: "/clientes", waitingYou: false });
+  });
+  it("leaves out Cotação when the simulator is off and keeps the old Início when the flag is off", () => {
+    const base = { data: workspace(), now, journey: journey() };
+    expect(buildAssistantThreads({ ...base, capabilities: { quoteSimulator: false, dutyCalendar: false, homeV2: true } }).map((t) => t.assistant)).toEqual(["ancora", "leads", "carteira", "plantao", "agenda", "desempenho"]);
+    const old = buildAssistantThreads({ ...base, capabilities: { quoteSimulator: false, dutyCalendar: false, journey: true } }).map((t) => t.assistant);
+    expect(old).toEqual(expect.arrayContaining(["insights", "jornada"]));
+    expect(old).not.toContain("carteira");
+  });
+});
+
 describe("Jornada assistant", () => {
   it("only appears with the journey capability and uses its own identity", () => {
     const input = { data: workspace(), now, journey: journey(), capabilities: { quoteSimulator: false, dutyCalendar: false } };

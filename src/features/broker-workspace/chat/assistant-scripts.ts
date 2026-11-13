@@ -26,6 +26,8 @@ type AssistantDefinition = {
 export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
   ancora: { name: "Jack", shape: "jack", hue: 175, verified: true, href: "/dashboard/c/ancora" },
   leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/minha-fila" },
+  // Início reorganizado (BROKER_NAV_REORG): a carteira abre a página, não uma conversa.
+  carteira: { name: "Minha carteira", shape: "salte", hue: 190, href: "/clientes" },
   plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/plantoes/agora" },
   agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/agenda" },
   cotacao: { name: "Cotação", shape: "favo", hue: 268, href: "/cotacao" },
@@ -42,7 +44,7 @@ export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
 export const SUPERVISOR_ASSISTANTS = ["equipe", "equipe-leads", "equipe-plantao", "equipe-desempenho"] as const;
 
 type LeadQueueItem = BrokerWorkspaceData["queue"][number];
-type ScriptAssistantId = Exclude<AssistantId, "ancora" | "cotacao" | "insights" | "equipe" | "equipe-leads" | "equipe-plantao" | "equipe-desempenho">;
+type ScriptAssistantId = Exclude<AssistantId, "ancora" | "carteira" | "cotacao" | "insights" | "equipe" | "equipe-leads" | "equipe-plantao" | "equipe-desempenho">;
 
 function iso(date: Date | null | undefined) {
   return date && Number.isFinite(date.getTime()) ? date.toISOString() : null;
@@ -206,6 +208,36 @@ function threadSort(left: ThreadSummary, right: ThreadSummary) {
 
 export function buildAssistantThreads(input: {
   data: BrokerWorkspaceData;
+  capabilities: { quoteSimulator: boolean; dutyCalendar: boolean; journey?: boolean; homeV2?: boolean };
+  journey?: BrokerJourneyData | null;
+  now: Date;
+}): ThreadSummary[] {
+  const threads = buildAllAssistantThreads(input);
+  if (!input.capabilities.homeV2) return threads.sort(threadSort);
+  return arrangeHomeV2(threads);
+}
+
+/**
+ * Início reorganizado (plano do modo corretor, etapa 1): o Jack fixo no topo e os acessos numa ordem estável
+ * (Meus leads, Minha carteira, Plantão, Agenda, Desempenho, Cotação). Dicas de Atendimento e Jornada saem do Início:
+ * a Jornada abre pelo Desempenho. O que pede atenção continua marcado em cada linha e no flutuante Agora.
+ */
+const HOME_V2_ORDER: readonly AssistantId[] = ["ancora", "leads", "carteira", "plantao", "agenda", "desempenho", "cotacao"];
+
+function arrangeHomeV2(threads: ThreadSummary[]): ThreadSummary[] {
+  const carteira = assistantThread("carteira", {
+    preview: "Seus clientes e contatos.",
+    at: null,
+    unread: false,
+    waitingYou: false,
+  });
+  const byId = new Map<AssistantId, ThreadSummary>();
+  for (const thread of [...threads, carteira]) if (thread.assistant) byId.set(thread.assistant, thread);
+  return HOME_V2_ORDER.flatMap((id) => byId.get(id) ?? []);
+}
+
+function buildAllAssistantThreads(input: {
+  data: BrokerWorkspaceData;
   capabilities: { quoteSimulator: boolean; dutyCalendar: boolean; journey?: boolean };
   journey?: BrokerJourneyData | null;
   now: Date;
@@ -297,7 +329,7 @@ export function buildAssistantThreads(input: {
       unread: Boolean(journey?.celebrations.length), waitingYou: false,
     }));
   }
-  return threads.sort(threadSort);
+  return threads;
 }
 
 export function buildLeadThreads(input: { queue: BrokerWorkspaceData["queue"]; now: Date }): ThreadSummary[] {

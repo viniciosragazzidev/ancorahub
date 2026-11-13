@@ -17,6 +17,13 @@ describe("Light routes", () => {
     expect(resolveLightRoute("/jornada")).toMatchObject({ title: "Minha jornada", parentHref: "/dashboard" });
     expect(resolveLightRoute("/settings", new URLSearchParams("tab=placar"))).toMatchObject({ title: "Placar", parentHref: "/settings" });
   });
+  it("moves the journey into Desempenho and promotes Minha carteira with the reorganized Início", () => {
+    const v2 = getLightMoreDestinations({ journey: true, dutyCalendar: true, quoteSimulator: true, homeV2: true });
+    expect(v2.map((item) => item.label)).toEqual(["Minha carteira", "Plantões", "Agenda", "Desempenho", "Cotação", "Notificações", "Configurações"]);
+    expect(v2.some((item) => item.href === "/jornada")).toBe(false);
+    expect(getLightMoreDestinations({ homeV2: true }, "supervisor").some((item) => item.label === "Minha carteira")).toBe(false);
+    expect(resolveLightRoute("/jornada", new URLSearchParams("de=desempenho"))).toMatchObject({ title: "Minha jornada", parentHref: "/desempenho" });
+  });
   it("keeps the allowed route list used by the dashboard layout", () => {
     for (const path of ["/dashboard", "/minha-fila", "/agenda", "/desempenho", "/leads/abc", "/conversas/broker", "/clientes/1", "/l/token", "/settings", "/notificacoes"]) {
       expect(isLightRouteAllowed(path)).toBe(true);

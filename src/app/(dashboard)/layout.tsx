@@ -65,6 +65,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const brokerJourneyFlagPromise = context.role === "broker"
     ? getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false")
     : Promise.resolve("false");
+  const brokerNavReorgFlagPromise = context.role === "broker"
+    ? getFeatureFlag(FEATURE_FLAGS.BROKER_NAV_REORG).catch(() => FEATURE_FLAGS.BROKER_NAV_REORG.defaultValue)
+    : Promise.resolve("false");
   const relationshipFlagPromise = context.role === "broker" || context.role === "supervisor"
     ? getFeatureFlag(FEATURE_FLAGS.RELATIONSHIP_CENTER).catch(() => "false")
     : Promise.resolve("false");
@@ -174,6 +177,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     cleanUiEnabled,
     brokerDutyCalendarFlag,
     brokerJourneyFlag,
+    brokerNavReorgFlag,
     relationshipFlag,
     teamRankingFlag,
     supervisorLiteAvailable,
@@ -192,6 +196,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     cleanUiPromise,
     brokerDutyCalendarFlagPromise,
     brokerJourneyFlagPromise,
+    brokerNavReorgFlagPromise,
     relationshipFlagPromise,
     teamRankingFlagPromise,
     supervisorLitePromise,
@@ -286,6 +291,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         queueBadgeCount={queueBadgeCount}
         showQuoteSimulator={isLightBroker}
         journeyEnabled={isLightBroker && brokerJourneyFlag === "true"}
+        homeV2Enabled={isLightBroker && brokerNavReorgFlag === "true"}
         welcomeVideoEnabled={isLightBroker && welcomeVideoFlag === "true" && (process.env.WELCOME_VIDEO_TENANT_ID ?? "").split(",").map((id) => id.trim()).filter(Boolean).includes(context.tenantId)}
         teamRankingEnabled={isLightSupervisor && teamRankingFlag === "true"}
         teamManagementEnabled={isLightManager && teamManagementFlag}

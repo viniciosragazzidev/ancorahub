@@ -2,6 +2,15 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Modo corretor, etapa 1: Início reorganizado
+
+- Início do corretor com o Jack fixo e os acessos numa ordem estável: Meus leads, Minha carteira (nova linha, abre `/clientes`), Plantão, Agenda, Desempenho e Cotação. Dicas de Atendimento e Jornada saem do Início; o que pede atenção segue marcado em cada linha e no flutuante Agora.
+- Jornada passa a abrir pelo Desempenho (cartão com anel de nível, pontos da semana e missões abertas); a seta da Jornada volta para o Desempenho.
+- Menu Mais: Minha carteira, Plantões, Agenda, Desempenho, Cotação, Mural da gestão, Notificações e Configurações (sai Minha jornada).
+- A faixa fixa "Seu WhatsApp não está conectado" já saiu no refinamento do Lite; a conexão fica no indicador do topo do Início e em Configurações.
+- Novo passo "Minha carteira" no tour (aparece só com a linha no Início; áudio pendente).
+- Chave do Super-admin `feature_broker_navigation_reorg_enabled` (Novidades do corretor), ligada por padrão e auditada; desligada, volta o Início anterior. Etapas seguintes do plano: Desempenho completo, Plantões, Carteira, Perfil, Agenda e validação.
+
 ## 13/11/2026 - Refinamento local do Lite: conversa e Agora sob demanda
 
 - Conversa ocupa a área principal; o olho ao lado do nome abre os dados, etapa, chegada e próximo passo. WhatsApp/Ligar/Etapa viram ícones no topo com área de toque uniforme; fontes atuais preservadas.
