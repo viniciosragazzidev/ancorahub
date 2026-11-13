@@ -10,7 +10,7 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import { buildStrictRoleLeadScope } from "@/features/leads/strict-role-scope";
-import { isInstallmentControlledByErp } from "@/features/erp/commissions";
+import { isErpLedgerReady, isInstallmentControlledByErp } from "@/features/erp/commissions";
 
 export type SaleActionState = { success?: boolean; error?: string };
 export type BulkExportState = { csvData?: string; count?: number; error?: string };
@@ -108,7 +108,7 @@ function formatDateShort(date: Date): string {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" }).format(date);
 }
 
-const notControlledByErp = (tenantId: string) => sql`NOT EXISTS (SELECT 1 FROM erp_financial_entries e WHERE e.tenant_id = ${tenantId} AND e.origin_commission_id = ${schema.commissionSchedule.id} AND e.status IN ('submitted', 'approved'))`;
+const notControlledByErp = async (tenantId: string) => (await isErpLedgerReady()) ? sql`NOT EXISTS (SELECT 1 FROM erp_financial_entries e WHERE e.tenant_id = ${tenantId} AND e.origin_commission_id = ${schema.commissionSchedule.id} AND e.status IN ('submitted', 'approved'))` : undefined;
 const ERP_CONTROLLED_MESSAGE = "Esta parcela é conferida no Financeiro (ERP). Registre a liquidação ou o estorno na ficha do lançamento.";
 
 // ─── Mark schedule item as paid ────────────────────────────────────────────
@@ -156,7 +156,7 @@ export async function markCommissionPaidAction(
         paidBy: context.userId,
         notes: notes && typeof notes === "string" ? notes.trim() || null : null,
       })
-      .where(and(eq(schema.commissionSchedule.id, scheduleId), eq(schema.commissionSchedule.status, "pending"), notControlledByErp(context.tenantId)))
+      .where(and(eq(schema.commissionSchedule.id, scheduleId), eq(schema.commissionSchedule.status, "pending"), await notControlledByErp(context.tenantId)))
       .returning({ id: schema.commissionSchedule.id });
     if (!marked.length) return { error: ERP_CONTROLLED_MESSAGE };
 
@@ -211,7 +211,7 @@ export async function markCommissionUnpaidAction(
         paidBy: null,
         notes: null,
       })
-      .where(and(eq(schema.commissionSchedule.id, scheduleId), eq(schema.commissionSchedule.status, "paid"), notControlledByErp(context.tenantId)))
+      .where(and(eq(schema.commissionSchedule.id, scheduleId), eq(schema.commissionSchedule.status, "paid"), await notControlledByErp(context.tenantId)))
       .returning({ id: schema.commissionSchedule.id });
     if (!reverted.length) return { error: ERP_CONTROLLED_MESSAGE };
 

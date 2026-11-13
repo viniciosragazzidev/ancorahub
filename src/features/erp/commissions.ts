@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { auditErp, canSeeAgencyBooks, erpScopeSql, getErpEffectiveAccess, requireErpAccess } from "./access";
@@ -87,7 +87,17 @@ export async function bringScheduleToConference(raw: unknown) {
 }
 
 /** Legacy screens must not mark an installment paid/unpaid once the ERP controls it. */
+let erpLedgerKnownReady = false;
+/** True once migration 0230 created the ERP ledger. Before that no installment can be ERP-controlled, so legacy actions keep working. */
+export async function isErpLedgerReady() {
+  if (erpLedgerKnownReady) return true;
+  const [row] = await getDatabase().execute(sql`SELECT to_regclass('public.erp_financial_entries') IS NOT NULL AS ready`);
+  erpLedgerKnownReady = (row as { ready?: boolean } | undefined)?.ready === true;
+  return erpLedgerKnownReady;
+}
+
 export async function isInstallmentControlledByErp(tenantId: string, scheduleId: string) {
+  if (!(await isErpLedgerReady())) return false;
   const [row] = await getDatabase().select({ id: schema.erpFinancialEntries.id }).from(schema.erpFinancialEntries)
     .where(and(eq(schema.erpFinancialEntries.tenantId, tenantId), eq(schema.erpFinancialEntries.originCommissionId, scheduleId), inArray(schema.erpFinancialEntries.status, ["submitted", "approved"]))).limit(1);
   return !!row;
