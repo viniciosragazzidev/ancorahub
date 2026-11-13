@@ -117,7 +117,7 @@ function PickerCard({
         )}
       >
         <span className="flex w-full items-center gap-1.5">
-          <Icon className="size-4 shrink-0 text-muted-foreground" />
+          <Icon className="size-4 shrink-0 text-primary" />
           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{title}</span>
           <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[popup-open]:rotate-90 motion-reduce:transition-none" />
         </span>
@@ -328,7 +328,7 @@ export function RegisterSalePanel({
 
           {/* Apólice com ícone à esquerda */}
           <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-card p-2 focus-within:ring-3 focus-within:ring-ring/50">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-muted text-muted-foreground">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-primary/10 text-primary">
               <FileText className="size-4" />
             </span>
             <Label htmlFor="policy-number" className="sr-only">
