@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useState, useTransition, type FormEvent, type ReactNode } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -12,7 +11,8 @@ import { formatCents, type ErpActionResult } from "../contracts";
 import { confirmPayoutPaymentAction, registerPayoutPaymentAction, reviewPayoutAction } from "../payout-actions";
 import { submitErpFile } from "../client-file-request";
 import type { getPayout } from "../payouts";
-import { ErpList, ErpNote, ErpSection, type ErpColumn } from "../ui/erp-kit";
+import { ErpCell, ErpList, ErpNote, ErpSection, ErpStatus, type ErpColumn } from "../ui/erp-kit";
+import { formatCompetence } from "../ui/format";
 import { FinanceFeedback } from "./finance-workspace";
 import { formatDay, PayoutFacts, PayoutStatusBadge } from "./payout-parts";
 
@@ -103,11 +103,11 @@ export function PayoutSummary({ detail }: { detail: PayoutDetailData }) {
   return <div className="flex flex-col gap-3">
     <div className="flex flex-wrap gap-2">
       <PayoutStatusBadge status={detail.status} />
-      {detail.receiptNumber ? <Badge variant="outline">Recibo {detail.receiptNumber}</Badge> : null}
+      {detail.receiptNumber ? <ErpStatus>Recibo {detail.receiptNumber}</ErpStatus> : null}
     </div>
     <PayoutFacts items={[
       { label: "Beneficiário", value: detail.beneficiaryName },
-      { label: "Competência", value: detail.competence },
+      { label: "Competência", value: formatCompetence(detail.competence, "long") },
       { label: "Valor líquido", value: formatCents(detail.netCents) },
       { label: "Comissões", value: String(detail.items.length) },
       ...(detail.reversedCents > 0 ? [{ label: "Estornado depois da emissão", value: formatCents(detail.reversedCents) }] : []),
@@ -119,7 +119,7 @@ export function PayoutSummary({ detail }: { detail: PayoutDetailData }) {
 }
 
 function EntryLink({ item }: { item: PayoutItem }) {
-  return <Button variant="link" className="h-auto p-0" render={<Link href={`/financeiro/lancamentos/${item.entryId}`} />}>{item.reference}</Button>;
+  return <Button variant="link" className="h-auto p-0 text-left whitespace-normal" render={<Link href={`/financeiro/lancamentos/${item.entryId}`} />}>{item.description}</Button>;
 }
 
 /** Compact item list for the drawer (the full page uses ErpList). */
@@ -128,7 +128,7 @@ export function PayoutItemsCompact({ detail }: { detail: PayoutDetailData }) {
     {detail.items.map((item) => <li key={item.entryId} className="flex items-start justify-between gap-3 py-2">
       <div className="min-w-0">
         <EntryLink item={item} />
-        <p className="truncate text-xs text-muted-foreground">{item.description}</p>
+        <p className="truncate text-xs text-muted-foreground">Ref. {item.reference}</p>
       </div>
       <span className="text-sm tabular-nums">{formatCents(item.balanceCents)}</span>
     </li>)}
@@ -138,12 +138,11 @@ export function PayoutItemsCompact({ detail }: { detail: PayoutDetailData }) {
 export function PayoutItemsList({ detail }: { detail: PayoutDetailData }) {
   const columns: ErpColumn<PayoutItem>[] = [
     { id: "reference", label: "Comissão", primary: true,
-      render: (item) => <EntryLink item={item} /> },
-    { id: "description", label: "Descrição", secondary: true, render: (item) => item.description },
+      render: (item) => <ErpCell title={<EntryLink item={item} />} sub={`Ref. ${item.reference}`} /> },
     { id: "amount", label: "Valor conferido", numeric: true, render: (item) => formatCents(item.amountCents) },
     { id: "balance", label: "Neste repasse", numeric: true, render: (item) => formatCents(item.balanceCents) },
   ];
-  return <ErpList title="Comissões do repasse" columns={columns} rows={detail.items} rowKey={(item) => item.entryId}
+  return <ErpList title="Comissões do repasse" count={detail.items.length} countLabel={["comissão", "comissões"]} columns={columns} rows={detail.items} rowKey={(item) => item.entryId}
     emptyTitle="Nenhuma comissão neste repasse" emptyText="Um repasse cancelado devolve as comissões para novos repasses." />;
 }
 

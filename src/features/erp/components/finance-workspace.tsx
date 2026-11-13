@@ -16,7 +16,7 @@ import {
 import { submitErpFile } from "../client-file-request";
 import { ENTRY_STATUS_LABELS, MOVEMENT_STATUS_LABELS } from "../shared";
 import type { getFinancialEntries, getFinancialEntry, getFinanceSelectors, searchFinanceSales } from "../finance";
-import { ErpCell, ErpList, ErpNote, ErpPager, ErpPanel, ErpRowMenu, ErpStatus, useUrlPanel, type ErpColumn, type ErpMenuItem, type ErpTone } from "../ui/erp-kit";
+import { ErpCell, ErpList, ErpMonthField, ErpNote, ErpPager, ErpPanel, ErpRowMenu, ErpStatus, useUrlPanel, type ErpColumn, type ErpMenuItem, type ErpTone } from "../ui/erp-kit";
 import { formatCompetence, formatDay } from "../ui/format";
 import { ServerSearchPick, type PickedRecord } from "./ledger-search-pick";
 
@@ -98,7 +98,7 @@ export function NewEntryForm({ branches, defaultKind, onCreated }: {
     <Field><FieldLabel htmlFor="finance-amount">Valor conferido (R$)</FieldLabel>
       <Input id="finance-amount" name="amount" inputMode="decimal" required placeholder="0,00" /></Field>
     <Field><FieldLabel htmlFor="finance-due">Vencimento</FieldLabel><Input id="finance-due" name="dueOn" type="date" required /></Field>
-    <Field><FieldLabel htmlFor="finance-period">Competência</FieldLabel><Input id="finance-period" name="competence" type="month" required /></Field>
+    <Field><FieldLabel htmlFor="finance-period">Competência</FieldLabel><ErpMonthField id="finance-period" name="competence" /></Field>
     {kind === "client_premium" ? <ErpNote>Pagamento do cliente à operadora. Este fato não movimenta o caixa da Âncora.</ErpNote> : null}
     {kind === "broker_commission" ? <ErpNote>A comissão pertence ao corretor da venda.</ErpNote> : null}
     <FinanceFeedback result={result} />

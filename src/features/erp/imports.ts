@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { and, arrayContained, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, arrayContained, desc, eq, ilike, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { auditErp, canSeeAgencyBooks, erpScopeSql, requireErpAccess, type ErpDatabase } from "./access";
@@ -218,19 +218,35 @@ async function availableDomains() {
   return domains;
 }
 
-export async function getErpImports() {
+const importListFiltersSchema = z.object({
+  q: z.string().trim().max(100).catch("").default(""),
+  status: z.enum(["all", "preview", "applied", "rejected"]).catch("all").default("all"),
+});
+
+export async function getErpImports(rawFilters: unknown = {}) {
+  const filters = importListFiltersSchema.parse(rawFilters ?? {});
   const domains = await availableDomains();
+  const search = filters.q ? ilike(schema.erpImports.fileName, `%${filters.q.replace(/[%_\\]/g, "\\$&")}%`) : undefined;
   const rows = (await Promise.all(domains.map(({ domain, auth }) => getDatabase().select({
     id: schema.erpImports.id, fileName: schema.erpImports.fileName, domain: schema.erpImports.domain,
     status: schema.erpImports.status, rowCount: schema.erpImports.rowCount, createdAt: schema.erpImports.createdAt, createdBy: schema.user.name,
   }).from(schema.erpImports).leftJoin(schema.user, eq(schema.erpImports.createdBy, schema.user.id))
-    .where(and(eq(schema.erpImports.tenantId, auth.context.tenantId), eq(schema.erpImports.domain, domain), batchScope(auth)))
+    .where(and(eq(schema.erpImports.tenantId, auth.context.tenantId), eq(schema.erpImports.domain, domain), batchScope(auth),
+      filters.status === "all" ? undefined : eq(schema.erpImports.status, filters.status), search))
     .orderBy(desc(schema.erpImports.createdAt)).limit(50))))
     .flat()
     .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
     .slice(0, 50)
     .map((row) => ({ ...row, domain: isImportDomain(row.domain) ? row.domain : "implantations" as const, status: importBatchStatusSchema.catch("preview").parse(row.status) }));
-  return { rows, maxRows: Math.min(...domains.map(({ auth }) => auth.maxRows)), domains: domains.map(({ domain }) => domain) };
+  // Numbers on top: the viewer's batches by state, independent of the list filters.
+  const counts = (await Promise.all(domains.map(({ domain, auth }) => getDatabase().select({ status: schema.erpImports.status, value: sql<number>`count(*)::int`.mapWith(Number) })
+    .from(schema.erpImports).where(and(eq(schema.erpImports.tenantId, auth.context.tenantId), eq(schema.erpImports.domain, domain), batchScope(auth)))
+    .groupBy(schema.erpImports.status)))).flat();
+  const countOf = (status: string) => counts.filter((row) => row.status === status).reduce((sum, row) => sum + row.value, 0);
+  return {
+    rows, filters, summary: { preview: countOf("preview"), applied: countOf("applied"), rejected: countOf("rejected") },
+    maxRows: Math.min(...domains.map(({ auth }) => auth.maxRows)), domains: domains.map(({ domain }) => domain),
+  };
 }
 
 async function batchDomain(id: string) {

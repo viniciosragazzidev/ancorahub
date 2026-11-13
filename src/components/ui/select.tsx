@@ -131,7 +131,10 @@ function AppSelect({
           aria-label={ariaLabel}
           className={triggerClassName}
         >
-          <SelectValue placeholder={placeholder} />
+          {/* The label comes from the options, so the chosen value reads correctly before the list is ever opened. */}
+          <SelectValue placeholder={placeholder}>
+            {(current: string | null) => options.find((opt) => opt.value === current)?.label ?? placeholder}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent className={contentClassName}>
           {options.map((opt) => (

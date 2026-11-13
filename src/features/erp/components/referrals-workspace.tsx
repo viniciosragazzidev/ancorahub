@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AppSelect } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+import { StatCard } from "@/components/dashboard/metric-card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldLabel, FieldSuccess } from "@/components/ui/field";
 import { SearchAddList, type SearchAddItem } from "@/components/ui/search-add-list";
@@ -17,7 +17,8 @@ import {
   type ReferralActionResult, type ReferralTimeline,
 } from "../referral-actions";
 import type { getReferrals } from "../referrals";
-import { ErpList, ErpPager, ErpPanel, ErpRowMenu, type ErpColumn, type ErpMenuItem } from "../ui/erp-kit";
+import { ErpCell, ErpList, ErpPager, ErpPanel, ErpRowMenu, ErpStats, ErpStatus, useUrlPanel, type ErpColumn, type ErpMenuItem, type ErpTone } from "../ui/erp-kit";
+import { formatDay, formatInstant } from "../ui/format";
 
 type Workspace = Awaited<ReturnType<typeof getReferrals>>;
 type Row = Workspace["rows"][number];
@@ -25,8 +26,8 @@ type Member = Workspace["members"][number];
 type Picked = { id: string; label: string };
 const INITIAL: ReferralActionResult = { ok: true, message: "" };
 
-const formatDate = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
-const formatDateTime = (iso: string) => new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+const formatDate = (iso: string) => formatDay(iso);
+const formatDateTime = (iso: string) => formatInstant(iso);
 
 function Feedback({ result }: { result: ReferralActionResult }) {
   if (!result.message) return null;
@@ -37,9 +38,12 @@ function Feedback({ result }: { result: ReferralActionResult }) {
   </FieldError>;
 }
 
-function statusVariant(status: Row["status"]) {
-  if (status === "converted") return "success";
-  return status === "lost" || status === "duplicate" ? "outline" : "secondary";
+const STATUS_TONE: Record<Row["status"], ErpTone> = {
+  registered: "neutral", validated: "info", contacting: "warning", opportunity: "info", converted: "success", lost: "danger", duplicate: "neutral",
+};
+
+function ReferralStatus({ row }: { row: Pick<Row, "status" | "statusLabel"> }) {
+  return <ErpStatus tone={STATUS_TONE[row.status] ?? "neutral"}>{row.statusLabel}</ErpStatus>;
 }
 
 function Details({ items }: { items: { label: string; value: ReactNode }[] }) {
@@ -130,28 +134,30 @@ export function LeadSearchAdd({ placeholder, disabled, addingId, onAdd }: {
   </div>;
 }
 
-export function NewReferralButton({ workspace }: { workspace: Workspace }) {
+/** "Nova indicação": drawer opened by the header CTA through `?novo=1`. A fresh form (and request id) every time it opens. */
+export function NewReferralPanel({ workspace }: { workspace: Workspace }) {
+  const panel = useUrlPanel("novo");
+  if (!workspace.canManage) return null;
+  return <ErpPanel
+    open={panel.open}
+    onOpenChange={(open) => { if (!open) panel.close(); }}
+    title="Nova indicação"
+    description="Quem indicou e os dados mínimos do contato. O sistema confere se o contato já existe antes de salvar."
+  >
+    {panel.open ? <NewReferralForm workspace={workspace} onDone={panel.close} /> : null}
+  </ErpPanel>;
+}
+
+function NewReferralForm({ workspace, onDone }: { workspace: Workspace; onDone: () => void }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<ReferralActionResult>(INITIAL);
-  const [requestId, setRequestId] = useState("");
+  const [requestId] = useState(() => crypto.randomUUID());
   const [channel, setChannel] = useState("cliente");
   const [consent, setConsent] = useState(false);
   const [referrer, setReferrer] = useState<Picked | null>(null);
-  const [owner, setOwner] = useState<Picked | null>(null);
-  if (!workspace.canManage) return null;
-  const self = { id: workspace.currentUserId, label: "Eu" };
+  const [owner, setOwner] = useState<Picked | null>({ id: workspace.currentUserId, label: "Eu" });
 
-  function start() {
-    setRequestId(crypto.randomUUID());
-    setResult(INITIAL);
-    setChannel("cliente");
-    setConsent(false);
-    setReferrer(null);
-    setOwner(self);
-    setOpen(true);
-  }
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -159,72 +165,62 @@ export function NewReferralButton({ workspace }: { workspace: Workspace }) {
       const response = await registerReferralAction(INITIAL, data);
       setResult(response);
       if (!response.ok) return;
-      setOpen(false);
+      onDone();
       router.refresh();
     });
   }
-  return <>
-    <Button type="button" onClick={start}>Nova indicação</Button>
-    <ErpPanel
-      open={open}
-      onOpenChange={setOpen}
-      title="Nova indicação"
-      description="Registre quem indicou e os dados mínimos do contato. O sistema confere se o contato já existe antes de salvar."
-    >
-      <form onSubmit={submit} className="flex flex-col gap-4">
-        <input type="hidden" name="requestId" value={requestId} />
-        <input type="hidden" name="referrerUserId" value={referrer?.id ?? ""} />
-        <input type="hidden" name="ownerId" value={workspace.canAssignOwner ? owner?.id ?? "" : ""} />
-        <input type="hidden" name="consent" value={consent ? "on" : ""} />
-        <Field>
-          <FieldLabel htmlFor="referral-referrer">Quem indicou</FieldLabel>
-          <Input id="referral-referrer" name="referrerName" required minLength={2} maxLength={120} disabled={pending} />
-        </Field>
-        <Field>
-          <FieldLabel>Indicador da equipe (opcional)</FieldLabel>
-          <MemberSearchAdd members={workspace.members} selected={referrer} onSelect={setReferrer} placeholder="Buscar pessoa da equipe" disabled={pending} />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="referral-referrer-contact">Contato de quem indicou (opcional)</FieldLabel>
-          <Input id="referral-referrer-contact" name="referrerContact" maxLength={120} disabled={pending} />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="referral-channel">Canal</FieldLabel>
-          <AppSelect id="referral-channel" name="channel" value={channel} disabled={pending} onValueChange={setChannel} options={workspace.channelOptions} />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="referral-name">Nome da pessoa indicada</FieldLabel>
-          <Input id="referral-name" name="referredName" required minLength={2} maxLength={120} disabled={pending} />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="referral-phone">Telefone com DDD</FieldLabel>
-          <Input id="referral-phone" name="referredPhone" type="tel" inputMode="tel" autoComplete="off" required maxLength={30} disabled={pending} />
-        </Field>
-        <label className="flex items-start gap-2 text-sm">
-          <Checkbox checked={consent} disabled={pending} onCheckedChange={(checked) => setConsent(checked === true)} />
-          <span>A pessoa indicada autorizou o contato</span>
-        </label>
-        {workspace.canAssignOwner ? <Field>
-          <FieldLabel>Responsável</FieldLabel>
-          <MemberSearchAdd
-            members={workspace.members}
-            selected={owner}
-            onSelect={setOwner}
-            placeholder="Buscar responsável"
-            disabled={pending}
-            selfId={workspace.currentUserId}
-          />
-          {!owner ? <FieldDescription>Sem seleção, você fica como responsável.</FieldDescription> : null}
-        </Field> : null}
-        <Field>
-          <FieldLabel htmlFor="referral-notes">Observações (opcional)</FieldLabel>
-          <Textarea id="referral-notes" name="notes" maxLength={1000} disabled={pending} />
-        </Field>
-        <Feedback result={result} />
-        <Button type="submit" loading={pending}>Registrar indicação</Button>
-      </form>
-    </ErpPanel>
-  </>;
+  return <form onSubmit={submit} className="flex flex-col gap-4">
+    <input type="hidden" name="requestId" value={requestId} />
+    <input type="hidden" name="referrerUserId" value={referrer?.id ?? ""} />
+    <input type="hidden" name="ownerId" value={workspace.canAssignOwner ? owner?.id ?? "" : ""} />
+    <input type="hidden" name="consent" value={consent ? "on" : ""} />
+    <Field>
+      <FieldLabel htmlFor="referral-referrer">Quem indicou</FieldLabel>
+      <Input id="referral-referrer" name="referrerName" required minLength={2} maxLength={120} disabled={pending} />
+    </Field>
+    <Field>
+      <FieldLabel>Indicador da equipe (opcional)</FieldLabel>
+      <MemberSearchAdd members={workspace.members} selected={referrer} onSelect={setReferrer} placeholder="Buscar pessoa da equipe" disabled={pending} />
+    </Field>
+    <Field>
+      <FieldLabel htmlFor="referral-referrer-contact">Contato de quem indicou (opcional)</FieldLabel>
+      <Input id="referral-referrer-contact" name="referrerContact" maxLength={120} disabled={pending} />
+    </Field>
+    <Field>
+      <FieldLabel htmlFor="referral-channel">Canal</FieldLabel>
+      <AppSelect id="referral-channel" name="channel" value={channel} disabled={pending} onValueChange={setChannel} options={workspace.channelOptions} />
+    </Field>
+    <Field>
+      <FieldLabel htmlFor="referral-name">Nome da pessoa indicada</FieldLabel>
+      <Input id="referral-name" name="referredName" required minLength={2} maxLength={120} disabled={pending} />
+    </Field>
+    <Field>
+      <FieldLabel htmlFor="referral-phone">Telefone com DDD</FieldLabel>
+      <Input id="referral-phone" name="referredPhone" type="tel" inputMode="tel" autoComplete="off" required maxLength={30} disabled={pending} />
+    </Field>
+    <label className="flex min-h-11 items-center gap-3 text-sm">
+      <Checkbox checked={consent} disabled={pending} onCheckedChange={(checked) => setConsent(checked === true)} />
+      <span>A pessoa indicada autorizou o contato</span>
+    </label>
+    {workspace.canAssignOwner ? <Field>
+      <FieldLabel>Responsável</FieldLabel>
+      <MemberSearchAdd
+        members={workspace.members}
+        selected={owner}
+        onSelect={setOwner}
+        placeholder="Buscar responsável"
+        disabled={pending}
+        selfId={workspace.currentUserId}
+      />
+      {!owner ? <FieldDescription>Sem seleção, você fica como responsável.</FieldDescription> : null}
+    </Field> : null}
+    <Field>
+      <FieldLabel htmlFor="referral-notes">Observações (opcional)</FieldLabel>
+      <Textarea id="referral-notes" name="notes" maxLength={1000} disabled={pending} />
+    </Field>
+    <Feedback result={result} />
+    <div><Button type="submit" loading={pending}>Registrar indicação</Button></div>
+  </form>;
 }
 
 function StatusForm({ row }: { row: Row }) {
@@ -347,7 +343,7 @@ function leadValue(row: Row) {
 
 function ReferralPanel({ row, open, onOpenChange }: { row: Row; open: boolean; onOpenChange: (open: boolean) => void }) {
   const details = [
-    { label: "Etapa", value: <Badge variant={statusVariant(row.status)}>{row.statusLabel}</Badge> },
+    { label: "Etapa", value: <ReferralStatus row={row} /> },
     { label: "Telefone", value: row.referredPhone },
     { label: "Consentimento de contato", value: row.consent ? "Autorizado" : "Não registrado" },
     { label: "Responsável", value: row.ownerName ?? "Não informado" },
@@ -369,7 +365,7 @@ function ReferralPanel({ row, open, onOpenChange }: { row: Row; open: boolean; o
   </ErpPanel>;
 }
 
-export function ReferralsWorkspace({ workspace }: { workspace: Workspace }) {
+export function ReferralsWorkspace({ workspace, toolbar }: { workspace: Workspace; toolbar?: ReactNode }) {
   const focusId = workspace.filters.id;
   const [selectedId, setSelectedId] = useState<string | null>(() => focusId && workspace.rows.some((row) => row.id === focusId) ? focusId : null);
   const selected = workspace.rows.find((row) => row.id === selectedId) ?? null;
@@ -379,31 +375,35 @@ export function ReferralsWorkspace({ workspace }: { workspace: Workspace }) {
     ...(row.canOpenLead && row.leadId ? [{ id: "lead", label: "Abrir negócio", href: `/leads/${row.leadId}` }] : []),
   ];
   const columns: ErpColumn<Row>[] = [
-    { id: "referred", label: "Indicado", primary: true, render: (row) => row.referredName },
-    { id: "referrer", label: "Indicado por", secondary: true, render: (row) => row.referrerName },
-    { id: "channel", label: "Canal", render: (row) => row.channelLabel },
-    { id: "status", label: "Etapa", render: (row) => <Badge variant={statusVariant(row.status)}>{row.statusLabel}</Badge> },
+    { id: "referred", label: "Indicado", primary: true, render: (row) => <ErpCell title={row.referredName} sub={`Indicado por ${row.referrerName}`} /> },
+    { id: "channel", label: "Canal", secondary: true, render: (row) => row.channelLabel },
+    { id: "status", label: "Etapa", render: (row) => <ReferralStatus row={row} /> },
     { id: "owner", label: "Responsável", nowrap: true, render: (row) => row.ownerName ?? "Não informado" },
     { id: "created", label: "Registro", nowrap: true, render: (row) => formatDate(row.createdAt) },
-    {
-      id: "menu",
-      label: "Ações",
-      render: (row) => <div onClick={(event) => event.stopPropagation()}><ErpRowMenu label={`Ações de ${row.referredName}`} items={menu(row)} /></div>,
-    },
+    { id: "menu", label: "", render: (row) => <ErpRowMenu label={`Ações de ${row.referredName}`} items={menu(row)} /> },
   ];
+  const { summary } = workspace;
   return <>
+    <ErpStats>
+      <StatCard label="Novas" value={summary.fresh} sublabel="registradas ou validadas" />
+      <StatCard label="Em andamento" value={summary.active} sublabel="em contato ou oportunidade" />
+      <StatCard label="Convertidas" value={summary.converted} sublabel="com venda no CRM" />
+      <StatCard label="Encerradas" value={summary.closed} sublabel="perdidas ou duplicadas" />
+    </ErpStats>
+    {toolbar}
     <ErpList
       title="Indicações"
-      description="Origem, responsável e andamento de cada indicação."
-      actions={<NewReferralButton workspace={workspace} />}
+      count={workspace.total}
+      countLabel={["indicação", "indicações"]}
       columns={columns}
       rows={workspace.rows}
       rowKey={(row) => row.id}
       onRowOpen={(row) => setSelectedId(row.id)}
       emptyTitle={filtered ? "Nenhuma indicação nesta busca" : "Nenhuma indicação registrada"}
-      emptyText={workspace.canManage ? "Use “Nova indicação” para registrar um contato indicado ou ajuste os filtros." : "Ajuste os filtros ou confira com a gestão."}
+      emptyText={workspace.canManage ? "Use Nova indicação para registrar um contato indicado ou ajuste os filtros." : "Ajuste os filtros ou confira com a gestão."}
       footer={<ErpPager page={workspace.filters.page} total={workspace.total} pageSize={workspace.pageSize} label="Paginação de indicações" />}
     />
+    <NewReferralPanel workspace={workspace} />
     {selected ? <ReferralPanel
       key={`${selected.id}-${selected.version}`}
       row={selected}

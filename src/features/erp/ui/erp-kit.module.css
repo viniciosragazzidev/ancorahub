@@ -29,6 +29,14 @@
   gap: 8px;
 }
 
+/* Lite audiences: the screen's actions open the body (the Lite frame owns the header). */
+.bodyActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .helpText {
   display: grid;
   gap: 12px;

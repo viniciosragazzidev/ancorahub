@@ -1,0 +1,111 @@
+/* Inteligência e Metas: só a cola de layout. Cores, raio e tipografia vêm dos tokens do sistema. */
+
+.fresh {
+  margin-left: auto;
+  color: var(--text-secondary, var(--muted-foreground));
+  font-size: var(--text-xs, 0.75rem);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.perspectives {
+  flex: none;
+  max-width: 100%;
+}
+
+.share {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.track {
+  position: relative;
+  width: 64px;
+  height: 6px;
+  flex: none;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--surface-muted, var(--muted));
+}
+
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+.fill[data-done="true"] {
+  background: var(--success, var(--primary));
+}
+
+.facts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.fact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  align-items: baseline;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+}
+
+.fact:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.fact dt {
+  color: var(--text-secondary, var(--muted-foreground));
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.fact dd {
+  margin: 0;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.memory {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.memory dt {
+  font-weight: 500;
+}
+
+.memory dd {
+  margin: 4px 0 0;
+  color: var(--text-secondary, var(--muted-foreground));
+}
+
+.help {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  color: var(--text-secondary, var(--muted-foreground));
+  font-size: var(--text-sm, 0.875rem);
+  line-height: 1.55;
+}
+
+.help p {
+  margin: 0;
+}
+
+@media (max-width: 767px) {
+  .fresh {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}

@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState, type MouseEvent } from "react";
-import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +11,8 @@ import { formatCents } from "../contracts";
 import { prepareClosingAction, prepareOffsetAction, reviewClosingAction, reviewOffsetAction, reverseOffsetAction } from "../finance-actions";
 import type { getOffsets } from "../offsets";
 import type { getClosings } from "../closing";
-import { ErpList, ErpNote, ErpPager, ErpPanel, ErpRowMenu, type ErpColumn, type ErpMenuItem } from "../ui/erp-kit";
+import { ErpCell, ErpList, ErpMonthField, ErpNote, ErpPager, ErpPanel, ErpStatus, useUrlPanel, type ErpColumn, type ErpTone } from "../ui/erp-kit";
+import { formatCompetence, formatInstant } from "../ui/format";
 import { FORM_STACK, FinanceFeedback, formatDate, useFinanceAction } from "./finance-workspace";
 
 type Offsets = Awaited<ReturnType<typeof getOffsets>>;
@@ -19,21 +20,15 @@ type OffsetRow = Offsets["rows"][number];
 type OffsetChoice = Offsets["choices"][number];
 type Closings = Awaited<ReturnType<typeof getClosings>>;
 type ClosingRow = Closings["rows"][number];
-type BadgeVariant = "secondary" | "outline" | "destructive";
 
-/** Keeps clicks on the row menu (and its portaled items) from also opening the row. */
-function stopRow(event: MouseEvent) {
-  event.stopPropagation();
-}
-
-const OFFSET_STATUS: Record<string, { label: string; variant: BadgeVariant }> = {
-  pending: { label: "A conferir", variant: "outline" },
-  confirmed: { label: "Confirmada", variant: "secondary" },
-  rejected: { label: "Rejeitada", variant: "destructive" },
+const OFFSET_STATUS: Record<string, { label: string; tone: ErpTone }> = {
+  pending: { label: "A conferir", tone: "warning" },
+  confirmed: { label: "Confirmada", tone: "success" },
+  rejected: { label: "Rejeitada", tone: "danger" },
 };
 function OffsetStatusBadge({ status }: { status: string }) {
   const value = OFFSET_STATUS[status] ?? OFFSET_STATUS.pending;
-  return <Badge variant={value.variant}>{value.label}</Badge>;
+  return <ErpStatus tone={value.tone}>{value.label}</ErpStatus>;
 }
 
 /** Choice from a bounded, already loaded list: search + "+", then the chosen one with "Trocar". */
@@ -89,18 +84,15 @@ function OffsetPreparationForm({ choices, onDone }: { choices: OffsetChoice[]; o
   </form>;
 }
 
-/** Primary CTA of the advances screen: opens the offset preparation in a drawer. */
-export function OffsetPrepareButton({ data }: { data: Offsets }) {
+/** Offset preparation drawer, opened by the header CTA (`?compensar=1`). */
+export function OffsetPreparePanel({ data }: { data: Offsets }) {
   const router = useRouter();
-  const [open, setOpen] = useState(0);
+  const panel = useUrlPanel("compensar");
   if (!data.canPrepare) return null;
-  return <>
-    <Button type="button" onClick={() => setOpen((value) => value + 1)}>Preparar compensação</Button>
-    <ErpPanel open={open > 0} onOpenChange={(next) => { if (!next) setOpen(0); }} title="Preparar compensação"
-      description="Usa o saldo comprovado do adiantamento para reduzir o valor a repassar, sem uma segunda saída.">
-      <OffsetPreparationForm key={open} choices={data.choices} onDone={() => router.refresh()} />
-    </ErpPanel>
-  </>;
+  return <ErpPanel open={panel.open} onOpenChange={(next) => { if (!next) panel.close(); }} title="Preparar compensação"
+    description="Usa o saldo comprovado do adiantamento para reduzir o valor a repassar, sem uma segunda saída.">
+    {panel.open ? <OffsetPreparationForm choices={data.choices} onDone={() => { panel.close(); router.refresh(); }} /> : null}
+  </ErpPanel>;
 }
 
 function OffsetReviewForm({ id, onDone }: { id: string; onDone: () => void }) {
@@ -133,6 +125,7 @@ function OffsetReversalForm({ id, onDone }: { id: string; onDone: () => void }) 
 function canReverseOffset(data: Offsets, row: OffsetRow) {
   return data.canPrepare && row.kind === "allocation" && row.status === "confirmed";
 }
+const offsetLabelHeader = "Compensação";
 function offsetLabel(row: OffsetRow) {
   return row.kind === "reversal" ? "Estorno" : "Compensação";
 }
@@ -146,26 +139,18 @@ export function OffsetsList({ data }: { data: Offsets }) {
     setOpenId(null);
     router.refresh();
   };
-  const menu = (item: OffsetRow): ErpMenuItem[] => [
-    ...(item.canReview ? [{ id: "review", label: "Conferir compensação", onSelect: () => setOpenId(item.id) }] : []),
-    ...(canReverseOffset(data, item) ? [{ id: "reverse", label: "Solicitar estorno", onSelect: () => setOpenId(item.id) }] : []),
-    { id: "advance", label: "Ver adiantamento", href: `/financeiro/lancamentos/${item.advanceEntryId}` },
-    { id: "commission", label: "Ver comissão", href: `/financeiro/lancamentos/${item.commissionEntryId}` },
-  ];
   const columns: ErpColumn<OffsetRow>[] = [
-    { id: "commission", label: "Comissão", primary: true, render: (item) => item.commissionReference },
-    { id: "advance", label: "Adiantamento", secondary: true, render: (item) => item.advanceReference ?? "Não informado" },
-    { id: "kind", label: "Tipo", render: (item) => offsetLabel(item) },
+    { id: "commission", label: offsetLabelHeader, primary: true, render: (item) => <ErpCell title={`${offsetLabel(item)} da comissão ${item.commissionReference}`}
+      sub={`Adiantamento ${item.advanceReference ?? "não informado"}`} /> },
     { id: "date", label: "Data", nowrap: true, render: (item) => formatDate(item.occurredOn) },
     { id: "amount", label: "Valor", numeric: true, render: (item) => formatCents(item.amountCents) },
     { id: "status", label: "Estado", render: (item) => <OffsetStatusBadge status={item.status} /> },
-    { id: "actions", label: "Ações", render: (item) => <div onClick={stopRow}>
-      <ErpRowMenu label={`Ações da ${offsetLabel(item).toLowerCase()}`} items={menu(item)} /></div> },
   ];
   return <>
     <ErpList<OffsetRow>
       title="Compensações"
-      description="Adiantamento usado para reduzir a comissão a repassar."
+      count={data.total}
+      countLabel={["compensação", "compensações"]}
       columns={columns}
       rows={data.rows}
       rowKey={(item) => item.id}
@@ -179,8 +164,10 @@ export function OffsetsList({ data }: { data: Offsets }) {
       {row ? <>
         <div><OffsetStatusBadge status={row.status} /></div>
         <dl className="grid grid-cols-2 gap-3">
-          <div><dt className="text-xs text-muted-foreground">Adiantamento</dt><dd className="text-sm">{row.advanceReference ?? "Não informado"}</dd></div>
-          <div><dt className="text-xs text-muted-foreground">Comissão</dt><dd className="text-sm">{row.commissionReference}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Adiantamento</dt><dd className="text-sm">
+            <Link className="underline-offset-4 hover:underline" href={`/financeiro/lancamentos/${row.advanceEntryId}`}>{row.advanceReference ?? "Não informado"}</Link></dd></div>
+          <div><dt className="text-xs text-muted-foreground">Comissão</dt><dd className="text-sm">
+            <Link className="underline-offset-4 hover:underline" href={`/financeiro/lancamentos/${row.commissionEntryId}`}>{row.commissionReference}</Link></dd></div>
         </dl>
         {row.reason ? <ErpNote>{row.reason}</ErpNote> : null}
         {row.canReview ? <OffsetReviewForm key={row.id} id={row.id} onDone={done} /> : null}
@@ -190,14 +177,14 @@ export function OffsetsList({ data }: { data: Offsets }) {
   </>;
 }
 
-const CLOSING_STATUS: Record<string, { label: string; variant: BadgeVariant }> = {
-  pending: { label: "Aguardando aprovação", variant: "outline" },
-  closed: { label: "Fechado", variant: "secondary" },
-  reopened: { label: "Reaberto", variant: "outline" },
+const CLOSING_STATUS: Record<string, { label: string; tone: ErpTone }> = {
+  pending: { label: "Aguardando aprovação", tone: "warning" },
+  closed: { label: "Fechado", tone: "success" },
+  reopened: { label: "Reaberto", tone: "info" },
 };
 function ClosingStatusBadge({ status }: { status: string }) {
   const value = CLOSING_STATUS[status] ?? CLOSING_STATUS.pending;
-  return <Badge variant={value.variant}>{value.label}</Badge>;
+  return <ErpStatus tone={value.tone}>{value.label}</ErpStatus>;
 }
 
 type ClosingMode = "prepare" | "close" | "reopen";
@@ -213,7 +200,7 @@ function ClosingForm({ competence, version, mode, primary, onDone }: {
     <input type="hidden" name="version" value={version} /><input type="hidden" name="decision" value={mode} />
     {competence ? <input type="hidden" name="competence" value={competence} /> : <Field>
       <FieldLabel htmlFor={`${prefix}-competence`}>Competência</FieldLabel>
-      <Input id={`${prefix}-competence`} name="competence" type="month" required disabled={pending} /></Field>}
+      <ErpMonthField id={`${prefix}-competence`} name="competence" after={0} disabled={pending} /></Field>}
     <Field><FieldLabel htmlFor={`${prefix}-reason`}>Motivo e parecer</FieldLabel>
       <Textarea id={`${prefix}-reason`} name="reason" required minLength={5} maxLength={300} disabled={pending} /></Field>
     <FinanceFeedback result={state} />
@@ -221,23 +208,26 @@ function ClosingForm({ competence, version, mode, primary, onDone }: {
   </form>;
 }
 
-/** Closings: one list (row → drawer with the snapshot and the close/reopen form); "Preparar competência" is the primary CTA. */
+/**
+ * Closings: one list (row → drawer with the snapshot and the close/reopen form). The page header owns
+ * "Preparar competência" (`?preparar=1`).
+ */
 export function ClosingsWorkspace({ data }: { data: Closings }) {
   const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(null);
-  const [preparing, setPreparing] = useState(0);
+  const preparing = useUrlPanel("preparar");
   const row = data.rows.find((item) => item.id === openId) ?? null;
   const done = () => {
     setOpenId(null);
-    setPreparing(0);
+    preparing.close();
     router.refresh();
   };
   const columns: ErpColumn<ClosingRow>[] = [
-    { id: "competence", label: "Competência", primary: true, render: (item) => item.competence },
-    { id: "status", label: "Estado", secondary: true, render: (item) => <ClosingStatusBadge status={item.status} /> },
+    { id: "competence", label: "Competência", primary: true, render: (item) => <ErpCell title={formatCompetence(item.competence, "long").replace(/^./, (letter) => letter.toUpperCase())}
+      sub={`Versão ${item.version} · prévia de ${formatInstant(item.snapshot.calculatedAt)}`} /> },
+    { id: "status", label: "Estado", render: (item) => <ClosingStatusBadge status={item.status} /> },
     { id: "in", label: "Entradas de caixa", numeric: true, render: (item) => formatCents(item.snapshot.cashInCents) },
     { id: "out", label: "Saídas de caixa", numeric: true, render: (item) => formatCents(item.snapshot.cashOutCents) },
-    { id: "version", label: "Versão", numeric: true, render: (item) => item.version },
   ];
   const facts = row ? [
     { label: "Lançamentos", value: String(row.snapshot.entryCount) },
@@ -254,7 +244,8 @@ export function ClosingsWorkspace({ data }: { data: Closings }) {
     <ErpList<ClosingRow>
       title="Competências"
       description="Últimas 36 competências preparadas."
-      actions={data.canPrepare ? <Button type="button" onClick={() => setPreparing((value) => value + 1)}>Preparar competência</Button> : undefined}
+      count={data.rows.length}
+      countLabel={["competência", "competências"]}
       columns={columns}
       rows={data.rows}
       rowKey={(item) => item.id}
@@ -263,21 +254,40 @@ export function ClosingsWorkspace({ data }: { data: Closings }) {
       emptyText="Prepare a prévia de uma competência para iniciar a conferência."
     />
     <ErpPanel open={row !== null} onOpenChange={(open) => { if (!open) setOpenId(null); }}
-      title={row ? `Competência ${row.competence}` : "Competência"} description={row ? `Versão ${row.version}` : undefined}>
+      title={row ? `Competência de ${formatCompetence(row.competence, "long")}` : "Competência"} description={row ? `Versão ${row.version}` : undefined}>
       {row ? <>
         <div><ClosingStatusBadge status={row.status} /></div>
         <dl className="grid grid-cols-2 gap-3">{facts.map((fact) => <div key={fact.label}>
           <dt className="text-xs text-muted-foreground">{fact.label}</dt><dd className="text-sm font-semibold tabular-nums">{fact.value}</dd></div>)}</dl>
-        <ErpNote>Prévia calculada em {new Date(row.snapshot.calculatedAt).toLocaleString("pt-BR")}.</ErpNote>
+        <ErpNote>Prévia calculada em {formatInstant(row.snapshot.calculatedAt)}.</ErpNote>
         {row.reason ? <ErpNote>{row.reason}</ErpNote> : null}
         {reopen ? <ClosingForm key={`${row.id}-reopen`} competence={row.competence} version={row.version} mode="reopen" primary={false} onDone={done} /> : null}
         {close ? <ClosingForm key={`${row.id}-close`} competence={row.competence} version={row.version} mode="close" primary onDone={done} /> : null}
         {reprepare ? <ClosingForm key={`${row.id}-prepare`} competence={row.competence} version={row.version} mode="prepare" primary={false} onDone={done} /> : null}
       </> : null}
     </ErpPanel>
-    {data.canPrepare ? <ErpPanel open={preparing > 0} onOpenChange={(open) => { if (!open) setPreparing(0); }} title="Preparar competência"
+    {data.canPrepare ? <ErpPanel open={preparing.open} onOpenChange={(open) => { if (!open) preparing.close(); }} title="Preparar competência"
       description="Calcula a memória dos fatos do mês para conferência independente.">
-      <ClosingForm key={preparing} version={0} mode="prepare" primary onDone={done} />
+      {preparing.open ? <ClosingForm version={0} mode="prepare" primary onDone={done} /> : null}
     </ErpPanel> : null}
   </>;
+}
+
+type CashKind = { kind: string; cents: number; count: number; incoming: boolean };
+const CASH_KIND_LABELS: Record<string, string> = {
+  agency_receivable: "Recebíveis da corretora", broker_commission: "Comissões pagas", expense: "Despesas pagas", advance: "Adiantamentos concedidos",
+};
+
+/** Cash of the month by type: one table, entries first; the empty state says what "no movement" means. */
+export function CashKindsList({ rows, monthLabel }: { rows: CashKind[]; monthLabel: string }) {
+  const sorted = [...rows].sort((left, right) => Number(right.incoming) - Number(left.incoming) || right.cents - left.cents);
+  const columns: ErpColumn<CashKind>[] = [
+    { id: "kind", label: "Tipo", primary: true, render: (row) => <ErpCell title={CASH_KIND_LABELS[row.kind] ?? row.kind} sub={`${row.count} movimento(s) confirmado(s)`} /> },
+    { id: "direction", label: "Sentido", render: (row) => <ErpStatus tone={row.incoming ? "success" : "warning"}>{row.incoming ? "Entrada" : "Saída"}</ErpStatus> },
+    { id: "cents", label: "Valor", numeric: true, render: (row) => formatCents(row.cents) },
+  ];
+  return <ErpList title={`Movimentos de ${monthLabel}`} count={rows.reduce((total, row) => total + row.count, 0)} countLabel={["movimento", "movimentos"]}
+    columns={columns} rows={sorted} rowKey={(row) => row.kind}
+    emptyTitle="Nenhum movimento confirmado neste mês"
+    emptyText="Só liquidações confirmadas entram no caixa. Um valor ainda não conferido não aparece aqui e não é inadimplência." />;
 }

@@ -1,20 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AppSelect } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Field, FieldError, FieldLabel, FieldSuccess } from "@/components/ui/field";
 import { StatCard } from "@/components/dashboard/metric-card";
-import { ErpList, ErpNote, ErpPager, ErpPanel, ErpToolbar, ErpUrlFilter, type ErpColumn } from "../ui/erp-kit";
+import { ErpCell, ErpList, ErpNote, ErpPager, ErpPanel, ErpSearch, ErpStats, ErpStatus, ErpToolbar, ErpUrlFilter, type ErpColumn, type ErpTone } from "../ui/erp-kit";
+import { formatDay as formatKitDay, formatInstant } from "../ui/format";
 import { availableImplantationStages, IMPLANTATION_LABELS, IMPLANTATION_STATUSES, type ErpActionResult, type ImplantationStatus } from "../contracts";
 import { adoptImplantationEvidenceAction, saveImplantationAction } from "../implantation-actions";
 import { submitErpFile } from "../client-file-request";
-import { ERP_TIME_ZONE } from "../shared";
 import type { getImplantations } from "../implantations";
 
 type Workspace = Awaited<ReturnType<typeof getImplantations>>;
@@ -25,11 +24,11 @@ const INITIAL: ErpActionResult = { ok: true, message: "" };
 const STATUS_OPTIONS = [{ value: "all", label: "Todas as etapas" }, ...IMPLANTATION_STATUSES.map((status) => ({ value: status, label: IMPLANTATION_LABELS[status] }))];
 
 function formatDay(value: string | null) {
-  return value ? value.split("-").reverse().join("/") : null;
+  return value ? formatKitDay(value) : null;
 }
 
 function formatMoment(value: Date | string) {
-  return new Date(value).toLocaleString("pt-BR", { timeZone: ERP_TIME_ZONE, dateStyle: "short", timeStyle: "short" });
+  return formatInstant(value);
 }
 
 function editorFor(row: Row): Editor {
@@ -44,30 +43,13 @@ function Feedback({ result }: { result: ErpActionResult }) {
   return result.ok ? <FieldSuccess role="status">{result.message}</FieldSuccess> : <FieldError role="alert">{result.message}</FieldError>;
 }
 
-function StageBadge({ stage }: { stage: ImplantationStatus }) {
-  return <Badge variant={stage === "implanted" ? "default" : "secondary"}>{IMPLANTATION_LABELS[stage]}</Badge>;
-}
+const STAGE_TONE: Record<ImplantationStatus, ErpTone> = {
+  awaiting_documents: "warning", review: "warning", submitted: "info", operator_pending: "warning",
+  implanted: "success", refused: "danger", cancelled: "neutral",
+};
 
-/** Text search by URL (server filter); resets the page. */
-function ImplantationSearch({ value }: { value: string }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
-  const [pending, start] = useTransition();
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const q = String(new FormData(event.currentTarget).get("q") ?? "").trim();
-    const query = new URLSearchParams(params.toString());
-    if (q) query.set("q", q);
-    else query.delete("q");
-    query.delete("page");
-    start(() => router.push(`${pathname}${query.toString() ? `?${query}` : ""}`));
-  }
-  return <form role="search" aria-label="Buscar implantações" onSubmit={submit} className="flex w-full gap-2 sm:w-auto">
-    <Input type="search" name="q" aria-label="Buscar negócio, protocolo ou apólice" placeholder="Buscar negócio, protocolo ou apólice"
-      defaultValue={value} maxLength={100} className="sm:w-72" />
-    <Button type="submit" variant="outline" loading={pending}>Buscar</Button>
-  </form>;
+function StageBadge({ stage }: { stage: ImplantationStatus }) {
+  return <ErpStatus tone={STAGE_TONE[stage] ?? "neutral"}>{IMPLANTATION_LABELS[stage]}</ErpStatus>;
 }
 
 function ImplantationHistory({ row }: { row: Row }) {
@@ -217,10 +199,9 @@ export function ImplantationsWorkspace({ workspace }: { workspace: Workspace }) 
   const selected = workspace.rows.find((row) => row.leadId === selectedId) ?? null;
   const counts = workspace.counts;
   const columns: ErpColumn<Row>[] = [
-    { id: "deal", label: "Negócio", primary: true, render: (row) => row.name },
-    { id: "broker", label: "Corretor", nowrap: true, render: (row) => row.brokerName ?? "A definir" },
+    { id: "deal", label: "Negócio", primary: true, render: (row) => <ErpCell title={row.name} sub={row.brokerName ?? "Corretor a definir"} /> },
     { id: "stage", label: "Etapa", render: (row) => <StageBadge stage={row.stage} /> },
-    { id: "reference", label: "Referência / apólice", secondary: true, render: (row) => [row.reference, row.policyNumber].filter(Boolean).join(" · ") || "A informar" },
+    { id: "reference", label: "Protocolo e apólice", secondary: true, render: (row) => <ErpCell title={row.policyNumber || "Apólice a informar"} sub={row.reference ? `Protocolo ${row.reference}` : undefined} /> },
     { id: "coverage", label: "Início da cobertura", nowrap: true, render: (row) => formatDay(row.coverageStartsOn) ?? "A confirmar" },
     { id: "updated", label: "Atualização", nowrap: true, render: (row) => row.updatedAt ? formatMoment(row.updatedAt) : "Sem conferência" },
   ];
@@ -229,23 +210,22 @@ export function ImplantationsWorkspace({ workspace }: { workspace: Workspace }) 
     setOpen(true);
   }
   return <>
-    <ErpNote>Da conferência à cobertura ativa. A implantação não comprova pagamento de mensalidade, recebimento de comissão ou repasse.</ErpNote>
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Implantações por etapa">
+    <ErpStats>
       <StatCard label="A conferir" value={counts.review + counts.awaiting_documents} sublabel="inclui aguardando documentos" />
       <StatCard label="Na operadora" value={counts.submitted + counts.operator_pending} sublabel="enviadas ou com pendência" />
       <StatCard label="Implantadas" value={counts.implanted} sublabel="cobertura confirmada" />
       <StatCard label="Encerradas" value={counts.refused + counts.cancelled} sublabel="recusadas ou canceladas" />
-    </div>
+    </ErpStats>
     <ErpToolbar>
-      <ImplantationSearch value={workspace.filters.q} />
+      <ErpSearch label="Buscar implantação" placeholder="Buscar negócio, protocolo ou apólice" value={workspace.filters.q} />
       <ErpUrlFilter label="Etapa de implantação" param="status" value={workspace.filters.status} defaultValue="all" options={STATUS_OPTIONS} />
     </ErpToolbar>
-    <ErpList title="Fila de implantação" description="Negócios em fechamento ou convertidos no seu escopo." columns={columns} rows={workspace.rows}
+    <ErpList title="Fila de implantação" count={workspace.total} countLabel={["negócio", "negócios"]} columns={columns} rows={workspace.rows}
       rowKey={(row) => row.leadId} onRowOpen={openRow} emptyTitle="Nenhuma implantação nesta busca"
       emptyText="Os negócios em fechamento ou convertidos entram nesta fila. Ajuste os filtros ou confira o andamento no CRM."
       footer={<ErpPager page={workspace.filters.page} total={workspace.total} pageSize={workspace.pageSize} label="Paginação de implantações" />} />
     <ErpPanel open={open && !!selected} onOpenChange={setOpen} title={selected?.name ?? "Implantação"}
-      description="Confira a resposta da operadora e registre a etapa. O contrato final continua usando o cadastro e os documentos do CRM.">
+      description={selected ? `${IMPLANTATION_LABELS[selected.stage]} · ${selected.brokerName ?? "Corretor a definir"}` : undefined}>
       {selected ? <ImplantationDetails key={`${selected.leadId}-${selected.version}`} row={selected} workspace={workspace} onSaved={() => setOpen(false)} /> : null}
     </ErpPanel>
   </>;

@@ -23,7 +23,7 @@ import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { DataTable } from "@/components/ui/data-table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppSelect, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
 import { LiteMenu, LiteUrlSelect, type LiteMenuItem } from "@/components/lite/controls";
@@ -230,9 +230,21 @@ export function ErpMonthFilter({ label = "Competência", param = "competence", v
   return <ErpUrlFilter label={label} param={param} value={value} options={options} defaultValue="" />;
 }
 
-function currentMonth() {
+export function currentMonth() {
   const parts = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", timeZone: "America/Sao_Paulo" }).formatToParts(new Date());
   return `${parts.find((part) => part.type === "year")?.value}-${parts.find((part) => part.type === "month")?.value}`;
+}
+
+/**
+ * Month field of a form ("Novembro de 2026"), submitted as `YYYY-MM` under `name`. Replaces `<input type="month">`,
+ * which renders as "------ de ----" in pt-BR browsers. Starts on `defaultValue` or the current month.
+ */
+export function ErpMonthField({ id, name, defaultValue, before = 12, after = 12, disabled }: { id: string; name: string; defaultValue?: string; before?: number; after?: number; disabled?: boolean }) {
+  const anchor = currentMonth();
+  const [value, setValue] = useState(defaultValue || anchor);
+  const options = competenceOptions(anchor, before, after);
+  if (!options.some((option) => option.value === value)) options.push(...competenceOptions(value, 0, 0));
+  return <AppSelect id={id} name={name} value={value} onValueChange={(next) => setValue(String(next))} options={options} disabled={disabled} />;
 }
 
 /** URL pagination for server-paginated lists. */

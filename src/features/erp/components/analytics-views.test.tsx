@@ -8,6 +8,11 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/components/ui/ds-bar-chart", () => ({ DsBarChart: () => <div data-testid="chart" /> }));
+vi.mock("@/components/arc/segmented-control/segmented-control", () => ({
+  default: ({ options, value, label }: { options: { value: string; label: string }[]; value: string; label: string }) => <div role="radiogroup" aria-label={label}>
+    {options.map((option) => <button key={option.value} type="button" role="radio" aria-checked={option.value === value}>{option.label}</button>)}
+  </div>,
+}));
 
 import { ErpSkinProvider } from "../ui/skin-context";
 import type { ErpSkin } from "../ui/skin";
@@ -47,14 +52,15 @@ const skins: ErpSkin[] = ["standard", "lite"];
 describe.each(skins)("analytics screens (%s skin)", (skin) => {
   const mount = (node: React.ReactNode) => render(<ErpSkinProvider skin={skin}>{node}</ErpSkinProvider>);
 
-  it("production: perspective tabs, KPI row, month list and hidden values", () => {
+  it("production: perspectives as a segmented control, KPI row, month list and hidden values", () => {
     mount(<ProductionView report={production} />);
-    const tabs = screen.getByRole("navigation", { name: "Perspectivas de inteligência" });
-    expect(within(tabs).getByRole("link", { name: "Produção" })).toHaveAttribute("aria-current", "page");
-    expect(within(tabs).getByRole("link", { name: "Análise diária" })).toHaveAttribute("href", "/relatorios/diario");
+    const perspectives = screen.getByLabelText("Perspectivas de inteligência");
+    expect(within(perspectives).getByText("Produção")).toBeInTheDocument();
+    expect(within(perspectives).getByText("Análise diária")).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Perspectivas de inteligência" })).toBeNull();
     expect(screen.getAllByText("Sem acesso a valores").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Out de 2026").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("parcial").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Outubro de 2026").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Mês em andamento").length).toBeGreaterThan(0);
     expect(screen.queryByText("Valor vendido", { selector: "th, th *" })).toBeNull();
     expect(screen.queryByText("Memória de cálculo")).toBeNull();
   });
@@ -66,16 +72,18 @@ describe.each(skins)("analytics screens (%s skin)", (skin) => {
     expect(screen.getAllByText("66,7%").length).toBeGreaterThan(0);
   });
 
-  it("goals: list rows and no primary CTA", () => {
+  it("goals: list rows with progress and the row opens the drawer", async () => {
     mount(<GoalsView goals={goals} />);
     expect(screen.getAllByText("Meta empresa").length).toBeGreaterThan(0);
     expect(screen.getAllByText("40%").length).toBeGreaterThan(0);
-    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: /Nova|Criar/ })).toBeNull();
+    fireEvent.click(screen.getAllByText("Meta empresa")[0]);
+    expect(await screen.findByText("Progresso calculado em")).toBeInTheDocument();
   });
 
-  it("calculation memory opens from the settings menu into the drawer", async () => {
-    mount(<AnalyticsSettings metrics={[metric]} generatedAt={generatedAt} links={[{ id: "vendas", label: "Abrir lista de vendas", href: "/vendas" }]} />);
-    fireEvent.click(screen.getByRole("button", { name: /Configurações/ }));
+  it("calculation memory opens from the options menu into the drawer", async () => {
+    mount(<AnalyticsSettings metrics={[metric]} generatedAt={generatedAt} links={[{ id: "vendas", label: "Abrir lista de vendas", href: "/vendas" }]} perspective="producao" />);
+    fireEvent.click(screen.getByRole("button", { name: /Opções/ }));
     fireEvent.click(await screen.findByText("Memória de cálculo"));
     expect(await screen.findByText(/Cada venda conta uma vez/)).toBeInTheDocument();
     expect(screen.getByText(/production_count v1/)).toBeInTheDocument();

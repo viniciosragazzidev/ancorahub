@@ -3,10 +3,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import type { ComponentProps, ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const search = vi.hoisted(() => ({ value: "" }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
   usePathname: () => "/campanhas-incentivo",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(search.value),
 }));
 const detail = vi.hoisted(() => ({ value: null as unknown }));
 const actions = vi.hoisted(() => ({
@@ -23,7 +24,7 @@ import { ErpSkinProvider } from "../ui/skin-context";
 import type { ErpSkin } from "../ui/skin";
 import { IncentiveCampaignDetail, IncentivesWorkspace } from "./incentives-workspace";
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); search.value = ""; });
 const SKINS: ErpSkin[] = ["standard", "lite"];
 const mount = (skin: ErpSkin, ui: ReactElement) => render(<ErpSkinProvider skin={skin}>{ui}</ErpSkinProvider>);
 
@@ -32,7 +33,8 @@ const campaign = {
   endsOn: "2026-11-30", branchIds: [] as string[], prize: "Troféu", showNames: false, status: "approved" as const, reason: "", version: 1,
 };
 const data: ComponentProps<typeof IncentivesWorkspace>["data"] = {
-  filters: { status: "all" as const, page: 1 }, total: 1, pageSize: 25, canManage: true, today: "2026-11-12", branches: [],
+  filters: { status: "all" as const, q: "", page: 1 }, total: 1, pageSize: 25, canManage: true, today: "2026-11-12", branches: [],
+  summary: { running: 1, awaitingApproval: 0, awaitingFinal: 0, closed: 0 },
   rows: [{ ...campaign, lastCalculatedAt: null }],
 };
 const detailData: ComponentProps<typeof IncentiveCampaignDetail>["data"] = {
@@ -48,10 +50,11 @@ const detailData: ComponentProps<typeof IncentiveCampaignDetail>["data"] = {
 detail.value = detailData;
 
 describe.each(SKINS)("Campanhas de incentivo (%s skin)", (skin) => {
-  it("lists campaigns with one primary CTA and the row opens the drawer with regulation, actions and ranking", async () => {
+  it("lists campaigns (the CTA lives in the page header) and the row opens the drawer with regulation, actions and ranking", async () => {
     mount(skin, <IncentivesWorkspace data={data} />);
     expect(screen.getAllByText("Campanha Novembro").length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: "Nova campanha" })).toHaveLength(1);
+    expect(screen.getAllByText("1 campanha").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Nova campanha" })).toBeNull();
     act(() => { fireEvent.click(screen.getAllByText("Campanha Novembro")[0]); });
     await waitFor(() => expect(screen.getByText("Regulamento sintético da campanha.")).toBeInTheDocument());
     expect(actions.getIncentiveCampaignAction).toHaveBeenCalledWith("c1");
@@ -60,9 +63,13 @@ describe.each(SKINS)("Campanhas de incentivo (%s skin)", (skin) => {
     expect(screen.getByRole("link", { name: "Abrir ficha completa" })).toBeInTheDocument();
   });
 
-  it("hides the create CTA from viewers who cannot manage", () => {
+  it("opens the create drawer from the header link (?novo=1) only for managers", () => {
+    search.value = "novo=1";
+    mount(skin, <IncentivesWorkspace data={data} />);
+    expect(screen.getByRole("button", { name: "Criar rascunho" })).toBeInTheDocument();
+    cleanup();
     mount(skin, <IncentivesWorkspace data={{ ...data, canManage: false }} />);
-    expect(screen.queryByRole("button", { name: "Nova campanha" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Criar rascunho" })).toBeNull();
   });
 
   it("full view renders ranking and apuração history lists", () => {
@@ -70,5 +77,6 @@ describe.each(SKINS)("Campanhas de incentivo (%s skin)", (skin) => {
     expect(screen.getAllByText("Você").length).toBeGreaterThan(0);
     expect(screen.getAllByText("abcdef123456").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Nenhuma contestação").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Participantes no ranking").length).toBeGreaterThan(0);
   });
 });

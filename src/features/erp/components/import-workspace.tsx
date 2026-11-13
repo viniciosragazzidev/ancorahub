@@ -1,19 +1,19 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useState, useTransition, type FormEvent } from "react";
+import { startTransition as startAction, useActionState, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldLabel, FieldSuccess } from "@/components/ui/field";
-import { Badge } from "@/components/ui/badge";
+import { StatCard } from "@/components/dashboard/metric-card";
 import { AppSelect } from "@/components/ui/select";
-import { ErpList, ErpNote, ErpPanel, ErpSection, type ErpColumn } from "../ui/erp-kit";
+import { ErpCell, ErpList, ErpNote, ErpPanel, ErpSection, ErpStats, ErpStatus, useUrlPanel, type ErpColumn, type ErpTone } from "../ui/erp-kit";
+import { formatCompetence, formatDay as formatKitDay, formatInstant } from "../ui/format";
 import { FINANCIAL_LABELS, IMPLANTATION_LABELS, IMPORT_STATUS, formatCents, type ErpActionResult } from "../contracts";
 import { submitErpFile } from "../client-file-request";
 import { reviewErpImportAction } from "../import-actions";
-import { ERP_TIME_ZONE } from "../shared";
 import type { getErpImport, getErpImports } from "../imports";
 
 type ImportDomain = "implantations" | "finance";
@@ -27,11 +27,11 @@ const INITIAL: ErpActionResult = { ok: true, message: "" };
 const DOMAIN_LABELS: Record<ImportDomain, string> = { implantations: "Implantação", finance: "Lançamentos financeiros" };
 
 function formatMoment(value: Date | string) {
-  return new Date(value).toLocaleString("pt-BR", { timeZone: ERP_TIME_ZONE, dateStyle: "short", timeStyle: "short" });
+  return formatInstant(value);
 }
 
 function formatDay(value: string | null) {
-  return value ? value.split("-").reverse().join("/") : null;
+  return value ? formatKitDay(value) : null;
 }
 
 function Feedback({ result }: { result: ErpActionResult }) {
@@ -39,8 +39,10 @@ function Feedback({ result }: { result: ErpActionResult }) {
   return result.ok ? <FieldSuccess role="status">{result.message}</FieldSuccess> : <FieldError role="alert">{result.message}</FieldError>;
 }
 
+const STATUS_TONE: Record<keyof typeof IMPORT_STATUS, ErpTone> = { preview: "warning", applied: "success", rejected: "danger" };
+
 function StatusBadge({ status }: { status: keyof typeof IMPORT_STATUS }) {
-  return <Badge variant={status === "applied" ? "default" : status === "rejected" ? "outline" : "secondary"}>{IMPORT_STATUS[status]}</Badge>;
+  return <ErpStatus tone={STATUS_TONE[status] ?? "neutral"}>{IMPORT_STATUS[status]}</ErpStatus>;
 }
 
 /** Upload form of a new batch (inside the "Nova importação" drawer). */
@@ -66,26 +68,25 @@ export function ImportUpload({ maxRows, domains }: { maxRows: number; domains: r
         onValueChange={(value) => { if (value === "finance" || value === "implantations") setDomain(value); setResult(INITIAL); }} /></Field> : null}
     <Field><FieldLabel htmlFor="erp-import-file">{finance ? "Arquivo de lançamentos" : "Arquivo de implantação"}</FieldLabel>
       <Input id="erp-import-file" name="file" type="file" accept=".csv,.xlsx" required disabled={pending} /></Field>
-    <ErpNote>
-      CSV UTF-8 ou XLSX, até 2 MB e {maxRows} linhas. Nenhuma linha será aplicada durante a prévia.
-      {finance
-        ? " Cada linha vira um lançamento a conferir: a evidência e a aprovação continuam na ficha do lançamento."
-        : " Use o código do negócio disponível em Implantação."}
-    </ErpNote>
-    <ErpNote>
-      {finance
-        ? "Datas: AAAA-MM-DD; competência: AAAA-MM. Tipo: recebível, mensalidade, comissão, despesa ou adiantamento. Valor com vírgula ou ponto e até duas casas. "
-          + "Recebível, mensalidade e comissão exigem o código da venda; comissão e adiantamento exigem o código do beneficiário. "
-          + "A referência é única por tipo: reenviar a mesma referência não duplica o lançamento."
-        : "Datas: AAAA-MM-DD. Etapas: awaiting_documents, review, submitted, operator_pending, implanted, refused ou cancelled. "
-          + "Para confirmar implantação, informe apólice, início de cobertura e o código da evidência enviada pelo módulo. Recusa, cancelamento e reabertura exigem motivo."}
-    </ErpNote>
-    <ErpNote>Um arquivo rejeitado pode ser enviado de novo: o mesmo lote volta para conferência em uma nova versão, com você como responsável pela prévia.</ErpNote>
+    <ErpNote>CSV UTF-8 ou XLSX, até 2 MB e {maxRows} linhas. Nenhuma linha é aplicada durante a prévia.</ErpNote>
+    <ul className="flex list-disc flex-col gap-1.5 pl-4 text-xs leading-5 text-muted-foreground">
+      {(finance ? [
+        "Datas no formato AAAA-MM-DD e competência AAAA-MM.",
+        "Tipo: recebível, mensalidade, comissão, despesa ou adiantamento. Valor com vírgula ou ponto e até duas casas.",
+        "Recebível, mensalidade e comissão exigem o código da venda; comissão e adiantamento exigem o código do beneficiário.",
+        "A referência é única por tipo: reenviar a mesma referência não duplica o lançamento.",
+        "Cada linha vira um lançamento a conferir: evidência e aprovação continuam na ficha do lançamento.",
+      ] : [
+        "Use o código do negócio disponível na ficha de Implantação. Datas no formato AAAA-MM-DD.",
+        "Etapas: awaiting_documents, review, submitted, operator_pending, implanted, refused ou cancelled.",
+        "Para confirmar implantação, informe apólice, início da cobertura e o código da evidência enviada pelo módulo.",
+        "Recusa, cancelamento e reabertura exigem motivo.",
+      ]).map((rule) => <li key={rule}>{rule}</li>)}
+    </ul>
     <Feedback result={result} />
     <div className="flex flex-wrap gap-2">
       <Button type="submit" loading={pending}>Preparar prévia</Button>
       <Button variant="outline" render={<a href={finance ? "/api/erp/imports/template?domain=finance" : "/api/erp/imports/template"} />}>Baixar modelo</Button>
-      <Button variant="ghost" render={<Link href={finance ? "/financeiro" : "/implantacoes"} />}>{finance ? "Ver lançamentos" : "Ver negócios"}</Button>
     </div>
   </form>;
 }
@@ -99,36 +100,38 @@ function BatchSummary({ batch }: { batch: BatchRow }) {
       <div><dt className="text-xs text-muted-foreground">Linhas</dt><dd className="tabular-nums">{batch.rowCount}</dd></div>
       <div className="col-span-2"><dt className="text-xs text-muted-foreground">Prévia preparada em</dt><dd>{formatMoment(batch.createdAt)}</dd></div>
     </dl>
-    <div><Button variant="outline" render={<Link href={`/administracao/importacoes/${batch.id}`} />}>Conferir lote</Button></div>
+    <div><Button render={<Link href={`/administracao/importacoes/${batch.id}`} />}>Conferir lote</Button></div>
   </>;
 }
 
-export function ImportsWorkspace({ data }: { data: ImportsData }) {
-  const [panel, setPanel] = useState<"new" | "batch" | null>(null);
+export function ImportsWorkspace({ data, toolbar }: { data: ImportsData; toolbar?: ReactNode }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const creating = useUrlPanel("novo");
   const selected = data.rows.find((row) => row.id === selectedId) ?? null;
   const columns: ErpColumn<BatchRow>[] = [
-    { id: "file", label: "Arquivo", primary: true, render: (row) => row.fileName },
-    { id: "domain", label: "Tipo", secondary: true, render: (row) => DOMAIN_LABELS[row.domain] },
+    { id: "file", label: "Arquivo", primary: true, render: (row) => <ErpCell title={row.fileName} sub={DOMAIN_LABELS[row.domain]} /> },
     { id: "author", label: "Preparado por", nowrap: true, render: (row) => row.createdBy ?? "Responsável registrado" },
-    { id: "rows", label: "Linhas", numeric: true, render: (row) => row.rowCount },
+    { id: "rows", label: "Linhas", numeric: true, render: (row) => row.rowCount.toLocaleString("pt-BR") },
     { id: "status", label: "Estado", render: (row) => <StatusBadge status={row.status} /> },
-    { id: "created", label: "Prévia", nowrap: true, render: (row) => formatMoment(row.createdAt) },
+    { id: "created", label: "Prévia", nowrap: true, secondary: true, render: (row) => formatMoment(row.createdAt) },
   ];
-  function openBatch(row: BatchRow) {
-    setSelectedId(row.id);
-    setPanel("batch");
-  }
-  const close = (open: boolean) => { if (!open) setPanel(null); };
+  const { summary } = data;
   return <>
-    <ErpNote>Prepare o arquivo, confira a prévia e solicite a revisão independente. Referências repetidas e alterações concorrentes impedem a aplicação.</ErpNote>
-    <ErpList title="Lotes de importação" description="Os 50 lotes mais recentes do seu escopo." columns={columns} rows={data.rows} rowKey={(row) => row.id}
-      onRowOpen={openBatch} actions={<Button type="button" onClick={() => setPanel("new")}>Nova importação</Button>}
-      emptyTitle="Nenhum lote preparado" emptyText="Use “Nova importação” para enviar um arquivo e conferir a prévia antes de aplicar." />
-    <ErpPanel open={panel === "new"} onOpenChange={close} title="Nova importação" description="Envie o arquivo para preparar a prévia. Outra pessoa autorizada aplica o lote.">
-      <ImportUpload maxRows={data.maxRows} domains={data.domains} />
+    <ErpStats>
+      <StatCard label="A conferir" value={summary.preview} sublabel="prévias aguardando revisão" />
+      <StatCard label="Aplicados" value={summary.applied} sublabel="lotes conferidos e aplicados" />
+      <StatCard label="Rejeitados" value={summary.rejected} sublabel="podem ser enviados de novo" />
+    </ErpStats>
+    {toolbar}
+    <ErpList title="Lotes de importação" count={data.rows.length} countLabel={["lote", "lotes"]} columns={columns} rows={data.rows} rowKey={(row) => row.id}
+      onRowOpen={(row) => setSelectedId(row.id)}
+      emptyTitle="Nenhum lote neste filtro" emptyText="Use Nova importação para enviar um arquivo e conferir a prévia antes de aplicar." />
+    <ErpPanel open={creating.open} onOpenChange={(open) => { if (!open) creating.close(); }} title="Nova importação"
+      description="Envie o arquivo para preparar a prévia. Outra pessoa autorizada aplica o lote.">
+      {creating.open ? <ImportUpload maxRows={data.maxRows} domains={data.domains} /> : null}
     </ErpPanel>
-    <ErpPanel open={panel === "batch" && !!selected} onOpenChange={close} title={selected?.fileName ?? "Lote"} description="Resumo do lote. A conferência linha a linha fica na página do lote.">
+    <ErpPanel open={!!selected} onOpenChange={(open) => { if (!open) setSelectedId(null); }} title={selected?.fileName ?? "Lote"}
+      description={selected ? `${DOMAIN_LABELS[selected.domain]} · ${IMPORT_STATUS[selected.status]}` : undefined}>
       {selected ? <BatchSummary batch={selected} /> : null}
     </ErpPanel>
   </>;
@@ -136,26 +139,23 @@ export function ImportsWorkspace({ data }: { data: ImportsData }) {
 
 function BatchLines({ batch }: { batch: Batch }) {
   const implantationColumns: ErpColumn<ImplantationLine>[] = [
-    { id: "deal", label: "Negócio", primary: true, render: (row) => batch.leadNames[row.leadId] ?? row.leadId },
-    { id: "reference", label: "Referência", secondary: true, render: (row) => row.reference || "A informar" },
+    { id: "deal", label: "Negócio", primary: true, render: (row) => <ErpCell title={batch.leadNames[row.leadId] ?? row.leadId} sub={row.reference ? `Protocolo ${row.reference}` : undefined} /> },
     { id: "stage", label: "Etapa", render: (row) => IMPLANTATION_LABELS[row.status] },
     { id: "policy", label: "Apólice", nowrap: true, render: (row) => row.policyNumber || "A informar" },
     { id: "coverage", label: "Cobertura", nowrap: true, render: (row) => formatDay(row.coverageStartsOn) ?? "A informar" },
-    { id: "check", label: "Conferência", render: (row) => `Versão ${row.expectedVersion} · ${row.evidenceDocumentId ? "evidência vinculada" : "sem evidência"}` },
+    { id: "check", label: "Evidência", render: (row) => <ErpStatus tone={row.evidenceDocumentId ? "success" : "neutral"}>{row.evidenceDocumentId ? "Vinculada" : "Sem evidência"}</ErpStatus> },
   ];
   const financeColumns: ErpColumn<FinanceLine>[] = [
-    { id: "reference", label: "Referência", primary: true, render: (row) => row.reference },
-    { id: "description", label: "Descrição", secondary: true, render: (row) => row.description },
-    { id: "kind", label: "Tipo", render: (row) => FINANCIAL_LABELS[row.kind] },
+    { id: "description", label: "Lançamento", primary: true, render: (row) => <ErpCell title={row.description} sub={`${FINANCIAL_LABELS[row.kind]} · Ref. ${row.reference}`} /> },
     { id: "amount", label: "Valor", numeric: true, render: (row) => formatCents(row.amountCents) },
     { id: "due", label: "Vencimento", nowrap: true, render: (row) => formatDay(row.dueOn) },
-    { id: "competence", label: "Competência", nowrap: true, render: (row) => row.competence },
+    { id: "competence", label: "Competência", nowrap: true, render: (row) => formatCompetence(row.competence) },
   ];
   if (batch.domain === "finance") {
-    return <ErpList title="Linhas do lote" columns={financeColumns} rows={batch.financeRows} rowKey={(row) => `${row.kind}-${row.reference}`}
+    return <ErpList title="Linhas do lote" count={batch.financeRows.length} countLabel={["linha", "linhas"]} columns={financeColumns} rows={batch.financeRows} rowKey={(row) => `${row.kind}-${row.reference}`}
       emptyTitle="Lote sem linhas" emptyText="Nenhuma linha válida neste lote." />;
   }
-  return <ErpList title="Linhas do lote" columns={implantationColumns} rows={batch.rows} rowKey={(row) => row.leadId}
+  return <ErpList title="Linhas do lote" count={batch.rows.length} countLabel={["linha", "linhas"]} columns={implantationColumns} rows={batch.rows} rowKey={(row) => row.leadId}
     emptyTitle="Lote sem linhas" emptyText="Nenhuma linha válida neste lote." />;
 }
 
@@ -163,19 +163,23 @@ function BatchLines({ batch }: { batch: Batch }) {
 export function ImportReview({ batch }: { batch: Batch }) {
   const [result, action, pending] = useActionState(reviewErpImportAction, INITIAL);
   const lineCount = batch.rows.length + batch.financeRows.length;
+  // Submits without React's automatic form reset: the Base UI checkbox would keep its look and send "unchecked".
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const native = event.nativeEvent as SubmitEvent;
+    const data = new FormData(event.currentTarget, native.submitter instanceof HTMLElement ? native.submitter : undefined);
+    startAction(() => action(data));
+  }
   return <>
-    <ErpSection title={batch.fileName} description={`${DOMAIN_LABELS[batch.domain]} · versão ${batch.version}`}>
-      <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-        <div><dt className="text-xs text-muted-foreground">Estado</dt><dd><StatusBadge status={batch.status} /></dd></div>
-        <div><dt className="text-xs text-muted-foreground">Linhas</dt><dd className="tabular-nums">{lineCount}</dd></div>
-        <div><dt className="text-xs text-muted-foreground">Preparado por</dt><dd>{batch.createdByName ?? "Responsável registrado"}</dd></div>
-        <div><dt className="text-xs text-muted-foreground">Prévia</dt><dd>{formatMoment(batch.createdAt)}</dd></div>
-      </dl>
-      {batch.reviewReason ? <ErpNote>Última revisão: {batch.reviewReason}</ErpNote> : null}
-    </ErpSection>
+    <ErpStats>
+      <StatCard label="Estado" value={IMPORT_STATUS[batch.status]} sublabel={`${DOMAIN_LABELS[batch.domain]} · versão ${batch.version}`} />
+      <StatCard label="Linhas" value={lineCount} sublabel="válidas na prévia" />
+      <StatCard label="Preparado por" value={batch.createdByName ?? "Responsável"} sublabel={formatMoment(batch.createdAt)} />
+    </ErpStats>
+    {batch.reviewReason ? <ErpNote>Última revisão: {batch.reviewReason}</ErpNote> : null}
     <BatchLines batch={batch} />
     <ErpSection title="Revisão" description="Aplicar exige outra pessoa autorizada. Revalidar atualiza a prévia; rejeitar encerra o lote.">
-      {batch.status !== "applied" ? <form action={action} className="flex flex-col gap-4">
+      {batch.status !== "applied" ? <form onSubmit={submit} className="flex flex-col gap-4">
         <input type="hidden" name="id" value={batch.id} />
         <input type="hidden" name="version" value={batch.version} />
         <Field><FieldLabel htmlFor="erp-import-reason">Motivo da revisão</FieldLabel>

@@ -9,7 +9,7 @@ import { analyticsVisibility, implantedInMonths, instantInMonths } from "./analy
 
 export type TvTile =
   | { id: string; kind: "number"; label: string; value: string; hint: string }
-  | { id: string; kind: "ranking"; label: string; hint: string; items: { label: string; value: string }[] };
+  | { id: string; kind: "ranking"; label: string; hint: string; items: { label: string; value: string; amount: number }[] };
 
 /** The board refreshes every few minutes; the access is audited at most once per person per hour. */
 export const TV_AUDIT_ACTION = "erp.tv.viewed";
@@ -84,11 +84,11 @@ export async function getTvBoard() {
     hint: "Implantações concluídas pelo início de cobertura",
   });
   if (units.length) {
-    const items = units.map((row) => ({ label: row.name, value: count(Number(row.count)) }));
+    const items = units.map((row) => ({ label: row.name, value: count(Number(row.count)), amount: Number(row.count) }));
     tiles.push({ id: "units", kind: "ranking", label: "Unidades com mais vendas", hint: "Vendas ativas no mês", items });
   }
   if (showNames && brokers.length) {
-    const items = brokers.map((row) => ({ label: row.name, value: count(Number(row.count)) }));
+    const items = brokers.map((row) => ({ label: row.name, value: count(Number(row.count)), amount: Number(row.count) }));
     tiles.push({ id: "brokers", kind: "ranking", label: "Destaques do mês", hint: "Vendas ativas no mês", items });
   }
   await auditTvView(db, auth, { page: "tv", month, tiles: tiles.map((tile) => tile.id) });

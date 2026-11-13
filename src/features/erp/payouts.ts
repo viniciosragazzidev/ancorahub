@@ -1,13 +1,13 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { and, asc, count, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { auditErp, canSeeAgencyBooks, erpScopeSql, getErpEffectiveAccess, requireErpAccess, type ErpDatabase } from "./access";
 import { assertIndependentReview, assertNotBeneficiary, ErpError } from "./contracts";
 import { notInOpenPayoutSql, openBalanceSql } from "./balances";
 import { deterministicUuid } from "./commission-core";
-import { activePayoutFor, assertOpenPeriods, entryMovements, financialTransaction } from "./finance";
+import { activePayoutFor, assertOpenPeriods, entryMovements, financialTransaction, likePattern } from "./finance";
 import { assertOccurredByToday, assertPaymentCapacity, checkedCents, settledCents } from "./ledger";
 import { getEntryOffsets } from "./offset-balances";
 import { scopedEvidence, scopedFinancialEntry, type ErpAccess } from "./records";
@@ -221,22 +221,33 @@ export async function confirmPayoutPayment(raw: unknown) {
   });
 }
 
-const listSchema = z.object({ status: z.enum(["all", ...PAYOUT_STATUSES]).default("all"), competence: period.optional(), page: pageSchema });
+const listSchema = z.object({ status: z.enum(["all", ...PAYOUT_STATUSES]).default("all"), competence: period.optional(), q: z.string().trim().max(100).optional().default(""), page: pageSchema });
 export async function getPayouts(raw: unknown) {
   const filters = listSchema.parse(raw);
   const auth = await requireErpAccess("finance", "erp_view_finance"); const db = getDatabase();
   const agency = canSeeAgencyBooks(auth.context) && auth.scope.mode !== "owners"; const access = await getErpEffectiveAccess(auth.context);
-  const where = and(eq(schema.erpPayouts.tenantId, auth.context.tenantId), erpScopeSql(auth.scope, schema.erpPayouts.branchId, schema.erpPayouts.beneficiaryId),
+  // Scope of the screen (who, month); the numbers on top follow it, the list adds state and search.
+  const scoped = and(eq(schema.erpPayouts.tenantId, auth.context.tenantId), erpScopeSql(auth.scope, schema.erpPayouts.branchId, schema.erpPayouts.beneficiaryId),
     agency ? undefined : eq(schema.erpPayouts.beneficiaryId, auth.context.userId), agency ? undefined : eq(schema.erpPayouts.status, "settled"),
-    filters.status === "all" ? undefined : eq(schema.erpPayouts.status, filters.status), filters.competence ? eq(schema.erpPayouts.competence, filters.competence) : undefined);
-  const [rows, total] = await Promise.all([
+    filters.competence ? eq(schema.erpPayouts.competence, filters.competence) : undefined);
+  const pattern = likePattern(filters.q);
+  const where = and(scoped, filters.status === "all" ? undefined : eq(schema.erpPayouts.status, filters.status),
+    filters.q ? sql`(${ilike(schema.user.name, pattern)} OR ${ilike(schema.erpPayouts.receiptNumber, pattern)})` : undefined);
+  const statusCount = (status: string) => sql<number>`count(*) FILTER (WHERE ${schema.erpPayouts.status} = ${status})::int`.mapWith(Number);
+  const [rows, total, [summary]] = await Promise.all([
     db.select({ payout: schema.erpPayouts, beneficiaryName: schema.user.name }).from(schema.erpPayouts).leftJoin(schema.user, eq(schema.user.id, schema.erpPayouts.beneficiaryId))
       .where(where).orderBy(desc(schema.erpPayouts.createdAt), desc(schema.erpPayouts.id)).limit(PAGE_SIZE).offset((filters.page - 1) * PAGE_SIZE),
-    db.select({ value: count() }).from(schema.erpPayouts).where(where),
+    db.select({ value: count() }).from(schema.erpPayouts).leftJoin(schema.user, eq(schema.user.id, schema.erpPayouts.beneficiaryId)).where(where),
+    db.select({ prepared: statusCount("prepared"), approved: statusCount("approved"), paying: statusCount("paying"), settled: statusCount("settled"),
+      settledCents: sql<number>`coalesce(sum(${schema.erpPayouts.netCents}) FILTER (WHERE ${schema.erpPayouts.status} = 'settled'), 0)::bigint`.mapWith(Number),
+      openCents: sql<number>`coalesce(sum(${schema.erpPayouts.netCents}) FILTER (WHERE ${schema.erpPayouts.status} IN ('prepared', 'approved', 'paying')), 0)::bigint`.mapWith(Number) })
+      .from(schema.erpPayouts).where(scoped),
   ]);
   await auditErp(db, { tenantId: auth.context.tenantId, actorId: auth.context.viewAs?.adminUserId ?? auth.context.userId, action: "erp.payout.viewed", entityType: "erp_access", entityId: "payouts",
     metadata: { count: rows.length, page: filters.page } });
   return { filters, agency, total: Number(total[0]?.value ?? 0), pageSize: PAGE_SIZE,
+    summary: { prepared: summary?.prepared ?? 0, approved: summary?.approved ?? 0, paying: summary?.paying ?? 0, settled: summary?.settled ?? 0,
+      settledCents: summary?.settledCents ?? 0, openCents: summary?.openCents ?? 0 },
     canPrepare: agency && !auth.context.viewAs && access.capabilities.has("erp_prepare_finance"),
     rows: rows.map(({ payout, beneficiaryName }) => ({ id: payout.id, beneficiaryName: beneficiaryName ?? "Sem nome", competence: payout.competence, status: payout.status,
       netCents: payout.netCents, grossCents: payout.grossCents, receiptNumber: payout.receiptNumber, occurredOn: payout.occurredOn })) };

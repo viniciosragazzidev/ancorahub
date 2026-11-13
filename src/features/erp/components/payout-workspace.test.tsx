@@ -42,7 +42,8 @@ const payoutRows = [
   { id: "p1", beneficiaryName: "Ana Souza", competence: "2026-11", status: "prepared", netCents: 15025, grossCents: 15025, receiptNumber: null, occurredOn: null },
   { id: "p2", beneficiaryName: "Bruno Lima", competence: "2026-10", status: "settled", netCents: 5000, grossCents: 5000, receiptNumber: "RP-2026-000001", occurredOn: "2026-11-12" },
 ];
-const payoutList = { filters: { status: "all" as const, competence: undefined, page: 1 }, agency: true, total: 2, pageSize: 25, canPrepare: true, rows: payoutRows };
+const payoutList = { filters: { status: "all" as const, competence: undefined, q: "", page: 1 }, agency: true, total: 2, pageSize: 25, canPrepare: true, rows: payoutRows,
+  summary: { prepared: 1, approved: 0, paying: 0, settled: 1, settledCents: 5000, openCents: 15025 } };
 const detail: PayoutDetailData = {
   id: "p1", status: "prepared", version: 1, competence: "2026-11", beneficiaryName: "Ana Souza", grossCents: 15025, netCents: 15025, occurredOn: null,
   reason: null, receiptNumber: null, agency: true, documents: [], reversedCents: 2000,
@@ -51,11 +52,13 @@ const detail: PayoutDetailData = {
 };
 
 describe.each(SKINS)("ERP payouts screens (%s skin)", (skin) => {
-  it("payouts: rows, single primary CTA, row opens the drawer with the step and the reversed amount", () => {
+  it("payouts: rows (named month, receipt as second line), no CTA inside the list, drawer with the step and the reversed amount", () => {
     search = new URLSearchParams("repasse=p1");
     mount(skin, <PayoutsList data={payoutList} candidates={null} detail={detail} detailMissing={false} />);
     expect(screen.getAllByText("Bruno Lima").length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: "Preparar repasse", hidden: true })).toHaveLength(1);
+    expect(screen.getAllByText("Recibo RP-2026-000001").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("out. 2026").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Preparar repasse" })).toBeNull();
     expect(screen.getByRole("button", { name: "Aprovar repasse" })).toBeInTheDocument();
     expect(screen.getAllByText(/Estornado depois da emissão/).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Abrir ficha completa" })).toBeInTheDocument();
@@ -86,7 +89,8 @@ describe.each(SKINS)("ERP payouts screens (%s skin)", (skin) => {
     const row = { id: "c1", saleId: "s1", monthNumber: 1, referenceMonth: "2026-10", percentage: "10.00", amount: "100.00", legacyStatus: "pending" as const,
       clientName: "Cliente Teste", brokerId: "u1", brokerName: "Ana Souza", saleStatus: "active" as const, expectedCents: 10000, entry: null,
       paidCents: 0, offsetCents: 0, divergence: null, divergenceLabel: null };
-    const data = { filters: { competence: undefined, page: 1 }, total: 1, pageSize: 25, agency: true, canBring: true, rows: [row] };
+    const data = { filters: { competence: undefined, q: "", page: 1 }, total: 1, pageSize: 25, agency: true, canBring: true, rows: [row],
+      summary: { installments: 1, expectedCents: 10000, conferred: 0, pendingLegacy: 1 } };
     mount(skin, <CommissionsList data={data} />);
     expect(screen.queryByRole("button", { name: "Conferir no ERP" })).toBeNull();
     openRow("Cliente Teste");
@@ -101,6 +105,7 @@ describe.each(SKINS)("ERP payouts screens (%s skin)", (skin) => {
       items: [], grossCents: 5000, offsetCents: 0, netCents: 5000 } };
     mount(skin, <ReceiptsList data={data} preview={preview} previewMissing={false} />);
     expect(screen.getAllByText("RP-2026-000001").length).toBeGreaterThan(0);
+    expect(screen.queryByText("2026-10")).toBeNull();
     expect(screen.getByRole("link", { name: "Abrir para imprimir" })).toBeInTheDocument();
     expect(screen.getAllByText(/Estornado depois da emissão/).length).toBeGreaterThan(0);
   });
