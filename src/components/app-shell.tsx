@@ -86,7 +86,7 @@ export function AppShell({
   showDutyCalendar?: boolean;
   showRelationship?: boolean;
   journeyEnabled?: boolean;
-  /** Início do corretor reorganizado (BROKER_NAV_REORG): menu Mais novo e sem a faixa fixa do WhatsApp. */
+  /** Início do corretor reorganizado (BROKER_NAV_REORG): menu Mais novo. */
   homeV2Enabled?: boolean;
   /** Welcome video on the broker's first access (Super-admin flag). */
   welcomeVideoEnabled?: boolean;
