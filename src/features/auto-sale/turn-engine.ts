@@ -49,17 +49,27 @@ export function normalizeDecision(raw: z.infer<typeof agentTurnSchema>): AgentTu
   return {
     ...raw,
     facts: cleanModelFacts(raw.facts),
-    messages: raw.messages.filter((message) => message.trim().length > 0).slice(0, 4).map((message) => message.slice(0, 600)),
+    messages: [...new Set(raw.messages.filter((message) => message.trim().length > 0).slice(0, 4).map((message) => plainLanguage(message.slice(0, 600))))],
   };
+}
+
+/** Termo de corretor que confunde o cliente (12/11, pedido do Vinicios): "PME", "adesão", "pessoa física", "modalidade". */
+const JARGON = /\b(pme|modalidade)\b|pessoa f[ií]sica|\bades[aã]o\b/i;
+
+/** Pergunta do modelo com jargão vira a pergunta simples de sempre; frase sem pergunta só troca os termos. */
+export function plainLanguage(message: string) {
+  if (!JARGON.test(message)) return message;
+  if (message.includes("?")) return QUESTION_FOR.modality;
+  return message.replace(/\bPME\b/gi, "plano pela empresa").replace(/pessoa f[ií]sica/gi, "plano no seu nome").replace(/\bades[aã]o\b/gi, "plano por profissão").replace(/\bmodalidade\b/gi, "tipo de plano");
 }
 
 export const QUESTION_FOR: Record<MissingFact, string> = {
   ages: "Para eu cotar certinho: qual a idade de cada pessoa que vai entrar no plano?",
   city: "E em qual cidade e bairro vocês moram?",
-  modality: "Você tem CNPJ ou MEI aberto, ou seria no seu CPF? Se for por profissão (OAB, CREA, conselho), me conta também.",
-  entity: "Qual a sua profissão ou a entidade de classe? Por exemplo OAB, CREA ou CRM.",
-  businessProfile: "Sua empresa é MEI, ME, EPP ou LTDA?",
-  businessMonths: "Há quanto tempo o CNPJ está aberto?",
+  modality: "O plano seria no seu nome, pelo seu CPF, ou pela sua empresa, se você tiver CNPJ ou MEI?",
+  entity: "Qual é a sua profissão? Algumas profissões têm planos mais em conta.",
+  businessProfile: "Sua empresa é MEI ou é outro tipo de CNPJ?",
+  businessMonths: "Há quanto tempo a empresa está aberta?",
 };
 
 /** Adesão: pergunta a entidade, mostrando até 3 do catálogo quando o que o cliente disse bate com várias. */

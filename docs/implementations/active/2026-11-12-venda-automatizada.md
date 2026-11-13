@@ -318,3 +318,7 @@ Limites conhecidos do piloto: WAHA não envia PDF nem imagem; Autopiloto não co
 
 - O turno passa ao modelo `conversaDaQualificacao` (últimas 30 mensagens do lead antes da negociação) e um histórico da venda com os dois lados (mensagens do cliente e o que a assistente enviou, tirado do outbox). Antes ela só via o cliente: cumprimentava de novo e perguntava idade e modalidade já respondidas.
 - Playbook 2026-11-12.4: tirar os fatos da conversa da qualificação e nunca repetir pergunta já respondida lá.
+
+## Adendo 12/11 (noite): termos simples com o cliente
+
+- Com o cliente não aparecem mais PME, adesão, pessoa física, modalidade, EPP ou LTDA. Perguntas fixas reescritas ("no seu nome, pelo seu CPF, ou pela sua empresa, se você tiver CNPJ ou MEI?", "qual é a sua profissão?", "MEI ou outro tipo de CNPJ?"). Pergunta do modelo com esses termos vira a pergunta simples; frase sem pergunta só troca os termos. PDF e página pública: "No seu nome (CPF)", "Pela empresa (CNPJ ou MEI)", "Por profissão". Playbook 2026-11-12.5.

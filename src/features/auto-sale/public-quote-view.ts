@@ -34,9 +34,9 @@ function copartLabel(value: string) {
 }
 
 function modalityLabel(offer: OfferSnapshot) {
-  if (offer.input.modality.startsWith("PME")) return "Empresarial (MEI ou CNPJ)";
-  if (offer.input.modality.startsWith("ADESAO")) return offer.input.entity ? `Adesão (${offer.input.entity})` : "Adesão por entidade";
-  return "Pessoa física";
+  if (offer.input.modality.startsWith("PME")) return "Pela empresa (CNPJ ou MEI)";
+  if (offer.input.modality.startsWith("ADESAO")) return offer.input.entity ? `Por profissão (${offer.input.entity})` : "Por profissão";
+  return "No seu nome (CPF)";
 }
 
 /** Link do WhatsApp da corretora com a mensagem pronta; null sem número. */

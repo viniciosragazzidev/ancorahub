@@ -56,9 +56,9 @@ function lifeLabel(age: number, holder: boolean) {
 
 function modalityLabel(offer: OfferSnapshot) {
   const modality = offer.input.modality;
-  if (modality.startsWith("PME")) return "Empresarial (MEI ou CNPJ)";
-  if (modality.startsWith("ADESAO")) return offer.input.entity ? `Adesão (${offer.input.entity})` : "Adesão por entidade";
-  return "Pessoa física";
+  if (modality.startsWith("PME")) return "Pela empresa (CNPJ ou MEI)";
+  if (modality.startsWith("ADESAO")) return offer.input.entity ? `Por profissão (${offer.input.entity})` : "Por profissão";
+  return "No seu nome (CPF)";
 }
 
 export async function renderQuotePdf(input: QuotePdfInput): Promise<Buffer> {
