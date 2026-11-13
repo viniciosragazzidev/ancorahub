@@ -7,7 +7,7 @@ import type { ErpActionResult } from "./contracts";
 export async function reviewErpImportAction(_previous: ErpActionResult, form: FormData): Promise<ErpActionResult> {
   return erpAction(async () => {
     const id = await reviewErpImport({ id: form.get("id"), version: Number(form.get("version")), decision: form.get("decision"), reason: form.get("reason"), confirmed: form.get("confirmed") === "on" });
-    revalidatePath("/administracao/importacoes"); revalidatePath(`/administracao/importacoes/${id}`); revalidatePath("/implantacoes");
+    revalidatePath("/administracao/importacoes"); revalidatePath(`/administracao/importacoes/${id}`); revalidatePath("/implantacoes"); revalidatePath("/financeiro", "layout");
     return { id, message: "Lote atualizado. Confira o resultado e o histórico." };
   });
 }

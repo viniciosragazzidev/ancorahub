@@ -11,7 +11,7 @@ import { SaleDetailLite } from "@/app/(dashboard)/vendas/[id]/sale-detail-lite";
 import { PropostasLite } from "@/app/(dashboard)/propostas/_components/propostas-lite";
 import { PROPOSAL_FIXTURES, PROPOSAL_LEADS } from "@/app/(dashboard)/propostas/_components/proposals-fixtures";
 import { DocumentsLite } from "@/features/documents/components/documents-lite";
-import { DrilldownLite } from "@/app/(dashboard)/relatorios/drill/_components/drilldown-lite";
+import { DrilldownLite } from "@/app/(dashboard)/relatorios/(legado)/drill/_components/drilldown-lite";
 import { IntegrityLite } from "@/app/(dashboard)/integridade/_components/integrity-lite";
 import { NocLite } from "@/app/(dashboard)/noc/_components/noc-lite";
 import { NOC_FIXTURE, NOC_NOW } from "@/app/(dashboard)/noc/_components/noc-fixtures";

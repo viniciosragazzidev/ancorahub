@@ -11,9 +11,10 @@ export async function POST(request: Request) {
     await getRequiredTenantContext();
     const form = await readBoundedFormData(request, 3 * 1024 * 1024);
     for (const key of form.keys()) if (!["domain", "file"].includes(key) || form.getAll(key).length !== 1) throw new ErpError("Confira os campos enviados.");
-    if (form.get("domain") !== "implantations") throw new ErpError("Tipo de importação indisponível.");
+    const domain = form.get("domain");
+    if (domain !== "implantations" && domain !== "finance") throw new ErpError("Tipo de importação indisponível.");
     const file = form.get("file"); if (!(file instanceof File)) throw new ErpError("Selecione um arquivo.");
-    const result = await previewErpImport("implantations", file);
+    const result = await previewErpImport(domain, file);
     return NextResponse.json({ ok: true, id: result.id, message: result.alreadyApplied ? "Este arquivo já foi aplicado. Consulte o lote existente." : "Prévia pronta. Outra pessoa autorizada deve conferir e aplicar o lote." });
   } catch (error) {
     return NextResponse.json({ ok: false, message: error instanceof ErpError || error instanceof MultipartLimitError ? error.message : "Não foi possível preparar o arquivo. Confira seu acesso e o modelo." }, { status: 400 });

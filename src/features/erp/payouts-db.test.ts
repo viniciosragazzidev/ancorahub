@@ -112,4 +112,23 @@ describe.skipIf(!testUrl)("ERP commissions, payouts and receipts against isolate
     expect(data.issues.some((issue) => issue.group === "legacy" && issue.detail.includes("estorno"))).toBe(true);
     await expect(as(broker("broker1"), () => reconciliation.getReconciliation())).rejects.toThrow("delegação");
   });
+
+  it("imports finance rows as submitted entries once, applied only by another person", async () => {
+    await db.insert(schema.erpModuleSettings).values({ tenantId: id("a"), moduleKey: "imports", enabled: true, roles: ["director"], updatedBy: id("director") }).onConflictDoNothing();
+    const imports = await import("./imports");
+    const csv = `referencia;tipo;venda_id;unidade_id;beneficiario_id;valor;vencimento;competencia;descricao\nREC-${run.slice(0, 8)};recebível;${id("sale")};;;1.234,56;2026-11-20;2026-11;Comissão da operadora\nDESP-${run.slice(0, 8)};despesa;;${id("a1")};;80,00;2026-11-15;2026-11;Material de escritório\n`;
+    const file = () => new File([csv], "financeiro.csv");
+    const batch = await as(context("director"), () => imports.previewErpImport("finance", file()));
+    expect((await as(context("director"), () => imports.previewErpImport("finance", file()))).id).toBe(batch.id);
+    const detail = await as(context("director"), () => imports.getErpImport(batch.id));
+    expect(detail.domain).toBe("finance"); expect(detail.financeRows.map((row) => row.amountCents).sort((a, b) => a - b)).toEqual([8000, 123456]);
+    const review = { id: batch.id, version: 1, decision: "apply", reason: "Lote financeiro conferido", confirmed: true };
+    await expect(as(context("director"), () => imports.reviewErpImport(review))).rejects.toThrow("outra pessoa");
+    await as(context("reviewer"), () => imports.reviewErpImport(review));
+    await as(context("reviewer"), () => imports.reviewErpImport(review));
+    const created = await db.select().from(schema.erpFinancialEntries).where(and(eq(schema.erpFinancialEntries.tenantId, id("a")), inArray(schema.erpFinancialEntries.reference, [`REC-${run.slice(0, 8)}`, `DESP-${run.slice(0, 8)}`])));
+    expect(created).toHaveLength(2); expect(created.every((entry) => entry.status === "submitted")).toBe(true);
+    await expect(as(context("director"), () => imports.previewErpImport("finance", new File([csv.replace("80,00", "81,00")], "financeiro-2.csv")))).rejects.toThrow("já foi lançada");
+    await expect(as(broker("broker1"), () => imports.previewErpImport("finance", file()))).rejects.toThrow();
+  });
 });

@@ -38,7 +38,7 @@ export async function assertOpenPeriods(db: ErpDatabase, tenantId: string, value
     .where(and(eq(schema.erpClosings.tenantId, tenantId), eq(schema.erpClosings.status, "closed"), inArray(schema.erpClosings.competence, periods))).limit(1);
   if (closed) throw new ErpError(`O período ${closed.competence} está fechado. Solicite uma reabertura justificada.`);
 }
-async function resolveEntryParties(db: ErpDatabase, auth: ErpAccess, input: z.infer<typeof financialInputSchema>) {
+export async function resolveEntryParties(db: ErpDatabase, auth: ErpAccess, input: z.infer<typeof financialInputSchema>) {
   let branchId = input.branchId; let ownerId = input.beneficiaryId ?? auth.context.userId;
   if (input.saleId) {
     const [sale] = await db.select({ id: schema.sales.id, brokerId: schema.sales.brokerId, branchId: schema.leads.branchId, status: schema.sales.status }).from(schema.sales)

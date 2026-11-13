@@ -114,6 +114,10 @@ export const NAV_AREAS: readonly NavArea[] = [
     tabs: [
       { id: "implantacao", label: "Implantação", href: "/implantacoes", permission: "erp_view_operations", requires: "erp" },
       { id: "financeiro", label: "Financeiro", href: "/financeiro", permission: "erp_view_finance", requires: "erp" },
+      { id: "indicacoes", label: "Indicações", href: "/indicacoes", permission: "erp_manage_referrals", requires: "erp" },
+      { id: "metas", label: "Metas", href: "/metas", permission: "erp_view_analytics", requires: "erp" },
+      { id: "incentivos", label: "Incentivos", href: "/campanhas-incentivo", permission: "erp_view_analytics", requires: "erp" },
+      { id: "tv", label: "Modo TV", href: "/tv", permission: "erp_view_analytics", requires: "erp" },
       { id: "importacoes", label: "Importações", href: "/administracao/importacoes", permission: "erp_import_data", requires: "erp" },
       { id: "governanca", label: "Módulos", href: "/administracao/erp", permission: "erp_manage_modules", requires: "erp", roles: ["director"], noCargo: true },
     ],
