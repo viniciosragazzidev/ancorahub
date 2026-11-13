@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,18 @@ import { updateErpPlatformAction } from "../platform-actions";
 import { ERP_TIME_ZONE } from "../shared";
 import type { getErpGovernance } from "../governance";
 import page from "@/components/lite/page/lite-page.module.css";
+
+/**
+ * Submits without React's automatic form reset. These forms use Base UI checkboxes, whose visual state survives the
+ * reset while their hidden inputs go back to the initial value: the next save would send everything unchecked.
+ */
+function keepValues(action: (form: FormData) => void) {
+  return (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    startTransition(() => action(data));
+  };
+}
 
 type Governance = Awaited<ReturnType<typeof getErpGovernance>>;
 type ModuleRow = Governance["modules"][number];
@@ -53,7 +65,7 @@ function audiencesSummary(module: ModuleRow) {
 export function ErpModuleForm({ module }: { module: ModuleRow }) {
   const [state, action, pending] = useActionState(saveErpModuleAction, INITIAL);
   const prefix = `erp-module-${module.key}`;
-  return <form action={action} className="flex flex-col gap-4" aria-label={`Configuração de ${module.label}`}>
+  return <form onSubmit={keepValues(action)} className="flex flex-col gap-4" aria-label={`Configuração de ${module.label}`}>
     <input type="hidden" name="module" value={module.key} />
     <input type="hidden" name="version" value={module.version} />
     <label className="flex items-center gap-2 text-sm"><Checkbox name="enabled" defaultChecked={module.enabled} disabled={pending || !module.ready} />Ativar nesta empresa</label>
@@ -136,7 +148,7 @@ export function ErpPlatformControl({ enabled, modules }: { enabled: boolean; mod
   return <Card data-settings-tab="platform"><CardHeader><CardTitle>ERP operacional</CardTitle>
     <CardDescription>Libera módulos para configuração nas empresas. Desligar impede novas operações e preserva o histórico. Aprovação financeira é independente e não realiza transferências bancárias.</CardDescription>
   </CardHeader><CardContent>
-    <form action={action} className={page.group}>
+    <form onSubmit={keepValues(action)} className={page.group}>
       <label className="flex items-center gap-2 text-sm"><Checkbox name="enabled" defaultChecked={enabled} disabled={pending} />Habilitar ERP</label>
       <fieldset disabled={pending} className={page.group}><legend className="text-sm font-medium">Módulos liberados</legend>
         {ERP_MODULES.map((module) => <label key={module.key} className="flex items-center gap-2 text-sm">

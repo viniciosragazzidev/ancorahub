@@ -11,7 +11,8 @@ vi.mock("../governance-actions", () => ({ saveErpModuleAction: vi.fn(async () =>
 vi.mock("../platform-actions", () => ({ updateErpPlatformAction: vi.fn(async () => ({ ok: true, message: "ok" })) }));
 
 import { ErpSkinProvider } from "../ui/skin-context";
-import { ErpGovernanceWorkspace } from "./governance-forms";
+import { ErpGovernanceWorkspace, ErpPlatformControl } from "./governance-forms";
+import { updateErpPlatformAction } from "../platform-actions";
 
 afterEach(cleanup);
 
@@ -44,5 +45,23 @@ describe.each(["standard", "lite"] as const)("Governança do ERP (%s)", (skin) =
     const cell = screen.getAllByText("Modo TV")[0];
     fireEvent.click(cell.closest("tr") ?? cell);
     expect(within(screen.getByRole("dialog")).getByLabelText("Segundos por tela")).toHaveValue(20);
+  });
+});
+
+describe("Disponibilidade do ERP na plataforma", () => {
+  it("envia as caixas marcadas também no segundo envio (sem o reset automático do formulário)", async () => {
+    const action = vi.mocked(updateErpPlatformAction);
+    action.mockResolvedValueOnce({ ok: false, message: "A estrutura do ERP ainda não está pronta." });
+    render(<ErpSkinProvider skin="standard"><ErpPlatformControl enabled={false} modules={[]} /></ErpSkinProvider>);
+    fireEvent.click(screen.getByText("Habilitar ERP"));
+    fireEvent.click(screen.getByText("Financeiro"));
+    const save = screen.getByRole("button", { name: "Salvar disponibilidade" });
+    fireEvent.click(save);
+    await screen.findByText("A estrutura do ERP ainda não está pronta.");
+    fireEvent.click(save);
+    await vi.waitFor(() => expect(action).toHaveBeenCalledTimes(2));
+    const sent = action.mock.calls[1][1] as FormData;
+    expect(sent.get("enabled")).toBe("on");
+    expect(sent.getAll("modules")).toEqual(["finance"]);
   });
 });
