@@ -2,6 +2,13 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 12/11/2026 - ERP operacional: financeiro completo, indicações, incentivos, BI e TV
+
+- Comissões do cronograma da venda entram no ERP para conferência (previsto, conferido e pago ao corretor lado a lado); telas antigas deixam de marcar como paga uma parcela controlada pelo ERP.
+- Repasses com aprovação e conferência por pessoas diferentes e recibo versionado (`RP-AAAA-NNNNNN`); recebíveis, despesas, conciliação e importação financeira por planilha.
+- Indicações (`/indicacoes`) com deduplicação por telefone, campanhas de incentivo (`/campanhas-incentivo`) com apuração reproduzível, relatórios de produção, operadoras, crescimento e diário, metas, Modo TV (`/tv`) e assistente respondendo indicadores pelo catálogo de métricas.
+- Tudo desligado por padrão, por empresa e por módulo; migration 0230 (aditiva) ainda não aplicada. Registro: [execução do ERP](implementations/active/2026-11-12-erp-operacional-execucao.md), DEC-185.
+
 ## 12/11/2026 - Planejamento do ERP operacional e reservas de rotas
 
 - Inventário das 17 famílias da LP New Master BI, comparação com a base real, matriz de cargos/ações/escopos e plano de 15 pacotes em M0 a M8, em `docs/product/erp-operacional/`.

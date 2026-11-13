@@ -1,5 +1,20 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-185 - Repasse em quatro mãos, cronograma subordinado ao ERP e assistente sem dados no modelo
+
+**Estado:** aceita para implementação. **Data:** 2026-11-12.
+
+Ao concluir o ERP a pedido do Vinicios ("terminar da forma mais completa possível"), foram adotadas as opções recomendadas do plano:
+
+- **Repasse:** quem prepara não aprova, e quem registra o pagamento não confere o comprovante (checagens no código e no banco). O recibo nasce só na conferência, como versão fixa e imutável. Registrar pagamento nunca inicia transferência bancária.
+- **Cronograma de comissão:** depois que uma parcela entra no ERP, as telas antigas não a marcam como paga ou não paga. O cronograma acompanha a liquidação conferida, nunca o contrário. Cancelamento e chargeback feitos no pós-venda aparecem como divergência na conciliação, sem correção automática.
+- **Importação financeira:** cria apenas lançamentos a conferir. Uma referência já lançada é recusada, para não esconder diferença de valor.
+- **Indicação:** não cria lead automaticamente, porque a titularidade ainda está pendente. A indicação é vinculada a um negócio existente e só conta como convertida com venda real.
+- **Incentivos:** a premiação é texto e não gera obrigação financeira.
+- **Modo TV:** mostra nomes só quando a empresa permite, e nunca mostra remuneração.
+- **Assistente:** perguntas de indicador são respondidas pelo catálogo de métricas, no escopo da sessão e sem passar dados ao modelo.
+- **Relatórios novos:** ficam fora do bloqueio do gestor em `/relatorios`, protegidos pelo módulo e pelo escopo do ERP.
+
 ## DEC-184 - Execução do ERP com valores conferidos e aprovação independente
 
 **Estado:** aceita para implementação incremental. **Data:** 2026-11-12.

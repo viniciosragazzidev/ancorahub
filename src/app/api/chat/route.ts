@@ -5,6 +5,7 @@ import { getAiModelInstance } from "@/features/ai/providers";
 import { answerIfOperatorQuestion, lastUserText } from "@/features/operator-catalog/answer";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { readChatRequest } from "@/features/ai/chat-request-guard";
+import { answerIfErpMetricQuestion } from "@/features/erp/assistant-answer";
 
 export async function POST(req: Request) {
   try {
@@ -20,6 +21,9 @@ export async function POST(req: Request) {
     // Operators, plans, prices, carências: only the imported material answers, never the free model.
     const operatorAnswer = await answerIfOperatorQuestion({ tenantId: context.tenantId, userId: context.userId, question: lastUserText(messages) }).catch(() => null);
     if (operatorAnswer) return new Response(operatorAnswer, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    // Indicadores do ERP: resposta determinística do catálogo de métricas, no escopo da sessão; o modelo não vê os dados.
+    const metricAnswer = await answerIfErpMetricQuestion(lastUserText(messages)).catch(() => null);
+    if (metricAnswer) return new Response(metricAnswer, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
     const settings = await getAiEngineSettings();
 
     if (!settings.enabled) {

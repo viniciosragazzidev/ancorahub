@@ -22,7 +22,8 @@ export async function getErpGovernance() {
       const setting = settings.find((row) => row.moduleKey === module.key);
       return { ...module, ready: ERP_IMPLEMENTED_MODULES.has(module.key), globallyAvailable: platform.enabled && platform.modules.includes(module.key),
         enabled: setting?.enabled ?? false, roles: setting?.roles ?? ["director"],
-        maxImportRows: setting?.maxImportRows ?? 100, version: setting?.version ?? 0 };
+        maxImportRows: setting?.maxImportRows ?? 100, version: setting?.version ?? 0,
+        params: { showNames: setting?.params?.showNames === true, intervalSeconds: typeof setting?.params?.intervalSeconds === "number" ? setting.params.intervalSeconds : 20 } };
     }),
   };
 }
@@ -44,13 +45,14 @@ export async function saveErpModule(raw: unknown) {
       const settings = await tx.select().from(schema.erpModuleSettings).where(eq(schema.erpModuleSettings.tenantId, context.tenantId));
       if (definition.dependencies.some((dependency) => !settings.some((row) => row.moduleKey === dependency && row.enabled))) throw new ErpError("Ative primeiro os módulos necessários indicados na configuração.");
     }
-    const next = { enabled: input.enabled, roles: input.roles, maxImportRows: input.maxImportRows,
+    const params = input.module === "tv" && input.params ? { ...(current?.params ?? {}), ...input.params } : current?.params ?? {};
+    const next = { enabled: input.enabled, roles: input.roles, maxImportRows: input.maxImportRows, params,
       version: (current?.version ?? 0) + 1, updatedBy: context.userId, updatedAt: new Date() };
     await tx.insert(schema.erpModuleSettings).values({ tenantId: context.tenantId, moduleKey: input.module, ...next })
       .onConflictDoUpdate({ target: [schema.erpModuleSettings.tenantId, schema.erpModuleSettings.moduleKey], set: next });
     await auditErp(tx, { tenantId: context.tenantId, actorId: context.userId, action: "erp.module.updated", entityType: "erp_module", entityId: input.module,
       metadata: { before: current ? { enabled: current.enabled, roles: current.roles, maxImportRows: current.maxImportRows, version: current.version } : null,
-        after: { enabled: next.enabled, roles: next.roles, maxImportRows: next.maxImportRows, version: next.version } } });
+        after: { enabled: next.enabled, roles: next.roles, maxImportRows: next.maxImportRows, params: next.params, version: next.version } } });
   });
 }
 

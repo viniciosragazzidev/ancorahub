@@ -12,6 +12,7 @@ export const erpModuleSettingsSchema = z.object({
   enabled: z.boolean(),
   roles: z.array(z.enum(ERP_AUDIENCES)).min(1).max(8).refine((roles) => new Set(roles).size === roles.length),
   maxImportRows: z.number().int().min(1).max(500),
+  params: z.object({ showNames: z.boolean(), intervalSeconds: z.number().int().min(5).max(300) }).strict().optional(),
   expectedVersion: z.number().int().nonnegative(),
 }).strict();
 
