@@ -322,3 +322,9 @@ Limites conhecidos do piloto: WAHA não envia PDF nem imagem; Autopiloto não co
 ## Adendo 12/11 (noite): termos simples com o cliente
 
 - Com o cliente não aparecem mais PME, adesão, pessoa física, modalidade, EPP ou LTDA. Perguntas fixas reescritas ("no seu nome, pelo seu CPF, ou pela sua empresa, se você tiver CNPJ ou MEI?", "qual é a sua profissão?", "MEI ou outro tipo de CNPJ?"). Pergunta do modelo com esses termos vira a pergunta simples; frase sem pergunta só troca os termos. PDF e página pública: "No seu nome (CPF)", "Pela empresa (CNPJ ou MEI)", "Por profissão". Playbook 2026-11-12.5.
+
+## Adendo 13/11: responder na hora (caso Katia)
+
+- A Katia escreveu às 06:50 e a venda só falou às 08:00: a janela de envio (8h às 20h) segurava também a resposta a quem acabou de escrever. Agora responder a um cliente que escreveu nos últimos 30 min pode sair a qualquer hora (`canSpeakNow`); follow-up e mensagem fria continuam no horário. A negociação nasce com `lastCustomerMessageAt` da última mensagem do lead, então a abertura da captura também sai na hora.
+- Rajada de 75 s para 20 s, e o próprio servidor responde e envia quando a rajada termina (`scheduleQuickReply`, via `after`), sem esperar a rodada do robô. O robô agendado segue como rede de segurança; o turno é reivindicado pelo prazo, então ninguém responde duas vezes.
+- Abertura confirma o que o cliente já contou: "para 2 pessoas, pela sua empresa".

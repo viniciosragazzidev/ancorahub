@@ -12,7 +12,7 @@ import { AUTO_SALE_LIMITS, type DealFacts, type ManagerCallReason } from "./cont
 import { pdfCount } from "./dispatch";
 import { readAutoSaleFlags } from "./flag";
 import { followUpNeedsTemplate, nextFollowUpAt, stepForNow } from "./follow-up";
-import { isWithinSendWindow, nextSendWindowStart } from "./guardrails";
+import { canSpeakNow, nextSendWindowStart } from "./guardrails";
 import { activePromotionLines, AUDIO_DECLINE_MESSAGE, followUpMessage, imageCaption, pdfCaption, quoteMessages } from "./quote-messages";
 import { catalogToday, createOfferForDeal, QuoteUnavailableError } from "./quote-service";
 import { conversationForTurn, listOffers, type DealRow } from "./repository";
@@ -42,7 +42,7 @@ export async function runDealTurn(seen: DealRow, options: { model?: AgentModel; 
   if (!deal) return { status: "skipped" as const };
   const flags = await readAutoSaleFlags(deal.tenantId);
   if (!flags.enabled || !flags.global) return { status: "disabled" as const };
-  if (deal.mode !== "simulation" && !isWithinSendWindow(now, flags.settings)) {
+  if (deal.mode !== "simulation" && !canSpeakNow(now, flags.settings, deal.lastCustomerMessageAt)) {
     await db.update(schema.autoSaleDeals).set({ replyDueAt: nextSendWindowStart(now, flags.settings) }).where(eq(schema.autoSaleDeals.id, deal.id));
     return { status: "deferred" as const };
   }

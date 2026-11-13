@@ -15,7 +15,7 @@ export const OPEN_DEAL_STATUSES = ["active", "paused", "waiting_manager"] as con
 
 /** Limites do piloto (D6, D10, D11 do plano). */
 export const AUTO_SALE_LIMITS = {
-  burstWaitMs: 75_000,
+  burstWaitMs: 20_000,
   // 12 e não 6: a cotação sozinha já são 4 ou 5 mensagens curtas (ritmo de chat).
   messagesPerHour: 12,
   messagesPerDay: 25,

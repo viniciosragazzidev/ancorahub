@@ -175,6 +175,20 @@ export function isWithinSendWindow(date: Date, window: SendWindow = DEFAULT_AUTO
   return weekday >= 1 && weekday <= 5 && hour >= window.sendStartHour && hour < window.sendEndHour;
 }
 
+/** Cliente escreveu há pouco: responder é conversa, não mensagem fria (13/11, caso Katia às 06:50). */
+export const CUSTOMER_REPLY_GRACE_MS = 30 * 60_000;
+
+export function customerJustWrote(lastCustomerMessageAt: Date | null | undefined, now: Date) {
+  if (!lastCustomerMessageAt) return false;
+  const elapsed = now.getTime() - lastCustomerMessageAt.getTime();
+  return elapsed >= -60_000 && elapsed <= CUSTOMER_REPLY_GRACE_MS;
+}
+
+/** Pode falar agora: dentro do horário de envio ou respondendo a quem acabou de escrever (follow-up segue o horário). */
+export function canSpeakNow(now: Date, window: SendWindow, lastCustomerMessageAt: Date | null | undefined) {
+  return isWithinSendWindow(now, window) || customerJustWrote(lastCustomerMessageAt, now);
+}
+
 /** Próximo instante dentro da janela de envio (ele mesmo, se já estiver dentro). */
 export function nextSendWindowStart(date: Date, window: SendWindow = DEFAULT_AUTO_SALE_SETTINGS) {
   if (isWithinSendWindow(date, window)) return date;

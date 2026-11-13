@@ -40,6 +40,18 @@ describe("abertura e cidade (caso Alex, 12/11)", () => {
     const brokerageName = "Âncora Saúde";
     expect(openingMessages({ brokerageName, facts: { firstName: "Alex", city: "Niterói" } })[1]).toBe("Vi que você procura um plano de saúde em Niterói. Está certo?");
     expect(openingMessages({ brokerageName, facts: { ages: [30] } })[1]).toMatch(/^Vi que você procura um plano de saúde para .+\. Está certo\?$/);
+    expect(openingMessages({ brokerageName, facts: { hasCnpj: true }, livesCount: 2 })[1]).toBe("Vi que você procura um plano de saúde para 2 pessoas, pela sua empresa. Está certo?");
     expect(openingMessages({ brokerageName, facts: {} })[1]).toBe("Vi que você procura um plano de saúde. Posso te ajudar a escolher?");
+  });
+});
+
+describe("responder na hora (caso Katia, 13/11)", () => {
+  it("cliente que acabou de escrever recebe resposta mesmo fora do horário de envio", async () => {
+    const { canSpeakNow, customerJustWrote } = await import("./guardrails");
+    const { DEFAULT_AUTO_SALE_SETTINGS } = await import("./settings");
+    const early = new Date("2026-11-13T09:50:00.000Z"); // 06:50 em São Paulo
+    expect(canSpeakNow(early, DEFAULT_AUTO_SALE_SETTINGS, null)).toBe(false);
+    expect(canSpeakNow(early, DEFAULT_AUTO_SALE_SETTINGS, new Date(early.getTime() - 60_000))).toBe(true);
+    expect(customerJustWrote(new Date(early.getTime() - 2 * 3_600_000), early)).toBe(false);
   });
 });

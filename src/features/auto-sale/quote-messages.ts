@@ -20,11 +20,15 @@ export function planLine(plan: OfferSnapshot["plans"][number], index: number) {
   return `${index + 1}. ${plan.operator} ${plan.name}: ${formatCents(plan.totalCents)} por mês (${copartLabel(plan)}${accommodation})`;
 }
 
-export function openingMessages(input: { brokerageName: string; facts: DealFacts }) {
+/** Abertura confirmando o que o cliente já contou (13/11, caso Katia: "2 vidas", "tenho CNPJ"), em termos simples. */
+export function openingMessages(input: { brokerageName: string; facts: DealFacts; livesCount?: number | null }) {
   const name = input.facts.firstName ? `, ${input.facts.firstName}` : "";
-  const lives = input.facts.ages?.length ? ` para ${livesLabel(input.facts.ages.length)}` : "";
+  const count = input.facts.ages?.length || (input.livesCount && input.livesCount > 0 && input.livesCount <= 30 ? input.livesCount : 0);
+  const lives = count ? ` para ${livesLabel(count)}` : "";
+  const how = input.facts.modality === "PME_EMPRESARIAL" || input.facts.hasCnpj ? ", pela sua empresa"
+    : input.facts.modality === "ADESAO" ? ", pela sua profissão" : "";
   const city = input.facts.city ? ` em ${input.facts.city}` : "";
-  const summary = lives || city ? `Vi que você procura um plano de saúde${lives}${city}. Está certo?` : "Vi que você procura um plano de saúde. Posso te ajudar a escolher?";
+  const summary = lives || how || city ? `Vi que você procura um plano de saúde${lives}${how}${city}. Está certo?` : "Vi que você procura um plano de saúde. Posso te ajudar a escolher?";
   return [`Oi${name}! Aqui é a assistente virtual da ${input.brokerageName}.`, summary];
 }
 

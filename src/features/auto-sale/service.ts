@@ -146,6 +146,7 @@ export async function startDeal(context: TenantContext, input: { leadId: string;
   const now = new Date();
   const dealId = randomUUID();
   let facts: DealFacts = {};
+  let livesCount: number | null = null;
   try {
     await db.transaction(async (tx) => {
       const [lead] = await tx.select().from(schema.leads).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, context.tenantId))).for("update").limit(1);
@@ -159,6 +160,11 @@ export async function startDeal(context: TenantContext, input: { leadId: string;
       const [session] = await tx.select({ collectedData: schema.aiQualificationSessions.collectedData }).from(schema.aiQualificationSessions)
         .where(and(eq(schema.aiQualificationSessions.tenantId, context.tenantId), eq(schema.aiQualificationSessions.leadId, lead.id))).limit(1);
       facts = factsFromQualification({ nome: lead.nome, tipo: lead.tipo, livesCount: lead.livesCount, collectedData: session?.collectedData, qualificationDetails: lead.qualificationDetails, formData: lead.formData });
+      livesCount = lead.livesCount;
+      // Última mensagem do cliente: se ele acabou de escrever, a abertura sai na hora mesmo fora do horário de envio.
+      const [lastInbound] = await tx.select({ sentAt: schema.whatsappMessages.sentAt }).from(schema.whatsappMessages)
+        .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id), inArray(schema.whatsappMessages.direction, ["incoming", "inbound"])))
+        .orderBy(desc(schema.whatsappMessages.sentAt)).limit(1);
 
       // Oferta pendente a corretor: cancela e solta o dono provisório (ninguém tinha aceitado).
       await tx.update(schema.leadOffers).set({ status: "CANCELLED", updatedAt: now }).where(and(
@@ -183,7 +189,7 @@ export async function startDeal(context: TenantContext, input: { leadId: string;
       await tx.insert(schema.autoSaleDeals).values({
         id: dealId, tenantId: context.tenantId, leadId: lead.id, stage: "chosen", status: "active", mode: input.mode,
         channel: input.channel, wahaNumberId: input.channel === "waha" ? input.wahaNumberId : null, chosenBy: context.userId,
-        facts, limits: DEAL_RUNTIME_DEFAULT, aiConversationPaused: Boolean(conversation),
+        facts, limits: DEAL_RUNTIME_DEFAULT, aiConversationPaused: Boolean(conversation), lastCustomerMessageAt: lastInbound?.sentAt ?? null,
         restoreState: {
           distributionStatus: lead.distributionStatus, provisionalBrokerId: lead.corretorId,
           conversationId: conversation?.id ?? null, automationState: conversation?.automationState ?? null,
@@ -200,7 +206,7 @@ export async function startDeal(context: TenantContext, input: { leadId: string;
   const brokerage = await brokerageInfo(context.tenantId);
   const deal = (await getDeal(context.tenantId, dealId))!;
   const turnId = await recordTurn(deal, { direction: "out", kind: "opening", body: null, decision: { action: "confirm" } });
-  await queueOutgoing(deal, openingMessages({ brokerageName: brokerage.name, facts }).map((body) => ({ kind: "text" as const, body })), turnId);
+  await queueOutgoing(deal, openingMessages({ brokerageName: brokerage.name, facts, livesCount }).map((body) => ({ kind: "text" as const, body })), turnId);
   await db.update(schema.autoSaleDeals).set({ stage: "confirming", updatedAt: new Date() }).where(eq(schema.autoSaleDeals.id, dealId));
   return { dealId };
 }

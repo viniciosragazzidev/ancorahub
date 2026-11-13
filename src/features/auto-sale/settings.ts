@@ -8,7 +8,7 @@ import { z } from "zod";
 import { AUTO_SALE_LIMITS, AUTO_SALE_SEND_END_HOUR, AUTO_SALE_SEND_START_HOUR } from "./contracts";
 
 export const autoSaleSettingsSchema = z.object({
-  burstWaitSeconds: z.number().int().min(30).max(300),
+  burstWaitSeconds: z.number().int().min(10).max(300),
   messagesPerHour: z.number().int().min(1).max(20),
   messagesPerDay: z.number().int().min(1).max(60),
   sendStartHour: z.number().int().min(6).max(12),

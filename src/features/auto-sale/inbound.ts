@@ -34,12 +34,17 @@ export async function routeAutoSaleInbound(input: { tenantId: string; leadId: st
   const { settings } = await readAutoSaleFlags(input.tenantId);
   await getDatabase().update(schema.autoSaleDeals).set({
     lastCustomerMessageAt: now,
-    // Rajada: cada mensagem nova empurra a resposta (75 s sem mensagem nova). Pausada ou aguardando o gestor, não responde.
+    // Rajada: cada mensagem nova empurra a resposta (20 s sem mensagem nova). Pausada ou aguardando o gestor, não responde.
     replyDueAt: deal.status === "active" ? new Date(now.getTime() + settings.burstWaitSeconds * 1000) : null,
     nextFollowUpAt: null,
     // Cliente respondeu: a cadência recomeça no passo de 20 h (o de 45 min é só logo após a cotação).
     followUpStep: sql`case when ${schema.autoSaleDeals.firstQuoteAt} is null then 0 else 1 end`,
     updatedAt: now,
   }).where(and(eq(schema.autoSaleDeals.id, deal.id), eq(schema.autoSaleDeals.tenantId, input.tenantId)));
+  // Responde assim que a rajada termina, sem esperar o robô agendado.
+  if (deal.status === "active") {
+    const { scheduleQuickReply } = await import("./quick-reply");
+    scheduleQuickReply(input.tenantId, deal.id, settings.burstWaitSeconds * 1000);
+  }
   return true;
 }
