@@ -82,10 +82,10 @@ export function decideErpAccess(base: ErpBase, module: ErpModuleKey, capability:
   if (!platform.enabled || !platform.modules.includes(module)) throw new ErpError("Este módulo está desativado. Solicite a ativação ao administrador.");
   const setting = settings.find((row) => row.moduleKey === module);
   const roles = roleListSchema.safeParse(setting?.roles);
-  const audience = context.jobTitle || context.role;
-  if (!setting?.enabled || !roles.success || !roles.data.some((role) => role === audience)) throw new ErpError("Este módulo não está liberado para seu perfil nesta empresa.");
+  const audiences = erpAudiences(context);
+  if (!setting?.enabled || !roles.success || !roles.data.some((role) => audiences.includes(role))) throw new ErpError("Este módulo não está liberado para seu perfil nesta empresa.");
   const dependencies = ERP_MODULES.find((definition) => definition.key === module)?.dependencies ?? [];
-  if (dependencies.some((dependency) => !platform.modules.includes(dependency) || !settings.some((row) => row.moduleKey === dependency && row.enabled && row.roles.includes(audience)))) throw new ErpError("Uma capacidade necessária está desativada para seu perfil.");
+  if (dependencies.some((dependency) => !platform.modules.includes(dependency) || !settings.some((row) => row.moduleKey === dependency && row.enabled && row.roles.some((role) => audiences.includes(role))))) throw new ErpError("Uma capacidade necessária está desativada para seu perfil.");
   if (!access.capabilities.has(capability)) throw new ErpError("Seu cargo não permite esta operação.");
   if (context.viewAs && !ERP_READ_CAPABILITIES.has(capability)) throw new ErpError("A visualização de suporte é somente leitura.");
   const scope = resolveErpScope({ context, financial: module === "finance" || (context.jobTitle === "finance" && ["analytics", "imports", "tv"].includes(module)), supervisedIds: base.supervisedIds, cargo: base.cargo });
@@ -107,6 +107,15 @@ export function hasAgencyScope(auth: { context: TenantContext; scope: ErpScope }
 }
 
 /** Audit actor: during support view-as, the administrator is recorded, never the impersonated person. */
+/**
+ * Profiles a person answers for in the module settings: the role AND the function (job title). A Diretor whose
+ * function is "corretor" is still a Diretor; the function only adds (finance, operations...). Data scope comes from
+ * role and cargo, never from this list.
+ */
+export function erpAudiences(context: Pick<TenantContext, "role" | "jobTitle">): string[] {
+  return context.jobTitle && context.jobTitle !== context.role ? [context.role, context.jobTitle] : [context.role];
+}
+
 export function auditActor(context: TenantContext) { return context.viewAs?.adminUserId ?? context.userId; }
 
 /** Every caller ALSO filters the actual table's tenantId. */

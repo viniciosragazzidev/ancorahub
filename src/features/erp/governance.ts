@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
-import { auditErp, getErpPlatformState, requireErpAdmin } from "./access";
+import { auditErp, erpAudiences, getErpPlatformState, requireErpAdmin } from "./access";
 import { ERP_IMPLEMENTED_MODULES, ERP_MODULES, ErpError, erpModuleSettingsSchema, type ErpModuleKey } from "./contracts";
 
 export async function getErpGovernance() {
@@ -62,8 +62,9 @@ export async function listEnabledErpModulesForCurrentUser(): Promise<ErpModuleKe
   const platform = await getErpPlatformState();
   if (!platform.enabled) return [];
   const settings = await getDatabase().select().from(schema.erpModuleSettings).where(eq(schema.erpModuleSettings.tenantId, context.tenantId));
-  const audience = context.jobTitle || context.role;
-  return ERP_MODULES.filter((module) => platform.modules.includes(module.key) && settings.some((row) => row.moduleKey === module.key && row.enabled && row.roles.includes(audience))
-    && module.dependencies.every((dependency) => platform.modules.includes(dependency) && settings.some((row) => row.moduleKey === dependency && row.enabled && row.roles.includes(audience))))
+  const audiences = erpAudiences(context);
+  const allowed = (key: ErpModuleKey) => settings.some((row) => row.moduleKey === key && row.enabled && row.roles.some((role) => audiences.includes(role)));
+  return ERP_MODULES.filter((module) => platform.modules.includes(module.key) && allowed(module.key)
+    && module.dependencies.every((dependency) => platform.modules.includes(dependency) && allowed(dependency)))
     .map((module) => module.key);
 }
