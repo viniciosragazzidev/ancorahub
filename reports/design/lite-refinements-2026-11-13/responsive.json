@@ -1,0 +1,107 @@
+[
+  {
+    "chatHeight": 726.4000244140625,
+    "icons": [
+      {
+        "dx": 0,
+        "dy": 0,
+        "height": 44,
+        "label": "Ver dados do cliente",
+        "width": 44
+      },
+      {
+        "dx": 0,
+        "dy": 0,
+        "height": 44,
+        "label": "Abrir WhatsApp do cliente",
+        "width": 44
+      },
+      {
+        "dx": 0,
+        "dy": 0,
+        "height": 44,
+        "label": "Ligar para o cliente",
+        "width": 44
+      },
+      {
+        "dx": 0,
+        "dy": 0,
+        "height": 44,
+        "label": "Alterar etapa do lead",
+        "width": 44
+      }
+    ],
+    "overflow": false,
+    "width": 320
+  },
+  {
+    "chatHeight": 726.4000244140625,
+    "icons": [
+      {
+        "dx": 0,
+        "dy": 0,
+        "height": 44,
+        "label": "Ver dados do cliente",
+        "width": 44
+      },
+      {
+        "dx": 0,
+        "dy": 0,
+        "height": 44,
+        "label": "Abrir WhatsApp do cliente",
+        "width": 44
+      },
+      {
+        "dx": 0,
+        "dy": 0,
+        "height": 44,
+        "label": "Ligar para o cliente",
+        "width": 44
+      },
+      {
+        "dx": 0,
+        "dy": 0,
+        "height": 44,
+        "label": "Alterar etapa do lead",
+        "width": 44
+      }
+    ],
+    "overflow": false,
+    "width": 390
+  },
+  {
+    "chatHeight": 760.8500366210938,
+    "icons": [
+      {
+        "dx": 0,
+        "dy": 0,
+        "height": 44,
+        "label": "Ver dados do cliente",
+        "width": 44
+      },
+      {
+        "dx": 0,
+        "dy": 0,
+        "height": 44,
+        "label": "Abrir WhatsApp do cliente",
+        "width": 44
+      },
+      {
+        "dx": 0,
+        "dy": 0,
+        "height": 44,
+        "label": "Ligar para o cliente",
+        "width": 44
+      },
+      {
+        "dx": 0,
+        "dy": 0,
+        "height": 44,
+        "label": "Alterar etapa do lead",
+        "width": 44
+      }
+    ],
+    "overflow": false,
+    "width": 430
+  }
+]

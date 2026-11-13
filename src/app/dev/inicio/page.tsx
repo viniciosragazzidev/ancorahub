@@ -30,12 +30,18 @@ function Showcase() {
     : { label: "Atender Carla", detail: "O prazo do primeiro contato já passou (há 18 min).", href: "/leads/l1", urgent: true };
   return (
     <ChatHome
-      viewerName="Vinicios Ragazzi"
+      viewerName={params.get("floating") === "1" ? "Corretor Demo" : "Vinicios Ragazzi"}
       nowIso="2026-10-10T15:00:00.000Z"
       canQuote
+      showWhatsAppStatus={params.get("floating") !== "1"}
+      nowFloatingEnabled={params.get("floating") === "1"}
       assistants={[thread({}), thread({ id: "j", assistant: "jornada" as never, name: "Jornada", preview: "Nível 2 · 340 pts nesta semana", href: "/jornada", shape: "mochi", hue: 85 })]}
       leads={[thread({ id: "l1", kind: "lead", leadId: "l1", name: "Carla Mendes", preview: "Oi, queria saber do plano PME", waitingYou: true, href: "/leads/l1", initials: "CM", shape: "logo", hue: null })]}
-      summary={{ receivedToday: 3, acceptedToday: 2, inServiceNow: 4, slaAtRiskNow: 1, duty: null, goal: null, next }}
+      summary={{ receivedToday: 3, acceptedToday: 2, inServiceNow: 4, slaAtRiskNow: 1, duty: null, goal: null, next,
+        ...(params.get("floating") === "1" ? { now: { title: "Agora", emptyText: "Você está em dia. Nenhuma pendência de demonstração.", items: params.get("state") === "empty" ? [] : [
+          { id: "demo-reply", title: "Cliente de demonstração com nome completo", detail: "O cliente respondeu e aguarda sua mensagem.", actionLabel: "Responder", href: "/leads/demo-1", tone: "waiting" },
+          { id: "demo-return", title: "Retorno de demonstração", detail: "Um retorno agendado está vencido.", actionLabel: "Ver retorno", href: "/agenda", tone: "urgent" },
+        ] } } : {}) }}
       firstSteps={params.get("steps") === "1" ? steps : null}
     />
   );

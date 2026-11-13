@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -9,6 +9,14 @@ import { motion, useReducedMotion } from "motion/react";
 import BottomSheet from "@/components/arc/bottom-sheet/bottom-sheet";
 import { motionTokens } from "@/components/arc/motion-tokens";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
+import { SearchField } from "@/components/arc/search-field/search-field";
+import { Button as ArcButton } from "@/components/arc/button/button";
+import { Badge as ArcBadge } from "@/components/arc/badge/badge";
+import { Avatar } from "@/components/arc/avatar/avatar";
+import { Button } from "@/components/ui/button";
+import { ArrowUpRight, ListTodo } from "lucide-react";
+import sharedPage from "@/components/lite/page/lite-page.module.css";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useLightAvailabilityContext } from "@/components/light/light-availability-context";
 
 // Loaded on the client only: it reads the broker's WhatsApp session (server actions).
@@ -29,6 +37,7 @@ import type { HomeNowItem, PresenceAskView, ThreadSummary } from "./types";
 import type { WhatsAppActivitySummary } from "@/features/dashboard/whatsapp-activity";
 import { WhatsAppActivityCard } from "@/features/dashboard/components/whatsapp-activity-card";
 import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
+import { BrokerHomeOverview } from "./broker-home-overview";
 
 type Tab = "assistentes" | "leads";
 
@@ -40,7 +49,14 @@ function formatCountdown(expiresAt: string, now: number) {
   return hours > 0 ? `Aceite em até ${hours} h ${minutes % 60} min` : `Aceite em até ${minutes} min`;
 }
 
-function NowSection({ data, mobile = false }: { data: NonNullable<HomeSummary["now"]>; mobile?: boolean }) {
+/** Short status shown on each Agora card, so the tone never depends on color alone. */
+const NOW_TONE_LABEL: Partial<Record<NonNullable<HomeNowItem["tone"]>, string>> = {
+  urgent: "Urgente",
+  waiting: "Esperando você",
+  warning: "Atenção",
+};
+
+function NowSection({ data, mobile = false, floating = false, onNavigate }: { data: NonNullable<HomeSummary["now"]>; mobile?: boolean; floating?: boolean; onNavigate?: () => void }) {
   const reduce = useReducedMotion();
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => {
@@ -50,16 +66,16 @@ function NowSection({ data, mobile = false }: { data: NonNullable<HomeSummary["n
 
   return (
     <motion.section
-      className={`${home.nowSection} ${mobile ? home.nowMobile : home.nowDesktop}`}
+      className={floating ? home.nowPanel : `${home.nowSection} ${mobile ? home.nowMobile : home.nowDesktop}`}
       aria-label={data.title}
-      initial={reduce ? false : { opacity: 0, y: 6 }}
+      initial={reduce || floating ? false : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: motionTokens.duration.standard, ease: motionTokens.ease.enter }}
     >
-      <header className={home.nowHeader}>
+      {!floating ? <header className={home.nowHeader}>
         <h2 className={home.nowTitle}>{data.title}</h2>
         {data.items.length ? <span className={home.nowCount}>{data.items.length}</span> : null}
-      </header>
+      </header> : null}
       {data.items.length ? (
         <ul className={home.nowList}>
           {data.items.map((item, index) => (
@@ -68,20 +84,22 @@ function NowSection({ data, mobile = false }: { data: NonNullable<HomeSummary["n
               className={home.nowItem}
               data-tone={item.tone ?? "normal"}
               layout={!reduce}
-              initial={reduce ? false : { opacity: 0, y: 5 }}
+              initial={reduce || floating ? false : { opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: motionTokens.duration.fast, delay: reduce ? 0 : index * motionTokens.stagger.item, ease: motionTokens.ease.enter }}
             >
+              {floating ? <span className={home.nowItemAvatar} aria-hidden="true"><Avatar name={item.title} size="sm" /></span> : null}
               <div className={home.nowItemCopy}>
+                {floating && item.tone && NOW_TONE_LABEL[item.tone] ? <span className={home.nowItemTone} data-tone={item.tone}>{NOW_TONE_LABEL[item.tone]}</span> : null}
                 <strong className={home.nowItemTitle}>{item.title}</strong>
                 <span className={home.nowItemDetail}>{item.detail}</span>
                 {item.expiresAt ? <span className={home.nowCountdown}>{formatCountdown(item.expiresAt, clock)}</span> : null}
               </div>
-              {item.acceptLeadId ? (
-                <AcceptLeadButton leadId={item.acceptLeadId} className={home.nowAction}>{item.actionLabel}</AcceptLeadButton>
+              <div className={floating ? home.nowItemActions : undefined}>{item.acceptLeadId ? (
+                <AcceptLeadButton appearance="shared" leadId={item.acceptLeadId} disabled={Boolean(item.expiresAt && Date.parse(item.expiresAt) <= clock)}>{item.expiresAt && Date.parse(item.expiresAt) <= clock ? "Oferta encerrada" : item.actionLabel}</AcceptLeadButton>
               ) : (
-                <Link className={home.nowAction} href={item.href}>{item.actionLabel}</Link>
-              )}
+                <Button asChild variant="secondary" className={floating && index === 0 ? sharedPage.primaryButton : sharedPage.button}><Link href={item.href} onClick={onNavigate}>{item.actionLabel}<ArrowUpRight size={16} aria-hidden="true" /></Link></Button>
+              )}</div>
             </motion.li>
           ))}
         </ul>
@@ -105,10 +123,10 @@ function matches(thread: ThreadSummary, query: string) {
 }
 
 function SearchIcon() {
-  return <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="m10.5 10.5 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
+  return <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="m10.5 10.5 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
 }
 function PlusIcon() {
-  return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
+  return <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
 }
 
 /** The day at a glance, for the center of the Início on computers. */
@@ -157,6 +175,8 @@ export function ChatHome({
   presence = null,
   presenceAsks = null,
   whatsappActivity = null,
+  showWhatsAppStatus = true,
+  nowFloatingEnabled = false,
 }: {
   viewerName: string;
   assistants: ThreadSummary[];
@@ -175,16 +195,26 @@ export function ChatHome({
   presenceAsks?: PresenceAskView[] | null;
   /** Scoped team metric, passed only to manager and supervisor homes. */
   whatsappActivity?: WhatsAppActivitySummary | null;
+  /** Anonymous component previews omit this authenticated, server-backed widget. */
+  showWhatsAppStatus?: boolean;
+  /** Server-controlled presentation switch; disabling restores the inline block. */
+  nowFloatingEnabled?: boolean;
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const reduce = useReducedMotion();
   const shell = useLightAvailabilityContext();
   const isSupervisor = shell?.audience === "supervisor";
   const isManager = shell?.audience === "manager";
+  const redesigned = Boolean(shell?.homeRedesign && !isSupervisor && !isManager);
+  const floatingNow = nowFloatingEnabled && !isSupervisor && !isManager && Boolean(summary?.now);
+  const [nowOpen, setNowOpen] = useState(false);
+  // Small phones stack the action under the text (chat-home.module.css), so each card is taller.
+  const compactNow = useMediaQuery("(max-width: 359px), (max-height: 720px)");
   const pathname = usePathname() ?? "";
   const [tab, setTab] = useState<Tab>("assistentes");
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const [newOpen, setNewOpen] = useState(false);
   const firstName = viewerName.split(/\s+/)[0] || viewerName;
   const waitingLeads = leadsBadgeCount ?? leads.filter((lead) => lead.waitingYou).length;
@@ -196,6 +226,7 @@ export function ChatHome({
   const activeId = mode === "rail" ? [...assistants, ...leads].find((thread) => isActive(thread, pathname))?.id ?? null : null;
   const waitingAssistants = assistants.filter((thread) => thread.waitingYou);
   const currentPresenceAsks = presenceAsks ?? (presence ? [presence] : []);
+  const hasPriority = hasNowItems || Boolean(next?.urgent) || currentPresenceAsks.some((ask) => ask.status !== "confirmed");
 
   const list = (
     <>
@@ -212,19 +243,19 @@ export function ChatHome({
       </div>
       {searching ? (
         <div className={home.search}>
-          <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "leads" ? "Buscar lead" : "Buscar conversa"} aria-label="Buscar" className={home.searchInput} />
+          {redesigned ? <SearchField ref={searchRef} autoFocus label={tab === "leads" ? "Buscar nos leads carregados" : "Buscar nas conversas carregadas"} value={query} onValueChange={setQuery} clearLabel="Limpar busca" placeholder="Nome ou trecho da conversa" /> : <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "leads" ? "Buscar lead" : "Buscar conversa"} aria-label="Buscar" className={home.searchInput} />}
         </div>
       ) : null}
       {tab === "leads" ? (
         <div className={home.listShortcut}>
-          <Link href="/minha-fila" className={styles.headerPill}>
+          <Link href={redesigned ? "/leads?tab=minha-fila" : "/minha-fila"} className={redesigned ? sharedPage.button : styles.headerPill}>
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
             Lista completa com filtros
           </Link>
         </div>
       ) : null}
-      <ThreadList threads={visible} now={now} activeId={activeId} groupByDay={tab === "leads" && !isSupervisor && !isManager} emptyText={tab === "leads" ? (query ? `Não encontramos nenhum lead com "${query}". Confira a grafia ou limpe a busca.` : "Você não tem lead no momento. Assim que uma oferta chegar, ela aparece aqui.") : "Nada por aqui ainda."} />
-      {!visible.length ? (
+      <ThreadList threads={visible} now={now} activeId={activeId} groupByDay={tab === "leads" && !isSupervisor && !isManager} emptyText={redesigned && query ? "Nenhuma conversa encontrada. Limpe a busca ou tente outro nome." : tab === "leads" ? (query ? `Não encontramos nenhum lead com "${query}". Confira a grafia ou limpe a busca.` : "Você não tem lead no momento. Assim que uma oferta chegar, ela aparece aqui.") : "Nada por aqui ainda."} />
+      {!visible.length && !(redesigned && query) ? (
         <div className={home.emptyAction}>
           {query ? <button type="button" className={styles.headerPill} onClick={() => setQuery("")}>Limpar busca</button>
             : tab === "leads" ? <Link href={isManager ? "/leads" : "/plantoes"} className={styles.headerPill}>{isManager ? "Ver leads da unidade" : "Ver plantões"}</Link>
@@ -237,19 +268,19 @@ export function ChatHome({
   const aside = (
     <aside className={home.sidebar}>
       <header className={home.header} data-tour="home-header">
-        <button type="button" className={home.me} data-tour="home-me" aria-label="Abrir menu e disponibilidade" onClick={() => shell?.openMore?.()}>{initialsOf(viewerName)}</button>
-        <Link href="/dashboard" className={home.helloLink}><h1 className={home.hello}>Olá, {firstName}</h1></Link>
+        {redesigned ? <ArcButton variant="ghost" className={sharedPage.iconButton} data-tour="home-me" aria-label="Abrir menu e disponibilidade" onClick={() => shell?.openMore?.()}>{initialsOf(viewerName)}</ArcButton> : <button type="button" className={home.me} data-tour="home-me" aria-label="Abrir menu e disponibilidade" onClick={() => shell?.openMore?.()}>{initialsOf(viewerName)}</button>}
+        <Link href="/dashboard" className={home.helloLink}>{redesigned ? <p className={home.hello}>Olá, {firstName}</p> : <h1 className={home.hello}>Olá, {firstName}</h1>}</Link>
         <div className={home.headerTools} data-tour="home-tools">
-          {isSupervisor || (isManager && mode !== "rail") ? null : <WhatsAppStatusButton />}
-          <button type="button" className={styles.iconButton} aria-label={searching ? "Fechar busca" : "Buscar"} aria-pressed={searching} onClick={() => { setSearching((value) => !value); setQuery(""); }}><SearchIcon /></button>
-          <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>
+          {!showWhatsAppStatus || isSupervisor || (isManager && mode !== "rail") ? null : <WhatsAppStatusButton />}
+          {redesigned ? <ArcButton variant="ghost" className={sharedPage.iconButton} aria-label={searching ? "Fechar busca" : "Buscar"} aria-pressed={searching} onClick={() => { setSearching((value) => !value); setQuery(""); }}><SearchIcon /></ArcButton> : <button type="button" className={styles.iconButton} aria-label={searching ? "Fechar busca" : "Buscar"} aria-pressed={searching} onClick={() => { setSearching((value) => !value); setQuery(""); }}><SearchIcon /></button>}
+          {redesigned ? <ArcButton variant="ghost" className={sharedPage.iconButton} aria-label="Nova ação" onClick={() => setNewOpen(true)}><PlusIcon /></ArcButton> : <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>}
         </div>
       </header>
-      {mode === "page" ? <PresenceCalloutList asks={currentPresenceAsks} /> : null}
-      {mode === "page" && summary?.now ? <NowSection data={summary.now} mobile /> : null}
+      {mode === "page" && !redesigned ? <PresenceCalloutList asks={currentPresenceAsks} /> : null}
+      {mode === "page" && !redesigned && !floatingNow && summary?.now ? <NowSection data={summary.now} mobile /> : null}
       {mode === "page" && whatsappActivity ? <div className="px-4 pb-4"><WhatsAppActivityCard activity={whatsappActivity} /></div> : null}
-      {mode === "page" && firstSteps ? <FirstStepsCard steps={firstSteps} className={home.firstSteps} /> : null}
-      {mode === "page" && highlights ? <WeekRanking data={highlights} /> : null}
+      {mode === "page" && !redesigned && firstSteps ? <FirstStepsCard steps={firstSteps} className={home.firstSteps} /> : null}
+      {mode === "page" && !redesigned && highlights ? <WeekRanking data={highlights} /> : null}
       {list}
     </aside>
   );
@@ -261,7 +292,7 @@ export function ChatHome({
         {isSupervisor ? <li><Link href="/equipe" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Ver minha equipe</strong><span>Corretores, status e números</span></Link></li> : null}
         {isSupervisor ? <li><Link href="/relacionamento" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Mandar recado para a equipe</strong><span>Aviso, reconhecimento ou pedido de ciente</span></Link></li> : null}
         {canQuote ? <li><Link href="/cotacao" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Fazer uma cotação</strong><span>Simular planos para um cliente</span></Link></li> : null}
-        <li><button type="button" className={home.newItem} onClick={() => { setNewOpen(false); setTab("leads"); setSearching(true); }}><strong>Buscar um lead</strong><span>Pelo nome ou telefone</span></button></li>
+        <li><button type="button" className={home.newItem} onClick={() => { setNewOpen(false); setTab("leads"); setSearching(true); if (redesigned) { setQuery(""); requestAnimationFrame(() => searchRef.current?.focus()); } }}><strong>Buscar um lead</strong><span>{redesigned ? "Pelo nome, nas conversas carregadas" : "Pelo nome ou telefone"}</span></button></li>
         {isManager ? <><li><Link href="/leads" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Leads da unidade</strong><span>Acompanhar e repassar leads</span></Link></li><li><Link href="/equipe" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Minha unidade</strong><span>Ver corretores e operação</span></Link></li></> : isSupervisor ? null : <li><Link href="/plantoes/agora" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Ver meu plantão</strong><span>Agora e próximos</span></Link></li>}
       </ul>
     </BottomSheet>
@@ -285,6 +316,16 @@ export function ChatHome({
     ]
     : [];
 
+  if (redesigned) {
+    return <div className={styles.root}>
+      <BrokerHomeOverview viewerName={viewerName} nowIso={nowIso} summary={summary} nextLead={nextLead} rail={aside} conversations={list} presenceAsks={currentPresenceAsks}
+        onSearch={() => { setQuery(""); setSearching(true); requestAnimationFrame(() => searchRef.current?.focus()); }} onNew={() => setNewOpen(true)}
+        learning={firstSteps || highlights ? <>{firstSteps ? <FirstStepsCard steps={firstSteps} /> : null}{highlights ? <WeekRanking data={highlights} /> : null}</> : null} />
+      {!hasPriority ? <><LiteWelcome variant="broker" /><LiteTour variant="broker" /></> : null}
+      {sheet}
+    </div>;
+  }
+
   return (
     <div className={`${styles.root} ${home.page}`}>
       {aside}
@@ -304,7 +345,7 @@ export function ChatHome({
                 ? `${waitingAssistants.map((thread) => thread.name).join(", ")} ${waitingAssistants.length === 1 ? "tem algo" : "têm algo"} para você. Escolha uma conversa à esquerda.`
                 : "Tudo em dia. Escolha uma conversa à esquerda para começar."}
           </p>}
-          {summary?.now ? <NowSection data={summary.now} /> : null}
+          {!floatingNow && summary?.now ? <NowSection data={summary.now} /> : null}
           {showNext && next?.acceptLeadId ? (
             <AcceptLeadButton leadId={next.acceptLeadId} className={`${styles.pill} ${styles.pillPulse}`} style={{ marginTop: 6 }}>{next.label}</AcceptLeadButton>
           ) : showNext && next ? (
@@ -355,7 +396,14 @@ export function ChatHome({
         </motion.div>
       </section>
 
-      <div className={styles.pillWrap} data-mobile-only>
+      {floatingNow && summary?.now ? (
+        <div className={`${styles.pillWrap} ${home.nowLauncher}`}>
+          <BottomSheet open={nowOpen} onOpenChange={setNowOpen} title="Agora" description={summary.now.items.length ? `${summary.now.items.length} ${summary.now.items.length === 1 ? "pendência na sua fila" : "pendências na sua fila"}.` : "Você está em dia."} detents={[summary.now.items.length <= 1 ? (compactNow ? 0.44 : 0.36) : summary.now.items.length === 2 ? (compactNow ? 0.66 : 0.5) : 0.8]} closeLabel="Fechar Agora" icon={<ListTodo strokeWidth={1.9} />} className="arc-venancor"
+            trigger={<ArcButton type="button" variant="secondary" data-tour="home-pill" aria-label={`Abrir Agora: ${summary.now.items.length} ${summary.now.items.length === 1 ? "pendência" : "pendências"}`}><ListTodo size={18} aria-hidden="true" /><span>Agora</span><ArcBadge size="sm" tone="neutral">{summary.now.items.length || "Em dia"}</ArcBadge></ArcButton>}>
+            <NowSection data={summary.now} floating onNavigate={() => setNowOpen(false)} />
+          </BottomSheet>
+        </div>
+      ) : <div className={styles.pillWrap} data-mobile-only>
         {next?.acceptLeadId ? (
           <AcceptLeadButton leadId={next.acceptLeadId} className={`${styles.pill} ${styles.pillPulse}`} data-tour="home-pill">{next.label}</AcceptLeadButton>
         ) : next ? (
@@ -365,7 +413,7 @@ export function ChatHome({
         ) : (
           <button type="button" className={styles.pill} data-tour="home-pill" onClick={() => setNewOpen(true)}><PlusIcon /> {isSupervisor ? "Ações da equipe" : "Novo atendimento"}</button>
         )}
-      </div>
+      </div>}
 
       {/* Welcome and tour of the audience: broker or supervisor (each with its own steps). */}
       {isManager ? null : <LiteWelcome variant={isSupervisor ? "supervisor" : "broker"} />}

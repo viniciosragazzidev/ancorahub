@@ -11,6 +11,7 @@ import { buildBrokerNowItems } from "@/features/broker-workspace/now-items";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import type { BrokerJourneyData } from "@/features/engagement/journey-types";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 
 const TIME_ZONE = "America/Sao_Paulo";
 const time = (date: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
@@ -105,12 +106,13 @@ export async function ChatHomeContent() {
   // same tenant and user, both come from the authenticated context).
   const context = await getRequiredTenantContext().catch(() => null);
   if (!context) return <LightDashboardUnavailable />;
-  const [rail, data, highlights, journey, firstSteps] = await Promise.all([
+  const [rail, data, highlights, journey, firstSteps, floatingNow] = await Promise.all([
     getChatRailData(),
     getCachedBrokerWorkspaceData().catch(() => null),
     getBrokerHighlights(context.tenantId, context.userId).catch(() => null),
     getCachedBrokerJourneyData(context.tenantId, context.userId).catch(() => null),
     getFirstSteps(context.tenantId, context.userId).catch(() => null),
+    context.role === "broker" ? getFeatureFlag(FEATURE_FLAGS.BROKER_NOW_FLOATING).catch(() => "false") : Promise.resolve("false"),
   ]);
   if (!rail || !data) return <LightDashboardUnavailable />;
   return (
@@ -120,6 +122,7 @@ export async function ChatHomeContent() {
       leads={rail.leads}
       nowIso={rail.nowIso}
       canQuote={rail.canQuote}
+      nowFloatingEnabled={floatingNow === "true"}
       summary={{ ...summaryOf(data), next: presenceNext(data) ?? nextActionOf(data.nextAction, journey) }}
       presence={presenceAskOf(data)}
       presenceAsks={presenceAsksOf(data)}

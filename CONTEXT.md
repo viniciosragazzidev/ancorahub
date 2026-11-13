@@ -17,6 +17,7 @@
 - **Extensão privada de catálogo**: operadora ou plano de acordo exclusivo de uma corretora. Pertence a exatamente um tenant, não é compartilhável e pode ser administrada apenas pelo Diretor desse tenant.
 - **Tabela comercial**: identidade lógica das condições de um plano; não é o preço em si.
 - **Versão de tabela**: publicação imutável de uma tabela comercial, com vigência e valores por faixa. Cotação, venda e PDF devem guardar a versão usada.
+- **Pendência comercial**: condição de um produto que ainda exige confirmação ou revisão para a contratação. Um preço vigente pode ser exibido com esse aviso; a pendência impede a proposta final até ser resolvida por revisão autorizada.
 - **Disponibilidade de catálogo**: decisão administrativa que habilita um plano oficial para um tenant e, opcionalmente, o restringe em uma unidade. Uma restrição nunca reabilita um item oculto acima dela.
 - **Documento por beneficiário**: evidência individual, como identidade ou declaração de saúde. Documentos familiares, como comprovante de residência, não precisam apontar para uma pessoa.
 - **Venda**: registro da contratação aprovada pela operadora; a data de registro, o início da vigência e o valor aprovado são fatos diferentes.

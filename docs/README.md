@@ -12,6 +12,10 @@
 | `business-rules.md` | Regras de domínio consolidadas e rastreáveis | Norma de comportamento vigente |
 | `product/resume-dashboard-plan.md` | Conteúdo e prioridades da home executiva `/resume` | Plano de produto vigente |
 | `product/corretor-resume-dashboard-plan.md` | Conteúdo e prioridades da home pessoal do Corretor | Plano de produto vigente |
+| `product/benchmark-cotadorfm-clientes.md` | Benchmark da área Clientes do Cotador FM, lacunas e sequência sugerida para CRM/Corretor | Nove entradas de navegação inspecionadas; estados preenchidos pendentes, 2026-11-11 |
+| `implementations/active/2026-11-11-carteira-corretor-lite.md` | Plano da carteira/relacionamento do Corretor Lite: UX, movimento, fases, decisões e aceite | Proposta; implementação não iniciada |
+| `implementations/active/2026-11-11-cotador-corretor-catalogo-real.md` | Plano do cotador real do Corretor Lite: catálogo, campos, motor, elegibilidade, rede, proposta, design e Q0–Q7 | Planejamento; pendência comercial definida em DEC-169; implementação não iniciada |
+| `product/cotador-corretor-field-map.csv`, `product/cotador-corretor-rule-types.csv`, `product/cotador-corretor-ui-inventory.csv` | Rastreabilidade de 234 campos/atributos de origem, 339 tipos de detalhe e 322 ocorrências de campos/seletores | Mapeamento proposto; originais e estruturas aninhadas preservados na ingestão futura |
 | `product/financeiro-role-based-plan.md` | Plano do Financeiro por papel, com governança, auditoria e controle do Super-admin | Plano de produto vigente |
 | `product/erp-operacional/README.md` | Comparação com New Master BI, matriz de cargos/rotas e plano do ERP operacional | Escopo operacional aprovado; regras financeiras e módulos futuros em planejamento |
 | `product/reporting-root-plan.md` | Plano da camada de inteligência operacional `/relatorios`: catálogo canônico de métricas, famílias, drill-down e fases | Plano de produto vigente (DEC-090, ADR-0040) |

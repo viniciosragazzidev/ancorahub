@@ -3,7 +3,7 @@
 import { CHAT_RAIL_REFRESH_EVENT } from "@/components/chat/chat-events";
 import { TipHost } from "@/components/chat/tip-host";
 import Link from "next/link";
-import { Suspense, useEffect, useState, type ReactNode, type RefObject } from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -26,6 +26,7 @@ import { LightAppHeader } from "./light-app-header";
 import { LightAvailabilityProvider } from "./light-availability-context";
 import { useLightNavigationTracker } from "./light-navigation";
 import { LightMoreSheet } from "./light-more-sheet";
+import { getLightMoreDestinations } from "./light-routes";
 import { useLightRoute } from "./use-light-route";
 
 /**
@@ -46,6 +47,8 @@ export function LightChrome({
   showNegotiations = false,
   journeyEnabled = false,
   welcomeVideoEnabled = false,
+  brokerHomeRedesign = false,
+  showHomeLearning = true,
   teamRankingEnabled = false,
   teamManagementEnabled = false,
   viewAs = { canViewAs: false, viewingAs: null },
@@ -64,6 +67,8 @@ export function LightChrome({
   showNegotiations?: boolean;
   journeyEnabled?: boolean;
   welcomeVideoEnabled?: boolean;
+  brokerHomeRedesign?: boolean;
+  showHomeLearning?: boolean;
   teamRankingEnabled?: boolean;
   teamManagementEnabled?: boolean;
   viewAs?: ViewAsState;
@@ -74,6 +79,7 @@ export function LightChrome({
   erpLinks?: readonly { href: string; label: string }[];
 }) {
   const { pathname, chat } = useLightRoute();
+  const moreReturnTo = useRef<HTMLElement | null>(null);
   // The sheet belongs to the screen it was opened on: navigating closes it without an effect.
   const [moreSheet, setMoreSheet] = useState<{ open: boolean; path: string }>({ open: false, path: pathname });
   const moreOpen = moreSheet.open && moreSheet.path === pathname;
@@ -96,6 +102,8 @@ export function LightChrome({
       teamRankingEnabled={teamRankingEnabled}
       teamManagementEnabled={teamManagementEnabled}
       audience={audience}
+      homeRedesign={audience === "broker" && brokerHomeRedesign}
+      returnFocusRef={moreReturnTo}
       availability={availability}
       availabilityPending={isPending}
       onChangeAvailability={setStatus}
@@ -107,7 +115,11 @@ export function LightChrome({
   const withAssist = (content: ReactNode) => <A11yPrefsProvider>{audience === "broker"
     ? <AssistLayer pathname={pathname} capabilities={{ journey: journeyEnabled, quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship }}>{content}</AssistLayer>
     : content}</A11yPrefsProvider>;
-  const shell = { availability, isPending, setStatus, openMore: () => setMoreOpen(true), audience, welcomeVideo: welcomeVideoEnabled };
+  const shell = {
+    availability, isPending, setStatus, openMore: (opener?: HTMLElement) => { moreReturnTo.current = opener ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null); setMoreOpen(true); }, audience, welcomeVideo: welcomeVideoEnabled,
+    homeRedesign: audience === "broker" && brokerHomeRedesign, showHomeLearning,
+    homeTools: getLightMoreDestinations({ quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship, journey: journeyEnabled }, audience),
+  };
   // Computers: the conversation list stays on the left and the screen opens at the center
   // (CSS .lite-split, venancor-scope.css); phones keep one screen at a time.
   const withRail = (content: ReactNode) => withAssist(

@@ -124,6 +124,11 @@
 .date { justify-self: center; font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .system { justify-self: center; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; font-size: var(--text-xs); color: var(--text-secondary); text-align: center; }
 .system strong { font-weight: 500; color: var(--foreground); }
+.systemDetails { width: 100%; text-align: left; }
+.systemDetails summary { cursor: pointer; color: var(--primary); padding-block: var(--space-2); }
+.systemDetails p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.screenEmbedded .system { justify-self: stretch; justify-content: flex-start; text-align: left; padding-block: var(--space-2); border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.screenEmbedded :is(.assistant, .user) { overflow-wrap: anywhere; }
 .systemAction { border: 0; background: none; padding: 0; font: inherit; font-weight: 500; color: var(--foreground); cursor: pointer; }
 /* Each message in its own soft bubble (2026-10-12): messages in a row no longer run together. */
 .assistant { width: fit-content; max-width: min(88%, 62ch); margin: 0; padding: 10px 14px; border-radius: 4px 18px 18px 18px; background: var(--surface-muted); font-size: var(--text-base); line-height: 1.5; letter-spacing: var(--tracking-body); white-space: pre-line; }
@@ -231,8 +236,8 @@
 .pillWrap { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); display: flex; justify-content: center; pointer-events: none; z-index: 20; }
 .pill {
   pointer-events: auto; display: inline-flex; align-items: center; gap: 8px; height: 50px; padding: 0 22px; border: 0; border-radius: 999px;
-  background: linear-gradient(180deg, var(--chat-action), var(--chat-action-strong)); color: white; font: inherit; font-weight: 500; font-size: var(--text-base);
-  box-shadow: 0 10px 24px oklch(55% 0.21 258 / 0.32); cursor: pointer; text-decoration: none;
+  background: var(--primary); color: var(--primary-foreground); font: inherit; font-weight: 500; font-size: var(--text-base);
+  box-shadow: var(--shadow-floating); cursor: pointer; text-decoration: none;
 }
 .pill svg { width: 18px; height: 18px; }
 /* A new lead waiting for acceptance: the button and its row pulse until accepted. */

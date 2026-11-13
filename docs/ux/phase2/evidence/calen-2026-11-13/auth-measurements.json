@@ -1,0 +1,54 @@
+{
+  "fields": [
+    {
+      "bg": "rgb(244, 246, 242)",
+      "border": "0px solid rgb(40, 40, 44)",
+      "font": "Satoshi, ui-sans-serif, system-ui, sans-serif",
+      "height": 51,
+      "padding": "15px 0px",
+      "placeholder": null,
+      "radius": "16px",
+      "size": "16px",
+      "tag": "BUTTON",
+      "text": "Continuar com Google",
+      "transition": "opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
+      "type": "button",
+      "weight": "700"
+    },
+    {
+      "bg": "rgb(26, 26, 29)",
+      "border": "0.8px solid rgb(40, 40, 44)",
+      "font": "Satoshi, ui-sans-serif, system-ui, sans-serif",
+      "height": 52.60000228881836,
+      "padding": "15px 0px",
+      "placeholder": null,
+      "radius": "16px",
+      "size": "16px",
+      "tag": "BUTTON",
+      "text": "Criar conta",
+      "transition": "opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
+      "type": "button",
+      "weight": "700"
+    },
+    {
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "0px solid rgb(40, 40, 44)",
+      "font": "Satoshi, ui-sans-serif, system-ui, sans-serif",
+      "height": 32,
+      "padding": "6px 0px",
+      "placeholder": null,
+      "radius": "0px",
+      "size": "15px",
+      "tag": "BUTTON",
+      "text": "Já tenho conta",
+      "transition": "all",
+      "type": "button",
+      "weight": "600"
+    }
+  ],
+  "url": "https://app.usecalen.com.br/login",
+  "viewport": {
+    "height": 844,
+    "width": 390
+  }
+}

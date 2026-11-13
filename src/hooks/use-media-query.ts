@@ -4,10 +4,11 @@ import { useCallback, useSyncExternalStore } from "react"
 
 export function useMediaQuery(query: string) {
   const subscribe = useCallback((onStoreChange: () => void) => {
+    if (typeof window.matchMedia !== "function") return () => {}
     const mql = window.matchMedia(query)
     mql.addEventListener("change", onStoreChange)
     return () => mql.removeEventListener("change", onStoreChange)
   }, [query])
-  const getSnapshot = useCallback(() => window.matchMedia(query).matches, [query])
+  const getSnapshot = useCallback(() => typeof window.matchMedia === "function" && window.matchMedia(query).matches, [query])
   return useSyncExternalStore(subscribe, getSnapshot, () => false)
 }

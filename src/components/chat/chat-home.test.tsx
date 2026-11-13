@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigation = vi.hoisted(() => ({ pathname: "/plantoes/agora" }));
+vi.mock("@/features/leads/accept-offer-action", () => ({ acceptLeadOfferAction: vi.fn() }));
 vi.mock("next/navigation", () => ({ usePathname: () => navigation.pathname, useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), back: vi.fn(), replace: vi.fn() }) }));
 vi.mock("motion/react", async () => {
   const actual = await vi.importActual<typeof import("motion/react")>("motion/react");
@@ -12,6 +13,10 @@ vi.mock("motion/react", async () => {
 import { ChatHome } from "./chat-home";
 import type { PresenceAskView, ThreadSummary } from "./types";
 
+// The Lite welcome opens 350 ms after mount; on a slow run it raced the sheet under test and stole focus.
+beforeEach(() => {
+  for (const key of ["ancora:lite-welcome:2026-10-chat", "ancora:lite-welcome:2026-10-supervisor", "ancora:welcome-video:2026-10-v3", "ancora:push-nudge:2026-10"]) window.localStorage.setItem(key, "1");
+});
 afterEach(() => cleanup());
 
 const thread = (id: string, name: string, href: string, extra: Partial<ThreadSummary> = {}): ThreadSummary => ({
@@ -24,6 +29,41 @@ const presenceAsk = (assignmentId: string, scheduleName: string, status: Presenc
 });
 
 describe("ChatHome", () => {
+  it("does not offer an acceptance action for an expired offer inside Agora", async () => {
+    render(<ChatHome viewerName="Corretor Demo" assistants={assistants} leads={[]} nowIso="2026-11-13T15:00:00Z" canQuote nowFloatingEnabled showWhatsAppStatus={false}
+      summary={{ receivedToday: 1, acceptedToday: 0, inServiceNow: 0, slaAtRiskNow: 0, duty: null, goal: null, now: { title: "Agora", emptyText: "Em dia", items: [
+        { id: "expired", title: "Oferta de demonstração", detail: "Prazo expirado", actionLabel: "Aceitar", href: "/leads/demo", acceptLeadId: "demo", expiresAt: "2020-01-01T00:00:00Z" },
+      ] } }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Abrir Agora: 1 pendência" }));
+    expect(await screen.findByRole("button", { name: "Oferta encerrada" })).toBeDisabled();
+  });
+  it("keeps Agora out of the conversation list and opens the same pending items on demand", async () => {
+    const longName = "Cliente de demonstração com nome completo para testar quebra de linha";
+    render(<ChatHome viewerName="Corretor Demo" assistants={assistants} leads={leads} nowIso="2026-11-13T15:00:00Z" canQuote nowFloatingEnabled showWhatsAppStatus={false}
+      summary={{ receivedToday: 2, acceptedToday: 1, inServiceNow: 1, slaAtRiskNow: 0, duty: null, goal: null,
+        now: { title: "Agora", emptyText: "Você está em dia.", items: [
+          { id: "reply", title: longName, detail: "Aguardando sua resposta", actionLabel: "Responder", href: "/leads/demo" },
+          { id: "return", title: "Retorno de demonstração", detail: "Retorno vencido", actionLabel: "Ver retorno", href: "/agenda" },
+        ] } }} />);
+    const opener = screen.getByRole("button", { name: "Abrir Agora: 2 pendências" });
+    expect(screen.queryByText(longName)).toBeNull();
+    expect(screen.queryByRole("link", { name: "Responder" })).toBeNull();
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = screen.getByRole("dialog", { name: "Agora" });
+    expect(within(dialog).getByText(longName)).toBeTruthy();
+    expect(within(dialog).getByRole("link", { name: "Responder" })).toHaveAttribute("href", "/leads/demo");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Fechar Agora" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Agora" })).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
+  it("opens an honest empty state when Agora has no pending items", () => {
+    render(<ChatHome viewerName="Corretor Demo" assistants={assistants} leads={[]} nowIso="2026-11-13T15:00:00Z" canQuote nowFloatingEnabled showWhatsAppStatus={false}
+      summary={{ receivedToday: 0, acceptedToday: 0, inServiceNow: 0, slaAtRiskNow: 0, duty: null, goal: null, now: { title: "Agora", emptyText: "Sem pendências de demonstração.", items: [] } }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Abrir Agora: 0 pendências" }));
+    expect(within(screen.getByRole("dialog", { name: "Agora" })).getByText("Sem pendências de demonstração.")).toBeTruthy();
+  });
   it("groups simultaneous duties with a heading and names, but keeps one ask ungrouped", () => {
     const { rerender } = render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote presenceAsks={[presenceAsk("as-1", "PME Manhã"), presenceAsk("as-2", "Presencial Tarde", "awaiting_release")]}/>);
     expect(screen.getByRole("heading", { level: 2, name: "2 plantões agora" })).toBeTruthy();

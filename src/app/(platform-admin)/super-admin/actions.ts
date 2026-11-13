@@ -1231,6 +1231,7 @@ export async function updateBrokerDutyCalendarEnabledSettingsAction(formData: Fo
 
 /** Switches of the broker news card (Central, jornada v1 e v2, ranking de equipes, campanhas, IA, supervisor). */
 const BROKER_NEWS_FLAGS = [
+  { field: "brokerNowFloatingEnabled", flag: FEATURE_FLAGS.BROKER_NOW_FLOATING },
   { field: "whatsappPlantaoNoticeEnabled", flag: FEATURE_FLAGS.WHATSAPP_PLANTAO_NOTICE },
   { field: "relationshipCenterEnabled", flag: FEATURE_FLAGS.RELATIONSHIP_CENTER },
   { field: "brokerEngagementEnabled", flag: FEATURE_FLAGS.BROKER_ENGAGEMENT },

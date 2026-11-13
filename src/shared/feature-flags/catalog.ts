@@ -38,6 +38,17 @@ export const FEATURE_FLAGS = {
     key: "feature_erp_operational_modules", scope: "global", defaultValue: "[]",
     description: "Módulos ERP liberados pelo Super-admin. Lista validada e auditada no painel ERP.",
   },
+  BROKER_NOW_FLOATING: {
+    key: "feature_broker_now_floating_enabled", scope: "global", defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Agora do corretor em painel flutuante no Lite. Desativar restaura o bloco inline, preservando dados e ações.",
+  },
+  BROKER_HOME_V2: {
+    key: "feature_broker_home_v2",
+    scope: "tenant",
+    defaultValue: '{"enabled":false,"brokerIds":[],"showLearning":true}',
+    description: "Piloto da nova Home do corretor, por empresa e corretores explícitos; editável e reversível pelo Super-admin.",
+  },
   UI_CONTEXTUAL_ILLUSTRATIONS: {
     key: "feature_ui_contextual_illustrations",
     scope: "global",

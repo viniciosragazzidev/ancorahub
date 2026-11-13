@@ -2,12 +2,13 @@
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, FocusEvent, KeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode, WheelEvent } from "react";
+import type { CSSProperties, FocusEvent, KeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject, WheelEvent } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, usePresence, useReducedMotion, useTransform } from "motion/react";
 import { X } from "lucide-react";
 import { motionTokens } from "../lib/motion-tokens";
 import styles from "./bottom-sheet.module.css";
 import { useArcPortalTarget, useArcScopeProps } from "../arc-scope-context";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 
 /**
  * A sheet that rises from the bottom edge and rests at one or more heights (detents).
@@ -17,11 +18,15 @@ import { useArcPortalTarget, useArcScopeProps } from "../arc-scope-context";
 export interface BottomSheetProps {
   /** The control that opens the sheet, usually a button. Focus returns to it when the sheet closes. */
   trigger?: ReactNode;
+  /** Explicit opener for controlled sheets opened without a Dialog.Trigger. */
+  returnFocusRef?: RefObject<HTMLElement | null>;
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   title: string;
   description?: string;
+  /** Optional glyph shown in a tinted tile before the title. */
+  icon?: ReactNode;
   /** Resting heights as fractions of the viewport height. The sheet opens at `initialDetent` and never grows past the largest. */
   detents?: number[];
   /** Index into the sorted detents the sheet opens at. Defaults to the smallest. */
@@ -66,7 +71,7 @@ function velocityOf(samples: Drag["samples"], now: number) {
   return (last.y - first.y) / ((last.t - first.t) / 1000);
 }
 
-export function BottomSheet({ trigger, open: openProp, defaultOpen = false, onOpenChange, ...props }: BottomSheetProps) {
+export function BottomSheet({ trigger, returnFocusRef, open: openProp, defaultOpen = false, onOpenChange, ...props }: BottomSheetProps) {
   const portalTarget = useArcPortalTarget();
   const [uncontrolled, setUncontrolled] = useState(defaultOpen);
   const open = openProp ?? uncontrolled;
@@ -78,35 +83,45 @@ export function BottomSheet({ trigger, open: openProp, defaultOpen = false, onOp
   // Without a trigger (opened from state), remember what had the focus and give it back on close:
   // keyboard and screen reader users stay where they were instead of landing at the top of the page.
   const returnTo = useRef<HTMLElement | null>(null);
-  const wasOpen = useRef(open);
+  const openRef = useRef(open);
+  const presentRef = useRef(open);
+  useLayoutEffect(() => {
+    openRef.current = open;
+    if (open) presentRef.current = true;
+  }, [open]);
   useEffect(() => {
-    if (trigger || open) return;
-    const remember = (event: globalThis.FocusEvent) => { if (event.target instanceof HTMLElement) returnTo.current = event.target; };
-    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) returnTo.current = document.activeElement;
+    if (trigger) return;
+    const remember = (event: globalThis.FocusEvent) => {
+      if (!openRef.current && !presentRef.current && event.target instanceof HTMLElement && !event.target.closest('[role="dialog"]')) returnTo.current = event.target;
+    };
+    if (!openRef.current && document.activeElement instanceof HTMLElement && document.activeElement !== document.body && !document.activeElement.closest('[role="dialog"]')) returnTo.current = document.activeElement;
     document.addEventListener("focusin", remember);
     return () => document.removeEventListener("focusin", remember);
-  }, [open, trigger]);
-  useEffect(() => {
-    const closed = wasOpen.current && !open;
-    wasOpen.current = open;
-    if (!closed || trigger) return;
-    const target = returnTo.current;
-    const timer = window.setTimeout(() => {
-      if (target?.isConnected && (document.activeElement === document.body || document.activeElement === null)) target.focus({ preventScroll: true });
-    }, 360);
-    return () => window.clearTimeout(timer);
-  }, [open, trigger]);
+  }, [trigger]);
+  const restoreFocus = useCallback(() => {
+    // Another modal has taken over (for example Register sale from Client data).
+    // Its focus belongs to that modal, never to this sheet's old opener.
+    if (document.activeElement?.closest('[role="dialog"]') && !document.activeElement.closest('[data-state="closed"]')) return true;
+    if (openRef.current) return false;
+    presentRef.current = false;
+    if (trigger) return false;
+    const target = returnFocusRef?.current ?? returnTo.current;
+    if (!target?.isConnected) return false;
+    target.focus({ preventScroll: true });
+    return true;
+  }, [trigger, returnFocusRef]);
   return <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
     {trigger ? <DialogPrimitive.Trigger asChild>{trigger}</DialogPrimitive.Trigger> : null}
     {/* The sheet stays mounted while it leaves, so a close can be caught and reversed mid-flight. */}
-    <AnimatePresence>{open && <DialogPrimitive.Portal key="sheet" forceMount container={portalTarget ?? undefined}><Sheet {...props} onDismiss={dismiss} /></DialogPrimitive.Portal>}</AnimatePresence>
+    <AnimatePresence onExitComplete={restoreFocus}>{open && <DialogPrimitive.Portal key="sheet" forceMount container={portalTarget ?? undefined}><Sheet {...props} onDismiss={dismiss} onRestoreFocus={restoreFocus} /></DialogPrimitive.Portal>}</AnimatePresence>
   </DialogPrimitive.Root>;
 }
 
-function Sheet({ title, description, detents = [.45, .92], initialDetent = 0, onDetentChange, closeLabel = "Close", className, children, onDismiss }: Omit<BottomSheetProps, "trigger" | "open" | "defaultOpen" | "onOpenChange"> & { onDismiss: () => void }) {
+function Sheet({ title, description, icon, detents = [.45, .92], initialDetent = 0, onDetentChange, closeLabel = "Close", className, children, onDismiss, onRestoreFocus }: Omit<BottomSheetProps, "trigger" | "open" | "defaultOpen" | "onOpenChange"> & { onDismiss: () => void; onRestoreFocus: () => boolean }) {
   const arcScope = useArcScopeProps();
   const [isPresent, safeToRemove] = usePresence();
   const reduced = useReducedMotion() ?? false;
+  const motionEnabled = useInterfaceMotionEnabled();
   const detentKey = detents.join(",");
   const stops = useMemo(() => detentKey.split(",").map(Number).filter(stop => stop > 0).sort((a, b) => a - b), [detentKey]);
   const top = stops.length - 1;
@@ -174,6 +189,12 @@ function Sheet({ title, description, detents = [.45, .92], initialDetent = 0, on
       y.jump(offset("closed"));
       if (reduced) { y.jump(offset(detentRef.current)); presence.jump(0); }
     }
+    if (!motionEnabled) {
+      y.jump(offset(isPresent ? detentRef.current : "closed"));
+      presence.jump(isPresent ? 1 : 0);
+      if (!isPresent) safeToRemove?.();
+      return;
+    }
     if (isPresent) {
       if (reduced) { y.jump(offset(detentRef.current)); animate(presence, 1, fade); return; }
       presence.jump(1);
@@ -184,7 +205,7 @@ function Sheet({ title, description, detents = [.45, .92], initialDetent = 0, on
     // A flick has already started the exit with its own velocity; only the unmount waits for it.
     if (aim.current === "closed" && y.isAnimating()) arrive.current = safeToRemove;
     else go("closed", undefined, safeToRemove);
-  }, [go, height, isPresent, offset, presence, reduced, safeToRemove, y]);
+  }, [go, height, isPresent, motionEnabled, offset, presence, reduced, safeToRemove, y]);
 
   // A viewport change (rotation, the mobile toolbar) moves every detent. Keep the sheet on its detent, retargeting any flight.
   useEffect(() => {
@@ -374,11 +395,12 @@ function Sheet({ title, description, detents = [.45, .92], initialDetent = 0, on
 
   return <>
     <DialogPrimitive.Overlay forceMount asChild><motion.div {...arcScope} className={[arcScope.className, styles.overlay].filter(Boolean).join(" ")} style={{ opacity: backdrop }} /></DialogPrimitive.Overlay>
-    <DialogPrimitive.Content forceMount {...(description ? {} : { "aria-describedby": undefined })} onOpenAutoFocus={event => { event.preventDefault(); sheetRef.current?.focus({ preventScroll: true }); }} onPointerDownOutside={event => { const { present, at } = presenceChange.current; if (!present || event.detail.originalEvent.timeStamp < at) event.preventDefault(); }} asChild><motion.div {...arcScope} ref={sheetRef} className={[arcScope.className, styles.sheet, className].filter(Boolean).join(" ")} style={style} data-expanded={expanded ? "" : undefined} onKeyDown={sheetKey}><div className={styles.header} onPointerDown={headerDown} onPointerMove={headerMove} onPointerUp={headerUp} onPointerCancel={headerUp}>
+    <DialogPrimitive.Content forceMount onCloseAutoFocus={event => { if (onRestoreFocus()) event.preventDefault(); }} {...(description ? {} : { "aria-describedby": undefined })} onOpenAutoFocus={event => { event.preventDefault(); sheetRef.current?.focus({ preventScroll: true }); }} onPointerDownOutside={event => { const { present, at } = presenceChange.current; if (!present || event.detail.originalEvent.timeStamp < at) event.preventDefault(); }} asChild><motion.div {...arcScope} ref={sheetRef} className={[arcScope.className, styles.sheet, className].filter(Boolean).join(" ")} style={style} data-expanded={expanded ? "" : undefined} onKeyDown={sheetKey}><div className={styles.header} onPointerDown={headerDown} onPointerMove={headerMove} onPointerUp={headerUp} onPointerCancel={headerUp}>
                 <button type="button" className={styles.grabber} data-grabber="" aria-label={expanded ? "Recolher painel" : "Expandir painel"} aria-expanded={expanded} onClick={grabberClick} onKeyDown={grabberKey}>
                   <span className={styles.grabberBar} aria-hidden="true" />
                 </button>
                 <div className={styles.headRow}>
+                  {icon ? <span className={styles.headIcon} aria-hidden="true">{icon}</span> : null}
                   <div className={styles.headText}>
                     <DialogPrimitive.Title className={styles.title}>{title}</DialogPrimitive.Title>
                     {description ? <DialogPrimitive.Description className={styles.description}>{description}</DialogPrimitive.Description> : null}

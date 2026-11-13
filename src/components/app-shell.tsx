@@ -1,7 +1,6 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef } from "react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
@@ -25,8 +24,6 @@ import "@/components/arc/director-skin.css";
 import "@/components/arc/director-primitives.css";
 import "@/components/arc/director-chrome.css";
 
-// Client only: it reads the broker's WhatsApp session (server actions) and stays hidden until it knows.
-const WhatsAppMissingBanner = dynamic(() => import("@/components/whatsapp/whatsapp-missing-banner").then((mod) => mod.WhatsAppMissingBanner), { ssr: false });
 
 type Branding = {
   brandColor: string | null;
@@ -61,6 +58,8 @@ export function AppShell({
   showRelationship = false,
   journeyEnabled = false,
   welcomeVideoEnabled = false,
+  brokerHomeRedesign = false,
+  showHomeLearning = true,
   teamRankingEnabled = false,
   teamManagementEnabled = false,
   viewAs = { canViewAs: false, viewingAs: null },
@@ -88,6 +87,8 @@ export function AppShell({
   journeyEnabled?: boolean;
   /** Welcome video on the broker's first access (Super-admin flag). */
   welcomeVideoEnabled?: boolean;
+  brokerHomeRedesign?: boolean;
+  showHomeLearning?: boolean;
   teamRankingEnabled?: boolean;
   teamManagementEnabled?: boolean;
   /** Super admin "Ver como" (button and the strip while viewing as someone). */
@@ -214,7 +215,6 @@ export function AppShell({
         }
       >
         <ViewAsBanner viewingAs={viewAs.viewingAs} />
-        {liteAudience === "broker" && !viewAs.viewingAs ? <WhatsAppMissingBanner /> : null}
         <LightChrome
           erpLinks={erpLinks}
           viewAs={viewAs}
@@ -225,6 +225,8 @@ export function AppShell({
           showRelationship={showRelationship}
           journeyEnabled={journeyEnabled}
           welcomeVideoEnabled={welcomeVideoEnabled}
+          brokerHomeRedesign={brokerHomeRedesign}
+          showHomeLearning={showHomeLearning}
           teamRankingEnabled={teamRankingEnabled}
           teamManagementEnabled={teamManagementEnabled}
           showNegotiations={negotiationsEnabled}

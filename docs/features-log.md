@@ -2,6 +2,24 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Refinamento local do Lite: conversa e Agora sob demanda
+
+- Conversa ocupa a área principal; o olho ao lado do nome abre os dados, etapa, chegada e próximo passo. WhatsApp/Ligar/Etapa viram ícones no topo com área de toque uniforme; fontes atuais preservadas.
+- Bloco Agora passa ao botão flutuante com contagem real e painel compartilhado, reversível no Super-admin; retirados faixa global de conexão e Cotações da ficha do corretor. Ícone de conexão, cotador próprio e dados salvos preservados.
+- Botões primários usam o tema; densidade dos campos do painel de dados é compacta. Host fecha Dados do cliente antes de outro fluxo e devolve foco ao olho. Registro de venda fica com Claude, sem edição direta nesta entrega.
+- Implementação e capturas locais, com verificações e limitações: [registro do refinamento](implementations/active/2026-11-13-agora-flutuante-lite.md). Sem publicação.
+
+## 13/11/2026 - Proposta da Home do corretor rejeitada e retirada
+
+- Vinicios rejeitou o resultado visual por considerá-lo confuso e determinou preservar o estilo e a metodologia atuais do Lite.
+- Integração do dashboard, prévia alternativa e entrada administrativa retiradas. Nenhuma ativação ou publicação em produção. A composição e os testes abaixo são histórico da proposta, não aceite visual.
+
+### Histórico da proposta local
+
+- Home Lite apresenta um próximo passo principal, prazo de oferta, pendências secundárias, números do dia e ferramentas agrupadas conforme as capacidades existentes.
+- Aceite reutiliza a operação canônica, impede duplo envio e oferece recuperação de falha. Piloto por empresa e corretores ativos explícitos, desligado por padrão, configurável pelo Super-admin com configuração e auditoria na mesma transação.
+- Capturas reais locais com dados fictícios e validações: [registro do lote](implementations/active/2026-11-13-broker-home-phase2.md). Publicação e QA autenticado não realizados; UX-M1.10 permanece pendente.
+
 ## 12/11/2026 - ERP operacional: financeiro completo, indicações, incentivos, BI e TV
 
 - Comissões do cronograma da venda entram no ERP para conferência (previsto, conferido e pago ao corretor lado a lado); telas antigas deixam de marcar como paga uma parcela controlada pelo ERP.

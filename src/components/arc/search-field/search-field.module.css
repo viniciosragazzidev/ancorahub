@@ -11,6 +11,9 @@
 .input:focus-visible { outline: 0; }
 .input::placeholder { color: var(--text-muted); }
 .input::-webkit-search-cancel-button { display: none; }
+/* Keep the compact glyph and reserve a comfortable touch target without changing layout. */
+.shell button { position: relative; }
+.shell button::after { content: ""; position: absolute; inset: calc((24px - var(--control-height-md)) / 2); }
 .clearSlot { display: grid; width: 24px; height: 24px; flex: 0 0 auto; place-items: center; }
 .shell button { display: grid; width: 24px; height: 24px; flex: 0 0 auto; place-items: center; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-muted); transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
 @media (hover: hover) and (pointer: fine) { .shell button:hover { background: var(--surface-muted); color: var(--foreground); } }

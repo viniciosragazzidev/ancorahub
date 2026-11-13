@@ -11,7 +11,7 @@ export function PeopleDataSection({ lead, c, showRecordDetails = true }: { lead:
     <>
         {/* ── Pessoas da Contratação + Dados Organizados ──────────────────── */}
         {!isDistributed && (
-          <div className="space-y-5">
+          <div className="space-y-4" data-form-density="compact">
             <BeneficiariesSection
               leadId={lead.id}
               contactName={lead.nome}

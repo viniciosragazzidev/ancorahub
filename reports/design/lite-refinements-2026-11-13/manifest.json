@@ -1,0 +1,37 @@
+[
+  {
+    "file": "chat-mobile.jpg",
+    "bytes": 21505,
+    "sha256": "F214DFC8F64F3B37679B3DD2444CD31AD0DE78B2FC143E45EAF7F60D5E815C2D"
+  },
+  {
+    "file": "chat-desktop.jpg",
+    "bytes": 38125,
+    "sha256": "BBEFA878598180D2615D862C4745D7179038FDF448C8924870CD0573542E8BAB"
+  },
+  {
+    "file": "client-data-mobile.jpg",
+    "bytes": 46053,
+    "sha256": "405B82692EE950386C0B740B0840494379378F98EB163687D55C23BFFA09CBE5"
+  },
+  {
+    "file": "home-mobile.jpg",
+    "bytes": 11994,
+    "sha256": "FC776E3DFA00C03DCEBA8A5FC08D40826C2D68F555CE70E23F1802BA0B3ABFD4"
+  },
+  {
+    "file": "agora-mobile.jpg",
+    "bytes": 24462,
+    "sha256": "B948D199B90695C7C992F70BB838D3FC522B2A561D48A9626BEDADA4822F8DC3"
+  },
+  {
+    "file": "agora-empty-mobile.jpg",
+    "bytes": 15163,
+    "sha256": "4DA983A3AD38E1AB6DEFD83A9BE965C3BB404539FCAE6F488DE23C5106421BBE"
+  },
+  {
+    "file": "handoff-mobile.jpg",
+    "bytes": 15919,
+    "sha256": "E84959DC1D0CEFBA42C1A952786BE63307A99AC89BDA5310326850EFEA07BF70"
+  }
+]

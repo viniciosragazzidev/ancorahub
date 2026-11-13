@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 vi.mock("@/hooks/use-media-query", () => ({ useMediaQuery: () => true }));
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/features/manager-workspace/manager-lead-transfer-form", () => ({ ManagerLeadTransferForm: () => <div>Formulário de repasse</div> }));
 vi.mock("@/features/manager-workspace/manager-lead-status-sheet", () => ({ ManagerLeadStatusSheet: () => <button type="button">Alterar etapa</button> }));
 vi.mock("@/components/arc/avatar/avatar", () => ({ Avatar: ({ name }: { name: string }) => <span role="img" aria-label={name} /> }));
 vi.mock("@/components/arc/empty-state/empty-state", () => ({ EmptyState: ({ title }: { title: string }) => <p>{title}</p> }));
-vi.mock("@/components/ui/button", () => ({ Button: ({ children }: { children: React.ReactNode }) => <button type="button">{children}</button> }));
+// Keeps the label and the click: the lead data now open from the eye button (conversation as focus, 13/11).
+vi.mock("@/components/ui/button", () => ({ Button: ({ children, variant: _variant, size: _size, asChild: _asChild, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string; asChild?: boolean }) => <button type="button" {...props}>{children}</button> }));
+const openLeadData = () => fireEvent.click(screen.getByRole("button", { name: "Ver dados do cliente" }));
 vi.mock("@/features/broker-workspace/components/light-lead-detail", () => ({
   LightLeadDetail: ({ lead, mode }: { lead: { nome: string; qualificationStatus?: string | null }; mode: string }) => <div data-testid="shared-light-detail" data-mode={mode}><span>{lead.nome}</span><span>{lead.qualificationStatus}</span></div>,
 }));
@@ -43,6 +45,9 @@ describe("SupervisorLeadDetail (gestor Lite tasks and documents)", () => {
         documents={[{ id: "d1", filename: "rg.pdf", status: "approved", requirementName: "RG" }]}
       />,
     );
+    expect(screen.getByRole("heading", { name: "Conversa do WhatsApp" })).toBeTruthy();
+    expect(screen.getByText("Quero saber mais")).toBeTruthy();
+    openLeadData();
 
     expect(screen.getByRole("heading", { name: "Tarefas (2)" })).toBeTruthy();
     expect(screen.getByText("Ligar para confirmar")).toBeTruthy();
@@ -50,13 +55,12 @@ describe("SupervisorLeadDetail (gestor Lite tasks and documents)", () => {
     expect(screen.getByRole("heading", { name: "Documentos (1)" })).toBeTruthy();
     expect(screen.getByText("RG · Aprovado")).toBeTruthy();
     expect(screen.getByTestId("shared-light-detail").getAttribute("data-mode")).toBe("management");
-    expect(screen.getByRole("heading", { name: "Conversa do WhatsApp" })).toBeTruthy();
-    expect(screen.getByText("Quero saber mais")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Alterar etapa" })).toBeTruthy();
   });
 
   it("keeps the supervisor view unchanged: no tasks or documents sections without the data", () => {
     render(<SupervisorLeadDetail lead={lead} lightLead={lightLead} requirements={[]} leadDocuments={[]} conversation={conversation} brokerWhatsAppConnected timeline={[]} now="2026-10-14T15:00:00.000Z" />);
+    openLeadData();
 
     expect(screen.queryByRole("heading", { name: /Tarefas/ })).toBeNull();
     expect(screen.queryByRole("heading", { name: /Documentos/ })).toBeNull();

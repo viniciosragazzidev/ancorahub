@@ -237,10 +237,11 @@ export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe
       return <p className={styles.date}>{block.label}</p>;
     case "system":
       return (
-        <p className={styles.system}>
+        <div className={styles.system}>
           {block.strong ? <><strong>{block.strong}</strong> </> : null}{block.text}
+          {block.details ? <details className={styles.systemDetails}><summary>Ver sugestão completa</summary><p>{block.details}</p></details> : null}
           {block.action ? <>{" · "}<button type="button" className={styles.systemAction} onClick={() => onSystemAction?.(block)}>{block.action.label}</button></> : null}
-        </p>
+        </div>
       );
     case "assistant":
       return <AssistantText block={block} />;

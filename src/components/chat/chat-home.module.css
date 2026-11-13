@@ -97,20 +97,38 @@
 .nowItemTitle { overflow: hidden; color: var(--foreground); font-size: var(--text-sm); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .nowItemDetail { color: var(--text-secondary); font-size: var(--text-xs); line-height: 1.4; }
 .nowCountdown { color: var(--danger); font-size: var(--text-xs); font-weight: 600; font-variant-numeric: tabular-nums; }
-.nowAction { display: inline-flex; min-width: 84px; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border: 0; border-radius: 999px; background: var(--accent); color: var(--accent-foreground); box-shadow: var(--shadow-resting); font: inherit; font-size: var(--text-sm); font-weight: 600; text-align: center; text-decoration: none; white-space: nowrap; cursor: pointer; transition: transform var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
-.nowAction:hover { background: var(--accent-strong); }
-.nowAction:active { transform: scale(.98); }
-.nowAction:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 .nowItem[data-tone="urgent"] .nowItemTitle { color: var(--danger); }
 .nowItem[data-tone="waiting"] .nowItemTitle { color: var(--accent-strong); }
 .nowEmpty { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.45; }
+
+/* The existing floating action opens one shared sheet instead of repeating the list above chats. */
+.nowPanel { min-width: 0; text-align: left; }
+/* Each pending item is a soft card; the first one carries the filled action ("comece por aqui"). */
+.nowPanel .nowList { gap: var(--space-3); }
+.nowPanel .nowItem { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius-panel); background: var(--surface-muted); }
+.nowPanel .nowItem:first-child { background: var(--chat-action-soft, var(--surface-muted)); }
+.nowPanel .nowItem:not(:first-child) .nowItemActions > a { background: var(--surface); }
+.nowPanel .nowItemActions > a { min-height: 40px; padding-inline: 12px; gap: 4px; font-size: var(--text-xs); }
+.nowPanel .nowItemActions > a svg { width: 14px; height: 14px; }
+.nowPanel .nowItemCopy { gap: 4px; }
+.nowItemTone { justify-self: start; max-width: 100%; overflow: hidden; margin-bottom: 6px; padding: 3px 9px; line-height: 1.4; white-space: nowrap; text-overflow: ellipsis; border-radius: 999px; background: var(--surface); color: var(--text-secondary); font-size: 11px; font-weight: 600; }
+.nowItemTone[data-tone="urgent"] { color: var(--danger); }
+.nowItemTone[data-tone="waiting"] { color: var(--chat-action-text, var(--accent-strong)); }
+.nowItemTone[data-tone="warning"] { color: var(--warning); }
+.nowPanel .nowItem .nowItemTitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--foreground); font-size: var(--text-sm); font-weight: 600; line-height: 1.3; white-space: normal; overflow-wrap: anywhere; }
+.nowPanel .nowItemDetail { font-size: var(--text-xs); line-height: 1.45; overflow-wrap: anywhere; }
+.nowItemAvatar { align-self: start; padding-top: 2px; }
+.nowItemActions { grid-column: 3; display: flex; justify-content: flex-end; min-width: 0; }
+/* Narrow phones: the action drops under the text so the title and detail keep the full width. */
+@media (max-width: 359px) {
+  .nowPanel .nowItem { grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+  .nowPanel .nowItemActions { grid-column: 2; justify-content: flex-start; margin-top: var(--space-1); }
+}
+.nowLauncher > button { pointer-events: auto; }
+@media (min-width: 1024px) { .nowLauncher { left: 360px; } }
 
 @media (min-width: 1024px) {
   .nowMobile { display: none; }
   .nowDesktop { display: grid; margin: 6px 0 8px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .nowAction { transition: none; }
-  .nowAction:active { transform: none; }
-}

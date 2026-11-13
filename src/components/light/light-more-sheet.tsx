@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { RefObject } from "react";
 
 import { startLiteTour } from "@/components/chat/tour/lite-tour";
 import { ChevronRight, LogOut } from "lucide-react";
@@ -32,6 +33,8 @@ export function LightMoreSheet({
   teamRankingEnabled = false,
   teamManagementEnabled = false,
   audience = "broker",
+  homeRedesign = false,
+  returnFocusRef,
   availability,
   availabilityPending,
   onChangeAvailability,
@@ -49,6 +52,8 @@ export function LightMoreSheet({
   teamRankingEnabled?: boolean;
   teamManagementEnabled?: boolean;
   audience?: "broker" | "supervisor" | "manager";
+  homeRedesign?: boolean;
+  returnFocusRef?: RefObject<HTMLElement | null>;
   availability: LightAvailability;
   availabilityPending: boolean;
   onChangeAvailability: (next: "available" | "paused") => void;
@@ -58,12 +63,19 @@ export function LightMoreSheet({
   // The supervisor does not receive leads: no availability, and the tour is the broker's.
   const isSupervisor = audience === "supervisor";
   const isManager = audience === "manager";
+  const workPaths = ["/clientes", "/cotacao", "/plantoes"];
+  const groups = homeRedesign && audience === "broker" ? [
+    { label: "Meu trabalho", items: destinations.filter((item) => workPaths.includes(item.href)) },
+    { label: "Acompanhamento", items: destinations.filter((item) => !workPaths.includes(item.href) && item.href !== "/settings") },
+    { label: "Preferências", items: destinations.filter((item) => item.href === "/settings") },
+  ] : [{ label: null, items: [...destinations, ...erpLinks] }];
 
   return (
     <BottomSheet
       open={open}
+      returnFocusRef={returnFocusRef}
       onOpenChange={onOpenChange}
-      title="Mais"
+      title={homeRedesign ? "Seu espaço de trabalho" : "Mais"}
       detents={[0.62, 0.92]}
       closeLabel="Fechar"
       className="arc-venancor"
@@ -77,9 +89,11 @@ export function LightMoreSheet({
           </div>
         </div>
 
-        <nav aria-label="Mais destinos">
+        <nav aria-label="Mais destinos" className="grid gap-5">
+          {groups.filter((group) => group.items.length).map((group) => <section key={group.label ?? "destinations"}>
+          {group.label ? <h3 className="mb-2 text-sm font-medium text-(--text-secondary)">{group.label}</h3> : null}
           <ul className="overflow-hidden rounded-3xl bg-(--surface-muted)">
-            {[...destinations, ...erpLinks].map((item) => (
+            {group.items.map((item) => (
               <li key={item.href} className="border-b border-(--border) last:border-b-0">
                 <Link
                   href={item.href}
@@ -92,6 +106,7 @@ export function LightMoreSheet({
               </li>
             ))}
           </ul>
+          </section>)}
         </nav>
 
         {/* The tour of the audience (broker or supervisor steps) runs on the Início. */}

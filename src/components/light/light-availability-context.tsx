@@ -9,11 +9,14 @@ export type LightAvailabilityValue = {
   isPending: boolean;
   setStatus: (next: "available" | "paused") => void;
   /** Opens the "Mais" sheet (chat screens have no tab bar of their own). */
-  openMore?: () => void;
+  openMore?: (opener?: HTMLElement) => void;
   /** Who uses the Lite: the broker (default) or the supervisor (team, no availability). */
   audience?: "broker" | "supervisor" | "manager";
   /** The welcome video plays first on the broker's first access (Super-admin flag). */
   welcomeVideo?: boolean;
+  homeRedesign?: boolean;
+  showHomeLearning?: boolean;
+  homeTools?: { href: string; label: string }[];
 };
 
 const LightAvailabilityContext = createContext<LightAvailabilityValue | null>(null);

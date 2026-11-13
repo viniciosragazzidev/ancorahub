@@ -113,7 +113,11 @@ function eventBlock(event: LeadConversationEvent, viewerId: string, hideTimes = 
   if (event.tipo === "note" && event.userId === viewerId) return { type: "user", id: `ev-${event.id}`, text: event.conteudo, at };
   if (event.tipo === "note") return { type: "system", id: `ev-${event.id}`, strong: event.userName ?? "Equipe", text: `anotou: ${event.conteudo}` };
   if (event.tipo === "whatsapp_msg") return { type: "assistant", id: `ev-${event.id}`, text: event.conteudo, at };
-  if (isAiFeedback(event)) return { type: "system", id: `ev-${event.id}`, strong: "Sugestão da IA", text: `${aiNextAction(event.conteudo)}${suffix}` };
+  if (isAiFeedback(event)) {
+    const fullNext = event.conteudo.split("Próxima Ação:")[1]?.trim();
+    const preview = aiNextAction(event.conteudo);
+    return { type: "system", id: `ev-${event.id}`, strong: "Sugestão da IA", text: `${preview}${suffix}`, details: fullNext && fullNext !== preview ? fullNext : undefined };
+  }
   return { type: "system", id: `ev-${event.id}`, text: `${event.conteudo}${suffix}` };
 }
 

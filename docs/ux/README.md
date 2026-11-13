@@ -6,6 +6,8 @@ anterior.
 
 ## Leitura obrigatória
 
+Proposta de segunda fase, começando pelo Corretor: [auditoria do Calen](./phase2/2026-11-13-calen-design-audit.md) e [plano por ondas](./phase2/2026-11-13-corretor-redesign-plan.md). Planejamento documental; não avança o gate vigente nem altera a pele atual.
+
 Plano transversal proposto: [interação, feedback e gamificação](./INTERACTION_FEEDBACK_GAMIFICATION_PLAN.md). A implementação depende das etapas e decisões indicadas no plano.
 
 1. [Contrato de Redesign](./UX_REDESIGN_CONTRACT.md)

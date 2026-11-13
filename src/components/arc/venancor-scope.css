@@ -118,7 +118,8 @@
   --radius-surface: 1.75rem;
   --font-body: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
-  --control-height-sm: 2.75rem; /* touch targets are at least 44px */
+  --control-height-sm: max(44px, 2.75rem);
+  --control-height-md: max(44px, 2.75rem); /* root text scaling must not shrink touch targets */
   /* The chat action blue, also for Lite screens outside the chat (team, journey, recados).
      The chat root (chat.module.css) sets the same values, so nothing changes inside it. */
   --chat-action: oklch(62% 0.2 255);
@@ -197,3 +198,15 @@ html[data-contrast="high"] .arc-venancor {
 }
 /* iOS draws the native date field wider than its box: it pushed the page sideways. */
 .arc-venancor input[type="date"] { display: block; min-width: 0; max-width: 100%; -webkit-appearance: none; appearance: none; }
+
+/* Shared compact form density: beneficiaries and sale registration use the same controls.
+   Typography is unchanged; the phone's 16px input rule above continues to prevent iOS zoom. */
+.arc-venancor [data-form-density="compact"] [data-slot="input"],
+.arc-venancor[data-form-density="compact"] [data-slot="input"] {
+  height: 36px; min-height: 36px; border-radius: var(--space-3); padding-block: var(--space-1); padding-inline: var(--space-3);
+}
+.arc-venancor [data-form-density="compact"] :is([data-slot="select-trigger"], [data-slot="date-picker-trigger"], select),
+.arc-venancor[data-form-density="compact"] :is([data-slot="select-trigger"], [data-slot="date-picker-trigger"], select) {
+  min-height: 40px; height: 40px; border-radius: var(--space-3); padding-inline: var(--space-3);
+}
+.arc-venancor [data-form-density="compact"] [data-slot="card"] { padding: var(--space-3); gap: var(--space-3); }

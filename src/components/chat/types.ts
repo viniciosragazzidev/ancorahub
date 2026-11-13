@@ -60,7 +60,7 @@ export type ChatListItem = {
 
 export type ChatBlock =
   | { type: "date"; id: string; label: string }
-  | { type: "system"; id: string; text: string; strong?: string; action?: { label: string; choiceAction: ChatAction } }
+  | { type: "system"; id: string; text: string; strong?: string; details?: string; action?: { label: string; choiceAction: ChatAction } }
   /** variant "tip": a tip bubble (lamp + "Dica"), used by Dicas de Atendimento. */
   | { type: "assistant"; id: string; text: string; at?: string; variant?: "tip" }
   /** An answer from the operator material (Jack, 23/10): sections of rows with their source, copy for the client. */

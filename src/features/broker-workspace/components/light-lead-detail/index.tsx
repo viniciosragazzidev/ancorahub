@@ -81,7 +81,7 @@ export function LightLeadDetail({
       <div className="arc-venancor flex w-full flex-col gap-4 text-foreground">
         <ClientInfoCard lead={lead} c={c} mode="management" />
         <SaleSection c={c} mode="management" />
-        {commercialValuesEnabled ? <LeadQuotesSection key={lead.id} leadId={lead.id} leadName={lead.nome} leadPhone={lead.telefone} beneficiaryCount={lead.livesCount} plans={quotePlans} monthlyValue={lead.monthlyValue} livesCount={lead.livesCount} commercialValueSource={lead.commercialValueSource} canDeleteQuotes={isManagement} /> : null}
+        {commercialValuesEnabled && isManagement ? <LeadQuotesSection key={lead.id} leadId={lead.id} leadName={lead.nome} leadPhone={lead.telefone} beneficiaryCount={lead.livesCount} plans={quotePlans} monthlyValue={lead.monthlyValue} livesCount={lead.livesCount} commercialValueSource={lead.commercialValueSource} canDeleteQuotes={isManagement} /> : null}
         <DetailsZone lead={lead} c={c} showAiInsight={false} />
       </div>
     );
@@ -105,18 +105,20 @@ export function LightLeadDetail({
     return (
       <>
         <LeadSocialLayout
-          header={<LeadHeaderBar name={lead.nome} statusLabel={stageLabel(c.leadStatus)} statusTone={statusTone} arrival={arrival} />}
+          detailOverlayActive={c.showSaleConfirm || c.showUpdateSheet || c.showDeclineModal}
+          actions={<LeadActionBar lead={lead} c={c} inline compact />}
+          header={<LeadHeaderBar name={lead.nome} statusLabel={stageLabel(c.leadStatus)} statusTone={statusTone} arrival={arrival} compact />}
           // One card: what to do now and its buttons (Aceitar, WhatsApp, Etapa) right under it.
-          next={<NextStepCard step={step} action={<LeadActionBar lead={lead} c={c} inline />} />}
+          next={<NextStepCard step={step} />}
           details={
             <div className="flex flex-col gap-4">
+              <LeadHeaderBar name={lead.nome} statusLabel={stageLabel(c.leadStatus)} statusTone={statusTone} arrival={arrival} />
               <ClosingOutcomeCard lead={lead} c={c} />
               {/* O plano anunciado antes dos dados: evita oferecer um plano mais caro do que o anúncio (10/11). */}
               <AdOriginCard ad={lead.adContext} />
               <ClientInfoCard lead={lead} c={c} withSummary />
               <PeopleDataSection lead={lead} c={c} showRecordDetails={false} />
               <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} registrationV2Enabled={saleRegistrationV2Enabled} hasActiveSale={lead.hasActiveSale} />
-              {commercialValuesEnabled ? <LeadQuotesSection key={lead.id} leadId={lead.id} leadName={lead.nome} leadPhone={lead.telefone} beneficiaryCount={lead.livesCount} plans={quotePlans} monthlyValue={lead.monthlyValue} livesCount={lead.livesCount} commercialValueSource={lead.commercialValueSource} canDeleteQuotes={isManagement} /> : null}
             </div>
           }
           conversation={conversation}
@@ -161,7 +163,6 @@ export function LightLeadDetail({
         <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} registrationV2Enabled={saleRegistrationV2Enabled} hasActiveSale={lead.hasActiveSale} />
         <DetailsZone lead={lead} c={c} />
         <PeopleDataSection lead={lead} c={c} />
-        {commercialValuesEnabled ? <LeadQuotesSection key={lead.id} leadId={lead.id} leadName={lead.nome} leadPhone={lead.telefone} beneficiaryCount={lead.livesCount} plans={quotePlans} monthlyValue={lead.monthlyValue} livesCount={lead.livesCount} commercialValueSource={lead.commercialValueSource} canDeleteQuotes={isManagement} /> : null}
       </div>
 
       <LeadActionBar lead={lead} c={c} />

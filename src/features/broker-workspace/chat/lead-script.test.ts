@@ -108,6 +108,7 @@ describe("buildLeadConversationScript", () => {
     expect(blocks.some((block) => block.id === "ev-a1")).toBe(false);
     const latest = blocks.find((block) => block.id === "ev-a2");
     expect(latest).toMatchObject({ type: "system", strong: "Sugestão da IA" });
+      expect(latest).toMatchObject({ details: "Enviar a cotação prometida. Depois confirmar o recebimento." });
     expect(latest && "text" in latest ? latest.text : "").toMatch(/^Enviar a cotação prometida\. ·/);
   });
 
@@ -116,6 +117,7 @@ describe("buildLeadConversationScript", () => {
       { id: "a3", tipo: "system_alert", conteudo: `[IA Feedback] ${"Texto sem marcador ".repeat(20)}`, userId: "me", userName: "Eu", createdAt: new Date("2026-10-13T14:59:00.000Z") },
     ]);
     const block = blocks.find((item) => item.id === "ev-a3");
+      expect(block && "details" in block ? block.details : undefined).toBeUndefined();
     const text = (block && "text" in block ? block.text : "") ?? "";
     expect(text.startsWith("Texto sem marcador")).toBe(true);
     expect(text.split(" · ")[0]?.length).toBeLessThanOrEqual(180);

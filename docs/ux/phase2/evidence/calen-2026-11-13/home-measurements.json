@@ -1,0 +1,191 @@
+{
+  "controls": [
+    {
+      "background": "none",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 36,
+      "lineHeight": "13px",
+      "padding": "0px 16px",
+      "radius": "0px",
+      "size": "13px",
+      "text": "Ganhe 10% no primeiro ano do plano anual com o cupom10% no 1º ano",
+      "transition": "background 0.15s ease-out",
+      "weight": "500"
+    },
+    {
+      "background": "none",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 26,
+      "lineHeight": "27.2px",
+      "padding": "0px",
+      "radius": "0px",
+      "size": "17px",
+      "text": "",
+      "transition": "all",
+      "weight": "400"
+    },
+    {
+      "background": "none",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 40.400001525878906,
+      "lineHeight": "22.4px",
+      "padding": "9px 10px",
+      "radius": "0px",
+      "size": "14px",
+      "text": "Entrar",
+      "transition": "opacity 0.15s ease-out",
+      "weight": "500"
+    },
+    {
+      "background": "linear-gradient(rgb(154, 91, 255), rgb(124, 58, 237))",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 40.400001525878906,
+      "lineHeight": "22.4px",
+      "padding": "9px 18px",
+      "radius": "999px",
+      "size": "14px",
+      "text": "Testar grátis",
+      "transition": "filter 0.15s ease-out",
+      "weight": "600"
+    },
+    {
+      "background": "none",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 0,
+      "lineHeight": "24px",
+      "padding": "10px 12px",
+      "radius": "12px",
+      "size": "15px",
+      "text": "Planos e preços",
+      "transition": "opacity 0.15s ease-out, background 0.15s ease-out",
+      "weight": "500"
+    },
+    {
+      "background": "none",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 0,
+      "lineHeight": "24px",
+      "padding": "10px 12px",
+      "radius": "12px",
+      "size": "15px",
+      "text": "Quem já usa",
+      "transition": "opacity 0.15s ease-out, background 0.15s ease-out",
+      "weight": "500"
+    },
+    {
+      "background": "none",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 0,
+      "lineHeight": "24px",
+      "padding": "10px 12px",
+      "radius": "12px",
+      "size": "15px",
+      "text": "Blog",
+      "transition": "opacity 0.15s ease-out, background 0.15s ease-out",
+      "weight": "500"
+    },
+    {
+      "background": "none",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 0,
+      "lineHeight": "24px",
+      "padding": "10px 12px",
+      "radius": "12px",
+      "size": "15px",
+      "text": "Comparativos",
+      "transition": "opacity 0.15s ease-out, background 0.15s ease-out",
+      "weight": "500"
+    },
+    {
+      "background": "none",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 0,
+      "lineHeight": "24px",
+      "padding": "10px 12px",
+      "radius": "12px",
+      "size": "15px",
+      "text": "Calculadoras",
+      "transition": "opacity 0.15s ease-out, background 0.15s ease-out",
+      "weight": "500"
+    },
+    {
+      "background": "none",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 0,
+      "lineHeight": "24px",
+      "padding": "10px 12px",
+      "radius": "12px",
+      "size": "15px",
+      "text": "Planilha grátis",
+      "transition": "opacity 0.15s ease-out, background 0.15s ease-out",
+      "weight": "500"
+    },
+    {
+      "background": "none",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 0,
+      "lineHeight": "24px",
+      "padding": "10px 12px",
+      "radius": "12px",
+      "size": "15px",
+      "text": "Trilha do aprendizado",
+      "transition": "opacity 0.15s ease-out, background 0.15s ease-out",
+      "weight": "500"
+    },
+    {
+      "background": "none",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 0,
+      "lineHeight": "24px",
+      "padding": "10px 12px",
+      "radius": "12px",
+      "size": "15px",
+      "text": "Suporte",
+      "transition": "opacity 0.15s ease-out, background 0.15s ease-out",
+      "weight": "500"
+    },
+    {
+      "background": "none",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 0,
+      "lineHeight": "24px",
+      "padding": "10px 12px",
+      "radius": "12px",
+      "size": "15px",
+      "text": "Seja afiliado",
+      "transition": "opacity 0.15s ease-out, background 0.15s ease-out",
+      "weight": "500"
+    },
+    {
+      "background": "none",
+      "font": "Satoshi, -apple-system, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif",
+      "height": 119.4000015258789,
+      "lineHeight": "59.6992px",
+      "padding": "0px",
+      "radius": "0px",
+      "size": "56.32px",
+      "text": "Quanto sobra no mês, antes de você gastar.",
+      "transition": "all",
+      "weight": "500"
+    }
+  ],
+  "tokens": {
+    "--accent-green": "#2FB22F",
+    "--accent-purple": "#AD52FF",
+    "--bg-cream": "#F8F5F0",
+    "--bg-dark": "#0B0D0A",
+    "--border-on-cream": "#E5E0D8",
+    "--border-on-dark": "rgba(244,246,242,0.10)",
+    "--fg-on-cream": "#1A1714",
+    "--fg-on-dark": "#F4F6F2",
+    "--muted-on-cream": "#5A554D",
+    "--muted-on-dark": "rgba(244,246,242,0.65)",
+    "--surface-card-on-cream": "#FFFFFF",
+    "--surface-raised-on-dark": "rgba(244,246,242,0.04)"
+  },
+  "url": "https://usecalen.com.br/",
+  "viewport": {
+    "height": 720,
+    "width": 1280
+  }
+}

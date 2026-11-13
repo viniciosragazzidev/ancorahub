@@ -21,6 +21,24 @@ afterEach(() => {
 });
 
 describe("AcceptLeadButton", () => {
+  it("shared: impede envio duplicado e mantém erro junto da ação para tentar novamente", async () => {
+    vi.spyOn(window, "open").mockReturnValue(fakeTab() as unknown as Window);
+    let finish: (value: { success: false; error: string }) => void = () => {};
+    mocks.accept.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    render(<AcceptLeadButton appearance="shared" leadId="l1">Aceitar e chamar</AcceptLeadButton>);
+    const button = screen.getByRole("button", { name: "Aceitar e chamar" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(mocks.accept).toHaveBeenCalledTimes(1);
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    finish({ success: false, error: "Oferta encerrada." });
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Oferta encerrada"));
+    expect(mocks.push).not.toHaveBeenCalled();
+    mocks.accept.mockResolvedValueOnce({ success: true });
+    fireEvent.click(screen.getByRole("button", { name: "Aceitar e chamar" }));
+    await waitFor(() => expect(mocks.accept).toHaveBeenCalledTimes(2));
+  });
+
   it("accepts and opens the client's WhatsApp Web in the same tap", async () => {
     const tab = fakeTab();
     const open = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);

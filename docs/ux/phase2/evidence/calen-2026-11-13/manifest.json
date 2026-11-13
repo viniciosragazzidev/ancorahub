@@ -1,0 +1,81 @@
+{
+  "purpose": "Design reference audit only; no product asset adoption",
+  "date": "2026-11-13",
+  "files": [
+    {
+      "name": "01-calen-hero-1090.jpg",
+      "bytes": 79028,
+      "sha256": "d802ac0fe5eed7e909c910900e31c3e86d41b3506c221a8ed8bdaced019b2df9"
+    },
+    {
+      "name": "03-produto-desktop-publicado.webp",
+      "bytes": 59716,
+      "sha256": "beb7d7977cf2a4d200b6d8db3390c243057af064d9789a9bf8a81d3581375f5a"
+    },
+    {
+      "name": "04-calen-precos.jpg",
+      "bytes": 82742,
+      "sha256": "2826bed676c0064fcea18d5b60943ffd0291c44d3e91ae232299f3fab7da22e3"
+    },
+    {
+      "name": "06-calen-mobile-390.jpg",
+      "bytes": 42637,
+      "sha256": "cf834dc2d437bbb400c7cedf7f3342103af96a14ca62366ecde00735c563ad56"
+    },
+    {
+      "name": "08-calen-acesso-mobile.jpg",
+      "bytes": 36975,
+      "sha256": "1d57e438da49874e4fa7a694eddbd8ff9c2017a1ad2b8f09d06b72c82aa67c81"
+    },
+    {
+      "name": "10-calen-tutorial-desktop.jpg",
+      "bytes": 76267,
+      "sha256": "494dc3513203a087e072df41b737600009be61d6038b6617c1a5649bb150e7d5"
+    },
+    {
+      "name": "11-calen-planos.jpg",
+      "bytes": 81533,
+      "sha256": "287e4a113527d625ca1febcb69947c83cdde329cb82891eb62409947d6abb7db"
+    },
+    {
+      "name": "12-tutorial-02-categorias.jpg",
+      "bytes": 69439,
+      "sha256": "c437d87b29124ca2e203def7e99f313f139ecb098cabc61d77c3fd058422f8f1"
+    },
+    {
+      "name": "13-tutorial-03-recorrencias.jpg",
+      "bytes": 40518,
+      "sha256": "1ed2c9d8ebc8dd83e537bb203289657033e8a95fa0e1ead857c5b7c0860c3425"
+    },
+    {
+      "name": "14-tutorial-04-calendario.jpg",
+      "bytes": 46058,
+      "sha256": "81be563248d751dd551de74abd44f0f667e664fa5671679158c2e78409afa085"
+    },
+    {
+      "name": "15-tutorial-05-investimentos.jpg",
+      "bytes": 56521,
+      "sha256": "583a8261e30c478b288819374b1890509fdd6bdc45dd02590162a94697c993dc"
+    },
+    {
+      "name": "16-tutorial-06-assistente.jpg",
+      "bytes": 48633,
+      "sha256": "f1206a6663c41c600f07d6513882c3718dfb2d0788dcd7c3136dc38d8f348025"
+    },
+    {
+      "name": "17-tutorial-07-contas.jpg",
+      "bytes": 52328,
+      "sha256": "a97d0fc92134eef7ba5ae67b81919f3af3852e4b309d8538f0d9c26b99ba5298"
+    },
+    {
+      "name": "auth-measurements.json",
+      "bytes": 1430,
+      "sha256": "8aa1803d1a48652b18c39a8f81a253e161c0c0848d730546a835b5ce344a491f"
+    },
+    {
+      "name": "home-measurements.json",
+      "bytes": 5997,
+      "sha256": "f47992b1e23325c4478798455480253bfdf844da11eea2dc9fb119f07f837963"
+    }
+  ]
+}

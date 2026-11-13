@@ -67,6 +67,7 @@ export async function getTenantMembers(tenantId: string) {
   await getRequiredPlatformAdmin();
   return getDatabase().select({
     id: schema.tenantMemberships.id,
+    userId: schema.tenantMemberships.userId,
     name: schema.user.name,
     email: schema.user.email,
     role: schema.tenantMemberships.role,

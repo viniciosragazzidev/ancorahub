@@ -3,12 +3,13 @@
 import { ClipboardList, MessageCircle, Phone } from "lucide-react";
 
 import { Button } from "@/components/arc/button/button";
+import page from "@/components/lite/page/lite-page.module.css";
 
 import type { LightLeadDetailData } from "./types";
 import type { LeadDetailController } from "./use-lead-detail";
 
 const linkBase = "inline-flex h-11 min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-(--accent) focus-visible:ring-offset-2";
-const linkPrimary = `${linkBase} bg-(--accent) text-(--accent-foreground)`;
+const linkPrimary = `${linkBase} bg-(--primary) text-(--primary-foreground)`;
 const linkSecondary = `${linkBase} bg-(--surface-muted) text-(--foreground)`;
 
 /**
@@ -16,7 +17,7 @@ const linkSecondary = `${linkBase} bg-(--surface-muted) text-(--foreground)`;
  * New lead: Recusar and Aceitar e chamar no WhatsApp (one tap). After accepting: WhatsApp (the one primary
  * action), Ligar and Etapa. The phone only exists after acceptance.
  */
-export function LeadActionBar({ lead, c, inline = false }: { lead: LightLeadDetailData; c: LeadDetailController; inline?: boolean }) {
+export function LeadActionBar({ lead, c, inline = false, compact = false }: { lead: LightLeadDetailData; c: LeadDetailController; inline?: boolean; compact?: boolean }) {
   const {
     isDistributed,
     leadStatus,
@@ -53,28 +54,31 @@ export function LeadActionBar({ lead, c, inline = false }: { lead: LightLeadDeta
                 href={externalWhatsAppUrl}
                 target="_blank"
                 rel="noreferrer"
-                className={linkPrimary}
+                className={compact ? page.iconButton : linkPrimary}
+                data-tone={compact ? "primary" : undefined}
+                aria-label={compact ? "Abrir WhatsApp do cliente" : undefined}
+                title={compact ? "WhatsApp" : undefined}
                 onClick={() =>
                   setWhatsappOpenedAt(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }))
                 }
               >
                 <MessageCircle className="size-4" aria-hidden="true" />
-                WhatsApp
+                {compact ? null : "WhatsApp"}
               </a>
             ) : (
-              <Button className="flex-1" disabled>
-                Sem WhatsApp no cadastro
+              <Button variant={compact ? "ghost" : "primary"} className={compact ? page.iconButton : "flex-1"} disabled aria-label={compact ? "WhatsApp indisponível: telefone não cadastrado" : undefined} title={compact ? "Telefone não cadastrado" : undefined}>
+                {compact ? <MessageCircle className="size-4" aria-hidden="true" /> : "Sem WhatsApp no cadastro"}
               </Button>
             )}
             {lead.telefone ? (
-              <a href={`tel:${lead.telefone}`} className={linkSecondary}>
+              <a href={`tel:${lead.telefone}`} className={compact ? page.iconButton : linkSecondary} aria-label={compact ? "Ligar para o cliente" : undefined} title={compact ? "Ligar" : undefined}>
                 <Phone className="size-4" aria-hidden="true" />
-                Ligar
+                {compact ? null : "Ligar"}
               </a>
             ) : null}
-            <Button variant="secondary" className="flex-1" onClick={handleOpenUpdateModal}>
+            <Button size={compact ? "sm" : "md"} variant={compact ? "ghost" : "secondary"} className={compact ? page.iconButton : "flex-1"} aria-label={compact ? "Alterar etapa do lead" : undefined} title={compact ? "Etapa" : undefined} onClick={handleOpenUpdateModal}>
               <ClipboardList className="size-4" aria-hidden="true" />
-              Etapa
+              {compact ? null : "Etapa"}
             </Button>
           </>
         )}

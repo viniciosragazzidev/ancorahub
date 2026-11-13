@@ -19,6 +19,8 @@ Os relatórios efêmeros ficam em `reports/agent/` e não são versionados. O co
 durável fica em `docs/`, decisões em `docs/decision-log.md` ou ADRs e termos em
 `CONTEXT.md`.
 
+Em máquinas com pouca memória durante QA visual, é possível limitar a suíte sem alterar os padrões: `npm run agent:verify -- --level full --test-pool threads --test-workers 1 --test-bail 1`. O relatório registra os argumentos reais. `--test-bail 1` interrompe a suíte na primeira falha e não certifica o restante dos testes; use a execução padrão para a cobertura global completa.
+
 ## Leitura por nível
 
 | Nível | Quando | Fonte |
