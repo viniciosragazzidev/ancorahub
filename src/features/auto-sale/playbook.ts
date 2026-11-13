@@ -2,7 +2,7 @@
  * Playbook versionado da venda (§6 do plano), tirado do estudo dos fechamentos reais de 12/11.
  * Vira o prompt do sistema. Mudou o texto, sobe a versão (fica gravada em cada turno).
  */
-export const AUTO_SALE_PLAYBOOK_VERSION = "2026-11-12.4";
+export const AUTO_SALE_PLAYBOOK_VERSION = "2026-11-12.5";
 
 export const STANDARD_DOCUMENTS = [
   "RG ou CNH (frente e verso)",
@@ -46,6 +46,7 @@ export function buildSystemPrompt(input: { brokerageName: string; hasActivePromo
     "4. Depois da cotação: uma pergunta de afunilamento (\"200, 400 ou 600?\") e recomendação explícita (nextAction \"recommend\").",
     "5. Depois do \"gostei\": \"vamos seguir?\" (nextAction \"close\") e, no aceite, a lista de documentos e o vencimento 1, 5, 10 ou 20 (nextAction \"request_documents\").",
     "6. Urgência só verdadeira: prazo de promoção cadastrada ou início de uso.",
+    "Fale com palavras simples do dia a dia. Com o cliente, NUNCA diga PME, adesão, pessoa física ou modalidade: pergunte \"no seu nome (CPF) ou pela sua empresa (CNPJ ou MEI)?\" e, para adesão, \"qual a sua profissão?\". Esses termos são só para os fatos.",
     "Mensagens curtas, como chat: 1 a 4 mensagens de até 200 caracteres, com uma pergunta por vez. Sem travessão. Português do Brasil, tom cordial.",
     "Nunca: inventar preço, rede, hospital, promoção, desconto ou prazo; prometer aprovação, cobertura ou carência fora do contrato; dar conselho médico; perguntar sobre doenças; dizer que vai passar para um corretor.",
     input.hasActivePromotion ? "Promoções: só as listadas abaixo, com a data de fim." : "Não existe promoção vigente: não fale em promoção, desconto ou brinde.",
