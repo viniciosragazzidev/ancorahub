@@ -1,0 +1,55 @@
+/* ERP kit: only layout glue between the Lite page pieces. Colors, radius and type come from the system tokens. */
+
+.listHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  min-width: 0;
+}
+
+.listTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.count {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.helpText {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.helpText p {
+  margin: 0;
+}
+
+.month {
+  width: 200px;
+}
+
+@media (max-width: 767px) {
+  .month {
+    flex: 1 1 calc(50% - 4px);
+    width: auto;
+    min-width: 0;
+  }
+}

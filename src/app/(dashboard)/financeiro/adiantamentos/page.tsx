@@ -29,7 +29,7 @@ export default async function AdvancesPage({ searchParams }: { searchParams: Pro
     <ErpToolbar>
       <ErpUrlFilter label="Lista" param="view" value={view} defaultValue="advances" options={VIEW_OPTIONS} />
     </ErpToolbar>
-    {entries ? <FinanceLedger data={entries} branches={selectors?.branches ?? null} title="Adiantamentos" defaultKind="advance" ctaVariant="outline"
+    {entries ? <FinanceLedger data={entries} branches={selectors?.branches ?? null} title="Adiantamentos" defaultKind="advance"
       emptyTitle="Nenhum adiantamento" emptyText="Nenhum adiantamento foi preparado no seu escopo." /> : <OffsetsList data={offsets} />}
   </ErpPage>;
 }

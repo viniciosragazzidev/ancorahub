@@ -22,6 +22,7 @@ import {
   SlidersHorizontal,
   UserCircle,
   ShieldCheck,
+  Wallet,
   Megaphone,
 } from "@phosphor-icons/react";
 import {
@@ -87,6 +88,7 @@ const areaPresentation: Record<NavAreaId, Pick<NavItemConfig, "icon" | "iconTone
   "atendimento-ia": { icon: Sparkle, iconTone: "text-fuchsia-600 dark:text-fuchsia-300" },
   marketing: { icon: Megaphone, iconTone: "text-blue-600 dark:text-blue-300" },
   configuracoes: { icon: SlidersHorizontal, iconTone: "text-slate-600 dark:text-slate-300" },
+  financeiro: { icon: Wallet, iconTone: "text-teal-600 dark:text-teal-300" },
   erp: { icon: ShieldCheck, iconTone: "text-primary" },
 };
 
