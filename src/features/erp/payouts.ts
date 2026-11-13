@@ -129,7 +129,7 @@ export async function reviewPayout(raw: unknown) {
   });
 }
 
-const paymentSchema = z.object({ id: uuid, expectedVersion: z.number().int().positive(), requestId: uuid, occurredOn: z.iso.date(), evidenceDocumentId: uuid, reason: z.string().trim().min(5).max(300) }).strict();
+const paymentSchema = z.object({ id: uuid, expectedVersion: z.number().int().positive(), requestId: uuid, occurredOn: z.iso.date({ message: "Informe a data do pagamento." }), evidenceDocumentId: z.string().uuid({ message: "Selecione o comprovante conferido." }), reason: z.string().trim().min(5, { message: "Descreva o pagamento com pelo menos 5 caracteres." }).max(300) }).strict();
 /** Records that the approved payout was paid (proof attached). Creates one pending settlement per item; nothing moves money. */
 export async function registerPayoutPayment(raw: unknown) {
   const input = paymentSchema.parse(raw);

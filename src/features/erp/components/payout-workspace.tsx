@@ -75,8 +75,8 @@ function DecisionForm({ detail, mode }: { detail: Detail; mode: "review" | "conf
   const [state, action, pending] = useActionState(mode === "review" ? reviewPayoutAction : confirmPayoutPaymentAction, INITIAL);
   return <form action={action} className={page.group}><input type="hidden" name="id" value={detail.id} /><input type="hidden" name="version" value={detail.version} />
     <Field><FieldLabel htmlFor={`payout-${mode}-reason`}>Parecer</FieldLabel><Textarea id={`payout-${mode}-reason`} name="reason" required minLength={5} maxLength={300} disabled={pending} /></Field><FinanceFeedback result={state} />
-    <div className="flex flex-wrap gap-2">{mode === "review" ? <>{detail.canApprove ? <Button name="decision" value="approve" disabled={pending}>Aprovar repasse</Button> : null}{detail.canCancel ? <Button name="decision" value="cancel" variant="outline" disabled={pending}>Cancelar repasse</Button> : null}</>
-      : <><Button name="decision" value="confirm" disabled={pending}>Confirmar pagamento e emitir recibo</Button><Button name="decision" value="reject" variant="outline" disabled={pending}>Rejeitar comprovante</Button></>}</div></form>;
+    <div className="flex flex-wrap gap-2">{mode === "review" ? <>{detail.canApprove ? <Button type="submit" name="decision" value="approve" disabled={pending}>Aprovar repasse</Button> : null}{detail.canCancel ? <Button type="submit" name="decision" value="cancel" variant="outline" disabled={pending}>Cancelar repasse</Button> : null}</>
+      : <><Button type="submit" name="decision" value="confirm" disabled={pending}>Confirmar pagamento e emitir recibo</Button><Button type="submit" name="decision" value="reject" variant="outline" disabled={pending}>Rejeitar comprovante</Button></>}</div></form>;
 }
 function PaymentForm({ detail }: { detail: Detail }) {
   const router = useRouter(); const [state, action, pending] = useActionState(registerPayoutPaymentAction, INITIAL); const [requestId] = useState(() => crypto.randomUUID());

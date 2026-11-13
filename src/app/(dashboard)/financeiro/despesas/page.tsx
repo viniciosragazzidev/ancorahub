@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import page from "@/components/lite/page/lite-page.module.css";
 
 export default async function ExpensesPage({ searchParams }: { searchParams: Promise<{ status?: string; competence?: string; page?: string }> }) {
   const raw = await searchParams; const data = await getFinancialEntries({ kind: "expense", status: raw.status, competence: raw.competence || undefined, page: raw.page });
+  if (!data.agency) redirect("/financeiro");
   const selectors = data.canPrepare ? await getFinanceSelectors() : null;
   return <><DashboardHeader breadcrumb="Financeiro" title="Despesas" /><main className={page.stack}>
     <div className={page.toolbar}><p className="text-sm text-muted-foreground">Cada despesa é preparada com evidência, aprovada por outra pessoa e paga por liquidação conferida. Nada aqui executa pagamento bancário.</p>{selectors ? <NewFinancialEntry selectors={selectors} /> : null}</div>

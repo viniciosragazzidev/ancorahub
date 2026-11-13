@@ -116,7 +116,8 @@ export function monthLabel(month: string) {
   const match = MONTH.exec(month);
   if (!match) return month;
   const label = new Intl.DateTimeFormat("pt-BR", { month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 15)));
-  return label.replace(".", "");
+  const clean = label.replace(".", "");
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
 export function formatDateTime(iso: string) {

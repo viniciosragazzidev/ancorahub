@@ -57,7 +57,7 @@ export function TvBoard({ tiles, intervalSeconds, generatedAt, month }: { tiles:
   return <section ref={container} className="flex min-h-[70vh] flex-col gap-6 rounded-xl border border-border bg-background p-6 sm:p-10" aria-label="Modo TV" aria-roledescription="apresentação">
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <p className="text-sm capitalize text-muted-foreground">{monthLabel(month)}</p>
+        <p className="text-sm text-muted-foreground">{monthLabel(month)}</p>
         <p className="text-sm text-muted-foreground" aria-live="polite">Atualizado em {formatDateTime(generatedAt)}{stale ? " · atualização atrasada" : ""}</p>
       </div>
       <div className="flex gap-2">

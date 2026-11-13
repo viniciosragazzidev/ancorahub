@@ -27,7 +27,16 @@ Em 12/11, às 19:13, o Codex atingiu o limite de uso no meio do lote financeiro.
 - [x] Metas (leitura das metas existentes no escopo) e Modo TV (`/tv`, rotação, pausa, tela cheia, atualização a cada 5 min, nomes só com política da empresa).
 - [x] Assistente analítico: perguntas sobre vendas, valor vendido, canceladas, implantações e recebido são respondidas pelo catálogo de métricas no escopo de quem pergunta, antes do modelo de IA; o modelo não recebe dados e nenhum SQL vem do texto. "Confirmada" é tratada como ambígua.
 - [x] Navegação: área "Operação ERP" com indicações, metas, incentivos e TV; títulos no shell Lite; rotas protegidas no proxy.
-- [ ] QA visual autenticado de cada tela (ver "Verificação").
+- [x] QA visual autenticado no servidor local contra o banco isolado, com usuários fictícios (diretor, revisor e corretor):
+  - Comissões: conferir o cronograma no ERP.
+  - Repasse completo: preparar → aprovar por outra pessoa → registrar pagamento → conferir → recibo RP-2026-000001.
+  - Recibo aberto pelo próprio corretor.
+  - Bloqueio do corretor em recebíveis, conciliação e governança.
+  - Telas de indicações, produção e Modo TV.
+  - Assistente respondendo indicador.
+  - Painel de módulos com os parâmetros da TV.
+  - O QA achou e corrigiu: botões de decisão que não enviavam o formulário (inclusive aprovação de lançamento, liquidação e compensação), mensagens de validação em inglês e rótulo de mês.
+  - O upload real de comprovante não foi exercitado, porque depende do R2; o comprovante foi cadastrado direto no banco de teste.
 - [ ] Roteiro de migração, ativação de piloto e revisão final de publicação (ações humanas abaixo).
 
 ## Verificação

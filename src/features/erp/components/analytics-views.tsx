@@ -88,7 +88,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 }
 
 function MonthCell({ month, partial }: { month: string; partial: boolean }) {
-  return <TableCell><span className="capitalize">{monthLabel(month)}</span>{partial ? <> <Badge variant="outline">parcial</Badge></> : null}</TableCell>;
+  return <TableCell><span>{monthLabel(month)}</span>{partial ? <> <Badge variant="outline">parcial</Badge></> : null}</TableCell>;
 }
 
 export function ProductionView({ report }: { report: Production }) {

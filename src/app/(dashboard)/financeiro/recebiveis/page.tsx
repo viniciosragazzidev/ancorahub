@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ const KINDS = { agency_receivable: "Recebíveis da corretora", client_premium: "
 export default async function ReceivablesPage({ searchParams }: { searchParams: Promise<{ kind?: string; status?: string; competence?: string; page?: string }> }) {
   const raw = await searchParams; const kind = raw.kind === "client_premium" ? "client_premium" : "agency_receivable";
   const data = await getFinancialEntries({ kind, status: raw.status, competence: raw.competence || undefined, page: raw.page });
+  if (!data.agency) redirect("/financeiro");
   const selectors = data.canPrepare ? await getFinanceSelectors() : null;
   return <><DashboardHeader breadcrumb="Financeiro" title="Recebíveis e mensalidades" /><main className={page.stack}>
     <div className={page.toolbar}><p className="text-sm text-muted-foreground">O recebível é o que a operadora deve à corretora. A mensalidade é paga pelo cliente à operadora e não entra no caixa. Um fato não comprova o outro, e falta de registro não é inadimplência.</p>{selectors ? <NewFinancialEntry selectors={selectors} /> : null}</div>

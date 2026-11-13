@@ -44,7 +44,7 @@ export function FinancialEntriesTable({ data }: { data: Awaited<ReturnType<typeo
 type Detail = Awaited<ReturnType<typeof getFinancialEntry>>;
 function ReviewEntry({ detail }: { detail: Detail }) {
   const [state, action, pending] = useActionState(reviewFinancialEntryAction, INITIAL);
-  return <form action={action} className={page.group}><input type="hidden" name="id" value={detail.entry.id} /><input type="hidden" name="version" value={detail.entry.version} /><Field><FieldLabel htmlFor="entry-review-reason">Parecer da conferência</FieldLabel><Textarea id="entry-review-reason" name="reason" required minLength={5} maxLength={300} disabled={pending} /></Field><FinanceFeedback result={state} /><div className="flex flex-wrap gap-2"><Button name="decision" value="approve" disabled={pending || !detail.entry.evidenceDocumentId}>Aprovar valor conferido</Button><Button name="decision" value="reject" variant="outline" disabled={pending}>Rejeitar lançamento</Button></div></form>;
+  return <form action={action} className={page.group}><input type="hidden" name="id" value={detail.entry.id} /><input type="hidden" name="version" value={detail.entry.version} /><Field><FieldLabel htmlFor="entry-review-reason">Parecer da conferência</FieldLabel><Textarea id="entry-review-reason" name="reason" required minLength={5} maxLength={300} disabled={pending} /></Field><FinanceFeedback result={state} /><div className="flex flex-wrap gap-2"><Button type="submit" name="decision" value="approve" disabled={pending || !detail.entry.evidenceDocumentId}>Aprovar valor conferido</Button><Button type="submit" name="decision" value="reject" variant="outline" disabled={pending}>Rejeitar lançamento</Button></div></form>;
 }
 function SettlementForm({ detail, reversalId }: { detail: Detail; reversalId?: string }) {
   const [state, action, pending] = useActionState(reversalId ? reverseSettlementAction : prepareSettlementAction, INITIAL);
@@ -56,7 +56,7 @@ function SettlementForm({ detail, reversalId }: { detail: Detail; reversalId?: s
 }
 function MovementReview({ id }: { id: string }) {
   const [state, action, pending] = useActionState(reviewSettlementAction, INITIAL);
-  return <form action={action} className={page.group}><input type="hidden" name="id" value={id} /><label className={page.group}>Parecer da revisão<Textarea name="reason" aria-label="Parecer da revisão da liquidação" required minLength={5} maxLength={300} disabled={pending} /></label><FinanceFeedback result={state} /><div className="flex flex-wrap gap-2"><Button name="decision" value="confirm" disabled={pending}>Confirmar liquidação</Button><Button name="decision" value="reject" variant="outline" disabled={pending}>Rejeitar</Button></div></form>;
+  return <form action={action} className={page.group}><input type="hidden" name="id" value={id} /><label className={page.group}>Parecer da revisão<Textarea name="reason" aria-label="Parecer da revisão da liquidação" required minLength={5} maxLength={300} disabled={pending} /></label><FinanceFeedback result={state} /><div className="flex flex-wrap gap-2"><Button type="submit" name="decision" value="confirm" disabled={pending}>Confirmar liquidação</Button><Button type="submit" name="decision" value="reject" variant="outline" disabled={pending}>Rejeitar</Button></div></form>;
 }
 export function FinancialEntryDetail({ detail }: { detail: Detail }) {
   const router = useRouter(); const [pending, startTransition] = useTransition(); const [result, setResult] = useState(INITIAL);
