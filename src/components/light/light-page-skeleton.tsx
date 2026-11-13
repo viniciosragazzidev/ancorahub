@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
+import { RouteLoadingBar } from "@/components/route-loading";
 
 type Variant = "list" | "detail" | "dashboard";
 
@@ -11,6 +12,8 @@ const card = "rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)";
  */
 export function LightPageSkeleton({ variant = "list", label = "Carregando" }: { variant?: Variant; label?: string }) {
   return (
+    <>
+    <RouteLoadingBar />
     <div
       className="arc-venancor mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 pb-[calc(112px+var(--mobile-safe-bottom))] pt-2 sm:px-6 md:pb-8"
       role="status"
@@ -48,5 +51,6 @@ export function LightPageSkeleton({ variant = "list", label = "Carregando" }: { 
         </>
       ) : null}
     </div>
+    </>
   );
 }

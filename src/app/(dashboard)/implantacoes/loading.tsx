@@ -1,1 +1,5 @@
-export default function ImplantationLoading() { return <p className="text-sm text-muted-foreground" role="status">Carregando implantações…</p>; }
+import { RouteLoading } from "@/components/route-loading";
+
+export default function ImplantationLoading() {
+  return <RouteLoading label="Carregando implantações…" />;
+}

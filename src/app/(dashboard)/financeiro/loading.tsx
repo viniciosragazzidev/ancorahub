@@ -1,1 +1,5 @@
-export default function FinanceLoading() { return <p className="text-sm text-muted-foreground" role="status">Carregando financeiro…</p>; }
+import { RouteLoading } from "@/components/route-loading";
+
+export default function FinanceLoading() {
+  return <RouteLoading label="Carregando financeiro…" />;
+}
