@@ -42,24 +42,9 @@ Branch `codex/erp-foundation`, worktree `C:\Users\kyper\Desktop\Kyper\Projects\a
   - QA visual autenticado do repasse até o recibo.
   - Na suíte completa, 14 arquivos falham igualmente no branch de deploy sem o ERP; não são desta entrega.
 
-### 1.3 Em andamento e NÃO commitado (padronização visual — DEC-186)
-- **Regra:** toda tela do ERP passa a usar o kit `src/features/erp/ui/`:
-  - `getErpSkin` escolhe a pele Lite ou a padrão.
-  - `ErpPage`, `ErpList` (lista = tabela), `ErpPanel` (clique na linha abre o painel), `ErpRowMenu` (`⋯`), `ErpSettingsMenu` ("Configurações ▾"), `ErpUrlFilter`, `ErpMonthFilter`, `ErpPager`, `ErpSection`, `ErpNote`.
-  - Um único botão principal por tela.
-  - Busca com "+" (`SearchAddList`) para itens relacionados.
-  - Sem `<details>` para ações.
-- **Brief completo dos agentes:** `C:\Users\kyper\AppData\Local\Temp\claude\b284a423cb2ca29a\a99f8bc8-44bc-4ffb-9af7-c30600e3a738\scratchpad\ui-brief.md`. As regras estão resumidas no prompt abaixo.
-- **Estado:**
-  - Cinco agentes do Claude estavam refazendo as telas quando esta passagem foi escrita. Há cerca de 41 arquivos alterados ou novos sem commit.
-  - Comissões, repasses, recibos e conciliação já estão migrados no disco.
-  - Os demais grupos estão parcialmente editados: lançamentos/adiantamentos/fechamento/caixa; implantação/importações/governança; indicações/incentivos; relatórios/metas/TV.
-- **Escopo pendente por grupo, além do visual:**
-  - **Lançamentos:** busca de venda no novo lançamento em vez de um select com 200 vendas; escolhas de compensação só com saldo; filtros de data indexáveis no fechamento (`periodBounds`).
-  - **Repasses:** paginação de `getPayouts`; seleção de comissões por busca; "Estornado depois da emissão" no repasse e no recibo.
-  - **Importações:** validação em lote, sem consultas linha a linha; reenvio de arquivo rejeitado; busca de lote em toda a empresa.
-  - **Indicações e incentivos:** mensagem clara no vínculo duplicado (índice único `erp_referrals_tenant_active_lead_unique`); nomes do ranking restritos ao escopo do gestor; trava `erp_incentive:` própria; filtros de data indexáveis; contestação por `entity_type`/`entity_id`; paginação.
-  - **Relatórios e TV:** auditoria da TV no máximo uma vez por hora por pessoa; filtros de data indexáveis; `count(*)` onde a junção é 1:1; memória de cálculo num painel.
+### 1.3 Padronização visual (DEC-186) — concluída
+Commits `287db0b5` e seguinte. Todas as telas do ERP usam o kit `src/features/erp/ui/` (ErpPage, ErpList, ErpPanel, ErpRowMenu, ErpSettingsMenu, ErpUrlFilter, ErpMonthFilter, ErpPager, ErpSection, ErpStats, ErpNote): lista em tabela, linha abre painel, ações secundárias em menu, um único botão principal, busca + "+" para itens relacionados, sem `<details>`. Verificado: tsc e lint limpos, 215 testes do ERP/navegação/cargos (única falha antiga em `action-areas.test.ts`, 4 arquivos de outras áreas), `next build --webpack` ok, QA visual do diretor nas duas peles e do corretor na pele Lite.
+Melhorias opcionais anotadas pelos agentes: `onQueryChange` no `SearchAddList` (hoje contornado), impressão do recibo escondendo menu lateral/cabeçalho, tela de erro que respeita a pele e mostra o motivo do `ErpError` (o Next oculta mensagens de erro de server components em produção), índices extras `erp_settlements(tenant_id, occurred_on)` e `erp_implantations(tenant_id, status, coverage_starts_on)`, trava na auditoria da TV para dois refreshes simultâneos.
 
 ### 1.4 Ações humanas antes de publicar
 1. Aplicar `drizzle/0230_erp_operational.sql` (aditiva; inclui índices em `sales` e `commission_schedule`), depois da 0228 e da 0229.

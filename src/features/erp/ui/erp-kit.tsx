@@ -19,7 +19,7 @@ import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { DataTable } from "@/components/ui/data-table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { AppSelect } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
 import { LiteMenu, LiteUrlSelect, type LiteMenuItem } from "@/components/lite/controls";
@@ -89,7 +89,11 @@ export function ErpUrlFilter({ label, param, value, options, defaultValue = "" }
   const skin = useErpSkin();
   const navigate = useUrlParam();
   if (skin === "lite") return <LiteUrlSelect label={label} param={param} value={value} options={options} defaultValue={defaultValue} resetPage />;
-  return <AppSelect aria-label={label} value={value} onValueChange={(next) => navigate(param, next === defaultValue ? null : next)} options={options} className="w-full sm:w-52" />;
+  // The label comes from the options, so the current value reads correctly before the list is ever opened.
+  return <Select value={value} onValueChange={(next: string) => navigate(param, next === defaultValue ? null : next)}>
+    <SelectTrigger aria-label={label} className="w-full sm:w-52"><SelectValue placeholder={label}>{(current: string | null) => options.find((option) => option.value === current)?.label ?? label}</SelectValue></SelectTrigger>
+    <SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+  </Select>;
 }
 
 /** Month filter (competence). */
