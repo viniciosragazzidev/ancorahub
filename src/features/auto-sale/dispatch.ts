@@ -14,7 +14,7 @@ import { downloadR2Object } from "@/shared/storage/r2-storage";
 
 import { OPEN_DEAL_STATUSES } from "./contracts";
 import { readAutoSaleFlags } from "./flag";
-import { isWithinSendWindow, nextSendWindowStart, withinRateLimits } from "./guardrails";
+import { canSpeakNow, nextSendWindowStart, withinRateLimits } from "./guardrails";
 import { callManager } from "./service";
 
 type OutboxRow = typeof schema.autoSaleOutbox.$inferSelect;
@@ -116,7 +116,7 @@ export async function dispatchAutoSaleOutbox(now = new Date(), limit = 20, onlyD
       .where(and(eq(schema.autoSaleOutbox.id, row.id), eq(schema.autoSaleOutbox.status, "approved"))).returning({ id: schema.autoSaleOutbox.id });
     if (!claimed.length) continue;
     try {
-      if (!isWithinSendWindow(now, flags.settings)) {
+      if (!canSpeakNow(now, flags.settings, deal.lastCustomerMessageAt)) {
         await db.update(schema.autoSaleOutbox).set({ status: "approved", scheduledAt: nextSendWindowStart(now, flags.settings), updatedAt: now }).where(eq(schema.autoSaleOutbox.id, row.id));
         result.deferred += 1;
         continue;
