@@ -11,17 +11,18 @@ import { formatCents, type ErpActionResult } from "../contracts";
 import { preparePayoutAction } from "../payout-actions";
 import { PAYOUT_STATUSES, PAYOUT_STATUS_LABELS } from "../shared";
 import type { getPayoutCandidates, getPayouts } from "../payouts";
-import { ErpList, ErpMonthFilter, ErpNote, ErpPager, ErpPanel, ErpRowMenu, ErpToolbar, ErpUrlFilter, type ErpColumn } from "../ui/erp-kit";
+import { ErpCell, ErpList, ErpMonthField, ErpNote, ErpPager, ErpPanel, type ErpColumn } from "../ui/erp-kit";
+import { formatCompetence } from "../ui/format";
 import { FinanceFeedback } from "./finance-workspace";
 import { PayoutItemsCompact, PayoutSteps, PayoutSummary, type PayoutDetailData } from "./payout-detail";
-import { PayoutStatusBadge, StopRowOpen, useUrlPanel } from "./payout-parts";
+import { formatDay, PayoutStatusBadge, useUrlPanel } from "./payout-parts";
 
 type PayoutList = Awaited<ReturnType<typeof getPayouts>>;
 type PayoutRow = PayoutList["rows"][number];
 type Candidates = Awaited<ReturnType<typeof getPayoutCandidates>>;
 
 const INITIAL: ErpActionResult = { ok: true, message: "" };
-const STATUS_OPTIONS = [
+export const PAYOUT_STATUS_OPTIONS = [
   { value: "all", label: "Todos os estados" },
   ...PAYOUT_STATUSES.map((status) => ({ value: status, label: PAYOUT_STATUS_LABELS[status] })),
 ];
@@ -52,7 +53,7 @@ export function PayoutPrepareForm({ candidates, onPrepared }: { candidates: Cand
     });
   }
   if (!candidates.groups.length) {
-    const scope = candidates.competence ? ` na competência ${candidates.competence}` : "";
+    const scope = candidates.competence ? ` em ${formatCompetence(candidates.competence, "long")}` : "";
     return <ErpNote>Nenhuma comissão aprovada com saldo fora de outro repasse{scope}.</ErpNote>;
   }
   return <form onSubmit={submit} className="flex flex-col gap-4">
@@ -69,21 +70,21 @@ export function PayoutPrepareForm({ candidates, onPrepared }: { candidates: Cand
     </Field>
     <Field>
       <FieldLabel htmlFor="payout-competence">Competência do repasse</FieldLabel>
-      <Input id="payout-competence" name="competence" type="month" required defaultValue={candidates.competence ?? ""} />
+      <ErpMonthField id="payout-competence" name="competence" defaultValue={candidates.competence ?? undefined} after={1} />
     </Field>
     <div className="flex flex-col gap-2">
       <p className="text-sm font-medium">Comissões ({chosen.length})</p>
       <SearchAddList placeholder="Buscar comissão por referência ou descrição" emptyLabel="Nenhuma comissão com saldo encontrada." disabled={full}
         items={available.map((item) => ({ id: item.id, label: item.reference, keywords: `${item.description} ${item.competence}`,
-          hint: `${item.description} · competência ${item.competence} · saldo ${formatCents(item.balanceCents)}` }))}
+          hint: `${item.description} · ${formatCompetence(item.competence)} · saldo ${formatCents(item.balanceCents)}` }))}
         onAdd={(item) => add(item.id)}
         toolbar={available.length ? <Button type="button" variant="ghost" size="sm" disabled={full}
           onClick={() => setSelected(items.slice(0, MAX_ITEMS).map((item) => item.id))}>Adicionar todas</Button> : null} />
       {chosen.length ? <ul className="flex flex-col divide-y divide-border">
         {chosen.map((item) => <li key={item.id} className="flex items-center justify-between gap-3 py-2">
           <div className="min-w-0">
-            <p className="text-sm font-medium">{item.reference}</p>
-            <p className="truncate text-xs text-muted-foreground">{item.description} · competência {item.competence}</p>
+            <p className="text-sm font-medium">{item.description}</p>
+            <p className="truncate text-xs text-muted-foreground">Ref. {item.reference} · {formatCompetence(item.competence)}</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm tabular-nums">{formatCents(item.balanceCents)}</span>
@@ -99,7 +100,10 @@ export function PayoutPrepareForm({ candidates, onPrepared }: { candidates: Cand
   </form>;
 }
 
-/** Payouts: one list; the row opens the drawer with the summary and the step the viewer can do; "Preparar repasse" is the only CTA. */
+/**
+ * Payouts: one list; the row opens the drawer with the summary and the step the viewer can do. The page header owns
+ * "Preparar repasse" (`?preparar=1`, which also makes the server load the candidates).
+ */
 export function PayoutsList({ data, candidates, detail, detailMissing }: {
   data: PayoutList; candidates: Candidates | null; detail: PayoutDetailData | null; detailMissing: boolean;
 }) {
@@ -107,7 +111,7 @@ export function PayoutsList({ data, candidates, detail, detailMissing }: {
   const payoutPanel = useUrlPanel("repasse");
   const preparePanel = useUrlPanel("preparar");
   const [openId, setOpenId] = useState<string | null>(payoutPanel.value);
-  const [preparing, setPreparing] = useState(preparePanel.value !== null && data.canPrepare);
+  const preparing = preparePanel.value !== null && data.canPrepare;
   const openRow = data.rows.find((row) => row.id === openId) ?? null;
   const shown = detail && detail.id === openId ? detail : null;
   const openPayout = (id: string) => {
@@ -118,40 +122,20 @@ export function PayoutsList({ data, candidates, detail, detailMissing }: {
     setOpenId(null);
     payoutPanel.close();
   };
-  const closePrepare = () => {
-    setPreparing(false);
-    preparePanel.close();
-  };
   const columns: ErpColumn<PayoutRow>[] = [
-    { id: "beneficiary", label: "Beneficiário", primary: true, nowrap: true, render: (row) => row.beneficiaryName },
-    { id: "competence", label: "Competência", secondary: true, render: (row) => row.competence },
+    { id: "beneficiary", label: "Repasse", primary: true, render: (row) => <ErpCell title={row.beneficiaryName}
+      sub={row.receiptNumber ? `Recibo ${row.receiptNumber}` : row.occurredOn ? `Pago em ${formatDay(row.occurredOn)}` : "Sem recibo"} /> },
+    { id: "competence", label: "Competência", nowrap: true, render: (row) => formatCompetence(row.competence) },
     { id: "net", label: "Valor líquido", numeric: true, render: (row) => formatCents(row.netCents) },
     { id: "status", label: "Estado", render: (row) => <PayoutStatusBadge status={row.status} /> },
-    { id: "receipt", label: "Recibo", render: (row) => row.receiptNumber ?? "—" },
-    { id: "menu", label: "Ações", render: (row) => <StopRowOpen><ErpRowMenu label={`Ações do repasse de ${row.beneficiaryName}`} items={[
-      { id: "details", label: "Ver detalhes", onSelect: () => openPayout(row.id) },
-      { id: "page", label: "Abrir ficha completa", href: `/financeiro/repasses/${row.id}` },
-      ...(row.receiptNumber ? [{ id: "receipt", label: "Abrir recibo", href: `/financeiro/recibos/${row.id}` }] : []),
-    ]} /></StopRowOpen> },
   ];
-  const cta = data.canPrepare
-    ? <Button type="button" onClick={() => { setPreparing(true); preparePanel.open("1"); }}>Preparar repasse</Button>
-    : null;
   return <>
-    <ErpNote>
-      Repasse agrupa comissões aprovadas de um corretor. Fluxo: preparar, aprovar (outra pessoa), registrar o pagamento com comprovante e
-      conferir (outra pessoa). O recibo sai na conferência.
-    </ErpNote>
-    {data.agency ? <ErpToolbar>
-      <ErpUrlFilter label="Estado" param="status" value={data.filters.status} defaultValue="all" options={STATUS_OPTIONS} />
-      <ErpMonthFilter value={data.filters.competence ?? ""} />
-    </ErpToolbar> : null}
-    <ErpList title={data.agency ? "Repasses" : "Meus repasses"} actions={cta} columns={columns} rows={data.rows} rowKey={(row) => row.id}
-      onRowOpen={(row) => openPayout(row.id)} emptyTitle="Nenhum repasse neste filtro"
+    <ErpList title={data.agency ? "Repasses" : "Meus repasses"} count={data.total} countLabel={["repasse", "repasses"]} columns={columns} rows={data.rows}
+      rowKey={(row) => row.id} onRowOpen={(row) => openPayout(row.id)} emptyTitle="Nenhum repasse neste filtro"
       emptyText={data.canPrepare ? "Prepare um repasse a partir das comissões aprovadas com saldo." : "Os repasses liquidados aparecem aqui."}
       footer={<ErpPager page={data.filters.page} total={data.total} pageSize={data.pageSize} label="Paginação de repasses" />} />
     <ErpPanel open={openId !== null} onOpenChange={(open) => { if (!open) closePayout(); }}
-      title={openRow ? `Repasse de ${openRow.beneficiaryName}` : "Repasse"} description={openRow ? `Competência ${openRow.competence}` : undefined}>
+      title={openRow ? `Repasse de ${openRow.beneficiaryName}` : "Repasse"} description={openRow ? `Competência ${formatCompetence(openRow.competence, "long")}` : undefined}>
       {shown ? <>
         <PayoutSummary detail={shown} />
         <PayoutItemsCompact detail={shown} />
@@ -161,10 +145,10 @@ export function PayoutsList({ data, candidates, detail, detailMissing }: {
         ? <ErpNote>Repasse não encontrado no seu escopo.</ErpNote>
         : <p className="text-sm text-muted-foreground" role="status">Carregando repasse…</p>}
     </ErpPanel>
-    {data.canPrepare ? <ErpPanel open={preparing} onOpenChange={(open) => { if (!open) closePrepare(); }} title="Preparar repasse"
+    {data.canPrepare ? <ErpPanel open={preparing} onOpenChange={(open) => { if (!open) preparePanel.close(); }} title="Preparar repasse"
       description="Escolha o beneficiário e adicione as comissões.">
       {candidates
-        ? <PayoutPrepareForm candidates={candidates} onPrepared={(id) => { setPreparing(false); router.push(`/financeiro/repasses/${id}`); }} />
+        ? <PayoutPrepareForm candidates={candidates} onPrepared={(id) => router.push(`/financeiro/repasses/${id}`)} />
         : <p className="text-sm text-muted-foreground" role="status">Carregando comissões com saldo…</p>}
     </ErpPanel> : null}
   </>;

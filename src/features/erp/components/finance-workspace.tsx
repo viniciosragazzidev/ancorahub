@@ -16,7 +16,8 @@ import {
 import { submitErpFile } from "../client-file-request";
 import { ENTRY_STATUS_LABELS, MOVEMENT_STATUS_LABELS } from "../shared";
 import type { getFinancialEntries, getFinancialEntry, getFinanceSelectors, searchFinanceSales } from "../finance";
-import { ErpList, ErpNote, ErpPager, ErpPanel, ErpRowMenu, type ErpColumn, type ErpMenuItem } from "../ui/erp-kit";
+import { ErpCell, ErpList, ErpMonthField, ErpNote, ErpPager, ErpPanel, ErpRowMenu, ErpStatus, useUrlPanel, type ErpColumn, type ErpMenuItem, type ErpTone } from "../ui/erp-kit";
+import { formatCompetence, formatDay } from "../ui/format";
 import { ServerSearchPick, type PickedRecord } from "./ledger-search-pick";
 
 export const INITIAL_RESULT: ErpActionResult = { ok: true, message: "" };
@@ -27,19 +28,18 @@ export function FinanceFeedback({ result }: { result: ErpActionResult }) {
   return result.ok ? <FieldSuccess>{result.message}</FieldSuccess> : <FieldError>{result.message}</FieldError>;
 }
 
-type BadgeVariant = "secondary" | "outline" | "destructive";
-const ENTRY_BADGE: Record<string, BadgeVariant> = { submitted: "outline", approved: "secondary", rejected: "destructive" };
-const MOVEMENT_BADGE: Record<string, BadgeVariant> = { pending: "outline", confirmed: "secondary", rejected: "destructive" };
+const ENTRY_TONE: Record<string, ErpTone> = { submitted: "warning", approved: "success", rejected: "danger" };
+const MOVEMENT_TONE: Record<string, ErpTone> = { pending: "warning", confirmed: "success", rejected: "danger" };
 
 export function EntryStatusBadge({ status }: { status: string }) {
   const label = ENTRY_STATUS_LABELS[status as keyof typeof ENTRY_STATUS_LABELS] ?? "A conferir";
-  return <Badge variant={ENTRY_BADGE[status] ?? "outline"}>{label}</Badge>;
+  return <ErpStatus tone={ENTRY_TONE[status] ?? "neutral"}>{label}</ErpStatus>;
 }
 export function MovementStatusBadge({ status }: { status: string }) {
-  return <Badge variant={MOVEMENT_BADGE[status] ?? "outline"}>{MOVEMENT_STATUS_LABELS[status] ?? "A conferir"}</Badge>;
+  return <ErpStatus tone={MOVEMENT_TONE[status] ?? "neutral"}>{MOVEMENT_STATUS_LABELS[status] ?? "A conferir"}</ErpStatus>;
 }
 export function formatDate(value: string) {
-  return value.split("-").reverse().join("/");
+  return formatDay(value);
 }
 
 export type EntryDetail = Awaited<ReturnType<typeof getFinancialEntry>>;
@@ -98,7 +98,7 @@ export function NewEntryForm({ branches, defaultKind, onCreated }: {
     <Field><FieldLabel htmlFor="finance-amount">Valor conferido (R$)</FieldLabel>
       <Input id="finance-amount" name="amount" inputMode="decimal" required placeholder="0,00" /></Field>
     <Field><FieldLabel htmlFor="finance-due">Vencimento</FieldLabel><Input id="finance-due" name="dueOn" type="date" required /></Field>
-    <Field><FieldLabel htmlFor="finance-period">Competência</FieldLabel><Input id="finance-period" name="competence" type="month" required /></Field>
+    <Field><FieldLabel htmlFor="finance-period">Competência</FieldLabel><ErpMonthField id="finance-period" name="competence" /></Field>
     {kind === "client_premium" ? <ErpNote>Pagamento do cliente à operadora. Este fato não movimenta o caixa da Âncora.</ErpNote> : null}
     {kind === "broker_commission" ? <ErpNote>A comissão pertence ao corretor da venda.</ErpNote> : null}
     <FinanceFeedback result={result} />
@@ -299,11 +299,9 @@ export function EntryPanelBody({ detail, onChanged }: { detail: EntryDetail; onC
 type Entries = Awaited<ReturnType<typeof getFinancialEntries>>;
 type EntryRow = Entries["rows"][number];
 const ENTRY_COLUMNS: ErpColumn<EntryRow>[] = [
-  { id: "reference", label: "Referência", primary: true, render: (row) => <div className="min-w-0">
-    <p className="truncate font-medium">{row.reference}</p><p className="truncate text-xs text-muted-foreground">{row.description}</p></div> },
-  { id: "kind", label: "Tipo", secondary: true, render: (row) => FINANCIAL_LABELS[row.kind] },
+  { id: "description", label: "Lançamento", primary: true, render: (row) => <ErpCell title={row.description} sub={`${FINANCIAL_LABELS[row.kind]} · Ref. ${row.reference}`} /> },
   { id: "beneficiary", label: "Beneficiário", nowrap: true, render: (row) => row.beneficiaryName ?? "Sem beneficiário" },
-  { id: "competence", label: "Competência", nowrap: true, render: (row) => row.competence },
+  { id: "competence", label: "Competência", nowrap: true, render: (row) => formatCompetence(row.competence) },
   { id: "amount", label: "Valor", numeric: true, render: (row) => formatCents(row.amountCents) },
   { id: "settled", label: "Liquidado", numeric: true, render: (row) => formatCents(row.settledCents) },
   { id: "status", label: "Estado", render: (row) => <EntryStatusBadge status={row.status} /> },
@@ -311,9 +309,9 @@ const ENTRY_COLUMNS: ErpColumn<EntryRow>[] = [
 
 /**
  * The ledger list of a screen: one table of entries, row → drawer with the entry and its actions, pagination by URL.
- * "Novo lançamento" is the screen's primary CTA unless the page already has one (`ctaVariant="outline"`).
+ * The page header owns the primary CTA (`ErpPrimaryAction`, `?novo=1` by default); this list owns its drawer.
  */
-export function FinanceLedger({ data, branches, title, description, emptyTitle = "Nenhum lançamento neste filtro", emptyText, defaultKind, ctaVariant = "default" }: {
+export function FinanceLedger({ data, branches, title, description, emptyTitle = "Nenhum lançamento neste filtro", emptyText, defaultKind, createParam = "novo" }: {
   data: Entries;
   branches: Branches | null;
   title: string;
@@ -321,13 +319,14 @@ export function FinanceLedger({ data, branches, title, description, emptyTitle =
   emptyTitle?: string;
   emptyText: string;
   defaultKind: FinancialKind;
-  ctaVariant?: "default" | "outline";
+  /** URL parameter that opens "Preparar lançamento" (the header CTA links to it). */
+  createParam?: string;
 }) {
   const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<EntryDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(0);
+  const creating = useUrlPanel(createParam);
   const [loading, startLoading] = useTransition();
 
   function load(id: string) {
@@ -348,14 +347,13 @@ export function FinanceLedger({ data, branches, title, description, emptyTitle =
     if (openId) load(openId);
   }
   const row = data.rows.find((item) => item.id === openId);
-  const cta = data.canPrepare && branches
-    ? <Button type="button" variant={ctaVariant} onClick={() => setCreating((value) => value + 1)}>Novo lançamento</Button>
-    : undefined;
+  const canCreate = data.canPrepare && !!branches;
   return <>
     <ErpList<EntryRow>
       title={title}
       description={description}
-      actions={cta}
+      count={data.total}
+      countLabel={["lançamento", "lançamentos"]}
       columns={ENTRY_COLUMNS}
       rows={data.rows}
       rowKey={(item) => item.id}
@@ -365,15 +363,15 @@ export function FinanceLedger({ data, branches, title, description, emptyTitle =
       footer={<ErpPager page={data.filters.page} total={data.total} pageSize={data.pageSize} label="Paginação dos lançamentos" />}
     />
     <ErpPanel open={openId !== null} onOpenChange={(open) => { if (!open) setOpenId(null); }}
-      title={detail?.entry.reference ?? row?.reference ?? "Lançamento"} description={detail ? FINANCIAL_LABELS[detail.entry.kind] : undefined}>
+      title={detail?.entry.description ?? row?.description ?? "Lançamento"} description={detail ? `${FINANCIAL_LABELS[detail.entry.kind]} · Ref. ${detail.entry.reference}` : undefined}>
       {detail ? <EntryPanelBody detail={detail} onChanged={changed} />
         : error ? <FieldError>{error}</FieldError>
           : <p role="status" className="text-sm text-muted-foreground">{loading ? "Carregando lançamento…" : ""}</p>}
     </ErpPanel>
-    {cta && branches ? <ErpPanel open={creating > 0} onOpenChange={(open) => { if (!open) setCreating(0); }} title="Preparar lançamento"
+    {canCreate && branches ? <ErpPanel open={creating.open} onOpenChange={(open) => { if (!open) creating.close(); }} title="Preparar lançamento"
       description="Informe o valor conferido e sua referência. A aprovação exige evidência e outra pessoa autorizada.">
-      <NewEntryForm key={creating} branches={branches} defaultKind={defaultKind}
-        onCreated={(id) => { setCreating(0); router.refresh(); openEntry(id); }} />
+      {creating.open ? <NewEntryForm branches={branches} defaultKind={defaultKind}
+        onCreated={(id) => { creating.close(); router.refresh(); openEntry(id); }} /> : null}
     </ErpPanel> : null}
   </>;
 }

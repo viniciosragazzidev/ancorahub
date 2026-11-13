@@ -3,39 +3,63 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { formatDateTime, monthLabel } from "../analytics-core";
+import page from "@/components/lite/page/lite-page.module.css";
+import { formatCompetence } from "../ui/format";
+import { useErpSkin } from "../ui/skin-context";
 import type { TvTile } from "../tv";
+import styles from "./tv-board.module.css";
 
 const REFRESH_MS = 5 * 60 * 1000;
 const STALE_MS = 2 * REFRESH_MS + 60 * 1000;
+/** Rankings visible at once; more than this rotates between pages of rankings (numbers never rotate). */
+const RANKINGS_PER_VIEW = 2;
 
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-  return reduced;
+type NumberTile = Extract<TvTile, { kind: "number" }>;
+type RankingTile = Extract<TvTile, { kind: "ranking" }>;
+
+const time = (iso: string) => new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(new Date(iso));
+const monthTitle = (month: string) => formatCompetence(month, "long").replace(/^./, (letter) => letter.toUpperCase());
+
+function Ranking({ tile }: { tile: RankingTile }) {
+  const top = Math.max(1, ...tile.items.map((item) => item.amount ?? 0));
+  return <section className={styles.ranking} aria-label={tile.label}>
+    <h2 className={styles.label}>{tile.label}</h2>
+    <ol className={styles.list}>
+      {tile.items.map((item, position) => <li key={`${item.label}-${position}`} className={styles.item}>
+        <span className={styles.position}>{position + 1}º</span>
+        <span className={styles.name}>{item.label}</span>
+        <span className={styles.amount}>{item.value}</span>
+        <span className={styles.bar} aria-hidden="true"><span className={styles.fill} style={{ width: `${Math.round(((item.amount ?? 0) / top) * 100)}%` }} /></span>
+      </li>)}
+    </ol>
+    <p className={styles.hint}>{tile.hint}</p>
+  </section>;
 }
 
-/** Rotates server-rendered aggregated tiles. Data comes only from the authenticated server render; on error the boundary unmounts this and the timers stop. */
+/**
+ * Wallboard of the month: every number tile at once, rankings with bars. Data comes only from the authenticated server
+ * render and refreshes every 5 minutes; on error the boundary unmounts this and the timers stop.
+ */
 export function TvBoard({ tiles, intervalSeconds, generatedAt, month }: { tiles: TvTile[]; intervalSeconds: number; generatedAt: string; month: string }) {
   const router = useRouter();
+  const skin = useErpSkin();
   const container = useRef<HTMLElement>(null);
-  const reducedMotion = usePrefersReducedMotion();
-  const [index, setIndex] = useState(0);
+  const [view, setView] = useState(0);
   const [paused, setPaused] = useState(false);
   const [stale, setStale] = useState(false);
-  const current = tiles.length ? tiles[index % tiles.length] : null;
+  const [fullscreen, setFullscreen] = useState(false);
+  const numbers = tiles.filter((tile): tile is NumberTile => tile.kind === "number");
+  const rankings = tiles.filter((tile): tile is RankingTile => tile.kind === "ranking");
+  const views = Math.max(1, Math.ceil(rankings.length / RANKINGS_PER_VIEW));
+  const rotating = views > 1;
+  const start = (view % views) * RANKINGS_PER_VIEW;
+  const shown = rankings.slice(start, start + RANKINGS_PER_VIEW);
 
   useEffect(() => {
-    if (paused || tiles.length < 2) return;
-    const timer = window.setInterval(() => setIndex((value) => (value + 1) % tiles.length), intervalSeconds * 1000);
+    if (paused || !rotating) return;
+    const timer = window.setInterval(() => setView((value) => (value + 1) % views), intervalSeconds * 1000);
     return () => window.clearInterval(timer);
-  }, [paused, tiles.length, intervalSeconds]);
+  }, [paused, rotating, views, intervalSeconds]);
 
   useEffect(() => {
     const timer = window.setInterval(() => router.refresh(), REFRESH_MS);
@@ -49,51 +73,46 @@ export function TvBoard({ tiles, intervalSeconds, generatedAt, month }: { tiles:
     return () => window.clearInterval(timer);
   }, [generatedAt]);
 
-  function fullScreen() {
+  useEffect(() => {
+    const sync = () => setFullscreen(document.fullscreenElement === container.current);
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
+  function toggleFullscreen() {
     if (document.fullscreenElement) void document.exitFullscreen();
     else void container.current?.requestFullscreen?.();
   }
 
-  const animation = reducedMotion ? "" : "motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500";
-  const selectTile = (position: number) => {
-    setIndex(position);
-    setPaused(true);
-  };
+  const lite = skin === "lite";
+  const control = (label: string, onClick: () => void, pressed?: boolean) => lite
+    ? <button type="button" className={page.button} onClick={onClick} aria-pressed={pressed}>{label}</button>
+    : <Button type="button" variant="outline" onClick={onClick} aria-pressed={pressed}>{label}</Button>;
 
-  // Type scale of docs/design-system.md only: display 48px (Satoshi slot, >=36px) for the number, heading 30px / heading-sm 24px for text.
-  return <section ref={container} aria-label="Modo TV" aria-roledescription="apresentação"
-    className="flex min-h-[70vh] flex-col gap-ds-24 rounded-ds-large-cards border border-border bg-background p-ds-24 sm:p-ds-40">
-    <header className="flex flex-wrap items-center justify-between gap-ds-12">
-      <div>
-        <p className="text-ds-body text-muted-foreground">{monthLabel(month)}</p>
-        <p className="text-ds-body text-muted-foreground" aria-live="polite">
-          Atualizado em {formatDateTime(generatedAt)}{stale ? " · atualização atrasada" : ""}
+  return <section ref={container} aria-label="Modo TV" data-skin={skin} className={styles.board}>
+    <header className={styles.top}>
+      <div className={styles.period}>
+        <p className={styles.month}>{monthTitle(month)}</p>
+        <p className={styles.updated} data-stale={stale} aria-live="polite">
+          Atualizado às {time(generatedAt)}{stale ? ", atualização atrasada" : ""}
         </p>
       </div>
-      <div className="flex gap-ds-8">
-        <Button type="button" variant="outline" onClick={() => setPaused((value) => !value)} aria-pressed={paused}>{paused ? "Retomar" : "Pausar"}</Button>
-        <Button type="button" variant="outline" onClick={fullScreen}>Tela cheia</Button>
+      <div className={styles.controls}>
+        {rotating ? control(paused ? "Retomar" : "Pausar", () => setPaused((value) => !value), paused) : null}
+        {control(fullscreen ? "Sair da tela cheia" : "Tela cheia", toggleFullscreen)}
       </div>
     </header>
-    {current ? <div key={current.id} className={`flex flex-1 flex-col justify-center gap-ds-16 ${animation}`} aria-live={paused ? "polite" : "off"}>
-      <h2 className="text-ds-heading-sm font-semibold text-foreground sm:text-ds-heading">{current.label}</h2>
-      {current.kind === "number"
-        ? <p className="font-ds-satoshi text-ds-display font-medium tracking-ds-satoshi tabular-nums text-foreground">{current.value}</p>
-        : <ol className="flex flex-col gap-ds-12">
-          {current.items.map((item, position) => <li key={`${item.label}-${position}`}
-            className="flex items-baseline justify-between gap-ds-24 border-b border-border pb-ds-12 text-ds-heading-sm sm:text-ds-heading">
-            <span className="text-foreground"><span className="mr-ds-16 tabular-nums text-muted-foreground">{position + 1}º</span>{item.label}</span>
-            <span className="font-semibold tabular-nums text-foreground">{item.value}</span>
-          </li>)}
-        </ol>}
-      <p className="text-ds-body-lg text-muted-foreground">{current.hint}</p>
-    </div> : <div className="flex flex-1 items-center justify-center text-ds-body text-muted-foreground">Nenhum indicador liberado para exibição.</div>}
-    {tiles.length > 1 ? <nav aria-label="Indicadores" className="flex flex-wrap justify-center gap-ds-8">
-      {tiles.map((tile, position) => {
-        const active = position === index % tiles.length;
-        return <Button key={tile.id} type="button" size="sm" variant={active ? "secondary" : "ghost"} aria-current={active ? "true" : undefined}
-          onClick={() => selectTile(position)}>{tile.label}</Button>;
-      })}
-    </nav> : null}
+    {tiles.length ? <div className={styles.content}>
+      {numbers.length ? <div className={styles.numbers}>
+        {numbers.map((tile) => <article key={tile.id} className={styles.tile} aria-label={tile.label}>
+          <h2 className={styles.label}>{tile.label}</h2>
+          <p className={styles.value}>{tile.value}</p>
+          <p className={styles.hint}>{tile.hint}</p>
+        </article>)}
+      </div> : null}
+      {shown.length ? <div key={view % views} className={`${styles.rankings} ${rotating ? styles.swap : ""}`} aria-live={rotating && paused ? "polite" : "off"}>
+        {shown.map((tile) => <Ranking key={tile.id} tile={tile} />)}
+      </div> : null}
+    </div> : <div className={styles.empty}>Nenhum indicador liberado para exibição.</div>}
   </section>;
 }

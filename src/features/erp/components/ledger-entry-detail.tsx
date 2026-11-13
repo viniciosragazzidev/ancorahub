@@ -1,20 +1,15 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState, type MouseEvent } from "react";
-import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { FINANCIAL_LABELS, formatCents } from "../contracts";
-import { ErpList, ErpNote, ErpPanel, ErpRowMenu, ErpSection, type ErpColumn } from "../ui/erp-kit";
+import { ErpList, ErpNote, ErpPanel, ErpSection, ErpStats, ErpStatus, type ErpColumn } from "../ui/erp-kit";
+import { formatCompetence } from "../ui/format";
 import {
   EntryStatusBadge, EvidenceBlock, MovementForm, MovementStatusBadge, ReviewBlock, SettlementBlock, entryBlocks, formatDate, movementLabel,
-  movementMenu, type EntryDetail, type EntryMovement,
+  type EntryDetail, type EntryMovement,
 } from "./finance-workspace";
-
-/** Keeps clicks on the row menu (and its portaled items) from also opening the row. */
-function stopRow(event: MouseEvent) {
-  event.stopPropagation();
-}
 
 /** Full record of an entry: summary KPIs, evidence, review, settlement and the movements list (row → drawer). */
 export function FinancialEntryDetail({ detail }: { detail: EntryDetail }) {
@@ -28,19 +23,18 @@ export function FinancialEntryDetail({ detail }: { detail: EntryDetail }) {
     { id: "date", label: "Data", nowrap: true, secondary: true, render: (row) => formatDate(row.occurredOn) },
     { id: "amount", label: "Valor", numeric: true, render: (row) => formatCents(row.amountCents) },
     { id: "status", label: "Estado", render: (row) => <MovementStatusBadge status={row.status} /> },
-    { id: "actions", label: "Ações", render: (row) => <div onClick={stopRow}>
-      <ErpRowMenu label={`Ações de ${movementLabel(row).toLowerCase()}`} items={movementMenu(detail, row, () => setMovementId(row.id))} /></div> },
   ];
   return <>
-    <ErpSection title={detail.entry.description} description={`Competência ${detail.entry.competence} · vencimento ${formatDate(detail.entry.dueOn)}`}
-      actions={<div className="flex flex-wrap gap-2"><EntryStatusBadge status={detail.entry.status} />
-        <Badge variant="outline">{FINANCIAL_LABELS[detail.entry.kind]}</Badge></div>}>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
-        <StatCard label="Conferido" value={formatCents(detail.entry.amountCents)} sublabel="valor aprovado ou a aprovar" />
-        <StatCard label="Liquidado" value={formatCents(detail.settledCents)} sublabel="liquidações confirmadas" />
-        <StatCard label="Saldo a liquidar" value={formatCents(detail.entry.amountCents - detail.settledCents)} sublabel="conferido menos liquidado" />
-      </div>
-    </ErpSection>
+    <div className="flex flex-wrap items-center gap-2">
+      <EntryStatusBadge status={detail.entry.status} />
+      <ErpStatus>{FINANCIAL_LABELS[detail.entry.kind]}</ErpStatus>
+      <ErpNote>Ref. {detail.entry.reference} · {formatCompetence(detail.entry.competence, "long")} · vencimento {formatDate(detail.entry.dueOn)}</ErpNote>
+    </div>
+    <ErpStats>
+      <StatCard label="Conferido" value={formatCents(detail.entry.amountCents)} sublabel="valor aprovado ou a aprovar" />
+      <StatCard label="Liquidado" value={formatCents(detail.settledCents)} sublabel="liquidações confirmadas" />
+      <StatCard label="Saldo a liquidar" value={formatCents(detail.entry.amountCents - detail.settledCents)} sublabel="conferido menos liquidado" />
+    </ErpStats>
     {blocks.evidence ? <ErpSection title="Evidências" description="Arquivos privados que comprovam o valor e as liquidações.">
       <EvidenceBlock detail={detail} onChanged={refresh} /></ErpSection> : null}
     {blocks.review ? <ErpSection title="Conferência independente" description="Outra pessoa autorizada aprova ou rejeita o valor conferido.">
@@ -48,7 +42,8 @@ export function FinancialEntryDetail({ detail }: { detail: EntryDetail }) {
     {blocks.settlement ? <ErpSection title="Registrar liquidação"><SettlementBlock detail={detail} onChanged={refresh} /></ErpSection> : null}
     <ErpList<EntryMovement>
       title="Liquidações e estornos"
-      description="Cada movimento é conferido por outra pessoa autorizada."
+      count={detail.movements.length}
+      countLabel={["movimento", "movimentos"]}
       columns={columns}
       rows={detail.movements}
       rowKey={(row) => row.id}

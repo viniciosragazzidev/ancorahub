@@ -139,7 +139,7 @@ export async function getOffsets(raw: unknown = {}) {
   const advance = alias(schema.erpFinancialEntries, "offset_advance");
   const joinCommission = and(eq(commission.tenantId, auth.context.tenantId), eq(commission.id, schema.erpOffsets.commissionEntryId));
   const conditions = and(eq(schema.erpOffsets.tenantId, auth.context.tenantId), erpScopeSql(auth.scope, commission.branchId, commission.ownerId));
-  const [rows, total, access] = await Promise.all([
+  const [rows, total, access, [summary]] = await Promise.all([
     db.select({
       id: schema.erpOffsets.id, advanceEntryId: schema.erpOffsets.advanceEntryId, commissionEntryId: schema.erpOffsets.commissionEntryId,
       advanceReference: advance.reference, commissionReference: commission.reference, kind: schema.erpOffsets.kind,
@@ -152,6 +152,10 @@ export async function getOffsets(raw: unknown = {}) {
       .limit(PAGE_SIZE).offset((filters.page - 1) * PAGE_SIZE),
     db.select({ value: count() }).from(schema.erpOffsets).innerJoin(commission, joinCommission).where(conditions),
     getErpEffectiveAccess(auth.context),
+    db.select({
+      pending: sql<number>`count(*) FILTER (WHERE ${schema.erpOffsets.status} = 'pending')::int`.mapWith(Number),
+      confirmedCents: sql<number>`coalesce(sum(CASE WHEN ${schema.erpOffsets.status} = 'confirmed' AND ${schema.erpOffsets.kind} = 'reversal' THEN -${schema.erpOffsets.amountCents} WHEN ${schema.erpOffsets.status} = 'confirmed' THEN ${schema.erpOffsets.amountCents} ELSE 0 END), 0)::bigint`.mapWith(Number),
+    }).from(schema.erpOffsets).innerJoin(commission, joinCommission).where(conditions),
   ]);
   const operator = agency && !auth.context.viewAs;
   const canPrepare = operator && access.capabilities.has("erp_prepare_finance");
@@ -162,6 +166,7 @@ export async function getOffsets(raw: unknown = {}) {
   });
   return {
     page: filters.page, pageSize: PAGE_SIZE, total: Number(total[0]?.value ?? 0), choices, canPrepare,
+    summary: { pending: summary?.pending ?? 0, confirmedCents: summary?.confirmedCents ?? 0 },
     rows: rows.map(({ createdBy, reason, ...row }) => ({
       ...row, reason: agency ? reason : null,
       canReview: operator && access.capabilities.has("erp_approve_finance") && createdBy !== auth.context.userId && row.status === "pending",

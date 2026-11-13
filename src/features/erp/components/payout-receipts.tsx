@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatCents } from "../contracts";
 import type { getPayouts, getReceipt, PayoutReceipt } from "../payouts";
-import { ErpList, ErpMonthFilter, ErpNote, ErpPager, ErpPanel, ErpSection, ErpToolbar, type ErpColumn } from "../ui/erp-kit";
+import { ErpCell, ErpList, ErpNote, ErpPager, ErpPanel, ErpSection, type ErpColumn } from "../ui/erp-kit";
+import { formatCompetence, formatInstant } from "../ui/format";
 import { formatDay, PayoutFacts, useUrlPanel } from "./payout-parts";
 
 type ReceiptList = Awaited<ReturnType<typeof getPayouts>>;
@@ -12,7 +13,7 @@ type ReceiptRow = ReceiptList["rows"][number];
 export type ReceiptData = Awaited<ReturnType<typeof getReceipt>>;
 type ReceiptItem = PayoutReceipt["items"][number];
 
-const IMMUTABLE_NOTE = "Cada recibo é uma versão fixa dos itens pagos e das compensações; um estorno posterior não altera o recibo, gera um novo evento.";
+export const IMMUTABLE_NOTE = "Cada recibo é uma versão fixa dos itens pagos e das compensações; um estorno posterior não altera o recibo, gera um novo evento.";
 
 /** Receipts: one list; the row opens a preview drawer with "Abrir para imprimir". */
 export function ReceiptsList({ data, preview, previewMissing }: { data: ReceiptList; preview: ReceiptData | null; previewMissing: boolean }) {
@@ -28,21 +29,18 @@ export function ReceiptsList({ data, preview, previewMissing }: { data: ReceiptL
     panel.close();
   };
   const columns: ErpColumn<ReceiptRow>[] = [
-    { id: "number", label: "Recibo", primary: true, nowrap: true, render: (row) => row.receiptNumber ?? "—" },
-    { id: "beneficiary", label: "Beneficiário", secondary: true, nowrap: true, render: (row) => row.beneficiaryName },
-    { id: "competence", label: "Competência", render: (row) => row.competence },
+    { id: "beneficiary", label: "Recibo", primary: true, render: (row) => <ErpCell title={row.beneficiaryName} sub={row.receiptNumber ?? "Sem número"} /> },
+    { id: "competence", label: "Competência", nowrap: true, render: (row) => formatCompetence(row.competence) },
     { id: "paidOn", label: "Pago em", render: (row) => formatDay(row.occurredOn) },
     { id: "net", label: "Valor líquido", numeric: true, render: (row) => formatCents(row.netCents) },
   ];
   return <>
-    <ErpNote>Recibos de repasses conferidos. {IMMUTABLE_NOTE}</ErpNote>
-    <ErpToolbar><ErpMonthFilter value={data.filters.competence ?? ""} /></ErpToolbar>
-    <ErpList title={data.agency ? "Recibos" : "Meus recibos"} columns={columns} rows={data.rows} rowKey={(row) => row.id}
+    <ErpList title={data.agency ? "Recibos" : "Meus recibos"} count={data.total} countLabel={["recibo", "recibos"]} columns={columns} rows={data.rows} rowKey={(row) => row.id}
       onRowOpen={(row) => openReceipt(row.id)} emptyTitle="Nenhum recibo emitido"
       emptyText="O recibo é emitido quando o pagamento de um repasse é conferido por outra pessoa."
       footer={<ErpPager page={data.filters.page} total={data.total} pageSize={data.pageSize} label="Paginação de recibos" />} />
     <ErpPanel open={openId !== null} onOpenChange={(open) => { if (!open) close(); }}
-      title={shown ? `Recibo ${shown.receipt.number}` : "Recibo"} description={shown ? `Competência ${shown.receipt.competence}` : undefined}>
+      title={shown ? `Recibo ${shown.receipt.number}` : "Recibo"} description={shown ? `Competência ${formatCompetence(shown.receipt.competence, "long")}` : undefined}>
       {shown ? <>
         <ReceiptFacts data={shown} />
         <ErpNote>{shown.receipt.items.length} comissão(ões) neste recibo.</ErpNote>
@@ -60,7 +58,7 @@ function ReceiptFacts({ data }: { data: ReceiptData }) {
     <PayoutFacts items={[
       { label: "Beneficiário", value: receipt.beneficiary.name },
       { label: "Pagamento em", value: formatDay(receipt.occurredOn) },
-      { label: "Emitido por", value: `${receipt.issuer.name} · ${new Date(receipt.issuedAt).toLocaleString("pt-BR")}` },
+      { label: "Emitido por", value: `${receipt.issuer.name} · ${formatInstant(receipt.issuedAt)}` },
       ...(receipt.branchName ? [{ label: "Unidade", value: receipt.branchName }] : []),
       { label: "Total pago", value: formatCents(receipt.netCents) },
       ...(data.reversedCents > 0 ? [{ label: "Estornado depois da emissão", value: formatCents(data.reversedCents) }] : []),
@@ -79,15 +77,14 @@ export function ReceiptPrintButton() {
 export function ReceiptView({ data }: { data: ReceiptData }) {
   const { receipt } = data;
   const columns: ErpColumn<ReceiptItem>[] = [
-    { id: "reference", label: "Comissão", primary: true, render: (item) => item.reference },
-    { id: "description", label: "Descrição", secondary: true, render: (item) => item.description },
+    { id: "reference", label: "Comissão", primary: true, render: (item) => <ErpCell title={item.description} sub={`Ref. ${item.reference}`} /> },
     { id: "amount", label: "Valor", numeric: true, render: (item) => formatCents(item.amountCents) },
     { id: "before", label: "Liquidado antes", numeric: true, render: (item) => formatCents(item.previouslySettledCents) },
     { id: "offset", label: "Compensado", numeric: true, render: (item) => formatCents(item.offsetCents) },
     { id: "paid", label: "Pago neste recibo", numeric: true, render: (item) => formatCents(item.paidCents) },
   ];
   return <>
-    <ErpSection title={`Recibo de repasse ${receipt.number}`} description={`Competência ${receipt.competence}`}>
+    <ErpSection title={`Recibo de repasse ${receipt.number}`} description={`Competência ${formatCompetence(receipt.competence, "long")}`}>
       <ReceiptFacts data={data} />
     </ErpSection>
     <ErpList title="Itens pagos" columns={columns} rows={receipt.items} rowKey={(item) => item.entryId}

@@ -1,21 +1,23 @@
 "use client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, type ReactNode } from "react";
-import { Badge } from "@/components/ui/badge";
+import { ErpStatus, type ErpTone } from "../ui/erp-kit";
+import { formatDay as formatDayLabel } from "../ui/format";
 import { PAYOUT_STATUS_LABELS, type PayoutStatus } from "../shared";
 
-/** AAAA-MM-DD → DD/MM/AAAA; missing dates stay visible as a dash, never as a made-up value. */
+/** AAAA-MM-DD → DD/MM/AAAA; a missing date reads "Sem data", never a made-up value. */
 export function formatDay(value: string | null) {
-  return value ? value.split("-").reverse().join("/") : "—";
+  return formatDayLabel(value);
 }
 
 export function payoutStatusLabel(status: string) {
   return PAYOUT_STATUS_LABELS[status as PayoutStatus] ?? status;
 }
 
+const PAYOUT_TONE: Record<string, ErpTone> = { prepared: "warning", approved: "success", paying: "info", settled: "success", cancelled: "danger" };
+
 export function PayoutStatusBadge({ status }: { status: string }) {
-  const variant = status === "settled" ? "success" : status === "cancelled" ? "outline" : "secondary";
-  return <Badge variant={variant}>{payoutStatusLabel(status)}</Badge>;
+  return <ErpStatus tone={PAYOUT_TONE[status] ?? "neutral"}>{payoutStatusLabel(status)}</ErpStatus>;
 }
 
 /** Label/value pairs of a record summary (drawer or section). */

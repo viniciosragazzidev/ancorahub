@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { StatCard } from "@/components/dashboard/metric-card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AppSelect } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldLabel, FieldSuccess } from "@/components/ui/field";
 import { formatCents, type ErpActionResult } from "../contracts";
@@ -17,7 +17,8 @@ import {
   saveIncentiveCampaignAction, type IncentiveCampaignData,
 } from "../incentive-actions";
 import type { getIncentiveCampaigns } from "../incentives";
-import { ErpList, ErpNote, ErpPager, ErpPanel, ErpRowMenu, ErpSection, ErpSettingsMenu, type ErpColumn, type ErpMenuItem } from "../ui/erp-kit";
+import { ErpCell, ErpList, ErpStats, ErpNote, ErpPager, ErpPanel, ErpRowMenu, ErpSection, ErpSettingsMenu, ErpStatus, useUrlPanel, type ErpColumn, type ErpMenuItem, type ErpTone } from "../ui/erp-kit";
+import { formatDay, formatInstant } from "../ui/format";
 
 type ListData = Awaited<ReturnType<typeof getIncentiveCampaigns>>;
 type ListRow = ListData["rows"][number];
@@ -36,8 +37,8 @@ const DRAWER_RANKING_ROWS = 10;
 const TIE_RULE = "Desempate: maior resultado; depois, quem atingiu o resultado primeiro (data do último fato válido); depois, ordem fixa de cadastro. "
   + "Premiação não gera pagamento automático.";
 
-const day = (value: string) => value.split("-").reverse().join("/");
-const dateTime = (value: string) => new Date(value).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+const day = (value: string) => formatDay(value);
+const dateTime = (value: string) => formatInstant(value);
 const kindLabel = (kind: string) => KIND_LABELS[kind] ?? kind;
 
 function Feedback({ result }: { result: ErpActionResult }) {
@@ -51,14 +52,15 @@ function statusLabel(status: IncentiveStatus, startsOn: string, endsOn: string, 
   return today > endsOn ? "Aguardando apuração final" : "Vigente";
 }
 
-function statusVariant(status: IncentiveStatus) {
-  if (status === "draft") return "secondary";
-  if (status === "approved") return "info";
-  return status === "closed" ? "success" : "outline";
+function statusTone(status: IncentiveStatus, startsOn: string, endsOn: string, today: string): ErpTone {
+  if (status === "draft") return "warning";
+  if (status === "closed") return "success";
+  if (status === "approved") return today >= startsOn && today <= endsOn ? "info" : today > endsOn ? "warning" : "neutral";
+  return "neutral";
 }
 
 function StatusBadge({ status, startsOn, endsOn, today }: { status: IncentiveStatus; startsOn: string; endsOn: string; today: string }) {
-  return <Badge variant={statusVariant(status)}>{statusLabel(status, startsOn, endsOn, today)}</Badge>;
+  return <ErpStatus tone={statusTone(status, startsOn, endsOn, today)}>{statusLabel(status, startsOn, endsOn, today)}</ErpStatus>;
 }
 
 function formatValue(metric: IncentiveMetric, value: number | null) {
@@ -175,24 +177,17 @@ function CampaignForm({ branches, campaign, onSaved }: { branches: Branch[]; cam
 
 const FORM_DESCRIPTION = "O regulamento vale como publicado. Depois da aprovação, por outra pessoa, ele não muda: para alterar, cancele e crie outra campanha.";
 
-export function NewIncentiveCampaign({ branches }: { branches: Branch[] }) {
+/** "Nova campanha" drawer, opened by the header CTA (`ErpPrimaryAction`, `?novo=1`). */
+function NewIncentiveCampaign({ branches }: { branches: Branch[] }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [key, setKey] = useState(0);
-  function start() {
-    setKey((value) => value + 1);
-    setOpen(true);
-  }
+  const creating = useUrlPanel("novo");
   function saved(id: string) {
-    setOpen(false);
+    creating.close();
     router.push(`/campanhas-incentivo/${id}`);
   }
-  return <>
-    <Button type="button" onClick={start}>Nova campanha</Button>
-    <ErpPanel open={open} onOpenChange={setOpen} title="Nova campanha" description={FORM_DESCRIPTION}>
-      <CampaignForm key={key} branches={branches} onSaved={saved} />
-    </ErpPanel>
-  </>;
+  return <ErpPanel open={creating.open} onOpenChange={(open) => { if (!open) creating.close(); }} title="Nova campanha" description={FORM_DESCRIPTION}>
+    {creating.open ? <CampaignForm branches={branches} onSaved={saved} /> : null}
+  </ErpPanel>;
 }
 
 function CancelForm({ campaign, onDone }: { campaign: { id: string; version: number }; onDone: () => void }) {
@@ -366,22 +361,17 @@ function CampaignDrawer({ id, onClose }: { id: string; onClose: () => void }) {
 
 export function IncentivesWorkspace({ data }: { data: ListData }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const filtered = data.filters.status !== "all";
+  const filtered = data.filters.status !== "all" || !!data.filters.q;
   const menu = (row: ListRow): ErpMenuItem[] => [
     { id: "open", label: "Ver resumo", onSelect: () => setSelectedId(row.id) },
     { id: "page", label: "Abrir ficha completa", href: `/campanhas-incentivo/${row.id}` },
   ];
   const columns: ErpColumn<ListRow>[] = [
-    { id: "name", label: "Campanha", primary: true, render: (row) => row.name },
-    { id: "metric", label: "Métrica", secondary: true, render: (row) => INCENTIVE_METRIC_LABELS[row.metric] },
+    { id: "name", label: "Campanha", primary: true, render: (row) => <ErpCell title={row.name} sub={INCENTIVE_METRIC_LABELS[row.metric]} /> },
     { id: "period", label: "Período", nowrap: true, render: (row) => `${day(row.startsOn)} a ${day(row.endsOn)}` },
     { id: "status", label: "Situação", render: (row) => <StatusBadge status={row.status} startsOn={row.startsOn} endsOn={row.endsOn} today={data.today} /> },
-    { id: "last", label: "Última apuração", nowrap: true, render: (row) => row.lastCalculatedAt ? dateTime(row.lastCalculatedAt) : "Sem apuração" },
-    {
-      id: "menu",
-      label: "Ações",
-      render: (row) => <div onClick={(event) => event.stopPropagation()}><ErpRowMenu label={`Ações de ${row.name}`} items={menu(row)} /></div>,
-    },
+    { id: "last", label: "Última apuração", nowrap: true, secondary: true, render: (row) => row.lastCalculatedAt ? dateTime(row.lastCalculatedAt) : "Sem apuração" },
+    { id: "menu", label: "", render: (row) => <ErpRowMenu label={`Ações de ${row.name}`} items={menu(row)} /> },
   ];
   const emptyText = data.canManage
     ? "Crie um rascunho com regulamento, período e métrica. Outra pessoa autorizada aprova antes da apuração."
@@ -389,17 +379,18 @@ export function IncentivesWorkspace({ data }: { data: ListData }) {
   return <>
     <ErpList
       title="Campanhas"
-      description="Regulamento aprovado por outra pessoa, apuração reproduzível e ranking conforme a política de exposição."
-      actions={data.canManage ? <NewIncentiveCampaign branches={data.branches} /> : undefined}
+      count={data.total}
+      countLabel={["campanha", "campanhas"]}
       columns={columns}
       rows={data.rows}
       rowKey={(row) => row.id}
       onRowOpen={(row) => setSelectedId(row.id)}
       emptyTitle={filtered ? "Nenhuma campanha nesta situação" : "Nenhuma campanha no seu escopo"}
-      emptyText={filtered ? "Ajuste o filtro de situação." : emptyText}
+      emptyText={filtered ? "Ajuste a busca ou o filtro de situação." : emptyText}
       footer={<ErpPager page={data.filters.page} total={data.total} pageSize={data.pageSize} label="Paginação de campanhas" />}
     />
     {selectedId ? <CampaignDrawer key={selectedId} id={selectedId} onClose={() => setSelectedId(null)} /> : null}
+    {data.canManage ? <NewIncentiveCampaign branches={data.branches} /> : null}
   </>;
 }
 
@@ -466,7 +457,15 @@ export function IncentiveCampaignDetail({ data }: { data: DetailData }) {
     { id: "note", label: "Nota", render: (row) => <span className="whitespace-pre-wrap">{row.note}</span> },
   ];
   const rankingTitle = latest ? `Ranking · apuração ${kindLabel(latest.kind).toLowerCase()} de ${dateTime(latest.createdAt)}` : "Ranking";
+  const viewer = latest?.ranking.find((row) => row.isViewer) ?? null;
+  const { campaign } = data;
   return <>
+    <ErpStats>
+      <StatCard label="Situação" value={statusLabel(campaign.status, campaign.startsOn, campaign.endsOn, data.today)} sublabel={INCENTIVE_METRIC_LABELS[campaign.metric]} />
+      <StatCard label="Período" value={`${day(campaign.startsOn)} a ${day(campaign.endsOn)}`} sublabel="horário de Brasília" />
+      <StatCard label="Participantes no ranking" value={(latest?.ranking.length ?? 0).toLocaleString("pt-BR")} sublabel={viewer ? `Sua posição: ${viewer.position}º` : "pela apuração mais recente"} />
+      <StatCard label="Última apuração" value={latest ? kindLabel(latest.kind) : "Sem apuração"} sublabel={latest ? dateTime(latest.createdAt) : "aparece depois da primeira apuração"} />
+    </ErpStats>
     <ErpSection title="Regulamento" description={`Versão ${data.campaign.version} do regulamento`}>
       <RegulationDetails data={data} />
     </ErpSection>

@@ -34,6 +34,10 @@ export interface DsBarChartProps<T extends Record<string, unknown>> {
   className?: string;
   /** Sparkline mode for KPI cards — no axes/grid/tooltip legend, thin bars. */
   compact?: boolean;
+  /** Room for the value axis labels. Set it for counts that can reach 3+ digits; the default keeps the tight dashboard layout. */
+  yAxisWidth?: number;
+  /** Value axis labels (e.g. thousands separator). */
+  yTickFormatter?: (value: number) => string;
 }
 
 /**
@@ -49,6 +53,8 @@ export function DsBarChart<T extends Record<string, unknown>>({
   height = 220,
   className,
   compact = false,
+  yAxisWidth,
+  yTickFormatter,
 }: DsBarChartProps<T>) {
   const reducedMotion = useInterfaceReducedMotion();
   const animatedOnce = React.useRef(false);
@@ -76,7 +82,7 @@ export function DsBarChart<T extends Record<string, unknown>>({
       className={className ?? "aspect-auto w-full"}
       style={{ height }}
     >
-      <BarChart data={data} margin={compact ? { left: 0, right: 0, top: 2, bottom: 0 } : { left: -16, right: 4, top: 4, bottom: 0 }}>
+      <BarChart data={data} margin={compact ? { left: 0, right: 0, top: 2, bottom: 0 } : { left: yAxisWidth ? 0 : -16, right: 4, top: 8, bottom: 0 }}>
         {compact ? null : <CartesianGrid stroke="var(--color-ds-ash)" vertical={false} />}
         {compact ? null : (
           <XAxis
@@ -96,7 +102,8 @@ export function DsBarChart<T extends Record<string, unknown>>({
             tickMargin={4}
             allowDecimals={false}
             fontSize={11}
-            width={28}
+            width={yAxisWidth ?? 28}
+            tickFormatter={yTickFormatter}
             stroke="var(--color-ds-fog)"
           />
         )}

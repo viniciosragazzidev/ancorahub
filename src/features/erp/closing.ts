@@ -81,5 +81,6 @@ export async function getCashMovements(competence: string) {
   const incoming = checkedCents(rows.filter((row) => row.kind === "agency_receivable").reduce((total, row) => total + BigInt(row.cents), BigInt(0)));
   const outgoing = checkedCents(rows.filter((row) => row.kind !== "agency_receivable").reduce((total, row) => total + BigInt(row.cents), BigInt(0)));
   await auditErp(getDatabase(), { tenantId: auth.context.tenantId, actorId: auditActor(auth.context), action: "erp.cash.viewed", entityType: "erp_access", entityId: competence });
-  return { competence, incoming, outgoing, net: checkedCents(BigInt(incoming) - BigInt(outgoing)), movementCount: rows.reduce((total, row) => total + row.count, 0), openingBalanceKnown: false as const };
+  return { competence, incoming, outgoing, net: checkedCents(BigInt(incoming) - BigInt(outgoing)), movementCount: rows.reduce((total, row) => total + row.count, 0), openingBalanceKnown: false as const,
+    byKind: rows.map((row) => ({ kind: row.kind, cents: checkedCents(BigInt(row.cents)), count: row.count, incoming: row.kind === "agency_receivable" })) };
 }

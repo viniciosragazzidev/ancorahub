@@ -375,7 +375,7 @@ export async function getReferrals(rawFilters: unknown) {
     searchSql,
   );
   const leadJoin = and(eq(schema.leads.id, schema.erpReferrals.leadId), eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt));
-  const [rows, totals] = await Promise.all([
+  const [rows, totals, byStatus] = await Promise.all([
     db.select({
       id: schema.erpReferrals.id, referrerName: schema.erpReferrals.referrerName, referrerContact: schema.erpReferrals.referrerContact,
       channel: schema.erpReferrals.channel, referredName: schema.erpReferrals.referredName, referredPhone: schema.erpReferrals.referredPhone,
@@ -388,7 +388,16 @@ export async function getReferrals(rawFilters: unknown) {
       .where(conditions).orderBy(desc(schema.erpReferrals.createdAt), schema.erpReferrals.id)
       .limit(PAGE_SIZE).offset((filters.page - 1) * PAGE_SIZE),
     db.select({ value: count() }).from(schema.erpReferrals).where(conditions),
+    // Numbers on top of the screen: the viewer's whole scope, independent of the list filters.
+    db.select({ status: schema.erpReferrals.status, value: count() }).from(schema.erpReferrals).where(scoped(auth)).groupBy(schema.erpReferrals.status),
   ]);
+  const countOf = (statuses: readonly string[]) => byStatus.filter((row) => statuses.includes(row.status)).reduce((sum, row) => sum + Number(row.value), 0);
+  const summary = {
+    fresh: countOf(["registered", "validated"]),
+    active: countOf(["contacting", "opportunity"]),
+    converted: countOf(["converted"]),
+    closed: countOf(["lost", "duplicate"]),
+  };
   const access = await getErpEffectiveAccess(auth.context);
   const canManage = !auth.context.viewAs;
   const canAssignOwner = canManage && ["director", "manager"].includes(auth.context.role);
@@ -409,7 +418,7 @@ export async function getReferrals(rawFilters: unknown) {
     && (auth.context.role !== "manager" || auth.context.branchId === row.branchId)
     && (auth.context.role !== "supervisor" || auth.context.supervisorTeamScope === true);
   return {
-    filters, total: Number(totals[0]?.value ?? 0), pageSize: PAGE_SIZE, canManage, canAssignOwner, members, currentUserId: auth.context.userId,
+    filters, total: Number(totals[0]?.value ?? 0), pageSize: PAGE_SIZE, summary, canManage, canAssignOwner, members, currentUserId: auth.context.userId,
     statusOptions: REFERRAL_STATUSES.map((value) => ({ value, label: REFERRAL_STATUS_LABELS[value] })),
     channelOptions: REFERRAL_CHANNELS.map((value) => ({ value, label: REFERRAL_CHANNEL_LABELS[value] })),
     rows: rows.map((row) => {

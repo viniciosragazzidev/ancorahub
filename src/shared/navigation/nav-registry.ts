@@ -7,7 +7,7 @@ import type { PermissionKey } from "@/shared/auth/permissions";
 import type { TenantRole } from "@/shared/db/schema";
 import { canShowNavigationItem, type NavigationAccessUser } from "@/shared/navigation-access";
 
-export type NavAreaId = "inicio" | "conversas" | "leads" | "distribuicao" | "comercial" | "erp" | "equipe" | "atendimento-ia" | "marketing" | "configuracoes";
+export type NavAreaId = "inicio" | "conversas" | "leads" | "distribuicao" | "comercial" | "financeiro" | "erp" | "equipe" | "atendimento-ia" | "marketing" | "configuracoes";
 
 export type NavSection = "Principal" | "Operação" | "Crescimento" | "Sistema";
 
@@ -110,12 +110,28 @@ export const NAV_AREAS: readonly NavArea[] = [
     ],
   },
   {
-    id: "erp", label: "Operação ERP", fullLabel: "Implantação, financeiro e gestão operacional", section: "Operação",
+    // ERP: o Financeiro é uma área própria (as seções são as abas), para nunca empilhar duas fileiras de abas.
+    id: "financeiro", label: "Financeiro", fullLabel: "Lançamentos, comissões, repasses e fechamento", section: "Operação",
+    tabs: [
+      { id: "lancamentos", label: "Lançamentos", href: "/financeiro", permission: "erp_view_finance", requires: "erp", paths: ["/financeiro/lancamentos"] },
+      { id: "conciliacao", label: "Conciliação", href: "/financeiro/conciliacao", permission: "acessar_financeiro", requires: "erp" },
+      { id: "recebiveis", label: "Recebíveis", href: "/financeiro/recebiveis", permission: "acessar_financeiro", requires: "erp" },
+      { id: "despesas", label: "Despesas", href: "/financeiro/despesas", permission: "acessar_financeiro", requires: "erp" },
+      { id: "comissoes", label: "Comissões", href: "/financeiro/comissoes", permission: "ver_comissao_propria", requires: "erp" },
+      { id: "repasses", label: "Repasses", href: "/financeiro/repasses", permission: "ver_comissao_propria", requires: "erp" },
+      { id: "recibos", label: "Recibos", href: "/financeiro/recibos", permission: "ver_comissao_propria", requires: "erp" },
+      { id: "adiantamentos", label: "Adiantamentos", href: "/financeiro/adiantamentos", permission: "erp_view_finance", requires: "erp" },
+      { id: "caixa", label: "Caixa", href: "/financeiro/fluxo-caixa", permission: "erp_view_finance", requires: "erp" },
+      { id: "fechamentos", label: "Fechamentos", href: "/financeiro/fechamentos", permission: "erp_view_finance", requires: "erp" },
+    ],
+  },
+  {
+    id: "erp", label: "Operação ERP", fullLabel: "Implantação, indicações, metas e inteligência", section: "Operação",
     tabs: [
       { id: "implantacao", label: "Implantação", href: "/implantacoes", permission: "erp_view_operations", requires: "erp" },
-      { id: "financeiro", label: "Financeiro", href: "/financeiro", permission: "erp_view_finance", requires: "erp" },
       { id: "indicacoes", label: "Indicações", href: "/indicacoes", permission: "erp_manage_referrals", requires: "erp" },
       { id: "metas", label: "Metas", href: "/metas", permission: "erp_view_analytics", requires: "erp" },
+      { id: "inteligencia", label: "Inteligência", href: "/relatorios/producao", permission: "erp_view_analytics", requires: "erp", paths: ["/relatorios/operadoras", "/relatorios/crescimento", "/relatorios/diario"] },
       { id: "incentivos", label: "Incentivos", href: "/campanhas-incentivo", permission: "erp_view_analytics", requires: "erp" },
       { id: "tv", label: "Modo TV", href: "/tv", permission: "erp_view_analytics", requires: "erp" },
       { id: "importacoes", label: "Importações", href: "/administracao/importacoes", permission: "erp_import_data", requires: "erp" },

@@ -3,10 +3,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const url = vi.hoisted(() => ({ search: "" }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
   usePathname: () => "/financeiro/recebiveis",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(url.search),
 }));
 const detail = vi.hoisted(() => ({
   entry: {
@@ -41,18 +42,19 @@ vi.mock("../client-file-request", () => ({ submitErpFile: vi.fn(async () => ({ o
 import { ErpSkinProvider } from "../ui/skin-context";
 import type { ErpSkin } from "../ui/skin";
 import { FinanceLedger, type EntryDetail } from "./finance-workspace";
-import { ClosingsWorkspace, OffsetPrepareButton, OffsetsList } from "./finance-controls";
+import { CashKindsList, ClosingsWorkspace, OffsetPreparePanel, OffsetsList } from "./finance-controls";
 import { FinancialEntryDetail } from "./ledger-entry-detail";
 import { activeSection } from "./ledger-section-tabs";
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); url.search = ""; });
 
 const SKINS: ErpSkin[] = ["standard", "lite"];
 const mount = (skin: ErpSkin, ui: ReactElement) => render(<ErpSkinProvider skin={skin}>{ui}</ErpSkinProvider>);
 const openRow = (text: string) => act(() => { fireEvent.click(screen.getAllByText(text)[0]); });
 
 const entries = {
-  filters: { kind: "agency_receivable" as const, status: "all" as const, competence: undefined, page: 1 }, pageSize: 25, total: 2, agency: true, canPrepare: true,
+  filters: { kind: "agency_receivable" as const, status: "all" as const, competence: undefined, q: "", page: 1 }, pageSize: 25, total: 2, agency: true, canPrepare: true,
+  summary: { toReview: 1, receivableCents: 10000, payableCents: 0, settledCents: 5000, approvedCents: 15000 },
   rows: [
     { id: "e1", kind: "agency_receivable" as const, reference: "REC-1", description: "Recebível sintético", amountCents: 15000, dueOn: "2026-11-30",
       competence: "2026-11", status: "approved", version: 2, settledCents: 5000, beneficiaryName: null },
@@ -61,7 +63,7 @@ const entries = {
   ],
 };
 const offsets = {
-  page: 1, pageSize: 25, total: 2, canPrepare: true,
+  page: 1, pageSize: 25, total: 2, canPrepare: true, summary: { pending: 1, confirmedCents: 1000 },
   choices: [
     { id: "a1", reference: "ADV-1", kind: "advance", beneficiaryId: "u1", beneficiaryName: "Ana Souza", availableCents: 3000 },
     { id: "c1", reference: "COM-1", kind: "broker_commission", beneficiaryId: "u1", beneficiaryName: "Ana Souza", availableCents: 8000 },
@@ -86,20 +88,22 @@ const closings = {
 };
 
 describe.each(SKINS)("ERP ledger screens (%s skin)", (skin) => {
-  it("entries: rows, one primary CTA, row opens the drawer with the entry and its actions", async () => {
+  it("entries: readable rows (description, formatted month), no CTA inside the list, row opens the drawer", async () => {
     mount(skin, <FinanceLedger data={entries} branches={[{ id: "b1", name: "Centro" }]} title="Recebíveis" defaultKind="agency_receivable" emptyText="Vazio" />);
-    expect(screen.getAllByText("REC-2").length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: "Novo lançamento" })).toHaveLength(1);
-    openRow("REC-1");
+    expect(screen.getAllByText("Outro recebível").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("dez. 2026").length).toBeGreaterThan(0);
+    expect(screen.queryByText("2026-12")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Novo lançamento" })).toBeNull();
+    openRow("Recebível sintético");
     await waitFor(() => expect(screen.getByRole("link", { name: "Abrir ficha completa" })).toHaveAttribute("href", "/financeiro/lancamentos/e1"));
     expect(actions.loadFinancialEntryAction).toHaveBeenCalledWith("e1");
     expect(screen.getByRole("button", { name: "Preparar liquidação para revisão" })).toHaveAttribute("type", "submit");
     expect(screen.getByRole("button", { name: "Enviar evidência" })).toBeInTheDocument();
   });
 
-  it("new entry opens the preparation drawer with server search for the sale", () => {
+  it("new entry (?novo=1 from the header CTA) opens the preparation drawer with server search for the sale", () => {
+    url.search = "novo=1";
     mount(skin, <FinanceLedger data={entries} branches={[]} title="Recebíveis" defaultKind="agency_receivable" emptyText="Vazio" />);
-    act(() => { fireEvent.click(screen.getByRole("button", { name: "Novo lançamento" })); });
     expect(screen.getByPlaceholderText("Buscar venda pelo nome do cliente")).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: /Venda/ })).toBeNull();
   });
@@ -119,23 +123,38 @@ describe.each(SKINS)("ERP ledger screens (%s skin)", (skin) => {
     expect(screen.getByRole("button", { name: "Confirmar liquidação" })).toBeInTheDocument();
   });
 
-  it("offsets: rows, primary CTA opens the preparation, row opens the review", () => {
-    mount(skin, <><OffsetPrepareButton data={offsets} /><OffsetsList data={offsets} /></>);
-    expect(screen.getAllByText("COM-2").length).toBeGreaterThan(0);
-    openRow("COM-1");
+  it("offsets: rows, row opens the review; ?compensar=1 opens the preparation", () => {
+    mount(skin, <><OffsetPreparePanel data={offsets} /><OffsetsList data={offsets} /></>);
+    expect(screen.getAllByText("Compensação da comissão COM-2").length).toBeGreaterThan(0);
+    expect(screen.queryByPlaceholderText("Buscar adiantamento ou beneficiário")).toBeNull();
+    openRow("Compensação da comissão COM-1");
     expect(screen.getByRole("button", { name: "Confirmar compensação" })).toBeInTheDocument();
     cleanup();
-    mount(skin, <><OffsetPrepareButton data={offsets} /><OffsetsList data={offsets} /></>);
-    act(() => { fireEvent.click(screen.getByRole("button", { name: "Preparar compensação" })); });
+    url.search = "compensar=1";
+    mount(skin, <><OffsetPreparePanel data={offsets} /><OffsetsList data={offsets} /></>);
     expect(screen.getByPlaceholderText("Buscar adiantamento ou beneficiário")).toBeInTheDocument();
   });
 
-  it("closings: rows, one primary CTA, row opens the snapshot with the close form", () => {
+  it("closings: named months, row opens the snapshot with the close form; ?preparar=1 opens the preparation", () => {
     mount(skin, <ClosingsWorkspace data={closings} />);
-    expect(screen.getAllByText("2026-09").length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: "Preparar competência" })).toHaveLength(1);
-    openRow("2026-10");
+    expect(screen.getAllByText("Setembro de 2026").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Preparar competência" })).toBeNull();
+    openRow("Outubro de 2026");
     expect(screen.getByRole("button", { name: "Aprovar e fechar período" })).toHaveAttribute("type", "submit");
+    cleanup();
+    url.search = "preparar=1";
+    mount(skin, <ClosingsWorkspace data={closings} />);
+    expect(screen.getByRole("button", { name: "Preparar prévia" })).toHaveAttribute("type", "submit");
+  });
+
+  it("cash: one row per type with direction, and an explicit empty state", () => {
+    mount(skin, <CashKindsList monthLabel="novembro de 2026" rows={[{ kind: "expense", cents: 4000, count: 2, incoming: false },
+      { kind: "agency_receivable", cents: 9000, count: 1, incoming: true }]} />);
+    expect(screen.getAllByText("Recebíveis da corretora").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Saída").length).toBeGreaterThan(0);
+    cleanup();
+    mount(skin, <CashKindsList monthLabel="novembro de 2026" rows={[]} />);
+    expect(screen.getAllByText("Nenhum movimento confirmado neste mês").length).toBeGreaterThan(0);
   });
 });
 

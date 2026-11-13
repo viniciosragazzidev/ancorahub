@@ -2,14 +2,14 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { formatCents, type ErpActionResult } from "../contracts";
 import { bringScheduleAction } from "../commission-actions";
 import { ENTRY_STATUS_LABELS } from "../shared";
 import type { getCommissionOverview } from "../commissions";
-import { ErpList, ErpMonthFilter, ErpNote, ErpPager, ErpPanel, ErpRowMenu, ErpToolbar, type ErpColumn, type ErpMenuItem } from "../ui/erp-kit";
+import { ErpCell, ErpList, ErpNote, ErpPager, ErpPanel, ErpStatus, type ErpColumn, type ErpTone } from "../ui/erp-kit";
+import { formatCompetence } from "../ui/format";
 import { FinanceFeedback } from "./finance-workspace";
-import { PayoutFacts, StopRowOpen } from "./payout-parts";
+import { PayoutFacts } from "./payout-parts";
 
 type Overview = Awaited<ReturnType<typeof getCommissionOverview>>;
 type CommissionRow = Overview["rows"][number];
@@ -21,6 +21,9 @@ const SCHEDULE_STATUS_LABELS: Record<string, string> = {
   cancelled: "Cancelado",
   chargeback_pending: "Revisão de estorno",
 };
+
+const SCHEDULE_TONE: Record<string, ErpTone> = { pending: "warning", paid: "success", cancelled: "danger", chargeback_pending: "danger" };
+const ENTRY_TONE: Record<string, ErpTone> = { submitted: "warning", approved: "success", rejected: "danger" };
 
 function entryLabel(status: string) {
   return ENTRY_STATUS_LABELS[status as keyof typeof ENTRY_STATUS_LABELS] ?? "A conferir";
@@ -43,7 +46,7 @@ function BringScheduleForm({ saleId }: { saleId: string }) {
 
 function CommissionPanel({ data, row, onClose }: { data: Overview; row: CommissionRow | null; onClose: () => void }) {
   return <ErpPanel open={row !== null} onOpenChange={(open) => { if (!open) onClose(); }} title={row ? row.clientName : "Parcela"}
-    description={row ? `${row.monthNumber}ª parcela · competência ${row.referenceMonth}` : undefined}>
+    description={row ? `${row.monthNumber}ª parcela · ${formatCompetence(row.referenceMonth, "long")}` : undefined}>
     {row ? <>
       <PayoutFacts items={[
         { label: "Corretor", value: row.brokerName ?? "Corretor" },
@@ -68,37 +71,30 @@ function CommissionPanel({ data, row, onClose }: { data: Overview; row: Commissi
   </ErpPanel>;
 }
 
+/**
+ * Commission installments: previsto (schedule), conferido (ERP) and pago ao corretor side by side. The row opens the
+ * drawer; "Conferir no ERP" lives there. Numbers, search and month are rendered by the page.
+ */
 export function CommissionsList({ data }: { data: Overview }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const open = data.rows.find((row) => row.id === openId) ?? null;
-  const menu = (row: CommissionRow): ErpMenuItem[] => [
-    { id: "details", label: "Ver detalhes", onSelect: () => setOpenId(row.id) },
-    ...(row.entry ? [{ id: "entry", label: "Abrir lançamento", href: `/financeiro/lancamentos/${row.entry.id}` }] : []),
-    ...(canBringRow(data, row) ? [{ id: "bring", label: "Conferir no ERP", onSelect: () => setOpenId(row.id) }] : []),
-  ];
   const columns: ErpColumn<CommissionRow>[] = [
-    { id: "sale", label: "Venda", primary: true, render: (row) => row.clientName },
-    { id: "broker", label: "Corretor", secondary: true, nowrap: true,
-      render: (row) => `${row.brokerName ?? "Corretor"}${row.saleStatus !== "active" ? " · venda cancelada" : ""}` },
-    { id: "installment", label: "Parcela", render: (row) => `${row.monthNumber}ª · ${row.referenceMonth} · ${row.percentage}%` },
+    { id: "sale", label: "Venda", primary: true, render: (row) => <ErpCell title={row.clientName}
+      sub={`${row.brokerName ?? "Corretor"}${row.saleStatus !== "active" ? " · venda cancelada" : ""}`} /> },
+    { id: "installment", label: "Parcela", nowrap: true, render: (row) => <ErpCell title={`${row.monthNumber}ª · ${formatCompetence(row.referenceMonth)}`} sub={`${row.percentage}%`} /> },
     { id: "expected", label: "Previsto", numeric: true, render: (row) => formatCents(row.expectedCents) },
     { id: "schedule", label: "Cronograma",
-      render: (row) => <Badge variant={row.legacyStatus === "paid" ? "success" : "outline"}>{SCHEDULE_STATUS_LABELS[row.legacyStatus] ?? row.legacyStatus}</Badge> },
+      render: (row) => <ErpStatus tone={SCHEDULE_TONE[row.legacyStatus] ?? "neutral"}>{SCHEDULE_STATUS_LABELS[row.legacyStatus] ?? row.legacyStatus}</ErpStatus> },
     { id: "conference", label: "Conferência", render: (row) => row.entry
-      ? <span className="flex flex-wrap items-center gap-1">{entryLabel(row.entry.status)} · {formatCents(row.entry.amountCents)}
-        {row.divergence ? <Badge variant="secondary">Divergência</Badge> : null}</span>
-      : "Não conferida" },
+      ? <span className="flex flex-wrap items-center gap-1"><ErpStatus tone={row.divergence ? "danger" : ENTRY_TONE[row.entry.status] ?? "neutral"}>
+        {row.divergence ? "Divergência" : entryLabel(row.entry.status)}</ErpStatus></span>
+      : <ErpStatus>Não conferida</ErpStatus> },
     { id: "paid", label: "Pago ao corretor", numeric: true,
-      render: (row) => row.entry ? `${formatCents(row.paidCents)}${row.offsetCents ? ` + ${formatCents(row.offsetCents)} compensado` : ""}` : "—" },
-    { id: "menu", label: "Ações", render: (row) => <StopRowOpen><ErpRowMenu label={`Ações da parcela de ${row.clientName}`} items={menu(row)} /></StopRowOpen> },
+      render: (row) => row.entry ? <ErpCell title={formatCents(row.paidCents)} sub={row.offsetCents ? `+ ${formatCents(row.offsetCents)} compensado` : undefined} /> : "Sem registro" },
   ];
   return <>
-    <ErpNote>
-      Previsto vem do cronograma da venda. Conferido é o valor aprovado com evidência no ERP. Pago ao corretor é a soma das liquidações e
-      compensações confirmadas. São três fatos diferentes.
-    </ErpNote>
-    <ErpToolbar><ErpMonthFilter value={data.filters.competence ?? ""} /></ErpToolbar>
-    <ErpList title={data.agency ? "Parcelas de comissão" : "Minhas parcelas"} columns={columns} rows={data.rows} rowKey={(row) => row.id}
+    <ErpList title={data.agency ? "Parcelas de comissão" : "Minhas parcelas"} count={data.total} countLabel={["parcela", "parcelas"]} columns={columns}
+      rows={data.rows} rowKey={(row) => row.id}
       onRowOpen={(row) => setOpenId(row.id)} emptyTitle="Nenhuma parcela de comissão neste filtro"
       emptyText="As parcelas nascem do cronograma da venda registrada. Sem cronograma, não há valor previsto."
       footer={<ErpPager page={data.filters.page} total={data.total} pageSize={data.pageSize} label="Paginação de comissões" />} />

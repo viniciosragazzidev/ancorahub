@@ -10,10 +10,10 @@ export default async function IncentiveCampaignPage({ params, searchParams }: Pr
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const data = await getIncentiveCampaign(id, query.page);
   const actions = <div className="flex flex-wrap items-center gap-2">
-    <Button variant="ghost" render={<Link href="/campanhas-incentivo" />}>Voltar às campanhas</Button>
+    <Button variant="ghost" render={<Link href="/campanhas-incentivo" />}>Todas as campanhas</Button>
     <IncentiveCampaignActions data={data} />
   </div>;
-  return <ErpPage pathname={`/campanhas-incentivo/${id}`} breadcrumb="Campanhas de incentivo" title={data.campaign.name} actions={actions}>
+  return <ErpPage pathname={`/campanhas-incentivo/${id}`} breadcrumb="Incentivos" title={data.campaign.name} actions={actions}>
     <IncentiveCampaignDetail data={data} />
   </ErpPage>;
 }

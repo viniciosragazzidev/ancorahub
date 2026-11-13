@@ -10,7 +10,7 @@ import { scopedEvidence, scopedFinancialEntry, type ErpAccess } from "./records"
 import { scopeIncludes } from "./scope";
 import { getEntryOffsets } from "./offset-balances";
 import { syncLegacyInstallment } from "./legacy-sync";
-import { confirmedSettledSql } from "./balances";
+import { confirmedSettledSql, openBalanceSql } from "./balances";
 import { PAGE_SIZE, pageSchema, periodSchema, uuidSchema } from "./shared";
 
 export async function activePayoutFor(db: ErpDatabase, tenantId: string, entryId: string) {
@@ -194,8 +194,16 @@ const filtersSchema = z.object({
   kind: z.enum(["all", ...FINANCIAL_KINDS]).default("all"),
   status: z.enum(ENTRY_FILTER_STATUSES).default("all"),
   competence: periodSchema.optional(),
+  q: z.string().trim().max(100).optional().default(""),
   page: pageSchema,
 });
+
+/** `%term%` for ILIKE with the user's wildcards escaped. */
+export function likePattern(term: string) {
+  return `%${term.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+}
+
+const OUTGOING_KINDS = ["broker_commission", "expense", "advance"] as const;
 
 export async function getFinancialEntries(raw: unknown) {
   const filters = filtersSchema.parse(raw);
@@ -203,22 +211,34 @@ export async function getFinancialEntries(raw: unknown) {
   const db = getDatabase();
   const agency = hasAgencyScope(auth);
   const entries = schema.erpFinancialEntries;
-  const conditions = and(
-    eq(entries.tenantId, auth.context.tenantId),
+  const tenantId = auth.context.tenantId;
+  // Scope of the screen (who sees what, type and month): the numbers on top follow it; the list adds state and search.
+  const scoped = and(
+    eq(entries.tenantId, tenantId),
     erpScopeSql(auth.scope, entries.branchId, entries.ownerId),
     agency ? undefined : inArray(entries.kind, ["broker_commission", "advance"]),
     !agency && auth.scope.mode !== "owners" ? eq(entries.status, "approved") : undefined,
     filters.kind === "all" ? undefined : eq(entries.kind, filters.kind),
-    filters.status === "all" ? undefined : eq(entries.status, filters.status),
     filters.competence ? eq(entries.competence, filters.competence) : undefined,
   );
-  const [rows, total, access] = await Promise.all([
+  const pattern = likePattern(filters.q);
+  const search = filters.q ? or(ilike(entries.reference, pattern), ilike(entries.description, pattern), ilike(schema.user.name, pattern)) : undefined;
+  const conditions = and(scoped, filters.status === "all" ? undefined : eq(entries.status, filters.status), search);
+  const approvedOpen = (kinds: readonly string[]) => sql<number>`coalesce(sum(CASE WHEN ${entries.status} = 'approved' AND ${inArray(entries.kind, [...kinds])} THEN greatest(${openBalanceSql(tenantId)}, 0) ELSE 0 END), 0)::bigint`.mapWith(Number);
+  const [rows, total, access, [summary]] = await Promise.all([
     // The join also makes Drizzle qualify the outer columns, which the correlated subquery of confirmedSettledSql needs.
-    db.select({ entry: entries, beneficiaryName: schema.user.name, settledCents: confirmedSettledSql(auth.context.tenantId) }).from(entries)
+    db.select({ entry: entries, beneficiaryName: schema.user.name, settledCents: confirmedSettledSql(tenantId) }).from(entries)
       .leftJoin(schema.user, eq(schema.user.id, entries.beneficiaryId)).where(conditions)
       .orderBy(desc(entries.createdAt), entries.id).limit(PAGE_SIZE).offset((filters.page - 1) * PAGE_SIZE),
-    db.select({ value: count() }).from(entries).where(conditions),
+    db.select({ value: count() }).from(entries).leftJoin(schema.user, eq(schema.user.id, entries.beneficiaryId)).where(conditions),
     getErpEffectiveAccess(auth.context),
+    db.select({
+      toReview: sql<number>`count(*) FILTER (WHERE ${entries.status} = 'submitted')::int`.mapWith(Number),
+      receivable: approvedOpen(["agency_receivable"]),
+      payable: approvedOpen(OUTGOING_KINDS),
+      settled: sql<number>`coalesce(sum(CASE WHEN ${entries.status} = 'approved' THEN ${confirmedSettledSql(tenantId)} ELSE 0 END), 0)::bigint`.mapWith(Number),
+      approved: sql<number>`coalesce(sum(CASE WHEN ${entries.status} = 'approved' THEN ${entries.amountCents} ELSE 0 END), 0)::bigint`.mapWith(Number),
+    }).from(entries).leftJoin(schema.user, eq(schema.user.id, entries.beneficiaryId)).where(scoped),
   ]);
   await auditErp(db, {
     tenantId: auth.context.tenantId, actorId: auditActor(auth.context), action: "erp.finance.viewed", entityType: "erp_access",
@@ -226,6 +246,7 @@ export async function getFinancialEntries(raw: unknown) {
   });
   return {
     filters, pageSize: PAGE_SIZE, total: Number(total[0]?.value ?? 0), agency,
+    summary: { toReview: summary?.toReview ?? 0, receivableCents: summary?.receivable ?? 0, payableCents: summary?.payable ?? 0, settledCents: summary?.settled ?? 0, approvedCents: summary?.approved ?? 0 },
     canPrepare: agency && !auth.context.viewAs && access.capabilities.has("erp_prepare_finance"),
     rows: rows.map(({ entry, beneficiaryName, settledCents: settled }) => ({
       id: entry.id, kind: z.enum(FINANCIAL_KINDS).parse(entry.kind), reference: entry.reference, description: entry.description, beneficiaryName,

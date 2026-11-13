@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { and, count, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { auditErp, canSeeAgencyBooks, getErpEffectiveAccess, requireErpAccess, type ErpDatabase, type ErpTransaction } from "./access";
@@ -34,6 +34,7 @@ const contestSchema = z.object({
 }).strict();
 export const incentiveFiltersSchema = z.object({
   status: z.enum(["all", ...INCENTIVE_STATUSES]).catch("all"),
+  q: z.string().trim().max(100).catch("").optional().default(""),
   page: pageSchema.catch(1),
 });
 
@@ -324,21 +325,32 @@ export async function getIncentiveCampaigns(rawFilters: unknown = {}) {
   const filters = incentiveFiltersSchema.parse(rawFilters ?? {});
   const { auth, canManage } = await viewer();
   const db = getDatabase();
+  const visible = and(eq(campaigns.tenantId, auth.context.tenantId), visibleCampaignSql(auth, canManage));
+  const term = filters.q ? `%${filters.q.replace(/[\\%_]/g, (char) => `\\${char}`)}%` : null;
   const where = and(
-    eq(campaigns.tenantId, auth.context.tenantId),
-    visibleCampaignSql(auth, canManage),
+    visible,
     filters.status === "all" ? undefined : eq(campaigns.status, filters.status),
+    term ? ilike(campaigns.name, term) : undefined,
   );
   const lastCalculatedAt = sql<string | null>`(
     SELECT max(r.created_at)::text FROM erp_incentive_results r WHERE r.tenant_id = ${campaigns.tenantId} AND r.campaign_id = ${campaigns.id}
   )`;
-  const [rows, totals] = await Promise.all([
+  const today = todayInSaoPaulo();
+  const [rows, totals, [summary]] = await Promise.all([
     db.select({ campaign: campaigns, lastCalculatedAt }).from(campaigns).where(where)
       .orderBy(desc(campaigns.startsOn), campaigns.id).limit(PAGE_SIZE).offset((filters.page - 1) * PAGE_SIZE),
     db.select({ value: count() }).from(campaigns).where(where),
+    // Same visibility as the list, without the status filter and search: the numbers on top of the screen.
+    db.select({
+      running: sql<number>`count(*) FILTER (WHERE ${campaigns.status} = 'approved' AND ${campaigns.startsOn} <= ${today}::date AND ${campaigns.endsOn} >= ${today}::date)::int`.mapWith(Number),
+      awaitingApproval: sql<number>`count(*) FILTER (WHERE ${campaigns.status} = 'draft')::int`.mapWith(Number),
+      awaitingFinal: sql<number>`count(*) FILTER (WHERE ${campaigns.status} = 'approved' AND ${campaigns.endsOn} < ${today}::date)::int`.mapWith(Number),
+      closed: sql<number>`count(*) FILTER (WHERE ${campaigns.status} = 'closed')::int`.mapWith(Number),
+    }).from(campaigns).where(visible),
   ]);
   return {
-    filters, total: Number(totals[0]?.value ?? 0), pageSize: PAGE_SIZE, canManage, today: todayInSaoPaulo(),
+    filters, total: Number(totals[0]?.value ?? 0), pageSize: PAGE_SIZE, canManage, today,
+    summary: { running: summary?.running ?? 0, awaitingApproval: summary?.awaitingApproval ?? 0, awaitingFinal: summary?.awaitingFinal ?? 0, closed: summary?.closed ?? 0 },
     branches: canManage ? await scopedBranches(auth) : [],
     rows: rows.map((row) => ({ ...campaignView(row.campaign), lastCalculatedAt: row.lastCalculatedAt })),
   };

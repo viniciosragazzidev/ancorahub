@@ -3,10 +3,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const search = vi.hoisted(() => ({ value: new URLSearchParams() }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
   usePathname: () => "/indicacoes",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => search.value,
 }));
 const actions = vi.hoisted(() => ({
   registerReferralAction: vi.fn(async () => ({ ok: true, message: "ok" })),
@@ -40,18 +41,25 @@ const row = {
   nextStatuses: [{ value: "contacting" as const, label: "Em contato" }], canLink: true, canOpenLead: false,
 };
 const workspace = {
-  filters: { q: "", status: "all" as const, page: 1, id: undefined }, total: 1, pageSize: 25, canManage: true, canAssignOwner: true,
+  filters: { q: "", status: "all" as const, page: 1, id: undefined }, total: 1, pageSize: 25, summary: { fresh: 1, active: 0, converted: 0, closed: 0 }, canManage: true, canAssignOwner: true,
   members: [{ id: "u1", name: "Ana" }], currentUserId: "u1", statusOptions: [], channelOptions: [{ value: "cliente" as const, label: "Cliente" }], rows: [row],
 };
 
 describe.each(SKINS)("Indicações (%s skin)", (skin) => {
-  it("renders the list with one primary CTA and opens the drawer with the history of that referral only", async () => {
+  it("renders the numbers and the list, and opens the drawer with the history of that referral only", async () => {
     mount(skin, <ReferralsWorkspace workspace={workspace} />);
     expect(screen.getAllByText("Bruno Indicado").length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: "Nova indicação" })).toHaveLength(1);
+    expect(screen.getByText("Em andamento")).toBeInTheDocument();
     act(() => { fireEvent.click(screen.getAllByText("Bruno Indicado")[0]); });
     await waitFor(() => expect(screen.getByText(/Indicação registrada · Registrada/)).toBeInTheDocument());
     expect(actions.getReferralTimelineAction).toHaveBeenCalledWith("r1", 1);
+  });
+
+  it("opens Nova indicação from the URL (?novo=1)", () => {
+    search.value = new URLSearchParams("novo=1");
+    mount(skin, <ReferralsWorkspace workspace={workspace} />);
+    search.value = new URLSearchParams();
+    expect(screen.getByRole("button", { name: "Registrar indicação" })).toHaveAttribute("type", "submit");
   });
 
   it("links a lead by search + add", async () => {
