@@ -114,19 +114,23 @@ describe("resultado do plantão", () => {
     const metrics: PlantaoReportMetrics = {
       generated: { total: 0 },
       external: { total: 0, details: null },
-      internal: { total: 0, queues: [] },
+      internal: { total: 0, queues: [], facebook: 0, whatsapp: 0 },
       others: { total: 0, queues: [] },
       indications: { morning: 0, afternoon: 0 },
       quantity: { pme: 5.5, onlineMorning: 1.6, onlineAfternoon: 0, inPersonMorning: 0, inPersonAfternoon: 0 },
     };
     const text = buildPlantaoReportText(metrics, start);
-    expect(text).toContain("PME 6 · Online 2/0 · Presencial 0/0");
+    expect(text).toContain("🏢 PME: 6");
+    expect(text).toContain("💻 PREMIUM: manhã 2 · tarde 0");
+    expect(text).toContain("🧑‍💼 Presencial: manhã 0 · tarde 0");
     expect(text).not.toMatch(/\d,\d/);
   });
 
   it("usa zeros preenchidos e 0,0 quando não há ofertas aceitas", () => {
     const text = buildPlantaoReportText(calculatePlantaoMetrics([], [], DEFAULT_PLANTAO_REPORT_CONFIG), start);
     expect(text).toContain("*EXTERNO* · 0 leads");
-    expect(text).toContain("PME 0 · Online 0/0 · Presencial 0/0");
+    expect(text).toContain("🏢 PME: 0");
+    expect(text).toContain("💻 PREMIUM: manhã 0 · tarde 0");
+    expect(text).not.toContain("Online");
   });
 });

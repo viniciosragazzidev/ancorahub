@@ -97,13 +97,17 @@ describe("linhas por fila de entrada, iguais à tela de Qualidade", () => {
     expect(naoSoma.external.details).toBeNull();
   });
 
-  it("o texto traz o título com o período, o total, as filas e as outras filas", () => {
+  it("o texto segue o formato de 11/11: seções separadas, sem outras filas, Manhã/Tarde escritos e PREMIUM", () => {
     const m = calculatePlantaoMetrics(dia10(), [], DEFAULT_PLANTAO_REPORT_CONFIG);
     const text = buildPlantaoReportText(m, envio("2026-11-10"));
-    expect(text).toContain("*Resultado do plantão · 10/11 (09/11 19h → 10/11 19h)*");
-    expect(text).toContain("*Total gerado* · 246 leads");
-    expect(text).toContain("*EXTERNO* · 125 leads");
-    expect(text).toContain("*INTERNO* · 110 leads");
-    expect(text).toContain("*Outras filas* · 11 leads");
+    expect(text.startsWith("📊 *Resultado do Plantão* · 10/11\n\n*EXTERNO* · 125 leads")).toBe(true);
+    expect(text).toContain("\n\n*INTERNO* · 110 leads\n📘 Facebook: ");
+    expect(text).toContain("💬 WhatsApp Interno: ");
+    expect(text).toContain("\n\n*Indicações*\n🌅 Manhã: ");
+    expect(text).toContain("🌇 Tarde: ");
+    expect(text).toContain("\n\n*Média de leads por corretor*\n🏢 PME: ");
+    expect(text).toContain("💻 PREMIUM: manhã ");
+    expect(text).not.toMatch(/Outras filas|Total gerado|Venâncio|Alessandra|Online/i);
+    expect(m.internal.facebook + m.internal.whatsapp).toBe(110);
   });
 });

@@ -94,7 +94,7 @@ describe("Resultado do Plantão cabe na variável do aviso (máx. 512)", () => {
     const text = buildPlantaoReportText({
       generated: { total: 9999 },
       external: { total: 9999, details: { whatsapp: 9999, rd: 9999 } },
-      internal: { total: 9999, queues: [{ name: "Fila PF - Renan", count: 9999 }, { name: "Fila PME - Renan", count: 9999 }, { name: "Whatsapp Renan", count: 9999 }] },
+      internal: { total: 9999, queues: [{ name: "Fila PF - Renan", count: 9999 }, { name: "Fila PME - Renan", count: 9999 }, { name: "Whatsapp Renan", count: 9999 }], facebook: 9999, whatsapp: 9999 },
       others: { total: 9999, queues: [{ name: "Venâncio Leads", count: 9999 }, { name: "Alessandra Leads", count: 9999 }, { name: "Fila Extra Exemplo", count: 9999 }] },
       indications: { morning: 9999, afternoon: 9999 },
       quantity: { pme: 99.9, onlineMorning: 99.9, onlineAfternoon: 99.9, inPersonMorning: 99.9, inPersonAfternoon: 99.9 },

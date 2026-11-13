@@ -67,8 +67,8 @@ export type PlantaoReportMetrics = {
   generated: { total: number };
   /** EXTERNO = Fila Tatiana. `details` (WhatsApp e RD) só existe quando somam exatamente o total da fila. */
   external: { total: number; details: { whatsapp: number; rd: number } | null };
-  /** INTERNO = PF, PME e Whatsapp Renan, com o detalhe de cada fila. */
-  internal: { total: number; queues: PlantaoLine[] };
+  /** INTERNO = PF, PME e Whatsapp Renan. Facebook = PF + PME; WhatsApp = Whatsapp Renan. */
+  internal: { total: number; queues: PlantaoLine[]; facebook: number; whatsapp: number };
   /** Outras filas: Venâncio, Alessandra e qualquer fila fora das categorias. */
   others: { total: number; queues: PlantaoLine[] };
   indications: { morning: number; afternoon: number };
@@ -182,6 +182,7 @@ export function calculatePlantaoMetrics(rows: readonly PlantaoQueueRow[], offers
   const internalNames = [...config.queues.facebook, config.queues.whatsappInternal];
   const internalQueues = internalNames.map((name) => ({ name, count: sumFor(name) }));
   const internalTotal = internalQueues.reduce((total, line) => total + line.count, 0);
+  const internalWhatsapp = sumFor(config.queues.whatsappInternal);
 
   // OUTRAS FILAS: qualquer nome fora das categorias (inclui quem não tem fila).
   const categoryKeys = new Set([config.queues.tatiana, ...internalNames].map(normalizePlantaoLabel));
@@ -225,7 +226,7 @@ export function calculatePlantaoMetrics(rows: readonly PlantaoQueueRow[], offers
   return {
     generated: { total: generatedTotal },
     external: { total: externalTotal, details },
-    internal: { total: internalTotal, queues: internalQueues },
+    internal: { total: internalTotal, queues: internalQueues, facebook: internalTotal - internalWhatsapp, whatsapp: internalWhatsapp },
     others: { total: othersTotal, queues: others },
     indications,
     quantity,
@@ -297,35 +298,37 @@ export function plantaoReportLocalHour(now: Date) {
   return Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23" }).format(now));
 }
 
-/** Nome curto da fila no relatório: sem o prefixo "FILA " (o aviso tem limite de 512 caracteres). */
-function shortQueueName(name: string) {
-  return name.replace(/^fila\s+/i, "");
-}
-
+/**
+ * Texto do grupo, no formato aprovado em 11/11: uma seção por bloco, com linha em branco entre elas.
+ * "Outras filas" (Venâncio, Alessandra...) fica fora do texto: entra só na conferência do total.
+ * O plantão Premium aparece como PREMIUM (antes "Online").
+ */
 export function buildPlantaoReportText(metrics: PlantaoReportMetrics, now: Date) {
-  const reported = plantaoReportWindow(now).reportedDayKey;
+  const [, month, day] = plantaoReportWindow(now).reportedDayKey.split("-");
   const lines = [
-    `📊 *${plantaoReportTitle(reported)}*`,
+    `📊 *Resultado do Plantão* · ${day}/${month}`,
     "",
-    `*Total gerado* · ${whole(metrics.generated.total)} leads`,
     `*EXTERNO* · ${whole(metrics.external.total)} leads`,
   ];
   if (metrics.external.details) {
-    // Só as partes com leads: sem "RD 0" quando a fila é toda WhatsApp.
-    const parts = [
-      metrics.external.details.whatsapp > 0 ? `WhatsApp ${whole(metrics.external.details.whatsapp)}` : null,
-      metrics.external.details.rd > 0 ? `RD ${whole(metrics.external.details.rd)}` : null,
-    ].filter((part): part is string => part !== null);
-    if (parts.length) lines.push(parts.join(" · "));
+    lines.push(
+      `💬 WhatsApp Externo: ${whole(metrics.external.details.whatsapp)}`,
+      `📝 RD: ${whole(metrics.external.details.rd)}`,
+    );
   }
-  lines.push(`*INTERNO* · ${whole(metrics.internal.total)} leads`);
-  for (const queue of metrics.internal.queues) lines.push(`${shortQueueName(queue.name)}: ${whole(queue.count)}`);
-  lines.push(`*Outras filas* · ${whole(metrics.others.total)} leads`);
-  for (const queue of metrics.others.queues) lines.push(`${shortQueueName(queue.name)}: ${whole(queue.count)}`);
   lines.push(
     "",
-    `*Indicações* 🌅 ${whole(metrics.indications.morning)} · 🌇 ${whole(metrics.indications.afternoon)}`,
-    `*Média por corretor* PME ${averageRoundedUp(metrics.quantity.pme)} · Online ${averageRoundedUp(metrics.quantity.onlineMorning)}/${averageRoundedUp(metrics.quantity.onlineAfternoon)} · Presencial ${averageRoundedUp(metrics.quantity.inPersonMorning)}/${averageRoundedUp(metrics.quantity.inPersonAfternoon)}`,
+    `*INTERNO* · ${whole(metrics.internal.total)} leads`,
+    `📘 Facebook: ${whole(metrics.internal.facebook)}`,
+    `💬 WhatsApp Interno: ${whole(metrics.internal.whatsapp)}`,
+    "",
+    "*Indicações*",
+    `🌅 Manhã: ${whole(metrics.indications.morning)} · 🌇 Tarde: ${whole(metrics.indications.afternoon)}`,
+    "",
+    "*Média de leads por corretor*",
+    `🏢 PME: ${averageRoundedUp(metrics.quantity.pme)}`,
+    `💻 PREMIUM: manhã ${averageRoundedUp(metrics.quantity.onlineMorning)} · tarde ${averageRoundedUp(metrics.quantity.onlineAfternoon)}`,
+    `🧑‍💼 Presencial: manhã ${averageRoundedUp(metrics.quantity.inPersonMorning)} · tarde ${averageRoundedUp(metrics.quantity.inPersonAfternoon)}`,
   );
   return lines.join("\n");
 }
