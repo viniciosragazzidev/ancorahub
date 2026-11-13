@@ -64,6 +64,25 @@ export async function getAutoSaleChannelsAction(leadId: unknown) {
   return guarded(async () => wahaNumbersForLead(await managerContext(), id.parse(leadId)));
 }
 
+/**
+ * "Passar para a Venda Automatizada" em /conversas (13/11, pedido do Vinicios): o gestor aperta numa conversa em
+ * qualificação e a venda assume já, pela Meta oficial, em Autopiloto quando liberado (a abertura sai na hora),
+ * senão em Copiloto. Mesmas travas da escolha manual; nenhum corretor recebe o lead.
+ */
+export async function startAutoSaleFromConversationAction(leadId: unknown): Promise<Result<{ dealId: string; mode: AutoSaleMode }>> {
+  return guarded(async () => {
+    const context = await managerContext();
+    const flags = await readAutoSaleFlags(context.tenantId);
+    if (!flags.global) throw new AutoSaleError("A Venda Automatizada está pausada pela plataforma.");
+    const mode: AutoSaleMode = flags.autopilot ? "autopilot" : "copilot";
+    const { dealId } = await startDeal(context, { leadId: id.parse(leadId), channel: "meta", wahaNumberId: null, mode });
+    if (mode === "autopilot") await sendOpeningNow(dealId);
+    revalidatePath(PATH);
+    revalidatePath("/conversas");
+    return { dealId, mode };
+  });
+}
+
 export async function startAutoSaleDealAction(input: unknown) {
   return guarded(async () => {
     const parsed = z.object({ leadId: id, channel: z.enum(["meta", "waha"]), wahaNumberId: id.nullable().default(null), mode: z.enum(["simulation", "copilot", "autopilot"]) }).parse(input);

@@ -328,3 +328,7 @@ Limites conhecidos do piloto: WAHA não envia PDF nem imagem; Autopiloto não co
 - A Katia escreveu às 06:50 e a venda só falou às 08:00: a janela de envio (8h às 20h) segurava também a resposta a quem acabou de escrever. Agora responder a um cliente que escreveu nos últimos 30 min pode sair a qualquer hora (`canSpeakNow`); follow-up e mensagem fria continuam no horário. A negociação nasce com `lastCustomerMessageAt` da última mensagem do lead, então a abertura da captura também sai na hora.
 - Rajada de 75 s para 20 s, e o próprio servidor responde e envia quando a rajada termina (`scheduleQuickReply`, via `after`), sem esperar a rodada do robô. O robô agendado segue como rede de segurança; o turno é reivindicado pelo prazo, então ninguém responde duas vezes.
 - Abertura confirma o que o cliente já contou: "para 2 pessoas, pela sua empresa".
+
+## Adendo 13/11: "Passar para a Venda Automatizada" em /conversas
+
+- Em "Ações do Atendimento" de uma conversa com lead em qualificação ou quente e sem corretor, diretor e gestor veem "Passar para a Venda Automatizada". A venda assume pela Meta oficial, em Autopiloto quando liberado (a abertura sai na hora, inclusive fora do horário se o cliente escreveu há pouco), senão em Copiloto. Mesmas travas da escolha manual; a recusa agora diz o motivo (ex.: "já tem corretor").

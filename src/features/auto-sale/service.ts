@@ -13,7 +13,7 @@ import type { TenantContext } from "@/shared/auth/types";
 import { postgresErrorCode } from "@/shared/db/postgres-errors";
 
 import { MANAGER_CALL_REASONS, OPEN_DEAL_STATUSES, type AutoSaleChannel, type AutoSaleMode, type DealFacts, type ManagerCallReason, type Promotion } from "./contracts";
-import { autoSaleIneligibleReasons, ELIGIBLE_LEAD_STATUSES, IN_QUALIFICATION_STATUSES, type IneligibleReason } from "./eligibility";
+import { autoSaleIneligibleReasons, ELIGIBLE_LEAD_STATUSES, IN_QUALIFICATION_STATUSES, INELIGIBLE_LABEL, type IneligibleReason } from "./eligibility";
 import { factsFromQualification } from "./facts";
 import { readAutoSaleFlags } from "./flag";
 import { managerSummary } from "./manager-summary";
@@ -153,7 +153,7 @@ export async function startDeal(context: TenantContext, input: { leadId: string;
       if (!lead) throw new AutoSaleError("Lead não encontrado.");
       if (context.role === "manager" && context.branchId && lead.branchId !== context.branchId) throw new AutoSaleError("Lead de outra unidade.");
       const reasons = autoSaleIneligibleReasons(await eligibilityFacts(tx, context.tenantId, lead));
-      if (reasons.length) throw new AutoSaleError("Este lead não pode entrar no piloto agora. Atualize a lista.");
+      if (reasons.length) throw new AutoSaleError(`Este lead não pode entrar na Venda Automatizada agora: ${reasons.map((reason) => INELIGIBLE_LABEL[reason].toLocaleLowerCase("pt-BR")).join(", ")}.`);
       const [conversation] = await tx.select({ id: schema.aiConversations.id, automationState: schema.aiConversations.automationState, status: schema.aiConversations.status })
         .from(schema.aiConversations).where(and(eq(schema.aiConversations.tenantId, context.tenantId), eq(schema.aiConversations.leadId, lead.id)))
         .orderBy(desc(schema.aiConversations.startedAt)).limit(1);
