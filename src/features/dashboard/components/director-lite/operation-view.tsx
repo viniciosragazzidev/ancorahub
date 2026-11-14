@@ -125,38 +125,97 @@ export function OperationView({ data, canOpenConversations = true }: { data: Ess
         </dl>
       </section>
 
-      <LiteItem index={5}>
-        <section className={`${kit.panel} ${kit.raised} ${kit.goal}`} aria-labelledby="operation-rate-title">
-          <Ring percentage={share(totals.qualified, totals.arrived)} />
-          <div>
-            <h2 id="operation-rate-title" className={kit.goalName}>Taxa de qualificação</h2>
-            <p className={kit.goalProgress}>{empty ? `Nenhum lead entrou ${label}.` : `${n(totals.qualified)} de ${n(totals.arrived)} leads viraram quentes ou mornos.`}</p>
-            {empty ? null : <p className={kit.pace}>{plural(totals.hot, "quente", "quentes")} · {plural(totals.warm, "morno", "mornos")}</p>}
-          </div>
-        </section>
-      </LiteItem>
+      <div className={local.pair}>
+        <LiteItem index={5} className={local.pairItem}>
+          <section className={`${kit.panel} ${kit.raised} ${kit.goal} ${local.centered}`} aria-labelledby="operation-rate-title">
+            <Ring percentage={share(totals.qualified, totals.arrived)} />
+            <div>
+              <h2 id="operation-rate-title" className={kit.goalName}>Taxa de qualificação</h2>
+              <p className={kit.goalProgress}>{empty ? `Nenhum lead entrou ${label}.` : `${n(totals.qualified)} de ${n(totals.arrived)} leads viraram quentes ou mornos.`}</p>
+              {empty ? null : <p className={kit.pace}>{plural(totals.hot, "quente", "quentes")} · {plural(totals.warm, "morno", "mornos")}</p>}
+            </div>
+          </section>
+        </LiteItem>
+        <LiteItem index={6} className={local.pairItem}>
+          <section className={kit.panel} aria-labelledby="operation-duties-title">
+            <div className={kit.cardTop}>
+              <div>
+                <h2 id="operation-duties-title" className={kit.sectionTitle}>Plantões acontecendo agora</h2>
+                <p className={kit.note}>{duties.running.length ? `${plural(duties.running.length, "plantão ativo", "plantões ativos")} neste momento.` : "Nenhum plantão ativo neste momento."}</p>
+              </div>
+              <ContextualIllustration name="calendar" size="sm" fallback={<CalendarCheck size={20} className={kit.cardIcon} aria-hidden="true" />} />
+            </div>
+            {duties.running.length ? (
+              <ul className={kit.carrierList}>
+                {duties.running.map((duty) => (
+                  <li key={duty.scheduleId} className={local.stackedRow}>
+                    <Link href={`/leads/distribuicao/plantao/${duty.scheduleId}`} className={local.rowLink}>
+                      <span className={kit.carrierName}>{duty.name}</span>
+                      <span className={local.time}>{duty.startsAt} às {duty.endsAt}</span>
+                    </Link>
+                    <span className={local.detail}>
+                      {n(duty.available)} disponíveis · {n(duty.distributed)} distribuídos ·{" "}
+                      <span data-warn={duty.belowMinimum ? "true" : undefined} className={duty.belowMinimum ? local.warn : undefined}>{duty.activeBrokers}/{duty.brokerCount} corretores{duty.belowMinimum ? ", abaixo do mínimo" : ""}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className={local.stackedRow}>
+                {duties.next ? <p className={local.detail}>Próximo: {duties.next.name}, {duties.next.dutyDate.slice(8, 10)}/{duties.next.dutyDate.slice(5, 7)} às {duties.next.startsAt}.</p> : null}
+                <Link href="/leads/distribuicao?view=plantao" className={kit.link}>Ver plantões <ArrowRight aria-hidden="true" size={14} /></Link>
+              </div>
+            )}
+          </section>
+        </LiteItem>
+      </div>
 
-      <LiteItem index={6}>
-        <section className={kit.panel} aria-labelledby="operation-funnel-title">
-          <h2 id="operation-funnel-title" className={kit.sectionTitle}>Funil de qualificação</h2>
-          {empty ? (
-            <p className={kit.empty}>Quando um lead entrar, o funil aparece aqui.</p>
-          ) : (
-            <>
-              {stages.map((stage, index) => (
-                <div key={stage.key} className={kit.stage}>
-                  <span className={kit.stageLabel}>{stage.label}</span>
-                  <Bar widthPercent={Math.max(Math.round((stage.value / topStage) * 100), stage.value > 0 ? 4 : 0)} step={index} />
-                  <span className={kit.stageValue}><LiteNumber value={stage.value} /></span>
-                </div>
-              ))}
-              <p className={kit.note}>
-                {plural(totals.requalification.attempts, "tentativa", "tentativas")} de requalificação. {plural(totals.requalification.coldLeads, "frio", "frios")}: {n(totals.requalification.once)} com 1, {n(totals.requalification.twice)} com 2, {n(totals.requalification.threePlus)} com 3+.
-              </p>
-            </>
-          )}
-        </section>
-      </LiteItem>
+      <div className={local.pair}>
+        <LiteItem index={7} className={local.pairItem}>
+          <section className={kit.panel} aria-labelledby="operation-funnel-title">
+            <h2 id="operation-funnel-title" className={kit.sectionTitle}>Funil de qualificação</h2>
+            {empty ? (
+              <p className={kit.empty}>Quando um lead entrar, o funil aparece aqui.</p>
+            ) : (
+              <>
+                {stages.map((stage, index) => (
+                  <div key={stage.key} className={kit.stage}>
+                    <span className={kit.stageLabel}>{stage.label}</span>
+                    <Bar widthPercent={Math.max(Math.round((stage.value / topStage) * 100), stage.value > 0 ? 4 : 0)} step={index} />
+                    <span className={kit.stageValue}><LiteNumber value={stage.value} /></span>
+                  </div>
+                ))}
+                <p className={kit.note}>
+                  {plural(totals.requalification.attempts, "tentativa", "tentativas")} de requalificação. {plural(totals.requalification.coldLeads, "frio", "frios")}: {n(totals.requalification.once)} com 1, {n(totals.requalification.twice)} com 2, {n(totals.requalification.threePlus)} com 3+.
+                </p>
+              </>
+            )}
+          </section>
+        </LiteItem>
+        <LiteItem index={7} className={local.pairItem}>
+          <section className={kit.panel} aria-labelledby="operation-queues-title">
+            <div className={kit.cardTop}>
+              <h2 id="operation-queues-title" className={kit.sectionTitle}>Leads por fila</h2>
+              <ContextualIllustration name="connections" size="sm" />
+            </div>
+            {empty ? (
+              <p className={kit.empty}>Nenhum lead entrou {label}. Quando um lead entrar, ele aparece aqui, separado por fila.</p>
+            ) : (
+              <ul className={kit.carrierList}>
+                {rows.map((row, index) => (
+                  <li key={row.id ?? row.name} className={local.queueRow}>
+                    <span className={kit.carrier}>
+                      <span className={kit.carrierName}>{row.name}</span>
+                      <span className={kit.carrierValue}>{n(row.arrived)} entraram · {n(row.qualified)} qualificados · {n(row.cold)} frios</span>
+                    </span>
+                    <Bar widthPercent={Math.max(Math.round((row.arrived / topQueue) * 100), 4)} step={Math.min(index, 2)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </LiteItem>
+      </div>
 
       {insight ? (
         <LiteItem index={7}>
@@ -166,63 +225,6 @@ export function OperationView({ data, canOpenConversations = true }: { data: Ess
           </p>
         </LiteItem>
       ) : null}
-
-      <LiteItem index={7}>
-        <section className={kit.panel} aria-labelledby="operation-queues-title">
-          <div className={kit.cardTop}>
-            <h2 id="operation-queues-title" className={kit.sectionTitle}>Leads por fila</h2>
-            <ContextualIllustration name="connections" size="sm" />
-          </div>
-          {empty ? (
-            <p className={kit.empty}>Nenhum lead entrou {label}. Quando um lead entrar, ele aparece aqui, separado por fila.</p>
-          ) : (
-            <ul className={kit.carrierList}>
-              {rows.map((row, index) => (
-                <li key={row.id ?? row.name} className={local.queueRow}>
-                  <span className={kit.carrier}>
-                    <span className={kit.carrierName}>{row.name}</span>
-                    <span className={kit.carrierValue}>{n(row.arrived)} entraram · {n(row.qualified)} qualificados · {n(row.cold)} frios</span>
-                  </span>
-                  <Bar widthPercent={Math.max(Math.round((row.arrived / topQueue) * 100), 4)} step={Math.min(index, 2)} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </LiteItem>
-
-      <LiteItem index={7}>
-        <section className={kit.panel} aria-labelledby="operation-duties-title">
-          <div className={kit.cardTop}>
-            <div>
-              <h2 id="operation-duties-title" className={kit.sectionTitle}>Plantões acontecendo agora</h2>
-              <p className={kit.note}>{duties.running.length ? `${plural(duties.running.length, "plantão ativo", "plantões ativos")} neste momento.` : "Nenhum plantão ativo neste momento."}</p>
-            </div>
-            <ContextualIllustration name="calendar" size="sm" fallback={<CalendarCheck size={20} className={kit.cardIcon} aria-hidden="true" />} />
-          </div>
-          {duties.running.length ? (
-            <ul className={kit.carrierList}>
-              {duties.running.map((duty) => (
-                <li key={duty.scheduleId} className={local.stackedRow}>
-                  <Link href={`/leads/distribuicao/plantao/${duty.scheduleId}`} className={local.rowLink}>
-                    <span className={kit.carrierName}>{duty.name}</span>
-                    <span className={local.time}>{duty.startsAt} às {duty.endsAt}</span>
-                  </Link>
-                  <span className={local.detail}>
-                    {n(duty.available)} disponíveis · {n(duty.distributed)} distribuídos ·{" "}
-                    <span data-warn={duty.belowMinimum ? "true" : undefined} className={duty.belowMinimum ? local.warn : undefined}>{duty.activeBrokers}/{duty.brokerCount} corretores{duty.belowMinimum ? ", abaixo do mínimo" : ""}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className={local.stackedRow}>
-              {duties.next ? <p className={local.detail}>Próximo: {duties.next.name}, {duties.next.dutyDate.slice(8, 10)}/{duties.next.dutyDate.slice(5, 7)} às {duties.next.startsAt}.</p> : null}
-              <Link href="/leads/distribuicao?view=plantao" className={kit.link}>Ver plantões <ArrowRight aria-hidden="true" size={14} /></Link>
-            </div>
-          )}
-        </section>
-      </LiteItem>
 
       <LiteItem index={7}>
         <section className={kit.panel} aria-labelledby="operation-whatsapp-title">
