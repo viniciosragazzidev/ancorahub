@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -25,6 +25,7 @@ import {
 } from "@/features/customers/broker-wallet-filters";
 import type { BrokerWalletLeadsResult } from "@/features/customers/broker-wallet-leads";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
+import { WhatsappLogo } from "@/components/huge-icons";
 
 import { BrokerClientWalletList, originLabels } from "./broker-client-wallet";
 import { BrokerWalletAddContact, type BrokerWalletAddContactAction } from "./broker-wallet-add-contact";
@@ -139,7 +140,7 @@ function WalletFilters({ filters, origins }: { filters: BrokerWalletFilters; ori
   );
 }
 
-function WalletControls({ filters, counts, origins }: { filters: BrokerWalletFilters; counts: BrokerMyWalletCounts; origins: string[] }) {
+function WalletControls({ filters, counts, origins, addContact }: { filters: BrokerWalletFilters; counts: BrokerMyWalletCounts; origins: string[]; addContact?: ReactNode }) {
   const router = useRouter();
   const [query, setQuery] = useState(filters.query ?? "");
   const segments = (Object.keys(VIEW_LABELS) as BrokerWalletView[]).map((view) => ({
@@ -151,23 +152,23 @@ function WalletControls({ filters, counts, origins }: { filters: BrokerWalletFil
   return (
     <div className={walletStyles.controls}>
       <SegmentedControl
-        className={walletStyles.segments}
+        className={`${walletStyles.segments} ${styles.tabs}`}
         label="Visões da carteira"
         options={segments}
         value={filters.view}
         onValueChange={(value) => router.push(brokerWalletViewHref(filters, value as BrokerWalletView))}
       />
-      <div className={walletStyles.controlRow}>
-        <form action="/clientes" method="get" className={walletStyles.searchForm} role="search">
+      <div className={styles.toolbar}>
+        <form action="/clientes" method="get" className={styles.search} role="search">
           <input type="hidden" name="view" value={filters.view} />
           {filters.origin ? <input type="hidden" name="origin" value={filters.origin} /> : null}
           {filters.stage ? <input type="hidden" name="situacao" value={filters.stage} /> : null}
           {filters.contractStatus ? <input type="hidden" name="contract" value={filters.contractStatus} /> : null}
           {filters.returnStatus ? <input type="hidden" name="return" value={filters.returnStatus} /> : null}
-          <SearchField label="Buscar na carteira" name="q" value={query} onValueChange={setQuery} placeholder="Nome ou telefone" clearLabel="Limpar busca" />
-          <Button type="submit" variant="secondary" className={walletStyles.searchButton}>Buscar</Button>
+          <SearchField label="Buscar na carteira" name="q" value={query} onValueChange={setQuery} placeholder="Nome ou telefone" clearLabel="Limpar busca" enterKeyHint="search" />
         </form>
         <WalletFilters filters={filters} origins={origins} />
+        {addContact}
       </div>
     </div>
   );
@@ -189,7 +190,7 @@ function LeadRows({ leads }: { leads: BrokerWalletLeadsResult }) {
             preview={leadPreview(lead, leads.view)}
             meta={shortDate.format(new Date(lead.updatedAt))}
             faded={leads.view === "archived"}
-            action={whatsappUrl ? <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className={walletStyles.whatsapp} aria-label={`WhatsApp de ${lead.name}`}>WhatsApp</a> : undefined}
+            action={whatsappUrl ? <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className={styles.whatsappIcon} aria-label={`WhatsApp de ${lead.name}`} title="WhatsApp"><WhatsappLogo aria-hidden="true" /></a> : undefined}
           />
         );
       })}
@@ -251,10 +252,9 @@ export function BrokerMyWallet({
       title="Minha carteira"
       hideTitle
       subtitle={summary}
-      action={addContactAction ? <BrokerWalletAddContact action={addContactAction} priorAction={addPriorClientAction} /> : undefined}
       className={`${walletStyles.page} ${styles.page}`}
     >
-      <WalletControls key={brokerWalletHref(effectiveFilters)} filters={effectiveFilters} counts={counts} origins={origins} />
+      <WalletControls key={brokerWalletHref(effectiveFilters)} filters={effectiveFilters} counts={counts} origins={origins} addContact={addContactAction ? <BrokerWalletAddContact action={addContactAction} priorAction={addPriorClientAction} /> : undefined} />
 
       <div key={filters.view} className={styles.viewBody}>
         {hasRows ? (
