@@ -1079,7 +1079,9 @@ async function guardNoticeRow(row: OutboundRow, channel: "company_number" | "met
       await sleep(Math.max(waitMs, 0));
       continue;
     }
-    await db.update(schema.whatsappOutboundMessages).set({ status: "queued", attempts: row.attempts, nextAttemptAt: verdict.until, holdReason: verdict.reason, updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+    // Fim de semana: scheduledAt = segunda 08:00, para a limpeza de pendentes antigos (24 h) não cancelar o aviso guardado.
+    const weekendHold = verdict.reason === "weekend" ? { scheduledAt: verdict.until } : {};
+    await db.update(schema.whatsappOutboundMessages).set({ status: "queued", attempts: row.attempts, nextAttemptAt: verdict.until, holdReason: verdict.reason, ...weekendHold, updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
     return "held";
   }
   return "go";
