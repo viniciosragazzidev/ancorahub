@@ -1,5 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { RouteLoadingBar } from "@/components/route-loading";
+import { MascotSlot } from "@/components/mascot/mascot-slot";
 
 /**
  * The Lite page frame while the server renders (Fase 1 de performance, 24/10): a route with
@@ -11,6 +12,8 @@ export function LitePageLoading({ label = "Carregando" }: { label?: string }) {
     <>
     <RouteLoadingBar />
     <main className="arc-venancor lite-page flex min-h-full flex-col gap-5 bg-(--surface) text-(--foreground)" aria-label={label} aria-busy="true">
+      {/* Vaga do mascote (mascot-placements.ts, "loading"): desligada, não desenha nada. */}
+      <MascotSlot placement="loading" className="mx-auto" />
       <div className="grid gap-2">
         <Skeleton className="h-7 w-48 rounded-full" />
         <Skeleton className="h-4 w-72 max-w-full rounded-full" />

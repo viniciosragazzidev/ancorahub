@@ -3,7 +3,8 @@
 import { useState } from "react";
 
 import { LiteActionButton } from "@/components/lite/controls";
-import { Mascot, MASCOT_STATES, type MascotState } from "@/components/mascot";
+import { Mascot, MASCOT_PLACEMENTS, MASCOT_STATES, setMascotPreviewAll, useMascotPreviewAll, type MascotState } from "@/components/mascot";
+import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { SPLASH_KEY } from "@/components/splash-screen";
 import { A11yPrefsProvider } from "@/features/assist/a11y-prefs";
 import { AccessibilityPreferences } from "@/features/assist/components/accessibility-preferences";
@@ -19,6 +20,7 @@ export function MascotePreview() {
   const [play, setPlay] = useState(0);
   const [fail, setFail] = useState(false);
   const [round, setRound] = useState(0);
+  const previewAll = useMascotPreviewAll();
 
   function show(next: MascotState) {
     setState(next);
@@ -84,6 +86,21 @@ export function MascotePreview() {
             <button type="button" className="min-h-11 self-start text-sm underline" onClick={() => { show("idle"); setRound((n) => n + 1); }}>
               Recomeçar a demonstração
             </button>
+          </section>
+
+          <section className="flex flex-col gap-3" aria-label="Vagas do mascote">
+            <h2 className="text-base font-medium">Vagas do mascote</h2>
+            <p className="text-sm text-[var(--text-secondary)]">Cada área já tem a vaga; só aparece quando ligada em mascot-placements.ts. Este interruptor mostra todas neste aparelho, só em desenvolvimento.</p>
+            <label className="flex min-h-11 items-center gap-2 text-sm">
+              <input type="checkbox" checked={previewAll} onChange={(event) => setMascotPreviewAll(event.target.checked)} />
+              Mostrar todas as vagas
+            </label>
+            <ul className="grid gap-1 text-sm">
+              {Object.entries(MASCOT_PLACEMENTS).map(([name, config]) => (
+                <li key={name}><strong className="font-medium">{name}</strong> · {config.enabled ? "ligada" : "desligada"} · {config.where}</li>
+              ))}
+            </ul>
+            <EmptyState title="Nenhum lead esperando" description="Que tal revisar os retornos de hoje?" />
           </section>
 
           <section className="flex flex-col gap-3" aria-label="Splash">
