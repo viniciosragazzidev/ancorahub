@@ -17,6 +17,18 @@ export const SPLASH_EXIT_MS = 240;
 type Phase = "showing" | "leaving" | "gone";
 
 /**
+ * Instante (performance.now) em que a splash foi pintada: a primeira pintura com conteúdo, que é a própria
+ * splash do HTML do servidor. Sem essa medida (navegador antigo), conta a partir de agora.
+ */
+function splashShownAt() {
+  try {
+    const paint = performance.getEntriesByName?.("first-contentful-paint")[0] ?? performance.getEntriesByName?.("first-paint")[0];
+    if (paint && paint.startTime > 0) return paint.startTime;
+  } catch { /* sem Paint Timing */ }
+  return performance.now();
+}
+
+/**
  * Splash do PWA com o capitão pirata e a marca ÂNCORA (arte original em design/mascote/splash/).
  * - Fundo #002B73 (o azul da arte) com o capitão e a marca, já no HTML do servidor (aparece antes do
  *   JavaScript, emendando com a tela do PWA instalado, que usa o mesmo azul em background_color).
@@ -58,10 +70,15 @@ export function SplashScreen() {
       // Espera a animação do capitão acabar (ela começa na primeira pintura, antes do JavaScript).
       let left = false;
       const once = () => { if (!left) { left = true; leave(); } };
+      // Os prazos contam de quando a splash apareceu, não do início da navegação: no PWA o servidor pode levar
+      // segundos para responder (a tela do sistema cobre essa espera) e, contando da navegação, a splash
+      // sumia logo depois de aparecer.
+      const shownAt = splashShownAt();
+      const elapsed = Math.max(0, performance.now() - shownAt);
       const animation = hero.current?.getAnimations?.()[0];
       if (animation) void animation.finished.then(once, once);
-      else timers.push(window.setTimeout(once, Math.max(0, SPLASH_ANIMATION_MS - performance.now())));
-      timers.push(window.setTimeout(once, Math.max(0, SPLASH_MAX_MS - performance.now())));
+      else timers.push(window.setTimeout(once, Math.max(0, SPLASH_ANIMATION_MS - elapsed)));
+      timers.push(window.setTimeout(once, Math.max(0, SPLASH_MAX_MS - elapsed)));
     }
     return () => {
       cancelAnimationFrame(frame);
