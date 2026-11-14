@@ -433,7 +433,7 @@ export function RegisterSaleWizard({
               <Button type="button" variant="outline" className="min-h-11" disabled={pending || stepIndex === 0} onClick={() => setStepIndex((current) => Math.max(0, current - 1))}>Voltar</Button>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" className="min-h-11" disabled={pending} onClick={() => handleOpenChange(false)}>Fechar</Button>
-                {stepIndex < STEPS.length - 1 ? <Button type="button" className="min-h-11" onClick={goNext}>Continuar</Button> : <Button type="button" className="min-h-11" disabled={previewMode || pending || !canConfirm} onClick={confirmSale}>{pending ? "Registrando…" : "Confirmar registro da venda"}</Button>}
+                {stepIndex < STEPS.length - 1 ? <Button type="button" className="min-h-11" onClick={goNext}>Continuar</Button> : <Button type="button" className="ct-anticipate min-h-11" disabled={previewMode || pending || !canConfirm} onClick={confirmSale}>{pending ? "Registrando…" : "Confirmar registro da venda"}</Button>}
               </div>
             </footer>
           </DialogPanel>
