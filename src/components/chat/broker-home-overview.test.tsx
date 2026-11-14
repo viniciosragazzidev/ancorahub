@@ -80,6 +80,24 @@ describe("Home operacional do corretor", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ferramentas" }));
     expect(shell.openMore).toHaveBeenCalledOnce();
   });
+  it("foco: só o próximo passo é primário; aceites da lista ficam secundários", async () => {
+    show({
+      ...summary,
+      now: {
+        title: "Agora",
+        emptyText: "",
+        items: [
+          summary.now!.items[0]!,
+          { ...summary.now!.items[0]!, id: "three", title: "Segunda oferta", acceptLeadId: "three", actionLabel: "Aceitar segunda" },
+        ],
+      },
+    });
+    const main = await screen.findByRole("button", { name: "Aceitar e chamar" });
+    const listed = await screen.findByRole("button", { name: "Aceitar segunda" });
+    expect(main.className).not.toMatch(/secondaryAction/);
+    expect(listed.className).toMatch(/secondaryAction/);
+    expect(screen.getByRole("button", { name: "Ferramentas" }).className).toMatch(/ghost/);
+  });
   it("não oferece aceite para oferta expirada", async () => {
     show({
       ...summary,

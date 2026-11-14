@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 
+import { LitePress } from "@/components/lite/motion";
+
 import { groupByArrivalDay } from "@/features/broker-workspace/arrival";
 
 import { AssistantAvatar } from "./assistant-avatar";
@@ -43,31 +45,33 @@ export function ThreadRow({ thread, now, index = 0, active = false, timeOnly = f
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1], delay: reduce ? 0 : Math.min(index, 8) * 0.035 }}
     >
-      <Link href={thread.href} className={`${styles.thread} ${active ? styles.threadActive : ""}`} aria-current={active ? "page" : undefined} data-attention={thread.attention ? "true" : undefined} data-tour={thread.assistant ? `thread-${thread.assistant}` : undefined} aria-label={`${thread.name}: ${thread.preview}${thread.waitingYou ? " (esperando você)" : ""}`}>
-        <AssistantAvatar shape={thread.shape} hue={thread.hue} initials={thread.initials} temperature={thread.temperature} />
-        <span className={styles.threadMain}>
-          <span className={styles.threadTop}>
-            <span className={styles.threadName}>{thread.name}</span>
-            {thread.verified ? <VerifiedBadge /> : null}
+      <LitePress kind="row">
+        <Link href={thread.href} className={`${styles.thread} ${active ? styles.threadActive : ""}`} aria-current={active ? "page" : undefined} data-attention={thread.attention ? "true" : undefined} data-tour={thread.assistant ? `thread-${thread.assistant}` : undefined} aria-label={`${thread.name}: ${thread.preview}${thread.waitingYou ? " (esperando você)" : ""}`}>
+          <AssistantAvatar shape={thread.shape} hue={thread.hue} initials={thread.initials} temperature={thread.temperature} />
+          <span className={styles.threadMain}>
+            <span className={styles.threadTop}>
+              <span className={styles.threadName}>{thread.name}</span>
+              {thread.verified ? <VerifiedBadge /> : null}
+            </span>
+            <span className={`${styles.threadPreview} ${thread.waitingYou ? styles.threadPreviewWaiting : ""}`}>{thread.preview}</span>
           </span>
-          <span className={`${styles.threadPreview} ${thread.waitingYou ? styles.threadPreviewWaiting : ""}`}>{thread.preview}</span>
-        </span>
-        <span className={styles.threadMeta}>
-          <span className={styles.threadTime}>
-            {thread.pinned ? <svg viewBox="0 0 16 16" width="12" height="12" aria-label="Fixado" role="img" style={{ verticalAlign: "-1px", marginRight: 4 }}><path d="M9.6 2.2 13.8 6.4l-1.4.4-2.3 2.3.3 3-1.1 1.1-2.8-2.8L3 14l-.9-.9 3.5-3.5-2.8-2.8L3.9 5.7l3 .3 2.3-2.3.4-1.4Z" fill="currentColor" /></svg> : null}
-            {timeOnly ? clockTime(thread.at) : threadTime(thread.at, now)}
+          <span className={styles.threadMeta}>
+            <span className={styles.threadTime}>
+              {thread.pinned ? <svg viewBox="0 0 16 16" width="12" height="12" aria-label="Fixado" role="img" style={{ verticalAlign: "-1px", marginRight: 4 }}><path d="M9.6 2.2 13.8 6.4l-1.4.4-2.3 2.3.3 3-1.1 1.1-2.8-2.8L3 14l-.9-.9 3.5-3.5-2.8-2.8L3.9 5.7l3 .3 2.3-2.3.4-1.4Z" fill="currentColor" /></svg> : null}
+              {timeOnly ? clockTime(thread.at) : threadTime(thread.at, now)}
+            </span>
+            {thread.unread || thread.waitingYou ? (
+              <motion.span
+                className={styles.unreadDot}
+                aria-hidden="true"
+                initial={reduce ? false : { scale: 0.4 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", visualDuration: 0.26, bounce: 0.3 }}
+              />
+            ) : <span style={{ height: 8 }} aria-hidden="true" />}
           </span>
-          {thread.unread || thread.waitingYou ? (
-            <motion.span
-              className={styles.unreadDot}
-              aria-hidden="true"
-              initial={reduce ? false : { scale: 0.4 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", visualDuration: 0.26, bounce: 0.3 }}
-            />
-          ) : <span style={{ height: 8 }} aria-hidden="true" />}
-        </span>
-      </Link>
+        </Link>
+      </LitePress>
     </motion.li>
   );
 }
