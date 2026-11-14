@@ -27,6 +27,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogClose, DialogDescription, DialogPanel, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { registerSaleAction } from "@/features/post-sale/actions";
 import { cn } from "@/lib/utils";
+import { dataIso, formatarData, lerData } from "@/shared/input/data";
+import { useCampoMascarado } from "@/shared/input/use-campo-mascarado";
 
 type CarrierOption = { id: string; name: string };
 type ConfirmationDocument = { id: string; filename: string; status: string };
@@ -75,6 +77,22 @@ function addMonths(dateStr: string, months: number): string {
   } catch {
     return "";
   }
+}
+
+/**
+ * ISO "aaaa-mm-dd" só quando a data digitada está completa (dd/mm/aaaa) e existe; senão "". Ano de 2 dígitos
+ * ("1/2/26") só vale ao sair do campo, para não virar 2020 no meio da digitação de "2026".
+ */
+export function isoDaDataCompleta(texto: string): string {
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(texto.trim())) return "";
+  return dataIso(texto) ?? "";
+}
+
+/** Aviso só para data completa que não existe (ex.: 31/02/2026). */
+function avisoDaData(texto: string): string | null {
+  if (texto.replace(/\D/g, "").length < 8) return null;
+  const lida = lerData(texto);
+  return lida.ok ? null : lida.mensagem;
 }
 
 function formatDate(dateStr: string): string {
@@ -201,6 +219,10 @@ export function RegisterSalePanel({
   const [coverageStartDate, setCoverageStartDate] = useState("");
   const [contractTermMonths, setContractTermMonths] = useState<number>(12);
   const [customExpirationDate, setCustomExpirationDate] = useState("");
+  // Datas digitadas com máscara dd/mm/aaaa; o estado enviado continua ISO "aaaa-mm-dd" (ou vazio), como no
+  // campo nativo de antes. `expirationText` null = campo intocado, mostra o vencimento calculado.
+  const [coverageStartText, setCoverageStartText] = useState("");
+  const [expirationText, setExpirationText] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("boleto");
   const [renewalType, setRenewalType] = useState<RenewalType>("reajuste_operadora");
   const [renewalContactPreference, setRenewalContactPreference] = useState("whatsapp");
@@ -219,6 +241,40 @@ export function RegisterSalePanel({
     if (customExpirationDate) return customExpirationDate;
     return addMonths(coverageStartDate, contractTermMonths);
   }, [coverageStartDate, contractTermMonths, customExpirationDate]);
+
+  const coverageStartField = useCampoMascarado("data", coverageStartText, (texto) => {
+    setCoverageStartText(texto);
+    setCoverageStartDate(isoDaDataCompleta(texto));
+  });
+  const expirationField = useCampoMascarado("data", expirationText ?? formatarData(computedExpirationDate), (texto) => {
+    setExpirationText(texto);
+    setCustomExpirationDate(isoDaDataCompleta(texto));
+  });
+  const coverageStartWarning = avisoDaData(coverageStartText);
+  const expirationWarning = expirationText === null ? null : avisoDaData(expirationText);
+
+  function settleCoverageStart() {
+    // Ao sair do campo, "1/2/26" vira "01/02/2026" e passa a valer.
+    const lida = lerData(coverageStartText);
+    if (!lida.ok) return;
+    setCoverageStartText(lida.exibicao);
+    setCoverageStartDate(lida.iso);
+  }
+
+  function settleExpiration() {
+    if (expirationText === null) return;
+    const lida = lerData(expirationText);
+    if (lida.ok) {
+      setExpirationText(lida.exibicao);
+      setCustomExpirationDate(lida.iso);
+      return;
+    }
+    // Vazio ou incompleto: volta a mostrar o calculado, que é o que já seria enviado.
+    if (!expirationText.trim() || expirationText.replace(/\D/g, "").length < 8) {
+      setExpirationText(null);
+      setCustomExpirationDate("");
+    }
+  }
 
   const missingFields = [
     !approvedValue && "valor",
@@ -424,13 +480,30 @@ export function RegisterSalePanel({
                   </Label>
                   <Input
                     id="coverage-start-date"
-                    type="date"
+                    type="text"
+                    format="none"
                     autoFocus
-                    value={coverageStartDate}
-                    onChange={(event) => setCoverageStartDate(event.target.value)}
-                    className="h-9 text-sm"
+                    autoComplete="off"
+                    placeholder="dd/mm/aaaa"
+                    {...coverageStartField}
+                    onBlur={settleCoverageStart}
+                    aria-invalid={coverageStartWarning ? true : undefined}
+                    aria-describedby={coverageStartWarning ? "coverage-start-date-aviso" : undefined}
+                    className="h-9 text-sm tabular-nums"
                   />
-                  <Button type="button" variant="outline" size="sm" className="w-full" onClick={close}>
+                  {coverageStartWarning ? (
+                    <p id="coverage-start-date-aviso" className="text-xs text-destructive">{coverageStartWarning}</p>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => {
+                      settleCoverageStart();
+                      close();
+                    }}
+                  >
                     Pronto
                   </Button>
                 </div>
@@ -481,11 +554,19 @@ export function RegisterSalePanel({
                 </Label>
                 <Input
                   id="expiration-date"
-                  type="date"
-                  value={computedExpirationDate}
-                  onChange={(event) => setCustomExpirationDate(event.target.value)}
+                  type="text"
+                  format="none"
+                  autoComplete="off"
+                  placeholder="dd/mm/aaaa"
+                  {...expirationField}
+                  onBlur={settleExpiration}
+                  aria-invalid={expirationWarning ? true : undefined}
+                  aria-describedby={expirationWarning ? "expiration-date-aviso" : undefined}
                   className="h-9 text-xs font-mono"
                 />
+                {expirationWarning ? (
+                  <p id="expiration-date-aviso" className="text-xs text-destructive">{expirationWarning}</p>
+                ) : null}
               </div>
 
               <div className="space-y-1.5">
