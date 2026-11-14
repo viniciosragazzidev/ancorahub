@@ -86,7 +86,6 @@ export const NAV_AREAS: readonly NavArea[] = [
     tabs: [
       { id: "hoje", label: "Resumo", href: "/distribuicao", permission: "acessar_qualificacao_ia", roles: ["director", "manager"], paths: ["/distribuicao", "/leads/distribuicao"], cargoCapability: "lead_queues_view" },
       { id: "regras", label: "Entradas e regras", href: "/distribuicao?view=roteamento", alsoAt: ["/leads/distribuicao"], permission: "acessar_qualificacao_ia", roles: ["director", "manager"], cargoCapability: "distribution_settings_manage" },
-      { id: "operacao", label: "Operação", href: "/distribuicao?view=operar", alsoAt: ["/leads/distribuicao"], permission: "acessar_qualificacao_ia", roles: ["director", "manager"], cargoCapability: "leads_assign" },
       { id: "filas", label: "Filas", href: "/distribuicao?view=filas", alsoAt: ["/leads/distribuicao"], permission: "acessar_qualificacao_ia", roles: ["director"], cargoCapability: "lead_queues_view" },
       { id: "plantoes", label: "Plantões", href: "/distribuicao?view=plantao", alsoAt: ["/leads/distribuicao"], permission: "acessar_qualificacao_ia", roles: ["director", "manager"], paths: ["/leads/distribuicao/plantao"], cargoCapability: "duty_schedules_manage" },
       { id: "saude", label: "Saúde", href: "/distribuicao?view=saude_historico", alsoAt: ["/leads/distribuicao"], permission: "acessar_qualificacao_ia", roles: ["director", "manager"], aliases: { view: ["saude", "historico"] }, cargoCapability: "distribution_audit_view" },

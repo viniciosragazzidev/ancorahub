@@ -11,7 +11,6 @@ describe("abas antigas da distribuição", () => {
         roteamentoContent={<p>Regras</p>}
         resumoDiaContent={<p>Resumo</p>}
         filasContent={<p>Filas</p>}
-        operarContent={<p>Operação</p>}
         plantaoContent={<p>Plantões</p>}
         saudeHistoricoContent={<p>Saúde</p>}
         showQueueDefinition

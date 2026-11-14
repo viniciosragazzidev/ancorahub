@@ -21,7 +21,7 @@ describe("abas da Distribuição com cargo (F2)", () => {
 
   it("Plantões (diretor + cargo) vê Filas e Plantões, sem Entradas e regras", () => {
     const views = visibleDistributionViews("director", plantoes.capabilities);
-    expect(views).toEqual(["resumo_dia", "filas", "operar", "plantao", "saude_historico"]);
+    expect(views).toEqual(["resumo_dia", "filas", "plantao", "saude_historico"]);
     expect(resolveDistributionView("director", "roteamento", plantoes.capabilities)).toBe("resumo_dia");
     expect(resolveDistributionView("director", "filas", plantoes.capabilities)).toBe("filas");
   });

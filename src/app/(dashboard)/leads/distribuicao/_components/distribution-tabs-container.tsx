@@ -11,7 +11,6 @@ export function DistributionTabsContainer({
   roteamentoContent,
   resumoDiaContent,
   filasContent,
-  operarContent,
   plantaoContent,
   saudeHistoricoContent,
   showQueueDefinition = false,
@@ -20,7 +19,6 @@ export function DistributionTabsContainer({
   roteamentoContent: React.ReactNode;
   resumoDiaContent: React.ReactNode;
   filasContent: React.ReactNode;
-  operarContent: React.ReactNode;
   plantaoContent: React.ReactNode;
   saudeHistoricoContent: React.ReactNode;
   showQueueDefinition?: boolean;
@@ -29,7 +27,7 @@ export function DistributionTabsContainer({
   const searchParams = useSearchParams();
   const requested = searchParams?.get("view") ?? null;
   const normalized = requested ? VIEW_ALIASES[requested] ?? requested : null;
-  const views = ["resumo_dia", "roteamento", "operar", ...(showQueueDefinition ? ["filas"] : []), "plantao", "saude_historico"];
+  const views = ["resumo_dia", "roteamento", ...(showQueueDefinition ? ["filas"] : []), "plantao", "saude_historico"];
   const activeTab = normalized && views.includes(normalized) ? normalized : initialView;
 
   return (
@@ -50,9 +48,6 @@ export function DistributionTabsContainer({
           {filasContent}
         </TabsContent>
       ) : null}
-      <TabsContent value="operar" className="space-y-5">
-        {operarContent}
-      </TabsContent>
       <TabsContent value="plantao" className="space-y-5">
         {plantaoContent}
       </TabsContent>

@@ -48,7 +48,7 @@ describe("leads frios", () => {
   it("zero vira frase e gravidade ok", () => {
     const status = buildColdLeadsStatus({ rows: [], now: NOW, scope: { role: "manager" }, automaticEnabled: true, turboCovers: false });
     expect(status).toMatchObject({ value: 0, severity: "ok", emptyText: "Nenhum lead frio agora" });
-    expect(status.action?.href).toBe("/leads/distribuicao?view=operar");
+    expect(status.action?.href).toBe("/distribuicao?atribuir=1");
   });
 
   it("mostra 500+ quando a consulta limitada atinge o teto", () => {

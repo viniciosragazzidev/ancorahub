@@ -2,7 +2,6 @@ export const distributionViewValues = [
   "resumo_dia",
   "roteamento",
   "filas",
-  "operar",
   "plantao",
   "saude_historico",
 ] as const;
@@ -14,7 +13,6 @@ export const DISTRIBUTION_VIEW_CAPABILITY: Record<DistributionView, string> = {
   resumo_dia: "lead_queues_view",
   roteamento: "distribution_settings_manage",
   filas: "lead_queues_view",
-  operar: "leads_assign",
   plantao: "duty_schedules_manage",
   saude_historico: "distribution_audit_view",
 };
@@ -33,6 +31,8 @@ export function resolveDistributionView(role: string, requestedView?: string, ca
     resumo: "resumo_dia",
     saude: "saude_historico",
     historico: "saude_historico",
+    // A aba Operação saiu (14/11/2026): a atribuição manual mora no Resumo.
+    operar: "resumo_dia",
   };
   const normalized = requestedView ? aliases[requestedView] ?? requestedView : "resumo_dia";
   const allowed = visibleDistributionViews(role, cargoCapabilities);
