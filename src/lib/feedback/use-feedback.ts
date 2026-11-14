@@ -68,7 +68,9 @@ function play(plan: FeedbackPlan) {
     const { recipe, volume } = feedbackTokens.sound[plan.sound];
     try { playSound(RECIPES[recipe], { volume }); } catch { /* o navegador pode exigir um toque antes */ }
   }
-  if (plan.haptic && typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+  // O Chrome só deixa vibrar depois do primeiro toque na página; antes disso, nem tenta (evita erro no console).
+  const activated = typeof navigator !== "undefined" && (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation?.hasBeenActive !== false;
+  if (plan.haptic && activated && typeof navigator.vibrate === "function") {
     try { navigator.vibrate([...plan.haptic]); } catch { /* sem vibração neste aparelho */ }
   }
 }
