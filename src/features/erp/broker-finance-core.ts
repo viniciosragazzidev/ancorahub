@@ -73,8 +73,39 @@ export type BrokerCommissionRow = {
 
 export type BrokerPayoutRow = { id: string; competence: string; occurredOn: string | null; netCents: number; receiptNumber: string | null; receiptHref: string | null };
 
+export type BrokerFinanceMonthPoint = { period: string; label: string; cents: number };
+
+/** Gráficos e indicadores do Meu financeiro: somas do que já existe (liquidações confirmadas e cronograma), sem fórmula nova. */
+export type BrokerFinanceInsights = {
+  /** Comissões recebidas (liquidação confirmada) nos últimos 6 meses, do mais antigo ao atual. */
+  received: BrokerFinanceMonthPoint[];
+  /** Parcelas ainda pendentes no cronograma das suas vendas, do mês atual aos próximos 5. */
+  forecast: BrokerFinanceMonthPoint[];
+  receivedTotalCents: number;
+  forecastTotalCents: number;
+  salesWithCommission: number;
+  nextInstallment: { referenceMonth: string; amountCents: number; clientName: string } | null;
+};
+
+/** "2026-11" deslocado em meses ("2026-09" com -2). */
+export function shiftPeriod(period: string, delta: number) {
+  const [year, month] = period.split("-").map(Number);
+  const index = year * 12 + (month - 1) + delta;
+  return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, "0")}`;
+}
+
+/** Série de meses com zero onde não houve valor, rotulada pelo mês abreviado ("nov"). */
+export function monthSeries(first: string, count: number, values: ReadonlyMap<string, number>): BrokerFinanceMonthPoint[] {
+  return Array.from({ length: count }, (_, index) => {
+    const period = shiftPeriod(first, index);
+    return { period, label: (formatCompetence(period).split(" ")[0] ?? period).replace(".", ""), cents: values.get(period) ?? 0 };
+  });
+}
+
 export type BrokerFinanceDetail = {
   summary: BrokerFinanceSummary;
+  /** null quando os gráficos não carregaram: o resto da tela continua. */
+  insights: BrokerFinanceInsights | null;
   commissions: { rows: BrokerCommissionRow[]; page: number; pageSize: number; hasNext: boolean };
   payouts: BrokerPayoutRow[];
   receiptsHref: string | null;
