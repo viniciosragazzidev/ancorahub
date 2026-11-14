@@ -77,6 +77,19 @@ describe("AcceptLeadButton com o aceite com contador", () => {
     expect(mocks.remember).not.toHaveBeenCalled();
   });
 
+  it("celular: se o aceite falhar no servidor (lead já foi de outro), não vai para o WhatsApp nem sai da tela", async () => {
+    device.current = "mobile";
+    mocks.accept.mockResolvedValue({ success: false, error: "Outro corretor já aceitou." });
+    render(<AcceptLeadButton leadId="l1">Aceitar lead</AcceptLeadButton>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Aceitar lead" }));
+    await waitFor(() => expect(mocks.error).toHaveBeenCalled());
+    expect(mocks.go).not.toHaveBeenCalled();
+    expect(mocks.leave).not.toHaveBeenCalled();
+    expect(mocks.report).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
   it("sem WhatsApp no cadastro, avisa como antes", async () => {
     mocks.accept.mockResolvedValue({ success: true });
     render(<AcceptLeadButton leadId="l1">Aceitar</AcceptLeadButton>);
