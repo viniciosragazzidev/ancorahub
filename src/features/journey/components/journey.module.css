@@ -148,3 +148,45 @@
   .hero { padding: 24px; gap: 24px; }
 }
 .anchor { scroll-margin-top: 72px; }
+
+/*
+ * Banner da jornada: card no azul da marca do capitão (#002B73, o mesmo da splash e do ícone), título em branco,
+ * selo no amarelo do chapéu e um botão branco largo. O capitão sai pelo topo do card, como no Duolingo.
+ */
+.banner {
+  --banner-blue: #002b73;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  grid-template-areas: "text art" "action action";
+  gap: 16px 8px;
+  margin-top: 20px;
+  padding: 20px 20px 16px;
+  border-radius: var(--radius-panel);
+  background: radial-gradient(120% 120% at 100% 0%, oklch(42% 0.14 262) 0%, transparent 60%), var(--banner-blue);
+  color: white;
+}
+.bannerText { grid-area: text; display: grid; align-content: start; gap: 10px; min-width: 0; }
+.bannerTitle { margin: 0; font-size: var(--text-lg); font-weight: 500; line-height: 1.3; letter-spacing: -0.01em; }
+.bannerBadge { display: inline-flex; align-items: center; gap: 6px; justify-self: start; color: oklch(86% 0.15 88); font-size: var(--text-sm); font-weight: 500; font-variant-numeric: tabular-nums; }
+.bannerArt { grid-area: art; align-self: end; width: 148px; height: auto; margin: -56px -12px -8px -8px; pointer-events: none; user-select: none; }
+.bannerAction {
+  grid-area: action;
+  display: grid; place-items: center;
+  min-height: 48px;
+  border-radius: var(--radius-control);
+  background: white;
+  color: var(--banner-blue);
+  font-size: var(--text-sm); font-weight: 500;
+  text-decoration: none;
+  box-shadow: 0 3px 0 oklch(80% 0.03 262);
+  transition: transform var(--motion-duration-fast, 120ms) ease, box-shadow var(--motion-duration-fast, 120ms) ease;
+}
+.bannerAction:active { transform: translateY(2px); box-shadow: 0 1px 0 oklch(80% 0.03 262); }
+.bannerAction:focus-visible { outline: 2px solid white; outline-offset: 3px; }
+@media (min-width: 640px) {
+  .banner { grid-template-columns: minmax(0, 1fr) 180px; }
+  .bannerArt { width: 200px; margin-top: -72px; }
+  .bannerAction { justify-self: start; min-width: 220px; padding: 0 24px; }
+}
+@media (prefers-reduced-motion: reduce) { .bannerAction { transition: none; } }

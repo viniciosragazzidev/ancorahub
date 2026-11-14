@@ -62,7 +62,11 @@ export function JourneyScreen({ data }: { data: JourneyScreenData }) {
           <JourneyHero data={data} />
         </motion.div>
 
-        <motion.section className={styles.section} data-tour="micro-journey-missions" aria-labelledby="journey-missions" initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(2)}>
+        <motion.div initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(2)}>
+          <JourneyBanner data={data} pending={daily.filter((mission) => !mission.progress.completed).length} />
+        </motion.div>
+
+        <motion.section id="missoes" className={`${styles.section} ${styles.anchor}`} data-tour="micro-journey-missions" aria-labelledby="journey-missions" initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(2)}>
           <div className={styles.sectionHead}>
             <h2 id="journey-missions">Missões de hoje</h2>
             {daily.length ? <span className={styles.sectionNote}>{daily.filter((mission) => mission.progress.completed).length} de {daily.length} concluídas</span> : null}
@@ -162,6 +166,37 @@ function JourneyHero({ data }: { data: JourneyScreenData }) {
           <span className={styles.heroNext}>Faltam <strong>{pts(level.pointsToNext)}</strong> para o <Term id="level">nível</Term> {level.nextLevel.name}</span>
         ) : <span className={styles.heroNext}>Você chegou ao nível máximo.</span>}
       </div>
+    </section>
+  );
+}
+
+/**
+ * Banner da jornada (14/11/2026, no estilo do card promocional do Duolingo): uma frase com a próxima meta,
+ * um selo com o número que falta e um botão que leva às missões. O capitão fica à direita, saindo do card.
+ * A arte é provisória (o capitão com o baú, de public/mascote/venda-capitao.webp) até a arte própria chegar.
+ */
+function JourneyBanner({ data, pending }: { data: JourneyScreenData; pending: number }) {
+  const { level, streak } = data;
+  const title = level.nextLevel
+    ? pending > 0
+      ? `Cumpra as missões de hoje e chegue ao nível ${level.nextLevel.name}!`
+      : `Missões de hoje feitas. O nível ${level.nextLevel.name} está chegando!`
+    : "Você chegou ao topo. Mantenha a sequência!";
+  const badge = level.nextLevel
+    ? `Faltam ${pts(level.pointsToNext)}`
+    : `${streak.current} ${streak.current === 1 ? "dia" : "dias"} de sequência`;
+  return (
+    <section className={styles.banner} aria-label="Próxima meta da jornada">
+      <div className={styles.bannerText}>
+        <p className={styles.bannerTitle}>{title}</p>
+        <span className={styles.bannerBadge}>
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+          {badge}
+        </span>
+      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element -- arte local do mascote */}
+      <img className={styles.bannerArt} src="/mascote/venda-capitao.webp" width={584} height={640} alt="" aria-hidden="true" draggable={false} />
+      <a className={styles.bannerAction} href="#missoes">{pending > 0 ? "Ver missões" : "Ver minha semana"}</a>
     </section>
   );
 }
