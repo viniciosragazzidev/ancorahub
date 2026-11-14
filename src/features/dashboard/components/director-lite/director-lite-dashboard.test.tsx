@@ -69,9 +69,9 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     expect(blocks).toEqual([
       "Leads desde sex 19h",
       "Taxa de qualificação",
+      "Plantões acontecendo agora",
       "Funil de qualificação",
       "Leads por fila",
-      "Plantões acontecendo agora",
       "WhatsApp dos corretores",
     ]);
   });
