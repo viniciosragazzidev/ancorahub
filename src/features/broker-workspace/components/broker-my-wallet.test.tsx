@@ -108,14 +108,14 @@ const clients: BrokerClientWalletResult = {
 };
 
 describe("Minha carteira", () => {
-  it("mostra as quatro visões na ordem do plano, com contagens, e troca mantendo busca e origem", () => {
+  it("mostra Clientes, Precisa de atenção e Arquivados, com o atalho para Meus leads, e troca mantendo busca e origem", () => {
     const filters = normalizeBrokerWalletFilters({ view: "negotiating", query: "Bru", origin: "manual", stage: "quote_sent" });
     render(<BrokerMyWallet filters={filters} counts={counts} origins={["manual", "webhook"]} leads={leads} />);
 
     const group = screen.getByRole("group", { name: "Visões da carteira" });
-    expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual(["Em negociação", "Clientes", "Precisa de atenção", "Arquivados"]);
+    expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual(["Clientes", "Precisa de atenção", "Arquivados"]);
     expect(screen.getByRole("heading", { level: 1, name: "Minha carteira" })).toBeTruthy();
-    expect(screen.getByText("12 em negociação · 30 clientes")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "12 em negociação" }).getAttribute("href")).toBe("/leads?tab=minha-fila");
 
     fireEvent.click(within(group).getByRole("button", { name: "Clientes" }));
     expect(push).toHaveBeenCalledWith("/clientes?view=all&page=1&q=Bru&origin=manual");
