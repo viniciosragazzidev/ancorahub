@@ -1,72 +1,77 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { AncoraLogo } from "@/components/ancora-logo";
+import { useEffect, useState } from "react";
 
-const SPLASH_KEY = "__ancora_splash_shown";
+import { MASCOT_ART } from "@/components/mascot/mascot-config";
+
+import styles from "./splash-screen.module.css";
+
+export const SPLASH_KEY = "__ancora_splash_shown";
+/** A entrada do mascote (0,4 s) não é cortada no meio; fora isso, nenhuma espera artificial. */
+export const SPLASH_ENTRANCE_MS = 400;
+export const SPLASH_EXIT_MS = 240;
 
 /**
- * PWA splash screen.
- *
- * - Starts unmounted so a full page navigation never flashes the overlay.
- * - Shows only once per browser session (tracked via sessionStorage).
- * - On first mount the logo fades in (700 ms), holds briefly (300 ms),
- *   then the entire overlay fades out (500 ms) and unmounts.
- * - Respects reduced‑motion: skips all animations and hides instantly.
+ * Antes da primeira pintura: se a splash já apareceu nesta sessão, some antes de ser vista; se o
+ * aparelho pediu "Menos animação", o mascote fica parado. Roda inline no HTML do servidor.
+ */
+const BOOT_SCRIPT = `(function(){try{var d=document.documentElement;if(sessionStorage.getItem("${SPLASH_KEY}")){d.dataset.splash="done";return}var p=JSON.parse(localStorage.getItem("ancora:a11y")||"{}");if(p&&p.reduceMotion)d.dataset.splash="static"}catch(e){}})();`;
+
+type Phase = "showing" | "leaving" | "gone";
+
+/**
+ * Splash do PWA com o mascote (docs/design-system/MASCOTE.md §5).
+ * - Fundo branco puro e o mascote centralizado, já no HTML do servidor (aparece antes do JavaScript,
+ *   emendando com a tela branca do PWA instalado, que usa background_color #ffffff).
+ * - Some quando o app está pronto: no primeiro quadro depois da hidratação, respeitando só os 0,4 s da
+ *   entrada. Nunca espera a animação inteira.
+ * - Uma vez por sessão do navegador. Movimento reduzido: mascote parado e saída sem transição.
+ * - Não captura cliques (pointer-events: none) e é decorativa para leitor de tela.
  */
 export function SplashScreen() {
-  const [phase, setPhase] = useState<SplashPhase>("hidden");
+  const [phase, setPhase] = useState<Phase>("showing");
 
   useEffect(() => {
-    // Already shown this session — skip entirely
-    if (sessionStorage.getItem(SPLASH_KEY)) {
+    const root = document.documentElement;
+    if (root.dataset.splash === "done") {
+      setPhase("gone");
       return;
     }
+    try { sessionStorage.setItem(SPLASH_KEY, "1"); } catch { /* aba anônima: aparece de novo na próxima carga */ }
 
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (mq.matches) {
-      sessionStorage.setItem(SPLASH_KEY, "1");
-      return;
-    }
-
-    sessionStorage.setItem(SPLASH_KEY, "1");
-    let logoIn = 0;
-    const show = requestAnimationFrame(() => {
-      setPhase("idle");
-      logoIn = requestAnimationFrame(() => setPhase("logo_enter"));
-    });
-    const splashOut = setTimeout(() => setPhase("splash_exit"), 700 + 300);
-    const remove = setTimeout(() => setPhase("hidden"), 700 + 300 + 500);
-
+    const reduce = root.dataset.splash === "static" || Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+    const timers: number[] = [];
+    let frame = 0;
+    const leave = () => {
+      // Dois quadros: o conteúdo do app já pintou por baixo antes de a splash sair.
+      frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => {
+          setPhase("leaving");
+          timers.push(window.setTimeout(() => {
+            root.dataset.splash = "done";
+            setPhase("gone");
+          }, reduce ? 0 : SPLASH_EXIT_MS));
+        });
+      });
+    };
+    const wait = reduce ? 0 : Math.max(0, SPLASH_ENTRANCE_MS - performance.now());
+    timers.push(window.setTimeout(leave, wait));
     return () => {
-      cancelAnimationFrame(show);
-      cancelAnimationFrame(logoIn);
-      clearTimeout(splashOut);
-      clearTimeout(remove);
+      cancelAnimationFrame(frame);
+      timers.forEach((timer) => window.clearTimeout(timer));
     };
   }, []);
 
-  if (phase === "hidden") return null;
+  if (phase === "gone") return null;
 
+  const art = MASCOT_ART.positivo;
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--surface-base,#f8f8f7)] transition-opacity duration-500 ease-[var(--ease-smooth-out,cubic-bezier(0.22,1,0.36,1))]"
-      style={{
-        opacity: phase === "splash_exit" ? 0 : 1,
-        willChange: "opacity",
-      }}
-    >
-      <AncoraLogo
-        className="h-12 w-48 object-contain"
-        style={{
-          opacity: phase === "idle" ? 0 : 1,
-          transform: phase === "idle" ? "scale(0.92) translateY(4px)" : "scale(1) translateY(0)",
-          transition: "opacity 700ms var(--ease-smooth-out), transform 700ms var(--ease-smooth-out)",
-          willChange: "opacity, transform",
-        }}
-      />
-    </div>
+    <>
+      <script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />
+      <div className={styles.splash} data-phase={phase} data-splash-screen="" aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element -- imagem local pequena, precisa estar no HTML antes do JS */}
+        <img className={styles.mascot} src={art.src} width={art.width} height={art.height} alt="" fetchPriority="high" decoding="async" draggable={false} />
+      </div>
+    </>
   );
 }
-
-type SplashPhase = "idle" | "logo_enter" | "splash_exit" | "hidden";
