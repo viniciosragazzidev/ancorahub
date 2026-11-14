@@ -11,6 +11,8 @@ import { buildBrokerNowItems } from "@/features/broker-workspace/now-items";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import type { BrokerJourneyData } from "@/features/engagement/journey-types";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { getBrokerFinanceSummary } from "@/features/erp/broker-finance";
+import { BrokerFinanceSummaryCard } from "@/features/erp/components/broker-finance-summary-card";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 
 const TIME_ZONE = "America/Sao_Paulo";
@@ -107,7 +109,7 @@ export async function ChatHomeContent() {
   // same tenant and user, both come from the authenticated context).
   const context = await getRequiredTenantContext().catch(() => null);
   if (!context) return <LightDashboardUnavailable />;
-  const [rail, data, highlights, journey, firstSteps, floatingNow, journeyFlag, homeActionsFlag] = await Promise.all([
+  const [rail, data, highlights, journey, firstSteps, floatingNow, journeyFlag, homeActionsFlag, financeSummary] = await Promise.all([
     getChatRailData(),
     getCachedBrokerWorkspaceData().catch(() => null),
     getBrokerHighlights(context.tenantId, context.userId).catch(() => null),
@@ -116,6 +118,8 @@ export async function ChatHomeContent() {
     context.role === "broker" ? getFeatureFlag(FEATURE_FLAGS.BROKER_NOW_FLOATING).catch(() => "false") : Promise.resolve("false"),
     getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false"),
     context.role === "broker" ? getFeatureFlag(FEATURE_FLAGS.BROKER_HOME_ACTIONS).catch(() => FEATURE_FLAGS.BROKER_HOME_ACTIONS.defaultValue) : Promise.resolve("false"),
+    // Meu mês: null sem o módulo financeiro liberado, sem permissão ou com a chave desligada.
+    context.role === "broker" ? getBrokerFinanceSummary(context).catch(() => null) : Promise.resolve(null),
   ]);
   if (!rail || !data) return <LightDashboardUnavailable />;
   return (
@@ -127,6 +131,7 @@ export async function ChatHomeContent() {
       canQuote={rail.canQuote}
       nowFloatingEnabled={floatingNow === "true"}
       homeActions={homeActionsFlag === "true"}
+      financeCard={financeSummary ? <BrokerFinanceSummaryCard summary={financeSummary} /> : null}
       summary={{ ...summaryOf(data), next: presenceNext(data) ?? nextActionOf(data.nextAction, journey) }}
       presence={presenceAskOf(data)}
       presenceAsks={presenceAsksOf(data)}
