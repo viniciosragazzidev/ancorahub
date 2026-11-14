@@ -81,7 +81,7 @@ Para ligar o rig: salve o arquivo em `public/mascote/mascote.riv`, troque `MASCO
 
 ## 5. Splash
 
-- Mostra o mascote fazendo o positivo (`lead-accepted.mp4`) e, embaixo, o logo da Âncora (`/logo.webp`, 40 px de altura). A splash é sempre branca, então o logo nunca inverte.
+- Arte aprovada em 14/11/2026: o capitão pirata com o sabre e a marca ÂNCORA, sobre o azul `#002B73` da própria arte (original em `design/mascote/splash/`). O capitão (`public/mascote/splash-capitao.webp`, 65 KB) e a marca (`splash-ancora.webp`, 24 KB) foram separados, com o azul removido, para o capitão entrar e dar um pulinho (1,9 s) enquanto a marca aparece 160 ms depois. O manifest usa o mesmo azul em `background_color`, para a tela do PWA instalado emendar com a splash. Esta arte é da splash; o `<Mascot>` das outras áreas segue com o personagem anterior até o visual delas ser decidido.
 
 - Vem no HTML do servidor: aparece antes do JavaScript e emenda com a tela branca do PWA instalado (`background_color: #ffffff` no manifest).
 - Some quando o app fica pronto: dois quadros depois da hidratação, respeitando só os 0,4 s de entrada. Nunca espera a animação inteira.

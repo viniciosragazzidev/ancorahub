@@ -1,16 +1,18 @@
 /*
- * Splash do PWA (docs/design-system/MASCOTE.md §5): fundo branco puro e o mascote no centro.
- * Vem no HTML do servidor, então aparece antes do JavaScript; some quando o app fica pronto.
- * A animação é um vídeo curto local (do repouso ao polegar levantado), sem som, com o mesmo branco do fundo.
- * Só opacity na entrada e na saída (compositor, 60 fps).
+ * Splash do PWA (docs/design-system/MASCOTE.md §5): a arte aprovada em 14/11/2026, o capitão pirata e a
+ * marca ÂNCORA sobre o azul da própria arte (#002B73). Vem no HTML do servidor, então aparece antes do
+ * JavaScript, e some quando o app fica pronto. Só transform e opacity (compositor, 60 fps).
  */
 .splash {
+  --splash-blue: #002b73;
+  /* Largura do capitão; a marca e o encaixe entre os dois seguem a proporção da arte original. */
+  --hero-w: min(68vw, 320px, 38vh);
   position: fixed;
   inset: 0;
   z-index: 9999;
   display: grid;
   place-items: center;
-  background: #ffffff;
+  background: var(--splash-blue);
   opacity: 1;
   transition: opacity 240ms cubic-bezier(0.7, 0, 0.84, 0);
   pointer-events: none;
@@ -18,55 +20,59 @@
 
 .splash[data-phase="leaving"] { opacity: 0; }
 
-/* Mascote em cima e o logo da Âncora embaixo, centralizados. */
 .content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
 }
 
-.logo {
+.hero {
   display: block;
-  height: 40px;
-  width: auto;
-  animation: splashEnter 400ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
+  width: var(--hero-w);
+  height: auto;
+  transform-origin: 50% 92%;
+  animation: splashHero 1900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
 }
 
-.stage {
-  position: relative;
-  height: min(300px, 38vh);
-  aspect-ratio: 480 / 640;
-  animation: splashEnter 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+/* Na arte, a marca começa 20 px acima do fim do capitão (sombra do chão). */
+.wordmark {
+  display: block;
+  width: calc(var(--hero-w) * 1.1008);
+  height: auto;
+  margin-top: calc(var(--hero-w) * -0.031);
+  animation: splashWordmark 400ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
 }
 
-.still,
-.clip {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #ffffff;
+/*
+ * Roteiro (dossiê §3), possível com a arte parada: 0 a 0,4 s aparece; 0,8 a 1,4 s agacha, salta e volta
+ * ao chão; 1,4 a 1,9 s balança de leve e repousa.
+ */
+@keyframes splashHero {
+  0% { opacity: 0; transform: translateY(12px) scale(0.96); }
+  21% { opacity: 1; transform: translateY(0) scale(1); }
+  42% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(2px) scale(1.04, 0.95); }
+  62% { transform: translateY(-14px) scale(0.98, 1.03); }
+  74% { transform: translateY(0) scale(1); }
+  86% { transform: translateY(0) rotate(-2deg); }
+  100% { opacity: 1; transform: translateY(0) rotate(0deg); }
 }
 
-/* Entrada (dossiê §3, 0 a 0,4 s): aparece suave. O resto do roteiro está no vídeo. */
-@keyframes splashEnter {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@keyframes splashWordmark {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Sessão em que a splash já apareceu: o script inline marca antes da pintura, nada pisca. */
 :global(html[data-splash="done"]) .splash { display: none; }
 
-/* "Menos animação" (preferência do aparelho) ou do sistema: só o quadro parado, saída imediata. */
-:global(html[data-splash="static"]) .clip { display: none; }
-:global(html[data-splash="static"]) .stage,
-:global(html[data-splash="static"]) .logo { animation: none; }
+/* "Menos animação" (preferência do aparelho) ou do sistema: arte parada, saída imediata. */
+:global(html[data-splash="static"]) .hero,
+:global(html[data-splash="static"]) .wordmark { animation: none; }
 :global(html[data-splash="static"]) .splash { transition: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .clip { display: none; }
-  .stage, .logo { animation: none; }
+  .hero, .wordmark { animation: none; }
   .splash { transition: none; }
 }
