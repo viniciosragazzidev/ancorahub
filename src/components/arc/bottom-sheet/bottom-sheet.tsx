@@ -33,6 +33,12 @@ export interface BottomSheetProps {
   initialDetent?: number;
   onDetentChange?: (index: number) => void;
   closeLabel?: string;
+  /**
+   * Follow-through on arrival: the opening glide uses the `morph` spring, overshooting a few px (hidden by the
+   * extension below the sheet) and settling. Only the first arrival; detent changes, drags and closing stay on
+   * the critically damped spring. Off by default; reduced motion and the interface kill-switch ignore it.
+   */
+  followThrough?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -56,6 +62,7 @@ const LOW_DIM = .78;
 const settle = motionTokens.spring.smooth;
 /** Leaving is shorter than arriving; a flick keeps its velocity through the same spring. */
 const leave = { ...motionTokens.spring.smooth, visualDuration: .3 };
+const arrival = motionTokens.spring.morph;
 const fade = { duration: motionTokens.duration.fast, ease: [...motionTokens.ease.standard] as [number, number, number, number] };
 
 /** iOS-style resistance: follows the finger at first, then approaches STRETCH. */
@@ -117,7 +124,7 @@ export function BottomSheet({ trigger, returnFocusRef, open: openProp, defaultOp
   </DialogPrimitive.Root>;
 }
 
-function Sheet({ title, description, icon, detents = [.45, .92], initialDetent = 0, onDetentChange, closeLabel = "Close", className, children, onDismiss, onRestoreFocus }: Omit<BottomSheetProps, "trigger" | "open" | "defaultOpen" | "onOpenChange"> & { onDismiss: () => void; onRestoreFocus: () => boolean }) {
+function Sheet({ title, description, icon, detents = [.45, .92], initialDetent = 0, onDetentChange, closeLabel = "Close", followThrough = false, className, children, onDismiss, onRestoreFocus }: Omit<BottomSheetProps, "trigger" | "open" | "defaultOpen" | "onOpenChange"> & { onDismiss: () => void; onRestoreFocus: () => boolean }) {
   const arcScope = useArcScopeProps();
   const [isPresent, safeToRemove] = usePresence();
   const reduced = useReducedMotion() ?? false;
@@ -157,13 +164,13 @@ function Sheet({ title, description, icon, detents = [.45, .92], initialDetent =
   });
 
   // Every move retargets the one motion value from wherever it is. A new target drops the previous arrival callback.
-  const go = useCallback((stop: Stop, velocity?: number, onArrive?: () => void) => {
+  const go = useCallback((stop: Stop, velocity?: number, onArrive?: () => void, arriving = false) => {
     aim.current = stop;
     arrive.current = onArrive;
     const target = offset(stop);
     const done = () => { const callback = arrive.current; arrive.current = undefined; callback?.(); };
     if (reduced) { y.jump(target); done(); return; }
-    animate(y, target, { ...(stop === "closed" ? leave : settle), ...(velocity === undefined ? {} : { velocity }), onComplete: done });
+    animate(y, target, { ...(stop === "closed" ? leave : arriving ? arrival : settle), ...(velocity === undefined ? {} : { velocity }), onComplete: done });
   }, [offset, reduced, y]);
 
   const rest = useCallback((stop: number, velocity?: number) => {
@@ -198,14 +205,14 @@ function Sheet({ title, description, icon, detents = [.45, .92], initialDetent =
     if (isPresent) {
       if (reduced) { y.jump(offset(detentRef.current)); animate(presence, 1, fade); return; }
       presence.jump(1);
-      go(detentRef.current);
+      go(detentRef.current, undefined, undefined, followThrough);
       return;
     }
     if (reduced) { animate(presence, 0, { ...fade, onComplete: safeToRemove }); return; }
     // A flick has already started the exit with its own velocity; only the unmount waits for it.
     if (aim.current === "closed" && y.isAnimating()) arrive.current = safeToRemove;
     else go("closed", undefined, safeToRemove);
-  }, [go, height, isPresent, motionEnabled, offset, presence, reduced, safeToRemove, y]);
+  }, [followThrough, go, height, isPresent, motionEnabled, offset, presence, reduced, safeToRemove, y]);
 
   // A viewport change (rotation, the mobile toolbar) moves every detent. Keep the sheet on its detent, retargeting any flight.
   useEffect(() => {
