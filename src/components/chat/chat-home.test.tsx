@@ -182,21 +182,22 @@ describe("ChatHome", () => {
     navigation.pathname = "/dashboard";
     render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote homeActions quickSaleEnabled />);
     const section = screen.getAllByRole("region", { name: "Ações rápidas" })[0]!;
-    expect(within(section).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Registrar venda", "Novo contato", "Cotação", "Minha agenda"]);
+    expect(within(section).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Registrar venda", "Novo contato"]);
     expect(within(section).getByRole("link", { name: "Novo contato" }).getAttribute("href")).toBe("/clientes?adicionar=1");
     expect(screen.queryByRole("button", { name: /Novo atendimento/ })).toBeNull();
     fireEvent.click(within(section).getByRole("button", { name: "Registrar venda" }));
     expect(screen.getByRole("dialog", { name: "Registrar venda" })).toBeTruthy();
   });
 
-  it("Início anterior com a chave desligada e sem Cotação quando o simulador não está liberado", () => {
+  it("Início anterior com a chave desligada; Ações rápidas não repetem Cotação nem Agenda do Mais", () => {
     navigation.pathname = "/dashboard";
     const { unmount } = render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote />);
     expect(screen.queryByRole("region", { name: "Ações rápidas" })).toBeNull();
     unmount();
-    render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote={false} homeActions />);
+    render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote homeActions />);
     const section = screen.getAllByRole("region", { name: "Ações rápidas" })[0]!;
     expect(within(section).queryByText("Cotação")).toBeNull();
+    expect(within(section).queryByText(/Agenda/)).toBeNull();
     // Sem a chave do Registrar venda rápido, o atalho leva à fila de leads.
     expect(within(section).getByRole("link", { name: "Registrar venda" }).getAttribute("href")).toBe("/leads?tab=minha-fila");
   });
