@@ -52,6 +52,7 @@ export function LightBottomNav({
                 href={tab.href}
                 aria-label={badge ? `${tab.label}, ${badge} pendentes` : tab.label}
                 aria-current={isActive ? "page" : undefined}
+                data-lite-arc-target={tab.id === "fila" ? "leads" : undefined}
                 className={cn(itemBase, isActive ? itemActive : itemIdle)}
               >
                 <NavPending className="text-(--accent)" />
