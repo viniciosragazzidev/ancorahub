@@ -4,8 +4,11 @@
  * Fluxos de WhatsApp no visual Lite. Mesmos modelos, campos de configuração e Server Actions (criar, pausar ou ativar,
  * excluir) com as mesmas mensagens. A configuração abre no painel lateral e excluir pede confirmação Lite no lugar do
  * confirm do navegador.
+ *
+ * Feedback (FEEDBACK.md, nível 1): criar, pausar ou ativar e excluir mostram o envio no botão e confirmam na lista
+ * "Seus fluxos" depois do servidor; a falha mostra a causa e "Tentar de novo" (no painel, quando ele está aberto).
  */
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { LiteConfirmDialog } from "@/components/lite/controls";
@@ -13,8 +16,8 @@ import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
 import sections from "@/components/lite/page/lite-sections.module.css";
-import { toast } from "@/components/ui/sonner";
 
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import styles from "./whatsapp-flows-lite.module.css";
 import { createWhatsappFlowAction, deleteWhatsappFlowAction, updateWhatsappFlowAction } from "../actions";
 
@@ -37,10 +40,13 @@ export function WhatsappFlowsLite({ initialFlows }: { initialFlows: WhatsappFlow
   const [flowName, setFlowName] = useState("");
   const [config, setConfig] = useState<Record<string, unknown>>({});
   const [removing, setRemoving] = useState<WhatsappFlow | null>(null);
-  const [pending, startTransition] = useTransition();
+  const { status, run, invalid, clear, show } = useActionStatus();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const pending = status.flows?.state === "busy" || status.create?.state === "busy";
   const cancelRemove = useCallback(() => setRemoving(null), []);
 
   const open = (template: Template) => {
+    clear("create");
     setActive(template);
     setFlowName(`Fluxo ${template.name}`);
     setConfig(template.defaultConfig);
@@ -48,40 +54,42 @@ export function WhatsappFlowsLite({ initialFlows }: { initialFlows: WhatsappFlow
 
   const create = () => {
     if (!flowName) {
-      toast.error("Informe um nome para o fluxo.");
+      invalid("create", "Informe um nome para o fluxo.");
       return;
     }
-    startTransition(async () => {
-      const result = await createWhatsappFlowAction({ name: flowName, triggerType: active!.triggerType, status: "active", configuration: config });
-      if (result.success) {
-        toast.success("Fluxo operacional criado com sucesso.");
-        setActive(null);
-        router.refresh();
-      } else {
-        toast.error(result.error || "Erro ao criar fluxo.");
-      }
-    });
+    const template = active!;
+    const name = flowName;
+    // O que acontece depois do servidor fica dentro da tarefa: o "Tentar de novo" refaz tudo.
+    void run("create", async () => {
+      const result = await createWhatsappFlowAction({ name, triggerType: template.triggerType, status: "active", configuration: config });
+      if (!result.success) return { ok: false as const, error: result.error };
+      setActive(null);
+      show("flows", { state: "done", label: `${name} criado e ativo` });
+      router.refresh();
+      return result;
+    }, { done: "Fluxo criado", fallback: "Não deu para criar o fluxo agora.", keeps: "A configuração continua aqui." });
   };
 
-  const toggle = (flow: WhatsappFlow) => startTransition(async () => {
-    const result = await updateWhatsappFlowAction(flow.id, { status: flow.status === "active" ? "paused" : "active" });
-    if (result.success) {
-      toast.success(`Fluxo ${flow.status === "active" ? "pausado" : "ativado"} com sucesso.`);
+  const toggle = (flow: WhatsappFlow) => {
+    const next = flow.status === "active" ? "paused" : "active";
+    setBusyId(flow.id);
+    void run("flows", async () => {
+      const result = await updateWhatsappFlowAction(flow.id, { status: next });
+      if (!result.success) return { ok: false as const, error: result.error };
       router.refresh();
-    } else {
-      toast.error(result.error || "Erro ao alterar status.");
-    }
-  });
+      return result;
+    }, { done: `${flow.name} ${next === "paused" ? "pausado" : "ativado"}`, fallback: "Não deu para mudar o fluxo agora.", keeps: `O fluxo continua ${flow.status === "active" ? "ativo" : "pausado"}.` }).finally(() => setBusyId(null));
+  };
 
-  const remove = (flow: WhatsappFlow) => startTransition(async () => {
-    const result = await deleteWhatsappFlowAction(flow.id);
-    if (result.success) {
-      toast.success("Fluxo excluido com sucesso.");
+  const remove = (flow: WhatsappFlow) => {
+    setBusyId(flow.id);
+    void run("flows", async () => {
+      const result = await deleteWhatsappFlowAction(flow.id);
+      if (!result.success) return { ok: false as const, error: result.error };
       router.refresh();
-    } else {
-      toast.error(result.error || "Erro ao excluir fluxo.");
-    }
-  });
+      return result;
+    }, { done: `${flow.name} excluído`, fallback: "Não deu para excluir o fluxo agora.", keeps: "O fluxo continua operando." }).finally(() => setBusyId(null));
+  };
 
   const field = (key: string, label: string, placeholder?: string, type: "text" | "number" = "text") => (
     <label className={form.field}>
@@ -128,6 +136,7 @@ export function WhatsappFlowsLite({ initialFlows }: { initialFlows: WhatsappFlow
             <div className={sections.rowText}>
               <h2 id="flows-title" className={sections.rowTitle}>Seus fluxos</h2>
               <p className={sections.rowDescription}>Fluxos operando na sua corretora.</p>
+              {status.flows?.state === "busy" ? null : <ActionNote status={status.flows} />}
             </div>
           </div>
           {flows.length ? (
@@ -140,7 +149,7 @@ export function WhatsappFlowsLite({ initialFlows }: { initialFlows: WhatsappFlow
                   </span>
                   <span className={sections.actions} style={{ alignItems: "center", gap: 8 }}>
                     <span className={page.badge} data-tone={flow.status === "active" ? "success" : undefined}>{flow.status === "active" ? "Ativo" : "Pausado"}</span>
-                    <button type="button" className={page.button} disabled={pending} onClick={() => toggle(flow)}>{flow.status === "active" ? "Pausar" : "Ativar"}</button>
+                    <button type="button" className={page.button} disabled={pending} aria-busy={busyId === flow.id || undefined} onClick={() => toggle(flow)}><BusyLabel busy={busyId === flow.id && status.flows?.state === "busy"} label="Salvando…">{flow.status === "active" ? "Pausar" : "Ativar"}</BusyLabel></button>
                     <button type="button" className={page.button} data-tone="danger" disabled={pending} onClick={() => setRemoving(flow)} aria-label={`Excluir ${flow.name}`}>Excluir</button>
                   </span>
                 </li>
@@ -171,8 +180,9 @@ export function WhatsappFlowsLite({ initialFlows }: { initialFlows: WhatsappFlow
           {active?.triggerType === "b2b_qualification" ? field("minVidas", "Mínimo de vidas (PME)", undefined, "number") : null}
           <div className={form.actions}>
             <button type="button" className={page.button} onClick={() => setActive(null)}>Cancelar</button>
-            <button type="button" className={page.primaryButton} disabled={pending} onClick={create}>Salvar fluxo</button>
+            <button type="button" className={page.primaryButton} disabled={pending} aria-busy={status.create?.state === "busy" || undefined} onClick={create}><BusyLabel busy={status.create?.state === "busy"} label="Salvando…">Salvar fluxo</BusyLabel></button>
           </div>
+          {status.create?.state === "error" ? <ActionNote status={status.create} /> : null}
         </div>
       </LiteSidePanel>
       <LiteConfirmDialog
