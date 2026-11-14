@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
 import { LeadHeaderBar, NextStepCard } from "@/features/broker-workspace/chat/lead-screen-parts";
@@ -75,6 +75,12 @@ export function LightLeadDetail({
   const isManagement = mode === "management";
   const c = useLeadDetail({ lead, requirements, documents, initialDetailsExpanded: isManagement });
   useQuickSaleAutoOpen({ enabled: openSaleOnLoad && !isManagement && variant !== "details", lead, c, registrationV2Enabled: saleRegistrationV2Enabled });
+  // Confirmação no próprio lugar: depois do registro, "Etapa atual" mostra o check que se desenha.
+  const [saleRegistered, setSaleRegistered] = useState(false);
+  const onSaleRegistered = () => {
+    c.markConverted();
+    setSaleRegistered(true);
+  };
 
   // Lead already taken by someone else (or finished): nothing to act on. The panel keeps the history visible.
   if (variant === "page" && !isManagement && !lead.isCurrentBroker && c.isDistributed === false) {
@@ -124,16 +130,16 @@ export function LightLeadDetail({
               <AdOriginCard ad={lead.adContext} />
               <ClientInfoCard lead={lead} c={c} withSummary />
               <PeopleDataSection lead={lead} c={c} showRecordDetails={false} />
-              <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} registrationV2Enabled={saleRegistrationV2Enabled} hasActiveSale={lead.hasActiveSale} />
+              <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} registrationV2Enabled={saleRegistrationV2Enabled} hasActiveSale={lead.hasActiveSale} justRegistered={saleRegistered} />
             </div>
           }
           conversation={conversation}
         />
         <DeclineSheet lead={lead} c={c} />
         <StepSheet c={c} />
-        {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={c.markConverted} /> : <>
+        {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} /> : <>
           <SaleDocSheet lead={lead} c={c} requirements={requirements} />
-          <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={c.markConverted} />
+          <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} />
         </>}
         {c.successOverlay}
       {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={c.handoffUrl} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} onClose={c.closeHandoff} /> : null}
@@ -166,7 +172,7 @@ export function LightLeadDetail({
         <ClosingOutcomeCard lead={lead} c={c} />
         <AdOriginCard ad={lead.adContext} />
         <ClientInfoCard lead={lead} c={c} />
-        <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} registrationV2Enabled={saleRegistrationV2Enabled} hasActiveSale={lead.hasActiveSale} />
+        <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} registrationV2Enabled={saleRegistrationV2Enabled} hasActiveSale={lead.hasActiveSale} justRegistered={saleRegistered} />
         <DetailsZone lead={lead} c={c} />
         <PeopleDataSection lead={lead} c={c} />
       </div>
@@ -174,9 +180,9 @@ export function LightLeadDetail({
       <LeadActionBar lead={lead} c={c} />
       <DeclineSheet lead={lead} c={c} />
       <StepSheet c={c} />
-      {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={c.markConverted} /> : <>
+      {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} /> : <>
         <SaleDocSheet lead={lead} c={c} requirements={requirements} />
-        <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={c.markConverted} />
+        <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} />
       </>}
       {c.successOverlay}
       {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={c.handoffUrl} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} onClose={c.closeHandoff} /> : null}

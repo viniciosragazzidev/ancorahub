@@ -139,4 +139,35 @@ describe("Cliente que já possuo na tela", () => {
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Confirmar remoção" })); });
     expect(removeContract).toHaveBeenCalledWith({ clientId: "client-p", contractId: "c1" });
   });
+
+  it("salvar os dados confirma no próprio cartão com o check, só depois do sucesso", async () => {
+    const update = vi.fn().mockResolvedValue({ ok: true });
+    render(<PriorClientProfile
+      client={{ id: "client-p", name: "Bruno Prévia", phone: "5511977776666", email: null, originNote: null }}
+      todayKey="2026-11-13"
+      contracts={[]}
+      actions={{ update, saveContract: vi.fn(), removeContract: vi.fn() }}
+    />);
+    fireEvent.click(screen.getByRole("button", { name: "Editar dados" }));
+    expect(screen.queryByRole("status")).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Salvar" })); });
+    expect(update).toHaveBeenCalled();
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Dados salvos");
+    expect(status.closest("section")).toHaveAttribute("aria-label", "Dados do cliente");
+  });
+
+  it("erro ao salvar não mostra confirmação, só o erro", async () => {
+    const update = vi.fn().mockResolvedValue({ ok: false, error: "Nome obrigatório." });
+    render(<PriorClientProfile
+      client={{ id: "client-p", name: "Bruno Prévia", phone: "5511977776666", email: null, originNote: null }}
+      todayKey="2026-11-13"
+      contracts={[]}
+      actions={{ update, saveContract: vi.fn(), removeContract: vi.fn() }}
+    />);
+    fireEvent.click(screen.getByRole("button", { name: "Editar dados" }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Salvar" })); });
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getAllByRole("alert").some((node) => node.textContent === "Nome obrigatório.")).toBe(true);
+  });
 });

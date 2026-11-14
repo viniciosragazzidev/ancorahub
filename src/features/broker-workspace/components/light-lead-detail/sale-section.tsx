@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/arc/button/button";
+import { LiteSuccess } from "@/components/lite/motion";
 
 import { aiSalePromptCopy, type AiSalePrompt } from "@/features/conversation-intelligence/sale-detection-core";
 
@@ -8,7 +9,7 @@ import { stageLabel } from "./format";
 import type { LeadDetailController } from "./use-lead-detail";
 
 /** Current stage and the sale documentation flow (register, in review, approved, rejected). */
-export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrationV2Enabled = false, hasActiveSale = false }: { c: LeadDetailController; mode?: "broker" | "management"; aiSalePrompt?: AiSalePrompt | null; registrationV2Enabled?: boolean; hasActiveSale?: boolean }) {
+export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrationV2Enabled = false, hasActiveSale = false, justRegistered = false }: { c: LeadDetailController; mode?: "broker" | "management"; aiSalePrompt?: AiSalePrompt | null; registrationV2Enabled?: boolean; hasActiveSale?: boolean; /** Venda acabou de ser registrada nesta tela: confirma aqui mesmo (o toast é só apoio). */ justRegistered?: boolean }) {
   const {
     isDistributed,
     leadStatus,
@@ -43,6 +44,9 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrat
         <p className="mt-1 text-sm text-(--text-secondary)">{stageLabel(leadStatus)}</p>
         {whatsappOpenedAt ? (
           <p className="mt-1 text-sm tabular-nums text-(--success)">Contato aberto às {whatsappOpenedAt}</p>
+        ) : null}
+        {justRegistered && mode === "broker" ? (
+          <LiteSuccess label="Venda registrada" className="mt-2 text-sm font-medium text-(--success)" />
         ) : null}
       </div>
 

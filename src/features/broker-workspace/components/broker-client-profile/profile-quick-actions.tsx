@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Button } from "@/components/arc/button/button";
 import { Input } from "@/components/arc/input/input";
+import { LiteSuccess } from "@/components/lite/motion";
 import { Textarea } from "@/components/arc/textarea/textarea";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { validateReturnDueAt } from "@/features/carteira/proxima-acao-core";
@@ -69,7 +70,7 @@ export function ProfileQuickActions({ client, canAct, readOnlyReason }: {
       }
       setNote("");
       setSheet(null);
-      setFeedback("Atendimento registrado no histórico.");
+      setFeedback("Atendimento registrado no histórico");
       router.refresh();
     });
   }
@@ -97,7 +98,7 @@ export function ProfileQuickActions({ client, canAct, readOnlyReason }: {
       setReturnDate("");
       setReturnNote("");
       setSheet(null);
-      setFeedback("Retorno agendado. Ele aparece na Agenda e no resumo.");
+      setFeedback("Retorno agendado. Aparece na Agenda e no resumo");
       router.refresh();
     });
   }
@@ -111,7 +112,8 @@ export function ProfileQuickActions({ client, canAct, readOnlyReason }: {
       </div>
       {!waUrl && !phoneDigits ? <p className={styles.hint}>Sem telefone cadastrado para contato.</p> : null}
       {!canAct && readOnlyReason ? <p className={styles.hint}>{readOnlyReason}</p> : null}
-      {feedback ? <p role="status" className={styles.feedback}>{feedback}</p> : null}
+      {/* Confirmação no próprio lugar: o check se desenha logo abaixo das ações. */}
+      {feedback ? <LiteSuccess label={feedback} className={styles.feedback} /> : null}
 
       <BottomSheet open={sheet === "contato"} onOpenChange={(value) => setSheet(value ? "contato" : null)} title="Falar com o cliente" description={client.name} detents={[0.45]} closeLabel="Fechar" className="arc-venancor">
         <div className={styles.sheetBody}>
