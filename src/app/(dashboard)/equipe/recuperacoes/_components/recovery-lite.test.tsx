@@ -7,11 +7,17 @@ const actions = vi.hoisted(() => ({
   rejectResetAction: vi.fn(async () => ({ success: true, message: "Solicitação rejeitada com justificativa." })),
 }));
 vi.mock("../actions", () => actions);
-vi.mock("@/components/ui/sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("@/components/ui/sonner", () => ({ toast }));
+const fire = vi.hoisted(() => vi.fn(() => ({ motion: false, celebrate: false })));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => fire }));
 
 import { RecoveryLite, type RecoveryLiteRequest } from "./recovery-lite";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 const base = { userId: "u", directorNotes: null, reviewedAt: null };
 const requests: RecoveryLiteRequest[] = [
@@ -39,6 +45,20 @@ describe("RecoveryLite", () => {
     await act(async () => { fireEvent.click(within(table()).getByRole("button", { name: /Aprovar/ })); });
     const data = (actions.approveResetAction.mock.calls[0] as unknown as [unknown, FormData])[1];
     expect(data.get("requestId")).toBe("r1");
+    expect(screen.getByText("Solicitação aprovada!")).toBeInTheDocument();
+    expect(fire).toHaveBeenCalledWith("confirm");
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("aprovar que falha mostra a causa na lista e Tentar de novo", async () => {
+    actions.approveResetAction.mockResolvedValueOnce({ error: "Este pedido já foi analisado." } as never);
+    render(<RecoveryLite requests={requests} />);
+    await act(async () => { fireEvent.click(within(table()).getByRole("button", { name: /Aprovar/ })); });
+    expect(screen.getByRole("alert")).toHaveTextContent("Este pedido já foi analisado. O pedido continua pendente.");
+    expect(fire).toHaveBeenCalledWith("error");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" })); });
+    expect(actions.approveResetAction).toHaveBeenCalledTimes(2);
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("rejeita com justificativa na confirmação Lite e mostra a justificativa salva", async () => {

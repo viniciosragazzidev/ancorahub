@@ -4,9 +4,12 @@
  * Unidades no visual Lite (/equipe?visao=unidades): os mesmos números e as mesmas ações do BranchesManager, em
  * cartões por unidade com as três chaves (recebe leads, distribuição automática, central), editar, ativar ou
  * desativar e abrir a unidade. Criar e editar em painel lateral.
+ *
+ * Feedback (FEEDBACK.md, nível 1): cada chave, ativar ou desativar e salvar mostram o envio e confirmam ao lado do
+ * próprio controle depois do servidor; a falha mostra a causa, o que continua valendo e "Tentar de novo". Sem toast.
  */
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Pencil, Plus, Power, Search } from "lucide-react";
 
@@ -15,7 +18,9 @@ import { StatCard } from "@/components/dashboard/metric-card";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
-import { toast } from "@/components/ui/sonner";
+import { LiteSuccess } from "@/components/lite/motion/success";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 import { createBranchAction, toggleAcceptingLeadsAction, toggleAutoDistributeAction, toggleBranchAction, toggleDistributionHubAction, updateBranchAction, type BranchActionState } from "@/features/branches/actions";
 
 import styles from "./units-lite.module.css";
@@ -36,26 +41,50 @@ export type UnitLite = {
 
 type BranchAction = (previous: BranchActionState, formData: FormData) => Promise<BranchActionState>;
 
+type BranchNote = { kind: "done"; label: string } | { kind: "error"; message: string; retry: () => void } | null;
+
 function useBranchAction() {
   const router = useRouter();
+  const fire = useFeedback();
   const [pending, startTransition] = useTransition();
+  const [result, setResult] = useState<BranchNote>(null);
   const run = (action: BranchAction, data: FormData, onDone?: () => void) => {
+    setResult(null);
+    fire("tap");
     startTransition(async () => {
-      const result = await action({}, data);
-      if (result.error) {
-        toast.error(result.error);
+      let outcome: BranchActionState;
+      let thrown = false;
+      try {
+        outcome = await action({}, data);
+      } catch (error) {
+        thrown = true;
+        outcome = { error: error instanceof Error ? error.message : undefined };
+      }
+      if (thrown || outcome.error) {
+        fire("error");
+        const info = normalizeActionError(outcome.error, "Não deu para salvar agora.");
+        setResult({ kind: "error", message: actionErrorMessage(info, "A unidade continua como estava."), retry: () => run(action, data, onDone) });
         return;
       }
-      toast.success(result.message ?? "Configuração atualizada.");
+      fire("confirm");
+      setResult({ kind: "done", label: outcome.message ?? "Configuração atualizada" });
       onDone?.();
       router.refresh();
     });
   };
-  return { pending, run };
+  const note: ReactNode = pending || !result ? null
+    : result.kind === "done" ? <LiteSuccess label={result.label} className="text-sm text-[var(--success)]" />
+    : (
+      <span className="flex flex-wrap items-center gap-2">
+        <span role="alert" className="text-sm text-[var(--danger)]">{result.message}</span>
+        <button type="button" className={page.button} onClick={result.retry}>Tentar de novo</button>
+      </span>
+    );
+  return { pending, run, note };
 }
 
 function BranchForm({ branch, onDone }: { branch?: UnitLite; onDone: () => void }) {
-  const { pending, run } = useBranchAction();
+  const { pending, run, note } = useBranchAction();
   return (
     <form
       className={form.form}
@@ -72,14 +101,15 @@ function BranchForm({ branch, onDone }: { branch?: UnitLite; onDone: () => void 
       </label>
       <div className={form.actions}>
         <button type="button" className={page.button} disabled={pending} onClick={onDone}>Cancelar</button>
-        <button type="submit" className={page.primaryButton} disabled={pending}>{pending ? "Salvando..." : branch ? "Salvar alterações" : "Salvar filial"}</button>
+        <button type="submit" className={page.primaryButton} disabled={pending} aria-busy={pending || undefined}>{pending ? "Salvando…" : branch ? "Salvar alterações" : "Salvar filial"}</button>
       </div>
+      {note}
     </form>
   );
 }
 
 function UnitSwitch({ branchId, label, enabled, action, readOnly, readOnlyText }: { branchId: string; label: string; enabled: boolean; action: BranchAction; readOnly: boolean; readOnlyText: string }) {
-  const { pending, run } = useBranchAction();
+  const { pending, run, note } = useBranchAction();
   if (readOnly) {
     return (
       <span className={styles.switchRow}>
@@ -94,6 +124,7 @@ function UnitSwitch({ branchId, label, enabled, action, readOnly, readOnlyText }
       <Switch
         checked={enabled}
         disabled={pending}
+        aria-busy={pending || undefined}
         aria-label={`${label}: ${enabled ? "ligado" : "desligado"}`}
         onCheckedChange={() => {
           const data = new FormData();
@@ -101,18 +132,21 @@ function UnitSwitch({ branchId, label, enabled, action, readOnly, readOnlyText }
           run(action, data);
         }}
       />
+      {note}
     </span>
   );
 }
 
 function StatusButton({ branch }: { branch: UnitLite }) {
-  const { pending, run } = useBranchAction();
+  const { pending, run, note } = useBranchAction();
   const verb = branch.status === "active" ? "Desativar" : "Ativar";
   return (
+    <>
     <button
       type="button"
       className={page.iconButton}
       disabled={pending}
+      aria-busy={pending || undefined}
       aria-label={`${verb} ${branch.name}`}
       title={`${verb} ${branch.name}`}
       onClick={() => {
@@ -123,6 +157,8 @@ function StatusButton({ branch }: { branch: UnitLite }) {
     >
       <Power aria-hidden="true" size={18} />
     </button>
+    {note}
+    </>
   );
 }
 
