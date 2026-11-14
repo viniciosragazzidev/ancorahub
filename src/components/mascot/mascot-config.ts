@@ -41,7 +41,7 @@ export const MASCOT_STATE_ART: Record<MascotState, MascotArt> = {
 };
 
 /** Proporção da caixa (largura / altura): a mesma em todos os estados, para a troca de pose não mexer no layout. */
-export const MASCOT_BOX_RATIO = 0.62;
+export const MASCOT_BOX_RATIO = 0.64;
 
 export const MASCOT_LABELS: Record<MascotState, string> = {
   idle: "Mascote da Âncora Saúde",

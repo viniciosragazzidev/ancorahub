@@ -18,6 +18,7 @@ export function MascotePreview() {
   const [state, setState] = useState<MascotState>("idle");
   const [play, setPlay] = useState(0);
   const [fail, setFail] = useState(false);
+  const [round, setRound] = useState(0);
 
   function show(next: MascotState) {
     setState(next);
@@ -67,11 +68,11 @@ export function MascotePreview() {
             <h2 className="text-base font-medium">Lead aceito</h2>
             <p className="text-sm text-[var(--text-secondary)]">O mascote espera (loading) e só comemora depois da confirmação (lead_accepted). Com falha, fica atento (error).</p>
             <label className="flex min-h-11 items-center gap-2 text-sm">
-              <input type="checkbox" checked={fail} onChange={(event) => setFail(event.target.checked)} />
+              <input type="checkbox" checked={fail} onChange={(event) => { setFail(event.target.checked); show("idle"); }} />
               Simular falha ao aceitar
             </label>
             <LiteActionButton
-              key={`${fail}-${play === 0 ? 0 : 1}`}
+              key={`${fail}-${round}`}
               busyLabel="Aceitando…"
               doneLabel="Lead é seu"
               keeps="O lead continua esperando você"
@@ -80,7 +81,7 @@ export function MascotePreview() {
             >
               Aceitar e chamar no WhatsApp
             </LiteActionButton>
-            <button type="button" className="min-h-11 self-start text-sm underline" onClick={() => { show("idle"); setPlay(0); }}>
+            <button type="button" className="min-h-11 self-start text-sm underline" onClick={() => { show("idle"); setRound((n) => n + 1); }}>
               Recomeçar a demonstração
             </button>
           </section>
