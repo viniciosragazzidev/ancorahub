@@ -184,7 +184,7 @@ function Indicator({ label, value, detail }: { label: string; value: number | nu
 }
 
 /** Atendimento e conversão: os indicadores que o motor já entrega, o funil e a frase do período. */
-function ServiceSection({ view, insightAsBanner = false }: { view: BrokerPerformanceView; insightAsBanner?: boolean }) {
+function ServiceSection({ view, insightAsBanner = false, banner = null }: { view: BrokerPerformanceView; insightAsBanner?: boolean; banner?: ReactNode }) {
   const { firstContact, quoteRate, saleRate } = view.service;
   const scope = PERIOD_SCOPE[view.period];
   return (
@@ -199,6 +199,7 @@ function ServiceSection({ view, insightAsBanner = false }: { view: BrokerPerform
         <Indicator label="Leads que viraram cotação" value={quoteRate} detail={quoteRate === null ? `Sem leads suficientes ${scope}` : scope} />
         <Indicator label="Cotações que viraram venda" value={saleRate} detail={saleRate === null ? `Sem cotações suficientes ${scope}` : scope} />
       </dl>
+      {banner}
       <div className={styles.panel}>
         <h3 className={styles.subTitle}>Seu funil</h3>
         <FunnelBody view={view} />
@@ -284,11 +285,8 @@ export function BrokerPerformanceLite({
           </section>
 
           <LiteStaggerItem index={6}>
-            <ServiceSection view={view} insightAsBanner />
-          </LiteStaggerItem>
-
-          <LiteStaggerItem index={7}>
-            <PerformanceBanner view={view} />
+            {/* O banner fica entre os indicadores e o funil (pedido de 14/11/2026). */}
+            <ServiceSection view={view} insightAsBanner banner={<PerformanceBanner view={view} />} />
           </LiteStaggerItem>
 
           {view.goal ? (

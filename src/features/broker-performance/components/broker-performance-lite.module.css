@@ -96,5 +96,5 @@
 .page[data-composition="results"] .bar { background: var(--chat-action, var(--primary)); }
 
 /* Respiro para o capitão do banner sair pelo topo sem encostar no funil. */
-.banner { margin-top: 40px; }
-@media (min-width: 640px) { .banner { margin-top: 56px; } }
+.banner { margin: 52px 0 12px; }
+@media (min-width: 640px) { .banner { margin: 68px 0 12px; } }
