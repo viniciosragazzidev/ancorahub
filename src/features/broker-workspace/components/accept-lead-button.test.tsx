@@ -65,4 +65,21 @@ describe("AcceptLeadButton", () => {
     expect(mocks.push).not.toHaveBeenCalled();
     expect(mocks.refresh).toHaveBeenCalled();
   });
+
+  it("mostra o lead como aceito na hora e volta ao rótulo original se o servidor recusar", async () => {
+    vi.spyOn(window, "open").mockReturnValue(fakeTab() as unknown as Window);
+    let finish: (value: { success: false; error: string }) => void = () => {};
+    mocks.accept.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    render(<AcceptLeadButton appearance="shared" leadId="l1">Aceitar e chamar</AcceptLeadButton>);
+    const button = screen.getByRole("button", { name: "Aceitar e chamar" });
+    fireEvent.click(button);
+    await waitFor(() => expect(button.textContent).toContain("Lead aceito"));
+    expect(button.getAttribute("data-state")).toBe("accepted");
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    finish({ success: false, error: "Este lead já foi assumido por outro corretor." });
+    await waitFor(() => expect(button.textContent).toBe("Aceitar e chamar"));
+    expect(button.getAttribute("data-state")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toContain("Este lead já foi assumido por outro corretor.");
+  });
 });
+
