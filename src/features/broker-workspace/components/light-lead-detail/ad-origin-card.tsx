@@ -1,7 +1,8 @@
 "use client";
 
-import { Play } from "lucide-react";
-import { useId, useState } from "react";
+import { Play, X } from "lucide-react";
+import { useEffect, useId, useState } from "react";
+import { createPortal } from "react-dom";
 
 import type { BrokerAdContext } from "@/features/leads/broker-ad-context";
 
@@ -21,12 +22,24 @@ const LONG_BODY = 140;
 export function AdOriginCard({ ad }: { ad: BrokerAdContext | null | undefined }) {
   const [expanded, setExpanded] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const id = useId();
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullscreen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [fullscreen]);
+
   if (!ad) return null;
 
   const image = ad.imageUrl && !imageFailed ? ad.imageUrl : null;
   const longBody = Boolean(ad.body && ad.body.length > LONG_BODY);
   const hasCreative = Boolean(ad.title || ad.body || image);
+  const imageAlt = ad.title ? `Anúncio: ${ad.title}` : "Imagem do anúncio";
 
   return (
     <section aria-labelledby={`${id}-heading`} data-tour="micro-lead-ad-origin" className="arc-venancor rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
@@ -47,12 +60,17 @@ export function AdOriginCard({ ad }: { ad: BrokerAdContext | null | undefined })
           <p className="text-xs text-(--text-muted)">O que o cliente viu</p>
           <div className="mt-2 flex min-w-0 gap-3">
             {image ? (
-              <div className="relative size-14 shrink-0 overflow-hidden rounded-2xl bg-(--surface-muted)">
+              <button
+                type="button"
+                onClick={() => setFullscreen(true)}
+                aria-label="Ampliar imagem do anúncio"
+                className="relative size-14 shrink-0 cursor-zoom-in overflow-hidden rounded-2xl bg-(--surface-muted) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--foreground)"
+              >
                 {/* URL da Meta (criativo público); next/image não conhece o domínio. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={image}
-                  alt={ad.title ? `Anúncio: ${ad.title}` : "Imagem do anúncio"}
+                  alt={imageAlt}
                   loading="lazy"
                   referrerPolicy="no-referrer"
                   onError={() => setImageFailed(true)}
@@ -65,7 +83,7 @@ export function AdOriginCard({ ad }: { ad: BrokerAdContext | null | undefined })
                     </span>
                   </span>
                 ) : null}
-              </div>
+              </button>
             ) : null}
             <div className="min-w-0 flex-1">
               {ad.title ? <p className="break-words text-sm font-medium text-(--foreground) [overflow-wrap:anywhere]">{ad.title}</p> : null}
@@ -92,6 +110,36 @@ export function AdOriginCard({ ad }: { ad: BrokerAdContext | null | undefined })
           ) : null}
         </div>
       ) : null}
+
+      {fullscreen && image && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={imageAlt}
+              className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/85 p-4"
+              onClick={() => setFullscreen(false)}
+            >
+              <button
+                type="button"
+                aria-label="Fechar imagem"
+                autoFocus
+                onClick={() => setFullscreen(false)}
+                className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              >
+                <X className="size-5" />
+              </button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={image}
+                alt={imageAlt}
+                referrerPolicy="no-referrer"
+                className="max-h-[90vh] max-w-full rounded-2xl object-contain"
+              />
+            </div>,
+            document.body,
+          )
+        : null}
     </section>
   );
 }
