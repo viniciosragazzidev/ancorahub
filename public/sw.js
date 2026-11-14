@@ -2,7 +2,7 @@
 // Versão: 1.0.2
 // Incremente CACHE_VERSION para forçar atualização do cache.
 
-const CACHE_VERSION = 7;
+const CACHE_VERSION = 8;
 const STATIC_CACHE = `corretop-static-v${CACHE_VERSION}`;
 const ASSET_CACHE = `corretop-assets-v${CACHE_VERSION}`;
 
