@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => {
 });
 const feedback = vi.hoisted(() => ({ fire: vi.fn(), celebrate: vi.fn() }));
 vi.mock("@/components/motion/success-overlay", () => ({ useSuccessOverlay: () => ({ celebrate: feedback.celebrate, node: null }) }));
-vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => feedback.fire }));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => feedback.fire, fireFeedbackOnce: vi.fn() }));
 vi.mock("@/components/ui/sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/features/post-sale/actions", () => ({ registerSaleAction: vi.fn() }));
 
@@ -186,7 +186,9 @@ describe("RegisterSalePanel: venda do corretor no Lite é nível 3", () => {
   it("celebra só depois de a venda ser persistida", async () => {
     await registrarComCelebracao();
     await waitFor(() => expect(feedback.fire).toHaveBeenCalledWith("celebrate", { budgetKey: "venda" }));
-    expect(feedback.celebrate).toHaveBeenCalledWith("Venda registrada");
+    // No Lite a venda comemora em tela cheia com o capitão (SaleCelebration), não no overlay pequeno.
+    expect(await screen.findByRole("dialog", { name: "Venda registrada!" })).toBeTruthy();
+    expect(feedback.celebrate).not.toHaveBeenCalled();
   });
 
   it("sem vaga no dia, confirma sem overlay", async () => {
@@ -194,6 +196,7 @@ describe("RegisterSalePanel: venda do corretor no Lite é nível 3", () => {
     await registrarComCelebracao();
     await waitFor(() => expect(feedback.fire).toHaveBeenCalledWith("celebrate", { budgetKey: "venda" }));
     expect(feedback.celebrate).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "Venda registrada!" })).toBeNull();
   });
 
   it("falha mostra a causa no painel, sem celebrar", async () => {

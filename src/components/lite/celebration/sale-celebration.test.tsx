@@ -37,3 +37,15 @@ describe("SaleCelebration", () => {
     expect(fired).not.toHaveBeenCalled();
   });
 });
+
+import { saleCelebrationStats } from "./sale-celebration";
+
+describe("saleCelebrationStats", () => {
+  it("formats the monthly value and the term, and skips what is missing", () => {
+    expect(saleCelebrationStats({ approvedValue: "1.240,50", contractTermMonths: 12 })).toEqual([
+      { label: "Valor mensal", value: expect.stringMatching(/R\$\s?1\.241/) },
+      { label: "Vigência", value: "12 meses" },
+    ]);
+    expect(saleCelebrationStats({ approvedValue: "", contractTermMonths: 0 })).toEqual([]);
+  });
+});

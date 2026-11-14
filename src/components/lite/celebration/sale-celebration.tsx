@@ -147,3 +147,12 @@ export function SaleCelebration({ open, onClose, celebrationKey, title = "Venda 
     document.body,
   );
 }
+
+/** Números da celebração a partir do formulário da venda: valor mensal e vigência. Sem dado pessoal. */
+export function saleCelebrationStats({ approvedValue, contractTermMonths }: { approvedValue?: string | number | null; contractTermMonths?: number | null }): SaleCelebrationStat[] {
+  const stats: SaleCelebrationStat[] = [];
+  const raw = typeof approvedValue === "number" ? approvedValue : Number(String(approvedValue ?? "").replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", "."));
+  if (Number.isFinite(raw) && raw > 0) stats.push({ label: "Valor mensal", value: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(raw) });
+  if (contractTermMonths && contractTermMonths > 0) stats.push({ label: "Vigência", value: `${contractTermMonths} meses` });
+  return stats;
+}

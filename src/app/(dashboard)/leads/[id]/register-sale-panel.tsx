@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition, type ComponentType, type ReactNode } 
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { useSuccessOverlay } from "@/components/motion/success-overlay";
+import { SaleCelebration, saleCelebrationStats, type SaleCelebrationStat } from "@/components/lite/celebration/sale-celebration";
 import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
 import { useFeedback } from "@/lib/feedback/use-feedback";
 
@@ -221,6 +222,8 @@ export function RegisterSalePanel({
   celebration?: boolean;
 }) {
   const { celebrate: celebrateSuccess, node: successOverlay } = useSuccessOverlay();
+  // Lite (celebration): a venda comemora em tela cheia com o capitão.
+  const [saleScreen, setSaleScreen] = useState<{ key: string; stats: SaleCelebrationStat[] } | null>(null);
   const fire = useFeedback();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const router = useRouter();
@@ -342,7 +345,7 @@ export function RegisterSalePanel({
         // Só depois de a venda ser persistida. A tela confirma "Venda registrada" no próprio lugar; o toast
         // fica com o trabalho do servidor (renovação agendada).
         const plan = fire("celebrate", { budgetKey: "venda" });
-        if (plan.celebrate) celebrateSuccess("Venda registrada");
+        if (plan.celebrate) setSaleScreen({ key: `${leadId}-${Date.now()}`, stats: saleCelebrationStats({ approvedValue, contractTermMonths }) });
         toast.success("Ciclo de vida e lembretes de renovação agendados.");
       } else {
         toast.success("Venda registrada com ciclo de vida e lembretes de renovação agendados!");
@@ -656,6 +659,7 @@ export function RegisterSalePanel({
       </DialogPopup>
     </Dialog>
     {successOverlay}
+    {saleScreen ? <SaleCelebration open celebrationKey={saleScreen.key} stats={saleScreen.stats} onClose={() => setSaleScreen(null)} /> : null}
     </>
   );
 }

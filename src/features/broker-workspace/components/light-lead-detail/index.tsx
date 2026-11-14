@@ -137,7 +137,7 @@ export function LightLeadDetail({
         />
         <DeclineSheet lead={lead} c={c} />
         <StepSheet c={c} />
-        {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} /> : <>
+        {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} celebrationScreen /> : <>
           <SaleDocSheet lead={lead} c={c} requirements={requirements} />
           <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} celebration />
         </>}
@@ -180,7 +180,7 @@ export function LightLeadDetail({
       <LeadActionBar lead={lead} c={c} />
       <DeclineSheet lead={lead} c={c} />
       <StepSheet c={c} />
-      {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} /> : <>
+      {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} celebrationScreen /> : <>
         <SaleDocSheet lead={lead} c={c} requirements={requirements} />
         <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} celebration />
       </>}

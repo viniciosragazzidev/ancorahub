@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { useSuccessOverlay } from "@/components/motion/success-overlay";
+import { SaleCelebration, saleCelebrationStats, type SaleCelebrationStat } from "@/components/lite/celebration/sale-celebration";
 import { LiteSuccess } from "@/components/lite/motion";
 import { AlertCircle, Info, Sparkles, XIcon } from "lucide-react";
 import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
@@ -112,6 +113,7 @@ export function RegisterSaleWizard({
   previewMode = false,
   previewMessage = null,
   successOverlay: showSuccessOverlay = true,
+  celebrationScreen = false,
 }: {
   lead: LightLeadDetailData;
   documents: ConfirmationDocument[];
@@ -127,11 +129,14 @@ export function RegisterSaleWizard({
    * é nível 3 (FEEDBACK.md): o overlay aparece quando o limite do dia e as preferências deixam celebrar.
    */
   successOverlay?: boolean;
+  /** Lite: a venda comemora em tela cheia com o capitão (SaleCelebration), em vez do overlay. */
+  celebrationScreen?: boolean;
 }) {
   const router = useRouter();
   const fire = useFeedback();
   const [pending, startTransition] = useTransition();
   const { celebrate, node: successOverlay } = useSuccessOverlay();
+  const [saleScreen, setSaleScreen] = useState<{ key: string; stats: SaleCelebrationStat[] } | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [policyNumber, setPolicyNumber] = useState("");
   const [coverageStartDate, setCoverageStartDate] = useState("");
@@ -289,7 +294,8 @@ export function RegisterSaleWizard({
         // Nível 3, só depois de a venda ser persistida: som de marco, vibração de sucesso e o overlay
         // (que não bloqueia). Sem vaga no dia ou com celebrações desligadas, vira confirmação simples.
         const plan = fire("celebrate", { budgetKey: "venda" });
-        if (plan.celebrate || showSuccessOverlay) celebrate("Venda registrada");
+        if (celebrationScreen && plan.celebrate) setSaleScreen({ key: `${lead.id}-${Date.now()}`, stats: saleCelebrationStats({ approvedValue, contractTermMonths }) });
+        else if (plan.celebrate || showSuccessOverlay) celebrate("Venda registrada");
         // "Venda registrada" já aparece na tela; o toast fica só com o que é trabalho do servidor.
         toast.success("O ciclo de renovação já foi agendado.");
         onOpenChange(false);
@@ -529,6 +535,7 @@ export function RegisterSaleWizard({
         </DialogPopup>
       </Dialog>
       {successOverlay}
+      {saleScreen ? <SaleCelebration open celebrationKey={saleScreen.key} stats={saleScreen.stats} onClose={() => setSaleScreen(null)} /> : null}
     </>
   );
 }
