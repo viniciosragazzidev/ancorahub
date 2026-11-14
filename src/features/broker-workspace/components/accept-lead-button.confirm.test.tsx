@@ -92,7 +92,8 @@ describe("AcceptLeadButton: confirmação no botão", () => {
     fireEvent.click(button);
     await waitFor(() => expect(mocks.error).toHaveBeenCalled());
     await waitFor(() => expect(button.textContent).toBe("Aceitar e chamar"));
-    expect(button.querySelector("svg")).toBeNull();
+    // Só o raio do visual de aceite (decorativo); nenhum check.
+    expect(button.querySelector(":not([data-accept-icon]) > svg")).toBeNull();
     expect(button.getAttribute("data-confirmed")).toBeNull();
   });
 

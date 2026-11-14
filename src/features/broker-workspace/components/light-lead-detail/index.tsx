@@ -142,7 +142,7 @@ export function LightLeadDetail({
           <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} />
         </>}
         {c.successOverlay}
-      {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={c.handoffUrl} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} onClose={c.closeHandoff} /> : null}
+      {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={`${c.handoffUrl}:${c.handoffPhase}`} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} initialPhase={c.handoffPhase} onClose={c.closeHandoff} /> : null}
       </>
     );
   }
@@ -185,7 +185,7 @@ export function LightLeadDetail({
         <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} />
       </>}
       {c.successOverlay}
-      {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={c.handoffUrl} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} onClose={c.closeHandoff} /> : null}
+      {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={`${c.handoffUrl}:${c.handoffPhase}`} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} initialPhase={c.handoffPhase} onClose={c.closeHandoff} /> : null}
     </div>
   );
 }

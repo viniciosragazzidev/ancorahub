@@ -5,6 +5,7 @@ import { ClipboardList, MessageCircle, Phone } from "lucide-react";
 
 import { Button } from "@/components/arc/button/button";
 import social from "@/features/broker-workspace/chat/lead-social.module.css";
+import { AcceptLeadIcon, acceptLeadButtonClass } from "@/features/broker-workspace/components/accept-lead-style";
 
 import type { LightLeadDetailData } from "./types";
 import type { LeadDetailController } from "./use-lead-detail";
@@ -49,7 +50,8 @@ export function LeadActionBar({ lead, c, inline = false, compact = false }: { le
             <Button variant="secondary" disabled={accepting} onClick={() => setShowDeclineModal(true)}>
               Recusar
             </Button>
-            <Button className="flex-1" loading={accepting} disabled={accepting} onClick={handleAccept}>
+            <Button className={`flex-1 ${acceptLeadButtonClass}`} loading={accepting} disabled={accepting} onClick={handleAccept}>
+              <AcceptLeadIcon />
               Aceitar e chamar no WhatsApp
             </Button>
           </>

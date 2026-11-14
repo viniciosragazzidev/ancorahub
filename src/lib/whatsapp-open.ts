@@ -99,6 +99,31 @@ export function prepareWhatsAppWindow(device: WhatsAppDevice = currentWhatsAppDe
 export type AutoOpenResult = "opened" | "failed";
 
 /**
+ * Celular: o app do WhatsApp abriu? Comece a vigiar ANTES de mandar para o link. Se a página sumir
+ * (visibilitychange hidden, pagehide ou blur) dentro de `waitMs`, abriu; se continuar visível, falhou
+ * (ex.: iOS barrou) e a tela oferece o toque.
+ */
+export function watchWhatsAppLeave(waitMs = 1500): Promise<AutoOpenResult> {
+  if (typeof window === "undefined") return Promise.resolve("failed");
+  return new Promise((resolve) => {
+    let left = false;
+    const onHide = () => {
+      if (document.visibilityState === "hidden") left = true;
+    };
+    const onPageHide = () => { left = true; };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("blur", onPageHide);
+    window.setTimeout(() => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("blur", onPageHide);
+      resolve(left ? "opened" : "failed");
+    }, waitMs);
+  });
+}
+
+/**
  * Aceite com contador (11/11): abre o WhatsApp sem um toque recente (depois dos 30 s). Os navegadores
  * costumam barrar: no computador `window.open` volta nulo; no celular a página continua visível
  * (o app não abriu). Em `failed`, a tela pede um toque, que sempre funciona.
@@ -121,25 +146,11 @@ export function tryOpenWhatsAppWithoutGesture(href: string, device: WhatsAppDevi
     }
     return Promise.resolve("opened");
   }
-  return new Promise((resolve) => {
-    let left = false;
-    const onHide = () => {
-      if (document.visibilityState === "hidden") left = true;
-    };
-    const onPageHide = () => { left = true; };
-    document.addEventListener("visibilitychange", onHide);
-    window.addEventListener("pagehide", onPageHide);
-    window.addEventListener("blur", onPageHide);
-    try {
-      window.location.href = target;
-    } catch {
-      /* blocked: resolved as failed below */
-    }
-    window.setTimeout(() => {
-      document.removeEventListener("visibilitychange", onHide);
-      window.removeEventListener("pagehide", onPageHide);
-      window.removeEventListener("blur", onPageHide);
-      resolve(left ? "opened" : "failed");
-    }, waitMs);
-  });
+  const left = watchWhatsAppLeave(waitMs);
+  try {
+    window.location.href = target;
+  } catch {
+    /* blocked: resolved as failed by the watcher */
+  }
+  return left;
 }

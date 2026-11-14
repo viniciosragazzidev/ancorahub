@@ -10,10 +10,11 @@ import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import page from "@/components/lite/page/lite-page.module.css";
+import { AcceptLeadIcon, OfferPendingTag, acceptLeadButtonClass, useOfferPendingAttributes } from "@/features/broker-workspace/components/accept-lead-style";
 
 import { acceptLeadOfferAction } from "@/features/leads/accept-offer-action";
-import { openWhatsApp, prepareWhatsAppWindow } from "@/lib/whatsapp-open";
-import { rememberWhatsAppHandoff, useAcceptHandoffEnabled } from "@/features/broker-workspace/whatsapp-handoff/handoff-store";
+import { currentWhatsAppDevice, openWhatsApp, prepareWhatsAppWindow, watchWhatsAppLeave } from "@/lib/whatsapp-open";
+import { rememberWhatsAppHandoff, reportWhatsAppOpenFailed, useAcceptHandoffEnabled } from "@/features/broker-workspace/whatsapp-handoff/handoff-store";
 
 /**
  * "Aceitar e chamar no WhatsApp" in the Lite workspace: one tap accepts the
@@ -29,6 +30,10 @@ import { rememberWhatsAppHandoff, useAcceptHandoffEnabled } from "@/features/bro
  * Confirmação no próprio botão: enquanto o servidor responde, "Lead aceito" fica com o lugar do check
  * reservado; quando o aceite confirma, o `LiteSuccess` desenha o check ali (0,32 s, `duration.draw`). Com
  * movimento reduzido ou o kill-switch html[data-interface-motion="off"], o check já aparece pronto.
+ *
+ * Visual (14/11): o mesmo em todo o app, verde de ação positiva com o raio num círculo (accept-lead-style).
+ * `offerPending` (o botão principal da Home quando há oferta esperando): etiqueta "Oferta pendente", anel
+ * em volta e, com movimento ligado, o anel pulsa a cada 2 s. Para quando aceita, encerra ou a oferta some.
  */
 function AcceptedLabel() {
   // Mesmo tamanho e espaçamento do LiteSuccess (ícone 16 px, gap 8 px): a troca não mexe na largura.
@@ -39,7 +44,7 @@ function ConfirmedLabel() {
   return <LiteSuccess label="Lead aceito" />;
 }
 
-export function AcceptLeadButton({ leadId, className, children, style, appearance = "legacy", disabled = false, arcToLeads = false, "data-tour": dataTour }: { leadId: string; className?: string; children: ReactNode; style?: CSSProperties; appearance?: "legacy" | "shared"; disabled?: boolean; /** Ponto em arco até a contagem de Leads ao aceitar (só o "Seu próximo passo"; ver lead-arc.ts). */ arcToLeads?: boolean; "data-tour"?: string }) {
+export function AcceptLeadButton({ leadId, className, children, style, appearance = "legacy", disabled = false, arcToLeads = false, offerPending = false, "data-tour": dataTour }: { leadId: string; className?: string; children: ReactNode; style?: CSSProperties; appearance?: "legacy" | "shared"; disabled?: boolean; /** Ponto em arco até a contagem de Leads ao aceitar (só o "Seu próximo passo"; ver lead-arc.ts). */ arcToLeads?: boolean; /** Oferta esperando o corretor: etiqueta, anel e pulso em loop (Home). */ offerPending?: boolean; "data-tour"?: string }) {
   const router = useRouter();
   const reduce = useReducedMotion();
   const motionEnabled = useInterfaceMotionEnabled();
@@ -58,7 +63,11 @@ export function AcceptLeadButton({ leadId, className, children, style, appearanc
     const origin = event.currentTarget;
     inFlight.current = true;
     setError(null);
-    const whatsapp = handoff ? { go: () => false, cancel: () => {} } : prepareWhatsAppWindow();
+    // Contador de 30 s só no computador (14/11). No celular o navegador barra abrir o app sem um toque
+    // recente, então aos 30 s falhava: lá o WhatsApp abre direto, aproveitando este toque.
+    const device = currentWhatsAppDevice();
+    const counting = handoff && device === "desktop";
+    const whatsapp = counting ? { go: () => false, cancel: () => {} } : prepareWhatsAppWindow(device);
     startTransition(async () => {
       setAccepted(true);
       let result: Awaited<ReturnType<typeof acceptLeadOfferAction>>;
@@ -79,9 +88,12 @@ export function AcceptLeadButton({ leadId, className, children, style, appearanc
       setConfirmed(true);
       if (arcToLeads) flyLeadArc(origin, { motionEnabled });
       const url = result.whatsappUrl;
-      if (handoff && url) {
+      // Celular: vigia se o app abriu; se a página continuar visível, a tela do lead pede o toque.
+      const leave = !counting && url && device === "mobile" ? watchWhatsAppLeave() : null;
+      if (counting && url) {
         rememberWhatsAppHandoff(leadId, url);
       } else if (url && whatsapp.go(url)) {
+        if (leave) void leave.then((outcome) => { if (outcome === "failed") reportWhatsAppOpenFailed(leadId, url); });
         toast.success("Lead aceito. Abrindo o WhatsApp do cliente.", { action: { label: "Abrir de novo", onClick: () => openWhatsApp(url) } });
       } else if (url) {
         whatsapp.cancel();
@@ -94,18 +106,24 @@ export function AcceptLeadButton({ leadId, className, children, style, appearanc
     });
   }
 
-  const label = confirmed ? <ConfirmedLabel /> : accepted ? <AcceptedLabel /> : children;
+  const settled = confirmed || accepted;
+  const label = confirmed ? <ConfirmedLabel /> : accepted ? <AcceptedLabel /> : <><AcceptLeadIcon />{offerPending && !disabled ? <OfferPendingTag /> : null}<span>{children}</span></>;
+  // Pendente só enquanto dá para aceitar; o loop só com movimento ligado (reduzido e kill-switch: anel parado).
+  const showPending = offerPending && !disabled && !settled;
+  const pendingProps = useOfferPendingAttributes(showPending);
+  const classes = [acceptLeadButtonClass, className].filter(Boolean).join(" ");
 
   if (appearance === "shared") return <div className="grid min-w-0 gap-2">
-    <Button type="button" className={[page.primaryButton, className].filter(Boolean).join(" ")} style={style} data-tour={dataTour} data-state={confirmed || accepted ? "accepted" : undefined} data-confirmed={confirmed || undefined} disabled={disabled || pending || confirmed} aria-busy={pending || undefined} aria-describedby={error ? errorId : undefined} onClick={handleClick}>{label}</Button>
+    <Button type="button" variant="success" className={[page.primaryButton, classes].join(" ")} style={style} {...pendingProps} data-tour={dataTour} data-state={confirmed || accepted ? "accepted" : undefined} data-confirmed={confirmed || undefined} disabled={disabled || pending || confirmed} aria-busy={pending || undefined} aria-describedby={error ? errorId : undefined} onClick={handleClick}>{label}</Button>
     {error ? <p id={errorId} role="alert" className="max-w-sm text-sm text-destructive">{error}</p> : null}
   </div>;
 
   return (
     <motion.button
       type="button"
-      className={className}
+      className={classes}
       style={style}
+      {...pendingProps}
       data-tour={dataTour}
       data-state={confirmed || accepted ? "accepted" : undefined}
       data-confirmed={confirmed || undefined}

@@ -11,6 +11,8 @@ import { ACTION_PRESENTATION, DEFAULT_ACTION } from "./format";
 
 const primary =
   "inline-flex h-11 w-full items-center justify-center rounded-full bg-(--accent) px-5 text-sm font-semibold text-(--accent-foreground) disabled:opacity-60";
+/** O aceite tem o visual próprio (verde, raio): aqui só a largura. */
+const acceptLayout = "w-full";
 const secondary =
   "inline-flex h-11 items-center justify-center rounded-full bg-(--surface-muted) px-5 text-sm font-semibold text-(--foreground)";
 
@@ -42,7 +44,7 @@ export function NextAction({ action }: { action: BrokerWorkspaceData["nextAction
           <Badge tone={presentation.tone}>{presentation.chip}</Badge>
         </div>
         {action.kind === "new_lead" && action.leadId ? (
-          <AcceptLeadButton leadId={action.leadId} className={primary}>
+          <AcceptLeadButton leadId={action.leadId} className={acceptLayout} offerPending>
             {presentation.button}
           </AcceptLeadButton>
         ) : (
