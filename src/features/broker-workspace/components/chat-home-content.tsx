@@ -77,7 +77,7 @@ function tipOf(data: BrokerHighlights) {
   return "continue assim: responder rápido e registrar cada atendimento mantém você no topo.";
 }
 
-function highlightsOf(data: BrokerHighlights | null, journey: BrokerJourneyData | null): HomeHighlights | null {
+function highlightsOf(data: BrokerHighlights | null, journey: BrokerJourneyData | null, journeyEnabled = false): HomeHighlights | null {
   const step = journey?.missions.find((m) => m.metric === "steps.coverage" && m.progress.eligible);
   if (!data && !step) return null;
   return {
@@ -93,6 +93,7 @@ function highlightsOf(data: BrokerHighlights | null, journey: BrokerJourneyData 
         progress: step.progress,
       }
       : null,
+    journeyHref: journeyEnabled ? "/jornada" : null,
   };
 }
 
@@ -106,13 +107,14 @@ export async function ChatHomeContent() {
   // same tenant and user, both come from the authenticated context).
   const context = await getRequiredTenantContext().catch(() => null);
   if (!context) return <LightDashboardUnavailable />;
-  const [rail, data, highlights, journey, firstSteps, floatingNow] = await Promise.all([
+  const [rail, data, highlights, journey, firstSteps, floatingNow, journeyFlag] = await Promise.all([
     getChatRailData(),
     getCachedBrokerWorkspaceData().catch(() => null),
     getBrokerHighlights(context.tenantId, context.userId).catch(() => null),
     getCachedBrokerJourneyData(context.tenantId, context.userId).catch(() => null),
     getFirstSteps(context.tenantId, context.userId).catch(() => null),
     context.role === "broker" ? getFeatureFlag(FEATURE_FLAGS.BROKER_NOW_FLOATING).catch(() => "false") : Promise.resolve("false"),
+    getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false"),
   ]);
   if (!rail || !data) return <LightDashboardUnavailable />;
   return (
@@ -127,7 +129,7 @@ export async function ChatHomeContent() {
       presence={presenceAskOf(data)}
       presenceAsks={presenceAsksOf(data)}
       firstSteps={firstSteps}
-      highlights={highlightsOf(highlights, journey)}
+      highlights={highlightsOf(highlights, journey, journeyFlag === "true")}
     />
   );
 }

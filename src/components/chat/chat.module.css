@@ -118,7 +118,7 @@
 /* The bar shows only while the pointer is over the conversation (like the ScrollArea beside it). */
 .scroll:hover { scrollbar-color: color-mix(in oklab, var(--foreground) 28%, transparent) transparent; }
 .topNotice { position: sticky; top: 0; z-index: 2; max-width: var(--chat-maxw); margin-inline: auto; padding: 2px var(--chat-gutter); background: var(--surface-card); }
-.thread_ { width: 100%; max-width: var(--chat-maxw); margin-inline: auto; padding: 12px var(--chat-gutter) 24px; display: grid; gap: 16px; }
+.thread_ { width: 100%; max-width: var(--chat-maxw); margin-inline: auto; padding: 12px var(--chat-gutter) 24px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 
 /* ---------- blocks ---------- */
 .date { justify-self: center; font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
@@ -203,7 +203,7 @@
 
 /* ---------- composer ---------- */
 .composerWrap { position: sticky; bottom: 0; z-index: 5; padding: 8px 12px calc(env(safe-area-inset-bottom, 0px) + 12px); background: linear-gradient(to top, var(--surface) 70%, transparent); }
-.composerInner { width: 100%; max-width: var(--chat-maxw); margin-inline: auto; display: grid; gap: 8px; }
+.composerInner { width: 100%; max-width: var(--chat-maxw); margin-inline: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .progress { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding: 0 8px; font-size: var(--text-sm); }
 /* Lesson-like track under the guided-flow title: one pill per step, filled in the action blue. */
 .progressTrack { flex-basis: 100%; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; }

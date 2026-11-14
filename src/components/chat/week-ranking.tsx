@@ -23,6 +23,8 @@ export type HomeHighlights = {
   stats?: WeekStat[];
   /** One concrete way to climb, from the weakest number. */
   tip?: string | null;
+  /** Atalho para a Jornada no fim do painel; só vem com a chave da Jornada ligada. */
+  journeyHref?: string | null;
 };
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -130,6 +132,13 @@ export function WeekRanking({ data, className }: { data: HomeHighlights; classNa
                 <span className={css.cardDetail}>{data.mission.detail}</span>
                 {data.mission.progress ? <MissionBar progress={data.mission.progress} /> : null}
               </span>
+            </Link>
+          ) : null}
+
+          {data.journeyHref ? (
+            <Link href={data.journeyHref} className={css.journeyLink} onClick={() => setOpen(false)}>
+              Ver minha jornada
+              <svg viewBox="0 0 16 16" aria-hidden className={css.journeyArrow}><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </Link>
           ) : null}
         </div>
