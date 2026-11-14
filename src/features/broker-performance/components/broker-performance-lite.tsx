@@ -11,6 +11,7 @@ import { CurrencyCircleDollar, FileText, Handshake, Sparkle, Users } from "@/com
 import { LiteDelta, LiteNumber, LiteStaggerItem } from "@/components/lite/motion";
 
 import { BROKER_PERFORMANCE_PERIODS, PERIOD_LABEL, type BrokerMetricCard, type BrokerPerformancePeriod, type BrokerPerformanceView } from "../domain";
+import { CaptainBanner } from "@/components/lite/banner/captain-banner";
 import styles from "./broker-performance-lite.module.css";
 
 const PERIOD_OPTIONS = BROKER_PERFORMANCE_PERIODS.map((value) => ({ value, label: PERIOD_LABEL[value] }));
@@ -183,7 +184,7 @@ function Indicator({ label, value, detail }: { label: string; value: number | nu
 }
 
 /** Atendimento e conversão: os indicadores que o motor já entrega, o funil e a frase do período. */
-function ServiceSection({ view }: { view: BrokerPerformanceView }) {
+function ServiceSection({ view, insightAsBanner = false }: { view: BrokerPerformanceView; insightAsBanner?: boolean }) {
   const { firstContact, quoteRate, saleRate } = view.service;
   const scope = PERIOD_SCOPE[view.period];
   return (
@@ -202,9 +203,21 @@ function ServiceSection({ view }: { view: BrokerPerformanceView }) {
         <h3 className={styles.subTitle}>Seu funil</h3>
         <FunnelBody view={view} />
       </div>
-      {view.insight ? <Insight text={view.insight} /> : null}
+      {view.insight && !insightAsBanner ? <Insight text={view.insight} /> : null}
     </section>
   );
+}
+
+/**
+ * Banner do Desempenho (14/11/2026): tom quase branco, o capitão saindo pelo topo. A frase é a dica do período
+ * (o que mais pode subir agora) e o atalho leva aos leads, onde a dica vira ação.
+ */
+function PerformanceBanner({ view }: { view: BrokerPerformanceView }) {
+  const first = view.service.firstContact;
+  const goal = first ? { value: `${Math.round(first.rate)}% no prazo`, hint: "primeiro contato" } : undefined;
+  const title = view.insight ?? (view.empty ? "Assim que os leads chegarem, seus números aparecem aqui. Bora pro próximo?" : "Responder rápido é o que mais vira venda. Bora manter o ritmo?");
+  return <CaptainBanner className={styles.banner} label="Dica do desempenho" tone="white" title={title} goal={goal}
+    progress={first ? first.rate : null} action={{ label: "Ver meus leads", href: "/minha-fila" }} />;
 }
 
 export type BrokerPerformanceComposition = "classic" | "results";
@@ -235,6 +248,8 @@ export function BrokerPerformanceLite({
   }
 
   if (composition === "results") {
+    // Refino 14/11/2026: o que está vazio sai da tela (operadoras sem venda, metas sem meta ativa); a dica do período
+    // vira o banner claro com o capitão, que também leva aos leads.
     return (
       <div className={styles.page} aria-busy={pending} data-composition="results">
         <LiteStaggerItem index={0}>
@@ -251,36 +266,38 @@ export function BrokerPerformanceLite({
               <p className={styles.lead}>{view.summary}</p>
             </LiteStaggerItem>
             <NumberCards view={view} />
-            <LiteStaggerItem index={5}>
-              <div className={styles.panel}>
-                <h3 className={styles.subTitle}>Vendas por operadora</h3>
-                <CarriersBody view={view} />
-              </div>
-            </LiteStaggerItem>
+            {view.carriers.length ? (
+              <LiteStaggerItem index={5}>
+                <div className={styles.panel}>
+                  <h3 className={styles.subTitle}>Vendas por operadora</h3>
+                  <CarriersBody view={view} />
+                </div>
+              </LiteStaggerItem>
+            ) : null}
           </section>
 
           <LiteStaggerItem index={6}>
-            <ServiceSection view={view} />
+            <ServiceSection view={view} insightAsBanner />
           </LiteStaggerItem>
 
           <LiteStaggerItem index={7}>
-            <section className={styles.section} aria-labelledby="performance-goals-title" data-block="metas">
-              <h2 id="performance-goals-title" className={styles.sectionTitle}>Metas</h2>
-              {view.goal ? (
-                <GoalPanel goal={view.goal} />
-              ) : (
-                <p className={`${styles.panel} ${styles.empty}`}>Nenhuma meta ativa para você agora. Quando a gestão definir uma, o progresso aparece aqui.</p>
-              )}
-            </section>
+            <PerformanceBanner view={view} />
           </LiteStaggerItem>
 
-          {journey ? (
+          {view.goal ? (
             <LiteStaggerItem index={8}>
-              <div data-block="jornada">{journey}</div>
+              <section className={styles.section} aria-labelledby="performance-goals-title" data-block="metas">
+                <h2 id="performance-goals-title" className={styles.sectionTitle}>Metas</h2>
+                <GoalPanel goal={view.goal} />
+              </section>
             </LiteStaggerItem>
           ) : null}
 
-          <Shortcuts />
+          {journey ? (
+            <LiteStaggerItem index={9}>
+              <div data-block="jornada">{journey}</div>
+            </LiteStaggerItem>
+          ) : null}
         </div>
       </div>
     );

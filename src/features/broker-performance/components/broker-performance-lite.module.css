@@ -73,3 +73,28 @@
 .indicatorEmpty { flex: none; color: var(--text-muted); font-size: var(--text-sm); font-weight: 500; }
 
 @media (prefers-reduced-motion: reduce) { .page[aria-busy="true"] .body { transition: none; } }
+
+/*
+ * Refino 14/11/2026 (composição por resultados): cartões e painéis brancos com borda fina, como o resto do Lite;
+ * número maior; o ícone num quadrado de cor suave; variação com seta.
+ */
+.page[data-composition="results"] .card,
+.page[data-composition="results"] .panel { background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
+.page[data-composition="results"] .card { gap: 6px; padding: 16px 16px 14px; }
+.page[data-composition="results"] .cardTop { align-items: center; flex-direction: row-reverse; justify-content: flex-end; gap: 10px; }
+.page[data-composition="results"] .cardIcon { box-sizing: content-box; width: 18px; height: 18px; padding: 8px; border-radius: 12px; background: var(--chat-action-soft, rgb(0 43 115 / 0.1)); color: var(--chat-action, var(--primary)); }
+.page[data-composition="results"] .cardLabel { font-weight: 500; }
+.page[data-composition="results"] .cardValue { margin-top: 6px; font-size: 30px; font-weight: 500; line-height: 1.1; }
+.page[data-composition="results"] .change { margin-top: 2px; }
+.page[data-composition="results"] .up::before { content: "▲ "; font-size: 9px; }
+.page[data-composition="results"] .down::before { content: "▼ "; font-size: 9px; }
+.page[data-composition="results"] .indicator + .indicator { border-top: 1px solid var(--border-subtle); }
+.page[data-composition="results"] .indicatorValue { font-weight: 500; }
+.page[data-composition="results"] .indicatorEmpty { padding: 4px 10px; border-radius: 999px; background: var(--surface-muted); font-size: var(--text-xs); }
+.page[data-composition="results"] .sectionTitle { font-weight: 500; }
+.page[data-composition="results"] .subTitle { font-weight: 500; }
+.page[data-composition="results"] .bar { background: var(--chat-action, var(--primary)); }
+
+/* Respiro para o capitão do banner sair pelo topo sem encostar no funil. */
+.banner { margin-top: 40px; }
+@media (min-width: 640px) { .banner { margin-top: 56px; } }

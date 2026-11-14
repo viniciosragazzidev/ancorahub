@@ -56,15 +56,19 @@ describe("BrokerPerformanceLite, composição por resultados (chave ligada)", ()
     expect(screen.queryByText(/ranking|placar|missões/i)).toBeNull();
   });
 
-  it("não transforma ausência de dado em zero e mostra os vazios de meta e jornada", () => {
+  it("não transforma ausência de dado em zero e esconde o que está vazio (refino 14/11/2026)", () => {
     const { container } = render(
       <BrokerPerformanceLite view={view({ current: totals(), previous: totals(), carriers: [], goal: null, period: "hoje" })} composition="results" />,
     );
     expect(screen.getAllByText("Sem dado")).toHaveLength(3);
     expect(screen.getByText("Nenhum lead com prazo medido hoje")).toBeTruthy();
-    expect(screen.getByText(/Nenhuma meta ativa para você agora/)).toBeTruthy();
-    expect(screen.getByText("Nenhuma venda neste período.")).toBeTruthy();
-    expect(blocks(container)).toEqual(["periodo", "resultados", "indicadores", "metas"]);
+    // Sem meta ativa e sem venda por operadora, os blocos saem da tela em vez de mostrar um aviso de vazio.
+    expect(screen.queryByText(/Nenhuma meta ativa para você agora/)).toBeNull();
+    expect(screen.queryByText("Nenhuma venda neste período.")).toBeNull();
+    expect(blocks(container)).toEqual(["periodo", "resultados", "indicadores"]);
+    // O banner do capitão leva aos leads.
+    expect(screen.getByRole("region", { name: "Dica do desempenho" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Ver meus leads" }).getAttribute("href")).toBe("/minha-fila");
   });
 });
 
