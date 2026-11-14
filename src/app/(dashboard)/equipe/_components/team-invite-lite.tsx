@@ -4,8 +4,12 @@
  * Criar membro no visual Lite (página /equipe/convidar e, depois, o "Novo funcionário" de /equipe). Mesmas regras e
  * mesmas Server Actions do TeamInviteSection: cadastro manual (cargo, perfil de acesso, código do corretor, cargo
  * personalizado, unidade) ou importação CSV; ao criar, a mensagem pronta com o link de ativação.
+ *
+ * Feedback (FEEDBACK.md, nível 1): o botão mostra o envio; o sucesso é a própria tela "Convite criado" (sem toast) e a
+ * falha fica no formulário, com a causa e "Tentar de novo". O toast só fica quando o painel fecha sozinho (acesso sem
+ * link ou importação concluída, com o relatório). Copiar é nível 0: o botão vira "Copiado".
  */
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Copy, Link2, MessageCircle } from "lucide-react";
 
@@ -18,6 +22,7 @@ import { openWhatsApp } from "@/lib/whatsapp-open";
 import { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";
 
 import { createTeamUserAction, importBrokersAction } from "../actions";
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import styles from "./team-invite-lite.module.css";
 
 export type InviteCustomRole = { id: string; name: string; scope: "none" | "own" | "branch" | "tenant" };
@@ -58,6 +63,7 @@ export function TeamInviteLite({ branches, canInviteManager, canInviteDirector =
   const [created, setCreated] = useState<{ name: string; link: string; whatsapp: string } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const csvRef = useRef<HTMLFormElement>(null);
+  const { status, confirm, fail, clear } = useActionStatus();
 
   const jobOptions = JOB_TITLES.filter((item) => (item.value === "director" ? canInviteDirector : canInviteManager || item.value !== "manager"));
   const roleOptions = [
@@ -84,16 +90,25 @@ export function TeamInviteLite({ branches, canInviteManager, canInviteDirector =
     }
     const name = String(data.get("name") ?? "");
     const titleLabel = JOB_TITLES.find((item) => item.value === jobTitle)?.label ?? "Funcionário";
+    clear("create");
     startTransition(async () => {
-      const result = await createTeamUserAction({ success: false }, data);
-      if (!result.success) {
-        toast.error("Não foi possível criar o acesso", { description: result.error });
+      let result: Awaited<ReturnType<typeof createTeamUserAction>>;
+      try {
+        result = await createTeamUserAction({ success: false }, data);
+      } catch (error) {
+        fail("create", error, { fallback: "Não foi possível criar o acesso.", keeps: "O que você preencheu continua aqui.", retry: () => formRef.current?.requestSubmit() });
         return;
       }
-      toast.success(`Acesso de ${titleLabel} criado com sucesso.`);
+      if (!result.success) {
+        fail("create", result.error, { fallback: "Não foi possível criar o acesso.", keeps: "O que você preencheu continua aqui.", retry: () => formRef.current?.requestSubmit() });
+        return;
+      }
+      confirm("create", `Acesso de ${titleLabel} criado`);
       if (result.token) {
         setCreated({ name, link: `${window.location.origin}/onboarding?token=${result.token}`, whatsapp: result.whatsappStatus ?? "not_available" });
       } else {
+        // O painel fecha: o toast é o único lugar que sobra para confirmar.
+        toast.success(`Acesso de ${titleLabel} criado com sucesso.`);
         formRef.current?.reset();
         onDone?.();
       }
@@ -102,15 +117,24 @@ export function TeamInviteLite({ branches, canInviteManager, canInviteDirector =
   };
 
   const importCsv = (data: FormData) => {
+    clear("import");
     startTransition(async () => {
-      const result = await importBrokersAction({ success: false }, data);
+      let result: Awaited<ReturnType<typeof importBrokersAction>>;
+      try {
+        result = await importBrokersAction({ success: false }, data);
+      } catch (error) {
+        fail("import", error, { fallback: "Não foi possível importar.", keeps: "Nenhum corretor foi criado.", retry: () => csvRef.current?.requestSubmit() });
+        return;
+      }
       if (result.success) {
+        confirm("import", "Importação concluída");
+        // O painel fecha e o relatório da importação só cabe no toast.
         toast.success("Importação concluída.", { description: result.report || "" });
         csvRef.current?.reset();
         onDone?.();
         router.refresh();
       } else {
-        toast.error("Não foi possível importar", { description: result.error });
+        fail("import", result.error, { fallback: "Não foi possível importar.", keeps: "Nenhum corretor foi criado.", retry: () => csvRef.current?.requestSubmit() });
       }
     });
   };
@@ -133,12 +157,8 @@ export function TeamInviteLite({ branches, canInviteManager, canInviteDirector =
           <p className={styles.message}>{message}</p>
         </div>
         <div className={styles.doneActions}>
-          <button type="button" className={page.primaryButton} onClick={async () => { await navigator.clipboard.writeText(message); toast.success("Mensagem completa de convite copiada!"); }}>
-            <Copy aria-hidden="true" size={16} />Copiar mensagem
-          </button>
-          <button type="button" className={page.button} onClick={async () => { await navigator.clipboard.writeText(created.link); toast.success("Link direto copiado!"); }}>
-            <Link2 aria-hidden="true" size={16} />Copiar só o link
-          </button>
+          <CopyButton primary value={message} label="Copiar mensagem" icon={<Copy aria-hidden="true" size={16} />} />
+          <CopyButton value={created.link} label="Copiar só o link" icon={<Link2 aria-hidden="true" size={16} />} />
           <button type="button" className={page.button} onClick={() => openWhatsApp(buildWhatsAppWebUrl(null, message))}>
             <MessageCircle aria-hidden="true" size={16} />Abrir no WhatsApp
           </button>
@@ -216,8 +236,9 @@ export function TeamInviteLite({ branches, canInviteManager, canInviteDirector =
             {branchError ? <span className={styles.error} role="alert">Escolha a unidade do membro.</span> : null}
           </div>
           <div className={form.actions}>
-            <button type="submit" className={page.primaryButton} disabled={pending}>{pending ? "Criando acesso..." : "Criar acesso"}</button>
+            <button type="submit" className={page.primaryButton} disabled={pending} aria-busy={pending || undefined}><BusyLabel busy={pending} label="Criando acesso…">Criar acesso</BusyLabel></button>
           </div>
+          {status.create?.state === "error" ? <ActionNote status={status.create} /> : null}
         </form>
       </TabsContent>
 
@@ -236,10 +257,33 @@ export function TeamInviteLite({ branches, canInviteManager, canInviteDirector =
             </ol>
           </div>
           <div className={form.actions}>
-            <button type="submit" className={page.primaryButton} disabled={pending}>{pending ? "Importando..." : "Importar corretores"}</button>
+            <button type="submit" className={page.primaryButton} disabled={pending} aria-busy={pending || undefined}><BusyLabel busy={pending} label="Importando…">Importar corretores</BusyLabel></button>
           </div>
+          {status.import?.state === "error" ? <ActionNote status={status.import} /> : null}
         </form>
       </TabsContent>
     </Tabs>
+  );
+}
+
+/** Copiar (nível 0): o botão mostra "Copiado" por 1,6 s; se a área de transferência recusar, diz isso no lugar. */
+function CopyButton({ value, label, icon, primary = false }: { value: string; label: string; icon: ReactNode; primary?: boolean }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const timer = useRef<number | null>(null);
+  useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setState("copied");
+    } catch {
+      setState("failed");
+    }
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setState("idle"), 1600);
+  }
+  return (
+    <button type="button" className={primary ? page.primaryButton : page.button} onClick={() => void copy()}>
+      {icon}<span role="status">{state === "copied" ? "Copiado" : state === "failed" ? "Não deu para copiar" : label}</span>
+    </button>
   );
 }

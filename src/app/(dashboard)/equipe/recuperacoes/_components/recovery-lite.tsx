@@ -4,8 +4,11 @@
  * Recuperação de senha no visual Lite: os mesmos três números, a lista Lite (tabela no desktop, cartões no celular)
  * com busca e status, e as mesmas Server Actions de aprovar e rejeitar. Aprovar segue sem confirmação, como hoje;
  * rejeitar abre a confirmação Lite com a justificativa opcional; a justificativa salva abre no painel lateral.
+ *
+ * Feedback (FEEDBACK.md, nível 1): aprovar e rejeitar mostram o envio no botão e confirmam na lista depois do
+ * servidor, com a mensagem dele; a falha mostra a causa e "Tentar de novo". Sem toast.
  */
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { Check, Eye, Search, X } from "lucide-react";
 
 import { StatCard } from "@/components/dashboard/metric-card";
@@ -16,10 +19,10 @@ import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import { formatLiteDate } from "@/components/lite/format/date";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
-import { toast } from "@/components/ui/sonner";
 import { dailyCounts } from "@/shared/trends";
 
 import { approveResetAction, rejectResetAction, type RecoveryActionState } from "../actions";
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import styles from "./recovery-lite.module.css";
 
 export type RecoveryLiteRequest = {
@@ -51,11 +54,6 @@ function outcome(request: RecoveryLiteRequest) {
   return "Sem análise";
 }
 
-function report(result: RecoveryActionState) {
-  if (result.message) toast.success(result.message);
-  if (result.error) toast.error(result.error);
-}
-
 export function RecoveryLite({ requests }: { requests: RecoveryLiteRequest[] }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -63,7 +61,7 @@ export function RecoveryLite({ requests }: { requests: RecoveryLiteRequest[] }) 
   const [reason, setReason] = useState("");
   const [details, setDetails] = useState<RecoveryLiteRequest | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const { status: feedback, run: runAction, show } = useActionStatus();
 
   const counts = useMemo(() => {
     const by = (value: string) => requests.filter((request) => request.status === value).length;
@@ -84,21 +82,27 @@ export function RecoveryLite({ requests }: { requests: RecoveryLiteRequest[] }) 
   }, [requests, status, query]);
   const { pageRows, pagination } = useLitePages(rows, 10);
 
-  const run = (id: string, action: typeof approveResetAction, data: FormData) => {
+  const run = (id: string, action: typeof approveResetAction, data: FormData, request: RecoveryLiteRequest) => {
+    const approving = action === approveResetAction;
     setPendingId(id);
-    startTransition(async () => {
-      try {
-        report(await action({}, data));
-      } finally {
-        setPendingId(null);
-      }
-    });
+    void runAction("list", async () => {
+      const result: RecoveryActionState = await action({}, data);
+      if (result.error) return { ok: false as const, error: result.error };
+      return result;
+    }, {
+      done: approving ? `Pedido de ${request.userName} aprovado` : `Pedido de ${request.userName} rejeitado`,
+      fallback: approving ? "Não deu para aprovar o pedido agora." : "Não deu para rejeitar o pedido agora.",
+      keeps: "O pedido continua pendente.",
+    }).then((result) => {
+      // A mensagem do servidor (ex.: link enviado por WhatsApp) vira a confirmação na lista.
+      if (result && "message" in result && result.message) show("list", { state: "done", label: result.message });
+    }).finally(() => setPendingId(null));
   };
 
   const approve = (request: RecoveryLiteRequest) => {
     const data = new FormData();
     data.set("requestId", request.id);
-    run(request.id, approveResetAction, data);
+    run(request.id, approveResetAction, data, request);
   };
 
   const confirmReject = () => {
@@ -106,7 +110,7 @@ export function RecoveryLite({ requests }: { requests: RecoveryLiteRequest[] }) 
     const data = new FormData();
     data.set("requestId", rejecting.id);
     if (reason) data.set("reason", reason);
-    run(rejecting.id, rejectResetAction, data);
+    run(rejecting.id, rejectResetAction, data, rejecting);
     setRejecting(null);
     setReason("");
   };
@@ -148,7 +152,7 @@ export function RecoveryLite({ requests }: { requests: RecoveryLiteRequest[] }) 
       render: (request) => request.status === "requested" ? (
         <span className={styles.actions}>
           <button type="button" className={page.primaryButton} disabled={pendingId === request.id} onClick={() => approve(request)}>
-            <Check aria-hidden="true" size={16} />{pendingId === request.id ? "Aprovando..." : "Aprovar"}
+            <BusyLabel busy={pendingId === request.id} label="Aprovando…"><Check aria-hidden="true" size={16} />Aprovar</BusyLabel>
           </button>
           <button type="button" className={page.iconButton} data-tone="danger" aria-label={`Rejeitar a solicitação de ${request.userName}`} title="Rejeitar" disabled={pendingId === request.id} onClick={() => setRejecting(request)}>
             <X aria-hidden="true" size={18} />
@@ -171,6 +175,7 @@ export function RecoveryLite({ requests }: { requests: RecoveryLiteRequest[] }) 
 
       <section className={page.group} aria-labelledby="recuperacoes-lista">
         <h2 id="recuperacoes-lista" className={page.sectionTitle}>Solicitações recebidas</h2>
+        {feedback.list?.state === "busy" ? null : <ActionNote status={feedback.list} />}
         <div className={page.toolbar}>
           <label className={page.search}>
             <Search aria-hidden="true" size={18} className={page.searchIcon} />

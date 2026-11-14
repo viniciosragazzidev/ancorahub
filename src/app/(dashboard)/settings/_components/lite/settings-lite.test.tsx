@@ -6,6 +6,8 @@ const search = vi.hoisted(() => ({ value: "" }));
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(search.value), usePathname: () => "/settings", useRouter: () => ({ refresh: vi.fn() }) }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 vi.mock("@/components/ui/sonner", () => ({ toast }));
+const fire = vi.hoisted(() => vi.fn(() => ({ motion: false, celebrate: false })));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => fire }));
 const actions = vi.hoisted(() => ({
   updateFeedbackSettingsAction: vi.fn(async () => ({ success: true })),
   createIntegrationAction: vi.fn(async () => ({ success: true })),
@@ -72,6 +74,9 @@ describe("/settings Lite", () => {
     expect(data.get("feedbackPushEnabled")).toBe("true");
     expect(data.get("feedbackToastEnabled")).toBeNull();
     expect(data.get("maxActiveLeadsLimit")).toBe("10");
+    expect(screen.getByRole("status")).toHaveTextContent("Configuração salva");
+    expect(fire).toHaveBeenCalledWith("confirm");
+    expect(toast.success).not.toHaveBeenCalled();
     unmount();
     render(<FeedbackLite feedbackReminderInterval="30" feedbackReminderMaxAttempts={5} feedbackPushEnabled feedbackToastEnabled feedbackRequiredEnabled maxActiveLeadsLimit={10} canEdit={false} />);
     expect(screen.queryByRole("button", { name: "Salvar configuração" })).toBeNull();
@@ -85,8 +90,15 @@ describe("/settings Lite", () => {
       fireEvent.click(screen.getByRole("radio", { name: "Automático" }));
     });
     expect(actions.updateAiStageModeAction).toHaveBeenCalledWith("auto");
-    expect(toast.error).toHaveBeenCalledWith("Sem permissão.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Sem permissão. Continua em Só sugerir.");
+    expect(fire).toHaveBeenCalledWith("error");
+    expect(toast.error).not.toHaveBeenCalled();
     expect(screen.getByRole("radio", { name: "Só sugerir" })).toHaveAttribute("aria-checked", "true");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    });
+    expect(screen.getByRole("radio", { name: "Automático" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("status")).toHaveTextContent("Etapa pela IA: Automático");
   });
 
   it("unidade sem filial aponta para a Central de Distribuição", () => {
@@ -101,6 +113,7 @@ describe("/settings Lite", () => {
       fireEvent.click(screen.getByRole("button", { name: "Desativar" }));
     });
     expect((actions.toggleIntegrationAction.mock.calls[0] as unknown as [FormData])[0].get("id")).toBe(integration.id);
+    expect(screen.getByRole("status")).toHaveTextContent("Recebimento desativado");
     fireEvent.click(screen.getByRole("button", { name: "Revogar integração" }));
     expect(actions.revokeIntegrationAction).not.toHaveBeenCalled();
     const dialog = screen.getByRole("alertdialog", { name: "Revogar esta integração?" });
@@ -108,6 +121,19 @@ describe("/settings Lite", () => {
       fireEvent.click(within(dialog).getByRole("button", { name: "Revogar integração" }));
     });
     expect(actions.revokeIntegrationAction).toHaveBeenCalledOnce();
-    expect(toast.success).toHaveBeenCalledWith("Integração revogada.");
+    expect(screen.getByRole("status")).toHaveTextContent("Integração revogada");
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("integrações: falha ao desativar desfaz a troca e mostra a causa com Tentar de novo", async () => {
+    actions.toggleIntegrationAction.mockResolvedValueOnce({ success: false, error: "Sem permissão para alterar integrações." } as never);
+    const integration = { id: "11111111-1111-4111-8111-111111111111", name: "Landing page Centro", source: "landing_page", branchId: null, branchName: null, status: "active" as const, tokenPrefix: "lp_abc", createdAt: new Date("2026-10-20T12:00:00Z") };
+    render(<IntegrationsLite integrations={[integration]} branches={[]} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Desativar" }));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("Sem permissão para alterar integrações. A fonte continua aceitando leads.");
+    expect(screen.getByText("Aceitando novos leads")).toBeInTheDocument();
+    expect(fire).toHaveBeenCalledWith("error");
   });
 });

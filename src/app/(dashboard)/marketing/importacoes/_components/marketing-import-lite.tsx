@@ -3,6 +3,9 @@
 /**
  * /marketing/importacoes no visual Lite (Onda 7): o mesmo envio (mesma Server Action, mesmos avisos), a mesma regra de
  * quem escolhe a unidade, a última importação e o histórico. A nova importação abre no painel lateral Lite.
+ *
+ * Feedback (FEEDBACK.md, nível 1): "Importar leads" mostra o envio no botão; o resumo "Importação concluída" no painel
+ * é a confirmação (sem toast repetindo os números) e a falha fica no painel, com a causa e "Tentar de novo".
  */
 import { useRef, useState, type DragEvent } from "react";
 import { CheckCircle2, Clock, FileDown, Plus, XCircle } from "lucide-react";
@@ -11,8 +14,9 @@ import { LiteSelect } from "@/components/lite/controls";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import { formatLiteDate } from "@/components/lite/format/date";
 import page from "@/components/lite/page/lite-page.module.css";
-import { toast } from "@/components/ui/sonner";
 import { uploadMetaLeadsAction, type ImportHistoryItem } from "@/features/marketing-import/actions";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 import styles from "./marketing-import-lite.module.css";
 
 type Branch = { id: string; name: string };
@@ -65,28 +69,49 @@ export function MarketingImportLite({ branches, history, lastImport, canChooseBr
   const [dragOver, setDragOver] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fire = useFeedback();
+  const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
 
   async function handleSubmit() {
-    if (!file) return toast.error("Selecione um arquivo.");
+    if (busy) return;
+    if (!file) {
+      fire("error");
+      setError({ message: "Selecione um arquivo.", retryable: false });
+      return;
+    }
     setBusy(true);
     setResult(null);
+    setError(null);
+    fire("tap");
 
     const formData = new FormData();
     formData.set("file", file);
     formData.set("branchId", branchId);
 
-    const response = await uploadMetaLeadsAction(formData);
+    const fail = (cause: unknown) => {
+      fire("error");
+      const info = normalizeActionError(cause, "Não deu para importar a planilha agora.");
+      setError({ message: actionErrorMessage(info, "Nenhum lead foi criado. O arquivo continua selecionado."), retryable: info.retryable });
+    };
+    let response: Awaited<ReturnType<typeof uploadMetaLeadsAction>>;
+    try {
+      response = await uploadMetaLeadsAction(formData);
+    } catch (cause) {
+      setBusy(false);
+      fail(cause);
+      return;
+    }
     setBusy(false);
 
     if (!("importId" in response) || !response.success) {
-      return toast.error("error" in response ? response.error ?? "Erro ao importar." : "Erro ao importar.");
+      fail("error" in response ? response.error : null);
+      return;
     }
 
+    // O resumo "Importação concluída" no painel é a confirmação: importados, duplicados e inválidos.
     const r = response as ImportResult;
     setResult({ importId: r.importId, imported: r.imported, duplicates: r.duplicates, invalid: r.invalid, durationMs: r.durationMs, errors: r.errors });
-    toast.success(`${r.imported} lead(s) importado(s)!`);
-    if (r.duplicates > 0) toast.info(`${r.duplicates} lead(s) duplicado(s) ignorado(s).`);
-    if (r.invalid > 0) toast.warning(`${r.invalid} linha(s) inválida(s). Verifique o resumo para mais detalhes.`);
+    fire("confirm");
     setFile(null);
     if (inputRef.current) inputRef.current.value = "";
   }
@@ -201,9 +226,16 @@ export function MarketingImportLite({ branches, history, lastImport, canChooseBr
             Colunas esperadas: <code>ID</code>, <code>Data</code>, <code>Nome</code>, <code>E-mail</code>, <code>Telefone</code>, <code>Operadora</code>, <code>Nome da campanha</code>, <code>Nome do conjunto de anúncio</code>, <code>Nome do anúncio</code>. A coluna <code>Nome do formulário</code> é opcional; quando ausente, os leads são registrados como “Formulário Direct”.
           </p>
 
-          <button type="button" className={`${page.primaryButton} ${styles.fullWidth}`} onClick={() => void handleSubmit()} disabled={busy || !file || (canChooseBranch && !branchId)}>
-            {busy ? "Importando..." : "Importar leads"}
+          <button type="button" className={`${page.primaryButton} ${styles.fullWidth}`} onClick={() => void handleSubmit()} disabled={busy || !file || (canChooseBranch && !branchId)} aria-busy={busy || undefined}>
+            {busy ? (
+              <>
+                <span aria-hidden="true" className="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none" />
+                Importando…
+              </>
+            ) : error?.retryable ? "Tentar de novo" : "Importar leads"}
           </button>
+
+          {error ? <p className={styles.note} role="alert" style={{ color: "var(--danger)" }}>{error.message}</p> : null}
 
           {result ? (
             <div className={styles.result} role="status">

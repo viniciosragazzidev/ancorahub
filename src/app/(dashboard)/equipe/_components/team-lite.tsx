@@ -4,9 +4,13 @@
  * Equipe no visual Lite (/equipe, visão Membros). Mesmos dados e ações da tela atual: números, pedidos de
  * transferência, lista de acessos com busca, filtro de unidade, seleção em lote (ativar, desativar, pausar e
  * retomar o recebimento) e, por linha, editar, ativar ou desativar, convite, senha, transferir leads e excluir.
+ *
+ * Feedback (FEEDBACK.md, nível 1): o lote, ativar ou desativar, revogar convite e decidir transferência confirmam
+ * na própria seção depois do servidor; a falha mostra a causa e "Tentar de novo". Reenviar convite segue com toast:
+ * o envio pelo WhatsApp é externo e o toast traz "Copiar link".
  */
 import Link from "next/link";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ShieldCheck, UserPlus } from "lucide-react";
 
@@ -25,6 +29,7 @@ import { formatLeadPhone } from "@/features/leads/format-lead-phone";
 import type { TenantRole } from "@/shared/db/schema";
 
 import { bulkToggleTeamMemberStatusAction, resendInviteAction, revokeInviteAction, toggleTeamMemberStatusAction } from "../actions";
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import { TeamInviteLite } from "./team-invite-lite";
 import { DeleteMemberLite, EditMemberLite, JOB_TITLE_LABELS, ROLE_LABELS, ResetPasswordLite, STATUS_LABELS, TransferLeadsLite, type BranchOption, type CustomRoleOption, type TeamMemberLite } from "./member-sheets-lite";
 import styles from "./team-lite.module.css";
@@ -61,22 +66,16 @@ export function TeamHeaderActionsLite({ isDirector, branches, customRoles }: { i
 
 function TransferRequestsLite({ initial }: { initial: PendingTransferRequest[] }) {
   const [requests, setRequests] = useState(initial);
-  const [feedback, setFeedback] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const { status, run } = useActionStatus();
+  const pending = status.transfers?.state === "busy";
   const decide = (id: string, approve: boolean) => {
-    setFeedback("");
     setActiveId(id);
-    startTransition(async () => {
+    void run("transfers", async () => {
       const result = await decideBrokerTransferAction(id, approve);
-      setActiveId(null);
-      if (!result.ok) {
-        setFeedback(result.reason);
-        return;
-      }
-      setRequests((current) => current.filter((request) => request.id !== id));
-      setFeedback(approve ? "Transferência aprovada." : "Pedido recusado.");
-    });
+      if (result.ok) setRequests((current) => current.filter((request) => request.id !== id));
+      return result;
+    }, { done: approve ? "Transferência aprovada" : "Pedido recusado", fallback: "Não deu para registrar a decisão agora.", keeps: "O pedido continua aguardando." }).finally(() => setActiveId(null));
   };
   return (
     <section className={page.card} aria-labelledby="equipe-transferencias">
@@ -94,14 +93,14 @@ function TransferRequestsLite({ initial }: { initial: PendingTransferRequest[] }
                 <span>{request.reason}</span>
               </span>
               <span className={styles.requestActions}>
-                <button type="button" className={page.primaryButton} disabled={pending} onClick={() => decide(request.id, true)}>{pending && activeId === request.id ? "Aprovando..." : "Aprovar"}</button>
+                <button type="button" className={page.primaryButton} disabled={pending} aria-busy={(pending && activeId === request.id) || undefined} onClick={() => decide(request.id, true)}><BusyLabel busy={pending && activeId === request.id} label="Aprovando…">Aprovar</BusyLabel></button>
                 <button type="button" className={page.button} disabled={pending} onClick={() => decide(request.id, false)}>Recusar</button>
               </span>
             </li>
           ))}
         </ul>
       )}
-      <p role="status" aria-live="polite" className={feedback ? page.muted : styles.srOnly}>{feedback}</p>
+      <ActionNote status={status.transfers} />
     </section>
   );
 }
@@ -126,6 +125,8 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
   const [sheet, setSheet] = useState<Sheet>(null);
   const [overrides, setOverrides] = useState<Record<string, TeamMemberLite["status"]>>({});
   const [busy, startTransition] = useTransition();
+  const { status: feedback, run, invalid, show } = useActionStatus();
+  const doneInList = (label: string) => show("members", { state: "done", label });
   const canBulk = currentRole === "director" || currentRole === "manager";
 
   const displayed = useMemo(() => members.map((member) => ({ ...member, status: overrides[member.id] ?? member.status })), [members, overrides]);
@@ -144,50 +145,69 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
   const multiSelect = useMultiSelect(memberIds);
   const selectedBrokerIds = displayed.filter((member) => multiSelect.isSelected(member.id) && member.role === "broker" && member.status === "active" && member.userId).map((member) => member.userId!);
 
-  const report = useCallback((result: { success?: boolean; error?: string; message?: string }, fallback: string) => {
-    if (result.success) {
-      toast.success(result.message ?? fallback);
-      multiSelect.clear();
-      router.refresh();
-    }
-    if (result.error) toast.error(result.error);
-  }, [multiSelect, router]);
+  type MemberResult = { success?: boolean; error?: string; message?: string };
+  const failedResult = (result: MemberResult) => (result.success ? result : { ok: false as const, error: result.error });
 
   const bulkStatus = (target: "active" | "disabled") => {
     const data = new FormData();
     for (const id of multiSelect.selectedIds) data.append("memberIds", id);
     data.set("targetStatus", target);
-    startTransition(async () => report(await bulkToggleTeamMemberStatusAction({}, data), "Operação concluída."));
+    // O que acontece depois do servidor fica dentro da tarefa: o "Tentar de novo" refaz tudo.
+    startTransition(async () => {
+      await run("members", async () => {
+        const result: MemberResult = await bulkToggleTeamMemberStatusAction({}, data);
+        if (result.success) {
+          multiSelect.clear();
+          router.refresh();
+        }
+        return failedResult(result);
+      }, { done: target === "active" ? "Acessos ativados" : "Acessos desativados", fallback: "Não deu para mudar os acessos agora.", keeps: "Os membros continuam como estavam e seguem selecionados." });
+    });
   };
   const bulkAvailability = (target: "paused" | "available") => {
     if (!selectedBrokerIds.length) {
-      toast.error("Selecione corretores ativos para pausar ou retomar o recebimento de leads.");
+      invalid("members", "Selecione corretores ativos para pausar ou retomar o recebimento de leads.");
       return;
     }
     const data = new FormData();
     data.set("brokerIds", selectedBrokerIds.join(","));
     data.set("target", target);
-    startTransition(async () => report(await setBrokersAvailabilityAction({}, data), "Recebimento de leads atualizado."));
+    startTransition(async () => {
+      await run("members", async () => {
+        const result: MemberResult = await setBrokersAvailabilityAction({}, data);
+        if (result.success) {
+          multiSelect.clear();
+          router.refresh();
+        }
+        return failedResult(result);
+      }, {
+        done: target === "paused" ? "Recebimento de leads pausado" : "Recebimento de leads retomado",
+        fallback: "Não deu para atualizar o recebimento de leads agora.",
+        keeps: "Os corretores continuam como estavam e seguem selecionados.",
+      });
+    });
   };
 
   const toggleStatus = (member: TeamMemberLite) => {
     const next = member.status === "active" ? "disabled" : "active";
+    const name = member.name ?? member.email;
     setOverrides((current) => ({ ...current, [member.id]: next }));
     const data = new FormData();
     data.set("memberId", member.id);
     startTransition(async () => {
-      const result = await toggleTeamMemberStatusAction({}, data);
-      if (result.success) {
-        toast.success(result.status === "disabled" ? "Membro desativado." : "Membro reativado.");
+      const done = await run("members", async () => {
+        const result = await toggleTeamMemberStatusAction({}, data);
+        if (!result.success) return { ok: false as const, error: result.error };
+        setOverrides((current) => ({ ...current, [member.id]: next }));
         router.refresh();
-      } else {
-        setOverrides((current) => {
-          const copy = { ...current };
-          delete copy[member.id];
-          return copy;
-        });
-        if (result.error) toast.error(result.error);
-      }
+        return result;
+      }, { done: next === "disabled" ? `${name}: acesso desativado` : `${name}: acesso reativado`, fallback: "Não deu para mudar o acesso agora.", keeps: `${name} continua ${member.status === "active" ? "com acesso" : "sem acesso"}.` });
+      if (done) return;
+      setOverrides((current) => {
+        const copy = { ...current };
+        delete copy[member.id];
+        return copy;
+      });
     });
   };
 
@@ -195,8 +215,10 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
     const data = new FormData();
     data.set("memberId", member.id);
     startTransition(async () => {
-      const result = await resendInviteAction({}, data);
-      if (result.success) {
+      await run("members", async () => {
+        const result = await resendInviteAction({}, data);
+        if (!result.success) return { ok: false as const, error: result.error };
+        // Envio externo (WhatsApp em fila): o toast fica, com "Copiar link" quando há token.
         const message = result.whatsappStatus === "sent" ? "A mensagem foi enviada pelo WhatsApp corporativo."
           : result.whatsappStatus === "failed" ? "O convite foi recriado, mas não foi possível enfileirar o envio. Copie o link para compartilhar."
             : result.whatsappStatus === "queued" ? "O convite foi colocado na fila de envio do WhatsApp."
@@ -213,8 +235,8 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
           } : undefined,
         });
         router.refresh();
-      }
-      if (result.error) toast.error(result.error);
+        return result;
+      }, { done: `Convite reenviado para ${member.name ?? member.email}`, fallback: "Não deu para reenviar o convite agora.", keeps: "O convite anterior continua valendo." });
     });
   };
 
@@ -222,13 +244,12 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
     const data = new FormData();
     data.set("invitationId", member.id);
     startTransition(async () => {
-      const result = await revokeInviteAction({ success: false }, data);
-      if (result.success) {
-        toast.success("Convite revogado.");
+      await run("members", async () => {
+        const result = await revokeInviteAction({ success: false }, data);
+        if (!result.success) return { ok: false as const, error: result.error ?? "Não deu para revogar o convite." };
         router.refresh();
-      } else {
-        toast.error(result.error ?? "Erro ao revogar convite.");
-      }
+        return result;
+      }, { done: `Convite de ${member.name ?? member.email} revogado`, fallback: "Não deu para revogar o convite agora.", keeps: "O convite continua valendo." });
     });
   };
 
@@ -295,6 +316,7 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
         <div className={page.cardHead}>
           <h2 id="equipe-acessos" className={page.sectionTitle}>Acessos vinculados</h2>
           <p className={page.muted}>{activeCount} acesso{activeCount === 1 ? "" : "s"} ativo{activeCount === 1 ? "" : "s"}. Convites pendentes ficam sinalizados até o primeiro login.</p>
+          {feedback.members?.state === "busy" ? <p className={page.muted} role="status">Salvando…</p> : <ActionNote status={feedback.members} />}
         </div>
         <div className={page.toolbar}>
           <label className={page.search}>
@@ -338,9 +360,9 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
         />
       ) : null}
 
-      {sheet?.kind === "edit" ? <EditMemberLite key={sheet.member.id} member={sheet.member} open onOpenChange={(open) => { if (!open) setSheet(null); }} branches={branches} currentRole={currentRole} currentBranchId={currentBranchId} customRoles={customRoles} allMembers={members} /> : null}
-      {sheet?.kind === "delete" ? <DeleteMemberLite member={sheet.member} open onOpenChange={(open) => { if (!open) setSheet(null); }} /> : null}
-      {sheet?.kind === "transfer" ? <TransferLeadsLite member={sheet.member} open onOpenChange={(open) => { if (!open) setSheet(null); }} allMembers={members} /> : null}
+      {sheet?.kind === "edit" ? <EditMemberLite key={sheet.member.id} member={sheet.member} open onOpenChange={(open) => { if (!open) setSheet(null); }} branches={branches} currentRole={currentRole} currentBranchId={currentBranchId} customRoles={customRoles} allMembers={members} onDone={doneInList} /> : null}
+      {sheet?.kind === "delete" ? <DeleteMemberLite member={sheet.member} open onOpenChange={(open) => { if (!open) setSheet(null); }} onDone={doneInList} /> : null}
+      {sheet?.kind === "transfer" ? <TransferLeadsLite member={sheet.member} open onOpenChange={(open) => { if (!open) setSheet(null); }} allMembers={members} onDone={doneInList} /> : null}
       {sheet?.kind === "password" ? <ResetPasswordLite member={sheet.member} open onOpenChange={(open) => { if (!open) setSheet(null); }} /> : null}
     </div>
   );

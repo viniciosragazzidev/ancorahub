@@ -5,6 +5,10 @@
  * vencendo), visões Todas, Abertas e Expirando, lista Lite com copiar link público, troca de status, "Fechar venda"
  * e o selo de venda fechada; criar proposta e fechar venda em painel lateral (LiteSidePanel), com as mesmas Server
  * Actions e mensagens.
+ *
+ * Feedback (FEEDBACK.md, nível 1): trocar status, criar proposta e fechar venda mostram o envio no botão e confirmam
+ * no próprio objeto (a lista ou o painel) depois do servidor; a falha mostra a causa e "Tentar de novo". Copiar o
+ * link é nível 0: a confirmação aparece na lista, sem som. Nenhum toast repete o que já está na tela.
  */
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
@@ -16,8 +20,9 @@ import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
 import { liteDateFormatter } from "@/components/lite/format/date";
 import page from "@/components/lite/page/lite-page.module.css";
-import { toast } from "@/components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import { convertProposalToSaleAction, createProposalAction, getQuotesForLeadAction, updateProposalStatusAction } from "@/features/proposals/actions";
 import type { ProposalRecord } from "@/features/proposals/queries";
 import type { ProposalStatus } from "@/shared/db/schema";
@@ -66,6 +71,8 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
   const [renewalType, setRenewalType] = useState<RenewalType>("reajuste_operadora");
   const [renewalContactPreference, setRenewalContactPreference] = useState("whatsapp");
   const [postSaleNotes, setPostSaleNotes] = useState("");
+  const { status: feedback, run, invalid, fail, clear, show } = useActionStatus();
+  const converting = feedback.convert?.state === "busy";
 
   const openProposals = proposals.filter((proposal) => !["aprovada", "perdida", "expirada"].includes(proposal.status));
   const totalValueOpen = openProposals.reduce((sum, proposal) => sum + Number(proposal.totalMonthly), 0);
@@ -79,16 +86,18 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
       return;
     }
     setLoading(true);
+    clear("lead");
+    const options = { fallback: "Não deu para carregar as cotações deste lead.", keeps: "Você pode criar a proposta sem cotação.", retry: () => void changeLead(nextLeadId) };
     try {
       const result = await getQuotesForLeadAction(nextLeadId);
       if (result.success && result.quotes && result.docs) {
         setQuotes(result.quotes);
         setDocuments(result.docs);
       } else {
-        toast.error("Erro ao carregar dados do lead.");
+        fail("lead", null, options);
       }
-    } catch {
-      toast.error("Erro na conexao com o servidor.");
+    } catch (error) {
+      fail("lead", error, options);
     } finally {
       setLoading(false);
     }
@@ -101,46 +110,58 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
     formData.set("quoteId", quoteId);
     formData.set("documentIds", JSON.stringify(attachedDocIds));
     startTransition(async () => {
-      const result = await createProposalAction({}, formData);
-      if (result.error) toast.error(result.error);
-      else if (result.success && result.proposalId) {
-        toast.success("Proposta criada com sucesso.");
-        router.refresh();
-      }
+      // O que acontece depois do servidor fica dentro da tarefa: o "Tentar de novo" refaz tudo.
+      await run("create", async () => {
+        const result = await createProposalAction({}, formData);
+        if (result.error) return { ok: false as const, error: result.error };
+        if (result.success && result.proposalId) router.refresh();
+        return result;
+      }, { done: "Proposta criada", fallback: "Não deu para criar a proposta agora.", keeps: "O que você preencheu continua aqui." });
     });
   }
 
   async function changeStatus(proposalId: string, status: ProposalStatus) {
-    const result = await updateProposalStatusAction(proposalId, status);
-    if (result.success) {
-      toast.success(`Status atualizado para ${STATUS[status].label}.`);
-      setProposals((current) => current.map((proposal) => (proposal.id === proposalId ? { ...proposal, status } : proposal)));
-    } else {
-      toast.error(result.error || "Erro ao atualizar status.");
-    }
+    const proposal = proposals.find((item) => item.id === proposalId);
+    const before = proposal ? STATUS[proposal.status]?.label ?? proposal.status : null;
+    await run("list", async () => {
+      const result = await updateProposalStatusAction(proposalId, status);
+      if (!result.success) return { ok: false as const, error: result.error };
+      setProposals((current) => current.map((item) => (item.id === proposalId ? { ...item, status } : item)));
+      return result;
+    }, {
+      done: `${proposal?.title ?? "Proposta"}: ${STATUS[status].label}`,
+      fallback: "Não deu para atualizar o status agora.",
+      keeps: before ? `A proposta continua como ${before}.` : undefined,
+    });
   }
 
-  function copyLink(proposalId: string) {
-    void navigator.clipboard.writeText(`${window.location.origin}/cotacao/${proposalId}`);
-    toast.success("Link copiado para a area de transferencia.");
+  // Copiar é nível 0: a confirmação aparece na lista, sem som nem vibração.
+  async function copyLink(proposalId: string) {
+    const title = proposals.find((item) => item.id === proposalId)?.title ?? "proposta";
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/cotacao/${proposalId}`);
+      show("list", { state: "done", label: `Link de ${title} copiado` });
+    } catch {
+      show("list", { state: "error", message: "Não deu para copiar o link. A proposta continua publicada." });
+    }
   }
 
   async function submitConvert() {
-    if (!selected) return;
+    if (!selected || converting) return;
     if (!policyNumber || !coverageStartDate) {
-      toast.error("Numero da apolice e data de vigencia sao obrigatorios.");
+      invalid("convert", "Informe o número da apólice e a data de vigência.");
       return;
     }
-    setLoading(true);
-    const result = await convertProposalToSaleAction(selected.id, { policyNumber, coverageStartDate, paymentMethod, renewalType, renewalContactPreference, notes: postSaleNotes });
-    setLoading(false);
-    if (result.success) {
-      toast.success("Proposta convertida em venda com sucesso!");
+    const proposal = selected;
+    // Venda registrada é ação ocasional: confirma com o som discreto do nível 1.
+    await run("convert", async () => {
+      const result = await convertProposalToSaleAction(proposal.id, { policyNumber, coverageStartDate, paymentMethod, renewalType, renewalContactPreference, notes: postSaleNotes });
+      if (!result.success) return { ok: false as const, error: result.error };
       setConvertOpen(false);
+      show("list", { state: "done", label: `${proposal.title}: venda registrada` });
       router.refresh();
-    } else {
-      toast.error(result.error || "Erro ao converter para venda.");
-    }
+      return result;
+    }, { done: "Venda registrada", fallback: "Não deu para converter a proposta em venda agora.", keeps: "A proposta continua aprovada.", sound: true });
   }
 
   const columns: LiteColumn<ProposalRecord>[] = [
@@ -174,14 +195,14 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
       label: "Ações",
       render: (proposal) => (
         <span className={styles.actions}>
-          <button type="button" className={styles.iconButton} aria-label={`Copiar link público de ${proposal.title}`} title="Copiar link público" onClick={() => copyLink(proposal.id)}>
+          <button type="button" className={styles.iconButton} aria-label={`Copiar link público de ${proposal.title}`} title="Copiar link público" onClick={() => void copyLink(proposal.id)}>
             <Link2 aria-hidden="true" size={16} />
           </button>
           <span className={styles.statusSelect}>
             <LiteSelect label={`Status de ${proposal.title}`} hideLabel value={proposal.status} onChange={(value) => changeStatus(proposal.id, value as ProposalStatus)} options={Object.entries(STATUS).map(([value, item]) => ({ value, label: item.label }))} />
           </span>
           {proposal.status === "aprovada" && !proposal.convertedSaleId ? (
-            <button type="button" className={page.primaryButton} onClick={() => { setSelected(proposal); setConvertOpen(true); }}>
+            <button type="button" className={page.primaryButton} onClick={() => { clear("convert"); setSelected(proposal); setConvertOpen(true); }}>
               <CheckCircle2 aria-hidden="true" size={16} /> Fechar venda
             </button>
           ) : null}
@@ -206,6 +227,7 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
       </div>
 
       <Tabs defaultValue="todas" variant="segment" className={styles.tabs}>
+        {feedback.list?.state === "busy" ? <p className={page.muted} role="status">Atualizando status…</p> : <ActionNote status={feedback.list} />}
         <div className={page.toolbar}>
           <div className={styles.views}>
             <TabsList aria-label="Propostas" className="w-max">
@@ -236,7 +258,7 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
           <div className={form.field}>
             <span className={form.label}>Cotação de origem (cálculo financeiro)</span>
             {loading || quotes.length === 0 ? (
-              <p className={form.hint}>{loading ? "Carregando cotações..." : leadId ? "Nenhuma cotação criada para este lead ainda." : "Escolha o lead para ver as cotações."}</p>
+              feedback.lead?.state === "error" && !loading ? <ActionNote status={feedback.lead} /> : <p className={form.hint}>{loading ? "Carregando cotações…" : leadId ? "Nenhuma cotação criada para este lead ainda." : "Escolha o lead para ver as cotações."}</p>
             ) : (
               <LiteSelect label="Cotação de origem" hideLabel inline value={quoteId} onChange={setQuoteId} options={[{ value: "", label: "Nenhuma (proposta manual)" }, ...quotes.map((quote) => ({ value: quote.id, label: quote.title }))]} />
             )}
@@ -266,8 +288,9 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
           ) : null}
           <div className={form.actions}>
             <button type="button" className={page.button} onClick={() => setCreateOpen(false)}>Cancelar</button>
-            <button type="submit" className={page.primaryButton} disabled={isPending || loading || !leadId}>{isPending ? "Salvando..." : "Criar proposta"}</button>
+            <button type="submit" className={page.primaryButton} disabled={isPending || loading || !leadId} aria-busy={isPending || undefined}><BusyLabel busy={isPending} label="Salvando…">Criar proposta</BusyLabel></button>
           </div>
+          {isPending ? null : <ActionNote status={feedback.create} />}
         </form>
       </LiteSidePanel>
 
@@ -306,8 +329,9 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
             </label>
             <div className={form.actions}>
               <button type="button" className={page.button} onClick={() => setConvertOpen(false)}>Cancelar</button>
-              <button type="button" className={page.primaryButton} onClick={submitConvert} disabled={loading}>{loading ? "Convertendo..." : "Confirmar venda"}</button>
+              <button type="button" className={page.primaryButton} onClick={submitConvert} disabled={loading || converting} aria-busy={converting || undefined}><BusyLabel busy={converting} label="Convertendo…">Confirmar venda</BusyLabel></button>
             </div>
+            {feedback.convert?.state === "error" ? <ActionNote status={feedback.convert} /> : null}
           </div>
         ) : null}
       </LiteSidePanel>

@@ -4,6 +4,10 @@
  * Qualificação turbo no visual Lite. Mesmos templates, status, configurações e Server Actions (enviar à Meta e salvar
  * as opções) com as mesmas mensagens; só quem pode editar (`data.canEdit`, como hoje) envia e altera. Templates em
  * lista Lite (cartões no celular) e as configurações no painel lateral.
+ *
+ * Feedback (FEEDBACK.md, nível 1): cada opção salva confirma no topo das configurações depois do servidor; a falha
+ * desfaz a troca e mostra a causa com "Tentar de novo". Enviar à Meta é trabalho externo (a aprovação demora): o
+ * resultado da Meta segue no toast, e a falha do envio fica na seção, com "Tentar de novo".
  */
 import { useState, useTransition } from "react";
 import Link from "next/link";
@@ -17,8 +21,10 @@ import page from "@/components/lite/page/lite-page.module.css";
 import sections from "@/components/lite/page/lite-sections.module.css";
 import { AppSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 
 import { submitRecommendedTemplatesAction, updateTurboSettingsAction, type TurboAdminData } from "../actions";
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import { SILENCE_FOLLOW_UP_CHANNEL_OPTIONS, SILENCE_FOLLOW_UP_DESCRIPTION } from "./silence-follow-up-copy";
 
 type TemplateRow = TurboAdminData["templates"][number];
@@ -55,20 +61,23 @@ function SettingRow({ id, title, description, checked, onChange, disabled }: { i
 function TurboSettingsLite({ data }: { data: TurboAdminData }) {
   const [settings, setSettings] = useState(data.settings);
   const [isPending, startTransition] = useTransition();
+  const { status, run } = useActionStatus();
   const save = (next: typeof settings) => {
     setSettings(next);
     startTransition(async () => {
-      const result = await updateTurboSettingsAction(next);
-      if (result.success) toast.success("Configuração salva.");
-      else {
-        setSettings(data.settings);
-        toast.error(result.error ?? "Não foi possível salvar.");
-      }
+      const done = await run("settings", async () => {
+        const result = await updateTurboSettingsAction(next);
+        if (!result.success) return { ok: false as const, error: result.error };
+        setSettings(next);
+        return result;
+      }, { done: "Configuração salva", fallback: "Não deu para salvar a configuração agora.", keeps: "As opções anteriores continuam valendo." });
+      if (!done) setSettings(data.settings);
     });
   };
   const disabled = !data.canEdit || isPending;
   return (
     <div className={sections.group}>
+      {isPending ? <p className={sections.note} role="status">Salvando…</p> : status.settings ? <div className={sections.formBody}><ActionNote status={status.settings} /></div> : null}
       <SettingRow id="turbo-enabled" title="Primeira mensagem inteligente" description="Escolhe a mensagem pelo tipo de anúncio e testa variantes. Desligado, volta ao template configurado em Atendimento." checked={settings.enabled} disabled={disabled} onChange={(value) => save({ ...settings, enabled: value })} />
       <SettingRow id="turbo-cadence" title="Lembretes automáticos" description="Para quem não respondeu: 20 min, 3h, no dia seguinte e despedida em 3 dias, só entre 8h e 20h." checked={settings.cadence} disabled={disabled || !settings.enabled} onChange={(value) => save({ ...settings, cadence: value })} />
       <SettingRow id="turbo-learn" title="Aprender sozinho" description="Depois de 50 envios por variante, usa mais a mensagem que tem mais respostas e segue testando 10%." checked={settings.learn} disabled={disabled || !settings.enabled} onChange={(value) => save({ ...settings, learn: value })} />
@@ -112,16 +121,35 @@ export function TurboAdminLite({ data }: { data: TurboAdminData }) {
   const missing = data.templates.filter((row) => row.status === "MISSING" || row.status === "REJECTED");
   const approved = data.templates.filter((row) => row.status === "APPROVED").length;
 
-  const submit = () => startTransition(async () => {
-    const result = await submitRecommendedTemplatesAction();
-    if (!result.success) {
-      toast.error(result.error);
-      return;
-    }
-    if (result.submitted.length) toast.success(`${result.submitted.length} templates enviados para aprovação da Meta.`);
-    if (result.failed.length) toast.error(`${result.failed.length} não foram aceitos pela Meta. ${result.failed.map((item) => `${item.name}: ${item.error}`).join(" · ")}`);
-    if (!result.submitted.length && !result.failed.length) toast.info("Todos os templates já estão na Meta.");
-  });
+  const { status, fail, clear } = useActionStatus();
+  const fire = useFeedback();
+  const submit = () => {
+    clear("submit");
+    fire("tap");
+    startTransition(async () => {
+      let result: Awaited<ReturnType<typeof submitRecommendedTemplatesAction>>;
+      try {
+        result = await submitRecommendedTemplatesAction();
+      } catch (error) {
+        fail("submit", error, { fallback: "Não deu para enviar os templates agora.", keeps: "Os templates continuam como estavam.", retry: submit });
+        return;
+      }
+      if (!result.success) {
+        fail("submit", result.error, { fallback: "Não deu para enviar os templates agora.", keeps: "Os templates continuam como estavam.", retry: submit });
+        return;
+      }
+      // A aprovação da Meta é externa e demora: o resultado dela segue no toast.
+      if (result.submitted.length) {
+        fire("confirm");
+        toast.success(`${result.submitted.length} templates enviados para aprovação da Meta.`);
+      }
+      if (result.failed.length) {
+        if (!result.submitted.length) fire("error");
+        toast.error(`${result.failed.length} não foram aceitos pela Meta. ${result.failed.map((item) => `${item.name}: ${item.error}`).join(" · ")}`);
+      }
+      if (!result.submitted.length && !result.failed.length) toast.info("Todos os templates já estão na Meta.");
+    });
+  };
 
   const columns: LiteColumn<TemplateRow>[] = [
     { id: "label", label: "Mensagem", primary: true, render: (row) => (
@@ -161,12 +189,15 @@ export function TurboAdminLite({ data }: { data: TurboAdminData }) {
             Configurações
           </button>
           {data.canEdit ? (
-            <button type="button" className={`${page.primaryButton} ${page.toolbarEnd}`} onClick={submit} disabled={isPending || !missing.length || !data.metaConnected}>
-              <Send aria-hidden="true" size={16} />
-              {isPending ? "Enviando..." : missing.length ? `Enviar ${missing.length} à Meta` : "Todos enviados"}
+            <button type="button" className={`${page.primaryButton} ${page.toolbarEnd}`} onClick={submit} disabled={isPending || !missing.length || !data.metaConnected} aria-busy={isPending || undefined}>
+              <BusyLabel busy={isPending} label="Enviando…">
+                <Send aria-hidden="true" size={16} />
+                {missing.length ? `Enviar ${missing.length} à Meta` : "Todos enviados"}
+              </BusyLabel>
             </button>
           ) : null}
         </div>
+        {status.submit?.state === "error" ? <ActionNote status={status.submit} /> : null}
         {!data.metaConnected ? (
           <div className={sections.notice} data-tone="warning" role="status">
             <p className={sections.note}>Conecte o número oficial da Meta em Integrações, WhatsApp, para enviar os templates.</p>
