@@ -43,7 +43,7 @@
   .card .cardHint { font-size: var(--text-xs); }
 }
 
-.banner { margin-top: 36px; }
+.banner { margin-top: 72px; }
 @media (min-width: 640px) { .banner { margin-top: 44px; } }
 
 /* Lista: busca e unidade numa linha, a contagem embaixo, a tabela (cartões no celular) e a paginação. */
@@ -62,3 +62,15 @@
 .empty { margin: 0; padding: 24px 16px; color: var(--text-secondary); font-size: var(--text-sm); text-align: center; }
 
 @media (prefers-reduced-motion: reduce) { .root { transition: none; } }
+
+/*
+ * A arte da Distribuição é larga (o capitão e três marujos): coluna maior para ela, saindo pelo topo do banner.
+ * Os seletores repetem tom e pose para pesar mais que as regras do banner compartilhado.
+ */
+/* No celular a arte larga vai para cima do texto, centralizada, saindo pelo topo do banner. */
+.root .banner[data-tone="white"][data-pose="rise"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "art" "title" "goal" "action"; padding-right: 18px; }
+.root .banner[data-tone="white"][data-pose="rise"] > img { justify-self: center; width: min(300px, 100%); margin: -84px 0 -4px; }
+@media (min-width: 640px) {
+  .root .banner[data-tone="white"][data-pose="rise"] { grid-template-columns: minmax(0, 1fr) 360px; grid-template-areas: "title art" "goal art" "action art"; padding-right: 8px; }
+  .root .banner[data-tone="white"][data-pose="rise"] > img { width: 420px; margin: -72px -12px -24px -48px; }
+}

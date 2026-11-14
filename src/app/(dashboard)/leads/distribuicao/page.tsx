@@ -29,7 +29,6 @@ import { readDistributionPolicy } from "@/features/lead-distribution/domain";
 import { RoutingMatrixPanel } from "./_components/routing-matrix-panel";
 import { DddRoutingPanel } from "./_components/ddd-routing-panel";
 import { fetchRoutingRules } from "@/features/lead-distribution/routing-engine";
-import { BrokerDailySummaryPanel } from "./_components/broker-daily-summary-panel";
 import { DirectorDailySummary } from "./_components/director-daily-summary";
 import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-summary-service";
 import { DutyOperationsWorkspace } from "./plantao/_components/duty-operations-workspace";
@@ -864,7 +863,7 @@ export default async function LeadDistributionPage({
               </div>
             }
             resumoDiaContent={
-              <BrokerDailySummaryPanel
+              <DirectorDailySummary
                 initialData={brokerSummary}
                 branches={branches.map((b) => ({ id: b.id, name: b.name }))}
                 canFilterBranch={context.role === "director"}

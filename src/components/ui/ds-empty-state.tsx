@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import { cn } from "@/utils/core/cn";
 import ArcEmptyState from "@/components/arc/empty-state/empty-state";
