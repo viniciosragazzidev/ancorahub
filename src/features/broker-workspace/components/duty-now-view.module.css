@@ -1,5 +1,5 @@
 .page { min-height: 100%; background: var(--surface); color: var(--foreground); }
-.inner { width: 100%; max-width: 760px; margin: 0 auto; padding: 8px 16px 40px; display: grid; gap: 16px; }
+.inner { width: 100%; max-width: 760px; margin: 0 auto; padding: 8px 16px 40px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 
 /* Two plantões at once (PME online + Presencial): pick which one to see. */
 .choices { display: flex; flex-wrap: wrap; gap: 8px; }

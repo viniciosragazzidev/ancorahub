@@ -1,5 +1,5 @@
 .page { min-height: var(--app-dvh, 100dvh); background: var(--surface); }
-.sidebar { display: grid; align-content: start; gap: 4px; padding-bottom: 96px; }
+.sidebar { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 4px; padding-bottom: 96px; }
 .header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: calc(env(safe-area-inset-top, 0px) + 14px) 20px 10px; }
 .me { width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-sm); font-weight: 500; cursor: pointer; box-shadow: var(--shadow-resting); }
 .hello { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); letter-spacing: var(--tracking-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -20,7 +20,7 @@
 .goalTrack { display: block; height: 6px; margin-top: 6px; border-radius: 999px; background: var(--neutral-4); overflow: hidden; }
 .goalFill { display: block; height: 100%; border-radius: inherit; background: var(--chat-action); transform-origin: left; }
 .listShortcut { padding: 0 20px 8px; }
-.highlights { display: grid; gap: 8px; padding: 2px 20px 10px; }
+.highlights { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 2px 20px 10px; }
 .rankRow { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .rankRow::-webkit-scrollbar { display: none; }
 .rank { flex: none; display: grid; gap: 2px; min-width: 120px; padding: 10px 14px; border-radius: var(--radius-panel); background: var(--surface-muted); }
@@ -36,7 +36,7 @@
 .missionArrow { width: 16px; height: 16px; color: var(--text-muted); }
 .centerHighlights { width: 100%; padding: 0; margin: 6px 0 12px; text-align: left; }
 
-.newList { list-style: none; margin: 0; padding: 0 0 12px; display: grid; gap: 4px; }
+.newList { list-style: none; margin: 0; padding: 0 0 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .newItem { width: 100%; display: grid; gap: 2px; padding: 12px 14px; border: 0; border-radius: var(--radius-control); background: none; text-align: left; font: inherit; color: var(--foreground); text-decoration: none; cursor: pointer; }
 .newItem:hover { background: var(--surface-muted); }
 .newItem strong { font-weight: 500; font-size: var(--text-base); }
@@ -47,7 +47,7 @@
   .page { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: var(--app-dvh, 100dvh); }
   .sidebar { border-right: 1px solid var(--border); background: var(--surface-muted); overflow-y: auto; padding-bottom: 24px; }
   .center { display: grid; place-items: center; overflow-y: auto; padding: 48px 32px; }
-  .centerInner { width: 100%; max-width: 760px; display: grid; justify-items: center; gap: 6px; }
+  .centerInner { width: 100%; max-width: 760px; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 6px; }
   .centerTitle { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: var(--text-3xl); letter-spacing: var(--tracking-display); }
   .centerSubtitle { margin: 0 0 12px; max-width: 34rem; text-align: center; color: var(--text-secondary); font-size: var(--text-base); line-height: 1.5; }
   .cards { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
@@ -85,13 +85,13 @@
 .headerPill svg { width: 16px; height: 16px; }
 .emptyAction { display: flex; justify-content: center; padding: 4px 20px 16px; }
 
-.nowSection { display: grid; gap: 8px; width: 100%; padding: 14px; border-radius: var(--radius-panel); background: var(--surface-muted); box-shadow: var(--shadow-resting); text-align: left; }
+.nowSection { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; width: 100%; padding: 14px; border-radius: var(--radius-panel); background: var(--surface-muted); box-shadow: var(--shadow-resting); text-align: left; }
 .nowMobile { margin: 2px 20px 12px; width: auto; }
 .nowDesktop { display: none; }
 .nowHeader { display: flex; align-items: center; gap: 8px; min-height: 28px; }
 .nowTitle { margin: 0; font-size: var(--text-base); font-weight: 600; letter-spacing: var(--tracking-display); }
 .nowCount { display: grid; min-width: 22px; height: 22px; place-items: center; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--accent-foreground); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
-.nowList { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.nowList { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 0; padding: 0; list-style: none; }
 .nowItem { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-width: 0; padding: 8px 0; }
 .nowItemCopy { display: grid; gap: 3px; min-width: 0; }
 .nowItemTitle { overflow: hidden; color: var(--foreground); font-size: var(--text-sm); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }

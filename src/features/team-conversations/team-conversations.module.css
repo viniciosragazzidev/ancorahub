@@ -5,7 +5,7 @@
 @media (prefers-reduced-motion: reduce) { .enter { animation: fade 150ms ease both; animation-delay: 0ms; } }
 
 .page { min-height: 100%; padding: 8px 16px 32px; }
-.inner { display: grid; gap: 16px; width: 100%; max-width: 860px; margin: 0 auto; }
+.inner { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; width: 100%; max-width: 860px; margin: 0 auto; }
 .title { margin: 0; font-size: 1.75rem; font-weight: 600; letter-spacing: -0.01em; color: var(--foreground); }
 .subtitle { margin: 2px 0 0; color: var(--text-muted); font-size: var(--text-sm); }
 
