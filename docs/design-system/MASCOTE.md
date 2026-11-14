@@ -103,3 +103,20 @@ Para ligar o rig: salve o arquivo em `public/mascote/mascote.riv`, troque `MASCO
 - `/dev/mascote` em desenvolvimento: estados, lead aceito com sucesso e falha, splash de novo e interruptores.
 - Celular Android e PWA instalado: abra o app pela rede local ou pelo ambiente de teste e confira a splash, a saída e o desempenho no "Monitor de desempenho" do Chrome remoto (meta 60 fps).
 - Movimento reduzido: ligue "Menos animação" em Configurações > Acessibilidade ou no sistema.
+
+## 8. Vagas do mascote nas áreas
+
+Cada área que pode mostrar o mascote já tem a vaga no código (`src/components/mascot/mascot-placements.ts`). Desligada, a vaga não desenha nada e a área fica como era. Para ligar, mude `enabled` para `true`; o estado e o tamanho também ficam ali.
+
+| Vaga | Onde | Estado padrão | Hoje |
+|---|---|---|---|
+| `splash` | abertura do PWA | `lead_accepted` | ligada |
+| `empty` | `EmptyState`, no lugar do ícone | `idle` | desligada |
+| `error` | `RouteError`, no lugar do ícone | `error` | desligada |
+| `loading` | `LitePageLoading`, acima do esqueleto | `loading` | desligada |
+| `success` | overlay de sucesso; a venda registrada pede `lead_converted` | `success` | desligada |
+| `celebration` | celebração da jornada (missão, conquista, nível), no lugar da arte | `lead_converted` | desligada |
+
+Em `/dev/mascote`, "Mostrar todas as vagas" liga todas só neste aparelho e só em desenvolvimento, para ver cada área com o mascote antes de decidir.
+
+Para trocar o visual de uma vaga: gere a pose (§1.1), salve em `public/mascote/`, aponte o estado em `mascot-config.ts` (`MASCOT_ART`, `MASCOT_STATE_ART` ou `MASCOT_VIDEOS`) e ligue a vaga.

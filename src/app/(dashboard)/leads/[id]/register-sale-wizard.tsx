@@ -271,7 +271,7 @@ export function RegisterSaleWizard({
           return;
         }
         toast.success("Venda registrada. O ciclo de renovação já foi agendado.");
-        if (showSuccessOverlay) celebrate("Venda registrada");
+        if (showSuccessOverlay) celebrate("Venda registrada", { mascot: "lead_converted" });
         onOpenChange(false);
         onRegistered?.();
         router.refresh();
