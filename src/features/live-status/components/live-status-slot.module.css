@@ -16,7 +16,8 @@
 .cardSkeleton { min-height: 248px; justify-content: start; align-content: start; }
 
 @media (max-width: 559px) {
-  .managementStrip { min-height: 1124px; }
+  /* Só o esqueleto reserva altura: a faixa carregada tem cartões e linhas compactas (14/11/2026). */
+  .managementStrip[data-live-status-fallback] { min-height: 760px; }
   .cardSkeleton { min-height: 126px; }
   .copySkeleton { display: none; }
 }

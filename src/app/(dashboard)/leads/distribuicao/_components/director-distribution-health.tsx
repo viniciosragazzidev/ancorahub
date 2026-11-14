@@ -1,5 +1,5 @@
 import { Badge } from "@/components/arc/badge/badge";
-import { formatLiteDate } from "@/components/lite/format/date";
+import { DirectorDistributionEvents } from "./director-distribution-events";
 import styles from "./director-distribution-health.module.css";
 
 type Health = { pending: number; retrying: number; processing: number; failed: number; completed: number };
@@ -45,19 +45,7 @@ export function DirectorDistributionHealth({ events, jobs, jobsAvailable, jobsEn
           <h2 id="distribution-health-history">Histórico de decisões</h2>
           <p>Atribuições, redistribuições e intervenções deste escopo.</p>
         </div>
-        {events.length ? (
-          <ol className={styles.events}>
-            {events.map((event) => (
-              <li key={event.id} className={styles.event}>
-                <div className={styles.eventCopy}>
-                  <p><strong>{event.leadName}</strong> <span aria-hidden="true">→</span> {event.brokerName ?? "Aguardando corretor"}</p>
-                  <p>{event.queueName ?? "Inbox geral"} · {eventActionLabel(event.action)}{event.reason ? ` · ${event.reason}` : ""}</p>
-                </div>
-                <time dateTime={event.createdAt}>{formatLiteDate(event.createdAt, { dateStyle: "short", timeStyle: "short" })}</time>
-              </li>
-            ))}
-          </ol>
-        ) : <p className={styles.empty}>Ainda não há eventos neste escopo.</p>}
+        <DirectorDistributionEvents events={events.map((event) => ({ ...event, actionLabel: eventActionLabel(event.action) }))} />
       </section>
 
       <div className={styles.healthGrid}>

@@ -180,19 +180,56 @@ export interface LiteLiveStatusStripProps {
   className?: string;
 }
 
-/** Faixa "Agora na operação": grade de 2 a 4 colunas, lista no celular. Sem status, não ocupa espaço. */
+/** Em ordem: sem número e sem alerta. Vira linha compacta em vez de cartão (14/11/2026). */
+function isCalmStatus(status: LiveStatus) {
+  return !(status.value > 0 || status.valueText) && (status.severity === "ok" || status.severity === "info") && !status.stale;
+}
+
+/** Linha compacta de um status em ordem: ponto, rótulo, a frase do vazio e o atalho. */
+function LiteLiveStatusRow({ status }: { status: LiveStatus }) {
+  return (
+    <li className={styles.row} data-severity={status.severity} aria-labelledby={`live-${status.id}`}>
+      <span className={styles.rowDot} aria-hidden="true"><span className={styles.dot} /></span>
+      <span className={styles.rowText}>
+        <span id={`live-${status.id}`} className={styles.rowLabel}>{status.label}</span>
+        <span className={styles.rowEmpty}>{status.emptyText}</span>
+      </span>
+      {status.action ? (
+        <Link href={status.action.href} className={styles.rowAction} aria-label={`${status.action.label}: ${status.label}`}>
+          {status.action.label}<span aria-hidden="true" className={styles.arrow}>→</span>
+        </Link>
+      ) : null}
+    </li>
+  );
+}
+
+/**
+ * Faixa "Agora na operação" em dois níveis (14/11/2026): o que tem número ou pede atenção vira cartão (grade que
+ * se ajusta à quantidade), o que está em ordem vira lista compacta embaixo. Assim nenhum cartão vazio estica a
+ * linha. Sem status, não ocupa espaço.
+ */
 export function LiteLiveStatusStrip({ statuses, seals = [], title = "Agora na operação", onDue, className }: LiteLiveStatusStripProps) {
   if (!statuses.length && !seals.length) return null;
+  const active = statuses.filter((status) => !isCalmStatus(status));
+  const calm = statuses.filter(isCalmStatus);
   return (
     <section className={[styles.strip, className].filter(Boolean).join(" ")} aria-label={title} data-live-status-strip="">
       <header className={styles.stripHead}>
         <h2 className={styles.stripTitle}>{title}</h2>
         {seals.length ? <div className={styles.seals}>{seals.map((seal) => <LiteLiveSeal key={seal.id} seal={seal} />)}</div> : null}
       </header>
-      {statuses.length ? (
+      {active.length ? (
         <LiteStagger className={styles.grid}>
-          {statuses.map((status) => <LiteLiveStatus key={status.id} status={status} onDue={onDue} />)}
+          {active.map((status) => <LiteLiveStatus key={status.id} status={status} onDue={onDue} />)}
         </LiteStagger>
+      ) : null}
+      {calm.length ? (
+        <div className={styles.calm}>
+          <p className={styles.calmTitle}>Em ordem</p>
+          <ul className={styles.calmList}>
+            {calm.map((status) => <LiteLiveStatusRow key={status.id} status={status} />)}
+          </ul>
+        </div>
       ) : null}
     </section>
   );
