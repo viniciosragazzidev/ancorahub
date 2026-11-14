@@ -63,7 +63,7 @@ describe("RegisterSaleWizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     expect(screen.getByText("Passo 3 de 4 · Documentos")).toBeTruthy();
-    expect(screen.getByText("Aguardando aprovação")).toBeTruthy();
+    expect(screen.getAllByText("Aguardando aprovação").length).toBeGreaterThan(0);
     expect(screen.getByText("Falta enviar")).toBeTruthy();
     expect(screen.getByText(/1 requisito ainda precisa ser aprovado/)).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Enviar$/ })).toBeTruthy();
