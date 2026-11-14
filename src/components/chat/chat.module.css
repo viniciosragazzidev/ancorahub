@@ -221,6 +221,12 @@
 .send { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; border: 0; background: var(--chat-action); color: white; cursor: pointer; }
 .send:disabled { background: var(--chat-action-soft); color: var(--chat-action); cursor: default; }
 .send svg { width: 16px; height: 16px; }
+/* Lite no celular: alvos do composer com 44px (o visual do modo normal não muda). */
+@media (pointer: coarse) {
+  :global([data-skin="diretor"]) .tool,
+  :global([data-skin="diretor"]) .send,
+  :global([data-skin="diretor"]) .audioButton { width: 44px; height: 44px; }
+}
 .mentionMenu { list-style: none; margin: 0; padding: 6px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-floating); display: grid; }
 .mentionItem { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 0; background: none; border-radius: var(--radius-control); font: inherit; text-align: left; color: inherit; cursor: pointer; }
 .mentionItem[data-active="true"], .mentionItem:hover { background: var(--surface-muted); }

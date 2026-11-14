@@ -1,0 +1,29 @@
+/*
+ * Área de toque mínima de 44x44 em telas de toque (pointer: coarse).
+ *
+ * A classe `ct-touch` (aplicada pelas variantes icon, icon-xs, icon-sm, xs e sm
+ * de src/components/ui/button-variants.ts) estende só a área clicável com um
+ * ::after centralizado. Visual e layout não mudam, e no desktop nada muda.
+ *
+ * - `:where()` tem especificidade zero: o botão só vira `relative` quando não
+ *   tem outro posicionamento (absolute, fixed, sticky ou relative já ganham
+ *   do `:where`). Assim, `absolute right-4 top-4` continua funcionando.
+ * - Limite: o ::after invade até (44 - tamanho) / 2 px além da borda. Se dois
+ *   botões de ícone ficarem com gap menor que isso, a área do de trás pode
+ *   roubar uns px da borda do vizinho. Em grupos apertados, mantenha gap >= 10px.
+ */
+@media (pointer: coarse) {
+  :where(.ct-touch) {
+    position: relative;
+  }
+
+  .ct-touch::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+}

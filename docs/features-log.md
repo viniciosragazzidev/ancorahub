@@ -2,6 +2,10 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Lite: alvos de toque de 44px no celular
+
+- Em telas de toque (`pointer: coarse`), os botões de ícone e os tamanhos xs/sm ganham área de toque de 44x44 (`ct-touch`, `src/styles/touch-target.css`) sem mudar o visual. No Lite, o composer (enviar, áudio, ferramentas) tem 44px e o botão principal fica com altura mínima de 44px. Desktop e modo normal não mudam.
+
 ## 13/11/2026 - Modo corretor, etapa 6: Agenda conectada
 
 - `/agenda` do corretor reúne as tarefas abertas atribuídas a ele (retornos, tarefas com prazo e acompanhamentos de renovação) agrupadas em Atrasados, Hoje, Amanhã, Próximos e Sem prazo, pelo dia de São Paulo. Cada linha traz ícone do tipo, título, tipo e nome do lead, horário e estado textual (Atrasado, Urgente).

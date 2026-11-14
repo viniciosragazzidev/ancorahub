@@ -10,6 +10,7 @@
 @import "../styles/design-system/tokens.css";
 @import "../styles/design-system/motion.css";
 @import "../styles/interface-motion.css";
+@import "../styles/touch-target.css";
 
 
 @custom-variant dark (&:is(.dark *));
