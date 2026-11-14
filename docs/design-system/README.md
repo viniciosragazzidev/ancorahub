@@ -10,6 +10,7 @@ Este diretório transforma a referência visual em contrato operacional. Ele nã
 2. [FOUNDATIONS.md](./FOUNDATIONS.md) e `tokens/`
 3. [COMPONENT_RULES.md](./COMPONENT_RULES.md) e `components/`
 4. [PAGE_PATTERNS.md](./PAGE_PATTERNS.md), [RESPONSIVE_RULES.md](./RESPONSIVE_RULES.md), [ACCESSIBILITY_RULES.md](./ACCESSIBILITY_RULES.md) e [MOTION_RULES.md](./MOTION_RULES.md)
+6. [FEEDBACK.md](./FEEDBACK.md): padrão geral de feedback e movimento (camadas, níveis 0 a 3, som, vibração, mascote e botão de ação). Vale para o Lite e para o modo normal.
 5. [DESIGN_GAPS.md](./DESIGN_GAPS.md), quando não houver regra aplicável.
 
 ## Design system "Conversa" (modo Lite)

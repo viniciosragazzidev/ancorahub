@@ -714,3 +714,7 @@ existente (48/64/80 px), sem novo token. Arquivos WebP com alpha de até 16 KB c
 sem movimento novo, prioridade de rede ou consulta de dados própria. O controle
 feature_ui_contextual_illustrations no Super-admin restaura a apresentação anterior.
 Mapa e verificação: docs/implementations/active/2026-10-28-contextual-illustrations.md.
+
+## Feedback e movimento · 14/11/2026
+
+O padrão geral de resposta a ações e eventos (camadas visual, texto, som, vibração e mascote; níveis 0 a 3; estados do botão de ação) está em `docs/design-system/FEEDBACK.md` e vale para todo o app. No modo descrito neste documento valem os níveis 0 a 2: o CTA Deep Sapphire ganha os estados enviando, confirmado e falhou, sem base sólida, sem bounce e sem confete. Plano de adoção por rota: `docs/implementations/active/2026-11-14-feedback-padrao.md`.
