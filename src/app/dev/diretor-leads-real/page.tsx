@@ -20,7 +20,7 @@ import { LEADS } from "./leads-fixtures";
 
 export default function DirectorLeadsRealPage() {
   if (process.env.NODE_ENV === "production") notFound();
-  const skin = { "--director-brand-color": "#3b2dff", "--director-brand-foreground": "#ffffff" } as CSSProperties;
+  const skin = { "--director-brand-color": "#002b73", "--director-brand-foreground": "#ffffff" } as CSSProperties;
   return (
     <ArcScopeProvider enabled>
       <div className="arc-venancor" data-skin="diretor" style={skin}>

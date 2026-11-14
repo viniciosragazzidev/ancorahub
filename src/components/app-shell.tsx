@@ -152,7 +152,7 @@ export function AppShell({
       "--sidebar-primary": branding?.brandColor ?? "",
       "--sidebar-primary-foreground": readableBrandForeground ?? "",
       "--sidebar-ring": branding?.brandColor ?? "",
-      "--director-brand-color": directorLiteEnabled ? branding?.brandColor ?? "#3b2dff" : "",
+      "--director-brand-color": directorLiteEnabled ? branding?.brandColor ?? "#002b73" : "",
       "--director-brand-foreground": directorLiteEnabled ? readableBrandForeground ?? "#ffffff" : "",
     } as const;
     const previous = Object.fromEntries(
@@ -252,7 +252,7 @@ export function AppShell({
 
   const directorSkinStyle = directorLiteEnabled
     ? {
-        "--director-brand-color": branding?.brandColor ?? "#3b2dff",
+        "--director-brand-color": branding?.brandColor ?? "#002b73",
         "--director-brand-foreground": readableBrandForeground ?? "#ffffff",
       } as CSSProperties
     : undefined;

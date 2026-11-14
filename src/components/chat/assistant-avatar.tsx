@@ -107,7 +107,7 @@ export function AssistantAvatar({
           <img src="/mascote/jack-capitao.webp" width={size} height={size} alt="" draggable={false} style={{ display: "block", width: size, height: size, borderRadius: 999 }} />
         </motion.span>
         {state === "waiting" ? (
-          <span aria-hidden="true" style={{ position: "absolute", right: 0, top: 0, width: Math.max(8, size * 0.2), height: Math.max(8, size * 0.2), borderRadius: 999, background: "oklch(62% 0.2 255)", boxShadow: "0 0 0 2px var(--surface)" }} />
+          <span aria-hidden="true" style={{ position: "absolute", right: 0, top: 0, width: Math.max(8, size * 0.2), height: Math.max(8, size * 0.2), borderRadius: 999, background: "oklch(36% 0.14 262)", boxShadow: "0 0 0 2px var(--surface)" }} />
         ) : null}
       </span>
     );
@@ -119,7 +119,7 @@ export function AssistantAvatar({
         role={label ? "img" : undefined}
         aria-label={label}
         aria-hidden={label ? undefined : true}
-        style={{ width: size, height: size, borderRadius: 999, display: "grid", placeItems: "center", flex: "none", background: "linear-gradient(160deg, oklch(70% 0.17 250), oklch(55% 0.21 258))", color: "white" }}
+        style={{ width: size, height: size, borderRadius: 999, display: "grid", placeItems: "center", flex: "none", background: "linear-gradient(160deg, oklch(70% 0.17 250), oklch(29% 0.12 263))", color: "white" }}
       >
         <svg viewBox="0 0 24 24" width={size * 0.5} height={size * 0.5} aria-hidden="true">
           <path fill="currentColor" d="M12 2a2.5 2.5 0 0 1 1 4.8V9h3a1 1 0 1 1 0 2h-3v8.9a7 7 0 0 0 5.7-5.4l-1.4.4a1 1 0 0 1-.6-1.9l3.4-1a1 1 0 0 1 1.3 1A9 9 0 0 1 3 13a1 1 0 0 1 1.3-1l3.4 1a1 1 0 1 1-.6 1.9l-1.4-.4A7 7 0 0 0 11 19.9V11H8a1 1 0 1 1 0-2h3V6.8A2.5 2.5 0 0 1 12 2Z" />
@@ -173,7 +173,7 @@ export function AssistantAvatar({
         </motion.g>
       </motion.svg>
       {state === "waiting" ? (
-        <span aria-hidden="true" style={{ position: "absolute", right: 0, top: 0, width: Math.max(8, size * 0.2), height: Math.max(8, size * 0.2), borderRadius: 999, background: "oklch(62% 0.2 255)", boxShadow: "0 0 0 2px var(--surface)" }} />
+        <span aria-hidden="true" style={{ position: "absolute", right: 0, top: 0, width: Math.max(8, size * 0.2), height: Math.max(8, size * 0.2), borderRadius: 999, background: "oklch(36% 0.14 262)", boxShadow: "0 0 0 2px var(--surface)" }} />
       ) : null}
     </span>
   );

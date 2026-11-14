@@ -66,7 +66,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
                 type="button"
                 disabled={clearing}
                 onClick={() => void clearSiteDataAndReload()}
-                style={{ minHeight: "44px", padding: "0 16px", borderRadius: "999px", border: "none", background: "var(--primary, #3b2dff)", color: "var(--primary-foreground, #fff)", font: "inherit", fontSize: "var(--text-sm, 14px)", fontWeight: 500, whiteSpace: "nowrap", cursor: "pointer" }}
+                style={{ minHeight: "44px", padding: "0 16px", borderRadius: "999px", border: "none", background: "var(--primary, #002b73)", color: "var(--primary-foreground, #fff)", font: "inherit", fontSize: "var(--text-sm, 14px)", fontWeight: 500, whiteSpace: "nowrap", cursor: "pointer" }}
               >
                 {clearing ? "Limpando..." : "Limpar dados e recarregar"}
               </button>

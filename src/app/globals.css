@@ -95,7 +95,7 @@
   --popover-foreground: #09090b;
 
   /* ── Camada 2: Acentos Funcionais & Ações da Marca ─────────────────────── */
-  --primary: #3b2dff;
+  --primary: #002b73;
   --primary-foreground: #ffffff;
 
   --secondary: #f4f3f0;
@@ -125,7 +125,7 @@
   /* Bordas suaves 1px */
   --border-strong: #afb0b1;
   --input: #e4e4e7;
-  --ring: #3b2dff;
+  --ring: #002b73;
 
   --sidebar: var(--card);
   --sidebar-foreground: var(--card-foreground);
@@ -136,13 +136,13 @@
   --sidebar-warning: oklch(0.965 0.003 260);
   --sidebar-warning-foreground: oklch(0.220 0.012 260);
   --sidebar-border: #e4e4e7;
-  --sidebar-ring: #3b2dff;
+  --sidebar-ring: #002b73;
 
   --ct-blue: #3b82f6;
   --ct-blue-strong: #1f6fe5;
 
   /* ── Camada 4: Paleta de Gráficos em OKLCH (L = 0.64, C = 0.16) ─────────── */
-  --chart-1: #3b2dff;
+  --chart-1: #002b73;
   /* Indigo/Blue */
   --chart-2: #3b82f6;
   /* Emerald */
@@ -330,7 +330,7 @@
   --popover-foreground: #fafafa;
 
   /* ── Action ───────────────────────────────────────────────────────────── */
-  --primary: #1f6fe5;
+  --primary: #3a6fd8;
   --primary-foreground: #ffffff;
 
   --secondary: #27272a;
@@ -356,7 +356,7 @@
   --border: #27272a;
   --border-strong: #353535;
   --input: #27272a;
-  --ring: #1f6fe5;
+  --ring: #3a6fd8;
 
   --sidebar: #18181b;
   --sidebar-foreground: #fafafa;

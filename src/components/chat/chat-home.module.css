@@ -5,7 +5,7 @@
 .hello { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); letter-spacing: var(--tracking-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .headerTools { display: flex; gap: 8px; }
 .tabs { padding: 4px 20px 8px; max-width: 320px; }
-.count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; border-radius: 999px; background: oklch(62% 0.2 255); color: white; font-size: 11px; font-variant-numeric: tabular-nums; }
+.count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; border-radius: 999px; background: oklch(36% 0.14 262); color: white; font-size: 11px; font-variant-numeric: tabular-nums; }
 /* Anel do pulso da contagem (RisePulse): a margem vai para o anel, para ele contornar só o número. */
 .countPulse { margin-left: 6px; border-radius: 999px; }
 .countPulse > .count { margin-left: 0; }
@@ -61,7 +61,7 @@
   .card:hover { background: var(--neutral-3); transform: translateY(-1px); }
   .cardName { margin-top: 10px; font-weight: 500; font-size: var(--text-base); }
   .cardPreview { font-size: var(--text-sm); color: var(--text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .cardWaiting { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: oklch(62% 0.2 255); font-weight: 500; }
+  .cardWaiting { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: oklch(36% 0.14 262); font-weight: 500; }
   .page [data-mobile-only] { display: none; }
   /* With the rail beside the screen (layout of the Lite on computers), the page shows only the center. */
   :global(.lite-split) .page { grid-template-columns: minmax(0, 1fr); }

@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 
 const presets = [
+  { label: "Azul-marinho", value: "#002B73" },
   { label: "Verde", value: "#16A34A" },
   { label: "Azul", value: "#2563EB" },
   { label: "Roxo", value: "#9333EA" },
@@ -18,7 +19,7 @@ type Props = {
 };
 
 export function ColorPicker({ defaultValue, name, disabled = false }: Props) {
-  const [color, setColor] = useState(defaultValue ?? "#16A34A");
+  const [color, setColor] = useState(defaultValue ?? "#002B73");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

@@ -145,27 +145,41 @@ function JourneyHero({ data }: { data: JourneyScreenData }) {
   const change = week.pointsChange;
   return (
     <section className={styles.hero} style={{ "--level-hue": hue } as React.CSSProperties} aria-label="Seu nível e sua semana">
-      <LevelRing index={level.level.index} percentage={level.percentage} />
-      <div className={styles.heroText}>
-        <span className={styles.heroLevel}>{level.level.name}</span>
-        <span className={styles.heroPoints}>
-          <AnimatedCounter value={week.points} locale="pt-BR" />
-          <small>pts nesta semana</small>
-        </span>
-        <span className={styles.heroChips}>
-          {change !== 0 ? <span className={styles.chip} data-tone={change > 0 ? "up" : "down"}>{change > 0 ? "▲" : "▼"} {pts(Math.abs(change))} vs semana passada</span> : null}
-          {streak.current > 0 ? (
-            <span className={styles.chip} data-tone="streak" aria-label={`Sequência de ${streak.current} dias`}>
-              <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 3c2 3 5 4.5 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3 1-5.5 1-7.5z" fill="currentColor" /></svg>
-              {/* Sobe uma vez quando a sequência aumenta; a troca de key remonta o número para rolar. */}
-              <LiteNumber key={streakRose ? "subiu" : "parado"} value={streak.current} countFromZero={streakRose} /> {streak.current === 1 ? "dia" : "dias"}
+      <div className={styles.heroTop}>
+        <LevelRing index={level.level.index} percentage={level.percentage} />
+        <div className={styles.heroText}>
+          <span className={styles.heroPoints}>
+            <AnimatedCounter value={week.points} locale="pt-BR" />
+            <small>pts nesta semana</small>
+          </span>
+          {change !== 0 ? (
+            <span className={styles.heroDelta} data-tone={change > 0 ? "up" : "down"}>
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d={change > 0 ? "M12 5l7 8h-4.5v6h-5v-6H5z" : "M12 19l-7-8h4.5V5h5v6H19z"} fill="currentColor" /></svg>
+              {pts(Math.abs(change))} {change > 0 ? "a mais" : "a menos"} que a semana passada
             </span>
-          ) : null}
-        </span>
-        {level.nextLevel ? (
-          <span className={styles.heroNext}>Faltam <strong>{pts(level.pointsToNext)}</strong> para o <Term id="level">nível</Term> {level.nextLevel.name}</span>
-        ) : <span className={styles.heroNext}>Você chegou ao nível máximo.</span>}
+          ) : <span className={styles.heroDelta}>Igual à semana passada</span>}
+        </div>
       </div>
+      <dl className={styles.heroStats}>
+        <div className={styles.heroStat} data-tone="streak">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3c2 3 5 4.5 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3 1-5.5 1-7.5z" fill="currentColor" /></svg>
+          <dt>Sequência</dt>
+          <dd>
+            {/* Sobe uma vez quando a sequência aumenta; a troca de key remonta o número para rolar. */}
+            <LiteNumber key={streakRose ? "subiu" : "parado"} value={streak.current} countFromZero={streakRose} /> {streak.current === 1 ? "dia" : "dias"}
+          </dd>
+        </div>
+        <div className={styles.heroStat} data-tone="level">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 2l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 16.9 6.1 20l1.2-6.5L2.5 8.9 9.1 8z" fill="currentColor" /></svg>
+          <dt><Term id="level">Nível</Term></dt>
+          <dd>{level.level.name}</dd>
+        </div>
+        <div className={styles.heroStat} data-tone="next">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zm0-4a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0-3a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" fill="currentColor" fillRule="evenodd" /></svg>
+          <dt>{level.nextLevel ? `Para ${level.nextLevel.name}` : "Próximo nível"}</dt>
+          <dd>{level.nextLevel ? pts(level.pointsToNext) : "Topo"}</dd>
+        </div>
+      </dl>
     </section>
   );
 }

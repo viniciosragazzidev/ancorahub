@@ -125,11 +125,11 @@
   color: white;
   font: 500 16px/1.2 var(--font-body);
   cursor: pointer;
-  box-shadow: 0 3px 0 var(--chat-action-base, oklch(46% 0.19 260));
+  box-shadow: 0 3px 0 var(--chat-action-base, oklch(27% 0.11 263));
   transition: transform 100ms var(--ease-standard), box-shadow 100ms var(--ease-standard);
   -webkit-tap-highlight-color: transparent;
 }
-.continue:active { transform: translateY(2px) scale(0.98); box-shadow: 0 1px 0 var(--chat-action-base, oklch(46% 0.19 260)); }
+.continue:active { transform: translateY(2px) scale(0.98); box-shadow: 0 1px 0 var(--chat-action-base, oklch(27% 0.11 263)); }
 .continue:focus-visible { outline: 2px solid var(--chat-action); outline-offset: 3px; }
 
 @media (prefers-reduced-motion: reduce) {

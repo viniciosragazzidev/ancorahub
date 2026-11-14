@@ -4,9 +4,9 @@
  * status (verde, âmbar, vermelho) só para status.
  */
 .root, .sheet {
-  --chat-action: oklch(62% 0.2 255);
-  --chat-action-strong: oklch(55% 0.21 258);
-  --chat-action-soft: oklch(62% 0.2 255 / 0.1);
+  --chat-action: oklch(36% 0.14 262);
+  --chat-action-strong: oklch(29% 0.12 263);
+  --chat-action-soft: oklch(36% 0.14 262 / 0.1);
 }
 .root { display: contents; }
 :global(.dark) .root, :global(.dark) .sheet {
@@ -77,7 +77,7 @@
 .action svg { width: 16px; height: 16px; flex: none; }
 .action[aria-pressed="true"] { border-color: var(--chat-action); color: var(--chat-action-strong); background: var(--chat-action-soft); }
 .action:disabled { opacity: 0.45; cursor: default; }
-.primary { width: 100%; min-height: 46px; border: 0; color: white; background: linear-gradient(180deg, var(--chat-action), var(--chat-action-strong)); box-shadow: 0 8px 20px oklch(55% 0.21 258 / 0.25); }
+.primary { width: 100%; min-height: 46px; border: 0; color: white; background: linear-gradient(180deg, var(--chat-action), var(--chat-action-strong)); box-shadow: 0 8px 20px oklch(29% 0.12 263 / 0.25); }
 .primary:hover { background: linear-gradient(180deg, var(--chat-action), var(--chat-action-strong)); filter: brightness(1.05); }
 .locked { display: grid; grid-template-columns: 16px 1fr; gap: 8px; align-items: start; margin: 0; font-size: var(--text-xs); line-height: 1.5; color: var(--text-muted); }
 .locked svg { width: 14px; height: 14px; margin-top: 2px; }
@@ -86,7 +86,7 @@
 .check svg { width: 11px; height: 11px; }
 
 /* ---------- Cabeçalho: comparar ---------- */
-.comparePill { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px 0 12px; border-radius: 9999px; border: 0; font: inherit; font-size: var(--text-sm); font-weight: 500; color: white; background: linear-gradient(180deg, var(--chat-action), var(--chat-action-strong)); box-shadow: 0 8px 20px oklch(55% 0.21 258 / 0.28); cursor: pointer; }
+.comparePill { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px 0 12px; border-radius: 9999px; border: 0; font: inherit; font-size: var(--text-sm); font-weight: 500; color: white; background: linear-gradient(180deg, var(--chat-action), var(--chat-action-strong)); box-shadow: 0 8px 20px oklch(29% 0.12 263 / 0.28); cursor: pointer; }
 .compareCount { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 9999px; background: white; color: var(--chat-action-strong); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
 
 /* ---------- Comemoração (proposta pronta) ---------- */
