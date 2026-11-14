@@ -12,6 +12,7 @@ import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import type { BrokerJourneyData } from "@/features/engagement/journey-types";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getBrokerFinanceSummary } from "@/features/erp/broker-finance";
+import { isBrokerQuickSaleEnabled } from "@/features/broker-workspace/quick-sale-flag";
 import { BrokerFinanceSummaryCard } from "@/features/erp/components/broker-finance-summary-card";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 
@@ -109,7 +110,7 @@ export async function ChatHomeContent() {
   // same tenant and user, both come from the authenticated context).
   const context = await getRequiredTenantContext().catch(() => null);
   if (!context) return <LightDashboardUnavailable />;
-  const [rail, data, highlights, journey, firstSteps, floatingNow, journeyFlag, homeActionsFlag, financeSummary] = await Promise.all([
+  const [rail, data, highlights, journey, firstSteps, floatingNow, journeyFlag, homeActionsFlag, financeSummary, quickSaleEnabled] = await Promise.all([
     getChatRailData(),
     getCachedBrokerWorkspaceData().catch(() => null),
     getBrokerHighlights(context.tenantId, context.userId).catch(() => null),
@@ -120,6 +121,7 @@ export async function ChatHomeContent() {
     context.role === "broker" ? getFeatureFlag(FEATURE_FLAGS.BROKER_HOME_ACTIONS).catch(() => FEATURE_FLAGS.BROKER_HOME_ACTIONS.defaultValue) : Promise.resolve("false"),
     // Meu mês: null sem o módulo financeiro liberado, sem permissão ou com a chave desligada.
     context.role === "broker" ? getBrokerFinanceSummary(context).catch(() => null) : Promise.resolve(null),
+    context.role === "broker" ? isBrokerQuickSaleEnabled().catch(() => false) : Promise.resolve(false),
   ]);
   if (!rail || !data) return <LightDashboardUnavailable />;
   return (
@@ -132,6 +134,7 @@ export async function ChatHomeContent() {
       nowFloatingEnabled={floatingNow === "true"}
       homeActions={homeActionsFlag === "true"}
       financeCard={financeSummary ? <BrokerFinanceSummaryCard summary={financeSummary} /> : null}
+      quickSaleEnabled={quickSaleEnabled}
       summary={{ ...summaryOf(data), next: presenceNext(data) ?? nextActionOf(data.nextAction, journey) }}
       presence={presenceAskOf(data)}
       presenceAsks={presenceAsksOf(data)}

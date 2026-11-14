@@ -1,28 +1,28 @@
 /* Meu financeiro do corretor (Lite). Só tokens do escopo arc-venancor: folha branca, cartões cinza sem borda, ação em --chat-action. */
 
-.page { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
+.page { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6, 24px); }
 
-.header { display: grid; gap: var(--space-1); }
+.header { display: grid; gap: var(--space-1, 4px); }
 .title { margin: 0; font-size: var(--text-xl); font-weight: 600; letter-spacing: var(--tracking-display); }
 .lead { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
 
-.section { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
-.sectionHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.section { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3, 12px); }
+.sectionHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2, 8px); }
 .sectionTitle { margin: 0; font-size: var(--text-base); font-weight: 600; }
 .sectionHint { margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
 
 /* Três números: um por linha no celular, lado a lado a partir de 600px. */
-.metrics { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); margin: 0; }
+.metrics { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3, 12px); margin: 0; }
 @media (min-width: 600px) { .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.metric { display: grid; align-content: start; gap: var(--space-1); min-width: 0; padding: var(--space-4); border-radius: var(--radius-panel); background: var(--surface-muted); }
+.metric { display: grid; align-content: start; gap: var(--space-1, 4px); min-width: 0; padding: var(--space-4, 16px); border-radius: var(--radius-panel); background: var(--surface-muted); }
 .metric dd { margin: 0; }
 .metricLabel { color: var(--text-secondary); font-size: var(--text-sm); }
 .metricValue { font-size: var(--text-2xl); font-weight: 600; letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .metricHint { color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
 .noData { color: var(--text-muted); font-size: var(--text-base); font-weight: 500; }
 
-.list { display: grid; margin: 0; padding: var(--space-2) var(--space-4); border-radius: var(--radius-panel); background: var(--surface-muted); list-style: none; }
-.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-height: 56px; padding-block: var(--space-3); }
+.list { display: grid; margin: 0; padding: var(--space-2, 8px) var(--space-4, 16px); border-radius: var(--radius-panel); background: var(--surface-muted); list-style: none; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-3, 12px); min-height: 56px; padding-block: var(--space-3, 12px); }
 .row + .row { border-top: 2px solid var(--surface); }
 .rowMain { display: grid; gap: 2px; min-width: 0; }
 .rowTitle { overflow: hidden; font-size: var(--text-sm); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
@@ -37,24 +37,25 @@
 .link:hover { text-decoration: underline; }
 .link:focus-visible { outline: 2px solid var(--chat-action); outline-offset: 2px; border-radius: var(--radius-control); }
 
-.pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3, 12px); }
 .pagerInfo { color: var(--text-muted); font-size: var(--text-xs); }
 
-.empty { display: grid; gap: var(--space-2); padding: var(--space-5); border-radius: var(--radius-panel); background: var(--surface-muted); }
+.empty { display: grid; gap: var(--space-2, 8px); padding: var(--space-5, 20px); border-radius: var(--radius-panel); background: var(--surface-muted); }
 .emptyTitle { margin: 0; font-size: var(--text-base); font-weight: 600; }
 .emptyText { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
-.actions { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-4, 16px); }
 
 .note { margin: 0; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
 
 /* Cartão "Meu mês": compacto, para o Início. */
-.card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); padding: var(--space-5); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-resting); }
-.cardHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+/* Cartão Meu mês no Início (fundo branco): mesmo fundo suave dos cartões do Início. */
+.card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2, 8px); padding: var(--space-4, 16px); border-radius: var(--radius-panel, 1.5rem); background: var(--surface-muted); }
+.cardHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2, 8px); }
 .cardTitle { margin: 0; font-size: var(--text-base); font-weight: 600; }
 .cardPeriod { color: var(--text-muted); font-size: var(--text-xs); }
 .cardNumbers { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin: 0; }
-.cardNumber { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); min-height: 40px; padding-block: var(--space-2); }
-.cardNumber + .cardNumber { border-top: 2px solid var(--surface-muted); }
+.cardNumber { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3, 12px); min-height: 40px; padding-block: var(--space-2, 8px); }
+.cardNumber + .cardNumber { border-top: 1px solid var(--border, rgb(16 16 40 / 0.08)); }
 .cardNumber dt { min-width: 0; color: var(--text-secondary); font-size: var(--text-sm); }
 .cardNumber dd { margin: 0; font-size: var(--text-base); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cardNumber dd[data-empty="true"] { color: var(--text-muted); font-size: var(--text-sm); font-weight: 500; }

@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigation = vi.hoisted(() => ({ pathname: "/plantoes/agora" }));
 vi.mock("@/features/leads/accept-offer-action", () => ({ acceptLeadOfferAction: vi.fn() }));
+// O painel de Registrar venda chama uma server action (código só de servidor); aqui basta um marcador.
+vi.mock("@/features/broker-workspace/components/quick-register-sale", () => ({ QuickRegisterSaleSheet: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="Registrar venda" /> : null) }));
 vi.mock("next/navigation", () => ({ usePathname: () => navigation.pathname, useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), back: vi.fn(), replace: vi.fn() }) }));
 vi.mock("motion/react", async () => {
   const actual = await vi.importActual<typeof import("motion/react")>("motion/react");
@@ -174,5 +176,28 @@ describe("ChatHome", () => {
     navigation.pathname = "/dashboard";
     render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={leads} nowIso="2026-10-10T12:00:00.000Z" canQuote highlights={{ ranks: [], acceptTime: null, mission: null }} />);
     expect(screen.getAllByText(/Seu ranking aparece depois dos primeiros atendimentos/).length).toBeGreaterThan(0);
+  });
+
+  it("Início organizado: Ações rápidas fixas, Registrar venda abre o painel e sem o botão flutuante repetido", () => {
+    navigation.pathname = "/dashboard";
+    render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote homeActions quickSaleEnabled />);
+    const section = screen.getAllByRole("region", { name: "Ações rápidas" })[0]!;
+    expect(within(section).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Registrar venda", "Novo contato", "Cotação", "Minha agenda"]);
+    expect(within(section).getByRole("link", { name: "Novo contato" }).getAttribute("href")).toBe("/clientes?adicionar=1");
+    expect(screen.queryByRole("button", { name: /Novo atendimento/ })).toBeNull();
+    fireEvent.click(within(section).getByRole("button", { name: "Registrar venda" }));
+    expect(screen.getByRole("dialog", { name: "Registrar venda" })).toBeTruthy();
+  });
+
+  it("Início anterior com a chave desligada e sem Cotação quando o simulador não está liberado", () => {
+    navigation.pathname = "/dashboard";
+    const { unmount } = render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote />);
+    expect(screen.queryByRole("region", { name: "Ações rápidas" })).toBeNull();
+    unmount();
+    render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote={false} homeActions />);
+    const section = screen.getAllByRole("region", { name: "Ações rápidas" })[0]!;
+    expect(within(section).queryByText("Cotação")).toBeNull();
+    // Sem a chave do Registrar venda rápido, o atalho leva à fila de leads.
+    expect(within(section).getByRole("link", { name: "Registrar venda" }).getAttribute("href")).toBe("/leads?tab=minha-fila");
   });
 });
