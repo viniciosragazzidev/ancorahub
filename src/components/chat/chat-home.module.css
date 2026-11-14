@@ -151,6 +151,9 @@
 /* Seletores dobrados: vencem o display do próprio banner, qualquer que seja a ordem das folhas. */
 .bannerMobile.bannerMobile { margin: 36px 16px 24px; }
 .bannerCenter.bannerCenter { display: none; width: 100%; margin-top: 36px; text-align: left; }
+/* Sem meta (Minha jornada, Meu desempenho) o card é mais baixo e o capitão sobe mais (~70px no celular, ~85px no computador). */
+.bannerMobile.bannerMobile:not([data-goal]) { margin-top: 76px; }
+.bannerCenter.bannerCenter:not([data-goal]) { margin-top: 92px; }
 @media (min-width: 1024px) {
   .bannerMobile.bannerMobile { display: none; }
   .bannerCenter.bannerCenter { display: grid; }

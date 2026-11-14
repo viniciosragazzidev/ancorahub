@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("@/features/leads/accept-offer-action", () => ({ acceptLeadOfferAction: vi.fn() }));
 import {
@@ -48,9 +48,14 @@ const shell: LightAvailabilityValue = {
   openMore: vi.fn(),
   homeTools: [{ label: "Clientes", href: "/clientes" }],
 };
+// O relógio fica no dia das ofertas do teste: sem isso a oferta (expira 13/11 16:08) vence com a data real.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-13T16:00:00Z") });
+});
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 function show(value = summary, overrides: Partial<LightAvailabilityValue> = {}) {
   return render(
