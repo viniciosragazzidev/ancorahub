@@ -12,6 +12,7 @@ import { Textarea } from "@/components/arc/textarea/textarea";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { BrokerWalletContactField, BrokerWalletContactResult } from "@/features/customers/broker-wallet-contact";
+import { useCampoMascarado } from "@/shared/input/use-campo-mascarado";
 
 import styles from "./broker-my-wallet.module.css";
 import { PriorClientForm, type PriorClientAction } from "./prior-client-form";
@@ -82,6 +83,8 @@ function NewInterestedForm({ action, showKind, onCreatedChange }: { action: Brok
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<BrokerWalletContactField, string>>>({});
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ leadId: string; name: string; noteSaved: boolean; withNote: boolean } | null>(null);
+  // Máscara: aceita colar "+55 21 99999-9999" ou "021..."; o servidor continua normalizando os dígitos como antes.
+  const telefone = useCampoMascarado("telefone", draft.telefone, (valor) => update("telefone", valor));
 
   function reset() {
     setDraft(EMPTY);
@@ -149,7 +152,7 @@ function NewInterestedForm({ action, showKind, onCreatedChange }: { action: Brok
         <form className={styles.sheetBody} onSubmit={submit} noValidate>
           {showKind ? <h3 className={styles.kind}>Novo interessado</h3> : null}
           <Input label="Nome" name="nome" autoComplete="name" value={draft.nome} onChange={(event) => update("nome", event.target.value)} error={fieldErrors.nome} required maxLength={120} />
-          <Input label="Telefone" name="telefone" type="tel" inputMode="tel" autoComplete="tel" placeholder="11 99999-9999" value={draft.telefone} onChange={(event) => update("telefone", event.target.value)} error={fieldErrors.telefone} required />
+          <Input label="Telefone" name="telefone" type="tel" autoComplete="tel" placeholder="(11) 99999-9999" {...telefone} error={fieldErrors.telefone} required />
           <Input label="E-mail (opcional)" name="email" type="email" inputMode="email" autoComplete="email" value={draft.email} onChange={(event) => update("email", event.target.value)} error={fieldErrors.email} maxLength={254} />
           <div className={styles.readonlyField}>
             <span className={styles.readonlyLabel}>Origem</span>

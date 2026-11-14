@@ -205,7 +205,7 @@ describe("Adicionar contato: Novo interessado", () => {
     fill();
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Cadastrar interessado" })); });
 
-    expect(action).toHaveBeenCalledWith({ nome: "Diana Reis", telefone: "11 98888-1111", email: "", observacao: "Indicação da Ana", consentimentoLgpd: true });
+    expect(action).toHaveBeenCalledWith({ nome: "Diana Reis", telefone: "(11) 98888-1111", email: "", observacao: "Indicação da Ana", consentimentoLgpd: true });
     expect(await screen.findByText("Diana Reis foi cadastrado.")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Abrir conversa" }).getAttribute("href")).toBe("/leads/lead-new");
     expect(refresh).toHaveBeenCalled();
