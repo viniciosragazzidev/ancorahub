@@ -106,7 +106,7 @@ mudança visual. Cadastros, alterações relevantes, documentos, exportações e
 | 2 Desempenho | Resultados concentrados e acesso à Jornada | Cartão da Jornada entregue na etapa 1; restante pendente |
 | 3 Plantões | Card atual, calendário e escala em `/plantoes` | Pendente |
 | 4 Carteira | Visões, cadastro próprio, cliente antigo e vínculos | Pendente; exige decisões de domínio registradas |
-| 5 Perfil | Perfil, histórico, contratos e documentos | Pendente; exige decisões de domínio registradas |
+| 5 Perfil | Perfil, histórico, contratos e documentos | Implementada em `feat/corretor-perfil-etapa5` (mesma chave da etapa 1), sem push; fixar registros, anexos pelo histórico e edição de observação pendentes |
 | 6 Agenda | Retornos e tarefas ligados a leads e perfis | Pendente |
 | 7 Validação | Fluxos, permissões, auditoria, responsividade | Pendente |
 

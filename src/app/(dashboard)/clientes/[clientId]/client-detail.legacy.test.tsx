@@ -51,6 +51,9 @@ vi.mock("@/features/post-sale/queries", async () => ({ getLeadBeneficiaries: asy
 vi.mock("@/features/post-sale/actions", () => ({ updateCustomerRenewalStatusAction: async () => ({}) }));
 vi.mock("@/features/leads/actions", () => ({ addLeadNoteAction: async () => ({}) }));
 vi.mock("@/features/broker-workspace/components/light-client-detail", () => ({ LightClientDetail: () => null }));
+// Perfil do corretor (etapa 5): fora deste teste do diretor.
+vi.mock("@/features/broker-workspace/client-profile/profile-server", () => ({ brokerClientProfileOn: async () => false, loadBrokerClientProfile: async () => null }));
+vi.mock("@/features/broker-workspace/components/broker-client-profile/broker-client-profile", () => ({ BrokerClientProfile: () => null }));
 // A área de soltar arquivos do Arc usa molas do motion (fora do mock global); aqui basta saber que ela aparece.
 vi.mock("@/components/arc/file-dropzone/file-dropzone", () => ({ FileDropzone: () => <div data-testid="file-dropzone" /> }));
 vi.mock("@/features/director-lite/style-flag", () => ({ isDirectorLitePageOnServer: async () => fixtures.liteStyle.current }));
