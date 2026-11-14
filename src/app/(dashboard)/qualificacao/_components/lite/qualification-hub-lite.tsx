@@ -93,16 +93,18 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
 
   const toggleEnabled = async (next: boolean) => {
     setFields((current) => ({ ...current, enabled: next }));
-    const done = await run("enabled", async () => { await toggleQualificationEnabledAction(next); return true; }, {
+    // O que acontece depois do servidor fica dentro da tarefa: o "Tentar de novo" refaz tudo.
+    const done = await run("enabled", async () => {
+      await toggleQualificationEnabledAction(next);
+      setFields((current) => ({ ...current, enabled: next }));
+      router.refresh();
+      return true;
+    }, {
       done: next ? "IA ativada" : "IA pausada",
       fallback: "Não deu para mudar a operação da IA agora.",
       keeps: next ? "A IA continua pausada." : "A IA continua operando.",
     });
-    if (!done) {
-      setFields((current) => ({ ...current, enabled: !next }));
-      return;
-    }
-    router.refresh();
+    if (!done) setFields((current) => ({ ...current, enabled: !next }));
   };
 
   const save = async () => {
@@ -132,7 +134,8 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
       invalid("rule", "Informe o nome da regra de follow-up.");
       return;
     }
-    const updated = await run("rule", () => saveFollowUpRuleAction({
+    await run("rule", async () => {
+      const updated = await saveFollowUpRuleAction({
       name: draft.name,
       enabled: false,
       trigger: draft.trigger as Parameters<typeof saveFollowUpRuleAction>[0]["trigger"],
@@ -146,15 +149,19 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
       messageMode: draft.messageMode,
       fixedMessage: draft.messageText,
       stopConditions: ["client_responded", "human_taken", "lead_closed", "sale_completed", "opt_out"],
-    }), { done: "Regra preparada. O envio automático segue desligado.", fallback: "Não deu para salvar a regra agora.", keeps: "O formulário continua preenchido." });
-    if (!updated) return;
-    setRules(updated);
-    setDraft((current) => ({ ...current, name: "" }));
+      });
+      setRules(updated);
+      setDraft((current) => ({ ...current, name: "" }));
+      return updated;
+    }, { done: "Regra preparada. O envio automático segue desligado.", fallback: "Não deu para salvar a regra agora.", keeps: "O formulário continua preenchido." });
   };
 
   const deleteRule = async (id: string) => {
-    const updated = await run("rules", () => deleteFollowUpRuleAction(id), { done: "Regra removida", fallback: "Não deu para remover a regra agora.", keeps: "A regra continua cadastrada." });
-    if (updated) setRules(updated);
+    await run("rules", async () => {
+      const updated = await deleteFollowUpRuleAction(id);
+      setRules(updated);
+      return updated;
+    }, { done: "Regra removida", fallback: "Não deu para remover a regra agora.", keeps: "A regra continua cadastrada." });
   };
 
   const toggleTool = async (tool: QualificationHubProps["toolPermissions"][number]) => {
@@ -163,17 +170,23 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
       return;
     }
     const next = tool.permission === "allowed" ? "blocked" : "allowed";
-    const updated = await run("tools", () => updateToolPermissionAction({ toolName: tool.toolName, permission: next as Parameters<typeof updateToolPermissionAction>[0]["permission"], maxCallsPerSession: 10, requiresHumanConfirmation: false }), {
+    await run("tools", async () => {
+      const updated = await updateToolPermissionAction({ toolName: tool.toolName, permission: next as Parameters<typeof updateToolPermissionAction>[0]["permission"], maxCallsPerSession: 10, requiresHumanConfirmation: false });
+      setTools(updated);
+      return updated;
+    }, {
       done: `${tool.displayName}: ${next === "allowed" ? "permitida" : "bloqueada"}`,
       fallback: "Não deu para mudar a permissão agora.",
       keeps: `${tool.displayName} continua ${tool.permission === "allowed" ? "permitida" : "bloqueada"}.`,
     });
-    if (updated) setTools(updated);
   };
 
   const acknowledge = async (id: string) => {
-    const updated = await run("alerts", () => acknowledgeAlertAction(id), { done: "Alerta resolvido", fallback: "Não deu para resolver o alerta agora.", keeps: "O alerta continua ativo." });
-    if (updated) setAlerts(updated);
+    await run("alerts", async () => {
+      const updated = await acknowledgeAlertAction(id);
+      setAlerts(updated);
+      return updated;
+    }, { done: "Alerta resolvido", fallback: "Não deu para resolver o alerta agora.", keeps: "O alerta continua ativo." });
   };
 
   const sendSim = async (event: FormEvent) => {

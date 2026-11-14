@@ -19,7 +19,8 @@ export type ActionStatus =
   | { state: "done"; label: string }
   | { state: "error"; message: string; retry?: () => void };
 
-export type ActionOptions = { done: string; fallback: string; keeps?: string };
+/** `sound`: som discreto de confirmação, só para ação ocasional (FEEDBACK.md §3, nível 1). */
+export type ActionOptions = { done: string; fallback: string; keeps?: string; sound?: boolean };
 
 function failed(result: unknown) {
   return isFailedResult(result) || Boolean(result && typeof result === "object" && (result as { success?: unknown }).success === false);
@@ -38,13 +39,18 @@ export function useActionStatus() {
     set(key, { state: "error", message });
   }, [fire, set]);
 
+  /**
+   * Roda a ação com o feedback completo. Tudo o que depende do sucesso (atualizar a lista, fechar o painel) fica
+   * dentro de `task`, para o "Tentar de novo" refazer a ação inteira. Devolve o resultado, ou `undefined` na falha.
+   */
   const run = useCallback(async function run<T>(key: string, task: () => Promise<T>, options: ActionOptions): Promise<T | undefined> {
     set(key, { state: "busy" });
     fire("tap");
     try {
       const result = await task();
       if (failed(result)) throw result;
-      fire("confirm");
+      if (options.sound) fire("confirm", { sound: true });
+      else fire("confirm");
       set(key, { state: "done", label: options.done });
       return result;
     } catch (error) {
@@ -68,7 +74,10 @@ export function useActionStatus() {
     set(key, { state: "error", message: actionErrorMessage(info, options.keeps), retry: info.retryable ? options.retry : undefined });
   }, [fire, set]);
 
-  return { status, run, invalid, clear, busy, confirm, fail };
+  /** Mostra um estado sem som nem vibração (o feedback já tocou em outro lugar, como num painel que fechou). */
+  const show = set;
+
+  return { status, run, invalid, clear, busy, confirm, fail, show };
 }
 
 /** Rótulo do botão enquanto envia: spinner e o verbo no gerúndio. */

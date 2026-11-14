@@ -239,16 +239,14 @@ function PasskeysLite() {
     if (!editingId || !editingName.trim()) return;
     const id = editingId;
     const nextName = editingName.trim();
-    const ok = await passkeyAction("rename", async () => {
+    await passkeyAction("rename", async () => {
       const result = await authClient.passkey.updatePasskey({ id, name: nextName });
       if (result.error) throw new Error(result.error.message ?? "Não foi possível renomear.");
       await recordSecurityAuditAction("renomeou_passkey");
-      await refresh();
-    }, { done: "Nome atualizado", fallback: "Não foi possível renomear.", keeps: "O nome anterior continua." });
-    if (ok) {
       setEditingId(null);
       setEditingName("");
-    }
+      await refresh();
+    }, { done: "Nome atualizado", fallback: "Não foi possível renomear.", keeps: "O nome anterior continua." });
   }
 
   async function deletePasskey(id: string, label: string) {
