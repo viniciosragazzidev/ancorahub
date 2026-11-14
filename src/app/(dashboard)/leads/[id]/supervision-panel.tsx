@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { startTransition, useActionState, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "@/components/ui/sonner";
 import { BrokerProfileLink } from "@/components/broker-profile-link";
-import { useSuccessOverlay } from "@/components/motion/success-overlay";
+import { ActionNoticeLine, useActionNotice } from "@/components/lite/feedback/action-notice";
 import { Clock, UserPlus, ListChecks, ArrowRight, ChatCircleText, UserSwitch, RotateCcw } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +49,12 @@ export function SupervisionPanel({
   isLost: boolean;
   currentUserId: string;
 }) {
-  const { celebrate: celebrateSuccess, node: successOverlay } = useSuccessOverlay();
+  // Feedback nível 1 (docs/design-system/FEEDBACK.md): o resultado aparece no próprio painel, sem overlay
+  // nem toast. `assignmentNotice` responde por assumir conversa, reenviar e remover; `formNotice` pelas ações administrativas.
+  const assignmentNotice = useActionNotice();
+  const formNotice = useActionNotice();
+  const reassignFormRef = useRef<HTMLFormElement>(null);
+  const assumeFormRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
   const [mode, setMode] = useState<"reassign" | "investigate">("reassign");
   const [brokerId, setBrokerId] = useState("");
@@ -87,20 +91,24 @@ export function SupervisionPanel({
         assignedAt: new Date(),
       });
     }
-    toast.success("Lead reatribuído e SLA reiniciado.");
-    celebrateSuccess("Lead reatribuído");
+    formNotice.succeed(broker ? `Lead reatribuído para ${broker.name}. SLA reiniciado.` : "Lead reatribuído. SLA reiniciado.");
     reassignSnapshotRef.current = null;
     setBrokerId("");
     setReassignVersion((version) => version + 1);
     startTransition(() => router.refresh());
-  }, [brokers, celebrateSuccess, currentOwner, router]);
+  }, [brokers, currentOwner, formNotice, router]);
   const handleReassignError = useCallback((result: typeof reassignState) => {
-    if (reassignSnapshotRef.current) {
-      setDisplayedAssignment(reassignSnapshotRef.current);
+    const previous = reassignSnapshotRef.current;
+    if (previous) {
+      setDisplayedAssignment(previous);
       reassignSnapshotRef.current = null;
     }
-    if (result.error) toast.error(result.error);
-  }, []);
+    formNotice.fail(result.error, {
+      fallback: "Não consegui reatribuir agora",
+      keeps: previous?.ownerName ? `O lead continua com ${previous.ownerName}` : "O lead continua como estava",
+      retry: () => reassignFormRef.current?.requestSubmit(),
+    });
+  }, [formNotice]);
   useActionDialogLifecycle({
     state: reassignState,
     pending: reassignPending,
@@ -118,14 +126,18 @@ export function SupervisionPanel({
         assignedAt: new Date(),
       });
     }
-    toast.success("Lead assumido para investigação.");
+    formNotice.succeed("Lead assumido para investigação.");
     setReason("");
     setAssumeVersion((version) => version + 1);
     startTransition(() => router.refresh());
-  }, [currentOwner, currentUserId, router]);
+  }, [currentOwner, currentUserId, formNotice, router]);
   const handleAssumeError = useCallback((result: typeof assumeState) => {
-    if (result.error) toast.error(result.error);
-  }, []);
+    formNotice.fail(result.error, {
+      fallback: "Não consegui registrar a investigação agora",
+      keeps: "O lead continua com o responsável atual",
+      retry: () => assumeFormRef.current?.requestSubmit(),
+    });
+  }, [formNotice]);
   useActionDialogLifecycle({
     state: assumeState,
     pending: assumePending,
@@ -138,16 +150,21 @@ export function SupervisionPanel({
   const handleRemoveAssignmentSuccess = useCallback(() => {
     setRemoveAssignmentDialogOpen(false);
     setDisplayedAssignment({ status: currentStatus, ownerId: null, ownerName: null, assignedAt: null });
-    toast.success("Atribuição removida. O lead aguardará uma nova ação manual.");
+    assignmentNotice.succeed("Atribuição removida. O lead aguarda uma nova ação manual.");
     startTransition(() => router.refresh());
-  }, [currentStatus, router]);
+  }, [assignmentNotice, currentStatus, router]);
   const handleRemoveAssignmentError = useCallback((result: typeof removeAssignmentState) => {
-    if (result.error) toast.error(result.error);
+    setRemoveAssignmentDialogOpen(false);
+    assignmentNotice.fail(result.error, {
+      fallback: "Não consegui remover a atribuição agora",
+      keeps: "O responsável continua o mesmo",
+      retry: () => setRemoveAssignmentDialogOpen(true),
+    });
     // The rejection usually means the lead's real state has already moved on
     // (e.g. someone else already removed it) — refresh so the panel stops
     // showing the stale owner/status that made the action look available.
     startTransition(() => router.refresh());
-  }, [router]);
+  }, [assignmentNotice, router]);
   useActionDialogLifecycle({
     state: removeAssignmentState,
     pending: removeAssignmentPending,
@@ -159,14 +176,18 @@ export function SupervisionPanel({
   const [resendState, resend, resendPending] = useActionState(resendLeadToSameBrokerAction, {});
   const handleResendSuccess = useCallback((result: typeof resendState) => {
     setResendDialogOpen(false);
-    toast.success(result.message ?? "Lead reenviado ao mesmo corretor.");
+    assignmentNotice.succeed(result.message ?? "Lead reenviado ao mesmo corretor.");
     startTransition(() => router.refresh());
-  }, [router]);
+  }, [assignmentNotice, router]);
   const handleResendError = useCallback((result: typeof resendState) => {
     setResendDialogOpen(false);
-    if (result.error) toast.error(result.error);
+    assignmentNotice.fail(result.error, {
+      fallback: "Não consegui reenviar agora",
+      keeps: "A oferta anterior continua valendo",
+      retry: () => setResendDialogOpen(true),
+    });
     startTransition(() => router.refresh());
-  }, [router]);
+  }, [assignmentNotice, router]);
   useActionDialogLifecycle({
     state: resendState,
     pending: resendPending,
@@ -174,12 +195,14 @@ export function SupervisionPanel({
     onError: handleResendError,
   });
   const confirmResend = () => {
+    assignmentNotice.tap();
     const formData = new FormData();
     formData.set("leadId", leadId);
     resend(formData);
   };
 
   const confirmRemoveAssignment = () => {
+    assignmentNotice.tap();
     const formData = new FormData();
     formData.set("leadId", leadId);
     removeAssignment(formData);
@@ -195,6 +218,8 @@ export function SupervisionPanel({
   const completedTasks = tasks.filter(t => t.completedAt).length;
 
   const handleAssumeMessaging = async () => {
+    assignmentNotice.tap();
+    assignmentNotice.clear();
     try {
       setIsAssuming(true);
       const res = await assumeLeadForMessagingAction(leadId);
@@ -205,19 +230,21 @@ export function SupervisionPanel({
           ownerName: "Você",
           assignedAt: new Date(),
         });
-        toast.success("Você assumiu este atendimento.");
+        assignmentNotice.succeed("Você assumiu este atendimento.");
         startTransition(() => router.refresh());
-      } else if (res.error) {
-        toast.error(res.error);
+      } else {
+        assignmentNotice.fail(res.error, { fallback: "Não consegui assumir o atendimento agora", keeps: "A conversa continua com o corretor", retry: () => void handleAssumeMessaging() });
       }
     } catch (err) {
-      toast.error("Ocorreu um erro ao assumir o atendimento.");
+      assignmentNotice.fail(err, { fallback: "Não consegui assumir o atendimento agora", keeps: "A conversa continua com o corretor", retry: () => void handleAssumeMessaging() });
     } finally {
       setIsAssuming(false);
     }
   };
 
   const handleOptimisticReassign = () => {
+    formNotice.tap();
+    formNotice.clear();
     const broker = brokers.find((item) => item.id === brokerId);
     if (!broker) return;
     reassignSnapshotRef.current = displayedAssignment;
@@ -326,6 +353,8 @@ export function SupervisionPanel({
           </div>
         </div>
 
+        <ActionNoticeLine notice={assignmentNotice.notice} />
+
         {/* Row 2: Takeover banner if active under someone else */}
         {activeStatus && displayedAssignment.ownerId && displayedAssignment.ownerId !== currentUserId && (
           <div className={litePage ? lite.takeover : "flex flex-col gap-4 rounded-[var(--radius-card)] border border-primary/20 bg-primary/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between"}>
@@ -414,7 +443,7 @@ export function SupervisionPanel({
 
           <div className={litePage ? lite.inner : "rounded-[var(--radius-card)] border border-border bg-muted/[0.15] p-4"}>
             {mode === "reassign" ? (
-              <form key={`${formKey}-reassign-${reassignVersion}`} action={reassign} className="space-y-4" onSubmit={handleOptimisticReassign}>
+              <form ref={reassignFormRef} key={`${formKey}-reassign-${reassignVersion}`} action={reassign} className="space-y-4" onSubmit={handleOptimisticReassign}>
                 <input name="leadId" type="hidden" value={leadId} />
                 <input name="brokerId" type="hidden" value={brokerId} />
                 <div className="space-y-2">
@@ -435,7 +464,7 @@ export function SupervisionPanel({
                 </Button>
               </form>
             ) : (
-              <form key={`${formKey}-assume-${assumeVersion}`} action={assume} className="space-y-4">
+              <form ref={assumeFormRef} key={`${formKey}-assume-${assumeVersion}`} action={assume} onSubmit={() => { formNotice.tap(); formNotice.clear(); }} className="space-y-4">
                 <input name="leadId" type="hidden" value={leadId} />
                 <div className="space-y-2">
                   <Label htmlFor="lead-investigation-reason-panel" className="text-xs">Motivo da investigação</Label>
@@ -446,11 +475,11 @@ export function SupervisionPanel({
                 </Button>
               </form>
             )}
+            <ActionNoticeLine notice={formNotice.notice} className="mt-3" />
           </div>
         </div>
       </CardContent>
     </Card>
-    {successOverlay}
     </>
   );
 }

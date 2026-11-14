@@ -8,6 +8,7 @@ import { Button } from "@/components/arc/button/button";
 import RadioCards from "@/components/arc/radio-cards/radio-cards";
 import { changeOwnBranchAction, type ChangeOwnBranchState } from "@/features/broker-unit-change/actions";
 import type { OwnUnitChangeOptions } from "@/features/broker-unit-change/queries";
+import { ActionNoticeLine, useActionNotice } from "@/components/lite/feedback/action-notice";
 
 type Props = OwnUnitChangeOptions & {
   changeAction?: (branchId: string) => Promise<ChangeOwnBranchState>;
@@ -19,26 +20,38 @@ const slotsText = (count: number) => (count === 1 ? "1 vaga de plantão" : `${co
  * Configurações > Minha unidade of the broker app (DEC-171). One choice and one confirmation:
  * the broker picks another active unit and confirms in a sheet that says what changes.
  * The server checks role, tenant, active unit and the global flag again.
+ * Feedback nível 1 (FEEDBACK.md): o toque vibra, "Trocando…" enquanto o servidor responde, check com a
+ * unidade nova e som de confirmação (troca é rara); erro com causa, a unidade atual continua e "Tentar de novo".
  */
 export function LightUnitSection({ current, options, openDutySlots, changeAction = changeOwnBranchAction }: Props) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [result, setResult] = useState<{ message: string; error: boolean } | null>(null);
+  const notice = useActionNotice();
   const [pending, startTransition] = useTransition();
   const selected = options.find((option) => option.id === selectedId) ?? null;
 
   function confirm() {
     if (!selected) return;
+    notice.tap();
+    notice.clear();
+    const failOptions = { fallback: "Não consegui trocar de unidade agora", keeps: current ? `Você continua em ${current.name}` : undefined, retry: () => setConfirmOpen(true) };
     startTransition(async () => {
-      const response = await changeAction(selected.id);
+      let response: ChangeOwnBranchState;
+      try {
+        response = await changeAction(selected.id);
+      } catch (error) {
+        setConfirmOpen(false);
+        notice.fail(error, failOptions);
+        return;
+      }
       setConfirmOpen(false);
       if (!response.ok) {
-        setResult({ message: response.error, error: true });
+        notice.fail(response, failOptions);
         return;
       }
       const left = response.releasedAssignments ? ` Você saiu de ${slotsText(response.releasedAssignments)} em ${current?.name ?? "sua unidade anterior"}.` : "";
-      setResult({ message: `Pronto, agora você está em ${response.branchName}.${left}`, error: false });
+      notice.succeed(`Pronto, agora você está em ${response.branchName}.${left}`, { sound: true });
       setSelectedId(null);
       router.refresh();
     });
@@ -62,7 +75,7 @@ export function LightUnitSection({ current, options, openDutySlots, changeAction
               layout="list"
               options={options.map((option) => ({ value: option.id, label: option.name }))}
               value={selectedId}
-              onValueChange={(value) => { setSelectedId(value); setResult(null); }}
+              onValueChange={(value) => { setSelectedId(value); notice.clear(); }}
               disabled={pending}
             />
           </div>
@@ -74,9 +87,7 @@ export function LightUnitSection({ current, options, openDutySlots, changeAction
         <p className="text-sm text-(--text-secondary)">Não há outra unidade ativa na sua corretora.</p>
       ) : null}
 
-      {result ? (
-        <p role={result.error ? "alert" : "status"} className={`text-sm ${result.error ? "text-(--danger)" : "text-(--success)"}`}>{result.message}</p>
-      ) : null}
+      <ActionNoticeLine notice={notice.notice} />
 
       <BottomSheet
         open={confirmOpen}
@@ -95,8 +106,8 @@ export function LightUnitSection({ current, options, openDutySlots, changeAction
             <li>A gestão das duas unidades recebe um aviso.</li>
           </ul>
           <div className="flex flex-col gap-2">
-            <Button type="button" variant="primary" loading={pending} disabled={pending} onClick={confirm}>
-              Trocar de unidade
+            <Button type="button" variant="primary" loading={pending} disabled={pending} aria-busy={pending || undefined} onClick={confirm}>
+              {pending ? "Trocando…" : "Trocar de unidade"}
             </Button>
             <Button type="button" variant="ghost" disabled={pending} onClick={() => setConfirmOpen(false)}>
               Cancelar

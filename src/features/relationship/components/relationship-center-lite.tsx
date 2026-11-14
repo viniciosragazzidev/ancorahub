@@ -20,6 +20,7 @@ import { broadcastRecipientsAction, previewAudienceAction, sendBroadcastAction }
 import type { Audience, AudienceOptions } from "../audience";
 import type { BroadcastKind, BroadcastSummary } from "../service";
 import styles from "./relationship-center-lite.module.css";
+import { ActionNoticeLine, useActionNotice } from "@/components/lite/feedback/action-notice";
 
 type HistoryItem = Omit<BroadcastSummary, "createdAt"> & { createdAt: string };
 type AudienceKind = Audience["kind"];
@@ -67,7 +68,8 @@ export function RelationshipCenterLite({ options, history, initialBrokerId, init
   const [body, setBody] = useState(initialBody);
   const [previewState, setPreview] = useState<{ key: string; count: number; names: string[]; error?: string } | null>(null);
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  // Feedback nível 1 (FEEDBACK.md): enviar é ocasional, então confirma com som; o resultado nomeia quantos receberam.
+  const notice = useActionNotice();
   const [pending, startTransition] = useTransition();
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -116,12 +118,21 @@ export function RelationshipCenterLite({ options, history, initialBrokerId, init
   function send() {
     if (!audience || !preview) return;
     if (!confirming) { setConfirmingKey(audienceKey); return; }
-    setFeedback(null);
+    notice.tap();
+    notice.clear();
     startTransition(async () => {
-      const result = await sendBroadcastAction({ kind, title, body, audience, channel: "app" });
+      const failed = (cause: unknown) => notice.fail(cause, { fallback: "Não consegui enviar o recado agora", keeps: "O texto continua aqui e ninguém recebeu", retry: send });
+      let result: Awaited<ReturnType<typeof sendBroadcastAction>>;
+      try {
+        result = await sendBroadcastAction({ kind, title, body, audience, channel: "app" });
+      } catch (error) {
+        setConfirmingKey(null);
+        failed(error);
+        return;
+      }
       setConfirmingKey(null);
-      if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return; }
-      setFeedback({ tone: "success", text: `Enviado para ${result.data.recipients} ${result.data.recipients === 1 ? "corretor" : "corretores"}.` });
+      if (!result.ok) { failed(result); return; }
+      notice.succeed(`Enviado para ${result.data.recipients} ${result.data.recipients === 1 ? "corretor" : "corretores"}.`, { sound: true });
       setTitle(""); setBody(""); setPeople(new Set());
       router.refresh();
     });
@@ -218,7 +229,7 @@ export function RelationshipCenterLite({ options, history, initialBrokerId, init
               </div>
             </section>
 
-            {feedback ? <p className={styles.feedback} data-tone={feedback.tone} role="status">{feedback.text}</p> : null}
+            <ActionNoticeLine notice={notice.notice} />
 
             <div className={styles.sendBar}>
               {confirming && !pending ? <Button type="button" variant="ghost" onClick={() => setConfirmingKey(null)}>Voltar</Button> : <span className={styles.sendHint}>{ready ? null : missing}</span>}

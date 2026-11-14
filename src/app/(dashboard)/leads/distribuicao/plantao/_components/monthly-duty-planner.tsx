@@ -13,7 +13,7 @@ import { SearchAddList } from "@/components/ui/search-add-list";
 import { AppSelect } from "@/components/ui/select";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "@/components/ui/sonner";
+import { plantaoDone, plantaoFailed, plantaoTap } from "./plantao-feedback";
 import {
   generateMonthlyDutyPlanAction,
   getMonthlyDutyPlanAction,
@@ -317,20 +317,22 @@ export function MonthlyDutyPlanner({
     setEntries((current) => current.map((entry) => (qualified.some((item) => item.brokerId === entry.brokerId) && entry.allowed.includes(key) ? { ...entry, seats: { ...entry.seats, [key]: value } } : entry)));
   }
 
-  function run(key: string, task: () => Promise<MonthlyDutyPlanView>, success: string, after?: () => void) {
+  /** Feedback (FEEDBACK.md): nível 1 nas ações da escala; publicar o mês é nível 2 (`milestone`, "escala-mes"). */
+  function run(key: string, task: () => Promise<MonthlyDutyPlanView>, success: string, after?: () => void, options: { milestone?: boolean } = {}) {
     setBusyKey(key);
+    plantaoTap();
     startTransition(async () => {
       try {
         setPlan(await task());
         after?.();
-        toast.success(success);
+        plantaoDone(success, options);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Não foi possível concluir a ação.";
+        const message = error instanceof Error ? error.message : "";
         // Another revision was created or published meanwhile (another tab, an import): show the current one.
         if (/não está mais em rascunho|proposta mais nova|publicada por outra pessoa/.test(message)) {
-          toast.error(`${message} Carreguei a versão atual da escala.`);
+          plantaoFailed(error, "A escala mudou enquanto você editava.", { keeps: "Carreguei a versão atual da escala" });
           void load(month, true);
-        } else toast.error(message);
+        } else plantaoFailed(error, "Não consegui concluir agora.", { keeps: "A escala continua como estava", retry: () => run(key, task, success, after, options) });
       } finally {
         setBusyKey(null);
       }
@@ -340,18 +342,19 @@ export function MonthlyDutyPlanner({
   /** Tira (ou devolve) um dia inteiro da escala. A ação devolve o motivo em vez de lançar erro. */
   function setDayExcluded(date: string, restore = false) {
     setBusyKey(`day:${date}`);
+    plantaoTap();
     startTransition(async () => {
       try {
         const result = await setMonthlyDutyDayExcludedAction({ monthKey: month, dutyDate: date, restore });
         if (!result.ok) {
-          toast.error(result.reason);
+          plantaoFailed(result.reason, "Não consegui alterar a escala agora.", { keeps: "O dia continua como estava" });
           return;
         }
         setPlan(result.view);
         setConfirmDay(null);
-        toast.success(result.message);
-      } catch {
-        toast.error("Não foi possível alterar a escala. Recarregue a página e tente de novo.");
+        plantaoDone(result.message);
+      } catch (error) {
+        plantaoFailed(error, "Não consegui alterar a escala agora.", { keeps: "O dia continua como estava", retry: () => setDayExcluded(date, restore) });
       } finally {
         setBusyKey(null);
       }
@@ -385,7 +388,7 @@ export function MonthlyDutyPlanner({
 
   function publish() {
     if (!plan) return;
-    run("publish", () => publishMonthlyDutyPlanAction(plan.id), "Escala publicada. Os corretores foram notificados.", () => setConfirmPublish(false));
+    run("publish", () => publishMonthlyDutyPlanAction(plan.id), "Escala publicada. Os corretores foram notificados.", () => setConfirmPublish(false), { milestone: true });
   }
 
   // ---- review data

@@ -1,11 +1,11 @@
 "use client";
 
+import { plantaoDone, plantaoFailed } from "./plantao-feedback";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { SearchAddList } from "@/components/ui/search-add-list";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { toast } from "@/components/ui/sonner";
 import {
   addBrokerToPublishedOccurrenceAction,
   removeBrokerFromPublishedOccurrenceAction,
@@ -53,11 +53,11 @@ export function PlantaoOccurrenceSheet({
     startTransition(async () => {
       try {
         onChanged(await task());
-        toast.success(success);
+        plantaoDone(success);
         setConfirmRemoveId(null);
         setConfirmOutside(null);
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o plantão.");
+        plantaoFailed(error, "Não foi possível atualizar o plantão.");
       }
     });
   }

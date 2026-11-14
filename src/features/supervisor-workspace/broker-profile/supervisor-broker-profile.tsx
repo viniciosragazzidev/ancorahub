@@ -12,6 +12,7 @@ import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { ActionButton } from "@/components/arc/action-button/action-button";
+import { ActionNoticeLine, useActionNotice } from "@/components/lite/feedback/action-notice";
 import { Input } from "@/components/arc/input/input";
 import { Textarea } from "@/components/arc/textarea/textarea";
 import { formatDuration } from "@/features/engagement/ranking";
@@ -193,7 +194,10 @@ export function SupervisorBrokerProfile({
   const [noteKind, setNoteKind] = useState<SupervisorNoteKind>("orientacao");
   const [noteBody, setNoteBody] = useState("");
   const [noteFollowUpDay, setNoteFollowUpDay] = useState("");
-  const [noteFeedback, setNoteFeedback] = useState("");
+  // Feedback nível 1 (docs/design-system/FEEDBACK.md): a nota entra no histórico e o check confirma; remover
+  // confirma no próprio sheet antes de voltar à equipe. Erro com causa, o que vale e "Tentar de novo".
+  const noteNotice = useActionNotice();
+  const removeNotice = useActionNotice();
   const [removing, startRemoving] = useTransition();
   const [noteSheetOpen, setNoteSheetOpen] = useState(false);
   const isOnline = member.availabilityStatus === "available" || member.availabilityStatus === "on_duty";
@@ -203,21 +207,39 @@ export function SupervisorBrokerProfile({
   const searchParams = useSearchParams();
 
   async function submitNote() {
-    setNoteFeedback("");
+    noteNotice.tap();
+    noteNotice.clear();
     const body = noteBody;
-    const result = await addSupervisorNoteAction({ brokerId: member.userId, kind: noteKind, body, ...(noteFollowUpDay ? { followUpDay: noteFollowUpDay } : {}) });
-    if (!result.ok) { setNoteFeedback(result.message); throw new Error(result.message); }
+    let result: Awaited<ReturnType<typeof addSupervisorNoteAction>>;
+    try {
+      result = await addSupervisorNoteAction({ brokerId: member.userId, kind: noteKind, body, ...(noteFollowUpDay ? { followUpDay: noteFollowUpDay } : {}) });
+    } catch (error) {
+      noteNotice.fail(error, { fallback: "Não consegui salvar a nota agora", keeps: "O texto continua aqui" });
+      throw error;
+    }
+    if (!result.ok) {
+      noteNotice.fail(result, { fallback: "Não consegui salvar a nota agora", keeps: "O texto continua aqui" });
+      throw new Error(result.message);
+    }
     setNotes((current) => [result.note, ...current]);
     setNoteBody("");
     setNoteFollowUpDay("");
-    setNoteFeedback("Nota salva.");
+    noteNotice.succeed("Nota salva.");
   }
 
   function removeFromTeam() {
+    removeNotice.tap();
+    removeNotice.clear();
     startRemoving(async () => {
-      const result = await removeBrokerFromMyTeamAction(member.userId);
-      if (result.ok) window.location.assign("/equipe/minha");
-      else setNoteFeedback(result.message);
+      try {
+        const result = await removeBrokerFromMyTeamAction(member.userId);
+        if (result.ok) {
+          removeNotice.succeed(`${member.name} saiu da equipe.`);
+          router.push("/equipe/minha");
+        } else removeNotice.fail(result, { fallback: "Não consegui remover agora", keeps: `${member.name} continua na equipe`, retry: removeFromTeam });
+      } catch (error) {
+        removeNotice.fail(error, { fallback: "Não consegui remover agora", keeps: `${member.name} continua na equipe`, retry: removeFromTeam });
+      }
     });
   }
 
@@ -329,8 +351,8 @@ export function SupervisorBrokerProfile({
                       <Textarea label="Mensagem" id="supervisor-note-body" value={noteBody} onChange={(event) => setNoteBody(event.currentTarget.value)} maxLength={1000} rows={3} placeholder="Escreva uma orientação, elogio ou alerta." aria-describedby="supervisor-note-count" />
                       <span id="supervisor-note-count" className={styles.noteCount}>{noteBody.length}/1000 caracteres</span>
                       <Input label="Revisar em (opcional)" id="supervisor-note-follow-up" type="date" min={todayKey()} value={noteFollowUpDay} onChange={(event) => setNoteFollowUpDay(event.currentTarget.value)} description="Lembrete para você voltar a este ponto." />
-                      <ActionButton label="Salvar nota" pendingLabel="Salvando" successLabel="Nota salva" disabled={!noteBody.trim()} onAction={submitNote} onActionError={(error) => setNoteFeedback(error instanceof Error ? error.message : "Não foi possível salvar a nota.")} />
-                      <p className={styles.noteFeedback} role="status" aria-live="polite">{noteFeedback}</p>
+                      <ActionButton label="Salvar nota" pendingLabel="Salvando" successLabel="Nota salva" disabled={!noteBody.trim()} onAction={submitNote} onActionError={() => undefined} />
+                      <div className={styles.noteFeedback} aria-live="polite"><ActionNoticeLine notice={noteNotice.notice} /></div>
                     </div>
                   </BottomSheet>
                 </div>
@@ -403,7 +425,8 @@ export function SupervisorBrokerProfile({
         </> : null}
 
         {showSupervisorActions ? <BottomSheet className="arc-venancor" trigger={<Button variant="outline">Mais ações</Button>} title={`Ações para ${member.name}`} description="Escolha como quer apoiar este corretor." closeLabel="Fechar" detents={[0.4, 0.72]}>
-          <div className={styles.memberActions}><Link className={styles.secondaryAction} href={relationshipHref}>Mandar recado</Link><button type="button" className={styles.secondaryAction} onClick={() => setRecognizeOpen(true)}>Reconhecer com pontos</button><Button variant="destructive" disabled={removing} loading={removing} onClick={removeFromTeam}>Remover da equipe</Button></div>
+          <div className={styles.memberActions}><Link className={styles.secondaryAction} href={relationshipHref}>Mandar recado</Link><button type="button" className={styles.secondaryAction} onClick={() => setRecognizeOpen(true)}>Reconhecer com pontos</button><Button variant="destructive" disabled={removing} loading={removing} onClick={removeFromTeam}>{removing ? "Removendo…" : "Remover da equipe"}</Button></div>
+          <ActionNoticeLine notice={removeNotice.notice} />
           <RecognizeSheet brokerId={member.userId} brokerName={member.name} open={recognizeOpen} onOpenChange={setRecognizeOpen} onRecognize={recognizeBrokerAction} />
         </BottomSheet> : managementActions ?? null}
       </div>

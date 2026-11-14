@@ -1,5 +1,6 @@
 "use client";
 
+import { plantaoDone, plantaoFailed } from "./plantao-feedback";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -11,7 +12,6 @@ import { ArrowsClockwise } from "@/components/huge-icons";
 import { GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/components/ui/sonner";
 import { motionTokens } from "@/components/arc/motion-tokens";
 import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
 import { mergeEligibleOrderKeepingBlockedSlots } from "@/features/lead-distribution/duty-queue-order";
@@ -209,10 +209,10 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
         delete next[preview.scheduleId];
         return next;
       });
-      toast.error(result.reason);
+      plantaoFailed(result.reason, "Não consegui atualizar o plantão agora.");
       return;
     }
-    toast.success("Fila do plantão atualizada.");
+    plantaoDone("Fila do plantão atualizada.");
     router.refresh();
   }
 
@@ -226,10 +226,10 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
     const result = await resetDutyManualQueueAction({ scheduleId: preview.scheduleId, dutyDate: preview.dutyDate });
     setSavingScheduleId(null);
     if (!result.ok) {
-      toast.error(result.reason);
+      plantaoFailed(result.reason, "Não consegui atualizar o plantão agora.");
       return;
     }
-    toast.success(preview.rotation ? "Fila voltou à ordem de chegada." : "Fila voltou ao automático.");
+    plantaoDone(preview.rotation ? "Fila voltou à ordem de chegada." : "Fila voltou ao automático.");
     router.refresh();
   }
 

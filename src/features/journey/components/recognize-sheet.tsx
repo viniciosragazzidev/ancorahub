@@ -6,6 +6,8 @@ import { ActionButton } from "@/components/arc/action-button/action-button";
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Textarea } from "@/components/arc/textarea/textarea";
 import type { JourneyActionResponse, JourneyRecognitionReceipt, RecognizeBrokerInput } from "@/features/journey/director-types";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 
 import styles from "./recognize-sheet.module.css";
 
@@ -17,6 +19,8 @@ const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
  * "Reconhecer com pontos" (plan §1, C4): the supervisor picks 5 to 50 points
  * and says why; the broker gets a celebration and the points in the ledger.
  * The weekly cap is the server's (the receipt says what is left).
+ * Feedback nível 1 para quem dá (FEEDBACK.md): toque vibra, o recibo só aparece depois do servidor, com som
+ * de confirmação (ação ocasional); erro com causa e "Tentar de novo". O nível 2 é do corretor que recebe.
  */
 export function RecognizeSheet({ brokerId, brokerName, open, onOpenChange, onRecognize }: {
   brokerId: string;
@@ -30,12 +34,26 @@ export function RecognizeSheet({ brokerId, brokerName, open, onOpenChange, onRec
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<JourneyRecognitionReceipt | null>(null);
   const name = firstName(brokerName);
+  const fire = useFeedback();
 
   async function send() {
     setError(null);
     if (reason.trim().length < 3) { setError("Diga o motivo em poucas palavras."); throw new Error("reason"); }
-    const result = await onRecognize({ brokerId, points, reason: reason.trim() });
-    if (!result.ok) { setError(result.message); throw new Error(result.message); }
+    fire("tap");
+    let result: JourneyActionResponse<JourneyRecognitionReceipt>;
+    try {
+      result = await onRecognize({ brokerId, points, reason: reason.trim() });
+    } catch (cause) {
+      fire("error");
+      setError(actionErrorMessage(normalizeActionError(cause, "Não consegui enviar o reconhecimento agora"), "Os pontos não saíram. Tente de novo"));
+      throw cause;
+    }
+    if (!result.ok) {
+      fire("error");
+      setError(actionErrorMessage(normalizeActionError(result, "Não consegui enviar o reconhecimento agora"), "Os pontos não saíram. Tente de novo"));
+      throw new Error(result.message);
+    }
+    fire("confirm", { sound: true });
     setReceipt(result.data);
   }
 

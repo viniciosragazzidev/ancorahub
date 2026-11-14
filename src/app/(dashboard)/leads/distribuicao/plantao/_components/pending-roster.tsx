@@ -1,12 +1,12 @@
 "use client";
 
+import { plantaoDone, plantaoFailed } from "./plantao-feedback";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AppSelect } from "@/components/ui/select";
-import { toast } from "@/components/ui/sonner";
 import { addPendingRosterEntryAction, removePendingRosterEntryAction } from "@/features/lead-distribution/duty-roster-pending-actions";
 
 type Person = { id: string; name: string; internalCode: string | null; branchName: string | null };
@@ -27,8 +27,8 @@ export function PendingRoster({ scheduleId, entries, candidates }: { scheduleId:
   function run(action: () => Promise<{ success: true } | { success: false; error: string }>, done: string) {
     startTransition(async () => {
       const result = await action();
-      if (!result.success) { toast.error(result.error); return; }
-      toast.success(done);
+      if (!result.success) { plantaoFailed(result.error, "Não consegui atualizar o plantão agora."); return; }
+      plantaoDone(done);
       setChoice("");
       router.refresh();
     });

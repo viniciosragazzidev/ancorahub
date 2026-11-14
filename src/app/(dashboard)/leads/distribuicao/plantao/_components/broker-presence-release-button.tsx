@@ -1,12 +1,12 @@
 "use client";
 
+import { plantaoDone, plantaoFailed } from "./plantao-feedback";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { toast } from "@/components/ui/sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { releaseDutyPresenceAction } from "@/features/lead-distribution/duty-actions";
 
@@ -27,11 +27,11 @@ export function BrokerPresenceReleaseButton({ scheduleId, assignmentId, brokerNa
     startTransition(async () => {
       const result = await releaseDutyPresenceAction(scheduleId, assignmentId, withNote);
       if (result.ok) {
-        toast.success(withPhoto ? `Foto validada. ${brokerName} já pode receber leads.` : inUnit ? `${brokerName} liberado(a) sem foto. O motivo ficou registrado.` : `${brokerName} liberado(a) no plantão.`);
+        plantaoDone(withPhoto ? `Foto validada. ${brokerName} já pode receber leads.` : inUnit ? `${brokerName} liberado(a) sem foto. O motivo ficou registrado.` : `${brokerName} liberado(a) no plantão.`);
         setOpen(false);
         router.refresh();
       } else {
-        toast.error(result.reason);
+        plantaoFailed(result.reason, "Não consegui atualizar o plantão agora.");
       }
     });
   }
