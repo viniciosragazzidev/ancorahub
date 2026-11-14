@@ -40,6 +40,8 @@ import { ContextualIllustration } from "@/components/illustrations/contextual-il
 import { BrokerHomeOverview } from "./broker-home-overview";
 import { RisePulse, useRisePulseKey } from "@/components/light/rise-pulse";
 import { LitePress } from "@/components/lite/motion";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
+import { useFirstTimeToday } from "@/components/motion/first-time-today/use-first-time-today";
 
 type Tab = "assistentes" | "leads";
 
@@ -391,7 +393,7 @@ export function ChatHome({
                 <LitePress kind="card"><Link href={isSupervisor ? "/equipe/desempenho" : "/desempenho"} className={home.card}>
                   <AssistantAvatar shape="nuvem" hue={330} size={40} />
                   <span className={home.cardName}>{summary.goal.name}</span>
-                  <span className={home.goalTrack} aria-hidden="true"><motion.span className={home.goalFill} initial={reduce ? false : { scaleX: 0 }} animate={{ scaleX: Math.min(1, summary.goal.percentage / 100) }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: reduce ? 0 : 0.2 }} /></span>
+                  <span className={home.goalTrack} aria-hidden="true"><GoalFill percentage={summary.goal.percentage} /></span>
                   <span className={home.cardPreview}>{summary.goal.currentValue} de {summary.goal.targetValue} · {summary.goal.percentage}%</span>
                 </Link></LitePress>
               ) : null}
@@ -424,5 +426,23 @@ export function ChatHome({
       {isManager ? null : <LiteTour variant={isSupervisor ? "supervisor" : "broker"} />}
       {sheet}
     </div>
+  );
+}
+
+/**
+ * Meta do dia: o corretor abre o Início dezenas de vezes por dia, então a barra
+ * só se preenche na primeira abertura do dia (docs/ux/motion-frequencia.md).
+ * Nas outras já aparece cheia até o valor, sem animação.
+ */
+export function GoalFill({ percentage }: { percentage: number }) {
+  const animate = useFirstTimeToday("meta-do-dia", useInterfaceMotionEnabled());
+  return (
+    <motion.span
+      className={home.goalFill}
+      data-animate={animate ? "primeira-vez" : undefined}
+      initial={animate ? { scaleX: 0 } : false}
+      animate={{ scaleX: Math.min(1, percentage / 100) }}
+      transition={animate ? { duration: motionTokens.duration.considered, ease: motionTokens.ease.enter, delay: motionTokens.duration.instant } : { duration: 0 }}
+    />
   );
 }
