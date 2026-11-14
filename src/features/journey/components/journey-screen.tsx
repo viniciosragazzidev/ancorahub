@@ -196,21 +196,29 @@ function JourneyBanner({ data, pending }: { data: JourneyScreenData; pending: nu
       ? `Cumpra as missões de hoje e chegue ao nível ${level.nextLevel.name}!`
       : `Missões de hoje feitas. O nível ${level.nextLevel.name} está chegando!`
     : "Você chegou ao topo. Mantenha a sequência!";
-  const badge = level.nextLevel
-    ? `Faltam ${pts(level.pointsToNext)}`
-    : `${streak.current} ${streak.current === 1 ? "dia" : "dias"} de sequência`;
+  const goal = level.nextLevel
+    ? { value: `Faltam ${pts(level.pointsToNext)}`, hint: `para ${level.nextLevel.name}` }
+    : { value: `${streak.current} ${streak.current === 1 ? "dia" : "dias"}`, hint: "de sequência" };
+  const share = level.nextLevel ? Math.min(100, Math.max(0, level.percentage)) : 100;
   return (
     <section className={styles.banner} aria-label="Próxima meta da jornada">
+      <span className={styles.bannerGlow} aria-hidden="true" />
       <div className={styles.bannerText}>
         <p className={styles.bannerTitle}>{title}</p>
-        <span className={styles.bannerBadge}>
-          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-          {badge}
-        </span>
+        <div className={styles.bannerGoal}>
+          <span className={styles.bannerBadge}>
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 2l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 16.9 6.1 20l1.2-6.5L2.5 8.9 9.1 8z" fill="currentColor" /></svg>
+            {goal.value}
+            <small>{goal.hint}</small>
+          </span>
+          <span className={styles.bannerMeter} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={share} aria-label="Progresso até a próxima meta">
+            <i style={{ width: `${share}%` }} />
+          </span>
+        </div>
+        <a className={styles.bannerAction} href="#missoes">{pending > 0 ? `Ver ${pending === 1 ? "a missão" : `as ${pending} missões`}` : "Ver minha semana"}</a>
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element -- arte local do mascote */}
       <img className={styles.bannerArt} src="/mascote/venda-capitao.webp" width={584} height={640} alt="" aria-hidden="true" draggable={false} />
-      <a className={styles.bannerAction} href="#missoes">{pending > 0 ? "Ver missões" : "Ver minha semana"}</a>
     </section>
   );
 }
@@ -228,7 +236,10 @@ function MissionCard({ mission, index }: { mission: JourneyMissionCard; index: n
       <div className={styles.missionBody}>
         <div className={styles.missionTop}>
           <strong>{mission.title}</strong>
-          <span className={styles.bonus} data-done={done}>{done ? `+${mission.bonusPoints} ganhos` : `+${mission.bonusPoints} pts`}</span>
+          <span className={styles.bonus} data-done={done}>
+            <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" opacity=".22" /><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+            {done ? `+${mission.bonusPoints} ganhos` : `+${mission.bonusPoints} pts`}
+          </span>
         </div>
         {mission.kind === "campaign" ? <span className={styles.campaignTag}>Campanha</span> : mission.kind === "team" ? <span className={styles.campaignTag} data-team="true">Missão da equipe</span> : null}
         <span className={styles.missionDetail}>{muted ? "Sem plantão hoje: esta fica para o próximo." : mission.description}</span>
