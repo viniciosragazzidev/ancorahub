@@ -41,6 +41,9 @@ export function BrokerDutyHub({ current, calendar, calendarState }: BrokerDutyHu
       <LitePageEnter>
         <header>
           <h1 id="duty-hub-title" className="lite-page-title">Plantões</h1>
+          <p className="lite-page-subtitle">
+            {calendarState === "disabled" ? "O que está marcado hoje e o próximo plantão." : "O que está marcado hoje, o calendário e a sua escala."}
+          </p>
         </header>
         {calendarState === "ready" && calendar ? (
           <DutyCalendarSections calendar={calendar} hub={{ current: card, coveredOccurrenceIds: current.coveredOccurrenceIds }} />
