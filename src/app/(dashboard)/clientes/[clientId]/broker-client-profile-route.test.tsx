@@ -40,6 +40,9 @@ vi.mock("@/shared/db", async () => {
   return { schema: await import("@/shared/db/schema"), getDatabase: () => db };
 });
 vi.mock("@/features/leads/queries", () => ({ getLeadTimeline: async () => [] }));
+// Carteira anterior (etapa 4b) roda só no servidor: desligada aqui, o perfil segue o caminho de cliente de venda.
+vi.mock("@/features/customers/prior-portfolio", () => ({ isBrokerPriorClientsEnabled: async () => false, listPriorContracts: async () => [], loadOwnPriorClient: async () => null, saoPauloDateKey: () => "2026-11-13" }));
+vi.mock("@/features/customers/prior-portfolio-actions", () => ({ updatePriorClientAction: async () => ({ ok: true }), savePriorContractAction: async () => ({ ok: true }), removePriorContractAction: async () => ({ ok: true }) }));
 vi.mock("@/features/documents/actions", () => ({ getRequirementsForLead: async () => [], getLeadDocuments: async () => [], getLeadDocumentChecklist: async () => [] }));
 vi.mock("@/features/documents/components/lead-documents-section", () => ({ LeadDocumentsSection: () => <div data-testid="docs" /> }));
 vi.mock("@/features/post-sale/queries", () => ({ getLeadBeneficiaries: async () => [] }));
