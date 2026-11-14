@@ -14,6 +14,7 @@ import { PausedHero } from "./paused-hero";
 import { ChatAudioPlayer } from "./chat-audio";
 import { PresenceCallout } from "./presence-callout";
 import { OperatorAnswerCard } from "./operator-answer-card";
+import { motionTokens } from "@/components/arc/motion-tokens";
 
 const LETTERS = "ABCDEFGHIJ";
 const enter = { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const };
@@ -24,6 +25,33 @@ function Chevron() {
 
 function CopyIcon() {
   return <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="2" fill="none" stroke="currentColor" strokeWidth="1.3" /><path d="M10.5 5V3.5a1.5 1.5 0 0 0-1.5-1.5H3.5A1.5 1.5 0 0 0 2 3.5V9a1.5 1.5 0 0 0 1.5 1.5H5" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>;
+}
+
+/**
+ * Mensagem do corretor. Envio otimista: enquanto o servidor não confirma, o balão fica mais
+ * claro com um relógio discreto; se falhar, o texto continua ali com "Não enviada · Tentar de novo".
+ */
+function UserMessage({ block, onRetry }: { block: Extract<ChatBlock, { type: "user" }>; onRetry?: (id: string) => void }) {
+  const reduce = useReducedMotion();
+  const sending = block.status === "sending";
+  const failed = block.status === "failed";
+  return (
+    <>
+      <p className={styles.user} data-status={block.status} aria-busy={sending || undefined} style={{ opacity: sending ? 0.6 : 1, transition: reduce ? undefined : `opacity ${motionTokens.duration.fast}s ease-out` }}>{block.text}</p>
+      {sending ? (
+        <span className="mt-1 flex items-center justify-end gap-1 text-xs text-muted-foreground" role="status">
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M8 4.8V8l2 1.4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+          Enviando
+        </span>
+      ) : null}
+      {failed ? (
+        <span className="mt-1 flex items-center justify-end gap-1 text-xs text-destructive" role="alert">
+          Não enviada ·
+          <button type="button" className="inline-flex min-h-11 items-center px-1 font-medium underline underline-offset-2" onClick={() => onRetry?.(block.id)}>Tentar de novo</button>
+        </span>
+      ) : null}
+    </>
+  );
 }
 
 /** Three dots while the assistant "writes" the next message. */
@@ -190,7 +218,7 @@ function SwipeRow({ item, disabled, onSwipe, children }: { item: ChatListItem & 
   );
 }
 
-export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe, swipeDisabled, onLeadOpen, onConsent }: { block: Exclude<ChatBlock, { type: "question" }>; onSystemAction?: (block: Extract<ChatBlock, { type: "system" }>) => void; onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void; onItemSwipe?: (item: ChatListItem) => void; swipeDisabled?: boolean; onLeadOpen?: (row: ChatLeadRow) => void; onConsent?: (block: Extract<ChatBlock, { type: "consent" }>, allow: boolean) => Promise<boolean> }) {
+export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe, swipeDisabled, onLeadOpen, onConsent, onUserRetry }: { block: Exclude<ChatBlock, { type: "question" }>; onUserRetry?: (id: string) => void; onSystemAction?: (block: Extract<ChatBlock, { type: "system" }>) => void; onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void; onItemSwipe?: (item: ChatListItem) => void; swipeDisabled?: boolean; onLeadOpen?: (row: ChatLeadRow) => void; onConsent?: (block: Extract<ChatBlock, { type: "consent" }>, allow: boolean) => Promise<boolean> }) {
   const reduce = useReducedMotion();
   switch (block.type) {
     case "leads":
@@ -255,7 +283,7 @@ export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe
         : <div className={`${noticeRowClass} ${styles.notice} ${styles.noticeStatic}`}>{body}</div>;
     }
     case "user":
-      return <p className={styles.user}>{block.text}</p>;
+      return <UserMessage block={block} onRetry={onUserRetry} />;
     case "whatsapp": {
       const label = block.from === "client" ? "Cliente" : block.from === "qualification" ? "Qualificação" : "Você";
       const tone = block.from === "client" ? styles.bubbleClient : block.from === "qualification" ? styles.bubbleQualification : styles.bubbleBroker;

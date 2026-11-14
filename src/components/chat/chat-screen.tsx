@@ -11,6 +11,7 @@ import { Composer, type Mention } from "./composer";
 import styles from "./chat.module.css";
 import type { ChatAction, ChatBlock, ChatChoice, ChatLeadRow, ChatProgress, ChatScript, MascotShape, ChatListItem } from "./types";
 import { fetchMentionBlocks, isDataMention } from "./mention-client";
+import { appendSending, settleSend, startRetry } from "./user-send-core";
 import { openWhatsApp } from "@/lib/whatsapp-open";
 
 /** Result of a server action run from a reply. A message is shown as the assistant's answer. */
@@ -322,15 +323,43 @@ export function ChatScreen({
     }
   }, [enqueue, onFreeText, working]);
 
+  // Free text is optimistic: the message shows at once as "sending" and the server settles it.
+  // A failure keeps the text on screen as "Não enviada" with "Tentar de novo".
+  const sendFree = useCallback(async (id: string, text: string) => {
+    if (!onFreeText) return;
+    setWorking(true);
+    // Guided flows may name the wait ("Procurando entre 2.681 planos…") when the typed answer starts a search.
+    setWorkingLabel(localWorkingLabel?.(`text:${text}`) ?? null);
+    try {
+      const blocks = await onFreeText(text);
+      setShown((current) => settleSend(current, id, true));
+      enqueue(blocks);
+    } catch {
+      setShown((current) => settleSend(current, id, false));
+    } finally {
+      setWorking(false);
+      setWorkingLabel(null);
+    }
+  }, [enqueue, localWorkingLabel, onFreeText]);
+
+  const retrySend = useCallback((id: string) => {
+    const retry = startRetry(shownRef.current, id);
+    if (!retry) return;
+    shownRef.current = retry.blocks;
+    setShown(retry.blocks);
+    void sendFree(id, retry.text);
+  }, [sendFree]);
+
   // Rows are memoized: they get stable handlers that always call the latest ones.
-  const latest = useRef({ choose, swipeItem, onButtonOpen, mention, consent, renderCustom });
-  useEffect(() => { latest.current = { choose, swipeItem, onButtonOpen, mention, consent, renderCustom }; });
+  const latest = useRef({ choose, swipeItem, onButtonOpen, mention, consent, renderCustom, retrySend });
+  useEffect(() => { latest.current = { choose, swipeItem, onButtonOpen, mention, consent, renderCustom, retrySend }; });
   const rowHandlers = useMemo<RowHandlers>(() => ({
     choose: (question, choice) => { void latest.current.choose(question, choice); },
     swipe: (item) => latest.current.swipeItem(item),
     buttonOpen: (block, event) => latest.current.onButtonOpen?.(block, event),
     lead: (row) => { void latest.current.mention({ handle: `lead:${row.leadId}`, label: `@${row.name}`, note: "", group: "leads" }); },
     consent: (block, allow) => latest.current.consent(block, allow),
+    retry: (id) => latest.current.retrySend(id),
     custom: (block) => latest.current.renderCustom?.(block, {
       local: (label, value, reply) => { void latest.current.choose({ type: "question", id: `custom-${block.id}-${Date.now()}`, prompt: "", choices: [] }, { id: value, label, reply, action: { kind: "local", value } }); },
     }) ?? null,
@@ -407,12 +436,10 @@ export function ChatScreen({
         inputLabel={composerInput?.label}
         dataTour={tourTargets?.composer}
         onSend={async (text) => {
-          setShown((current) => [...current, { type: "user", id: `free-${Date.now()}`, text, at: nowLabel() }]);
-          if (!onFreeText) return;
-          setWorking(true);
-          // Guided flows may name the wait ("Procurando entre 2.681 planos…") when the typed answer starts a search.
-          setWorkingLabel(localWorkingLabel?.(`text:${text}`) ?? null);
-          try { enqueue(await onFreeText(text)); } finally { setWorking(false); setWorkingLabel(null); }
+          const message = { type: "user" as const, id: `free-${Date.now()}`, text, at: nowLabel() };
+          if (!onFreeText) { setShown((current) => [...current, message]); return; }
+          setShown((current) => appendSending(current, message));
+          await sendFree(message.id, text);
         }}
         onMention={mention}
       />}
@@ -430,6 +457,7 @@ type RowHandlers = {
   buttonOpen: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void;
   lead: (row: ChatLeadRow) => void;
   consent: (block: Extract<ChatBlock, { type: "consent" }>, allow: boolean) => Promise<boolean>;
+  retry: (id: string) => void;
 };
 
 /** Blocks from the server are plain data: equal JSON means nothing to redraw. */
@@ -443,7 +471,7 @@ const BlockRow = memo(function BlockRow({ block, chosenId, working, handlers }: 
     <MessageEnter>
       {block.type === "custom" ? handlers.custom(block) : block.type === "question"
         ? <ChoiceList block={block} chosenId={chosenId} disabled={working} onChoose={(choice) => handlers.choose(block, choice)} />
-        : <ChatBlockView block={block} onButtonOpen={handlers.buttonOpen} onItemSwipe={handlers.swipe} swipeDisabled={working} onLeadOpen={handlers.lead} onConsent={handlers.consent} onSystemAction={(system) => { if (system.action) handlers.choose({ type: "question", id: `sys-${system.id}`, prompt: "", choices: [] }, { id: system.id, label: system.action.label, action: system.action.choiceAction }); }} />}
+        : <ChatBlockView block={block} onButtonOpen={handlers.buttonOpen} onItemSwipe={handlers.swipe} swipeDisabled={working} onLeadOpen={handlers.lead} onConsent={handlers.consent} onUserRetry={handlers.retry} onSystemAction={(system) => { if (system.action) handlers.choose({ type: "question", id: `sys-${system.id}`, prompt: "", choices: [] }, { id: system.id, label: system.action.label, action: system.action.choiceAction }); }} />}
     </MessageEnter>
   );
 });
