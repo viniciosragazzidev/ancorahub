@@ -24,22 +24,70 @@ import {
 } from "@/features/customers/broker-client-wallet";
 import { serializeBrokerClientWalletFilters } from "@/features/customers/broker-client-wallet-url";
 import { carteiraFichaLiteLigada } from "@/features/carteira/retorno-servico";
+import { BrokerMyWallet } from "@/features/broker-workspace/components/broker-my-wallet";
+import { isBrokerMyWalletEnabled } from "@/features/customers/broker-my-wallet-flag";
+import { isBrokerWalletLeadView, normalizeBrokerWalletFilters } from "@/features/customers/broker-wallet-filters";
+import { getBrokerWalletLeads, toBrokerWalletLeadFilters } from "@/features/customers/broker-wallet-leads";
+import { createBrokerWalletContactAction } from "@/features/customers/broker-wallet-contact-actions";
+import { hasPermission } from "@/shared/auth/permissions";
+import type { TenantContext } from "@/shared/auth/types";
+
+type CustomersSearchParams = {
+  period?: string;
+  branch?: string;
+  view?: string;
+  page?: string;
+  q?: string;
+  origin?: string;
+  contract?: string;
+  return?: string;
+  situacao?: string;
+};
+
+/**
+ * Minha carteira (etapa 4a do plano do modo corretor, chaves BROKER_NAV_REORG e BROKER_CLIENT_WALLET_LITE):
+ * Em negociação e Arquivados vêm de leads; Clientes e Precisa de atenção, de `clients` (DEC-180).
+ */
+async function renderBrokerMyWallet(context: TenantContext, searchParams: CustomersSearchParams) {
+  const filters = normalizeBrokerWalletFilters({
+    view: searchParams.view,
+    page: searchParams.page,
+    query: searchParams.q,
+    origin: searchParams.origin,
+    stage: searchParams.situacao,
+    contractStatus: searchParams.contract,
+    returnStatus: searchParams.return,
+  });
+  const leadView = isBrokerWalletLeadView(filters.view);
+  const [leads, clients] = await Promise.all([
+    getBrokerWalletLeads(context, toBrokerWalletLeadFilters(filters, leadView ? (filters.view as "negotiating" | "archived") : "negotiating"), { rows: leadView }),
+    getBrokerClientWallet(context, {
+      view: leadView ? "all" : (filters.view as "all" | "attention"),
+      page: filters.page,
+      query: filters.query,
+      origin: filters.origin,
+      contractStatus: filters.contractStatus,
+      returnStatus: filters.returnStatus,
+    }, new Date(), { rows: !leadView }),
+  ]);
+  return (
+    <BrokerMyWallet
+      filters={filters}
+      counts={{ negotiating: leads.counts.negotiating, all: clients.counts.all, attention: clients.counts.attention, archived: leads.counts.archived }}
+      origins={[...new Set([...leads.origins, ...clients.origins])].sort()}
+      leads={leadView ? leads : undefined}
+      clients={leadView ? undefined : clients}
+      addContactAction={hasPermission(context.role, "criar_lead_manual") ? createBrokerWalletContactAction : undefined}
+    />
+  );
+}
 
 export const dynamic = "force-dynamic";
 
 export default async function CustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    period?: string;
-    branch?: string;
-    view?: string;
-    page?: string;
-    q?: string;
-    origin?: string;
-    contract?: string;
-    return?: string;
-  }>;
+  searchParams: Promise<CustomersSearchParams>;
 }) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
@@ -87,6 +135,7 @@ export default async function CustomersPage({
   if (isLightBroker) {
     const flagEnabled = await carteiraFichaLiteLigada();
     if (shouldUseBrokerClientWalletLite({ isLightBroker, flagEnabled })) {
+      if (await isBrokerMyWalletEnabled()) return renderBrokerMyWallet(context, resolvedSearchParams);
       const filters = normalizeBrokerClientWalletFilters({
         view: resolvedSearchParams.view as "all" | "attention" | "renewals",
         page: Number(resolvedSearchParams.page),

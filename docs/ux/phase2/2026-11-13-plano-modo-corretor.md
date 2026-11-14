@@ -105,7 +105,7 @@ mudança visual. Cadastros, alterações relevantes, documentos, exportações e
 | 1 Navegação | Início sem Dicas e Jornada, Minha carteira nos acessos, Mais reorganizado | Implementada em `feat/corretor-navegacao-etapa1` (chave `feature_broker_navigation_reorg_enabled`), sem push |
 | 2 Desempenho | Resultados concentrados e acesso à Jornada | Implementada em `feat/corretor-desempenho-etapa2` (mesma chave da etapa 1): período, resultados, atendimento e conversão, metas e Minha jornada; sem push |
 | 3 Plantões | Card atual, calendário e escala em `/plantoes` | Implementada em `feat/corretor-plantoes-etapa3` (mesma chave da etapa 1; calendário e escala seguem `BROKER_DUTY_CALENDAR`), sem push |
-| 4 Carteira | Visões, cadastro próprio, cliente antigo e vínculos | Pendente; exige decisões de domínio registradas |
+| 4 Carteira | Visões, cadastro próprio, cliente antigo e vínculos | 4a implementada em `feat/corretor-carteira-etapa4a` (Minha carteira com Em negociação, Clientes, Precisa de atenção e Arquivados; Adicionar contato com Novo interessado; chaves `feature_broker_navigation_reorg_enabled` e `feature_broker_client_wallet_lite_enabled`), sem migration e sem push. 4b (Cliente que já possuo e contratos anteriores) aprovada pela opção recomendada em [proposta](./2026-11-13-plano-modo-corretor-etapa4b.md); pendente de DEC e implementação |
 | 5 Perfil | Perfil, histórico, contratos e documentos | Pendente; exige decisões de domínio registradas |
 | 6 Agenda | Retornos e tarefas ligados a leads e perfis | Pendente |
 | 7 Validação | Fluxos, permissões, auditoria, responsividade | Pendente |

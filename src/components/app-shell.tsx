@@ -58,6 +58,7 @@ export function AppShell({
   showRelationship = false,
   journeyEnabled = false,
   homeV2Enabled = false,
+  brokerMyWalletEnabled = false,
   welcomeVideoEnabled = false,
   brokerHomeRedesign = false,
   showHomeLearning = true,
@@ -88,6 +89,8 @@ export function AppShell({
   journeyEnabled?: boolean;
   /** Início do corretor reorganizado (BROKER_NAV_REORG): menu Mais novo. */
   homeV2Enabled?: boolean;
+  /** Minha carteira do corretor (etapa 4a): título de `/clientes` no Lite. */
+  brokerMyWalletEnabled?: boolean;
   /** Welcome video on the broker's first access (Super-admin flag). */
   welcomeVideoEnabled?: boolean;
   brokerHomeRedesign?: boolean;
@@ -228,6 +231,7 @@ export function AppShell({
           showRelationship={showRelationship}
           journeyEnabled={journeyEnabled}
           homeV2Enabled={homeV2Enabled}
+          brokerMyWalletEnabled={brokerMyWalletEnabled}
           welcomeVideoEnabled={welcomeVideoEnabled}
           brokerHomeRedesign={brokerHomeRedesign}
           showHomeLearning={showHomeLearning}

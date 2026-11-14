@@ -29,6 +29,7 @@ export function LightAppHeader({
   moreButton,
   showMoreButton = true,
   titleAsHeading = false,
+  brokerMyWallet = false,
 }: {
   /** Supervisor Lite: no availability (they do not receive leads). */
   hideAvailability?: boolean;
@@ -46,8 +47,10 @@ export function LightAppHeader({
   showMoreButton?: boolean;
   /** Página com título global mantém um único h1 sem repetir outro no conteúdo. */
   titleAsHeading?: boolean;
+  /** Corretor com a Minha carteira ligada: `/clientes` se chama "Minha carteira". */
+  brokerMyWallet?: boolean;
 }) {
-  const lightRoute = useLightRoute();
+  const lightRoute = useLightRoute({ brokerMyWallet });
   const title = routeOverride?.title ?? lightRoute.title;
   const isRoot = routeOverride?.isRoot ?? lightRoute.isRoot;
   const parentHref = routeOverride?.parentHref ?? lightRoute.parentHref;
