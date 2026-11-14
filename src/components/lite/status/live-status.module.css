@@ -276,3 +276,17 @@ a.seal:focus-visible { outline: 2px solid var(--ring, var(--primary)); outline-o
   .value { font-size: 22px; }
   .valueRow { margin-top: 6px; }
 }
+
+/*
+ * Atalho no pé do cartão (14/11/2026): o rótulo fica com a linha inteira e aparece completo; a pílula desce para o
+ * fim do cartão, alinhada entre os cartões da mesma linha. O cartão vira coluna flexível para empurrá-la.
+ */
+.card { display: flex; flex-direction: column; }
+.label { display: block; overflow: visible; -webkit-line-clamp: unset; }
+.card > .action { align-self: flex-start; margin-top: auto; }
+.card > .breakdown { margin-top: auto; }
+.card > .breakdown ~ .action { margin-top: 12px; }
+.card > .valueRow { margin-top: 10px; }
+@media (max-width: 559px) {
+  .card > .action { margin-top: 6px; }
+}

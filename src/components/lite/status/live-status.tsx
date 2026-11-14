@@ -110,13 +110,6 @@ export function LiteLiveStatus({ status, onDue }: LiteLiveStatusProps) {
         </LiteAttention>
         <h3 id={`live-${status.id}`} className={styles.label}>{status.label}</h3>
         <span className={styles.srOnly}>{SEVERITY_LABEL[status.severity]}</span>
-        {status.action ? (
-          // Rótulo curto na tela ("Plantão"); o nome acessível diz de qual cartão é ("Plantão: Ofertas aguardando aceite").
-          <Link href={status.action.href} className={styles.action} aria-label={`${status.action.label}: ${status.label}`}>
-            {status.action.label}
-            <span aria-hidden="true" className={styles.arrow}>→</span>
-          </Link>
-        ) : null}
       </header>
       <div className={styles.valueRow}>
         {hasValue ? (
@@ -138,6 +131,14 @@ export function LiteLiveStatus({ status, onDue }: LiteLiveStatusProps) {
             <li key={item.label}><span>{item.label}</span> <strong>{item.value}</strong></li>
           ))}
         </ul>
+      ) : null}
+      {status.action ? (
+        // No pé do cartão (14/11/2026): na linha do rótulo ela cortava "Em qualificação…" nas colunas estreitas.
+        // Rótulo curto na tela ("Plantão"); o nome acessível diz de qual cartão é ("Plantão: Ofertas aguardando aceite").
+        <Link href={status.action.href} className={styles.action} aria-label={`${status.action.label}: ${status.label}`}>
+          {status.action.label}
+          <span aria-hidden="true" className={styles.arrow}>→</span>
+        </Link>
       ) : null}
       {status.stale ? <p className={styles.staleNote}>Sem atualização agora; dado {formatAbsoluteTime(status.generatedAt, status.generatedAt)}.</p> : null}
     </article>
