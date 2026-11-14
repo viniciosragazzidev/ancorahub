@@ -3,12 +3,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Calculator, CalendarDays, HandCoins, UserPlus, type LucideIcon } from "lucide-react";
+import { HandCoins, UserPlus, type LucideIcon } from "lucide-react";
 
 import css from "./home-quick-actions.module.css";
 
 export type HomeQuickAction = {
-  id: "venda" | "contato" | "cotacao" | "agenda";
+  id: "venda" | "contato";
   label: string;
   icon: LucideIcon;
   /** Link de destino; quando há onSelect, o toque abre o painel no próprio Início. */
@@ -17,15 +17,13 @@ export type HomeQuickAction = {
 };
 
 /**
- * Ações rápidas do Início do corretor (chave BROKER_HOME_ACTIONS): sempre no mesmo lugar, na mesma ordem.
- * Registrar venda, Novo contato, Cotação (quando o simulador está liberado) e Minha agenda.
+ * Ações rápidas do Início do corretor (chave BROKER_HOME_ACTIONS): só o que não tem atalho em outro lugar da tela.
+ * Registrar venda e Novo contato. Cotação e Agenda já ficam no Mais, então não se repetem aqui.
  */
-export function homeQuickActions({ canQuote, onQuickSale }: { canQuote: boolean; onQuickSale?: () => void }): HomeQuickAction[] {
+export function homeQuickActions({ onQuickSale }: { onQuickSale?: () => void }): HomeQuickAction[] {
   return [
     { id: "venda", label: "Registrar venda", icon: HandCoins, ...(onQuickSale ? { onSelect: onQuickSale } : { href: "/leads?tab=minha-fila" }) },
     { id: "contato", label: "Novo contato", icon: UserPlus, href: "/clientes?adicionar=1" },
-    ...(canQuote ? [{ id: "cotacao" as const, label: "Cotação", icon: Calculator, href: "/cotacao" }] : []),
-    { id: "agenda", label: "Minha agenda", icon: CalendarDays, href: "/agenda" },
   ];
 }
 

@@ -242,7 +242,7 @@ export function ChatHome({
   const organized = homeActions && !isSupervisor && !isManager;
   const quickSale = quickSaleEnabled && !isSupervisor && !isManager;
   const [quickSaleOpen, setQuickSaleOpen] = useState(false);
-  const quickActions = organized ? homeQuickActions({ canQuote, onQuickSale: quickSale ? () => setQuickSaleOpen(true) : undefined }) : [];
+  const quickActions = organized ? homeQuickActions({ onQuickSale: quickSale ? () => setQuickSaleOpen(true) : undefined }) : [];
 
   const list = (
     <>
