@@ -74,12 +74,6 @@ export function LightLeadDetail({
 }) {
   const isManagement = mode === "management";
   const c = useLeadDetail({ lead, requirements, documents, initialDetailsExpanded: isManagement });
-  // Confirmação no próprio lugar: depois do registro, "Etapa atual" mostra o check que se desenha.
-  const [saleRegistered, setSaleRegistered] = useState(false);
-  const onSaleRegistered = () => {
-    c.markConverted();
-    setSaleRegistered(true);
-  };
   useQuickSaleAutoOpen({ enabled: openSaleOnLoad && !isManagement && variant !== "details", lead, c, registrationV2Enabled: saleRegistrationV2Enabled });
   // Confirmação no próprio lugar: depois do registro, "Etapa atual" mostra o check que se desenha.
   const [saleRegistered, setSaleRegistered] = useState(false);

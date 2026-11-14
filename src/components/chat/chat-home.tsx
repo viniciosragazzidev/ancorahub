@@ -38,10 +38,6 @@ import type { WhatsAppActivitySummary } from "@/features/dashboard/whatsapp-acti
 import { WhatsAppActivityCard } from "@/features/dashboard/components/whatsapp-activity-card";
 import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
 import { BrokerHomeOverview } from "./broker-home-overview";
-import { RisePulse, useRisePulseKey } from "@/components/light/rise-pulse";
-import { LitePress } from "@/components/lite/motion";
-import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
-import { useFirstTimeToday } from "@/components/motion/first-time-today/use-first-time-today";
 import { HomeQuickActions, homeQuickActions } from "./home-quick-actions";
 import { QuickRegisterSaleSheet } from "@/features/broker-workspace/components/quick-register-sale";
 import { RisePulse, useRisePulseKey } from "@/components/light/rise-pulse";
