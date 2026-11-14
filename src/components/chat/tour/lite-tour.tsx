@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { readSeen, writeSeen } from "./seen-storage";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 
 import { AssistantAvatar } from "../assistant-avatar";
 import { DynamicNotice, type DynamicNoticeItem } from "../dynamic-notice";
@@ -115,7 +116,9 @@ export function LiteTour({ variant = "broker", steps: configuredSteps, storageKe
   const activeStorageKey = storageKey ?? baseConfig.storageKey;
   const activeStartEvent = startEvent ?? START_TOUR_EVENT;
   const badgeLabel = badge ?? baseConfig.badge;
-  const reduce = useReducedMotion();
+  // Kill-switch (html[data-interface-motion="off"]) também desliga, não só o movimento reduzido do sistema.
+  const motionOn = useInterfaceMotionEnabled();
+  const reduce = Boolean(useReducedMotion()) || !motionOn;
   const [open, setOpen] = useState(false);
   const [steps, setSteps] = useState<TourStep[]>([]);
   const [index, setIndex] = useState(0);
@@ -430,7 +433,7 @@ export function LiteTour({ variant = "broker", steps: configuredSteps, storageKe
             initial={{ opacity: 0, y: 8, scale: 0.8 }}
             animate={{ opacity: 1, y: -18, scale: 1 }}
             exit={{ opacity: 0, y: -40 }}
-            transition={{ duration: 0.5, ease: EASE }}
+            transition={{ duration: 0.32, ease: EASE }}
             onAnimationComplete={() => window.setTimeout(() => setGain(null), 350)}
           >
             +{gain.value} XP
@@ -539,12 +542,12 @@ function Team({ reduce }: { reduce: boolean }) {
           key={member.shape}
           initial={reduce ? false : { opacity: 0, y: 24, scale: 0.5, rotate: position % 2 ? 8 : -8 }}
           animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
-          transition={{ type: "spring", visualDuration: 0.45, bounce: 0.4, delay: reduce ? 0 : 0.12 + position * 0.06 }}
+          transition={{ type: "spring", visualDuration: 0.32, bounce: 0.4, delay: reduce ? 0 : Math.min(0.12, position * 0.035) }}
         >
           <motion.span
             style={{ display: "inline-grid" }}
             animate={reduce ? undefined : { y: [0, -4, 0] }}
-            transition={reduce ? undefined : { duration: 2.4, repeat: Infinity, ease: "easeInOut", delay: position * 0.2 }}
+            transition={reduce ? undefined : { duration: 0.32, ease: "easeInOut", delay: 0.32 + Math.min(0.12, position * 0.035) }}
           >
             <AssistantAvatar shape={member.shape} hue={member.hue} size={position === 3 ? 56 : 42} />
           </motion.span>
@@ -561,11 +564,11 @@ function Badge({ xp, maxXp, reduce, label }: { xp: number; maxXp: number; reduce
         className={styles.badge}
         initial={reduce ? false : { scale: 0.2, rotate: -40, opacity: 0 }}
         animate={{ scale: 1, rotate: 0, opacity: 1 }}
-        transition={{ type: "spring", visualDuration: 0.6, bounce: 0.45, delay: reduce ? 0 : 0.1 }}
+        transition={{ type: "spring", visualDuration: 0.32, bounce: 0.45, delay: reduce ? 0 : 0.1 }}
       >
         <AssistantAvatar shape="logo" hue={null} size={64} />
       </motion.div>
-      <motion.p className={styles.badgeLabel} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduce ? 0 : 0.45 }}>
+      <motion.p className={styles.badgeLabel} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, delay: reduce ? 0 : 0.12 }}>
         Selo: {label} · {xp} de {maxXp} XP
       </motion.p>
     </div>

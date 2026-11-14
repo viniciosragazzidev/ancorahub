@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 
 import { cn } from "@/utils/core/cn";
 
@@ -214,11 +215,13 @@ export function WaitDots() {
 }
 
 export function BigCheck() {
-  const reduce = useReducedMotion();
+  // Kill-switch (html[data-interface-motion="off"]) também desliga, não só o movimento reduzido do sistema.
+  const motionOn = useInterfaceMotionEnabled();
+  const reduce = Boolean(useReducedMotion()) || !motionOn;
   return (
-    <motion.span className={styles.checkBig} initial={reduce ? false : { scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", visualDuration: 0.4, bounce: 0.3 }} aria-hidden="true">
+    <motion.span className={styles.checkBig} initial={reduce ? false : { scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", visualDuration: 0.32, bounce: 0.3 }} aria-hidden="true">
       <svg viewBox="0 0 24 24" width="48" height="48">
-        <motion.path d="M5 12.5 10 17.5 19 7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" initial={reduce ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.45, ease: guideEase, delay: 0.15 }} />
+        <motion.path d="M5 12.5 10 17.5 19 7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" initial={reduce ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={reduce ? { duration: 0 } : { duration: 0.32, ease: guideEase, delay: 0.12 }} />
       </svg>
     </motion.span>
   );

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 
 import { AssistantAvatar } from "@/components/chat/assistant-avatar";
 import { openWhatsAppApp } from "@/components/whatsapp/open-whatsapp-app";
@@ -86,7 +87,9 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   mode?: GuideMode;
 }) {
   const connectOnly = mode === "connect";
-  const reduce = useReducedMotion();
+  // Kill-switch (html[data-interface-motion="off"]) também desliga, não só o movimento reduzido do sistema.
+  const motionOn = useInterfaceMotionEnabled();
+  const reduce = Boolean(useReducedMotion()) || !motionOn;
   const desktop = device === "desktop";
   const [localStep, setLocalStep] = React.useState<GuideStep>(preview?.step ?? (connection.started ? "codigo" : "boasvindas"));
   const [scene, setScene] = React.useState(preview?.scene ?? 0);
@@ -503,7 +506,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
         <div className={styles.top}>
           <button type="button" className={styles.close} aria-label={COPY.close} onClick={() => (finished ? presence.onFinish() : setSheet("sair"))}><CloseIcon /></button>
           <div className={styles.track} role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={at} aria-label={`Passo ${COPY.progress(at, total)}`}>
-            <motion.div className={styles.fill} initial={false} animate={{ scaleX: fill }} transition={reduce ? { duration: 0 } : { duration: 0.45, ease: guideEase }} />
+            <motion.div className={styles.fill} initial={false} animate={{ scaleX: fill }} transition={reduce ? { duration: 0 } : { duration: 0.32, ease: guideEase }} />
           </div>
           <span className={styles.count}>{COPY.progress(at, total)}</span>
           {voiceBase && narration ? (
@@ -607,10 +610,12 @@ function formatPhone(digits: string) {
 }
 
 function Say({ title, sub, state = "idle", celebrate = false }: { title: string; sub?: React.ReactNode; state?: "idle" | "working" | "waiting"; celebrate?: boolean }) {
-  const reduce = useReducedMotion();
+  // Kill-switch (html[data-interface-motion="off"]) também desliga, não só o movimento reduzido do sistema.
+  const motionOn = useInterfaceMotionEnabled();
+  const reduce = Boolean(useReducedMotion()) || !motionOn;
   return (
     <div className={styles.say}>
-      <motion.span className={styles.mascot} initial={reduce || !celebrate ? false : { scale: 0.6, rotate: -8 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", visualDuration: 0.45, bounce: 0.3 }}>
+      <motion.span className={styles.mascot} initial={reduce || !celebrate ? false : { scale: 0.6, rotate: -8 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", visualDuration: 0.32, bounce: 0.3 }}>
         <AssistantAvatar shape="onigiri" hue={28} size={52} state={state} />
       </motion.span>
       <span className={styles.sayText}>

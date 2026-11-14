@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 
 import styles from "./lite-welcome.module.css";
 
@@ -19,7 +20,9 @@ const MESSAGE: Partial<Record<Result, string>> = {
  * lead "lands" and a check closes it.
  */
 export function PushNudge({ onClose }: { onClose: () => void }) {
-  const reduce = useReducedMotion();
+  // Kill-switch (html[data-interface-motion="off"]) também desliga, não só o movimento reduzido do sistema.
+  const motionOn = useInterfaceMotionEnabled();
+  const reduce = Boolean(useReducedMotion()) || !motionOn;
   const [result, setResult] = useState<Result>("idle");
 
   async function activate() {
@@ -54,7 +57,7 @@ export function PushNudge({ onClose }: { onClose: () => void }) {
             transition={reduce || result === "done" ? { duration: 0.2 } : { duration: 1.1, repeat: Infinity, repeatDelay: 1.4, ease: "easeInOut" }}
           >
             {result === "done" ? (
-              <svg viewBox="0 0 24 24" width="34" height="34"><motion.path d="M5 12.5 10 17.5 19 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" initial={reduce ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.4 }} /></svg>
+              <svg viewBox="0 0 24 24" width="34" height="34"><motion.path d="M5 12.5 10 17.5 19 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" initial={reduce ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={reduce ? { duration: 0 } : { duration: 0.32 }} /></svg>
             ) : (
               <svg viewBox="0 0 24 24" width="34" height="34"><path d="M12 3a6 6 0 0 0-6 6v3.3L4.4 15.6h15.2L18 12.3V9a6 6 0 0 0-6-6ZM9.8 18.5a2.3 2.3 0 0 0 4.4 0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
             )}
