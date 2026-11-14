@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { toast } from "@/components/ui/sonner";
 
-import { Trash } from "@/components/huge-icons";
+import { Plus, Trash } from "@/components/huge-icons";
+import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,6 +89,9 @@ export function BeneficiariesSection({
   const [editAge, setEditAge] = useState("");
   const [editCpf, setEditCpf] = useState("");
   const [editRelationship, setEditRelationship] = useState<Relationship>("filho");
+  // O formulário de inclusão abre num painel próprio; a área principal mostra só as pessoas já cadastradas.
+  const [addOpen, setAddOpen] = useState(false);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
 
   const holder = beneficiaries.find((beneficiary) => beneficiary.isHolder);
   const isCompletingHolder = !holder;
@@ -129,6 +133,7 @@ export function BeneficiariesSection({
       setAge("");
       setCpf("");
       setRelationship("filho");
+      setAddOpen(false);
       onChanged?.();
       toast.success(isCompletingHolder ? "Titular confirmado." : "Beneficiário adicionado.");
     });
@@ -196,117 +201,121 @@ export function BeneficiariesSection({
       <CardHeader className="gap-1">
         <CardTitle className="text-base">Pessoas da contratação</CardTitle>
         <CardDescription>
-          O contato do lead inicia como titular. Confirme sua data de nascimento e adicione dependentes quando necessário.
+          O contato do lead é o titular. Adicione os dependentes que farão parte da contratação.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className={embedded ? "max-h-64 overflow-y-auto divide-y divide-border" : "max-h-64 overflow-y-auto rounded-[var(--radius-card)] border border-border"}>
+      <CardContent className="space-y-3">
+        <ul className="grid gap-2" aria-label="Pessoas da contratação">
           {isCompletingHolder ? (
-            <div className={`flex items-start justify-between gap-3 px-3 py-3 text-sm ${embedded ? "" : "bg-muted/30"}`}>
+            <li className="flex items-start justify-between gap-3 rounded-[var(--radius-card)] border border-dashed border-border bg-muted/30 p-3 text-sm">
               <div className="min-w-0">
                 <p className="truncate font-medium">{contactName}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Contato do lead</p>
+                <p className="mt-1 text-xs text-muted-foreground">Contato do lead · confirme a data de nascimento</p>
               </div>
               <Badge>Titular</Badge>
-            </div>
+            </li>
           ) : null}
-
-          {beneficiaries.length ? (
-            <div className={embedded ? "" : "divide-y divide-border"}>
-              {beneficiaries.map((beneficiary) => (
-                <div className="flex items-start justify-between gap-3 px-3 py-3 text-sm" key={beneficiary.id}>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="break-words font-medium">{beneficiary.name}</p>
-                      {beneficiary.isHolder ? <Badge>Titular</Badge> : null}
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {[formatBirthDate(beneficiary.birthDate), beneficiary.age != null ? `${beneficiary.age} anos` : null, beneficiary.isHolder ? "Titular da contratação" : beneficiary.relationship, beneficiary.hasCpf ? "CPF cadastrado" : null].filter(Boolean).join(" · ") || "Dados pessoais pendentes"}
-                    </p>
+          {beneficiaries.map((beneficiary) => (
+            <li className="rounded-[var(--radius-card)] border border-border bg-card p-3 text-sm" key={beneficiary.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="break-words font-medium">{beneficiary.name}</p>
+                    {beneficiary.isHolder ? <Badge>Titular</Badge> : null}
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button type="button" size="sm" variant="ghost" className="min-h-11" disabled={pending} onClick={() => edit(beneficiary)}>Editar</Button>
-                    {!beneficiary.isHolder ? <Button
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {[formatBirthDate(beneficiary.birthDate), beneficiary.age != null ? `${beneficiary.age} anos` : null, beneficiary.isHolder ? "Titular da contratação" : relationshipLabels[beneficiary.relationship as Relationship] ?? beneficiary.relationship, beneficiary.hasCpf ? "CPF cadastrado" : null].filter(Boolean).join(" · ") || "Dados pessoais pendentes"}
+                  </p>
+                </div>
+                <div className="-my-1 -mr-1 flex shrink-0 items-center">
+                  <Button type="button" size="sm" variant="ghost" className="min-h-11" disabled={pending} onClick={() => edit(beneficiary)}>Editar</Button>
+                  {!beneficiary.isHolder ? (
+                    <Button
                       type="button"
                       size="sm"
                       variant="ghost"
-                      className="min-h-11 shrink-0 text-destructive hover:text-destructive"
+                      className="min-h-11 text-destructive hover:text-destructive"
                       disabled={pending}
+                      aria-label={`Excluir ${beneficiary.name}`}
                       onClick={() => setBeneficiaryToDelete(beneficiary)}
                     >
                       <Trash className="size-4" />
-                      Excluir
-                    </Button> : null}
-                  </div>
+                    </Button>
+                  ) : null}
                 </div>
-              ))}
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <Button ref={addButtonRef} type="button" variant="outline" className="min-h-11 w-full gap-2" disabled={pending} onClick={() => setAddOpen(true)}>
+          <Plus className="size-4" />
+          {isCompletingHolder ? "Confirmar titular" : "Adicionar dependente"}
+        </Button>
+      </CardContent>
+
+      <BottomSheet
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        returnFocusRef={addButtonRef}
+        title={isCompletingHolder ? "Completar dados do titular" : "Adicionar dependente"}
+        description={isCompletingHolder ? "Use o contato já registrado no lead como titular da contratação." : "Inclua apenas as pessoas que farão parte da contratação."}
+        detents={[0.86]}
+        closeLabel="Fechar"
+        className="arc-venancor"
+      >
+        <div className="grid grid-cols-1 gap-3 pb-4">
+          {isCompletingHolder ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="beneficiary-holder-name">Titular</Label>
+              <Input id="beneficiary-holder-name" className="min-h-11" value={contactName} readOnly aria-readonly="true" />
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label htmlFor="beneficiary-name">Nome do dependente</Label>
+              <Input id="beneficiary-name" className="min-h-11" value={name} onChange={(event) => setName(event.target.value)} />
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <DatePicker id="beneficiary-birth" label="Data de nascimento" className="min-h-11" value={dateFromKey(birthDate)} onChange={(date) => setBirthDate(keyFromDate(date))} locale="pt-BR" format={{ day: "2-digit", month: "2-digit", year: "numeric" }} placeholder="Selecione uma data" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="beneficiary-age">Idade, se não souber a data</Label>
+            <Input id="beneficiary-age" className="min-h-11" inputMode="numeric" type="number" min={0} max={120} value={age} onChange={(event) => setAge(event.target.value)} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="beneficiary-cpf">CPF, se informado</Label>
+            <Input id="beneficiary-cpf" className="min-h-11" inputMode="numeric" value={cpf} onChange={(event) => setCpf(event.target.value)} placeholder="000.000.000-00" />
+          </div>
+
+          {!isCompletingHolder ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="beneficiary-relationship">Parentesco</Label>
+              <Select
+                value={relationship}
+                labels={relationshipLabels}
+                onValueChange={(value) => setRelationship((value ?? "filho") as Relationship)}
+              >
+                <SelectTrigger id="beneficiary-relationship" className="min-h-11 w-full">
+                  <SelectValue placeholder="Selecione o parentesco" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(relationshipLabels).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           ) : null}
-        </div>
 
-        <div className={embedded ? "space-y-3 border-t border-dashed border-border pt-3" : "space-y-3 rounded-[var(--radius-card)] border border-dashed border-border p-3"}>
-          <div>
-            <p className="text-sm font-medium">{isCompletingHolder ? "Completar dados do titular" : "Adicionar dependente"}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {isCompletingHolder
-                ? "Use o contato já registrado no lead como titular da contratação."
-                : "Inclua apenas as pessoas que farão parte da contratação."}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3">
-            {isCompletingHolder ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="beneficiary-holder-name">Titular</Label>
-                <Input id="beneficiary-holder-name" className="min-h-11" value={contactName} readOnly aria-readonly="true" />
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                <Label htmlFor="beneficiary-name">Nome do dependente</Label>
-                <Input id="beneficiary-name" className="min-h-11" value={name} onChange={(event) => setName(event.target.value)} />
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <DatePicker id="beneficiary-birth" label="Data de nascimento" className="min-h-11" value={dateFromKey(birthDate)} onChange={(date) => setBirthDate(keyFromDate(date))} locale="pt-BR" format={{ day: "2-digit", month: "2-digit", year: "numeric" }} placeholder="Selecione uma data" />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="beneficiary-age">Idade, se não souber a data</Label>
-              <Input id="beneficiary-age" className="min-h-11" inputMode="numeric" type="number" min={0} max={120} value={age} onChange={(event) => setAge(event.target.value)} />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="beneficiary-cpf">CPF, se informado</Label>
-              <Input id="beneficiary-cpf" className="min-h-11" inputMode="numeric" value={cpf} onChange={(event) => setCpf(event.target.value)} placeholder="000.000.000-00" />
-            </div>
-
-            {!isCompletingHolder ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="beneficiary-relationship">Parentesco</Label>
-                <Select
-                  value={relationship}
-                  labels={relationshipLabels}
-                  onValueChange={(value) => setRelationship((value ?? "filho") as Relationship)}
-                >
-                  <SelectTrigger id="beneficiary-relationship" className="min-h-11 w-full">
-                    <SelectValue placeholder="Selecione o parentesco" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(relationshipLabels).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
-          </div>
-
-          <Button type="button" className="min-h-11 w-full" disabled={pending || !draftName || (!birthDate && !age)} onClick={add}>
-            {isCompletingHolder ? "Confirmar titular" : "Adicionar beneficiário"}
+          <Button type="button" className="mt-1 min-h-11 w-full" disabled={pending || !draftName || (!birthDate && !age)} onClick={add}>
+            {pending ? "Salvando..." : isCompletingHolder ? "Confirmar titular" : "Adicionar dependente"}
           </Button>
         </div>
-      </CardContent>
+      </BottomSheet>
 
       <Dialog open={Boolean(beneficiaryToDelete)} onOpenChange={(open) => !open && setBeneficiaryToDelete(null)}>
         <DialogPopup>
