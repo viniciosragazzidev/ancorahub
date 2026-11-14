@@ -28,4 +28,6 @@
 .topAction:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .topAction:disabled { cursor: not-allowed; opacity: 0.5; }
 .topActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-2); }
+/* Celular estreito: as três ações continuam numa linha. */
+@media (max-width: 359px) { .topActions { gap: 6px; } .topAction { padding: 0 12px 0 10px; font-size: 12.5px; gap: 5px; } }
 @media (prefers-reduced-motion: reduce) { .topAction { transition: none; } .topAction:active { transform: none; } }
