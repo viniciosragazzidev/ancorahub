@@ -18,14 +18,14 @@
 
 /* Top of the conversation: back button and named actions (icon in a circle, label under it). */
 .backButton { flex: none; margin-inline-start: calc(var(--space-2) * -1); }
-.topAction { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; min-width: 52px; padding: 0 2px; border: 0; background: transparent; color: var(--text-secondary); font: inherit; font-size: 11px; font-weight: 500; line-height: 1.2; text-decoration: none; white-space: nowrap; cursor: pointer; border-radius: var(--radius-control); outline: none; -webkit-tap-highlight-color: transparent; }
-.topActionIcon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px; background: var(--surface-muted); color: var(--foreground); transition: background-color var(--duration-fast, 160ms) var(--ease-standard, ease), transform var(--duration-fast, 160ms) var(--ease-standard, ease); }
-.topActionIcon svg { width: 18px; height: 18px; }
-.topAction[data-tone="primary"] .topActionIcon { background: color-mix(in oklab, var(--primary) 10%, var(--surface)); color: var(--primary); }
-.topAction:hover .topActionIcon { background: color-mix(in oklab, var(--foreground) 8%, var(--surface)); }
-.topAction[data-tone="primary"]:hover .topActionIcon { background: color-mix(in oklab, var(--primary) 16%, var(--surface)); }
-.topAction:active .topActionIcon { transform: scale(0.94); }
-.topAction:focus-visible .topActionIcon { outline: 2px solid var(--primary); outline-offset: 2px; }
+.topAction { display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 16px 0 13px; border: 0; border-radius: 999px; background: var(--surface-muted); color: var(--foreground); font: inherit; font-size: 13px; font-weight: 600; line-height: 1; text-decoration: none; white-space: nowrap; cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; transition: background-color var(--duration-fast, 160ms) var(--ease-standard, ease), transform var(--duration-fast, 160ms) var(--ease-standard, ease); }
+.topActionIcon { display: inline-grid; place-items: center; }
+.topActionIcon svg { width: 17px; height: 17px; }
+.topAction[data-tone="primary"] { background: color-mix(in oklab, var(--primary) 10%, var(--surface)); color: var(--primary); }
+.topAction:hover { background: color-mix(in oklab, var(--foreground) 8%, var(--surface)); }
+.topAction[data-tone="primary"]:hover { background: color-mix(in oklab, var(--primary) 16%, var(--surface)); }
+.topAction:active { transform: scale(0.97); }
+.topAction:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .topAction:disabled { cursor: not-allowed; opacity: 0.5; }
-.topActions { display: flex; align-items: flex-start; justify-content: center; gap: var(--space-2); }
-@media (prefers-reduced-motion: reduce) { .topActionIcon { transition: none; } .topAction:active .topActionIcon { transform: none; } }
+.topActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-2); }
+@media (prefers-reduced-motion: reduce) { .topAction { transition: none; } .topAction:active { transform: none; } }
