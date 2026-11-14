@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { AnimatePresence, animate, motion, useReducedMotion } from "motion/react";
 
 import { AssistantAvatar } from "@/components/chat/assistant-avatar";
+import { LiteSuccess } from "@/components/lite/motion";
 import type { CustomBlockApi } from "@/components/chat/chat-screen";
 
 import type { QuoteResult } from "../contracts";
@@ -220,25 +221,16 @@ export function PlansBlock({ data, api, mascot }: { data: PlansBlockData; api: C
   );
 }
 
-const CONFETTI = Array.from({ length: 18 }, (_, index) => ({
-  x: Math.round(Math.cos((index / 18) * Math.PI * 2) * (90 + (index % 3) * 30)),
-  y: Math.round(Math.sin((index / 18) * Math.PI * 2) * (50 + (index % 4) * 14)) - 30,
-  rotate: (index * 47) % 360,
-  hue: [245, 255, 262, 270][index % 4],
-}));
-
-/** Proposta pronta: o mascote comemora e um confete curto sai do centro. */
+/**
+ * Proposta pronta: confirmação discreta de nível 1 (FEEDBACK.md). Gerar proposta acontece dezenas de vezes por
+ * dia, então não tem confete nem mascote pulando: o check se desenha ao lado do título e o resumo vem embaixo.
+ * O bloco "celebrate" mantém o nome por compatibilidade com conversas já salvas.
+ */
 export function CelebrateBlock({ data, mascot }: { data: CelebrateBlockData; mascot: { shape: Parameters<typeof AssistantAvatar>[0]["shape"]; hue: number | null } }) {
-  const reduce = useReducedMotion();
   return (
-    <section className={styles.celebrate} role="status" aria-label={data.title}>
-      {reduce ? null : CONFETTI.map((piece, index) => (
-        <motion.span key={index} className={styles.confetti} aria-hidden="true" style={{ background: `oklch(${62 + (index % 3) * 8}% 0.18 ${piece.hue})` }} initial={{ x: 0, y: 0, opacity: 0, rotate: 0 }} animate={{ x: piece.x, y: [0, piece.y, piece.y + 60], opacity: [0, 1, 0], rotate: piece.rotate }} transition={{ duration: 1.3, ease: "easeOut", delay: 0.1 + (index % 5) * 0.03 }} />
-      ))}
-      <motion.span initial={reduce ? false : { scale: 0.5, y: 10 }} animate={{ scale: 1, y: 0 }} transition={{ type: "spring", visualDuration: 0.45, bounce: 0.5 }}>
-        <AssistantAvatar shape={mascot.shape} hue={mascot.hue} size={56} state="working" />
-      </motion.span>
-      <p className={styles.celebrateTitle}>{data.title}</p>
+    <section className={styles.celebrate} aria-label={data.title}>
+      <AssistantAvatar shape={mascot.shape} hue={mascot.hue} size={40} />
+      <LiteSuccess label={data.title} className={styles.celebrateTitle} />
       <p className={styles.celebrateText}>{data.text}</p>
     </section>
   );

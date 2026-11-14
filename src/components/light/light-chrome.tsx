@@ -89,7 +89,7 @@ export function LightChrome({
   const [moreSheet, setMoreSheet] = useState<{ open: boolean; path: string }>({ open: false, path: pathname });
   const moreOpen = moreSheet.open && moreSheet.path === pathname;
   const setMoreOpen = (open: boolean) => setMoreSheet({ open, path: pathname });
-  const { availability, isPending, setStatus } = useLightAvailability(initialAvailability);
+  const { availability, isPending, error: availabilityError, setStatus } = useLightAvailability(initialAvailability);
   useLightNavigationTracker();
 
   const sheet = (
@@ -122,7 +122,7 @@ export function LightChrome({
     ? <AssistLayer pathname={pathname} capabilities={{ journey: journeyEnabled, quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship }}>{content}</AssistLayer>
     : content}</A11yPrefsProvider>;
   const shell = {
-    availability, isPending, setStatus, openMore: (opener?: HTMLElement) => { moreReturnTo.current = opener ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null); setMoreOpen(true); }, audience, welcomeVideo: welcomeVideoEnabled,
+    availability, isPending, setStatus, error: availabilityError, openMore: (opener?: HTMLElement) => { moreReturnTo.current = opener ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null); setMoreOpen(true); }, audience, welcomeVideo: welcomeVideoEnabled,
     homeRedesign: audience === "broker" && brokerHomeRedesign, showHomeLearning,
     homeTools: getLightMoreDestinations({ quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship, journey: journeyEnabled }, audience),
   };

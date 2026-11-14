@@ -1,5 +1,6 @@
 "use client";
 
+import { plantaoDone, plantaoFailed } from "./plantao-feedback";
 import { useState, useTransition, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
@@ -9,7 +10,6 @@ import { DetailDrawer } from "@/components/foundations/detail-drawer";
 import { LeadStatusBadge } from "@/components/status-badges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/sonner";
 import { assignDutyLeadToBrokerAction, getBrokerDayHistoryAction, getBrokerOccurrenceLeadsAction, getDutyAvailableLeadsAction, setDutyAbsenceAction, setDutyAssignmentAttendanceModeAction } from "@/features/lead-distribution/duty-actions";
 import { cn } from "@/lib/utils";
 import { BrokerPresenceReleaseButton } from "./broker-presence-release-button";
@@ -161,11 +161,11 @@ export function BrokerOccurrenceCard({ children, directorLite = false, summary, 
       const result = await assignDutyLeadToBrokerAction(scheduleId, brokerId, lead.id);
       setAssigningId(null);
       if (!result.ok) {
-        toast.error(result.reason);
+        plantaoFailed(result.reason, "Não consegui atualizar o plantão agora.");
         loadAvailable();
         return;
       }
-      toast.success(`${lead.name} enviado para ${brokerName}.`);
+      plantaoDone(`${lead.name} enviado para ${brokerName}.`);
       setAvailable((current) => current?.filter((item) => item.id !== lead.id) ?? null);
       loadReceived();
       loadOffers();
@@ -179,10 +179,10 @@ export function BrokerOccurrenceCard({ children, directorLite = false, summary, 
     startSaving(async () => {
       const result = await setDutyAbsenceAction(scheduleId, assignmentId, !absent);
       if (result.ok) {
-        toast.success(absent ? "Falta desfeita." : "Falta registrada.");
+        plantaoDone(absent ? "Falta desfeita." : "Falta registrada.");
         setOpen(false);
         router.refresh();
-      } else toast.error(result.reason);
+      } else plantaoFailed(result.reason, "Não consegui atualizar o plantão agora.");
     });
   }
 
@@ -196,10 +196,10 @@ export function BrokerOccurrenceCard({ children, directorLite = false, summary, 
     startSaving(async () => {
       const result = await setDutyAssignmentAttendanceModeAction({ scheduleId, assignmentId, mode: onlineOverride ? null : "online" });
       if (result.ok) {
-        toast.success(onlineOverride ? `${brokerName} voltou a presencial.` : `${brokerName} está online neste plantão.`);
+        plantaoDone(onlineOverride ? `${brokerName} voltou a presencial.` : `${brokerName} está online neste plantão.`);
         setOpen(false);
         router.refresh();
-      } else toast.error(result.reason);
+      } else plantaoFailed(result.reason, "Não consegui atualizar o plantão agora.");
     });
   }
 
@@ -288,7 +288,7 @@ export function BrokerOccurrenceCard({ children, directorLite = false, summary, 
       {swapOpen ? <DutySwapPicker assignmentId={assignmentId} onCancel={() => setSwapOpen(false)} onSwapped={(result) => {
         setSwapOpen(false);
         setSwapDone(result);
-        toast.success(`Troca feita entre ${result.source.brokerName} e ${result.target.brokerName}.`);
+        plantaoDone(`Troca feita entre ${result.source.brokerName} e ${result.target.brokerName}.`);
         router.refresh();
       }} /> : null}
       {swapNotice && !swapDone ? <p role="status" className="rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-xs">

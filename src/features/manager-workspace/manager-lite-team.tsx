@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { Avatar } from "@/components/arc/avatar/avatar";
 import { AssistantAvatar } from "@/components/chat/assistant-avatar";
@@ -15,12 +16,17 @@ import { TeamInviteLiteSheet } from "@/features/team/team-invite-lite-sheet";
 import { PeopleFilters, PeopleRow, PeopleSection } from "@/components/light/people-list/people-list";
 import type { ManagerLiteTeamData } from "./manager-lite-team-queries";
 import styles from "@/features/supervisor-workspace/my-team-page.module.css";
+import { ActionNoticeLine, useActionNotice } from "@/components/lite/feedback/action-notice";
 
 const dateFormat = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "medium", timeStyle: "short" });
 
 export function ManagerLiteTeam({ initialData, initialTransfers }: { initialData: ManagerLiteTeamData; initialTransfers: PendingTransferRequest[] }) {
   const [query, setQuery] = useState("");
-  const [feedback, setFeedback] = useState("");
+  // Feedback nível 1 (FEEDBACK.md): toque vibra, o botão da linha diz "…ando", o item muda depois do servidor
+  // (router.refresh no lugar de recarregar a página) e a linha de resultado confirma; erro com "Tentar de novo".
+  const notice = useActionNotice();
+  const router = useRouter();
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [requests, setRequests] = useState(initialTransfers);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
@@ -28,28 +34,49 @@ export function ManagerLiteTeam({ initialData, initialTransfers }: { initialData
   const members = useMemo(() => initialData.members.filter((member) => member.name.toLocaleLowerCase("pt-BR").includes(query.trim().toLocaleLowerCase("pt-BR"))), [initialData.members, query]);
 
   function invoke(action: typeof resendInviteAction, invitationId: string) {
-    setFeedback("");
+    const resend = action === resendInviteAction;
+    const failOptions = { fallback: "Não consegui atualizar o convite agora", keeps: resend ? "O convite anterior continua valendo" : "O convite continua pendente", retry: () => invoke(action, invitationId) };
+    notice.tap();
+    notice.clear();
+    setBusyKey(`${resend ? "resend" : "revoke"}:${invitationId}`);
     const form = new FormData();
     form.set("invitationId", invitationId);
     startTransition(async () => {
-      const result = await action({}, form);
-      setFeedback(result.error ?? result.message ?? (result.success ? "Ação concluída." : "Não foi possível concluir a ação."));
-      if (result.success) window.location.reload();
+      try {
+        const result = await action({}, form);
+        if (result.success) {
+          notice.succeed(result.message ?? (resend ? "Convite reenviado." : "Convite cancelado."));
+          router.refresh();
+        } else notice.fail(result, failOptions);
+      } catch (error) {
+        notice.fail(error, failOptions);
+      } finally {
+        setBusyKey(null);
+      }
     });
   }
 
   function decideTransfer(requestId: string, approve: boolean) {
-    setFeedback("");
+    const failOptions = { fallback: "Não consegui registrar a decisão agora", keeps: "O pedido continua esperando", retry: () => decideTransfer(requestId, approve) };
+    notice.tap();
+    notice.clear();
     setActiveRequestId(requestId);
     startTransition(async () => {
-      const result = await decideBrokerTransferAction(requestId, approve);
+      let result: Awaited<ReturnType<typeof decideBrokerTransferAction>>;
+      try {
+        result = await decideBrokerTransferAction(requestId, approve);
+      } catch (error) {
+        setActiveRequestId(null);
+        notice.fail(error, failOptions);
+        return;
+      }
       setActiveRequestId(null);
       if (!result.ok) {
-        setFeedback(result.reason);
+        notice.fail(result, failOptions);
         return;
       }
       setRequests((current) => current.filter((request) => request.id !== requestId));
-      setFeedback(approve ? "Transferência aprovada." : "Pedido recusado.");
+      notice.succeed(approve ? "Transferência aprovada." : "Pedido recusado.");
     });
   }
 
@@ -117,8 +144,8 @@ export function ManagerLiteTeam({ initialData, initialTransfers }: { initialData
                 chip="Supervisor"
                 preview={invite.email || "sem e-mail"}
                 action={<div className={styles.brokerActions}>
-                  <Button variant="outline" size="sm" disabled={pending} onClick={() => invoke(resendInviteAction, invite.id)}>Reenviar</Button>
-                  <Button variant="ghost" size="sm" disabled={pending} onClick={() => invoke(revokeInviteAction, invite.id)}>Cancelar</Button>
+                  <Button variant="outline" size="sm" disabled={pending} aria-busy={busyKey === `resend:${invite.id}` || undefined} onClick={() => invoke(resendInviteAction, invite.id)}>{busyKey === `resend:${invite.id}` ? "Reenviando…" : "Reenviar"}</Button>
+                  <Button variant="ghost" size="sm" disabled={pending} aria-busy={busyKey === `revoke:${invite.id}` || undefined} onClick={() => invoke(revokeInviteAction, invite.id)}>{busyKey === `revoke:${invite.id}` ? "Cancelando…" : "Cancelar"}</Button>
                 </div>}
               />
             ))}
@@ -126,7 +153,7 @@ export function ManagerLiteTeam({ initialData, initialTransfers }: { initialData
         ) : null}
 
         <PeopleFilters search={query} onSearch={setQuery} searchPlaceholder="Buscar corretor por nome" />
-        {feedback ? <motion.p className={styles.feedback} role="status" aria-live="polite" initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reducedMotion ? 0.12 : 0.2 }}>{feedback}</motion.p> : null}
+        <div aria-live="polite"><ActionNoticeLine notice={notice.notice} /></div>
 
         {members.length ? (
           <PeopleSection id="unit-members-title" title="Corretores" count={members.length}>
@@ -151,8 +178,8 @@ export function ManagerLiteTeam({ initialData, initialTransfers }: { initialData
                       {member.status !== "pending" ? <Link href={`/equipe/${encodeURIComponent(member.userId ?? member.id)}`} className={styles.sheetRow}><span>Ver perfil</span><small>Informações e operação</small></Link> : null}
                       {member.userId ? <Link href={`/relacionamento?brokerId=${encodeURIComponent(member.userId)}`} className={styles.sheetRow}><span>Mandar recado</span><small>Pela Central de relacionamento</small></Link> : null}
                       {member.status === "pending" && member.inviteId ? <div className={styles.sheetRow}>
-                        <Button variant="outline" size="sm" disabled={pending} onClick={() => invoke(resendInviteAction, member.inviteId!)}>Reenviar convite</Button>
-                        <Button variant="ghost" size="sm" disabled={pending} onClick={() => invoke(revokeInviteAction, member.inviteId!)}>Cancelar convite</Button>
+                        <Button variant="outline" size="sm" disabled={pending} aria-busy={busyKey === `resend:${member.inviteId}` || undefined} onClick={() => invoke(resendInviteAction, member.inviteId!)}>{busyKey === `resend:${member.inviteId}` ? "Reenviando…" : "Reenviar convite"}</Button>
+                        <Button variant="ghost" size="sm" disabled={pending} aria-busy={busyKey === `revoke:${member.inviteId}` || undefined} onClick={() => invoke(revokeInviteAction, member.inviteId!)}>{busyKey === `revoke:${member.inviteId}` ? "Cancelando…" : "Cancelar convite"}</Button>
                       </div> : null}
                     </nav>
                   </BottomSheet>}

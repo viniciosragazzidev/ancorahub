@@ -6,6 +6,8 @@ const search = vi.hoisted(() => ({ value: "" }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), usePathname: () => "/qualificacao", useSearchParams: () => new URLSearchParams(search.value) }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 vi.mock("@/components/ui/sonner", () => ({ toast }));
+const fire = vi.hoisted(() => vi.fn(() => ({ motion: false, celebrate: false })));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => fire }));
 const actions = vi.hoisted(() => ({
   updateQualificationSettingsAction: vi.fn(async () => ({})),
   toggleQualificationEnabledAction: vi.fn(async () => ({})),
@@ -75,5 +77,54 @@ describe("hub de qualificação Lite", () => {
       fireEvent.click(screen.getByRole("button", { name: "Resolver alerta" }));
     });
     expect(actions.acknowledgeAlertAction).toHaveBeenCalledWith("alert-1");
+  });
+
+  it("salvar: confirma no próprio botão só depois do servidor, sem toast", async () => {
+    render(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    });
+    expect(await screen.findByText("Alterações salvas", { selector: "span:not(.sr-only)" })).toBeInTheDocument();
+    expect(fire).toHaveBeenCalledWith("confirm", expect.anything());
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("salvar: a falha mostra a causa em português e o que continua valendo", async () => {
+    actions.updateQualificationSettingsAction.mockRejectedValueOnce(new Error("internal server error"));
+    render(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent("As alterações não foram salvas. O que você escreveu continua aqui.");
+    expect(fire).toHaveBeenCalledWith("error");
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("permissão: confirma na seção e, se falhar, oferece Tentar de novo", async () => {
+    search.value = "tab=agent_triggers";
+    actions.updateToolPermissionAction.mockRejectedValueOnce(new Error("TypeError: cannot read undefined"));
+    render(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} />);
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: /Consultar planos: permitida/ })[0]);
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("Não deu para mudar a permissão agora. Consultar planos continua permitida.");
+    expect(fire).toHaveBeenCalledWith("error");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    });
+    expect(actions.updateToolPermissionAction).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("status")).toHaveTextContent("Consultar planos: bloqueada");
+    expect(fire).toHaveBeenCalledWith("confirm");
+  });
+
+  it("follow-up: nome vazio mostra o erro no formulário, sem chamar o servidor", async () => {
+    search.value = "tab=followup_rules";
+    render(<QualificationHubLite {...QUALIFICATION_HUB_FIXTURE} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Adicionar regra" }));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("Informe o nome da regra de follow-up.");
+    expect(actions.saveFollowUpRuleAction).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

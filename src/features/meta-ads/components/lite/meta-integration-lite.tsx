@@ -4,20 +4,23 @@
  * /integrations/meta no visual Lite (Onda 7): a mesma conexão (sincronizar, revisar ativos, desconectar com
  * confirmação), os mesmos avisos de permissão, os ativos autorizados com 15 por página e o mapa de aquisição que só
  * entra no DOM quando aberto. O assistente de conexão é o mesmo da tela atual (camada com a pele Lite).
+ *
+ * Feedback (FEEDBACK.md, nível 1): sincronizar e desconectar mostram o envio no botão e confirmam no card da conexão
+ * depois do servidor (a sincronização parcial diz o motivo ali mesmo); a falha mostra a causa e "Tentar de novo".
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { ArrowRight, Power, RefreshCw, Zap } from "lucide-react";
 
 import { LiteConfirmDialog } from "@/components/lite/controls";
 import { LitePagination } from "@/components/lite/data/pagination";
 import page from "@/components/lite/page/lite-page.module.css";
-import { toast } from "@/components/ui/sonner";
 import { disconnectMetaConnection, triggerManualMetaSync } from "../../actions";
 import type { MetaConnectionAssets, MetaConnectionInfo } from "../../types";
 import { MetaMarketingWizard } from "../meta-marketing-wizard";
 import type { MetaSyncInfo } from "./meta-lite-shared";
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import styles from "./meta-lite.module.css";
 import integration from "./meta-integration-lite.module.css";
 
@@ -42,45 +45,40 @@ export function MetaIntegrationLite({ connection, assets, sync, captureModeLabel
   captureModeLabel: string | null;
   canConfigure: boolean;
 }) {
-  const [syncing, setSyncing] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
-  const [disconnecting, startDisconnecting] = useTransition();
+  const { status, run, show } = useActionStatus();
+  const syncing = status.sync?.state === "busy";
+  const disconnecting = status.disconnect?.state === "busy";
   const router = useRouter();
   const connected = connection?.status === "connected";
   const permissionWarning = getPermissionWarning(connection?.lastError);
 
   const runSync = async () => {
-    setSyncing(true);
-    try {
-      const result = await triggerManualMetaSync();
-      if (!result.success) {
-        toast.error(result.error ?? "A sincronização não foi concluída.");
-        return;
-      }
-      if (result.warnings?.length) {
-        toast.warning("Sincronização parcial da Meta.", { description: result.warnings[0]?.message });
-      } else {
-        toast.success("Ativos sincronizados.");
-      }
+    if (syncing) return;
+    const result = await run("sync", async () => {
+      const outcome = await triggerManualMetaSync();
+      if (!outcome.success) return { ok: false as const, error: outcome.error };
       router.refresh();
-    } finally {
-      setSyncing(false);
+      return outcome;
+    }, { done: "Ativos sincronizados", fallback: "A sincronização não foi concluída.", keeps: "Os ativos da última sincronização continuam valendo." });
+    // Parcial: a Meta respondeu, mas faltou algo; o motivo fica no card, junto da confirmação.
+    if (result && "warnings" in result && result.warnings?.length) {
+      show("sync", { state: "done", label: `Sincronização parcial da Meta. ${result.warnings[0]?.message ?? ""}`.trim() });
     }
   };
 
   const handleDisconnect = () => {
     if (disconnecting) return;
-    startDisconnecting(async () => {
-      try {
-        await disconnectMetaConnection();
-        setDisconnectOpen(false);
-        toast.success("Conexão de Marketing desconectada.", { description: "Ativos e captura foram liberados; o histórico foi preservado." });
-        router.refresh();
-      } catch (cause) {
-        toast.error(cause instanceof Error ? cause.message : "Não foi possível desconectar a Meta agora.");
-      }
+    void run("disconnect", async () => {
+      await disconnectMetaConnection();
+      setDisconnectOpen(false);
+      router.refresh();
+      return true;
+    }, { done: "Conexão de Marketing desconectada. Ativos e captura foram liberados; o histórico foi preservado.", fallback: "Não foi possível desconectar a Meta agora.", keeps: "A conexão continua ativa." }).then((done) => {
+      // Na falha o diálogo fecha para a causa e o "Tentar de novo" aparecerem no card da conexão.
+      if (!done) setDisconnectOpen(false);
     });
   };
 
@@ -124,8 +122,8 @@ export function MetaIntegrationLite({ connection, assets, sync, captureModeLabel
         <div className={page.toolbar}>
           {connected ? (
             <>
-              <button type="button" className={page.button} disabled={syncing || !canConfigure} onClick={() => void runSync()}>
-                <RefreshCw aria-hidden="true" size={16} /> {syncing ? "Sincronizando…" : "Sincronizar"}
+              <button type="button" className={page.button} disabled={syncing || !canConfigure} aria-busy={syncing || undefined} onClick={() => void runSync()}>
+                <BusyLabel busy={syncing} label="Sincronizando…"><RefreshCw aria-hidden="true" size={16} /> Sincronizar</BusyLabel>
               </button>
               <button type="button" className={page.button} disabled={!canConfigure} onClick={() => setWizardOpen(true)}>
                 <Zap aria-hidden="true" size={16} /> {permissionWarning ? "Reconectar permissões" : "Revisar ativos"}
@@ -141,6 +139,8 @@ export function MetaIntegrationLite({ connection, assets, sync, captureModeLabel
           )}
         </div>
 
+        {status.sync && !syncing ? <ActionNote status={status.sync} /> : null}
+        {status.disconnect && !disconnecting ? <ActionNote status={status.disconnect} /> : null}
         {permissionWarning ? (
           <div role="alert" className={integration.warning}>
             <p className={integration.noticeTitle}>Permissão de anúncios necessária</p>

@@ -4,8 +4,12 @@
  * Regras de comissão e pós-venda no visual Lite. Mesmas Server Actions (criar, editar, ativar ou desativar, excluir,
  * pós-venda), os mesmos campos do formulário (inclusive o JSON de percentuais) e as mesmas mensagens. As regras viram
  * tabela (cartões no celular), o formulário abre no painel lateral e excluir pede confirmação Lite.
+ *
+ * Feedback (FEEDBACK.md, nível 1): salvar, ativar ou desativar, excluir e o pós-venda mostram o envio no botão e
+ * confirmam na própria seção depois do servidor (a regra salva confirma na lista, quando o painel fecha); a falha
+ * mostra a causa, o que continua valendo e "Tentar de novo". Sem toast.
  */
-import { useActionState, useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Trash2 } from "lucide-react";
 
@@ -16,12 +20,12 @@ import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
 import sections from "@/components/lite/page/lite-sections.module.css";
-import { toast } from "@/components/ui/sonner";
 import { createCommissionRuleAction, deleteCommissionRuleAction, toggleCommissionRuleAction, updateCommissionRuleAction } from "@/features/commissions/actions";
 import type { CommissionRuleRecord } from "@/features/commissions/queries";
 import type { CommissionActionState } from "@/features/commissions/schema";
 import { updatePostSaleSettingsAction } from "@/features/post-sale/actions";
 
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import styles from "./commission-rules-lite.module.css";
 
 type Carrier = { id: string; name: string };
@@ -37,8 +41,10 @@ function normalize(text: string) {
   return text.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase("pt-BR");
 }
 
-function RuleForm({ rule, carriers, onDone }: { rule: CommissionRuleRecord | null; carriers: Carrier[]; onDone: () => void }) {
+function RuleForm({ rule, carriers, onDone, onSaved }: { rule: CommissionRuleRecord | null; carriers: Carrier[]; onDone: () => void; onSaved?: (label: string) => void }) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+  const { status: feedback, confirm, fail } = useActionStatus();
   const [state, formAction, pending] = useActionState<CommissionActionState, FormData>(rule ? updateCommissionRuleAction : createCommissionRuleAction, {});
   const [ruleType, setRuleType] = useState<"unica" | "escalonada">(rule?.type ?? "escalonada");
   const [months, setMonths] = useState<number[]>(() => (rule?.percentages?.length ? [...rule.percentages] : [100, 25, 5]));
@@ -46,14 +52,19 @@ function RuleForm({ rule, carriers, onDone }: { rule: CommissionRuleRecord | nul
   const [carrier, setCarrier] = useState(rule?.carrierId ?? "");
   const [plan, setPlan] = useState(rule?.planId ?? "");
 
+  // Cada resposta do servidor é tratada uma vez (o efeito pode rodar de novo sem resposta nova).
+  const handled = useRef(state);
   useEffect(() => {
+    if (handled.current === state) return;
+    handled.current = state;
     if (state.success) {
-      toast.success("Regra de comissão salva.");
+      confirm("form", "Regra salva");
+      onSaved?.(rule ? `${rule.name}: alterações salvas` : "Regra de comissão criada");
       router.refresh();
       onDone();
     }
-    if (state.error) toast.error(state.error);
-  }, [state, router, onDone]);
+    if (state.error) fail("form", state.error, { fallback: "Não deu para salvar a regra agora.", keeps: "O que você preencheu continua aqui.", retry: () => formRef.current?.requestSubmit() });
+  }, [state, router, onDone, onSaved, rule, confirm, fail]);
 
   const changeType = (value: string) => {
     const next = value as "unica" | "escalonada";
@@ -65,7 +76,7 @@ function RuleForm({ rule, carriers, onDone }: { rule: CommissionRuleRecord | nul
   const planOptions = [{ value: "", label: "Todos os planos" }, ...(carrier ? [{ value: "__all__", label: "Todos os planos desta operadora" }] : [])];
 
   return (
-    <form action={formAction} className={form.form}>
+    <form ref={formRef} action={formAction} className={form.form}>
       {rule ? <input type="hidden" name="ruleId" value={rule.id} /> : null}
       <input type="hidden" name="percentages" value={JSON.stringify(months)} />
       <input type="hidden" name="type" value={ruleType} />
@@ -134,8 +145,9 @@ function RuleForm({ rule, carriers, onDone }: { rule: CommissionRuleRecord | nul
       </fieldset>
       <div className={form.actions}>
         <button type="button" className={page.button} onClick={onDone}>Cancelar</button>
-        <button type="submit" className={page.primaryButton} disabled={pending || !valid}>{pending ? "Salvando..." : rule ? "Salvar alterações" : "Criar regra de comissão"}</button>
+        <button type="submit" className={page.primaryButton} disabled={pending || !valid} aria-busy={pending || undefined}><BusyLabel busy={pending} label="Salvando…">{rule ? "Salvar alterações" : "Criar regra de comissão"}</BusyLabel></button>
       </div>
+      {!pending && feedback.form?.state === "error" ? <ActionNote status={feedback.form} /> : null}
     </form>
   );
 }
@@ -146,8 +158,10 @@ export function CommissionRulesLite({ rules, carriers }: { rules: CommissionRule
   const [status, setStatus] = useState<StatusFilter>("all");
   const [panel, setPanel] = useState<{ rule: CommissionRuleRecord | null } | null>(null);
   const [removing, setRemoving] = useState<CommissionRuleRecord | null>(null);
-  const [pending, startTransition] = useTransition();
+  const { status: feedback, run: runAction, show } = useActionStatus();
+  const pending = feedback.rules?.state === "busy";
   const closePanel = useCallback(() => setPanel(null), []);
+  const savedInList = useCallback((label: string) => show("rules", { state: "done", label }), [show]);
   const cancelRemove = useCallback(() => setRemoving(null), []);
 
   const visible = useMemo(() => {
@@ -159,16 +173,21 @@ export function CommissionRulesLite({ rules, carriers }: { rules: CommissionRule
     });
   }, [rules, search, status]);
 
-  const run = (action: typeof toggleCommissionRuleAction, rule: CommissionRuleRecord) => startTransition(async () => {
+  const run = (action: typeof toggleCommissionRuleAction, rule: CommissionRuleRecord) => {
+    const isDelete = action === deleteCommissionRuleAction;
     const formData = new FormData();
     formData.set("ruleId", rule.id);
-    const result = await action({}, formData);
-    if (result.success) {
-      toast.success("Regra de comissão salva.");
+    void runAction("rules", async () => {
+      const result = await action({}, formData);
+      if (!result.success) return { ok: false as const, error: result.error };
       router.refresh();
-    }
-    if (result.error) toast.error(result.error);
-  });
+      return result;
+    }, {
+      done: isDelete ? `${rule.name} excluída` : `${rule.name} ${rule.active ? "desativada" : "ativada"}`,
+      fallback: isDelete ? "Não deu para excluir a regra agora." : "Não deu para mudar a regra agora.",
+      keeps: isDelete ? "A regra continua cadastrada." : `A regra continua ${rule.active ? "ativa" : "inativa"}.`,
+    });
+  };
 
   const columns: LiteColumn<CommissionRuleRecord>[] = [
     { id: "name", label: "Regra", primary: true, render: (rule) => <span className={page.cellTitle}>{rule.name}</span> },
@@ -211,6 +230,7 @@ export function CommissionRulesLite({ rules, carriers }: { rules: CommissionRule
         <header className={page.cardHead}>
           <h2 id="commission-rules-title" className={page.cardTitle}>Regras de comissão</h2>
           <p className={page.cardDescription}>Como os corretores são comissionados por operadora e plano. As regras ativas valem ao converter um lead em venda.</p>
+          {pending ? <p className={page.muted} role="status">Salvando…</p> : <ActionNote status={feedback.rules} />}
         </header>
         <div className={page.toolbar}>
           <label className={page.search}>
@@ -246,7 +266,7 @@ export function CommissionRulesLite({ rules, carriers }: { rules: CommissionRule
         />
       </section>
       <LiteSidePanel open={Boolean(panel)} onOpenChange={(open) => { if (!open) closePanel(); }} title={panel?.rule ? `Editar: ${panel.rule.name}` : "Nova regra de comissão"} description="Percentuais de repasse para as vendas realizadas.">
-        {panel ? <RuleForm key={panel.rule?.id ?? "new"} rule={panel.rule} carriers={carriers} onDone={closePanel} /> : null}
+        {panel ? <RuleForm key={panel.rule?.id ?? "new"} rule={panel.rule} carriers={carriers} onDone={closePanel} onSaved={savedInList} /> : null}
       </LiteSidePanel>
       <LiteConfirmDialog
         open={Boolean(removing)}
@@ -268,13 +288,15 @@ export function CommissionRulesLite({ rules, carriers }: { rules: CommissionRule
 export function PostSaleSettingsLite({ chargebackWindowDays, active }: { chargebackWindowDays: number; active: boolean }) {
   const [days, setDays] = useState(String(chargebackWindowDays));
   const [enabled, setEnabled] = useState(active);
-  const [pending, startTransition] = useTransition();
+  const { status, run } = useActionStatus();
+  const pending = status.postSale?.state === "busy";
   return (
     <section className={sections.group} aria-labelledby="post-sale-title">
       <div className={sections.row}>
         <div className={sections.rowText}>
           <h2 id="post-sale-title" className={sections.rowTitle}>Pós-venda e chargeback</h2>
           <p className={sections.rowDescription}>Controla apenas a sinalização de possíveis estornos. O sistema nunca desconta dinheiro automaticamente.</p>
+          {pending ? null : <ActionNote status={status.postSale} />}
         </div>
       </div>
       <div className={sections.formBody}>
@@ -291,13 +313,16 @@ export function PostSaleSettingsLite({ chargebackWindowDays, active }: { chargeb
             type="button"
             className={page.button}
             disabled={pending}
-            onClick={() => startTransition(async () => {
-              const result = await updatePostSaleSettingsAction({ chargebackWindowDays: Number(days), active: enabled });
-              if (result.error) toast.error(result.error);
-              else toast.success("Configuração de pós-venda salva.");
-            })}
+            aria-busy={pending || undefined}
+            onClick={() => {
+              const payload = { chargebackWindowDays: Number(days), active: enabled };
+              void run("postSale", async () => {
+                const result = await updatePostSaleSettingsAction(payload);
+                return result.error ? { ok: false as const, error: result.error } : result;
+              }, { done: "Configuração de pós-venda salva", fallback: "Não deu para salvar a configuração agora.", keeps: "A configuração anterior continua valendo." });
+            }}
           >
-            {pending ? "Salvando..." : "Salvar configuração"}
+            <BusyLabel busy={pending} label="Salvando…">Salvar configuração</BusyLabel>
           </button>
         </div>
       </div>

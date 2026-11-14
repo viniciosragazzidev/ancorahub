@@ -4,6 +4,9 @@
  * "Integrações" no visual Lite: fontes de captura (webhooks e pixels). Mesmas Server Actions (criar, ativar ou
  * desativar, revogar), mesma atualização otimista, mesmo teste pelo endpoint público e o mesmo snippet. Revogar pede
  * confirmação Lite; a nova fonte e a ajuda abrem no painel lateral. A origem do snippet é lida depois da hidratação.
+ *
+ * Feedback (FEEDBACK.md, nível 1): criar, ativar ou desativar, revogar e o lead de teste confirmam na própria seção
+ * depois do servidor; a falha desfaz a mudança otimista e mostra a causa com "Tentar de novo". Sem toast.
  */
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
@@ -14,10 +17,12 @@ import { LiteConfirmDialog, LiteSelect } from "@/components/lite/controls";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
-import { toast } from "@/components/ui/sonner";
 
 import { createIntegrationAction, revokeIntegrationAction, toggleIntegrationAction, type IntegrationRecord } from "../../integrations-actions";
 import styles from "@/components/lite/page/lite-sections.module.css";
+import { useFeedback } from "@/lib/feedback/use-feedback";
+
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 
 type Branch = { id: string; name: string };
 
@@ -52,6 +57,8 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
   const testPhoneRef = useRef<HTMLInputElement>(null);
   const testEmailRef = useRef<HTMLInputElement>(null);
   const cancelRevoke = useCallback(() => setConfirmRevoke(false), []);
+  const fire = useFeedback();
+  const { status: feedback, confirm, fail, clear } = useActionStatus();
 
   useEffect(() => {
     setList(integrations);
@@ -65,6 +72,7 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
     const branchId = String(formData.get("branchId") ?? "") || null;
     const optimistic: IntegrationRecord = { id: `temp-${crypto.randomUUID()}`, name: String(formData.get("name") ?? "Nova fonte"), source: String(formData.get("source") ?? "site_pixel"), branchId, branchName: branchName(branchId), status: "active", tokenPrefix: "sincronizando⬦", createdAt: new Date() };
     setCreatePending(true);
+    clear("sources");
     setList((current) => [optimistic, ...current]);
     setSelectedId(optimistic.id);
     setCreateOpen(false);
@@ -74,12 +82,12 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
       setList((current) => current.map((item) => item.id === optimistic.id ? { ...result.integration!, branchName: branchName(result.integration!.branchId) } : item));
       setSelectedId(result.integration.id);
       setRevealedToken(result.token ?? null);
-      toast.success("Fonte de captura criada.");
+      confirm("sources", "Fonte de captura criada. O token completo aparece só agora.");
       router.refresh();
     } catch (error) {
       setList(previous);
       setSelectedId(previous[0]?.id ?? null);
-      toast.error(error instanceof Error ? error.message : "Não foi possível criar a integração.");
+      fail("sources", error, { fallback: "Não foi possível criar a integração.", keeps: "As outras fontes continuam como estavam.", retry: () => void handleCreate(formData) });
     } finally {
       setCreatePending(false);
     }
@@ -87,18 +95,20 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
 
   async function handleToggle(id: string) {
     const previous = list;
+    const wasActive = previous.find((item) => item.id === id)?.status === "active";
     setTogglePendingId(id);
+    clear("config");
     setList((current) => current.map((item) => item.id === id ? { ...item, status: item.status === "active" ? "revoked" : "active" } : item));
     try {
       const formData = new FormData();
       formData.set("id", id);
       const result = await toggleIntegrationAction(formData);
       if (!result.success) throw new Error(result.error ?? "Não foi possível atualizar o status.");
-      toast.success("Status da integração atualizado.");
+      confirm("config", wasActive ? "Recebimento desativado" : "Recebimento ativado");
       router.refresh();
     } catch (error) {
       setList(previous);
-      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o status.");
+      fail("config", error, { fallback: "Não foi possível atualizar o status.", keeps: wasActive ? "A fonte continua aceitando leads." : "A fonte continua bloqueada.", retry: () => void handleToggle(id) });
     } finally {
       setTogglePendingId(null);
     }
@@ -106,16 +116,17 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
 
   async function handleRevoke(id: string) {
     setRevokePendingId(id);
+    clear("sources");
     try {
       const formData = new FormData();
       formData.set("id", id);
       await revokeIntegrationAction(formData);
       setList((current) => current.filter((item) => item.id !== id));
       setSelectedId(null);
-      toast.success("Integração revogada.");
+      confirm("sources", "Integração revogada");
       router.refresh();
-    } catch {
-      toast.error("Não foi possível revogar a integração.");
+    } catch (error) {
+      fail("sources", error, { fallback: "Não foi possível revogar a integração.", keeps: "A fonte continua recebendo leads.", retry: () => void handleRevoke(id) });
     } finally {
       setRevokePendingId(null);
     }
@@ -126,6 +137,7 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
     if (!selected || !revealedToken) return;
     setTestStatus("loading");
     setTestResult(null);
+    fire("tap");
     try {
       const response = await fetch("/api/webhooks/leads/" + encodeURIComponent(revealedToken), {
         method: "POST",
@@ -136,12 +148,14 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
       if (data.success) {
         setTestStatus("success");
         setTestResult({ leadId: data.data?.leadId });
-        toast.success("Lead de teste criado com sucesso!");
+        fire("confirm");
       } else {
+        fire("error");
         setTestStatus("error");
         setTestResult({ code: data.error?.code, message: data.error?.message });
       }
     } catch {
+      fire("error");
       setTestStatus("error");
       setTestResult({ code: "NETWORK_ERROR", message: "Sem conexão com o servidor." });
     }
@@ -193,6 +207,7 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
             <div className={styles.rowText}>
               <h3 id="sources-title" className={styles.rowTitle}>Fontes de captura</h3>
               <p className={styles.rowDescription}>Webhooks e pixels que criam leads automaticamente.</p>
+              {createPending ? <p className={styles.note} role="status">Gerando token…</p> : revokePendingId ? <p className={styles.note} role="status">Revogando…</p> : <ActionNote status={feedback.sources} />}
             </div>
             <div className={styles.actions}>
               <button type="button" className={page.iconButton} aria-label="Como integrar em um site externo" onClick={() => setHelpOpen(true)}>
@@ -246,9 +261,10 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
               <div className={styles.rowText}>
                 <p className={styles.rowTitle}>Recebimento</p>
                 <p className={styles.rowDescription}>{selected.status === "active" ? "Aceitando novos leads" : "Bloqueado"}</p>
+                <ActionNote status={feedback.config} />
               </div>
-              <button type="button" className={page.button} disabled={togglePendingId === selected.id} onClick={() => handleToggle(selected.id)}>
-                {selected.status === "active" ? "Desativar" : "Ativar"}
+              <button type="button" className={page.button} disabled={togglePendingId === selected.id} aria-busy={togglePendingId === selected.id || undefined} onClick={() => handleToggle(selected.id)}>
+                <BusyLabel busy={togglePendingId === selected.id} label="Salvando…">{selected.status === "active" ? "Desativar" : "Ativar"}</BusyLabel>
               </button>
             </div>
             <div className={styles.formBody}>
@@ -289,8 +305,8 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
                       <input ref={testEmailRef} className={form.input} type="email" placeholder="teste@email.com" />
                     </label>
                     <div>
-                      <button type="submit" className={page.primaryButton} disabled={testStatus === "loading"}>
-                        {testStatus === "loading" ? "Enviando..." : "Enviar lead de teste"}
+                      <button type="submit" className={page.primaryButton} disabled={testStatus === "loading"} aria-busy={testStatus === "loading" || undefined}>
+                        <BusyLabel busy={testStatus === "loading"} label="Enviando…">Enviar lead de teste</BusyLabel>
                       </button>
                     </div>
                     {testStatus === "success" && testResult ? (
@@ -327,7 +343,7 @@ export function IntegrationsLite({ integrations, branches }: { integrations: Int
           <input type="hidden" name="branchId" value={newBranch} />
           <div className={form.actions}>
             <button type="button" className={page.button} disabled={createPending} onClick={() => setCreateOpen(false)}>Cancelar</button>
-            <button type="submit" className={page.primaryButton} disabled={createPending}>{createPending ? "Gerando token..." : "Gerar token"}</button>
+            <button type="submit" className={page.primaryButton} disabled={createPending} aria-busy={createPending || undefined}><BusyLabel busy={createPending} label="Gerando token…">Gerar token</BusyLabel></button>
           </div>
         </form>
       </LiteSidePanel>

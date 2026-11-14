@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/arc/button/button";
 import { Badge } from "@/components/arc/badge/badge";
-import type { ChatServerActionName } from "@/components/chat/types";
-import { runChatServerAction, type ChatServerActionResult } from "@/features/broker-workspace/chat/chat-actions";
+import { LiteSuccess } from "@/components/lite/motion/success";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 
+import { AgendaNotice } from "./agenda-notice";
 import { formatAgendaWhen } from "./format";
+import { useAgendaAction } from "./use-agenda-action";
 import { useMinuteClock } from "./use-minute-clock";
 
 const MAX_ITEMS = 4;
@@ -22,29 +22,14 @@ export function Agenda({ items, maxItems = MAX_ITEMS, interactive = false, headi
   interactive?: boolean;
   heading?: string;
 }) {
-  type UndoAction = NonNullable<ChatServerActionResult["undo"]>["action"];
-  const router = useRouter();
   const now = useMinuteClock();
   const visible = maxItems === null ? items : items.slice(0, maxItems);
   const showAllLink = maxItems !== null && items.length > maxItems;
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ message: string; undo?: UndoAction } | null>(null);
+  const { busyId, done, notice, execute: run, retry } = useAgendaAction();
 
-  async function execute(id: string, name: ChatServerActionName, payload: Record<string, unknown>) {
-    setBusyId(id);
-    try {
-      const result = await runChatServerAction(name, payload);
-      setNotice({ message: result.message, undo: result.ok ? result.undo?.action : undefined });
-      if (result.ok) {
-        setReschedulingId(null);
-        router.refresh();
-      }
-    } catch {
-      setNotice({ message: "Não consegui atualizar este retorno. Tente de novo." });
-    } finally {
-      setBusyId(null);
-    }
+  async function execute(id: string, name: Parameters<typeof run>[1], payload: Record<string, unknown>) {
+    if (await run(id, name, payload)) setReschedulingId(null);
   }
 
   return (
@@ -57,12 +42,7 @@ export function Agenda({ items, maxItems = MAX_ITEMS, interactive = false, headi
           </Link>
         ) : null}
       </div>
-      {notice ? (
-        <p className="flex flex-wrap items-center gap-3 rounded-2xl bg-(--surface-muted) px-4 py-3 text-sm text-(--text-secondary)" role="status" aria-live="polite">
-          <span>{notice.message}</span>
-          {notice.undo ? <Button size="sm" variant="secondary" loading={busyId === "undo"} onClick={() => execute("undo", notice.undo!.name, notice.undo!.payload)}>Desfazer</Button> : null}
-        </p>
-      ) : null}
+      <AgendaNotice notice={notice} busyId={busyId} onUndo={(name, payload) => void execute("undo", name, payload)} onRetry={retry} />
       {visible.length === 0 ? (
         <p className="rounded-3xl bg-(--surface-muted) p-5 text-sm text-(--text-secondary) shadow-(--shadow-resting)">
           Nenhum compromisso agendado. Retornos e tarefas com data aparecem aqui.
@@ -85,7 +65,11 @@ export function Agenda({ items, maxItems = MAX_ITEMS, interactive = false, headi
                     {overdue ? <Badge tone="warning" size="sm">Atrasada</Badge> : null}
                   </span>
                 </div>
-                {interactive ? (
+                {interactive && done?.id === item.id ? (
+                  <div className="flex min-h-9 items-center text-sm font-medium text-(--success)">
+                    <LiteSuccess label={done.label} />
+                  </div>
+                ) : interactive ? (
                   <div className="grid justify-items-start gap-2">
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" variant="secondary" loading={busyId === item.id} disabled={busyId !== null} onClick={() => execute(item.id, "lead.completeReturn", { taskId: item.id })}>Concluir</Button>

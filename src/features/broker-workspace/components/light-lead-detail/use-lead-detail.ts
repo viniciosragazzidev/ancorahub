@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { useSuccessOverlay } from "@/components/motion/success-overlay";
-import { normalizeActionError } from "@/lib/feedback/action-error";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
 import { useFeedback } from "@/lib/feedback/use-feedback";
 import { startLeadServiceAction } from "@/app/(dashboard)/leads/[id]/service-action";
 import { declineLeadAction } from "@/features/leads/decline-action";
@@ -21,6 +21,8 @@ import { buildFollowUpWhen, type FollowUpOptionValue } from "@/features/broker-w
 import { runOptimistic } from "@/lib/optimistic-core";
 import { STEP_OPTIONS, type ConfirmationDocument, type LightLeadDetailData, type LiteRequirement } from "./types";
 
+const DECLINE_ERROR = "Não deu para devolver o lead agora";
+const DECLINE_KEEPS = "O lead continua com você";
 const STEP_ERROR_GENERIC = "Não deu para mudar a etapa agora. Tente de novo em instantes.";
 /** Server reasons the broker can act on; anything else (internal or IA diagnosis) stays generic. */
 const STEP_ERROR_REASONS = [
@@ -63,6 +65,9 @@ export function useLeadDetail({
     const [showDeclineModal, setShowDeclineModal] = useState(false);
     const [declineReason, setDeclineReason] = useState<string>("");
     const [declining, startDeclineTransition] = useTransition();
+    // Recusa (nível 1): a confirmação e o erro ficam na própria folha, sem toast.
+    const [declined, setDeclined] = useState(false);
+    const [declineError, setDeclineError] = useState<string | null>(null);
 
     const [showUpdateSheet, setShowUpdateSheet] = useState(false);
     const [selectedStep, setSelectedStep] = useState<string>("quote_sent");
@@ -72,6 +77,9 @@ export function useLeadDetail({
     const [lossReason, setLossReason] = useState<string>("preco");
     const [regressionJustification, setRegressionJustification] = useState<string>("");
     const [updatingStep, startUpdateTransition] = useTransition();
+    // Mudar etapa (nível 1): o resultado aparece em "Etapa atual" e o erro na folha, sem toast.
+    const [stepNotice, setStepNotice] = useState<{ id: number; tone: "success" | "warning"; text: string } | null>(null);
+    const [stepError, setStepError] = useState<string | null>(null);
 
     // SLA Live Countdown calculation
     const [slaRemainingMinutes, setSlaRemainingMinutes] = useState<number | null>(null);
@@ -149,6 +157,7 @@ export function useLeadDetail({
       setCustomFollowupDate("");
       setObservation("");
       setRegressionJustification("");
+      setStepError(null);
       setShowUpdateSheet(true);
     }
 
@@ -220,25 +229,29 @@ export function useLeadDetail({
     }
 
     // Handle Decline Lead
+    // Nível 1: "Recusando…" no botão e o check "Lead devolvido" na folha, só depois que o servidor confirma.
     function handleConfirmDecline() {
-      if (declining || !declineReason) return;
-      const formData = new FormData();
-      formData.append("leadId", lead.id);
-      formData.append("motivoRecusa", declineReason);
+      if (declining || declined || !declineReason) return;
+      setDeclineError(null);
+      fire("tap");
 
       startDeclineTransition(async () => {
+        let res: Awaited<ReturnType<typeof declineLeadAction>> | null = null;
+        let failure: unknown = null;
         try {
-          const res = await declineLeadAction(lead.id, declineReason);
-          if (!res.success) {
-            toast.error("Não deu para devolver o lead agora. Tente de novo em instantes.");
-            return;
-          }
-
-          toast.info("Lead devolvido. Outro corretor assumirá o atendimento.");
-          router.push("/minha-fila");
-        } catch {
-          toast.error("Não deu para devolver o lead agora. Tente de novo em instantes.");
+          res = await declineLeadAction(lead.id, declineReason);
+        } catch (error) {
+          failure = error;
         }
+        if (!res?.success) {
+          fire("error");
+          setDeclineError(actionErrorMessage(normalizeActionError(res ?? failure, DECLINE_ERROR), DECLINE_KEEPS));
+          return;
+        }
+
+        fire("confirm");
+        setDeclined(true);
+        router.push("/minha-fila");
       });
     }
 
@@ -253,8 +266,9 @@ export function useLeadDetail({
         ? buildFollowUpWhen(followupOption, customFollowupDate)
         : null;
 
+      setStepError(null);
       if (shouldScheduleFollowup && !followupWhen) {
-        toast.error("Escolha uma data para o próximo acompanhamento.");
+        setStepError("Escolha uma data para o próximo acompanhamento.");
         return;
       }
 
@@ -275,9 +289,7 @@ export function useLeadDetail({
       // Proteção de Regressão da IA
       if (potentialSaleCheck.isPotentialSale && isSelectedStepRegression) {
         if (regressionJustification.trim().length < 15) {
-          toast.error(
-            "Esse lead parecia perto de fechar. Conte em poucas palavras por que ele voltou de etapa, com pelo menos 15 caracteres.",
-          );
+          setStepError("Esse lead parecia perto de fechar. Conte em poucas palavras por que ele voltou de etapa, com pelo menos 15 caracteres.");
           return;
         }
         formData.append("justificativaRegressao", regressionJustification.trim());
@@ -298,6 +310,8 @@ export function useLeadDetail({
       // (estado de transição só aparece no fim). Se o servidor recusar, a etapa volta e a folha
       // reabre com o que o corretor escreveu, junto do aviso.
       const previousStatus = leadStatus;
+      setStepNotice(null);
+      fire("tap");
       const change = runOptimistic({
         apply: () => {
           setLeadStatus(targetStatus);
@@ -314,7 +328,9 @@ export function useLeadDetail({
       startUpdateTransition(async () => {
         const outcome = await change;
         if (!outcome.ok) {
-          toast.error(outcome.value ? stepErrorMessage(outcome.value.error) : STEP_ERROR_GENERIC);
+          // A etapa já voltou e a folha reabriu com o que o corretor escreveu: a causa fica nela.
+          fire("error");
+          setStepError(`${outcome.value ? stepErrorMessage(outcome.value.error) : STEP_ERROR_GENERIC} A etapa continua como estava.`);
           return;
         }
         resetStepDialog();
@@ -326,13 +342,14 @@ export function useLeadDetail({
             const reminder = await quickReminderAction({}, reminderForm);
             if (!reminder.success) throw new Error("reminder");
           } catch {
-            toast.warning("Etapa atualizada, mas não deu para marcar o acompanhamento.", {
-              description: "Tente de novo em instantes ou marque o retorno pela ficha do lead.",
-            });
+            fire("warning");
+            setStepNotice({ id: Date.now(), tone: "warning", text: "Etapa atualizada. O acompanhamento não foi marcado: marque o retorno pela ficha." });
             return;
           }
         }
-        toast.success(followupWhen ? "Etapa e acompanhamento registrados." : "Etapa atualizada.");
+        // Mudar etapa é ação de dezenas por dia: vibração de confirmação, sem som.
+        fire("confirm");
+        setStepNotice({ id: Date.now(), tone: "success", text: followupWhen ? "Etapa e acompanhamento registrados" : "Etapa atualizada" });
       });
     }
 
@@ -449,6 +466,8 @@ export function useLeadDetail({
     accepting,
     showDeclineModal,
     setShowDeclineModal,
+    declined,
+    declineError,
     declineReason,
     setDeclineReason,
     declining,
@@ -467,6 +486,8 @@ export function useLeadDetail({
     regressionJustification,
     setRegressionJustification,
     updatingStep,
+    stepNotice,
+    stepError,
     slaRemainingMinutes,
     potentialSaleCheck,
     isSelectedStepRegression,

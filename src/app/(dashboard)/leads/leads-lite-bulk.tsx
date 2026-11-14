@@ -12,6 +12,8 @@ import { LiteBulkBar, LiteConfirmDialog, type BulkAction } from "@/components/li
 import { BulkStatusDialog } from "@/components/ui/bulk-status-dialog";
 import { BulkReassignDialog, type BulkMode } from "@/components/ui/bulk-reassign-dialog";
 import { toast } from "@/components/ui/sonner";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 
 import { bulkChangeLeadStatusAction, bulkRevertToQualificationAction } from "./status-actions";
 import { buildPostSaleAudienceHref } from "@/features/post-sale-audit/bulk-navigation";
@@ -37,6 +39,7 @@ export function LeadsLiteBulk({ selectedIds, onClear, config }: { selectedIds: s
   const canManage = role === "director" || role === "manager";
   const count = selectedIds.length;
   const postSaleHref = config.postSaleEnabled ? buildPostSaleAudienceHref(selectedIds) : null;
+  const fire = useFeedback();
 
   const actions: BulkAction[] = [];
   if (canManage) {
@@ -50,25 +53,36 @@ export function LeadsLiteBulk({ selectedIds, onClear, config }: { selectedIds: s
   actions.push({ id: "export", label: "Exportar CSV", shortLabel: "Exportar", onRun: () => alert(`Exportando ${count} lead(s)...`) });
 
   const cancelRevert = useCallback(() => setConfirmRevert(false), []);
-  const runRevert = () => {
-    setConfirmRevert(false);
-    const ids = [...selectedIds];
+  // Feedback nível 1 (FEEDBACK.md): o toque vibra; o resultado vem do servidor. Lote mexe em vários leads e a
+  // barra some com a seleção, então o resultado fica no toast; o erro é normalizado e traz "Tentar de novo".
+  const revertIds = (ids: string[]) => {
+    fire("tap");
     startRevert(async () => {
       const formData = new FormData();
       for (const id of ids) formData.append("leadIds", id);
+      const failed = (cause: unknown) => {
+        fire("error");
+        const message = actionErrorMessage(normalizeActionError(cause, "Não consegui devolver os leads agora"), "Eles continuam com os corretores");
+        toast.error(message, { action: { label: "Tentar de novo", onClick: () => revertIds(ids) } });
+      };
       try {
         const result = await bulkRevertToQualificationAction({}, formData);
         if (result.error) {
-          toast.error(result.error);
+          failed(result);
           return;
         }
+        fire("confirm");
         toast.success(result.message ?? "Leads devolvidos à fila de qualificação.");
         if (result.changedLeadIds?.length) config.onRevertCommitted?.({ leadIds: result.changedLeadIds });
-      } catch {
+      } catch (error) {
         // Falha de rede ou do servidor: o mesmo aviso de erro, sem deixar a promessa solta.
-        toast.error("Não foi possível devolver os leads para a qualificação. Tente de novo.");
+        failed(error);
       }
     });
+  };
+  const runRevert = () => {
+    setConfirmRevert(false);
+    revertIds([...selectedIds]);
   };
 
   return (

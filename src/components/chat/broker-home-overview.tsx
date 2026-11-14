@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useLightAvailabilityContext } from "@/components/light/light-availability-context";
 import { Button as ActionButton } from "@/components/ui/button";
-import { LitePress } from "@/components/lite/motion";
+import { LitePress, LiteSuccess } from "@/components/lite/motion";
 import { PresenceCalloutList } from "./presence-callout";
 import type { HomeSummary } from "./chat-home";
 import type { HomeNowItem, PresenceAskView, ThreadSummary } from "./types";
@@ -125,6 +125,9 @@ export function BrokerHomeOverview({
   const expiresAt = focus && "expiresAt" in focus ? focus.expiresAt : undefined;
   const expired = Boolean(expiresAt && Date.parse(expiresAt) <= clock);
   const paused = shell?.availability === "paused";
+  // "Ficar disponível" daqui: a confirmação e o erro aparecem no próprio aviso (nível 1, sem toast).
+  const [resumeAsked, setResumeAsked] = useState(false);
+  const resumeFailed = resumeAsked && paused && !shell?.isPending && Boolean(shell?.error);
   const tools =
     shell?.homeTools?.filter((item) =>
       ["/clientes", "/cotacao", "/plantoes"].includes(item.href),
@@ -170,10 +173,18 @@ export function BrokerHomeOverview({
               <Button
                 variant="secondary"
                 loading={shell?.isPending}
-                onClick={() => shell?.setStatus("available")}
+                onClick={() => {
+                  setResumeAsked(true);
+                  shell?.setStatus("available", { inlineError: true });
+                }}
               >
-                Ficar disponível
+                {resumeFailed ? "Tentar de novo" : "Ficar disponível"}
               </Button>
+              {resumeFailed ? <p role="alert">{shell?.error}</p> : null}
+            </div>
+          ) : resumeAsked ? (
+            <div className={layout.availability}>
+              <LiteSuccess label="Você está disponível. Novas ofertas voltam a chegar." />
             </div>
           ) : null}
           <PresenceCalloutList asks={presenceAsks} />

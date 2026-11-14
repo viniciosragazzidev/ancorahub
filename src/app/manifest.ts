@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Plataforma de Gestão de Leads e Qualificação IA da Âncora Saúde.",
     start_url: "/",
     display: "standalone",
-    // Mesmo azul da splash (MASCOTE.md §5): a tela do PWA instalado emenda com a splash sem piscar.
+    // Mesmo azul da splash: a tela do PWA instalado emenda com a splash sem piscar.
     background_color: "#002b73",
     theme_color: "#16A34A",
     orientation: "portrait-primary",

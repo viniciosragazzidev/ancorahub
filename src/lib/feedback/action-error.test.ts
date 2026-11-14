@@ -13,6 +13,8 @@ describe("normalizeActionError", () => {
     expect(normalizeActionError(new TypeError("Cannot read properties of undefined (reading 'id')")).cause).toBe(DEFAULT_ACTION_ERROR);
     expect(normalizeActionError({ ok: false, error: "Internal server error" }).cause).toBe(DEFAULT_ACTION_ERROR);
     expect(normalizeActionError("duplicate key value violates constraint {lead_pkey}").cause).toBe(DEFAULT_ACTION_ERROR);
+    expect(normalizeActionError(new ReferenceError("onSaved is not defined")).cause).toBe(DEFAULT_ACTION_ERROR);
+    expect(normalizeActionError("save is not a function").cause).toBe(DEFAULT_ACTION_ERROR);
   });
 
   it("names a lost connection", () => {

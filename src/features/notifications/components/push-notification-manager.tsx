@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "@/components/ui/sonner";
+import { LiteSuccess } from "@/components/lite/motion/success";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 
 import { Bell, BellRinging, CheckCircle } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
@@ -33,11 +36,21 @@ type PushNotificationManagerProps = {
   onSubscribed?: () => void;
 };
 
+/** Resultado da última ação, mostrado no próprio cartão (sem toast repetindo). */
+type PushNotice = { tone: "ok" | "error"; text: string; retry?: "subscribe" | "unsubscribe" };
+
+/**
+ * Feedback nível 1 (docs/design-system/FEEDBACK.md): ativar e desativar confirmam no próprio cartão só depois
+ * do navegador e do servidor, com vibração de confirmação; a falha diz a causa normalizada, o que continua
+ * valendo e o mesmo botão vira "Tentar de novo". O envio de teste é trabalho externo e fica no toast.
+ */
 export function PushNotificationManager({
   variant = "card",
   onSubscribed,
 }: PushNotificationManagerProps) {
   const reduceMotion = useReducedMotion();
+  const fire = useFeedback();
+  const [notice, setNotice] = useState<PushNotice | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscriptionCount, setSubscriptionCount] = useState(0);
   const [message, setMessage] = useState("");
@@ -85,20 +98,25 @@ export function PushNotificationManager({
       hasVapidPublicKey: Boolean(vapidPublicKey),
     });
     if (availability === "unsupported") return;
+    const fail = (cause: unknown, fallback: string) => {
+      setNotice({ tone: "error", text: actionErrorMessage(normalizeActionError(cause, fallback), "As notificações continuam desligadas neste aparelho"), retry: "subscribe" });
+      fire("error");
+    };
     setLoading(true);
+    setNotice(null);
+    fire("tap");
     try {
       if (availability === "blocked") {
+        // A tela passa a explicar o bloqueio e como liberar (cartão e aviso de "bloqueado").
         setPermission("denied");
-        toast.error("As notificações estão bloqueadas neste navegador.", {
-          description: "Libere a permissão nas configurações do navegador para ativá-las.",
-        });
+        fire("error");
         return;
       }
 
       const registration = await navigator.serviceWorker.ready;
       const vapidKey = vapidPublicKey;
       if (!vapidKey) {
-        toast.error("Notificações push não estão disponíveis nesta instalação.");
+        fail(null, "As notificações não estão disponíveis nesta instalação");
         return;
       }
 
@@ -108,21 +126,20 @@ export function PushNotificationManager({
       });
       const result = await subscribeUserAction(JSON.parse(JSON.stringify(subscription)));
       if (!result.success) {
-        toast.error(result.error ?? "Não foi possível ativar as notificações.");
+        fail(result, "Não consegui ativar as notificações");
         return;
       }
 
       setIsSubscribed(true);
       setSubscriptionCount(1);
       setPermission(Notification.permission);
+      setNotice({ tone: "ok", text: "Notificações ativadas neste aparelho." });
+      fire("confirm");
       onSubscribed?.();
-      toast.success("Notificações ativadas", {
-        description: "Você receberá alertas mesmo com o CorreTop fechado.",
-      });
     } catch (error) {
       // The browser's own message (bad key, push service down) means nothing to the broker.
       console.error("[push] subscribe failed", error);
-      toast.error("Push indisponível agora.", { description: "Tente de novo em alguns minutos ou fale com o suporte." });
+      fail(null, "Push indisponível agora. Tente em alguns minutos");
     } finally {
       setLoading(false);
     }
@@ -130,6 +147,8 @@ export function PushNotificationManager({
 
   const unsubscribe = async () => {
     setLoading(true);
+    setNotice(null);
+    fire("tap");
     try {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
@@ -140,9 +159,11 @@ export function PushNotificationManager({
       setIsSubscribed(false);
       setSubscriptionCount(0);
       setShowControls(false);
-      toast.success("Notificações desativadas");
-    } catch {
-      toast.error("Não foi possível desativar as notificações.");
+      setNotice({ tone: "ok", text: "Notificações desativadas neste aparelho." });
+      fire("confirm");
+    } catch (error) {
+      setNotice({ tone: "error", text: actionErrorMessage(normalizeActionError(error, "Não consegui desativar as notificações"), "Elas continuam ligadas neste aparelho"), retry: "unsubscribe" });
+      fire("error");
     } finally {
       setLoading(false);
     }
@@ -157,13 +178,16 @@ export function PushNotificationManager({
     try {
       const result = await sendTestNotificationAction(message);
       if (!result.success) {
-        toast.error(result.error ?? "Falha ao enviar a notificação.");
+        toast.error(normalizeActionError(result, "O teste não foi enviado").cause);
+        fire("error");
         return;
       }
       setMessage("");
+      // Trabalho externo (o aviso chega pelo serviço de push): o toast fica.
       toast.success("Notificação enviada", { description: `${result.sent} dispositivo(s) notificado(s).` });
-    } catch {
-      toast.error("Erro ao enviar a notificação de teste.");
+    } catch (error) {
+      toast.error(normalizeActionError(error, "O teste não foi enviado").cause);
+      fire("error");
     } finally {
       setLoading(false);
     }
@@ -177,6 +201,13 @@ export function PushNotificationManager({
     hasVapidPublicKey: Boolean(vapidPublicKey),
   });
   const isSupported = availability !== "unsupported";
+  const noticeNode = notice ? (
+    notice.tone === "ok"
+      ? <p className="text-xs font-medium text-success"><LiteSuccess label={notice.text} /></p>
+      : <p role="alert" className="text-xs leading-5 text-destructive">{notice.text}</p>
+  ) : null;
+  const retrySubscribe = notice?.tone === "error" && notice.retry === "subscribe";
+  const retryUnsubscribe = notice?.tone === "error" && notice.retry === "unsubscribe";
 
   if (variant === "compact") {
     if (checking) return null;
@@ -189,8 +220,9 @@ export function PushNotificationManager({
         layout
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
       >
+        {!showBanner && notice?.tone === "ok" ? <div className="mx-4 mb-3 mt-3">{noticeNode}</div> : null}
         {showBanner && (
-          <div className="mx-4 mb-3 mt-3 flex items-center gap-3 rounded-lg border border-border/80 bg-card px-3 py-3">
+          <div className="mx-4 mb-3 mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-border/80 bg-card px-3 py-3">
             <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
               <BellRinging className="size-4" />
             </span>
@@ -207,9 +239,10 @@ export function PushNotificationManager({
             {!isBlocked && (
               <Button size="xs" onClick={() => void subscribe()} disabled={loading} className="shrink-0 gap-1.5">
                 <BellRinging className="size-3" />
-                {loading ? "Ativando" : "Ativar"}
+                {loading ? "Ativando" : retrySubscribe ? "Tentar de novo" : "Ativar"}
               </Button>
             )}
+            {notice?.tone === "error" ? <div className="basis-full">{noticeNode}</div> : null}
           </div>
         )}
       </motion.div>
@@ -319,15 +352,16 @@ export function PushNotificationManager({
                         disabled={loading}
                         className="w-full"
                       >
-                        {loading ? "Desativando..." : "Desativar notificações"}
+                        {loading ? "Desativando…" : retryUnsubscribe ? "Tentar de novo" : "Desativar notificações"}
                       </Button>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
+              {noticeNode}
             </>
           ) : (
-            <><p className="text-xs leading-5 text-muted-foreground">Ative para receber avisos de novos leads, tarefas urgentes e atualizações importantes em tempo real.</p><Button size="sm" onClick={() => void subscribe()} disabled={loading} className="w-full gap-1.5">{loading ? "Ativando..." : <><BellRinging className="size-3.5" />Ativar notificações</>}</Button></>
+            <><p className="text-xs leading-5 text-muted-foreground">Ative para receber avisos de novos leads, tarefas urgentes e atualizações importantes em tempo real.</p><Button size="sm" onClick={() => void subscribe()} disabled={loading} className="w-full gap-1.5">{loading ? "Ativando…" : retrySubscribe ? "Tentar de novo" : <><BellRinging className="size-3.5" />Ativar notificações</>}</Button>{noticeNode}</>
           )}
         </CardContent>
       </Card>

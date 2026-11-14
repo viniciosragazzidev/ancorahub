@@ -8,11 +8,17 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock("../actions", () => actions);
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
-vi.mock("@/components/ui/sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("@/components/ui/sonner", () => ({ toast }));
+const fire = vi.hoisted(() => vi.fn(() => ({ motion: false, celebrate: false })));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => fire }));
 
 import { TeamInviteLite, inviteMessage } from "./team-invite-lite";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 const branches = [{ id: "11111111-1111-4111-8111-111111111111", name: "Centro" }];
 
@@ -39,6 +45,21 @@ describe("TeamInviteLite", () => {
     expect(data.get("branchId")).toBe(branches[0]!.id);
     expect(await screen.findByText("Convite criado")).toBeInTheDocument();
     expect(screen.getByText(/onboarding\?token=tok-1/)).toBeInTheDocument();
+    expect(fire).toHaveBeenCalledWith("confirm");
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("falha ao criar fica no formulário com a causa e Tentar de novo", async () => {
+    actions.createTeamUserAction.mockResolvedValueOnce({ success: false, error: "Já existe um membro com esse telefone." } as never);
+    render(<TeamInviteLite branches={branches} canInviteManager canInviteDirector />);
+    fireEvent.change(screen.getByRole("textbox", { name: "Nome" }), { target: { value: "Ana Souza" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Telefone" }), { target: { value: "21999990000" } });
+    pick(/^Unidade/, "Centro");
+    await act(async () => { fireEvent.submit(screen.getByRole("button", { name: "Criar acesso" }).closest("form")!); });
+    expect(screen.getByRole("alert")).toHaveTextContent("Já existe um membro com esse telefone. O que você preencheu continua aqui.");
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeInTheDocument();
+    expect(fire).toHaveBeenCalledWith("error");
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("gestor não vê os cargos de diretor e gestor", () => {

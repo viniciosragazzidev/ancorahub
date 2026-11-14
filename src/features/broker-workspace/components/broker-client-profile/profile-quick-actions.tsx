@@ -9,6 +9,8 @@ import { Button } from "@/components/arc/button/button";
 import { Input } from "@/components/arc/input/input";
 import { LiteSuccess } from "@/components/lite/motion";
 import { Textarea } from "@/components/arc/textarea/textarea";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { validateReturnDueAt } from "@/features/carteira/proxima-acao-core";
 import { addLeadNoteAction } from "@/features/leads/actions";
@@ -27,6 +29,8 @@ type Sheet = null | "contato" | "atendimento" | "retorno";
  * Ações rápidas do perfil: contato com os dados existentes, registrar atendimento (nota do lead, autorizada e
  * auditada pela action existente) e agendar retorno (tarefa do lead, autorizada e auditada). Só de leitura quando
  * o cliente não está na carteira do corretor; o servidor confere de novo em cada action.
+ * Feedback nível 1 (docs/design-system/FEEDBACK.md): toque vibra curto, o check só depois do servidor, sem som;
+ * a falha mostra a causa normalizada e o que continua valendo, e o mesmo botão tenta de novo.
  */
 export function ProfileQuickActions({ client, canAct, readOnlyReason }: {
   client: { leadId: string; name: string; phone: string | null };
@@ -34,6 +38,7 @@ export function ProfileQuickActions({ client, canAct, readOnlyReason }: {
   readOnlyReason: string | null;
 }) {
   const router = useRouter();
+  const fire = useFeedback();
   const [pending, startTransition] = useTransition();
   const [sheet, setSheet] = useState<Sheet>(null);
   const [note, setNote] = useState("");
@@ -58,16 +63,24 @@ export function ProfileQuickActions({ client, canAct, readOnlyReason }: {
       return;
     }
     setError(null);
+    fire("tap");
     startTransition(async () => {
       const form = new FormData();
       form.set("leadId", client.leadId);
       form.set("content", content);
-      const result = await addLeadNoteAction({}, form);
+      let result: Awaited<ReturnType<typeof addLeadNoteAction>>;
+      try {
+        result = await addLeadNoteAction({}, form);
+      } catch (cause) {
+        result = { error: normalizeActionError(cause).cause };
+      }
       if (result.error) {
         // O texto digitado fica no campo para tentar de novo.
-        setError(result.error);
+        setError(actionErrorMessage(normalizeActionError(result, "O atendimento não foi registrado"), "O texto continua no campo"));
+        fire("error");
         return;
       }
+      fire("confirm");
       setNote("");
       setSheet(null);
       setFeedback("Atendimento registrado no histórico");
@@ -83,6 +96,7 @@ export function ProfileQuickActions({ client, canAct, readOnlyReason }: {
       return;
     }
     setError(null);
+    fire("tap");
     startTransition(async () => {
       const form = new FormData();
       form.set("leadId", client.leadId);
@@ -90,11 +104,18 @@ export function ProfileQuickActions({ client, canAct, readOnlyReason }: {
       form.set("priority", "normal");
       form.set("dueAt", check.dueAt.toISOString());
       if (returnNote.trim()) form.set("description", returnNote.trim());
-      const result = await createLeadTaskAction({}, form);
+      let result: Awaited<ReturnType<typeof createLeadTaskAction>>;
+      try {
+        result = await createLeadTaskAction({}, form);
+      } catch (cause) {
+        result = { error: normalizeActionError(cause).cause };
+      }
       if (result.error) {
-        setError(result.error);
+        setError(actionErrorMessage(normalizeActionError(result, "O retorno não foi agendado"), "A data continua escolhida"));
+        fire("error");
         return;
       }
+      fire("confirm");
       setReturnDate("");
       setReturnNote("");
       setSheet(null);

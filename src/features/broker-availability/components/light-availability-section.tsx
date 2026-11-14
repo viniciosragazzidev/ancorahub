@@ -6,7 +6,8 @@ import { Button } from "@/components/arc/button/button";
 import { Input } from "@/components/arc/input/input";
 import { Switch } from "@/components/arc/switch/switch";
 import { useLightAvailabilityContext } from "@/components/light/light-availability-context";
-import { toast } from "@/components/ui/sonner";
+import { LiteSuccess } from "@/components/lite/motion/success";
+import { SettingStatus, useSettingFeedback, type SettingFeedbackState } from "@/features/broker-workspace/components/light-setting-feedback";
 
 import { saveOwnBrokerAvailabilityAction } from "../actions";
 import { DEFAULT_AVAILABILITY_HOURS, DEFAULT_BROKER_AVAILABILITY, WEEKDAY_LABELS, type BrokerAvailabilityWindowInput } from "../contracts";
@@ -23,38 +24,54 @@ const card = "rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)";
  * Disponibilidade of the broker app: the manual pause (same state as the header) and the weekly
  * windows in which automatic distribution may include the broker. Saves through the same action
  * as the desktop editor.
+ * Feedback nível 1 (docs/design-system/FEEDBACK.md): a pausa e os horários confirmam no próprio controle só
+ * depois do servidor; a falha diz a causa normalizada, o que continua valendo e "Tentar de novo".
  */
 export function LightAvailabilitySection({ windows: initialWindows, schemaReady = true }: { windows: BrokerAvailabilityWindowInput[]; schemaReady?: boolean }) {
   const availability = useLightAvailabilityContext();
   const [windows, setWindows] = useState<BrokerAvailabilityWindowInput[]>(ordered(initialWindows.length ? initialWindows : DEFAULT_BROKER_AVAILABILITY));
   const [pending, startTransition] = useTransition();
-  const [saved, setSaved] = useState(false);
+  const saveFeedback = useSettingFeedback();
+  // Pausa pedida daqui: a confirmação e o erro aparecem embaixo do interruptor (sem toast).
+  const [pauseTarget, setPauseTarget] = useState<"available" | "paused" | null>(null);
+  const pauseState: SettingFeedbackState = !availability || pauseTarget === null ? null
+    : availability.isPending ? { tone: "saving" }
+    : availability.error ? { tone: "error", text: availability.error }
+    : availability.availability === pauseTarget ? { tone: "ok", text: pauseTarget === "available" ? "Recebendo novos leads" : "Recebimento pausado" }
+    : null;
+
+  function setPause(next: "available" | "paused") {
+    setPauseTarget(next);
+    availability?.setStatus(next, { inlineError: true });
+  }
   const grouped = useMemo(
     () => WEEKDAY_LABELS.map((label, dayOfWeek) => ({ label, dayOfWeek, windows: windows.filter((window) => window.dayOfWeek === dayOfWeek) })),
     [windows],
   );
 
   function change(next: BrokerAvailabilityWindowInput[]) {
-    setSaved(false);
+    saveFeedback.reset();
     setWindows(ordered(next));
   }
 
   function save() {
     if (!windows.length) {
-      toast.error("Escolha ao menos um período em que você pode receber novos leads.");
+      saveFeedback.fail("Escolha ao menos um período em que você pode receber novos leads.", "Escolha ao menos um período", "Nada foi salvo ainda");
       return;
     }
     const snapshot = windows;
+    saveFeedback.start();
     startTransition(async () => {
       try {
         const result = await saveOwnBrokerAvailabilityAction({ windows: snapshot });
         setWindows(ordered(result.windows));
-        setSaved(true);
-      } catch {
-        toast.error("Não deu para salvar seus horários. Tente de novo em instantes.");
+        saveFeedback.ok("Agenda salva");
+      } catch (error) {
+        saveFeedback.fail(error, "Não deu para salvar seus horários", "Seus horários salvos continuam valendo");
       }
     });
   }
+  const saveState = saveFeedback.state;
 
   if (!schemaReady) {
     return (
@@ -75,12 +92,13 @@ export function LightAvailabilitySection({ windows: initialWindows, schemaReady 
                 ? "Você está disponível. Desligue para pausar a qualquer momento."
                 : "Você está pausado e não recebe novos leads até ligar de novo."}
             </p>
+            <SettingStatus state={pauseState} onRetry={pauseTarget ? () => setPause(pauseTarget) : undefined} />
           </div>
           <Switch
             aria-label="Receber novos leads agora"
             checked={availability.availability === "available"}
             disabled={availability.isPending}
-            onCheckedChange={(checked) => availability.setStatus(checked ? "available" : "paused")}
+            onCheckedChange={(checked) => setPause(checked ? "available" : "paused")}
           />
         </section>
       ) : null}
@@ -147,9 +165,14 @@ export function LightAvailabilitySection({ windows: initialWindows, schemaReady 
         aria-label="Salvar disponibilidade"
         className="fixed inset-x-4 bottom-[calc(22px+var(--mobile-safe-bottom))] z-40 md:left-[calc(72px+1rem)]"
       >
+        {saveState?.tone === "error" ? (
+          <p role="alert" className="mx-auto mb-2 max-w-2xl rounded-2xl bg-(--surface) px-4 py-3 text-sm text-(--foreground) shadow-(--shadow-floating)">{saveState.text}</p>
+        ) : null}
         <div className="mx-auto flex max-w-2xl items-center gap-3 rounded-full bg-(--surface)/86 p-2 pl-5 shadow-(--shadow-floating) backdrop-blur-xl backdrop-saturate-150">
-          <p role="status" className="min-w-0 flex-1 truncate text-sm text-(--text-secondary)">{saved ? "Agenda salva" : "Salve para aplicar as mudanças"}</p>
-          <Button loading={pending} disabled={pending} onClick={save}>Salvar disponibilidade</Button>
+          <p role="status" className="min-w-0 flex-1 truncate text-sm text-(--text-secondary)">
+            {saveState?.tone === "ok" ? <span className="font-medium text-(--success)"><LiteSuccess label={saveState.text} /></span> : saveState?.tone === "saving" ? "Salvando…" : "Salve para aplicar as mudanças"}
+          </p>
+          <Button loading={pending} disabled={pending} onClick={save}>{saveState?.tone === "error" ? "Tentar de novo" : "Salvar disponibilidade"}</Button>
         </div>
       </nav>
     </div>

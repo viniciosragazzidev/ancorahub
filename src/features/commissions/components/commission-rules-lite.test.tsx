@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 vi.mock("@/components/ui/sonner", () => ({ toast }));
+const fire = vi.hoisted(() => vi.fn(() => ({ motion: false, celebrate: false })));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => fire }));
 const actions = vi.hoisted(() => ({
   createCommissionRuleAction: vi.fn(async () => ({ success: true })),
   updateCommissionRuleAction: vi.fn(async () => ({ success: true })),
@@ -41,12 +43,14 @@ describe("regras de comissão Lite", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Buscar regra de comissão" }), { target: { value: "amil" } });
     expect(within(table()).getAllByRole("row")).toHaveLength(2);
     fireEvent.click(within(table()).getByRole("button", { name: "Ações da regra Amil PME" }));
-    fireEvent.click(within(table()).getByRole("menuitem", { name: "Excluir" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Excluir" }));
     expect(actions.deleteCommissionRuleAction).not.toHaveBeenCalled();
     await act(async () => {
       fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Excluir regra" }));
     });
     expect((actions.deleteCommissionRuleAction.mock.calls[0] as unknown as [unknown, FormData])[1].get("ruleId")).toBe("r2");
+    expect(screen.getByRole("status")).toHaveTextContent("Amil PME excluída");
+    expect(fire).toHaveBeenCalledWith("confirm");
   });
 
   it("nova regra envia os mesmos campos (percentuais em JSON e tipo)", async () => {
@@ -62,6 +66,20 @@ describe("regras de comissão Lite", () => {
     expect(data.get("name")).toBe("Nova");
     expect(data.get("type")).toBe("unica");
     expect(data.get("percentages")).toBe("[100]");
-    expect(toast.success).toHaveBeenCalledWith("Regra de comissão salva.");
+    expect(await screen.findByText("Regra de comissão criada")).toBeInTheDocument();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("falha ao ativar mostra a causa na lista e Tentar de novo", async () => {
+    actions.toggleCommissionRuleAction.mockResolvedValueOnce({ error: "Já existe uma regra ativa para esse plano." } as never);
+    render(<CommissionRulesLite rules={RULES} carriers={[{ id: "c1", name: "Amil" }]} />);
+    fireEvent.click(within(table()).getByRole("button", { name: "Ações da regra Amil PME" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: /ativar/i }));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("Já existe uma regra ativa para esse plano.");
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeInTheDocument();
+    expect(fire).toHaveBeenCalledWith("error");
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

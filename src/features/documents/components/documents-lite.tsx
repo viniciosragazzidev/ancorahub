@@ -5,6 +5,10 @@
  * (com contagens), busca, seleção com aprovar e rejeitar em lote, aprovar, rejeitar e alterar status por linha; e a
  * configuração de requisitos com a lista, excluir (com confirmação Lite em vez do confirm do navegador) e o
  * formulário de novo requisito. Mesmas Server Actions, mensagens e o tratamento de versão nova do sistema.
+ *
+ * Feedback (FEEDBACK.md, nível 1): aprovar, rejeitar, o lote, excluir e criar requisito confirmam na própria seção
+ * (fila ou card) depois do servidor; a falha mostra a causa e "Tentar de novo". O toast só fica para o aviso de
+ * versão nova do sistema, que recarrega a tela.
  */
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { isOutdatedDeploymentError } from "@/shared/http/outdated-deployment";
@@ -23,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkReviewDocumentsAction, createRequirementAction, deleteRequirementAction, reviewDocumentAction } from "@/features/documents/actions";
 
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import styles from "./documents-lite.module.css";
 
 type Carrier = { id: string; name: string };
@@ -108,18 +113,23 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
   const [reqState, reqAction, reqPending] = useActionState(createRequirementAction, {});
   const reqFormRef = useRef<HTMLFormElement>(null);
   const [reqKey, setReqKey] = useState(0);
+  const { status: feedback, confirm, fail } = useActionStatus();
 
+  // Cada resposta do formulário é tratada uma vez (o efeito pode rodar de novo sem resposta nova).
+  const handledReqState = useRef(reqState);
   useEffect(() => {
+    if (handledReqState.current === reqState) return;
+    handledReqState.current = reqState;
     if (reqState.success) {
-      toast.success("Requisito criado com sucesso!");
+      confirm("requirement", "Requisito criado");
       reqFormRef.current?.reset();
       setCarrierId("");
       setPlanId("");
       setReqKey((key) => key + 1);
       router.refresh();
     }
-    if (reqState.error) toast.error(reqState.error);
-  }, [reqState, router]);
+    if (reqState.error) fail("requirement", reqState.error, { fallback: "Não foi possível criar o requisito.", keeps: "O formulário continua preenchido.", retry: () => reqFormRef.current?.requestSubmit() });
+  }, [reqState, router, confirm, fail]);
   useEffect(() => setRequirements(initialRequirements), [initialRequirements]);
   useEffect(() => setDocs(initialPendingDocs), [initialPendingDocs]);
 
@@ -154,18 +164,20 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
 
   const review = (docId: string, leadId: string, next: "approved" | "rejected") => {
     if (busyRef.current.has(docId)) return;
+    const filename = docs.find((doc) => doc.id === docId)?.filename ?? "Documento";
+    const options = { fallback: "Não foi possível atualizar o documento.", keeps: "O documento continua como estava.", retry: () => review(docId, leadId, next) };
     setBusy(docId, true);
     startTransition(async () => {
       try {
         const result = await reviewDocumentAction({ documentId: docId, leadId, status: next });
-        if (result.error) toast.error(result.error);
+        if (result.error) fail("queue", result.error, options);
         else {
-          toast.success(next === "approved" ? "Documento aprovado." : "Documento rejeitado.");
+          confirm("queue", `${filename}: ${next === "approved" ? "aprovado" : "rejeitado"}`);
           setDocs((current) => current.map((doc) => (doc.id === docId ? { ...doc, status: next } : doc)));
         }
       } catch (error) {
         if (isVersionSkewError(error)) reloadAfterDeploymentUpdate();
-        else toast.error("Não foi possível atualizar o documento. Tente novamente.");
+        else fail("queue", error, options);
       } finally {
         setBusy(docId, false);
       }
@@ -175,18 +187,37 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
   const bulkReview = (next: "approved" | "rejected") => {
     const selected = multiSelect.selectedIds;
     if (selected.length === 0 || bulkPending) return;
+    const options = { fallback: "Não foi possível atualizar os documentos.", keeps: "Os documentos continuam como estavam e seguem selecionados.", retry: () => bulkReview(next) };
     startBulkTransition(async () => {
       try {
         const result = await bulkReviewDocumentsAction(selected, next);
-        if (result.error) toast.error(result.error);
+        if (result.error) fail("queue", result.error, options);
         else {
-          toast.success(`Processamento em lote concluído (${selected.length} itens).`);
+          const verb = next === "approved" ? (selected.length === 1 ? "aprovado" : "aprovados") : (selected.length === 1 ? "rejeitado" : "rejeitados");
+          confirm("queue", `${selected.length} ${selected.length === 1 ? "documento" : "documentos"} ${verb}`);
           setDocs((current) => current.map((doc) => (selected.includes(doc.id) ? { ...doc, status: next } : doc)));
           multiSelect.clear();
         }
       } catch (error) {
         if (isVersionSkewError(error)) reloadAfterDeploymentUpdate();
-        else toast.error("Não foi possível atualizar os documentos. Tente novamente.");
+        else fail("queue", error, options);
+      }
+    });
+  };
+
+  const removeRequirement = (requirement: RequirementLite) => {
+    const options = { fallback: "Não foi possível remover o requisito.", keeps: "O requisito continua no checklist.", retry: () => removeRequirement(requirement) };
+    startDeleteTransition(async () => {
+      try {
+        const result = await deleteRequirementAction(requirement.id);
+        if (result.error) fail("checklist", result.error, options);
+        else {
+          confirm("checklist", "Requisito removido");
+          setRequirements((current) => current.filter((item) => item.id !== requirement.id));
+        }
+      } catch (error) {
+        if (isVersionSkewError(error)) reloadAfterDeploymentUpdate();
+        else fail("checklist", error, options);
       }
     });
   };
@@ -195,19 +226,7 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
     const requirement = deleting;
     setDeleting(null);
     if (!requirement || deletePending) return;
-    startDeleteTransition(async () => {
-      try {
-        const result = await deleteRequirementAction(requirement.id);
-        if (result.error) toast.error(result.error);
-        else {
-          toast.success("Requisito removido.");
-          setRequirements((current) => current.filter((item) => item.id !== requirement.id));
-        }
-      } catch (error) {
-        if (isVersionSkewError(error)) reloadAfterDeploymentUpdate();
-        else toast.error("Não foi possível remover o requisito. Tente novamente.");
-      }
-    });
+    removeRequirement(requirement);
   };
   const cancelDelete = useCallback(() => setDeleting(null), []);
 
@@ -293,6 +312,7 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
               <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por lead, documento ou tipo" aria-label="Buscar documentos" className={page.searchInput} />
             </label>
           </div>
+          {bulkPending ? <p className={page.muted} role="status">Atualizando documentos…</p> : <ActionNote status={feedback.queue} />}
           <LiteFilterChips
             label="Status dos documentos"
             scroll
@@ -347,6 +367,7 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
               <header className={page.cardHead}>
                 <h2 id="checklist" className={page.cardTitle}>Checklist de documentos</h2>
                 <p className={page.cardDescription}>Requisitos de documentos obrigatórios por operadora e plano.</p>
+                {deletePending ? <p className={page.muted} role="status">Removendo…</p> : <ActionNote status={feedback.checklist} />}
               </header>
               {requirements.length === 0 ? (
                 <div className={page.empty}><p className={page.emptyText}>Nenhum requisito de documento configurado.</p></div>
@@ -409,8 +430,9 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
                   Exigir este documento para cada beneficiário
                 </label>
                 <div className={form.actions}>
-                  <button type="submit" className={page.primaryButton} disabled={reqPending}>{reqPending ? "Criando..." : "Criar requisito"}</button>
+                  <button type="submit" className={page.primaryButton} disabled={reqPending} aria-busy={reqPending || undefined}><BusyLabel busy={reqPending} label="Criando…">Criar requisito</BusyLabel></button>
                 </div>
+                {reqPending ? null : <ActionNote status={feedback.requirement} />}
               </form>
             </section>
           </div>

@@ -8,9 +8,11 @@ import { motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/arc/button/button";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { AssistantAvatar } from "@/components/chat/assistant-avatar";
-import { LiteNumber, LitePageEnter, LiteProgress } from "@/components/lite/motion";
+import { LiteNumber, LitePageEnter, LiteProgress, LiteSuccess } from "@/components/lite/motion";
 import { formatDuration } from "@/features/engagement/ranking";
 import { runChatServerAction } from "@/features/broker-workspace/chat/chat-actions";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 
 import css from "./duty-now-view.module.css";
 
@@ -51,7 +53,8 @@ export function DutyNowView({ data, nowIso, canManageAvailability = false }: { d
   const reduce = useReducedMotion();
   const router = useRouter();
   const [now, setNow] = useState(() => new Date(nowIso).getTime());
-  const [availabilityMessage, setAvailabilityMessage] = useState<string | null>(null);
+  const fire = useFeedback();
+  const [availabilityMessage, setAvailabilityMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [availabilityBusy, setAvailabilityBusy] = useState(false);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -61,15 +64,27 @@ export function DutyNowView({ data, nowIso, canManageAvailability = false }: { d
   const end = new Date(data.endsAt).getTime();
   const progress = Math.min(1, Math.max(0, (now - start) / Math.max(1, end - start)));
   const state = STATE[data.state];
+  // Pausar e retomar (FEEDBACK.md, nível 1, ação ocasional): toque vibra, o check só depois do servidor e com
+  // o som discreto de confirmação; a falha diz a causa, que a disponibilidade não mudou e "Tentar de novo".
   async function toggleAvailability() {
     const action = data.state === "pausado" ? "duty.resume" : "duty.pause";
     setAvailabilityBusy(true);
+    setAvailabilityMessage(null);
+    fire("tap");
+    const keeps = data.state === "pausado" ? "Você continua pausado" : "Você continua recebendo leads";
     try {
       const result = await runChatServerAction(action, {});
-      setAvailabilityMessage(result.message);
-      if (result.ok) router.refresh();
-    } catch {
-      setAvailabilityMessage("Não consegui atualizar sua disponibilidade. Tente de novo.");
+      if (result.ok) {
+        setAvailabilityMessage({ tone: "ok", text: result.message });
+        fire("confirm", { sound: true });
+        router.refresh();
+      } else {
+        setAvailabilityMessage({ tone: "error", text: actionErrorMessage(normalizeActionError({ message: result.message }, "Não consegui atualizar sua disponibilidade"), keeps) });
+        fire("error");
+      }
+    } catch (error) {
+      setAvailabilityMessage({ tone: "error", text: actionErrorMessage(normalizeActionError(error, "Não consegui atualizar sua disponibilidade"), keeps) });
+      fire("error");
     } finally {
       setAvailabilityBusy(false);
     }
@@ -186,9 +201,10 @@ export function DutyNowView({ data, nowIso, canManageAvailability = false }: { d
         {canManageAvailability && data.state !== "aguardando" ? (
           <div className={css.footer}>
             <Button variant={data.state === "pausado" ? "primary" : "secondary"} loading={availabilityBusy} onClick={toggleAvailability}>
-              {data.state === "pausado" ? "Voltar a receber" : "Pausar recebimento"}
+              {availabilityMessage?.tone === "error" ? "Tentar de novo" : data.state === "pausado" ? "Voltar a receber" : "Pausar recebimento"}
             </Button>
-            {availabilityMessage ? <p role="status" aria-live="polite" className="mt-2 text-sm text-(--text-secondary)">{availabilityMessage}</p> : null}
+            {availabilityMessage?.tone === "ok" ? <p className="mt-2 text-sm text-(--text-secondary)"><LiteSuccess label={availabilityMessage.text} /></p> : null}
+            {availabilityMessage?.tone === "error" ? <p role="alert" className="mt-2 text-sm text-(--foreground)">{availabilityMessage.text}</p> : null}
           </div>
         ) : null}
       </div>

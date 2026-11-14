@@ -4,9 +4,13 @@
  * Cargos e permissões no visual Lite. Mesmos dados (getCustomRolesWorkspace), mesmas Server Actions e mesmas regras
  * do CustomRolesWorkspace: busca, filtro de estado, cartões de cargo e o editor (identidade, permissões por escopo,
  * rotas visíveis, membros) em painel lateral, com chaves Arc de 44px e categorias em caixa de frase.
+ *
+ * Feedback (FEEDBACK.md, nível 1): salvar e arquivar mostram o envio no botão; depois que o servidor confirma, o
+ * painel fecha e a confirmação aparece na lista de cargos. A falha fica no painel, com a causa e "Tentar de novo".
+ * Aplicar um modelo é nível 0: o aviso aparece ao lado dos modelos, sem som.
  */
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, TriangleAlert, Users } from "lucide-react";
 
 import { Switch } from "@/components/arc/switch/switch";
@@ -15,7 +19,6 @@ import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import { liteDateFormatter } from "@/components/lite/format/date";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
-import { toast } from "@/components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { roleScopeLabel } from "@/features/custom-roles/member-scope";
 import type { RouteDefinition } from "@/features/custom-roles/routes";
@@ -23,6 +26,7 @@ import { isRoutePermission, routePermissionKey } from "@/features/custom-roles/r
 import { AREAS_SEM_CORTE_FINO, CARGO_MODELOS, completarAreas, telasDoCargo } from "@/features/custom-roles/presets";
 
 import { archiveCustomRoleAction, saveCustomRoleAction } from "../actions";
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import styles from "./cargos-lite.module.css";
 
 export type CargoCapability = { key: string; label: string; description: string; category: string; delegable: boolean; scopes: readonly string[] };
@@ -76,13 +80,15 @@ function ToggleRow({ id, title, description, detail, checked, onToggle }: { id: 
   );
 }
 
-function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose }: {
+function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose, onSaved }: {
   editing: CargoRole | null;
   catalog: CargoCapability[];
   routeCatalog: readonly RouteDefinition[];
   enabled: boolean;
   open: boolean;
   onClose: () => void;
+  /** Confirmação na lista depois que o painel fecha. */
+  onSaved?: (label: string) => void;
 }) {
   const [name, setName] = useState(editing?.name ?? "");
   const [description, setDescription] = useState(editing?.description ?? "");
@@ -90,8 +96,10 @@ function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose }: 
   const [scope, setScope] = useState<CargoRole["scope"]>(editing?.scope ?? "tenant");
   const [selected, setSelected] = useState<string[]>(editing?.permissions ?? []);
   const [tab, setTab] = useState("identidade");
-  const [pending, startTransition] = useTransition();
-  const [archiving, startArchive] = useTransition();
+  const { status: feedback, run, clear } = useActionStatus();
+  const [appliedModel, setAppliedModel] = useState<string | null>(null);
+  const pending = feedback.save?.state === "busy";
+  const archiving = feedback.archive?.state === "busy";
 
   useEffect(() => {
     if (open) {
@@ -101,8 +109,11 @@ function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose }: 
       setScope(editing?.scope ?? "tenant");
       setSelected(editing?.permissions ?? []);
       setTab("identidade");
+      setAppliedModel(null);
+      clear("save");
+      clear("archive");
     }
-  }, [open, editing]);
+  }, [open, editing, clear]);
 
   const toggle = (key: string) => setSelected((current) => (current.includes(key) ? current.filter((item) => item !== key) : completarAreas([...current, key])));
   const aplicarModelo = (id: string) => {
@@ -112,7 +123,7 @@ function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose }: 
     setDescription(modelo.description);
     setScope(modelo.scope);
     setSelected([...modelo.permissions]);
-    toast.success(`Modelo "${modelo.name}" aplicado. Revise as telas e salve.`);
+    setAppliedModel(`Modelo "${modelo.name}" aplicado. Revise as telas e salve.`);
   };
   const telas = telasDoCargo(selected).map((key) => routeCatalog.find((route) => route.key === key)?.label ?? key);
   const changeScope = (next: string) => {
@@ -126,28 +137,25 @@ function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose }: 
 
   const archive = () => {
     if (!editing) return;
-    startArchive(async () => {
-      try {
-        await archiveCustomRoleAction(editing.id);
-        toast.success(`Cargo "${editing.name}" arquivado.`);
-        onClose();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível arquivar o cargo.");
-      }
-    });
+    const target = editing;
+    // O que acontece depois do servidor fica dentro da tarefa: o "Tentar de novo" refaz tudo.
+    void run("archive", async () => {
+      await archiveCustomRoleAction(target.id);
+      onSaved?.(`Cargo "${target.name}" arquivado`);
+      onClose();
+      return true;
+    }, { done: "Cargo arquivado", fallback: "Não foi possível arquivar o cargo.", keeps: "O cargo continua como estava." });
   };
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    startTransition(async () => {
-      try {
-        await saveCustomRoleAction({ id: editing?.id, name, description, color: "primary", icon: "shield", scope, permissions: selected, status });
-        toast.success(editing ? "Cargo atualizado com sucesso." : "Cargo criado com sucesso.");
-        onClose();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível salvar o cargo.");
-      }
-    });
+    const payload = { id: editing?.id, name, description, color: "primary", icon: "shield", scope, permissions: selected, status } as const;
+    void run("save", async () => {
+      await saveCustomRoleAction(payload);
+      onSaved?.(editing ? `Cargo "${name}" atualizado` : `Cargo "${name}" criado`);
+      onClose();
+      return true;
+    }, { done: editing ? "Cargo atualizado" : "Cargo criado", fallback: "Não foi possível salvar o cargo.", keeps: "O que você preencheu continua aqui." });
   };
 
   return (
@@ -174,6 +182,7 @@ function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose }: 
                 <button key={modelo.id} type="button" className={page.button} onClick={() => aplicarModelo(modelo.id)} title={modelo.description}>{modelo.name}</button>
               ))}
             </span>
+            {appliedModel ? <span className={form.hint} role="status">{appliedModel}</span> : null}
           </div>
         ) : null}
         <Tabs value={tab} onValueChange={(value) => setTab(String(value))} variant="segment" className={styles.tabs}>
@@ -267,13 +276,15 @@ function RoleEditor({ editing, catalog, routeCatalog, enabled, open, onClose }: 
           ) : null}
         </Tabs>
 
+        {feedback.save?.state === "error" ? <ActionNote status={feedback.save} /> : null}
+        {feedback.archive?.state === "error" ? <ActionNote status={feedback.archive} /> : null}
         <div className={styles.footer}>
           {editing && editing.status !== "archived" ? (
-            <button type="button" className={page.button} data-tone="danger" disabled={archiving || pending} onClick={archive}>Arquivar cargo</button>
+            <button type="button" className={page.button} data-tone="danger" disabled={archiving || pending} aria-busy={archiving || undefined} onClick={archive}><BusyLabel busy={archiving} label="Arquivando…">Arquivar cargo</BusyLabel></button>
           ) : <span />}
           <span className={styles.footerEnd}>
             <button type="button" className={page.button} disabled={pending} onClick={onClose}>Cancelar</button>
-            <button type="submit" className={page.primaryButton} disabled={!enabled || pending}>{pending ? "Salvando..." : editing ? "Salvar alterações" : "Criar cargo"}</button>
+            <button type="submit" className={page.primaryButton} disabled={!enabled || pending || archiving} aria-busy={pending || undefined}><BusyLabel busy={pending} label="Salvando…">{editing ? "Salvar alterações" : "Criar cargo"}</BusyLabel></button>
           </span>
         </div>
       </form>
@@ -289,6 +300,8 @@ export function CargosLite({ enabled, catalog, routeCatalog, roles }: { enabled:
   const visible = roles.filter((role) => (filter === "all" || role.status === filter) && `${role.name} ${role.description ?? ""}`.toLocaleLowerCase("pt-BR").includes(needle));
   const editing = selectedId && selectedId !== "new" ? roles.find((role) => role.id === selectedId) ?? null : null;
   const count = (status: CargoRole["status"]) => roles.filter((role) => role.status === status).length;
+  const { status: feedback, show } = useActionStatus();
+  const savedInList = (label: string) => show("roles", { state: "done", label });
 
   return (
     <div className={`arc-venancor ${page.stack}`} data-skin="diretor">
@@ -308,6 +321,7 @@ export function CargosLite({ enabled, catalog, routeCatalog, roles }: { enabled:
       ) : null}
 
       <section className={page.group} aria-label="Cargos">
+        <ActionNote status={feedback.roles} />
         <div className={page.toolbar}>
           <label className={page.search}>
             <Search aria-hidden="true" size={18} className={page.searchIcon} />
@@ -354,7 +368,7 @@ export function CargosLite({ enabled, catalog, routeCatalog, roles }: { enabled:
         )}
       </section>
 
-      <RoleEditor editing={editing} catalog={catalog} routeCatalog={routeCatalog} enabled={enabled} open={selectedId !== null} onClose={() => setSelectedId(null)} />
+      <RoleEditor editing={editing} catalog={catalog} routeCatalog={routeCatalog} enabled={enabled} open={selectedId !== null} onClose={() => setSelectedId(null)} onSaved={savedInList} />
     </div>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
 
+import { plantaoDone, plantaoFailed } from "./plantao-feedback";
+import { toast } from "@/components/ui/sonner";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "@/components/ui/sonner";
 import {
   ArrowSquareOut,
   CalendarCheck,
@@ -311,10 +312,10 @@ function DutyFormSheet({
     startTransition(async () => {
       const result = await action({}, formData);
       if (!result.success) {
-        toast.error(result.error ?? "Não foi possível salvar o plantão.");
+        plantaoFailed(result.error, "Não foi possível salvar o plantão.");
         return;
       }
-      toast.success(
+      plantaoDone(
         schedule
           ? "Plantão atualizado."
           : queueIds.length
@@ -797,11 +798,11 @@ function DutyInspector({
       const result = await addPendingRosterEntryAction({ scheduleId: schedule.id, brokerProfileId: person.id });
       setAddingBrokerId(null);
       if (!result.success) {
-        toast.error(result.error);
+        plantaoFailed(result.error, "Não consegui atualizar o plantão agora.");
         return;
       }
       setBrokerSearch("");
-      toast.success(`${person.name} escalado. Entra no plantão quando criar a conta.`);
+      plantaoDone(`${person.name} escalado. Entra no plantão quando criar a conta.`);
       setInvitesVersion((value) => value + 1);
       router.refresh();
     });
@@ -812,10 +813,10 @@ function DutyInspector({
     startTransition(async () => {
       const result = await removePendingRosterEntryAction({ scheduleId: schedule.id, entryId: entry.entryId });
       if (!result.success) {
-        toast.error(result.error);
+        plantaoFailed(result.error, "Não consegui atualizar o plantão agora.");
         return;
       }
-      toast.success(`${entry.name} saiu do plantão.`);
+      plantaoDone(`${entry.name} saiu do plantão.`);
       setInvitesVersion((value) => value + 1);
       router.refresh();
     });
@@ -837,10 +838,10 @@ function DutyInspector({
     startTransition(async () => {
       const result = await action({}, formData);
       if (!result.success) {
-        toast.error(result.error ?? "Não foi possível atualizar o plantão.");
+        plantaoFailed(result.error, "Não foi possível atualizar o plantão.");
         return;
       }
-      toast.success(successMessage);
+      plantaoDone(successMessage);
       if (result.message?.startsWith("Esta fila também está no plantão")) toast.info(result.message);
       setConfirmArchive(false);
       router.refresh();
@@ -862,11 +863,11 @@ function DutyInspector({
       const result = await createRosterAssignmentAction({}, formData);
       setAddingBrokerId(null);
       if (!result.success) {
-        toast.error(result.error ?? "Não foi possível escalar o corretor.");
+        plantaoFailed(result.error, "Não foi possível escalar o corretor.");
         return;
       }
       setBrokerSearch("");
-      toast.success("Corretor adicionado à escala.");
+      plantaoDone("Corretor adicionado à escala.");
       if (result.message) toast.info(result.message);
       router.refresh();
     });
@@ -885,10 +886,10 @@ function DutyInspector({
     startTransition(async () => {
       const result = await moveRosterAssignmentAction({}, formData);
       if (!result.success) {
-        toast.error(result.error ?? "Não foi possível trocar o turno.");
+        plantaoFailed(result.error, "Não foi possível trocar o turno.");
         return;
       }
-      toast.success(`${assignment.brokerName}: ${shift.label}.`);
+      plantaoDone(`${assignment.brokerName}: ${shift.label}.`);
       if (result.message) toast.info(result.message);
       router.refresh();
     });
@@ -900,11 +901,11 @@ function DutyInspector({
     startTransition(async () => {
       const result = await removeRosterAssignmentAction({}, formData);
       if (!result.success) {
-        toast.error(result.error ?? "Não foi possível remover o corretor.");
+        plantaoFailed(result.error, "Não foi possível remover o corretor.");
         return;
       }
       router.refresh();
-      toast.success("Corretor removido da escala.");
+      plantaoDone("Corretor removido da escala.");
     });
   }
 
@@ -1515,10 +1516,10 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], queueOrders = [
     if (schedule.webhookCredentialId) formData.set("webhookCredentialId", schedule.webhookCredentialId);
     const result = await updateDutyScheduleAction({}, formData);
     if (!result.success) {
-      toast.error(result.error ?? "Não foi possível estender o plantão.");
+      plantaoFailed(result.error, "Não foi possível estender o plantão.");
       return false;
     }
-    toast.success(`${schedule.name} agora vai até ${dateLabel(new Date(`${lastDayOfMonth(month)}T12:00:00Z`))}.`);
+    plantaoDone(`${schedule.name} agora vai até ${dateLabel(new Date(`${lastDayOfMonth(month)}T12:00:00Z`))}.`);
     router.refresh();
     return true;
   }

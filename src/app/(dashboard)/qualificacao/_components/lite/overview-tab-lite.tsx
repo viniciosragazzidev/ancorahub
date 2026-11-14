@@ -6,6 +6,7 @@
  */
 import { Switch } from "@/components/arc/switch/switch";
 import { LiteSelect } from "@/components/lite/controls";
+import { ActionNote, type ActionStatus } from "./action-status-lite";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
 import sections from "@/components/lite/page/lite-sections.module.css";
@@ -33,11 +34,12 @@ function brl(value: number) {
   return `R$ ${value.toFixed(2)}`;
 }
 
-export function OverviewTabLite({ stats, fields, onChange, onToggleEnabled }: {
+export function OverviewTabLite({ stats, fields, onChange, onToggleEnabled, enabledStatus }: {
   stats: QualificationStatsSummary;
   fields: OverviewFields;
   onChange: (patch: Partial<OverviewFields>) => void;
   onToggleEnabled: (value: boolean) => void;
+  enabledStatus?: ActionStatus;
 }) {
   const numbers = [
     { label: "Leads atendidos", value: stats.operation.startedToday, hint: `${stats.operation.active} ativos · ${stats.operation.transferredToHuman} passados a humano` },
@@ -63,9 +65,10 @@ export function OverviewTabLite({ stats, fields, onChange, onToggleEnabled }: {
             <div className={sections.rowText}>
               <h2 id="ai-status-title" className={sections.rowTitle}>Operação da IA de qualificação</h2>
               <p className={sections.rowDescription}>{fields.enabled ? "O robô responde os novos atendimentos pelo WhatsApp." : "Automação pausada. As mensagens vão direto para a fila humana."}</p>
+              <ActionNote status={enabledStatus} />
             </div>
             <span style={{ display: "inline-grid", placeItems: "center", minWidth: 44, minHeight: 44 }}>
-              <Switch aria-labelledby="ai-status-title" checked={fields.enabled} onCheckedChange={(value) => onToggleEnabled(Boolean(value))} />
+              <Switch aria-labelledby="ai-status-title" checked={fields.enabled} disabled={enabledStatus?.state === "busy"} aria-busy={enabledStatus?.state === "busy" || undefined} onCheckedChange={(value) => onToggleEnabled(Boolean(value))} />
             </span>
           </div>
           <div className={sections.formBody}>

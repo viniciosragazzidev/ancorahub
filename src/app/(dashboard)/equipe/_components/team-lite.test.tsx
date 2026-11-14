@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push: vi.fn(), replace: vi.fn() }) }));
-vi.mock("@/components/ui/sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("@/components/ui/sonner", () => ({ toast }));
+const fire = vi.hoisted(() => vi.fn(() => ({ motion: false, celebrate: false })));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => fire }));
 const team = vi.hoisted(() => ({
   bulkToggleTeamMemberStatusAction: vi.fn(async () => ({ success: true, message: "ok" })),
   toggleTeamMemberStatusAction: vi.fn(async () => ({ success: true, status: "disabled" })),
@@ -25,7 +28,10 @@ vi.mock("@/features/supervisor-workspace/transfer-actions", () => ({ decideBroke
 import { TeamLite } from "./team-lite";
 import type { TeamMemberLite } from "./member-sheets-lite";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 const base = { phone: null, jobTitle: "broker", branchId: "b1", branchName: "Centro", canEditAuthority: true, canManage: true } as const;
 const members: TeamMemberLite[] = [
@@ -88,6 +94,30 @@ describe("TeamLite", () => {
     await act(async () => { fireEvent.click(within(dialog).getByRole("button", { name: "Excluir membro" })); });
     const data = (team.deleteTeamMemberAction.mock.calls[0] as unknown as [unknown, FormData])[1];
     expect(data.get("memberId")).toBe("m1");
+    expect(screen.getByRole("status")).toHaveTextContent("Ana Souza removido da equipe");
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("lote confirma na seção da lista, sem toast", async () => {
+    renderTeam();
+    fireEvent.click(within(table()).getByRole("checkbox", { name: "Selecionar Ana Souza" }));
+    const bar = within(screen.getByRole("region", { name: "Ações em lote" }));
+    await act(async () => { fireEvent.click(bar.getByRole("button", { name: "Desativar" })); });
+    expect(screen.getByRole("status")).toHaveTextContent("Acessos desativados");
+    expect(fire).toHaveBeenCalledWith("confirm");
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("desativar acesso que falha volta o status e mostra a causa com Tentar de novo", async () => {
+    team.toggleTeamMemberStatusAction.mockResolvedValueOnce({ success: false, error: "Você não pode desativar a si mesmo." } as never);
+    renderTeam();
+    fireEvent.click(within(table()).getByRole("button", { name: "Ações de Ana Souza" }));
+    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "Desativar acesso" })); });
+    expect(screen.getByRole("alert")).toHaveTextContent("Você não pode desativar a si mesmo. Ana Souza continua com acesso.");
+    expect(within(table()).getAllByText("Ativo").length).toBe(2);
+    expect(fire).toHaveBeenCalledWith("error");
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });
 

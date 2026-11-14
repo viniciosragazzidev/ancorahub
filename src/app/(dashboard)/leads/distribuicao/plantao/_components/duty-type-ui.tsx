@@ -1,5 +1,6 @@
 "use client";
 
+import { plantaoDone, plantaoFailed } from "./plantao-feedback";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -11,7 +12,6 @@ import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, Dia
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { toast } from "@/components/ui/sonner";
 import { createDutyTypeAction, setDutyTypeArchivedAction, updateDutyTypeAction } from "@/features/lead-distribution/duty-type-actions";
 import { pickDistinctHue, QUEUE_COLOR_SWATCHES } from "@/features/lead-distribution/queue-color";
 import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
@@ -82,10 +82,10 @@ export function DutyTypeDialog({
     startTransition(async () => {
       const result = type ? await updateDutyTypeAction(type.id, payload) : await createDutyTypeAction(payload);
       if (!result.ok) {
-        toast.error(result.error);
+        plantaoFailed(result.error, "Não consegui atualizar o plantão agora.");
         return;
       }
-      toast.success(type ? "Tipo de plantão atualizado." : `Tipo ${form.name.trim()} criado.`);
+      plantaoDone(type ? "Tipo de plantão atualizado." : `Tipo ${form.name.trim()} criado.`);
       router.refresh();
       onSaved?.(result.typeId);
       onOpenChange(false);
@@ -200,8 +200,8 @@ export function DutyTypesSheet({ open, onOpenChange, types, branches }: { open: 
   function toggleArchived(type: DutyTypeOption) {
     startTransition(async () => {
       const result = await setDutyTypeArchivedAction(type.id, type.status !== "archived");
-      if (!result.ok) { toast.error(result.error); return; }
-      toast.success(type.status === "archived" ? "Tipo restaurado." : "Tipo arquivado. Os plantões dele continuam como estão.");
+      if (!result.ok) { plantaoFailed(result.error, "Não consegui atualizar o plantão agora."); return; }
+      plantaoDone(type.status === "archived" ? "Tipo restaurado." : "Tipo arquivado. Os plantões dele continuam como estão.");
       router.refresh();
     });
   }

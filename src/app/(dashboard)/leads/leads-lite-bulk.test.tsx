@@ -128,4 +128,19 @@ describe("seleção em massa na lista Lite", () => {
     expect(toast.success).toHaveBeenCalledWith("2 leads devolvidos.");
     expect(onRevertCommitted).toHaveBeenCalledWith({ leadIds: ["l1", "l2"] });
   });
+
+  it("falha ao devolver: causa normalizada, o que continua valendo e Tentar de novo no aviso", async () => {
+    actions.bulkRevertToQualificationAction.mockResolvedValueOnce({ error: "Sem permissão para devolver estes leads." } as never);
+    renderList({ selectedIds: ["l1", "l2"] });
+    fireEvent.click(screen.getByRole("button", { name: "Devolver para qualificação" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Devolver" }));
+    });
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith("Sem permissão para devolver estes leads. Eles continuam com os corretores.", expect.objectContaining({ action: expect.objectContaining({ label: "Tentar de novo" }) }));
+    const retry = (toast.error.mock.calls[0] as unknown as [string, { action: { onClick: () => void } }])[1].action;
+    await act(async () => { retry.onClick(); });
+    expect(actions.bulkRevertToQualificationAction).toHaveBeenCalledTimes(2);
+    expect(toast.success).toHaveBeenCalledWith("2 leads devolvidos.");
+  });
 });

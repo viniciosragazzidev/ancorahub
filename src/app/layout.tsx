@@ -32,6 +32,16 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+/** Telas de iPhone em retrato: largura e altura em pontos e a densidade. Imagens em public/splash/ios. */
+const IOS_SCREENS: Array<[number, number, number]> = [
+  [440, 956, 3], [430, 932, 3], [402, 874, 3], [393, 852, 3], [428, 926, 3], [390, 844, 3],
+  [375, 812, 3], [414, 896, 3], [414, 896, 2], [414, 736, 3], [375, 667, 2],
+];
+const IOS_STARTUP_IMAGES = IOS_SCREENS.map(([width, height, ratio]) => ({
+  url: `/splash/ios/splash-${width * ratio}x${height * ratio}.jpg`,
+  media: `(device-width: ${width}px) and (device-height: ${height}px) and (-webkit-device-pixel-ratio: ${ratio}) and (orientation: portrait)`,
+}));
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://crm.ancorasaude.cloud"),
   title: {
@@ -90,11 +100,12 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "AncoraHub",
+    // Abertura do PWA no iPhone: a mesma arte da splash (capitão e ÂNCORA sobre #002B73), uma por tela.
+    startupImage: IOS_STARTUP_IMAGES,
   },
   other: {
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-status-bar-style": "default",
-    "apple-touch-startup-image": "/logo.webp",
   },
 };
 

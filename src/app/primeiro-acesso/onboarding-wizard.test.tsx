@@ -9,13 +9,19 @@ const mocks = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
   complete: vi.fn(),
   signIn: vi.fn(),
+  addPasskey: vi.fn(),
+  fire: vi.fn(),
+  fireOnce: vi.fn<(...args: unknown[]) => { celebrate: boolean }>(() => ({ celebrate: false })),
+  celebrate: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }) }));
 vi.mock("@/components/ui/sonner", () => ({ toast: { error: mocks.toastError, success: mocks.toastSuccess } }));
 vi.mock("@/shared/auth/client", () => ({
-  authClient: { signIn: { email: mocks.signIn }, passkey: { addPasskey: vi.fn() } },
+  authClient: { signIn: { email: mocks.signIn }, passkey: { addPasskey: mocks.addPasskey } },
 }));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => mocks.fire, fireFeedbackOnce: mocks.fireOnce }));
+vi.mock("@/components/motion/success-overlay", () => ({ useSuccessOverlay: () => ({ celebrate: mocks.celebrate, node: null }) }));
 vi.mock("@/app/(dashboard)/settings/security-actions", () => ({ recordSecurityAuditAction: vi.fn() }));
 vi.mock("./onboarding-actions", () => ({ completeOnboardingAction: mocks.complete }));
 // Arc components drive Motion springs that the global jsdom mock of motion/react does not implement.
@@ -116,5 +122,52 @@ describe("OnboardingWizard", () => {
     expect(formData.get("termsAccepted")).toBe("on");
     await waitFor(() => expect(screen.getByRole("heading", { name: "Acesso com biometria" })).toBeTruthy());
     expect(mocks.signIn).toHaveBeenCalledWith({ email: "ana@example.test", password: "SenhaForte#12345" });
+  });
+
+  async function activate() {
+    mocks.complete.mockResolvedValue({ success: true, email: "ana@example.test" });
+    mocks.signIn.mockResolvedValue({ error: null });
+    render(<OnboardingWizard invitation={invitation} profile={profile} />);
+    next("Confirmar dados");
+    fireEvent.change(screen.getByLabelText("Data de nascimento"), { target: { value: "1990-05-10" } });
+    next("Validar dados");
+    fireEvent.change(screen.getByLabelText("Senha de acesso"), { target: { value: "SenhaForte#12345" } });
+    fireEvent.change(screen.getByLabelText("Confirme sua senha"), { target: { value: "SenhaForte#12345" } });
+    next("Confirmar senha");
+    fireEvent.click(screen.getByLabelText(/Li e aceito os termos/));
+    fireEvent.click(screen.getByRole("button", { name: "Concluir e ativar" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Acesso com biometria" })).toBeTruthy());
+  }
+
+  it("concluir o onboarding celebra uma vez (nível 3), com a chave do convite", async () => {
+    mocks.fireOnce.mockReturnValue({ celebrate: true });
+    await activate();
+    expect(mocks.fireOnce).toHaveBeenCalledWith("onboarding:inv-1", "celebrate", { budgetKey: "boas-vindas" }, expect.any(Boolean));
+    expect(mocks.celebrate).toHaveBeenCalledTimes(1);
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("sem celebração (preferência ou limite), confirma com texto", async () => {
+    mocks.fireOnce.mockReturnValue({ celebrate: false });
+    await activate();
+    expect(mocks.celebrate).not.toHaveBeenCalled();
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Conta ativada. Boas-vindas ao time.");
+  });
+
+  it("biometria que falha mostra a causa em português e o que continua valendo", async () => {
+    mocks.fireOnce.mockReturnValue({ celebrate: false });
+    const original = (window as { PublicKeyCredential?: unknown }).PublicKeyCredential;
+    Object.defineProperty(window, "PublicKeyCredential", { configurable: true, value: { isUserVerifyingPlatformAuthenticatorAvailable: async () => true } });
+    mocks.addPasskey.mockResolvedValue({ error: { message: "The operation either timed out or was not allowed." } });
+    try {
+      await activate();
+      fireEvent.click(await screen.findByRole("button", { name: "Ativar digital agora" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("A biometria não foi cadastrada. Sua conta já está ativa e você entra com a senha.");
+      expect(mocks.fire).toHaveBeenCalledWith("error");
+      expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+      expect(mocks.push).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window, "PublicKeyCredential", { configurable: true, value: original });
+    }
   });
 });

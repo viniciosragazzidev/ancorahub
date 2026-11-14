@@ -1,5 +1,5 @@
 /*
- * Splash do PWA (docs/design-system/MASCOTE.md §5): a arte aprovada em 14/11/2026, o capitão pirata e a
+ * Splash do PWA: a arte aprovada em 14/11/2026, o capitão pirata e a
  * marca ÂNCORA sobre o azul da própria arte (#002B73). Vem no HTML do servidor, então aparece antes do
  * JavaScript, e some quando o app fica pronto. Só transform e opacity (compositor, 60 fps).
  */
@@ -45,7 +45,7 @@
 }
 
 /*
- * Roteiro (dossiê §3), possível com a arte parada: 0 a 0,4 s aparece; 0,8 a 1,4 s agacha, salta e volta
+ * Roteiro do dossiê do mascote, possível com a arte parada: 0 a 0,4 s aparece; 0,8 a 1,4 s agacha, salta e volta
  * ao chão; 1,4 a 1,9 s balança de leve e repousa.
  */
 @keyframes splashHero {

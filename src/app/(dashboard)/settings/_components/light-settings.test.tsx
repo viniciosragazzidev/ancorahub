@@ -104,7 +104,33 @@ describe("LightAvailabilitySection", () => {
     );
 
     fireEvent.click(screen.getByRole("switch", { name: "Receber novos leads agora" }));
-    expect(setStatus).toHaveBeenCalledWith("paused");
+    expect(setStatus).toHaveBeenCalledWith("paused", { inlineError: true });
+  });
+
+  it("pausa que falha mostra a causa embaixo do interruptor e tenta de novo", () => {
+    const setStatus = vi.fn();
+    const { rerender } = render(
+      <LightAvailabilityProvider value={{ availability: "available", isPending: false, setStatus }}>
+        <LightAvailabilitySection windows={windows} />
+      </LightAvailabilityProvider>,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Receber novos leads agora" }));
+    rerender(
+      <LightAvailabilityProvider value={{ availability: "available", isPending: false, setStatus, error: "Sem conexão agora. Você continua recebendo leads." }}>
+        <LightAvailabilitySection windows={windows} />
+      </LightAvailabilityProvider>,
+    );
+    expect(screen.getByRole("alert").textContent).toBe("Sem conexão agora. Você continua recebendo leads.");
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    expect(setStatus).toHaveBeenLastCalledWith("paused", { inlineError: true });
+  });
+
+  it("horários que não salvam mostram a causa e o que continua valendo", async () => {
+    saveAction.mockRejectedValueOnce(new Error("Failed to fetch"));
+    render(<LightAvailabilitySection windows={windows} />);
+    fireEvent.click(screen.getByRole("button", { name: "Salvar disponibilidade" }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Sem conexão agora. Seus horários salvos continuam valendo."));
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
   });
 
   it("saves the windows with the existing action and confirms in place", async () => {

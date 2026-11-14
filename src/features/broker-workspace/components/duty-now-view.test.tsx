@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
 import styles from "./duty-now-view.module.css";
 
-const mocks = vi.hoisted(() => ({ runAction: vi.fn(), pathname: "/plantoes/agora" }));
+const mocks = vi.hoisted(() => ({ runAction: vi.fn(), fire: vi.fn(), pathname: "/plantoes/agora" }));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => mocks.fire }));
 
 vi.mock("motion/react", async () => {
   const actual = await vi.importActual<typeof import("motion/react")>("motion/react");
@@ -87,5 +88,23 @@ describe("DutyNowView", () => {
     rerender(<DutyNowView nowIso="2026-10-10T18:00:00.000Z" data={{ ...data, state: "pausado" }} canManageAvailability />);
     fireEvent.click(screen.getByRole("button", { name: "Voltar a receber" }));
     await waitFor(() => expect(mocks.runAction).toHaveBeenCalledWith("duty.resume", {}));
+  });
+
+  it("confirma a pausa com check e som discreto só depois do servidor", async () => {
+    mocks.runAction.mockResolvedValueOnce({ ok: true, message: "Recebimento pausado." });
+    render(<DutyNowView nowIso="2026-10-10T18:00:00.000Z" data={data} canManageAvailability />);
+    fireEvent.click(screen.getByRole("button", { name: "Pausar recebimento" }));
+    expect((await screen.findByRole("status")).textContent).toContain("Recebimento pausado.");
+    expect(mocks.fire).toHaveBeenCalledWith("confirm", { sound: true });
+  });
+
+  it("falha na pausa diz que nada mudou e oferece tentar de novo", async () => {
+    mocks.runAction.mockRejectedValueOnce(new Error("Failed to fetch"));
+    render(<DutyNowView nowIso="2026-10-10T18:00:00.000Z" data={data} canManageAvailability />);
+    fireEvent.click(screen.getByRole("button", { name: "Pausar recebimento" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Sem conexão agora. Você continua recebendo leads.");
+    expect(mocks.fire).toHaveBeenCalledWith("error");
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    await waitFor(() => expect(mocks.runAction).toHaveBeenLastCalledWith("duty.pause", {}));
   });
 });

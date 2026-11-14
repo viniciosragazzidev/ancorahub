@@ -5,28 +5,51 @@
  * auditoria (recordSecurityAuditAction) e mesmas mensagens da aba atual. Excluir chave pede confirmação Lite no
  * lugar do confirm do navegador. A largura do aparelho (celular força biometria do aparelho) é lida depois da
  * hidratação, como hoje.
+ *
+ * Feedback (FEEDBACK.md, nível 1): ativar, desativar, gerar códigos, cadastrar, renomear e excluir biometria
+ * mostram o envio no botão e confirmam na própria seção depois do servidor; a falha mostra a causa e
+ * "Tentar de novo". Copiar é nível 0: o botão vira "Copiado" por um instante.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Copy, Fingerprint, KeyRound, Pencil, ShieldCheck, Trash2 } from "lucide-react";
 
 import { LiteConfirmDialog, LiteSelect } from "@/components/lite/controls";
 import { formatLiteDate } from "@/components/lite/format/date";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
-import { toast } from "@/components/ui/sonner";
 import { authClient } from "@/shared/auth/client";
 
 import { recordSecurityAuditAction } from "../../security-actions";
 import styles from "@/components/lite/page/lite-sections.module.css";
+
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 
 function getSecretFromUri(uri: string | null) {
   if (!uri) return null;
   try { return new URL(uri).searchParams.get("secret"); } catch { return null; }
 }
 
-async function copyText(value: string, label: string) {
-  await navigator.clipboard.writeText(value);
-  toast.success(`${label} copiado.`);
+/** Copiar (nível 0): o botão mostra "Copiado" por 1,6 s; se a área de transferência recusar, diz isso no lugar. */
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const timer = useRef<number | null>(null);
+  useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setState("copied");
+    } catch {
+      setState("failed");
+    }
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setState("idle"), 1600);
+  }
+  return (
+    <button type="button" className={page.button} onClick={() => void copy()}>
+      <Copy aria-hidden="true" size={16} />
+      <span role="status">{state === "copied" ? "Copiado" : state === "failed" ? "Não deu para copiar" : label}</span>
+    </button>
+  );
 }
 
 export function SecurityLite({ enabled: initialEnabled, email }: { enabled: boolean; email: string }) {
@@ -43,11 +66,13 @@ function TwoFactorLite({ initialEnabled, email }: { initialEnabled: boolean; ema
   const [password, setPassword] = useState("");
   const [totpUri, setTotpUri] = useState<string | null>(null);
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const { status, run } = useActionStatus();
+  const [action, setAction] = useState<"enable" | "disable" | "codes" | null>(null);
+  const busy = status.twoFactor?.state === "busy";
 
-  async function enable() {
-    setBusy(true);
-    try {
+  function enable() {
+    setAction("enable");
+    void run("twoFactor", async () => {
       const result = await authClient.twoFactor.enable({ password: password || undefined, issuer: "Âncora Corretora" });
       if (result.error || !result.data) throw new Error(result.error?.message ?? "Não foi possível ativar o 2FA.");
       setEnabled(true);
@@ -57,33 +82,27 @@ function TwoFactorLite({ initialEnabled, email }: { initialEnabled: boolean; ema
       }
       setPassword("");
       await recordSecurityAuditAction("ativou_2fa");
-      toast.success("2FA ativado. Guarde seus códigos de recuperação.");
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível ativar o 2FA."); }
-    finally { setBusy(false); }
+    }, { done: "2FA ativado. Guarde seus códigos de recuperação.", fallback: "Não foi possível ativar o 2FA.", keeps: "A conta continua sem duas etapas." });
   }
 
-  async function disable() {
-    setBusy(true);
-    try {
+  function disable() {
+    setAction("disable");
+    void run("twoFactor", async () => {
       const result = await authClient.twoFactor.disable({ password: password || undefined });
       if (result.error) throw new Error(result.error.message ?? "Não foi possível desativar o 2FA.");
       setEnabled(false); setTotpUri(null); setBackupCodes([]); setPassword("");
       await recordSecurityAuditAction("desativou_2fa");
-      toast.success("2FA desativado para esta conta.");
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível desativar o 2FA."); }
-    finally { setBusy(false); }
+    }, { done: "2FA desativado para esta conta.", fallback: "Não foi possível desativar o 2FA.", keeps: "As duas etapas continuam ativas." });
   }
 
-  async function regenerateCodes() {
-    setBusy(true);
-    try {
+  function regenerateCodes() {
+    setAction("codes");
+    void run("twoFactor", async () => {
       const result = await authClient.twoFactor.generateBackupCodes({ password: password || undefined });
       if (result.error || !result.data) throw new Error(result.error?.message ?? "Não foi possível gerar novos códigos.");
       setBackupCodes(result.data.backupCodes); setPassword("");
       await recordSecurityAuditAction("gerou_codigos_backup");
-      toast.success("Novos códigos gerados. Os anteriores foram invalidados.");
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível gerar novos códigos."); }
-    finally { setBusy(false); }
+    }, { done: "Novos códigos gerados. Os anteriores foram invalidados.", fallback: "Não foi possível gerar novos códigos.", keeps: "Os códigos anteriores continuam valendo." });
   }
 
   const secret = getSecretFromUri(totpUri);
@@ -97,6 +116,7 @@ function TwoFactorLite({ initialEnabled, email }: { initialEnabled: boolean; ema
         </div>
         <span className={page.badge} data-tone={enabled ? "success" : undefined}>{enabled ? "Ativo" : "Não configurado"}</span>
       </div>
+      {status.twoFactor && !busy ? <div className={styles.formBody}><ActionNote status={status.twoFactor} /></div> : null}
       {!enabled ? (
         <div className={styles.formBody}>
           <ol className={styles.steps}>
@@ -109,9 +129,11 @@ function TwoFactorLite({ initialEnabled, email }: { initialEnabled: boolean; ema
             <input className={form.input} type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Digite sua senha para continuar" />
           </label>
           <div>
-            <button type="button" className={page.primaryButton} onClick={enable} disabled={busy || !password}>
-              <ShieldCheck aria-hidden="true" size={16} />
-              {busy ? "Ativando..." : "Ativar duas etapas"}
+            <button type="button" className={page.primaryButton} onClick={enable} disabled={busy || !password} aria-busy={busy || undefined}>
+              <BusyLabel busy={busy} label="Ativando…">
+                <ShieldCheck aria-hidden="true" size={16} />
+                Ativar duas etapas
+              </BusyLabel>
             </button>
           </div>
         </div>
@@ -128,14 +150,14 @@ function TwoFactorLite({ initialEnabled, email }: { initialEnabled: boolean; ema
               {secret ? (
                 <div className={styles.badges}>
                   <code className={styles.code}>{secret}</code>
-                  <button type="button" className={page.button} onClick={() => copyText(secret, "Chave")}><Copy aria-hidden="true" size={16} /> Copiar chave</button>
+                  <CopyButton value={secret} label="Copiar chave" />
                 </div>
               ) : null}
               {backupCodes.length ? (
                 <>
                   <div className={styles.footer} style={{ padding: 0 }}>
                     <p className={styles.rowTitle}>Códigos de recuperação</p>
-                    <button type="button" className={page.button} onClick={() => copyText(backupCodes.join("\n"), "Códigos")}><Copy aria-hidden="true" size={16} /> Copiar todos</button>
+                    <CopyButton value={backupCodes.join("\n")} label="Copiar todos" />
                   </div>
                   <ul className={styles.codes}>{backupCodes.map((code) => <li key={code}>{code}</li>)}</ul>
                   <p className={styles.note}>Cada código pode ser usado uma única vez. Não os compartilhe.</p>
@@ -148,8 +170,12 @@ function TwoFactorLite({ initialEnabled, email }: { initialEnabled: boolean; ema
             <input className={form.input} type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} />
           </label>
           <div className={styles.badges}>
-            <button type="button" className={page.button} disabled={busy || !password} onClick={regenerateCodes}><KeyRound aria-hidden="true" size={16} /> Gerar novos códigos</button>
-            <button type="button" className={page.button} data-tone="danger" disabled={busy || !password} onClick={disable}>Desativar 2FA</button>
+            <button type="button" className={page.button} disabled={busy || !password} aria-busy={(busy && action === "codes") || undefined} onClick={regenerateCodes}>
+              <BusyLabel busy={busy && action === "codes"} label="Gerando…"><KeyRound aria-hidden="true" size={16} /> Gerar novos códigos</BusyLabel>
+            </button>
+            <button type="button" className={page.button} data-tone="danger" disabled={busy || !password} aria-busy={(busy && action === "disable") || undefined} onClick={disable}>
+              <BusyLabel busy={busy && action === "disable"} label="Desativando…">Desativar 2FA</BusyLabel>
+            </button>
           </div>
         </div>
       )}
@@ -170,6 +196,7 @@ function PasskeysLite() {
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const { status, run } = useActionStatus();
   const [busy, setBusy] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -190,54 +217,45 @@ function PasskeysLite() {
     return () => window.removeEventListener("resize", checkMobile);
   }, [refresh]);
 
+  async function passkeyAction(key: string, task: () => Promise<void>, options: { done: string; fallback: string; keeps: string }) {
+    setBusy(key);
+    const done = await run("passkeys", async () => { await task(); return true; }, options);
+    setBusy("");
+    return done !== undefined;
+  }
+
   async function addPasskey() {
-    setBusy("add");
-    try {
+    await passkeyAction("add", async () => {
       const finalName = name.trim() || (isMobile ? "Biometria Celular" : "Biometria do Dispositivo");
       const result = await authClient.passkey.addPasskey({ name: finalName, authenticatorAttachment: isMobile ? "platform" : attachmentType || "platform" });
       if (result.error) throw new Error(result.error.message ?? "Não foi possível cadastrar a biometria.");
       await recordSecurityAuditAction("cadastrou_passkey");
-      toast.success("Biometria cadastrada com sucesso.");
       setName("");
       await refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar a biometria.");
-    } finally {
-      setBusy("");
-    }
+    }, { done: "Biometria cadastrada", fallback: "Não foi possível cadastrar a biometria.", keeps: "As biometrias que você já tem continuam valendo." });
   }
 
   async function renamePasskey() {
     if (!editingId || !editingName.trim()) return;
-    setBusy("rename");
-    try {
-      const result = await authClient.passkey.updatePasskey({ id: editingId, name: editingName.trim() });
+    const id = editingId;
+    const nextName = editingName.trim();
+    await passkeyAction("rename", async () => {
+      const result = await authClient.passkey.updatePasskey({ id, name: nextName });
       if (result.error) throw new Error(result.error.message ?? "Não foi possível renomear.");
       await recordSecurityAuditAction("renomeou_passkey");
-      toast.success("Nome atualizado.");
       setEditingId(null);
       setEditingName("");
       await refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível renomear.");
-    } finally {
-      setBusy("");
-    }
+    }, { done: "Nome atualizado", fallback: "Não foi possível renomear.", keeps: "O nome anterior continua." });
   }
 
   async function deletePasskey(id: string, label: string) {
-    setBusy(id);
-    try {
+    await passkeyAction(id, async () => {
       const result = await authClient.passkey.deletePasskey({ id });
       if (result.error) throw new Error(result.error.message ?? "Não foi possível excluir.");
       await recordSecurityAuditAction("excluiu_passkey");
-      toast.success(`Biometria "${label}" removida.`);
       await refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
-    } finally {
-      setBusy("");
-    }
+    }, { done: `Biometria "${label}" removida`, fallback: "Não foi possível excluir.", keeps: "A biometria continua cadastrada." });
   }
 
   return (
@@ -247,9 +265,11 @@ function PasskeysLite() {
           <h3 id="passkey-title" className={styles.rowTitle}>Chaves de acesso</h3>
           <p className={styles.rowDescription}>Use a digital ou o reconhecimento facial do aparelho para entrar com um toque, sem digitar senha.</p>
         </div>
-        <button type="button" className={page.primaryButton} onClick={addPasskey} disabled={busy === "add"}>
-          <Fingerprint aria-hidden="true" size={16} />
-          {busy === "add" ? "Aguardando leitura..." : "Cadastrar biometria"}
+        <button type="button" className={page.primaryButton} onClick={addPasskey} disabled={busy === "add"} aria-busy={busy === "add" || undefined}>
+          <BusyLabel busy={busy === "add"} label="Aguardando leitura…">
+            <Fingerprint aria-hidden="true" size={16} />
+            Cadastrar biometria
+          </BusyLabel>
         </button>
       </div>
       {busy === "add" ? (
@@ -277,6 +297,7 @@ function PasskeysLite() {
       ) : null}
       <div>
         <p className={styles.item}><span className={styles.rowTitle}>Biometrias cadastradas ({passkeys.length})</span></p>
+        {status.passkeys && !busy ? <div className={styles.formBody}><ActionNote status={status.passkeys} /></div> : null}
         {passkeys.length === 0 ? (
           <div className={styles.empty}>
             <p className={styles.emptyTitle}>Nenhuma biometria cadastrada ainda</p>
@@ -303,7 +324,7 @@ function PasskeysLite() {
                           if (event.key === "Escape") { setEditingId(null); setEditingName(""); }
                         }}
                       />
-                      <button type="button" className={page.primaryButton} onClick={renamePasskey} disabled={busy === "rename"}>Salvar nome</button>
+                      <button type="button" className={page.primaryButton} onClick={renamePasskey} disabled={busy === "rename"} aria-busy={busy === "rename" || undefined}><BusyLabel busy={busy === "rename"} label="Salvando…">Salvar nome</BusyLabel></button>
                       <button type="button" className={page.button} onClick={() => { setEditingId(null); setEditingName(""); }}>Cancelar</button>
                     </div>
                   ) : (
@@ -321,7 +342,7 @@ function PasskeysLite() {
                         <button type="button" className={page.iconButton} aria-label={`Renomear ${label}`} onClick={() => { setEditingId(passkey.id); setEditingName(passkey.name || ""); }}>
                           <Pencil aria-hidden="true" size={18} />
                         </button>
-                        <button type="button" className={page.iconButton} aria-label={`Excluir ${label}`} disabled={busy === passkey.id} onClick={() => setRemoving({ id: passkey.id, label })}>
+                        <button type="button" className={page.iconButton} aria-label={`Excluir ${label}`} disabled={busy === passkey.id} aria-busy={busy === passkey.id || undefined} onClick={() => setRemoving({ id: passkey.id, label })}>
                           <Trash2 aria-hidden="true" size={18} />
                         </button>
                       </span>

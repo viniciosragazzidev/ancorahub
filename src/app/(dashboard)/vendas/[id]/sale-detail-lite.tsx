@@ -4,15 +4,20 @@
  * Detalhe da venda no visual Lite do diretor. Mesmos dados, mesmos números (com as tendências do cronograma) e as
  * mesmas ações (ver lead, ver cliente, marcar parcela paga e reverter pela mesma Server Action). Abas: cronograma,
  * dados do contrato e observações.
+ *
+ * Feedback (FEEDBACK.md, nível 1): marcar paga e reverter mostram o envio no botão e confirmam na própria parcela depois
+ * do servidor; a falha mostra a causa, o que continua valendo e "Tentar de novo". Sem toast.
  */
 import Link from "next/link";
-import { useActionState, useEffect, type ReactNode } from "react";
+import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, CheckCircle2, FileText, Undo2, Users } from "lucide-react";
 
 import { StatCard } from "@/components/dashboard/metric-card";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import page from "@/components/lite/page/lite-page.module.css";
-import { toast } from "@/components/ui/sonner";
+import { LiteSuccess } from "@/components/lite/motion/success";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { markCommissionPaidAction, markCommissionUnpaidAction, type SaleActionState } from "@/features/sales/actions";
 import { formatLiteDate } from "@/components/lite/format/date";
@@ -207,36 +212,72 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Marcar paga e reverter: as mesmas Server Actions e mensagens; os avisos saem num efeito, não no render. */
+/** Marcar paga e reverter: as mesmas Server Actions; o resultado aparece na própria parcela, num efeito, não no render. */
 function ScheduleAction({ item }: { item: ScheduleItem }) {
+  const fire = useFeedback();
   const [payState, payAction, payPending] = useActionState<SaleActionState, FormData>(markCommissionPaidAction, {});
   const [unpayState, unpayAction, unpayPending] = useActionState<SaleActionState, FormData>(markCommissionUnpaidAction, {});
+  const [note, setNote] = useState<{ kind: "done"; label: string } | { kind: "error"; message: string; retry: () => void } | null>(null);
+  const payForm = useRef<HTMLFormElement>(null);
+  const unpayForm = useRef<HTMLFormElement>(null);
+  // Cada resposta do servidor é tratada uma vez (o efeito pode rodar de novo sem resposta nova).
+  const handled = useRef<{ pay: SaleActionState; unpay: SaleActionState }>({ pay: payState, unpay: unpayState });
   useEffect(() => {
-    if (payState.success) toast.success("Comissão marcada como paga.");
-    if (payState.error) toast.error(payState.error);
-  }, [payState]);
+    if (handled.current.pay === payState) return;
+    handled.current.pay = payState;
+    if (payState.success) {
+      fire("confirm");
+      setNote({ kind: "done", label: "Paga" });
+    }
+    if (payState.error) {
+      fire("error");
+      setNote({ kind: "error", message: actionErrorMessage(normalizeActionError(payState.error, "Não deu para marcar a parcela como paga."), "A parcela continua pendente."), retry: () => payForm.current?.requestSubmit() });
+    }
+  }, [payState, fire]);
   useEffect(() => {
-    if (unpayState.success) toast.success("Pagamento revertido.");
-    if (unpayState.error) toast.error(unpayState.error);
-  }, [unpayState]);
+    if (handled.current.unpay === unpayState) return;
+    handled.current.unpay = unpayState;
+    if (unpayState.success) {
+      fire("confirm");
+      setNote({ kind: "done", label: "Pagamento revertido" });
+    }
+    if (unpayState.error) {
+      fire("error");
+      setNote({ kind: "error", message: actionErrorMessage(normalizeActionError(unpayState.error, "Não deu para reverter o pagamento."), "A parcela continua paga."), retry: () => unpayForm.current?.requestSubmit() });
+    }
+  }, [unpayState, fire]);
+  const spinner = <span aria-hidden="true" className="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none" />;
+  const feedback = note?.kind === "done" ? <LiteSuccess label={note.label} className="text-sm text-[var(--success)]" />
+    : note?.kind === "error" ? (
+      <span className="flex flex-wrap items-center gap-2">
+        <span role="alert" className="text-sm text-[var(--danger)]">{note.message}</span>
+        <button type="button" className={page.button} onClick={note.retry}>Tentar de novo</button>
+      </span>
+    ) : null;
   if (item.status === "pending") {
     return (
-      <form action={payAction}>
-        <input type="hidden" name="scheduleId" value={item.id} />
-        <button type="submit" className={page.button} disabled={payPending}>
-          <CheckCircle2 aria-hidden="true" size={16} />{payPending ? "Salvando..." : "Marcar paga"}
-        </button>
-      </form>
+      <span className="inline-flex flex-wrap items-center gap-2">
+        <form ref={payForm} action={(data) => { setNote(null); fire("tap"); payAction(data); }}>
+          <input type="hidden" name="scheduleId" value={item.id} />
+          <button type="submit" className={page.button} disabled={payPending} aria-busy={payPending || undefined}>
+            {payPending ? <>{spinner}Salvando…</> : <><CheckCircle2 aria-hidden="true" size={16} />Marcar paga</>}
+          </button>
+        </form>
+        {payPending ? null : feedback}
+      </span>
     );
   }
   if (item.status === "paid") {
     return (
-      <form action={unpayAction}>
-        <input type="hidden" name="scheduleId" value={item.id} />
-        <button type="submit" className={page.button} disabled={unpayPending}>
-          <Undo2 aria-hidden="true" size={16} />{unpayPending ? "Revertendo..." : "Reverter"}
-        </button>
-      </form>
+      <span className="inline-flex flex-wrap items-center gap-2">
+        <form ref={unpayForm} action={(data) => { setNote(null); fire("tap"); unpayAction(data); }}>
+          <input type="hidden" name="scheduleId" value={item.id} />
+          <button type="submit" className={page.button} disabled={unpayPending} aria-busy={unpayPending || undefined}>
+            {unpayPending ? <>{spinner}Revertendo…</> : <><Undo2 aria-hidden="true" size={16} />Reverter</>}
+          </button>
+        </form>
+        {unpayPending ? null : feedback}
+      </span>
     );
   }
   return null;

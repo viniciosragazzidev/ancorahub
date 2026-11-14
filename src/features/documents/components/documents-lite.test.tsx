@@ -15,6 +15,8 @@ const actions = vi.hoisted(() => ({
 vi.mock("@/features/documents/actions", () => actions);
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 vi.mock("@/components/ui/sonner", () => ({ toast }));
+const fire = vi.hoisted(() => vi.fn(() => ({ motion: false, celebrate: false })));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => fire }));
 
 afterEach(() => {
   cleanup();
@@ -42,13 +44,16 @@ describe("documentos Lite", () => {
       fireEvent.click(within(table()).getAllByRole("button", { name: /^Aprovar / })[0]!);
     });
     expect(actions.reviewDocumentAction).toHaveBeenCalledWith({ documentId: "doc-1", leadId: "lead-1", status: "approved" });
-    expect(toast.success).toHaveBeenCalledWith("Documento aprovado.");
+    expect(screen.getByRole("status")).toHaveTextContent(/aprovado$/);
+    expect(fire).toHaveBeenCalledWith("confirm");
+    expect(toast.success).not.toHaveBeenCalled();
     fireEvent.click(within(table()).getByRole("checkbox", { name: "Selecionar todos" }));
     const bar = within(screen.getByRole("region", { name: "Ações em lote" }));
     await act(async () => {
       fireEvent.click(bar.getByRole("button", { name: "Rejeitar" }));
     });
     expect(actions.bulkReviewDocumentsAction).toHaveBeenCalledWith(expect.arrayContaining(["doc-2"]), "rejected");
+    expect(screen.getByRole("status")).toHaveTextContent(/documentos rejeitados$/);
   });
 
   it("resumo da fila mostra pendentes e a idade do pendente mais antigo", () => {
@@ -91,7 +96,36 @@ describe("documentos Lite", () => {
       fireEvent.click(within(dialog).getByRole("button", { name: "Excluir requisito" }));
     });
     expect(actions.deleteRequirementAction).toHaveBeenCalledWith("req-3");
-    expect(toast.success).toHaveBeenCalledWith("Requisito removido.");
+    expect(screen.getByRole("status")).toHaveTextContent("Requisito removido");
+    expect(toast.success).not.toHaveBeenCalled();
     expect(screen.getByRole("textbox", { name: "Nome do documento" })).toBeInTheDocument();
+  });
+
+  it("falha ao aprovar mostra a causa na fila e Tentar de novo refaz a mesma ação", async () => {
+    actions.reviewDocumentAction.mockResolvedValueOnce({ error: "Documento já revisado por outra pessoa." } as never);
+    renderDocs();
+    await act(async () => {
+      fireEvent.click(within(table()).getAllByRole("button", { name: /^Aprovar / })[0]!);
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("Documento já revisado por outra pessoa. O documento continua como estava.");
+    expect(fire).toHaveBeenCalledWith("error");
+    expect(toast.error).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    });
+    expect(actions.reviewDocumentAction).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("status")).toHaveTextContent(/aprovado$/);
+  });
+
+  it("criar requisito: a falha do servidor aparece no formulário", async () => {
+    actions.createRequirementAction.mockResolvedValueOnce({ error: "Já existe um requisito com esse nome." } as never);
+    renderDocs();
+    fireEvent.click(screen.getByRole("tab", { name: "Configuração de requisitos" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Nome do documento" }), { target: { value: "RG" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Criar requisito" }));
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Já existe um requisito com esse nome. O formulário continua preenchido.");
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

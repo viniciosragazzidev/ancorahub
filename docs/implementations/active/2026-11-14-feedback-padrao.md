@@ -2,7 +2,9 @@
 
 Data: 14/11/2026 · Dono: Vinicios · Padrão: `docs/design-system/FEEDBACK.md`
 Relatórios e protótipo: `reports/design/feedback-duolingo-2026-11-14/`. O protótipo `aceitar-lead-exemplo.html` é a referência visual e de tempo do botão de ação e do aceite.
-Status: **fases 0, 1 e 2 entregues em 14/11/2026** (branch `feat/feedback-padrao`); fases 3 a 7 pendentes. Vitrine para testar: `/dev/feedback` (só em desenvolvimento). Cada fase abaixo é uma branch própria, com revisão visual antes do merge.
+Status: **fases 0 a 5 entregues em 14/11/2026 (modo Lite inteiro)**; fases 6 (modo normal) e 7 (rig do mascote) pendentes. Venda registrada no Lite comemora em tela cheia com o capitão (`SaleCelebration`).
+
+Ficaram de fora da fase 5 (ainda com toast): feedback-templates-lite, negotiations-radar-lite, campaign-detail-lite, campaign-broker-offer-lite, meta-conversions-lite, capture-control-lite, unit-reports-lite, unit-profile-lite, situations-workspace-lite, flow-editor-lite, messages-workspace-lite, sales-workspace-lite, client-renewal-lite e welcome-screen-lite. O `action-status-lite.tsx` da fase 5 está copiado em 11 pastas: promover para `src/components/lite`. Fase 3b: avaliar se a missão (`missao`) e a meta do dia (`meta-do-dia`) devem dividir a mesma vaga de celebração.
 
 Frequência: estimada pelo papel de cada tela, não por métrica. N0 a N3 = níveis do §3 do padrão.
 

@@ -29,6 +29,7 @@ import styles from "./chat.module.css";
 import { FirstStepsCard } from "@/features/assist/components/first-steps-card";
 import type { FirstStep } from "@/features/assist/first-steps";
 import home from "./chat-home.module.css";
+import { GoalReached } from "./goal-reached";
 import { LiteWelcome } from "./lite-welcome";
 import { LiteTour } from "./tour/lite-tour";
 import { ThreadList } from "./thread-row";
@@ -433,7 +434,9 @@ export function ChatHome({
                 <LitePress kind="card"><Link href={isSupervisor ? "/equipe/desempenho" : "/desempenho"} className={home.card}>
                   <AssistantAvatar shape="nuvem" hue={330} size={40} />
                   <span className={home.cardName}>{summary.goal.name}</span>
-                  <span className={home.goalTrack} aria-hidden="true"><GoalFill percentage={summary.goal.percentage} /></span>
+                  <GoalReached reached={summary.goal.percentage >= 100} kind="goal" className={home.goalRing}>
+                    <span className={home.goalTrack} aria-hidden="true"><GoalFill percentage={summary.goal.percentage} /></span>
+                  </GoalReached>
                   <span className={home.cardPreview}>{summary.goal.currentValue} de {summary.goal.targetValue} · {summary.goal.percentage}%</span>
                 </Link></LitePress>
               ) : null}
@@ -473,7 +476,8 @@ export function ChatHome({
 /**
  * Meta do dia: o corretor abre o Início dezenas de vezes por dia, então a barra
  * só se preenche na primeira abertura do dia (docs/ux/motion-frequencia.md).
- * Nas outras já aparece cheia até o valor, sem animação.
+ * Nas outras já aparece cheia até o valor, sem animação. Quando bate 100%, o `GoalReached` em volta
+ * marca o nível 2 uma vez por dia (anel, som de marco e texto curto).
  */
 export function GoalFill({ percentage }: { percentage: number }) {
   const animate = useFirstTimeToday("meta-do-dia", useInterfaceMotionEnabled());

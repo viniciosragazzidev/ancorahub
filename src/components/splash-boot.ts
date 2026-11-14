@@ -1,8 +1,8 @@
 /**
- * Script da splash que roda antes da primeira pintura (docs/design-system/MASCOTE.md §5), injetado
+ * Script da splash que roda antes da primeira pintura, injetado
  * no <head> pelo layout raiz com next/script "beforeInteractive":
  * - se a splash já apareceu nesta sessão, marca html[data-splash="done"] e ela nem aparece;
- * - se o aparelho pediu "Menos animação" (ancora:a11y), marca html[data-splash="static"] e o mascote fica parado.
+ * - se o aparelho pediu "Menos animação" (ancora:a11y), marca html[data-splash="static"] e a arte fica parada.
  * Texto fixo, sem dado do usuário.
  */
 export const SPLASH_KEY = "__ancora_splash_shown";

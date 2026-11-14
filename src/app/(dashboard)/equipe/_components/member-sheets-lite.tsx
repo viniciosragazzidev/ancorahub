@@ -3,19 +3,24 @@
 /**
  * Ações de membro no visual Lite (/equipe): editar, transferir leads e redefinir senha em painel lateral; excluir na
  * confirmação Lite. Mesmas Server Actions, regras e textos dos diálogos de member-actions.tsx.
+ *
+ * Feedback (FEEDBACK.md, nível 1): o botão mostra o envio; depois que o servidor confirma, o painel fecha e
+ * `onDone` leva a confirmação para a lista (o objeto). A falha fica no painel, com a causa e "Tentar de novo".
  */
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, KeyRound } from "lucide-react";
 
 import { LiteConfirmDialog, LiteSelect } from "@/components/lite/controls";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
-import { toast } from "@/components/ui/sonner";
 import type { TenantRole } from "@/shared/db/schema";
 
 import { deleteTeamMemberAction, generateResetPasswordLinkAction, transferLeadsAction, updateTeamMemberAction } from "../actions";
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import styles from "./team-lite.module.css";
 
 export type TeamMemberLite = {
@@ -66,7 +71,7 @@ function useRefreshOnSuccess() {
 }
 
 /** Editar membro: os mesmos campos e regras do EditMemberDialog. */
-export function EditMemberLite({ member, open, onOpenChange, branches, currentRole, currentBranchId, customRoles, allMembers }: {
+export function EditMemberLite({ member, open, onOpenChange, branches, currentRole, currentBranchId, customRoles, allMembers, onDone }: {
   member: TeamMemberLite;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -75,9 +80,12 @@ export function EditMemberLite({ member, open, onOpenChange, branches, currentRo
   currentBranchId: string | null;
   customRoles: CustomRoleOption[];
   allMembers: TeamMemberLite[];
+  /** Confirmação na lista depois que o painel fecha. */
+  onDone?: (label: string) => void;
 }) {
   const refresh = useRefreshOnSuccess();
-  const [pending, startTransition] = useTransition();
+  const { status, run } = useActionStatus();
+  const pending = status.edit?.state === "busy";
   const allowedBranches = currentRole === "manager" && currentBranchId ? branches.filter((branch) => branch.id === currentBranchId) : branches;
   const [jobTitle, setJobTitle] = useState(member.jobTitle);
   const [role, setRole] = useState<string>(member.role);
@@ -117,15 +125,15 @@ export function EditMemberLite({ member, open, onOpenChange, branches, currentRo
   };
 
   const submit = (data: FormData) => {
-    startTransition(async () => {
+    // O que acontece depois do servidor fica dentro da tarefa: o "Tentar de novo" refaz tudo.
+    void run("edit", async () => {
       const result = await updateTeamMemberAction({}, data);
-      if (result.success) {
-        toast.success("Membro atualizado com sucesso.");
-        onOpenChange(false);
-        refresh();
-      }
-      if (result.error) toast.error(result.error);
-    });
+      if (!result.success) return { ok: false as const, error: result.error };
+      onOpenChange(false);
+      onDone?.(`${member.name ?? member.email}: dados atualizados`);
+      refresh();
+      return result;
+    }, { done: "Membro atualizado", fallback: "Não deu para salvar as alterações agora.", keeps: "O que você preencheu continua aqui." });
   };
 
   const branchOptions = [
@@ -214,29 +222,31 @@ export function EditMemberLite({ member, open, onOpenChange, branches, currentRo
         ) : null}
         <div className={form.actions}>
           <button type="button" className={page.button} disabled={pending} onClick={() => onOpenChange(false)}>Cancelar</button>
-          <button type="submit" className={page.primaryButton} disabled={pending}>{pending ? "Salvando..." : "Salvar alterações"}</button>
+          <button type="submit" className={page.primaryButton} disabled={pending} aria-busy={pending || undefined}><BusyLabel busy={pending} label="Salvando…">Salvar alterações</BusyLabel></button>
         </div>
+        {status.edit?.state === "error" ? <ActionNote status={status.edit} /> : null}
       </form>
     </LiteSidePanel>
   );
 }
 
 /** Excluir membro: confirmação Lite com o mesmo texto do diálogo atual. */
-export function DeleteMemberLite({ member, open, onOpenChange }: { member: TeamMemberLite; open: boolean; onOpenChange: (open: boolean) => void }) {
+export function DeleteMemberLite({ member, open, onOpenChange, onDone }: { member: TeamMemberLite; open: boolean; onOpenChange: (open: boolean) => void; onDone?: (label: string) => void }) {
   const refresh = useRefreshOnSuccess();
-  const [, startTransition] = useTransition();
+  const { status, run } = useActionStatus();
+  const pending = status.delete?.state === "busy";
   const confirm = () => {
+    if (pending) return;
     const data = new FormData();
     data.set("memberId", member.id);
-    startTransition(async () => {
+    void run("delete", async () => {
       const result = await deleteTeamMemberAction({}, data);
-      if (result.success) {
-        toast.success("Membro removido com sucesso.");
-        onOpenChange(false);
-        refresh();
-      }
-      if (result.error) toast.error(result.error);
-    });
+      if (!result.success) return { ok: false as const, error: result.error };
+      onOpenChange(false);
+      onDone?.(`${member.name ?? member.email} removido da equipe`);
+      refresh();
+      return result;
+    }, { done: "Membro removido", fallback: "Não deu para excluir o membro agora.", keeps: "O acesso continua como estava." });
   };
   return (
     <LiteConfirmDialog
@@ -249,6 +259,8 @@ export function DeleteMemberLite({ member, open, onOpenChange }: { member: TeamM
       description={(
         <div className={styles.deleteBody}>
           <span>Essa ação remove o acesso desta empresa, a associação de equipe e as sessões ativas. O histórico operacional é preservado.</span>
+          {pending ? <span className={page.muted} role="status">Excluindo…</span> : null}
+          {status.delete?.state === "error" ? <ActionNote status={status.delete} /> : null}
           <span className={styles.deleteCard}>
             <span className={page.cellTitle}>{member.name ?? "Sem nome"}</span>
             <span className={page.cellSub}>{member.email}</span>
@@ -264,9 +276,10 @@ export function DeleteMemberLite({ member, open, onOpenChange }: { member: TeamM
 }
 
 /** Transferir todos os leads do corretor para outro corretor ativo. */
-export function TransferLeadsLite({ member, open, onOpenChange, allMembers }: { member: TeamMemberLite; open: boolean; onOpenChange: (open: boolean) => void; allMembers: TeamMemberLite[] }) {
+export function TransferLeadsLite({ member, open, onOpenChange, allMembers, onDone }: { member: TeamMemberLite; open: boolean; onOpenChange: (open: boolean) => void; allMembers: TeamMemberLite[]; onDone?: (label: string) => void }) {
   const refresh = useRefreshOnSuccess();
-  const [pending, startTransition] = useTransition();
+  const { status, run } = useActionStatus();
+  const pending = status.transfer?.state === "busy";
   const [target, setTarget] = useState("");
   const brokers = allMembers.filter((item) => item.role === "broker" && item.status === "active" && item.userId && item.userId !== member.userId);
   useEffect(() => {
@@ -276,15 +289,15 @@ export function TransferLeadsLite({ member, open, onOpenChange, allMembers }: { 
     const data = new FormData();
     data.set("fromUserId", member.userId ?? "");
     data.set("toUserId", target);
-    startTransition(async () => {
+    const targetName = brokers.find((broker) => broker.userId === target)?.name ?? "o corretor escolhido";
+    void run("transfer", async () => {
       const result = await transferLeadsAction({}, data);
-      if (result.success) {
-        toast.success("Leads transferidos com sucesso.");
-        onOpenChange(false);
-        refresh();
-      }
-      if (result.error) toast.error(result.error);
-    });
+      if (!result.success) return { ok: false as const, error: result.error };
+      onOpenChange(false);
+      onDone?.(`Leads de ${member.name ?? member.email} transferidos para ${targetName}`);
+      refresh();
+      return result;
+    }, { done: "Leads transferidos", fallback: "Não deu para transferir os leads agora.", keeps: `Os leads continuam com ${member.name ?? member.email}.` });
   };
   return (
     <LiteSidePanel open={open} onOpenChange={onOpenChange} title="Transferir leads em lote" description={`Mova todos os leads de ${member.name ?? member.email} para outro corretor ativo.`}>
@@ -293,8 +306,9 @@ export function TransferLeadsLite({ member, open, onOpenChange, allMembers }: { 
         {brokers.length === 0 ? <p className={styles.error}>Nenhum outro corretor ativo disponível para receber os leads.</p> : null}
         <div className={form.actions}>
           <button type="button" className={page.button} disabled={pending} onClick={() => onOpenChange(false)}>Cancelar</button>
-          <button type="button" className={page.primaryButton} disabled={pending || brokers.length === 0 || !target} onClick={submit}>{pending ? "Transferindo..." : "Confirmar transferência"}</button>
+          <button type="button" className={page.primaryButton} disabled={pending || brokers.length === 0 || !target} aria-busy={pending || undefined} onClick={submit}><BusyLabel busy={pending} label="Transferindo…">Confirmar transferência</BusyLabel></button>
         </div>
+        {status.transfer?.state === "error" ? <ActionNote status={status.transfer} /> : null}
       </div>
     </LiteSidePanel>
   );
@@ -302,11 +316,12 @@ export function TransferLeadsLite({ member, open, onOpenChange, allMembers }: { 
 
 /** Redefinir senha: gera o link, que vai direto para o WhatsApp do membro; a mensagem pronta fica para copiar. */
 export function ResetPasswordLite({ member, open, onOpenChange }: { member: TeamMemberLite; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const fire = useFeedback();
   const [pending, setPending] = useState(false);
   const [resetUrl, setResetUrl] = useState<string | null>(null);
   const [whatsapp, setWhatsapp] = useState<"sent" | "failed" | "no_phone" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
   const memberName = member.name ?? member.email;
 
   useEffect(() => {
@@ -314,55 +329,65 @@ export function ResetPasswordLite({ member, open, onOpenChange }: { member: Team
       setResetUrl(null);
       setWhatsapp(null);
       setError(null);
-      setCopied(false);
+      setCopied("idle");
       setPending(false);
     }
   }, [open]);
 
   const generate = async () => {
+    if (pending) return;
     const targetId = member.userId ?? member.id;
     setPending(true);
     setError(null);
+    fire("tap");
     try {
       const data = new FormData();
       data.set("userId", targetId);
       const result = await generateResetPasswordLinkAction({}, data);
       if (result.success && result.resetUrl) {
+        // O resultado (link enviado ou mensagem para copiar) aparece no próprio painel; sem toast repetindo.
         setResetUrl(result.resetUrl.startsWith("http") ? result.resetUrl : `${window.location.origin}${result.resetUrl}`);
         setWhatsapp(result.resetWhatsApp ?? null);
-        if (result.resetWhatsApp === "sent") toast.success(`Link enviado no WhatsApp de ${memberName}.`);
+        fire("confirm");
       } else {
-        setError(result.error ?? "Erro desconhecido ao gerar o link.");
+        fire("error");
+        setError(actionErrorMessage(normalizeActionError(result.error, "Não deu para gerar o link agora."), "A senha atual continua valendo."));
       }
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Falha na requisição. Verifique sua conexão.");
+      fire("error");
+      setError(actionErrorMessage(normalizeActionError(failure, "Não deu para gerar o link agora."), "A senha atual continua valendo."));
     } finally {
       setPending(false);
     }
   };
 
   const message = resetUrl ? `Olá, ${memberName}! Seu link para redefinir sua senha no sistema Âncora CRM foi gerado. Acesse o link abaixo para criar sua nova senha:\n\n${resetUrl}\n\nEste link é seguro e é válido por 24 horas.` : "";
+  // Copiar é nível 0: o botão mostra "Copiado" e volta sozinho.
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(message);
-      setCopied(true);
-      toast.success("Mensagem e link copiados com sucesso!");
-      window.setTimeout(() => setCopied(false), 3000);
+      setCopied("copied");
     } catch {
-      toast.error("Erro ao copiar para a área de transferência.");
+      setCopied("failed");
     }
+    window.setTimeout(() => setCopied("idle"), 3000);
   };
 
   return (
     <LiteSidePanel open={open} onOpenChange={onOpenChange} title="Redefinir senha do membro" description={`O link seguro de redefinição vai direto para o WhatsApp de ${memberName}.`}>
       <div className={form.form}>
-        {error ? <p className={styles.error} role="alert">{error}</p> : null}
+        {error ? (
+          <div className={styles.badges}>
+            <p className={styles.error} role="alert">{error}</p>
+            {!resetUrl ? <button type="button" className={page.button} disabled={pending} onClick={generate}>Tentar de novo</button> : null}
+          </div>
+        ) : null}
         {!resetUrl ? (
           <>
             <p className={page.muted}>Ao gerar o link, todas as sessões ativas deste membro são encerradas por segurança.</p>
             <div className={form.actions}>
               <button type="button" className={page.button} disabled={pending} onClick={() => onOpenChange(false)}>Cancelar</button>
-              <button type="button" className={page.primaryButton} disabled={pending} onClick={generate}><KeyRound aria-hidden="true" size={16} />{pending ? "Gerando e enviando..." : "Gerar e enviar no WhatsApp"}</button>
+              <button type="button" className={page.primaryButton} disabled={pending} aria-busy={pending || undefined} onClick={generate}><BusyLabel busy={pending} label="Gerando e enviando…"><KeyRound aria-hidden="true" size={16} />Gerar e enviar no WhatsApp</BusyLabel></button>
             </div>
           </>
         ) : (
@@ -376,7 +401,7 @@ export function ResetPasswordLite({ member, open, onOpenChange }: { member: Team
             </label>
             <div className={form.actions}>
               <button type="button" className={page.button} onClick={() => onOpenChange(false)}>Fechar</button>
-              <button type="button" className={page.primaryButton} onClick={copy}>{copied ? <Check aria-hidden="true" size={16} /> : <Copy aria-hidden="true" size={16} />}{copied ? "Copiado" : "Copiar mensagem e link"}</button>
+              <button type="button" className={page.primaryButton} onClick={copy}>{copied === "copied" ? <Check aria-hidden="true" size={16} /> : <Copy aria-hidden="true" size={16} />}<span role="status">{copied === "copied" ? "Copiado" : copied === "failed" ? "Não deu para copiar" : "Copiar mensagem e link"}</span></button>
             </div>
           </>
         )}

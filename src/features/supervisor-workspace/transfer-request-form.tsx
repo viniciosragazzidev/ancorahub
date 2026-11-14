@@ -5,28 +5,38 @@ import { useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import ChipGroup from "@/components/arc/chip-group/chip-group";
 import { Textarea } from "@/components/arc/textarea/textarea";
+import { ActionNoticeLine, useActionNotice } from "@/components/lite/feedback/action-notice";
 import { requestBrokerTransferAction, type TransferCandidate } from "./transfer-actions";
 
+/** Feedback nível 1 (FEEDBACK.md): toque vibra, o pedido sai da lista só depois do servidor e o check confirma. */
 export function TransferRequestForm({ candidates }: { candidates: TransferCandidate[] }) {
   const [availableCandidates, setAvailableCandidates] = useState(candidates);
   const [brokerId, setBrokerId] = useState(candidates[0]?.brokerId ?? "");
   const [reason, setReason] = useState("");
-  const [feedback, setFeedback] = useState("");
+  const notice = useActionNotice();
   const [isPending, startTransition] = useTransition();
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFeedback("");
+  function submit(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    notice.tap();
+    notice.clear();
     startTransition(async () => {
-      const result = await requestBrokerTransferAction({ brokerId, reason });
+      const failOptions = { fallback: "Não consegui enviar o pedido agora", keeps: "O texto continua aqui", retry: () => submit() };
+      let result: Awaited<ReturnType<typeof requestBrokerTransferAction>>;
+      try {
+        result = await requestBrokerTransferAction({ brokerId, reason });
+      } catch (error) {
+        notice.fail(error, failOptions);
+        return;
+      }
       if (!result.ok) {
-        setFeedback(result.reason);
+        notice.fail(result, failOptions);
         return;
       }
       setAvailableCandidates((current) => current.filter((candidate) => candidate.brokerId !== brokerId));
       setBrokerId((current) => current === brokerId ? (availableCandidates.find((candidate) => candidate.brokerId !== current)?.brokerId ?? "") : current);
       setReason("");
-      setFeedback("Pedido enviado para aprovação da gestão.");
+      notice.succeed("Pedido enviado para aprovação da gestão.");
     });
   }
 
@@ -43,7 +53,7 @@ export function TransferRequestForm({ candidates }: { candidates: TransferCandid
       </div>
       <Textarea id="transfer-reason" label="Por que você quer trazer este corretor para sua equipe?" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={1000} required rows={3} placeholder="Explique brevemente o pedido" />
       <Button type="submit" disabled={isPending || !brokerId || !reason.trim()} loading={isPending}>Pedir transferência</Button>
-      <p role="status" aria-live="polite" className="min-h-5 text-sm text-[var(--text-muted)]">{feedback}</p>
+      <div aria-live="polite" className="min-h-5"><ActionNoticeLine notice={notice.notice} /></div>
     </form>
   );
 }

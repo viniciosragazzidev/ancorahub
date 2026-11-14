@@ -1,10 +1,10 @@
 "use client";
 
+import { plantaoDone, plantaoFailed } from "./plantao-feedback";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PaperPlaneTilt } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/sonner";
 import { sendDutyPresenceInviteManuallyAction } from "@/features/lead-distribution/duty-actions";
 
 /** Roster-row button: sends (or resends) the presence-confirmation WhatsApp invite right now, for one broker. */
@@ -23,10 +23,10 @@ export function BrokerPresenceInviteButton({ scheduleId, assignmentId, brokerNam
       onClick={() => startTransition(async () => {
         const result = await sendDutyPresenceInviteManuallyAction(scheduleId, assignmentId);
         if (result.ok) {
-          toast.success(`Convite enviado para ${brokerName}.`);
+          plantaoDone(`Convite enviado para ${brokerName}.`);
           router.refresh();
         } else {
-          toast.error(result.reason);
+          plantaoFailed(result.reason, "Não consegui atualizar o plantão agora.");
         }
       })}
     >

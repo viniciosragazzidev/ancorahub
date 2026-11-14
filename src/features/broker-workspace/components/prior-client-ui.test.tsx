@@ -168,6 +168,6 @@ describe("Cliente que já possuo na tela", () => {
     fireEvent.click(screen.getByRole("button", { name: "Editar dados" }));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Salvar" })); });
     expect(screen.queryByRole("status")).toBeNull();
-    expect(screen.getAllByRole("alert").some((node) => node.textContent === "Nome obrigatório.")).toBe(true);
+    expect(screen.getAllByRole("alert").some((node) => node.textContent === "Nome obrigatório. O que você digitou continua no formulário.")).toBe(true);
   });
 });

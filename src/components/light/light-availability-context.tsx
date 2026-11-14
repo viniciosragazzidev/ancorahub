@@ -2,12 +2,14 @@
 
 import { createContext, useContext } from "react";
 
-import type { LightAvailability } from "@/components/light-top-nav";
+import type { LightAvailability, LightAvailabilityOptions } from "@/components/light-top-nav";
 
 export type LightAvailabilityValue = {
   availability: LightAvailability;
   isPending: boolean;
-  setStatus: (next: "available" | "paused") => void;
+  setStatus: (next: "available" | "paused", options?: LightAvailabilityOptions) => void;
+  /** Causa da última falha ao mudar a disponibilidade (já normalizada), para a tela mostrar no lugar. */
+  error?: string | null;
   /** Opens the "Mais" sheet (chat screens have no tab bar of their own). */
   openMore?: (opener?: HTMLElement) => void;
   /** Who uses the Lite: the broker (default) or the supervisor (team, no availability). */

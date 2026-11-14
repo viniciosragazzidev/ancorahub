@@ -5,17 +5,29 @@ import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Button } from "@/components/arc/button/button";
 import { LitePress } from "@/components/light/light-motion";
+import { useActionStateFeedback } from "@/components/lite/feedback/action-notice";
+import { LiteSuccess } from "@/components/lite/motion/success";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 import { LEAD_STATUS_LABELS, MOTIVOS_PERDA, VALID_TRANSITIONS } from "@/features/leads/lead-status-constants";
 import { changeManagerLeadStatusAction, type ManagerLeadStatusState } from "./manager-lead-status-action";
 
 const reasonLabel = (reason: string) => reason.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase());
 
-/** Alterar etapa do lead na ficha do gestor Lite: só as etapas que o pipeline permite a partir da atual. */
+/**
+ * Alterar etapa do lead na ficha do gestor Lite: só as etapas que o pipeline permite a partir da atual.
+ * Feedback nível 1 (docs/design-system/FEEDBACK.md): toque vibra curto, "Salvando…" enquanto o servidor
+ * responde, check com a nova etapa só depois de confirmado; erro com causa, o que vale e "Tentar de novo".
+ */
 export function ManagerLeadStatusSheet({ leadId, leadName, currentStatus }: { leadId: string; leadName: string; currentStatus: string }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<ManagerLeadStatusState, FormData>(changeManagerLeadStatusAction, {});
   const [next, setNext] = useState<string | null>(null);
   const router = useRouter();
+  const fire = useFeedback();
+  useActionStateFeedback(state);
+  const currentLabel = LEAD_STATUS_LABELS[currentStatus] ?? currentStatus;
+  const errorText = state.error ? actionErrorMessage(normalizeActionError(state.error, "Não consegui mudar a etapa agora"), `O lead continua em ${currentLabel}`) : null;
   const options = (VALID_TRANSITIONS[currentStatus] ?? []).filter((status) => status !== currentStatus && status !== "converted");
 
   return <>
@@ -23,11 +35,11 @@ export function ManagerLeadStatusSheet({ leadId, leadName, currentStatus }: { le
     <BottomSheet className="arc-venancor" title="Alterar etapa" description={`${leadName} · etapa atual: ${LEAD_STATUS_LABELS[currentStatus] ?? currentStatus}`} open={open} onOpenChange={setOpen} closeLabel="Fechar" detents={[0.72]}>
       {state.success ? (
         <div className="grid gap-3 px-5 pb-6" aria-live="polite">
-          <p className="text-base font-semibold text-(--foreground)">Etapa alterada para {LEAD_STATUS_LABELS[state.newStatus ?? ""] ?? state.newStatus}.</p>
+          <LiteSuccess label={`Etapa alterada para ${LEAD_STATUS_LABELS[state.newStatus ?? ""] ?? state.newStatus}.`} className="text-base font-semibold text-(--foreground)" />
           <Button variant="secondary" onClick={() => { setOpen(false); router.refresh(); }}>Fechar</Button>
         </div>
       ) : (
-        <form action={action} aria-label="Nova etapa do lead" className="grid gap-4 px-5 pb-6">
+        <form action={action} onSubmit={() => fire("tap")} aria-label="Nova etapa do lead" className="grid gap-4 px-5 pb-6">
           <input type="hidden" name="leadId" value={leadId} />
           <input type="hidden" name="newStatus" value={next ?? ""} />
           {options.length === 0 ? <p className="text-sm text-(--text-secondary)">Este lead não tem outra etapa disponível agora.</p> : null}
@@ -51,8 +63,8 @@ export function ManagerLeadStatusSheet({ leadId, leadName, currentStatus }: { le
               {reasonLabel(reason)}
             </label>)}
           </fieldset> : null}
-          {state.error ? <p role="alert" className="text-sm text-(--danger,#b42318)">{state.error}</p> : null}
-          <Button type="submit" disabled={pending || !next} className="w-full">{pending ? "Salvando…" : next ? `Mover para ${LEAD_STATUS_LABELS[next] ?? next}` : "Escolha uma etapa"}</Button>
+          {errorText ? <p role="alert" className="text-sm text-(--danger,#b42318)">{errorText}</p> : null}
+          <Button type="submit" disabled={pending || !next} aria-busy={pending || undefined} className="w-full">{pending ? "Salvando…" : !next ? "Escolha uma etapa" : errorText ? "Tentar de novo" : `Mover para ${LEAD_STATUS_LABELS[next] ?? next}`}</Button>
         </form>
       )}
     </BottomSheet>

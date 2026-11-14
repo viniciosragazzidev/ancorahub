@@ -13,6 +13,7 @@ import page from "@/components/lite/page/lite-page.module.css";
 import sections from "@/components/lite/page/lite-sections.module.css";
 
 import type { QualificationHubProps } from "../qualification-hub-types";
+import { ActionNote, BusyLabel, type ActionStatus } from "./action-status-lite";
 
 type Rule = QualificationHubProps["followUpRules"][number];
 export type FollowUpDraft = { name: string; trigger: string; delay: number; messageMode: "fixed" | "template" | "ai_generated"; messageText: string };
@@ -31,13 +32,17 @@ const MODES = [
 const TRIGGER_LABEL = new Map(TRIGGERS.map((item) => [item.value, item.label]));
 const MODE_LABEL: Record<string, string> = { fixed: "Mensagem fixa", template: "Template oficial", ai_generated: "Gerada por IA" };
 
-export function FollowUpTabLite({ rules, draft, onDraft, onSubmit, onDelete }: {
+export function FollowUpTabLite({ rules, draft, onDraft, onSubmit, onDelete, ruleStatus, rulesStatus }: {
   rules: Rule[];
   draft: FollowUpDraft;
   onDraft: (patch: Partial<FollowUpDraft>) => void;
   onSubmit: (event: FormEvent) => void;
   onDelete: (id: string) => void;
+  ruleStatus?: ActionStatus;
+  rulesStatus?: ActionStatus;
 }) {
+  const adding = ruleStatus?.state === "busy";
+  const removingBusy = rulesStatus?.state === "busy";
   const [removing, setRemoving] = useState<Rule | null>(null);
   const cancel = useCallback(() => setRemoving(null), []);
   return (
@@ -75,17 +80,25 @@ export function FollowUpTabLite({ rules, draft, onDraft, onSubmit, onDelete }: {
               <div><button type="button" className={page.button} onClick={() => onDraft({ messageMode: "fixed" })}>Usar mensagem fixa (recomendado)</button></div>
             </div>
           ) : null}
-          <div>
-            <button type="submit" className={page.button}>
-              <Plus aria-hidden="true" size={16} />
-              Adicionar regra
-            </button>
+          <div className="grid gap-2">
+            <div>
+              <button type="submit" className={page.button} disabled={adding} aria-busy={adding || undefined}>
+                <BusyLabel busy={adding} label="Adicionando…">
+                  <Plus aria-hidden="true" size={16} />
+                  Adicionar regra
+                </BusyLabel>
+              </button>
+            </div>
+            <ActionNote status={ruleStatus} />
           </div>
         </div>
       </form>
       <section className={sections.group} aria-labelledby="followup-rules-title">
         <div className={sections.row}>
-          <h2 id="followup-rules-title" className={sections.rowTitle}>Regras cadastradas ({rules.length})</h2>
+          <div className={sections.rowText}>
+            <h2 id="followup-rules-title" className={sections.rowTitle}>Regras cadastradas ({rules.length})</h2>
+            {removingBusy ? <p className={sections.note} role="status">Removendo…</p> : <ActionNote status={rulesStatus} />}
+          </div>
         </div>
         {rules.length ? (
           <ul className={sections.list}>
@@ -97,7 +110,7 @@ export function FollowUpTabLite({ rules, draft, onDraft, onSubmit, onDelete }: {
                     {TRIGGER_LABEL.get(rule.trigger) ?? rule.trigger} · {MODE_LABEL[rule.messageMode] ?? rule.messageMode} · depois de {rule.delayMinutes} min · até {rule.maxAttempts} tentativas · das {rule.allowedStartTime} às {rule.allowedEndTime}
                   </span>
                 </span>
-                <button type="button" className={page.iconButton} aria-label={`Remover ${rule.name}`} onClick={() => setRemoving(rule)}>
+                <button type="button" className={page.iconButton} aria-label={`Remover ${rule.name}`} disabled={removingBusy} onClick={() => setRemoving(rule)}>
                   <Trash2 aria-hidden="true" size={18} />
                 </button>
               </li>

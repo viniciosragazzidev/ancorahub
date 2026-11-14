@@ -44,6 +44,7 @@ export function StepSheet({ c }: { c: LeadDetailController }) {
     potentialSaleCheck,
     isSelectedStepRegression,
     updatingStep,
+    stepError,
     handleSaveStep,
   } = c;
 
@@ -142,9 +143,13 @@ export function StepSheet({ c }: { c: LeadDetailController }) {
           </div>
         ) : null}
 
-        <Button size="lg" loading={updatingStep} disabled={updatingStep} onClick={handleSaveStep}>
-          Salvar etapa
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button size="lg" loading={updatingStep} disabled={updatingStep} aria-describedby={stepError ? "step-sheet-error" : undefined} onClick={handleSaveStep}>
+            Salvar etapa
+          </Button>
+          {/* Nível 1: a causa fica aqui, na folha que reabriu com o que o corretor escreveu (sem toast). */}
+          {stepError ? <p id="step-sheet-error" role="alert" className="text-sm text-(--danger)">{stepError}</p> : null}
+        </div>
       </div>
     </BottomSheet>
   );

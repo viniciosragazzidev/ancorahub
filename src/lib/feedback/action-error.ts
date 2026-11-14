@@ -10,7 +10,7 @@ export const DEFAULT_ACTION_ERROR = "Não consegui concluir agora.";
 const OFFLINE_ERROR = "Sem conexão agora.";
 const MAX_LENGTH = 180;
 
-const TECHNICAL = /(\b(TypeError|ReferenceError|SyntaxError|undefined|null|NaN|ECONN\w*|ETIMEDOUT|SQL|stack|digest|status code|JSON)\b|\bat \w+ \(|[{}<>]|=>|::)/;
+const TECHNICAL = /(\b(TypeError|ReferenceError|SyntaxError|undefined|null|NaN|ECONN\w*|ETIMEDOUT|SQL|stack|digest|status code|JSON)\b|\bis not (defined|a function)\b|\bcannot read\b|\bat \w+ \(|[{}<>]|=>|::)/i;
 const ENGLISH = /\b(the|failed|error|invalid|unexpected|unauthorized|forbidden|not found|timeout|network|request|internal|server)\b/i;
 const PORTUGUESE_HINT = /[ãõçáéíóúâêô]|\b(não|nao|para|com|sem|de|do|da|tente|já|ja|está|esta)\b/i;
 const OFFLINE = /failed to fetch|networkerror|load failed|network request failed|offline/i;

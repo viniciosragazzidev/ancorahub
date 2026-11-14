@@ -4,20 +4,24 @@
  * "Atendimento" no visual Lite: lembretes de feedback e limite da distribuição (mesma Server Action e mesmos campos do
  * formulário atual, com a mesma regra `canEdit`) e a escolha da etapa do lead pela IA (mesma ação, com volta ao valor
  * anterior se falhar).
+ *
+ * Feedback (FEEDBACK.md, nível 1): salvar e trocar a etapa pela IA confirmam na própria seção depois do servidor; a
+ * falha mostra a causa, o que continua valendo e "Tentar de novo". Sem toast.
  */
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { BadgeCheck, Loader2, Save } from "lucide-react";
+import { BadgeCheck, Save } from "lucide-react";
 
 import { RadioCards } from "@/components/arc/radio-cards/radio-cards";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
-import { toast } from "@/components/ui/sonner";
 import { updateAiStageModeAction } from "@/features/conversation-intelligence/actions";
 import type { AiStageMode } from "@/features/conversation-intelligence/stage-mode";
 
 import { updateFeedbackSettingsAction } from "../../feedback-actions";
 import styles from "@/components/lite/page/lite-sections.module.css";
+
+import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 
 type FeedbackProps = {
   feedbackReminderInterval: string;
@@ -43,18 +47,25 @@ function CheckRow({ name, title, description, defaultChecked, disabled }: { name
 
 export function FeedbackLite(props: FeedbackProps) {
   const { canEdit } = props;
-  const [state, formAction, isPending] = useActionState(
+  const formRef = useRef<HTMLFormElement>(null);
+  const { status, confirm, fail } = useActionStatus();
+  const [, formAction, isPending] = useActionState(
     async (prev: { success: boolean; error?: string }, formData: FormData) => {
-      const result = await updateFeedbackSettingsAction(prev, formData);
-      if (result.success) toast.success("Configuração de feedback salva!");
-      else toast.error(result.error ?? "Erro ao salvar.");
+      let result: Awaited<ReturnType<typeof updateFeedbackSettingsAction>>;
+      try {
+        result = await updateFeedbackSettingsAction(prev, formData);
+      } catch (error) {
+        result = { success: false, error: error instanceof Error ? error.message : undefined };
+      }
+      if (result.success) confirm("save", "Configuração salva");
+      else fail("save", result.error, { fallback: "Não deu para salvar a configuração agora.", keeps: "A configuração anterior continua valendo.", retry: () => formRef.current?.requestSubmit() });
       return result;
     },
     { success: false },
   );
 
   return (
-    <form action={formAction} className={styles.group} aria-label="Lembretes de feedback e distribuição">
+    <form ref={formRef} action={formAction} className={styles.group} aria-label="Lembretes de feedback e distribuição">
       <div className={styles.formBody}>
         <div className={styles.fields}>
           <label className={form.field}>
@@ -79,7 +90,6 @@ export function FeedbackLite(props: FeedbackProps) {
           <input className={form.input} type="number" name="maxActiveLeadsLimit" defaultValue={props.maxActiveLeadsLimit} min={1} max={100} disabled={!canEdit} />
           <span className={form.hint}>Quem tem menos leads ativos ou pendentes que este limite recebe prioridade. Se todos estiverem acima, a distribuição segue normal entre todos.</span>
         </label>
-        {state.error ? <p className={styles.error} role="alert">{state.error}</p> : null}
       </div>
       <div className={styles.footer}>
         <Link href="/settings/feedback-templates" className={styles.link}>
@@ -88,9 +98,9 @@ export function FeedbackLite(props: FeedbackProps) {
         </Link>
         {canEdit ? (
           <div className={styles.footerEnd}>
-            <button type="submit" className={page.primaryButton} disabled={isPending}>
-              {isPending ? <Loader2 aria-hidden="true" size={16} className="animate-spin" /> : <Save aria-hidden="true" size={16} />}
-              Salvar configuração
+            {isPending ? null : <ActionNote status={status.save} />}
+            <button type="submit" className={page.primaryButton} disabled={isPending} aria-busy={isPending || undefined}>
+              <BusyLabel busy={isPending} label="Salvando…"><Save aria-hidden="true" size={16} />Salvar configuração</BusyLabel>
             </button>
           </div>
         ) : null}
@@ -108,19 +118,22 @@ const STAGE_OPTIONS: Array<{ value: AiStageMode; label: string; description: str
 export function StageModeLite({ initialMode }: { initialMode: AiStageMode }) {
   const [mode, setMode] = useState(initialMode);
   const [isPending, startTransition] = useTransition();
+  const { status, run } = useActionStatus();
 
   const choose = (value: string) => {
     const next = value as AiStageMode;
     if (next === mode) return;
     const previous = mode;
+    const label = (target: AiStageMode) => STAGE_OPTIONS.find((option) => option.value === target)?.label ?? target;
     setMode(next);
     startTransition(async () => {
-      const result = await updateAiStageModeAction(next);
-      if (result.success) toast.success("Configuração salva.");
-      else {
-        setMode(previous);
-        toast.error(result.error ?? "Não foi possível salvar.");
-      }
+      const done = await run("stage", async () => {
+        const result = await updateAiStageModeAction(next);
+        if (!result.success) return { ok: false as const, error: result.error };
+        setMode(next);
+        return result;
+      }, { done: `Etapa pela IA: ${label(next)}`, fallback: "Não deu para salvar a escolha agora.", keeps: `Continua em ${label(previous)}.` });
+      if (!done) setMode(previous);
     });
   };
 
@@ -130,6 +143,7 @@ export function StageModeLite({ initialMode }: { initialMode: AiStageMode }) {
         <div className={styles.rowText}>
           <h3 id="stage-mode-title" className={styles.rowTitle}>Etapa do lead pela IA</h3>
           <p className={styles.rowDescription}>A IA lê a conversa de WhatsApp entre o cliente e o corretor e identifica em que etapa o atendimento está.</p>
+          {isPending ? <p className={styles.note} role="status">Salvando…</p> : <ActionNote status={status.stage} />}
         </div>
       </div>
       <div className={styles.formBody}>

@@ -21,6 +21,9 @@
 .statLabel { font-size: var(--text-sm); color: var(--text-muted); }
 .statAlert .statValue { color: var(--chat-action); }
 .goalTrack { display: block; height: 6px; margin-top: 6px; border-radius: 999px; background: var(--neutral-4); overflow: hidden; }
+/* Meta batida: o anel único do LiteAttention envolve a barra (mesma margem e raio da trilha). */
+.goalRing { width: 100%; margin-top: 6px; border-radius: 999px; }
+.goalRing > .goalTrack { flex: 1; margin-top: 0; }
 .goalFill { display: block; height: 100%; border-radius: inherit; background: var(--chat-action); transform-origin: left; }
 .listShortcut { padding: 0 20px 8px; }
 .highlights { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 2px 20px 10px; }

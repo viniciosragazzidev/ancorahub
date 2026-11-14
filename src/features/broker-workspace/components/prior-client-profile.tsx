@@ -17,6 +17,8 @@ import {
   PRIOR_STATUS_LABELS,
   type PriorContractActionResult,
 } from "@/features/customers/prior-portfolio-input";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 
 import walletStyles from "./broker-client-wallet.module.css";
@@ -53,6 +55,8 @@ function toDraft(contract: PriorClientProfileContract): PriorContractDraft {
 /**
  * Perfil de cliente de carteira anterior (DEC-187): dados, selo "Carteira anterior" e contratos anteriores com
  * pendências. Sem lead não há conversa, retorno nem histórico ainda (agenda na etapa 6).
+ * Feedback nível 1 (docs/design-system/FEEDBACK.md): toque vibra curto, check no lugar só depois do servidor, sem
+ * som; a falha mostra a causa normalizada e o que continua valendo, e o mesmo botão tenta de novo.
  */
 export function PriorClientProfile({
   client,
@@ -66,6 +70,7 @@ export function PriorClientProfile({
   actions: PriorClientProfileActions;
 }) {
   const router = useRouter();
+  const fire = useFeedback();
   const [pending, startTransition] = useTransition();
   const [sheet, setSheet] = useState<null | { kind: "client" } | { kind: "contract"; contractId?: string }>(null);
   const [clientDraft, setClientDraft] = useState({ nome: client.name, email: client.email ?? "", observacao: client.originNote ?? "" });
@@ -89,22 +94,27 @@ export function PriorClientProfile({
     setSheet(next);
   }
 
-  function run(task: () => Promise<PriorContractActionResult>, success: NonNullable<typeof feedback>, onDone?: () => void) {
+  function run(task: () => Promise<PriorContractActionResult>, success: NonNullable<typeof feedback>, keeps: string, onDone?: () => void) {
     setError(null);
     setFeedback(null);
+    fire("tap");
     startTransition(async () => {
       let result: PriorContractActionResult;
       try {
         result = await task();
-      } catch {
-        setError("Sem conexão com o servidor. Confira a internet e tente de novo.");
+      } catch (cause) {
+        setError(actionErrorMessage(normalizeActionError(cause), keeps));
+        fire("error");
         return;
       }
       if (!result.ok) {
         setFieldErrors(result.fieldErrors ?? {});
-        setError(result.error);
+        // Erro de campo já aponta o que corrigir; o "continua valendo" vai só na falha geral.
+        setError(result.fieldErrors ? normalizeActionError(result).cause : actionErrorMessage(normalizeActionError(result), keeps));
+        fire("error");
         return;
       }
+      fire("confirm");
       setFeedback(success);
       onDone?.();
       router.refresh();
@@ -113,13 +123,13 @@ export function PriorClientProfile({
 
   function submitClient(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    run(() => actions.update({ clientId: client.id, ...clientDraft }), { where: "client", label: "Dados salvos" }, () => setSheet(null));
+    run(() => actions.update({ clientId: client.id, ...clientDraft }), { where: "client", label: "Dados salvos" }, "O que você digitou continua no formulário", () => setSheet(null));
   }
 
   function submitContract(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const contractId = sheet?.kind === "contract" ? sheet.contractId : undefined;
-    run(() => actions.saveContract({ clientId: client.id, ...(contractId ? { contractId } : {}), contract: contractDraft }), { where: "contracts", label: contractId ? "Contrato atualizado" : "Contrato adicionado" }, () => setSheet(null));
+    run(() => actions.saveContract({ clientId: client.id, ...(contractId ? { contractId } : {}), contract: contractDraft }), { where: "contracts", label: contractId ? "Contrato atualizado" : "Contrato adicionado" }, "O que você digitou continua no formulário", () => setSheet(null));
   }
 
   return (
@@ -170,7 +180,7 @@ export function PriorClientProfile({
                   <Button variant="secondary" onClick={() => open({ kind: "contract", contractId: contract.id })}>Editar</Button>
                   {confirmRemove === contract.id ? (
                     <>
-                      <Button variant="secondary" loading={pending} disabled={pending} onClick={() => run(() => actions.removeContract({ clientId: client.id, contractId: contract.id }), { where: "contracts", label: "Contrato removido" }, () => setConfirmRemove(null))}>Confirmar remoção</Button>
+                      <Button variant="secondary" loading={pending} disabled={pending} onClick={() => run(() => actions.removeContract({ clientId: client.id, contractId: contract.id }), { where: "contracts", label: "Contrato removido" }, "O contrato continua salvo", () => setConfirmRemove(null))}>Confirmar remoção</Button>
                       <Button variant="secondary" onClick={() => setConfirmRemove(null)}>Manter</Button>
                     </>
                   ) : (

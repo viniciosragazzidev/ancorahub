@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotionConfig, type Transition } from "motion/react";
 
 import { AnimatedCounter } from "@/components/arc/animated-counter/animated-counter";
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import { LiteNumber } from "@/components/lite/motion/number";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import type {
   BrokerJourneyData, JourneyAchievement, JourneyMissionCard, MissionMetric, UnitLeaderboard,
 } from "@/features/engagement/journey-types";
@@ -108,8 +110,33 @@ export function JourneyScreen({ data }: { data: JourneyScreenData }) {
   );
 }
 
+const STREAK_SEEN_KEY = "ancora:journey-streak-seen";
+
+/**
+ * A sequência subiu desde a última vez que o corretor viu a jornada neste aparelho (FEEDBACK.md: ao fechar
+ * o plantão sem SLA estourado, o número sobe uma vez). A sequência muda no máximo uma vez por dia, então
+ * guardar o último valor visto já garante "uma vez". Com movimento desligado não grava, para não gastar a vez.
+ */
+export function useStreakRose(current: number) {
+  const motionEnabled = useInterfaceMotionEnabled();
+  const [rose, setRose] = useState(false);
+  useEffect(() => {
+    if (!motionEnabled) return;
+    let last: number | null = null;
+    try {
+      const raw = window.localStorage.getItem(STREAK_SEEN_KEY);
+      last = raw === null ? null : Number(raw);
+      window.localStorage.setItem(STREAK_SEEN_KEY, String(current));
+    } catch { /* aparelho sem armazenamento: o número aparece pronto */ }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lembrança local, lida só no navegador
+    if (last !== null && Number.isFinite(last) && current > last) setRose(true);
+  }, [current, motionEnabled]);
+  return rose;
+}
+
 function JourneyHero({ data }: { data: JourneyScreenData }) {
   const { level, week, streak } = data;
+  const streakRose = useStreakRose(streak.current);
   const hue = LEVEL_HUE[Math.min(LEVEL_HUE.length - 1, level.level.index)];
   const change = week.pointsChange;
   return (
@@ -126,7 +153,8 @@ function JourneyHero({ data }: { data: JourneyScreenData }) {
           {streak.current > 0 ? (
             <span className={styles.chip} data-tone="streak" aria-label={`Sequência de ${streak.current} dias`}>
               <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 3c2 3 5 4.5 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3 1-5.5 1-7.5z" fill="currentColor" /></svg>
-              {streak.current} {streak.current === 1 ? "dia" : "dias"}
+              {/* Sobe uma vez quando a sequência aumenta; a troca de key remonta o número para rolar. */}
+              <LiteNumber key={streakRose ? "subiu" : "parado"} value={streak.current} countFromZero={streakRose} /> {streak.current === 1 ? "dia" : "dias"}
             </span>
           ) : null}
         </span>

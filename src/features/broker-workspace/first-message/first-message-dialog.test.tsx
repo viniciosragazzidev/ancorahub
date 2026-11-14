@@ -69,4 +69,17 @@ describe("FirstMessageDialog", () => {
     render(<FirstMessageDialog leadId="l1" open onOpenChange={() => {}} />);
     expect(await screen.findByText("A primeira mensagem já foi enviada")).toBeTruthy();
   });
+
+  it("send that fails: X for a moment, the cause in Portuguese, the text kept and Tentar de novo", async () => {
+    mocks.context.mockResolvedValue(context());
+    mocks.send.mockRejectedValue(new Error("Failed to fetch"));
+    render(<FirstMessageDialog leadId="l1" open onOpenChange={() => {}} />);
+    const box = await screen.findByLabelText("Mensagem");
+    fireEvent.change(box, { target: { value: "Oi Maria" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sem conexão agora. O texto continua aqui.");
+    expect(screen.getByRole("button", { name: "Não deu certo" })).toBeDisabled();
+    expect((screen.getByLabelText("Mensagem") as HTMLTextAreaElement).value).toBe("Oi Maria");
+    expect(await screen.findByRole("button", { name: "Tentar de novo" }, { timeout: 3000 })).toBeTruthy();
+  });
 });
