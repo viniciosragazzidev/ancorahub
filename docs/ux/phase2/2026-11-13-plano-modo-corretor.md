@@ -107,7 +107,7 @@ mudança visual. Cadastros, alterações relevantes, documentos, exportações e
 | 3 Plantões | Card atual, calendário e escala em `/plantoes` | Pendente |
 | 4 Carteira | Visões, cadastro próprio, cliente antigo e vínculos | Pendente; exige decisões de domínio registradas |
 | 5 Perfil | Perfil, histórico, contratos e documentos | Pendente; exige decisões de domínio registradas |
-| 6 Agenda | Retornos e tarefas ligados a leads e perfis | Pendente |
+| 6 Agenda | Retornos e tarefas ligados a leads e perfis | Parcial em `feat/corretor-agenda-etapa6` (chave `feature_broker_navigation_reorg_enabled`), sem push: retornos, tarefas e renovações já gravadas agrupados por dia, abrindo lead ou perfil, e plantão do dia como atalho. Falta reunião/compromisso como dado próprio e agendar pelo perfil (depende da etapa 5) |
 | 7 Validação | Fluxos, permissões, auditoria, responsividade | Pendente |
 
 Pronto quando o corretor conseguir receber ou cadastrar um contato, atendê-lo, acompanhar o histórico, concluir o
