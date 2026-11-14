@@ -927,3 +927,7 @@ O botão "Aceitar lead" mostra "Aceitando…" e só desenha o check depois que o
 ## 14/11/2026 - Mascote da Âncora Saúde e splash branca
 
 Novo componente `Mascot` (`src/components/mascot`), com os estados idle, welcome, loading, lead_accepted, lead_converted, success e error. Ele usa uma arte de reserva local, recortada das pranchas aprovadas, e fica pronto para o personagem articulado da Rive (runtime `@rive-app/react-canvas`, MIT, carregado só quando houver `.riv`). A splash do PWA passa a ser fundo branco com o mascote: vem no HTML do servidor, some quando o app fica pronto (sem a espera fixa de 1,5 s) e respeita movimento reduzido. O rig ainda depende do redesenho em camadas vetoriais. Prévia em `/dev/mascote`; manutenção em `docs/design-system/MASCOTE.md`.
+
+## 14/11/2026 - Feedback padrão, fase 2 (ações do chat)
+
+As respostas sugeridas do chat seguem os níveis do padrão, numa tabela única (`src/components/chat/chat-feedback.ts`). A resposta escolhida aparece como "Enviando" até o servidor confirmar. Se falhar, vira "Não enviada · Tentar de novo", balança uma vez e as opções voltam a valer. O mascote do cabeçalho fica pensando enquanto a ação roda. Tocam som: pausar ou retomar o plantão, falhas e acertos parciais. Nota, etapa, retorno e aceite ficam em silêncio, só com vibração no celular. Plano: `docs/implementations/active/2026-11-14-feedback-padrao.md`.
