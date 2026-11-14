@@ -93,6 +93,7 @@ async function renderBrokerMyWallet(context: TenantContext, searchParams: Custom
       addPriorClientAction={priorPortfolio ? createPriorClientAction : undefined}
       openAddContact={searchParams.adicionar === "1"}
       quickSaleEnabled={quickSaleEnabled}
+      walletTabs
     />
   );
 }

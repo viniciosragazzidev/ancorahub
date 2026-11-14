@@ -13,6 +13,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getManagerLiteLeads } from "@/features/supervisor-workspace/manager-lite-queries";
 
+import { isBrokerMyWalletEnabled } from "@/features/customers/broker-my-wallet-flag";
 import { buildAssistantThreads, buildLeadThreads } from "./assistant-scripts";
 
 /** One workspace load per request: the layout's rail and the Início page share it. */
@@ -86,17 +87,18 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
       .then(async (flag) => flag === "true"
         ? { enabled: true, data: await getCachedBrokerJourneyData(context.tenantId, context.userId).catch(() => null) }
         : { enabled: false, data: null });
-    const [data, dutyCalendarFlag, journeyResult, homeV2Flag] = await Promise.all([
+    const [data, dutyCalendarFlag, journeyResult, homeV2Flag, walletUnified] = await Promise.all([
       getCachedBrokerWorkspaceData(),
       getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR).catch(() => "false"),
       journeyPromise,
       getFeatureFlag(FEATURE_FLAGS.BROKER_NAV_REORG).catch(() => FEATURE_FLAGS.BROKER_NAV_REORG.defaultValue),
+      isBrokerMyWalletEnabled().catch(() => false),
     ]);
     const dutyCalendar = dutyCalendarFlag === "true";
     const now = new Date();
     const journeyEnabled = journeyResult.enabled;
     const journey = journeyResult.data;
-    const capabilities = { quoteSimulator: true, dutyCalendar, journey: journeyEnabled, homeV2: homeV2Flag === "true" };
+    const capabilities = { quoteSimulator: true, dutyCalendar, journey: journeyEnabled, homeV2: homeV2Flag === "true", walletUnified };
     return {
       viewerName: data.viewer.name,
       assistants: buildAssistantThreads({ data, capabilities, journey, now }),

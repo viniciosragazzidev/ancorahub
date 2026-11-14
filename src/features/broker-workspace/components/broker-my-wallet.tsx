@@ -32,6 +32,7 @@ import { BrokerClientWalletList, originLabels } from "./broker-client-wallet";
 import { BrokerWalletAddContact, type BrokerWalletAddContactAction } from "./broker-wallet-add-contact";
 import type { PriorClientAction } from "./prior-client-form";
 import { QuickRegisterSaleSheet } from "./quick-register-sale";
+import { BrokerWalletTabs } from "./broker-wallet-tabs";
 import walletStyles from "./broker-client-wallet.module.css";
 import styles from "./broker-my-wallet.module.css";
 
@@ -246,6 +247,7 @@ export function BrokerMyWallet({
   addPriorClientAction,
   openAddContact = false,
   quickSaleEnabled = false,
+  walletTabs = false,
 }: {
   filters: BrokerWalletFilters;
   counts: BrokerMyWalletCounts;
@@ -259,6 +261,8 @@ export function BrokerMyWallet({
   openAddContact?: boolean;
   /** Registrar venda em dois toques (chave BROKER_QUICK_SALE). */
   quickSaleEnabled?: boolean;
+  /** Abas Em atendimento e Clientes no topo (a mesma entrada da fila de leads). */
+  walletTabs?: boolean;
 }) {
   const leadView = isBrokerWalletLeadView(filters.view);
   const page = (leadView ? leads?.page : clients?.page) ?? 1;
@@ -284,6 +288,7 @@ export function BrokerMyWallet({
       subtitle={summary}
       className={`${walletStyles.page} ${styles.page}`}
     >
+      {walletTabs ? <BrokerWalletTabs value="clientes" /> : null}
       <WalletControls key={brokerWalletHref(effectiveFilters)} filters={effectiveFilters} counts={counts} origins={origins} quickSale={quickSaleEnabled} addContact={addContactAction ? <BrokerWalletAddContact action={addContactAction} priorAction={addPriorClientAction} defaultOpen={openAddContact} /> : undefined} />
 
       <div key={filters.view} className={styles.viewBody}>

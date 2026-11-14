@@ -35,6 +35,7 @@ vi.mock("@/components/arc/button/button", () => ({
   Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button type="button" {...props}>{children}</button>,
 }));
 vi.mock("@/shared/auth/client", () => ({ signOut: vi.fn() }));
+vi.mock("@/features/broker-workspace/components/quick-register-sale", () => ({ QuickRegisterSaleSheet: () => null }));
 vi.mock("@/features/leads/availability-action", () => ({
   updateBrokerAvailabilityAction: vi.fn(),
 }));
