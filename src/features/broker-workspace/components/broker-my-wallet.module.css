@@ -7,8 +7,28 @@
 
 .page :global(header) { align-items: center; }
 
+/* Abas: rótulo inteiro no tamanho normal; a faixa rola de lado quando não cabe. */
+.tabs.tabs :global([data-slot="segmented-control-item"]) { padding-inline: 12px; font-size: var(--text-sm); white-space: nowrap; flex-shrink: 0; }
+
+/* Busca, filtros e Adicionar contato numa linha só. */
+.toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; min-width: 0; }
+.search { min-width: 0; }
+.search label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* O campo fica em 16 px (o iPhone não dá zoom ao digitar); só o texto de exemplo fica menor. */
+.search input::placeholder { font-size: var(--text-sm); }
+
 .addButton { min-height: 44px; flex-shrink: 0; gap: 6px; }
 .addIcon { width: 18px; height: 18px; }
+
+/* WhatsApp de cada contato em negociação: só o ícone, na mesma linha. */
+.whatsappIcon { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 999px; background: color-mix(in oklab, #25d366 14%, var(--surface)); color: #128c4a; transition: background-color var(--duration-fast, 160ms) var(--ease-standard, ease), transform var(--duration-fast, 160ms) var(--ease-standard, ease); }
+.whatsappIcon svg { width: 20px; height: 20px; }
+.whatsappIcon:hover { background: color-mix(in oklab, #25d366 22%, var(--surface)); }
+.whatsappIcon:active { transform: scale(0.94); }
+.whatsappIcon:focus-visible { outline: 2px solid var(--chat-action-text, #2563eb); outline-offset: 2px; }
+.page.page [data-has-action="true"] { grid-template-columns: minmax(0, 1fr) auto; padding: 0 12px 0 0; }
+.page.page [data-has-action="true"] > :last-child { padding-left: 0; }
+@media (prefers-reduced-motion: reduce) { .whatsappIcon { transition: none; } .whatsappIcon:active { transform: none; } }
 
 .sheetBody { display: grid; gap: 14px; padding: 4px 4px 20px; }
 .kind { margin: 0; display: inline-flex; justify-self: start; align-items: center; min-height: 32px; padding: 0 14px; border-radius: 999px; background: var(--chat-action-soft); color: var(--chat-action-text, var(--foreground)); font-size: var(--text-sm); font-weight: 600; }
@@ -37,8 +57,9 @@
 .duplicate a:focus-visible { outline: 2px solid var(--chat-action-text, #2563eb); outline-offset: 2px; }
 
 @media (max-width: 480px) {
-  .page :global(header) { flex-direction: column; align-items: stretch; }
-  .addButton { width: 100%; }
+  /* No celular, Adicionar contato vira o botão redondo com +. */
+  .addButton { width: 44px; padding: 0; justify-content: center; }
+  .addLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .sheetButtons > * { flex: 1 1 100%; }
 }
 

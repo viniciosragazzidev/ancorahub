@@ -42,7 +42,7 @@ export function BrokerWalletAddContact({ action, priorAction }: { action: Broker
         // Depois de um cadastro, fechar recomeça os formulários.
         if (!next && created) { setRound((value) => value + 1); setCreated(false); }
       }}
-      trigger={<Button variant="primary" className={styles.addButton}><Plus aria-hidden="true" className={styles.addIcon} />Adicionar contato</Button>}
+      trigger={<Button variant="primary" className={styles.addButton} aria-label="Adicionar contato"><Plus aria-hidden="true" className={styles.addIcon} /><span className={styles.addLabel}>Adicionar contato</span></Button>}
       title="Adicionar contato"
       description={created ? undefined : kind === "prior"
         ? "Cliente que já possuo: fica em Clientes, sem venda, comissão ou pontos."
