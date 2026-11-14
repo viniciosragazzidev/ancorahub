@@ -14,6 +14,8 @@ import type {
 
 import { Term } from "@/features/assist/components/term";
 
+import { CaptainBanner } from "@/components/lite/banner/captain-banner";
+
 import { BadgeArt } from "./badge-art";
 import { LEVEL_HUE, LevelRing } from "./level-ring";
 import { Podium } from "./podium";
@@ -199,27 +201,9 @@ function JourneyBanner({ data, pending }: { data: JourneyScreenData; pending: nu
   const goal = level.nextLevel
     ? { value: `Faltam ${pts(level.pointsToNext)}`, hint: `para ${level.nextLevel.name}` }
     : { value: `${streak.current} ${streak.current === 1 ? "dia" : "dias"}`, hint: "de sequência" };
-  const share = level.nextLevel ? Math.min(100, Math.max(0, level.percentage)) : 100;
   return (
-    <section className={styles.banner} aria-label="Próxima meta da jornada">
-      <span className={styles.bannerGlow} aria-hidden="true" />
-      <div className={styles.bannerText}>
-        <p className={styles.bannerTitle}>{title}</p>
-        <div className={styles.bannerGoal}>
-          <span className={styles.bannerBadge}>
-            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 2l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 16.9 6.1 20l1.2-6.5L2.5 8.9 9.1 8z" fill="currentColor" /></svg>
-            {goal.value}
-            <small>{goal.hint}</small>
-          </span>
-          <span className={styles.bannerMeter} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={share} aria-label="Progresso até a próxima meta">
-            <i style={{ width: `${share}%` }} />
-          </span>
-        </div>
-        <a className={styles.bannerAction} href="#missoes">{pending > 0 ? `Ver ${pending === 1 ? "a missão" : `as ${pending} missões`}` : "Ver minha semana"}</a>
-      </div>
-      {/* eslint-disable-next-line @next/next/no-img-element -- arte local do mascote */}
-      <img className={styles.bannerArt} src="/mascote/venda-capitao.webp" width={584} height={640} alt="" aria-hidden="true" draggable={false} />
-    </section>
+    <CaptainBanner className={styles.bannerSpace} label="Próxima meta da jornada" title={title} goal={goal} progress={level.nextLevel ? level.percentage : 100}
+      action={{ label: pending > 0 ? `Ver ${pending === 1 ? "a missão" : `as ${pending} missões`}` : "Ver minha semana", href: "#missoes" }} />
   );
 }
 

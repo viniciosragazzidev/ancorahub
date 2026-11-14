@@ -39,6 +39,7 @@ import type { WhatsAppActivitySummary } from "@/features/dashboard/whatsapp-acti
 import { WhatsAppActivityCard } from "@/features/dashboard/components/whatsapp-activity-card";
 import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
 import { BrokerHomeOverview } from "./broker-home-overview";
+import { HomeBanner } from "./home-banner";
 import { HomeQuickActions, homeQuickActions } from "./home-quick-actions";
 import { QuickRegisterSaleSheet } from "@/features/broker-workspace/components/quick-register-sale";
 import { RisePulse, useRisePulseKey } from "@/components/light/rise-pulse";
@@ -324,6 +325,8 @@ export function ChatHome({
       {list}
       {/* Organizado: Sua semana desce para o fim, depois do trabalho. */}
       {mode === "page" && !redesigned && highlights && organized ? <WeekRanking data={highlights} className={home.weekAtEnd} /> : null}
+      {/* Banner do fim (14/11/2026): no celular fecha a lista; no computador fica no fim do centro. */}
+      {mode === "page" && !redesigned && !isSupervisor && !isManager ? <HomeBanner highlights={highlights} className={home.bannerMobile} /> : null}
     </aside>
   );
 
@@ -365,7 +368,8 @@ export function ChatHome({
     return <div className={styles.root}>
       <BrokerHomeOverview viewerName={viewerName} nowIso={nowIso} summary={summary} nextLead={nextLead} rail={aside} conversations={list} presenceAsks={currentPresenceAsks}
         onSearch={() => { setQuery(""); setSearching(true); requestAnimationFrame(() => searchRef.current?.focus()); }} onNew={() => setNewOpen(true)}
-        learning={firstSteps || highlights ? <>{firstSteps ? <FirstStepsCard steps={firstSteps} /> : null}{highlights ? <WeekRanking data={highlights} /> : null}</> : null} />
+        learning={firstSteps || highlights ? <>{firstSteps ? <FirstStepsCard steps={firstSteps} /> : null}{highlights ? <WeekRanking data={highlights} /> : null}</> : null}
+        banner={<HomeBanner highlights={highlights} />} />
       {!hasPriority ? <><LiteWelcome variant="broker" /><LiteTour variant="broker" /></> : null}
       {sheet}
     </div>;
@@ -442,6 +446,7 @@ export function ChatHome({
               ) : null}
             </div>
           ) : null}
+          {!isSupervisor && !isManager ? <HomeBanner highlights={highlights} className={home.bannerCenter} /> : null}
         </motion.div>
       </section>
 

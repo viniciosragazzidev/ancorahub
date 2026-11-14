@@ -43,6 +43,13 @@ function Showcase() {
           { id: "demo-return", title: "Retorno de demonstração", detail: "Um retorno agendado está vencido.", actionLabel: "Ver retorno", href: "/agenda", tone: "urgent" },
         ] } } : {}) }}
       firstSteps={params.get("steps") === "1" ? steps : null}
+      homeActions={params.get("acoes") === "1"}
+      // ?semana=1: Sua semana e a missão da semana (banner do fim com a missão).
+      highlights={params.get("semana") === "1" ? {
+        ranks: [{ key: "sales", label: "nos atendimentos", position: 72, total: 140 } as never], acceptTime: "1 min 20 s",
+        mission: { title: "Responder 10 leads em até 5 min", detail: "Faltam 3 nesta semana.", href: "/jornada", progress: { missionId: "m", subjectId: "s", periodKey: "w", progress: 7, target: 10, percentage: 70, remaining: 3, eligible: true, completed: false, completedAt: null } },
+        journeyHref: "/jornada",
+      } : null}
     />
   );
 }

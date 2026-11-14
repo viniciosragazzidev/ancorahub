@@ -146,3 +146,12 @@
  * (seletor dupla vence o .primaryButton compartilhado sem mexer no botão de aceite). */
 .secondaryAction.secondaryAction { background: var(--surface-muted); color: var(--foreground); box-shadow: none; }
 .secondaryAction.secondaryAction:hover:not(:disabled) { background: var(--border-subtle); }
+
+/* Banner do fim do Início: no celular fecha a lista (com respiro para o capitão sair do card); no computador, o centro. */
+/* Seletores dobrados: vencem o display do próprio banner, qualquer que seja a ordem das folhas. */
+.bannerMobile.bannerMobile { margin: 64px 16px 24px; }
+.bannerCenter.bannerCenter { display: none; width: 100%; margin-top: 72px; text-align: left; }
+@media (min-width: 1024px) {
+  .bannerMobile.bannerMobile { display: none; }
+  .bannerCenter.bannerCenter { display: grid; }
+}
