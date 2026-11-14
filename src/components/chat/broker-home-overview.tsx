@@ -65,6 +65,7 @@ export function BrokerHomeOverview({
   conversations,
   presenceAsks,
   learning,
+  banner,
   onSearch,
   onNew,
 }: {
@@ -76,6 +77,8 @@ export function BrokerHomeOverview({
   conversations: ReactNode;
   presenceAsks: PresenceAskView[];
   learning: ReactNode;
+  /** Banner do fim do Início (o capitão), depois das conversas. */
+  banner?: ReactNode;
   onSearch: () => void;
   onNew: () => void;
 }) {
@@ -359,6 +362,7 @@ export function BrokerHomeOverview({
             </h2>
             {conversations}
           </section>
+          {banner}
         </div>
       </section>
     </div>
