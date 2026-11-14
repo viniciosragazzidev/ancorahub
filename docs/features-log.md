@@ -2,6 +2,13 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Modo corretor, etapa 3: Plantões em uma entrada única
+
+- `/plantoes` reúne **Seu plantão atual** (nome, dia e horário, local, modalidade quando conhecida, situação e **Abrir plantão** para `/plantoes/agora`), o **Calendário** com os dias escalados e detalhe ao tocar, e **Minha escala** (próximos plantões por data, cinco datas e "Ver mais").
+- Estados: em andamento; sem plantão agora (mostra o próximo); confirmação de presença aberta (o botão leva ao link de presença `?assignment=`); mais de um plantão ao mesmo tempo (escolha por controle segmentado, cada um com `?plantao=`); sem escala (explica e mantém o calendário); falha de carregamento (Tentar de novo, sem afirmar que não há escala). Calendário e escala seguem a chave `BROKER_DUTY_CALENDAR`; desligada, a página mostra só o plantão atual ou o próximo.
+- Com `feature_broker_navigation_reorg_enabled` ligada, o assistente Plantão do Início e o Mais levam a `/plantoes` (o Mais mostra Plantões mesmo sem o calendário). Desligada, tudo como antes. Links diretos de confirmação de presença e `/plantoes/agora` inalterados.
+- Só apresentação: reaproveita os dados do Início e do calendário (auditoria de visualização do calendário mantida); nenhuma regra de distribuição, presença ou escala mudou. Testes do domínio do cartão, da página e da navegação; prévia visual com dados sintéticos em 320, 375 e desktop.
+
 ## 13/11/2026 - Modo corretor, etapa 1: Início reorganizado
 
 - Início do corretor com o Jack fixo e os acessos numa ordem estável: Meus leads, Minha carteira (nova linha, abre `/clientes`), Plantão, Agenda, Desempenho e Cotação. Dicas de Atendimento e Jornada saem do Início; o que pede atenção segue marcado em cada linha e no flutuante Agora.
