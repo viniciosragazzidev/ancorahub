@@ -2,6 +2,15 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Modo corretor, etapa 6: Agenda conectada
+
+- `/agenda` do corretor reúne as tarefas abertas atribuídas a ele (retornos, tarefas com prazo e acompanhamentos de renovação) agrupadas em Atrasados, Hoje, Amanhã, Próximos e Sem prazo, pelo dia de São Paulo. Cada linha traz ícone do tipo, título, tipo e nome do lead, horário e estado textual (Atrasado, Urgente).
+- Cada item abre o perfil do cliente (`/clientes/[clientId]`) quando o lead já virou cliente e passa pelo escopo da carteira (`buildClientScopeWhere`); senão abre o lead (`/leads/[id]`). Com perfil, a conversa do lead fica a um toque ("Conversa").
+- Renovação só aparece como tal quando a tarefa nasceu de um lembrete de renovação (vínculo `customer_renewal_reminders.task_created_id`); nenhum cálculo novo de vencimento. Reuniões e compromissos fora das tarefas do lead não existem como dado e ficaram de fora.
+- Plantão em andamento ou de hoje aparece só como atalho para `/plantoes`; a escala continua sendo editada em Plantões. Concluir, Reagendar e Cancelar usam as mesmas actions da Agenda anterior (mesmas checagens e auditoria); nenhuma regra de tarefa, SLA ou permissão mudou.
+- Estados de vazio e de falha de leitura (tentar de novo, sem afirmar que a agenda está vazia); entrada discreta das linhas com movimento reduzido respeitado; verificada em 320, 375 e desktop com dados sintéticos.
+- Atrás da chave `feature_broker_navigation_reorg_enabled` (Início do corretor reorganizado); desligada, volta a Agenda anterior. Sem migration.
+
 ## 13/11/2026 - Modo corretor, etapa 4a: Minha carteira
 
 - Com `feature_broker_navigation_reorg_enabled` e `feature_broker_client_wallet_lite_enabled` ligadas, `/clientes` do corretor vira **Minha carteira** (título da página e do header Lite); supervisor e gestor seguem "Clientes". Qualquer chave desligada devolve a carteira anterior.

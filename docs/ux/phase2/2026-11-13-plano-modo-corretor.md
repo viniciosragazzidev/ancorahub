@@ -107,7 +107,7 @@ mudança visual. Cadastros, alterações relevantes, documentos, exportações e
 | 3 Plantões | Card atual, calendário e escala em `/plantoes` | Implementada em `feat/corretor-plantoes-etapa3` (mesma chave da etapa 1; calendário e escala seguem `BROKER_DUTY_CALENDAR`), sem push |
 | 4 Carteira | Visões, cadastro próprio, cliente antigo e vínculos | 4a implementada em `feat/corretor-carteira-etapa4a` (Minha carteira com Em negociação, Clientes, Precisa de atenção e Arquivados; Adicionar contato com Novo interessado; chaves `feature_broker_navigation_reorg_enabled` e `feature_broker_client_wallet_lite_enabled`), sem migration e sem push. 4b (Cliente que já possuo e contratos anteriores) aprovada pela opção recomendada em [proposta](./2026-11-13-plano-modo-corretor-etapa4b.md); pendente de DEC e implementação |
 | 5 Perfil | Perfil, histórico, contratos e documentos | Implementada em `feat/corretor-perfil-etapa5` (mesma chave da etapa 1), sem push; fixar registros, anexos pelo histórico e edição de observação pendentes |
-| 6 Agenda | Retornos e tarefas ligados a leads e perfis | Pendente |
+| 6 Agenda | Retornos e tarefas ligados a leads e perfis | Parcial em `feat/corretor-agenda-etapa6` (chave `feature_broker_navigation_reorg_enabled`), sem push: retornos, tarefas e renovações já gravadas agrupados por dia, abrindo lead ou perfil, e plantão do dia como atalho. Falta reunião/compromisso como dado próprio e agendar pelo perfil (depende da etapa 5) |
 | 7 Validação | Fluxos, permissões, auditoria, responsividade | Pendente |
 
 Pronto quando o corretor conseguir receber ou cadastrar um contato, atendê-lo, acompanhar o histórico, concluir o
