@@ -3,6 +3,7 @@
 /**
  * Lista de registros no visual Lite (F3): `LiteDataTable` como tabela a partir de 768px e `LiteDataList` como cartões
  * abaixo disso. As mesmas linhas e as mesmas colunas alimentam as duas; só a apresentação muda.
+ * No celular (Miller), o cartão mostra no máximo 6 campos; o resto fica em "Mais dados", sem perder nada.
  */
 import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 
@@ -22,7 +23,28 @@ export type LiteColumn<T> = {
   secondary?: boolean;
   /** Nome curto (ex.: corretor): largura mínima, uma linha só e reticências, nunca quebra "Ana / Souza". */
   nowrap?: boolean;
+  /**
+   * Prioridade no cartão do celular, que mostra no máximo `LITE_PHONE_MAX_FIELDS` campos. "high" entra antes das
+   * outras (ex.: ação da linha); "low" vai direto para "Mais dados". Sem valor, vale a ordem das colunas.
+   */
+  phonePriority?: "high" | "low";
 };
+
+/** Miller: campos visíveis no cartão do celular (título, apoio e detalhes). O excedente vai para "Mais dados". */
+export const LITE_PHONE_MAX_FIELDS = 6;
+
+/** Separa os detalhes do cartão em visíveis (até o limite) e "Mais dados", respeitando a prioridade. */
+export function splitPhoneDetails<T>(details: LiteColumn<T>[], slots: number) {
+  const ordered = [
+    ...details.filter((column) => column.phonePriority === "high"),
+    ...details.filter((column) => !column.phonePriority),
+  ];
+  const visibleIds = new Set(ordered.slice(0, Math.max(0, slots)).map((column) => column.id));
+  return {
+    visible: details.filter((column) => visibleIds.has(column.id)),
+    more: details.filter((column) => !visibleIds.has(column.id)),
+  };
+}
 
 /** Seleção em massa: uma caixa por linha (44px de alvo) e "selecionar todos" no cabeçalho da tabela. */
 export type LiteSelection<T> = {
@@ -56,7 +78,7 @@ function SelectBox({ checked, label, onChange }: { checked: boolean; label: stri
   );
 }
 
-const INTERACTIVE = "a, button, input, select, textarea, label, [role='combobox'], [role='menuitem']";
+const INTERACTIVE = "a, button, input, select, textarea, label, summary, [role='combobox'], [role='menuitem']";
 
 /** Clique na linha abre o registro, exceto quando nasce num controle dentro dela (link, botão, caixa). */
 function openOnClick(onOpen: () => void) {
@@ -131,12 +153,22 @@ export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, em
   );
 }
 
-/** Cartões abaixo de 768px: título (coluna `primary`), apoio (`secondary`) e as demais colunas em pares rótulo e valor. */
+/**
+ * Cartões abaixo de 768px: título (coluna `primary`), apoio (`secondary`) e as demais colunas em pares rótulo e
+ * valor, no máximo `LITE_PHONE_MAX_FIELDS` campos à vista; o resto abre em "Mais dados" dentro do próprio cartão.
+ */
 export function LiteDataList<T>({ caption, columns, rows, rowKey, onRowOpen, empty, selection, rowTone }: LiteDataProps<T>) {
   if (!rows.length) return <div className={styles.empty}>{empty}</div>;
   const primary = columns.find((column) => column.primary) ?? columns[0]!;
   const secondary = columns.find((column) => column.secondary);
   const details = columns.filter((column) => column !== primary && column !== secondary);
+  const { visible, more } = splitPhoneDetails(details, LITE_PHONE_MAX_FIELDS - 1 - (secondary ? 1 : 0));
+  const renderDetail = (row: T) => (column: LiteColumn<T>) => (
+    <div key={column.id}>
+      <dt>{column.label}</dt>
+      <dd className={column.numeric ? styles.numeric : undefined}>{column.render(row)}</dd>
+    </div>
+  );
   return (
     <ul className={styles.cards} aria-label={caption} data-lite="list">
       {rows.map((row) => (
@@ -158,14 +190,13 @@ export function LiteDataList<T>({ caption, columns, rows, rowKey, onRowOpen, emp
             <span className={styles.cardTitle}>{primary.render(row)}</span>
           )}
           {secondary ? <span className={styles.cardSub}>{secondary.render(row)}</span> : null}
-          <dl className={styles.cardDetails}>
-            {details.map((column) => (
-              <div key={column.id}>
-                <dt>{column.label}</dt>
-                <dd className={column.numeric ? styles.numeric : undefined}>{column.render(row)}</dd>
-              </div>
-            ))}
-          </dl>
+          {visible.length ? <dl className={styles.cardDetails}>{visible.map(renderDetail(row))}</dl> : null}
+          {more.length ? (
+            <details className={styles.cardMore}>
+              <summary>Mais dados ({more.length})</summary>
+              <dl className={styles.cardDetails}>{more.map(renderDetail(row))}</dl>
+            </details>
+          ) : null}
         </li>
       ))}
     </ul>

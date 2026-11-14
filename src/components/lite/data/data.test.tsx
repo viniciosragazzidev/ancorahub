@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LiteDataList, LiteDataTable, LiteResponsiveData, type LiteColumn } from "./data";
+import { LITE_PHONE_MAX_FIELDS, LiteDataList, LiteDataTable, LiteResponsiveData, splitPhoneDetails, type LiteColumn } from "./data";
 
 afterEach(cleanup);
 
@@ -117,5 +117,47 @@ describe("seleção em massa", () => {
     fireEvent.click(box);
     expect(onToggle).toHaveBeenCalledWith(rows[0]);
     expect(open).not.toHaveBeenCalled();
+  });
+});
+
+describe("cartão do celular (Miller: no máximo 6 campos à vista)", () => {
+  type Wide = Record<string, string>;
+  const ids = ["nome", "telefone", "fila", "etapa", "origem", "corretor", "valor", "criado", "unidade", "acoes"];
+  const wide: LiteColumn<Wide>[] = ids.map((id, index) => ({
+    id, label: id.toUpperCase(), render: (row) => row[id], primary: index === 0, secondary: index === 1,
+  }));
+  const wideRow: Wide = Object.fromEntries(ids.map((id) => [id, `v-${id}`]));
+
+  it("mostra título, apoio e 4 detalhes; o resto fica em Mais dados, sem perder nada", () => {
+    expect(LITE_PHONE_MAX_FIELDS).toBe(6);
+    const open = vi.fn();
+    render(<LiteDataList caption="Leads" columns={wide} rows={[wideRow]} rowKey={() => "x"} empty={null} onRowOpen={open} />);
+    const card = screen.getByRole("listitem");
+    const summary = within(card).getByText("Mais dados (4)");
+    const details = summary.closest("details")!;
+    const visible = [...card.querySelectorAll("dl")].filter((dl) => !details.contains(dl)).flatMap((dl) => [...dl.querySelectorAll("dt")].map((dt) => dt.textContent));
+    expect(visible).toEqual(["FILA", "ETAPA", "ORIGEM", "CORRETOR"]);
+    expect([...details.querySelectorAll("dt")].map((dt) => dt.textContent)).toEqual(["VALOR", "CRIADO", "UNIDADE", "ACOES"]);
+    expect(within(details).getByText("v-acoes")).toBeInTheDocument();
+    // Abrir "Mais dados" não abre o registro.
+    fireEvent.click(summary);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it("prioridade: high sobe para os visíveis, low vai direto para Mais dados", () => {
+    const columns = wide.map((column) => column.id === "acoes" ? { ...column, phonePriority: "high" as const } : column.id === "fila" ? { ...column, phonePriority: "low" as const } : column);
+    const { visible, more } = splitPhoneDetails(columns.slice(2), 4);
+    expect(visible.map((column) => column.id)).toEqual(["etapa", "origem", "corretor", "acoes"]);
+    expect(more.map((column) => column.id)).toEqual(["fila", "valor", "criado", "unidade"]);
+  });
+
+  it("até 6 campos, nada muda: sem Mais dados", () => {
+    render(<LiteDataList {...base} />);
+    expect(screen.queryByText(/Mais dados/)).not.toBeInTheDocument();
+  });
+
+  it("a tabela do computador continua com todas as colunas", () => {
+    render(<LiteDataTable caption="Leads" columns={wide} rows={[wideRow]} rowKey={() => "x"} empty={null} />);
+    expect(screen.getAllByRole("columnheader")).toHaveLength(ids.length);
   });
 });

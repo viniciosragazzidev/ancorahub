@@ -2,6 +2,10 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 14/11/2026 - Entrada sem atrito no Lite (Postel e Miller)
+
+- Módulo único `src/shared/input` (telefone BR, CPF/CNPJ com dígito verificador, valor em centavos, data dd/mm/aaaa e ISO, máscara que mantém o cursor e aceita colagem bagunçada) aplicado no telefone de Adicionar contato, Cliente que já possuo e simulador de cotação e no CPF de Pessoas da contratação; cópias locais de telefone trocadas por funções legado idênticas (formato gravado em `leads.telefone` não muda); cartão Lite no celular mostra no máximo 6 campos e o resto em "Mais dados".
+
 ## 13/11/2026 - Lite: polimento de movimento (antecipação, follow-through, arco, profundidade)
 
 - Hover que sobe 1px só no confirmar venda e no aceitar do "Seu próximo passo" (`ct-anticipate`); mola de assentamento só no que chega (folha "O que você quer fazer?", check do `LiteSuccess`, cartão novo em "Agora"); ponto em arco do aceite até a contagem de Leads, no máximo 1 vez a cada 10 min; coluna erguida do kanban respeita o kill-switch. Tudo desligado com movimento reduzido. Detalhes em `docs/ux/motion-frequencia.md`.
