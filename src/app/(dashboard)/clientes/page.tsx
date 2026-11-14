@@ -32,6 +32,7 @@ import { createBrokerWalletContactAction } from "@/features/customers/broker-wal
 import { hasPermission } from "@/shared/auth/permissions";
 import { isBrokerPriorClientsEnabled } from "@/features/customers/prior-portfolio";
 import { createPriorClientAction } from "@/features/customers/prior-portfolio-actions";
+import { isBrokerQuickSaleEnabled } from "@/features/broker-workspace/quick-sale-flag";
 import { saleClientsOnly } from "@/features/customers/prior-portfolio-schema";
 import type { TenantContext } from "@/shared/auth/types";
 
@@ -65,7 +66,10 @@ async function renderBrokerMyWallet(context: TenantContext, searchParams: Custom
   });
   const leadView = isBrokerWalletLeadView(filters.view);
   // DEC-187: carteira anterior entra com a chave e a migration 0231; sem elas, a carteira é a da etapa 4a.
-  const priorPortfolio = await isBrokerPriorClientsEnabled().catch(() => false);
+  const [priorPortfolio, quickSaleEnabled] = await Promise.all([
+    isBrokerPriorClientsEnabled().catch(() => false),
+    isBrokerQuickSaleEnabled(),
+  ]);
   const [leads, clients] = await Promise.all([
     getBrokerWalletLeads(context, toBrokerWalletLeadFilters(filters, leadView ? (filters.view as "negotiating" | "archived") : "negotiating"), { rows: leadView }),
     getBrokerClientWallet(context, {
@@ -86,6 +90,7 @@ async function renderBrokerMyWallet(context: TenantContext, searchParams: Custom
       clients={leadView ? undefined : clients}
       addContactAction={hasPermission(context.role, "criar_lead_manual") ? createBrokerWalletContactAction : undefined}
       addPriorClientAction={priorPortfolio ? createPriorClientAction : undefined}
+      quickSaleEnabled={quickSaleEnabled}
     />
   );
 }

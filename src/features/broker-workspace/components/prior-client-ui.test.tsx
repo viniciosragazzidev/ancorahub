@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const push = vi.fn();
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
+vi.mock("../quick-sale-actions", () => ({ listQuickSaleLeadsAction: vi.fn(async () => ({ ok: true, leads: [] })) }));
 vi.mock("@/components/arc/button/button", () => ({
   Button: ({ children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; loading?: boolean; size?: string }) => {
     const { variant, loading, size, ...buttonProps } = props;

@@ -1,0 +1,37 @@
+/* Registrar venda em dois toques: só o que é desta folha. As linhas vêm da lista de pessoas do Lite. */
+
+.body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; padding: 4px 4px 20px; }
+
+.search { min-width: 0; }
+.search label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* O campo fica em 16 px (o iPhone não dá zoom ao digitar); só o texto de exemplo fica menor. */
+.search input::placeholder { font-size: var(--text-sm); }
+
+.results { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+
+/* Nova busca sobre a lista atual: ela só esmaece, sem pulo de layout. */
+.list { display: grid; gap: 10px; min-width: 0; transition: opacity var(--duration-fast, 160ms) var(--ease-standard, ease); }
+.list[data-refreshing] { opacity: 0.6; }
+
+.hint { margin: 0 4px; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
+
+.state { display: grid; justify-items: center; gap: 6px; padding: 32px 16px; border-radius: 1.5rem; background: var(--surface-muted); text-align: center; }
+.stateTitle { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: 600; }
+.stateText { max-width: 22rem; margin: 0; color: var(--text-muted); font-size: var(--text-sm); line-height: var(--leading-body); }
+.retry { min-height: 44px; margin-top: 8px; }
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.skeletonList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.skeletonRow { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 12px 14px; border-radius: 1.25rem; background: var(--surface); box-shadow: var(--shadow-resting); }
+.skeletonAvatar { width: 48px; height: 48px; border-radius: 50%; background: var(--surface-muted); animation: pulse 1.4s ease-in-out infinite; }
+.skeletonLines { display: grid; gap: 8px; }
+.skeletonLines span { height: 12px; border-radius: 999px; background: var(--surface-muted); animation: pulse 1.4s ease-in-out infinite; }
+.skeletonLines span:first-child { width: 55%; }
+.skeletonLines span:last-child { width: 35%; }
+
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .list { transition: none; }
+  .skeletonAvatar, .skeletonLines span { animation: none; }
+}
