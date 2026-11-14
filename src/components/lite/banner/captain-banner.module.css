@@ -207,3 +207,22 @@
 .banner[data-tone="white"] .action:active { box-shadow: 0 1px 0 oklch(18% 0.08 264); }
 .banner[data-tone="white"] .action:focus-visible { outline-color: var(--banner-blue); }
 .banner[data-tone="white"] .art { filter: drop-shadow(0 10px 16px oklch(30% 0.12 262 / 0.18)); }
+
+/* Arte do Desempenho é mais larga que alta: um pouco maior para o capitão e o mapa caberem lado a lado. */
+.banner[data-tone="white"] .art { width: 176px; margin: -56px -14px -18px -40px; }
+@media (min-width: 640px) {
+  .banner[data-tone="white"] { grid-template-columns: minmax(0, 1fr) 280px; }
+  .banner[data-tone="white"] .art { width: 300px; margin: -84px -16px -26px -24px; }
+}
+
+/*
+ * Celular (ajuste 14/11/2026): o capitão maior e encostado no canto direito, sem invadir o texto. A coluna do
+ * capitão cresce, e a arte sangra para a direita (o recorte do card corta só a sobra transparente da imagem).
+ */
+@media (max-width: 639px) {
+  .banner[data-pose="rise"] { grid-template-columns: minmax(0, 1fr) 132px; padding-right: 0; column-gap: 4px; }
+  .banner[data-pose="rise"] .art { width: 184px; margin: -78px -40px -22px -12px; }
+  .banner[data-pose="rise"] .action { margin-right: 20px; }
+  .banner[data-tone="white"][data-pose="rise"] { grid-template-columns: minmax(0, 1fr) 140px; }
+  .banner[data-tone="white"][data-pose="rise"] .art { width: 196px; margin: -56px -30px -20px -18px; }
+}
