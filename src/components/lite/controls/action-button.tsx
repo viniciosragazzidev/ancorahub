@@ -7,7 +7,7 @@
  * Som e vibração passam por useFeedback. Um por tela.
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
@@ -189,18 +189,16 @@ export function LiteActionButton({
         animate={state === "error" && motionOn ? { x: SHAKE } : { x: 0 }}
         transition={{ duration: motionTokens.shake.duration, ease: [...motionTokens.ease.inOut] }}
       >
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.span
+        {/* Só entrada: o rótulo antigo sai na hora, então nunca empilha nem depende do fim de uma animação. */}
+        <motion.span
             key={`${state}-${retry ? "retry" : "first"}`}
             className={styles.label}
-            initial={motionOn ? { opacity: 0, y: motionTokens.distance.sm } : { opacity: 0 }}
+            initial={state === "idle" && !retry ? false : motionOn ? { opacity: 0, y: motionTokens.distance.sm } : { opacity: 0 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, transition: { duration: motionTokens.duration.instant } }}
             transition={{ duration: motionOn ? motionTokens.duration.fast : motionTokens.duration.instant, ease: [...motionTokens.ease.enter], delay: state === "done" && motionOn ? motionTokens.beat.text : 0 }}
           >
             {label}
           </motion.span>
-        </AnimatePresence>
       </motion.button>
       {message ? <p id={errorId} role="alert" className={styles.error}>{message}</p> : null}
       {state === "done" ? <span role="status" className="sr-only">{doneLabel}</span> : null}
