@@ -73,6 +73,24 @@ describe("Mascot", () => {
     expect(riveRendered).not.toHaveBeenCalled();
   });
 
+  it("plays the local pre-rendered clip only for its states, in light theme, with motion on", () => {
+    const { container } = render(<Mascot state="lead_accepted" />);
+    const clip = container.querySelector("video")!;
+    expect(clip.getAttribute("src")).toBe("/mascote/lead-accepted.mp4");
+    expect(clip.muted).toBe(true);
+    expect(clip.style.mixBlendMode).toBe("multiply");
+    cleanup();
+    expect(render(<Mascot state="idle" />).container.querySelector("video")).toBeNull();
+    cleanup();
+    motionState.enabled = false;
+    expect(render(<Mascot state="lead_accepted" />).container.querySelector("video")).toBeNull();
+    cleanup();
+    motionState.enabled = true;
+    document.documentElement.classList.add("dark");
+    expect(render(<Mascot state="lead_accepted" />).container.querySelector("video")).toBeNull();
+    document.documentElement.classList.remove("dark");
+  });
+
   it("maps states to the Rive number input in a stable order", () => {
     expect(MASCOT_STATES.map(mascotStateIndex)).toEqual([0, 1, 2, 3, 4, 5, 6]);
   });

@@ -20,7 +20,7 @@ import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-
 import { prefersLessMotion } from "@/features/assist/a11y-prefs";
 import { cn } from "@/lib/utils";
 
-import { MASCOT_ART, MASCOT_BOX_RATIO, MASCOT_LABELS, MASCOT_RIVE, MASCOT_STATE_ART, type MascotArt, type MascotState } from "./mascot-config";
+import { MASCOT_ART, MASCOT_BOX_RATIO, MASCOT_LABELS, MASCOT_RIVE, MASCOT_STATE_ART, MASCOT_STATE_VIDEO, MASCOT_VIDEO_FRAME, MASCOT_VIDEOS, type MascotArt, type MascotState } from "./mascot-config";
 import { mascotMotion } from "./mascot-motion";
 
 const MascotRive = dynamic(() => import("./mascot-rive"), { ssr: false });
@@ -51,6 +51,18 @@ export function Mascot({ state = "idle", size = 160, decorative = false, playKey
   const rive = Boolean(riveSrc) && motionOn && riveState !== "failed";
   const riveReady = rive && riveState === "ready";
 
+  // Animação pré-gravada (Higgsfield): só com movimento ligado, tema claro (o branco do vídeo some com
+  // multiply sobre superfícies claras) e enquanto o vídeo carrega sem erro. Até tocar, a arte de reserva fica visível.
+  const [lightTheme, setLightTheme] = useState(false);
+  useEffect(() => { setLightTheme(!document.documentElement.classList.contains("dark")); }, []);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const [playingKey, setPlayingKey] = useState<string | null>(null);
+  const videoName = MASCOT_STATE_VIDEO[state];
+  const videoKey = `${state}-${playKey ?? ""}`;
+  const showVideo = Boolean(videoName) && motionOn && lightTheme && !videoFailed && !riveReady;
+  const videoPlaying = showVideo && playingKey === videoKey;
+  const videoHeight = size / MASCOT_VIDEO_FRAME.subjectHeight;
+
   const current = MASCOT_STATE_ART[state];
   const width = Math.round(size * MASCOT_BOX_RATIO);
   const [scope, animate] = useAnimate<HTMLSpanElement>();
@@ -73,9 +85,9 @@ export function Mascot({ state = "idle", size = 160, decorative = false, playKey
       aria-label={decorative ? undefined : MASCOT_LABELS[state]}
       aria-hidden={decorative || undefined}
       data-mascot-state={state}
-      data-mascot-renderer={riveReady ? "rive" : "fallback"}
+      data-mascot-renderer={riveReady ? "rive" : videoPlaying ? "video" : "fallback"}
     >
-      <span ref={scope} className="absolute inset-0" style={{ transformOrigin: "50% 100%", visibility: riveReady ? "hidden" : undefined }}>
+      <span ref={scope} className="absolute inset-0" style={{ transformOrigin: "50% 100%", visibility: riveReady || videoPlaying ? "hidden" : undefined }}>
         {ART_NAMES.map((name) => {
           const art = MASCOT_ART[name];
           return (
@@ -97,6 +109,26 @@ export function Mascot({ state = "idle", size = 160, decorative = false, playKey
           );
         })}
       </span>
+      {showVideo && videoName ? (
+        <video
+          key={videoKey}
+          src={MASCOT_VIDEOS[videoName].src}
+          poster={MASCOT_VIDEOS[videoName].poster}
+          width={MASCOT_VIDEO_FRAME.width}
+          height={MASCOT_VIDEO_FRAME.height}
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          disablePictureInPicture
+          aria-hidden="true"
+          data-mascot-video={videoName}
+          onPlaying={() => setPlayingKey(videoKey)}
+          onError={() => setVideoFailed(true)}
+          className="pointer-events-none absolute left-1/2 max-w-none -translate-x-1/2 select-none"
+          style={{ height: videoHeight, width: "auto", bottom: -videoHeight * MASCOT_VIDEO_FRAME.subjectBottom, mixBlendMode: "multiply", opacity: videoPlaying ? 1 : 0 }}
+        />
+      ) : null}
       {rive && riveSrc ? (
         <span className="absolute inset-0" style={{ opacity: riveReady ? 1 : 0 }}>
           <MascotRive src={riveSrc} state={state} onReady={() => setRiveState("ready")} onFail={() => setRiveState("failed")} />

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { MASCOT_ART } from "@/components/mascot/mascot-config";
+import { MASCOT_VIDEO_FRAME, MASCOT_VIDEOS } from "@/components/mascot/mascot-config";
 
 import { SPLASH_KEY } from "./splash-boot";
 
@@ -61,11 +61,20 @@ export function SplashScreen() {
 
   if (phase === "gone") return null;
 
-  const art = MASCOT_ART.positivo;
+  // Do repouso ao polegar levantado (animação pré-gravada, MASCOTE.md §5). Sem movimento: só o primeiro quadro.
+  const clip = MASCOT_VIDEOS.leadAccepted;
   return (
     <div className={styles.splash} data-phase={phase} data-splash-screen="" aria-hidden="true">
-      {/* eslint-disable-next-line @next/next/no-img-element -- imagem local pequena, precisa estar no HTML antes do JS */}
-      <img className={styles.mascot} src={art.src} width={art.width} height={art.height} alt="" fetchPriority="high" decoding="async" draggable={false} />
+      <div className={styles.content}>
+      <div className={styles.stage}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- quadro estático local, precisa estar no HTML antes do JS */}
+        <img className={styles.still} src={clip.poster} width={MASCOT_VIDEO_FRAME.width} height={MASCOT_VIDEO_FRAME.height} alt="" fetchPriority="high" decoding="async" draggable={false} />
+        <video className={styles.clip} src={clip.src} poster={clip.poster} width={MASCOT_VIDEO_FRAME.width} height={MASCOT_VIDEO_FRAME.height} autoPlay muted playsInline preload="auto" disablePictureInPicture />
+      </div>
+        {/* Logo da Âncora Saúde. A splash é sempre branca, então o logo nunca inverte no tema escuro. */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- logo local, precisa estar no HTML antes do JS */}
+        <img className={styles.logo} src="/logo.webp" width={3126} height={886} alt="" decoding="async" draggable={false} />
+      </div>
     </div>
   );
 }
