@@ -82,7 +82,7 @@
   border-radius: var(--radius-surface);
   background: var(--surface-muted);
   scroll-snap-align: start;
-  transition: scale var(--duration-fast) var(--ease-standard);
+  transition: scale var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .column[data-lifted="true"] {
@@ -172,6 +172,8 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Profundidade (F6): a coluna erguida ganha a sombra flutuante e scale 1.02, sem rotação. Movimento reduzido e o
+   kill-switch html[data-interface-motion="off"] mantêm só a sombra (profundidade sem movimento). */
 @media (prefers-reduced-motion: reduce) {
   .column {
     transition: none;
@@ -180,4 +182,12 @@
   .column[data-lifted="true"] {
     scale: 1;
   }
+}
+
+:global(html[data-interface-motion="off"]) .column {
+  transition: none;
+}
+
+:global(html[data-interface-motion="off"]) .column[data-lifted="true"] {
+  scale: 1;
 }

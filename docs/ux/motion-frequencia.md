@@ -34,3 +34,16 @@ Valem sempre: `prefers-reduced-motion` e o kill-switch `html[data-interface-moti
 | Entrada do Início (fade e y 8px, 240ms; listas 160 a 200ms) | `chat/chat-home.tsx` | Dezenas | Pendente: deveria ficar só em opacidade até 160ms |
 | Pulsos de lead esperando (`pillPulse`, `rowPulse`, 1,8s) | `chat/chat.module.css` | Diária | Mantidos: sinal de estado (lead esperando aceite), não decoração |
 | Aurora e "z" do assistente pausado | `chat/chat.module.css`, `chat/paused-hero.tsx` | Ocasional | Não mexido nesta fase |
+
+## Polimento (Fase 6): antecipação, follow-through, arco e profundidade
+
+Só em ações raras e em elementos que chegam. Ação frequente, lista e texto continuam parados. Tudo desligado com `prefers-reduced-motion` e com o kill-switch.
+
+| Item | Onde | Frequência | Como |
+|---|---|---|---|
+| Antecipação no hover (`ct-anticipate`) | `src/styles/anticipation.css`; "Confirmar registro da venda" (`register-sale-wizard.tsx`) e aceitar do "Seu próximo passo" (`chat/broker-home-overview.tsx`) | Rara | Sobe 1px e sombra `raised` em 160ms (`fast`). Só com mouse (`hover: hover` e `pointer: fine`); usa `translate`, nunca `::after` (é do `ct-touch`). O "Registrar venda" que abre o wizard (`light-lead-detail/sale-section.tsx`) ainda não leva a classe |
+| Follow-through da folha | `arc/bottom-sheet` (`followThrough`), ligado em "O que você quer fazer?" (`chat/chat-home.tsx`) | Ocasional | Só a primeira abertura usa a mola `morph` (passa uns px, escondidos pela extensão, e assenta). Detentes, arrasto e fechamento seguem na `smooth`, sem balanço |
+| Follow-through do check | `lite/motion/success.tsx` (`LiteSuccess`) | Ocasional | Check entra em 0.6 e assenta com `spring.snappy`; o texto não balança |
+| Cartão que chega em "Agora" | `light-leads-list.tsx` (`NowBlock`) com `useArrivedKeys` (`lite/motion/arrivals.ts`) | Ocasional | Só o cartão que entra depois da tela abrir: sobe 8px com `spring.snappy`. A abertura da tela e o layout da lista ficam como estavam |
+| Arco do aceite | `lite/motion/lead-arc.ts`, chamado pelo `AcceptLeadButton` com `arcToLeads` (só o destaque do Início); alvo `data-lite-arc-target="leads"` (contagem da aba Leads e aba Fila da barra de baixo) | Rara por lead, frequente no dia | Ponto em arco em 360ms, só depois do aceite confirmado, só com a contagem visível na tela, no máximo 1 vez a cada 10 min (marca em memória da sessão) |
+| Coluna erguida no kanban | `lite/data/kanban.module.css` | Ocasional | Sombra `floating` e scale 1.02 enquanto arrasta, sem rotação. Movimento reduzido e kill-switch mantêm só a sombra |

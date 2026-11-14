@@ -2,6 +2,10 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Lite: polimento de movimento (antecipação, follow-through, arco, profundidade)
+
+- Hover que sobe 1px só no confirmar venda e no aceitar do "Seu próximo passo" (`ct-anticipate`); mola de assentamento só no que chega (folha "O que você quer fazer?", check do `LiteSuccess`, cartão novo em "Agora"); ponto em arco do aceite até a contagem de Leads, no máximo 1 vez a cada 10 min; coluna erguida do kanban respeita o kill-switch. Tudo desligado com movimento reduzido. Detalhes em `docs/ux/motion-frequencia.md`.
+
 ## 13/11/2026 - Lite: movimento por frequência de uso
 
 - Meta do dia e ranking da semana animam só na primeira abertura do dia (`useFirstTimeToday`, dia de São Paulo); avisos ocasionais e tour em até 320ms; gradiente do consentimento sem loop. Tabela em `docs/ux/motion-frequencia.md`.
