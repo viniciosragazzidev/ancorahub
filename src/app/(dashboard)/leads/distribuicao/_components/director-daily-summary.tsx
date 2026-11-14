@@ -1,11 +1,13 @@
 "use client";
 
 /**
- * Resumo do dia da Distribuição no modo Diretor (refino 14/11/2026, no mesmo desenho do Desempenho do Lite):
+ * Resumo do dia da Distribuição para todos os cargos fora do modo corretor (refino 14/11/2026, no mesmo desenho do Desempenho do Lite):
  * título com o período e o menu de exportação, seis números em cartões brancos com ícone, o banner do capitão
  * entre os números e a tabela, e a tabela dos corretores paginada de 10 em 10 (no celular, cartões).
  * A lógica (período, unidade, busca, exportação) é a mesma do painel clássico: `useBrokerDailySummary`.
  */
+import "@/components/arc/venancor-scope.css";
+
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { BadgeCheck, CircleSlash, Clock, Headset, Inbox, Search, TrendingUp, Users } from "lucide-react";
@@ -32,11 +34,8 @@ const PERIOD_OPTIONS = [
   { value: "custom", label: "Escolher datas" },
 ];
 
-/**
- * Arte provisória (o capitão mirando com a luneta) até chegar a arte própria da Distribuição: o capitão de pé no
- * convés, ao lado do leme, lançando envelopes com a âncora para três marujos.
- */
-const DISTRIBUTION_ART: CaptainBannerArt = { src: "/mascote/desempenho-mirando.webp", width: 640, height: 561 };
+/** O capitão no convés, mão no leme, lançando envelopes com a âncora para três marujos (arte de 14/11/2026). */
+const DISTRIBUTION_ART: CaptainBannerArt = { src: "/mascote/distribuicao-capitao.webp", width: 800, height: 533 };
 
 const STATUS_LABEL: Record<string, string> = { available: "Disponível", busy: "Em atendimento", break: "Pausa", paused: "Pausa" };
 
@@ -92,7 +91,7 @@ export function DirectorDailySummary({ initialData, branches, canFilterBranch = 
   const response = data.avgTeamResponseMinutes !== null ? `~${data.avgTeamResponseMinutes} min de resposta` : "sem tempo de resposta";
 
   return (
-    <div className={styles.root} aria-busy={isLoading}>
+    <div className={`arc-venancor ${styles.root}`} data-art="wide" aria-busy={isLoading}>
       <header className={styles.head}>
         <div className={styles.headText}>
           <h2 className={styles.title}>Resumo dos corretores</h2>
