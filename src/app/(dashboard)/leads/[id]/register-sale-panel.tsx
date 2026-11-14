@@ -281,6 +281,8 @@ export function RegisterSalePanel({
     !policyNumber && "apólice",
     !coverageStartDate && "início da vigência",
     !confirmationDocumentId && "confirmação da operadora",
+    // Vencimento digitado que não existe (31/02): não enviar o calculado em silêncio no lugar do que aparece.
+    expirationWarning && "vencimento válido",
   ].filter(Boolean) as string[];
 
   const confirmationHint =

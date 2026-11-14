@@ -154,4 +154,18 @@ describe("RegisterSalePanel: máscara de data mantém o payload", () => {
     digitar(vencimento, "15032027");
     expect(await salvar()).toEqual({ ...PAYLOAD_ANTIGO, expirationDate: "2027-03-15" });
   });
+
+  it("vencimento inexistente trava o registro em vez de mandar o calculado", async () => {
+    renderPanel();
+    await preencherBase();
+    const inicio = await abrirInicio();
+    digitar(inicio, "01022026");
+    fireEvent.click(screen.getByRole("button", { name: "Pronto" }));
+    fireEvent.click(screen.getByRole("button", { name: /Mais opções/ }));
+    const vencimento = screen.getByLabelText("Data de vencimento (calculada)") as HTMLInputElement;
+    digitar(vencimento, "31022027");
+    fireEvent.blur(vencimento);
+    expect(vencimento.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByRole("button", { name: "Salvar venda" })).toBeDisabled();
+  });
 });
