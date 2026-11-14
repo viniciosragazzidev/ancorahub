@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), setMode: vi.fn(), saveRoute: vi.fn(), saveConversions: vi.fn(), sync: vi.fn(), disconnect: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }), usePathname: () => "/marketing/campanhas" }));
-vi.mock("@/components/ui/sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() }));
+vi.mock("@/components/ui/sonner", () => ({ toast }));
+const fire = vi.hoisted(() => vi.fn(() => ({ motion: false, celebrate: false })));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => fire }));
 vi.mock("../../actions", () => ({ setMetaGlobalCaptureModeAction: mocks.setMode, triggerManualMetaSync: mocks.sync, disconnectMetaConnection: mocks.disconnect, confirmMetaConnection: vi.fn(), getMetaMarketingAttemptAssets: vi.fn(), recordMetaMarketingOnboardingStep: vi.fn() }));
 vi.mock("@/features/lead-distribution/actions", () => ({ saveMetaCampaignQueueRouteAction: mocks.saveRoute }));
 vi.mock("../../broker-brief-actions", () => ({ saveCampaignBrokerOfferAction: vi.fn() }));
@@ -88,12 +91,25 @@ describe("integração Meta no visual Lite", () => {
     render(<MetaIntegrationLite connection={META_CONNECTION_FIXTURE} assets={META_ASSETS_FIXTURE} sync={null} captureModeLabel="Captura seletiva" canConfigure />);
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Sincronizar" })); });
     expect(mocks.sync).toHaveBeenCalled();
+    expect(screen.getByText("Ativos sincronizados")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Desconectar" }));
     const dialog = screen.getByRole("alertdialog", { name: "Desconectar Marketing da Meta?" });
     await act(async () => { fireEvent.click(within(dialog).getByRole("button", { name: "Desconectar" })); });
     expect(mocks.disconnect).toHaveBeenCalled();
+    expect(screen.getByText(/Conexão de Marketing desconectada/)).toBeInTheDocument();
+    expect(toast.success).not.toHaveBeenCalled();
     // 18 formulários: só a lista de ativos pagina; o mapa só entra no DOM quando aberto.
     expect(screen.queryByLabelText("Mapa de ativos Meta")).not.toBeInTheDocument();
+  });
+
+  it("sincronização que falha mostra a causa no card e Tentar de novo", async () => {
+    mocks.sync.mockResolvedValueOnce({ success: false, error: "O token da Meta expirou." });
+    render(<MetaIntegrationLite connection={META_CONNECTION_FIXTURE} assets={META_ASSETS_FIXTURE} sync={null} captureModeLabel="Captura seletiva" canConfigure />);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Sincronizar" })); });
+    expect(screen.getByText(/O token da Meta expirou. Os ativos da última sincronização continuam valendo./)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeInTheDocument();
+    expect(fire).toHaveBeenCalledWith("error");
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("conversões: salvar só com mudança e pela mesma action", async () => {
