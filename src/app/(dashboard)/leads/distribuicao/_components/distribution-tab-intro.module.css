@@ -1,0 +1,36 @@
+/* Topo das abas: o mesmo cartão do Resumo da Distribuição (borda fina, ícone em quadrado de cor, número 22/28px). */
+.root { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; container-type: inline-size; }
+.head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.headText { display: grid; gap: 4px; min-width: 0; max-width: 72ch; }
+.title { margin: 0; font-size: var(--text-lg); font-weight: 500; letter-spacing: -0.01em; }
+.lead { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.45; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.cards[data-count="3"] > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+@container (min-width: 640px) {
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .cards[data-count="3"] > :last-child:nth-child(odd) { grid-column: auto; }
+  .cards[data-count="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.card { display: grid; align-content: start; min-width: 0; padding: 14px 14px 12px; border-radius: var(--radius-panel, 16px); background: var(--surface, var(--card)); box-shadow: inset 0 0 0 1px var(--border); }
+.card dd { margin: 0; }
+.cardTop { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cardIcon { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border-radius: 10px; background: var(--chat-action-soft, rgb(0 43 115 / 0.1)); color: var(--chat-action, var(--primary)); }
+.cardIcon svg { width: 16px; height: 16px; }
+.card[data-tone="success"] .cardIcon { background: color-mix(in oklch, var(--success) 12%, transparent); color: var(--success); }
+.card[data-tone="warning"] .cardIcon { background: oklch(72% 0.15 85 / 0.16); color: oklch(55% 0.13 65); }
+.card[data-tone="danger"] .cardIcon { background: color-mix(in oklch, var(--danger) 10%, transparent); color: var(--danger); }
+.card[data-tone="neutral"] .cardIcon { background: var(--surface-muted); color: var(--text-secondary); }
+.cardLabel { overflow: hidden; color: var(--text-secondary); font-size: var(--text-xs); font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
+.card .cardValue { margin-top: 12px; font-size: 22px; font-weight: 600; line-height: 1.15; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.card .cardText { margin-top: 12px; font-size: var(--text-base); font-weight: 600; line-height: 1.3; }
+.card .cardHint { margin-top: 4px; color: var(--text-muted); font-size: 11px; line-height: 1.35; }
+@media (min-width: 720px) {
+  .card { padding: 18px 18px 16px; }
+  .cardIcon { width: 32px; height: 32px; }
+  .cardLabel { font-size: var(--text-sm); }
+  .card .cardValue { margin-top: 14px; font-size: 28px; }
+  .card .cardText { margin-top: 14px; font-size: var(--text-lg); }
+  .card .cardHint { font-size: var(--text-xs); }
+}

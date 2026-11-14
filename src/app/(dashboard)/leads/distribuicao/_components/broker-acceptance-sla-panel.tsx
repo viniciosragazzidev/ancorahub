@@ -138,14 +138,16 @@ export function BrokerAcceptanceSlaPanel({
         {/* Botão Salvar */}
         {canEdit && (
           <div className="flex justify-end pt-1">
+            {/* Secundário (14/11/2026): na aba Filas o único primário é "Nova fila". */}
             <Button
               size="sm"
+              variant="outline"
               disabled={isPending}
               onClick={handleSave}
               className="gap-2 font-semibold"
             >
               {isPending && <ArrowsClockwise className="size-4 animate-spin" />}
-              <span>{isPending ? "Salvando..." : "Salvar Configuração de SLA"}</span>
+              <span>{isPending ? "Salvando..." : "Salvar prazo"}</span>
             </Button>
           </div>
         )}
