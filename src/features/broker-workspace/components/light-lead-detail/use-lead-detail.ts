@@ -16,6 +16,7 @@ import { openWhatsApp, prepareWhatsAppWindow } from "@/lib/whatsapp-open";
 import { takeWhatsAppHandoff, useAcceptHandoffEnabled } from "@/features/broker-workspace/whatsapp-handoff/handoff-store";
 import { quickReminderAction } from "@/features/leads/reminder-actions";
 import { buildFollowUpWhen, type FollowUpOptionValue } from "@/features/broker-workspace/follow-up-options";
+import { runOptimistic } from "@/lib/optimistic-core";
 import { STEP_OPTIONS, type ConfirmationDocument, type LightLeadDetailData, type LiteRequirement } from "./types";
 
 const STEP_ERROR_GENERIC = "Não deu para mudar a etapa agora. Tente de novo em instantes.";
@@ -256,45 +257,55 @@ export function useLeadDetail({
         formData.append("regressionJustification", regressionJustification.trim());
       }
 
-      startUpdateTransition(async () => {
-        try {
-          if (
-            targetStatus === leadStatus &&
-            selectedStep !== "no_interest" &&
-            selectedStep !== "no_contact"
-          ) {
-            toast.info("O lead já está nesta etapa.");
-            resetStepDialog();
-            return;
-          }
+      if (
+        targetStatus === leadStatus &&
+        selectedStep !== "no_interest" &&
+        selectedStep !== "no_contact"
+      ) {
+        toast.info("O lead já está nesta etapa.");
+        resetStepDialog();
+        return;
+      }
 
-          const res = await changeLeadStatusAction({}, formData);
-          resetStepDialog();
-
-          if (!res.success) {
-            toast.error(stepErrorMessage(res.error));
-            return;
-          }
-
+      // Resposta otimista (Doherty, 400 ms): a etapa muda e a folha fecha na hora, fora da transição
+      // (estado de transição só aparece no fim). Se o servidor recusar, a etapa volta e a folha
+      // reabre com o que o corretor escreveu, junto do aviso.
+      const previousStatus = leadStatus;
+      const change = runOptimistic({
+        apply: () => {
           setLeadStatus(targetStatus);
-          if (followupWhen) {
+          setShowUpdateSheet(false);
+        },
+        commit: () => changeLeadStatusAction({}, formData),
+        rollback: () => {
+          setLeadStatus(previousStatus);
+          setShowUpdateSheet(true);
+        },
+        isSuccess: (res) => res.success === true,
+      });
+
+      startUpdateTransition(async () => {
+        const outcome = await change;
+        if (!outcome.ok) {
+          toast.error(outcome.value ? stepErrorMessage(outcome.value.error) : STEP_ERROR_GENERIC);
+          return;
+        }
+        resetStepDialog();
+        if (followupWhen) {
+          try {
             const reminderForm = new FormData();
             reminderForm.set("leadId", lead.id);
             reminderForm.set("when", followupWhen);
             const reminder = await quickReminderAction({}, reminderForm);
-            if (!reminder.success) {
-              toast.warning("Etapa atualizada, mas não deu para marcar o acompanhamento.", {
-                description: "Tente de novo em instantes ou marque o retorno pela ficha do lead.",
-              });
-              resetStepDialog();
-              return;
-            }
+            if (!reminder.success) throw new Error("reminder");
+          } catch {
+            toast.warning("Etapa atualizada, mas não deu para marcar o acompanhamento.", {
+              description: "Tente de novo em instantes ou marque o retorno pela ficha do lead.",
+            });
+            return;
           }
-          toast.success(followupWhen ? "Etapa e acompanhamento registrados." : "Etapa atualizada.");
-        } catch {
-          resetStepDialog();
-          toast.error(STEP_ERROR_GENERIC);
         }
+        toast.success(followupWhen ? "Etapa e acompanhamento registrados." : "Etapa atualizada.");
       });
     }
 
