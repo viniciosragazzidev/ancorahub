@@ -12,6 +12,7 @@ import styles from "./controls.module.css";
 export { LiteMenu, type LiteMenuItem } from "./menu";
 export { LiteSelect, useLitePhone, type LiteOption, type LiteSelectProps } from "./select";
 export { LiteUrlSelect } from "./url-select";
+export { LiteActionButton, type LiteActionButtonProps, type LiteActionOutcome, type LiteActionState } from "./action-button";
 
 export type FilterChip = { id: string; label: string; count?: number };
 /** Filtro ativo: rótulo do campo e valor escolhido ("Filial" e "Centro"). */

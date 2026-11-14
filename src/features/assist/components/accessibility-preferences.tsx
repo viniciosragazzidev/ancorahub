@@ -43,6 +43,21 @@ export function AccessibilityPreferences() {
           <Switch aria-labelledby="a11y-contrast" checked={prefs.highContrast} onCheckedChange={(checked) => update({ highContrast: checked })} />
         </div>
       </section>
+      <section className={styles.prefGroup} aria-labelledby="a11y-feedback">
+        <h2 id="a11y-feedback">Som e vibração</h2>
+        <div className={styles.switchRow}>
+          <span><strong id="a11y-sound">Sons</strong><small>Lead novo, erro e conquistas. Ações do dia a dia ficam em silêncio.</small></span>
+          <Switch aria-labelledby="a11y-sound" checked={prefs.sound} onCheckedChange={(checked) => update({ sound: checked })} />
+        </div>
+        <div className={styles.switchRow}>
+          <span><strong id="a11y-haptic">Vibração</strong><small>Um toque curto quando a ação é confirmada ou falha. Só no celular.</small></span>
+          <Switch aria-labelledby="a11y-haptic" checked={prefs.haptic} onCheckedChange={(checked) => update({ haptic: checked })} />
+        </div>
+        <div className={styles.switchRow}>
+          <span><strong id="a11y-celebrations">Comemorações</strong><small>Meta do dia, venda registrada e novo nível. Desligado, só o número muda.</small></span>
+          <Switch aria-labelledby="a11y-celebrations" checked={prefs.celebrations} onCheckedChange={(checked) => update({ celebrations: checked })} />
+        </div>
+      </section>
       <p className={styles.prefNote}>Vale para este aparelho. O app também segue as opções de acessibilidade do seu celular.</p>
     </div>
   );
