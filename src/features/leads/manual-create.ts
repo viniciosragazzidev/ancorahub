@@ -8,6 +8,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
+import { telefoneCadastroManual } from "@/shared/input/telefone";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { startAiQualificationForLead } from "@/features/ai-qualification/service";
 import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
@@ -42,18 +43,12 @@ const leadInput = z.object({
 
 export type DuplicateLeadNotice = { id: string; nome: string; createdAt: Date; corretorNome: string | null };
 
-export function normalizePhone(phone: string) {
-  // Normalização agressiva: remove formatação, garante DDD+9+8d para números de 10 dígitos,
-  // e sempre retorna com prefixo 55.
-  let digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
-    digits = digits.slice(2);
-  }
-  if (digits.length === 10) {
-    digits = `${digits.slice(0, 2)}9${digits.slice(2)}`;
-  }
-  return `55${digits}`;
-}
+/**
+ * Normalização agressiva do cadastro manual: remove formatação, garante DDD+9+8d para números de 10 dígitos e
+ * sempre retorna com prefixo 55 ("55DDDnum", o formato que esta porta grava em leads.telefone). Vive no módulo
+ * único de entrada; equivalência com a versão antiga provada em src/shared/input/telefone.test.ts.
+ */
+export const normalizePhone = telefoneCadastroManual;
 
 export function normalizeCnpj(value: string | null | undefined) {
   const digits = value?.replace(/\D/g, "") ?? "";
