@@ -7,6 +7,7 @@ import { Badge } from "@/components/arc/badge/badge";
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Button } from "@/components/arc/button/button";
 import { Input } from "@/components/arc/input/input";
+import { LiteSuccess } from "@/components/lite/motion";
 import { Textarea } from "@/components/arc/textarea/textarea";
 import { PeopleEmpty, PeoplePage, PeopleSection, peopleHue, peopleInitials } from "@/components/light/people-list/people-list";
 import {
@@ -72,7 +73,8 @@ export function PriorClientProfile({
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  // Confirmação no próprio lugar: dados do cliente no cartão de dados, contratos junto de "Adicionar contrato".
+  const [feedback, setFeedback] = useState<{ where: "client" | "contracts"; label: string } | null>(null);
   const whatsappUrl = buildWhatsAppUrl(client.phone);
 
   function open(next: NonNullable<typeof sheet>) {
@@ -87,8 +89,9 @@ export function PriorClientProfile({
     setSheet(next);
   }
 
-  function run(task: () => Promise<PriorContractActionResult>, success: string, onDone?: () => void) {
+  function run(task: () => Promise<PriorContractActionResult>, success: NonNullable<typeof feedback>, onDone?: () => void) {
     setError(null);
+    setFeedback(null);
     startTransition(async () => {
       let result: PriorContractActionResult;
       try {
@@ -110,13 +113,13 @@ export function PriorClientProfile({
 
   function submitClient(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    run(() => actions.update({ clientId: client.id, ...clientDraft }), "Dados salvos.", () => setSheet(null));
+    run(() => actions.update({ clientId: client.id, ...clientDraft }), { where: "client", label: "Dados salvos" }, () => setSheet(null));
   }
 
   function submitContract(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const contractId = sheet?.kind === "contract" ? sheet.contractId : undefined;
-    run(() => actions.saveContract({ clientId: client.id, ...(contractId ? { contractId } : {}), contract: contractDraft }), contractId ? "Contrato atualizado." : "Contrato adicionado.", () => setSheet(null));
+    run(() => actions.saveContract({ clientId: client.id, ...(contractId ? { contractId } : {}), contract: contractDraft }), { where: "contracts", label: contractId ? "Contrato atualizado" : "Contrato adicionado" }, () => setSheet(null));
   }
 
   return (
@@ -139,11 +142,13 @@ export function PriorClientProfile({
           {whatsappUrl ? <a className={walletStyles.whatsapp} href={whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp de ${client.name}`}>WhatsApp</a> : null}
           <Button variant="secondary" onClick={() => open({ kind: "client" })}>Editar dados</Button>
         </div>
+        {feedback?.where === "client" ? <LiteSuccess label={feedback.label} className={styles.sheetText} /> : null}
         <p className={styles.sheetText}>Cliente que você já tinha antes do CRM: não gera venda, comissão nem pontos. Retornos para este cliente chegam com a Agenda.</p>
       </section>
 
       <div className={styles.profileSectionHeader}>
         <Button variant="primary" onClick={() => open({ kind: "contract" })}>Adicionar contrato</Button>
+        {feedback?.where === "contracts" ? <LiteSuccess label={feedback.label} className={styles.sheetText} /> : null}
       </div>
       {contracts.length ? (
         <PeopleSection title="Contratos anteriores" id="prior-contracts" count={contracts.length}>
@@ -165,7 +170,7 @@ export function PriorClientProfile({
                   <Button variant="secondary" onClick={() => open({ kind: "contract", contractId: contract.id })}>Editar</Button>
                   {confirmRemove === contract.id ? (
                     <>
-                      <Button variant="secondary" loading={pending} disabled={pending} onClick={() => run(() => actions.removeContract({ clientId: client.id, contractId: contract.id }), "Contrato removido.", () => setConfirmRemove(null))}>Confirmar remoção</Button>
+                      <Button variant="secondary" loading={pending} disabled={pending} onClick={() => run(() => actions.removeContract({ clientId: client.id, contractId: contract.id }), { where: "contracts", label: "Contrato removido" }, () => setConfirmRemove(null))}>Confirmar remoção</Button>
                       <Button variant="secondary" onClick={() => setConfirmRemove(null)}>Manter</Button>
                     </>
                   ) : (
@@ -179,7 +184,6 @@ export function PriorClientProfile({
       ) : (
         <PeopleEmpty title="Nenhum contrato anterior" description="Cadastre o plano que o cliente já tem para acompanhar a renovação em Precisa de atenção." />
       )}
-      {feedback ? <p role="status" className={styles.sheetText}>{feedback}</p> : null}
       {error && sheet === null ? <p role="alert" className={styles.fieldError}>{error}</p> : null}
 
       <BottomSheet
