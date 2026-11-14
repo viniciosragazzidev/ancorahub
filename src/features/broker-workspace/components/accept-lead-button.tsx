@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { motionTokens } from "@/components/arc/motion-tokens";
 import { flyLeadArc } from "@/components/lite/motion/lead-arc";
+import { LiteSuccess } from "@/components/lite/motion/success";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
@@ -24,9 +25,18 @@ import { rememberWhatsAppHandoff, useAcceptHandoffEnabled } from "@/features/bro
  * Resposta otimista (Doherty, 400 ms): no toque o botão já mostra "Lead aceito" e fica travado
  * (nunca aceita duas vezes). Se o servidor recusar (outro corretor pegou, oferta expirou), o
  * `useOptimistic` volta sozinho ao rótulo original e o erro da action aparece junto do botão.
+ *
+ * Confirmação no próprio botão: enquanto o servidor responde, "Lead aceito" fica com o lugar do check
+ * reservado; quando o aceite confirma, o `LiteSuccess` desenha o check ali (0,32 s, `duration.draw`). Com
+ * movimento reduzido ou o kill-switch html[data-interface-motion="off"], o check já aparece pronto.
  */
 function AcceptedLabel() {
-  return <span className="inline-flex items-center gap-1.5"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>Lead aceito</span>;
+  // Mesmo tamanho e espaçamento do LiteSuccess (ícone 16 px, gap 8 px): a troca não mexe na largura.
+  return <span className="inline-flex items-center gap-2" data-accept-feedback="pending"><span aria-hidden="true" className="inline-block size-4 shrink-0" />Lead aceito</span>;
+}
+
+function ConfirmedLabel() {
+  return <LiteSuccess label="Lead aceito" />;
 }
 
 export function AcceptLeadButton({ leadId, className, children, style, appearance = "legacy", disabled = false, arcToLeads = false, "data-tour": dataTour }: { leadId: string; className?: string; children: ReactNode; style?: CSSProperties; appearance?: "legacy" | "shared"; disabled?: boolean; /** Ponto em arco até a contagem de Leads ao aceitar (só o "Seu próximo passo"; ver lead-arc.ts). */ arcToLeads?: boolean; "data-tour"?: string }) {
@@ -35,6 +45,8 @@ export function AcceptLeadButton({ leadId, className, children, style, appearanc
   const motionEnabled = useInterfaceMotionEnabled();
   const [pending, startTransition] = useTransition();
   const [accepted, setAccepted] = useOptimistic(false);
+  // Aceite confirmado pelo servidor: estado real (o otimista some quando a transição termina).
+  const [confirmed, setConfirmed] = useState(false);
   // Aceite com contador (11/11): ligado, nada abre no clique; a tela do lead conta 30 s e abre.
   const handoff = useAcceptHandoffEnabled();
   const inFlight = useRef(false);
@@ -42,7 +54,7 @@ export function AcceptLeadButton({ leadId, className, children, style, appearanc
   const errorId = useId();
 
   function handleClick(event: MouseEvent<HTMLButtonElement>) {
-    if (inFlight.current || pending || disabled) return;
+    if (inFlight.current || pending || disabled || confirmed) return;
     const origin = event.currentTarget;
     inFlight.current = true;
     setError(null);
@@ -64,6 +76,7 @@ export function AcceptLeadButton({ leadId, className, children, style, appearanc
         router.refresh();
         return;
       }
+      setConfirmed(true);
       if (arcToLeads) flyLeadArc(origin, { motionEnabled });
       const url = result.whatsappUrl;
       if (handoff && url) {
@@ -81,8 +94,10 @@ export function AcceptLeadButton({ leadId, className, children, style, appearanc
     });
   }
 
+  const label = confirmed ? <ConfirmedLabel /> : accepted ? <AcceptedLabel /> : children;
+
   if (appearance === "shared") return <div className="grid min-w-0 gap-2">
-    <Button type="button" className={[page.primaryButton, className].filter(Boolean).join(" ")} style={style} data-tour={dataTour} data-state={accepted ? "accepted" : undefined} disabled={disabled || pending} aria-busy={pending || undefined} aria-describedby={error ? errorId : undefined} onClick={handleClick}>{accepted ? <AcceptedLabel /> : children}</Button>
+    <Button type="button" className={[page.primaryButton, className].filter(Boolean).join(" ")} style={style} data-tour={dataTour} data-state={confirmed || accepted ? "accepted" : undefined} data-confirmed={confirmed || undefined} disabled={disabled || pending || confirmed} aria-busy={pending || undefined} aria-describedby={error ? errorId : undefined} onClick={handleClick}>{label}</Button>
     {error ? <p id={errorId} role="alert" className="max-w-sm text-sm text-destructive">{error}</p> : null}
   </div>;
 
@@ -92,14 +107,15 @@ export function AcceptLeadButton({ leadId, className, children, style, appearanc
       className={className}
       style={style}
       data-tour={dataTour}
-      data-state={accepted ? "accepted" : undefined}
-      disabled={pending || disabled}
+      data-state={confirmed || accepted ? "accepted" : undefined}
+      data-confirmed={confirmed || undefined}
+      disabled={pending || disabled || confirmed}
       aria-busy={pending}
       onClick={handleClick}
       whileTap={reduce ? undefined : { scale: 0.98 }}
       transition={motionTokens.spring.snappy}
     >
-      {accepted ? <AcceptedLabel /> : children}
+      {label}
     </motion.button>
   );
 }
