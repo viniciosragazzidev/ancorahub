@@ -28,6 +28,9 @@ import { fichaAcoesCorretor } from "@/features/carteira/ficha-acoes-core";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { ClientDetailLite } from "./client-detail-lite";
+import { PriorClientProfile } from "@/features/broker-workspace/components/prior-client-profile";
+import { isBrokerPriorClientsEnabled, listPriorContracts, loadOwnPriorClient, saoPauloDateKey } from "@/features/customers/prior-portfolio";
+import { removePriorContractAction, savePriorContractAction, updatePriorClientAction } from "@/features/customers/prior-portfolio-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +66,22 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
     .limit(1);
 
   if (!client) notFound();
+
+  // DEC-187: cliente de carteira anterior (sem lead) só existe na carteira do corretor dono, com a chave ligada.
+  if (!(client.leadId as string | null)) {
+    if (context.role !== "broker" || !(await isBrokerPriorClientsEnabled())) notFound();
+    const prior = await loadOwnPriorClient(context, client.id);
+    if (!prior) notFound();
+    const contracts = await listPriorContracts(context, [prior.id]);
+    return (
+      <PriorClientProfile
+        client={{ id: prior.id, name: prior.name, phone: prior.phone, email: prior.email, originNote: prior.originNote }}
+        contracts={contracts}
+        todayKey={saoPauloDateKey(new Date())}
+        actions={{ update: updatePriorClientAction, saveContract: savePriorContractAction, removeContract: removePriorContractAction }}
+      />
+    );
+  }
 
   // Gestor and supervisor Lite: the Lite ficha, read through the same scoped client lookup above.
   // Corretor Lite: a mesma ficha com a próxima ação, só com a flag da carteira ligada (C2, 11/11).

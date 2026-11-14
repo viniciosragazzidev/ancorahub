@@ -10,6 +10,10 @@ const fixtures = vi.hoisted(() => ({
   liteStyle: { current: false },
 }));
 
+// Carteira anterior (DEC-187): os clientes destes testes têm lead, então o perfil novo não entra.
+vi.mock("@/features/customers/prior-portfolio", () => ({ isBrokerPriorClientsEnabled: async () => false, listPriorContracts: async () => [], loadOwnPriorClient: async () => null, saoPauloDateKey: () => "2026-11-13" }));
+vi.mock("@/features/customers/prior-portfolio-actions", () => ({ updatePriorClientAction: async () => ({ ok: true }), savePriorContractAction: async () => ({ ok: true }), removePriorContractAction: async () => ({ ok: true }) }));
+vi.mock("@/features/broker-workspace/components/prior-client-profile", () => ({ PriorClientProfile: () => null }));
 vi.mock("@/features/carteira/retorno-servico", () => ({ carregarProximaAcao: async () => null, carteiraFichaLiteLigada: async () => false }));
 vi.mock("@/shared/db", async () => {
   const data = await import("./client-detail-fixtures");

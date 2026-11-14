@@ -1170,6 +1170,13 @@
                         "when":  1794520800000,
                         "tag":  "0230_erp_operational",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  167,
+                        "version":  "7",
+                        "when":  1794600000000,
+                        "tag":  "0231_broker_prior_clients",
+                        "breakpoints":  true
                     }
                 ]
 }

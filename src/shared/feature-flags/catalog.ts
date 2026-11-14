@@ -627,6 +627,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Habilita a carteira avançada e os retornos de clientes do Corretor Lite.",
   },
+  BROKER_PRIOR_CLIENTS: {
+    key: "feature_broker_prior_clients_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Cliente que já possuo (DEC-187, etapa 4b do modo corretor): o corretor cadastra na Minha carteira clientes e contratos anteriores ao CRM, sem venda, comissão, conversão ou pontos. Só vale com o Início reorganizado e a carteira Lite ligados.",
+  },
   BROKER_SALE_REGISTRATION_V2: {
     key: "feature_broker_sale_registration_v2_enabled",
     scope: "global",

@@ -28,6 +28,7 @@ import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 
 import { BrokerClientWalletList, originLabels } from "./broker-client-wallet";
 import { BrokerWalletAddContact, type BrokerWalletAddContactAction } from "./broker-wallet-add-contact";
+import type { PriorClientAction } from "./prior-client-form";
 import walletStyles from "./broker-client-wallet.module.css";
 import styles from "./broker-my-wallet.module.css";
 
@@ -222,6 +223,7 @@ export function BrokerMyWallet({
   leads,
   clients,
   addContactAction,
+  addPriorClientAction,
 }: {
   filters: BrokerWalletFilters;
   counts: BrokerMyWalletCounts;
@@ -229,6 +231,8 @@ export function BrokerMyWallet({
   leads?: BrokerWalletLeadsResult;
   clients?: BrokerClientWalletResult;
   addContactAction?: BrokerWalletAddContactAction;
+  /** Cliente que já possuo (DEC-187): só com a chave e a migration 0231. */
+  addPriorClientAction?: PriorClientAction;
 }) {
   const leadView = isBrokerWalletLeadView(filters.view);
   const page = (leadView ? leads?.page : clients?.page) ?? 1;
@@ -247,7 +251,7 @@ export function BrokerMyWallet({
       title="Minha carteira"
       hideTitle
       subtitle={summary}
-      action={addContactAction ? <BrokerWalletAddContact action={addContactAction} /> : undefined}
+      action={addContactAction ? <BrokerWalletAddContact action={addContactAction} priorAction={addPriorClientAction} /> : undefined}
       className={`${walletStyles.page} ${styles.page}`}
     >
       <WalletControls key={brokerWalletHref(effectiveFilters)} filters={effectiveFilters} counts={counts} origins={origins} />

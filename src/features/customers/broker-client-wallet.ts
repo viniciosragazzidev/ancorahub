@@ -19,6 +19,7 @@ import {
 } from "drizzle-orm";
 
 import { buildClientScopeWhere } from "@/features/customers/customer-authorization";
+import { isPriorContractRenewalAttention } from "@/features/customers/prior-portfolio-input";
 import { getSaoPauloDayBounds } from "@/features/broker-workspace/workspace-data-domain";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
@@ -49,7 +50,10 @@ export type BrokerClientWalletTask = {
 
 export type BrokerClientWalletRow = {
   id: string;
-  leadId: string;
+  /** Nulo só em cliente de carteira anterior (DEC-187). */
+  leadId: string | null;
+  /** Cliente que o corretor já tinha antes do CRM, sem venda (DEC-187). */
+  priorPortfolio?: boolean;
   name: string;
   phone: string | null;
   email: string | null;
@@ -214,6 +218,20 @@ function activeContractExists(context: WalletContext, options?: {
   return sql`${schema.clients.id} in (select ${schema.activeCustomers.clientId} from ${schema.activeCustomers} where ${and(...conditions)})`;
 }
 
+/** Opções que dependem da chave e da migration da carteira anterior (DEC-187). */
+export type BrokerClientWalletOptions = { priorPortfolio?: boolean };
+
+function priorContractExists(context: WalletContext, options: { status?: BrokerClientContractFilter; renewalFrom?: string; renewalTo?: string }) {
+  const conditions = [
+    eq(schema.clientPriorContracts.tenantId, context.tenantId),
+    eq(schema.clientPriorContracts.brokerId, context.userId),
+    options.status ? eq(schema.clientPriorContracts.status, options.status) : undefined,
+    options.renewalFrom ? gte(schema.clientPriorContracts.renewalDate, options.renewalFrom) : undefined,
+    options.renewalTo ? lte(schema.clientPriorContracts.renewalDate, options.renewalTo) : undefined,
+  ];
+  return sql`${schema.clients.id} in (select ${schema.clientPriorContracts.clientId} from ${schema.clientPriorContracts} where ${and(...conditions)})`;
+}
+
 function leadOriginExists(context: WalletContext, origin: string) {
   return sql`${schema.clients.leadId} in (select ${schema.leads.id} from ${schema.leads} where ${and(
     eq(schema.leads.tenantId, context.tenantId),
@@ -229,13 +247,17 @@ export function buildBrokerClientWalletWhere(
   context: WalletContext,
   filters: BrokerClientWalletFilters,
   now: Date,
+  options: BrokerClientWalletOptions = {},
 ): SQL {
   if (context.role !== "broker") return sql`false`;
+  const prior = options.priorPortfolio === true;
 
+  const saleClient = sql`${schema.clients.leadId} in (select ${schema.leads.id} from ${schema.leads} where ${eq(schema.leads.tenantId, context.tenantId)})`;
   const conditions: (SQL | undefined)[] = [
     buildClientScopeWhere(context),
     eq(schema.clients.tenantId, context.tenantId),
-    sql`${schema.clients.leadId} in (select ${schema.leads.id} from ${schema.leads} where ${eq(schema.leads.tenantId, context.tenantId)})`,
+    // Carteira anterior (lead_id nulo) só entra com a chave e a migration da DEC-187.
+    prior ? or(isNull(schema.clients.leadId), saleClient) : saleClient,
   ];
 
   if (filters.query) {
@@ -247,7 +269,10 @@ export function buildBrokerClientWalletWhere(
     conditions.push(or(...matches));
   }
   if (filters.origin) conditions.push(leadOriginExists(context, filters.origin));
-  if (filters.contractStatus) conditions.push(activeContractExists(context, { status: filters.contractStatus }));
+  if (filters.contractStatus) {
+    const saleContract = activeContractExists(context, { status: filters.contractStatus });
+    conditions.push(prior ? or(saleContract, priorContractExists(context, { status: filters.contractStatus })) : saleContract);
+  }
 
   const bounds = getSaoPauloDayBounds(now);
   const dueTodayOrEarlier = lt(schema.leadTasks.dueAt, bounds.end);
@@ -258,8 +283,10 @@ export function buildBrokerClientWalletWhere(
     renewalEligibleOn: today,
   });
   const attentionReturn = openTaskExists(context, dueTodayOrEarlier);
+  // DEC-187: contrato anterior ativo com renovação entre hoje e 30 dias, a mesma janela da DEC-180.
+  const priorRenewal = prior ? priorContractExists(context, { status: "active", renewalFrom: today, renewalTo: renewalCutoff(now) }) : undefined;
 
-  if (filters.view === "attention") conditions.push(or(attentionReturn, attentionRenewal));
+  if (filters.view === "attention") conditions.push(or(attentionReturn, attentionRenewal, priorRenewal));
   if (filters.view === "renewals") conditions.push(attentionRenewal);
 
   switch (filters.returnStatus) {
@@ -276,9 +303,11 @@ export function buildBrokerClientWalletWhere(
     case "future":
       conditions.push(openTaskExists(context, and(isNotNull(schema.leadTasks.dueAt), sql`${schema.leadTasks.dueAt} >= ${bounds.end}`)!));
       break;
-    case "none":
-      conditions.push(not(openTaskExists(context, isNotNull(schema.leadTasks.dueAt))));
+    case "none": {
+      const withoutReturn = not(openTaskExists(context, isNotNull(schema.leadTasks.dueAt)));
+      conditions.push(prior ? or(isNull(schema.clients.leadId), withoutReturn) : withoutReturn);
       break;
+    }
   }
 
   return and(...conditions)!;
@@ -289,8 +318,9 @@ export async function getBrokerClientWallet(
   rawFilters: Partial<BrokerClientWalletFilters>,
   now = new Date(),
   /** `rows: false` só conta (a "Minha carteira" mostra os números dos clientes enquanto lista leads). */
-  options: { rows?: boolean } = {},
+  options: { rows?: boolean } & BrokerClientWalletOptions = {},
 ): Promise<BrokerClientWalletResult> {
+  const walletOptions: BrokerClientWalletOptions = { priorPortfolio: options.priorPortfolio === true };
   const filters = normalizeBrokerClientWalletFilters(rawFilters);
   if (context.role !== "broker") {
     return { filters, rows: [], page: 1, pageSize: BROKER_CLIENT_WALLET_PAGE_SIZE, totalPages: 0, totalCount: 0, walletCount: 0, counts: { all: 0, attention: 0, renewals: 0 }, hasRenewalData: false, origins: [] };
@@ -302,10 +332,10 @@ export async function getBrokerClientWallet(
   const [aggregates, origins] = await Promise.all([
     db.select({
       walletCount: count(),
-      selectedCount: sql<number>`count(*) filter (where ${buildBrokerClientWalletWhere(context, filters, now)})`,
-      allCount: sql<number>`count(*) filter (where ${buildBrokerClientWalletWhere(context, common, now)})`,
-      attentionCount: sql<number>`count(*) filter (where ${buildBrokerClientWalletWhere(context, { ...common, view: "attention" }, now)})`,
-      renewalCount: sql<number>`count(*) filter (where ${buildBrokerClientWalletWhere(context, { ...common, view: "renewals" }, now)})`,
+      selectedCount: sql<number>`count(*) filter (where ${buildBrokerClientWalletWhere(context, filters, now, walletOptions)})`,
+      allCount: sql<number>`count(*) filter (where ${buildBrokerClientWalletWhere(context, common, now, walletOptions)})`,
+      attentionCount: sql<number>`count(*) filter (where ${buildBrokerClientWalletWhere(context, { ...common, view: "attention" }, now, walletOptions)})`,
+      renewalCount: sql<number>`count(*) filter (where ${buildBrokerClientWalletWhere(context, { ...common, view: "renewals" }, now, walletOptions)})`,
       renewalDataCount: sql<number>`count(*) filter (where ${activeContractExists(context, {
         status: "active",
         hasRenewalDate: true,
@@ -313,7 +343,7 @@ export async function getBrokerClientWallet(
       })})`,
     })
       .from(schema.clients)
-      .where(buildBrokerClientWalletWhere(context, scopeFilters, now)),
+      .where(buildBrokerClientWalletWhere(context, scopeFilters, now, walletOptions)),
     db.selectDistinct({ origin: schema.leads.origem })
       .from(schema.leads)
       .innerJoin(schema.clients, and(eq(schema.clients.leadId, schema.leads.id), eq(schema.clients.tenantId, schema.leads.tenantId)))
@@ -352,14 +382,29 @@ export async function getBrokerClientWallet(
     origin: schema.leads.origem,
   })
     .from(schema.clients)
-    .innerJoin(schema.leads, and(eq(schema.leads.id, schema.clients.leadId), eq(schema.leads.tenantId, schema.clients.tenantId)))
-    .where(buildBrokerClientWalletWhere(context, effectiveFilters, now))
+    // Left join: cliente de carteira anterior não tem lead (DEC-187); o predicado decide quem entra.
+    .leftJoin(schema.leads, and(eq(schema.leads.id, schema.clients.leadId), eq(schema.leads.tenantId, schema.clients.tenantId)))
+    .where(buildBrokerClientWalletWhere(context, effectiveFilters, now, walletOptions))
     .orderBy(desc(schema.clients.convertedAt), desc(schema.clients.id))
     .limit(BROKER_CLIENT_WALLET_PAGE_SIZE)
     .offset((page - 1) * BROKER_CLIENT_WALLET_PAGE_SIZE);
 
   const clientIds = clients.map((client) => client.id);
-  const leadIds = clients.map((client) => client.leadId);
+  // `schema.clients.leadId` é tipado como obrigatório (clientes de venda); a carteira anterior chega nula.
+  const leadIds = clients.flatMap((client) => (client.leadId as string | null) ? [client.leadId] : []);
+  const priorClientIds = clients.flatMap((client) => (client.leadId as string | null) ? [] : [client.id]);
+  const priorContracts = walletOptions.priorPortfolio && priorClientIds.length
+    ? await db.select({ clientId: schema.clientPriorContracts.clientId, status: schema.clientPriorContracts.status, renewalDate: schema.clientPriorContracts.renewalDate })
+      .from(schema.clientPriorContracts)
+      .where(and(
+        eq(schema.clientPriorContracts.tenantId, context.tenantId),
+        eq(schema.clientPriorContracts.brokerId, context.userId),
+        inArray(schema.clientPriorContracts.clientId, priorClientIds),
+      ))
+    : [];
+  const priorByClient = new Map<string, typeof priorContracts>();
+  for (const contract of priorContracts) priorByClient.set(contract.clientId, [...(priorByClient.get(contract.clientId) ?? []), contract]);
+  const todayKey = dateKeyInSaoPaulo(now);
   const [contracts, tasks] = clientIds.length
     ? await Promise.all([
       db.select({
@@ -375,7 +420,7 @@ export async function getBrokerClientWallet(
         .orderBy(desc(sql`case when ${schema.activeCustomers.status} = 'active' then 1 else 0 end`), desc(schema.activeCustomers.updatedAt)),
       db.select({ id: schema.leadTasks.id, leadId: schema.leadTasks.leadId, title: schema.leadTasks.title, dueAt: schema.leadTasks.dueAt, priority: schema.leadTasks.priority })
         .from(schema.leadTasks)
-        .where(and(eq(schema.leadTasks.tenantId, context.tenantId), eq(schema.leadTasks.assignedTo, context.userId), inArray(schema.leadTasks.leadId, leadIds), isNull(schema.leadTasks.completedAt)))
+        .where(and(eq(schema.leadTasks.tenantId, context.tenantId), eq(schema.leadTasks.assignedTo, context.userId), leadIds.length ? inArray(schema.leadTasks.leadId, leadIds) : sql`false`, isNull(schema.leadTasks.completedAt)))
         .orderBy(sql`${schema.leadTasks.dueAt} asc nulls last`, desc(schema.leadTasks.createdAt)),
     ])
     : [[], []] as const;
@@ -394,11 +439,28 @@ export async function getBrokerClientWallet(
     tasksByLead.set(task.leadId, leadTasks);
   }
 
-  const rows = clients.map((client) => {
+  const rows = clients.map((client): BrokerClientWalletRow => {
+    const leadId = (client.leadId as string | null) ?? null;
+    if (!leadId) {
+      // Carteira anterior: situação e renovação vêm do contrato anterior; sem lead não há retorno (etapa 6).
+      const prior = priorByClient.get(client.id) ?? [];
+      const display = (effectiveFilters.contractStatus ? prior.find((contract) => contract.status === effectiveFilters.contractStatus) : undefined)
+        ?? prior.find((contract) => contract.status === "active") ?? prior.find((contract) => contract.status === "cancelled");
+      return {
+        ...client,
+        leadId: null,
+        priorPortfolio: true,
+        origin: null,
+        contractStatus: display?.status === "active" ? "active" : display?.status === "cancelled" ? "cancelled" : null,
+        renewalWindowStartDate: null,
+        nextTask: null,
+        attentionReason: prior.some((contract) => isPriorContractRenewalAttention(contract, todayKey)) ? "renewal" : null,
+      };
+    }
     const clientContracts = contractsByClient.get(client.id) ?? [];
     const displayContract = chooseBrokerClientWalletContract(clientContracts, effectiveFilters.contractStatus);
     const renewalContract = clientContracts.find((contract) => hasBrokerClientWalletRenewalAttention(contract, now));
-    const nextTask = chooseBrokerClientWalletTask(tasksByLead.get(client.leadId) ?? [], effectiveFilters.returnStatus, now);
+    const nextTask = chooseBrokerClientWalletTask(tasksByLead.get(leadId) ?? [], effectiveFilters.returnStatus, now);
     const returnBucket = classifyBrokerClientReturn(nextTask?.dueAt ?? null, now);
     const contractStatus: BrokerClientWalletRow["contractStatus"] = displayContract?.status === "active"
       ? "active"

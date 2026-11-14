@@ -1,8 +1,10 @@
 # Etapa 4b do modo corretor: "Cliente que já possuo" e contratos anteriores
 
 Data: 2026-11-13. Complementa as seções 4 e 5 de [2026-11-13-plano-modo-corretor.md](./2026-11-13-plano-modo-corretor.md).
-Estado: **proposta aprovada pela opção recomendada (Vinicios, 2026-11-13); não implementada.** A decisão precisa virar
-DEC no `docs/decision-log.md` antes do código, e a migration só entra com o número livre no momento (ver abaixo).
+Estado: **aprovada pela opção recomendada (Vinicios, 2026-11-13), registrada na DEC-187 e implementada em
+`feat/corretor-carteira-etapa4b`** com a migration `0231_broker_prior_clients.sql` (não aplicada). Diferença da proposta:
+o CHECK também exige `lead_id` nulo para `prior_portfolio`, então "cliente de venda" é `lead_id is not null`, filtro
+que funciona antes e depois da migration.
 
 ## Problema
 

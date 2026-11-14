@@ -16,3 +16,15 @@ export async function isBrokerMyWalletEnabled(): Promise<boolean> {
   ]);
   return navReorg === "true" && walletLite;
 }
+
+/**
+ * "Cliente que já possuo" (DEC-187, etapa 4b): a chave `feature_broker_prior_clients_enabled` (desligada por padrão)
+ * sobre a Minha carteira. A migration 0231 é conferida à parte (`isPriorPortfolioSchemaReady`).
+ */
+export async function isBrokerPriorClientsFlagOn(): Promise<boolean> {
+  const [wallet, prior] = await Promise.all([
+    isBrokerMyWalletEnabled(),
+    getFeatureFlag(FEATURE_FLAGS.BROKER_PRIOR_CLIENTS).catch(() => "false"),
+  ]);
+  return wallet && prior === "true";
+}
