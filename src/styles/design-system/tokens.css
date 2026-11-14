@@ -24,13 +24,13 @@
   --color-ds-steel: #525252;
   --color-ds-fog: #71717a;
   --color-ds-silver: #a3a3a3;
-  --color-ds-electric-blue: #3b2dff;
+  --color-ds-electric-blue: #002b73;
   --color-ds-deep-sapphire: #2f22d9;
   --color-ds-soft-mint: #dcfce7;
   --color-ds-vivid-green: #10b981;
   --color-ds-tangerine: #ea580c;
   --color-ds-lavender: #7c3aed;
-  --color-ds-primary-action-fill: #3b2dff;
+  --color-ds-primary-action-fill: #002b73;
   /* Text on the primary action fill, and its hover fill (dark mode: indigo) */
   --color-ds-on-primary-action: #ffffff;
   --color-ds-primary-action-hover: #2f22d9;

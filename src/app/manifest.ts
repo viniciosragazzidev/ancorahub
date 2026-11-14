@@ -9,7 +9,7 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     // Mesmo azul da splash: a tela do PWA instalado emenda com a splash sem piscar.
     background_color: "#002b73",
-    theme_color: "#16A34A",
+    theme_color: "#002b73",
     orientation: "portrait-primary",
     categories: ["business", "productivity"],
     lang: "pt-BR",

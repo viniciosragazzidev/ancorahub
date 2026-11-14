@@ -87,7 +87,7 @@
   --card-foreground: var(--foreground);
   --popover: var(--surface-raised);
   --popover-foreground: var(--foreground);
-  --primary: #3b2dff;
+  --primary: #002b73;
   --primary-foreground: #ffffff;
   --secondary: var(--surface-muted);
   --secondary-foreground: var(--foreground);
@@ -101,12 +101,12 @@
   --border: rgb(16 16 40 / 0.08);
   --border-subtle: rgb(16 16 40 / 0.05);
   --border-strong: rgb(16 16 40 / 0.18);
-  --accent: #3b2dff;
-  --accent-strong: #2a1fd1;
-  --accent-subtle: rgb(59 45 255 / 0.1);
+  --accent: #002b73;
+  --accent-strong: #001c4d;
+  --accent-subtle: rgb(0 43 115 / 0.1);
   --accent-foreground: #ffffff;
-  --control-on: #3b2dff;
-  --control-fill: #3b2dff;
+  --control-on: #002b73;
+  --control-fill: #002b73;
   --success: #0f7a4d;
   --warning: #a15c00;
   --danger: #d4263a;
@@ -122,13 +122,13 @@
   --control-height-md: max(44px, 2.75rem); /* root text scaling must not shrink touch targets */
   /* The chat action blue, also for Lite screens outside the chat (team, journey, recados).
      The chat root (chat.module.css) sets the same values, so nothing changes inside it. */
-  --chat-action: oklch(62% 0.2 255);
-  --chat-action-strong: oklch(55% 0.21 258);
-  --chat-action-soft: oklch(62% 0.2 255 / 0.1);
+  --chat-action: oklch(36% 0.14 262);
+  --chat-action-strong: oklch(29% 0.12 263);
+  --chat-action-soft: oklch(36% 0.14 262 / 0.1);
   /* Base sólida do botão de ação (FEEDBACK.md §4): só no botão primário do Lite, um por tela. */
-  --chat-action-base: oklch(46% 0.19 260);
+  --chat-action-base: oklch(27% 0.11 263);
   /* Blue for text (links, highlights): 4.5:1 or more on --surface and --surface-muted. */
-  --chat-action-text: oklch(48% 0.2 258);
+  --chat-action-text: oklch(38% 0.14 262);
 }
 
 /* Arc shared keyboard ring, scoped (foundation.css applies it to :root). Pointer focus draws nothing. */
@@ -177,7 +177,7 @@ html[data-contrast="high"] .arc-venancor {
   --text-secondary: var(--neutral-10, #27272a);
   --border-subtle: var(--neutral-6, #a1a1aa);
   --border: var(--neutral-7, #71717a);
-  --chat-action-text: oklch(40% 0.2 258);
+  --chat-action-text: oklch(30% 0.13 263);
 }
 
 /* Inputs are pills in the Lite (--radius-control 9999px), but a multi-line box needs corners

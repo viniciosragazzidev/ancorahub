@@ -15,7 +15,7 @@
 .member { display: inline-grid; }
 .tag {
   display: inline-flex; height: 24px; align-items: center; padding: 0 10px; border-radius: 999px;
-  background: oklch(62% .2 255 / .1); color: oklch(55% .21 258); font-size: 12px; font-weight: 500;
+  background: oklch(36% 0.14 262 / .1); color: oklch(29% 0.12 263); font-size: 12px; font-weight: 500;
 }
 .title { margin: 10px 0 0; font-size: 22px; font-weight: 500; letter-spacing: -.03em; line-height: 1.15; }
 .lead { margin: 8px 0 0; font-size: 15px; line-height: 1.5; color: var(--text-secondary); }
@@ -29,8 +29,8 @@
 .later:hover { background: var(--surface-muted); color: var(--foreground); }
 .start {
   height: 50px; border: 0; border-radius: 999px; font: inherit; font-size: 16px; font-weight: 500; color: white; cursor: pointer;
-  background: linear-gradient(180deg, oklch(62% .2 255), oklch(55% .21 258));
-  box-shadow: 0 10px 24px oklch(55% .21 258 / .32);
+  background: linear-gradient(180deg, oklch(36% 0.14 262), oklch(29% 0.12 263));
+  box-shadow: 0 10px 24px oklch(29% 0.12 263 / .32);
 }
 
 /* First access: "Não perca nenhum lead" (turn on notifications), 2026-10-12. */
@@ -38,5 +38,5 @@
 .pushBell { width: 72px; height: 72px; border-radius: 24px; display: grid; place-items: center; color: white; background: linear-gradient(135deg, oklch(66% 0.18 255), oklch(62% 0.2 285)); box-shadow: 0 14px 28px -14px oklch(55% 0.2 265 / 0.9); transform-origin: 50% 12%; }
 .pushBell[data-done="true"] { background: var(--success); box-shadow: 0 14px 28px -14px color-mix(in oklab, var(--success) 90%, transparent); }
 .pushToast { position: absolute; top: 0; left: 50%; translate: -50% 0; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--foreground); background: var(--surface); box-shadow: var(--shadow-floating, 0 8px 24px rgb(16 16 40 / 0.12)); }
-.pushToastDot { width: 8px; height: 8px; border-radius: 50%; background: oklch(62% 0.2 255); }
+.pushToastDot { width: 8px; height: 8px; border-radius: 50%; background: oklch(36% 0.14 262); }
 .pushError { margin: 8px 0 0; font-size: 13px; line-height: 1.45; color: var(--danger); }

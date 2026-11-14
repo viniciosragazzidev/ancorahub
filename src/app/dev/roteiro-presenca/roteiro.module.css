@@ -2,9 +2,9 @@
    Tokens do Lite (escopo .arc-venancor): superfícies, texto, raios pílula/painel e o azul de ação do chat.
    Suposições marcadas na tela com .assume (ver plano 2026-11-09-roteiro-guiado-presenca-whatsapp.md § 8). */
 .root {
-  --chat-action: oklch(62% 0.2 255);
-  --chat-action-strong: oklch(55% 0.21 258);
-  --chat-action-soft: oklch(62% 0.2 255 / 0.1);
+  --chat-action: oklch(36% 0.14 262);
+  --chat-action-strong: oklch(29% 0.12 263);
+  --chat-action-soft: oklch(36% 0.14 262 / 0.1);
   --wa: oklch(64% 0.17 150);
   --wa-soft: oklch(64% 0.17 150 / 0.12);
   --wa-ink: oklch(42% 0.12 150);
@@ -51,7 +51,7 @@
 .cardTitle { font-size: 16px; font-weight: 500; }
 .cardText { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
 .cardResume { font-size: 12px; color: var(--text-muted); text-align: center; }
-.cta { min-height: 50px; border: 0; border-radius: 9999px; padding: 0 22px; font: inherit; font-size: 16px; font-weight: 500; color: white; background: linear-gradient(180deg, var(--chat-action), var(--chat-action-strong)); box-shadow: 0 10px 24px oklch(55% 0.21 258 / 0.32); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.cta { min-height: 50px; border: 0; border-radius: 9999px; padding: 0 22px; font: inherit; font-size: 16px; font-weight: 500; color: white; background: linear-gradient(180deg, var(--chat-action), var(--chat-action-strong)); box-shadow: 0 10px 24px oklch(29% 0.12 263 / 0.32); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .cta[data-tone="whatsapp"] { background: var(--wa); box-shadow: 0 10px 24px oklch(64% 0.17 150 / 0.3); }
 .copied { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: var(--wa-ink); min-height: 22px; }
 .dutyPill { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; color: oklch(45% 0.13 28); background: oklch(95% 0.04 28); }

@@ -118,7 +118,7 @@ const lite = {
   muted: hex("#666674"),
   border: hex("#ececef"), // rgb(16 16 40 / .08)
   borderSubtle: hex("#f3f3f5"), // rgb(16 16 40 / .05)
-  actionSoft: hex("#e8f1fe"), // --chat-action-soft, oklch(62% .2 255 / .1)
+  actionSoft: hex("#e8f1fe"), // --chat-action-soft, oklch(36% 0.14 262 / .1)
   whatsappSoft: hex("#e5f5eb"), // WhatsApp oklch(64% .17 150 / .12): the broker's bubble
   hot: hex("#e8553d"), // oklch(64% .2 30)
   warm: hex("#e0a32e"), // oklch(75% .16 75)

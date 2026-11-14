@@ -14,7 +14,7 @@ import { LeadDetailFixture } from "./lead-detail-fixture";
 /** Dev-only: o perfil do lead Lite do diretor fora da moldura (para a moldura real, /dev/diretor-shell-real?tela=lead). */
 export default function DirectorLeadRealPage() {
   if (process.env.NODE_ENV === "production") notFound();
-  const skin = { "--director-brand-color": "#3b2dff", "--director-brand-foreground": "#ffffff" } as CSSProperties;
+  const skin = { "--director-brand-color": "#002b73", "--director-brand-foreground": "#ffffff" } as CSSProperties;
   return (
     <ArcScopeProvider enabled>
       <div className="arc-venancor" data-skin="diretor" style={skin}>

@@ -25,7 +25,7 @@
 
 /* Category colors: tinted circle + text (works in light and dark). */
 .gestao { background: color-mix(in oklch, oklch(62% 0.2 15) 16%, transparent); color: oklch(52% 0.2 15); }
-.lead { background: color-mix(in oklch, oklch(62% 0.2 255) 16%, transparent); color: oklch(52% 0.2 255); }
+.lead { background: color-mix(in oklch, oklch(36% 0.14 262) 16%, transparent); color: oklch(52% 0.2 255); }
 .plantao { background: color-mix(in oklch, oklch(70% 0.17 45) 18%, transparent); color: oklch(56% 0.17 45); }
 .alerta { background: color-mix(in oklch, oklch(78% 0.16 80) 22%, transparent); color: oklch(55% 0.14 70); }
 .info { background: var(--surface-muted); color: var(--text-muted); }
