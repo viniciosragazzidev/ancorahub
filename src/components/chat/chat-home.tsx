@@ -242,7 +242,19 @@ export function ChatHome({
   const hasNowItems = Boolean(summary?.now?.items.length);
   const showNext = Boolean(next && !hasNowItems);
   // Oferta esperando o corretor (item do Agora com aceite e ainda no prazo): o "Agora" flutuante avisa e pulsa.
-  const offerWaiting = Boolean(summary?.now?.items.some((item) => item.acceptLeadId && (!item.expiresAt || Date.parse(item.expiresAt) > now.getTime())));
+  // O `now` vem do servidor e não anda: um timer acorda no fim da oferta mais próxima para o anel parar quando ela expira.
+  const [offerClock, setOfferClock] = useState(() => now.getTime());
+  const offerNow = Math.max(now.getTime(), offerClock);
+  const offerWaiting = Boolean(summary?.now?.items.some((item) => item.acceptLeadId && (!item.expiresAt || Date.parse(item.expiresAt) > offerNow)));
+  const nextOfferExpiry = summary?.now?.items.reduce<number | null>((soonest, item) => {
+    const at = item.acceptLeadId && item.expiresAt ? Date.parse(item.expiresAt) : NaN;
+    return Number.isFinite(at) && at > offerNow && (soonest === null || at < soonest) ? at : soonest;
+  }, null) ?? null;
+  useEffect(() => {
+    if (nextOfferExpiry === null) return;
+    const timer = window.setTimeout(() => setOfferClock(Date.now()), Math.max(0, nextOfferExpiry - Date.now()) + 50);
+    return () => window.clearTimeout(timer);
+  }, [nextOfferExpiry]);
   const offerAttributes = useOfferPendingAttributes(floatingNow && offerWaiting);
   const activeId = mode === "rail" ? [...assistants, ...leads].find((thread) => isActive(thread, pathname))?.id ?? null : null;
   const waitingAssistants = assistants.filter((thread) => thread.waitingYou);
