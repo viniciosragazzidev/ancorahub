@@ -57,7 +57,18 @@ export function useActionStatus() {
 
   const busy = useCallback((key: string) => status[key]?.state === "busy", [status]);
 
-  return { status, run, invalid, clear, busy };
+  /** Para ações que não passam por `run` (formulário com useActionState): confirma ou mostra a falha. */
+  const confirm = useCallback((key: string, label: string) => {
+    fire("confirm");
+    set(key, { state: "done", label });
+  }, [fire, set]);
+  const fail = useCallback((key: string, error: unknown, options: Omit<ActionOptions, "done"> & { retry?: () => void }) => {
+    fire("error");
+    const info = normalizeActionError(error, options.fallback);
+    set(key, { state: "error", message: actionErrorMessage(info, options.keeps), retry: info.retryable ? options.retry : undefined });
+  }, [fire, set]);
+
+  return { status, run, invalid, clear, busy, confirm, fail };
 }
 
 /** Rótulo do botão enquanto envia: spinner e o verbo no gerúndio. */
