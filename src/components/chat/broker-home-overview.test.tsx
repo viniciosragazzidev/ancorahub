@@ -72,7 +72,9 @@ function show(value = summary, overrides: Partial<LightAvailabilityValue> = {}) 
 describe("Home operacional do corretor", () => {
   it("mostra um único aceite principal e mantém a outra pendência secundária", async () => {
     show();
-    expect(await screen.findAllByRole("button", { name: "Aceitar e chamar" })).toHaveLength(1);
+    // O aceite principal avisa a oferta pendente no próprio rótulo; só ele.
+    expect(await screen.findAllByRole("button", { name: "Oferta pendente: Aceitar e chamar" })).toHaveLength(1);
+    expect(screen.queryAllByRole("button", { name: "Aceitar e chamar" })).toHaveLength(0);
     expect(screen.getByRole("heading", { name: "Cliente de demonstração" })).toBeTruthy();
     expect(screen.getByRole("link", { name: /Responder/ }).getAttribute("href")).toBe("/leads/two");
     expect(screen.getByText("Aceite em até 8 min")).toBeTruthy();
@@ -92,10 +94,13 @@ describe("Home operacional do corretor", () => {
         ],
       },
     });
-    const main = await screen.findByRole("button", { name: "Aceitar e chamar" });
+    const main = await screen.findByRole("button", { name: "Oferta pendente: Aceitar e chamar" });
     const listed = await screen.findByRole("button", { name: "Aceitar segunda" });
     expect(main.className).not.toMatch(/secondaryAction/);
     expect(listed.className).toMatch(/secondaryAction/);
+    // Só o principal pulsa: o da lista não tem o estado de oferta pendente.
+    expect(main.getAttribute("data-offer-pending")).toBe("true");
+    expect(listed.hasAttribute("data-offer-pending")).toBe(false);
     expect(screen.getByRole("button", { name: "Ferramentas" }).className).toMatch(/ghost/);
   });
   it("não oferece aceite para oferta expirada", async () => {

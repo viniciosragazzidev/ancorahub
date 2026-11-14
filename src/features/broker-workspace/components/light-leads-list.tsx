@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
+import { CalendarClock, Clock3, Hourglass, MessageCircle, UserRoundPlus, UsersRound, Zap, type LucideIcon } from "lucide-react";
 
 import { Badge, type BadgeTone } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
@@ -105,8 +106,8 @@ function describeLead(lead: LightLeadItem): LeadState {
   return { tone: "neutral", chip: stage, context: lead.productName ? `${lead.productName}${lead.city ? ` em ${lead.city}` : ""}` : stage };
 }
 
-const acceptButton =
-  "inline-flex h-11 items-center justify-center rounded-full bg-(--accent) px-4 text-sm font-semibold text-(--accent-foreground) disabled:opacity-60";
+/** O aceite tem o visual próprio (verde, raio, accept-lead-style): aqui não encolhe ao lado da linha. */
+const acceptButton = "shrink-0";
 
 export type LeadNowItem = { kind: "acceptance" | "response" | "return"; lead: LightLeadItem };
 
@@ -150,6 +151,18 @@ const arrivalTransition = {
   layout: { duration: motionTokens.duration.fast, ease: motionTokens.ease.enter },
 };
 
+/** Cada passo do Agora com o seu ícone e o seu nome (o tipo nunca depende só da cor). */
+const NOW_KIND: Record<LeadNowItem["kind"], { label: string; action: string; icon: LucideIcon }> = {
+  acceptance: { label: "Aceite pendente", action: "Aceitar e chamar", icon: UserRoundPlus },
+  response: { label: "Cliente respondeu", action: "Responder", icon: MessageCircle },
+  return: { label: "Retorno vencido", action: "Ver retorno", icon: CalendarClock },
+};
+
+/**
+ * Cartão "Agora" de /leads (14/11): o tipo do passo com ícone, o nome do lead em destaque e, embaixo,
+ * cada informação com o seu ícone (quando chegou, fila/plantão, prazo do aceite). O aceite usa o botão
+ * verde com o raio (accept-lead-style). Só visual: os itens continuam vindo de buildLeadNowItems.
+ */
 function NowBlock({ items }: { items: LeadNowItem[] }) {
   const reduce = useReducedMotion();
   const motionEnabled = useInterfaceMotionEnabled();
@@ -163,26 +176,38 @@ function NowBlock({ items }: { items: LeadNowItem[] }) {
   if (!items.length) return null;
   return (
     <motion.section className={styles.now} aria-label="Agora" initial={reduce ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: motionTokens.duration.standard, ease: motionTokens.ease.enter }}>
-      <h2 className={styles.nowTitle}>Agora</h2>
+      <header className={styles.nowHeader}>
+        <span className={styles.nowTitleIcon} aria-hidden="true"><Zap /></span>
+        <h2 className={styles.nowTitle}>Agora</h2>
+        <span className={styles.nowCount} aria-label={`${items.length} ${items.length === 1 ? "passo" : "passos"}`}>{items.length}</span>
+      </header>
       <ul className={styles.nowList}>
         {items.map(({ kind, lead }, index) => {
-          const label = kind === "acceptance" ? "Aceite pendente" : kind === "response" ? "Cliente respondeu" : "Retorno vencido";
-          const actionLabel = kind === "acceptance" ? "Aceitar e chamar" : kind === "response" ? "Responder" : "Ver retorno";
+          const { label, action: actionLabel, icon: KindIcon } = NOW_KIND[kind];
           const arrived = distributedAt(lead);
-          const detail = kind === "acceptance"
-            ? [arrived ? `Recebido ${formatBrokerArrival(arrived)}` : null, lead.dutyName ? `Plantão ${lead.dutyName}` : null].filter(Boolean).join(" · ")
-            : kind === "response" ? "O cliente aguarda sua mensagem." : "O prazo combinado para falar com o cliente venceu.";
+          const arrivedText = arrived ? formatBrokerArrival(arrived) : null;
           const arriving = motionEnabled && !reduce && newcomers.has(`${kind}-${lead.id}`);
           return (
-            <motion.li key={`${kind}-${lead.id}`} className={styles.nowItem} layout={!reduce} initial={reduce ? false : arriving ? arrivalInitial : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={arriving ? arrivalTransition : { duration: motionTokens.duration.fast, delay: reduce ? 0 : index * motionTokens.stagger.item, ease: motionTokens.ease.enter }}>
+            <motion.li key={`${kind}-${lead.id}`} className={styles.nowItem} data-kind={kind} layout={!reduce} initial={reduce ? false : arriving ? arrivalInitial : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={arriving ? arrivalTransition : { duration: motionTokens.duration.fast, delay: reduce ? 0 : index * motionTokens.stagger.item, ease: motionTokens.ease.enter }}>
+              <span className={styles.nowKindIcon} aria-hidden="true"><KindIcon /></span>
               <div className={styles.nowCopy}>
-                <strong>{lead.name}</strong>
-                <span>{label} · {detail}</span>
-                {kind === "acceptance" && lead.expiresAt ? <span className={styles.nowCountdown}>{countdown(lead.expiresAt, clock)}</span> : null}
+                <span className={styles.nowKind}>{label}</span>
+                <strong className={styles.nowName}>{lead.name}</strong>
+                {kind === "acceptance" ? (
+                  <span className={styles.nowMeta}>
+                    {arrivedText ? <span className={styles.nowFact}><Clock3 aria-hidden="true" />Recebido {arrivedText}</span> : null}
+                    {lead.dutyName ? <span className={styles.nowFact}><UsersRound aria-hidden="true" />Plantão {lead.dutyName}</span> : null}
+                    {lead.expiresAt ? <span className={`${styles.nowFact} ${styles.nowCountdown}`}><Hourglass aria-hidden="true" />{countdown(lead.expiresAt, clock)}</span> : null}
+                  </span>
+                ) : (
+                  <span className={styles.nowMeta}><span className={styles.nowFact}>{kind === "response" ? "O cliente aguarda sua mensagem." : "O prazo combinado para falar com o cliente venceu."}</span></span>
+                )}
               </div>
-              {kind === "acceptance"
-                ? <AcceptLeadButton leadId={lead.id} className={styles.nowAction}>{actionLabel}</AcceptLeadButton>
-                : <Link className={styles.nowAction} href={`/leads/${lead.id}${kind === "return" ? "#tarefas" : ""}`}>{actionLabel}</Link>}
+              <div className={styles.nowActionSlot}>
+                {kind === "acceptance"
+                  ? <AcceptLeadButton leadId={lead.id} className={styles.nowAccept}>{actionLabel}</AcceptLeadButton>
+                  : <Link className={styles.nowAction} href={`/leads/${lead.id}${kind === "return" ? "#tarefas" : ""}`}>{actionLabel}</Link>}
+              </div>
             </motion.li>
           );
         })}

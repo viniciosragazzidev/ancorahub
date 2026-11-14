@@ -41,7 +41,7 @@ function ItemAction({
   if (item.acceptLeadId) {
     return (
       // O aceite do destaque é raro e importante: sobe 1px no hover (ct-anticipate) e manda o ponto em arco até Leads.
-      <AcceptLeadButton leadId={item.acceptLeadId} appearance="shared" disabled={expired} arcToLeads={primary} className={primary ? "ct-anticipate" : layout.secondaryAction}>
+      <AcceptLeadButton leadId={item.acceptLeadId} appearance="shared" disabled={expired} arcToLeads={primary} offerPending={primary} className={primary ? "ct-anticipate" : layout.secondaryAction}>
         {expired ? "Oferta encerrada" : item.actionLabel}
       </AcceptLeadButton>
     );

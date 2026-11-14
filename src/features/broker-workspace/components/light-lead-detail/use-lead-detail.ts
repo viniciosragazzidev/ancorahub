@@ -12,8 +12,8 @@ import { LEAD_STATUS_ORDER } from "@/features/leads/lead-status-constants";
 import { confirmDocumentUploadAction } from "@/features/documents/actions";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { brokerGreeting } from "@/features/leads/broker-greeting";
-import { openWhatsApp, prepareWhatsAppWindow } from "@/lib/whatsapp-open";
-import { takeWhatsAppHandoff, useAcceptHandoffEnabled } from "@/features/broker-workspace/whatsapp-handoff/handoff-store";
+import { currentWhatsAppDevice, openWhatsApp, prepareWhatsAppWindow, watchWhatsAppLeave } from "@/lib/whatsapp-open";
+import { onWhatsAppOpenFailed, takeWhatsAppHandoff, useAcceptHandoffEnabled, type WhatsAppHandoffPhase } from "@/features/broker-workspace/whatsapp-handoff/handoff-store";
 import { quickReminderAction } from "@/features/leads/reminder-actions";
 import { buildFollowUpWhen, type FollowUpOptionValue } from "@/features/broker-workspace/follow-up-options";
 import { runOptimistic } from "@/lib/optimistic-core";
@@ -103,11 +103,21 @@ export function useLeadDetail({
     // Aceite com contador (11/11): o link do WhatsApp enquanto o quadro "Antes de chamar" está aberto.
     const handoffEnabled = useAcceptHandoffEnabled();
     const [handoffUrl, setHandoffUrl] = useState<string | null>(null);
+    // "failed": celular, o app não abriu no toque do aceite; o quadro já começa em "Toque para abrir o WhatsApp".
+    const [handoffPhase, setHandoffPhase] = useState<WhatsAppHandoffPhase>("counting");
     useEffect(() => {
       // Aceite feito no Início, na lista ou no chat: o botão deixou o link para esta tela.
       if (!lead.isCurrentBroker) return;
       const handoff = takeWhatsAppHandoff(lead.id);
-      if (handoff?.url) setHandoffUrl(handoff.url);
+      if (handoff?.url) {
+        setHandoffPhase(handoff.phase);
+        setHandoffUrl(handoff.url);
+      }
+      // O aviso de "não abriu" pode chegar depois que esta tela montou (o aceite vigia por ~1,5 s).
+      return onWhatsAppOpenFailed(lead.id, (url) => {
+        setHandoffPhase("failed");
+        setHandoffUrl(url);
+      });
     }, [lead.id, lead.isCurrentBroker]);
     const [requestingSale, startRequestSaleTransition] = useTransition();
     const brokerIntro = lead.brokerGreeting || brokerGreeting({ leadName: lead.nome, brokerName: lead.corretorNome, tipo: lead.tipo, planName: lead.planName, livesCount: lead.livesCount, city: lead.city });
@@ -151,8 +161,11 @@ export function useLeadDetail({
       if (accepting || accepted) return;
       const formData = new FormData();
       formData.append("leadId", lead.id);
-      // Aceite com contador (11/11): ligado, nada abre no clique; o quadro conta 30 s e abre.
-      const whatsapp = handoffEnabled ? { go: () => false, cancel: () => {} } : prepareWhatsAppWindow();
+      // Aceite com contador (11/11): ligado, nada abre no clique; o quadro conta 30 s e abre. Só no
+      // computador (14/11): no celular o WhatsApp abre direto neste toque (sem toque recente o app não abre).
+      const device = currentWhatsAppDevice();
+      const counting = handoffEnabled && device === "desktop";
+      const whatsapp = counting ? { go: () => false, cancel: () => {} } : prepareWhatsAppWindow(device);
 
       startAcceptTransition(async () => {
         let res;
@@ -176,13 +189,21 @@ export function useLeadDetail({
         router.refresh();
 
         const url = res.whatsappUrl;
-        if (handoffEnabled && url) {
+        if (counting && url) {
           // O quadro "Antes de chamar" já confirma o aceite: sem overlay nem toast (LITE §7).
+          setHandoffPhase("counting");
           setHandoffUrl(url);
           return;
         }
         celebrateSuccess("Lead aceito");
+        // Celular: se a página continuar visível (o app não abriu), o quadro pede o toque.
+        const leave = url && device === "mobile" ? watchWhatsAppLeave() : null;
         if (url && whatsapp.go(url)) {
+          if (leave) void leave.then((outcome) => {
+            if (outcome !== "failed") return;
+            setHandoffPhase("failed");
+            setHandoffUrl(url);
+          });
           setWhatsappOpenedAt(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
           toast.success("Lead aceito. Abrindo o WhatsApp do cliente.", { action: { label: "Abrir de novo", onClick: () => openWhatsApp(url) } });
         } else {
@@ -413,6 +434,7 @@ export function useLeadDetail({
     accepted,
     leadStatus,
     handoffUrl,
+    handoffPhase,
     closeHandoff: () => setHandoffUrl(null),
     /** After the sale is registered: the screen leaves "Confirmar venda" at once (no second tap). */
     markConverted: () => setLeadStatus("converted"),

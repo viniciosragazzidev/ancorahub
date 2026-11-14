@@ -44,6 +44,7 @@ import { RisePulse, useRisePulseKey } from "@/components/light/rise-pulse";
 import { LitePress } from "@/components/lite/motion";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { useFirstTimeToday } from "@/components/motion/first-time-today/use-first-time-today";
+import { offerHaloClass, useOfferPendingAttributes } from "@/features/broker-workspace/components/accept-lead-style";
 
 type Tab = "assistentes" | "leads";
 
@@ -102,7 +103,7 @@ function NowSection({ data, mobile = false, floating = false, onNavigate }: { da
                 {item.expiresAt ? <span className={home.nowCountdown}>{formatCountdown(item.expiresAt, clock)}</span> : null}
               </div>
               <div className={floating ? home.nowItemActions : undefined}>{item.acceptLeadId ? (
-                <AcceptLeadButton appearance="shared" leadId={item.acceptLeadId} className={index === 0 ? undefined : home.secondaryAction} disabled={Boolean(item.expiresAt && Date.parse(item.expiresAt) <= clock)}>{item.expiresAt && Date.parse(item.expiresAt) <= clock ? "Oferta encerrada" : item.actionLabel}</AcceptLeadButton>
+                <AcceptLeadButton appearance="shared" leadId={item.acceptLeadId} className={index === 0 ? undefined : home.secondaryAction} offerPending={index === 0 && !floating} disabled={Boolean(item.expiresAt && Date.parse(item.expiresAt) <= clock)}>{item.expiresAt && Date.parse(item.expiresAt) <= clock ? "Oferta encerrada" : item.actionLabel}</AcceptLeadButton>
               ) : (
                 <Button asChild variant="secondary" className={floating && index === 0 ? sharedPage.primaryButton : sharedPage.button}><Link href={item.href} onClick={onNavigate}>{item.actionLabel}<ArrowUpRight size={16} aria-hidden="true" /></Link></Button>
               )}</div>
@@ -240,6 +241,9 @@ export function ChatHome({
   const next = summary?.next ?? null;
   const hasNowItems = Boolean(summary?.now?.items.length);
   const showNext = Boolean(next && !hasNowItems);
+  // Oferta esperando o corretor (item do Agora com aceite e ainda no prazo): o "Agora" flutuante avisa e pulsa.
+  const offerWaiting = Boolean(summary?.now?.items.some((item) => item.acceptLeadId && (!item.expiresAt || Date.parse(item.expiresAt) > now.getTime())));
+  const offerAttributes = useOfferPendingAttributes(floatingNow && offerWaiting);
   const activeId = mode === "rail" ? [...assistants, ...leads].find((thread) => isActive(thread, pathname))?.id ?? null : null;
   const waitingAssistants = assistants.filter((thread) => thread.waitingYou);
   const currentPresenceAsks = presenceAsks ?? (presence ? [presence] : []);
@@ -375,7 +379,7 @@ export function ChatHome({
           </p>}
           {!floatingNow && summary?.now ? <NowSection data={summary.now} /> : null}
           {showNext && next?.acceptLeadId ? (
-            <AcceptLeadButton leadId={next.acceptLeadId} className={`${styles.pill} ${styles.pillPulse}`} style={{ marginTop: 6 }}>{next.label}</AcceptLeadButton>
+            <AcceptLeadButton leadId={next.acceptLeadId} className={styles.pill} style={{ marginTop: 6 }} offerPending>{next.label}</AcceptLeadButton>
           ) : showNext && next ? (
             <LitePress><Link href={next.href} className={styles.pill} style={{ marginTop: 6 }}>{next.label}</Link></LitePress>
           ) : !summary?.now && nextLead ? (
@@ -429,13 +433,13 @@ export function ChatHome({
       {floatingNow && summary?.now ? (
         <div className={`${styles.pillWrap} ${home.nowLauncher}`}>
           <BottomSheet open={nowOpen} onOpenChange={setNowOpen} title="Agora" description={summary.now.items.length ? `${summary.now.items.length} ${summary.now.items.length === 1 ? "pendência na sua fila" : "pendências na sua fila"}.` : "Você está em dia."} detents={[summary.now.items.length <= 1 ? (compactNow ? 0.44 : 0.36) : summary.now.items.length === 2 ? (compactNow ? 0.66 : 0.5) : 0.8]} closeLabel="Fechar Agora" icon={<ListTodo strokeWidth={1.9} />} className="arc-venancor"
-            trigger={<ArcButton type="button" variant="secondary" data-tour="home-pill" aria-label={`Abrir Agora: ${summary.now.items.length} ${summary.now.items.length === 1 ? "pendência" : "pendências"}`}><ListTodo size={18} aria-hidden="true" /><span>Agora</span><ArcBadge size="sm" tone="neutral">{summary.now.items.length || "Em dia"}</ArcBadge></ArcButton>}>
+            trigger={<ArcButton type="button" variant="secondary" data-tour="home-pill" className={offerWaiting ? offerHaloClass : undefined} {...offerAttributes} aria-label={`${offerWaiting ? "Oferta pendente. " : ""}Abrir Agora: ${summary.now.items.length} ${summary.now.items.length === 1 ? "pendência" : "pendências"}`}><ListTodo size={18} aria-hidden="true" /><span>{offerWaiting ? "Oferta pendente" : "Agora"}</span><ArcBadge size="sm" tone="neutral">{summary.now.items.length || "Em dia"}</ArcBadge></ArcButton>}>
             <NowSection data={summary.now} floating onNavigate={() => setNowOpen(false)} />
           </BottomSheet>
         </div>
       ) : <div className={styles.pillWrap} data-mobile-only>
         {next?.acceptLeadId ? (
-          <AcceptLeadButton leadId={next.acceptLeadId} className={`${styles.pill} ${styles.pillPulse}`} data-tour="home-pill">{next.label}</AcceptLeadButton>
+          <AcceptLeadButton leadId={next.acceptLeadId} className={styles.pill} data-tour="home-pill" offerPending>{next.label}</AcceptLeadButton>
         ) : next ? (
           <LitePress><Link href={next.href} className={styles.pill} data-tour="home-pill" aria-label={`A próxima coisa é: ${next.label}. ${next.detail}`}>{next.urgent ? <span className={home.urgentDot} aria-hidden="true" /> : null}{next.label}</Link></LitePress>
         ) : nextLead ? (
