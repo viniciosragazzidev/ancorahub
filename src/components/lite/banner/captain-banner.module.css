@@ -88,3 +88,47 @@
   .action { transition: none; }
   .meter i { animation: none; }
 }
+
+/*
+ * Tom claro (Plantões): azul bem claro com uma grade de pontinhos de calendário, texto azul-marinho, selo âmbar
+ * escuro (contraste em fundo claro) e o botão sólido azul-marinho com base, o primário da tela.
+ */
+.banner[data-tone="light"] {
+  --banner-gold: oklch(52% 0.13 65);
+  background:
+    radial-gradient(circle at 1px 1px, oklch(30% 0.12 262 / 0.09) 1.2px, transparent 1.6px) 0 0 / 18px 18px,
+    radial-gradient(90% 120% at 100% 100%, oklch(88% 0.06 240) 0%, transparent 60%),
+    linear-gradient(160deg, oklch(97.5% 0.018 240), oklch(93.5% 0.04 238));
+  box-shadow: inset 0 0 0 1px oklch(30% 0.12 262 / 0.1);
+  color: var(--banner-blue);
+}
+.banner[data-tone="light"] .glow::before { background: oklch(100% 0 0 / 0.55); }
+.banner[data-tone="light"] .glow::after { background: oklch(78% 0.14 80); box-shadow: 40px 34px 0 -1px oklch(78% 0.14 80 / 0.7), -120px 70px 0 -2px oklch(30% 0.12 262 / 0.18); }
+.banner[data-tone="light"] .badge small { color: oklch(30% 0.12 262 / 0.7); }
+.banner[data-tone="light"] .meter { background: oklch(30% 0.12 262 / 0.1); }
+.banner[data-tone="light"] .action {
+  background: var(--banner-blue);
+  color: white;
+  box-shadow: 0 4px 0 oklch(18% 0.08 264);
+}
+.banner[data-tone="light"] .action:hover { background: oklch(32% 0.13 262); }
+.banner[data-tone="light"] .action:active { box-shadow: 0 1px 0 oklch(18% 0.08 264); }
+.banner[data-tone="light"] .action:focus-visible { outline-color: var(--banner-blue); }
+.banner[data-tone="light"] .art { filter: drop-shadow(0 8px 14px oklch(30% 0.12 262 / 0.22)); }
+
+/*
+ * Pose "espiando": o card recorta tudo (nada sai pelo topo) e o capitão fica afundado na borda de baixo,
+ * aparecendo do peito para cima, como quem se debruça numa janela.
+ */
+.banner[data-pose="peek"] {
+  grid-template-columns: minmax(0, 1fr) 104px;
+  grid-template-areas: "title art" "goal art" "action art";
+  clip-path: inset(0 round var(--radius-panel));
+  padding-top: 22px;
+}
+.banner[data-pose="peek"] .action { margin-right: 0; }
+.banner[data-pose="peek"] .art { align-self: end; width: 140px; margin: 0 -18px -48px -36px; transform: rotate(-6deg); transform-origin: 50% 100%; }
+@media (min-width: 640px) {
+  .banner[data-pose="peek"] { grid-template-columns: minmax(0, 1fr) 200px; padding-top: 28px; }
+  .banner[data-pose="peek"] .art { width: 210px; margin: 0 -8px -128px -16px; }
+}

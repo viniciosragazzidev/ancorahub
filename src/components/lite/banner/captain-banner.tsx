@@ -13,7 +13,7 @@ export type CaptainBannerArt = { src: string; width: number; height: number };
 /** Arte provisória (o capitão com o baú) até as artes próprias de cada banner chegarem. */
 export const CAPTAIN_TREASURE_ART: CaptainBannerArt = { src: "/mascote/venda-capitao.webp", width: 584, height: 640 };
 
-export function CaptainBanner({ label, title, goal, progress, action, art = CAPTAIN_TREASURE_ART, className }: {
+export function CaptainBanner({ label, title, goal, progress, action, art = CAPTAIN_TREASURE_ART, tone = "navy", pose = "rise", className }: {
   /** Nome acessível da região. */
   label: string;
   title: ReactNode;
@@ -23,11 +23,15 @@ export function CaptainBanner({ label, title, goal, progress, action, art = CAPT
   progress?: number | null;
   action: { label: string; href: string };
   art?: CaptainBannerArt;
+  /** navy: o azul da marca (Início, jornada). light: azul bem claro com texto azul-marinho (Plantões). */
+  tone?: "navy" | "light";
+  /** rise: o capitão sai pelo topo do card. peek: ele espia por cima da borda de baixo, debruçado. */
+  pose?: "rise" | "peek";
   className?: string;
 }) {
   const share = progress === null || progress === undefined ? null : Math.min(100, Math.max(0, Math.round(progress)));
   return (
-    <section className={[styles.banner, className].filter(Boolean).join(" ")} aria-label={label}>
+    <section className={[styles.banner, className].filter(Boolean).join(" ")} data-tone={tone} data-pose={pose} aria-label={label}>
       <span className={styles.glow} aria-hidden="true" />
       <p className={styles.title}>{title}</p>
       {goal || share !== null ? (
