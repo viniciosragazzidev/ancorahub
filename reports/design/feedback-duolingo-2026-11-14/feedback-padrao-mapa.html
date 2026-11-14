@@ -1,0 +1,230 @@
+<title>Mapa do feedback padrão</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: coluna de leitura com tabelas por fase; os níveis N0 a N3 são chips de cor fixa reaproveitados em todas as tabelas. */
+:root {
+  --bg: #f7f7f9; --surface: #ffffff; --fg: #0b0b12; --muted: #5a5a68; --line: rgb(16 16 40 / .10);
+  --accent: #1e40af; --accent-soft: rgb(30 64 175 / .08); --code-bg: #f1f1f5;
+  --n0: #5a5a68; --n0-bg: rgb(90 90 104 / .10);
+  --n1: #1e40af; --n1-bg: rgb(30 64 175 / .09);
+  --n2: #0f7a4d; --n2-bg: rgb(15 122 77 / .10);
+  --n3: #a15c00; --n3-bg: rgb(161 92 0 / .11);
+  --ev: #7c3aed; --ev-bg: rgb(124 58 237 / .09);
+  --font-body: "Plus Jakarta Sans", system-ui, sans-serif; --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0e0f14; --surface: #16171e; --fg: #ececf2; --muted: #a2a2b2; --line: rgb(255 255 255 / .10); --accent: #8aa6ff; --accent-soft: rgb(138 166 255 / .12); --code-bg: #1e1f28; --n0: #b4b4c2; --n1: #8aa6ff; --n2: #5fd39c; --n3: #f0b35a; --ev: #c4a5ff; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg: #0e0f14; --surface: #16171e; --fg: #ececf2; --muted: #a2a2b2; --line: rgb(255 255 255 / .10); --accent: #8aa6ff; --accent-soft: rgb(138 166 255 / .12); --code-bg: #1e1f28; --n0: #b4b4c2; --n1: #8aa6ff; --n2: #5fd39c; --n3: #f0b35a; --ev: #c4a5ff; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 400 15.5px/1.6 var(--font-body); }
+.wrap { max-width: 960px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 44px 96px; display: flex; flex-direction: column; gap: 52px; }
+header, section { display: flex; flex-direction: column; gap: 16px; }
+.kicker { font: 500 13px var(--font-mono); color: var(--muted); }
+h1 { font-size: clamp(28px, 4.6vw, 42px); line-height: 1.1; letter-spacing: -.03em; margin: 0; text-wrap: balance; }
+h2 { font-size: 23px; letter-spacing: -.02em; margin: 0; text-wrap: balance; }
+h3 { font-size: 16px; font-weight: 500; margin: 0; }
+p { margin: 0; max-width: 70ch; }
+.lead { font-size: 17.5px; color: var(--muted); }
+.muted { color: var(--muted); }
+ul, ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 7px; max-width: 72ch; }
+code { font: 400 12.5px var(--font-mono); background: var(--code-bg); padding: 1px 5px; border-radius: 6px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+.sec-no { font: 500 13px var(--font-mono); color: var(--accent); }
+.n { display: inline-block; font: 500 11px/1 var(--font-mono); padding: 4px 7px; border-radius: 9999px; white-space: nowrap; }
+.n0 { color: var(--n0); background: var(--n0-bg); } .n1 { color: var(--n1); background: var(--n1-bg); } .n2 { color: var(--n2); background: var(--n2-bg); } .n3 { color: var(--n3); background: var(--n3-bg); } .ev { color: var(--ev); background: var(--ev-bg); }
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.card p { font-size: 14px; color: var(--muted); }
+.stat { font: 700 28px/1 var(--font-body); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; line-height: 1.5; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+th { font-weight: 500; color: var(--muted); font-size: 12px; background: var(--bg); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 500; }
+.phase { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.phase .tag { font: 500 12px var(--font-mono); color: var(--accent); background: var(--accent-soft); padding: 4px 9px; border-radius: 9999px; }
+.files { columns: 2 260px; font-size: 14px; }
+.files li { break-inside: avoid; }
+footer { font-size: 13px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+<header>
+  <span class="kicker">AncoraHub e CorreTop · padrão registrado em 14/11/2026 · branch feat/feedback-padrao</span>
+  <h1>Feedback padrão em todo o app, começando pelo Lite</h1>
+  <p class="lead">O novo jeito de responder ao usuário, inspirado no Duolingo e adaptado a uma corretora, passa a ser regra do projeto. Esta página mostra o padrão e todas as rotas, ações, botões e componentes que vão recebê-lo, na ordem de adoção.</p>
+  <p class="muted" style="font-size:14px">Contexto: <a href="https://claude.ai/artifact/HmqvJecKPrVKgiAskLJ47c">relatório Duolingo no AncoraHub</a> · <a href="https://claude.ai/artifact/5MHfFasD4iD4pgWPu7sxM5">protótipo do aceite de lead</a>.</p>
+</header>
+
+<div class="box">
+  <h2>O que ficou registrado</h2>
+  <ul>
+    <li><code>docs/design-system/FEEDBACK.md</code> (novo): o padrão completo, com princípios, camadas, níveis, botão de ação, tokens, API, preferências, texto, o que nunca fazer e checklist de PR.</li>
+    <li><code>CLAUDE.md</code>: nova seção "Feedback e movimento: REGRA OBRIGATÓRIA". Todo agente e toda sessão passam a segui-la.</li>
+    <li><code>docs/design-system.md</code>, <code>README.md</code>, <code>MOTION.md</code>, <code>MOTION_RULES.md</code> e o §3 do Lite apontam para o padrão. A contradição sobre o confete fica resolvida: no modo normal, nada de bounce nem confete; no Lite, os dois só existem no nível 3.</li>
+    <li><code>docs/implementations/active/2026-11-14-feedback-padrao.md</code>: o plano por fase, com arquivo e linha de cada ação.</li>
+    <li><code>reports/design/feedback-duolingo-2026-11-14/</code>: as três páginas (relatório, protótipo e este mapa).</li>
+  </ul>
+  <p class="muted" style="font-size:14px">Só documentação. Nenhum componente mudou ainda: cada fase abaixo vira uma branch própria, com revisão visual antes do merge.</p>
+</div>
+
+<section>
+  <span class="sec-no">1</span>
+  <h2>O padrão em uma tela</h2>
+  <div class="grid">
+    <div class="card"><span class="n n0">N0 · silencioso</span><h3>Ação frequente</h3><p>Pressão e novo estado no objeto, até 160ms. Sem som, sem vibração. Ex.: nota, filtro, etapa.</p></div>
+    <div class="card"><span class="n n1">N1 · confirmação</span><h3>Ação que muda algo</h3><p>Botão com estados, check, texto +80ms. Vibração no celular. Ex.: aceitar lead, agendar, salvar.</p></div>
+    <div class="card"><span class="n n2">N2 · marco</span><h3>Feito do dia</h3><p>Anel único, número que rola, mascote comemora, som de marco. Uma vez por dia por tipo.</p></div>
+    <div class="card"><span class="n n3">N3 · celebração</span><h3>Feito raro e verificado</h3><p>Overlay sem bloquear, mascote, confete curto só no Lite. Venda, nível, marco de plantão.</p></div>
+  </div>
+  <div class="grid">
+    <div class="card"><h3>Ritmo fixo</h3><p>Visual na hora, texto +80ms, número +160ms, depois +320ms. Som e vibração junto com o visual.</p></div>
+    <div class="card"><h3>Sucesso confirmado</h3><p>"Aceitando…" na hora; "Lead é seu" só depois do servidor.</p></div>
+    <div class="card"><h3>Erro útil</h3><p>Vermelho com X e shake, a causa, o que continua valendo e "Tentar de novo" depois de 1,4s.</p></div>
+    <div class="card"><h3>Usuário no controle</h3><p>Som, Vibração, Animações e Celebrações com interruptores próprios, abaixo do kill-switch.</p></div>
+  </div>
+</section>
+
+<section>
+  <span class="sec-no">2</span>
+  <h2>Ponto de partida</h2>
+  <div class="grid">
+    <div class="card"><span class="stat">2</span><p>lugares tocam som hoje, os dois para lead novo. As receitas de toque, erro e alerta já existem e não são usadas.</p></div>
+    <div class="card"><span class="stat">3</span><p>lugares vibram, todos ligados à presença no plantão. Nenhuma ação vibra.</p></div>
+    <div class="card"><span class="stat">~970</span><p>chamadas de toast em cerca de 215 arquivos. Umas 157 repassam o erro cru do servidor e só 7 dizem "Tente novamente".</p></div>
+    <div class="card"><span class="stat">0</span><p>telas do Lite usam shake, e o mascote não reage a nenhum resultado de ação.</p></div>
+  </div>
+</section>
+
+<section>
+  <span class="sec-no">3</span>
+  <div class="phase"><span class="tag">Fase 0</span><h2>Fundação</h2></div>
+  <p>Vem antes de qualquer tela, para nenhuma página recriar estados por conta própria.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Peça</th><th>Arquivo</th><th>Entrega</th></tr></thead>
+    <tbody>
+      <tr><td>Tokens de movimento</td><td><code>arc/motion-tokens.ts</code>, <code>lite/motion/motion-tokens.css</code></td><td><code>beat</code>, <code>shake</code>, <code>celebration</code>, <code>spring.celebrate</code>, <code>--chat-action-base</code></td></tr>
+      <tr><td>Tokens de feedback</td><td><code>lib/feedback/tokens.ts</code> (novo)</td><td>volumes, padrões de vibração, preferências</td></tr>
+      <tr><td>Som de marco</td><td><code>lib/sounds/recipes.ts</code></td><td><code>milestoneSound</code>; as cinco receitas passam pela aprovação ouvindo</td></tr>
+      <tr><td>Hook</td><td><code>lib/feedback/use-feedback.ts</code> (novo)</td><td><code>fire(evento, resultado)</code> com nível e preferências</td></tr>
+      <tr><td>Botão de ação</td><td><code>lite/controls/action-button.tsx</code> (novo)</td><td><code>LiteActionButton</code>: repouso, pressionado, enviando, confirmado, falhou</td></tr>
+      <tr><td>Erro de ação</td><td><code>lib/feedback/action-error.ts</code> (novo)</td><td>junta <code>reason</code>, <code>error</code> e <code>message</code> num formato só</td></tr>
+      <tr><td>Preferências</td><td>Configurações do Lite, <code>InterfaceMotionProvider</code></td><td>quatro interruptores salvos por usuário</td></tr>
+      <tr><td>Mascote</td><td><code>chat/assistant-avatar.tsx</code></td><td>prop <code>mood</code>: idle, alert, thinking, cheer</td></tr>
+      <tr><td>Migração</td><td>3 <code>vibrate</code> e 2 <code>playSound</code> atuais</td><td>passam por <code>useFeedback</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <span class="sec-no">4</span>
+  <div class="phase"><span class="tag">Fase 1</span><h2>Lite do corretor: aceite e eventos</h2></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Fluxo</th><th>Onde</th><th>Nível</th><th>Mudança</th></tr></thead>
+    <tbody>
+      <tr><td>Lead novo</td><td><code>chat/dynamic-notice.tsx</code>, <code>notifications/incoming-lead-card.tsx</code>, <code>realtime-sync-provider.tsx</code></td><td><span class="n ev">evento</span></td><td>som e vibração <code>notify</code>, mascote atento, textos que variam</td></tr>
+      <tr><td>Aceitar (aviso, pílula, card, lista)</td><td><code>accept-lead-button.tsx</code>, <code>chat-home.tsx:106,394,454</code>, <code>broker-home-overview.tsx:44</code>, <code>light-leads-list.tsx:208,276</code></td><td><span class="n n1">N1</span> <span class="n n2">N2</span></td><td><code>LiteActionButton</code>; sem toast duplicado; N2 quando bate a meta</td></tr>
+      <tr><td>Aceitar na ficha</td><td><code>action-bar.tsx:53</code> → <code>use-lead-detail.ts:173</code></td><td><span class="n n1">N1</span></td><td>mesmo botão; o overlay sai, porque o aceite é diário</td></tr>
+      <tr><td>Aceitar pelo chat</td><td><code>chat-actions.ts:54</code>, <code>assistant-chat.tsx:41</code></td><td><span class="n n1">N1</span></td><td>mascote pensando na espera; resposta nomeia o lead</td></tr>
+      <tr><td>SLA em risco</td><td><code>assistant-scripts.ts:430</code>, <code>chat-home.tsx:359</code></td><td><span class="n ev">evento</span></td><td>só texto e cor; sem som, sem pânico</td></tr>
+      <tr><td>Celebrações da jornada</td><td><code>journey/components/celebration-layer.tsx</code>, <code>celebration-host.tsx</code>, <code>confetti.tsx</code></td><td><span class="n n2">N2</span> <span class="n n3">N3</span></td><td>limite por dia, som de marco, mola <code>celebrate</code>, confete só no N3</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <span class="sec-no">5</span>
+  <div class="phase"><span class="tag">Fase 2</span><h2>Ações do chat</h2></div>
+  <p>Todas passam por <code>broker-workspace/chat/chat-actions.ts</code>, então a mudança fica num ponto só, com a opção escolhida do <code>ChoiceList</code> mostrando "enviando" e "falhou".</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Ação</th><th>Frequência</th><th>Nível</th><th>Som e vibração</th></tr></thead>
+    <tbody>
+      <tr><td><code>lead.addNote</code></td><td>centenas</td><td><span class="n n0">N0</span></td><td>nenhum; a falha mantém "Tentar de novo" com shake</td></tr>
+      <tr><td><code>registerContact</code>, <code>changeStep</code>, <code>scheduleReturn</code>, <code>completeReturn</code></td><td>dezenas</td><td><span class="n n1">N1</span></td><td>vibração <code>confirm</code>; sem som</td></tr>
+      <tr><td><code>cancelReturn</code>, <code>reopenReturn</code>, <code>decline</code>, <code>markLost</code></td><td>dezenas ou ocasional</td><td><span class="n n1">N1</span></td><td>vibração <code>tap</code>; o "Desfazer" continua</td></tr>
+      <tr><td><code>duty.pause</code>, <code>duty.resume</code></td><td>ocasional</td><td><span class="n n1">N1</span></td><td>som e vibração <code>confirm</code></td></tr>
+      <tr><td><code>notifications.markRead</code>, <code>relationship.ack</code>, <code>team.addBroker</code></td><td>ocasional ou rara</td><td><span class="n n0">N0</span></td><td>nenhum</td></tr>
+      <tr><td>Falha de qualquer ação</td><td></td><td><span class="n ev">erro</span></td><td>som e vibração <code>error</code>; o assistente diz a causa e oferece "Tentar de novo"</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <span class="sec-no">6</span>
+  <div class="phase"><span class="tag">Fase 3</span><h2>Lite do corretor: ficha, venda, agenda, clientes, plantão, cotação</h2></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Rota ou fluxo</th><th>Ação e arquivo</th><th>Nível</th><th>Mudança</th></tr></thead>
+    <tbody>
+      <tr><td>Ficha do lead</td><td>etapa (<code>action-bar.tsx:89</code>), recusar (<code>decline-sheet</code>), segurar fechamento (<code>closing-outcome-card.tsx:51</code>), primeira mensagem (<code>first-message-dialog.tsx:124</code>)</td><td><span class="n n1">N1</span></td><td>o resultado aparece no objeto, no lugar do toast</td></tr>
+      <tr><td>Registrar venda</td><td><code>sale-section.tsx:57</code>, <code>register-sale-wizard.tsx:273</code>, <code>register-sale-panel.tsx:325</code>, <code>quick-register-sale.tsx</code></td><td><span class="n n3">N3</span></td><td>resumo com valor e vidas, número que conta, mascote do Desempenho, som de marco</td></tr>
+      <tr><td>Documento da venda</td><td><code>register-sale-wizard.tsx:226</code></td><td><span class="n n1">N1</span></td><td>progresso real por arquivo</td></tr>
+      <tr><td><code>/agenda</code></td><td><code>light-dashboard/agenda.tsx:37</code>, <code>connected-agenda.tsx:62</code></td><td><span class="n n1">N1</span></td><td>check no item, mantém "Desfazer"</td></tr>
+      <tr><td><code>/clientes/[id]</code></td><td><code>profile-quick-actions.tsx:65,93</code>, <code>light-client-next-action.tsx:61,82</code></td><td><span class="n n1">N1</span></td><td>padroniza o erro</td></tr>
+      <tr><td><code>/plantoes/agora</code></td><td>presença (<code>presence-callout.tsx:115</code>), pausar (<code>duty-now-view.tsx:68</code>)</td><td><span class="n n1">N1</span> <span class="n n3">N3</span></td><td>sequência sobe ao fechar o plantão; marcos 5, 10, 25 e 50 em N3</td></tr>
+      <tr><td>Sequência de plantão</td><td><code>engagement/levels.ts</code> (<code>evaluateStreak</code>)</td><td>regra</td><td>folga, feriado e plantão não escalado não quebram a contagem</td></tr>
+      <tr><td>Meta do dia</td><td><code>chat-home.tsx</code> (GoalFill), <code>week-ranking.tsx</code> (MissionBar)</td><td><span class="n n2">N2</span></td><td>anel único, número que rola, uma vez por dia</td></tr>
+      <tr><td><code>/cotacao</code></td><td><code>catalog-quote-guide.tsx:171</code>, <code>plan-cards.tsx:234</code></td><td><span class="n n1">N1</span></td><td>o bloco "celebrate" vira confirmação, porque é diário</td></tr>
+      <tr><td>Pausar recebimento</td><td><code>broker-home-overview.tsx:173</code></td><td><span class="n n1">N1</span></td><td>hoje não confirma o sucesso</td></tr>
+      <tr><td><code>/settings</code></td><td><code>light-availability-section.tsx:50</code>, push, toggles</td><td><span class="n n1">N1</span></td><td>nova seção "Som e vibração"</td></tr>
+      <tr><td><code>/notificacoes</code></td><td><code>light-notifications.tsx:169</code></td><td><span class="n n0">N0</span></td><td></td></tr>
+      <tr><td><code>/primeiro-acesso</code></td><td><code>onboarding-wizard.tsx:128,157</code></td><td><span class="n n3">N3</span></td><td>uma única vez, boas-vindas</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <span class="sec-no">7</span>
+  <div class="phase"><span class="tag">Fase 4</span><h2>Lite do supervisor e do gestor</h2></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Rota</th><th>Ação e arquivo</th><th>Nível</th></tr></thead>
+    <tbody>
+      <tr><td><code>/leads/[id]</code></td><td>etapa (<code>manager-lead-status-sheet.tsx:16</code>), repassar (<code>manager-lead-transfer-form.tsx:22</code>), reatribuir ou assumir (<code>supervision-panel.tsx:90</code>)</td><td><span class="n n1">N1</span> (o overlay atual cai para N1)</td></tr>
+      <tr><td><code>/equipe/minha</code></td><td>convidar, adicionar, remover, reenviar (<code>my-team-page.tsx:44</code>); trocar o reload da página pela atualização do item</td><td><span class="n n1">N1</span></td></tr>
+      <tr><td><code>/equipe/[id]</code></td><td>nota, remover, reconhecer com pontos (<code>supervisor-broker-profile.tsx:208</code>, <code>recognize-sheet.tsx</code>)</td><td><span class="n n1">N1</span>; quem recebe ganha <span class="n n2">N2</span></td></tr>
+      <tr><td><code>/gestao/equipes/[id]</code></td><td>salvar meta (<code>goal-sheet.tsx:42</code>)</td><td><span class="n n1">N1</span></td></tr>
+      <tr><td><code>/relacionamento</code></td><td>enviar comunicado (<code>relationship-center-lite.tsx:99</code>)</td><td><span class="n n1">N1</span></td></tr>
+      <tr><td>Gestor <code>/leads</code></td><td>devolver em massa (<code>leads-lite-bulk.tsx:60</code>), venda (<code>RegisterSaleButton</code>)</td><td><span class="n n1">N1</span>; a venda é <span class="n n3">N3</span> para o corretor dono</td></tr>
+      <tr><td>Distribuição e plantão</td><td><code>leads/distribuicao/plantao/_components/*</code></td><td><span class="n n1">N1</span>; publicar a escala do mês <span class="n n2">N2</span></td></tr>
+      <tr><td><code>/settings</code></td><td>troca de unidade (<code>light-unit-section.tsx:34</code>), que hoje não confirma</td><td><span class="n n1">N1</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <span class="sec-no">8</span>
+  <div class="phase"><span class="tag">Fase 5</span><h2>Diretor Lite</h2></div>
+  <p>Os componentes <code>*-lite.tsx</code> de <code>director-routes.ts</code> usam só toast. Toda ação de salvar ou configurar vira N1, com o resultado no próprio objeto e o erro normalizado. A ordem segue o número de chamadas de toast: qualificação 15, segurança 13, documentos 12, equipe 10, propostas 10, membros 9, integrações 7, fluxos de WhatsApp 7, convites 6, comissão 6, turbo 6, cargos 5, importação 5, Meta 5, atendimento 4, venda 4, unidades 2 e recuperações 2.</p>
+</section>
+
+<section>
+  <span class="sec-no">9</span>
+  <div class="phase"><span class="tag">Fase 6</span><h2>Modo normal</h2></div>
+  <ul>
+    <li><strong>Ponto único:</strong> <code>components/ui/sonner.tsx</code> chama <code>useFeedback</code>, só com som e vibração de erro de ação. <code>lib/toast.ts</code> vira a entrada oficial, com presets por nível.</li>
+    <li><strong>Botão:</strong> <code>components/ui/button.tsx</code> ganha os estados confirmado e falhou, sem base sólida, e absorve o <code>StatefulButton</code>.</li>
+    <li><strong>Erros:</strong> as cerca de 157 chamadas com erro cru e os "Erro ao…" passam pelo normalizador, rota por rota.</li>
+    <li><strong>Overlay:</strong> "Venda registrada" fica N2, sem confete. "Lead reatribuído" cai para N1.</li>
+    <li><strong>ERP</strong> (incentivos, importações, financeiro, implantações, indicações): já usa feedback inline e só ganha os estados do botão.</li>
+    <li><strong>Ordem:</strong> leads e distribuição (39 arquivos), settings (15), features/leads (14), equipe (10), meta-ads (10), atendimento (9), vendas (8), filiais (7) e o restante depois.</li>
+  </ul>
+</section>
+
+<section>
+  <span class="sec-no">10</span>
+  <div class="phase"><span class="tag">Fase 7</span><h2>Mascotes com estados e prova de Rive</h2></div>
+  <p>Os seis mascotes ganham quatro estados: Leads, Plantão, Agenda, Cotação, Desempenho e Insights. Depois vem uma prova de Rive com o mascote do Leads, medindo o peso no celular, antes de trocar o CSS.</p>
+</section>
+
+<section>
+  <h2>Próximos passos</h2>
+  <ol>
+    <li>Revisar o <code>FEEDBACK.md</code> e o plano na branch <code>feat/feedback-padrao</code>, que já está em <code>preview/3005</code>.</li>
+    <li>Ouvir e aprovar as cinco receitas de som, incluindo a nova de marco.</li>
+    <li>Fazer a fase 0 numa branch própria e depois a fase 1, que é o aceite do protótipo levado para o código.</li>
+    <li>Medir nos pilotos: contato no SLA, aceite da oferta, vendas registradas e quantos usuários desligam som ou celebração.</li>
+  </ol>
+  <footer>As linhas de arquivo são aproximadas e as frequências são estimativas pelo papel de cada tela, não por métrica. As rotas <code>/l/</code> e <code>/extensao</code> não foram verificadas.</footer>
+</section>
+</div>

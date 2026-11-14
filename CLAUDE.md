@@ -36,6 +36,16 @@ Detalhes em `docs/design-system.md` § "Product Density".
 - Adicionar itens relacionados = busca + botão "+" (`SearchAddList`), com "Só ativos" por padrão
 - Um único CTA primário por tela; reutilizar os componentes compartilhados, nunca recriar por página
 
+## Feedback e movimento: REGRA OBRIGATÓRIA
+Toda resposta a ação ou evento segue `docs/design-system/FEEDBACK.md` (padrão geral desde 14/11/2026, começando pelo modo Lite).
+- Cada ação tem um nível: 0 silencioso, 1 confirmação, 2 marco no contexto, 3 celebração. Ação frequente nunca tem som nem celebração
+- Camadas em ritmo fixo: visual na hora, texto +80ms, número +160ms; som e vibração só a partir do nível que pede
+- Sucesso só depois da confirmação do servidor; erro mostra causa, o que continua valendo e "Tentar de novo"
+- Botão de ação com estados repouso, pressionado, enviando, confirmado e falhou, largura fixa (`LiteActionButton` no Lite)
+- Som e vibração só via `useFeedback`; nunca `playSound` ou `navigator.vibrate` direto
+- Respeitar `prefers-reduced-motion`, o kill-switch e os interruptores do usuário (som, vibração, animações, celebrações)
+- Sem culpa, sem confete no modo normal, sem celebrar volume. Plano por rota: `docs/implementations/active/2026-11-14-feedback-padrao.md`
+
 ## Fluxo de trabalho
 1. Nunca commitar direto na main — sempre branch por rota/lote
 2. Antes de codificar: apresentar plano de mudanças por componente
