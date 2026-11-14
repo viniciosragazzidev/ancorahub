@@ -1,72 +1,74 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { AncoraLogo } from "@/components/ancora-logo";
+import { useEffect, useState } from "react";
 
-const SPLASH_KEY = "__ancora_splash_shown";
+import { SPLASH_KEY } from "./splash-boot";
+
+import styles from "./splash-screen.module.css";
+
+export { SPLASH_KEY };
+/** A entrada do capitão (0,4 s) não é cortada no meio; fora isso, nenhuma espera artificial. */
+export const SPLASH_ENTRANCE_MS = 400;
+export const SPLASH_EXIT_MS = 240;
+
+
+type Phase = "showing" | "leaving" | "gone";
 
 /**
- * PWA splash screen.
- *
- * - Starts unmounted so a full page navigation never flashes the overlay.
- * - Shows only once per browser session (tracked via sessionStorage).
- * - On first mount the logo fades in (700 ms), holds briefly (300 ms),
- *   then the entire overlay fades out (500 ms) and unmounts.
- * - Respects reduced‑motion: skips all animations and hides instantly.
+ * Splash do PWA com o capitão pirata e a marca ÂNCORA (arte original em design/mascote/splash/).
+ * - Fundo #002B73 (o azul da arte) com o capitão e a marca, já no HTML do servidor (aparece antes do
+ *   JavaScript, emendando com a tela do PWA instalado, que usa o mesmo azul em background_color).
+ * - Some quando o app está pronto: no primeiro quadro depois da hidratação, respeitando só os 0,4 s da
+ *   entrada. Nunca espera a animação inteira.
+ * - Uma vez por sessão do navegador. Movimento reduzido: arte parada e saída sem transição.
+ * - Não captura cliques (pointer-events: none) e é decorativa para leitor de tela.
  */
 export function SplashScreen() {
-  const [phase, setPhase] = useState<SplashPhase>("hidden");
+  const [phase, setPhase] = useState<Phase>("showing");
 
   useEffect(() => {
-    // Already shown this session — skip entirely
-    if (sessionStorage.getItem(SPLASH_KEY)) {
+    const root = document.documentElement;
+    if (root.dataset.splash === "done") {
+      setPhase("gone");
       return;
     }
+    try { sessionStorage.setItem(SPLASH_KEY, "1"); } catch { /* aba anônima: aparece de novo na próxima carga */ }
 
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (mq.matches) {
-      sessionStorage.setItem(SPLASH_KEY, "1");
-      return;
-    }
-
-    sessionStorage.setItem(SPLASH_KEY, "1");
-    let logoIn = 0;
-    const show = requestAnimationFrame(() => {
-      setPhase("idle");
-      logoIn = requestAnimationFrame(() => setPhase("logo_enter"));
-    });
-    const splashOut = setTimeout(() => setPhase("splash_exit"), 700 + 300);
-    const remove = setTimeout(() => setPhase("hidden"), 700 + 300 + 500);
-
+    const reduce = root.dataset.splash === "static" || Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+    const timers: number[] = [];
+    let frame = 0;
+    const leave = () => {
+      // Dois quadros: o conteúdo do app já pintou por baixo antes de a splash sair.
+      frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => {
+          setPhase("leaving");
+          timers.push(window.setTimeout(() => {
+            root.dataset.splash = "done";
+            setPhase("gone");
+          }, reduce ? 0 : SPLASH_EXIT_MS));
+        });
+      });
+    };
+    const wait = reduce ? 0 : Math.max(0, SPLASH_ENTRANCE_MS - performance.now());
+    timers.push(window.setTimeout(leave, wait));
     return () => {
-      cancelAnimationFrame(show);
-      cancelAnimationFrame(logoIn);
-      clearTimeout(splashOut);
-      clearTimeout(remove);
+      cancelAnimationFrame(frame);
+      timers.forEach((timer) => window.clearTimeout(timer));
     };
   }, []);
 
-  if (phase === "hidden") return null;
+  if (phase === "gone") return null;
 
+  // Arte da splash aprovada em 14/11/2026 (design/mascote/splash/): o capitão e a marca ÂNCORA, separados
+  // para o capitão entrar e dar um pulinho enquanto a marca aparece logo depois. Fundo do mesmo azul da arte.
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--surface-base,#f8f8f7)] transition-opacity duration-500 ease-[var(--ease-smooth-out,cubic-bezier(0.22,1,0.36,1))]"
-      style={{
-        opacity: phase === "splash_exit" ? 0 : 1,
-        willChange: "opacity",
-      }}
-    >
-      <AncoraLogo
-        className="h-12 w-48 object-contain"
-        style={{
-          opacity: phase === "idle" ? 0 : 1,
-          transform: phase === "idle" ? "scale(0.92) translateY(4px)" : "scale(1) translateY(0)",
-          transition: "opacity 700ms var(--ease-smooth-out), transform 700ms var(--ease-smooth-out)",
-          willChange: "opacity, transform",
-        }}
-      />
+    <div className={styles.splash} data-phase={phase} data-splash-screen="" aria-hidden="true">
+      <div className={styles.content}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- arte local, precisa estar no HTML antes do JS */}
+        <img className={styles.hero} src="/mascote/splash-capitao.webp" width={645} height={735} alt="" fetchPriority="high" decoding="async" draggable={false} />
+        {/* eslint-disable-next-line @next/next/no-img-element -- marca local, precisa estar no HTML antes do JS */}
+        <img className={styles.wordmark} src="/mascote/splash-ancora.webp" width={710} height={240} alt="" decoding="async" draggable={false} />
+      </div>
     </div>
   );
 }
-
-type SplashPhase = "idle" | "logo_enter" | "splash_exit" | "hidden";

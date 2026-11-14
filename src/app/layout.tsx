@@ -4,7 +4,9 @@ import { Plus_Jakarta_Sans, Geist_Mono, JetBrains_Mono } from "next/font/google"
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { AppProviders } from "@/components/app-providers";
+import Script from "next/script";
 import { SplashScreen } from "@/components/splash-screen";
+import { SPLASH_BOOT_SCRIPT } from "@/components/splash-boot";
 import { InterfaceMotionProvider } from "@/components/motion/interface-motion-provider";
 import { RouteViewTransition } from "@/components/motion/route-view-transition";
 import { SkipToContent } from "@/components/skip-to-content";
@@ -125,6 +127,9 @@ export default async function RootLayout({
 
   return (
     <html lang="pt-BR" data-interface-motion="off" suppressHydrationWarning className={`${jakartaSans.variable} ${geistMono.variable} ${jetbrainsMono.variable} ${theme === "dark" ? "dark" : ""} h-full antialiased`}>
+      <head>
+        <Script id="ancora-splash-boot" strategy="beforeInteractive">{SPLASH_BOOT_SCRIPT}</Script>
+      </head>
       <body className="min-h-full flex flex-col">
         <SkipToContent />
         <SplashScreen />
