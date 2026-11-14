@@ -44,7 +44,7 @@ function checkPath(button: HTMLElement) {
 
 describe("AcceptLeadButton: confirmação no botão", () => {
   for (const appearance of ["shared", "legacy"] as const) {
-    it(`${appearance}: otimista sem check; o check do LiteSuccess só desenha quando o servidor confirma`, async () => {
+    it(`${appearance}: "Aceitando…" sem check; o check do LiteSuccess só desenha quando o servidor confirma`, async () => {
       let finish: (value: { success: true }) => void = () => {};
       mocks.accept.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
       render(<AcceptLeadButton appearance={appearance} leadId="l1" arcToLeads>Aceitar e chamar</AcceptLeadButton>);
@@ -52,8 +52,9 @@ describe("AcceptLeadButton: confirmação no botão", () => {
       // O motion de teste (captureMotion) recria o elemento a cada render: sempre buscar o botão de novo.
       const current = () => screen.getByRole("button");
 
-      await waitFor(() => expect(current().textContent).toContain("Lead aceito"));
+      await waitFor(() => expect(current().textContent).toContain("Aceitando…"));
       let button = current();
+      expect(button.textContent).not.toContain("Lead aceito");
       expect(button.querySelector("svg")).toBeNull();
       expect(button.getAttribute("data-confirmed")).toBeNull();
       expect(mocks.fly).not.toHaveBeenCalled();
@@ -85,13 +86,14 @@ describe("AcceptLeadButton: confirmação no botão", () => {
     expect(mocks.accept).toHaveBeenCalledTimes(1);
   });
 
-  it("recusa do servidor não mostra check e volta ao rótulo original", async () => {
+  it("recusa do servidor não mostra check, mostra a causa e volta como Tentar de novo", async () => {
     mocks.accept.mockResolvedValueOnce({ success: false, error: "Oferta encerrada." });
     render(<AcceptLeadButton appearance="shared" leadId="l1">Aceitar e chamar</AcceptLeadButton>);
     const button = screen.getByRole("button", { name: "Aceitar e chamar" });
     fireEvent.click(button);
-    await waitFor(() => expect(mocks.error).toHaveBeenCalled());
-    await waitFor(() => expect(button.textContent).toBe("Aceitar e chamar"));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Oferta encerrada"));
+    expect(mocks.error).not.toHaveBeenCalled();
+    await waitFor(() => expect(button.textContent).toBe("Tentar de novo"), { timeout: 3000 });
     // Só o raio do visual de aceite (decorativo); nenhum check.
     expect(button.querySelector(":not([data-accept-icon]) > svg")).toBeNull();
     expect(button.getAttribute("data-confirmed")).toBeNull();

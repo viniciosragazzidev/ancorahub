@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotionConfig } from "motion/react";
 
+import { motionTokens } from "@/components/arc/motion-tokens";
 import type { JourneyCelebration } from "@/features/engagement/journey-types";
+import { fireFeedbackOnce } from "@/lib/feedback/use-feedback";
 
 import { BadgeArt } from "./badge-art";
 import { Confetti } from "./confetti";
@@ -57,6 +59,8 @@ export function CelebrationLayer({ items, blocked = false, onSeen }: { items: Jo
 
 function PointsToast({ item, queued, onDone }: { item: JourneyCelebration; queued: number; onDone: () => void }) {
   const reduce = useReducedMotionConfig();
+  // Nível 2 (FEEDBACK.md): som de marco e vibração uma vez por dia; depois, só o número sobe.
+  const [plan] = useState(() => fireFeedbackOnce(`jornada:${item.id}`, "milestone", { budgetKey: "pontos" }));
   const payload = item.payload.kind === "points" ? item.payload : null;
   const [shown, setShown] = useState(0);
   const doneRef = useRef(onDone);
@@ -100,7 +104,7 @@ function PointsToast({ item, queued, onDone }: { item: JourneyCelebration; queue
           <strong>{payload.label}</strong>
           <small>{queued > 0 ? `e mais ${queued} na fila` : "pontos na sua jornada"}</small>
         </span>
-        {!reduce ? <Sparks /> : null}
+        {!reduce && plan.celebrate ? <Sparks /> : null}
       </motion.button>
     </div>
   );
@@ -125,6 +129,9 @@ function Sparks() {
 
 function BigMoment({ item, queued, onDone }: { item: JourneyCelebration; queued: number; onDone: () => void }) {
   const reduce = useReducedMotionConfig();
+  // Missão é nível 2; conquista e nível são nível 3, os únicos com confete (FEEDBACK.md §3).
+  const levelThree = item.kind === "achievement" || item.kind === "level";
+  const [plan] = useState(() => fireFeedbackOnce(`jornada:${item.id}`, levelThree ? "celebrate" : "milestone", { budgetKey: "missao" }));
   const button = useRef<HTMLButtonElement>(null);
   // Tells the screen tour to wait: one overlay at a time (18/10, tour ring drawn over this dialog).
   useEffect(() => {
@@ -150,7 +157,7 @@ function BigMoment({ item, queued, onDone }: { item: JourneyCelebration; queued:
 
   return (
     <motion.div className={styles.backdrop} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduce ? 0.1 : 0.25 }} onClick={onDone}>
-      {!reduce ? <Confetti seed={item.id.length + 1} /> : null}
+      {!reduce && levelThree && plan.celebrate ? <Confetti seed={item.id.length + 1} /> : null}
       <motion.div
         role="dialog"
         aria-modal="true"
@@ -163,7 +170,7 @@ function BigMoment({ item, queued, onDone }: { item: JourneyCelebration; queued:
         exit={reduce ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.96, transition: { duration: 0.18 } }}
         transition={reduce ? { duration: 0.1 } : { type: "spring", stiffness: 300, damping: 26 }}
       >
-        <motion.div className={styles.art} initial={reduce ? false : { scale: 0.4, rotate: -12, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }} transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 260, damping: 14, delay: 0.12 }}>
+        <motion.div className={styles.art} initial={reduce ? false : { scale: 0.4, rotate: -12, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }} transition={reduce ? { duration: 0 } : { ...motionTokens.spring.celebrate, delay: motionTokens.beat.text }}>
           <span className={styles.glow} aria-hidden="true" />
           {payload.kind === "achievement" ? <BadgeArt badge={payload.badgeKey} earned size={120} /> : null}
           {payload.kind === "level" ? <LevelRing index={payload.level.index} percentage={100} size={120} /> : null}
