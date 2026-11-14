@@ -311,7 +311,7 @@ export function ChatHome({
   );
 
   const sheet = (
-    <BottomSheet open={newOpen} onOpenChange={setNewOpen} title="O que você quer fazer?" className="arc-venancor">
+    <BottomSheet open={newOpen} onOpenChange={setNewOpen} title="O que você quer fazer?" className="arc-venancor" followThrough>
       <ul className={home.newList}>
         {nextLead ? <li><Link href={nextLead.href} className={home.newItem} onClick={() => setNewOpen(false)}><strong>{isSupervisor ? "Ver" : "Atender"} {nextLead.name}</strong><span>{nextLead.preview}</span></Link></li> : null}
         {isSupervisor ? <li><Link href="/equipe" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Ver minha equipe</strong><span>Corretores, status e números</span></Link></li> : null}

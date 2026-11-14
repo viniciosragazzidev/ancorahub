@@ -31,6 +31,14 @@ describe("LiteSuccess", () => {
     expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
 
+  it("settles the check with the snappy spring (follow-through) and keeps the text still", () => {
+    const { container } = render(<LiteSuccess label="Salvo" />);
+    const svg = container.querySelector("svg")!;
+    expect(readMotion(svg).initial).toEqual({ opacity: 0, scale: 0.6 });
+    expect((readMotion(svg).transition as { scale: unknown }).scale).toEqual({ type: "spring", visualDuration: 0.26, bounce: 0.12 });
+    expect(readMotion(container.querySelector("span > span")!).initial).toBeUndefined();
+  });
+
   it("shows the finished check with reduced motion and no displacement", () => {
     motionState.reduce = true;
     const { container } = render(<LiteSuccess label="Enviado" />);

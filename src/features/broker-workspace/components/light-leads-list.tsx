@@ -8,6 +8,8 @@ import { motion, useReducedMotion } from "motion/react";
 import { Badge, type BadgeTone } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { motionTokens } from "@/components/arc/motion-tokens";
+import { useArrivedKeys } from "@/components/lite/motion/arrivals";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { PeopleEmpty, PeopleFilters, PeoplePage, PeopleRow, PeopleSection } from "@/components/light/people-list/people-list";
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
 import { BrokerWalletTabs } from "@/features/broker-workspace/components/broker-wallet-tabs";
@@ -138,8 +140,20 @@ function countdown(expiresAt: Date | string, now: number) {
   return hours ? `Aceite em até ${hours} h ${minutes % 60} min` : `Aceite em até ${minutes} min`;
 }
 
+/** Follow-through do cartão que chega depois de a tela abrir: sobe 8px e assenta com a mola `snappy`. */
+const arrivalInitial = { opacity: 0, y: motionTokens.distance.md, scale: motionTokens.scale.popIn };
+const arrivalTransition = {
+  opacity: { duration: motionTokens.duration.fast, ease: motionTokens.ease.enter },
+  y: motionTokens.spring.snappy,
+  scale: motionTokens.spring.snappy,
+  // A lista que abre espaço continua sem balanço.
+  layout: { duration: motionTokens.duration.fast, ease: motionTokens.ease.enter },
+};
+
 function NowBlock({ items }: { items: LeadNowItem[] }) {
   const reduce = useReducedMotion();
+  const motionEnabled = useInterfaceMotionEnabled();
+  const newcomers = useArrivedKeys(items.map(({ kind, lead }) => `${kind}-${lead.id}`));
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setClock(Date.now()), 15_000);
@@ -158,8 +172,9 @@ function NowBlock({ items }: { items: LeadNowItem[] }) {
           const detail = kind === "acceptance"
             ? [arrived ? `Recebido ${formatBrokerArrival(arrived)}` : null, lead.dutyName ? `Plantão ${lead.dutyName}` : null].filter(Boolean).join(" · ")
             : kind === "response" ? "O cliente aguarda sua mensagem." : "O prazo combinado para falar com o cliente venceu.";
+          const arriving = motionEnabled && !reduce && newcomers.has(`${kind}-${lead.id}`);
           return (
-            <motion.li key={`${kind}-${lead.id}`} className={styles.nowItem} layout={!reduce} initial={reduce ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: motionTokens.duration.fast, delay: reduce ? 0 : index * motionTokens.stagger.item, ease: motionTokens.ease.enter }}>
+            <motion.li key={`${kind}-${lead.id}`} className={styles.nowItem} layout={!reduce} initial={reduce ? false : arriving ? arrivalInitial : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={arriving ? arrivalTransition : { duration: motionTokens.duration.fast, delay: reduce ? 0 : index * motionTokens.stagger.item, ease: motionTokens.ease.enter }}>
               <div className={styles.nowCopy}>
                 <strong>{lead.name}</strong>
                 <span>{label} · {detail}</span>
