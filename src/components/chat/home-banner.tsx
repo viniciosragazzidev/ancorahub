@@ -25,6 +25,6 @@ export function HomeBanner({ highlights, className }: { highlights: HomeHighligh
     return <CaptainBanner className={className} label="Minha jornada" title="Cada atendimento vira ponto. Bora subir de nível?"
       action={{ label: "Ver minha jornada", href: highlights.journeyHref }} />;
   }
-  return <CaptainBanner className={className} label="Meu desempenho" title="Bora fazer o dia de hoje valer?"
-    goal={{ value: "Seus números do dia", hint: "e da semana" }} action={{ label: "Ver meu desempenho", href: "/desempenho" }} />;
+  return <CaptainBanner className={className} label="Meu desempenho" title="Bora fazer o dia de hoje valer? Seus números estão aqui."
+    action={{ label: "Ver meu desempenho", href: "/desempenho" }} />;
 }
