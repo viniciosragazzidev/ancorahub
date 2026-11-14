@@ -21,16 +21,15 @@
 .stat[data-alert="true"] strong { color: var(--danger); }
 @media (max-width: 560px) { .stats { gap: 8px; } .stat { padding: 12px; } .stat strong { font-size: 1.4rem; } .stat span { font-size: var(--text-xs); } }
 
-.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.segment { display: inline-flex; flex-wrap: nowrap; max-width: 100%; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; padding: 4px; border-radius: 999px; background: var(--surface-muted); }
-.segment::-webkit-scrollbar { display: none; }
-.segment button { scroll-snap-align: start; flex-shrink: 0; }
-.segment button { border: 0; border-radius: 999px; padding: 8px 14px; background: transparent; color: var(--text-muted); font: inherit; font-size: var(--text-sm); cursor: pointer; white-space: nowrap; transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease; }
-.segment button[aria-pressed="true"] { background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-resting); }
-.segment button:focus-visible { outline: 2px solid var(--chat-action-text, #2563eb); outline-offset: 2px; }
-.count { margin-left: 6px; font-variant-numeric: tabular-nums; }
-.search { flex: 1; min-width: 12rem; height: 44px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow-resting); color: var(--foreground); font: inherit; font-size: var(--text-sm); }
-.search:focus-visible { outline: 2px solid var(--chat-action-text, #2563eb); outline-offset: 2px; }
+/* Abas e busca: SegmentedControl e SearchField do Arc, no mesmo arranjo da Minha carteira (/clientes): abas em cima,
+   busca na linha de baixo. Aqui só o encaixe; altura, raio, borda e ícone vêm dos componentes. */
+.filters { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
+.filters > * { min-width: 0; max-width: 100%; }
+.segment { display: grid; min-width: 0; }
+.count { margin-left: 6px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* Rótulo da busca só para leitor de tela, como na carteira. */
+.filters label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.searchInput::placeholder { font-size: var(--text-sm); }
 
 .section { display: grid; gap: 8px; }
 .sectionTitle { margin: 4px 4px 0; font-size: var(--text-base); font-weight: 600; color: var(--foreground); }

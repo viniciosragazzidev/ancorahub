@@ -3,6 +3,9 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
+import { SearchField } from "@/components/arc/search-field/search-field";
+import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
+
 import styles from "./people-list.module.css";
 
 /**
@@ -68,19 +71,34 @@ export function PeopleFilters<T extends string>({
   dataTourSegment?: string;
   dataTourSearch?: string;
 }) {
+  // Mesmos componentes do Arc da Minha carteira (/clientes): abas e busca com a mesma altura, raio, borda e ícone.
   return (
     <div className={`${styles.filters} ${styles.enter}`} style={{ "--i": 2 } as CSSProperties}>
       {options?.length ? (
-        <div className={styles.segment} role="group" aria-label={label} data-tour={dataTourSegment}>
-          {options.map((item) => (
-            <button key={item.id} type="button" aria-pressed={value === item.id} onClick={() => onChange?.(item.id)}>
-              {item.label}{item.count ? <span className={styles.count}>{item.count}</span> : null}
-            </button>
-          ))}
+        <div className={styles.segment} data-tour={dataTourSegment}>
+          <SegmentedControl
+            label={label}
+            value={value ?? ""}
+            onValueChange={(next) => onChange?.(next as T)}
+            options={options.map((item) => ({
+              value: item.id,
+              label: item.label,
+              accessory: item.count ? <span className={styles.count}>{item.count}</span> : undefined,
+            }))}
+          />
         </div>
       ) : null}
       {onSearch ? (
-        <input className={styles.search} type="search" placeholder={searchPlaceholder} aria-label={searchLabel ?? searchPlaceholder} value={search ?? ""} onChange={(event) => onSearch(event.target.value)} data-tour={dataTourSearch} />
+        <SearchField
+          className={styles.searchInput}
+          label={searchLabel ?? searchPlaceholder}
+          placeholder={searchPlaceholder}
+          value={search ?? ""}
+          onValueChange={onSearch}
+          clearLabel="Limpar busca"
+          enterKeyHint="search"
+          data-tour={dataTourSearch}
+        />
       ) : null}
     </div>
   );
