@@ -2,6 +2,10 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Lite: movimento por frequência de uso
+
+- Meta do dia e ranking da semana animam só na primeira abertura do dia (`useFirstTimeToday`, dia de São Paulo); avisos ocasionais e tour em até 320ms; gradiente do consentimento sem loop. Tabela em `docs/ux/motion-frequencia.md`.
+
 ## 13/11/2026 - Lite: alvos de toque de 44px no celular
 
 - Em telas de toque (`pointer: coarse`), os botões de ícone e os tamanhos xs/sm ganham área de toque de 44x44 (`ct-touch`, `src/styles/touch-target.css`) sem mudar o visual. No Lite, o composer (enviar, áudio, ferramentas) tem 44px e o botão principal fica com altura mínima de 44px. Desktop e modo normal não mudam.
