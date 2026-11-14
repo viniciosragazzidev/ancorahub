@@ -9,10 +9,12 @@ import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Button } from "@/components/arc/button/button";
 import { Input } from "@/components/arc/input/input";
 import { Textarea } from "@/components/arc/textarea/textarea";
+import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { BrokerWalletContactField, BrokerWalletContactResult } from "@/features/customers/broker-wallet-contact";
 
 import styles from "./broker-my-wallet.module.css";
+import { PriorClientForm, type PriorClientAction } from "./prior-client-form";
 
 type Draft = { nome: string; telefone: string; email: string; observacao: string };
 const EMPTY: Draft = { nome: "", telefone: "", email: "", observacao: "" };
@@ -22,14 +24,56 @@ type Duplicate = Extract<BrokerWalletContactResult, { duplicate: unknown }>["dup
 export type BrokerWalletAddContactAction = (input: Draft & { consentimentoLgpd: boolean; duplicateConfirmed?: boolean }) => Promise<BrokerWalletContactResult>;
 
 /**
- * "Adicionar contato" da Minha carteira. Nesta etapa só existe **Novo interessado** (cadastro manual existente);
- * "Cliente que já possuo" depende do modelo da etapa 4b e não aparece. O que foi digitado fica no painel quando
- * há erro ou aviso de duplicidade.
+ * "Adicionar contato" da Minha carteira: **Novo interessado** (cadastro manual existente) e, com a chave e a
+ * migration da DEC-187, **Cliente que já possuo**. O que foi digitado fica no painel quando há erro ou aviso de
+ * duplicidade; trocar de opção não apaga o rascunho da outra.
  */
-export function BrokerWalletAddContact({ action }: { action: BrokerWalletAddContactAction }) {
+export function BrokerWalletAddContact({ action, priorAction }: { action: BrokerWalletAddContactAction; priorAction?: PriorClientAction }) {
+  const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState<"lead" | "prior">("lead");
+  const [created, setCreated] = useState(false);
+  const [round, setRound] = useState(0);
+  return (
+    <BottomSheet
+      className="arc-venancor"
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        // Depois de um cadastro, fechar recomeça os formulários.
+        if (!next && created) { setRound((value) => value + 1); setCreated(false); }
+      }}
+      trigger={<Button variant="primary" className={styles.addButton}><Plus aria-hidden="true" className={styles.addIcon} />Adicionar contato</Button>}
+      title="Adicionar contato"
+      description={created ? undefined : kind === "prior"
+        ? "Cliente que já possuo: fica em Clientes, sem venda, comissão ou pontos."
+        : "Novo interessado: entra em Em negociação com você como responsável."}
+      closeLabel="Fechar"
+      detents={[0.92]}
+    >
+      {priorAction && !created ? (
+        <SegmentedControl
+          className={styles.kindSwitch}
+          label="Tipo de contato"
+          options={[{ value: "lead", label: "Novo interessado" }, { value: "prior", label: "Cliente que já possuo" }]}
+          value={kind}
+          onValueChange={(value) => setKind(value as "lead" | "prior")}
+        />
+      ) : null}
+      <div key={`lead-${round}`} hidden={kind !== "lead"}>
+        <NewInterestedForm action={action} showKind={!priorAction} onCreatedChange={setCreated} />
+      </div>
+      {priorAction ? (
+        <div key={`prior-${round}`} hidden={kind !== "prior"}>
+          <PriorClientForm action={priorAction} onCreatedChange={setCreated} />
+        </div>
+      ) : null}
+    </BottomSheet>
+  );
+}
+
+function NewInterestedForm({ action, showKind, onCreatedChange }: { action: BrokerWalletAddContactAction; showKind: boolean; onCreatedChange: (created: boolean) => void }) {
   const router = useRouter();
   const consentId = useId();
-  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [consent, setConsent] = useState(false);
@@ -47,6 +91,7 @@ export function BrokerWalletAddContact({ action }: { action: BrokerWalletAddCont
     setFieldErrors({});
     setError(null);
     setCreated(null);
+    onCreatedChange(false);
   }
 
   function update(field: keyof Draft, value: string) {
@@ -72,6 +117,7 @@ export function BrokerWalletAddContact({ action }: { action: BrokerWalletAddCont
       }
       if (result.ok) {
         setCreated({ leadId: result.leadId, name: draft.nome.trim(), noteSaved: result.noteSaved, withNote: Boolean(draft.observacao.trim()) });
+        onCreatedChange(true);
         router.refresh();
         return;
       }
@@ -86,19 +132,7 @@ export function BrokerWalletAddContact({ action }: { action: BrokerWalletAddCont
   }
 
   return (
-    <BottomSheet
-      className="arc-venancor"
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next && created) reset();
-      }}
-      trigger={<Button variant="primary" className={styles.addButton}><Plus aria-hidden="true" className={styles.addIcon} />Adicionar contato</Button>}
-      title="Adicionar contato"
-      description={created ? undefined : "Novo interessado: entra em Em negociação com você como responsável."}
-      closeLabel="Fechar"
-      detents={[0.92]}
-    >
+    <>
       {created ? (
         <div className={styles.sheetBody} role="status">
           <p className={styles.successTitle}>{created.name} foi cadastrado.</p>
@@ -113,7 +147,7 @@ export function BrokerWalletAddContact({ action }: { action: BrokerWalletAddCont
         </div>
       ) : (
         <form className={styles.sheetBody} onSubmit={submit} noValidate>
-          <h3 className={styles.kind}>Novo interessado</h3>
+          {showKind ? <h3 className={styles.kind}>Novo interessado</h3> : null}
           <Input label="Nome" name="nome" autoComplete="name" value={draft.nome} onChange={(event) => update("nome", event.target.value)} error={fieldErrors.nome} required maxLength={120} />
           <Input label="Telefone" name="telefone" type="tel" inputMode="tel" autoComplete="tel" placeholder="11 99999-9999" value={draft.telefone} onChange={(event) => update("telefone", event.target.value)} error={fieldErrors.telefone} required />
           <Input label="E-mail (opcional)" name="email" type="email" inputMode="email" autoComplete="email" value={draft.email} onChange={(event) => update("email", event.target.value)} error={fieldErrors.email} maxLength={254} />
@@ -152,6 +186,6 @@ export function BrokerWalletAddContact({ action }: { action: BrokerWalletAddCont
           </Button>
         </form>
       )}
-    </BottomSheet>
+    </>
   );
 }

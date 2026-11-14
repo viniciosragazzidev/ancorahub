@@ -42,7 +42,7 @@ const leadInput = z.object({
 
 export type DuplicateLeadNotice = { id: string; nome: string; createdAt: Date; corretorNome: string | null };
 
-function normalizePhone(phone: string) {
+export function normalizePhone(phone: string) {
   // Normalização agressiva: remove formatação, garante DDD+9+8d para números de 10 dígitos,
   // e sempre retorna com prefixo 55.
   let digits = phone.replace(/\D/g, "");

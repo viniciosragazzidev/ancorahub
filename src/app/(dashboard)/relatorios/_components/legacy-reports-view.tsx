@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, sql, isNotNull } from "drizzle-orm";
 import Link from "next/link";
 
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -120,6 +120,7 @@ export default async function LegacyReportsView({
         and(
           eq(schema.clients.tenantId, context.tenantId),
           clientScope,
+          isNotNull(schema.clients.leadId) /* DEC-187: só clientes de venda */,
           gte(schema.clients.convertedAt, reportStart),
         ),
       ),
@@ -182,6 +183,7 @@ export default async function LegacyReportsView({
         and(
           eq(schema.clients.tenantId, context.tenantId),
           clientScope,
+          isNotNull(schema.clients.leadId) /* DEC-187: só clientes de venda */,
           gte(schema.clients.convertedAt, reportStart),
         ),
       )

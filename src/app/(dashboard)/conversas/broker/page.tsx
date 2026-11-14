@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql, isNotNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 
@@ -53,7 +53,7 @@ export default async function BrokerConversationsPage({ searchParams }: { search
       .orderBy(desc(schema.leads.stageEnteredAt)).limit(150),
     db.select({ id: schema.clients.id, leadId: schema.clients.leadId, nome: schema.clients.nome, telefone: schema.clients.telefone, createdAt: schema.clients.createdAt })
       .from(schema.clients)
-      .where(and(eq(schema.clients.tenantId, context.tenantId), eq(schema.clients.corretorId, context.userId))).limit(150),
+      .where(and(eq(schema.clients.tenantId, context.tenantId), eq(schema.clients.corretorId, context.userId), isNotNull(schema.clients.leadId) /* DEC-187: só clientes de venda */)).limit(150),
     db.select({ status: schema.whatsappConnections.status, chatInternoAtivo: schema.whatsappConnections.chatInternoAtivo })
       .from(schema.whatsappConnections)
       .where(and(eq(schema.whatsappConnections.tenantId, context.tenantId), eq(schema.whatsappConnections.userId, context.userId))).limit(1),

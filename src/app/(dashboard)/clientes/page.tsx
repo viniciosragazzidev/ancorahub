@@ -30,6 +30,9 @@ import { isBrokerWalletLeadView, normalizeBrokerWalletFilters } from "@/features
 import { getBrokerWalletLeads, toBrokerWalletLeadFilters } from "@/features/customers/broker-wallet-leads";
 import { createBrokerWalletContactAction } from "@/features/customers/broker-wallet-contact-actions";
 import { hasPermission } from "@/shared/auth/permissions";
+import { isBrokerPriorClientsEnabled } from "@/features/customers/prior-portfolio";
+import { createPriorClientAction } from "@/features/customers/prior-portfolio-actions";
+import { saleClientsOnly } from "@/features/customers/prior-portfolio-schema";
 import type { TenantContext } from "@/shared/auth/types";
 
 type CustomersSearchParams = {
@@ -59,6 +62,8 @@ async function renderBrokerMyWallet(context: TenantContext, searchParams: Custom
     returnStatus: searchParams.return,
   });
   const leadView = isBrokerWalletLeadView(filters.view);
+  // DEC-187: carteira anterior entra com a chave e a migration 0231; sem elas, a carteira é a da etapa 4a.
+  const priorPortfolio = await isBrokerPriorClientsEnabled().catch(() => false);
   const [leads, clients] = await Promise.all([
     getBrokerWalletLeads(context, toBrokerWalletLeadFilters(filters, leadView ? (filters.view as "negotiating" | "archived") : "negotiating"), { rows: leadView }),
     getBrokerClientWallet(context, {
@@ -68,7 +73,7 @@ async function renderBrokerMyWallet(context: TenantContext, searchParams: Custom
       origin: filters.origin,
       contractStatus: filters.contractStatus,
       returnStatus: filters.returnStatus,
-    }, new Date(), { rows: !leadView }),
+    }, new Date(), { rows: !leadView, priorPortfolio }),
   ]);
   return (
     <BrokerMyWallet
@@ -78,6 +83,7 @@ async function renderBrokerMyWallet(context: TenantContext, searchParams: Custom
       leads={leadView ? leads : undefined}
       clients={leadView ? undefined : clients}
       addContactAction={hasPermission(context.role, "criar_lead_manual") ? createBrokerWalletContactAction : undefined}
+      addPriorClientAction={priorPortfolio ? createPriorClientAction : undefined}
     />
   );
 }
@@ -126,7 +132,7 @@ export default async function CustomersPage({
     }).from(schema.clients)
       .leftJoin(schema.user, eq(schema.clients.corretorId, schema.user.id))
       .leftJoin(schema.activeCustomers, and(eq(schema.activeCustomers.clientId, schema.clients.id), eq(schema.activeCustomers.tenantId, schema.clients.tenantId)))
-      .where(buildClientScopeWhere(context))
+      .where(and(buildClientScopeWhere(context), saleClientsOnly()))
       .orderBy(desc(schema.clients.convertedAt));
     return <LightClientsList clients={clients} management />;
   }
@@ -160,7 +166,7 @@ export default async function CustomersPage({
         convertedAt: schema.clients.convertedAt,
       })
       .from(schema.clients)
-      .where(buildClientScopeWhere(context))
+      .where(and(buildClientScopeWhere(context), saleClientsOnly()))
       .orderBy(desc(schema.clients.convertedAt));
 
     return <LightClientsList clients={clients} />;
@@ -190,14 +196,14 @@ export default async function CustomersPage({
       .from(schema.clients)
       .leftJoin(schema.user, eq(schema.clients.corretorId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.clients.branchId, schema.branches.id))
-      .where(and(clientScope, gte(schema.clients.convertedAt, periodStartDate)))
+      .where(and(clientScope, saleClientsOnly(), gte(schema.clients.convertedAt, periodStartDate)))
       .orderBy(desc(schema.clients.convertedAt)),
 
     // Total clients
     db
       .select({ total: count() })
       .from(schema.clients)
-      .where(and(clientScope, gte(schema.clients.convertedAt, periodStartDate))),
+      .where(and(clientScope, saleClientsOnly(), gte(schema.clients.convertedAt, periodStartDate))),
 
     // Total leads (for conversion rate)
     db
@@ -209,7 +215,7 @@ export default async function CustomersPage({
     db
       .select({ total: countDistinct(schema.clients.corretorId) })
       .from(schema.clients)
-      .where(and(clientScope, gte(schema.clients.convertedAt, periodStartDate))),
+      .where(and(clientScope, saleClientsOnly(), gte(schema.clients.convertedAt, periodStartDate))),
 
     // Upcoming renewals (clients with active customers whose contract anniversary is within 30 days)
     db
@@ -232,6 +238,7 @@ export default async function CustomersPage({
       .where(
         and(
           clientScope,
+          saleClientsOnly(),
           gte(schema.clients.convertedAt, periodStartDate),
         ),
       ),

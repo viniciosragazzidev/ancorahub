@@ -1,4 +1,4 @@
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, isNotNull } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import {
@@ -115,7 +115,7 @@ export default async function SubscriptionPage() {
     db
       .select({ count: count() })
       .from(schema.clients)
-      .where(eq(schema.clients.tenantId, context.tenantId)),
+      .where(and(eq(schema.clients.tenantId, context.tenantId), isNotNull(schema.clients.leadId) /* DEC-187: só clientes de venda */)),
   ]);
 
   const planInfo =

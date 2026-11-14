@@ -56,6 +56,8 @@ function buildHref(filters: BrokerClientWalletFilters, overrides: Partial<Broker
 }
 
 function describeAction(row: BrokerClientWalletResult["rows"][number]) {
+  // Sem lead não há retorno ainda (DEC-187; agenda na etapa 6).
+  if (row.priorPortfolio) return row.attentionReason === "renewal" ? "Renovação de contrato anterior em até 30 dias" : "Cliente que você já tinha antes do CRM";
   if (row.nextTask) {
     const due = row.nextTask.dueAt ? dateTime.format(new Date(row.nextTask.dueAt)) : "sem data";
     return [`Próxima ação: ${row.nextTask.title}`, due].join(" · ");
@@ -182,6 +184,7 @@ export function BrokerClientWalletList({ rows, totalCount, title = "Sua carteira
         const whatsappUrl = buildWhatsAppUrl(client.phone);
         const href = `/clientes/${encodeURIComponent(client.id)}`;
         const chips = [
+          client.priorPortfolio ? <Badge key="prior" tone="info" size="sm">Carteira anterior</Badge> : null,
           status ? <Badge key="contract" tone={status.tone} size="sm">{status.text}</Badge> : null,
           client.attentionReason ? <Badge key="attention" tone={attentionTones[client.attentionReason]} size="sm">{attentionLabels[client.attentionReason]}</Badge> : null,
         ].filter(Boolean);
