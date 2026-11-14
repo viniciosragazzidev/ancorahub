@@ -80,12 +80,26 @@
  */
 .page[data-composition="results"] .card,
 .page[data-composition="results"] .panel { background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
-.page[data-composition="results"] .card { gap: 6px; padding: 16px 16px 14px; }
-.page[data-composition="results"] .cardTop { align-items: center; flex-direction: row-reverse; justify-content: flex-end; gap: 10px; }
-.page[data-composition="results"] .cardIcon { box-sizing: content-box; width: 18px; height: 18px; padding: 8px; border-radius: 12px; background: var(--chat-action-soft, rgb(0 43 115 / 0.1)); color: var(--chat-action, var(--primary)); }
-.page[data-composition="results"] .cardLabel { font-weight: 500; }
-.page[data-composition="results"] .cardValue { margin-top: 6px; font-size: 30px; font-weight: 500; line-height: 1.1; }
-.page[data-composition="results"] .change { margin-top: 2px; }
+/*
+ * Cards do topo (refino 14/11/2026, 2ª passada): no celular o número fica em 22px para caber inteiro (inclusive
+ * em reais), o ícone num quadrado menor, o rótulo numa linha só e a variação embaixo, discreta. No computador o
+ * número volta a 28px.
+ */
+.page[data-composition="results"] .cards { gap: 10px; }
+.page[data-composition="results"] .card { gap: 0; padding: 14px 14px 12px; }
+.page[data-composition="results"] .cardTop { align-items: center; flex-direction: row-reverse; justify-content: flex-end; gap: 8px; min-width: 0; }
+.page[data-composition="results"] .cardIcon { box-sizing: content-box; width: 16px; height: 16px; padding: 6px; border-radius: 10px; background: var(--chat-action-soft, rgb(0 43 115 / 0.1)); color: var(--chat-action, var(--primary)); }
+.page[data-composition="results"] .cardLabel { overflow: hidden; font-size: var(--text-xs); font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
+.page[data-composition="results"] .cardValue { margin-top: 12px; font-size: 22px; font-weight: 600; line-height: 1.15; letter-spacing: -0.02em; overflow-wrap: normal; white-space: nowrap; }
+.page[data-composition="results"] .change { gap: 2px 4px; margin-top: 4px; font-size: 11px; line-height: 1.35; }
+@media (min-width: 720px) {
+  .page[data-composition="results"] .cards { gap: var(--space-3); }
+  .page[data-composition="results"] .card { padding: 18px 18px 16px; }
+  .page[data-composition="results"] .cardIcon { width: 18px; height: 18px; padding: 7px; }
+  .page[data-composition="results"] .cardLabel { font-size: var(--text-sm); }
+  .page[data-composition="results"] .cardValue { margin-top: 14px; font-size: 28px; }
+  .page[data-composition="results"] .change { font-size: var(--text-xs); }
+}
 .page[data-composition="results"] .up::before { content: "▲ "; font-size: 9px; }
 .page[data-composition="results"] .down::before { content: "▼ "; font-size: 9px; }
 .page[data-composition="results"] .indicator + .indicator { border-top: 1px solid var(--border-subtle); }
