@@ -99,14 +99,15 @@ export function LeadConversation({
           const followUp: ChatBlock[] = result.ok && result.href?.startsWith("http") ? [whatsappButton(`b-whatsapp-${Date.now()}`, result.href)] : [];
           return { ok: result.ok, message: result.message, warning: result.warning, followUp };
         }}
-        onFreeText={async (text): Promise<ChatBlock[]> => {
+        onFreeText={async (text, meta): Promise<ChatBlock[]> => {
           // A question ("...?") goes to the AI of this lead; anything else, or an AI failure, is a note.
           if (text.trim().endsWith("?")) {
             const answer = await askAssistantAction({ agentId: "lead", question: text, leadId });
             // The AI consent card is shown as is (the question is not saved as a note).
             if (answer.ok || answer.blocks.some((block) => block.type === "consent")) return answer.blocks;
           }
-          const result = await runChatServerAction("lead.addNote", { leadId, content: text });
+          // clientMessageId: a retry after a timeout does not save the same note twice.
+          const result = await runChatServerAction("lead.addNote", { leadId, content: text, ...(meta ? { clientMessageId: meta.clientMessageId } : {}) });
           return [{ type: "assistant", id: `note-${Date.now()}`, text: result.message }];
         }}
         onMention={(mention: Mention): ChatBlock[] => {
