@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   Bell,
@@ -19,7 +18,7 @@ import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Button } from "@/components/arc/button/button";
 import { SuperAdminRoleSwitcher } from "@/components/super-admin-role-switcher";
 import { ViewAsButton } from "@/features/super-admin/components/view-as";
-import { signOut } from "@/shared/auth/client";
+import { signOutAndGoToLogin } from "@/shared/auth/sign-out";
 import { cn } from "@/lib/utils";
 
 import { useDirectorChrome } from "./director-chrome-context";
@@ -30,7 +29,6 @@ function openLayer(eventName: string) {
 
 export function DirectorMoreSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const chrome = useDirectorChrome();
-  const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
   const profile = chrome?.profile;
   const canSettings = Boolean(profile?.permissions?.includes("acessar_configuracoes")
@@ -39,11 +37,7 @@ export function DirectorMoreSheet({ open, onOpenChange }: { open: boolean; onOpe
 
   async function handleSignOut() {
     setSigningOut(true);
-    try {
-      await signOut({ fetchOptions: { onSuccess: () => router.replace("/login") } });
-    } finally {
-      router.replace("/login");
-    }
+    await signOutAndGoToLogin();
   }
 
   const rowClass = "director-more-row flex min-h-11 w-full items-center gap-3 rounded-full px-3 text-left text-sm font-medium text-(--foreground) transition-colors hover:bg-(--surface-muted) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)";

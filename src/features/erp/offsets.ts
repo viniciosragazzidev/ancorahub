@@ -4,7 +4,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { auditActor, auditErp, erpScopeSql, getErpEffectiveAccess, hasAgencyScope, requireErpAccess, type ErpDatabase } from "./access";
-import { confirmedSettledSql, notInOpenPayoutSql, openBalanceSql } from "./balances";
+import { advanceAvailableSql, notInOpenPayoutSql, openBalanceSql } from "./balances";
 import { PAGE_SIZE, pageSchema } from "./shared";
 import { assertIndependentReview, ErpError, moneyCentsSchema } from "./contracts";
 import { activePayoutFor, assertOpenPeriods, entryMovements, financialTransaction } from "./finance";
@@ -90,20 +90,6 @@ export async function reviewOffset(raw: unknown) {
     }
     return row.id;
   });
-}
-
-/**
- * Offsettable amount of an advance, in SQL (same rule as `assertOffsetCapacity`): confirmed cash − pending cash reversals
- * − confirmed offsets (reversals give back) − pending offset allocations.
- */
-function advanceAvailableSql(tenantId: string): SQL<number> {
-  const entryId = schema.erpFinancialEntries.id;
-  return sql<number>`(${confirmedSettledSql(tenantId)}
-    - coalesce((SELECT sum(s.amount_cents) FROM erp_settlements s
-      WHERE s.tenant_id = ${tenantId} AND s.entry_id = ${entryId} AND s.status = 'pending' AND s.kind = 'reversal'), 0)
-    - coalesce((SELECT sum(CASE WHEN o.status = 'confirmed' AND o.kind = 'reversal' THEN -o.amount_cents
-        WHEN o.status = 'confirmed' OR (o.status = 'pending' AND o.kind = 'allocation') THEN o.amount_cents ELSE 0 END)
-      FROM erp_offsets o WHERE o.tenant_id = ${tenantId} AND o.advance_entry_id = ${entryId}), 0))::bigint`.mapWith(Number);
 }
 
 const OFFSET_CHOICE_LIMIT = 200;

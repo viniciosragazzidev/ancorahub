@@ -22,6 +22,8 @@ export const LIGHT_ALLOWED_PREFIXES = [
   "/relacionamento",
   "/primeiro-acesso",
   "/extensao",
+  // Meu financeiro (somente leitura): a página ainda confere a chave, o módulo financeiro do ERP e a permissão.
+  "/meu-financeiro",
 ] as const;
 
 /**
@@ -212,6 +214,7 @@ const RULES: readonly RouteRule[] = [
   { test: exact("/negociacoes"), route: { title: "Negociações", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   // Aberta pelo Desempenho (Início reorganizado), a seta volta para lá.
   { test: exact("/jornada"), route: (_path, search) => ({ title: "Minha jornada", tab: "mais", isRoot: false, parentHref: search?.get("de") === "desempenho" ? "/desempenho" : "/dashboard", hidesTabBar: true }) },
+  { test: exact("/meu-financeiro"), route: { title: "Meu financeiro", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/agenda"), route: { title: "Agenda", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/desempenho"), route: { title: "Desempenho", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/dashboard"), route: { title: "Início", tab: "inicio", isRoot: true, parentHref: null, chat: true, hidesTabBar: true } },

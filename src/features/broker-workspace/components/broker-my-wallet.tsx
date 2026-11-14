@@ -244,6 +244,7 @@ export function BrokerMyWallet({
   clients,
   addContactAction,
   addPriorClientAction,
+  openAddContact = false,
   quickSaleEnabled = false,
 }: {
   filters: BrokerWalletFilters;
@@ -254,6 +255,8 @@ export function BrokerMyWallet({
   addContactAction?: BrokerWalletAddContactAction;
   /** Cliente que já possuo (DEC-187): só com a chave e a migration 0231. */
   addPriorClientAction?: PriorClientAction;
+  /** Abre o painel Adicionar contato ao chegar (Novo contato nas Ações rápidas do Início). */
+  openAddContact?: boolean;
   /** Registrar venda em dois toques (chave BROKER_QUICK_SALE). */
   quickSaleEnabled?: boolean;
 }) {
@@ -281,7 +284,7 @@ export function BrokerMyWallet({
       subtitle={summary}
       className={`${walletStyles.page} ${styles.page}`}
     >
-      <WalletControls key={brokerWalletHref(effectiveFilters)} filters={effectiveFilters} counts={counts} origins={origins} quickSale={quickSaleEnabled} addContact={addContactAction ? <BrokerWalletAddContact action={addContactAction} priorAction={addPriorClientAction} /> : undefined} />
+      <WalletControls key={brokerWalletHref(effectiveFilters)} filters={effectiveFilters} counts={counts} origins={origins} quickSale={quickSaleEnabled} addContact={addContactAction ? <BrokerWalletAddContact action={addContactAction} priorAction={addPriorClientAction} defaultOpen={openAddContact} /> : undefined} />
 
       <div key={filters.view} className={styles.viewBody}>
         {hasRows ? (

@@ -1242,11 +1242,13 @@ const BROKER_NEWS_FLAGS = [
   { field: "brokerPerformanceLiteEnabled", flag: FEATURE_FLAGS.BROKER_PERFORMANCE_LITE },
   { field: "brokerJourneyEnabled", flag: FEATURE_FLAGS.BROKER_JOURNEY },
   { field: "brokerNavReorgEnabled", flag: FEATURE_FLAGS.BROKER_NAV_REORG },
+  { field: "brokerHomeActionsEnabled", flag: FEATURE_FLAGS.BROKER_HOME_ACTIONS },
   { field: "brokerPriorClientsEnabled", flag: FEATURE_FLAGS.BROKER_PRIOR_CLIENTS },
   { field: "brokerQuickSaleEnabled", flag: FEATURE_FLAGS.BROKER_QUICK_SALE },
   { field: "teamRankingEnabled", flag: FEATURE_FLAGS.TEAM_RANKING },
   { field: "engagementCampaignsEnabled", flag: FEATURE_FLAGS.ENGAGEMENT_CAMPAIGNS },
   { field: "welcomeVideoEnabled", flag: FEATURE_FLAGS.WELCOME_VIDEO },
+  { field: "brokerLiteFinanceEnabled", flag: FEATURE_FLAGS.BROKER_LITE_FINANCE },
 ] as const;
 
 export async function updateBrokerNewsSettingsAction(formData: FormData) {

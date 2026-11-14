@@ -7,7 +7,7 @@ import { LogOut, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PushNotificationManager } from "@/features/notifications/components/push-notification-manager";
 import { startLiteTour } from "@/components/chat/tour/lite-tour";
-import { signOut } from "@/shared/auth/client";
+import { signOutAndGoToLogin } from "@/shared/auth/sign-out";
 
 export function SupervisorLiteSettings({ user, branchName, team }: { user: { name: string; image: string | null }; branchName: string | null; team: { name: string; imageUrl: string | null } | null }) {
   const initials = user.name.split(/\s+/).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("pt-BR") ?? "").join("");
@@ -27,6 +27,6 @@ export function SupervisorLiteSettings({ user, branchName, team }: { user: { nam
       <h2 id="supervisor-push-title" className="mb-3 text-base font-semibold">Notificações</h2><PushNotificationManager variant="compact" />
     </section>
     <Button variant="outline" size="lg" onClick={() => { if (window.location.pathname === "/dashboard") startLiteTour(); else window.location.assign("/dashboard?tour=1"); }}><Play className="size-4" /> Ver o tour do app</Button>
-    <Button variant="secondary" size="lg" onClick={() => void signOut()}><LogOut className="size-4" /> Sair da conta</Button>
+    <Button variant="secondary" size="lg" onClick={() => void signOutAndGoToLogin()}><LogOut className="size-4" /> Sair da conta</Button>
   </div>;
 }

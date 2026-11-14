@@ -169,6 +169,8 @@ export function isRoutePermission(value: string) {
 /** Outros caminhos que pertencem a uma rota do catálogo (não aparecem como item próprio na tela de cargos). */
 const routeAliases: readonly { path: string; key: string }[] = [
   { path: "/leads/distribuicao", key: "distribuicao" },
+  // Meu financeiro do corretor (Lite) lê as próprias comissões: quem tem cargo precisa da mesma rota de Comissões.
+  { path: "/meu-financeiro", key: "erp-comissoes" },
 ];
 
 const resolvedRoutes: readonly RouteDefinition[] = [...routeCatalog, ...ERP_IMPLEMENTED_ROUTES.filter((route) => route.noCargo), ...ERP_ROUTE_RESERVATIONS];

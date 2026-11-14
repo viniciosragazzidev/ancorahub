@@ -11,7 +11,7 @@ import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Button } from "@/components/arc/button/button";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import type { LightAvailability } from "@/components/light-top-nav";
-import { signOut } from "@/shared/auth/client";
+import { signOutAndGoToLogin } from "@/shared/auth/sign-out";
 import { ViewAsButton, type ViewAsState } from "@/features/super-admin/components/view-as";
 
 import { getLightMoreDestinations } from "./light-routes";
@@ -154,7 +154,7 @@ export function LightMoreSheet({
           size="lg"
           onClick={() => {
             onOpenChange(false);
-            void signOut();
+            void signOutAndGoToLogin();
           }}
         >
           <LogOut className="size-4" aria-hidden="true" />

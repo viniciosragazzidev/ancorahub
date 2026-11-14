@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -42,6 +42,8 @@ import { RisePulse, useRisePulseKey } from "@/components/light/rise-pulse";
 import { LitePress } from "@/components/lite/motion";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { useFirstTimeToday } from "@/components/motion/first-time-today/use-first-time-today";
+import { HomeQuickActions, homeQuickActions } from "./home-quick-actions";
+import { QuickRegisterSaleSheet } from "@/features/broker-workspace/components/quick-register-sale";
 
 type Tab = "assistentes" | "leads";
 
@@ -181,6 +183,9 @@ export function ChatHome({
   whatsappActivity = null,
   showWhatsAppStatus = true,
   nowFloatingEnabled = false,
+  homeActions = false,
+  financeCard = null,
+  quickSaleEnabled = false,
 }: {
   viewerName: string;
   assistants: ThreadSummary[];
@@ -203,6 +208,12 @@ export function ChatHome({
   showWhatsAppStatus?: boolean;
   /** Server-controlled presentation switch; disabling restores the inline block. */
   nowFloatingEnabled?: boolean;
+  /** Início organizado (BROKER_HOME_ACTIONS): Ações rápidas, Meu mês e Sua semana no fim. */
+  homeActions?: boolean;
+  /** Cartão Meu mês (financeiro do próprio corretor), só quando o módulo financeiro está liberado. */
+  financeCard?: ReactNode;
+  /** Registrar venda em dois toques (BROKER_QUICK_SALE): escolher o lead e abrir o registro dele. */
+  quickSaleEnabled?: boolean;
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const reduce = useReducedMotion();
@@ -233,6 +244,11 @@ export function ChatHome({
   const waitingAssistants = assistants.filter((thread) => thread.waitingYou);
   const currentPresenceAsks = presenceAsks ?? (presence ? [presence] : []);
   const hasPriority = hasNowItems || Boolean(next?.urgent) || currentPresenceAsks.some((ask) => ask.status !== "confirmed");
+  // Início organizado: só para o corretor, nunca para supervisor ou gestor.
+  const organized = homeActions && !isSupervisor && !isManager;
+  const quickSale = quickSaleEnabled && !isSupervisor && !isManager;
+  const [quickSaleOpen, setQuickSaleOpen] = useState(false);
+  const quickActions = organized ? homeQuickActions({ canQuote, onQuickSale: quickSale ? () => setQuickSaleOpen(true) : undefined }) : [];
 
   const list = (
     <>
@@ -285,9 +301,12 @@ export function ChatHome({
       {mode === "page" && !redesigned ? <PresenceCalloutList asks={currentPresenceAsks} /> : null}
       {mode === "page" && !redesigned && !floatingNow && summary?.now ? <NowSection data={summary.now} mobile /> : null}
       {mode === "page" && whatsappActivity ? <div className="px-4 pb-4"><WhatsAppActivityCard activity={whatsappActivity} /></div> : null}
+      {mode === "page" && !redesigned && organized ? <HomeQuickActions actions={quickActions} after={financeCard} /> : null}
       {mode === "page" && !redesigned && firstSteps ? <FirstStepsCard steps={firstSteps} className={home.firstSteps} /> : null}
-      {mode === "page" && !redesigned && highlights ? <WeekRanking data={highlights} /> : null}
+      {mode === "page" && !redesigned && highlights && !organized ? <WeekRanking data={highlights} /> : null}
       {list}
+      {/* Organizado: Sua semana desce para o fim, depois do trabalho. */}
+      {mode === "page" && !redesigned && highlights && organized ? <WeekRanking data={highlights} className={home.weekAtEnd} /> : null}
     </aside>
   );
 
@@ -297,18 +316,21 @@ export function ChatHome({
         {nextLead ? <li><Link href={nextLead.href} className={home.newItem} onClick={() => setNewOpen(false)}><strong>{isSupervisor ? "Ver" : "Atender"} {nextLead.name}</strong><span>{nextLead.preview}</span></Link></li> : null}
         {isSupervisor ? <li><Link href="/equipe" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Ver minha equipe</strong><span>Corretores, status e números</span></Link></li> : null}
         {isSupervisor ? <li><Link href="/relacionamento" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Mandar recado para a equipe</strong><span>Aviso, reconhecimento ou pedido de ciente</span></Link></li> : null}
+        {quickSale ? <li><button type="button" className={home.newItem} onClick={() => { setNewOpen(false); setQuickSaleOpen(true); }}><strong>Registrar venda</strong><span>Escolher o lead e registrar a venda dele</span></button></li> : null}
         {canQuote ? <li><Link href="/cotacao" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Fazer uma cotação</strong><span>Simular planos para um cliente</span></Link></li> : null}
         <li><button type="button" className={home.newItem} onClick={() => { setNewOpen(false); setTab("leads"); setSearching(true); if (redesigned) { setQuery(""); requestAnimationFrame(() => searchRef.current?.focus()); } }}><strong>Buscar um lead</strong><span>{redesigned ? "Pelo nome, nas conversas carregadas" : "Pelo nome ou telefone"}</span></button></li>
         {isManager ? <><li><Link href="/leads" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Leads da unidade</strong><span>Acompanhar e repassar leads</span></Link></li><li><Link href="/equipe" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Minha unidade</strong><span>Ver corretores e operação</span></Link></li></> : isSupervisor ? null : <li><Link href="/plantoes/agora" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Ver meu plantão</strong><span>Agora e próximos</span></Link></li>}
       </ul>
     </BottomSheet>
   );
+  const quickSaleSheet = quickSale ? <QuickRegisterSaleSheet open={quickSaleOpen} onOpenChange={setQuickSaleOpen} /> : null;
 
   if (mode === "rail") {
     return (
       <div className={`${styles.root} ${home.rail}`}>
         {aside}
         {sheet}
+        {quickSaleSheet}
       </div>
     );
   }
@@ -359,6 +381,8 @@ export function ChatHome({
           ) : !summary?.now && nextLead ? (
             <LitePress><Link href={nextLead.href} className={styles.pill} style={{ marginTop: 6 }}>{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link></LitePress>
           ) : null}
+
+          {organized ? <HomeQuickActions actions={quickActions} className={home.centerActions} after={financeCard} /> : null}
 
           {stats.length ? (
             <ul className={home.stats}>
@@ -416,7 +440,7 @@ export function ChatHome({
           <LitePress><Link href={next.href} className={styles.pill} data-tour="home-pill" aria-label={`A próxima coisa é: ${next.label}. ${next.detail}`}>{next.urgent ? <span className={home.urgentDot} aria-hidden="true" /> : null}{next.label}</Link></LitePress>
         ) : nextLead ? (
           <LitePress><Link href={nextLead.href} className={styles.pill} data-tour="home-pill">{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link></LitePress>
-        ) : (
+        ) : organized ? null : (
           <LitePress><button type="button" className={styles.pill} data-tour="home-pill" onClick={() => setNewOpen(true)}><PlusIcon /> {isSupervisor ? "Ações da equipe" : "Novo atendimento"}</button></LitePress>
         )}
       </div>}
@@ -425,6 +449,7 @@ export function ChatHome({
       {isManager ? null : <LiteWelcome variant={isSupervisor ? "supervisor" : "broker"} />}
       {isManager ? null : <LiteTour variant={isSupervisor ? "supervisor" : "broker"} />}
       {sheet}
+      {quickSaleSheet}
     </div>
   );
 }
