@@ -1,6 +1,6 @@
 /* Desempenho Lite do corretor. Só tokens do escopo arc-venancor; cartões com fundo cinza e sem borda (folha branca, 2026-10-10). */
 
-.page { display: grid; gap: var(--space-6); }
+.page { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
 .page[aria-busy="true"] .body { opacity: .55; transition: opacity var(--duration-fast) var(--ease-standard); }
 .body { display: grid; gap: var(--space-6); }
 
