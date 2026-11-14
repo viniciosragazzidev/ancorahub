@@ -148,6 +148,7 @@ export default async function SuperAdminSettingsPage() {
     FEATURE_FLAGS.BROKER_PRIOR_CLIENTS.key,
     FEATURE_FLAGS.TEAM_RANKING.key,
     FEATURE_FLAGS.WELCOME_VIDEO.key,
+    FEATURE_FLAGS.BROKER_LITE_FINANCE.key,
     FEATURE_FLAGS.BROKER_NOW_FLOATING.key,
     FEATURE_FLAGS.ENGAGEMENT_CAMPAIGNS.key,
     FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.key,
@@ -254,6 +255,7 @@ export default async function SuperAdminSettingsPage() {
     { field: "teamRankingEnabled", needsTables: true, enabled: flagOn(FEATURE_FLAGS.TEAM_RANKING), title: "Placar entre equipes", detail: "Supervisor ganha /equipe/desempenho (pódio da equipe e disputa entre equipes da unidade, por média de pontos por corretor ativo) e o diretor vê unidades e equipes na Jornada da equipe." },
     { field: "engagementCampaignsEnabled", needsTables: true, enabled: flagOn(FEATURE_FLAGS.ENGAGEMENT_CAMPAIGNS), title: "Campanhas, regras e auditoria de pontos", detail: "Diretor cria campanhas com bônus para um público, ajusta as regras de pontos e audita pontos fora do padrão (com estorno). Gestor e supervisor criam campanhas só no próprio escopo." },
     { field: "welcomeVideoEnabled", needsTables: false, enabled: flagOn(FEATURE_FLAGS.WELCOME_VIDEO), title: "Vídeo de boas-vindas no primeiro acesso", detail: "Antes do card de boas-vindas e do tour, o corretor vê um vídeo de 1 minuto (narrado, legendado) com o que o app faz. Pode pular a qualquer momento e só aparece uma vez por aparelho." },
+    { field: "brokerLiteFinanceEnabled", needsTables: false, enabled: flagOn(FEATURE_FLAGS.BROKER_LITE_FINANCE), title: "Meu financeiro do corretor no Lite", detail: "Tela /meu-financeiro e cartão Meu mês, somente leitura: a receber, recebido no mês e adiantamentos em aberto do próprio corretor, com comissões por venda, repasses e recibos. Só aparece quando a direção liberou o módulo financeiro do ERP e o corretor pode ver a própria comissão. Desligar volta a rota ao Início sem apagar dados." },
     { field: "brokerAiAssistantsEnabled", needsTables: false, enabled: flagOn(FEATURE_FLAGS.BROKER_AI_ASSISTANTS), title: "IA nos assistentes do corretor", detail: "Texto livre nos assistentes do Lite responde com IA. Precisa das chaves (Groq/OpenRouter) no Coolify; a conversa do lead só usa provedor pago." },
   ];
   const brokerDutyCalendarEnabled = (settingMap.get(FEATURE_FLAGS.BROKER_DUTY_CALENDAR.key) ?? FEATURE_FLAGS.BROKER_DUTY_CALENDAR.defaultValue) === "true";

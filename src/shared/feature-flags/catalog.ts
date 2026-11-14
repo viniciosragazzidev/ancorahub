@@ -646,6 +646,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Habilita o novo fluxo Lite de registro de venda para corretores.",
   },
+  BROKER_LITE_FINANCE: {
+    key: "feature_broker_lite_finance_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Meu financeiro do corretor no Lite (/meu-financeiro e o cartão Meu mês), somente leitura. Só aparece com o módulo financeiro do ERP liberado e ativo para a empresa e com a permissão de ver a própria comissão. Desligada, a rota volta ao Início e o resumo não é calculado.",
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<string>>;
 
 // ─── Tipo utilitário ──────────────────────────────────────────────────────────

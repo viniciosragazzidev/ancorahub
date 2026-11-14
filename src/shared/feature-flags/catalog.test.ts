@@ -2,6 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import { FEATURE_FLAGS } from "./catalog";
 
+describe("broker Lite finance feature flag", () => {
+  it("is globally controlled and enabled by default (the screen still depends on the ERP finance module)", () => {
+    expect(FEATURE_FLAGS.BROKER_LITE_FINANCE).toMatchObject({
+      key: "feature_broker_lite_finance_enabled",
+      scope: "global",
+      defaultValue: "true",
+      allowedValues: ["true", "false"],
+    });
+  });
+});
+
 describe("cold lead reactivation feature flag", () => {
   it("is globally controlled and enabled by default", () => {
     expect(FEATURE_FLAGS.COLD_LEAD_REACTIVATION).toMatchObject({

@@ -2,6 +2,16 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Meu financeiro do corretor no Lite (somente leitura)
+
+- Parte C do plano "Início do corretor e CRM". Rota `/meu-financeiro` no Lite (título "Meu financeiro", volta ao Início): no topo **A receber**, **Recebido no mês** e **Adiantamentos em aberto**, em BRL e com o período; abaixo, comissões por venda (cliente, operadora e plano quando houver, parcela, competência, valor e estado textual Prevista, Conferida, Paga, Cancelada ou Em revisão de estorno), paginadas de 20 em 20, e os últimos 12 repasses conferidos com link para o recibo quando a rota de recibos está liberada ao corretor.
+- `getBrokerFinanceSummary(context)` e `getBrokerFinanceDetail` em `src/features/erp/broker-finance.ts`: só a própria pessoa (escopo do ERP da sessão e beneficiário igual ao usuário). Sem fórmula nova: a receber é o saldo em aberto das comissões aprovadas (`openBalanceSql`, o mesmo "A pagar" do ERP); recebido no mês é a liquidação confirmada das comissões com data no mês de São Paulo (pagamentos menos estornos, como `settledCents`); adiantamento em aberto é o saldo compensável (`advanceAvailableSql`, movido sem mudança de `offsets.ts` para `balances.ts`). Sem lançamento aprovado do tipo, o número mostra "Sem dado", nunca zero.
+- Acesso igual ao das telas `/financeiro/*` do corretor: ERP e módulo financeiro liberados pela plataforma, ativos para a empresa e o perfil (`requireErpAccess("finance", "erp_view_finance")`) e a rota de Comissões (`ver_comissao_propria`; quem tem cargo precisa da chave `erp-comissoes`, apelido em `routes.ts`). Sem isso a tela explica que o financeiro é liberado pela direção; falha de leitura mostra erro com tentar de novo.
+- Auditoria: `erp.broker_finance.viewed` a cada leitura da tela (como `/financeiro`) e `erp.broker_finance.summary_viewed` no máximo uma vez por hora para o cartão.
+- `BrokerFinanceSummaryCard` (`src/features/erp/components/broker-finance-summary-card.tsx`), cartão "Meu mês" com os três números e link para `/meu-financeiro`; exportado, ainda fora do Início.
+- Chave `feature_broker_lite_finance_enabled` (global, ligada por padrão porque a tela já depende do ERP ligado pela direção), no card Novidades do corretor do Super-admin, auditada. Desligada, a rota volta ao Início e o resumo devolve null. Sem migration.
+- Pendências: o ERP não mostra ao corretor repasses ainda não liquidados nem parcelas aguardando aprovação como valor a receber; parcelas sem lançamento conferido aparecem só como previstas. Fórmula de saldo líquido e regra da segunda parcela seguem pendentes (DEC-183/184).
+
 ## 13/11/2026 - Modo corretor, etapa 6: Agenda conectada
 
 - `/agenda` do corretor reúne as tarefas abertas atribuídas a ele (retornos, tarefas com prazo e acompanhamentos de renovação) agrupadas em Atrasados, Hoje, Amanhã, Próximos e Sem prazo, pelo dia de São Paulo. Cada linha traz ícone do tipo, título, tipo e nome do lead, horário e estado textual (Atrasado, Urgente).

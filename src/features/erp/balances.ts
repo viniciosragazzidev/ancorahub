@@ -38,3 +38,17 @@ export function confirmedSettledSql(tenantId: string): SQL<number> {
     + CASE WHEN ${schema.erpFinancialEntries.kind} = 'broker_commission' THEN coalesce((SELECT sum(CASE WHEN o.kind = 'reversal' THEN -o.amount_cents ELSE o.amount_cents END) FROM erp_offsets o
       WHERE o.tenant_id = ${tenantId} AND o.commission_entry_id = ${entryId} AND o.status = 'confirmed'), 0) ELSE 0 END)::bigint`.mapWith(Number);
 }
+
+/**
+ * Offsettable amount of an advance, in SQL (same rule as `assertOffsetCapacity`): confirmed cash − pending cash reversals
+ * − confirmed offsets (reversals give back) − pending offset allocations.
+ */
+export function advanceAvailableSql(tenantId: string): SQL<number> {
+  const entryId = ENTRY_ID;
+  return sql<number>`(${confirmedSettledSql(tenantId)}
+    - coalesce((SELECT sum(s.amount_cents) FROM erp_settlements s
+      WHERE s.tenant_id = ${tenantId} AND s.entry_id = ${entryId} AND s.status = 'pending' AND s.kind = 'reversal'), 0)
+    - coalesce((SELECT sum(CASE WHEN o.status = 'confirmed' AND o.kind = 'reversal' THEN -o.amount_cents
+        WHEN o.status = 'confirmed' OR (o.status = 'pending' AND o.kind = 'allocation') THEN o.amount_cents ELSE 0 END)
+      FROM erp_offsets o WHERE o.tenant_id = ${tenantId} AND o.advance_entry_id = ${entryId}), 0))::bigint`.mapWith(Number);
+}

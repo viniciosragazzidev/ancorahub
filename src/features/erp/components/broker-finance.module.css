@@ -1,0 +1,65 @@
+/* Meu financeiro do corretor (Lite). Só tokens do escopo arc-venancor: folha branca, cartões cinza sem borda, ação em --chat-action. */
+
+.page { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
+
+.header { display: grid; gap: var(--space-1); }
+.title { margin: 0; font-size: var(--text-xl); font-weight: 600; letter-spacing: var(--tracking-display); }
+.lead { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+
+.section { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+.sectionHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.sectionTitle { margin: 0; font-size: var(--text-base); font-weight: 600; }
+.sectionHint { margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
+
+/* Três números: um por linha no celular, lado a lado a partir de 600px. */
+.metrics { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); margin: 0; }
+@media (min-width: 600px) { .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.metric { display: grid; align-content: start; gap: var(--space-1); min-width: 0; padding: var(--space-4); border-radius: var(--radius-panel); background: var(--surface-muted); }
+.metric dd { margin: 0; }
+.metricLabel { color: var(--text-secondary); font-size: var(--text-sm); }
+.metricValue { font-size: var(--text-2xl); font-weight: 600; letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.metricHint { color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
+.noData { color: var(--text-muted); font-size: var(--text-base); font-weight: 500; }
+
+.list { display: grid; margin: 0; padding: var(--space-2) var(--space-4); border-radius: var(--radius-panel); background: var(--surface-muted); list-style: none; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-height: 56px; padding-block: var(--space-3); }
+.row + .row { border-top: 2px solid var(--surface); }
+.rowMain { display: grid; gap: 2px; min-width: 0; }
+.rowTitle { overflow: hidden; font-size: var(--text-sm); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.rowMeta { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.rowSide { display: grid; justify-items: end; gap: 4px; }
+.rowValue { font-size: var(--text-sm); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.state { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: var(--radius-pill); background: var(--surface); color: var(--text-secondary); font-size: var(--text-xs); font-weight: 500; white-space: nowrap; }
+.state[data-state="paga"] { background: var(--chat-action-soft); color: var(--chat-action-text); }
+
+.link { display: inline-flex; align-items: center; min-height: 44px; color: var(--chat-action-text); font-size: var(--text-sm); font-weight: 500; text-decoration: none; }
+.link:hover { text-decoration: underline; }
+.link:focus-visible { outline: 2px solid var(--chat-action); outline-offset: 2px; border-radius: var(--radius-control); }
+
+.pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.pagerInfo { color: var(--text-muted); font-size: var(--text-xs); }
+
+.empty { display: grid; gap: var(--space-2); padding: var(--space-5); border-radius: var(--radius-panel); background: var(--surface-muted); }
+.emptyTitle { margin: 0; font-size: var(--text-base); font-weight: 600; }
+.emptyText { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+
+.note { margin: 0; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
+
+/* Cartão "Meu mês": compacto, para o Início. */
+.card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); padding: var(--space-5); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-resting); }
+.cardHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.cardTitle { margin: 0; font-size: var(--text-base); font-weight: 600; }
+.cardPeriod { color: var(--text-muted); font-size: var(--text-xs); }
+.cardNumbers { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin: 0; }
+.cardNumber { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); min-height: 40px; padding-block: var(--space-2); }
+.cardNumber + .cardNumber { border-top: 2px solid var(--surface-muted); }
+.cardNumber dt { min-width: 0; color: var(--text-secondary); font-size: var(--text-sm); }
+.cardNumber dd { margin: 0; font-size: var(--text-base); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cardNumber dd[data-empty="true"] { color: var(--text-muted); font-size: var(--text-sm); font-weight: 500; }
+
+/* Entrada discreta: sobe 6px e aparece, em cascata curta. Com movimento reduzido, só aparece. */
+.enter { animation: brokerFinanceEnter var(--motion-duration-standard, 240ms) var(--ease-enter, ease-out) both; animation-delay: calc(var(--i, 0) * 40ms); }
+@keyframes brokerFinanceEnter { from { opacity: 0; transform: translateY(var(--motion-distance-sm, 6px)); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .enter { animation: none; } }
