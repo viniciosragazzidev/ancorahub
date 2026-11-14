@@ -106,6 +106,7 @@ vi.mock("@/features/lead-distribution/post-sale-transfer", () => ({
 vi.mock("@/features/lead-distribution/jobs", () => ({ enqueueAndProcessLeadDistribution: vi.fn(), enqueueLeadDistributionJob: vi.fn() }));
 
 import { removeLeadAssignmentAction, reassignLeadAction } from "./management-actions";
+import { ensureDefaultQueue } from "@/features/lead-distribution/service";
 
 function formData() {
   const data = new FormData();
@@ -238,6 +239,13 @@ describe("manual service reassignment", () => {
     expect(await reassignLeadAction({}, reassignmentForm())).toMatchObject({ success: true });
     expect(state.updates.find(u => u.table === state.schema.leads)?.values).toMatchObject({ dutyScheduleId: null });
   });
+  it("unidade sem fila padrão ativa não trava: o lead troca de unidade e corretor e fica na fila atual", async () => {
+    vi.mocked(ensureDefaultQueue).mockRejectedValueOnce(new Error("A unidade não possui uma fila ativa. Crie uma fila para a unidade antes de enviar leads."));
+    const result = await reassignLeadAction({}, reassignmentForm());
+    expect(result).toMatchObject({ success: true, entity: { corretorId: "00000000-0000-4000-8000-000000000003" } });
+    expect(state.updates.find(u => u.table === state.schema.leads)?.values).toMatchObject({ branchId: "00000000-0000-4000-8000-000000000004", queueId: "queue-test" });
+  });
+
   it("keeps a Pós Venda lead in its queue when only the broker changes", async () => {
     state.controls.postSale = true;
     const data = reassignmentForm();

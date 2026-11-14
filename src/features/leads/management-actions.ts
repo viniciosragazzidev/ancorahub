@@ -563,7 +563,13 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       // On the active plantão is enough: the broker's own unit may differ (22/10, case Kelven).
       if (!broker) throw new Error(isPostSale ? "O corretor selecionado não está ativo neste tenant." : isDutyReassignment ? "O corretor não pertence mais ao plantão ativo desta fila." : "O corretor selecionado não está ativo nesta unidade.");
       // Pós Venda na mesma unidade continua na fila Pós Venda; mudando de unidade, vai para a fila padrão do destino.
-      const targetQueueId = isDutyReassignment || (isPostSale && targetBranchId === lead.branchId) ? lead.queueId : await ensureDefaultQueue(context.tenantId, targetBranchId, context.userId);
+      // Unidade sem fila padrão ativa (ex.: Matriz 7° Andar) não trava a reatribuição: o lead fica na fila atual (Vinicios, 14/11).
+      const targetQueueId = isDutyReassignment || (isPostSale && targetBranchId === lead.branchId)
+        ? lead.queueId
+        : await ensureDefaultQueue(context.tenantId, targetBranchId, context.userId).catch((error: unknown) => {
+          if (error instanceof Error && error.message.startsWith("A unidade não possui uma fila ativa")) return lead.queueId;
+          throw error;
+        });
       if (!targetQueueId) throw new Error("A fila do lead não está mais disponível.");
       if (input.assignmentMode === "offer") {
         const offered = await offerLeadToBrokerManually(context, lead.id, brokerId, { targetBranchId, targetQueueId, ...(dutyScheduleId ? { dutyScheduleId } : {}) });
