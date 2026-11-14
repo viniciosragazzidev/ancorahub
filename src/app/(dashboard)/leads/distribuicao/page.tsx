@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { Activity, History, Workflow, Inbox as InboxIcon } from "lucide-react";
-import { DistributionMetrics } from "./_components/distribution-dashboard";
 import { DistributionInbox } from "./_components/distribution-inbox";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getFeatureFlag, getSystemSetting, FEATURE_FLAGS } from "@/features/system-settings/queries";
@@ -30,6 +29,7 @@ import { RoutingMatrixPanel } from "./_components/routing-matrix-panel";
 import { DddRoutingPanel } from "./_components/ddd-routing-panel";
 import { fetchRoutingRules } from "@/features/lead-distribution/routing-engine";
 import { DirectorDailySummary } from "./_components/director-daily-summary";
+import { AssignSection } from "./_components/assign-section";
 import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-summary-service";
 import { DutyOperationsWorkspace } from "./plantao/_components/duty-operations-workspace";
 import { UnitQueueModeCard } from "./plantao/_components/unit-queue-mode-card";
@@ -104,6 +104,8 @@ export default async function LeadDistributionPage({
   searchParams: Promise<{ view?: string; status?: string; escalaMes?: string }>;
 }) {
   const params = await searchParams;
+  // A aba Operação saiu (14/11/2026): a caixa de atribuição mora no Resumo. Links antigos abrem a seção lá.
+  if (params.view === "operar") redirect("/distribuicao?atribuir=1");
   const queueFilter: QueueFilter =
     params.status === "unassigned" ||
     params.status === "queued" ||
@@ -609,9 +611,6 @@ export default async function LeadDistributionPage({
     }
   });
 
-  const totalBranches = branches.length;
-  const acceptingBranches = branches.filter((b) => b.acceptingLeads).length;
-  const autoDistributeBranches = branches.filter((b) => b.autoDistribute).length;
   const totalBrokers = [...countsByBranch.values()].reduce((a, b) => a + b, 0);
   const totalAvailable = [...availableByBranch.values()].reduce((a, b) => a + b, 0);
   const totalNewLeads = [...newByBranch.values()].reduce((a, b) => a + b, 0);
@@ -689,11 +688,34 @@ export default async function LeadDistributionPage({
     ? await getColdLeadRequalificationReview(context)
     : null;
 
+  // Caixa "Leads aguardando corretor" (antes, a aba Operação): só para quem pode atribuir.
+  const canAssign = !cargoCapabilities || cargoCapabilities.has("leads_assign");
+  const assignSection = view === "resumo_dia" && canAssign ? (
+    <AssignSection count={totalUnassignedForArchive}>
+      <DistributionInbox
+        key={queueFilter}
+        role={context.role}
+        manualAssignmentChoiceEnabled={(await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false"}
+        totalUnassigned={totalUnassignedForArchive}
+        initialStatusFilter={queueFilter}
+        branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+        brokers={brokers.map((broker) => ({
+          id: broker.id,
+          name: broker.name,
+          branchId: broker.branchId,
+          availabilityStatus: broker.availabilityStatus,
+          activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
+        }))}
+        leads={unassignedLeads.map((lead) => ({
+          ...lead,
+          createdAt: lead.createdAt.toISOString(),
+        }))}
+      />
+    </AssignSection>
+  ) : null;
+
   const directorLite = await isDirectorLitePageOnServer(context, "/leads/distribuicao");
-  if (directorLite && ["resumo_dia", "roteamento", "operar", "filas", "plantao", "saude_historico"].includes(view)) {
-    const manualAssignmentChoiceEnabled = view === "operar"
-      ? (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false"
-      : false;
+  if (directorLite && ["resumo_dia", "roteamento", "filas", "plantao", "saude_historico"].includes(view)) {
     const liveEnabled = view === "resumo_dia" && await shouldShowLiveStatusStrip(context);
     const live = liveEnabled ? <LiveStatusBoundary context={context} enabled /> : null;
     return (
@@ -703,6 +725,7 @@ export default async function LeadDistributionPage({
           {live}
           {view === "resumo_dia" ? (
             <section className={directorDistributionStyles.stack} aria-label="Resumo diário da distribuição">
+              {assignSection}
               <DirectorDailySummary
                 initialData={brokerSummary}
                 branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
@@ -726,38 +749,6 @@ export default async function LeadDistributionPage({
                 branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
                 brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
                 canEdit={context.role === "director" || context.role === "manager"}
-              />
-            </section>
-          ) : view === "operar" ? (
-            <section className={directorDistributionStyles.stack} aria-label="Operação de distribuição">
-              <DistributionMetrics
-                metrics={{
-                  totalBranches,
-                  acceptingBranches,
-                  autoDistributeBranches,
-                  totalBrokers,
-                  totalAvailable,
-                  totalNewLeads,
-                }}
-              />
-              <DistributionInbox
-                key={queueFilter}
-                role={context.role}
-                manualAssignmentChoiceEnabled={manualAssignmentChoiceEnabled}
-                totalUnassigned={totalUnassignedForArchive}
-                initialStatusFilter={queueFilter}
-                branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
-                brokers={brokers.map((broker) => ({
-                  id: broker.id,
-                  name: broker.name,
-                  branchId: broker.branchId,
-                  availabilityStatus: broker.availabilityStatus,
-                  activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
-                }))}
-                leads={unassignedLeads.map((lead) => ({
-                  ...lead,
-                  createdAt: lead.createdAt.toISOString(),
-                }))}
               />
             </section>
           ) : view === "filas" && canViewDistributionQueues(context.role) && (!allowedViews || allowedViews.includes("filas")) ? (
@@ -863,11 +854,14 @@ export default async function LeadDistributionPage({
               </div>
             }
             resumoDiaContent={
+              <>
+              {assignSection}
               <DirectorDailySummary
                 initialData={brokerSummary}
                 branches={branches.map((b) => ({ id: b.id, name: b.name }))}
                 canFilterBranch={context.role === "director"}
               />
+              </>
             }
             filasContent={
               context.role === "director" ? (
@@ -930,41 +924,6 @@ export default async function LeadDistributionPage({
                   />
                 </div>
               ) : null
-            }
-            operarContent={
-              <>
-                <DistributionMetrics
-                  metrics={{
-                    totalBranches,
-                    acceptingBranches,
-                    autoDistributeBranches,
-                    totalBrokers,
-                    totalAvailable,
-                    totalNewLeads,
-                  }}
-                />
-                <div id="inbox-distribuicao">
-                  <DistributionInbox
-                    key={queueFilter}
-                    role={context.role}
-                    manualAssignmentChoiceEnabled={(await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false"}
-                    totalUnassigned={totalUnassignedForArchive}
-                    initialStatusFilter={queueFilter}
-                    branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
-                    brokers={brokers.map((broker) => ({
-                      id: broker.id,
-                      name: broker.name,
-                      branchId: broker.branchId,
-                      availabilityStatus: broker.availabilityStatus,
-                      activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
-                    }))}
-                    leads={unassignedLeads.map((lead) => ({
-                      ...lead,
-                      createdAt: lead.createdAt.toISOString(),
-                    }))}
-                  />
-                </div>
-              </>
             }
             plantaoContent={<div className="grid gap-ds-16">{plantaoWorkspace}</div>}
             saudeHistoricoContent={

@@ -46,7 +46,7 @@ export function buildWaitingBrokerStatus(input: { groups: readonly WaitingJobGro
         ? `Motivo principal: ${mainError}.`
         : "Estão na fila para a próxima rodada do robô.",
     breakdown: held ? [{ label: "retidos por regra", value: held }] : undefined,
-    action: { href: "/leads/distribuicao?view=operar", label: "Atribuir" },
+    action: { href: "/distribuicao?atribuir=1", label: "Atribuir" },
     generatedAt: now.toISOString(),
   };
 }

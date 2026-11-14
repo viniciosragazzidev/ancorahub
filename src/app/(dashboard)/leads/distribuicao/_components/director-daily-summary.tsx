@@ -59,7 +59,7 @@ function SummaryBanner({ data }: { data: BrokerDailySummaryAggregate }) {
   return (
     <CaptainBanner className={styles.banner} label="Dica da distribuição" tone="white" title={title} goal={goal}
       progress={data.totalReceived > 0 ? data.teamConversionRate : null} art={DISTRIBUTION_ART}
-      action={{ label: "Abrir a operação", href: "/distribuicao?view=operar" }} />
+      action={{ label: "Ver os leads", href: "/leads" }} />
   );
 }
 

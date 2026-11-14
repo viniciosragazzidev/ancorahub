@@ -123,7 +123,6 @@ describe("nav-registry", () => {
   it("Distribuição: views by ?view=, the old /leads/distribuicao address and the duty detail", () => {
     expect(resolveNavLocation("/distribuicao")).toMatchObject({ area: { id: "distribuicao" }, tab: { id: "hoje" } });
     expect(resolveNavLocation("/distribuicao?view=resumo_dia")).toMatchObject({ tab: { id: "hoje" } });
-    expect(resolveNavLocation("/distribuicao?view=operar")).toMatchObject({ tab: { id: "operacao" } });
     expect(resolveNavLocation("/leads/distribuicao?view=roteamento")).toMatchObject({ tab: { id: "regras" } });
     expect(resolveNavLocation("/distribuicao?view=historico")).toMatchObject({ tab: { id: "saude" } });
     expect(resolveNavLocation("/leads/distribuicao/plantao/abc")).toMatchObject({ tab: { id: "plantoes" } });
@@ -135,7 +134,7 @@ describe("nav-registry", () => {
   it("Distribuição: with a cargo only the tabs it grants show, the same rule as the page", async () => {
     const { DISTRIBUTION_VIEW_CAPABILITY } = await import("@/features/lead-distribution/distribution-view-access");
     const distribution = NAV_AREAS.find((area) => area.id === "distribuicao")!;
-    const viewOf: Record<string, string> = { hoje: "resumo_dia", regras: "roteamento", operacao: "operar", filas: "filas", plantoes: "plantao", saude: "saude_historico" };
+    const viewOf: Record<string, string> = { hoje: "resumo_dia", regras: "roteamento", filas: "filas", plantoes: "plantao", saude: "saude_historico" };
     for (const tab of distribution.tabs) expect(tab.cargoCapability).toBe(DISTRIBUTION_VIEW_CAPABILITY[viewOf[tab.id] as keyof typeof DISTRIBUTION_VIEW_CAPABILITY]);
     const cargo: NavAccessUser = { ...director, permissions: [...(director.permissions ?? []), "route:distribuicao", "duty_schedules_manage"] };
     expect(distribution.tabs.filter((tab) => canShowNavTab(tab, cargo)).map((tab) => tab.id)).toEqual(["plantoes"]);
