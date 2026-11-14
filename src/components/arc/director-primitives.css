@@ -1,5 +1,15 @@
 /* Pele das primitivas CRM, restrita ao escopo do Diretor. */
 
+/* Botão principal do Lite no celular: altura mínima de 44px (desktop não muda). */
+@media (pointer: coarse) {
+  [data-skin="diretor"] [data-slot="button"][data-variant="primary"][data-size="default"],
+  [data-skin="diretor"] [data-slot="button"][data-variant="default"][data-size="default"],
+  [data-skin="diretor"] [data-slot="button"][data-variant="primary"][data-size="lg"],
+  [data-skin="diretor"] [data-slot="button"][data-variant="default"][data-size="lg"] {
+    min-height: 44px;
+  }
+}
+
 [data-skin="diretor"] [data-slot="button"] {
   min-height: var(--control-height-sm);
   border-radius: var(--radius-control);

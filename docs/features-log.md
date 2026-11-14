@@ -2,6 +2,10 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Lite: alvos de toque de 44px no celular
+
+- Em telas de toque (`pointer: coarse`), os botões de ícone e os tamanhos xs/sm ganham área de toque de 44x44 (`ct-touch`, `src/styles/touch-target.css`) sem mudar o visual. No Lite, o composer (enviar, áudio, ferramentas) tem 44px e o botão principal fica com altura mínima de 44px. Desktop e modo normal não mudam.
+
 ## 13/11/2026 - Início do corretor e CRM, parte B: Registrar venda em dois toques
 
 - Em Minha carteira, ao lado de Adicionar contato, **Registrar venda** abre a folha `QuickRegisterSaleSheet` (`src/features/broker-workspace/components/quick-register-sale.tsx`, exportada para a entrada no Início): busca por nome ou telefone e a lista dos leads do próprio corretor em negociação, os mais adiantados no funil primeiro (Em análise, Documentação pendente, Negociação, Cotação enviada, Aguardando retorno, Em atendimento). Novo e Distribuído ficam de fora porque ainda não abrem o registro. Estados de carregamento, vazio e erro com tentar de novo.
