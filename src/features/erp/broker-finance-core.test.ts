@@ -38,3 +38,19 @@ describe("sem dado não vira zero", () => {
     expect(periodLabel("2026-11")).toBe("novembro de 2026");
   });
 });
+
+describe("séries mensais do Meu financeiro", () => {
+  it("desloca a competência atravessando o ano", async () => {
+    const { shiftPeriod } = await import("./broker-finance-core");
+    expect(shiftPeriod("2026-11", -5)).toBe("2026-06");
+    expect(shiftPeriod("2026-11", 2)).toBe("2027-01");
+    expect(shiftPeriod("2026-01", -1)).toBe("2025-12");
+  });
+  it("preenche meses sem valor com zero e rotula pelo mês abreviado", async () => {
+    const { monthSeries } = await import("./broker-finance-core");
+    const series = monthSeries("2026-11", 3, new Map([["2026-12", 500]]));
+    expect(series.map((point) => point.period)).toEqual(["2026-11", "2026-12", "2027-01"]);
+    expect(series.map((point) => point.cents)).toEqual([0, 500, 0]);
+    expect(series[0]?.label).not.toContain("2026");
+  });
+});

@@ -3,15 +3,25 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/link", () => ({ default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => <a href={href} {...props}>{children}</a> }));
+vi.mock("./broker-finance-charts", () => ({ BrokerFinanceMonthChart: ({ label }: { label: string }) => <div role="img" aria-label={label} /> }));
 
-import type { BrokerFinanceDetail, BrokerFinanceSummary } from "../broker-finance-core";
+import { monthSeries, type BrokerFinanceDetail, type BrokerFinanceInsights, type BrokerFinanceSummary } from "../broker-finance-core";
 import { BrokerFinanceScreen } from "./broker-finance-screen";
 import { BrokerFinanceSummaryCard } from "./broker-finance-summary-card";
 
 const money = (text: string | null) => (text ?? "").replace(/\s/g, " ");
 const summary: BrokerFinanceSummary = { period: "2026-11", periodLabel: "novembro de 2026", receivableCents: 150_000, receivedThisMonthCents: 42_500, openAdvancesCents: null };
+const insights: BrokerFinanceInsights = {
+  received: monthSeries("2026-06", 6, new Map([["2026-10", 50_000], ["2026-11", 42_500]])),
+  forecast: monthSeries("2026-11", 6, new Map([["2026-12", 30_000]])),
+  receivedTotalCents: 92_500,
+  forecastTotalCents: 30_000,
+  salesWithCommission: 3,
+  nextInstallment: { referenceMonth: "2026-12", amountCents: 30_000, clientName: "Cliente Sintético B" },
+};
 const detail = (overrides: Partial<BrokerFinanceDetail> = {}): BrokerFinanceDetail => ({
   summary,
+  insights,
   commissions: {
     page: 1, pageSize: 20, hasNext: true,
     rows: [
@@ -26,15 +36,17 @@ const detail = (overrides: Partial<BrokerFinanceDetail> = {}): BrokerFinanceDeta
 
 afterEach(cleanup);
 
-describe("BrokerFinanceSummaryCard", () => {
-  it("mostra Meu mês com os três números compactos e o link para a tela", () => {
+describe("BrokerFinanceSummaryCard (atalho do Início)", () => {
+  it("é uma faixa só com o valor a receber que leva ao Meu financeiro", () => {
     render(<BrokerFinanceSummaryCard summary={summary} />);
-    const card = screen.getByRole("region", { name: "Meu mês" });
-    expect(within(card).getByText("novembro de 2026")).toBeTruthy();
-    expect(money(within(card).getByText("A receber").nextElementSibling?.textContent ?? null)).toBe("R$ 1.500,00");
-    expect(money(within(card).getByText("Recebido no mês").nextElementSibling?.textContent ?? null)).toBe("R$ 425,00");
-    expect(within(card).getByText("Adiantamentos em aberto").nextElementSibling?.textContent).toBe("Sem dado");
-    expect(within(card).getByRole("link", { name: "Ver meu financeiro" }).getAttribute("href")).toBe("/meu-financeiro");
+    const link = screen.getByRole("link", { name: /Meu financeiro/ });
+    expect(link.getAttribute("href")).toBe("/meu-financeiro");
+    expect(money(link.textContent)).toContain("R$ 1.500,00 a receber");
+    expect(screen.queryByText("Recebido no mês")).toBeNull();
+  });
+  it("sem valor a receber conferido, convida a ver comissões e repasses", () => {
+    render(<BrokerFinanceSummaryCard summary={{ ...summary, receivableCents: null }} />);
+    expect(screen.getByRole("link", { name: /Meu financeiro/ }).textContent).toContain("Ver comissões e repasses");
   });
   it("sem resumo (sem acesso ou chave desligada) não desenha nada", () => {
     const { container } = render(<BrokerFinanceSummaryCard summary={null} />);
@@ -57,6 +69,20 @@ describe("BrokerFinanceScreen", () => {
     expect(within(payouts).getByText("Repasse de outubro de 2026")).toBeTruthy();
     expect(within(payouts).getByText(/Pago em 05\/11\/2026 · Recibo R-0001/)).toBeTruthy();
     expect(within(payouts).getByRole("link", { name: /Ver recibo/ }).getAttribute("href")).toBe("/financeiro/recibos/p-1");
+  });
+  it("mostra a evolução: recebido e previsto por mês e os indicadores", () => {
+    render(<BrokerFinanceScreen state={{ status: "ready", data: detail() }} />);
+    const evolution = screen.getByRole("region", { name: "Evolução" });
+    expect(within(evolution).getByRole("img", { name: "Comissões recebidas por mês" })).toBeTruthy();
+    expect(within(evolution).getByRole("img", { name: "Parcelas previstas por mês" })).toBeTruthy();
+    expect(money(within(evolution).getByText("Vendas com comissão").nextElementSibling?.textContent ?? null)).toBe("3");
+    expect(money(within(evolution).getByText("Próxima parcela").nextElementSibling?.textContent ?? null)).toBe("R$ 300,00");
+    expect(within(evolution).getByText(/Cliente Sintético B · dez/i)).toBeTruthy();
+  });
+  it("sem os gráficos (falha ao carregar), o resto da tela continua", () => {
+    render(<BrokerFinanceScreen state={{ status: "ready", data: detail({ insights: null }) }} />);
+    expect(screen.queryByRole("region", { name: "Evolução" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Comissões por venda" })).toBeTruthy();
   });
   it("vazio: explica que nenhuma comissão foi registrada", () => {
     render(<BrokerFinanceScreen state={{ status: "ready", data: detail({ commissions: { page: 1, pageSize: 20, hasNext: false, rows: [] }, payouts: [], receiptsHref: null }) }} />);

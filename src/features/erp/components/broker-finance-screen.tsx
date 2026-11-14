@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 
 import { formatBrokerCents, type BrokerFinanceDetail } from "../broker-finance-core";
 import { formatCompetence, formatDay } from "../ui/format";
+import { BrokerFinanceMonthChart } from "./broker-finance-charts";
 import styles from "./broker-finance.module.css";
 
 export type BrokerFinanceScreenState = { status: "ready"; data: BrokerFinanceDetail } | { status: "denied" } | { status: "error" };
@@ -35,6 +36,53 @@ function Metrics({ summary }: { summary: BrokerFinanceDetail["summary"] }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+/** Gráficos (recebido e previsto por mês) e os indicadores rápidos da carteira de comissões. */
+function Insights({ insights, period }: { insights: NonNullable<BrokerFinanceDetail["insights"]>; period: string }) {
+  const months = insights.received.length;
+  const average = months > 0 ? Math.round(insights.receivedTotalCents / months) : 0;
+  const next = insights.nextInstallment;
+  const stats = [
+    { label: "Vendas com comissão", value: String(insights.salesWithCommission), hint: null },
+    { label: `Média recebida por mês`, value: formatBrokerCents(average), hint: `últimos ${months} meses` },
+    { label: "Previsto nos próximos meses", value: formatBrokerCents(insights.forecastTotalCents), hint: "pelo cronograma" },
+    { label: "Próxima parcela", value: next ? formatBrokerCents(next.amountCents) : "Nenhuma", hint: next ? `${next.clientName} · ${formatCompetence(next.referenceMonth)}` : "sem parcela pendente" },
+  ];
+  return (
+    <section className={styles.section} aria-labelledby="broker-finance-insights">
+      <div className={styles.sectionHead}>
+        <h2 id="broker-finance-insights" className={styles.sectionTitle}>Evolução</h2>
+        <p className={styles.sectionHint}>Comissões por mês</p>
+      </div>
+      <div className={styles.charts}>
+        <div className={`${styles.chartCard} ${styles.enter}`} style={order(3)}>
+          <div className={styles.chartHead}>
+            <p className={styles.chartTitle}>Recebido nos últimos {months} meses</p>
+            <p className={styles.chartTotal}>{formatBrokerCents(insights.receivedTotalCents)}</p>
+          </div>
+          <BrokerFinanceMonthChart points={insights.received} tone="paid" label="Comissões recebidas por mês" currentPeriod={period} />
+        </div>
+        <div className={`${styles.chartCard} ${styles.enter}`} style={order(4)}>
+          <div className={styles.chartHead}>
+            <p className={styles.chartTitle}>Previsto para os próximos meses</p>
+            <p className={styles.chartTotal}>{formatBrokerCents(insights.forecastTotalCents)}</p>
+          </div>
+          <BrokerFinanceMonthChart points={insights.forecast} tone="forecast" label="Parcelas previstas por mês" currentPeriod={period} />
+          <p className={styles.chartHint}>Parcelas pendentes no cronograma das suas vendas. O valor final é o que o financeiro conferir.</p>
+        </div>
+      </div>
+      <dl className={styles.stats}>
+        {stats.map((stat, index) => (
+          <div key={stat.label} className={`${styles.stat} ${styles.enter}`} style={order(5 + index)}>
+            <dt>{stat.label}</dt>
+            <dd>{stat.value}</dd>
+            {stat.hint ? <dd className={styles.statHint}>{stat.hint}</dd> : null}
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 
@@ -146,6 +194,7 @@ export function BrokerFinanceScreen({ state }: { state: BrokerFinanceScreenState
         <h2 id="broker-finance-month" className={styles.sectionTitle}>Meu mês</h2>
         <Metrics summary={data.summary} />
       </section>
+      {data.insights ? <Insights insights={data.insights} period={data.summary.period} /> : null}
       <Commissions data={data.commissions} />
       <Payouts rows={data.payouts} receiptsHref={data.receiptsHref} />
       <p className={styles.note}>Dúvida sobre algum valor? Fale com o financeiro da sua empresa. Esta tela não altera lançamentos.</p>

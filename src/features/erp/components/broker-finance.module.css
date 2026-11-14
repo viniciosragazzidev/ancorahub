@@ -11,9 +11,11 @@
 .sectionTitle { margin: 0; font-size: var(--text-base); font-weight: 600; }
 .sectionHint { margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
 
-/* Três números: um por linha no celular, lado a lado a partir de 600px. */
-.metrics { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3, 12px); margin: 0; }
-@media (min-width: 600px) { .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Três números: no celular, A receber na largura toda e os outros dois lado a lado; a partir de 600px, os três lado a lado. */
+.metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3, 12px); margin: 0; }
+.metrics > :first-child { grid-column: 1 / -1; }
+@media (max-width: 599px) { .metrics > :not(:first-child) .metricValue { font-size: var(--text-lg); } .metrics > :not(:first-child) .metricHint { display: none; } }
+@media (min-width: 600px) { .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } .metrics > :first-child { grid-column: auto; } }
 .metric { display: grid; align-content: start; gap: var(--space-1, 4px); min-width: 0; padding: var(--space-4, 16px); border-radius: var(--radius-panel); background: var(--surface-muted); }
 .metric dd { margin: 0; }
 .metricLabel { color: var(--text-secondary); font-size: var(--text-sm); }
@@ -47,18 +49,37 @@
 
 .note { margin: 0; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
 
-/* Cartão "Meu mês": compacto, para o Início. */
-/* Cartão Meu mês no Início (fundo branco): mesmo fundo suave dos cartões do Início. */
-.card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2, 8px); padding: var(--space-4, 16px); border-radius: var(--radius-panel, 1.5rem); background: var(--surface-muted); }
-.cardHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2, 8px); }
-.cardTitle { margin: 0; font-size: var(--text-base); font-weight: 600; }
-.cardPeriod { color: var(--text-muted); font-size: var(--text-xs); }
-.cardNumbers { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin: 0; }
-.cardNumber { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3, 12px); min-height: 40px; padding-block: var(--space-2, 8px); }
-.cardNumber + .cardNumber { border-top: 1px solid var(--border, rgb(16 16 40 / 0.08)); }
-.cardNumber dt { min-width: 0; color: var(--text-secondary); font-size: var(--text-sm); }
-.cardNumber dd { margin: 0; font-size: var(--text-base); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.cardNumber dd[data-empty="true"] { color: var(--text-muted); font-size: var(--text-sm); font-weight: 500; }
+/* Atalho no Início: uma faixa só, ícone, título, valor a receber e seta. */
+.shortcut { display: flex; align-items: center; gap: var(--space-3, 12px); min-height: 56px; padding: 8px 14px 8px 10px; border-radius: var(--radius-panel, 1.5rem); background: var(--surface-muted); color: var(--foreground); text-decoration: none; -webkit-tap-highlight-color: transparent; transition: background-color var(--duration-fast, 160ms) var(--ease-standard, ease), transform var(--duration-fast, 160ms) var(--ease-standard, ease); }
+.shortcut:hover { background: color-mix(in oklab, var(--foreground) 6%, var(--surface-muted)); }
+.shortcut:active { transform: scale(0.99); }
+.shortcut:focus-visible { outline: 2px solid var(--chat-action-text, #2563eb); outline-offset: 2px; }
+.shortcutIcon { display: grid; flex: none; place-items: center; width: 36px; height: 36px; border-radius: 999px; background: var(--chat-action-soft, var(--surface)); color: var(--chat-action-text, var(--foreground)); }
+.shortcutIcon svg { width: 18px; height: 18px; }
+.shortcutText { display: flex; flex: 1; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px var(--space-2, 8px); min-width: 0; }
+.shortcutTitle { font-size: var(--text-sm); font-weight: 600; }
+.shortcutValue { color: var(--text-secondary); font-size: var(--text-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.shortcutChevron { flex: none; width: 18px; height: 18px; color: var(--text-muted); }
+@media (prefers-reduced-motion: reduce) { .shortcut { transition: none; } .shortcut:active { transform: none; } }
+
+/* Gráficos e indicadores do Meu financeiro. */
+.charts { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3, 12px); }
+@media (min-width: 720px) { .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.chartCard { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2, 8px); min-width: 0; padding: var(--space-4, 16px); border-radius: var(--radius-panel); background: var(--surface-muted); }
+.chartHead { display: grid; gap: 2px; }
+.chartTitle { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); font-weight: 500; }
+.chartTotal { margin: 0; font-size: var(--text-xl); font-weight: 600; letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; }
+.chartHint { margin: 0; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
+.chartBox { width: 100%; height: 148px; }
+.tooltip { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow-raised); font-size: var(--text-xs); }
+.tooltip strong { display: block; font-variant-numeric: tabular-nums; }
+
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3, 12px); margin: 0; }
+@media (min-width: 720px) { .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.stat { display: grid; align-content: start; gap: 2px; min-width: 0; padding: var(--space-3, 12px) var(--space-4, 16px); border-radius: var(--radius-panel); background: var(--surface-muted); }
+.stat dt { color: var(--text-secondary); font-size: var(--text-xs); }
+.stat dd { margin: 0; font-size: var(--text-base); font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stat .statHint { color: var(--text-muted); font-size: var(--text-xs); font-weight: 400; }
 
 /* Entrada discreta: sobe 6px e aparece, em cascata curta. Com movimento reduzido, só aparece. */
 .enter { animation: brokerFinanceEnter var(--motion-duration-standard, 240ms) var(--ease-enter, ease-out) both; animation-delay: calc(var(--i, 0) * 40ms); }

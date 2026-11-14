@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, countDistinct, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { canAccessRoute } from "@/features/custom-roles/effective-access";
@@ -12,8 +12,8 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { auditActor, auditErp, erpScopeSql, getErpEffectiveAccess, getErpPlatformState, requireErpAccess, type ErpDatabase } from "./access";
 import { advanceAvailableSql, confirmedSettledSql, openBalanceSql } from "./balances";
 import {
-  amountOrNoData, BROKER_COMMISSION_STATE_LABELS, brokerCommissionState, periodLabel,
-  type BrokerCommissionRow, type BrokerFinanceDetail, type BrokerFinanceSummary, type BrokerPayoutRow,
+  amountOrNoData, BROKER_COMMISSION_STATE_LABELS, brokerCommissionState, monthSeries, periodLabel, shiftPeriod,
+  type BrokerCommissionRow, type BrokerFinanceDetail, type BrokerFinanceInsights, type BrokerFinanceSummary, type BrokerPayoutRow,
 } from "./broker-finance-core";
 import { numericToCents } from "./commission-core";
 import { ErpError } from "./contracts";
@@ -35,7 +35,7 @@ const SUMMARY_AUDIT_INTERVAL_MS = 60 * 60 * 1000;
 export const BROKER_FINANCE_PAGE_SIZE = 20;
 export const BROKER_FINANCE_PAYOUT_LIMIT = 12;
 
-export type { BrokerCommissionRow, BrokerFinanceDetail, BrokerFinanceSummary, BrokerPayoutRow };
+export type { BrokerCommissionRow, BrokerFinanceDetail, BrokerFinanceInsights, BrokerFinanceSummary, BrokerPayoutRow };
 
 export async function isBrokerLiteFinanceEnabled() {
   const value = await getFeatureFlag(FEATURE_FLAGS.BROKER_LITE_FINANCE).catch(() => FEATURE_FLAGS.BROKER_LITE_FINANCE.defaultValue);
@@ -184,6 +184,64 @@ async function ownSettledPayouts(db: ErpDatabase, auth: ErpAccess, receiptLinks:
   return rows.map((row) => ({ ...row, netCents: checkedCents(row.netCents), receiptHref: receiptLinks && row.receiptNumber ? `/financeiro/recibos/${row.id}` : null }));
 }
 
+const INSIGHT_MONTHS = 6;
+
+/**
+ * Gráficos do Meu financeiro, sem fórmula nova: recebido por mês é a mesma liquidação confirmada do "Recebido no mês"
+ * (pagamentos menos estornos) agrupada por mês; o previsto é a soma das parcelas pendentes do cronograma das próprias
+ * vendas, como a lista de comissões já mostra uma a uma.
+ */
+async function computeInsights(db: ErpDatabase, auth: ErpAccess, now: Date): Promise<BrokerFinanceInsights> {
+  const tenantId = auth.context.tenantId;
+  const entries = schema.erpFinancialEntries;
+  const settlements = schema.erpSettlements;
+  const schedule = schema.commissionSchedule;
+  const current = currentPeriod(now);
+  const firstReceived = shiftPeriod(current, -(INSIGHT_MONTHS - 1));
+  const lastForecast = shiftPeriod(current, INSIGHT_MONTHS - 1);
+  const month = sql<string>`to_char(${settlements.occurredOn}, 'YYYY-MM')`;
+  const ownSchedule = and(
+    eq(schedule.tenantId, tenantId),
+    eq(schema.sales.brokerId, auth.context.userId),
+    erpScopeSql(auth.scope, schema.leads.branchId, schema.sales.brokerId),
+  );
+  const salesJoin = and(eq(schema.sales.id, schedule.saleId), eq(schema.sales.tenantId, tenantId));
+  const leadsJoin = and(eq(schema.leads.id, schema.sales.leadId), eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt));
+  const [receivedRows, forecastRows, [sales], [next]] = await Promise.all([
+    db.select({
+      period: month,
+      value: sql<number>`coalesce(sum(CASE WHEN ${settlements.kind} = 'reversal' THEN -${settlements.amountCents} ELSE ${settlements.amountCents} END), 0)::bigint`.mapWith(Number),
+    }).from(settlements)
+      .innerJoin(entries, and(eq(entries.tenantId, tenantId), eq(entries.id, settlements.entryId)))
+      .where(and(eq(settlements.tenantId, tenantId), eq(settlements.status, "confirmed"),
+        gte(settlements.occurredOn, periodBounds(firstReceived).start), lt(settlements.occurredOn, periodBounds(current).end),
+        ownApprovedEntriesWhere(auth), sql`${entries.kind} = 'broker_commission'`))
+      .groupBy(month),
+    db.select({ period: schedule.referenceMonth, value: sql<string>`coalesce(sum(${schedule.amount}), 0)::numeric(14,2)::text` })
+      .from(schedule).innerJoin(schema.sales, salesJoin).innerJoin(schema.leads, leadsJoin)
+      .where(and(ownSchedule, eq(schedule.status, "pending"), gte(schedule.referenceMonth, current), lte(schedule.referenceMonth, lastForecast)))
+      .groupBy(schedule.referenceMonth),
+    db.select({ count: countDistinct(schedule.saleId) })
+      .from(schedule).innerJoin(schema.sales, salesJoin).innerJoin(schema.leads, leadsJoin)
+      .where(ownSchedule),
+    db.select({ referenceMonth: schedule.referenceMonth, amount: schedule.amount, clientName: schema.leads.nome })
+      .from(schedule).innerJoin(schema.sales, salesJoin).innerJoin(schema.leads, leadsJoin)
+      .where(and(ownSchedule, eq(schedule.status, "pending"), gte(schedule.referenceMonth, current)))
+      .orderBy(asc(schedule.referenceMonth), asc(schedule.dueDate), asc(schedule.id))
+      .limit(1),
+  ]);
+  const received = monthSeries(firstReceived, INSIGHT_MONTHS, new Map(receivedRows.map((row) => [row.period, checkedCents(row.value)])));
+  const forecast = monthSeries(current, INSIGHT_MONTHS, new Map(forecastRows.map((row) => [row.period, numericToCents(row.value)])));
+  return {
+    received,
+    forecast,
+    receivedTotalCents: checkedCents(received.reduce((total, point) => total + point.cents, 0)),
+    forecastTotalCents: checkedCents(forecast.reduce((total, point) => total + point.cents, 0)),
+    salesWithCommission: sales?.count ?? 0,
+    nextInstallment: next ? { referenceMonth: next.referenceMonth, amountCents: numericToCents(next.amount), clientName: next.clientName } : null,
+  };
+}
+
 const detailInput = z.object({ page: pageSchema });
 
 /** Tela /meu-financeiro: resumo, comissões por venda (paginadas) e repasses com recibo. Auditada a cada leitura, como /financeiro. */
@@ -193,13 +251,19 @@ export async function getBrokerFinanceDetail(context: TenantContext, raw: unknow
   if (!resolved) return null;
   const { auth, receiptLinks } = resolved;
   const db = getDatabase();
-  const [summary, commissions, payouts] = await Promise.all([
+  const [summary, commissions, payouts, insights] = await Promise.all([
     computeSummary(db, auth, now), ownCommissionRows(db, auth, page), ownSettledPayouts(db, auth, receiptLinks),
+    // Os gráficos não derrubam a tela: sem eles, os números e as listas continuam.
+    computeInsights(db, auth, now).catch((error: unknown) => {
+      console.error("[meu-financeiro] gráficos indisponíveis", error instanceof Error ? error.message : "erro desconhecido");
+      return null;
+    }),
   ]);
   await auditErp(db, { tenantId: auth.context.tenantId, actorId: auditActor(auth.context), action: BROKER_FINANCE_AUDIT_ACTION, entityType: "erp_access", entityId: "broker_finance",
     metadata: { page, commissions: commissions.rows.length, payouts: payouts.length } });
   return {
     summary,
+    insights,
     commissions: { rows: commissions.rows, page, pageSize: BROKER_FINANCE_PAGE_SIZE, hasNext: commissions.hasNext },
     payouts,
     receiptsHref: receiptLinks ? "/financeiro/recibos" : null,
