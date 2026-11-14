@@ -13,6 +13,8 @@ import type { ChatAction, ChatBlock, ChatChoice, ChatLeadRow, ChatProgress, Chat
 import { fetchMentionBlocks, isDataMention } from "./mention-client";
 import { appendSending, newClientMessageId, settleSend, startRetry } from "./user-send-core";
 import { openWhatsApp } from "@/lib/whatsapp-open";
+import { useFeedback } from "@/lib/feedback/use-feedback";
+import { feedbackOnChoose, feedbackOnResult } from "./chat-feedback";
 
 /** Result of a server action run from a reply. A message is shown as the assistant's answer. */
 export type ChatActionResult = { ok: boolean; message?: string; followUp?: ChatBlock[]; warning?: boolean };
@@ -168,6 +170,8 @@ export function ChatScreen({
     return { ...block, id };
   }, []);
   const answersRef = useRef<Record<string, string>>({});
+  const fire = useFeedback();
+  const choiceRetries = useRef(new Map<string, { question: Extract<ChatBlock, { type: "question" }>; choice: ChatChoice }>());
   const shownRef = useRef<ChatBlock[]>([]);
   useEffect(() => {
     answersRef.current = answers;
@@ -209,9 +213,11 @@ export function ChatScreen({
   const choose = useCallback(async (question: Extract<ChatBlock, { type: "question" }>, choice: ChatChoice) => {
     if (answers[question.id]) return;
     setAnswers((current) => ({ ...current, [question.id]: choice.id }));
-    const reply: ChatBlock = { type: "user", id: `reply-${question.id}`, text: choice.reply ?? choice.label, at: nowLabel() };
-    setShown((current) => [...current, reply]);
     const action = choice.action;
+    // Ação no servidor: a resposta escolhida fica "Enviando" até confirmar e, se falhar, "Não enviada · Tentar de novo" (FEEDBACK.md).
+    const replyId = `reply-${question.id}`;
+    const reply: ChatBlock = { type: "user", id: replyId, text: choice.reply ?? choice.label, at: nowLabel(), ...(action.kind === "server" ? { status: "sending" as const } : {}) };
+    setShown((current) => [...current, reply]);
     if (action.kind === "href") {
       // WhatsApp and other external links open beside the app; the conversation stays.
       if (/^https?:/.test(action.href)) { if (!openWhatsApp(action.href)) window.open(action.href, "_blank", "noopener"); }
@@ -245,8 +251,16 @@ export function ChatScreen({
     if (!runAction) return;
     setWorking(true);
     setStatus({ label: "Trabalhando...", tone: "working" });
+    feedbackOnChoose(action.name, fire);
+    choiceRetries.current.set(replyId, { question, choice });
     try {
       const result = await runAction(action, choice);
+      feedbackOnResult(action.name, result, fire);
+      const settled = result.ok || Boolean(result.warning);
+      setShown((current) => settleSend(current, replyId, settled));
+      if (settled) choiceRetries.current.delete(replyId);
+      // Recusada pelo servidor: as opções voltam a valer, junto do "Tentar de novo" na resposta.
+      else setAnswers((current) => { const next = { ...current }; delete next[question.id]; return next; });
       enqueue([
         ...(result.message ? [{ type: "assistant" as const, id: `result-${question.id}`, text: result.message, at: nowLabel() }] : []),
         ...(result.followUp ?? []),
@@ -258,6 +272,8 @@ export function ChatScreen({
       }
       return result.ok;
     } catch {
+      feedbackOnResult(action.name, "failed", fire);
+      setShown((current) => settleSend(current, replyId, false));
       enqueue([{ type: "assistant", id: `error-${question.id}`, text: "Sua ação não foi concluída. Toque de novo em alguns segundos. Se continuar, fale com o suporte." }]);
       setStatus({ label: "Esperando você", tone: "waiting" });
       setAnswers((current) => { const next = { ...current }; delete next[question.id]; return next; });
@@ -265,7 +281,7 @@ export function ChatScreen({
     } finally {
       setWorking(false);
     }
-  }, [answers, copyQuestion, enqueue, localWorkingLabel, onLocalChoice, router, runAction, script.blocks, script.replayAfterAction]);
+  }, [answers, copyQuestion, enqueue, fire, localWorkingLabel, onLocalChoice, router, runAction, script.blocks, script.replayAfterAction]);
 
   // A list row swiped away (Agenda: cancel a return): it leaves at once, the action runs as a reply.
   const swipeItem = useCallback((item: ChatListItem) => {
@@ -348,12 +364,22 @@ export function ChatScreen({
   }, [enqueue, localWorkingLabel, onFreeText]);
 
   const retrySend = useCallback((id: string) => {
+    // Resposta sugerida que falhou: some a resposta antiga e a mesma escolha roda de novo.
+    const failedChoice = choiceRetries.current.get(id);
+    if (failedChoice) {
+      choiceRetries.current.delete(id);
+      const next = shownRef.current.filter((block) => block.id !== id);
+      shownRef.current = next;
+      setShown(next);
+      void choose(failedChoice.question, failedChoice.choice);
+      return;
+    }
     const retry = startRetry(shownRef.current, id);
     if (!retry) return;
     shownRef.current = retry.blocks;
     setShown(retry.blocks);
     void sendFree(id, retry.text);
-  }, [sendFree]);
+  }, [choose, sendFree]);
 
   // Rows are memoized: they get stable handlers that always call the latest ones.
   const latest = useRef({ choose, swipeItem, onButtonOpen, mention, consent, renderCustom, retrySend });
@@ -398,7 +424,7 @@ export function ChatScreen({
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>}
         <div className={styles.headerIdentity}>
-          <AssistantAvatar shape={identity.shape} hue={identity.hue} size={32} state={working ? "working" : "idle"} initials={identity.initials} temperature={identity.temperature} />
+          <AssistantAvatar shape={identity.shape} hue={identity.hue} size={32} state={working ? "working" : "idle"} mood={working ? "thinking" : "idle"} initials={identity.initials} temperature={identity.temperature} />
           <div style={{ minWidth: 0 }}>
             <div className={styles.headerName}>{identity.name}</div>
             {status ? (

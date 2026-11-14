@@ -138,6 +138,10 @@
 .messageFooter { display: flex; align-items: center; gap: 10px; margin-top: 6px; color: var(--text-muted); font-size: var(--text-xs); }
 .messageFooter button { border: 0; background: none; padding: 2px; color: inherit; cursor: pointer; display: grid; }
 .messageFooter svg { width: 14px; height: 14px; }
+.user[data-status="failed"] { animation: userFailedShake 250ms cubic-bezier(0.65, 0, 0.35, 1) both; }
+@keyframes userFailedShake { 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .user[data-status="failed"] { animation: none; } }
+:global(html[data-interface-motion="off"]) .user[data-status="failed"], :global(html[data-reduce-motion="1"]) .user[data-status="failed"] { animation: none; }
 .user { justify-self: end; width: fit-content; max-width: 80%; margin: 0 0 0 auto; padding: 10px 14px; border-radius: 18px 4px 18px 18px; background: var(--chat-action-soft); font-size: var(--text-base); line-height: 1.5; text-align: left; }
 
 .card { border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); overflow: hidden; }

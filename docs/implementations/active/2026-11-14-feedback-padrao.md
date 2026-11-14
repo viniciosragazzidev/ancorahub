@@ -2,7 +2,7 @@
 
 Data: 14/11/2026 · Dono: Vinicios · Padrão: `docs/design-system/FEEDBACK.md`
 Relatórios e protótipo: `reports/design/feedback-duolingo-2026-11-14/`. O protótipo `aceitar-lead-exemplo.html` é a referência visual e de tempo do botão de ação e do aceite.
-Status: **fases 0 e 1 entregues em 14/11/2026** (branch `feat/feedback-padrao`); fases 2 a 7 pendentes. Vitrine para testar: `/dev/feedback` (só em desenvolvimento). Cada fase abaixo é uma branch própria, com revisão visual antes do merge.
+Status: **fases 0, 1 e 2 entregues em 14/11/2026** (branch `feat/feedback-padrao`); fases 3 a 7 pendentes. Vitrine para testar: `/dev/feedback` (só em desenvolvimento). Cada fase abaixo é uma branch própria, com revisão visual antes do merge.
 
 Frequência: estimada pelo papel de cada tela, não por métrica. N0 a N3 = níveis do §3 do padrão.
 
@@ -54,7 +54,10 @@ Entregue: `AcceptLeadButton` com "Aceitando…" (sem o otimista "Lead aceito"), 
 | SLA em risco | `assistant-scripts.ts:430`, `chat-home.tsx:359` | evento | só texto e cor de status; sem som, sem pânico |
 | Celebrações da jornada | `journey/components/celebration-layer.tsx`, `celebration-host.tsx`, `confetti.tsx` | N2 (pontos, missão, resumo) e N3 (conquista, nível) | aplicar `celebration.maxPerDay`; som `milestone` e vibração `success`; mola `celebrate` no lugar do damping 14; confete só no N3 |
 
-## Fase 2 · Ações do chat (todas as rotas de conversa)
+## Fase 2 · Ações do chat (todas as rotas de conversa) · ENTREGUE 14/11/2026
+
+Entregue: tabela única `src/components/chat/chat-feedback.ts` (nível de cada uma das 15 ações) aplicada no `ChatScreen`: toque ao escolher nas de nível 1, confirmação ao concluir (som só em pausar e retomar o plantão), alerta quando dá certo em parte e erro quando falha. A resposta escolhida fica "Enviando" até o servidor confirmar; se falhar ou for recusada, vira "Não enviada · Tentar de novo", balança uma vez e as opções voltam a valer; o "Tentar de novo" roda a mesma escolha. O mascote do cabeçalho fica pensando enquanto a ação roda. A nota livre já tinha envio otimista e agora também balança ao falhar.
+
 
 Todas passam por `features/broker-workspace/chat/chat-actions.ts` → `runChatServerAction`. A mudança fica num ponto só: o resultado da ação chama `useFeedback` com o nível abaixo, e a opção escolhida do `ChoiceList` (`chat-blocks.tsx:78`) mostra o estado enviando e o de falha.
 
