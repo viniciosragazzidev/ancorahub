@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 import { LIGHT_TABS, type LightTabId } from "./light-routes";
 import { formatQueueBadge, LIGHT_TAB_ICONS } from "./light-tab-icons";
+import { RisePulse, useRisePulseKey } from "./rise-pulse";
 
 const itemBase =
   "relative inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full transition-[background-color,color,padding] duration-(--duration-fast) ease-(--ease-standard) motion-reduce:transition-none";
@@ -17,7 +18,7 @@ const itemActive = "bg-(--foreground) px-4 text-sm font-semibold text-(--surface
 /**
  * Floating pill tab bar (mobile only). The active tab is a black pill with icon
  * and label; the others are icon-only with an aria-label. The Fila tab carries
- * a red count badge. "Mais" opens the bottom sheet instead of navigating.
+ * a red count badge that pulses once when the count goes up. "Mais" opens the bottom sheet instead of navigating.
  */
 export function LightBottomNav({
   activeTab,
@@ -32,6 +33,8 @@ export function LightBottomNav({
 }) {
   const MoreIcon = LIGHT_TAB_ICONS.mais;
   const moreActive = activeTab === "mais" || moreOpen;
+  // Fica no nav (sempre montado): o selo que aparece de 0 para 1 também pulsa.
+  const queuePulse = useRisePulseKey(queueBadgeCount);
 
   return (
     <nav
@@ -55,12 +58,14 @@ export function LightBottomNav({
                 <Icon className="size-5" strokeWidth={isActive ? 2.4 : 1.9} aria-hidden="true" />
                 {isActive ? <span>{tab.label}</span> : null}
                 {badge ? (
-                  <span
-                    aria-hidden="true"
-                    className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-(--danger) px-1 text-xs font-semibold leading-none tabular-nums text-(--surface)"
-                  >
-                    {formatQueueBadge(badge)}
-                  </span>
+                  <RisePulse pulseKey={queuePulse} className="absolute -right-0.5 -top-0.5 rounded-full">
+                    <span
+                      aria-hidden="true"
+                      className="grid h-5 min-w-5 place-items-center rounded-full bg-(--danger) px-1 text-xs font-semibold leading-none tabular-nums text-(--surface)"
+                    >
+                      {formatQueueBadge(badge)}
+                    </span>
+                  </RisePulse>
                 ) : null}
               </Link>
             </li>
