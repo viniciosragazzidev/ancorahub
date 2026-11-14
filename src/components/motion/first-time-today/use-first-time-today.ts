@@ -11,7 +11,7 @@ const noopSubscribe = () => () => {};
  * no cliente e o kill-switch buscado em /api/public/interface-motion); passada
  * essa janela, a tela já foi vista parada e não anima mais.
  */
-export const FIRST_TIME_TODAY_DECISION_WINDOW_MS = 2_000;
+export const FIRST_TIME_TODAY_DECISION_WINDOW_MS = 500;
 
 function safeLocalStorage(): Storage | null {
   try {
