@@ -26,6 +26,7 @@ export async function sendPlantaoReportNowAction() {
     const result = await sendPlantaoReportForTenant(context.tenantId, { actorUserId: context.userId, manual: true });
     revalidatePath("/settings/resultado-plantao");
     if (result.state === "sent") return { ok: true as const, message: "Relatório enviado ao grupo configurado." };
+    if (result.state === "weekend") return { ok: false as const, error: "No sábado e no domingo o relatório não é enviado ao grupo." };
     if (result.state === "duplicate") return { ok: false as const, error: "Já existe um envio ou tentativa registrada para hoje. Para evitar mensagens duplicadas, não foi enviado novamente." };
     if (result.state === "disabled") return { ok: false as const, error: result.reason === "feature_disabled" ? "O recurso está desativado pelo Super-admin." : "Ative o relatório antes de enviar." };
     if (result.state === "failed") return { ok: false as const, error: result.reason };

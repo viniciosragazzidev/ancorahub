@@ -230,6 +230,8 @@ export async function sendPlantaoReportForTenant(tenantId: string, options: { no
   if (await getFeatureFlag(FEATURE_FLAGS.PLANTAO_REPORT) !== "true") return { tenantId, state: "disabled" as const, reason: "feature_disabled" };
   const config = await readConfig(tenantId);
   if (!config.enabled) return { tenantId, state: "disabled" as const, reason: "tenant_disabled" };
+  // Sábado e domingo nada vai ao grupo, nem pelo botão "Enviar agora" (pedido do Vinicios, 14/11).
+  if (!plantaoSendsOn(now)) return { tenantId, state: "weekend" as const, reason: "weekend" };
   // Hora fixa do envio (08h), e não a hora salva na configuração antiga (19h).
   if (!options.manual && plantaoReportLocalHour(now) < PLANTAO_REPORT_HOUR) {
     return { tenantId, state: "before_schedule" as const, reason: "before_schedule" };
