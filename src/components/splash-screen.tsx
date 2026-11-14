@@ -4,18 +4,15 @@ import { useEffect, useState } from "react";
 
 import { MASCOT_ART } from "@/components/mascot/mascot-config";
 
+import { SPLASH_KEY } from "./splash-boot";
+
 import styles from "./splash-screen.module.css";
 
-export const SPLASH_KEY = "__ancora_splash_shown";
+export { SPLASH_KEY };
 /** A entrada do mascote (0,4 s) não é cortada no meio; fora isso, nenhuma espera artificial. */
 export const SPLASH_ENTRANCE_MS = 400;
 export const SPLASH_EXIT_MS = 240;
 
-/**
- * Antes da primeira pintura: se a splash já apareceu nesta sessão, some antes de ser vista; se o
- * aparelho pediu "Menos animação", o mascote fica parado. Roda inline no HTML do servidor.
- */
-const BOOT_SCRIPT = `(function(){try{var d=document.documentElement;if(sessionStorage.getItem("${SPLASH_KEY}")){d.dataset.splash="done";return}var p=JSON.parse(localStorage.getItem("ancora:a11y")||"{}");if(p&&p.reduceMotion)d.dataset.splash="static"}catch(e){}})();`;
 
 type Phase = "showing" | "leaving" | "gone";
 
@@ -66,12 +63,9 @@ export function SplashScreen() {
 
   const art = MASCOT_ART.positivo;
   return (
-    <>
-      <script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />
-      <div className={styles.splash} data-phase={phase} data-splash-screen="" aria-hidden="true">
-        {/* eslint-disable-next-line @next/next/no-img-element -- imagem local pequena, precisa estar no HTML antes do JS */}
-        <img className={styles.mascot} src={art.src} width={art.width} height={art.height} alt="" fetchPriority="high" decoding="async" draggable={false} />
-      </div>
-    </>
+    <div className={styles.splash} data-phase={phase} data-splash-screen="" aria-hidden="true">
+      {/* eslint-disable-next-line @next/next/no-img-element -- imagem local pequena, precisa estar no HTML antes do JS */}
+      <img className={styles.mascot} src={art.src} width={art.width} height={art.height} alt="" fetchPriority="high" decoding="async" draggable={false} />
+    </div>
   );
 }

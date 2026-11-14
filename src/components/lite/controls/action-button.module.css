@@ -30,7 +30,7 @@
 .button:active:not(:disabled):not([aria-busy="true"]) { transform: translateY(2px) scale(0.98); box-shadow: 0 1px 0 var(--chat-action-base); }
 .button:focus-visible { outline: 2px solid var(--chat-action); outline-offset: 3px; }
 .button[aria-busy="true"] { cursor: progress; transform: translateY(1px); box-shadow: 0 2px 0 var(--chat-action-base); }
-.button:disabled:not([aria-busy="true"]) { cursor: default; background: var(--chat-action-soft); color: var(--chat-action-text, var(--chat-action)); box-shadow: none; }
+.button:disabled:not([aria-busy="true"]):not([data-state="done"]) { cursor: default; background: var(--chat-action-soft); color: var(--chat-action-text, var(--chat-action)); box-shadow: none; }
 
 .button[data-state="done"] { background: var(--success); box-shadow: 0 3px 0 color-mix(in oklab, var(--success) 70%, black); }
 .button[data-state="error"] { background: var(--danger); box-shadow: 0 3px 0 color-mix(in oklab, var(--danger) 70%, black); }
