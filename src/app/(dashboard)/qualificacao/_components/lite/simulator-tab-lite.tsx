@@ -4,7 +4,7 @@
  * Aba "Simulador" do hub de qualificação no visual Lite: alertas operacionais (resolver com a mesma ação) e o
  * simulador com bolhas de conversa e o inspetor da memória extraída. A conversa e a memória vêm do hub.
  */
-import type { FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Send } from "lucide-react";
 
 import form from "@/components/lite/page/lite-form.module.css";
@@ -13,14 +13,16 @@ import sections from "@/components/lite/page/lite-sections.module.css";
 import type { QualificationAlertRecord } from "@/features/ai-qualification/alerts-service";
 
 import type { SimMemory } from "../simulator-memory";
+import { ActionNote, BusyLabel, type ActionStatus } from "./action-status-lite";
 import styles from "./qualification-lite.module.css";
 
 const MEMORY_FIELDS: Array<[keyof SimMemory, string]> = [["nome", "Nome"], ["plano", "Plano"], ["vidas", "Vidas"], ["idade", "Idade"], ["cidade", "Cidade"], ["email", "E-mail"]];
 const LEVEL_LABEL: Record<string, string> = { critical: "Crítico", warning: "Atenção", info: "Informação" };
 
-export function SimulatorTabLite({ alerts, onAcknowledge, messages, input, onInput, onSend, loading, memory }: {
+export function SimulatorTabLite({ alerts, onAcknowledge, alertsStatus, messages, input, onInput, onSend, loading, memory }: {
   alerts: QualificationAlertRecord[];
   onAcknowledge: (id: string) => void;
+  alertsStatus?: ActionStatus;
   messages: Array<{ sender: "user" | "bot"; text: string }>;
   input: string;
   onInput: (value: string) => void;
@@ -29,6 +31,7 @@ export function SimulatorTabLite({ alerts, onAcknowledge, messages, input, onInp
   memory: SimMemory;
 }) {
   const active = alerts.filter((alert) => alert.status === "active").length;
+  const [resolving, setResolving] = useState<string | null>(null);
   return (
     <>
       {alerts.length ? (
@@ -37,6 +40,7 @@ export function SimulatorTabLite({ alerts, onAcknowledge, messages, input, onInp
             <div className={sections.rowText}>
               <h2 id="alerts-title" className={sections.rowTitle}>Alertas operacionais ({active} ativos)</h2>
               <p className={sections.rowDescription}>Filas sem corretor, desconexões e problemas de operação.</p>
+              <ActionNote status={alertsStatus} />
             </div>
           </div>
           <ul className={sections.list}>
@@ -50,7 +54,7 @@ export function SimulatorTabLite({ alerts, onAcknowledge, messages, input, onInp
                   <span className={sections.rowDescription}>{alert.message}</span>
                   {alert.suggestedAction ? <span className={sections.itemSub}>Ação recomendada: {alert.suggestedAction}</span> : null}
                 </span>
-                {alert.status === "active" ? <button type="button" className={page.button} onClick={() => onAcknowledge(alert.id)}>Resolver alerta</button> : null}
+                {alert.status === "active" ? <button type="button" className={page.button} disabled={alertsStatus?.state === "busy"} aria-busy={(alertsStatus?.state === "busy" && resolving === alert.id) || undefined} onClick={() => { setResolving(alert.id); onAcknowledge(alert.id); }}><BusyLabel busy={alertsStatus?.state === "busy" && resolving === alert.id} label="Resolvendo…">Resolver alerta</BusyLabel></button> : null}
               </li>
             ))}
           </ul>
