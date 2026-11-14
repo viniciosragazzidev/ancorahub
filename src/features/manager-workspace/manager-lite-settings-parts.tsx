@@ -7,7 +7,7 @@ import { ChevronRight, LogOut, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { startLiteTour } from "@/components/chat/tour/lite-tour";
-import { signOut } from "@/shared/auth/client";
+import { signOutAndGoToLogin } from "@/shared/auth/sign-out";
 
 const initialsOf = (name: string) => name.split(/\s+/).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("pt-BR") ?? "").join("");
 
@@ -94,7 +94,7 @@ export function ManagerLiteSettingsFooter() {
   return (
     <div className="grid gap-3 pt-1">
       <Button variant="outline" size="lg" onClick={() => { if (window.location.pathname === "/dashboard") startLiteTour(); else window.location.assign("/dashboard?tour=1"); }}><Play className="size-4" /> Ver o tour do app</Button>
-      <Button variant="secondary" size="lg" onClick={() => void signOut()}><LogOut className="size-4" /> Sair da conta</Button>
+      <Button variant="secondary" size="lg" onClick={() => void signOutAndGoToLogin()}><LogOut className="size-4" /> Sair da conta</Button>
     </div>
   );
 }
