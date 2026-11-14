@@ -117,7 +117,7 @@ export function AdOriginCard({ ad }: { ad: BrokerAdContext | null | undefined })
               role="dialog"
               aria-modal="true"
               aria-label={imageAlt}
-              className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/85 p-4"
+              className="fixed inset-0 z-[1100] flex cursor-zoom-out items-center justify-center bg-black/85 p-4"
               onClick={() => setFullscreen(false)}
             >
               <button
