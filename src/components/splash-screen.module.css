@@ -1,0 +1,54 @@
+/*
+ * Splash do PWA (docs/design-system/MASCOTE.md §5): fundo branco puro e o mascote no centro.
+ * Vem no HTML do servidor, então aparece antes do JavaScript; some quando o app fica pronto.
+ * Só transform e opacity (compositor, 60 fps). Movimento provisório sobre a arte de reserva até o rig da Rive.
+ */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+  opacity: 1;
+  transition: opacity 240ms cubic-bezier(0.7, 0, 0.84, 0);
+  pointer-events: none;
+}
+
+.splash[data-phase="leaving"] { opacity: 0; }
+
+.mascot {
+  display: block;
+  height: min(240px, 34vh);
+  width: auto;
+  transform-origin: 50% 100%;
+  animation: splashMascot 1900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
+/*
+ * Roteiro (dossiê §3), na versão possível sem rig: 0 a 0,4 s aparece; 0,8 a 1,4 s agacha, salta e volta
+ * ao chão; 1,4 a 1,9 s balança de leve e repousa. A piscada e o polegar levantando chegam com a Rive.
+ */
+@keyframes splashMascot {
+  0% { opacity: 0; transform: translateY(12px) scale(0.96); }
+  21% { opacity: 1; transform: translateY(0) scale(1); }
+  42% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(1px) scale(1.05, 0.93); }
+  62% { transform: translateY(-8px) scale(0.98, 1.03); }
+  74% { transform: translateY(0) scale(1); }
+  86% { transform: translateY(0) rotate(-2deg); }
+  100% { opacity: 1; transform: translateY(0) rotate(0deg); }
+}
+
+/* Sessão em que a splash já apareceu: o script inline marca antes da pintura, nada pisca. */
+:global(html[data-splash="done"]) .splash { display: none; }
+
+/* "Menos animação" (preferência do aparelho) ou do sistema: mascote parado, saída imediata. */
+:global(html[data-splash="static"]) .mascot { animation: none; }
+:global(html[data-splash="static"]) .splash { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot { animation: none; }
+  .splash { transition: none; }
+}
