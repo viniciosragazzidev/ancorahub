@@ -85,3 +85,39 @@
 .enter { animation: brokerFinanceEnter var(--motion-duration-standard, 240ms) var(--ease-enter, ease-out) both; animation-delay: calc(var(--i, 0) * 40ms); }
 @keyframes brokerFinanceEnter { from { opacity: 0; transform: translateY(var(--motion-distance-sm, 6px)); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .enter { animation: none; } }
+
+/*
+ * Refino 14/11/2026: cartões brancos com borda fina (como o Desempenho), ícone num quadrado de cor suave ao lado do
+ * rótulo, números menores no celular e linhas da lista separadas por um fio. O banner do capitão fica abaixo do
+ * Meu mês, com espaço em cima para a arte sair pelo topo.
+ */
+.metric, .stat, .chartCard, .list, .empty { background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
+.metric { gap: 0; padding: 14px 14px 12px; }
+.metricLabel { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--text-xs); font-weight: 500; }
+.metricIcon { box-sizing: content-box; flex: none; padding: 6px; border-radius: 10px; background: var(--chat-action-soft, rgb(0 43 115 / 0.1)); color: var(--chat-action, var(--primary)); }
+.metric[data-metric="received"] .metricIcon { background: color-mix(in oklch, var(--success) 12%, transparent); color: var(--success); }
+.metric[data-metric="advances"] .metricIcon { background: oklch(72% 0.15 85 / 0.16); color: oklch(55% 0.13 65); }
+.metricValue { margin-top: 12px; font-size: 26px; line-height: 1.15; letter-spacing: -0.02em; overflow-wrap: normal; white-space: nowrap; }
+.metricHint { margin-top: 4px; }
+.noData { margin-top: 12px; font-size: var(--text-sm); }
+@media (max-width: 599px) { .metrics { gap: 10px; } .metrics > :not(:first-child) .metricValue { font-size: 20px; } }
+@media (min-width: 600px) { .metric { padding: 18px 18px 16px; } .metricLabel { font-size: var(--text-sm); } .metricValue { margin-top: 14px; font-size: 28px; } }
+
+.chartTotal { font-size: var(--text-lg); }
+.stats { gap: 10px; }
+.stat { padding: 12px 14px; }
+.stat dd { font-size: var(--text-sm); }
+
+.list { padding: 4px 16px; }
+.row + .row { border-top: 1px solid var(--border-subtle); }
+.rowTitle { font-weight: 500; }
+.rowValue { font-weight: 500; }
+.state { background: var(--surface-muted); }
+.state[data-state="paga"] { background: color-mix(in oklch, var(--success) 12%, transparent); color: var(--success); }
+
+.banner { margin-top: 28px; }
+@media (min-width: 640px) { .banner { margin-top: 36px; } }
+/* `.metric dd { margin: 0 }` vem antes e pesa mais: o respiro entre rótulo e número precisa do mesmo peso. */
+.metric .metricValue, .metric .noData { margin-top: 10px; }
+.metric .metricHint { margin-top: 4px; }
+@media (min-width: 600px) { .metric .metricValue, .metric .noData { margin-top: 12px; } }

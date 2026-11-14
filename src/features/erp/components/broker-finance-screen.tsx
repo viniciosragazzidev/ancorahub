@@ -1,5 +1,7 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
+
+import { CaptainBanner, type CaptainBannerArt } from "@/components/lite/banner/captain-banner";
 
 import { formatBrokerCents, type BrokerFinanceDetail } from "../broker-finance-core";
 import { formatCompetence, formatDay } from "../ui/format";
@@ -20,17 +22,27 @@ function Empty({ title, text, alert, children }: { title: string; text: string; 
   );
 }
 
+/** Ícones dos três números do mês, num quadrado de cor suave (refino 14/11/2026). */
+const METRIC_ICON: Record<string, ReactNode> = {
+  receivable: <path d="M4 7a3 3 0 0 1 3-3h10a1 1 0 0 1 0 2H7a1 1 0 0 0 0 2h12a1 1 0 0 1 1 1v9a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3zm12 7.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z" fill="currentColor" />,
+  received: <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 14.2-4.2-4.2 1.4-1.4 2.8 2.8 5.8-5.8 1.4 1.4z" fill="currentColor" />,
+  advances: <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 5v4.6l3.2 3.2-1.4 1.4L11 12.4V7z" fill="currentColor" />,
+};
+
 function Metrics({ summary }: { summary: BrokerFinanceDetail["summary"] }) {
   const metrics = [
-    { label: "A receber", cents: summary.receivableCents, hint: "Comissões conferidas que ainda não foram pagas a você" },
-    { label: "Recebido no mês", cents: summary.receivedThisMonthCents, hint: `Pagamentos conferidos em ${summary.periodLabel}` },
-    { label: "Adiantamentos em aberto", cents: summary.openAdvancesCents, hint: "Saldo de adiantamento ainda não descontado das comissões" },
+    { key: "receivable", label: "A receber", cents: summary.receivableCents, hint: "Comissões conferidas que ainda não foram pagas a você" },
+    { key: "received", label: "Recebido no mês", cents: summary.receivedThisMonthCents, hint: `Pagamentos conferidos em ${summary.periodLabel}` },
+    { key: "advances", label: "Adiantamentos em aberto", cents: summary.openAdvancesCents, hint: "Saldo de adiantamento ainda não descontado das comissões" },
   ];
   return (
     <dl className={styles.metrics}>
       {metrics.map((metric, index) => (
-        <div key={metric.label} className={`${styles.metric} ${styles.enter}`} style={order(index)}>
-          <dt className={styles.metricLabel}>{metric.label}</dt>
+        <div key={metric.label} className={`${styles.metric} ${styles.enter}`} style={order(index)} data-metric={metric.key}>
+          <dt className={styles.metricLabel}>
+            <svg className={styles.metricIcon} viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">{METRIC_ICON[metric.key]}</svg>
+            {metric.label}
+          </dt>
           <dd className={metric.cents === null ? styles.noData : styles.metricValue}>{formatBrokerCents(metric.cents)}</dd>
           <dd className={styles.metricHint}>{metric.cents === null ? "Ainda não há lançamento conferido para este número." : metric.hint}</dd>
         </div>
@@ -162,6 +174,22 @@ function Payouts({ rows, receiptsHref }: { rows: BrokerFinanceDetail["payouts"];
   );
 }
 
+/** O capitão no trono, cercado de moedas, mostrando uma ao corretor (arte de 14/11/2026). */
+const FINANCE_ART: CaptainBannerArt = { src: "/mascote/financeiro-trono.webp", width: 640, height: 585 };
+
+/**
+ * Banner do Meu financeiro (14/11/2026): a frase fala do que está a caminho do baú (ou do que já caiu no mês) e o
+ * atalho leva aos leads, de onde vem a próxima comissão. Fica logo abaixo do Meu mês.
+ */
+function FinanceBanner({ summary }: { summary: BrokerFinanceDetail["summary"] }) {
+  const receivable = summary.receivableCents ?? 0;
+  const received = summary.receivedThisMonthCents ?? 0;
+  const title = receivable > 0 ? `Tem ${formatBrokerCents(receivable)} a caminho do seu baú. Bora encher mais um pouco?`
+    : received > 0 ? `Seu baú já recebeu ${formatBrokerCents(received)} em ${summary.periodLabel}. Bora atrás da próxima comissão?`
+      : "Cada venda fechada vira moeda no seu baú. Bora pra próxima?";
+  return <CaptainBanner className={styles.banner} label="Dica do financeiro" title={title} art={FINANCE_ART} action={{ label: "Ver meus leads", href: "/minha-fila" }} />;
+}
+
 /** Meu financeiro (Lite), somente leitura: três números do mês, comissões por venda, repasses e recibos. */
 export function BrokerFinanceScreen({ state }: { state: BrokerFinanceScreenState }) {
   if (state.status === "denied") {
@@ -194,6 +222,7 @@ export function BrokerFinanceScreen({ state }: { state: BrokerFinanceScreenState
         <h2 id="broker-finance-month" className={styles.sectionTitle}>Meu mês</h2>
         <Metrics summary={data.summary} />
       </section>
+      <FinanceBanner summary={data.summary} />
       {data.insights ? <Insights insights={data.insights} period={data.summary.period} /> : null}
       <Commissions data={data.commissions} />
       <Payouts rows={data.payouts} receiptsHref={data.receiptsHref} />
