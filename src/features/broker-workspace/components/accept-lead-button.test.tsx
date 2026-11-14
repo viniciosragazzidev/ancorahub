@@ -36,7 +36,8 @@ describe("AcceptLeadButton", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Oferta encerrada"));
     expect(mocks.push).not.toHaveBeenCalled();
     mocks.accept.mockResolvedValueOnce({ success: true });
-    fireEvent.click(screen.getByRole("button", { name: "Aceitar e chamar" }));
+    // O rótulo otimista volta quando a transição termina, um instante depois do alerta.
+    fireEvent.click(await screen.findByRole("button", { name: "Aceitar e chamar" }));
     await waitFor(() => expect(mocks.accept).toHaveBeenCalledTimes(2));
   });
 
@@ -91,7 +92,7 @@ describe("AcceptLeadButton", () => {
     expect(mocks.fly).not.toHaveBeenCalled();
 
     mocks.accept.mockResolvedValueOnce({ success: true });
-    const button = screen.getByRole("button", { name: "Aceitar e chamar" });
+    const button = await screen.findByRole("button", { name: "Aceitar e chamar" });
     fireEvent.click(button);
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/leads/l1"));
     expect(mocks.fly).toHaveBeenCalledTimes(1);
