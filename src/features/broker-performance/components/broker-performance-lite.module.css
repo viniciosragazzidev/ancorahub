@@ -60,4 +60,16 @@
 .links { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .link { display: inline-flex; align-items: center; min-height: 44px; color: var(--chat-action-text); font-size: var(--text-sm); font-weight: 500; }
 
+/* Composição por resultados (BROKER_NAV_REORG): frase do período, subtítulos e linhas de indicador. Divisória na cor da folha, sem borda. */
+.lead { margin: var(--space-1) 0 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.subTitle { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
+.indicators { gap: 0; margin: 0; padding-block: var(--space-2); }
+.indicator { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 56px; padding-block: var(--space-2); }
+.indicator + .indicator { border-top: 2px solid var(--surface); }
+.indicator dd { margin: 0; }
+.indicatorLabel { display: grid; gap: 2px; min-width: 0; font-size: var(--text-sm); }
+.indicatorLabel small { color: var(--text-muted); font-size: var(--text-xs); }
+.indicatorValue { flex: none; font-size: var(--text-xl); font-weight: 600; font-variant-numeric: tabular-nums; }
+.indicatorEmpty { flex: none; color: var(--text-muted); font-size: var(--text-sm); font-weight: 500; }
+
 @media (prefers-reduced-motion: reduce) { .page[aria-busy="true"] .body { transition: none; } }

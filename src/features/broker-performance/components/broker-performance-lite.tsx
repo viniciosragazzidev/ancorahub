@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import { useTransition } from "react";
+import { useTransition, type ReactNode } from "react";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { CurrencyCircleDollar, FileText, Handshake, Sparkle, Users } from "@/components/huge-icons";
 import { LiteDelta, LiteNumber, LiteStaggerItem } from "@/components/lite/motion";
 
-import { BROKER_PERFORMANCE_PERIODS, PERIOD_LABEL, type BrokerMetricCard, type BrokerPerformanceView } from "../domain";
+import { BROKER_PERFORMANCE_PERIODS, PERIOD_LABEL, type BrokerMetricCard, type BrokerPerformancePeriod, type BrokerPerformanceView } from "../domain";
 import styles from "./broker-performance-lite.module.css";
 
 const PERIOD_OPTIONS = BROKER_PERFORMANCE_PERIODS.map((value) => ({ value, label: PERIOD_LABEL[value] }));
@@ -86,8 +86,143 @@ function FunnelBar({ widthPercent, step }: { widthPercent: number; step: number 
   );
 }
 
-/** Desempenho do próprio corretor: período na URL (?periodo=), seis blocos, sem ranking nem comparação com a equipe. */
-export function BrokerPerformanceLite({ view }: { view: BrokerPerformanceView }) {
+function NumberCards({ view }: { view: BrokerPerformanceView }) {
+  return (
+    <dl className={styles.cards}>
+      {view.cards.map((card, index) => (
+        <LiteStaggerItem key={card.key} index={index + 1} className={styles.card}>
+          <dt className={styles.cardTop}>
+            <span className={styles.cardLabel}>{card.label}</span>
+            <CardIcon metric={card.key} />
+          </dt>
+          <dd className={styles.cardValue}><LiteNumber value={card.value} format={card.format === "currency" ? "currency" : "integer"} decimals={0} countFromZero /></dd>
+          <dd><ChangeLine card={card} /></dd>
+        </LiteStaggerItem>
+      ))}
+    </dl>
+  );
+}
+
+function GoalPanel({ goal }: { goal: NonNullable<BrokerPerformanceView["goal"]> }) {
+  return (
+    <section className={`${styles.panel} ${styles.raised} ${styles.goal}`} aria-labelledby="performance-goal-title">
+      <GoalRing percentage={goal.percentage} />
+      <div>
+        <h2 id="performance-goal-title" className={styles.goalName}>{goal.name}</h2>
+        <p className={styles.goalProgress}>{goal.currentLabel} de {goal.targetLabel}</p>
+        {goal.pace ? <p className={styles.pace}>{goal.pace}</p> : null}
+      </div>
+    </section>
+  );
+}
+
+function FunnelBody({ view }: { view: BrokerPerformanceView }) {
+  if (view.empty) return <p className={styles.empty}>Quando chegarem leads neste período, o caminho até a venda aparece aqui.</p>;
+  return (
+    <>
+      {view.funnel.stages.map((stage, index) => (
+        <div key={stage.key} className={styles.stage}>
+          <span className={styles.stageLabel}>{stage.label}</span>
+          <FunnelBar widthPercent={Math.max(stage.widthPercent, stage.value > 0 ? 4 : 0)} step={index} />
+          <span className={styles.stageValue}><LiteNumber value={stage.value} countFromZero /></span>
+        </div>
+      ))}
+      {view.funnel.note ? <p className={styles.note}>{view.funnel.note}</p> : null}
+    </>
+  );
+}
+
+function Insight({ text }: { text: string }) {
+  return (
+    <p className={styles.insight}>
+      <Sparkle size={18} weight="fill" aria-hidden="true" />
+      <span>{text}</span>
+    </p>
+  );
+}
+
+function CarriersBody({ view }: { view: BrokerPerformanceView }) {
+  if (view.carriers.length === 0) return <p className={styles.empty}>Nenhuma venda neste período.</p>;
+  return (
+    <ul className={styles.carrierList}>
+      {view.carriers.map((carrier) => (
+        <li key={carrier.name} className={styles.carrier}>
+          <span className={styles.carrierName}>{carrier.name}</span>
+          <span className={styles.carrierValue}>{carrier.sales} · {carrier.revenueLabel}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Shortcuts() {
+  return (
+    <nav aria-label="Atalhos do desempenho" className={styles.links}>
+      <Link href="/minha-fila" className={styles.link}>Ver meus leads</Link>
+      <Link href="/plantoes" className={styles.link}>Ver plantões</Link>
+    </nav>
+  );
+}
+
+const PERIOD_SCOPE: Record<BrokerPerformancePeriod, string> = { hoje: "hoje", "7d": "nos últimos 7 dias", "30d": "nos últimos 30 dias" };
+const RESULTS_TITLE: Record<BrokerPerformancePeriod, string> = { hoje: "Resultados de hoje", "7d": "Resultados dos últimos 7 dias", "30d": "Resultados dos últimos 30 dias" };
+
+/** Uma linha de indicador: rótulo à esquerda, valor com unidade à direita. Sem dado, diz isso em vez de mostrar 0%. */
+function Indicator({ label, value, detail }: { label: string; value: number | null; detail: string }) {
+  return (
+    <div className={styles.indicator}>
+      <dt className={styles.indicatorLabel}>
+        <span>{label}</span>
+        <small>{detail}</small>
+      </dt>
+      <dd className={value === null ? styles.indicatorEmpty : styles.indicatorValue}>
+        {value === null ? "Sem dado" : <LiteNumber value={value} format="percent" countFromZero />}
+      </dd>
+    </div>
+  );
+}
+
+/** Atendimento e conversão: os indicadores que o motor já entrega, o funil e a frase do período. */
+function ServiceSection({ view }: { view: BrokerPerformanceView }) {
+  const { firstContact, quoteRate, saleRate } = view.service;
+  const scope = PERIOD_SCOPE[view.period];
+  return (
+    <section className={styles.section} aria-labelledby="performance-service-title" data-block="indicadores">
+      <h2 id="performance-service-title" className={styles.sectionTitle}>Atendimento e conversão</h2>
+      <dl className={`${styles.panel} ${styles.indicators}`}>
+        <Indicator
+          label="Primeiro contato no prazo"
+          value={firstContact ? Math.round(firstContact.rate) : null}
+          detail={firstContact ? `${firstContact.leads} ${firstContact.leads === 1 ? "lead medido" : "leads medidos"} ${scope}` : `Nenhum lead com prazo medido ${scope}`}
+        />
+        <Indicator label="Leads que viraram cotação" value={quoteRate} detail={quoteRate === null ? `Sem leads suficientes ${scope}` : scope} />
+        <Indicator label="Cotações que viraram venda" value={saleRate} detail={saleRate === null ? `Sem cotações suficientes ${scope}` : scope} />
+      </dl>
+      <div className={styles.panel}>
+        <h3 className={styles.subTitle}>Seu funil</h3>
+        <FunnelBody view={view} />
+      </div>
+      {view.insight ? <Insight text={view.insight} /> : null}
+    </section>
+  );
+}
+
+export type BrokerPerformanceComposition = "classic" | "results";
+
+/**
+ * Desempenho do próprio corretor: período na URL (?periodo=), sem ranking nem comparação com a equipe.
+ * `classic` mantém os seis blocos de antes. `results` (BROKER_NAV_REORG) organiza a página em período, resultados,
+ * atendimento e conversão, metas e Minha jornada (o cartão chega pronto em `journey`; ranking e missões ficam na Jornada).
+ */
+export function BrokerPerformanceLite({
+  view,
+  composition = "classic",
+  journey = null,
+}: {
+  view: BrokerPerformanceView;
+  composition?: BrokerPerformanceComposition;
+  journey?: ReactNode;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -97,6 +232,58 @@ export function BrokerPerformanceLite({ view }: { view: BrokerPerformanceView })
     const query = new URLSearchParams(searchParams.toString());
     query.set("periodo", period);
     startTransition(() => router.push(`${pathname}?${query.toString()}`, { scroll: false }));
+  }
+
+  if (composition === "results") {
+    return (
+      <div className={styles.page} aria-busy={pending} data-composition="results">
+        <LiteStaggerItem index={0}>
+          <header className={styles.header} data-block="periodo">
+            <h1 className="lite-page-title">Desempenho</h1>
+            <SegmentedControl label="Período" options={PERIOD_OPTIONS} value={view.period} onValueChange={changePeriod} className={styles.period} />
+          </header>
+        </LiteStaggerItem>
+
+        <div className={styles.body}>
+          <section className={styles.section} aria-labelledby="performance-numbers-title" data-block="resultados">
+            <LiteStaggerItem index={1}>
+              <h2 id="performance-numbers-title" className={styles.sectionTitle}>{RESULTS_TITLE[view.period]}</h2>
+              <p className={styles.lead}>{view.summary}</p>
+            </LiteStaggerItem>
+            <NumberCards view={view} />
+            <LiteStaggerItem index={5}>
+              <div className={styles.panel}>
+                <h3 className={styles.subTitle}>Vendas por operadora</h3>
+                <CarriersBody view={view} />
+              </div>
+            </LiteStaggerItem>
+          </section>
+
+          <LiteStaggerItem index={6}>
+            <ServiceSection view={view} />
+          </LiteStaggerItem>
+
+          <LiteStaggerItem index={7}>
+            <section className={styles.section} aria-labelledby="performance-goals-title" data-block="metas">
+              <h2 id="performance-goals-title" className={styles.sectionTitle}>Metas</h2>
+              {view.goal ? (
+                <GoalPanel goal={view.goal} />
+              ) : (
+                <p className={`${styles.panel} ${styles.empty}`}>Nenhuma meta ativa para você agora. Quando a gestão definir uma, o progresso aparece aqui.</p>
+              )}
+            </section>
+          </LiteStaggerItem>
+
+          {journey ? (
+            <LiteStaggerItem index={8}>
+              <div data-block="jornada">{journey}</div>
+            </LiteStaggerItem>
+          ) : null}
+
+          <Shortcuts />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -116,84 +303,36 @@ export function BrokerPerformanceLite({ view }: { view: BrokerPerformanceView })
           <LiteStaggerItem index={1}>
             <h2 id="performance-numbers-title" className={styles.sectionTitle}>Seus números</h2>
           </LiteStaggerItem>
-          <dl className={styles.cards}>
-            {view.cards.map((card, index) => (
-              <LiteStaggerItem key={card.key} index={index + 1} className={styles.card}>
-                <dt className={styles.cardTop}>
-                  <span className={styles.cardLabel}>{card.label}</span>
-                  <CardIcon metric={card.key} />
-                </dt>
-                <dd className={styles.cardValue}><LiteNumber value={card.value} format={card.format === "currency" ? "currency" : "integer"} decimals={0} countFromZero /></dd>
-                <dd><ChangeLine card={card} /></dd>
-              </LiteStaggerItem>
-            ))}
-          </dl>
+          <NumberCards view={view} />
         </section>
 
         {view.goal ? (
           <LiteStaggerItem index={5}>
-            <section className={`${styles.panel} ${styles.raised} ${styles.goal}`} aria-labelledby="performance-goal-title">
-              <GoalRing percentage={view.goal.percentage} />
-              <div>
-                <h2 id="performance-goal-title" className={styles.goalName}>{view.goal.name}</h2>
-                <p className={styles.goalProgress}>{view.goal.currentLabel} de {view.goal.targetLabel}</p>
-                {view.goal.pace ? <p className={styles.pace}>{view.goal.pace}</p> : null}
-              </div>
-            </section>
+            <GoalPanel goal={view.goal} />
           </LiteStaggerItem>
         ) : null}
 
         <LiteStaggerItem index={6}>
           <section className={styles.panel} aria-labelledby="performance-funnel-title">
             <h2 id="performance-funnel-title" className={styles.sectionTitle}>Seu funil</h2>
-            {view.empty ? (
-              <p className={styles.empty}>Quando chegarem leads neste período, o caminho até a venda aparece aqui.</p>
-            ) : (
-              <>
-                {view.funnel.stages.map((stage, index) => (
-                  <div key={stage.key} className={styles.stage}>
-                    <span className={styles.stageLabel}>{stage.label}</span>
-                    <FunnelBar widthPercent={Math.max(stage.widthPercent, stage.value > 0 ? 4 : 0)} step={index} />
-                    <span className={styles.stageValue}><LiteNumber value={stage.value} countFromZero /></span>
-                  </div>
-                ))}
-                {view.funnel.note ? <p className={styles.note}>{view.funnel.note}</p> : null}
-              </>
-            )}
+            <FunnelBody view={view} />
           </section>
         </LiteStaggerItem>
 
         {view.insight ? (
           <LiteStaggerItem index={7}>
-            <p className={styles.insight}>
-              <Sparkle size={18} weight="fill" aria-hidden="true" />
-              <span>{view.insight}</span>
-            </p>
+            <Insight text={view.insight} />
           </LiteStaggerItem>
         ) : null}
 
         <LiteStaggerItem index={7}>
           <section className={styles.panel} aria-labelledby="performance-carriers-title">
             <h2 id="performance-carriers-title" className={styles.sectionTitle}>Vendas por operadora</h2>
-            {view.carriers.length === 0 ? (
-              <p className={styles.empty}>Nenhuma venda neste período.</p>
-            ) : (
-              <ul className={styles.carrierList}>
-                {view.carriers.map((carrier) => (
-                  <li key={carrier.name} className={styles.carrier}>
-                    <span className={styles.carrierName}>{carrier.name}</span>
-                    <span className={styles.carrierValue}>{carrier.sales} · {carrier.revenueLabel}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <CarriersBody view={view} />
           </section>
         </LiteStaggerItem>
 
-        <nav aria-label="Atalhos do desempenho" className={styles.links}>
-          <Link href="/minha-fila" className={styles.link}>Ver meus leads</Link>
-          <Link href="/plantoes" className={styles.link}>Ver plantões</Link>
-        </nav>
+        <Shortcuts />
       </div>
     </div>
   );

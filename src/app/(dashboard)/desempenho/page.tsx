@@ -13,14 +13,18 @@ import { JourneyEntryCard } from "@/features/journey/components/journey-entry-ca
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 
-/** Início reorganizado: a Jornada sai do Início e passa a abrir por aqui (precisa das duas chaves ligadas). */
-async function journeyEntry(tenantId: string, userId: string) {
+/**
+ * Modo corretor (BROKER_NAV_REORG): a Jornada sai do Início e passa a abrir por aqui (precisa também da BROKER_JOURNEY),
+ * e o Desempenho Lite usa a composição por resultados. Desligada a chave, tudo fica como antes.
+ */
+async function brokerNavigation(tenantId: string, userId: string) {
   const [homeV2, journey] = await Promise.all([
     getFeatureFlag(FEATURE_FLAGS.BROKER_NAV_REORG).catch(() => FEATURE_FLAGS.BROKER_NAV_REORG.defaultValue),
     getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false"),
   ]);
-  if (homeV2 !== "true" || journey !== "true") return null;
-  return <JourneyEntryCard journey={await getCachedBrokerJourneyData(tenantId, userId).catch(() => null)} />;
+  const reorg = homeV2 === "true";
+  if (!reorg || journey !== "true") return { reorg, journey: null };
+  return { reorg, journey: <JourneyEntryCard journey={await getCachedBrokerJourneyData(tenantId, userId).catch(() => null)} /> };
 }
 
 export const dynamic = "force-dynamic";
@@ -32,16 +36,20 @@ export default async function BrokerPerformancePage({ searchParams }: { searchPa
   // Flag do Super-admin: desligada, o corretor continua com o resumo do dia abaixo.
   if (await isBrokerPerformanceLiteEnabled()) {
     const period = parseBrokerPerformancePeriod((await searchParams).periodo);
-    const [data, journey] = await Promise.all([getBrokerPerformance(context, { period, now: new Date() }), journeyEntry(context.tenantId, context.userId)]);
+    const [data, navigation] = await Promise.all([getBrokerPerformance(context, { period, now: new Date() }), brokerNavigation(context.tenantId, context.userId)]);
+    const view = buildBrokerPerformanceView(data);
     return (
       <main className="arc-venancor lite-page flex min-h-full flex-col gap-6 bg-(--surface) text-(--foreground)">
-        <BrokerPerformanceLite view={buildBrokerPerformanceView(data)} />
-        {journey}
+        {navigation.reorg ? (
+          <BrokerPerformanceLite view={view} composition="results" journey={navigation.journey} />
+        ) : (
+          <BrokerPerformanceLite view={view} />
+        )}
       </main>
     );
   }
 
-  const [data, journey] = await Promise.all([getBrokerWorkspaceData(), journeyEntry(context.tenantId, context.userId)]);
+  const [data, { journey }] = await Promise.all([getBrokerWorkspaceData(), brokerNavigation(context.tenantId, context.userId)]);
   const { receivedToday, acceptedToday, inServiceNow, slaAtRiskNow } = data.today;
   const summary = slaAtRiskNow > 0
     ? `${slaAtRiskNow} ${slaAtRiskNow === 1 ? "lead está" : "leads estão"} com o primeiro contato atrasando.`

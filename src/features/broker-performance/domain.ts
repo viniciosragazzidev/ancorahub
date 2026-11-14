@@ -84,12 +84,23 @@ export type BrokerGoalView = {
   pace: string | null;
 };
 
+/**
+ * Indicadores de atendimento e conversão já existentes, só repassados: primeiro contato no prazo vem do motor canônico
+ * (null quando nenhum lead teve prazo medido no período, para não virar 0%) e as taxas são as mesmas da nota do funil.
+ */
+export type BrokerServiceIndicators = {
+  firstContact: { rate: number; leads: number } | null;
+  quoteRate: number | null;
+  saleRate: number | null;
+};
+
 export type BrokerPerformanceView = {
   period: BrokerPerformancePeriod;
   summary: string;
   empty: boolean;
   cards: BrokerMetricCard[];
   funnel: { stages: BrokerFunnelStage[]; note: string | null };
+  service: BrokerServiceIndicators;
   goal: BrokerGoalView | null;
   insight: string | null;
   carriers: Array<BrokerCarrierSales & { revenueLabel: string }>;
@@ -233,6 +244,7 @@ export function buildBrokerPerformanceView(data: BrokerPerformanceData): BrokerP
     empty,
     cards: [card("leads", "Leads", "integer"), card("quotes", "Cotações", "integer"), card("sales", "Vendas", "integer"), card("revenue", "Receita", "currency")],
     funnel: { stages, note: empty ? null : note },
+    service: { firstContact: current.slaLeads > 0 ? { rate: current.slaRate, leads: current.slaLeads } : null, quoteRate, saleRate },
     goal,
     insight: empty ? null : pickInsight(data),
     carriers: data.carriers.slice(0, 5).map((carrier) => ({ ...carrier, revenueLabel: formatBrl(carrier.revenue) })),
