@@ -120,8 +120,29 @@ describe("Home operacional do corretor", () => {
   it("explica pausa e esconde aprendizagem quando desativada", () => {
     show(summary, { availability: "paused", showHomeLearning: false });
     fireEvent.click(screen.getByRole("button", { name: "Ficar disponível" }));
-    expect(shell.setStatus).toHaveBeenCalledWith("available");
+    expect(shell.setStatus).toHaveBeenCalledWith("available", { inlineError: true });
     expect(screen.queryByText("Aprendizagem existente")).toBeNull();
+  });
+  it("confirma no próprio lugar quando o servidor tira a pausa", () => {
+    const view = show(summary, { availability: "paused" });
+    fireEvent.click(screen.getByRole("button", { name: "Ficar disponível" }));
+    view.rerender(
+      <LightAvailabilityProvider value={{ ...shell, availability: "available" }}>
+        <BrokerHomeOverview viewerName="Corretor Demo" nowIso="2026-11-13T16:00:00Z" summary={summary} nextLead={null} rail={null} conversations={null} presenceAsks={[]} learning={null} onSearch={vi.fn()} onNew={vi.fn()} />
+      </LightAvailabilityProvider>,
+    );
+    expect(screen.getByText("Você está disponível. Novas ofertas voltam a chegar.")).toBeTruthy();
+  });
+  it("falha ao tirar a pausa mostra a causa e tentar de novo", () => {
+    const view = show(summary, { availability: "paused" });
+    fireEvent.click(screen.getByRole("button", { name: "Ficar disponível" }));
+    view.rerender(
+      <LightAvailabilityProvider value={{ ...shell, availability: "paused", error: "Sem conexão agora. Você continua pausado." }}>
+        <BrokerHomeOverview viewerName="Corretor Demo" nowIso="2026-11-13T16:00:00Z" summary={summary} nextLead={null} rail={null} conversations={null} presenceAsks={[]} learning={null} onSearch={vi.fn()} onNew={vi.fn()} />
+      </LightAvailabilityProvider>,
+    );
+    expect(screen.getByRole("alert").textContent).toBe("Sem conexão agora. Você continua pausado.");
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
   });
   it("oferece próximo destino útil sem inventar urgência no vazio", () => {
     show({ ...summary, now: { title: "Agora", emptyText: "", items: [] } });

@@ -3,7 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ action: vi.fn(), refresh: vi.fn() }));
+const mocks = vi.hoisted(() => ({ action: vi.fn(), refresh: vi.fn(), fire: vi.fn() }));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => mocks.fire }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh }) }));
 vi.mock("@/features/broker-workspace/chat/chat-actions", () => ({ runChatServerAction: mocks.action }));
 vi.mock("@/components/arc/badge/badge", () => ({ Badge: ({ children }: { children: ReactNode }) => <span>{children}</span> }));
@@ -22,6 +23,7 @@ afterEach(() => cleanup());
 beforeEach(() => {
   mocks.action.mockReset().mockResolvedValue({ ok: true, message: "Retorno concluído." });
   mocks.refresh.mockReset();
+  mocks.fire.mockReset();
 });
 
 const NOW = "2026-11-13T13:00:00.000Z";
@@ -55,7 +57,22 @@ describe("ConnectedAgenda", () => {
     fireEvent.click(within(screen.getByRole("region", { name: /Atrasados/ })).getByRole("button", { name: "Concluir" }));
     await waitFor(() => expect(mocks.action).toHaveBeenCalledWith("lead.completeReturn", { taskId: "t1" }));
     await waitFor(() => expect(mocks.refresh).toHaveBeenCalled());
-    expect(screen.getByRole("status").textContent).toContain("Retorno concluído.");
+    expect(screen.getByText("Retorno concluído.")).toBeTruthy();
+    expect(screen.getByText("Concluído")).toBeTruthy();
+    expect(mocks.fire).toHaveBeenCalledWith("tap");
+    expect(mocks.fire).toHaveBeenCalledWith("confirm");
+  });
+
+  it("falha deixa o item como estava e oferece tentar de novo", async () => {
+    mocks.action.mockResolvedValueOnce({ ok: false, message: "Não encontrei esse retorno." });
+    render(<ConnectedAgenda entries={entries} duty={null} generatedAt={NOW} />);
+    fireEvent.click(within(screen.getByRole("region", { name: /Atrasados/ })).getByRole("button", { name: "Cancelar" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Não encontrei esse retorno. O retorno continua na sua agenda.");
+    expect(mocks.refresh).not.toHaveBeenCalled();
+    expect(mocks.fire).toHaveBeenCalledWith("error");
+    fireEvent.click(within(alert).getByRole("button", { name: "Tentar de novo" }));
+    await waitFor(() => expect(mocks.action).toHaveBeenLastCalledWith("lead.cancelReturn", { taskId: "t1", leadName: "Ana Teste" }));
   });
 
   it("mostra o plantão do dia só como atalho para Plantões", () => {

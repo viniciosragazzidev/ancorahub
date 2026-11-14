@@ -162,6 +162,8 @@ export function LightNotifications({
   );
   const groups = useMemo(() => groupByDate(visibleNotifications), [visibleNotifications]);
 
+  // Marcar como lida é nível 0 (docs/design-system/FEEDBACK.md): ação frequente, só o novo estado no próprio
+  // aviso, sem som, sem vibração e sem toast. Nenhuma chamada a useFeedback aqui de propósito.
   const markRead = useCallback(async (id: string) => {
     startTransition(() => addOptimisticRead(id));
     const form = new FormData();

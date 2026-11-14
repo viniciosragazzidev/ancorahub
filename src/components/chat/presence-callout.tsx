@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
 import { fireFeedback } from "@/lib/feedback/use-feedback";
 
 import { AssistantAvatar } from "./assistant-avatar";
@@ -141,7 +142,9 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
       // Pelo roteiro, a tela atualiza quando o corretor sai dele ("Ir para o Plantão").
       if (!viaGuide) window.setTimeout(() => router.refresh(), 1600);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Não consegui confirmar agora. Tente de novo.";
+      // Causa normalizada (nunca texto técnico) + o que continua valendo; o botão vira "Tentar de novo".
+      const message = actionErrorMessage(normalizeActionError(error, "Não consegui confirmar agora"), "Sua presença ainda não foi registrada");
+      fireFeedback("error");
       setState({ kind: "error", message });
       if (viaGuide) setWhatsapp((current) => (current ? { ...current, stage: "error", error: message } : current));
     }
