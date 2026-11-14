@@ -1,0 +1,113 @@
+/* Carregamento de página inteira. Centralizado na área útil: no celular desconta o topo
+   (--header-height) e a barra de abas flutuante do Lite (112px + área segura); no desktop
+   só o topo. Entra com 200ms de atraso para não piscar em navegação rápida. */
+
+.root {
+  display: grid;
+  width: 100%;
+  min-height: calc(100dvh - var(--header-height, 3.5rem) - 112px - var(--mobile-safe-bottom, 0px));
+  place-items: center;
+  padding: 24px 16px;
+  opacity: 0;
+  animation: page-loading-in 220ms cubic-bezier(0.22, 1, 0.36, 1) 200ms forwards;
+}
+
+@media (min-width: 768px) {
+  .root {
+    min-height: calc(100dvh - var(--header-height, 4rem));
+  }
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  /* Leve subida para o olho ler como centro (o bloco tem mais peso embaixo, no texto). */
+  transform: translateY(-4%);
+}
+
+.indicator {
+  position: relative;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  border: 3px solid color-mix(in oklch, var(--primary) 16%, transparent);
+  border-top-color: var(--primary);
+  border-radius: 999px;
+  animation: page-loading-spin 1.2s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+}
+
+.core {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--primary);
+  animation: page-loading-pulse 1.2s ease-in-out infinite;
+}
+
+.label {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  color: var(--muted-foreground, var(--text-secondary));
+}
+
+@keyframes page-loading-in {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes page-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes page-loading-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Indicador estático: sem giro nem pulso. A entrada continua só por opacidade, com o atraso. */
+@media (prefers-reduced-motion: reduce) {
+  .root {
+    animation-duration: 1ms;
+  }
+
+  .ring,
+  .core {
+    animation: none;
+  }
+
+  .core {
+    opacity: 0.6;
+  }
+}
+
+:global(html[data-interface-motion="off"]) .root {
+  animation-duration: 1ms;
+}
+
+:global(html[data-interface-motion="off"]) .ring,
+:global(html[data-interface-motion="off"]) .core {
+  animation: none;
+}
+
+:global(html[data-interface-motion="off"]) .core {
+  opacity: 0.6;
+}
