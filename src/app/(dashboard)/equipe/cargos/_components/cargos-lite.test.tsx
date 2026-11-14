@@ -2,13 +2,19 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/components/ui/sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("@/components/ui/sonner", () => ({ toast }));
+const fire = vi.hoisted(() => vi.fn(() => ({ motion: false, celebrate: false })));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => fire }));
 const actions = vi.hoisted(() => ({ saveCustomRoleAction: vi.fn(async () => undefined), archiveCustomRoleAction: vi.fn(async () => undefined) }));
 vi.mock("../actions", () => actions);
 
 import { CargosLite, type CargoCapability, type CargoRole } from "./cargos-lite";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 // O Switch Arc (Radix) mede o próprio tamanho.
 globalThis.ResizeObserver ??= class { observe() {} unobserve() {} disconnect() {} } as unknown as typeof ResizeObserver;
@@ -41,6 +47,20 @@ describe("CargosLite", () => {
     fireEvent.click(screen.getByRole("option", { name: /^Uma unidade/ }));
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" })); });
     expect(actions.saveCustomRoleAction).toHaveBeenCalledWith(expect.objectContaining({ id: "r1", scope: "branch", permissions: ["leads.ver"] }));
+    expect(await screen.findByText('Cargo "Marketing digital" atualizado')).toBeInTheDocument();
+    expect(fire).toHaveBeenCalledWith("confirm");
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("arquivar que falha fica no painel com a causa e Tentar de novo", async () => {
+    actions.archiveCustomRoleAction.mockRejectedValueOnce(new Error("Tire o cargo das pessoas antes de arquivar: arquivar ampliaria o acesso delas."));
+    render(<CargosLite enabled catalog={catalog} routeCatalog={routeCatalog} roles={roles} />);
+    fireEvent.click(screen.getByRole("button", { name: "Editar cargo Marketing digital" }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Arquivar cargo" })); });
+    expect(screen.getByRole("alert")).toHaveTextContent("Tire o cargo das pessoas antes de arquivar: arquivar ampliaria o acesso delas. O cargo continua como estava.");
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeInTheDocument();
+    expect(fire).toHaveBeenCalledWith("error");
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("módulo desligado: aviso e criar desativado", () => {

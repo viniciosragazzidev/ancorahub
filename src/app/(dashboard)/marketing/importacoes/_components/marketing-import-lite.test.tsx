@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ upload: vi.fn() }));
 vi.mock("@/features/marketing-import/actions", () => ({ uploadMetaLeadsAction: mocks.upload }));
-vi.mock("@/components/ui/sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() }));
+vi.mock("@/components/ui/sonner", () => ({ toast }));
+const fire = vi.hoisted(() => vi.fn(() => ({ motion: false, celebrate: false })));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => fire }));
 
 import { MarketingImportClient } from "./marketing-import-client";
 import { MarketingImportLite } from "./marketing-import-lite";
@@ -43,5 +46,21 @@ describe("importações no visual Lite", () => {
     expect((form.get("file") as File).name).toBe("leads.csv");
     expect(form.get("branchId")).toBe("b1");
     expect(screen.getByText("Importação concluída")).toBeInTheDocument();
+    expect(fire).toHaveBeenCalledWith("confirm");
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("falha na importação fica no painel com a causa e o botão vira Tentar de novo", async () => {
+    mocks.upload.mockResolvedValueOnce({ success: false, error: "A planilha não tem a coluna Telefone." });
+    render(<MarketingImportLite branches={BRANCHES} history={HISTORY} lastImport={HISTORY[0]!} canChooseBranch={false} userBranchId="b1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Nova importação" }));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["a,b"], "leads.csv", { type: "text/csv" })] } });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Importar leads" })); });
+    expect(screen.getByRole("alert")).toHaveTextContent("A planilha não tem a coluna Telefone. Nenhum lead foi criado. O arquivo continua selecionado.");
+    expect(fire).toHaveBeenCalledWith("error");
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeEnabled();
   });
 });

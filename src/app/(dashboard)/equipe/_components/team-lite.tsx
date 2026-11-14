@@ -155,12 +155,12 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
     // O que acontece depois do servidor fica dentro da tarefa: o "Tentar de novo" refaz tudo.
     startTransition(async () => {
       await run("members", async () => {
-        const result = failedResult(await bulkToggleTeamMemberStatusAction({}, data));
+        const result: MemberResult = await bulkToggleTeamMemberStatusAction({}, data);
         if (result.success) {
           multiSelect.clear();
           router.refresh();
         }
-        return result;
+        return failedResult(result);
       }, { done: target === "active" ? "Acessos ativados" : "Acessos desativados", fallback: "Não deu para mudar os acessos agora.", keeps: "Os membros continuam como estavam e seguem selecionados." });
     });
   };
@@ -174,12 +174,12 @@ export function TeamLite({ members, branches, customRoles, stats, transferReques
     data.set("target", target);
     startTransition(async () => {
       await run("members", async () => {
-        const result = failedResult(await setBrokersAvailabilityAction({}, data));
+        const result: MemberResult = await setBrokersAvailabilityAction({}, data);
         if (result.success) {
           multiSelect.clear();
           router.refresh();
         }
-        return result;
+        return failedResult(result);
       }, {
         done: target === "paused" ? "Recebimento de leads pausado" : "Recebimento de leads retomado",
         fallback: "Não deu para atualizar o recebimento de leads agora.",
