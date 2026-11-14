@@ -30,6 +30,7 @@ import { RoutingMatrixPanel } from "./_components/routing-matrix-panel";
 import { DddRoutingPanel } from "./_components/ddd-routing-panel";
 import { fetchRoutingRules } from "@/features/lead-distribution/routing-engine";
 import { BrokerDailySummaryPanel } from "./_components/broker-daily-summary-panel";
+import { DirectorDailySummary } from "./_components/director-daily-summary";
 import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-summary-service";
 import { DutyOperationsWorkspace } from "./plantao/_components/duty-operations-workspace";
 import { UnitQueueModeCard } from "./plantao/_components/unit-queue-mode-card";
@@ -703,7 +704,7 @@ export default async function LeadDistributionPage({
           {live}
           {view === "resumo_dia" ? (
             <section className={directorDistributionStyles.stack} aria-label="Resumo diário da distribuição">
-              <BrokerDailySummaryPanel
+              <DirectorDailySummary
                 initialData={brokerSummary}
                 branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
                 canFilterBranch={context.role === "director"}

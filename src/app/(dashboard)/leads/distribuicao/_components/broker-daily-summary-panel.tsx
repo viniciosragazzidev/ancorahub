@@ -37,22 +37,19 @@ import {
 import { getBrokerDailySummaryAction } from "@/features/lead-distribution/broker-summary-actions";
 import type {
   BrokerDailySummaryAggregate,
-  BrokerDailySummaryItem,
 } from "@/features/lead-distribution/broker-summary-service";
 
 type BranchOption = { id: string; name: string };
 
-export function BrokerDailySummaryPanel({
-  initialData,
-  branches,
-  canFilterBranch = true,
-}: {
-  initialData: BrokerDailySummaryAggregate;
-  branches: BranchOption[];
-  canFilterBranch?: boolean;
-}) {
+export type SummaryPeriod = "today" | "week" | "month" | "custom";
+
+/**
+ * Estado e ações do resumo diário (período, unidade, busca, exportações), usado pelo painel clássico e pela versão
+ * Lite do modo Diretor. Uma lógica só; cada tela desenha do seu jeito.
+ */
+export function useBrokerDailySummary(initialData: BrokerDailySummaryAggregate) {
   const [data, setData] = useState<BrokerDailySummaryAggregate>(initialData);
-  const [period, setPeriod] = useState<"today" | "week" | "month" | "custom">("today");
+  const [period, setPeriod] = useState<SummaryPeriod>("today");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
@@ -82,7 +79,7 @@ export function BrokerDailySummaryPanel({
     }
   };
 
-  const handlePeriodChange = (newPeriod: "today" | "week" | "month" | "custom") => {
+  const handlePeriodChange = (newPeriod: SummaryPeriod) => {
     setPeriod(newPeriod);
     if (newPeriod !== "custom") {
       fetchSummary(newPeriod, selectedBranchId);
@@ -219,6 +216,28 @@ export function BrokerDailySummaryPanel({
       (item.branchName ?? "").toLowerCase().includes(q)
     );
   });
+
+  return {
+    data, period, startDate, setStartDate, endDate, setEndDate, selectedBranchId, searchQuery, setSearchQuery,
+    isLoading, isExportingPdf, handlePeriodChange, handleBranchChange, handleCustomDateSubmit, handleExportCSV, handleExportPDF,
+    filteredItems,
+  };
+}
+
+export function BrokerDailySummaryPanel({
+  initialData,
+  branches,
+  canFilterBranch = true,
+}: {
+  initialData: BrokerDailySummaryAggregate;
+  branches: BranchOption[];
+  canFilterBranch?: boolean;
+}) {
+  const {
+    data, period, startDate, setStartDate, endDate, setEndDate, selectedBranchId, searchQuery, setSearchQuery,
+    isLoading, isExportingPdf, handlePeriodChange, handleBranchChange, handleCustomDateSubmit, handleExportCSV, handleExportPDF,
+    filteredItems,
+  } = useBrokerDailySummary(initialData);
 
   const getStatusBadge = (status: string) => {
     if (status === "available") return <Badge variant="success">Disponível</Badge>;
