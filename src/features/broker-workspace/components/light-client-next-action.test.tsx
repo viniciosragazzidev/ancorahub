@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -7,7 +7,9 @@ vi.mock("@/features/carteira/retorno-actions", () => ({
   agendarRetornoAction: vi.fn(async () => ({ ok: true })),
   reagendarRetornoAction: vi.fn(async () => ({ ok: true })),
 }));
-vi.mock("@/features/leads/task-actions", () => ({ setLeadTaskDoneAction: vi.fn(async () => ({ success: true })) }));
+const mocks = vi.hoisted(() => ({ done: vi.fn(async () => ({ success: true }) as { success?: boolean; error?: string }), fire: vi.fn() }));
+vi.mock("@/features/leads/task-actions", () => ({ setLeadTaskDoneAction: mocks.done }));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => mocks.fire }));
 vi.mock("@/components/arc/bottom-sheet/bottom-sheet", () => ({
   BottomSheet: ({ open, children }: { open?: boolean; children: React.ReactNode }) => (open ? <div>{children}</div> : null),
 }));
@@ -56,5 +58,23 @@ describe("próxima ação do corretor", () => {
     expect(screen.getByRole("alert").textContent).toContain("Não foi possível carregar");
     expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
     expect(screen.queryByText(/Nenhum retorno/)).toBeNull();
+  });
+
+  it("concluir confirma com check só depois do servidor", async () => {
+    mocks.done.mockResolvedValueOnce({ success: true });
+    render(<LightNextActionPanel clientId="c1" leadId="l1" nextAction={{ state: "overdue", taskId: "t1", title: "Retorno", dueAt: "2026-11-10T15:00:00.000Z", reason: "Retorno atrasado há 1 dia." }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Já falei" }));
+    expect((await screen.findByRole("status")).textContent).toContain("Retorno concluído.");
+    expect(mocks.fire).toHaveBeenCalledWith("confirm");
+  });
+
+  it("falha ao concluir mostra a causa, o que continua valendo e tentar de novo", async () => {
+    mocks.done.mockResolvedValueOnce({ error: "internal server error" });
+    render(<LightNextActionPanel clientId="c1" leadId="l1" nextAction={{ state: "overdue", taskId: "t1", title: "Retorno", dueAt: "2026-11-10T15:00:00.000Z", reason: "Retorno atrasado há 1 dia." }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Já falei" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("O retorno não foi concluído. Ele continua na sua agenda.");
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(mocks.fire).toHaveBeenCalledWith("error");
   });
 });

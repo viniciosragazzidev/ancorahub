@@ -10,6 +10,8 @@ import { motionTokens } from "@/components/arc/lib/motion-tokens";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { useFirstTimeToday } from "@/components/motion/first-time-today/use-first-time-today";
 
+import { GoalReached } from "./goal-reached";
+
 import css from "./week-ranking.module.css";
 
 export type WeekRank = { key: string; position: number; label: string; total: number };
@@ -72,7 +74,11 @@ export function WeekRanking({ data, className }: { data: HomeHighlights; classNa
           <span className={css.cardText}>
             <span className={css.missionTitle}>{data.mission.title}</span>
             <span className={css.cardDetail}>{data.mission.detail}</span>
-            {data.mission.progress ? <MissionBar progress={data.mission.progress} /> : null}
+            {data.mission.progress ? (
+              <GoalReached reached={data.mission.progress.completed} kind="mission" className={css.trackRing}>
+                <MissionBar progress={data.mission.progress} />
+              </GoalReached>
+            ) : null}
           </span>
           <svg viewBox="0 0 16 16" aria-hidden className={css.chevron}><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </Link>
@@ -148,7 +154,11 @@ function WeekSheet({ data, best, onNavigate }: { data: HomeHighlights; best: Wee
           <span className={css.cardText}>
             <span className={css.missionTitle}>{data.mission.title}</span>
             <span className={css.cardDetail}>{data.mission.detail}</span>
-            {data.mission.progress ? <MissionBar progress={data.mission.progress} /> : null}
+            {data.mission.progress ? (
+              <GoalReached reached={data.mission.progress.completed} kind="mission" className={css.trackRing}>
+                <MissionBar progress={data.mission.progress} />
+              </GoalReached>
+            ) : null}
           </span>
         </Link>
       ) : null}

@@ -145,7 +145,7 @@ describe("PresenceCallout", () => {
     fetchMock.mockResolvedValue({ ok: false, json: async () => ({ ok: false, error: "A gestão marcou falta neste plantão. Fale com ela." }) });
     render(<PresenceCallout ask={base} />);
     fireEvent.click(screen.getByRole("button", { name: "Confirmar presença" }));
-    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect((await screen.findByRole("alert")).textContent).toBe("A gestão marcou falta neste plantão. Fale com ela. Sua presença ainda não foi registrada.");
     await waitFor(() => expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeTruthy());
   });
 

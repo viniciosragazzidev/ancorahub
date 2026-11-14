@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const actions = vi.hoisted(() => ({ read: vi.fn(async () => {}), readAll: vi.fn(async () => {}), more: vi.fn() }));
 vi.mock("@/app/(dashboard)/notificacoes/actions", () => ({ markNotificationReadAction: actions.read, markAllNotificationsReadAction: actions.readAll, loadMoreNotificationsAction: actions.more }));
+const feedback = vi.hoisted(() => ({ fire: vi.fn() }));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => feedback.fire, fireFeedback: feedback.fire, fireFeedbackOnce: feedback.fire }));
 vi.mock("@/features/notifications/components/push-notification-manager", () => ({ PushNotificationManager: () => null }));
 vi.mock("./light-ai-consent-toggle", () => ({ LightAiConsentToggle: () => null }));
 vi.mock("./light-lead-toast-toggle", () => ({ LightLeadToastToggle: () => null }));
@@ -26,9 +28,10 @@ describe("LightNotifications", () => {
     expect(screen.getByRole("link", { name: /Lead qualificado atribuído/ }).getAttribute("href")).toBe("/leads/l1");
   });
 
-  it("tapping an unread notice without a lead marks it read", () => {
+  it("tapping an unread notice without a lead marks it read (nível 0: sem som nem vibração)", () => {
     render(<LightNotifications initialNotifications={items} initialNextCursor={null} initialHasMore={false} totalCount={2} unreadCount={1} urgentCount={0} leadToastEnabled />);
     fireEvent.click(screen.getByRole("button", { name: /Você vê isso\?.*Toque para marcar como lida/ }));
     expect(actions.read).toHaveBeenCalled();
+    expect(feedback.fire).not.toHaveBeenCalled();
   });
 });

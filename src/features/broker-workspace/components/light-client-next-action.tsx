@@ -5,6 +5,9 @@ import { useState, useTransition } from "react";
 
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Button } from "@/components/arc/button/button";
+import { LiteSuccess } from "@/components/lite/motion/success";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 import { agendarRetornoAction, reagendarRetornoAction } from "@/features/carteira/retorno-actions";
 import type { NextActionView } from "@/features/carteira/proxima-acao-core";
 import { setLeadTaskDoneAction } from "@/features/leads/task-actions";
@@ -31,10 +34,14 @@ export function instantToSaoPauloInput(iso: string): string {
 /**
  * Próxima ação da ficha do corretor (C2). Sem pendência diz que não há retorno agendado; nunca "em dia".
  * WhatsApp não aparece aqui como contato concluído: só o retorno é registrado.
+ * Feedback nível 1 (docs/design-system/FEEDBACK.md): toque vibra curto, check só depois do servidor, sem som;
+ * a falha mostra a causa normalizada, o que continua valendo e "Tentar de novo".
  */
 export function LightNextActionPanel({ clientId, leadId, nextAction }: { clientId: string; leadId: string; nextAction: NextActionView | null }) {
   const router = useRouter();
+  const fire = useFeedback();
   const [pending, startTransition] = useTransition();
+  const [failedDone, setFailedDone] = useState(false);
   const [sheet, setSheet] = useState<null | "agendar" | "reagendar">(null);
   const [draftDate, setDraftDate] = useState("");
   const [draftNote, setDraftNote] = useState("");
@@ -44,6 +51,7 @@ export function LightNextActionPanel({ clientId, leadId, nextAction }: { clientI
   function openSheet(kind: "agendar" | "reagendar") {
     setError(null);
     setFeedback(null);
+    setFailedDone(false);
     // Reagendar sempre parte do prazo atual; sem prazo, limpa o rascunho antigo.
     if (kind === "reagendar") setDraftDate(nextAction?.dueAt ? instantToSaoPauloInput(nextAction.dueAt) : "");
     setSheet(kind);
@@ -56,15 +64,23 @@ export function LightNextActionPanel({ clientId, leadId, nextAction }: { clientI
       setError("Escolha a data e a hora do retorno.");
       return;
     }
+    fire("tap");
     startTransition(async () => {
-      const result = sheet === "reagendar" && nextAction?.taskId
-        ? await reagendarRetornoAction({ taskId: nextAction.taskId, clientId, dueAt })
-        : await agendarRetornoAction({ leadId, clientId, dueAt, note: draftNote || null });
+      let result: Awaited<ReturnType<typeof agendarRetornoAction>>;
+      try {
+        result = sheet === "reagendar" && nextAction?.taskId
+          ? await reagendarRetornoAction({ taskId: nextAction.taskId, clientId, dueAt })
+          : await agendarRetornoAction({ leadId, clientId, dueAt, note: draftNote || null });
+      } catch (cause) {
+        result = { ok: false, error: normalizeActionError(cause).cause };
+      }
       if (!result.ok) {
-        // Erro mantém data e observação digitadas.
-        setError(result.error);
+        // Erro mantém data e observação digitadas; o mesmo botão tenta de novo.
+        setError(actionErrorMessage(normalizeActionError(result, "O retorno não foi salvo"), "A data continua escolhida"));
+        fire("error");
         return;
       }
+      fire("confirm");
       const repeated = "repeated" in result && result.repeated === true;
       setSheet(null);
       setDraftDate("");
@@ -78,12 +94,22 @@ export function LightNextActionPanel({ clientId, leadId, nextAction }: { clientI
     if (!nextAction?.taskId) return;
     setError(null);
     setFeedback(null);
+    setFailedDone(false);
+    fire("tap");
     startTransition(async () => {
-      const result = await setLeadTaskDoneAction(nextAction.taskId!, "done");
+      let result: Awaited<ReturnType<typeof setLeadTaskDoneAction>>;
+      try {
+        result = await setLeadTaskDoneAction(nextAction.taskId!, "done");
+      } catch (cause) {
+        result = { error: normalizeActionError(cause).cause };
+      }
       if (result.error) {
-        setError(result.error);
+        setError(actionErrorMessage(normalizeActionError(result, "O retorno não foi concluído"), "Ele continua na sua agenda"));
+        setFailedDone(true);
+        fire("error");
         return;
       }
+      fire("confirm");
       setFeedback("Retorno concluído.");
       router.refresh();
     });
@@ -114,12 +140,13 @@ export function LightNextActionPanel({ clientId, leadId, nextAction }: { clientI
             <p className={styles.empty}>{nextAction.reason}{nextAction.dueAt ? ` · ${dateTimeFormat.format(new Date(nextAction.dueAt))}` : ""}</p>
           </div>
           <div className={styles.actions}>
-            <Button variant="primary" loading={pending} disabled={pending} onClick={concluir}>Já falei</Button>
+            <Button variant="primary" loading={pending} disabled={pending} onClick={concluir}>{failedDone ? "Tentar de novo" : "Já falei"}</Button>
             <Button variant="secondary" disabled={pending} onClick={() => openSheet("reagendar")}>Reagendar</Button>
           </div>
         </>
       )}
-      {feedback ? <p role="status" className={styles.empty}>{feedback}</p> : null}
+      {/* Confirmação no próprio painel: o check se desenha depois que o servidor confirma. */}
+      {feedback ? <LiteSuccess label={feedback} className={styles.empty} /> : null}
       {error && sheet === null ? <p role="alert" className={styles.empty}>{error}</p> : null}
 
       <BottomSheet

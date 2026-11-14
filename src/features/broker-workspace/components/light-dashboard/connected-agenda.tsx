@@ -9,8 +9,7 @@ import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { motionTokens } from "@/components/arc/motion-tokens";
 import { ArrowsClockwise, CalendarBlank, ChevronRightIcon, ListChecks, Phone } from "@/components/huge-icons";
-import type { ChatServerActionName } from "@/components/chat/types";
-import { runChatServerAction, type ChatServerActionResult } from "@/features/broker-workspace/chat/chat-actions";
+import { LiteSuccess } from "@/components/lite/motion/success";
 import {
   AGENDA_KIND_LABELS,
   agendaDestination,
@@ -21,6 +20,8 @@ import {
   type AgendaEntryKind,
 } from "@/features/broker-workspace/agenda-connected";
 
+import { AgendaNotice } from "./agenda-notice";
+import { useAgendaAction } from "./use-agenda-action";
 import { useMinuteClock } from "./use-minute-clock";
 
 const KIND_ICONS: Record<AgendaEntryKind, ComponentType<{ className?: string; "aria-hidden"?: boolean }>> = {
@@ -46,30 +47,15 @@ export function ConnectedAgenda({ entries, duty, generatedAt }: {
   /** Hora do servidor, usada até o relógio do navegador montar (evita grupos diferentes na hidratação). */
   generatedAt: string;
 }) {
-  type UndoAction = NonNullable<ChatServerActionResult["undo"]>["action"];
-  const router = useRouter();
   const clock = useMinuteClock();
   const reduceMotion = useReducedMotion();
   const now = useMemo(() => clock ?? new Date(generatedAt), [clock, generatedAt]);
   const groups = useMemo(() => groupAgendaEntries(entries, now), [entries, now]);
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ message: string; undo?: UndoAction } | null>(null);
+  const { busyId, done, notice, execute: run, retry } = useAgendaAction();
 
-  async function execute(id: string, name: ChatServerActionName, payload: Record<string, unknown>) {
-    setBusyId(id);
-    try {
-      const result = await runChatServerAction(name, payload);
-      setNotice({ message: result.message, undo: result.ok ? result.undo?.action : undefined });
-      if (result.ok) {
-        setReschedulingId(null);
-        router.refresh();
-      }
-    } catch {
-      setNotice({ message: "Não consegui atualizar este item. Tente de novo." });
-    } finally {
-      setBusyId(null);
-    }
+  async function execute(id: string, name: Parameters<typeof run>[1], payload: Record<string, unknown>) {
+    if (await run(id, name, payload)) setReschedulingId(null);
   }
 
   const enter = reduceMotion ? false : { opacity: 0, y: motionTokens.distance.xs };
@@ -95,14 +81,7 @@ export function ConnectedAgenda({ entries, duty, generatedAt }: {
         </Link>
       ) : null}
 
-      {notice ? (
-        <p className="flex flex-wrap items-center gap-3 rounded-2xl bg-(--surface-muted) px-4 py-3 text-sm text-(--text-secondary)" role="status" aria-live="polite">
-          <span>{notice.message}</span>
-          {notice.undo ? (
-            <Button size="sm" variant="secondary" loading={busyId === "undo"} onClick={() => execute("undo", notice.undo!.name, notice.undo!.payload)}>Desfazer</Button>
-          ) : null}
-        </p>
-      ) : null}
+      <AgendaNotice notice={notice} busyId={busyId} onUndo={(name, payload) => void execute("undo", name, payload)} onRetry={retry} />
 
       {groups.length === 0 ? (
         <section className="grid justify-items-start gap-3 rounded-3xl bg-(--surface-muted) p-5 shadow-(--shadow-resting)" aria-label="Agenda vazia">
@@ -153,6 +132,11 @@ export function ConnectedAgenda({ entries, duty, generatedAt }: {
                           {group.key === "atrasados" ? <Badge tone="warning" size="sm">Atrasado</Badge> : entry.priority === "urgent" ? <Badge tone="danger" size="sm">Urgente</Badge> : null}
                         </span>
                       </div>
+                      {done?.id === entry.id ? (
+                        <div className="flex min-h-9 items-center text-sm font-medium text-(--success) sm:pl-[3.25rem]">
+                          <LiteSuccess label={done.label} />
+                        </div>
+                      ) : (
                       <div className="flex flex-wrap items-center gap-2 sm:pl-[3.25rem]">
                         <Button size="sm" variant="secondary" loading={busy} disabled={busyId !== null} onClick={() => execute(entry.id, "lead.completeReturn", { taskId: entry.id })}>Concluir</Button>
                         <Button size="sm" variant="ghost" disabled={busyId !== null} aria-expanded={reschedulingId === entry.id} onClick={() => setReschedulingId(reschedulingId === entry.id ? null : entry.id)}>Reagendar</Button>
@@ -163,7 +147,8 @@ export function ConnectedAgenda({ entries, duty, generatedAt }: {
                           </Link>
                         ) : null}
                       </div>
-                      {reschedulingId === entry.id ? (
+                      )}
+                      {reschedulingId === entry.id && done?.id !== entry.id ? (
                         <div className="flex flex-wrap gap-2 sm:pl-[3.25rem]" role="group" aria-label={`Novo prazo para ${entry.leadName}`}>
                           {RESCHEDULE_OPTIONS.map((option) => (
                             <Button key={option.value} size="sm" variant="secondary" loading={busy} disabled={busyId !== null} onClick={() => execute(entry.id, "lead.scheduleReturn", { leadId: entry.leadId, when: option.value, taskId: entry.id })}>
