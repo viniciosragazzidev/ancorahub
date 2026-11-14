@@ -19,6 +19,7 @@ import { ClosingOutcomeCard } from "./closing-outcome-card";
 import { ClientInfoCard, IdentityHeader } from "./identity-zone";
 import { LeadNotices } from "./lead-notices";
 import { PeopleDataSection } from "./people-data-section";
+import { useQuickSaleAutoOpen } from "./quick-sale-auto-open";
 import { SaleDocSheet } from "./sale-doc-sheet";
 import { SaleSection } from "./sale-section";
 import { StepSheet } from "./step-sheet";
@@ -51,6 +52,7 @@ export function LightLeadDetail({
   commercialValuesEnabled = false,
   quotePlans = [],
   saleRegistrationV2Enabled = false,
+  openSaleOnLoad = false,
 }: {
   lead: LightLeadDetailData;
   /** Kept for the page contract; the responsible broker is no longer printed on this screen. */
@@ -67,9 +69,12 @@ export function LightLeadDetail({
   commercialValuesEnabled?: boolean;
   quotePlans?: Array<{ id: string; name: string }>;
   saleRegistrationV2Enabled?: boolean;
+  /** Registrar venda em dois toques: a página recebeu `?registrar-venda=1` com a chave ligada. */
+  openSaleOnLoad?: boolean;
 }) {
   const isManagement = mode === "management";
   const c = useLeadDetail({ lead, requirements, documents, initialDetailsExpanded: isManagement });
+  useQuickSaleAutoOpen({ enabled: openSaleOnLoad && !isManagement && variant !== "details", lead, c, registrationV2Enabled: saleRegistrationV2Enabled });
 
   // Lead already taken by someone else (or finished): nothing to act on. The panel keeps the history visible.
   if (variant === "page" && !isManagement && !lead.isCurrentBroker && c.isDistributed === false) {

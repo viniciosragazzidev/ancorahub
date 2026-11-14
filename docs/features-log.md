@@ -2,6 +2,14 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Início do corretor e CRM, parte B: Registrar venda em dois toques
+
+- Em Minha carteira, ao lado de Adicionar contato, **Registrar venda** abre a folha `QuickRegisterSaleSheet` (`src/features/broker-workspace/components/quick-register-sale.tsx`, exportada para a entrada no Início): busca por nome ou telefone e a lista dos leads do próprio corretor em negociação, os mais adiantados no funil primeiro (Em análise, Documentação pendente, Negociação, Cotação enviada, Aguardando retorno, Em atendimento). Novo e Distribuído ficam de fora porque ainda não abrem o registro. Estados de carregamento, vazio e erro com tentar de novo.
+- A lista vem da server action `listQuickSaleLeadsAction` (zod estrito, sessão via `getRequiredTenantContext`, mesmo predicado da carteira com `buildLeadScopeWhere` e o corretor como responsável, busca e limite de 30 no servidor). Leitura, sem auditoria.
+- Tocar num lead abre `/leads/[id]?registrar-venda=1`. A tela do lead do corretor abre uma vez o mesmo fluxo do botão da seção Etapa atual (assistente ou painel de registro, conforme `feature_broker_sale_registration_v2_enabled`; no fluxo anterior, o Registrar venda de documentação) e limpa o parâmetro com `history.replaceState`. Quando o botão não estaria disponível (não aceito, perdido, já registrado, venda em andamento, documentação em análise ou rejeitada), mostra só um aviso com o motivo. Nenhuma regra de venda, aprovação ou validação mudou.
+- Chave `feature_broker_quick_sale_enabled` (global, ligada por padrão), no card Novidades do corretor do Super-admin, que já audita (`broker_news.settings_updated`). Desligada, some o acesso e o parâmetro é ignorado. Sem migration.
+- Verificação visual em prévia temporária com dados sintéticos (320, 375 e desktop), removida antes do commit.
+
 ## 13/11/2026 - Meu financeiro do corretor no Lite (somente leitura)
 
 - Parte C do plano "Início do corretor e CRM". Rota `/meu-financeiro` no Lite (título "Meu financeiro", volta ao Início): no topo **A receber**, **Recebido no mês** e **Adiantamentos em aberto**, em BRL e com o período; abaixo, comissões por venda (cliente, operadora e plano quando houver, parcela, competência, valor e estado textual Prevista, Conferida, Paga, Cancelada ou Em revisão de estorno), paginadas de 20 em 20, e os últimos 12 repasses conferidos com link para o recibo quando a rota de recibos está liberada ao corretor.

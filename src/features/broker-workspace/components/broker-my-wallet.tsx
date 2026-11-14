@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Receipt } from "lucide-react";
 
 import { Badge } from "@/components/arc/badge/badge";
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
@@ -30,6 +31,7 @@ import { WhatsappLogo } from "@/components/huge-icons";
 import { BrokerClientWalletList, originLabels } from "./broker-client-wallet";
 import { BrokerWalletAddContact, type BrokerWalletAddContactAction } from "./broker-wallet-add-contact";
 import type { PriorClientAction } from "./prior-client-form";
+import { QuickRegisterSaleSheet } from "./quick-register-sale";
 import walletStyles from "./broker-client-wallet.module.css";
 import styles from "./broker-my-wallet.module.css";
 
@@ -140,7 +142,21 @@ function WalletFilters({ filters, origins }: { filters: BrokerWalletFilters; ori
   );
 }
 
-function WalletControls({ filters, counts, origins, addContact }: { filters: BrokerWalletFilters; counts: BrokerMyWalletCounts; origins: string[]; addContact?: ReactNode }) {
+/** Registrar venda em dois toques (chave BROKER_QUICK_SALE): ao lado de Adicionar contato. */
+function WalletQuickSale() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="secondary" className={styles.saleButton} aria-label="Registrar venda" onClick={() => setOpen(true)}>
+        <Receipt aria-hidden="true" className={styles.addIcon} />
+        <span className={styles.addLabel}>Registrar venda</span>
+      </Button>
+      <QuickRegisterSaleSheet open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
+
+function WalletControls({ filters, counts, origins, addContact, quickSale = false }: { filters: BrokerWalletFilters; counts: BrokerMyWalletCounts; origins: string[]; addContact?: ReactNode; quickSale?: boolean }) {
   const router = useRouter();
   const [query, setQuery] = useState(filters.query ?? "");
   // Em negociação não é aba da carteira: quem está em atendimento fica em Meus leads.
@@ -169,6 +185,7 @@ function WalletControls({ filters, counts, origins, addContact }: { filters: Bro
           <SearchField label="Buscar na carteira" name="q" value={query} onValueChange={setQuery} placeholder="Nome ou telefone" clearLabel="Limpar busca" enterKeyHint="search" />
         </form>
         <WalletFilters filters={filters} origins={origins} />
+        {quickSale ? <WalletQuickSale /> : null}
         {addContact}
       </div>
     </div>
@@ -228,6 +245,7 @@ export function BrokerMyWallet({
   addContactAction,
   addPriorClientAction,
   openAddContact = false,
+  quickSaleEnabled = false,
 }: {
   filters: BrokerWalletFilters;
   counts: BrokerMyWalletCounts;
@@ -239,6 +257,8 @@ export function BrokerMyWallet({
   addPriorClientAction?: PriorClientAction;
   /** Abre o painel Adicionar contato ao chegar (Novo contato nas Ações rápidas do Início). */
   openAddContact?: boolean;
+  /** Registrar venda em dois toques (chave BROKER_QUICK_SALE). */
+  quickSaleEnabled?: boolean;
 }) {
   const leadView = isBrokerWalletLeadView(filters.view);
   const page = (leadView ? leads?.page : clients?.page) ?? 1;
@@ -264,7 +284,7 @@ export function BrokerMyWallet({
       subtitle={summary}
       className={`${walletStyles.page} ${styles.page}`}
     >
-      <WalletControls key={brokerWalletHref(effectiveFilters)} filters={effectiveFilters} counts={counts} origins={origins} addContact={addContactAction ? <BrokerWalletAddContact action={addContactAction} priorAction={addPriorClientAction} defaultOpen={openAddContact} /> : undefined} />
+      <WalletControls key={brokerWalletHref(effectiveFilters)} filters={effectiveFilters} counts={counts} origins={origins} quickSale={quickSaleEnabled} addContact={addContactAction ? <BrokerWalletAddContact action={addContactAction} priorAction={addPriorClientAction} defaultOpen={openAddContact} /> : undefined} />
 
       <div key={filters.view} className={styles.viewBody}>
         {hasRows ? (

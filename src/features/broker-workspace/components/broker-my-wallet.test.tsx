@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const push = vi.fn();
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
+vi.mock("../quick-sale-actions", () => ({ listQuickSaleLeadsAction: vi.fn(async () => ({ ok: true, leads: [] })) }));
 vi.mock("@/components/arc/button/button", () => ({
   Button: ({ children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; loading?: boolean; size?: string }) => {
     const { variant, loading, size, ...buttonProps } = props;
@@ -162,6 +163,20 @@ describe("Minha carteira", () => {
     render(<BrokerMyWallet filters={normalizeBrokerWalletFilters({ view: "negotiating", query: "zzz" })} counts={counts} origins={[]} leads={{ ...leads, rows: [], totalCount: 0, totalPages: 0 }} />);
     expect(screen.getByText("Nada encontrado")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Limpar busca e filtros" }).getAttribute("href")).toBe("/clientes?view=negotiating&page=1");
+  });
+
+  it("Registrar venda só aparece com a chave e abre a folha com os leads em negociação", async () => {
+    const filters = normalizeBrokerWalletFilters({ view: "all" });
+    const { unmount } = render(<BrokerMyWallet filters={filters} counts={counts} origins={["webhook"]} clients={clients} />);
+    expect(screen.queryByRole("button", { name: "Registrar venda" })).toBeNull();
+    unmount();
+
+    render(<BrokerMyWallet filters={filters} counts={counts} origins={["webhook"]} clients={clients} quickSaleEnabled />);
+    const sheet = screen.getByRole("region", { name: "Registrar venda" });
+    expect(sheet.getAttribute("data-open")).toBe("false");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Registrar venda" })); });
+    expect(screen.getByRole("region", { name: "Registrar venda" }).getAttribute("data-open")).toBe("true");
+    expect(await screen.findByText("Nenhum lead em negociação")).toBeTruthy();
   });
 
   it("Adicionar contato só aparece com a ação e oferece apenas Novo interessado", () => {

@@ -67,6 +67,8 @@ import { LeadDocumentsSection } from "@/features/documents/components/lead-docum
 import { LeadActionHub } from "@/features/leads/components/lead-action-hub";
 import { getFeatureFlag, getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { QUICK_SALE_PARAM } from "@/features/broker-workspace/quick-sale";
+import { isBrokerQuickSaleEnabled } from "@/features/broker-workspace/quick-sale-flag";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { getCachedLegacyPlans } from "@/features/leads/reference-data";
 import { LeadQuotesSection } from "@/features/leads/components/lead-quotes-section";
@@ -96,8 +98,8 @@ function getCurrentTimestamp() {
   return Date.now();
 }
 
-export default async function LeadDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ficha?: string }> }) {
-  const [{ id }, { ficha }] = await Promise.all([params, searchParams]);
+export default async function LeadDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ficha?: string; [QUICK_SALE_PARAM]?: string }> }) {
+  const [{ id }, { ficha, [QUICK_SALE_PARAM]: quickSaleParam }] = await Promise.all([params, searchParams]);
   const context = await getRequiredTenantContext();
   if (context.role === "broker") {
     const db = getDatabase();
@@ -153,14 +155,14 @@ export default async function LeadDetailPage({ params, searchParams }: { params:
   if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
     return (
       <Suspense fallback={<LightPageSkeleton variant="detail" />}>
-        <LeadDetailContent id={id} ficha={ficha === "1"} />
+        <LeadDetailContent id={id} ficha={ficha === "1"} quickSaleRequested={quickSaleParam === "1"} />
       </Suspense>
     );
   }
   return <LeadDetailContent id={id} />;
 }
 
-async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: boolean }) {
+async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false }: { id: string; ficha?: boolean; quickSaleRequested?: boolean }) {
   const context = await getRequiredTenantContext();
   const isMarketing = context.jobTitle === "marketing";
   const brokerInternalChatEnabled =
@@ -343,6 +345,8 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
   const saleRegistrationV2Enabled = isLightBroker
     ? (await getSystemSetting(FEATURE_FLAGS.BROKER_SALE_REGISTRATION_V2.key).catch(() => null)) === "true"
     : false;
+  // Registrar venda em dois toques: `?registrar-venda=1` abre o registro na tela do lead; chave desligada, é ignorado.
+  const openSaleOnLoad = isLightBroker && quickSaleRequested && await isBrokerQuickSaleEnabled();
   const [metaCampaign, metaAd, metaForm] = isLightBroker ? [[], [], []] : await Promise.all([
     lead.metaCampaignId
       ? db.select({ name: schema.metaCampaigns.name }).from(schema.metaCampaigns)
@@ -570,6 +574,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
           commercialValuesEnabled={commercialValuesEnabled}
           quotePlans={quotePlans}
           saleRegistrationV2Enabled={saleRegistrationV2Enabled}
+          openSaleOnLoad={openSaleOnLoad}
         />
         </>
       );
@@ -601,6 +606,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
         commercialValuesEnabled={commercialValuesEnabled}
         quotePlans={quotePlans}
           saleRegistrationV2Enabled={saleRegistrationV2Enabled}
+        openSaleOnLoad={openSaleOnLoad}
       />
       </>
     );
