@@ -10,6 +10,8 @@ import { Textarea } from "@/components/arc/textarea/textarea";
 import { ActionButton } from "@/components/arc/action-button/action-button";
 import { motionTokens } from "@/components/arc/lib/motion-tokens";
 
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 import { saveMySupervisorTeamAction } from "./my-team-actions";
 import { teamAvatarHue } from "./my-team-page";
 import styles from "./team-settings.module.css";
@@ -60,6 +62,8 @@ export function SupervisorTeamSettings({ initialTeam }: { initialTeam: TeamProfi
   const [imageUrl, setImageUrl] = useState(initialTeam?.imageUrl ?? null);
   const [feedback, setFeedback] = useState("");
   const isNew = !initialTeam;
+  const fire = useFeedback();
+  const [saveFailed, setSaveFailed] = useState(false);
 
   async function selectPhoto(file: File | undefined) {
     if (!file) return;
@@ -76,13 +80,23 @@ export function SupervisorTeamSettings({ initialTeam }: { initialTeam: TeamProfi
     }
   }
 
+  // Feedback nível 1 (FEEDBACK.md): o botão espera o servidor e confirma com o check; erro com causa,
+  // o que continua valendo e o botão de volta para tentar de novo.
   async function save() {
     setFeedback("");
-    const result = await saveMySupervisorTeamAction({ name, description, imageUrl });
-    if (!result.ok) {
-      setFeedback(result.message);
-      throw new Error(result.message);
+    setSaveFailed(false);
+    fire("tap");
+    const keeps = isNew ? "Nada foi criado ainda" : "O perfil anterior continua valendo";
+    try {
+      const result = await saveMySupervisorTeamAction({ name, description, imageUrl });
+      if (!result.ok) throw result;
+    } catch (error) {
+      fire("error");
+      setSaveFailed(true);
+      setFeedback(actionErrorMessage(normalizeActionError(error, "Não consegui salvar o perfil agora"), keeps));
+      throw error instanceof Error ? error : new Error("team");
     }
+    fire("confirm", { sound: isNew });
   }
 
   const pickPhoto = () => fileInput.current?.click();
@@ -134,16 +148,16 @@ export function SupervisorTeamSettings({ initialTeam }: { initialTeam: TeamProfi
           </div>
         </form>
 
-        {feedback ? <p className={styles.feedback} role="status" aria-live="polite">{feedback}</p> : null}
+        {feedback ? <p className={styles.feedback} role="alert">{feedback}</p> : null}
 
         <div className={styles.actions}>
           <Button variant="ghost" render={<Link href="/equipe/minha" />}>Cancelar</Button>
           <ActionButton
-            label={isNew ? "Criar equipe" : "Salvar alterações"}
+            label={saveFailed ? "Tentar de novo" : isNew ? "Criar equipe" : "Salvar alterações"}
             pendingLabel="Salvando"
             successLabel={isNew ? "Equipe criada" : "Perfil salvo"}
             onAction={save}
-            onActionError={(error) => setFeedback(error instanceof Error ? error.message : "Não foi possível salvar o perfil.")}
+            onActionError={() => undefined}
           />
         </div>
       </div>

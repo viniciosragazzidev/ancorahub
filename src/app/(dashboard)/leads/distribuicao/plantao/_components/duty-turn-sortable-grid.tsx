@@ -1,5 +1,6 @@
 "use client";
 
+import { plantaoDone, plantaoFailed } from "./plantao-feedback";
 import { useState, type ReactNode } from "react";
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
@@ -7,7 +8,6 @@ import { GripVertical } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/sonner";
 import { saveDutyManualQueueAction } from "@/features/lead-distribution/duty-queue-order-actions";
 import { moveDutyTurn } from "@/features/lead-distribution/duty-turn-core";
 import { cn } from "@/lib/utils";
@@ -89,11 +89,11 @@ export function DutyTurnSortableGrid({ scheduleId, dutyDate, order, queue, items
     setSaving(false);
     if (!result.ok) {
       setLocal(null);
-      toast.error(result.reason);
+      plantaoFailed(result.reason, "Não consegui atualizar o plantão agora.");
       return;
     }
     const moved = items.find((item) => item.id === movedId)?.name ?? "Corretor";
-    toast.success(nextQueue[0] === movedId ? `${moved} é o próximo a receber.` : `${moved} agora é o ${nextQueue.indexOf(movedId) + 1}º na vez.`);
+    plantaoDone(nextQueue[0] === movedId ? `${moved} é o próximo a receber.` : `${moved} agora é o ${nextQueue.indexOf(movedId) + 1}º na vez.`);
     router.refresh();
   }
 

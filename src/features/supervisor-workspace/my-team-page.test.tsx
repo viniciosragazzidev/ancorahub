@@ -8,6 +8,8 @@ const mockRemove = vi.hoisted(() => vi.fn());
 const mockAddDirectly = vi.hoisted(() => vi.fn());
 const mockResendAccessInvite = vi.hoisted(() => vi.fn());
 const mockRevokeAccessInvite = vi.hoisted(() => vi.fn());
+const refresh = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 vi.mock("./actions", () => ({ addBrokerToMyTeamAction: mockAddDirectly }));
 vi.mock("./my-team-actions", () => ({ inviteBrokerToMyTeamAction: mockInvite, cancelMyTeamInviteAction: mockCancel, removeBrokerFromMyTeamAction: mockRemove }));
 vi.mock("@/app/(dashboard)/equipe/actions", () => ({ resendInviteAction: mockResendAccessInvite, revokeInviteAction: mockRevokeAccessInvite }));
@@ -24,7 +26,7 @@ import { MyTeamPage, teamAvatarHue } from "./my-team-page";
 
 const base = { branchId: "branch-1", branchName: "Centro", overview: { brokers: 0, inService: 0, late: 0 }, ranking: null, team: null, members: [], invites: [], pendingAccessInvites: [], brokers: [{ id: "broker-1", name: "Ana Exemplo", imageUrl: null, supervisorId: null, supervisorName: null, inviteId: null }] };
 
-beforeEach(() => { cleanup(); mockInvite.mockReset(); mockCancel.mockReset(); mockRemove.mockReset(); mockAddDirectly.mockReset(); mockResendAccessInvite.mockReset(); mockRevokeAccessInvite.mockReset(); });
+beforeEach(() => { cleanup(); refresh.mockReset(); mockInvite.mockReset(); mockCancel.mockReset(); mockRemove.mockReset(); mockAddDirectly.mockReset(); mockResendAccessInvite.mockReset(); mockRevokeAccessInvite.mockReset(); });
 
 describe("MyTeamPage", () => {
   it("shows the illustrated empty state and keeps setup outside the team page", () => {
@@ -51,6 +53,29 @@ describe("MyTeamPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /Unidade/ }));
     fireEvent.click(screen.getByRole("button", { name: "Adicionar" }));
     await waitFor(() => expect(mockAddDirectly).toHaveBeenCalledWith("broker-1"));
+  });
+
+  it("confirms the direct add in place and refreshes the data instead of reloading the page", async () => {
+    mockAddDirectly.mockResolvedValue({ ok: true, message: "Pronto, o corretor entrou na sua equipe." });
+    render(<MyTeamPage initialData={{ ...base, team: { name: "Equipe Centro", description: "", imageUrl: null } }} />);
+    fireEvent.click(screen.getByRole("button", { name: /Unidade/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar" }));
+    expect((await screen.findByRole("status")).textContent).toBe("Pronto, o corretor entrou na sua equipe.");
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the cause, what still holds and a retry when the invite fails", async () => {
+    mockInvite.mockResolvedValueOnce({ ok: false, message: "Já existe um convite pendente para esse corretor." }).mockResolvedValueOnce({ ok: true, message: "Convite enviado para Ana Exemplo." });
+    render(<MyTeamPage initialData={{ ...base, team: { name: "Equipe Centro", description: "", imageUrl: null } }} />);
+    fireEvent.click(screen.getByRole("button", { name: /Unidade/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Convidar" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Já existe um convite pendente para esse corretor. Nenhum convite foi enviado.");
+    expect(refresh).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    await waitFor(() => expect(mockInvite).toHaveBeenCalledTimes(2));
+    expect((await screen.findByRole("status")).textContent).toBe("Convite enviado para Ana Exemplo.");
+    expect(screen.getByRole("button", { name: "Convite pendente" })).toBeTruthy();
   });
 
   it("derives a stable non-neutral hue from the member name", () => {

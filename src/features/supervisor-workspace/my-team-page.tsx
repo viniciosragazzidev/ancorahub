@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { SearchField } from "@/components/arc/search-field/search-field";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { resendInviteAction, revokeInviteAction } from "@/app/(dashboard)/equipe/actions";
 import { TeamInviteLiteSheet } from "@/features/team/team-invite-lite-sheet";
+import { ActionNoticeLine, useActionNotice } from "@/components/lite/feedback/action-notice";
 
 import { addBrokerToMyTeamAction } from "./actions";
 import { cancelMyTeamInviteAction, inviteBrokerToMyTeamAction, removeBrokerFromMyTeamAction } from "./my-team-actions";
@@ -32,44 +34,87 @@ export function teamAvatarHue(name: string) {
 
 export function MyTeamPage({ initialData, initialTab = "members" }: { initialData: SupervisorTeamPageData; initialTab?: "members" | "invites" | "unit" }) {
   const [data, setData] = useState(initialData);
+  // Depois de router.refresh() o servidor manda os dados novos: a lista passa a refletir o que ele confirmou.
+  const [seenData, setSeenData] = useState(initialData);
+  if (initialData !== seenData) { setSeenData(initialData); setData(initialData); }
   const [activeTab, setActiveTab] = useState<"members" | "invites" | "unit">(initialTab);
   const [unitSearch, setUnitSearch] = useState("");
-  const [feedback, setFeedback] = useState("");
+  // Feedback nível 1 (docs/design-system/FEEDBACK.md): toque vibra, o botão da linha diz "…ando", o item muda
+  // só depois do servidor e a linha de resultado confirma com check; erro com causa e "Tentar de novo".
+  const notice = useActionNotice();
+  const router = useRouter();
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const reducedMotion = useReducedMotion() ?? false;
   const normalizeName = (value: string) => value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-BR");
   const unitQuery = normalizeName(unitSearch.trim());
   const unitBrokers = data.brokers.filter((broker) => normalizeName(broker.name).includes(unitQuery));
 
-  function runAction(action: () => Promise<{ ok: boolean; message: string }>, onSuccess?: () => void) {
-    setFeedback("");
+  function runAction(key: string, action: () => Promise<{ ok: boolean; message: string }>, options: { keeps: string; fallback: string; retry: () => void; onSuccess?: () => void }) {
+    notice.tap();
+    notice.clear();
+    setBusyKey(key);
     startTransition(async () => {
-      const result = await action();
-      setFeedback(result.message);
-      if (result.ok) onSuccess?.();
+      try {
+        const result = await action();
+        if (result.ok) {
+          options.onSuccess?.();
+          notice.succeed(result.message);
+          router.refresh();
+        } else notice.fail(result, { keeps: options.keeps, fallback: options.fallback, retry: options.retry });
+      } catch (error) {
+        notice.fail(error, { keeps: options.keeps, fallback: options.fallback, retry: options.retry });
+      } finally {
+        setBusyKey(null);
+      }
     });
   }
   function removeMember(brokerId: string) {
-    runAction(() => removeBrokerFromMyTeamAction(brokerId), () => window.location.reload());
+    const name = data.members.find((member) => member.id === brokerId)?.name;
+    runAction(`remove:${brokerId}`, () => removeBrokerFromMyTeamAction(brokerId), {
+      keeps: name ? `${firstNameOf(name)} continua na equipe` : "O corretor continua na equipe",
+      fallback: "Não consegui remover agora",
+      retry: () => removeMember(brokerId),
+      onSuccess: () => setData((current) => ({ ...current, members: current.members.filter((member) => member.id !== brokerId), brokers: current.brokers.map((item) => item.id === brokerId ? { ...item, supervisorId: null, supervisorName: null } : item) })),
+    });
   }
   function invite(brokerId: string) {
-    runAction(() => inviteBrokerToMyTeamAction({ brokerId }), () => window.location.reload());
+    runAction(`invite:${brokerId}`, () => inviteBrokerToMyTeamAction({ brokerId }), {
+      keeps: "Nenhum convite foi enviado",
+      fallback: "Não consegui enviar o convite agora",
+      retry: () => invite(brokerId),
+      onSuccess: () => setData((current) => ({ ...current, brokers: current.brokers.map((item) => item.id === brokerId ? { ...item, inviteId: item.inviteId ?? `pending:${brokerId}` } : item) })),
+    });
   }
   function addDirectly(brokerId: string) {
-    runAction(() => addBrokerToMyTeamAction(brokerId), () => window.location.reload());
+    runAction(`add:${brokerId}`, () => addBrokerToMyTeamAction(brokerId), {
+      keeps: "O corretor continua livre na unidade",
+      fallback: "Não consegui adicionar agora",
+      retry: () => addDirectly(brokerId),
+    });
   }
   function cancelInvite(inviteId: string) {
-    runAction(() => cancelMyTeamInviteAction(inviteId), () => setData((current) => ({ ...current, invites: current.invites.filter((item) => item.id !== inviteId), brokers: current.brokers.map((item) => item.inviteId === inviteId ? { ...item, inviteId: null } : item) })));
+    runAction(`cancel:${inviteId}`, () => cancelMyTeamInviteAction(inviteId), {
+      keeps: "O convite continua pendente",
+      fallback: "Não consegui cancelar agora",
+      retry: () => cancelInvite(inviteId),
+      onSuccess: () => setData((current) => ({ ...current, invites: current.invites.filter((item) => item.id !== inviteId), brokers: current.brokers.map((item) => item.inviteId === inviteId ? { ...item, inviteId: null } : item) })),
+    });
   }
   function manageAccessInvite(action: typeof resendInviteAction | typeof revokeInviteAction, invitationId: string) {
-    setFeedback("");
+    const resend = action === resendInviteAction;
     const formData = new FormData();
     formData.set("invitationId", invitationId);
-    startTransition(async () => {
+    runAction(`${resend ? "resend" : "revoke"}:${invitationId}`, async () => {
       const result = await action({}, formData);
-      const success = result.success === true;
-      setFeedback(success ? (action === resendInviteAction ? "Convite reenviado." : "Convite cancelado.") : result.error ?? "Não foi possível atualizar o convite.");
-      if (success) window.location.reload();
+      return result.success === true
+        ? { ok: true, message: resend ? "Convite reenviado." : "Convite cancelado." }
+        : { ok: false, message: result.error ?? "" };
+    }, {
+      keeps: resend ? "O convite anterior continua valendo" : "O convite continua pendente",
+      fallback: "Não consegui atualizar o convite agora",
+      retry: () => manageAccessInvite(action, invitationId),
+      onSuccess: resend ? undefined : () => setData((current) => ({ ...current, pendingAccessInvites: current.pendingAccessInvites.filter((item) => item.id !== invitationId) })),
     });
   }
 
@@ -87,7 +132,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
       </motion.section> : <EmptyState label="Equipe ainda não criada" title="Sua equipe começa com um bom plano" description="Crie o perfil da equipe e convide corretores da sua unidade." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} action={<Button render={<Link href="/equipe/minha/configurar" />}>Criar minha equipe</Button>} />}
 
       <SegmentedControl label="Seções da equipe" value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} options={[{ value: "members", label: "Membros", accessory: <Badge size="sm">{data.members.length}</Badge> }, { value: "invites", label: "Convites", accessory: <Badge size="sm">{data.invites.length + data.pendingAccessInvites.length}</Badge> }, { value: "unit", label: "Unidade", accessory: <Badge size="sm">{data.brokers.length}</Badge> }]} />
-      {feedback ? <motion.p className={styles.feedback} role="status" aria-live="polite" initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reducedMotion ? 0.12 : 0.2 }}>{feedback}</motion.p> : null}
+      <div aria-live="polite"><ActionNoticeLine notice={notice.notice} /></div>
 
       {activeTab === "members" ? <TeamOnDutyList duty={initialData.onDuty ?? []} /> : null}
       {activeTab === "members" ? (data.members.length ? <PeopleSection id="team-members-title" title="Membros" count={data.members.length}>
@@ -103,14 +148,14 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
           dot={member.late ? "alert" : null}
           dotLabel={member.late ? "Tem lead atrasado" : undefined}
           action={<BottomSheet className="arc-venancor" trigger={<button type="button" className={styles.memberMenuTrigger} aria-label={`Ações de ${member.name}`}>•••</button>} title={`Ações de ${member.name}`} description="Escolha uma ação para este membro." closeLabel="Fechar" detents={[0.38, 0.7]}>
-            <MemberSheetActions memberId={member.id} memberName={member.name} pending={pending} onRemove={() => removeMember(member.id)} />
+            <MemberSheetActions memberId={member.id} memberName={member.name} pending={pending} removing={busyKey === `remove:${member.id}`} onRemove={() => removeMember(member.id)} />
           </BottomSheet>}
         />)}
       </PeopleSection> : <EmptyState title="Sua equipe ainda não tem membros" description="Adicione alguém da sua unidade ou envie um convite." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} action={<Button variant="outline" onClick={() => setActiveTab("unit")}>Ver corretores da unidade</Button>} />) : null}
 
       {activeTab === "invites" ? (data.invites.length || data.pendingAccessInvites.length ? <PeopleSection id="team-invites-title" title="Convites pendentes" count={data.invites.length + data.pendingAccessInvites.length}>
-        {data.pendingAccessInvites.map((invite, index) => <PeopleRow key={invite.id} index={index} name={invite.brokerName} chip="Primeiro acesso" preview={`${invite.email ?? "sem e-mail"} · ${shortDate.format(new Date(invite.createdAt))}`} action={<div className={styles.brokerActions}><Button variant="outline" size="sm" disabled={pending} onClick={() => manageAccessInvite(resendInviteAction, invite.id)}>Reenviar</Button><Button variant="ghost" size="sm" disabled={pending} onClick={() => manageAccessInvite(revokeInviteAction, invite.id)}>Cancelar</Button></div>} />)}
-        {data.invites.map((invite, index) => <PeopleRow key={invite.id} index={data.pendingAccessInvites.length + index} name={invite.brokerName} chip="Convite para a equipe" preview={shortDate.format(new Date(invite.createdAt))} action={<Button variant="outline" size="sm" disabled={pending} onClick={() => cancelInvite(invite.id)}>Cancelar convite</Button>} />)}
+        {data.pendingAccessInvites.map((invite, index) => <PeopleRow key={invite.id} index={index} name={invite.brokerName} chip="Primeiro acesso" preview={`${invite.email ?? "sem e-mail"} · ${shortDate.format(new Date(invite.createdAt))}`} action={<div className={styles.brokerActions}><Button variant="outline" size="sm" disabled={pending} aria-busy={busyKey === `resend:${invite.id}` || undefined} onClick={() => manageAccessInvite(resendInviteAction, invite.id)}>{busyKey === `resend:${invite.id}` ? "Reenviando…" : "Reenviar"}</Button><Button variant="ghost" size="sm" disabled={pending} aria-busy={busyKey === `revoke:${invite.id}` || undefined} onClick={() => manageAccessInvite(revokeInviteAction, invite.id)}>{busyKey === `revoke:${invite.id}` ? "Cancelando…" : "Cancelar"}</Button></div>} />)}
+        {data.invites.map((invite, index) => <PeopleRow key={invite.id} index={data.pendingAccessInvites.length + index} name={invite.brokerName} chip="Convite para a equipe" preview={shortDate.format(new Date(invite.createdAt))} action={<Button variant="outline" size="sm" disabled={pending} aria-busy={busyKey === `cancel:${invite.id}` || undefined} onClick={() => cancelInvite(invite.id)}>{busyKey === `cancel:${invite.id}` ? "Cancelando…" : "Cancelar convite"}</Button>} />)}
       </PeopleSection> : <EmptyState title="Nenhum convite pendente" description="Os convites enviados para corretores aparecem aqui." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} />) : null}
 
       {activeTab === "unit" ? <>
@@ -122,7 +167,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
           name={broker.name}
           avatar={broker.imageUrl ? <Avatar name={broker.name} src={broker.imageUrl} size="lg" /> : undefined}
           preview={broker.supervisorName ? `Equipe de ${broker.supervisorName}` : "Livre para entrar na equipe"}
-          action={broker.supervisorId ? <Link className={styles.textLink} href="/equipe/transferencia">Pedir transferência</Link> : broker.inviteId ? <Button variant="outline" size="sm" disabled>Convite pendente</Button> : <div className={styles.brokerActions}><Button size="sm" disabled={pending} onClick={() => addDirectly(broker.id)}>Adicionar</Button><Button variant="outline" size="sm" disabled={pending || !data.team} onClick={() => invite(broker.id)}>Convidar</Button></div>}
+          action={broker.supervisorId ? <Link className={styles.textLink} href="/equipe/transferencia">Pedir transferência</Link> : broker.inviteId ? <Button variant="outline" size="sm" disabled>Convite pendente</Button> : <div className={styles.brokerActions}><Button size="sm" disabled={pending} aria-busy={busyKey === `add:${broker.id}` || undefined} onClick={() => addDirectly(broker.id)}>{busyKey === `add:${broker.id}` ? "Adicionando…" : "Adicionar"}</Button><Button variant="outline" size="sm" disabled={pending || !data.team} aria-busy={busyKey === `invite:${broker.id}` || undefined} onClick={() => invite(broker.id)}>{busyKey === `invite:${broker.id}` ? "Convidando…" : "Convidar"}</Button></div>}
         />)}
       </PeopleSection> : <EmptyState title={unitQuery ? "Nenhum corretor encontrado" : "Não há outros corretores ativos"} description={unitQuery ? "Tente outro nome ou limpe a busca para ver os corretores da sua unidade." : "Quando houver corretores disponíveis na sua unidade, eles aparecerão aqui."} icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} />}
       </> : null}
@@ -133,7 +178,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
 const firstNameOf = (name: string) => name.trim().split(/\s+/)[0] ?? name;
 
 /** Member actions in the sheet: shortcuts first, removal behind a confirmation step. */
-function MemberSheetActions({ memberId, memberName, pending, onRemove }: { memberId: string; memberName: string; pending: boolean; onRemove: () => void }) {
+function MemberSheetActions({ memberId, memberName, pending, removing = false, onRemove }: { memberId: string; memberName: string; pending: boolean; removing?: boolean; onRemove: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const id = encodeURIComponent(memberId);
   return (
@@ -148,7 +193,7 @@ function MemberSheetActions({ memberId, memberName, pending, onRemove }: { membe
           <p>Tirar {firstNameOf(memberName)} da sua equipe? Ele volta a ficar livre na unidade e o histórico de leads é mantido.</p>
           <div className={styles.sheetDangerActions}>
             <Button variant="ghost" onClick={() => setConfirming(false)}>Voltar</Button>
-            <Button variant="destructive" disabled={pending} onClick={onRemove}>Sim, remover</Button>
+            <Button variant="destructive" disabled={pending} aria-busy={removing || undefined} onClick={onRemove}>{removing ? "Removendo…" : "Sim, remover"}</Button>
           </div>
         </div>
       ) : (
