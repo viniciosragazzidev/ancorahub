@@ -2,6 +2,10 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Lite: movimento por frequência de uso
+
+- Meta do dia e ranking da semana animam só na primeira abertura do dia (`useFirstTimeToday`, dia de São Paulo); avisos ocasionais e tour em até 320ms; gradiente do consentimento sem loop. Tabela em `docs/ux/motion-frequencia.md`.
+
 ## 13/11/2026 - Lite: feedback e foco (Motion e UX, fase 3)
 
 - Confirmação no próprio lugar com `LiteSuccess` ao registrar venda (Etapa atual; sem overlay no v2, toast de apoio) e ao salvar a ficha do cliente e as ações rápidas do perfil; `LitePress` nos cartões e links primários da home do corretor e nas linhas de conversa; uma ação primária por tela na home (Ferramentas em ghost, aceites da lista secundários); contador da Fila e da aba Leads pulsa uma vez (240 ms) só quando sobe, nada com movimento reduzido.
