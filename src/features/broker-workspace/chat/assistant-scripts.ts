@@ -208,13 +208,14 @@ function threadSort(left: ThreadSummary, right: ThreadSummary) {
 
 export function buildAssistantThreads(input: {
   data: BrokerWorkspaceData;
-  capabilities: { quoteSimulator: boolean; dutyCalendar: boolean; journey?: boolean; homeV2?: boolean };
+  /** walletUnified: com a Minha carteira ligada, Meus leads e Minha carteira viram uma linha só (abas Em atendimento e Clientes). */
+  capabilities: { quoteSimulator: boolean; dutyCalendar: boolean; journey?: boolean; homeV2?: boolean; walletUnified?: boolean };
   journey?: BrokerJourneyData | null;
   now: Date;
 }): ThreadSummary[] {
   const threads = buildAllAssistantThreads(input);
   if (!input.capabilities.homeV2) return threads.sort(threadSort);
-  return arrangeHomeV2(threads);
+  return arrangeHomeV2(threads, input.capabilities.walletUnified ?? false);
 }
 
 /**
@@ -225,7 +226,7 @@ export function buildAssistantThreads(input: {
 const HOME_V2_ORDER: readonly AssistantId[] = ["ancora", "leads", "carteira", "plantao", "agenda", "desempenho", "cotacao"];
 export const HOME_V2_PLANTAO_HREF = "/plantoes";
 
-function arrangeHomeV2(threads: ThreadSummary[]): ThreadSummary[] {
+function arrangeHomeV2(threads: ThreadSummary[], walletUnified: boolean): ThreadSummary[] {
   const carteira = assistantThread("carteira", {
     preview: "Seus clientes e contatos.",
     at: null,
@@ -237,6 +238,13 @@ function arrangeHomeV2(threads: ThreadSummary[]): ThreadSummary[] {
   // Plantões em uma entrada única (etapa 3): o Plantão abre o plantão atual, o calendário e a escala.
   const plantao = byId.get("plantao");
   if (plantao) byId.set("plantao", { ...plantao, href: HOME_V2_PLANTAO_HREF });
+  // Minha carteira em uma entrada só: a linha dos leads (com os avisos dela) leva o nome e o rosto da carteira e abre
+  // na aba Em atendimento; a aba Clientes fica ao lado. A linha separada da carteira sai.
+  const leads = byId.get("leads");
+  if (walletUnified && leads) {
+    byId.set("leads", { ...leads, name: ASSISTANTS.carteira.name, shape: ASSISTANTS.carteira.shape, hue: ASSISTANTS.carteira.hue, href: "/leads?tab=minha-fila" });
+    byId.delete("carteira");
+  }
   return HOME_V2_ORDER.flatMap((id) => byId.get(id) ?? []);
 }
 

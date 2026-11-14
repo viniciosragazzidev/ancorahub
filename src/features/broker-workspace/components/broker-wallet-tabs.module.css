@@ -1,0 +1,4 @@
+/* Abas principais da Minha carteira: ocupam a largura toda, em duas metades iguais, acima dos filtros de cada aba. */
+.tabs { display: flex; width: 100%; }
+.tabs > :global(*) { flex: 1 1 auto; }
+.tabs :global([data-slot="segmented-control-item"]) { flex: 1 1 0; font-weight: 600; }

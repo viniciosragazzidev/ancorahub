@@ -10,6 +10,7 @@ import { Button } from "@/components/arc/button/button";
 import { motionTokens } from "@/components/arc/motion-tokens";
 import { PeopleEmpty, PeopleFilters, PeoplePage, PeopleRow, PeopleSection } from "@/components/light/people-list/people-list";
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
+import { BrokerWalletTabs } from "@/features/broker-workspace/components/broker-wallet-tabs";
 import { AcceptLeadButton } from "@/features/broker-workspace/components/accept-lead-button";
 import { formatBrokerArrival, groupByArrivalDay, isBrokerArrivalToday } from "@/features/broker-workspace/arrival";
 import styles from "./light-leads-list.module.css";
@@ -241,10 +242,13 @@ export function LightLeadsList({
   leads,
   initialFilter,
   availabilityStatus = "available",
+  walletTabs = false,
 }: {
   leads: LightLeadItem[];
   initialFilter?: FilterTab;
   availabilityStatus?: "available" | "paused" | "offline";
+  /** Minha carteira ligada: a fila vira a aba Em atendimento, ao lado de Clientes. */
+  walletTabs?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -295,6 +299,7 @@ export function LightLeadsList({
       <LightAvailabilityBanner initialStatus={availabilityStatus} />
 
       <PeoplePage>
+        {walletTabs ? <BrokerWalletTabs value="atendimento" /> : null}
         {filter !== "closed" && !searching ? <NowBlock items={nowItems} /> : null}
         <PeopleFilters
           label="Etapas da fila"

@@ -20,6 +20,15 @@ describe("Início reorganizado (BROKER_NAV_REORG)", () => {
     expect(threads.map((t) => t.assistant)).toEqual(["ancora", "leads", "carteira", "plantao", "agenda", "desempenho", "cotacao"]);
     expect(threads.find((t) => t.assistant === "carteira")).toMatchObject({ name: "Minha carteira", href: "/clientes", waitingYou: false });
   });
+  it("joins Meus leads and Minha carteira in one row that opens Em atendimento, keeping the leads signals", () => {
+    const data = workspace({ queue: [lead()] });
+    const split = buildAssistantThreads({ data, now, capabilities: { quoteSimulator: true, dutyCalendar: true, homeV2: true } });
+    const threads = buildAssistantThreads({ data, now, capabilities: { quoteSimulator: true, dutyCalendar: true, homeV2: true, walletUnified: true } });
+    expect(threads.map((t) => t.assistant)).toEqual(["ancora", "leads", "plantao", "agenda", "desempenho", "cotacao"]);
+    const wallet = threads.find((t) => t.assistant === "leads");
+    const leadsBefore = split.find((t) => t.assistant === "leads");
+    expect(wallet).toMatchObject({ name: "Minha carteira", href: "/leads?tab=minha-fila", shape: ASSISTANTS.carteira.shape, preview: leadsBefore?.preview, waitingYou: leadsBefore?.waitingYou });
+  });
   it("leaves out Cotação when the simulator is off and keeps the old Início when the flag is off", () => {
     const base = { data: workspace(), now, journey: journey() };
     expect(buildAssistantThreads({ ...base, capabilities: { quoteSimulator: false, dutyCalendar: false, homeV2: true } }).map((t) => t.assistant)).toEqual(["ancora", "leads", "carteira", "plantao", "agenda", "desempenho"]);

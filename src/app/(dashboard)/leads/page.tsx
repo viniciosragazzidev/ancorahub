@@ -39,6 +39,7 @@ import { withRadarSignals } from "@/features/supervisor-workspace/radar-signals"
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import type { TenantContext } from "@/shared/auth/types";
 import { LightLeadsList, type LightLeadItem } from "@/features/broker-workspace/components/light-leads-list";
+import { isBrokerMyWalletEnabled } from "@/features/customers/broker-my-wallet-flag";
 import { stripLeadOriginForRole } from "@/features/leads/broker-visibility";
 import { isOutsideManagerScope, MANAGER_HOME_PATH } from "@/features/manager-scope/manager-routes";
 import { redirect } from "next/navigation";
@@ -236,7 +237,8 @@ async function LeadsPageContent({
       };
     });
 
-    return <LightLeadsList leads={lightItems} />;
+    // Minha carteira ligada: a fila é a aba Em atendimento, ao lado de Clientes.
+    return <LightLeadsList leads={lightItems} walletTabs={await isBrokerMyWalletEnabled().catch(() => false)} />;
   }
 
   const filters = await searchParams;

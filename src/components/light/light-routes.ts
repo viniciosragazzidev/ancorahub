@@ -309,6 +309,8 @@ export type LightRouteOptions = {
 export function resolveLightRoute(pathname: string, search: LightSearchParams | null = null, options: LightRouteOptions = {}): LightRoute {
   const path = pathname.split("?")[0].replace(/(.)\/+$/, "$1");
   if (options.brokerMyWallet && path === "/clientes") return { title: "Minha carteira", tab: "mais", isRoot: false, parentHref: "/dashboard" };
+  // Minha carteira em uma entrada só: a fila de leads é a aba Em atendimento, com o mesmo título.
+  if (options.brokerMyWallet && path === "/leads") return { title: "Minha carteira", tab: "fila", isRoot: false, parentHref: "/dashboard", backToParent: true, hidesTabBar: true };
   if (path === "/implantacoes") return { title: "Implantação", tab: "mais", isRoot: false, parentHref: "/dashboard" };
   if (path === "/financeiro") return { title: "Financeiro", tab: "mais", isRoot: false, parentHref: "/dashboard" };
   if (/^\/financeiro\/lancamentos\/[^/]+$/.test(path)) return { title: "Lançamento financeiro", tab: "mais", isRoot: false, parentHref: "/financeiro", backToParent: true };
