@@ -88,11 +88,24 @@ export async function addLeadNoteAction(
 
     const isManagerOrDirector = context.role === "manager" || context.role === "director";
 
-    await createLeadInteraction(db, {
-      leadId: lead.id,
-      userId: context.userId,
-      tipo: "note",
-      conteudo: parsed.data.content,
+    // A nota e o registro de auditoria entram juntos (perfil do cliente, etapa 5: registrar atendimento auditado).
+    const interactionId = randomUUID();
+    await db.transaction(async (tx) => {
+      await tx.insert(schema.leadInteractions).values({
+        id: interactionId,
+        leadId: lead.id,
+        userId: context.userId,
+        tipo: "note",
+        conteudo: parsed.data.content,
+      });
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "lead_interaction",
+        entidadeId: interactionId,
+        acao: "registrou_nota",
+        metadata: { leadId: lead.id, tenantId: context.tenantId },
+      });
     });
 
     // If a manager/director adds a note to a lead owned by a broker, notify the broker

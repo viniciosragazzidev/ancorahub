@@ -27,11 +27,17 @@ import { carregarProximaAcao, carteiraFichaLiteLigada } from "@/features/carteir
 import { fichaAcoesCorretor } from "@/features/carteira/ficha-acoes-core";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import litePage from "@/components/lite/page/lite-page.module.css";
+import { BrokerClientProfile } from "@/features/broker-workspace/components/broker-client-profile/broker-client-profile";
+import { brokerClientProfileOn, loadBrokerClientProfile } from "@/features/broker-workspace/client-profile/profile-server";
+import { parseProfileTab, parseTimelineFilter } from "@/features/broker-workspace/client-profile/profile-core";
 import { ClientDetailLite } from "./client-detail-lite";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
+export default async function ClientDetailPage({ params, searchParams }: {
+  params: Promise<{ clientId: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const { clientId } = await params;
   const context = await getRequiredTenantContext();
   const db = getDatabase();
@@ -67,6 +73,35 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
   // Gestor and supervisor Lite: the Lite ficha, read through the same scoped client lookup above.
   // Corretor Lite: a mesma ficha com a próxima ação, só com a flag da carteira ligada (C2, 11/11).
   const liteAudience = await getLiteAudience(context);
+
+  // Perfil do cliente do corretor (plano do modo corretor, etapa 5), com a chave do modo corretor ligada. O cliente
+  // acima já passou pelo escopo da carteira; cada leitura e cada ação confere de novo o dono no servidor.
+  if (await brokerClientProfileOn(context, liteAudience)) {
+    const query = (await searchParams) ?? {};
+    const profile = await loadBrokerClientProfile(context, client);
+    const [requirements, checklist] = profile.canAct
+      ? await Promise.all([getRequirementsForLead(client.leadId), getLeadDocumentChecklist(client.leadId)]).catch(() => [null, null] as const)
+      : [null, null] as const;
+    const documentsSlot = profile.canAct && requirements && checklist ? (
+      <LeadDocumentsSection
+        leadId={client.leadId}
+        clientId={client.id}
+        requirements={requirements}
+        documents={await getLeadDocuments(client.leadId).catch(() => [])}
+        checklist={checklist}
+        beneficiaries={profile.beneficiaries.map((b) => ({ id: b.id, name: b.name, isHolder: b.isHolder }))}
+      />
+    ) : undefined;
+    return (
+      <BrokerClientProfile
+        data={profile}
+        documentsSlot={documentsSlot}
+        initialTab={parseProfileTab(query.aba)}
+        initialFilter={parseTimelineFilter(query.filtro)}
+      />
+    );
+  }
+
   const brokerWalletLite = liteAudience === "broker" && (await carteiraFichaLiteLigada());
   if (liteAudience === "supervisor" || liteAudience === "manager" || brokerWalletLite) {
     const [liteSales, liteActiveCustomer, timeline, documents, beneficiaries] = await Promise.all([
