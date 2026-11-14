@@ -46,7 +46,7 @@ export function BrokerWalletAddContact({ action, priorAction }: { action: Broker
       title="Adicionar contato"
       description={created ? undefined : kind === "prior"
         ? "Cliente que já possuo: fica em Clientes, sem venda, comissão ou pontos."
-        : "Novo interessado: entra em Em negociação com você como responsável."}
+        : "Novo interessado: entra em Meus leads com você como responsável."}
       closeLabel="Fechar"
       detents={[0.92]}
     >
@@ -137,7 +137,7 @@ function NewInterestedForm({ action, showKind, onCreatedChange }: { action: Brok
         <div className={styles.sheetBody} role="status">
           <p className={styles.successTitle}>{created.name} foi cadastrado.</p>
           <p className={styles.sheetText}>
-            O contato está em Em negociação, com você como responsável.
+            O contato está em Meus leads, com você como responsável.
             {created.withNote && !created.noteSaved ? " A observação não foi salva; registre-a na conversa do lead." : ""}
           </p>
           <div className={styles.sheetButtons}>

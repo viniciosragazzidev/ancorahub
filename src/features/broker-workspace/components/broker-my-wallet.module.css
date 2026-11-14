@@ -7,6 +7,11 @@
 
 .page :global(header) { align-items: center; }
 
+/* "N em negociação" no resumo leva a Meus leads. */
+.summaryLink { color: var(--chat-action-text, var(--foreground)); font-weight: 600; text-decoration: none; }
+.summaryLink:hover { text-decoration: underline; text-underline-offset: 3px; }
+.summaryLink:focus-visible { outline: 2px solid var(--chat-action-text, #2563eb); outline-offset: 2px; border-radius: 4px; }
+
 /* Abas: rótulo inteiro no tamanho normal; a faixa rola de lado quando não cabe. */
 .tabs.tabs :global([data-slot="segmented-control-item"]) { padding-inline: 12px; font-size: var(--text-sm); white-space: nowrap; flex-shrink: 0; }
 

@@ -67,12 +67,12 @@ function includes<T extends string>(list: readonly T[], value: string | undefine
 }
 
 /**
- * Normaliza a URL. Sem visão, abre "Em negociação"; o antigo `renewals` cai em "Precisa de atenção", onde as
+ * Normaliza a URL. Sem visão, abre "Clientes" (quem está em atendimento fica em Meus leads); o antigo `renewals` cai em "Precisa de atenção", onde as
  * renovações já entram quando há dado (DEC-180). Cada filtro de situação só vale na visão a que pertence.
  */
 export function normalizeBrokerWalletFilters(input: BrokerWalletFilterInput): BrokerWalletFilters {
   const requestedView = input.view === "renewals" ? "attention" : input.view;
-  const view: BrokerWalletView = includes(BROKER_WALLET_VIEWS, requestedView) ? requestedView : "negotiating";
+  const view: BrokerWalletView = includes(BROKER_WALLET_VIEWS, requestedView) ? requestedView : "all";
   const query = input.query?.trim().slice(0, 100) ?? "";
   const origin = input.origin?.trim();
   const stageList: readonly string[] = view === "negotiating"

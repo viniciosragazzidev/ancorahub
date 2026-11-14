@@ -49,9 +49,11 @@ type CustomersSearchParams = {
 
 /**
  * Minha carteira (etapa 4a do plano do modo corretor, chaves BROKER_NAV_REORG e BROKER_CLIENT_WALLET_LITE):
- * Em negociação e Arquivados vêm de leads; Clientes e Precisa de atenção, de `clients` (DEC-180).
+ * Clientes e Precisa de atenção vêm de `clients` (DEC-180); Arquivados, de leads. Em atendimento fica em Meus leads.
  */
 async function renderBrokerMyWallet(context: TenantContext, searchParams: CustomersSearchParams) {
+  // Quem está em atendimento fica em Meus leads: links antigos para "Em negociação" vão para lá.
+  if (searchParams.view === "negotiating") redirect("/leads?tab=minha-fila");
   const filters = normalizeBrokerWalletFilters({
     view: searchParams.view,
     page: searchParams.page,

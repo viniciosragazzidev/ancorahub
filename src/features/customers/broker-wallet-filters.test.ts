@@ -10,9 +10,9 @@ import {
 } from "./broker-wallet-filters";
 
 describe("Minha carteira: filtros na URL", () => {
-  it("abre Em negociação sem visão e leva o antigo renewals para Precisa de atenção", () => {
-    expect(normalizeBrokerWalletFilters({}).view).toBe("negotiating");
-    expect(normalizeBrokerWalletFilters({ view: "qualquer" }).view).toBe("negotiating");
+  it("abre Clientes sem visão e leva o antigo renewals para Precisa de atenção", () => {
+    expect(normalizeBrokerWalletFilters({}).view).toBe("all");
+    expect(normalizeBrokerWalletFilters({ view: "qualquer" }).view).toBe("all");
     expect(normalizeBrokerWalletFilters({ view: "renewals" }).view).toBe("attention");
     expect(normalizeBrokerWalletFilters({ view: "all" }).view).toBe("all");
     expect(normalizeBrokerWalletFilters({ view: "archived" }).view).toBe("archived");

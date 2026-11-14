@@ -143,7 +143,8 @@ function WalletFilters({ filters, origins }: { filters: BrokerWalletFilters; ori
 function WalletControls({ filters, counts, origins, addContact }: { filters: BrokerWalletFilters; counts: BrokerMyWalletCounts; origins: string[]; addContact?: ReactNode }) {
   const router = useRouter();
   const [query, setQuery] = useState(filters.query ?? "");
-  const segments = (Object.keys(VIEW_LABELS) as BrokerWalletView[]).map((view) => ({
+  // Em negociação não é aba da carteira: quem está em atendimento fica em Meus leads.
+  const segments = (Object.keys(VIEW_LABELS) as BrokerWalletView[]).filter((view) => view !== "negotiating").map((view) => ({
     value: view,
     label: VIEW_LABELS[view],
     accessory: <span className={walletStyles.count}>{counts[view]}</span>,
@@ -213,7 +214,8 @@ function Pagination({ filters, page, totalPages, totalCount }: { filters: Broker
 }
 
 /**
- * Minha carteira (etapa 4a do plano do modo corretor): Em negociação e Arquivados listam leads (abrem
+ * Minha carteira (etapa 4a do plano do modo corretor): a base de relacionamento. Quem está em atendimento
+ * fica em Meus leads (o resumo do topo leva até lá). Arquivados lista leads (abrem
  * `/leads/[id]`), Clientes e Precisa de atenção listam `clients` (abrem `/clientes/[clientId]`). Busca,
  * filtros e página ficam na URL; a lista vem paginada do servidor.
  */
@@ -242,10 +244,15 @@ export function BrokerMyWallet({
   const effectiveFilters = { ...filters, page };
   const hasRows = leadView ? Boolean(leads?.rows.length) : Boolean(clients?.rows.length);
   const narrowed = hasBrokerWalletNarrowing(filters);
-  const summary = [
-    counts.negotiating === 1 ? "1 em negociação" : `${counts.negotiating} em negociação`,
-    counts.all === 1 ? "1 cliente" : `${counts.all} clientes`,
-  ].join(" · ");
+  const summary = (
+    <>
+      {counts.all === 1 ? "1 cliente" : `${counts.all} clientes`}
+      {" · "}
+      <Link href="/leads?tab=minha-fila" className={styles.summaryLink}>
+        {counts.negotiating === 1 ? "1 em negociação" : `${counts.negotiating} em negociação`}
+      </Link>
+    </>
+  );
 
   return (
     <PeoplePage
