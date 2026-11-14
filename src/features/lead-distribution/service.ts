@@ -685,7 +685,11 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
     if (!branch || (!postSaleExempt && (branch.status !== "active" || !branch.acceptingLeads || branch.isDistributionHub))) return { status: "conflict", leadId, reason: "A unidade de destino não está ativa e apta a receber leads." };
   }
   const assignmentQueueId = options?.manualTransferOverride
-    ? await ensureDefaultQueue(context.tenantId, assignmentBranchId, context.userId)
+    // Unidade sem fila padrão ativa não trava a transferência manual: fica na fila atual (Vinicios, 14/11).
+    ? await ensureDefaultQueue(context.tenantId, assignmentBranchId, context.userId).catch((error: unknown) => {
+      if (error instanceof Error && error.message.startsWith("A unidade não possui uma fila ativa")) return lead.queueId;
+      throw error;
+    })
     : lead.queueId;
   const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id)).where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, brokerId), postSaleExempt || options?.dutyScheduleId ? undefined : eq(schema.tenantMemberships.branchId, assignmentBranchId), eq(schema.tenantMemberships.role, "broker"), postSaleExempt || options?.dutyScheduleId ? undefined : eq(schema.tenantMemberships.jobTitle, "broker"), eq(schema.tenantMemberships.status, "active"), !postSaleExempt && !options?.manualTransferOverride && !options?.dutyScheduleId ? eq(schema.tenantMemberships.availabilityStatus, "available") : undefined, eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
   if (!broker) return { status: "conflict", leadId, reason: "O corretor não está elegível nesta unidade." };
