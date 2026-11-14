@@ -28,6 +28,10 @@ vi.mock("@/shared/db", () => {
 });
 vi.mock("drizzle-orm", () => ({ and: () => ({}), count: () => ({}), desc: () => ({}), eq: () => ({}), gte: () => ({}), countDistinct: () => ({}) }));
 vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: async () => state.context }));
+// Carteira anterior (DEC-187): só o filtro de clientes de venda importa aqui.
+vi.mock("@/features/customers/prior-portfolio-schema", () => ({ saleClientsOnly: () => ({}) }));
+vi.mock("@/features/customers/prior-portfolio", () => ({ isBrokerPriorClientsEnabled: async () => false }));
+vi.mock("@/features/customers/prior-portfolio-actions", () => ({ createPriorClientAction: async () => ({ ok: true, clientId: "x" }) }));
 vi.mock("@/features/customers/customer-authorization", () => ({ buildClientScopeWhere: () => ({}) }));
 vi.mock("@/features/leads/lead-authorization", () => ({ buildLeadScopeWhere: () => ({}) }));
 vi.mock("@/features/broker-workspace/experience-mode", () => ({ getExperienceMode: async () => "FULL" }));

@@ -1,5 +1,5 @@
 import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
-import { and, eq, ilike, isNull, or } from "drizzle-orm";
+import { and, eq, ilike, isNull, or, isNotNull } from "drizzle-orm";
 import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/supervisor-scope";
 import { NextRequest } from "next/server";
 
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       .limit(6),
     isOutsideManagerScope(context.role, context.jobTitle) ? Promise.resolve([]) : db.select({ id: schema.clients.id, title: schema.clients.nome, subtitle: schema.clients.email, leadId: schema.clients.leadId })
       .from(schema.clients)
-      .where(and(eq(schema.clients.tenantId, context.tenantId), ...(context.role === "manager" && context.branchId ? [eq(schema.clients.branchId, context.branchId)] : []), ...(context.role === "broker" ? [eq(schema.clients.corretorId, context.userId)] : []), ...(teamScoped ? [inSupervisorTeam(schema.clients.corretorId, context.tenantId, context.userId)] : []), or(ilike(schema.clients.nome, pattern), ilike(schema.clients.telefone, pattern), ilike(schema.clients.email, pattern))))
+      .where(and(eq(schema.clients.tenantId, context.tenantId), isNotNull(schema.clients.leadId) /* DEC-187: só clientes de venda */, ...(context.role === "manager" && context.branchId ? [eq(schema.clients.branchId, context.branchId)] : []), ...(context.role === "broker" ? [eq(schema.clients.corretorId, context.userId)] : []), ...(teamScoped ? [inSupervisorTeam(schema.clients.corretorId, context.tenantId, context.userId)] : []), or(ilike(schema.clients.nome, pattern), ilike(schema.clients.telefone, pattern), ilike(schema.clients.email, pattern))))
       .limit(6),
     isOutsideManagerScope(context.role, context.jobTitle) ? Promise.resolve([]) : db.select({ id: schema.leadTasks.id, title: schema.leadTasks.title, subtitle: schema.leads.nome, leadId: schema.leadTasks.leadId })
       .from(schema.leadTasks)

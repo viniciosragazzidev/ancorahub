@@ -41,3 +41,25 @@
   .addButton { width: 100%; }
   .sheetButtons > * { flex: 1 1 100%; }
 }
+
+/* Cliente que já possuo (DEC-187). */
+.kindSwitch { margin: 0 4px 8px; }
+.contractBlock { display: grid; gap: 10px; padding: 14px; border-radius: 1.25rem; background: var(--surface-muted); }
+.contractFields { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.contractLegend { margin-bottom: 4px; padding: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 600; }
+.dateRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 360px) { .dateRow { grid-template-columns: minmax(0, 1fr); } }
+.profileHeader { display: flex; align-items: center; gap: 14px; }
+.profileAvatar { display: grid; place-items: center; width: 56px; height: 56px; flex-shrink: 0; border-radius: 50%; background: hsl(var(--hue, 210) 52% 91%); color: hsl(var(--hue, 210) 42% 30%); font-weight: 600; }
+.profileMain { display: grid; gap: 6px; min-width: 0; justify-items: start; }
+.profileName { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; color: var(--foreground); font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-display); }
+.profileCard { display: grid; gap: 14px; padding: 16px; border-radius: 1.25rem; background: var(--surface); box-shadow: var(--shadow-resting); }
+.profileData { display: grid; gap: 10px; margin: 0; }
+.profileData div { display: grid; gap: 2px; }
+.profileData dt { color: var(--text-muted); font-size: var(--text-xs); font-weight: 600; }
+.profileData dd { margin: 0; color: var(--foreground); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.profileSectionHeader { display: flex; justify-content: flex-end; }
+.pending { margin: 0; color: var(--text-muted); font-size: var(--text-sm); font-style: italic; }
+.contractItem { display: grid; gap: 8px; padding: 14px 16px; border-radius: 1.25rem; background: var(--surface); box-shadow: var(--shadow-resting); list-style: none; }
+.contractTop { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; color: var(--foreground); font-size: var(--text-sm); }
+@media (max-width: 480px) { .profileSectionHeader > * { width: 100%; } }

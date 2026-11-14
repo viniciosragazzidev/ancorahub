@@ -929,6 +929,41 @@ export const clients = pgTable(
   ],
 );
 
+/**
+ * DEC-187 (etapa 4b do modo corretor): contratos que um cliente de carteira anterior já tinha antes do CRM.
+ * Não tem venda, valor nem comissão e não alimenta financeiro, metas, ranking ou pontos. Campo desconhecido
+ * fica nulo e aparece como pendente. As colunas novas de `clients` (`source`, `origin_note`, `created_by`) ficam
+ * em `features/customers/prior-portfolio-schema.ts`, lidas só depois de conferir a migration 0231.
+ */
+export const clientPriorContractProductValues = ["PF", "PJ", "adesao", "odonto", "outro", "unknown"] as const;
+export const clientPriorContractStatusValues = ["active", "cancelled", "unknown"] as const;
+
+export const clientPriorContracts = pgTable(
+  "client_prior_contracts",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    clientId: text("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    brokerId: text("broker_id").notNull().references(() => user.id),
+    branchId: text("branch_id").references(() => branches.id),
+    productType: text("product_type", { enum: clientPriorContractProductValues }).notNull().default("unknown"),
+    carrierName: text("carrier_name"),
+    carrierId: text("carrier_id"),
+    coverageStartDate: date("coverage_start_date", { mode: "string" }),
+    renewalDate: date("renewal_date", { mode: "string" }),
+    status: text("status", { enum: clientPriorContractStatusValues }).notNull().default("unknown"),
+    notes: text("notes"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("client_prior_contracts_tenant_client_idx").on(table.tenantId, table.clientId),
+    index("client_prior_contracts_tenant_renewal_idx").on(table.tenantId, table.renewalDate),
+  ],
+);
+
 export const leadInteractions = pgTable(
   "lead_interactions",
   {

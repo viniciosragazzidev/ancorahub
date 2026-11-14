@@ -11,6 +11,15 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 - Estados de vazio e de falha de leitura (tentar de novo, sem afirmar que a agenda está vazia); entrada discreta das linhas com movimento reduzido respeitado; verificada em 320, 375 e desktop com dados sintéticos.
 - Atrás da chave `feature_broker_navigation_reorg_enabled` (Início do corretor reorganizado); desligada, volta a Agenda anterior. Sem migration.
 
+## 13/11/2026 - Modo corretor, etapa 4b: Cliente que já possuo
+
+- DEC-187. Com `feature_broker_prior_clients_enabled` (global, desligada por padrão, auditada no card Novidades do corretor do Super-admin) sobre as chaves da 4a, Adicionar contato ganha **Cliente que já possuo**: nome, telefone, e-mail e observação opcionais e até cinco contratos anteriores (produto, operadora, início de vigência, renovação, situação). O que não for informado fica pendente.
+- Modelo: `clients.lead_id` anulável, `clients.source` (`sale`/`prior_portfolio`) com CHECK, `origin_note`, `created_by`; tabela `client_prior_contracts` sem venda, valor ou comissão. Migration `drizzle/0231_broker_prior_clients.sql` (aditiva, não aplicada). O código tolera colunas e tabela ausentes: sem a migration, a opção some.
+- Visão Clientes mostra o selo "Carteira anterior"; Precisa de atenção inclui contrato anterior ativo com renovação entre hoje e 30 dias. Perfil próprio do cliente de carteira anterior com dados, contratos, pendências, edição e remoção confirmada.
+- Nada gera lead, venda, comissão, conversão ou pontos. Métricas e listas de clientes da gestão, relatórios, busca, assinatura e conversas contam só clientes de venda (`lead_id` preenchido).
+- Duplicidade por telefone no escopo do corretor; fora dele, aviso genérico. Auditoria: `client.prior_portfolio.created/updated`, `client_prior_contract.created/updated/removed`, `client.prior_portfolio.duplicate_blocked`.
+- Pendente: aplicar a 0231 no banco antes de ligar a chave; próxima ação de cliente sem lead fica para a etapa 6.
+
 ## 13/11/2026 - Modo corretor, etapa 4a: Minha carteira
 
 - Com `feature_broker_navigation_reorg_enabled` e `feature_broker_client_wallet_lite_enabled` ligadas, `/clientes` do corretor vira **Minha carteira** (título da página e do header Lite); supervisor e gestor seguem "Clientes". Qualquer chave desligada devolve a carteira anterior.
