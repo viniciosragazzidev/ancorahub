@@ -1,4 +1,5 @@
-﻿import { redirect } from "next/navigation";
+﻿import { isBrokerMyWalletEnabled } from "@/features/customers/broker-my-wallet-flag";
+import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import { AuthorizationError, AuthenticationError } from "@/shared/auth/errors";
@@ -68,6 +69,10 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const brokerNavReorgFlagPromise = context.role === "broker"
     ? getFeatureFlag(FEATURE_FLAGS.BROKER_NAV_REORG).catch(() => FEATURE_FLAGS.BROKER_NAV_REORG.defaultValue)
     : Promise.resolve("false");
+  // Minha carteira (etapa 4a): mesma regra da página /clientes, para o título do header não divergir dela.
+  const brokerMyWalletPromise = context.role === "broker"
+    ? isBrokerMyWalletEnabled().catch(() => false)
+    : Promise.resolve(false);
   const relationshipFlagPromise = context.role === "broker" || context.role === "supervisor"
     ? getFeatureFlag(FEATURE_FLAGS.RELATIONSHIP_CENTER).catch(() => "false")
     : Promise.resolve("false");
@@ -189,6 +194,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     postSaleAuditFlag,
     illustrationsSetting,
     autoSaleFlag,
+    brokerMyWalletFlag,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -208,6 +214,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     postSaleAuditFlagPromise,
     illustrationsPromise,
     autoSaleFlagPromise,
+    brokerMyWalletPromise,
   ]);
 
   // Flag criada no G0 (feature_team_management_enabled): só libera o item Gestão do gestor Lite.
@@ -292,6 +299,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         showQuoteSimulator={isLightBroker}
         journeyEnabled={isLightBroker && brokerJourneyFlag === "true"}
         homeV2Enabled={isLightBroker && brokerNavReorgFlag === "true"}
+        brokerMyWalletEnabled={isLightBroker && brokerMyWalletFlag}
         welcomeVideoEnabled={isLightBroker && welcomeVideoFlag === "true" && (process.env.WELCOME_VIDEO_TENANT_ID ?? "").split(",").map((id) => id.trim()).filter(Boolean).includes(context.tenantId)}
         teamRankingEnabled={isLightSupervisor && teamRankingFlag === "true"}
         teamManagementEnabled={isLightManager && teamManagementFlag}

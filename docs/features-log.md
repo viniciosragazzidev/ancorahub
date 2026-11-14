@@ -2,6 +2,13 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Modo corretor, etapa 4a: Minha carteira
+
+- Com `feature_broker_navigation_reorg_enabled` e `feature_broker_client_wallet_lite_enabled` ligadas, `/clientes` do corretor vira **Minha carteira** (título da página e do header Lite); supervisor e gestor seguem "Clientes". Qualquer chave desligada devolve a carteira anterior.
+- Visões com contagem e paginação no servidor: **Em negociação** (leads do corretor nas etapas em atendimento, pelo escopo canônico `buildLeadScopeWhere`, abre `/leads/[id]`), **Clientes** (`clients`, abre `/clientes/[clientId]`), **Precisa de atenção** (a visão existente, com renovações quando há dado, DEC-180) e **Arquivados** (leads perdidos ou arquivados). Busca por nome ou telefone; filtros de situação (por visão) e de origem separados, tudo na URL.
+- **Adicionar contato** abre painel com **Novo interessado**: reaproveita o cadastro manual (`criar_lead_manual`, corretor responsável, origem manual), com nome, telefone, e-mail opcional, observação opcional (vira a primeira nota) e o consentimento LGPD que o cadastro exige. Duplicidade respeita a checagem existente: do próprio corretor mostra o contato; de outro, só um aviso genérico. Auditoria `cadastro_minha_carteira` além do "criou" do cadastro.
+- "Cliente que já possuo" fica para a etapa 4b ([proposta](ux/phase2/2026-11-13-plano-modo-corretor-etapa4b.md)). Sem migration; distribuição, funil, conversão e pontos inalterados. Verificação visual em prévia temporária com dados sintéticos (320, 375 e desktop), removida antes do commit.
+
 ## 13/11/2026 - Modo corretor, etapa 1: Início reorganizado
 
 - Início do corretor com o Jack fixo e os acessos numa ordem estável: Meus leads, Minha carteira (nova linha, abre `/clientes`), Plantão, Agenda, Desempenho e Cotação. Dicas de Atendimento e Jornada saem do Início; o que pede atenção segue marcado em cada linha e no flutuante Agora.

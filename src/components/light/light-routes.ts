@@ -295,9 +295,16 @@ const RULES: readonly RouteRule[] = [
 
 const FALLBACK_ROUTE: LightRoute = { title: "Ancora", tab: "inicio", isRoot: false, parentHref: "/dashboard" };
 
+/** Contexto que só o servidor sabe (chaves e audiência); a tabela de rotas continua a mesma para todos. */
+export type LightRouteOptions = {
+  /** Corretor com a Minha carteira ligada (etapa 4a): `/clientes` vira "Minha carteira". Supervisor e gestor seguem "Clientes". */
+  brokerMyWallet?: boolean;
+};
+
 /** Resolves title, active tab and parent for a pathname; only a few rules read the query (Insights). */
-export function resolveLightRoute(pathname: string, search: LightSearchParams | null = null): LightRoute {
+export function resolveLightRoute(pathname: string, search: LightSearchParams | null = null, options: LightRouteOptions = {}): LightRoute {
   const path = pathname.split("?")[0].replace(/(.)\/+$/, "$1");
+  if (options.brokerMyWallet && path === "/clientes") return { title: "Minha carteira", tab: "mais", isRoot: false, parentHref: "/dashboard" };
   if (path === "/implantacoes") return { title: "Implantação", tab: "mais", isRoot: false, parentHref: "/dashboard" };
   if (path === "/financeiro") return { title: "Financeiro", tab: "mais", isRoot: false, parentHref: "/dashboard" };
   if (/^\/financeiro\/lancamentos\/[^/]+$/.test(path)) return { title: "Lançamento financeiro", tab: "mais", isRoot: false, parentHref: "/financeiro", backToParent: true };

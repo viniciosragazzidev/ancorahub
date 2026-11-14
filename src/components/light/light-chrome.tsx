@@ -47,6 +47,7 @@ export function LightChrome({
   showNegotiations = false,
   journeyEnabled = false,
   homeV2Enabled = false,
+  brokerMyWalletEnabled = false,
   welcomeVideoEnabled = false,
   brokerHomeRedesign = false,
   showHomeLearning = true,
@@ -68,6 +69,8 @@ export function LightChrome({
   showNegotiations?: boolean;
   journeyEnabled?: boolean;
   homeV2Enabled?: boolean;
+  /** Minha carteira (etapa 4a): só muda o título de `/clientes` para o corretor. */
+  brokerMyWalletEnabled?: boolean;
   welcomeVideoEnabled?: boolean;
   brokerHomeRedesign?: boolean;
   showHomeLearning?: boolean;
@@ -183,6 +186,7 @@ export function LightChrome({
           availabilityPending={isPending}
           onToggleAvailability={() => setStatus(availability === "available" ? "paused" : "available")}
           hideAvailability={audience !== "broker"}
+          brokerMyWallet={audience === "broker" && brokerMyWalletEnabled}
           actions={audience === "broker" ? <AssistHelpButton /> : undefined}
           onOpenMore={() => setMoreOpen(true)}
         />

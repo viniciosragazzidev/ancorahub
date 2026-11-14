@@ -3,11 +3,12 @@
 import { useMemo } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-import { resolveLightRoute } from "./light-routes";
+import { resolveLightRoute, type LightRouteOptions } from "./light-routes";
 
 /** Title, active tab and parent route of the current Light screen (a few screens depend on the query). */
-export function useLightRoute() {
+export function useLightRoute(options: LightRouteOptions = {}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  return useMemo(() => ({ pathname, ...resolveLightRoute(pathname, searchParams) }), [pathname, searchParams]);
+  const brokerMyWallet = options.brokerMyWallet === true;
+  return useMemo(() => ({ pathname, ...resolveLightRoute(pathname, searchParams, { brokerMyWallet }) }), [pathname, searchParams, brokerMyWallet]);
 }

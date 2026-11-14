@@ -41,7 +41,7 @@ const contractLabels = {
   cancelled: { text: "Contrato cancelado", tone: "neutral" },
 } as const;
 
-const originLabels: Record<string, string> = {
+export const originLabels: Record<string, string> = {
   manual: "Cadastro manual",
   webhook: "Integração",
 };
@@ -173,6 +173,35 @@ function ClientWalletControls({
   );
 }
 
+/** Linhas de clientes da carteira (também usadas pela visão Clientes da Minha carteira). */
+export function BrokerClientWalletList({ rows, totalCount, title = "Sua carteira" }: { rows: BrokerClientWalletResult["rows"]; totalCount: number; title?: string }) {
+  return (
+    <PeopleSection title={title} id="broker-wallet-list" count={totalCount} label="Clientes do corretor">
+      {rows.map((client, index) => {
+        const status = client.contractStatus ? contractLabels[client.contractStatus] : null;
+        const whatsappUrl = buildWhatsAppUrl(client.phone);
+        const href = `/clientes/${encodeURIComponent(client.id)}`;
+        const chips = [
+          status ? <Badge key="contract" tone={status.tone} size="sm">{status.text}</Badge> : null,
+          client.attentionReason ? <Badge key="attention" tone={attentionTones[client.attentionReason]} size="sm">{attentionLabels[client.attentionReason]}</Badge> : null,
+        ].filter(Boolean);
+        return (
+          <PeopleRow
+            key={client.id}
+            index={index}
+            href={href}
+            name={client.name}
+            chip={chips.length ? <span className={styles.badges}>{chips}</span> : undefined}
+            preview={describeAction(client)}
+            meta={shortDate.format(new Date(client.convertedAt))}
+            action={whatsappUrl ? <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className={styles.whatsapp} aria-label={`WhatsApp de ${client.name}`}>WhatsApp</a> : undefined}
+          />
+        );
+      })}
+    </PeopleSection>
+  );
+}
+
 export function BrokerClientWallet({ wallet, filters, hideTitle = true }: { wallet: BrokerClientWalletResult; filters: BrokerClientWalletFilters; hideTitle?: boolean }) {
   const effectiveFilters = { ...filters, page: wallet.page };
   const countLabel = wallet.walletCount === 1 ? "1 cliente na carteira" : `${wallet.walletCount} clientes na carteira`;
@@ -184,29 +213,7 @@ export function BrokerClientWallet({ wallet, filters, hideTitle = true }: { wall
       <ClientWalletControls key={buildQuery(effectiveFilters)} filters={effectiveFilters} counts={wallet.counts} hasRenewalData={wallet.hasRenewalData} origins={wallet.origins} />
 
       {wallet.rows.length ? (
-        <PeopleSection title="Sua carteira" id="broker-wallet-list" count={wallet.totalCount} label="Clientes do corretor">
-          {wallet.rows.map((client, index) => {
-            const status = client.contractStatus ? contractLabels[client.contractStatus] : null;
-            const whatsappUrl = buildWhatsAppUrl(client.phone);
-            const href = `/clientes/${encodeURIComponent(client.id)}`;
-            const chips = [
-              status ? <Badge key="contract" tone={status.tone} size="sm">{status.text}</Badge> : null,
-              client.attentionReason ? <Badge key="attention" tone={attentionTones[client.attentionReason]} size="sm">{attentionLabels[client.attentionReason]}</Badge> : null,
-            ].filter(Boolean);
-            return (
-              <PeopleRow
-                key={client.id}
-                index={index}
-                href={href}
-                name={client.name}
-                chip={chips.length ? <span className={styles.badges}>{chips}</span> : undefined}
-                preview={describeAction(client)}
-                meta={shortDate.format(new Date(client.convertedAt))}
-                action={whatsappUrl ? <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className={styles.whatsapp} aria-label={`WhatsApp de ${client.name}`}>WhatsApp</a> : undefined}
-              />
-            );
-          })}
-        </PeopleSection>
+        <BrokerClientWalletList rows={wallet.rows} totalCount={wallet.totalCount} />
       ) : wallet.walletCount === 0 ? (
         <PeopleEmpty title="Sua carteira ainda está vazia" description="Clientes aparecem aqui quando uma venda gera o cadastro no CRM." />
       ) : (

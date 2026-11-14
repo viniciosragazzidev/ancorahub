@@ -288,6 +288,8 @@ export async function getBrokerClientWallet(
   context: WalletContext,
   rawFilters: Partial<BrokerClientWalletFilters>,
   now = new Date(),
+  /** `rows: false` só conta (a "Minha carteira" mostra os números dos clientes enquanto lista leads). */
+  options: { rows?: boolean } = {},
 ): Promise<BrokerClientWalletResult> {
   const filters = normalizeBrokerClientWalletFilters(rawFilters);
   if (context.role !== "broker") {
@@ -333,6 +335,13 @@ export async function getBrokerClientWallet(
 
   const totalPages = Math.ceil(selectedCount / BROKER_CLIENT_WALLET_PAGE_SIZE);
   const page = totalPages > 0 ? Math.min(effectiveFilters.page, totalPages) : 1;
+  const originList = origins.flatMap(({ origin }) => origin ? [origin] : []);
+  if (options.rows === false) {
+    return {
+      filters: effectiveFilters, rows: [], page, pageSize: BROKER_CLIENT_WALLET_PAGE_SIZE, totalPages, totalCount: selectedCount, walletCount,
+      counts: { all: allCount, attention: attentionCount, renewals: renewalCount }, hasRenewalData, origins: originList,
+    };
+  }
   const clients = await db.select({
     id: schema.clients.id,
     leadId: schema.clients.leadId,
@@ -420,6 +429,6 @@ export async function getBrokerClientWallet(
     walletCount,
     counts: { all: allCount, attention: attentionCount, renewals: renewalCount },
     hasRenewalData,
-    origins: origins.flatMap(({ origin }) => origin ? [origin] : []),
+    origins: originList,
   };
 }
