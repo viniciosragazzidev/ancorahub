@@ -1,14 +1,30 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { Eye } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Eye } from "lucide-react";
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Button } from "@/components/arc/button/button";
 import page from "@/components/lite/page/lite-page.module.css";
 import styles from "./lead-social.module.css";
 
+/** Back to the previous screen of the app; from outside (link, notification) it goes to the list. */
+function BackButton({ fallbackHref }: { fallbackHref: string }) {
+  const router = useRouter();
+  function goBack() {
+    const fromApp = typeof document !== "undefined" && document.referrer.startsWith(window.location.origin);
+    if (fromApp && window.history.length > 1) router.back();
+    else router.push(fallbackHref);
+  }
+  return (
+    <Button variant="ghost" size="sm" className={`${page.iconButton} ${styles.backButton}`} aria-label="Voltar" title="Voltar" onClick={goBack}>
+      <ArrowLeft size={20} aria-hidden="true" />
+    </Button>
+  );
+}
+
 /** Conversation first. The eye owns all lead context, at every screen width. */
-export function LeadSocialLayout({ header, next, details, side, conversation, detailOverlayActive = false, actions }: {
+export function LeadSocialLayout({ header, next, details, side, conversation, detailOverlayActive = false, actions, backHref }: {
   header: ReactNode;
   next: ReactNode;
   details?: ReactNode;
@@ -16,6 +32,8 @@ export function LeadSocialLayout({ header, next, details, side, conversation, de
   conversation: ReactNode;
   detailOverlayActive?: boolean;
   actions?: ReactNode;
+  /** Where the back button goes when there is no previous screen of the app (opened from a link or a notification). */
+  backHref?: string;
 }) {
   const eye = useRef<HTMLButtonElement>(null);
   const previousOverlay = useRef(detailOverlayActive);
@@ -29,6 +47,7 @@ export function LeadSocialLayout({ header, next, details, side, conversation, de
   return <div className={`${styles.root} ${styles.focusRoot}`}>
     <header className={styles.focusHeader}>
       <div className={styles.focusIdentity}>
+        {backHref ? <BackButton fallbackHref={backHref} /> : null}
         <div className={styles.phoneHeaderMain}>{header}</div>
         {!detailOverlayActive && (next || details || side) ? (
           <BottomSheet className="arc-venancor" trigger={<Button ref={eye} variant="ghost" size="sm" className={page.iconButton} aria-label="Ver dados do cliente" title="Ver dados do cliente"><Eye size={20} aria-hidden="true" /></Button>}
