@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { telefoneComMais } from "@/shared/input/telefone";
+
 export const extensionVersionSchema = z.string().regex(/^\d+\.\d+\.\d+$/, "Versão inválida.");
 export const phoneSchema = z.string().trim().min(8).max(32);
 export const extensionIdSchema = z.string().regex(/^[a-p]{32}$/, "ID da extensão inválido.");
@@ -61,12 +63,8 @@ export type ExtensionSession = {
   permissions: string[];
 };
 
-export function normalizePhone(value: string): string {
-  const digits = value.replace(/\D/g, "");
-  if (!digits) return "";
-  if (digits.startsWith("00")) return `+${digits.slice(2)}`;
-  return `+${digits}`;
-}
+/** "+" + dígitos (00 vira +). Vive no módulo único de entrada; equivalência provada em src/shared/input/telefone.test.ts. */
+export const normalizePhone = telefoneComMais;
 
 export function maskPhone(value: string): string {
   const normalized = normalizePhone(value);

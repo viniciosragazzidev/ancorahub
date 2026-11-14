@@ -16,6 +16,7 @@ import {
 } from "@/features/waha-cadence/pairing-phase";
 import type { WahaUiStatus } from "@/features/waha-cadence/status";
 import type { TenantChannelState, TenantChannelView } from "@/features/waha-cadence/tenant-channel";
+import { formatarTelefoneCanal } from "@/shared/input/telefone";
 import {
   disconnectTenantChannelAction,
   pollTenantChannelAction,
@@ -57,14 +58,6 @@ const STATUS_BADGE: Record<WahaUiStatus, { status: DsStatusBadgeStatus; label: s
   error: { status: "destructive", label: "Falhou" },
   disconnected: { status: "secondary", label: "Desconectado" },
 };
-
-function formatPhone(digits: string | null) {
-  if (!digits) return null;
-  const national = digits.startsWith("55") && digits.length >= 12 ? digits.slice(2) : digits;
-  if (national.length === 11) return `+55 (${national.slice(0, 2)}) ${national.slice(2, 7)}-${national.slice(7)}`;
-  if (national.length === 10) return `+55 (${national.slice(0, 2)}) ${national.slice(2, 6)}-${national.slice(6)}`;
-  return `+${digits}`;
-}
 
 export function TenantChannelCard({
   initialChannel,
@@ -216,7 +209,7 @@ export function TenantChannelCard({
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 p-3">
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Número conectado</p>
-              <p className="text-sm font-medium tabular-nums text-foreground">{formatPhone(phone) ?? "Número confirmado pelo WhatsApp"}</p>
+              <p className="text-sm font-medium tabular-nums text-foreground">{formatarTelefoneCanal(phone) ?? "Número confirmado pelo WhatsApp"}</p>
             </div>
             {confirmingDisconnect ? (
               <div className="flex flex-wrap items-center gap-2">
