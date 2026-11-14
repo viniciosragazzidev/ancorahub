@@ -45,6 +45,7 @@ export function AreaTabs() {
   const inPlaceHrefs = new Set(tabs.filter((tab) => tab.inPlace).map((tab) => tab.href));
   const onClickCapture = (event: MouseEvent<HTMLElement>) => switchViewInPlace(event, inPlaceHrefs);
   const label = `Seções de ${location.area.label}`;
-  if (directorLite) return <div data-slot="area-tabs" className="px-4 pt-2" onClickCapture={onClickCapture}><LiteRouteTabs label={label} tabs={items} active={location.tab.id} /></div>;
+  // Mesma largura e gutter do topo e da página do diretor (1328px, clamp 16 a 32px): as abas alinham com o título e o conteúdo.
+  if (directorLite) return <div data-slot="area-tabs" className="mx-auto box-border w-full max-w-[1328px] px-[clamp(16px,4vw,32px)] pt-2" onClickCapture={onClickCapture}><LiteRouteTabs label={label} tabs={items} active={location.tab.id} /></div>;
   return <div data-slot="area-tabs" className="bg-background px-5 lg:px-6" onClickCapture={onClickCapture}><RouteSectionTabs label={label} tabs={items} active={location.tab.id} /></div>;
 }
