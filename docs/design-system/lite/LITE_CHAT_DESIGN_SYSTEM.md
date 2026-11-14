@@ -104,6 +104,8 @@ Ponteiro não desenha anel (decisão de produto). Teclado: contorno 2px na cor d
 
 ## 3. Movimento
 
+> Resposta a ações e eventos (níveis 0 a 3, som, vibração, mascote, botão de ação com base sólida e estados enviando, confirmado e falhou): [FEEDBACK.md](../FEEDBACK.md). Este padrão vale desde 14/11/2026 e prevalece em conflito com a tabela abaixo.
+
 Tokens: `--ease-enter cubic-bezier(.16,1,.3,1)`, `--ease-standard (.22,1,.36,1)`, `--ease-exit (.7,0,.84,0)`; durações 120/160/240/480ms; molas em `motion-tokens.ts` (`snappy` .26s bounce .12, `smooth` .4s bounce 0, `morph` .42s bounce .16).
 
 | Elemento | Especificação |

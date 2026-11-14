@@ -1,0 +1,433 @@
+<title>Duolingo no AncoraHub</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: coluna de leitura única, com tabelas largas roláveis e marcadores de fonte (oficial ou terceiro) em cada fato. */
+:root {
+  --bg: #f7f7f9;
+  --surface: #ffffff;
+  --fg: #0b0b12;
+  --muted: #5a5a68;
+  --line: rgb(16 16 40 / .10);
+  --accent: #1e40af;
+  --accent-soft: rgb(30 64 175 / .08);
+  --ok: #0f7a4d;
+  --ok-soft: rgb(15 122 77 / .10);
+  --warn: #a15c00;
+  --warn-soft: rgb(161 92 0 / .10);
+  --no: #c42236;
+  --no-soft: rgb(196 34 54 / .09);
+  --code-bg: #f1f1f5;
+  --font-body: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0f14; --surface: #16171e; --fg: #ececf2; --muted: #a2a2b2; --line: rgb(255 255 255 / .10);
+    --accent: #8aa6ff; --accent-soft: rgb(138 166 255 / .12); --ok: #5fd39c; --ok-soft: rgb(95 211 156 / .12);
+    --warn: #f0b35a; --warn-soft: rgb(240 179 90 / .12); --no: #ff8a96; --no-soft: rgb(255 138 150 / .12);
+    --code-bg: #1e1f28; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e0f14; --surface: #16171e; --fg: #ececf2; --muted: #a2a2b2; --line: rgb(255 255 255 / .10);
+  --accent: #8aa6ff; --accent-soft: rgb(138 166 255 / .12); --ok: #5fd39c; --ok-soft: rgb(95 211 156 / .12);
+  --warn: #f0b35a; --warn-soft: rgb(240 179 90 / .12); --no: #ff8a96; --no-soft: rgb(255 138 150 / .12);
+  --code-bg: #1e1f28; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 400 16px/1.6 var(--font-body); letter-spacing: -.005em; }
+.wrap { max-width: 860px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 48px 96px; display: flex; flex-direction: column; gap: 56px; }
+header { display: flex; flex-direction: column; gap: 16px; }
+.kicker { font: 500 13px/1.3 var(--font-mono); color: var(--muted); }
+h1 { font-size: clamp(30px, 5vw, 44px); line-height: 1.1; letter-spacing: -.03em; font-weight: 700; margin: 0; text-wrap: balance; }
+h2 { font-size: 24px; line-height: 1.25; letter-spacing: -.02em; font-weight: 700; margin: 0; text-wrap: balance; }
+h3 { font-size: 17px; line-height: 1.35; font-weight: 500; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.lead { font-size: 18px; color: var(--muted); }
+section { display: flex; flex-direction: column; gap: 20px; }
+.sec-no { font: 500 13px var(--font-mono); color: var(--accent); }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+ul, ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; max-width: 70ch; }
+li::marker { color: var(--muted); }
+code { font: 400 13.5px var(--font-mono); background: var(--code-bg); padding: 1px 6px; border-radius: 6px; overflow-wrap: anywhere; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.tag { display: inline-block; font: 500 11px/1 var(--font-mono); padding: 4px 7px; border-radius: 9999px; vertical-align: 2px; margin-right: 4px; white-space: nowrap; }
+.t-of { background: var(--ok-soft); color: var(--ok); }
+.t-3 { background: var(--warn-soft); color: var(--warn); }
+.t-ah { background: var(--accent-soft); color: var(--accent); }
+.summary { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+.summary ol { gap: 10px; }
+.principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.pr { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pr p { font-size: 14.5px; color: var(--muted); }
+.pr .src { font-size: 12.5px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 1.5; }
+th, td { text-align: left; vertical-align: top; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+th { font-weight: 500; color: var(--muted); font-size: 12.5px; background: var(--bg); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, .num { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .compare { grid-template-columns: 1fr; } }
+.col { border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; border: 1px solid var(--line); background: var(--surface); }
+.col h3 { display: flex; gap: 8px; align-items: center; }
+.dot { width: 8px; height: 8px; border-radius: 9999px; flex: none; }
+.col ul { font-size: 14.5px; }
+.place { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; display: grid; grid-template-columns: 170px 1fr; gap: 6px 20px; }
+.place h3 { grid-row: span 6; }
+.place .hint { font-size: 13px; color: var(--muted); }
+@media (max-width: 640px) { .place { grid-template-columns: 1fr; } .place h3 { grid-row: auto; } }
+.place dl { margin: 0; display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; font-size: 14.5px; }
+.place dt { color: var(--muted); font-size: 13px; padding-top: 1px; }
+.place dd { margin: 0; min-width: 0; }
+pre { margin: 0; background: var(--code-bg); border-radius: 12px; padding: 18px; overflow-x: auto; font: 400 13px/1.6 var(--font-mono); }
+.callout { border-left: 3px solid var(--warn); background: var(--warn-soft); padding: 16px 18px; border-radius: 0 12px 12px 0; display: flex; flex-direction: column; gap: 8px; }
+.callout p { font-size: 15px; }
+.tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.tier { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; min-width: 0; }
+.tier .n { font: 500 12px var(--font-mono); color: var(--accent); }
+.tier p { color: var(--muted); font-size: 13.5px; }
+.demo { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn { font: 500 14px var(--font-body); border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 10px 16px; border-radius: 8px; cursor: pointer; transition: transform 120ms cubic-bezier(.22,1,.36,1); }
+.btn:active { transform: scale(.97); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.demo-out { font-size: 14px; color: var(--muted); min-height: 1.5em; }
+.chk { display: inline-flex; align-items: center; gap: 8px; color: var(--ok); font-weight: 500; }
+.chk svg path { stroke-dasharray: 24; stroke-dashoffset: 24; }
+.chk.go svg { animation: pop 260ms cubic-bezier(.34,1.3,.64,1) both; }
+.chk.go svg path { animation: draw 320ms cubic-bezier(.22,1,.36,1) 60ms forwards; }
+.chk.go span { animation: rise 240ms cubic-bezier(.16,1,.3,1) 80ms both; }
+.shake { animation: shake 250ms cubic-bezier(.36,.07,.19,.97) both; color: var(--no); }
+@keyframes pop { from { transform: scale(.6); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+@keyframes draw { to { stroke-dashoffset: 0 } }
+@keyframes rise { from { transform: translateY(4px); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes shake { 20%,60% { transform: translateX(-4px) } 40%,80% { transform: translateX(4px) } }
+@media (prefers-reduced-motion: reduce) {
+  .chk.go svg, .chk.go svg path, .chk.go span, .shake { animation: none !important; }
+  .chk svg path { stroke-dashoffset: 0; }
+  .btn { transition: none; }
+}
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+summary { cursor: pointer; font-weight: 500; }
+details ul { margin-top: 12px; font-size: 14px; }
+footer { font-size: 13px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+
+<header>
+  <span class="kicker">Relatório de design · AncoraHub e CorreTop · 14/11/2026</span>
+  <h1>O que o Duolingo ensina sobre movimento e feedback, e o que cabe numa corretora</h1>
+  <p class="lead">Pesquisa sobre o estilo, as animações, os sons, a vibração e a filosofia do Duolingo, comparada com o que já existe no código do AncoraHub. Termina com uma proposta de tokens e os próximos passos.</p>
+  <p style="font-size:13.5px;color:var(--muted)"><span class="tag t-of">oficial</span> Duolingo, ou parceiro como Rive e LottieFiles em estudo de caso com o Duolingo. <span class="tag t-3">terceiro</span> análise externa ou engenharia reversa, sem confirmação. <span class="tag t-ah">AncoraHub</span> o que já está no nosso código.</p>
+</header>
+
+<div class="summary">
+  <h2>Resumo em cinco pontos</h2>
+  <ol>
+    <li><strong>O Duolingo não publica tempos nem curvas.</strong> O que ele documenta é método: todo movimento precisa de ritmo e propósito, o timing é iterado em vários passes, e o personagem reage ao que o usuário fez. Os números que circulam são estimativas de terceiros.</li>
+    <li><strong>O feedback dele é em camadas:</strong> visual, texto, som, vibração e personagem. Cada camada tem um interruptor próprio nas preferências do app. Essa é a ideia mais útil para nós.</li>
+    <li><strong>O AncoraHub já tem quase toda a base.</strong> Temos tokens de movimento, regra por frequência de uso, a regra "primeira vez hoje", mascotes, sons sintetizados, sequência de plantões, níveis, missões e celebrações. O que falta é juntar som e vibração num contrato só, com preferência do usuário e níveis de celebração.</li>
+    <li><strong>Há uma decisão pendente:</strong> <code>MOTION.md</code> proíbe bounce e confete no CRM, mas o Lite já usa mola com bounce leve e confete em dois lugares. Recomendo manter as duas regras, cada uma no seu modo, e formalizar níveis de celebração.</li>
+    <li><strong>Não copiar:</strong> culpa, perda de vidas, pressão com prazo, cores saturadas, botão 3D de brinquedo e celebração em ação repetida. O trabalho da corretora envolve saúde e dinheiro de clientes, e a pontuação não pode premiar volume.</li>
+  </ol>
+</div>
+
+<section>
+  <span class="sec-no">1</span>
+  <h2>Princípios do Duolingo</h2>
+  <div class="principles">
+    <div class="pr"><h3>Movimento com ritmo</h3><p>Mesmo sem som, toda animação precisa de um "beat". O motion serve a um propósito e não enfeita. O time anima streak, fim de lição, mudança de liga e toasts, e testa o timing em protótipo antes.</p><span class="src"><span class="tag t-of">oficial</span> Inside Design Studio #3 (LinkedIn, lido por trecho de busca)</span></div>
+    <div class="pr"><h3>Timing pesa tanto quanto a forma</h3><p>No redesenho dos marcos de streak (Duo virando fênix), a animação passou por vários passes rough. O post diz que o timing foi tão importante quanto o design.</p><span class="src"><span class="tag t-of">oficial</span> <a href="https://blog.duolingo.com/streak-milestone-design-animation">Streak milestone design</a></span></div>
+    <div class="pr"><h3>Formas simples e amigáveis</h3><p>Poucas formas, cantos arredondados, sombra em pílula embaixo do objeto e nada pontudo. O objetivo é deixar o aprendizado menos intimidador para o aluno voltar todo dia.</p><span class="src"><span class="tag t-of">oficial</span> <a href="https://blog.duolingo.com/shape-language-duolingos-art-style/">Shape language</a></span></div>
+    <div class="pr"><h3>O personagem reage</h3><p>Cada personagem tem uma animação própria de acerto e outra de recompensa por acertos seguidos. Ele pisca, mexe a cabeça e fala com a boca sincronizada ao áudio.</p><span class="src"><span class="tag t-of">oficial</span> <a href="https://blog.duolingo.com/ko/building-character/">Building character</a>, <a href="https://blog.duolingo.com/world-character-visemes">Visemes</a></span></div>
+    <div class="pr"><h3>Voz constante, tom que muda</h3><p>A voz é a personalidade e não muda. O tom se ajusta ao momento do aluno, seja de acerto ou de frustração. As frases são curtas e claras, com palavras que todo mundo entende.</p><span class="src"><span class="tag t-of">oficial</span> design.duolingo.com/writing (lido por trecho de busca, hoje redireciona)</span></div>
+    <div class="pr"><h3>Hábito medido por experimento</h3><p>O streak passou a valer com uma lição só, e isso aumentou a retenção. Foram mais de 600 experimentos. O próprio Duolingo publica os trade-offs: com a mudança, menos gente bate a meta diária.</p><span class="src"><span class="tag t-of">oficial</span> <a href="https://blog.duolingo.com/improving-the-streak">Improving the streak</a> · <span class="tag t-3">terceiro</span> Lenny's Newsletter</span></div>
+    <div class="pr"><h3>A espera parece intencional</h3><p>Na chamada de vídeo com a Lily, ela "pondera" enquanto a IA responde. Ela tem 64 ou mais variações de idle para não repetir o loop.</p><span class="src"><span class="tag t-of">oficial</span> <a href="https://rive.app/blog/duolingo-s-ai-powered-video-call-brings-lily-to-life">Rive: Lily</a></span></div>
+    <div class="pr"><h3>Consistência com propósito</h3><p>No redesign das abas, o espaço em branco separa o conteúdo no lugar de caixas, e o sistema de tipos tem o mínimo de estilos. A simplicidade não pode custar clareza.</p><span class="src"><span class="tag t-of">oficial</span> <a href="https://blog.duolingo.com/core-tabs-redesign/">Core tabs redesign</a></span></div>
+  </div>
+</section>
+
+<section>
+  <span class="sec-no">2</span>
+  <h2>Catálogo de padrões de animação e feedback</h2>
+  <p>Não há número oficial de duração, curva ou mola. Os valores abaixo marcados como terceiro vêm de engenharia reversa e servem só como ordem de grandeza.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Padrão</th><th>Como funciona</th><th>Tempo e curva</th><th>Fonte</th></tr></thead>
+    <tbody>
+      <tr><td>Botão com pressão</td><td>Borda inferior de 4px num tom mais escuro. Ao tocar, o botão desce 4px e a borda some, como uma tecla.</td><td class="num">~100ms ease</td><td><span class="tag t-3">terceiro</span></td></tr>
+      <tr><td>Banner de acerto ou erro</td><td>Painel sobe da base com a resposta, a cor do resultado e o botão de continuar. Fica na mesma posição em toda lição.</td><td class="num">~200ms ease-out</td><td><span class="tag t-3">terceiro</span></td></tr>
+      <tr><td>Som de acerto e de erro</td><td>Acerto com um "chime" que quica. Erro com um tom descendente, "murcho", que desanima sem gerar ansiedade. Tocam junto com o banner.</td><td class="num">sem dado</td><td><span class="tag t-3">terceiro</span></td></tr>
+      <tr><td>Reação do personagem</td><td>O personagem da lição reage em tempo real ao acerto e ao erro, pela state machine da Rive.</td><td class="num">sem dado</td><td><span class="tag t-of">oficial</span></td></tr>
+      <tr><td>Combo de acertos</td><td>Recompensa animada depois de vários acertos seguidos ("N in a row"), com bônus no fim da lição.</td><td class="num">sem dado</td><td><span class="tag t-of">oficial</span> <span class="tag t-3">terceiro</span></td></tr>
+      <tr><td>Barra de progresso</td><td>Enche a cada acerto da lição.</td><td class="num">~300ms ease-out</td><td><span class="tag t-3">terceiro</span></td></tr>
+      <tr><td>Fim de lição</td><td>Resumo em três cartões (XP, tempo, precisão), "Perfect lesson" quando não há erro, confete com personagens e baú de recompensa.</td><td class="num">sem dado</td><td><span class="tag t-3">terceiro</span></td></tr>
+      <tr><td>Marco de streak</td><td>Duo vira fênix, um "power-up" de videogame. A tela gera um cartão para compartilhar.</td><td class="num">iterado em passes</td><td><span class="tag t-of">oficial</span></td></tr>
+      <tr><td>Chama do streak</td><td>Em repouso, oscila devagar. Em risco de perder, oscila mais rápido e maior.</td><td class="num">2s ↔ 0,8s, escala 1,05 ↔ 1,1</td><td><span class="tag t-3">terceiro</span></td></tr>
+      <tr><td>Recompensas com Rive</td><td>Primeiro uso da Rive: baú que balança e gemas que pulam.</td><td class="num">sem dado</td><td><span class="tag t-of">oficial</span></td></tr>
+      <tr><td>Lip sync</td><td>O app envia o timing de palavras e fonemas, que dispara mais de 20 bocas por personagem. O idle roda em paralelo: piscar, cabeça e sobrancelha.</td><td class="num">sincronizado ao áudio</td><td><span class="tag t-of">oficial</span></td></tr>
+      <tr><td>Widget do Duo</td><td>O humor do Duo muda com a hora e com o status da lição. Perto da meia-noite, ele entra em pânico.</td><td class="num">não se aplica</td><td><span class="tag t-of">oficial</span></td></tr>
+      <tr><td>Preferências</td><td>Interruptores separados para efeitos sonoros, vibração, animações e mensagens motivacionais.</td><td class="num">não se aplica</td><td><span class="tag t-of">oficial</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <h3>Streaks, progresso e recompensas: o que os números dizem</h3>
+  <ul>
+    <li><span class="tag t-of">oficial</span> Em 2020, o streak passou a valer com uma lição. O resultado foi +3,3% de retenção em 14 dias e +1% de usuários ativos por dia. Um ano depois, mais da metade dos alunos diários tinha streak de 7 dias ou mais. Quem tem 7 dias tem 2,4 vezes mais chance de voltar no dia seguinte.</li>
+    <li><span class="tag t-of">oficial</span> Em 2017, a aposta no streak deu +14% de retenção em 7 dias. O amuleto de fim de semana deu 5% menos perda de streak, porque o uso cai de 5% a 10% aos sábados e domingos.</li>
+    <li><span class="tag t-of">oficial</span> Usuários com o widget retêm mais, mesmo controlando pelo nível de comprometimento. As ligas aumentaram as lições iniciadas e concluídas.</li>
+    <li><span class="tag t-of">oficial</span> As notificações usam um algoritmo que penaliza mensagem repetida há pouco tempo (artigo na KDD 2020, com 200 milhões de notificações).</li>
+    <li><span class="tag t-3">terceiro</span> Críticas: culpa nas notificações, ansiedade do "tudo ou nada" do streak, inclusive em crianças, e um boost de XP que não dá para adiar.</li>
+  </ul>
+</section>
+
+<section>
+  <span class="sec-no">3</span>
+  <h2>Como o AncoraHub está hoje</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Peça</th><th>Onde</th><th>Estado</th></tr></thead>
+    <tbody>
+      <tr><td>Tokens de movimento</td><td><code>src/components/arc/motion-tokens.ts</code></td><td>120 / 160 / 180 / 240 / 320 / 480ms. Curvas enter, exit, standard e inOut. Molas snappy (bounce .12), smooth (0) e morph (.16). Escalas de pressão e de atenção.</td></tr>
+      <tr><td>Kit Lite</td><td><code>src/components/lite/motion</code></td><td>15 primitivas testadas: Press, Success (check desenhado + mola), Attention (anel único), Number, Delta, Progress (480ms), ListPresence, Stagger e outras.</td></tr>
+      <tr><td>Regra por frequência</td><td><code>docs/ux/motion-frequencia.md</code>, <code>useFirstTimeToday</code></td><td>Quanto mais vista, menos anima. A barra da meta enche só na primeira abertura do dia. É a mesma lógica do Duolingo de dosar o encanto.</td></tr>
+      <tr><td>Movimento no modo normal</td><td><code>docs/design-system/MOTION.md</code></td><td>"Sério, calmo, confiável". Proíbe bounce, elastic e confete. Um momento de destaque só: o check em círculo de 300 a 400ms.</td></tr>
+      <tr><td>Celebrações</td><td><code>src/features/journey/components</code></td><td>Pontos, missão, conquista, nível e resumo do dia. Aparecem em fila e esperam a oferta de lead sair. Usam confete (46 peças, 2,4 a 3,4s) e mola de bounce alto (damping 14) na arte.</td></tr>
+      <tr><td>Sequência, níveis, missões</td><td><code>src/features/engagement</code></td><td>A sequência conta plantões fechados sem SLA estourado, e o dia em curso não quebra a contagem. São 5 níveis, de Iniciante a Mestre. Missões e ranking existem.</td></tr>
+      <tr><td>Sons</td><td><code>src/lib/sounds</code></td><td>Sintetizados com Web Audio, sem arquivo. As receitas são notification, tap, error e warning. <strong>Só o aviso de lead novo toca.</strong> As outras três não têm uso.</td></tr>
+      <tr><td>Vibração</td><td><code>camera-capture</code>, <code>presence-callout</code>, <code>presence-guide</code></td><td><code>navigator.vibrate(20 ou 30)</code> chamado direto, sem token e sem preferência. Não funciona no Safari do iPhone, que não tem a Vibration API.</td></tr>
+      <tr><td>Mascotes</td><td>Kit de chat, §2.2 e §3 do Lite</td><td>Um mascote por assistente, com cor por matiz. Hoje só respiram (1,6s) e piscam (4,2s). Não reagem ao que o corretor faz.</td></tr>
+      <tr><td>Kill-switch</td><td><code>InterfaceMotionProvider</code></td><td>Desliga o movimento pelo Super Admin e respeita <code>prefers-reduced-motion</code>. Não existe preferência do usuário para som ou vibração.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="callout">
+    <h3>Decisão pendente: duas regras que se contradizem</h3>
+    <p><code>MOTION.md</code> diz "nada de bounce, nada de confete". Já o Lite usa bounce de .12 a .16 nas molas, confete no fim do tour e confete nas celebrações da jornada, com mola de damping 14, que balança bastante. Recomendação: o modo normal (diretor e gestor) segue <code>MOTION.md</code>. O Lite segue os níveis de celebração da seção 6, com confete só no nível 3.</p>
+  </div>
+</section>
+
+<section>
+  <span class="sec-no">4</span>
+  <h2>O que adotar e onde</h2>
+  <p>A ideia central é responder em camadas, sempre na mesma ordem e no mesmo ritmo. O visual vem primeiro e na hora. O texto chega cerca de 80ms depois. Som e vibração entram junto com o visual, e só quando o evento justifica. A recompensa grande fica para o que é raro e verificado.</p>
+
+  <div class="demo" aria-label="Demonstração do ritmo de feedback">
+    <button class="btn" id="demo-ok" type="button">Ver acerto de ação</button>
+    <button class="btn" id="demo-err" type="button">Ver erro de ação</button>
+    <span class="demo-out" id="demo-out" role="status" aria-live="polite">Toque num botão para ver o ritmo proposto.</span>
+  </div>
+
+  <p><strong>Exemplo interativo:</strong> <a href="https://claude.ai/artifact/5MHfFasD4iD4pgWPu7sxM5">Aceitar um lead, do aviso ao próximo passo</a>, com o botão reestilizado, som, vibração, mascote e a trilha de tempos.</p>
+
+  <div class="stack">
+    <div class="place"><h3>Acerto de ação</h3>
+      <dl>
+        <dt>Duolingo</dt><dd>Banner fixo, som curto e reação do personagem a cada acerto.</dd>
+        <dt>Adotar</dt><dd>Ritmo fixo: o check desenha (<code>LiteSuccess</code>) e o texto do resultado vem 80ms depois, no próprio objeto. A confirmação acontece na conversa, como já manda o §7 do Lite.</dd>
+        <dt>Som e vibração</dt><dd>Nenhum em ação frequente (mudar etapa, salvar nota). Vibração leve de 10ms só em confirmação que muda o estado do lead, no celular.</dd>
+        <dt>Onde</dt><dd><code>LiteSuccess</code>, opções do chat, ChoiceList.</dd>
+      </dl></div>
+    <div class="place"><h3>Lead novo</h3>
+      <dl>
+        <dt>Duolingo</dt><dd>Notificação com personagem e humor, sem repetir a mesma mensagem.</dd>
+        <dt>Adotar</dt><dd>Já temos DynamicNotice com o som <code>notification</code>. Falta somar a vibração de aviso (padrão curto duplo), o mascote do Leads num estado "chegou alguém" de uma passada e textos que variam sem repetir o último.</dd>
+        <dt>Som e vibração</dt><dd>Som uma vez por item, como já é hoje. Vibração com o mesmo gatilho e o mesmo interruptor do som.</dd>
+        <dt>Onde</dt><dd><code>dynamic-notice.tsx</code>, <code>incoming-lead-card.tsx</code>, <code>realtime-sync-provider.tsx</code>.</dd>
+      </dl></div>
+    <div class="place"><h3>Venda registrada</h3>
+      <dl>
+        <dt>Duolingo</dt><dd>Fim de lição: resumo em cartões, número que conta até o total e celebração do personagem.</dd>
+        <dt>Adotar</dt><dd>Nível 3 de celebração (seção 6): o overlay atual, mais um resumo de três números (valor, vidas, comissão estimada se houver) contando até o total, e o mascote do Desempenho comemorando uma vez. Só depois que a venda foi persistida, como manda o plano de feedback.</dd>
+        <dt>Som e vibração</dt><dd>Som novo de marco, mais rico que o tap, e vibração de sucesso.</dd>
+        <dt>Onde</dt><dd><code>register-sale-panel.tsx</code>, <code>useSuccessOverlay</code>, <code>CelebrationLayer</code>.</dd>
+      </dl></div>
+    <div class="place"><h3>Metas</h3>
+      <dl>
+        <dt>Duolingo</dt><dd>Barra que enche a cada passo. O marco vira uma tela própria.</dd>
+        <dt>Adotar</dt><dd>A barra da meta do dia continua enchendo só na primeira abertura do dia. Quando a meta é batida, ganha um pulso único (<code>LiteAttention</code>), um texto de colega ("Meta do dia batida.") e, no máximo uma vez por dia, um nível 2.</dd>
+        <dt>Som e vibração</dt><dd>Som de marco e vibração de sucesso só no momento em que a meta é batida.</dd>
+        <dt>Onde</dt><dd><code>chat-home.tsx</code> (GoalFill), <code>week-ranking.tsx</code> (MissionBar).</dd>
+      </dl></div>
+    <div class="place"><h3>Plantão</h3>
+      <dl>
+        <dt>Duolingo</dt><dd>Streak com chama, proteção de fim de semana e marcos que viram fênix.</dd>
+        <dt>Adotar</dt><dd>A sequência de plantões sem SLA estourado já existe. Faltam três coisas. Mostrar a sequência com ícone e número que sobe uma vez ao fechar o plantão. Ter marcos em 5, 10, 25 e 50 plantões. E garantir que folga, feriado e plantão não escalado nunca quebrem a contagem, já que o plantão não depende só do corretor.</dd>
+        <dt>Som e vibração</dt><dd>Som de marco só nos marcos. Nada ao abrir a tela.</dd>
+        <dt>Onde</dt><dd><code>levels.ts</code> (evaluateStreak), <code>journey-screen.tsx</code>, assistente Plantão.</dd>
+      </dl></div>
+    <div class="place"><h3>Vazio</h3>
+      <dl>
+        <dt>Duolingo</dt><dd>O personagem está sempre presente e dá contexto com humor leve.</dd>
+        <dt>Adotar</dt><dd>O mascote do assistente em repouso, uma frase de colega que diz o próximo passo ("Nenhum lead esperando. Que tal revisar os retornos de hoje?") e uma ação. O mascote não fica em loop, só respira, como já faz.</dd>
+        <dt>Som e vibração</dt><dd>Nenhum.</dd>
+        <dt>Onde</dt><dd>Empty State do design system (§ Empty State) e roteiros <code>build*Script</code>.</dd>
+      </dl></div>
+    <div class="place"><h3>Erro</h3>
+      <dl>
+        <dt>Duolingo</dt><dd>Banner vermelho, tom descendente que desanima sem gerar ansiedade e a resposta certa logo abaixo.</dd>
+        <dt>Adotar</dt><dd>O shake curto que já está em <code>MOTION.md</code> (2 ciclos, 4px, 250ms) no controle que falhou. A mensagem diz o que fazer e oferece "Tentar de novo". Nunca usar vermelho em tela cheia nem tirar o foco do corretor.</dd>
+        <dt>Som e vibração</dt><dd>O <code>errorSound</code>, que já existe, só para falha de ação do usuário (envio, aceite), nunca para validação de campo. Vibração dupla curta.</dd>
+        <dt>Onde</dt><dd>Respostas de ação no chat e campos (<code>MOTION.md</code>, § Campos).</dd>
+      </dl></div>
+  </div>
+
+  <h3>Mascotes que reagem, com Rive como fase 2</h3>
+  <p>O Duolingo usa a Rive porque os arquivos são leves e a state machine troca de estado sem código novo para cada animação. Nossos mascotes hoje são CSS e só respiram e piscam. Proposta: definir primeiro quatro estados por mascote (repouso, pensando, comemorando, atento) feitos com as primitivas atuais. A Rive só entra depois, numa prova com um mascote, medindo o peso do runtime no celular. O "pensando" vale especialmente para a espera da IA, como a Lily faz.</p>
+</section>
+
+<section>
+  <span class="sec-no">5</span>
+  <h2>O que não copiar</h2>
+  <div class="compare">
+    <div class="col"><h3><span class="dot" style="background:var(--no)"></span>Fica de fora</h3>
+      <ul>
+        <li>Culpa e notificação passivo-agressiva ("o Duo está triste"). Corretor não é aluno faltando à aula.</li>
+        <li>Vidas ou corações que punem erro. Erro no CRM é operação, não jogo.</li>
+        <li>Pânico com prazo (o Duo da meia-noite). O SLA já pressiona o suficiente.</li>
+        <li>Verde saturado, paleta de brinquedo e botão 3D com lábio. Isso fere o design system: bordas, raio de 8px nos botões e um único CTA azul.</li>
+        <li>Fonte arredondada de título. Mantemos Plus Jakarta no Lite, e Inter e Satoshi no modo normal.</li>
+        <li>Celebração em ação repetida dezenas de vezes por dia.</li>
+        <li>Pontos por volume (mensagens, cliques, leads aceitos), como o plano de gamificação já proíbe.</li>
+        <li>Boost ou recompensa que não dá para dispensar.</li>
+        <li>Ranking público por padrão.</li>
+      </ul></div>
+    <div class="col"><h3><span class="dot" style="background:var(--ok)"></span>Fica, adaptado</h3>
+      <ul>
+        <li>Ritmo fixo de feedback (visual, texto, som e vibração) em todo o app.</li>
+        <li>Um interruptor por camada para o usuário: som, vibração, animações e celebrações.</li>
+        <li>Celebração rara, verificada e proporcional ao feito.</li>
+        <li>Sequência que perdoa: só conta o que dependia do corretor.</li>
+        <li>Mascote que reage ao que aconteceu, em vez de só decorar.</li>
+        <li>Espera que parece intencional (mascote "pensando" enquanto a IA responde).</li>
+        <li>Textos curtos que variam sem repetir o último.</li>
+        <li>Experimento com métrica de resultado (contato no SLA, venda), não só de engajamento.</li>
+      </ul></div>
+  </div>
+</section>
+
+<section>
+  <span class="sec-no">6</span>
+  <h2>Proposta de tokens de movimento e feedback</h2>
+  <p>Tudo é aditivo ao <code>motionTokens</code> atual: nada muda de valor e nenhuma curva nova entra. O ritmo reaproveita <code>stagger.line</code> (80ms). O som e a vibração ganham um módulo irmão, e cada evento do app aponta para um nível.</p>
+
+  <div class="tiers">
+    <div class="tier"><span class="n">Nível 0 · silencioso</span><strong>Ação frequente</strong><p>Pressão e troca de estado. Até 160ms. Sem som e sem vibração.</p></div>
+    <div class="tier"><span class="n">Nível 1 · confirmação</span><strong>Ação que muda o lead</strong><p>Check e texto no ritmo. Até 320ms. Vibração de toque no celular.</p></div>
+    <div class="tier"><span class="n">Nível 2 · marco no contexto</span><strong>Meta do dia, missão</strong><p>Pulso único e número que conta. Até 480ms. Som de marco. No máximo um por dia por tipo.</p></div>
+    <div class="tier"><span class="n">Nível 3 · celebração</span><strong>Venda, nível, marco de plantão</strong><p>Overlay com mascote e confete curto. Até cerca de 1,4s, sem bloquear. Espera a oferta de lead sair.</p></div>
+  </div>
+
+<pre><code>// src/components/arc/motion-tokens.ts · acréscimos propostos
+duration: { /* existentes */ celebrate: 1.4 },          // só nível 3, nunca bloqueia
+spring: {   /* existentes */
+  /** Só nível 3: arte da celebração. Substitui o damping 14 avulso. */
+  celebrate: { type: "spring", visualDuration: 0.5, bounce: 0.24 },
+},
+/** Ritmo do feedback em camadas (o "beat" do Duolingo). */
+beat: { visual: 0, text: 0.08, number: 0.16, after: 0.32 },
+/** Nível máximo por superfície e por frequência de uso. */
+celebration: { maxPerDay: { 2: 1, 3: 3 }, holdDuringLeadOffer: true },
+shake: { distance: 4, cycles: 2, duration: 0.25 },     // MOTION.md, § Campos
+
+// src/lib/feedback/tokens.ts · novo, irmão de src/lib/sounds
+export const feedbackTokens = {
+  sound: {                                  // receitas em src/lib/sounds/recipes.ts
+    notify:    { recipe: "notificationSound", volume: 0.8 },
+    confirm:   { recipe: "tapSound",          volume: 0.35 },
+    milestone: { recipe: "milestoneSound",    volume: 0.6 },   // receita nova
+    error:     { recipe: "errorSound",        volume: 0.5 },
+    warning:   { recipe: "warningSound",      volume: 0.5 },
+  },
+  haptic: {                                 // ms; Vibration API (Android). iOS ignora.
+    tap: 10, confirm: 15, notify: [20, 60, 20], success: [12, 40, 24], error: [30, 50, 30],
+  },
+  /** Interruptores do usuário; o kill-switch do Super Admin vence todos. */
+  preference: ["sound", "haptic", "motion", "celebration"],
+} as const;</code></pre>
+
+  <ul>
+    <li>Um hook só, <code>useFeedback(evento)</code>, dispara visual, som e vibração já respeitando as preferências, <code>prefers-reduced-motion</code> e o kill-switch. Ele substitui os <code>navigator.vibrate</code> soltos e o <code>playSound</code> chamado direto.</li>
+    <li>Pares CSS em <code>lite/motion/motion-tokens.css</code> para o novo <code>--motion-duration-celebrate</code>, seguindo o padrão atual.</li>
+    <li>Movimento reduzido: o nível 3 vira o nível 1 (check e texto). Som e vibração seguem só os próprios interruptores, porque movimento reduzido não significa silêncio.</li>
+    <li>Os novos valores entram primeiro no §3 do documento Lite e em <code>MOTION.md</code>, porque o código é a fonte da verdade e o documento descreve o código.</li>
+  </ul>
+</section>
+
+<section>
+  <span class="sec-no">7</span>
+  <h2>Próximos passos</h2>
+  <ol>
+    <li><strong>Decidir</strong> a contradição entre <code>MOTION.md</code> e o Lite sobre bounce e confete, e aprovar os quatro níveis de celebração.</li>
+    <li><strong>Preferências do usuário:</strong> som, vibração, animações e celebrações em Configurações do Lite, guardadas por usuário e sob o kill-switch.</li>
+    <li><strong>Contrato de feedback:</strong> <code>feedbackTokens</code> e <code>useFeedback</code>, migrando os três <code>vibrate</code> e os dois <code>playSound</code> atuais, com testes.</li>
+    <li><strong>Receita de som de marco</strong> em <code>recipes.ts</code>, ouvida e aprovada pelo dono do produto junto com as outras quatro.</li>
+    <li><strong>Piloto em três lugares:</strong> venda registrada (nível 3), meta do dia batida (nível 2) e falha ao aceitar lead (erro). Medir contato no SLA e vendas, além do uso.</li>
+    <li><strong>Sequência de plantão que perdoa:</strong> confirmar que folga, feriado e escala de outra pessoa não quebram a contagem, e expor os marcos.</li>
+    <li><strong>Mascotes com estados</strong> (repouso, pensando, comemorando, atento) com as primitivas atuais. Depois, uma prova de Rive com um mascote só, medindo o peso no celular.</li>
+    <li><strong>Atualizar os documentos</strong> (§3 do Lite, <code>MOTION.md</code>, <code>motion-frequencia.md</code>) junto com o código.</li>
+  </ol>
+</section>
+
+<section>
+  <h2>Fontes</h2>
+  <details open>
+    <summary>Oficiais: Duolingo, e Rive e LottieFiles sobre o Duolingo</summary>
+    <ul>
+      <li><a href="https://blog.duolingo.com/shape-language-duolingos-art-style/">Shape language: Duolingo's art style</a> (Megan Barker, 2020)</li>
+      <li><a href="https://blog.duolingo.com/ko/building-character/">Building character</a> (Greg Hartman, 2020)</li>
+      <li><a href="https://blog.duolingo.com/world-character-visemes">World character visemes</a> (Jasmine Vahidsafa, 2022)</li>
+      <li><a href="https://blog.duolingo.com/streak-milestone-design-animation">Streak milestone design and animation</a> (Kurt Hartfelder, 2022)</li>
+      <li><a href="https://blog.duolingo.com/improving-the-streak">Improving the streak</a> (Anton Yu, 2020)</li>
+      <li><a href="https://blog.duolingo.com/how-streaks-keep-duolingo-learners-committed-to-their-language-goals">How streaks keep learners committed</a> (2017)</li>
+      <li><a href="https://blog.duolingo.com/widget-feature/">Widget feature</a></li>
+      <li><a href="https://blog.duolingo.com/core-tabs-redesign/">Core tabs redesign</a> (Leah Lee)</li>
+      <li><a href="https://blog.duolingo.com/duolingo-leagues-leaderboards/">Leagues and leaderboards</a></li>
+      <li><a href="https://blog.duolingo.com/learning-with-hearing-aids/">Learning with hearing aids</a> (mostra os interruptores de som, vibração e animação, 2026)</li>
+      <li><a href="https://blog.duolingo.com/hub/design/">Hub de design do blog</a>. O antigo design.duolingo.com (voz, tom, cor e ilustração) hoje redireciona para cá. Foi citado por trechos indexados.</li>
+      <li><a href="https://research.duolingo.com/papers/yancey.kdd20.pdf">Yancey e Settles, KDD 2020</a> (notificações)</li>
+      <li><a href="https://rive.app/blog/duolingo-s-ai-powered-video-call-brings-lily-to-life">Rive: Lily na chamada de vídeo</a> (2025)</li>
+      <li><a href="https://rive.app/blog/creative-technologists-duolingo-s-solution-to-the-designer-to-developer-handoff">Rive: creative technologists</a></li>
+      <li><a href="https://lottiefiles.com/case-studies/duolingo">LottieFiles: estudo de caso</a></li>
+    </ul>
+  </details>
+  <details>
+    <summary>Terceiros: imprensa, análise e engenharia reversa</summary>
+    <ul>
+      <li><a href="https://www.lennysnewsletter.com/p/behind-the-product-duolingo-streaks">Lenny's Newsletter: streaks</a></li>
+      <li><a href="https://blakecrosley.com/es/guides/design/duolingo">Blake Crosley: guia de design</a> (CSS ilustrativo, origem dos tempos estimados)</li>
+      <li><a href="https://www.shadcn.io/design/duolingo">shadcn.io: Duolingo design</a></li>
+      <li><a href="https://duolingo.deconstructoroffun.com/mechanics/streaks">Deconstructor of Fun: streaks</a></li>
+      <li><a href="https://60fpsdesign.substack.com/p/fun-in-every-frame">60fps: Fun in every frame</a></li>
+      <li><a href="https://out-of-scope-product.beehiiv.com/p/duolingo-has-it-venmo-has-it-even-slack-has-it-your-product-doesn-t">Out of Scope: sons</a></li>
+      <li><a href="https://builtformars.com/company/duolingo">Built for Mars</a></li>
+      <li><a href="https://androidauthority.com/duolingo-xp-boost-ux-trap-3674572">Android Authority: XP Boost</a></li>
+      <li><a href="https://creativebloq.com/news/feather-bold">Creative Bloq: Feather Bold</a></li>
+      <li><a href="https://techcrunch.com/2024/07/09/duolingo-acquires-detroit-based-design-studio-hobbes">TechCrunch: compra do Hobbes</a> · <a href="https://kidscreen.com/2022/10/07/duolingo-acquires-animation-studio-gunner">Kidscreen: compra do Gunner</a></li>
+      <li><a href="https://screenwiseapp.com/guides/duolingo-streaks-and-anxiety-in-kids">Screenwise: ansiedade do streak</a></li>
+    </ul>
+  </details>
+  <footer>Lacunas: não há post oficial sobre o design de som, nem padrões de vibração ou números de tempo e curva. Esses itens ficaram marcados como terceiro ou sem dado. Nenhum código foi alterado.</footer>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var out = document.getElementById("demo-out");
+  var check = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  document.getElementById("demo-ok").addEventListener("click", function () {
+    out.innerHTML = '<span class="chk">' + check + '<span>Pronto, etapa: Cotação enviada.</span></span>';
+    void out.offsetWidth;
+    out.querySelector(".chk").classList.add("go");
+  });
+  document.getElementById("demo-err").addEventListener("click", function () {
+    out.innerHTML = '<span>Não consegui concluir agora. Tente de novo em instantes.</span>';
+    var s = out.firstChild; void s.offsetWidth; s.className = "shake"; s.style.display = "inline-block";
+  });
+})();
+</script>

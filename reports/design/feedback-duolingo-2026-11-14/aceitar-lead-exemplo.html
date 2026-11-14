@@ -1,0 +1,505 @@
+<title>Aceitar lead, feedback completo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: à esquerda o celular com a tela Lite real; à direita os controles e a trilha de feedback ao vivo; embaixo a anatomia do botão e a tabela de tempos. */
+:root {
+  --bg: #f7f7f9; --surface: #ffffff; --fg: #0b0b12; --muted: #5a5a68; --line: rgb(16 16 40 / .10);
+  --accent: #1e40af; --accent-soft: rgb(30 64 175 / .08);
+  --code-bg: #f1f1f5;
+  --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  /* Tokens do Lite, usados dentro do celular (sempre tema claro, como o produto) */
+  --l-bg: #f7f7f9; --l-surface: #ffffff; --l-fg: #0b0b12; --l-sec: #4b4b59; --l-muted: #666674; --l-soft-bg: #f1f1f5;
+  --l-border: rgb(16 16 40 / .08);
+  --action: oklch(62% .2 255); --action-strong: oklch(55% .21 258); --action-base: oklch(46% .19 260); --action-soft: oklch(62% .2 255 / .1);
+  --success: #0f7a4d; --success-soft: rgb(15 122 77 / .1); --danger: #d4263a; --danger-soft: rgb(212 38 58 / .08);
+  --notice: oklch(18% .01 260); --notice-fg: oklch(98% 0 0);
+  --wa: oklch(64% .17 150);
+  /* Movimento: valores de motion-tokens.ts e da proposta (× --slow para câmera lenta) */
+  --slow: 1;
+  --ease-enter: cubic-bezier(.16,1,.3,1); --ease-standard: cubic-bezier(.22,1,.36,1); --ease-exit: cubic-bezier(.7,0,.84,0);
+  --spring-snappy: cubic-bezier(.34,1.25,.64,1); --spring-celebrate: cubic-bezier(.3,1.5,.6,1);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0e0f14; --surface: #16171e; --fg: #ececf2; --muted: #a2a2b2; --line: rgb(255 255 255 / .10); --accent: #8aa6ff; --accent-soft: rgb(138 166 255 / .12); --code-bg: #1e1f28; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg: #0e0f14; --surface: #16171e; --fg: #ececf2; --muted: #a2a2b2; --line: rgb(255 255 255 / .10); --accent: #8aa6ff; --accent-soft: rgb(138 166 255 / .12); --code-bg: #1e1f28; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 400 15px/1.55 var(--font-body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 40px 80px; display: flex; flex-direction: column; gap: 40px; }
+header { display: flex; flex-direction: column; gap: 10px; }
+.kicker { font: 500 13px var(--font-mono); color: var(--muted); }
+h1 { font-size: clamp(26px, 4vw, 38px); line-height: 1.12; letter-spacing: -.03em; margin: 0; text-wrap: balance; }
+h2 { font-size: 21px; letter-spacing: -.02em; margin: 0; }
+h3 { font-size: 15px; font-weight: 500; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.muted { color: var(--muted); }
+code { font: 400 12.5px var(--font-mono); background: var(--code-bg); padding: 1px 5px; border-radius: 6px; }
+a { color: var(--accent); }
+
+.stage { display: grid; grid-template-columns: 380px 1fr; gap: 32px; align-items: start; }
+@media (max-width: 860px) { .stage { grid-template-columns: 1fr; } }
+
+/* ---------- celular ---------- */
+.phone { width: 100%; max-width: 380px; margin-inline: auto; aspect-ratio: 380 / 760; border-radius: 44px; border: 10px solid #0b0b12; background: var(--l-bg); position: relative; overflow: hidden; color: var(--l-fg); font-size: 15px; box-shadow: 0 20px 50px rgb(16 16 40 / .18); }
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.chead { display: flex; align-items: center; gap: 10px; padding: 46px 16px 12px; background: var(--l-surface); border-bottom: 1px solid var(--l-border); }
+.chead .who { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.chead .who b { font-weight: 500; font-size: 16px; }
+.chead .who span { font-size: 12px; color: var(--l-muted); }
+.goal { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; position: relative; }
+.goal small { font-size: 11px; color: var(--l-muted); }
+.goal .num { font: 500 13px var(--font-body); font-variant-numeric: tabular-nums; display: inline-flex; overflow: hidden; height: 18px; }
+.goal .bar { width: 76px; height: 6px; border-radius: 9999px; background: var(--l-soft-bg); overflow: hidden; }
+.goal .fill { height: 100%; background: var(--action); transform-origin: left; transform: scaleX(.8); transition: transform calc(480ms * var(--slow)) var(--ease-standard); }
+.goal.hit .fill { background: var(--success); }
+.ring { position: absolute; inset: -6px -8px; border: 2px solid var(--success); border-radius: 12px; opacity: 0; pointer-events: none; }
+.ring.go { animation: ring calc(600ms * var(--slow)) var(--ease-standard); }
+@keyframes ring { from { opacity: .5; transform: scale(1) } to { opacity: 0; transform: scale(1.04) } }
+.digit { display: inline-block; }
+.digit.roll { animation: roll calc(240ms * var(--slow)) var(--ease-enter); }
+@keyframes roll { from { transform: translateY(100%); opacity: .4 } to { transform: none; opacity: 1 } }
+
+.thread { flex: 1; overflow: hidden; padding: 14px 16px 20px; display: flex; flex-direction: column; gap: 12px; justify-content: flex-end; }
+.sys { align-self: center; font-size: 12px; color: var(--l-muted); text-align: center; }
+.bubble { max-width: 86%; background: var(--l-surface); border: 1px solid var(--l-border); border-radius: 16px 16px 16px 6px; padding: 10px 13px; font-size: 15px; line-height: 1.45; }
+.bubble.me { align-self: flex-end; background: var(--action); color: #fff; border: 0; border-radius: 16px 16px 6px 16px; }
+.in { animation: msgIn calc(180ms * var(--slow)) var(--ease-enter) both; }
+@keyframes msgIn { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+.typing { display: inline-flex; gap: 4px; padding: 13px 14px; }
+.typing i { width: 6px; height: 6px; border-radius: 9999px; background: var(--l-muted); animation: dot 1s infinite; }
+.typing i:nth-child(2) { animation-delay: .15s } .typing i:nth-child(3) { animation-delay: .3s }
+@keyframes dot { 0%,100% { opacity: .3 } 50% { opacity: 1 } }
+.opts { display: flex; flex-direction: column; gap: 8px; }
+.opt { font: 400 14px var(--font-body); min-height: 44px; border-radius: 9999px; border: 1px solid var(--l-border); background: var(--l-surface); color: var(--l-fg); text-align: left; padding: 0 16px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.opt b { font: 500 12px var(--font-mono); color: var(--l-muted); }
+.opt.in { animation: optIn calc(180ms * var(--slow)) var(--ease-enter) both; }
+@keyframes optIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+.empty { margin: auto; text-align: center; color: var(--l-muted); font-size: 14px; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 240px; }
+
+/* ---------- mascote ---------- */
+.masc { width: 40px; height: 40px; flex: none; position: relative; }
+.masc svg { width: 100%; height: 100%; overflow: visible; }
+.masc .body { transform-origin: 50% 100%; animation: breathe 1.6s ease-in-out infinite; }
+@keyframes breathe { 0%,100% { transform: scale(1) translateY(0) } 50% { transform: scale(1.05) translateY(-1.5px) } }
+.masc .eyes { transform-origin: 50% 46%; animation: blink 4.2s infinite; }
+@keyframes blink { 0%,94%,100% { transform: scaleY(1) } 97% { transform: scaleY(.1) } }
+.masc.atento .body { animation: atento calc(420ms * var(--slow)) var(--spring-snappy) both; }
+@keyframes atento { from { transform: translateY(0) } 50% { transform: translateY(-5px) scale(1.04) } to { transform: translateY(0) } }
+.masc.pensando .eyes { animation: none; transform: translate(2px,-2px); transition: transform calc(240ms * var(--slow)) var(--ease-standard); }
+.masc.comemora .body { animation: hop calc(560ms * var(--slow)) var(--spring-celebrate) both; }
+@keyframes hop { 0% { transform: translateY(0) scale(1) } 25% { transform: translateY(1px) scale(1.06,.92) } 55% { transform: translateY(-8px) scale(.97,1.04) } 100% { transform: translateY(0) scale(1) } }
+.masc.comemora .mouth { d: path("M15 27 Q20 33 25 27"); }
+
+/* ---------- aviso dinâmico ---------- */
+.notice { position: absolute; top: 10px; left: 50%; width: 126px; height: 36px; margin-left: -63px; background: var(--notice); color: var(--notice-fg); border-radius: 20px; z-index: 9; transform: translateY(-70px); opacity: 0; overflow: hidden;
+  transition: transform calc(420ms * var(--slow)) var(--ease-enter), opacity calc(160ms * var(--slow)) linear, width calc(400ms * var(--slow)) var(--ease-enter), height calc(400ms * var(--slow)) var(--ease-enter), margin-left calc(400ms * var(--slow)) var(--ease-enter), border-radius calc(400ms * var(--slow)) var(--ease-enter); box-shadow: 0 16px 40px rgb(0 0 0 / .35); }
+.notice.down { transform: none; opacity: 1; }
+.notice.open { width: calc(100% - 16px); height: 232px; margin-left: calc(-50% + 8px); border-radius: 28px; }
+.notice.leave { transform: translateY(-80px); opacity: 0; transition: transform calc(220ms * var(--slow)) var(--ease-exit), opacity calc(220ms * var(--slow)) linear; }
+.ncontent { padding: 16px; display: flex; flex-direction: column; gap: 12px; opacity: 0; filter: blur(6px); transition: opacity calc(240ms * var(--slow)) var(--ease-enter), filter calc(240ms * var(--slow)) var(--ease-enter); }
+.notice.open .ncontent { opacity: 1; filter: none; transition-delay: calc(160ms * var(--slow)); }
+.nrow { display: flex; gap: 12px; align-items: flex-start; }
+.nmeta { font-size: 12px; color: oklch(80% 0 0); display: flex; justify-content: space-between; }
+.ntitle { font-weight: 500; font-size: 15px; line-height: 1.3; }
+.nmsg { font-size: 14px; color: oklch(85% 0 0); line-height: 1.4; }
+.sla { font: 500 12px var(--font-mono); font-variant-numeric: tabular-nums; color: oklch(85% 0 0); }
+.nactions { display: flex; flex-direction: column; gap: 8px; }
+.ghost { font: 500 13px var(--font-body); background: transparent; border: 0; color: oklch(80% 0 0); padding: 6px; cursor: pointer; }
+.errline { font-size: 13px; color: oklch(80% .12 25); min-height: 0; }
+
+/* ---------- botão reestilizado ---------- */
+.cta { --h: 50px; position: relative; height: var(--h); width: 100%; border: 0; border-radius: 9999px; cursor: pointer;
+  font: 500 15px var(--font-body); color: #fff; background: var(--action);
+  box-shadow: 0 3px 0 var(--action-base); transform: translateY(0);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; overflow: hidden;
+  transition: transform calc(100ms * var(--slow)) var(--ease-standard), box-shadow calc(100ms * var(--slow)) var(--ease-standard), background-color calc(160ms * var(--slow)) linear, filter calc(160ms * var(--slow)) linear; }
+.cta:hover { filter: brightness(1.05); }
+.cta:active, .cta.pressing { transform: translateY(2px) scale(.98); box-shadow: 0 1px 0 var(--action-base); }
+.cta:focus-visible { outline: 2px solid oklch(80% .12 255); outline-offset: 3px; }
+.cta[aria-busy="true"] { cursor: progress; filter: saturate(.85); transform: translateY(1px); box-shadow: 0 2px 0 var(--action-base); }
+.cta.ok { background: var(--success); box-shadow: 0 3px 0 #0a5a38; }
+.cta.err { animation: shake calc(250ms * var(--slow)) cubic-bezier(.36,.07,.19,.97) both; }
+.cta.bad { background: var(--danger); box-shadow: 0 3px 0 #8f1626; }
+.cta .xk path { stroke-dasharray: 16; stroke-dashoffset: 16; animation: draw calc(240ms * var(--slow)) var(--ease-standard) forwards; }
+.cta .xk path + path { animation-delay: calc(80ms * var(--slow)); }
+.errline:empty { display: none; }
+.errline { display: flex; gap: 6px; align-items: flex-start; animation: msgIn calc(180ms * var(--slow)) var(--ease-enter) both; }
+@keyframes shake { 20%,60% { transform: translateX(-4px) } 40%,80% { transform: translateX(4px) } }
+.cta .lbl { display: inline-flex; align-items: center; gap: 8px; }
+.cta .lbl.in { animation: lblIn calc(160ms * var(--slow)) var(--ease-enter) both; }
+@keyframes lblIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+.spin { width: 16px; height: 16px; border-radius: 9999px; border: 2px solid rgb(255 255 255 / .35); border-top-color: #fff; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg) } }
+.cta .ck path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: draw calc(320ms * var(--slow)) var(--ease-standard) forwards; }
+.cta .ck { animation: pop calc(260ms * var(--slow)) var(--spring-snappy) both; }
+@keyframes draw { to { stroke-dashoffset: 0 } }
+@keyframes pop { from { transform: scale(.6); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+
+/* háptica visível (o navegador do artifact não vibra) */
+.haptic { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; z-index: 12; pointer-events: none; }
+.haptic i { display: block; height: 6px; border-radius: 9999px; background: var(--l-fg); opacity: 0; }
+.haptic i.on { animation: buzz var(--d) linear both; }
+@keyframes buzz { 0% { opacity: .0 } 10%,90% { opacity: .7 } 100% { opacity: 0 } }
+
+/* confete curto (nível 3, só ilustrado; aqui fica desligado) */
+
+/* movimento reduzido: tudo vira troca direta ou fade curto */
+.reduce *, .reduce *::before, .reduce *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 120ms !important; transition-delay: 0ms !important; }
+.reduce .notice, .reduce .ncontent { filter: none !important; }
+.reduce .cta:active, .reduce .cta.pressing { transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .phone *, .phone *::before, .phone *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 120ms !important; }
+}
+
+/* ---------- painel ---------- */
+.panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.controls { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.run { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { font: 500 14px var(--font-body); padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .btn.primary { color: #0e0f14; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #0e0f14; } }
+.btn:focus-visible, .sw input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switches { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.sw { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; user-select: none; }
+.sw input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+.hint { font-size: 12.5px; color: var(--muted); }
+.log { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.log h3 { padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: baseline; }
+.log h3 span { font: 400 12px var(--font-mono); color: var(--muted); }
+.log ol { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow-y: auto; }
+.log li { display: grid; grid-template-columns: 64px 92px 1fr; gap: 10px; padding: 9px 16px; border-bottom: 1px solid var(--line); font-size: 13.5px; align-items: baseline; }
+.log li:last-child { border-bottom: 0; }
+.log li.new { animation: msgIn 180ms var(--ease-enter) both; }
+.log .t { font: 400 12px var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.layer { font: 500 11px var(--font-mono); padding: 3px 7px; border-radius: 9999px; justify-self: start; white-space: nowrap; }
+.L-visual { background: rgb(37 99 235 / .1); color: #2563eb; }
+.L-texto { background: rgb(100 100 120 / .12); color: var(--muted); }
+.L-som { background: rgb(124 58 237 / .1); color: #7c3aed; }
+.L-vibra { background: rgb(234 88 12 / .1); color: #c2410c; }
+.L-mascote { background: rgb(15 122 77 / .1); color: #0f7a4d; }
+.L-servidor { background: rgb(16 16 40 / .07); color: var(--muted); }
+.log li .d { min-width: 0; }
+.log li .d code { font-size: 11.5px; }
+.log .emptylog { display: block; padding: 16px; color: var(--muted); font-size: 13.5px; }
+
+/* ---------- explicação ---------- */
+.doc { display: flex; flex-direction: column; gap: 16px; }
+.anat { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.st { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.st .prev { background: var(--l-bg); border-radius: 10px; padding: 18px 14px; color: var(--l-fg); }
+.st p { font-size: 13.5px; color: var(--muted); }
+.st .cta { pointer-events: none; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; line-height: 1.5; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+th { font-weight: 500; color: var(--muted); font-size: 12px; background: var(--bg); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.note { border-left: 3px solid #a15c00; background: rgb(161 92 0 / .08); padding: 14px 16px; border-radius: 0 12px 12px 0; font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
+</style>
+
+<div class="wrap">
+<header>
+  <span class="kicker">Exemplo do relatório Duolingo no AncoraHub · modo Lite · corretor</span>
+  <h1>Aceitar um lead, do aviso ao próximo passo</h1>
+  <p class="muted">Toque em "Simular lead novo" e depois aceite. Cada camada de feedback (visual, texto, som, vibração e mascote) aparece na trilha à direita, com o tempo e o token. Use a câmera lenta para ver o ritmo e os interruptores para testar as preferências do usuário.</p>
+  <p class="hint">Este é um protótipo para revisão. Os nomes e dados do lead são fictícios e nenhum código do app foi alterado. Relatório: <a href="https://claude.ai/artifact/HmqvJecKPrVKgiAskLJ47c">Duolingo no AncoraHub</a>.</p>
+</header>
+
+<div class="stage">
+  <div class="phone" id="phone" aria-label="Simulação da tela do corretor">
+    <div class="screen">
+      <div class="chead">
+        <div class="masc" id="masc" aria-hidden="true"><svg viewBox="0 0 40 40"><g class="body"><circle cx="20" cy="22" r="17" fill="oklch(54% .18 212)"/><path d="M3 22a17 17 0 0 1 34 0z" fill="oklch(86% .1 212)"/><circle cx="20" cy="24" r="13" fill="oklch(66% .17 212)"/><g class="eyes"><circle cx="15" cy="19" r="2.2" fill="#0b0b12"/><circle cx="25" cy="19" r="2.2" fill="#0b0b12"/></g><path class="mouth" d="M16 27 Q20 30 24 27" stroke="#0b0b12" stroke-width="1.6" fill="none" stroke-linecap="round"/></g></svg></div>
+        <div class="who"><b>Leads</b><span id="status" aria-live="polite">Em dia</span></div>
+        <div class="goal" id="goal" aria-label="Contatos no prazo hoje">
+          <span class="ring" id="ring"></span>
+          <small>Contatos no prazo</small>
+          <span class="num"><span class="digit" id="gnum">4</span>&nbsp;de 5</span>
+          <span class="bar"><span class="fill" id="gfill" style="display:block"></span></span>
+        </div>
+      </div>
+      <div class="thread" id="thread" aria-live="polite" aria-relevant="additions">
+        <div class="empty" id="empty">
+          <span>Nenhum lead esperando. Que tal revisar os retornos de hoje?</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="notice" id="notice" role="status" aria-label="Lead novo">
+      <div class="ncontent">
+        <div class="nrow">
+          <div class="masc" aria-hidden="true"><svg viewBox="0 0 40 40"><circle cx="20" cy="22" r="17" fill="oklch(54% .18 212)"/><path d="M3 22a17 17 0 0 1 34 0z" fill="oklch(86% .1 212)"/><circle cx="20" cy="24" r="13" fill="oklch(66% .17 212)"/><circle cx="15" cy="19" r="2.2" fill="#0b0b12"/><circle cx="25" cy="19" r="2.2" fill="#0b0b12"/></svg></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+            <div class="nmeta"><span>Leads · agora</span><span class="sla" id="sla">responda em 5:00</span></div>
+            <div class="ntitle">Maria Souza quer uma cotação</div>
+            <div class="nmsg">Plano familiar, 3 vidas, Zona Sul. Chegou pelo Meta Ads.</div>
+          </div>
+        </div>
+        <div class="nactions">
+          <button class="cta" id="cta" type="button"><span class="lbl" id="lbl">Aceitar e chamar no WhatsApp</span></button>
+          <div class="errline" id="errline" role="alert"></div>
+          <button class="ghost" id="later" type="button">Agora não</button>
+        </div>
+      </div>
+    </div>
+    <div class="haptic" id="haptic" aria-hidden="true"></div>
+  </div>
+
+  <div class="panel">
+    <div class="controls">
+      <div class="run">
+        <button class="btn primary" id="go" type="button">Simular lead novo</button>
+        <button class="btn" id="reset" type="button">Recomeçar</button>
+      </div>
+      <div class="switches" role="group" aria-label="Preferências do usuário">
+        <label class="sw"><input type="checkbox" id="pSound" checked><span>Som</span></label>
+        <label class="sw"><input type="checkbox" id="pHaptic" checked><span>Vibração</span></label>
+        <label class="sw"><input type="checkbox" id="pMotion" checked><span>Animações</span></label>
+        <label class="sw"><input type="checkbox" id="pCeleb" checked><span>Celebrações</span></label>
+      </div>
+      <div class="switches" role="group" aria-label="Simulação">
+        <label class="sw"><input type="checkbox" id="pSlow"><span>Câmera lenta 4×</span></label>
+        <label class="sw"><input type="checkbox" id="pFail"><span>Simular falha ao aceitar</span></label>
+      </div>
+      <p class="hint">O som toca de verdade (sintetizado como em <code>src/lib/sounds</code>). A vibração aparece como traços na base do celular, porque esta página não pode vibrar o aparelho. No app, ela usa <code>navigator.vibrate</code> no Android, e o iPhone ignora.</p>
+    </div>
+    <div class="log">
+      <h3>Trilha de feedback <span id="clock">t = 0 ms</span></h3>
+      <ol id="log"><li class="emptylog" style="display:block">Os eventos aparecem aqui, na ordem em que disparam.</li></ol>
+    </div>
+  </div>
+</div>
+
+<section class="doc">
+  <h2>O botão reestilizado</h2>
+  <p>É a pílula de ação do Lite (50px, <code>--chat-action</code>), mais uma base de 3px em um tom mais escuro do mesmo azul. Ao pressionar, o botão desce 2px e a base encolhe, como uma tecla. É a ideia do botão do Duolingo, mas em versão contida: mesmo matiz, sem verde saturado e sem lábio grosso. Largura e altura nunca mudam entre os estados, então nada pula.</p>
+  <div class="anat">
+    <div class="st"><div class="prev"><button class="cta" type="button" tabindex="-1"><span class="lbl">Aceitar e chamar no WhatsApp</span></button></div><h3>Repouso</h3><p>Fundo <code>--chat-action</code>, base <code>0 3px 0</code> em azul 46%. Um único CTA na tela.</p></div>
+    <div class="st"><div class="prev"><button class="cta pressing" type="button" tabindex="-1"><span class="lbl">Aceitar e chamar no WhatsApp</span></button></div><h3>Pressionado</h3><p><code>translateY(2px) scale(.98)</code>, base 1px, 100ms <code>ease-standard</code>. Vibração <code>tap</code> de 10ms.</p></div>
+    <div class="st"><div class="prev"><button class="cta" aria-busy="true" type="button" tabindex="-1"><span class="lbl"><span class="spin"></span>Aceitando…</span></button></div><h3>Enviando</h3><p>Spinner no lugar do texto, largura fixa, <code>aria-busy</code>. Não declara sucesso antes do servidor confirmar.</p></div>
+    <div class="st"><div class="prev"><button class="cta ok" type="button" tabindex="-1"><span class="lbl"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Lead é seu</span></button></div><h3>Confirmado</h3><p>Fundo <code>--success</code> (status), check desenhado em 320ms, mola <code>snappy</code>.</p></div>
+    <div class="st"><div class="prev"><button class="cta bad" type="button" tabindex="-1"><span class="lbl"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10"/><path d="M17 7L7 17"/></svg>Não deu certo</span></button></div><h3>Falhou</h3><p>Fica vermelho (<code>--danger</code>, status), o X se desenha e o botão balança (2 ciclos, 4px, 250ms). A causa aparece logo abaixo. Depois de 1,4s volta ao azul como "Tentar de novo", com o foco nele.</p></div>
+  </div>
+
+  <h2>O processo, passo a passo</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Quando</th><th>O que acontece</th><th>Camadas</th><th>Tempo e curva</th><th>Por quê</th></tr></thead>
+    <tbody>
+      <tr><td class="n">0 ms</td><td>O aviso desce como pílula preta e o mascote do Leads dá um salto de atenção.</td><td>visual, som <code>notify</code>, vibração <code>[20,60,20]</code>, mascote</td><td class="n">420ms ease-enter</td><td>Evento urgente. Som e vibração uma vez por lead, como já está no §5.10.</td></tr>
+      <tr><td class="n">+260 ms</td><td>A pílula abre em cartão e o conteúdo entra com blur 6px até 0.</td><td>visual</td><td class="n">400ms ease-enter, conteúdo +160ms</td><td>É o padrão atual do DynamicNotice.</td></tr>
+      <tr><td class="n">toque</td><td>O botão afunda e a base encolhe.</td><td>visual, vibração <code>tap 10</code></td><td class="n">100ms ease-standard</td><td>Resposta imediata ao toque (nível 0). Sem som, porque é frequente.</td></tr>
+      <tr><td class="n">+0 ms</td><td>O spinner substitui o texto e o mascote fica "pensando".</td><td>visual, texto, mascote</td><td class="n">160ms</td><td>A espera parece intencional, como a Lily faz na chamada de vídeo.</td></tr>
+      <tr><td class="n">servidor ok</td><td>O botão fica verde, o check se desenha e o texto "Lead é seu" chega 80ms depois.</td><td>visual, texto, som <code>confirm</code>, vibração <code>confirm 15</code></td><td class="n">check 320ms, texto +80ms (<code>beat.text</code>)</td><td>Nível 1: ritmo fixo, sucesso só depois da confirmação.</td></tr>
+      <tr><td class="n">+160 ms</td><td>O número da meta rola de 4 para 5 e a barra enche.</td><td>visual</td><td class="n">240ms (número), 480ms (barra)</td><td><code>beat.number</code>. O número explica a mudança.</td></tr>
+      <tr><td class="n">+320 ms</td><td>Meta batida: anel único na meta, mascote comemora e o status vira "Meta do dia batida".</td><td>visual, som <code>milestone</code>, vibração <code>success</code>, mascote</td><td class="n">anel 600ms, salto 560ms <code>spring.celebrate</code></td><td>Nível 2, uma vez por dia. Some com "Celebrações" desligado.</td></tr>
+      <tr><td class="n">+900 ms</td><td>O aviso sobe e sai. A conversa recebe a nota de sistema e a resposta do assistente, depois do "digitando".</td><td>visual, texto</td><td class="n">saída 220ms ease-exit, mensagem 180ms</td><td>A confirmação vive na conversa, não em toast (§7 do Lite).</td></tr>
+      <tr><td class="n">depois</td><td>Próximas ações em cascata.</td><td>visual</td><td class="n">50ms + i × 40ms</td><td>Próxima ação primeiro (princípio 1 do Lite).</td></tr>
+      <tr><td class="n">falha</td><td>O botão fica vermelho com X e balança. A causa chega 80ms depois e diz o que continua valendo, e o aviso cresce para caber. Após 1,4s o botão volta ao azul como "Tentar de novo".</td><td>visual, texto, som <code>error</code>, vibração <code>[30,50,30]</code></td><td class="n">shake 250ms, texto +80ms, volta 1,4s</td><td>O tom é descendente e curto, para desanimar sem assustar. O foco fica no botão.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note">
+    <strong>Para aprovar</strong>
+    <span>A base de 3px do botão é uma sombra sólida. O design system do Lite usa <code>--shadow-resting</code> e não tem esse padrão. Ela só entra se você aprovar. O salto do mascote usa a mola <code>celebrate</code> (bounce .24), que ainda é proposta, e a receita de som <code>milestone</code> ainda não existe em <code>recipes.ts</code>.</span>
+  </div>
+</section>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var phone = $("phone"), notice = $("notice"), cta = $("cta"), lbl = $("lbl"), masc = $("masc"), thread = $("thread"), logEl = $("log"), hapticEl = $("haptic");
+  var timers = [], t0 = 0, busy = false, done = false, slaTimer = 0;
+  function pref(id) { return $(id).checked; }
+  function slow() { return pref("pSlow") ? 4 : 1; }
+  function later(ms, fn) { timers.push(setTimeout(fn, ms * slow())); }
+  function clearAll() { timers.forEach(clearTimeout); timers = []; clearInterval(slaTimer); }
+
+  /* ---- trilha ---- */
+  function log(layer, text) {
+    var first = logEl.querySelector(".emptylog"); if (first) first.remove();
+    var ms = Math.round((performance.now() - t0) / slow());
+    $("clock").textContent = "t = " + ms + " ms";
+    var li = document.createElement("li"); li.className = "new";
+    li.innerHTML = '<span class="t">+' + ms + '</span><span class="layer L-' + layer + '">' + layer + '</span><span class="d">' + text + '</span>';
+    logEl.appendChild(li); logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  /* ---- som (Web Audio, mesmas ideias de src/lib/sounds) ---- */
+  var ctx = null;
+  function ac() { try { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === "suspended") ctx.resume(); } catch (e) { ctx = null; } return ctx; }
+  function tone(type, f0, f1, dur, gain, delay) {
+    var c = ac(); if (!c) return;
+    var t = c.currentTime + (delay || 0), o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter();
+    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur * .8);
+    lp.type = "lowpass"; lp.frequency.value = 3200;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + .006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(lp); lp.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + .02);
+  }
+  var sounds = {
+    notify: function () { tone("sine", 419, 398, .6, .22); tone("sine", 838, 796, .4, .08); },
+    confirm: function () { tone("sine", 880, 990, .14, .1); },
+    milestone: function () { tone("sine", 660, 660, .18, .14); tone("sine", 880, 880, .22, .14, .09); tone("sine", 1320, 1320, .35, .07, .18); },
+    error: function () { tone("triangle", 330, 220, .32, .16); }
+  };
+  function sound(name, why) {
+    if (!pref("pSound")) { log("som", "<s>" + name + "</s> desligado pelo usuário"); return; }
+    sounds[name](); log("som", "<code>" + name + "</code> · " + why);
+  }
+
+  /* ---- vibração ---- */
+  var patterns = { tap: [10], confirm: [15], notify: [20, 60, 20], success: [12, 40, 24], error: [30, 50, 30] };
+  function haptic(name) {
+    var p = patterns[name];
+    if (!pref("pHaptic")) { log("vibra", "<s>" + name + "</s> desligado pelo usuário"); return; }
+    try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {}
+    hapticEl.innerHTML = ""; var acc = 0;
+    p.forEach(function (d, i) {
+      if (i % 2 === 0) {
+        var bar = document.createElement("i"); bar.style.width = Math.max(8, d) + "px";
+        bar.style.setProperty("--d", (d * 3 * slow()) + "ms"); bar.style.animationDelay = (acc * 3 * slow()) + "ms";
+        hapticEl.appendChild(bar); requestAnimationFrame(function () { bar.className = "on"; });
+      }
+      acc += d;
+    });
+    log("vibra", "<code>" + name + "</code> [" + p.join(", ") + "] ms");
+  }
+
+  /* ---- mascote ---- */
+  function mascot(state, why) {
+    masc.classList.remove("atento", "pensando", "comemora"); void masc.offsetWidth;
+    if (state) masc.classList.add(state);
+    log("mascote", (state || "repouso") + " · " + why);
+  }
+
+  function setStatus(s) { $("status").textContent = s; }
+  function applyMotion() { phone.classList.toggle("reduce", !pref("pMotion")); document.documentElement.style.setProperty("--slow", slow()); }
+
+  function reset() {
+    clearAll(); busy = false; done = false;
+    notice.className = "notice"; notice.style.height = ""; cta.className = "cta"; cta.removeAttribute("aria-busy"); cta.disabled = false;
+    lbl.className = "lbl"; lbl.textContent = "Aceitar e chamar no WhatsApp"; $("errline").textContent = "";
+    $("sla").textContent = "responda em 5:00";
+    masc.className = "masc"; setStatus("Em dia");
+    $("gnum").textContent = "4"; $("gfill").style.transform = "scaleX(.8)"; $("goal").classList.remove("hit");
+    thread.innerHTML = '<div class="empty" id="empty"><span>Nenhum lead esperando. Que tal revisar os retornos de hoje?</span></div>';
+    logEl.innerHTML = '<li class="emptylog" style="display:block">Os eventos aparecem aqui, na ordem em que disparam.</li>';
+    $("clock").textContent = "t = 0 ms"; $("go").disabled = false;
+  }
+
+  function arrive() {
+    reset(); applyMotion(); ac(); t0 = performance.now(); $("go").disabled = true;
+    notice.classList.add("down");
+    log("visual", "aviso desce como pílula · 420ms <code>ease-enter</code>");
+    sound("notify", "uma vez por lead"); haptic("notify"); mascot("atento", "chegou alguém");
+    setStatus("Esperando você");
+    later(260, function () { notice.classList.add("open"); fitNotice(); log("visual", "pílula abre em cartão · conteúdo com blur 6→0"); });
+    later(700, function () { log("texto", "SLA visível sem pânico: \"responda em 5:00\""); try { cta.focus({ preventScroll: true }); } catch (e) {} });
+    var left = 300; slaTimer = setInterval(function () { left--; if (left < 0) return; $("sla").textContent = "responda em " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0"); }, 1000);
+  }
+
+  function accept() {
+    if (busy || done || !notice.classList.contains("open")) return;
+    busy = true; $("errline").textContent = ""; fitNotice();
+    haptic("tap"); log("visual", "pressão: desce 2px, base 3→1px · 100ms");
+    cta.setAttribute("aria-busy", "true");
+    lbl.innerHTML = '<span class="spin" aria-hidden="true"></span>Aceitando…'; lbl.className = "lbl in";
+    log("texto", "\"Aceitando…\" com largura fixa; sucesso só após o servidor");
+    mascot("pensando", "esperando o servidor");
+    log("servidor", "POST aceitar lead…");
+    later(800, function () { if (pref("pFail")) fail(); else ok(); });
+  }
+
+  /* Mede o conteúdo na largura final do cartão (não na largura da pílula, que ainda está animando). */
+  function fitNotice() {
+    var c = notice.querySelector(".ncontent");
+    c.style.width = (phone.clientWidth - 16) + "px";
+    notice.style.height = c.offsetHeight + "px";
+  }
+
+  function fail() {
+    busy = true; cta.removeAttribute("aria-busy");
+    log("servidor", "falhou (simulado)");
+    cta.classList.add("bad");
+    cta.classList.remove("err"); void cta.offsetWidth; cta.classList.add("err");
+    lbl.innerHTML = '<svg class="xk" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10"/><path d="M17 7L7 17"/></svg>Não deu certo';
+    lbl.className = "lbl in";
+    log("visual", "botão fica vermelho (<code>--danger</code>) + X desenhado + shake 2×4px, 250ms");
+    sound("error", "tom descendente curto"); haptic("error");
+    mascot(null, "volta ao normal");
+    later(80, function () {
+      $("errline").textContent = "Outro pedido estava em andamento e o aceite não foi registrado. O lead continua esperando você.";
+      fitNotice();
+      log("texto", "causa + o que continua valendo, logo abaixo · <code>beat.text</code> +80ms; o aviso cresce para caber");
+    });
+    later(1400, function () {
+      busy = false; cta.classList.remove("bad", "err");
+      lbl.textContent = "Tentar de novo"; lbl.className = "lbl in";
+      try { cta.focus({ preventScroll: true }); } catch (e) {}
+      log("visual", "após 1,4s volta ao azul como \"Tentar de novo\"; foco no botão");
+    });
+  }
+
+  function ok() {
+    busy = false; done = true; cta.removeAttribute("aria-busy");
+    log("servidor", "confirmado (200)");
+    cta.classList.add("ok");
+    lbl.innerHTML = '<svg class="ck" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span id="okt" style="opacity:0">Lead é seu</span>';
+    lbl.className = "lbl";
+    log("visual", "nível 1: check desenha 320ms, mola <code>snappy</code>");
+    sound("confirm", "nível 1, discreto"); haptic("confirm");
+    later(80, function () { var s = $("okt"); if (s) { s.style.opacity = 1; s.className = "lbl in"; } log("texto", "\"Lead é seu\" · <code>beat.text</code> +80ms"); });
+    later(160, function () {
+      var d = $("gnum"); d.textContent = "5"; d.classList.remove("roll"); void d.offsetWidth; d.classList.add("roll");
+      $("gfill").style.transform = "scaleX(1)";
+      log("visual", "meta 4→5 rola · barra enche 480ms · <code>beat.number</code>");
+    });
+    later(320, function () {
+      if (!pref("pCeleb")) { log("visual", "<s>nível 2</s> celebrações desligadas: só o número muda"); setStatus("Em dia"); return; }
+      $("goal").classList.add("hit");
+      var r = $("ring"); r.classList.remove("go"); void r.offsetWidth; r.classList.add("go");
+      log("visual", "nível 2: anel único na meta · 600ms, uma vez por dia");
+      sound("milestone", "meta do dia batida"); haptic("success"); mascot("comemora", "uma passada, mola <code>celebrate</code>");
+      setStatus("Meta do dia batida");
+    });
+    later(1100, function () {
+      notice.classList.add("leave"); clearInterval(slaTimer);
+      log("visual", "aviso sai subindo 80px · 220ms <code>ease-exit</code>");
+      var e = $("empty"); if (e) e.remove();
+      addMsg('<div class="sys in">Maria Souza chegou pelo Meta Ads às 14:32 · aceito por você</div>');
+      log("texto", "nota de sistema na conversa");
+      addMsg('<div class="bubble typing in" id="typ"><i></i><i></i><i></i></div>');
+      var text = "Pronto, Maria é sua. Abri o WhatsApp com a primeira mensagem. Como quer seguir?";
+      var typing = Math.min(900, 400 + text.length * 6);
+      log("visual", "\"digitando\" " + typing + "ms = min(900, 400 + caracteres × 6)");
+      later(typing, function () {
+        var t = $("typ"); if (t) t.remove();
+        addMsg('<div class="bubble in">' + text + '</div>');
+        log("texto", "confirmação na conversa, não em toast");
+        var opts = document.createElement("div"); opts.className = "opts"; thread.appendChild(opts);
+        ["Agendar retorno", "Registrar cotação", "Não deu certo"].forEach(function (o, i) {
+          later(50 + i * 40, function () {
+            var b = document.createElement("button"); b.type = "button"; b.className = "opt in"; b.innerHTML = "<b>" + "ABC"[i] + "</b>" + o; opts.appendChild(b);
+          });
+        });
+        later(50 + 2 * 40 + 180, function () { log("visual", "opções em cascata · 50ms + i × 40ms"); $("go").disabled = false; mascot(null, "volta a respirar"); });
+      });
+    });
+  }
+
+  function addMsg(html) { var w = document.createElement("div"); w.innerHTML = html; var el = w.firstChild; thread.appendChild(el); return el; }
+
+  $("go").addEventListener("click", arrive);
+  $("reset").addEventListener("click", function () { reset(); applyMotion(); });
+  cta.addEventListener("click", accept);
+  $("later").addEventListener("click", function () {
+    if (!notice.classList.contains("open") || done) return;
+    notice.classList.add("leave"); clearInterval(slaTimer); log("visual", "\"Agora não\": aviso sai e repousa como pílula no app real"); mascot(null, "volta ao normal"); setStatus("Em dia"); $("go").disabled = false;
+  });
+  ["pMotion", "pSlow"].forEach(function (id) { $(id).addEventListener("change", applyMotion); });
+  applyMotion();
+})();
+</script>

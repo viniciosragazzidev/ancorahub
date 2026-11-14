@@ -4,6 +4,8 @@ Diretriz de animação do CRM, adaptada da skill "animate" escolhida pelo dono d
 Base técnica que já existe e deve ser reutilizada: `src/lib/motion/*` (tokens, presets, transições),
 `src/utils/animation`, provider de motion da interface e o hook de reduced motion.
 
+> **Padrão geral de feedback (14/11/2026):** níveis de resposta, som, vibração, mascote e estados do botão de ação estão em [FEEDBACK.md](./FEEDBACK.md), que prevalece em conflito. No modo normal valem os níveis 0 a 2: o bounce e o confete continuam proibidos aqui. O confete e a mola `celebrate` existem só no nível 3 do Lite.
+
 ## Contexto (define o quanto animar)
 - **Público:** corretores e gestores, uso intensivo o dia todo, desktop e celular. Usuários avançados: **velocidade acima de tudo**.
 - **Personalidade:** sério, calmo, confiável (saúde). Nada brincalhão, nada de bounce/elastic, nada de confete.
