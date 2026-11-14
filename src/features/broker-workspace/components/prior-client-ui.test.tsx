@@ -82,7 +82,7 @@ describe("Cliente que já possuo na tela", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Operadora" }), { target: { value: "Operadora X" } });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Cadastrar cliente" })); });
     expect(prior).toHaveBeenCalledWith({
-      nome: "Ana Prévia", telefone: "11 98888-7777", email: "", observacao: "",
+      nome: "Ana Prévia", telefone: "(11) 98888-7777", email: "", observacao: "",
       contracts: [{ productType: "unknown", carrierName: "Operadora X", coverageStartDate: "", renewalDate: "", status: "unknown" }],
     });
     expect(await screen.findByText("Ana Prévia está na sua carteira.")).toBeTruthy();

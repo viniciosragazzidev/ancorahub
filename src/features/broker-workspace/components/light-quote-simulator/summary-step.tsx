@@ -8,6 +8,7 @@ import { SearchField } from "@/components/arc/search-field/search-field";
 import { MOCK_LEADS } from "@/features/broker-workspace/quote-simulator/mock-data";
 import { Folder } from "lucide-react";
 import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
+import { useCampoMascarado } from "@/shared/input/use-campo-mascarado";
 
 import { COVERAGE_LABEL, money, PROFILE_LABEL, REGION_LABEL } from "./constants";
 import type { QuoteSimulator } from "./use-quote-simulator";
@@ -17,6 +18,7 @@ const card = "flex flex-col gap-4 rounded-3xl bg-(--surface) p-5 shadow-(--shado
 /** Step 4: the chosen plan with the lives, plus share, print and a demo lead link. */
 export function SummaryStep({ q }: { q: QuoteSimulator }) {
   const { chosenResult, finalMonthly, familyDiscount, profileType, region, coverage } = q;
+  const telefone = useCampoMascarado("telefone", q.phone, q.setPhone);
 
   if (!chosenResult) {
     return (
@@ -88,11 +90,9 @@ export function SummaryStep({ q }: { q: QuoteSimulator }) {
           <Input
             label="Telefone com DDD (opcional)"
             type="tel"
-            inputMode="tel"
             autoComplete="tel"
-            value={q.phone}
-            onChange={(event) => q.setPhone(event.target.value)}
-            placeholder="Ex.: 5521999999999"
+            {...telefone}
+            placeholder="Ex.: (21) 99999-9999"
           />
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button variant="secondary" className="sm:flex-1" onClick={q.copySummary}>Copiar resumo</Button>
