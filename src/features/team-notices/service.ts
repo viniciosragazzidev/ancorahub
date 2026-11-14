@@ -163,6 +163,7 @@ export async function evaluateNoticeRow(row: {
 
   return evaluateDeliveryGuard({
     noticeClass,
+    weekdaysOnly: Boolean(notice?.weekdaysOnly),
     now,
     createdAt: row.createdAt,
     channel,

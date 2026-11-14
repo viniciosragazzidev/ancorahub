@@ -28,6 +28,8 @@ export type TeamNotice = {
   chat?: boolean;
   /** Goes to the WhatsApp numbers the director types (not to a team member): the card shows the field. */
   phoneRecipients?: boolean;
+  /** Não sai no sábado nem no domingo: fica na fila até segunda às 08:00 (pedido do Vinicios, 14/11). */
+  weekdaysOnly?: boolean;
   /** Other outbox purposes governed by this notice (same switch, channel and numbers; built-in text only). */
   extraPurposes?: readonly string[];
 };
@@ -99,9 +101,10 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     key: "LEAD_CLOSING_DIRECTOR",
     purpose: "leadClosingDirectorAlert",
     label: "Fechamento para a direção",
-    description: "Quando um lead entra em Documentação ou Em análise, manda para os números escolhidos abaixo: cliente, corretor, valor e vidas e o resumo da conversa feito pela IA. Uma vez por lead e número.",
-    // A deal is closing now: goes out at once, any day.
+    description: "Quando um lead entra em Documentação ou Em análise, manda para os números escolhidos abaixo: cliente, corretor, valor e vidas e o resumo da conversa feito pela IA. Uma vez por lead e número. No sábado e no domingo fica guardado e sai na segunda às 8h.",
+    // A deal is closing now: goes out at once on weekdays; weekends wait for Monday 08:00.
     class: "critical",
+    weekdaysOnly: true,
     defaultEnabled: true,
     defaultChannel: "company_number",
     phoneRecipients: true,
@@ -110,9 +113,10 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     key: "LEAD_CONVERTED_DIRECTOR",
     purpose: "leadConvertedDirectorAlert",
     label: "Venda fechada para a direção",
-    description: "Quando um lead vira venda (pela IA ou por uma pessoa), manda para os números abaixo: cliente, negócio, corretor, dias no fechamento, como a venda foi confirmada e o que falta no CRM. Se a venda já tinha sido avisada e o corretor conclui o Registrar venda depois, sai uma mensagem curta com o que foi registrado. Sem números próprios, usa os do Fechamento para a direção. Uma vez por lead e número.",
-    // A sale just closed: goes out at once, any day.
+    description: "Quando um lead vira venda (pela IA ou por uma pessoa), manda para os números abaixo: cliente, negócio, corretor, dias no fechamento, como a venda foi confirmada e o que falta no CRM. Se a venda já tinha sido avisada e o corretor conclui o Registrar venda depois, sai uma mensagem curta com o que foi registrado. Sem números próprios, usa os do Fechamento para a direção. Uma vez por lead e número. No sábado e no domingo fica guardado e sai na segunda às 8h.",
+    // A sale just closed: goes out at once on weekdays; weekends wait for Monday 08:00.
     class: "critical",
+    weekdaysOnly: true,
     defaultEnabled: true,
     defaultChannel: "company_number",
     phoneRecipients: true,
@@ -124,8 +128,9 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     purpose: "dailyLeadsReport",
     label: "Relatório das 18h",
     description: "Todo dia às 18h, para os números abaixo: quantos leads entraram em cada fila e quantos ficaram quentes, mornos e frios. Sem números próprios, usa os do Fechamento para a direção.",
-    // Sai às 18h todo dia (inclusive sábado e domingo), fora do horário comercial.
+    // Sai no fim do dia, de segunda a sexta (fora do horário comercial); no sábado e no domingo não sai.
     class: "any_day",
+    weekdaysOnly: true,
     defaultEnabled: true,
     defaultChannel: "company_number",
     phoneRecipients: true,
