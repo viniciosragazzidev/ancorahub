@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { resetFirstTimeTodayMemory } from "@/components/motion/first-time-today/first-time-today-core";
 import { WeekRanking, type HomeHighlights } from "./week-ranking";
 import { GoalFill } from "./chat-home";
+
+// chat-home importa a folha de venda rápida, que puxa uma server action (server-only não existe no vitest).
+vi.mock("@/features/broker-workspace/components/quick-register-sale", () => ({ QuickRegisterSaleSheet: () => null }));
 
 const data: HomeHighlights = {
   ranks: [
