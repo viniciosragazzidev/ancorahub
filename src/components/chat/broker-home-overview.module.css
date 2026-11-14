@@ -276,3 +276,10 @@
     display: none;
   }
 }
+
+/* Foco (Fase 3 motion/UX): uma ação primária por tela. Aceites da lista "Também precisa de você" ficam com
+ * peso secundário; a seletor dupla vence o .primaryButton compartilhado sem mexer no botão de aceite. */
+.secondaryAction.secondaryAction { background: var(--surface-muted); color: var(--foreground); box-shadow: none; }
+.secondaryAction.secondaryAction:hover:not(:disabled) { background: var(--border-subtle); }
+/* O invólucro do toque (LitePress) não muda o tamanho do link. */
+.press { display: inline-flex; max-width: 100%; }

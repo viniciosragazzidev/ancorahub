@@ -41,6 +41,7 @@ import { BrokerHomeOverview } from "./broker-home-overview";
 import { HomeQuickActions, homeQuickActions } from "./home-quick-actions";
 import { QuickRegisterSaleSheet } from "@/features/broker-workspace/components/quick-register-sale";
 import { RisePulse, useRisePulseKey } from "@/components/light/rise-pulse";
+import { LitePress } from "@/components/lite/motion";
 
 type Tab = "assistentes" | "leads";
 
@@ -99,7 +100,7 @@ function NowSection({ data, mobile = false, floating = false, onNavigate }: { da
                 {item.expiresAt ? <span className={home.nowCountdown}>{formatCountdown(item.expiresAt, clock)}</span> : null}
               </div>
               <div className={floating ? home.nowItemActions : undefined}>{item.acceptLeadId ? (
-                <AcceptLeadButton appearance="shared" leadId={item.acceptLeadId} disabled={Boolean(item.expiresAt && Date.parse(item.expiresAt) <= clock)}>{item.expiresAt && Date.parse(item.expiresAt) <= clock ? "Oferta encerrada" : item.actionLabel}</AcceptLeadButton>
+                <AcceptLeadButton appearance="shared" leadId={item.acceptLeadId} className={index === 0 ? undefined : home.secondaryAction} disabled={Boolean(item.expiresAt && Date.parse(item.expiresAt) <= clock)}>{item.expiresAt && Date.parse(item.expiresAt) <= clock ? "Oferta encerrada" : item.actionLabel}</AcceptLeadButton>
               ) : (
                 <Button asChild variant="secondary" className={floating && index === 0 ? sharedPage.primaryButton : sharedPage.button}><Link href={item.href} onClick={onNavigate}>{item.actionLabel}<ArrowUpRight size={16} aria-hidden="true" /></Link></Button>
               )}</div>
@@ -374,9 +375,9 @@ export function ChatHome({
           {showNext && next?.acceptLeadId ? (
             <AcceptLeadButton leadId={next.acceptLeadId} className={`${styles.pill} ${styles.pillPulse}`} style={{ marginTop: 6 }}>{next.label}</AcceptLeadButton>
           ) : showNext && next ? (
-            <Link href={next.href} className={styles.pill} style={{ marginTop: 6 }}>{next.label}</Link>
+            <LitePress><Link href={next.href} className={styles.pill} style={{ marginTop: 6 }}>{next.label}</Link></LitePress>
           ) : !summary?.now && nextLead ? (
-            <Link href={nextLead.href} className={styles.pill} style={{ marginTop: 6 }}>{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link>
+            <LitePress><Link href={nextLead.href} className={styles.pill} style={{ marginTop: 6 }}>{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link></LitePress>
           ) : null}
 
           {organized ? <HomeQuickActions actions={quickActions} className={home.centerActions} after={financeCard} /> : null}
@@ -404,19 +405,19 @@ export function ChatHome({
           {summary?.duty || summary?.goal ? (
             <div className={home.cards}>
               {summary.duty ? (
-                <Link href={summary.duty.href} className={home.card}>
+                <LitePress kind="card"><Link href={summary.duty.href} className={home.card}>
                   <ContextualIllustration name="calendar" size="sm" fallback={<AssistantAvatar shape="onigiri" hue={28} size={40} />} />
                   <span className={home.cardName}>{summary.duty.title}</span>
                   <span className={home.cardPreview}>{summary.duty.detail}</span>
-                </Link>
+                </Link></LitePress>
               ) : null}
               {summary.goal ? (
-                <Link href={isSupervisor ? "/equipe/desempenho" : "/desempenho"} className={home.card}>
+                <LitePress kind="card"><Link href={isSupervisor ? "/equipe/desempenho" : "/desempenho"} className={home.card}>
                   <AssistantAvatar shape="nuvem" hue={330} size={40} />
                   <span className={home.cardName}>{summary.goal.name}</span>
                   <span className={home.goalTrack} aria-hidden="true"><motion.span className={home.goalFill} initial={reduce ? false : { scaleX: 0 }} animate={{ scaleX: Math.min(1, summary.goal.percentage / 100) }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: reduce ? 0 : 0.2 }} /></span>
                   <span className={home.cardPreview}>{summary.goal.currentValue} de {summary.goal.targetValue} · {summary.goal.percentage}%</span>
-                </Link>
+                </Link></LitePress>
               ) : null}
             </div>
           ) : null}
@@ -434,11 +435,11 @@ export function ChatHome({
         {next?.acceptLeadId ? (
           <AcceptLeadButton leadId={next.acceptLeadId} className={`${styles.pill} ${styles.pillPulse}`} data-tour="home-pill">{next.label}</AcceptLeadButton>
         ) : next ? (
-          <Link href={next.href} className={styles.pill} data-tour="home-pill" aria-label={`A próxima coisa é: ${next.label}. ${next.detail}`}>{next.urgent ? <span className={home.urgentDot} aria-hidden="true" /> : null}{next.label}</Link>
+          <LitePress><Link href={next.href} className={styles.pill} data-tour="home-pill" aria-label={`A próxima coisa é: ${next.label}. ${next.detail}`}>{next.urgent ? <span className={home.urgentDot} aria-hidden="true" /> : null}{next.label}</Link></LitePress>
         ) : nextLead ? (
-          <Link href={nextLead.href} className={styles.pill} data-tour="home-pill">{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link>
+          <LitePress><Link href={nextLead.href} className={styles.pill} data-tour="home-pill">{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link></LitePress>
         ) : organized ? null : (
-          <button type="button" className={styles.pill} data-tour="home-pill" onClick={() => setNewOpen(true)}><PlusIcon /> {isSupervisor ? "Ações da equipe" : "Novo atendimento"}</button>
+          <LitePress><button type="button" className={styles.pill} data-tour="home-pill" onClick={() => setNewOpen(true)}><PlusIcon /> {isSupervisor ? "Ações da equipe" : "Novo atendimento"}</button></LitePress>
         )}
       </div>}
 
