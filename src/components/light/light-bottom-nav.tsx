@@ -59,14 +59,17 @@ export function LightBottomNav({
                 <Icon className="size-5" strokeWidth={isActive ? 2.4 : 1.9} aria-hidden="true" />
                 {isActive ? <span>{tab.label}</span> : null}
                 {badge ? (
-                  <RisePulse pulseKey={queuePulse} className="absolute -right-0.5 -top-0.5 rounded-full">
-                    <span
-                      aria-hidden="true"
-                      className="grid h-5 min-w-5 place-items-center rounded-full bg-(--danger) px-1 text-xs font-semibold leading-none tabular-nums text-(--surface)"
-                    >
-                      {formatQueueBadge(badge)}
-                    </span>
-                  </RisePulse>
+                  // O RisePulse põe position: relative inline; o absolute fica num invólucro para o selo não voltar ao fluxo.
+                  <span className="absolute -right-0.5 -top-0.5 flex">
+                    <RisePulse pulseKey={queuePulse} className="rounded-full">
+                      <span
+                        aria-hidden="true"
+                        className="grid h-5 min-w-5 place-items-center rounded-full bg-(--danger) px-1 text-xs font-semibold leading-none tabular-nums text-(--surface)"
+                      >
+                        {formatQueueBadge(badge)}
+                      </span>
+                    </RisePulse>
+                  </span>
                 ) : null}
               </Link>
             </li>

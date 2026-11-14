@@ -117,6 +117,8 @@ export function flyLeadArc(origin: Element, { motionEnabled = true, now = Date.n
     const remove = () => dot.remove();
     animation.onfinish = remove;
     animation.oncancel = remove;
+    // Segurança: se a animação nunca terminar (aba em segundo plano), o ponto não fica preso no body.
+    window.setTimeout(remove, LEAD_ARC_DURATION_MS + 1000);
   } catch {
     dot.remove();
     return false;

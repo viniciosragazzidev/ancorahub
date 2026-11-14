@@ -6,6 +6,26 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 
 - Módulo único `src/shared/input` (telefone BR, CPF/CNPJ com dígito verificador, valor em centavos, data dd/mm/aaaa e ISO, máscara que mantém o cursor e aceita colagem bagunçada) aplicado no telefone de Adicionar contato, Cliente que já possuo e simulador de cotação e no CPF de Pessoas da contratação; cópias locais de telefone trocadas por funções legado idênticas (formato gravado em `leads.telefone` não muda); cartão Lite no celular mostra no máximo 6 campos e o resto em "Mais dados".
 
+## 13/11/2026 - Lite: polimento de movimento (antecipação, follow-through, arco, profundidade)
+
+- Hover que sobe 1px só no confirmar venda e no aceitar do "Seu próximo passo" (`ct-anticipate`); mola de assentamento só no que chega (folha "O que você quer fazer?", check do `LiteSuccess`, cartão novo em "Agora"); ponto em arco do aceite até a contagem de Leads, no máximo 1 vez a cada 10 min; coluna erguida do kanban respeita o kill-switch. Tudo desligado com movimento reduzido. Detalhes em `docs/ux/motion-frequencia.md`.
+
+## 13/11/2026 - Lite: movimento por frequência de uso
+
+- Meta do dia e ranking da semana animam só na primeira abertura do dia (`useFirstTimeToday`, dia de São Paulo); avisos ocasionais e tour em até 320ms; gradiente do consentimento sem loop. Tabela em `docs/ux/motion-frequencia.md`.
+
+## 13/11/2026 - Lite: feedback e foco (Motion e UX, fase 3)
+
+- Confirmação no próprio lugar com `LiteSuccess` ao registrar venda (Etapa atual; sem overlay no v2, toast de apoio) e ao salvar a ficha do cliente e as ações rápidas do perfil; `LitePress` nos cartões e links primários da home do corretor e nas linhas de conversa; uma ação primária por tela na home (Ferramentas em ghost, aceites da lista secundários); contador da Fila e da aba Leads pulsa uma vez (240 ms) só quando sobe, nada com movimento reduzido.
+
+## 13/11/2026 - Lite: resposta otimista nas 3 ações mais frequentes do corretor
+
+- Aceitar lead mostra "Lead aceito" na hora (`useOptimistic`, botão travado contra duplo aceite) e volta com o erro da action se o servidor recusar; mensagem na conversa entra na hora como "Enviando", e em falha fica "Não enviada · Tentar de novo" sem perder o texto; mudar etapa na tela do lead (Lite) muda e fecha a folha na hora, e volta reabrindo a folha com aviso se o servidor recusar. O kanban Lite de /leads não move cartão entre etapas (só reordena colunas), por isso ficou de fora. Lógica em `src/lib/optimistic-core.ts` e `src/components/chat/user-send-core.ts`, com testes.
+
+## 13/11/2026 - Lite: alvos de toque de 44px no celular
+
+- Em telas de toque (`pointer: coarse`), os botões de ícone e os tamanhos xs/sm ganham área de toque de 44x44 (`ct-touch`, `src/styles/touch-target.css`) sem mudar o visual. No Lite, o composer (enviar, áudio, ferramentas) tem 44px e o botão principal fica com altura mínima de 44px. Desktop e modo normal não mudam.
+
 ## 13/11/2026 - Início do corretor e CRM, parte B: Registrar venda em dois toques
 
 - Em Minha carteira, ao lado de Adicionar contato, **Registrar venda** abre a folha `QuickRegisterSaleSheet` (`src/features/broker-workspace/components/quick-register-sale.tsx`, exportada para a entrada no Início): busca por nome ou telefone e a lista dos leads do próprio corretor em negociação, os mais adiantados no funil primeiro (Em análise, Documentação pendente, Negociação, Cotação enviada, Aguardando retorno, Em atendimento). Novo e Distribuído ficam de fora porque ainda não abrem o registro. Estados de carregamento, vazio e erro com tentar de novo.

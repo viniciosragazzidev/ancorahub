@@ -44,6 +44,10 @@ import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-
 import { useFirstTimeToday } from "@/components/motion/first-time-today/use-first-time-today";
 import { HomeQuickActions, homeQuickActions } from "./home-quick-actions";
 import { QuickRegisterSaleSheet } from "@/features/broker-workspace/components/quick-register-sale";
+import { RisePulse, useRisePulseKey } from "@/components/light/rise-pulse";
+import { LitePress } from "@/components/lite/motion";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
+import { useFirstTimeToday } from "@/components/motion/first-time-today/use-first-time-today";
 
 type Tab = "assistentes" | "leads";
 

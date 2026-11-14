@@ -25,6 +25,9 @@ export function LitePress({ kind = "button", children, className }: LitePressPro
   return (
     <motion.div
       className={className}
+      // O whileTap do motion põe tabindex=0 em quem não é focável: o invólucro viraria uma parada extra no Tab,
+      // sem nome nem ação (Enter nele não aciona o link/botão de dentro). -1 mantém o foco só no controle real.
+      tabIndex={-1}
       whileTap={reduce ? undefined : { scale: TARGET_SCALE[kind] }}
       transition={motionTokens.spring.snappy}
     >

@@ -81,6 +81,12 @@ export function LightLeadDetail({
     setSaleRegistered(true);
   };
   useQuickSaleAutoOpen({ enabled: openSaleOnLoad && !isManagement && variant !== "details", lead, c, registrationV2Enabled: saleRegistrationV2Enabled });
+  // Confirmação no próprio lugar: depois do registro, "Etapa atual" mostra o check que se desenha.
+  const [saleRegistered, setSaleRegistered] = useState(false);
+  const onSaleRegistered = () => {
+    c.markConverted();
+    setSaleRegistered(true);
+  };
 
   // Lead already taken by someone else (or finished): nothing to act on. The panel keeps the history visible.
   if (variant === "page" && !isManagement && !lead.isCurrentBroker && c.isDistributed === false) {
