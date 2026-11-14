@@ -110,6 +110,7 @@ export function RegisterSaleWizard({
   onRegistered,
   previewMode = false,
   previewMessage = null,
+  successOverlay: showSuccessOverlay = true,
 }: {
   lead: LightLeadDetailData;
   documents: ConfirmationDocument[];
@@ -120,6 +121,8 @@ export function RegisterSaleWizard({
   onRegistered?: () => void;
   previewMode?: boolean;
   previewMessage?: string | null;
+  /** false quando a tela confirma no próprio lugar (Lite: check em "Etapa atual"); o toast fica como apoio. */
+  successOverlay?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -262,7 +265,7 @@ export function RegisterSaleWizard({
           return;
         }
         toast.success("Venda registrada. O ciclo de renovação já foi agendado.");
-        celebrate("Venda registrada");
+        if (showSuccessOverlay) celebrate("Venda registrada");
         onOpenChange(false);
         onRegistered?.();
         router.refresh();
