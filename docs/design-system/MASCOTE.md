@@ -39,7 +39,7 @@ Em 14/11/2026, três animações foram geradas no Higgsfield pelo MCP, com o mod
 | `public/mascote/lead-accepted.mp4` | repouso → positivo (levanta o polegar) | `lead_accepted` e a splash |
 | `public/mascote/lead-converted.mp4` | positivo → positivo (punho no ar e salto) | `lead_converted` |
 
-- Ficaram em H.264, 480 x 640, sem som, de 40 a 120 KB, com fundo branco puro e um pôster (primeiro quadro) em WebP. Originais e as imagens de entrada estão em `design/mascote/higgsfield/`.
+- Ficaram em H.264, 480 x 640, sem som, de 65 a 185 KB, com fundo branco puro e um pôster (primeiro quadro) em WebP. Originais e as imagens de entrada estão em `design/mascote/higgsfield/`.
 - O `Mascot` toca o vídeo só com movimento ligado e tema claro. O branco some com `mix-blend-mode: multiply` sobre superfícies claras. No tema escuro, com movimento reduzido ou se o vídeo falhar, usa a arte de reserva. A arte fica visível até o vídeo começar a tocar.
 - São vídeos, não um rig: não reagem nem misturam estados. O rig da Rive (§2 e §3) continua sendo o objetivo para um personagem articulado.
 - Para gerar outra: envie a pose em fundo branco 768 x 1024 (como em `design/mascote/higgsfield/`), use `start_image` e `end_image` iguais à pose final, 2 s, 720p, câmera parada e sem cenário. Converta com o comando de ffmpeg da seção 7.
@@ -98,7 +98,7 @@ Para ligar o rig: salve o arquivo em `public/mascote/mascote.riv`, troque `MASCO
 
 ## 7. Como testar
 
-- Conversão de um vídeo novo: `ffmpeg -i entrada.mp4 -an -vf "scale=480:-2:flags=lanczos,curves=all=0/0 0.93/1 1/1,format=yuv420p" -c:v libx264 -profile:v main -crf 27 -preset slow -movflags +faststart public/mascote/nome.mp4`. O `curves` leva o fundo quase branco a branco puro.
+- Conversão de um vídeo novo: `ffmpeg -i entrada.mp4 -an -vf "scale=480:-2:flags=lanczos:out_color_matrix=bt709:out_range=tv,lutrgb=r=if(gt(val,238),255,val):g=if(gt(val,238),255,val):b=if(gt(val,238),255,val),format=yuv420p" -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv -c:v libx264 -profile:v main -crf 22 -preset slow -movflags +faststart public/mascote/nome.mp4`. O `lutrgb` só leva o fundo quase branco a branco puro e não mexe nas cores do personagem. Não use `curves` na imagem toda: ele clareia e desbota o mascote.
 
 - `/dev/mascote` em desenvolvimento: estados, lead aceito com sucesso e falha, splash de novo e interruptores.
 - Celular Android e PWA instalado: abra o app pela rede local ou pelo ambiente de teste e confira a splash, a saída e o desempenho no "Monitor de desempenho" do Chrome remoto (meta 60 fps).
