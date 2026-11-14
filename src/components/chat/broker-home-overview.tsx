@@ -40,7 +40,8 @@ function ItemAction({
   // Uma ação primária por tela: só o "Seu próximo passo" usa o botão cheio; o resto da lista fica secundário.
   if (item.acceptLeadId) {
     return (
-      <AcceptLeadButton leadId={item.acceptLeadId} appearance="shared" disabled={expired} className={primary ? undefined : layout.secondaryAction}>
+      // O aceite do destaque é raro e importante: sobe 1px no hover (ct-anticipate) e manda o ponto em arco até Leads.
+      <AcceptLeadButton leadId={item.acceptLeadId} appearance="shared" disabled={expired} arcToLeads={primary} className={primary ? "ct-anticipate" : layout.secondaryAction}>
         {expired ? "Oferta encerrada" : item.actionLabel}
       </AcceptLeadButton>
     );

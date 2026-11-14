@@ -2,7 +2,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ accept: vi.fn(), push: vi.fn(), refresh: vi.fn(), success: vi.fn(), error: vi.fn() }));
+const mocks = vi.hoisted(() => ({ accept: vi.fn(), push: vi.fn(), refresh: vi.fn(), success: vi.fn(), error: vi.fn(), fly: vi.fn() }));
+vi.mock("@/components/lite/motion/lead-arc", () => ({ flyLeadArc: mocks.fly }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }) }));
 vi.mock("@/features/leads/accept-offer-action", () => ({ acceptLeadOfferAction: mocks.accept }));
 vi.mock("@/components/ui/sonner", () => ({ toast: { success: mocks.success, error: mocks.error } }));
@@ -80,6 +81,30 @@ describe("AcceptLeadButton", () => {
     await waitFor(() => expect(button.textContent).toBe("Aceitar e chamar"));
     expect(button.getAttribute("data-state")).toBeNull();
     expect(screen.getByRole("alert").textContent).toContain("Este lead já foi assumido por outro corretor.");
+  });
+  it("arco até Leads: só com arcToLeads e só depois do aceite confirmado", async () => {
+    vi.spyOn(window, "open").mockReturnValue(fakeTab() as unknown as Window);
+    mocks.accept.mockResolvedValueOnce({ success: false, error: "Oferta encerrada." });
+    render(<AcceptLeadButton appearance="shared" leadId="l1" arcToLeads>Aceitar e chamar</AcceptLeadButton>);
+    fireEvent.click(screen.getByRole("button", { name: "Aceitar e chamar" }));
+    await waitFor(() => expect(mocks.error).toHaveBeenCalled());
+    expect(mocks.fly).not.toHaveBeenCalled();
+
+    mocks.accept.mockResolvedValueOnce({ success: true });
+    const button = screen.getByRole("button", { name: "Aceitar e chamar" });
+    fireEvent.click(button);
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/leads/l1"));
+    expect(mocks.fly).toHaveBeenCalledTimes(1);
+    expect(mocks.fly).toHaveBeenCalledWith(button, expect.objectContaining({ motionEnabled: expect.any(Boolean) }));
+  });
+
+  it("sem arcToLeads o aceite nunca dispara o arco", async () => {
+    vi.spyOn(window, "open").mockReturnValue(fakeTab() as unknown as Window);
+    mocks.accept.mockResolvedValueOnce({ success: true });
+    render(<AcceptLeadButton appearance="shared" leadId="l1">Aceitar e chamar</AcceptLeadButton>);
+    fireEvent.click(screen.getByRole("button", { name: "Aceitar e chamar" }));
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/leads/l1"));
+    expect(mocks.fly).not.toHaveBeenCalled();
   });
 });
 

@@ -1,9 +1,11 @@
 "use client";
 
-import { useId, useOptimistic, useRef, useState, useTransition, type CSSProperties, type ReactNode } from "react";
+import { useId, useOptimistic, useRef, useState, useTransition, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { motionTokens } from "@/components/arc/motion-tokens";
+import { flyLeadArc } from "@/components/lite/motion/lead-arc";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import page from "@/components/lite/page/lite-page.module.css";
@@ -27,9 +29,10 @@ function AcceptedLabel() {
   return <span className="inline-flex items-center gap-1.5"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>Lead aceito</span>;
 }
 
-export function AcceptLeadButton({ leadId, className, children, style, appearance = "legacy", disabled = false, "data-tour": dataTour }: { leadId: string; className?: string; children: ReactNode; style?: CSSProperties; appearance?: "legacy" | "shared"; disabled?: boolean; "data-tour"?: string }) {
+export function AcceptLeadButton({ leadId, className, children, style, appearance = "legacy", disabled = false, arcToLeads = false, "data-tour": dataTour }: { leadId: string; className?: string; children: ReactNode; style?: CSSProperties; appearance?: "legacy" | "shared"; disabled?: boolean; /** Ponto em arco até a contagem de Leads ao aceitar (só o "Seu próximo passo"; ver lead-arc.ts). */ arcToLeads?: boolean; "data-tour"?: string }) {
   const router = useRouter();
   const reduce = useReducedMotion();
+  const motionEnabled = useInterfaceMotionEnabled();
   const [pending, startTransition] = useTransition();
   const [accepted, setAccepted] = useOptimistic(false);
   // Aceite com contador (11/11): ligado, nada abre no clique; a tela do lead conta 30 s e abre.
@@ -38,8 +41,9 @@ export function AcceptLeadButton({ leadId, className, children, style, appearanc
   const [error, setError] = useState<string | null>(null);
   const errorId = useId();
 
-  function handleClick() {
+  function handleClick(event: MouseEvent<HTMLButtonElement>) {
     if (inFlight.current || pending || disabled) return;
+    const origin = event.currentTarget;
     inFlight.current = true;
     setError(null);
     const whatsapp = handoff ? { go: () => false, cancel: () => {} } : prepareWhatsAppWindow();
@@ -60,6 +64,7 @@ export function AcceptLeadButton({ leadId, className, children, style, appearanc
         router.refresh();
         return;
       }
+      if (arcToLeads) flyLeadArc(origin, { motionEnabled });
       const url = result.whatsappUrl;
       if (handoff && url) {
         rememberWhatsAppHandoff(leadId, url);

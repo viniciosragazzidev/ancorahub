@@ -259,7 +259,7 @@ export function ChatHome({
           onValueChange={(value) => setTab(value as Tab)}
           options={[
             { value: "assistentes", label: "Assistentes" },
-            { value: "leads", label: "Leads", accessory: waitingLeads ? <RisePulse pulseKey={leadsPulse} className={home.countPulse}><span className={home.count}>{waitingLeads}</span></RisePulse> : undefined },
+            { value: "leads", label: "Leads", accessory: waitingLeads ? <RisePulse pulseKey={leadsPulse} className={home.countPulse}><span className={home.count} data-lite-arc-target="leads">{waitingLeads}</span></RisePulse> : undefined },
           ]}
         />
       </div>
