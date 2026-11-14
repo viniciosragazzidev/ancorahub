@@ -40,3 +40,7 @@
 @media (max-width: 639px) {
   .page :global([data-slot="card-header"]), .page :global([data-slot="card-content"]) { padding: 14px 16px; }
 }
+
+/* Cartões de número compartilhados (StatCard) nas abas: borda fina, número no corpo dos cartões do Resumo. */
+.page :global([data-slot="stat-card"]) { border: 0; border-radius: var(--radius-panel, 16px); box-shadow: inset 0 0 0 1px var(--border) !important; }
+.page :global([data-slot="stat-card"] .ui-metric-card-value), .page :global([data-slot="stat-card"] [data-slot="stat-value"]) { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }

@@ -1557,8 +1557,11 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], queueOrders = [
       </section>
 
       <section className="grid grid-cols-2 gap-2 sm:gap-3">
-        <StatCard label={`Dias com plantão em ${monthLabel(month).replace(/ de \d{4}$/, "").toLocaleLowerCase("pt-BR")}`} value={monthDays.total} sublabel={`${monthDays.upcoming} por acontecer · ${monthDays.finished} ${monthDays.finished === 1 ? "encerrado" : "encerrados"}`} />
+        {/* Ícone no quadrado de cor, como os cartões do Resumo (14/11/2026). */}
+        <StatCard icon={CalendarCheck} iconClassName="rounded-[10px] bg-[var(--chat-action-soft,rgb(0_43_115/0.1))] text-[var(--chat-action,var(--primary))]" label={`Dias com plantão em ${monthLabel(month).replace(/ de \d{4}$/, "").toLocaleLowerCase("pt-BR")}`} value={monthDays.total} sublabel={`${monthDays.upcoming} por acontecer · ${monthDays.finished} ${monthDays.finished === 1 ? "encerrado" : "encerrados"}`} />
         <StatCard
+          icon={CalendarCheck}
+          iconClassName={gapCount ? "rounded-[10px] bg-[oklch(72%_0.15_85/0.16)] text-[oklch(55%_0.13_65)]" : "rounded-[10px] bg-[color-mix(in_oklch,var(--success)_12%,transparent)] text-[var(--success)]"}
           label="Dias sem cobertura"
           value={gapCount}
           sublabel="abaixo do mínimo na escala semanal"
@@ -1622,7 +1625,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], queueOrders = [
           ) : (
             <div className="flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-border p-8 text-center">
               <p className="text-sm font-medium">Nenhum plantão acontece em {monthLabel(month)}</p>
-              <Button onClick={() => openCreate()}>
+              <Button variant="outline" onClick={() => openCreate()}>
                 <Plus />
                 Novo plantão
               </Button>

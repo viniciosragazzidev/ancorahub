@@ -2,7 +2,7 @@ import { count, desc, eq, and, inArray, isNull, or } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
-import { Activity, History, Workflow, Inbox as InboxIcon } from "lucide-react";
+import { Activity, History, Workflow, Inbox as InboxIcon, ShieldCheck, Phone, Route, ListOrdered, Timer, Sparkles, Cpu, AlertTriangle, Clock3 } from "lucide-react";
 import { DistributionInbox } from "./_components/distribution-inbox";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getFeatureFlag, getSystemSetting, FEATURE_FLAGS } from "@/features/system-settings/queries";
@@ -30,6 +30,7 @@ import { DddRoutingPanel } from "./_components/ddd-routing-panel";
 import { fetchRoutingRules } from "@/features/lead-distribution/routing-engine";
 import { DirectorDailySummary } from "./_components/director-daily-summary";
 import { AssignSection } from "./_components/assign-section";
+import { DistributionTabIntro } from "./_components/distribution-tab-intro";
 import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-summary-service";
 import { DutyOperationsWorkspace } from "./plantao/_components/duty-operations-workspace";
 import { UnitQueueModeCard } from "./plantao/_components/unit-queue-mode-card";
@@ -714,6 +715,47 @@ export default async function LeadDistributionPage({
     </AssignSection>
   ) : null;
 
+  // Topo de cada aba no Lite (refino 14/11/2026): o estado de cada bloco em cartões, antes dos painéis.
+  const activeQueues = queuesForControl.filter((queue) => queue.status === "active");
+  const waitingInQueues = queuesForControl.reduce((sum, queue) => sum + (queue.waiting ?? 0), 0);
+  const tenantPolicy = readDistributionPolicy(globalPolicy.find((policy) => !policy.queueId)?.policy ?? {});
+  const slaMinutes = Number(tenantSlaSettings?.slaFirstContactMinutes) || 15;
+  const jobExceptions = jobHealth.failed + effectHealth.failed;
+  const rulesIntro = (
+    <DistributionTabIntro
+      title="Entradas e regras"
+      lead="O que acontece com cada lead antes da oferta: quem segura, para qual fila vai e em que ordem as regras valem."
+      stats={[
+        { key: "disq", icon: <ShieldCheck />, label: "Desqualificados", text: true, value: holdDisqualifiedLeads ? "Retidos" : "Seguem a distribuição", hint: holdDisqualifiedLeads ? "ficam em espera antes da oferta" : "vão para o corretor como os outros", tone: holdDisqualifiedLeads ? "success" : "neutral" },
+        { key: "ddd", icon: <Phone />, label: "Regra de DDD", text: true, value: dddRoutingSettings.enabled ? "Ligada" : "Desligada", hint: dddRoutingSettings.enabled ? `${dddRoutingSettings.validDdds.length} ${dddRoutingSettings.validDdds.length === 1 ? "DDD válido" : "DDDs válidos"}` : "nenhum lead é movido pelo DDD", tone: dddRoutingSettings.enabled ? "success" : "neutral" },
+        { key: "rules", icon: <Route />, label: "Regras de roteamento", value: routingRules.length, hint: routingRules.length ? "em ordem de prioridade" : "tudo segue a fila geral da unidade" },
+      ]}
+    />
+  );
+  const queuesIntro = (
+    <DistributionTabIntro
+      title="Filas"
+      lead="Quem recebe cada lead, em que ordem e com quanto tempo para aceitar."
+      stats={[
+        { key: "queues", icon: <ListOrdered />, label: "Filas ativas", value: activeQueues.length, hint: waitingInQueues ? `${waitingInQueues} ${waitingInQueues === 1 ? "lead esperando" : "leads esperando"}` : `de ${queuesForControl.length} ${queuesForControl.length === 1 ? "fila" : "filas"}` },
+        { key: "sla", icon: <Timer />, label: "Prazo de aceite", value: `${slaMinutes} min`, hint: tenantSlaSettings?.autoRedistributeOnFeedbackTimeout ?? true ? "depois disso, passa para o próximo" : "sem redistribuição automática", tone: "warning" },
+        { key: "ranking", icon: <Sparkles />, label: "Ranking depois do plantão", text: true, value: tenantPolicy.ranking.enabled ? "Ligado" : "Desligado", hint: tenantPolicy.ranking.enabled ? `conversão ${tenantPolicy.ranking.conversionWeight} · SLA ${tenantPolicy.ranking.slaWeight} · manual ${tenantPolicy.ranking.manualPriorityWeight}` : "ordem simples da fila", tone: tenantPolicy.ranking.enabled ? "success" : "neutral" },
+      ]}
+    />
+  );
+  const healthIntro = (
+    <DistributionTabIntro
+      title="Saúde"
+      lead="Se o motor de distribuição está rodando e o que ficou para revisão."
+      stats={[
+        { key: "engine", icon: <Cpu />, label: "Motor de distribuição", text: true, value: !jobHealth.available ? "Aguardando configuração" : !jobConfig.enabled ? "Pausado" : "Ativo", tone: !jobHealth.available || !jobConfig.enabled ? "neutral" : "success" },
+        { key: "pending", icon: <Clock3 />, label: "Pendências", value: jobHealth.pending + jobHealth.retrying + effectHealth.pending + effectHealth.retrying, hint: "o motor tenta de novo sozinho" },
+        { key: "failed", icon: <AlertTriangle />, label: "Exceções", value: jobExceptions, hint: jobExceptions ? "pedem revisão da gestão" : "nada para revisar", tone: jobExceptions ? "danger" : "success" },
+        { key: "events", icon: <History />, label: "Decisões recentes", value: recentEvents.length, hint: "atribuições e redistribuições" },
+      ]}
+    />
+  );
+
   const directorLite = await isDirectorLitePageOnServer(context, "/leads/distribuicao");
   if (directorLite && ["resumo_dia", "roteamento", "filas", "plantao", "saude_historico"].includes(view)) {
     const liveEnabled = view === "resumo_dia" && await shouldShowLiveStatusStrip(context);
@@ -734,6 +776,7 @@ export default async function LeadDistributionPage({
             </section>
           ) : view === "roteamento" ? (
             <section className={directorDistributionStyles.stack} aria-label="Entradas e regras">
+              {rulesIntro}
               <DisqualifiedLeadsRoutingPanel
                 initialHoldDisqualifiedLeads={holdDisqualifiedLeads}
                 canEdit={context.role === "director"}
@@ -753,6 +796,7 @@ export default async function LeadDistributionPage({
             </section>
           ) : view === "filas" && canViewDistributionQueues(context.role) && (!allowedViews || allowedViews.includes("filas")) ? (
             <section className={directorDistributionStyles.stack} aria-label="Filas de distribuição">
+              {queuesIntro}
               {coldLeadReview ? <ColdLeadRequalificationPanel {...coldLeadReview} /> : null}
               <QueueControlCenter
                 queues={queuesForControl}
@@ -794,6 +838,8 @@ export default async function LeadDistributionPage({
               {plantaoWorkspace}
             </section>
           ) : (
+            <section className={directorDistributionStyles.stack} aria-label="Saúde da distribuição">
+            {healthIntro}
             <DirectorDistributionHealth
               events={recentEvents.map((event) => ({ ...event, createdAt: event.createdAt.toISOString() }))}
               jobs={jobHealth}
@@ -802,6 +848,7 @@ export default async function LeadDistributionPage({
               effects={effectHealth}
               failedEffects={failedEffects}
             />
+            </section>
           )}
         </main>
       </>
