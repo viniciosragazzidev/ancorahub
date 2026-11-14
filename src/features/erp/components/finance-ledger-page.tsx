@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { StatCard } from "@/components/dashboard/metric-card";
+import { CaptainBanner, type CaptainBannerArt } from "@/components/lite/banner/captain-banner";
 import { formatCents, type FinancialKind } from "../contracts";
 import type { getFinancialEntries, getFinanceSelectors } from "../finance";
 import { ErpPage } from "../ui/erp-page";
@@ -74,6 +75,21 @@ function BrokerFinanceHero({ data }: { data: Entries }) {
   </section>;
 }
 
+/** O capitão no trono, cercado de moedas, mostrando uma ao corretor (arte de 14/11/2026). */
+const FINANCE_ART: CaptainBannerArt = { src: "/mascote/financeiro-trono.webp", width: 640, height: 585 };
+
+/**
+ * Banner do Meu financeiro: a frase fala do que está a caminho do baú e o atalho leva aos leads, de onde vem a
+ * próxima comissão. Fica entre o resumo e a lista, como nas outras telas do corretor.
+ */
+function BrokerFinanceBanner({ data }: { data: Entries }) {
+  const { payableCents, settledCents } = data.summary;
+  const title = payableCents > 0 ? `Tem ${formatCents(payableCents)} a caminho do seu baú. Bora encher mais um pouco?`
+    : settledCents > 0 ? `Seu baú já recebeu ${formatCents(settledCents)}. Bora atrás da próxima comissão?`
+      : "Sua primeira comissão aprovada aparece aqui. Bora pra próxima venda?";
+  return <CaptainBanner className={hero.banner} label="Dica do financeiro" title={title} art={FINANCE_ART} action={{ label: "Ver meus leads", href: "/minha-fila" }} />;
+}
+
 /**
  * One ledger screen (Lançamentos, Recebíveis, Despesas): header with "Como funciona" and the single CTA, the numbers
  * of the filter, the filter bar (search, type, state, month) and the table. Same order as /clientes and /equipe.
@@ -91,7 +107,7 @@ export function FinanceLedgerPage({ pathname, title, data, branches, focus, defa
   return <ErpPage pathname={pathname} breadcrumb="Financeiro" title={title} actions={actions}>
     {data.agency
       ? <ErpStats>{tiles(data, focus).map((tile) => <StatCard key={tile.label} label={tile.label} value={tile.value} sublabel={tile.hint} />)}</ErpStats>
-      : <BrokerFinanceHero data={data} />}
+      : <><BrokerFinanceHero data={data} /><BrokerFinanceBanner data={data} /></>}
     <ErpToolbar>
       <ErpSearch label="Buscar lançamento" placeholder={data.agency ? "Buscar descrição, referência ou pessoa" : "Buscar cliente ou referência"} value={data.filters.q} />
       {kindFilter ? <ErpUrlFilter label="Tipo" param="kind" value={kindFilter.value} defaultValue={kindFilter.defaultValue} options={kindFilter.options} /> : null}

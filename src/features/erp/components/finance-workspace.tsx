@@ -308,6 +308,21 @@ const ENTRY_COLUMNS: ErpColumn<EntryRow>[] = [
 ];
 
 /**
+ * Lista do corretor (Meu financeiro, refino 14/11/2026): o lançamento com mês e tipo embaixo (a referência técnica
+ * fica no painel), o valor e a situação do pagamento em uma pílula. No celular vira um cartão de três linhas.
+ */
+function brokerSituation(row: EntryRow) {
+  if (row.amountCents > 0 && row.settledCents >= row.amountCents) return <ErpStatus tone="success">Recebido</ErpStatus>;
+  if (row.settledCents > 0) return <ErpStatus tone="info">Parte recebida</ErpStatus>;
+  return <ErpStatus>A receber</ErpStatus>;
+}
+const BROKER_ENTRY_COLUMNS: ErpColumn<EntryRow>[] = [
+  { id: "description", label: "Lançamento", primary: true, render: (row) => <ErpCell title={row.description} sub={`${formatCompetence(row.competence)} · ${FINANCIAL_LABELS[row.kind]}`} /> },
+  { id: "amount", label: "Valor", numeric: true, render: (row) => <strong style={{ fontWeight: 500 }}>{formatCents(row.amountCents)}</strong> },
+  { id: "situation", label: "Situação", render: brokerSituation },
+];
+
+/**
  * The ledger list of a screen: one table of entries, row → drawer with the entry and its actions, pagination by URL.
  * The page header owns the primary CTA (`ErpPrimaryAction`, `?novo=1` by default); this list owns its drawer.
  */
@@ -354,8 +369,8 @@ export function FinanceLedger({ data, branches, title, description, emptyTitle =
       description={description}
       count={data.total}
       countLabel={["lançamento", "lançamentos"]}
-      // O corretor só vê os próprios lançamentos já aprovados: beneficiário e estado repetiriam o óbvio.
-      columns={data.agency ? ENTRY_COLUMNS : ENTRY_COLUMNS.filter((column) => column.id !== "beneficiary" && column.id !== "status")}
+      // O corretor só vê os próprios lançamentos já aprovados: beneficiário e estado repetiriam o óbvio; vale a situação do pagamento.
+      columns={data.agency ? ENTRY_COLUMNS : BROKER_ENTRY_COLUMNS}
       rows={data.rows}
       rowKey={(item) => item.id}
       onRowOpen={(item) => openEntry(item.id)}

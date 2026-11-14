@@ -136,3 +136,18 @@
 @media (prefers-reduced-motion: reduce) {
   .barFill { animation: none; }
 }
+
+/*
+ * Refino 14/11/2026: ícones dos três números num quadrado de cor suave (como no Desempenho), valor um pouco menor
+ * no celular, e o banner do capitão com espaço em cima para a arte sair pelo topo.
+ */
+.stat svg { box-sizing: content-box; width: 16px; height: 16px; padding: 7px; border-radius: 10px; background: var(--surface-muted); }
+.stat[data-tone="approved"] svg { background: var(--chat-action-soft, rgb(0 43 115 / 0.1)); }
+.stat[data-tone="received"] svg { background: color-mix(in oklch, var(--success) 12%, transparent); }
+.stat[data-tone="count"] svg { background: oklch(72% 0.15 85 / 0.16); }
+.banner { margin-top: 24px; }
+@media (max-width: 420px) {
+  .amount { font-size: 30px; }
+  .stat svg { margin-bottom: 6px; }
+}
+@media (min-width: 640px) { .banner { margin-top: 28px; } }
