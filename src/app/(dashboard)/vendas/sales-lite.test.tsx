@@ -18,7 +18,10 @@ const actions = vi.hoisted(() => ({
   markCommissionUnpaidAction: vi.fn(async () => ({})),
 }));
 vi.mock("@/features/sales/actions", () => actions);
-vi.mock("@/components/ui/sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("@/components/ui/sonner", () => ({ toast }));
+const fire = vi.hoisted(() => vi.fn(() => ({ motion: false, celebrate: false })));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => fire }));
 vi.mock("@/components/dashboard/metric-card", () => ({ StatCard: ({ label, value }: { label: string; value: string | number }) => <div data-testid="stat">{label}: {value}</div> }));
 
 afterEach(() => {
@@ -85,5 +88,21 @@ describe("vendas Lite", () => {
     expect(screen.getByRole("progressbar", { name: "Repasse concluído" })).toHaveAttribute("aria-valuenow", "50");
     rerender(<SaleDetailLite sale={detail} schedule={[item("p1", 1, "paid")]} canManage={false} />);
     expect(screen.queryByRole("button", { name: "Reverter" })).not.toBeInTheDocument();
+  });
+
+  it("detalhe: marcar paga confirma na parcela; a falha mostra a causa e Tentar de novo", async () => {
+    const item = { id: "p2", saleId: "s1", monthNumber: 2, referenceMonth: "2026-12", dueDate: null, percentage: "50", amount: "600", status: "pending" as const, paidAt: null, paidBy: null, paidByName: null, notes: null };
+    const detail = { id: "s1", leadId: "lead-s1", leadName: "Justiniano", clientName: null, brokerName: "Ana Souza", branchName: "Centro", planName: "Amil 400", carrierName: "Amil", ruleName: null, status: "active", saleDate: "2026-10-20T12:00:00.000Z", saleValue: 1200, notes: null };
+    actions.markCommissionPaidAction.mockResolvedValueOnce({ error: "Esta parcela já foi paga por outra pessoa." } as never);
+    render(<SaleDetailLite sale={detail} schedule={[item]} canManage />);
+    const table = () => within(document.querySelector('[data-lite="table"]') as HTMLElement);
+    await act(async () => { fireEvent.click(table().getByRole("button", { name: "Marcar paga" })); });
+    expect(table().getByRole("alert")).toHaveTextContent("Esta parcela já foi paga por outra pessoa. A parcela continua pendente.");
+    expect(fire).toHaveBeenCalledWith("error");
+    await act(async () => { fireEvent.click(table().getByRole("button", { name: "Tentar de novo" })); });
+    expect(actions.markCommissionPaidAction).toHaveBeenCalledTimes(2);
+    expect(table().getByRole("status")).toHaveTextContent("Paga");
+    expect(fire).toHaveBeenCalledWith("confirm");
+    expect(toast.success).not.toHaveBeenCalled();
   });
 });
