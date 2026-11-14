@@ -5,7 +5,13 @@
 .focusHeader { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: calc(env(safe-area-inset-top, 0px) + var(--space-3)) max(var(--space-4), env(safe-area-inset-right, 0px)) var(--space-3) max(var(--space-4), env(safe-area-inset-left, 0px)); border-bottom: 1px solid var(--border); background: var(--surface); }
 .focusIdentity { display: flex; flex: 1 1 16rem; align-items: center; gap: var(--space-2); min-width: 0; }
 .phoneHeaderMain { flex: 1; min-width: 0; }
-.focusActions { display: flex; flex: none; align-items: center; justify-content: center; margin-inline-start: auto; }
+/* WhatsApp, Ligar e Etapa centralizados: numa linha própria no celular, no meio do cabeçalho no desktop. */
+.focusActions { display: flex; flex: 1 1 100%; align-items: center; justify-content: center; }
+@media (min-width: 768px) {
+  .focusHeader { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .focusIdentity { grid-column: 1; }
+  .focusActions { grid-column: 2; }
+}
 .conversation { display: grid; grid-template-rows: minmax(0, 1fr); min-width: 0; min-height: 0; height: 100%; background: var(--surface); }
 .conversationBody { min-height: 0; height: 100%; padding-bottom: env(safe-area-inset-bottom, 0px); }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -21,5 +27,5 @@
 .topAction:active .topActionIcon { transform: scale(0.94); }
 .topAction:focus-visible .topActionIcon { outline: 2px solid var(--primary); outline-offset: 2px; }
 .topAction:disabled { cursor: not-allowed; opacity: 0.5; }
-.topActions { display: flex; align-items: flex-start; gap: var(--space-1); }
+.topActions { display: flex; align-items: flex-start; justify-content: center; gap: var(--space-2); }
 @media (prefers-reduced-motion: reduce) { .topActionIcon { transition: none; } .topAction:active .topActionIcon { transform: none; } }
