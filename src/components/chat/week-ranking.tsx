@@ -97,7 +97,7 @@ function WeekSheet({ data, best, onNavigate }: { data: HomeHighlights; best: Wee
   return (
     <div className={css.sheet}>
       {best ? (
-        <motion.div className={css.hero} initial={animate ? { opacity: 0, scale: 0.96 } : false} animate={{ opacity: 1, scale: 1 }} transition={animate ? { duration: motionTokens.duration.standard, ease } : { duration: 0 }}>
+        <motion.div key={animate ? "hero-primeira-vez" : "hero"} className={css.hero} initial={animate ? { opacity: 0, scale: 0.96 } : false} animate={{ opacity: 1, scale: 1 }} transition={animate ? { duration: motionTokens.duration.standard, ease } : { duration: 0 }}>
           <span className={css.heroMedal} aria-hidden>{medal(best.position) ?? "🏆"}</span>
           <span className={css.heroPosition}>{best.position}º</span>
           <span className={css.heroLabel}>{best.label}</span>
@@ -114,7 +114,7 @@ function WeekSheet({ data, best, onNavigate }: { data: HomeHighlights; best: Wee
       {data.ranks.length ? (
         <ul className={css.ranks} aria-label="Suas posições">
           {data.ranks.map((rank, index) => (
-            <motion.li key={rank.key} className={css.rank} initial={animate ? { opacity: 0, y: 8 } : false} animate={{ opacity: 1, y: 0 }} transition={animate ? { duration: motionTokens.duration.standard, ease, delay: delayFor(index) } : { duration: 0 }}>
+            <motion.li key={`${rank.key}:${animate ? "primeira-vez" : "estatico"}`} className={css.rank} initial={animate ? { opacity: 0, y: 8 } : false} animate={{ opacity: 1, y: 0 }} transition={animate ? { duration: motionTokens.duration.standard, ease, delay: delayFor(index) } : { duration: 0 }}>
               <div className={css.rankHead}>
                 <span className={css.rankLabel}>{rank.label.replace(/^n[oa]s? /, "").replace(/^\w/, (letter) => letter.toUpperCase())}</span>
                 <span className={`${css.rankPosition} ${rank.position <= 3 ? css.rankTop : ""}`}>{rank.position}º de {rank.total}</span>
@@ -130,7 +130,7 @@ function WeekSheet({ data, best, onNavigate }: { data: HomeHighlights; best: Wee
       {data.stats?.length ? (
         <dl className={css.stats}>
           {data.stats.map((stat, index) => (
-            <motion.div key={stat.label} className={css.stat} initial={animate ? { opacity: 0, y: 6 } : false} animate={{ opacity: 1, y: 0 }} transition={animate ? { duration: motionTokens.duration.standard, ease, delay: delayFor(index) } : { duration: 0 }}>
+            <motion.div key={`${stat.label}:${animate ? "primeira-vez" : "estatico"}`} className={css.stat} initial={animate ? { opacity: 0, y: 6 } : false} animate={{ opacity: 1, y: 0 }} transition={animate ? { duration: motionTokens.duration.standard, ease, delay: delayFor(index) } : { duration: 0 }}>
               <dt className={css.statLabel}>{stat.label}</dt>
               <dd className={css.statValue}>{stat.value}</dd>
             </motion.div>
@@ -167,6 +167,6 @@ function MissionBar({ progress }: { progress: MissionProgress }) {
   // Fica no Início (dezenas de visitas por dia): enche só na primeira montagem do dia.
   const reduce = !useFirstTimeToday("missao-etapas", useInterfaceMotionEnabled());
   return <span className={css.track} role="progressbar" aria-label="Etapas registradas" aria-valuemin={0} aria-valuemax={progress.target} aria-valuenow={Math.min(progress.progress, progress.target)} aria-valuetext={`${progress.progress} de ${progress.target} leads com etapa`}>
-    <motion.span className={css.fill} initial={reduce ? false : { scaleX: 0 }} animate={{ scaleX: progress.percentage / 100 }} transition={reduce ? { duration: 0 } : motionTokens.spring.snappy} />
+    <motion.span key={reduce ? "estatico" : "primeira-vez"} className={css.fill} initial={reduce ? false : { scaleX: 0 }} animate={{ scaleX: progress.percentage / 100 }} transition={reduce ? { duration: 0 } : motionTokens.spring.snappy} />
   </span>;
 }

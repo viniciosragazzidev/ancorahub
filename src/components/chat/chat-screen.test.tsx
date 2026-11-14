@@ -137,8 +137,12 @@ describe("ChatScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
     await waitFor(() => expect(screen.getByText("Anotei.")).toBeTruthy());
-    expect(onFreeText).toHaveBeenLastCalledWith("Mandei a cotação");
+    expect(onFreeText).toHaveBeenLastCalledWith("Mandei a cotação", { clientMessageId: expect.stringMatching(/^free-/) });
     expect(onFreeText).toHaveBeenCalledTimes(3);
+    // The retry reuses the optimistic id as idempotency key: a timeout never saves the note twice.
+    const [, failedSend, retried] = onFreeText.mock.calls as Array<[string, { clientMessageId: string }]>;
+    expect(retried[1].clientMessageId).toBe(failedSend[1].clientMessageId);
+    expect(onFreeText.mock.calls[0][1].clientMessageId).not.toBe(failedSend[1].clientMessageId);
     expect(screen.getAllByText("Mandei a cotação")).toHaveLength(1);
     expect(screen.queryByText(/Não enviada/)).toBeNull();
   });

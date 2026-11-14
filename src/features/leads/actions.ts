@@ -3,7 +3,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { assertTenantAccess } from "@/shared/auth/authorization";
@@ -13,6 +13,7 @@ import { buildLeadResourceScope, toEffectiveLeadAccessContext } from "@/features
 import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 import { getDatabase, schema } from "@/shared/db";
 import { publishNotification } from "@/features/notifications/send-push-helper";
+import { clientMessageIdSchema, noteIdempotencyLockKey } from "@/features/leads/note-idempotency";
 
 type Database = ReturnType<typeof getDatabase>;
 type InteractionWriter = Pick<Database, "insert">;
@@ -22,6 +23,7 @@ export type LeadNoteState = { success?: boolean; error?: string };
 const noteSchema = z.object({
   leadId: z.string().min(1),
   content: z.string().trim().min(1, "A nota não pode ficar vazia.").max(2000, "A nota deve ter no máximo 2.000 caracteres."),
+  clientMessageId: clientMessageIdSchema.optional(),
 });
 
 export async function createLeadInteraction(
@@ -51,6 +53,7 @@ export async function addLeadNoteAction(
   const parsed = noteSchema.safeParse({
     leadId: formData.get("leadId"),
     content: formData.get("content"),
+    clientMessageId: formData.get("clientMessageId") ?? undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
 
@@ -89,14 +92,32 @@ export async function addLeadNoteAction(
     const isManagerOrDirector = context.role === "manager" || context.role === "director";
 
     // A nota e o registro de auditoria entram juntos (perfil do cliente, etapa 5: registrar atendimento auditado).
+    // Com clientMessageId (conversa do Lite), um reenvio da mesma mensagem depois de um timeout
+    // encontra a nota já salva e não grava de novo; o lock serializa envios simultâneos.
+    const { clientMessageId } = parsed.data;
     const interactionId = randomUUID();
-    await db.transaction(async (tx) => {
+    const created = await db.transaction(async (tx) => {
+      if (clientMessageId) {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${noteIdempotencyLockKey(lead.id, context.userId, clientMessageId)}))`);
+        const [existing] = await tx
+          .select({ id: schema.leadInteractions.id })
+          .from(schema.leadInteractions)
+          .where(and(
+            eq(schema.leadInteractions.leadId, lead.id),
+            eq(schema.leadInteractions.userId, context.userId),
+            eq(schema.leadInteractions.tipo, "note"),
+            sql`${schema.leadInteractions.metadata} ->> 'clientMessageId' = ${clientMessageId}`,
+          ))
+          .limit(1);
+        if (existing) return false;
+      }
       await tx.insert(schema.leadInteractions).values({
         id: interactionId,
         leadId: lead.id,
         userId: context.userId,
         tipo: "note",
         conteudo: parsed.data.content,
+        ...(clientMessageId ? { metadata: { clientMessageId } } : {}),
       });
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(),
@@ -106,10 +127,11 @@ export async function addLeadNoteAction(
         acao: "registrou_nota",
         metadata: { leadId: lead.id, tenantId: context.tenantId },
       });
+      return true;
     });
 
     // If a manager/director adds a note to a lead owned by a broker, notify the broker
-    if (isManagerOrDirector && lead.corretorId && lead.corretorId !== context.userId) {
+    if (created && isManagerOrDirector && lead.corretorId && lead.corretorId !== context.userId) {
       const roleLabel = context.role === "director" ? "Diretor" : "Gestor";
       void publishNotification({
         capability: "manager_note",

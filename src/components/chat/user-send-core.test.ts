@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { ChatBlock } from "./types";
-import { appendSending, settleSend, startRetry } from "./user-send-core";
+import { clientMessageIdSchema } from "@/features/leads/note-idempotency";
+
+import { appendSending, newClientMessageId, settleSend, startRetry } from "./user-send-core";
 
 const base: ChatBlock[] = [{ type: "assistant", id: "a1", text: "Oi" }];
 
@@ -33,5 +35,19 @@ describe("envio otimista da conversa", () => {
     const sent = settleSend(appendSending(base, { type: "user", id: "m1", text: "Oi" }), "m1", true);
     expect(settleSend(sent, "m1", false)).toBe(sent);
     expect(settleSend(sent, "outra", true)).toBe(sent);
+  });
+});
+
+describe("chave de idempotência da mensagem", () => {
+  it("cada mensagem ganha um id único que o servidor aceita como chave", () => {
+    const ids = new Set(Array.from({ length: 50 }, () => newClientMessageId()));
+    expect(ids.size).toBe(50);
+    for (const id of ids) expect(clientMessageIdSchema.safeParse(id).success).toBe(true);
+  });
+
+  it("o tentar de novo mantém o mesmo id da mensagem", () => {
+    const id = newClientMessageId();
+    const failed = settleSend(appendSending(base, { type: "user", id, text: "Liguei" }), id, false);
+    expect(startRetry(failed, id)?.blocks.at(-1)).toMatchObject({ id, status: "sending" });
   });
 });
