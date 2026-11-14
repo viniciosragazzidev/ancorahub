@@ -14,6 +14,7 @@ import type {
   BrokerDutyCalendarOccurrence,
   BrokerDutyCalendarResult,
 } from "../duty-calendar";
+import hubStyles from "./duty-hub.module.css";
 import styles from "./light-duty-calendar-motion.module.css";
 
 type LightDutyCalendarProps = { calendar: BrokerDutyCalendarResult };
@@ -23,8 +24,8 @@ const SCHEDULE_PREVIEW_DAYS = 5;
 
 export const DUTY_CARD_STYLE: React.CSSProperties = {
   background: "var(--surface)",
-  borderRadius: "var(--radius-surface)",
-  boxShadow: "var(--shadow-resting)",
+  borderRadius: "var(--radius-panel)",
+  boxShadow: "inset 0 0 0 1px var(--border)",
 };
 
 // These helpers keep the original dutyDate handling untouched: the YYYY-MM-DD
@@ -276,21 +277,27 @@ export function DutyCalendarSections({ calendar, hub }: DutyCalendarSectionsProp
                         <button
                           type="button"
                           onClick={() => openDay(dateKey)}
-                          className="w-full cursor-pointer px-4 py-3 text-left transition-colors hover:bg-[var(--surface-muted)] motion-reduce:transition-none sm:px-5"
+                          className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--surface-muted)] motion-reduce:transition-none sm:px-5"
                           aria-label={`Ver plantões de ${formatDate(dateKey, { weekday: "long", day: "numeric", month: "long" })}`}
                         >
-                          <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
-                            {dateKey === calendar.todayKey ? "Hoje" : capitalizeLabel(formatDate(dateKey, { weekday: "long", day: "numeric", month: "long" }))}
-                          </p>
-                          {dayOccurrences.map((occurrence) => (
-                            <div key={occurrence.id} className="mt-1 flex items-center justify-between gap-2">
-                              <span className="min-w-0 truncate text-sm font-medium" style={{ color: "var(--foreground)" }}>{occurrence.scheduleName}</span>
-                              <span className="flex shrink-0 items-center gap-2 text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
-                                {getOccurrenceTime(occurrence)}
-                                {occurrence.paused && <Badge tone="warning" size="sm">Pausado</Badge>}
+                          <span className={hubStyles.leaf} data-today={dateKey === calendar.todayKey} aria-hidden="true">
+                            <small>{dateKey === calendar.todayKey ? "hoje" : formatDate(dateKey, { weekday: "short" }).replace(".", "")}</small>
+                            <strong>{Number(dateKey.slice(8, 10))}</strong>
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+                              {dateKey === calendar.todayKey ? "Hoje" : capitalizeLabel(formatDate(dateKey, { weekday: "long", day: "numeric", month: "long" }))}
+                            </span>
+                            {dayOccurrences.map((occurrence) => (
+                              <span key={occurrence.id} className="mt-1 flex items-center justify-between gap-2">
+                                <span className="min-w-0 truncate text-sm font-medium" style={{ color: "var(--foreground)" }}>{occurrence.scheduleName}</span>
+                                <span className="flex shrink-0 items-center gap-2 text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                                  {getOccurrenceTime(occurrence)}
+                                  {occurrence.paused && <Badge tone="warning" size="sm">Pausado</Badge>}
+                                </span>
                               </span>
-                            </div>
-                          ))}
+                            ))}
+                          </span>
                         </button>
                       </li>
                     );

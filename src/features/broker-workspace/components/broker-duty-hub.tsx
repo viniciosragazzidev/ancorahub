@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 import type { BrokerDutyCalendarResult } from "../duty-calendar";
 import type { DutyHubCurrent, DutyHubShift } from "../duty-hub";
 import { DUTY_CARD_STYLE, DutyCalendarSections } from "./light-duty-calendar";
+import { CaptainBanner } from "@/components/lite/banner/captain-banner";
+import hub from "./duty-hub.module.css";
 
 export type BrokerDutyHubProps = {
   current: DutyHubCurrent;
@@ -53,6 +55,7 @@ export function BrokerDutyHub({ current, calendar, calendarState }: BrokerDutyHu
             {calendarState === "error" ? <CalendarUnavailable /> : null}
           </div>
         )}
+        <DutyBanner current={current} />
       </LitePageEnter>
     </section>
   );
@@ -63,26 +66,24 @@ function CurrentDutyCard({ current }: { current: DutyHubCurrent }) {
   const shift = current.shifts.find((item) => item.key === selectedKey) ?? current.shifts[0];
 
   return (
-    <section data-tour="micro-duty-highlight" aria-labelledby="current-duty-title" className="p-4 sm:p-5" style={DUTY_CARD_STYLE}>
-      <div className="flex items-center justify-between gap-3">
-        <h2 id="current-duty-title" className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Seu plantão atual</h2>
+    <section data-tour="micro-duty-highlight" aria-labelledby="current-duty-title" className={hub.card}>
+      <div className={hub.head}>
+        <h2 id="current-duty-title" className={hub.headTitle}>Seu plantão atual</h2>
         {current.state === "active" ? <Badge tone="success" size="sm" className="shrink-0">Em andamento</Badge> : null}
       </div>
 
-      {current.state === "error" ? <CurrentDutyError /> : null}
+      {current.state === "error" ? <div className={hub.foot} style={{ paddingTop: 12 }}><CurrentDutyError /></div> : null}
 
       {current.state === "none" ? (
-        <EmptyState
-          className="py-6"
-          label="Você não tem plantão marcado"
-          icon={<CalendarDays width={24} height={24} strokeWidth={1.5} />}
-          title="Você não tem plantão marcado"
-          description="Quando o supervisor colocar você na escala, o plantão aparece aqui e as datas ficam marcadas no calendário."
-        />
+        <div className={hub.empty}>
+          <span className={hub.emptyIcon} aria-hidden="true"><CalendarDays width={26} height={26} strokeWidth={1.6} /></span>
+          <p className={hub.emptyTitle}>Você não tem plantão marcado</p>
+          <p className={hub.emptyText}>Quando o supervisor colocar você na escala, o plantão aparece aqui e as datas ficam marcadas no calendário.</p>
+        </div>
       ) : null}
 
       {current.state === "active" && current.shifts.length > 1 ? (
-        <div className="mt-3 space-y-2">
+        <div className="space-y-2" style={{ padding: "12px 20px 0" }}>
           <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Você está em {current.shifts.length} plantões agora. Escolha qual abrir.
           </p>
@@ -95,9 +96,7 @@ function CurrentDutyCard({ current }: { current: DutyHubCurrent }) {
         </div>
       ) : null}
 
-      {current.state === "next" ? (
-        <p className="mt-2 text-sm" style={{ color: "var(--text-secondary)" }}>Você não está de plantão agora.</p>
-      ) : null}
+      {current.state === "next" ? <p className={hub.note} style={{ paddingTop: 6 }}>Você não está de plantão agora.</p> : null}
 
       {shift && (current.state === "active" || current.state === "next") ? (
         <LiteSwap swapKey={shift.key}>
@@ -111,40 +110,65 @@ function CurrentDutyCard({ current }: { current: DutyHubCurrent }) {
 function ShiftDetails({ shift }: { shift: DutyHubShift }) {
   const ModalityIcon = shift.modality === "Presencial" ? Building2 : MonitorSmartphone;
   return (
-    <div className="mt-4">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <h3 className="min-w-0 truncate text-lg font-semibold" style={{ color: "var(--foreground)" }}>{shift.scheduleName}</h3>
-        <Badge tone={shift.situation.tone} size="sm" className="shrink-0">{shift.situation.label}</Badge>
+    <div>
+      <div className={hub.top}>
+        <p className={hub.name}>
+          <span className="min-w-0 truncate">{shift.scheduleName}</span>
+          <Badge tone={shift.situation.tone} size="sm" className="shrink-0">{shift.situation.label}</Badge>
+        </p>
+        <p className={hub.time}>{shift.timeLabel}</p>
       </div>
-      <dl className="mt-3 grid gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
-        <div className="flex items-center gap-2">
-          <dt className="sr-only">Horário</dt>
-          <Clock3 className="size-4 shrink-0" aria-hidden="true" style={{ color: "var(--text-muted)" }} />
-          <dd className="tabular-nums">{shift.dateLabel}, {shift.timeLabel}</dd>
+      <dl className={hub.facts}>
+        <div className={hub.fact} data-tone="when">
+          <Clock3 aria-hidden="true" />
+          <dt>Quando</dt>
+          <dd>{shift.dateLabel}</dd>
         </div>
-        {shift.place ? (
-          <div className="flex min-w-0 items-center gap-2">
-            <dt className="sr-only">Local</dt>
-            <MapPin className="size-4 shrink-0" aria-hidden="true" style={{ color: "var(--text-muted)" }} />
-            <dd className="truncate">{shift.place}</dd>
-          </div>
-        ) : null}
-        {shift.modality ? (
-          <div className="flex items-center gap-2">
-            <dt className="sr-only">Modalidade</dt>
-            <ModalityIcon className="size-4 shrink-0" aria-hidden="true" style={{ color: "var(--text-muted)" }} />
-            <dd>{shift.modality}</dd>
-          </div>
-        ) : null}
+        <div className={hub.fact} data-tone="where">
+          <MapPin aria-hidden="true" />
+          <dt>Onde</dt>
+          <dd>{shift.place ?? "A definir"}</dd>
+        </div>
+        <div className={hub.fact} data-tone="mode">
+          <ModalityIcon aria-hidden="true" />
+          <dt>Modalidade</dt>
+          <dd>{shift.modality ?? "A definir"}</dd>
+        </div>
       </dl>
-      {shift.hint ? <p className="mt-3 text-sm" style={{ color: "var(--text-secondary)" }}>{shift.hint}</p> : null}
-      {shift.href ? (
-        <Link href={shift.href} className={cn(buttonStyles.button, buttonStyles.primary, buttonStyles.md, "mt-4 w-full sm:w-auto")}>
-          Abrir plantão
-        </Link>
+      {shift.hint || shift.href ? (
+        <div className={hub.foot} style={{ paddingTop: 16 }}>
+          {shift.hint ? <p className={hub.hint}>{shift.hint}</p> : null}
+          {shift.href ? (
+            <Link href={shift.href} className={cn(buttonStyles.button, buttonStyles.primary, buttonStyles.md, "w-full sm:w-auto sm:justify-self-start")}>
+              Abrir plantão
+            </Link>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
+}
+
+/**
+ * Banner do fim de Plantões (14/11/2026): o tom claro e o capitão espiando por cima da borda, diferente do
+ * banner azul do Início e da jornada. Uma dica do próximo passo e um atalho para os horários de atendimento.
+ */
+function DutyBanner({ current }: { current: DutyHubCurrent }) {
+  const shift = current.shifts[0];
+  const hours = { label: "Ajustar meus horários", href: "/settings?tab=disponibilidade" };
+  if (current.state === "active" && shift) {
+    return <CaptainBanner className={hub.banner} tone="light" pose="peek" label="Dica do plantão"
+      title="Plantão no ar! Quem aceita primeiro recebe mais leads."
+      goal={{ value: shift.timeLabel, hint: shift.scheduleName }} action={hours} />;
+  }
+  if (current.state === "next" && shift) {
+    return <CaptainBanner className={hub.banner} tone="light" pose="peek" label="Dica do plantão"
+      title={`Seu próximo plantão é ${shift.dateLabel.toLowerCase()}. Fique online uns minutos antes.`}
+      goal={{ value: shift.timeLabel, hint: shift.scheduleName }} action={hours} />;
+  }
+  return <CaptainBanner className={hub.banner} tone="light" pose="peek" label="Dica do plantão"
+    title="Ainda sem plantão? Diga quando você atende e fica mais fácil entrar na escala."
+    action={{ label: "Informar meus horários", href: hours.href }} />;
 }
 
 function CurrentDutyError() {

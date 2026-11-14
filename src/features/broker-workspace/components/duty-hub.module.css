@@ -1,0 +1,153 @@
+/*
+ * Plantões do corretor (refino 14/11/2026), no mesmo desenho do card de nível da Minha jornada: o horário em
+ * destaque em cima, uma faixa de três fatos embaixo e a ação no fim. Só tokens do Lite.
+ */
+.card {
+  overflow: hidden;
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px 0;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.top {
+  display: grid;
+  gap: 6px;
+  padding: 12px 20px 18px;
+  background: radial-gradient(130% 160% at 0% 0%, var(--chat-action-soft, rgb(0 43 115 / 0.1)) 0%, transparent 62%);
+}
+
+.name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.time {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: var(--tracking-display, -0.03em);
+  font-variant-numeric: tabular-nums;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.fact {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "icon value" "icon label";
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 1px;
+  min-width: 0;
+  padding: 14px 16px;
+}
+
+.fact + .fact { border-left: 1px solid var(--border-subtle); }
+.fact svg { grid-area: icon; width: 20px; height: 20px; color: var(--chat-action, var(--primary)); }
+.fact[data-tone="where"] svg { color: oklch(62% 0.16 28); }
+.fact[data-tone="mode"] svg { color: var(--success); }
+.fact dt { grid-area: label; overflow: hidden; color: var(--text-muted); font-size: var(--text-xs); white-space: nowrap; text-overflow: ellipsis; }
+.fact dd { grid-area: value; margin: 0; overflow: hidden; font-size: var(--text-sm); font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
+
+.foot {
+  display: grid;
+  gap: 12px;
+  padding: 0 20px 20px;
+}
+
+.hint {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.note {
+  margin: 0;
+  padding: 0 20px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px 24px 28px;
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: var(--chat-action-soft, rgb(0 43 115 / 0.1));
+  color: var(--chat-action, var(--primary));
+}
+
+.emptyTitle { margin: 0; font-size: var(--text-base); font-weight: 500; }
+.emptyText { max-width: 40ch; margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.5; }
+
+.banner { margin-top: 24px; }
+
+@media (max-width: 420px) {
+  .time { font-size: 30px; }
+  .fact { grid-template-columns: minmax(0, 1fr); grid-template-areas: "icon" "value" "label"; justify-items: start; row-gap: 4px; padding: 12px; }
+}
+
+@media (min-width: 720px) {
+  .head { padding: 20px 28px 0; }
+  .top { padding: 12px 28px 22px; }
+  .fact { padding: 16px 28px; }
+  .foot { padding: 0 28px 24px; }
+  .note { padding: 0 28px; }
+}
+
+/* Minha escala: a data como uma folhinha de calendário ao lado do turno. */
+.leaf {
+  display: grid;
+  flex: none;
+  place-items: center;
+  align-content: center;
+  width: 48px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--surface-muted);
+  line-height: 1;
+}
+
+.leaf small { color: var(--text-muted); font-size: 11px; font-weight: 500; text-transform: lowercase; }
+.leaf strong { margin-top: 3px; font-size: var(--text-lg); font-weight: 500; font-variant-numeric: tabular-nums; }
+.leaf[data-today="true"] { background: var(--chat-action, var(--primary)); color: white; }
+.leaf[data-today="true"] small { color: oklch(100% 0 0 / 0.8); }

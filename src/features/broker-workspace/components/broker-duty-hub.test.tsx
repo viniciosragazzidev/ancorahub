@@ -90,7 +90,9 @@ describe("BrokerDutyHub", () => {
     />);
     expect(screen.getByText("Você não está de plantão agora.")).toBeTruthy();
     expect(screen.getByText("Próximo plantão")).toBeTruthy();
-    expect(screen.getByText("Sexta-feira, 2 de outubro, 13:00 às 17:00")).toBeTruthy();
+    // Data e horário em destaque separados (refino 14/11/2026): o horário grande, a data na faixa "Quando".
+    expect(screen.getByText("Sexta-feira, 2 de outubro")).toBeTruthy();
+    expect(screen.getAllByText("13:00 às 17:00").length).toBeGreaterThan(0);
     expect(screen.queryByRole("link", { name: "Abrir plantão" })).toBeNull();
   });
 
