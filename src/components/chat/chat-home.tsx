@@ -38,6 +38,7 @@ import type { WhatsAppActivitySummary } from "@/features/dashboard/whatsapp-acti
 import { WhatsAppActivityCard } from "@/features/dashboard/components/whatsapp-activity-card";
 import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
 import { BrokerHomeOverview } from "./broker-home-overview";
+import { RisePulse, useRisePulseKey } from "@/components/light/rise-pulse";
 
 type Tab = "assistentes" | "leads";
 
@@ -218,6 +219,8 @@ export function ChatHome({
   const [newOpen, setNewOpen] = useState(false);
   const firstName = viewerName.split(/\s+/)[0] || viewerName;
   const waitingLeads = leadsBadgeCount ?? leads.filter((lead) => lead.waitingYou).length;
+  // A contagem da aba Leads (a fila no Lite) pulsa uma vez quando sobe; nunca ao descer.
+  const leadsPulse = useRisePulseKey(waitingLeads);
   const visible = (tab === "assistentes" ? assistants : leads).filter((thread) => matches(thread, query));
   const nextLead = leads.find((lead) => lead.waitingYou) ?? null;
   const next = summary?.next ?? null;
@@ -237,7 +240,7 @@ export function ChatHome({
           onValueChange={(value) => setTab(value as Tab)}
           options={[
             { value: "assistentes", label: "Assistentes" },
-            { value: "leads", label: "Leads", accessory: waitingLeads ? <span className={home.count}>{waitingLeads}</span> : undefined },
+            { value: "leads", label: "Leads", accessory: waitingLeads ? <RisePulse pulseKey={leadsPulse} className={home.countPulse}><span className={home.count}>{waitingLeads}</span></RisePulse> : undefined },
           ]}
         />
       </div>
