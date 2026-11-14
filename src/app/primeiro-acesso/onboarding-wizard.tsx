@@ -3,6 +3,10 @@
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "@/components/ui/sonner";
 import { useRouter } from "next/navigation";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
+import { useSuccessOverlay } from "@/components/motion/success-overlay";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { fireFeedbackOnce, useFeedback } from "@/lib/feedback/use-feedback";
 
 import { Button } from "@/components/arc/button/button";
 import { Input } from "@/components/arc/input/input";
@@ -70,7 +74,11 @@ export function OnboardingWizard({ invitation, profile }: Props) {
   const [pending, startTransition] = useTransition();
   const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(true);
+  const [passkeyError, setPasskeyError] = useState<string | null>(null);
   const router = useRouter();
+  const motionEnabled = useInterfaceMotionEnabled();
+  const fire = useFeedback();
+  const { celebrate, node: welcomeOverlay } = useSuccessOverlay();
 
   useEffect(() => {
     void platformAuthenticatorAvailable().then(setPasskeySupported);
@@ -119,6 +127,8 @@ export function OnboardingWizard({ invitation, profile }: Props) {
 
   async function registerPasskey() {
     setPasskeyBusy(true);
+    setPasskeyError(null);
+    fire("tap");
     try {
       const result = await authClient.passkey.addPasskey({
         name: "Biometria do primeiro acesso",
@@ -126,10 +136,14 @@ export function OnboardingWizard({ invitation, profile }: Props) {
       });
       if (result.error) throw new Error(result.error.message ?? "Não foi possível cadastrar a biometria.");
       await recordSecurityAuditAction("cadastrou_passkey");
-      toast.success("Biometria cadastrada! Você já pode entrar com a digital.");
+      fire("confirm", { sound: true });
+      // A tela muda logo em seguida: o toast leva a confirmação para o painel.
+      toast.success("Biometria cadastrada. Você já pode entrar com a digital.");
       goToDashboard();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar a biometria.");
+      // O navegador devolve o motivo em inglês (cancelado, tempo esgotado): vira a causa em português.
+      fire("error");
+      setPasskeyError(actionErrorMessage(normalizeActionError(error, "A biometria não foi cadastrada"), "Sua conta já está ativa e você entra com a senha"));
     } finally {
       setPasskeyBusy(false);
     }
@@ -179,7 +193,10 @@ export function OnboardingWizard({ invitation, profile }: Props) {
           password,
         });
         if (!signIn.error) {
-          toast.success("Conta ativada com sucesso! Bem-vindo(a).");
+          // Nível 3, uma vez só (FEEDBACK.md): a conta foi ativada e confirmada pelo servidor.
+          const plan = fireFeedbackOnce(`onboarding:${invitation.id}`, "celebrate", { budgetKey: "boas-vindas" }, motionEnabled);
+          if (plan.celebrate) celebrate("Conta ativada. Boas-vindas ao time");
+          else toast.success("Conta ativada. Boas-vindas ao time.");
           setStep(5);
           return;
         }
@@ -305,11 +322,14 @@ export function OnboardingWizard({ invitation, profile }: Props) {
           )}
 
           {step === 5 && (
-            <p className="text-sm leading-relaxed text-(--text-secondary)">
-              {passkeySupported
-                ? "Use a biometria do seu dispositivo (digital ou Face ID) para entrar no CorreTop sem digitar senha. Você pode cadastrar ou gerenciar biometrias depois, em Configurações, na seção Segurança."
-                : "Este dispositivo não parece oferecer autenticador biométrico. Você pode cadastrar uma biometria depois, em Configurações, na seção Segurança, a partir de um dispositivo compatível."}
-            </p>
+            <>
+              <p className="text-sm leading-relaxed text-(--text-secondary)">
+                {passkeySupported
+                  ? "Use a biometria do seu dispositivo (digital ou Face ID) para entrar no CorreTop sem digitar senha. Você pode cadastrar ou gerenciar biometrias depois, em Configurações, na seção Segurança."
+                  : "Este dispositivo não parece oferecer autenticador biométrico. Você pode cadastrar uma biometria depois, em Configurações, na seção Segurança, a partir de um dispositivo compatível."}
+              </p>
+              {passkeyError ? <p id="passkey-error" role="alert" className="text-sm text-(--danger)">{passkeyError}</p> : null}
+            </>
           )}
         </section>
       </form>
@@ -334,8 +354,8 @@ export function OnboardingWizard({ invitation, profile }: Props) {
             <>
               <Button variant="secondary" onClick={goToDashboard} disabled={passkeyBusy}>Fazer depois</Button>
               {passkeySupported ? (
-                <Button className="flex-1" loading={passkeyBusy} disabled={passkeyBusy} onClick={() => void registerPasskey()}>
-                  Ativar digital agora
+                <Button className="flex-1" loading={passkeyBusy} disabled={passkeyBusy} aria-describedby={passkeyError ? "passkey-error" : undefined} onClick={() => void registerPasskey()}>
+                  {passkeyError ? "Tentar de novo" : "Ativar digital agora"}
                 </Button>
               ) : (
                 <Button className="flex-1" onClick={goToDashboard}>Ir para o painel</Button>
@@ -344,6 +364,7 @@ export function OnboardingWizard({ invitation, profile }: Props) {
           ) : null}
         </div>
       </nav>
+      {welcomeOverlay}
     </LightAuthShell>
   );
 }

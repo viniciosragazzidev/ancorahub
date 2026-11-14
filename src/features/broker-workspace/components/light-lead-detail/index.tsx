@@ -139,7 +139,7 @@ export function LightLeadDetail({
         <StepSheet c={c} />
         {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} /> : <>
           <SaleDocSheet lead={lead} c={c} requirements={requirements} />
-          <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} />
+          <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} celebration />
         </>}
         {c.successOverlay}
       {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={`${c.handoffUrl}:${c.handoffPhase}`} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} initialPhase={c.handoffPhase} onClose={c.closeHandoff} /> : null}
@@ -182,7 +182,7 @@ export function LightLeadDetail({
       <StepSheet c={c} />
       {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} /> : <>
         <SaleDocSheet lead={lead} c={c} requirements={requirements} />
-        <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} />
+        <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} celebration />
       </>}
       {c.successOverlay}
       {!isManagement && c.handoffUrl ? <WhatsAppHandoff key={`${c.handoffUrl}:${c.handoffPhase}`} lead={handoffLeadFrom(lead)} whatsappUrl={c.handoffUrl} initialPhase={c.handoffPhase} onClose={c.closeHandoff} /> : null}

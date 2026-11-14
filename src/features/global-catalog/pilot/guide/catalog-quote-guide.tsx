@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ChatScreen, type CustomBlockApi } from "@/components/chat/chat-screen";
 import type { ChatBlock, ChatChoice, ChatScript } from "@/components/chat/types";
 import { ASSISTANTS } from "@/features/broker-workspace/chat/assistant-scripts";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 
 import type { QuoteInput, QuoteResponse, QuoteResult } from "../contracts";
 import {
@@ -59,6 +60,7 @@ function QuoteGuideConversation({ facets, services, canExport = true, onRestart 
   const [exploring, setExploring] = useState<{ plan: QuoteResult; tab: "conditions" | "network" } | null>(null);
   const [comparing, setComparing] = useState(false);
   const [awaitingBudget, setAwaitingBudget] = useState(false);
+  const fire = useFeedback();
 
   const script = useMemo<ChatScript>(() => ({
     status: { label: "Esperando você", tone: "waiting" },
@@ -159,6 +161,7 @@ function QuoteGuideConversation({ facets, services, canExport = true, onRestart 
     if (!plan || !lastInput.current) return [{ type: "assistant", id: `a-pdf-missing-${turn}`, text: "Esse plano saiu da lista. Busque de novo e tente outra vez." }];
     const result = await services.exportPdf({ planId, profile: lastInput.current });
     if (result.error || !result.data) {
+      fire("error");
       return [{ type: "assistant", id: `a-pdf-error-${turn}`, text: [result.error ?? "Não consegui gerar a proposta agora.", ...(result.reasons ?? [])].join(" ") }];
     }
     const bytes = Uint8Array.from(atob(result.data.base64), (char) => char.charCodeAt(0));
@@ -168,12 +171,14 @@ function QuoteGuideConversation({ facets, services, canExport = true, onRestart 
     anchor.download = result.data.filename;
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 5000);
-    const celebrate: CelebrateBlockData = { title: "Proposta pronta!", text: `${plan.name}, ${money(plan.totalCents)} por mês. O PDF já baixou no seu aparelho.` };
+    // Gerar proposta é ação de dezenas por dia: nível 1 (FEEDBACK.md), vibração de confirmação, sem som nem festa.
+    fire("confirm");
+    const celebrate: CelebrateBlockData = { title: "Proposta pronta", text: `${plan.name}, ${money(plan.totalCents)} por mês. O PDF já baixou no seu aparelho.` };
     return [
       { type: "custom", id: `celebrate-${turn}`, kind: "celebrate", data: celebrate },
       ...afterResultsBlocks(turn, { more: false, filtered: Boolean(answersRef.current.operator || answersRef.current.budgetCents) }),
     ];
-  }, [services]);
+  }, [services, fire]);
 
   const onLocalChoice = useCallback(async (_choice: ChatChoice, value: string): Promise<ChatBlock[]> => {
     const current = answersRef.current;

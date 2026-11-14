@@ -10,7 +10,9 @@ vi.mock("next/navigation", () => {
   const router = { refresh: vi.fn() };
   return { useRouter: () => router };
 });
-vi.mock("@/components/motion/success-overlay", () => ({ useSuccessOverlay: () => ({ celebrate: vi.fn(), node: null }) }));
+const feedback = vi.hoisted(() => ({ fire: vi.fn(), celebrate: vi.fn() }));
+vi.mock("@/components/motion/success-overlay", () => ({ useSuccessOverlay: () => ({ celebrate: feedback.celebrate, node: null }) }));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => feedback.fire }));
 vi.mock("@/components/ui/sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/features/post-sale/actions", () => ({ registerSaleAction: vi.fn() }));
 
@@ -76,6 +78,9 @@ async function salvar() {
 }
 
 beforeEach(() => {
+  feedback.fire.mockReset();
+  feedback.fire.mockReturnValue({ celebrate: true });
+  feedback.celebrate.mockReset();
   registerSale.mockReset();
   registerSale.mockResolvedValue({ success: true } as never);
 });
@@ -167,5 +172,36 @@ describe("RegisterSalePanel: máscara de data mantém o payload", () => {
     fireEvent.blur(vencimento);
     expect(vencimento.getAttribute("aria-invalid")).toBe("true");
     expect(screen.getByRole("button", { name: "Salvar venda" })).toBeDisabled();
+  });
+});
+
+describe("RegisterSalePanel: venda do corretor no Lite é nível 3", () => {
+  async function registrarComCelebracao() {
+    render(<RegisterSalePanel leadId="lead-1" documents={[{ id: "doc-1", filename: "confirmacao.pdf", status: "approved" }]} carriers={[]} open onOpenChange={() => undefined} celebration />);
+    await preencherBase();
+    digitar(await abrirInicio(), "01022026");
+    await salvar();
+  }
+
+  it("celebra só depois de a venda ser persistida", async () => {
+    await registrarComCelebracao();
+    await waitFor(() => expect(feedback.fire).toHaveBeenCalledWith("celebrate", { budgetKey: "venda" }));
+    expect(feedback.celebrate).toHaveBeenCalledWith("Venda registrada");
+  });
+
+  it("sem vaga no dia, confirma sem overlay", async () => {
+    feedback.fire.mockReturnValue({ celebrate: false });
+    await registrarComCelebracao();
+    await waitFor(() => expect(feedback.fire).toHaveBeenCalledWith("celebrate", { budgetKey: "venda" }));
+    expect(feedback.celebrate).not.toHaveBeenCalled();
+  });
+
+  it("falha mostra a causa no painel, sem celebrar", async () => {
+    registerSale.mockResolvedValue({ error: "A confirmação da operadora ainda não foi aprovada." } as never);
+    await registrarComCelebracao();
+    expect(await screen.findByRole("alert")).toHaveTextContent("A confirmação da operadora ainda não foi aprovada. Os dados preenchidos continuam aqui.");
+    expect(feedback.fire).toHaveBeenCalledWith("error");
+    expect(feedback.fire).not.toHaveBeenCalledWith("celebrate", expect.anything());
+    expect(feedback.celebrate).not.toHaveBeenCalled();
   });
 });

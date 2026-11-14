@@ -19,6 +19,7 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrat
     requestingSale,
     handleRequestSale,
     setShowSaleConfirm,
+    stepNotice,
   } = c;
 
   if (isDistributed && mode === "broker") return null;
@@ -47,6 +48,11 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrat
         ) : null}
         {justRegistered && mode === "broker" ? (
           <LiteSuccess label="Venda registrada" className="mt-2 text-sm font-medium text-(--success)" />
+        ) : stepNotice && mode === "broker" ? (
+          // Mudar etapa (nível 1): a confirmação fica aqui, na etapa que mudou, em vez do toast.
+          stepNotice.tone === "success"
+            ? <LiteSuccess key={stepNotice.id} label={stepNotice.text} className="mt-2 text-sm font-medium text-(--success)" />
+            : <p key={stepNotice.id} role="status" className="mt-2 text-sm font-medium text-(--warning)">{stepNotice.text}</p>
         ) : null}
       </div>
 
