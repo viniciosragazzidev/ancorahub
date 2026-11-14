@@ -34,7 +34,7 @@ export function CaptainBanner({ label, title, goal, progress, action, art = CAPT
 }) {
   const share = progress === null || progress === undefined ? null : Math.min(100, Math.max(0, Math.round(progress)));
   return (
-    <section className={[styles.banner, className].filter(Boolean).join(" ")} data-tone={tone} data-pose={pose} data-size={size} aria-label={label}>
+    <section className={[styles.banner, className].filter(Boolean).join(" ")} data-tone={tone} data-pose={pose} data-size={size} data-goal={goal || share !== null ? "" : undefined} aria-label={label}>
       <span className={styles.glow} aria-hidden="true" />
       <p className={styles.title}>{title}</p>
       {goal || share !== null ? (
