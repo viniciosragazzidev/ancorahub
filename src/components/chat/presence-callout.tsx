@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 
 import { AssistantAvatar } from "./assistant-avatar";
 import { CameraCapture, canUseInPageCamera } from "./camera-capture";
@@ -72,7 +73,9 @@ async function shrink(file: File): Promise<Blob> {
  */
 export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskView; variant?: "home" | "chat" }) {
   const router = useRouter();
-  const reduce = useReducedMotion();
+  // Kill-switch (html[data-interface-motion="off"]) também desliga, não só o movimento reduzido do sistema.
+  const motionOn = useInterfaceMotionEnabled();
+  const reduce = Boolean(useReducedMotion()) || !motionOn;
   const camera = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<State>(
     ask.status === "confirmed" ? { kind: "done", preview: null, at: null }
@@ -265,7 +268,7 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
             className={styles.presencePhoto}
             initial={reduce ? false : { opacity: 0, scale: 0.92, rotate: -2 }}
             animate={{ opacity: 1, scale: 1, rotate: done ? 0 : -1.5 }}
-            transition={{ type: "spring", visualDuration: 0.45, bounce: 0.3 }}
+            transition={{ type: "spring", visualDuration: 0.32, bounce: 0.3 }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- local preview or the private, auth-checked photo route */}
             <img src={preview} alt="Foto do local do plantão" />
@@ -283,10 +286,10 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
           role="status"
           initial={reduce ? false : { opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: "spring", visualDuration: 0.4, bounce: 0.45 }}
+          transition={{ type: "spring", visualDuration: 0.32, bounce: 0.45 }}
         >
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-            <motion.path d="M5 12.5 10 17.5 19 7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" initial={reduce ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.45, ease, delay: 0.1 }} />
+            <motion.path d="M5 12.5 10 17.5 19 7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" initial={reduce ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={reduce ? { duration: 0 } : { duration: 0.32, ease, delay: 0.1 }} />
           </svg>
           {state.at ? `Confirmado às ${state.at}` : "Confirmado"}
         </motion.p>
