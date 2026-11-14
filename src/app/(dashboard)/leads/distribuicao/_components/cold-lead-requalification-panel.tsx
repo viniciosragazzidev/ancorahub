@@ -9,6 +9,7 @@ import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { toast } from "@/components/ui/sonner";
 import { requalifyColdLeadsAction } from "@/features/ai-qualification/cold-lead-requalification-actions";
 import { useRouter } from "next/navigation";
+import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 
 type ColdReviewLead = { id: string; nome: string; createdAt: Date };
 type QueueReview = { noResponse: ColdReviewLead[]; respondedStillCold: ColdReviewLead[] };
@@ -61,17 +62,7 @@ export function ColdLeadRequalificationPanel({
         <span className="text-xs text-muted-foreground">{leads.length}</span>
       </div>
       {leads.length ? (
-        <ul className="max-h-64 space-y-1 overflow-auto rounded-[var(--radius-card)] border border-border/70 p-2">
-          {leads.map((lead) => (
-            <li key={lead.id} className="flex min-w-0 items-center gap-3 rounded-md px-2 py-2 hover:bg-muted/30">
-              <Checkbox checked={selectedIds.includes(lead.id)} onCheckedChange={() => toggle(lead.id)} aria-label={`Selecionar ${lead.nome}`} />
-              <span className="min-w-0 flex-1 truncate text-sm text-foreground">{lead.nome || "Lead sem nome"}</span>
-              <time className="shrink-0 text-[11px] text-muted-foreground" dateTime={lead.createdAt.toISOString()}>
-                {new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(lead.createdAt)}
-              </time>
-            </li>
-          ))}
-        </ul>
+        <ColdLeadPage leads={leads} selectedIds={selectedIds} onToggle={toggle} />
       ) : <p className="rounded-[var(--radius-card)] border border-dashed border-border p-4 text-xs text-muted-foreground">Nenhum lead neste grupo hoje.</p>}
     </section>
   );
@@ -124,5 +115,26 @@ export function ColdLeadRequalificationPanel({
         </DialogPopup>
       </Dialog>
     </Card>
+  );
+}
+
+/** Um grupo de leads frios, 10 por página, com a seleção valendo entre as páginas (14/11/2026). */
+function ColdLeadPage({ leads, selectedIds, onToggle }: { leads: ColdReviewLead[]; selectedIds: string[]; onToggle: (leadId: string) => void }) {
+  const { pageRows, pagination } = useLitePages(leads, 10);
+  return (
+    <div className="grid gap-2">
+      <ul className="space-y-1 rounded-[var(--radius-card)] border border-border/70 p-2">
+        {pageRows.map((lead) => (
+          <li key={lead.id} className="flex min-w-0 items-center gap-3 rounded-md px-2 py-2 hover:bg-muted/30">
+            <Checkbox checked={selectedIds.includes(lead.id)} onCheckedChange={() => onToggle(lead.id)} aria-label={`Selecionar ${lead.nome}`} />
+            <span className="min-w-0 flex-1 truncate text-sm text-foreground">{lead.nome || "Lead sem nome"}</span>
+            <time className="shrink-0 text-[11px] text-muted-foreground" dateTime={lead.createdAt.toISOString()}>
+              {new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(lead.createdAt)}
+            </time>
+          </li>
+        ))}
+      </ul>
+      <LitePagination {...pagination} label="Páginas dos leads frios" />
+    </div>
   );
 }

@@ -290,3 +290,27 @@ a.seal:focus-visible { outline: 2px solid var(--ring, var(--primary)); outline-o
 @media (max-width: 559px) {
   .card > .action { margin-top: 6px; }
 }
+
+/*
+ * Dois níveis (14/11/2026). Cartões: a grade acompanha a quantidade, sem coluna vazia. "Em ordem": linhas
+ * compactas de 56px em 1 a 3 colunas, com o ponto, o rótulo, a frase do vazio e o atalho.
+ */
+.grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.card { min-height: 0; }
+.calm { display: grid; gap: 8px; min-width: 0; }
+.calmTitle { margin: 0; color: var(--text-muted, var(--muted-foreground)); font-size: var(--text-xs, 0.75rem); font-weight: 500; }
+.calmList { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.row { --live-tone: var(--text-muted, var(--muted-foreground)); display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 56px; padding: 8px 8px 8px 12px; border-radius: 12px; background: var(--surface, var(--card)); box-shadow: inset 0 0 0 1px var(--border); }
+.row[data-severity="ok"] { --live-tone: var(--success); }
+.row[data-severity="info"] { --live-tone: var(--info, var(--primary)); }
+.rowDot { display: inline-flex; flex: none; padding: 8px; border-radius: 10px; background: color-mix(in oklch, var(--live-tone) 14%, transparent); }
+.rowDot .dot { display: block; }
+.rowText { display: grid; flex: 1 1 auto; gap: 1px; min-width: 0; }
+.rowLabel { overflow: hidden; font-size: var(--text-sm, 0.875rem); font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
+.rowEmpty { overflow: hidden; color: var(--text-muted, var(--muted-foreground)); font-size: var(--text-xs, 0.75rem); white-space: nowrap; text-overflow: ellipsis; }
+.rowAction { display: inline-flex; flex: none; align-items: center; gap: 4px; min-height: 36px; padding: 0 12px; border-radius: 9999px; color: var(--chat-action, var(--accent-strong, var(--primary))); font-size: var(--text-xs, 0.75rem); font-weight: 500; text-decoration: none; }
+.rowAction:hover { background: var(--surface-muted, var(--muted)); }
+.rowAction:focus-visible { outline: 2px solid var(--ring, var(--primary)); outline-offset: 2px; }
+@media (max-width: 559px) {
+  .calmList { grid-template-columns: minmax(0, 1fr); }
+}
