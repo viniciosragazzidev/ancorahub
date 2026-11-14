@@ -2,6 +2,10 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Lite: movimento por frequência de uso
+
+- Meta do dia e ranking da semana animam só na primeira abertura do dia (`useFirstTimeToday`, dia de São Paulo); avisos ocasionais e tour em até 320ms; gradiente do consentimento sem loop. Tabela em `docs/ux/motion-frequencia.md`.
+
 ## 13/11/2026 - Modo corretor, etapa 6: Agenda conectada
 
 - `/agenda` do corretor reúne as tarefas abertas atribuídas a ele (retornos, tarefas com prazo e acompanhamentos de renovação) agrupadas em Atrasados, Hoje, Amanhã, Próximos e Sem prazo, pelo dia de São Paulo. Cada linha traz ícone do tipo, título, tipo e nome do lead, horário e estado textual (Atrasado, Urgente).
