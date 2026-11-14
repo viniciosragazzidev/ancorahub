@@ -2,8 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { playSound } from "@/lib/sounds/player";
-import { notificationSound } from "@/lib/sounds/recipes";
+import { fireFeedback } from "@/lib/feedback/use-feedback";
 
 import { toast } from "@/components/ui/sonner";
 import type { IncomingLead } from "./incoming-lead-queue";
@@ -34,11 +33,7 @@ export function IncomingLeadCard({
     const now = Date.now();
     if (now - lastSoundPlayedAt >= SOUND_THROTTLE_MS) {
       lastSoundPlayedAt = now;
-      try {
-        playSound(notificationSound, { volume: 0.8 });
-      } catch {
-        // Fallback se o navegador exigir gesto do usuário
-      }
+      fireFeedback("notify");
     }
 
     const toastId = `incoming-lead-${item.notificationId}`;

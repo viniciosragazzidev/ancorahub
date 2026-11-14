@@ -125,6 +125,8 @@
   --chat-action: oklch(62% 0.2 255);
   --chat-action-strong: oklch(55% 0.21 258);
   --chat-action-soft: oklch(62% 0.2 255 / 0.1);
+  /* Base sólida do botão de ação (FEEDBACK.md §4): só no botão primário do Lite, um por tela. */
+  --chat-action-base: oklch(46% 0.19 260);
   /* Blue for text (links, highlights): 4.5:1 or more on --surface and --surface-muted. */
   --chat-action-text: oklch(48% 0.2 258);
 }

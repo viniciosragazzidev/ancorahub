@@ -102,7 +102,8 @@ Receita nova em `src/lib/sounds/recipes.ts`: `milestoneSound` (três notas subin
 
 ## 6. API
 
-- `useFeedback()` devolve `fire(evento, resultado)`. Ele toca som e vibração conforme o nível, respeita as preferências, o `prefers-reduced-motion` e o kill-switch, e devolve as flags para o componente visual (`motion`, `celebrate`). Nenhum código chama `playSound` ou `navigator.vibrate` direto, exceto o próprio hook.
+- Implementado em 14/11/2026 (fase 0): `src/lib/feedback/` (`tokens.ts`, `core.ts`, `use-feedback.ts`, `action-error.ts`), `LiteActionButton` em `src/components/lite/controls/action-button.tsx`, `mood` no `AssistantAvatar` e `milestoneSound`.
+- `useFeedback()` devolve `fire(tipo, opções)`, com tipo `tap`, `confirm`, `milestone`, `celebrate`, `notify`, `error` ou `warning`. Fora do React, use `fireFeedback`. O limite diário de celebrações fica no aparelho (`ancora:feedback-budget`). Ele toca som e vibração conforme o nível, respeita as preferências, o `prefers-reduced-motion` e o kill-switch, e devolve as flags para o componente visual (`motion`, `celebrate`). Nenhum código chama `playSound` ou `navigator.vibrate` direto, exceto o próprio hook.
 - `LiteActionButton` (§4) cobre o caso comum de ação com servidor.
 - `CelebrationLayer` e `useSuccessOverlay` passam a receber o nível e a respeitar `celebration.maxPerDay`.
 - Mascote: `AssistantAvatar` ganha a prop `mood` (`idle`, `alert`, `thinking`, `cheer`), com uma passada por troca. Com animações desligadas, mostra a pose final parada. Rive fica para depois de uma prova com um mascote só, medindo o peso no celular.
@@ -113,7 +114,7 @@ Receita nova em `src/lib/sounds/recipes.ts`: `milestoneSound` (três notas subin
 
 1. Super Admin (kill-switch `html[data-interface-motion="off"]`) desliga o movimento para todos.
 2. A empresa pode desligar celebrações (a chave da jornada já existe).
-3. O usuário, em Configurações, tem os interruptores Som, Vibração, Animações e Celebrações, todos ligados por padrão, menos Vibração no computador. A preferência fica salva por usuário no servidor.
+3. O usuário, em Configurações > Acessibilidade, tem "Menos animação" (o inverso de Animações) e a seção "Som e vibração" com Sons, Vibração e Comemorações, todos ligados por padrão. As preferências ficam neste aparelho (`ancora:a11y`, `src/features/assist/a11y-prefs.tsx`), como as outras de acessibilidade. No computador a vibração não tem efeito. Levar ao servidor por usuário fica para depois, se o uso pedir.
 4. `prefers-reduced-motion` do sistema equivale a "Animações" desligado.
 
 ---

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "motion/react";
+import { fireFeedback } from "@/lib/feedback/use-feedback";
 
 import styles from "./chat.module.css";
 
@@ -67,7 +68,7 @@ export function CameraCapture({ onShot, onClose, onFallback }: { onShot: (photo:
       if (!blob) return;
       setShot({ blob, url: URL.createObjectURL(blob) });
       setPhase("shot");
-      if ("vibrate" in navigator) navigator.vibrate?.(20);
+      fireFeedback("tap");
     }, "image/jpeg", 0.82);
   }
 

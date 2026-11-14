@@ -1,0 +1,56 @@
+/* Botão de ação do Lite (docs/design-system/FEEDBACK.md §4). Um por tela. Largura e altura fixas entre os estados. */
+.wrap { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+.button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius-control, 9999px);
+  background: var(--chat-action);
+  color: white;
+  font: 500 15px/1.2 var(--font-body);
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 3px 0 var(--chat-action-base);
+  transform: translateY(0);
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--motion-duration-instant, 120ms) var(--ease-standard),
+    box-shadow var(--motion-duration-instant, 120ms) var(--ease-standard),
+    background-color var(--motion-duration-fast, 160ms) linear;
+}
+.sm { min-height: 46px; font-size: 14px; }
+
+.button:hover:not(:disabled) { filter: brightness(1.04); }
+.button:active:not(:disabled):not([aria-busy="true"]) { transform: translateY(2px) scale(0.98); box-shadow: 0 1px 0 var(--chat-action-base); }
+.button:focus-visible { outline: 2px solid var(--chat-action); outline-offset: 3px; }
+.button[aria-busy="true"] { cursor: progress; transform: translateY(1px); box-shadow: 0 2px 0 var(--chat-action-base); }
+.button:disabled:not([aria-busy="true"]) { cursor: default; background: var(--chat-action-soft); color: var(--chat-action-text, var(--chat-action)); box-shadow: none; }
+
+.button[data-state="done"] { background: var(--success); box-shadow: 0 3px 0 color-mix(in oklab, var(--success) 70%, black); }
+.button[data-state="error"] { background: var(--danger); box-shadow: 0 3px 0 color-mix(in oklab, var(--danger) 70%, black); }
+
+.label { display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
+.icon { flex: none; }
+
+.spinner {
+  width: 16px; height: 16px; flex: none; border-radius: 9999px;
+  border: 2px solid rgb(255 255 255 / 0.35); border-top-color: white;
+  animation: lite-action-spin 0.7s linear infinite;
+}
+@keyframes lite-action-spin { to { transform: rotate(360deg); } }
+
+.error { margin: 0; font-size: 13px; line-height: 1.45; color: var(--danger); }
+
+/* Movimento reduzido, "Menos animação" e kill-switch: sem deslocamento nem escala. */
+@media (prefers-reduced-motion: reduce) {
+  .button, .button:active:not(:disabled) { transform: none; transition: background-color 120ms linear; }
+  .spinner { animation-duration: 1.4s; }
+}
+:global(html[data-reduce-motion="1"]) .button,
+:global(html[data-interface-motion="off"]) .button { transform: none !important; transition: background-color 120ms linear; }

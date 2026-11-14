@@ -2,7 +2,7 @@
 
 Data: 14/11/2026 · Dono: Vinicios · Padrão: `docs/design-system/FEEDBACK.md`
 Relatórios e protótipo: `reports/design/feedback-duolingo-2026-11-14/`. O protótipo `aceitar-lead-exemplo.html` é a referência visual e de tempo do botão de ação e do aceite.
-Status: **padrão registrado; código ainda não alterado.** Cada fase abaixo é uma branch própria, com revisão visual antes do merge.
+Status: **fase 0 entregue em 14/11/2026** (branch `feat/feedback-padrao`); fases 1 a 7 pendentes. Cada fase abaixo é uma branch própria, com revisão visual antes do merge.
 
 Frequência: estimada pelo papel de cada tela, não por métrica. N0 a N3 = níveis do §3 do padrão.
 
@@ -21,7 +21,10 @@ Frequência: estimada pelo papel de cada tela, não por métrica. N0 a N3 = nív
 
 ---
 
-## Fase 0 · Fundação (antes de qualquer tela)
+## Fase 0 · Fundação (antes de qualquer tela) · ENTREGUE 14/11/2026
+
+Entregue: tokens (`beat`, `shake`, `celebration`, `mascot`, `duration.celebrate`, `spring.celebrate`, `--chat-action-base` e pares CSS), `src/lib/feedback/*` com testes, `milestoneSound`, preferências Sons, Vibração e Comemorações em Configurações > Acessibilidade (no aparelho, junto de "Menos animação"), `LiteActionButton` com testes, `mood` no `AssistantAvatar` e os 3 `navigator.vibrate` e 2 `playSound` migrados para `fireFeedback`. Diferença do plano: as preferências ficam no aparelho, não no servidor, como as demais de acessibilidade. Nenhuma tela usa o botão novo ainda; isso começa na fase 1.
+
 
 | Peça | Arquivo | Entrega |
 |---|---|---|
