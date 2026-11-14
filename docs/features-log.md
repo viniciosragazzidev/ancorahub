@@ -2,6 +2,10 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Lite: resposta otimista nas 3 ações mais frequentes do corretor
+
+- Aceitar lead mostra "Lead aceito" na hora (`useOptimistic`, botão travado contra duplo aceite) e volta com o erro da action se o servidor recusar; mensagem na conversa entra na hora como "Enviando", e em falha fica "Não enviada · Tentar de novo" sem perder o texto; mudar etapa na tela do lead (Lite) muda e fecha a folha na hora, e volta reabrindo a folha com aviso se o servidor recusar. O kanban Lite de /leads não move cartão entre etapas (só reordena colunas), por isso ficou de fora. Lógica em `src/lib/optimistic-core.ts` e `src/components/chat/user-send-core.ts`, com testes.
+
 ## 13/11/2026 - Lite: alvos de toque de 44px no celular
 
 - Em telas de toque (`pointer: coarse`), os botões de ícone e os tamanhos xs/sm ganham área de toque de 44x44 (`ct-touch`, `src/styles/touch-target.css`) sem mudar o visual. No Lite, o composer (enviar, áudio, ferramentas) tem 44px e o botão principal fica com altura mínima de 44px. Desktop e modo normal não mudam.
