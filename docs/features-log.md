@@ -895,3 +895,7 @@ O bloco aparece quando o lead entra em fechamento ou a venda é confirmada. Reú
 ## 14/11/2026 - Feedback padrão em todo o app (começando pelo Lite)
 
 A resposta a ações e eventos passa a seguir um padrão único em `docs/design-system/FEEDBACK.md`. Ela tem camadas (visual, texto, som, vibração e mascote) em ritmo fixo e quatro níveis: 0 silencioso, 1 confirmação, 2 marco no contexto e 3 celebração. O botão de ação tem os estados enviando, confirmado e falhou, e o usuário ganha interruptores de som, vibração, animações e celebrações. Regra obrigatória em `CLAUDE.md`. Só documentação nesta etapa: o plano por rota e fase está em `docs/implementations/active/2026-11-14-feedback-padrao.md`, e o relatório, o protótipo do aceite e o mapa estão em `reports/design/feedback-duolingo-2026-11-14/`.
+
+## 14/11/2026 - Feedback padrão, fase 0 (fundação)
+
+Base técnica do padrão `docs/design-system/FEEDBACK.md`. Inclui os tokens de ritmo, shake, limites de celebração e humor do mascote; `src/lib/feedback` (`useFeedback` e `fireFeedback`, que passam a ser os únicos a tocar som e vibrar; o normalizador de erro de ação; o limite diário de celebrações); o som de marco; o `LiteActionButton`, com os estados enviando, confirmado e falhou; e o `mood` do mascote. Configurações > Acessibilidade ganhou "Som e vibração": Sons, Vibração e Comemorações, guardados no aparelho. O lead novo agora também vibra no celular. Nenhuma tela usa o botão novo ainda. Plano: `docs/implementations/active/2026-11-14-feedback-padrao.md`.

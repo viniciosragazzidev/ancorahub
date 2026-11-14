@@ -8,9 +8,17 @@ import { useEffect, useState, type ReactNode } from "react";
  * bigger text, less motion and high contrast. Applied as attributes on <html>
  * (CSS in venancor-scope.css) and through MotionConfig for the animations.
  */
-export type A11yPrefs = { textScale: 100 | 115 | 130; reduceMotion: boolean; highContrast: boolean };
+export type A11yPrefs = {
+  textScale: 100 | 115 | 130;
+  reduceMotion: boolean;
+  highContrast: boolean;
+  /** Feedback (docs/design-system/FEEDBACK.md §7): ligados por padrão; "Animações" é o inverso de reduceMotion. */
+  sound: boolean;
+  haptic: boolean;
+  celebrations: boolean;
+};
 
-export const A11Y_DEFAULTS: A11yPrefs = { textScale: 100, reduceMotion: false, highContrast: false };
+export const A11Y_DEFAULTS: A11yPrefs = { textScale: 100, reduceMotion: false, highContrast: false, sound: true, haptic: true, celebrations: true };
 const STORAGE_KEY = "ancora:a11y";
 export const A11Y_EVENT = "ancora:a11y-change";
 
@@ -21,6 +29,9 @@ export function readA11yPrefs(): A11yPrefs {
       textScale: raw.textScale === 115 || raw.textScale === 130 ? raw.textScale : 100,
       reduceMotion: raw.reduceMotion === true,
       highContrast: raw.highContrast === true,
+      sound: raw.sound !== false,
+      haptic: raw.haptic !== false,
+      celebrations: raw.celebrations !== false,
     };
   } catch {
     return A11Y_DEFAULTS;

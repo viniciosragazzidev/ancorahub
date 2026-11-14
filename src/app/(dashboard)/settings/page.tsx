@@ -139,7 +139,7 @@ export default async function SettingsPage() {
             { id: "notificacoes", title: "Notificações", description: "Avisos no celular e no navegador", node: <div className="rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)"><PushNotificationManager variant="compact" /></div> },
             { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} /> },
             ...(extensionPilot ? [{ id: "extensao" as const, title: "Extensão para o WhatsApp Web", description: "Atendimento contextual no navegador", node: extension }] : []),
-            { id: "acessibilidade", title: "Acessibilidade", description: "Texto maior, menos animação e alto contraste", node: <AccessibilityPreferences /> },
+            { id: "acessibilidade", title: "Acessibilidade", description: "Texto maior, animação, som e vibração", node: <AccessibilityPreferences /> },
           ]}
           footer={<ManagerLiteSettingsFooter />}
         />
@@ -180,7 +180,7 @@ export default async function SettingsPage() {
           { id: "whatsapp", title: "WhatsApp pessoal", description: "O número que você usa no atendimento", node: <LightWhatsappSection connected={whatsappConnection?.status === "ready"} status={whatsappConnection?.status ?? "disconnected"} /> },
           { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} /> },
           ...(extensionPilot ? [{ id: "extensao" as const, title: "Extensão para o WhatsApp Web", description: "Atendimento contextual no navegador", node: extension }] : []),
-          { id: "acessibilidade", title: "Acessibilidade", description: "Texto maior, menos animação e alto contraste", node: <AccessibilityPreferences /> },
+          { id: "acessibilidade", title: "Acessibilidade", description: "Texto maior, animação, som e vibração", node: <AccessibilityPreferences /> },
         ]}
       />
     );

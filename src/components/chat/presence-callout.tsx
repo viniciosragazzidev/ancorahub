@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
+import { fireFeedback } from "@/lib/feedback/use-feedback";
 
 import { AssistantAvatar } from "./assistant-avatar";
 import { CameraCapture, canUseInPageCamera } from "./camera-capture";
@@ -136,7 +137,7 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
       const at = hhmm(new Date().toISOString());
       setState(result.awaitingRelease ? { kind: "waiting", preview } : { kind: "done", preview, at });
       if (viaGuide) setWhatsapp((current) => (current ? { ...current, stage: result.awaitingRelease ? "waiting" : "done", confirmedAt: at } : current));
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(30);
+      fireFeedback("confirm");
       // Pelo roteiro, a tela atualiza quando o corretor sai dele ("Ir para o Plantão").
       if (!viaGuide) window.setTimeout(() => router.refresh(), 1600);
     } catch (error) {

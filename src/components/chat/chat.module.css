@@ -7,6 +7,7 @@
   --chat-action: oklch(62% 0.2 255);
   --chat-action-strong: oklch(55% 0.21 258);
   --chat-action-soft: oklch(62% 0.2 255 / 0.1);
+  --chat-action-base: oklch(46% 0.19 260);
   --chat-unread: oklch(62% 0.2 255);
   --chat-online: oklch(68% 0.17 150);
   /* Tip bubble (Dicas de Atendimento): soft yellow; the label passes 4.5:1 on it. */
@@ -23,6 +24,7 @@
   --chat-action: oklch(70% 0.17 255);
   --chat-action-strong: oklch(76% 0.15 255);
   --chat-action-soft: oklch(70% 0.17 255 / 0.16);
+  --chat-action-base: oklch(58% 0.17 258);
   --chat-unread: oklch(70% 0.17 255);
   --chat-tip: oklch(30% 0.05 85);
   --chat-tip-border: oklch(44% 0.07 85);

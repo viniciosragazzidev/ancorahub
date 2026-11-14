@@ -4,8 +4,7 @@ import { startTransition, useCallback, useEffect, useRef, useState } from "react
 import { useRouter } from "next/navigation";
 import { IncomingLeadCard } from "@/components/notifications/incoming-lead-card";
 import { DynamicNotice, type DynamicNoticeItem } from "@/components/chat/dynamic-notice";
-import { playSound } from "@/lib/sounds/player";
-import { notificationSound } from "@/lib/sounds/recipes";
+import { fireFeedback } from "@/lib/feedback/use-feedback";
 import {
   createIncomingLeadQueueState,
   enqueueIncomingLead,
@@ -406,7 +405,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   useEffect(() => {
     if (leadNoticeStyle !== "dynamic" || !currentIncoming || soundedRef.current === currentIncoming.notificationId) return;
     soundedRef.current = currentIncoming.notificationId;
-    try { playSound(notificationSound, { volume: 0.8 }); } catch { /* the browser may need a gesture first */ }
+    fireFeedback("notify"); // som e vibração de lead novo, conforme as preferências (FEEDBACK.md)
   }, [currentIncoming, leadNoticeStyle]);
 
   // Journey celebrations wait while an offer is on screen (an offer always wins).

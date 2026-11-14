@@ -1,9 +1,31 @@
 "use client";
 
 import { useId } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion, type TargetAndTransition, type Transition } from "motion/react";
+
+import { motionTokens } from "@/components/arc/motion-tokens";
 
 import type { MascotShape } from "./types";
+
+export type MascotMood = "idle" | "alert" | "thinking" | "cheer";
+
+/** Uma passada de cada humor. Os tempos e alturas saem de motionTokens.mascot. */
+function moodMotion(mood: MascotMood, reduce: boolean | null): { animate: TargetAndTransition; transition: Transition } {
+  const m = motionTokens.mascot;
+  const ease: [number, number, number, number] = [...motionTokens.ease.standard];
+  if (reduce || mood === "idle" || mood === "thinking") return { animate: { y: 0, scaleX: 1, scaleY: 1 }, transition: { duration: 0 } };
+  if (mood === "alert") {
+    return {
+      animate: { y: [0, -m.alertLift, 0], scaleX: [1, 1.04, 1], scaleY: [1, 1.04, 1] },
+      transition: { duration: m.alert, ease },
+    };
+  }
+  // cheer: agacha, salta e assenta (squash and stretch), uma vez.
+  return {
+    animate: { y: [0, 1, -m.cheerLift, 0], scaleX: [1, 1.06, 0.97, 1], scaleY: [1, 0.92, 1.04, 1] },
+    transition: { duration: m.cheer, times: [0, 0.25, 0.55, 1], ease },
+  };
+}
 
 const SHAPES: Record<Exclude<MascotShape, "logo">, string> = {
   // 64x64 viewBox; every body leaves room under it for the soft shadow.
@@ -42,6 +64,7 @@ export function AssistantAvatar({
   hue,
   size = 44,
   state = "idle",
+  mood = "idle",
   initials,
   temperature,
   label,
@@ -50,6 +73,12 @@ export function AssistantAvatar({
   hue: number | null;
   size?: number;
   state?: "idle" | "working" | "waiting";
+  /**
+   * Reação ao que aconteceu (docs/design-system/FEEDBACK.md §6), uma passada por troca:
+   * alert (chegou algo), thinking (esperando servidor ou IA), cheer (nível 2 ou 3). Com movimento
+   * reduzido, só a pose final parada (o olhar de "pensando"), sem saltos.
+   */
+  mood?: MascotMood;
   /** Lead conversations show initials instead of a mascot. */
   initials?: string;
   temperature?: "hot" | "warm" | "cold" | null;
@@ -118,17 +147,24 @@ export function AssistantAvatar({
           </radialGradient>
         </defs>
         <ellipse cx="32" cy="55" rx="17" ry="3" fill={`oklch(40% 0.08 ${h} / 0.18)`} />
-        <path d={body} fill={`url(#b${id})`} />
-        <path d={body} fill={`url(#g${id})`} />
-        <motion.g
-          animate={!reduce ? { scaleY: [1, 1, 0.15, 1, 1] } : undefined}
-          transition={!reduce ? { duration: 4.2, repeat: Infinity, times: [0, 0.9, 0.93, 0.96, 1] } : undefined}
-          style={{ transformOrigin: "32px 36px" }}
-        >
-          <ellipse cx="26.5" cy="36" rx="2.4" ry="3.4" fill={`oklch(28% 0.06 ${h})`} />
-          <ellipse cx="37.5" cy="36" rx="2.4" ry="3.4" fill={`oklch(28% 0.06 ${h})`} />
+        <motion.g key={mood} data-mood={mood} {...moodMotion(mood, reduce)} style={{ transformOrigin: "32px 50px" }}>
+          <path d={body} fill={`url(#b${id})`} />
+          <path d={body} fill={`url(#g${id})`} />
+          <motion.g
+            animate={mood === "thinking" ? { x: motionTokens.mascot.thinkingGaze, y: -motionTokens.mascot.thinkingGaze } : { x: 0, y: 0 }}
+            transition={{ duration: reduce ? 0 : motionTokens.duration.standard, ease: [...motionTokens.ease.standard] }}
+          >
+            <motion.g
+              animate={!reduce ? { scaleY: [1, 1, 0.15, 1, 1] } : undefined}
+              transition={!reduce ? { duration: 4.2, repeat: Infinity, times: [0, 0.9, 0.93, 0.96, 1] } : undefined}
+              style={{ transformOrigin: "32px 36px" }}
+            >
+              <ellipse cx="26.5" cy="36" rx="2.4" ry="3.4" fill={`oklch(28% 0.06 ${h})`} />
+              <ellipse cx="37.5" cy="36" rx="2.4" ry="3.4" fill={`oklch(28% 0.06 ${h})`} />
+            </motion.g>
+          </motion.g>
+          {shape === "jack" ? <PirateGear /> : null}
         </motion.g>
-        {shape === "jack" ? <PirateGear /> : null}
       </motion.svg>
       {state === "waiting" ? (
         <span aria-hidden="true" style={{ position: "absolute", right: 0, top: 0, width: Math.max(8, size * 0.2), height: Math.max(8, size * 0.2), borderRadius: 999, background: "oklch(62% 0.2 255)", boxShadow: "0 0 0 2px var(--surface)" }} />

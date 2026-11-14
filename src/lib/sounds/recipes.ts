@@ -193,3 +193,43 @@ export const warningSound: Patch = {
     },
   ],
 };
+
+/**
+ * Milestone sound — three soft notes going up (sol, si, mi), ~0.55s.
+ * Levels 2 and 3 of docs/design-system/FEEDBACK.md: daily goal hit, sale registered, level up.
+ * Warmer than the tap and never in a loop.
+ */
+export const milestoneSound: Patch = {
+  layers: [
+    {
+      type: "sine",
+      frequency: 784,
+      gain: 0.32,
+      envelope: { attack: 0.006, hold: 0.02, decay: 0.16, sustain: 0, release: 0.08 },
+      filter: { type: "lowpass", frequency: 3200, Q: 0.7 },
+    },
+    {
+      type: "sine",
+      frequency: 988,
+      gain: 0.32,
+      delay: 0.09,
+      envelope: { attack: 0.006, hold: 0.02, decay: 0.18, sustain: 0, release: 0.1 },
+      filter: { type: "lowpass", frequency: 3200, Q: 0.7 },
+    },
+    {
+      type: "sine",
+      frequency: 1319,
+      gain: 0.26,
+      delay: 0.18,
+      envelope: { attack: 0.008, hold: 0.03, decay: 0.26, sustain: 0.04, release: 0.16 },
+      filter: { type: "lowpass", frequency: 3600, Q: 0.7 },
+    },
+    {
+      type: "sine",
+      frequency: 2638,
+      gain: 0.05,
+      delay: 0.18,
+      envelope: { attack: 0.01, hold: 0, decay: 0.2, sustain: 0, release: 0.12 },
+    },
+  ],
+};

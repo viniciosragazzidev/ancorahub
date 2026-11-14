@@ -3,6 +3,7 @@
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
+import { fireFeedback } from "@/lib/feedback/use-feedback";
 
 import { AssistantAvatar } from "@/components/chat/assistant-avatar";
 import { openWhatsAppApp } from "@/components/whatsapp/open-whatsapp-app";
@@ -280,7 +281,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
     try {
       if (!navigator.clipboard) throw new Error("clipboard");
       await navigator.clipboard.writeText(connection.code.replace(/[^A-Z0-9]/gi, ""));
-      if ("vibrate" in navigator) navigator.vibrate?.(20);
+      fireFeedback("tap");
       setCopied(true);
     } catch {
       setLocal("copyBlocked");

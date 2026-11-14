@@ -14,6 +14,11 @@
   --motion-duration-fast: 160ms;
   --motion-duration-exit: 180ms;
   --motion-duration-standard: 240ms;
+  --motion-duration-celebrate: 1400ms;
+  --motion-beat-text: 80ms;
+  --motion-beat-number: 160ms;
+  --motion-shake-distance: 4px;
+  --motion-duration-shake: 250ms;
   --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
   --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
