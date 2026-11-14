@@ -132,3 +132,7 @@
   .nowDesktop { display: grid; margin: 6px 0 8px; }
 }
 
+
+/* Início organizado (BROKER_HOME_ACTIONS). */
+.weekAtEnd { padding-top: 14px; }
+.centerActions { width: 100%; max-width: 560px; padding-inline: 0; }

@@ -45,6 +45,7 @@ type CustomersSearchParams = {
   contract?: string;
   return?: string;
   situacao?: string;
+  adicionar?: string;
 };
 
 /**
@@ -86,6 +87,7 @@ async function renderBrokerMyWallet(context: TenantContext, searchParams: Custom
       clients={leadView ? undefined : clients}
       addContactAction={hasPermission(context.role, "criar_lead_manual") ? createBrokerWalletContactAction : undefined}
       addPriorClientAction={priorPortfolio ? createPriorClientAction : undefined}
+      openAddContact={searchParams.adicionar === "1"}
     />
   );
 }

@@ -28,8 +28,8 @@ export type BrokerWalletAddContactAction = (input: Draft & { consentimentoLgpd: 
  * migration da DEC-187, **Cliente que já possuo**. O que foi digitado fica no painel quando há erro ou aviso de
  * duplicidade; trocar de opção não apaga o rascunho da outra.
  */
-export function BrokerWalletAddContact({ action, priorAction }: { action: BrokerWalletAddContactAction; priorAction?: PriorClientAction }) {
-  const [open, setOpen] = useState(false);
+export function BrokerWalletAddContact({ action, priorAction, defaultOpen = false }: { action: BrokerWalletAddContactAction; priorAction?: PriorClientAction; /** Novo contato pelas Ações rápidas do Início (?adicionar=1). */ defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [kind, setKind] = useState<"lead" | "prior">("lead");
   const [created, setCreated] = useState(false);
   const [round, setRound] = useState(0);

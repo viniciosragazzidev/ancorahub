@@ -1,0 +1,14 @@
+/* Ações rápidas do Início: quatro atalhos fixos, ícone em círculo do tema e o nome embaixo. */
+.root { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 4px 20px 14px; }
+.title { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); font-weight: 600; }
+.grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.grid[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.action { display: grid; justify-items: center; align-content: start; gap: 6px; width: 100%; min-height: 84px; padding: 12px 4px 10px; border: 0; border-radius: var(--radius-panel, 1.5rem); background: var(--surface-muted); color: var(--foreground); font: inherit; text-align: center; text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color var(--duration-fast, 160ms) var(--ease-standard, ease), transform var(--duration-fast, 160ms) var(--ease-standard, ease); }
+.action:hover { background: color-mix(in oklab, var(--foreground) 6%, var(--surface-muted)); }
+.action:active { transform: scale(0.97); }
+.action:focus-visible { outline: 2px solid var(--chat-action-text, #2563eb); outline-offset: 2px; }
+.icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px; background: var(--chat-action-soft, var(--surface)); color: var(--chat-action-text, var(--foreground)); }
+.icon svg { width: 20px; height: 20px; }
+.label { font-size: 12px; font-weight: 600; line-height: 1.25; }
+@media (max-width: 359px) { .root { padding-inline: 16px; } .grid { gap: 6px; } .action { min-height: 78px; } .label { font-size: 11px; } }
+@media (prefers-reduced-motion: reduce) { .action { transition: none; } .action:active { transform: none; } }

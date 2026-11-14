@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -38,6 +38,7 @@ import type { WhatsAppActivitySummary } from "@/features/dashboard/whatsapp-acti
 import { WhatsAppActivityCard } from "@/features/dashboard/components/whatsapp-activity-card";
 import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
 import { BrokerHomeOverview } from "./broker-home-overview";
+import { HomeQuickActions, homeQuickActions } from "./home-quick-actions";
 
 type Tab = "assistentes" | "leads";
 
@@ -177,6 +178,8 @@ export function ChatHome({
   whatsappActivity = null,
   showWhatsAppStatus = true,
   nowFloatingEnabled = false,
+  homeActions = false,
+  financeCard = null,
 }: {
   viewerName: string;
   assistants: ThreadSummary[];
@@ -199,6 +202,10 @@ export function ChatHome({
   showWhatsAppStatus?: boolean;
   /** Server-controlled presentation switch; disabling restores the inline block. */
   nowFloatingEnabled?: boolean;
+  /** Início organizado (BROKER_HOME_ACTIONS): Ações rápidas, Meu mês e Sua semana no fim. */
+  homeActions?: boolean;
+  /** Cartão Meu mês (financeiro do próprio corretor), só quando o módulo financeiro está liberado. */
+  financeCard?: ReactNode;
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const reduce = useReducedMotion();
@@ -227,6 +234,9 @@ export function ChatHome({
   const waitingAssistants = assistants.filter((thread) => thread.waitingYou);
   const currentPresenceAsks = presenceAsks ?? (presence ? [presence] : []);
   const hasPriority = hasNowItems || Boolean(next?.urgent) || currentPresenceAsks.some((ask) => ask.status !== "confirmed");
+  // Início organizado: só para o corretor, nunca para supervisor ou gestor.
+  const organized = homeActions && !isSupervisor && !isManager;
+  const quickActions = organized ? homeQuickActions({ canQuote }) : [];
 
   const list = (
     <>
@@ -279,9 +289,12 @@ export function ChatHome({
       {mode === "page" && !redesigned ? <PresenceCalloutList asks={currentPresenceAsks} /> : null}
       {mode === "page" && !redesigned && !floatingNow && summary?.now ? <NowSection data={summary.now} mobile /> : null}
       {mode === "page" && whatsappActivity ? <div className="px-4 pb-4"><WhatsAppActivityCard activity={whatsappActivity} /></div> : null}
+      {mode === "page" && !redesigned && organized ? <HomeQuickActions actions={quickActions} after={financeCard} /> : null}
       {mode === "page" && !redesigned && firstSteps ? <FirstStepsCard steps={firstSteps} className={home.firstSteps} /> : null}
-      {mode === "page" && !redesigned && highlights ? <WeekRanking data={highlights} /> : null}
+      {mode === "page" && !redesigned && highlights && !organized ? <WeekRanking data={highlights} /> : null}
       {list}
+      {/* Organizado: Sua semana desce para o fim, depois do trabalho. */}
+      {mode === "page" && !redesigned && highlights && organized ? <WeekRanking data={highlights} className={home.weekAtEnd} /> : null}
     </aside>
   );
 
@@ -354,6 +367,8 @@ export function ChatHome({
             <Link href={nextLead.href} className={styles.pill} style={{ marginTop: 6 }}>{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link>
           ) : null}
 
+          {organized ? <HomeQuickActions actions={quickActions} className={home.centerActions} after={financeCard} /> : null}
+
           {stats.length ? (
             <ul className={home.stats}>
               {stats.map((stat, index) => (
@@ -410,7 +425,7 @@ export function ChatHome({
           <Link href={next.href} className={styles.pill} data-tour="home-pill" aria-label={`A próxima coisa é: ${next.label}. ${next.detail}`}>{next.urgent ? <span className={home.urgentDot} aria-hidden="true" /> : null}{next.label}</Link>
         ) : nextLead ? (
           <Link href={nextLead.href} className={styles.pill} data-tour="home-pill">{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link>
-        ) : (
+        ) : organized ? null : (
           <button type="button" className={styles.pill} data-tour="home-pill" onClick={() => setNewOpen(true)}><PlusIcon /> {isSupervisor ? "Ações da equipe" : "Novo atendimento"}</button>
         )}
       </div>}

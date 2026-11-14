@@ -107,7 +107,7 @@ export async function ChatHomeContent() {
   // same tenant and user, both come from the authenticated context).
   const context = await getRequiredTenantContext().catch(() => null);
   if (!context) return <LightDashboardUnavailable />;
-  const [rail, data, highlights, journey, firstSteps, floatingNow, journeyFlag] = await Promise.all([
+  const [rail, data, highlights, journey, firstSteps, floatingNow, journeyFlag, homeActionsFlag] = await Promise.all([
     getChatRailData(),
     getCachedBrokerWorkspaceData().catch(() => null),
     getBrokerHighlights(context.tenantId, context.userId).catch(() => null),
@@ -115,6 +115,7 @@ export async function ChatHomeContent() {
     getFirstSteps(context.tenantId, context.userId).catch(() => null),
     context.role === "broker" ? getFeatureFlag(FEATURE_FLAGS.BROKER_NOW_FLOATING).catch(() => "false") : Promise.resolve("false"),
     getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false"),
+    context.role === "broker" ? getFeatureFlag(FEATURE_FLAGS.BROKER_HOME_ACTIONS).catch(() => FEATURE_FLAGS.BROKER_HOME_ACTIONS.defaultValue) : Promise.resolve("false"),
   ]);
   if (!rail || !data) return <LightDashboardUnavailable />;
   return (
@@ -125,6 +126,7 @@ export async function ChatHomeContent() {
       nowIso={rail.nowIso}
       canQuote={rail.canQuote}
       nowFloatingEnabled={floatingNow === "true"}
+      homeActions={homeActionsFlag === "true"}
       summary={{ ...summaryOf(data), next: presenceNext(data) ?? nextActionOf(data.nextAction, journey) }}
       presence={presenceAskOf(data)}
       presenceAsks={presenceAsksOf(data)}

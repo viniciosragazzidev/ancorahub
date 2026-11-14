@@ -217,6 +217,11 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Mostra o vídeo de boas-vindas (1 min) no primeiro acesso do corretor ao app Lite.",
   },
+  BROKER_HOME_ACTIONS: {
+    key: "feature_broker_home_actions_enabled", scope: "global", defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Início do corretor organizado: Ações rápidas (Registrar venda, Novo contato, Cotação, Minha agenda), cartão Meu mês quando o financeiro está liberado e Sua semana no fim; sai o botão flutuante repetido de novo atendimento. Desligada, volta o Início anterior.",
+  },
   BROKER_NAV_REORG: {
     key: "feature_broker_navigation_reorg_enabled", scope: "global", defaultValue: "true",
     allowedValues: ["true", "false"] as const,
