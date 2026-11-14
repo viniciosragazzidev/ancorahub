@@ -84,3 +84,19 @@ export function useFeedback() {
   const motion = useInterfaceMotionEnabled();
   return useCallback((kind: FeedbackKind, options?: FeedbackOptions) => fireFeedback(kind, options, motion), [motion]);
 }
+
+const firedOnce = new Map<string, FeedbackPlan>();
+
+/**
+ * Para momentos que aparecem uma vez (celebração da jornada): dispara só na primeira chamada com a
+ * mesma chave e devolve o mesmo plano nas seguintes (re-render e StrictMode não tocam de novo nem
+ * gastam o limite do dia duas vezes).
+ */
+export function fireFeedbackOnce(key: string, kind: FeedbackKind, options?: FeedbackOptions, motion?: boolean): FeedbackPlan {
+  const known = firedOnce.get(key);
+  if (known) return known;
+  const plan = fireFeedback(kind, options, motion);
+  firedOnce.set(key, plan);
+  if (firedOnce.size > 100) firedOnce.delete(firedOnce.keys().next().value as string);
+  return plan;
+}

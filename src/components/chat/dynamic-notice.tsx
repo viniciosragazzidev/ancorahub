@@ -131,7 +131,8 @@ function Notice({ item, queuedCount, reduce, onOpen, onDismiss }: { item: Dynami
             transition={{ duration: 0.2, delay: reduce ? 0 : 0.08 }}
           >
             <div className={styles.body}>
-              <AssistantAvatar shape={item.shape} hue={item.hue} size={40} state="waiting" />
+              {/* Mascote atento: um salto curto quando o aviso abre (FEEDBACK.md, lead novo). */}
+              <AssistantAvatar shape={item.shape} hue={item.hue} size={40} state="waiting" mood="alert" />
               <div className={styles.text}>
                 <div className={styles.top}>
                   <span className={styles.app}>{item.app}</span>

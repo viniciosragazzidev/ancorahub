@@ -35,9 +35,10 @@ describe("AcceptLeadButton", () => {
     finish({ success: false, error: "Oferta encerrada." });
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Oferta encerrada"));
     expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.error).not.toHaveBeenCalled();
     mocks.accept.mockResolvedValueOnce({ success: true });
-    // O rótulo otimista volta quando a transição termina, um instante depois do alerta.
-    fireEvent.click(await screen.findByRole("button", { name: "Aceitar e chamar" }));
+    // Depois de 1,4 s em vermelho, o botão volta como "Tentar de novo" (FEEDBACK.md §4).
+    fireEvent.click(await screen.findByRole("button", { name: "Tentar de novo" }, { timeout: 3000 }));
     await waitFor(() => expect(mocks.accept).toHaveBeenCalledTimes(2));
   });
 
@@ -62,37 +63,42 @@ describe("AcceptLeadButton", () => {
     render(<AcceptLeadButton leadId="l1">Aceitar e chamar no WhatsApp</AcceptLeadButton>);
 
     fireEvent.click(screen.getByRole("button", { name: "Aceitar e chamar no WhatsApp" }));
-    await waitFor(() => expect(mocks.error).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Este lead já foi assumido por outro corretor."));
+    // O erro fica junto do botão; sem toast duplicando.
+    expect(mocks.error).not.toHaveBeenCalled();
     expect(tab.close).toHaveBeenCalled();
     expect(mocks.push).not.toHaveBeenCalled();
     expect(mocks.refresh).toHaveBeenCalled();
   });
 
-  it("mostra o lead como aceito na hora e volta ao rótulo original se o servidor recusar", async () => {
+  it("mostra Aceitando… na hora, fica vermelho se o servidor recusar e volta como Tentar de novo", async () => {
     vi.spyOn(window, "open").mockReturnValue(fakeTab() as unknown as Window);
     let finish: (value: { success: false; error: string }) => void = () => {};
     mocks.accept.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
     render(<AcceptLeadButton appearance="shared" leadId="l1">Aceitar e chamar</AcceptLeadButton>);
     const button = screen.getByRole("button", { name: "Aceitar e chamar" });
     fireEvent.click(button);
-    await waitFor(() => expect(button.textContent).toContain("Lead aceito"));
+    await waitFor(() => expect(button.textContent).toContain("Aceitando…"));
+    expect(button.textContent).not.toContain("Lead aceito");
     expect(button.getAttribute("data-state")).toBe("accepted");
     expect((button as HTMLButtonElement).disabled).toBe(true);
     finish({ success: false, error: "Este lead já foi assumido por outro corretor." });
-    await waitFor(() => expect(button.textContent).toBe("Aceitar e chamar"));
-    expect(button.getAttribute("data-state")).toBeNull();
+    await waitFor(() => expect(button.getAttribute("data-state")).toBe("error"));
+    expect(button.textContent).toBe("Não deu certo");
     expect(screen.getByRole("alert").textContent).toContain("Este lead já foi assumido por outro corretor.");
+    await waitFor(() => expect(button.textContent).toBe("Tentar de novo"), { timeout: 3000 });
+    expect(button.getAttribute("data-state")).toBeNull();
   });
   it("arco até Leads: só com arcToLeads e só depois do aceite confirmado", async () => {
     vi.spyOn(window, "open").mockReturnValue(fakeTab() as unknown as Window);
     mocks.accept.mockResolvedValueOnce({ success: false, error: "Oferta encerrada." });
     render(<AcceptLeadButton appearance="shared" leadId="l1" arcToLeads>Aceitar e chamar</AcceptLeadButton>);
     fireEvent.click(screen.getByRole("button", { name: "Aceitar e chamar" }));
-    await waitFor(() => expect(mocks.error).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     expect(mocks.fly).not.toHaveBeenCalled();
 
     mocks.accept.mockResolvedValueOnce({ success: true });
-    const button = await screen.findByRole("button", { name: "Aceitar e chamar" });
+    const button = await screen.findByRole("button", { name: "Tentar de novo" }, { timeout: 3000 });
     fireEvent.click(button);
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/leads/l1"));
     expect(mocks.fly).toHaveBeenCalledTimes(1);

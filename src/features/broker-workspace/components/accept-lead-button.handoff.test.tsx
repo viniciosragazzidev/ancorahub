@@ -83,7 +83,8 @@ describe("AcceptLeadButton com o aceite com contador", () => {
     render(<AcceptLeadButton leadId="l1">Aceitar lead</AcceptLeadButton>);
 
     fireEvent.click(screen.getByRole("button", { name: "Aceitar lead" }));
-    await waitFor(() => expect(mocks.error).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Outro corretor já aceitou."));
+    expect(mocks.error).not.toHaveBeenCalled();
     expect(mocks.go).not.toHaveBeenCalled();
     expect(mocks.leave).not.toHaveBeenCalled();
     expect(mocks.report).not.toHaveBeenCalled();

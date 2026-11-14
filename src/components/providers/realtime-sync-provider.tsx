@@ -4,6 +4,7 @@ import { startTransition, useCallback, useEffect, useRef, useState } from "react
 import { useRouter } from "next/navigation";
 import { IncomingLeadCard } from "@/components/notifications/incoming-lead-card";
 import { DynamicNotice, type DynamicNoticeItem } from "@/components/chat/dynamic-notice";
+import { leadNoticeTitle } from "@/components/chat/notice-titles";
 import { fireFeedback } from "@/lib/feedback/use-feedback";
 import {
   createIncomingLeadQueueState,
@@ -416,7 +417,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   }, [offerActive]);
 
   const noticeItem: DynamicNoticeItem | null = currentIncoming
-    ? { id: currentIncoming.notificationId, app: "Leads", title: currentIncoming.title, message: currentIncoming.message, actionLabel: "Atender", shape: "mochi", hue: 212, pillLabel: "Lead novo" }
+    ? { id: currentIncoming.notificationId, app: "Leads", title: leadNoticeTitle(currentIncoming.notificationId, currentIncoming.title), message: currentIncoming.message, actionLabel: "Atender", shape: "mochi", hue: 212, pillLabel: "Lead novo" }
     : null;
   const incomingQueue = incomingLeads.queue;
   const findIncoming = useCallback((notice: DynamicNoticeItem) => incomingQueue.find((item) => item.notificationId === notice.id) ?? null, [incomingQueue]);
