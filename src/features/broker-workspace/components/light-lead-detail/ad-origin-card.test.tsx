@@ -17,7 +17,22 @@ describe("cartão De onde veio", () => {
     expect(card).toHaveTextContent("Amil custo-benefício, a partir de R$ 89");
     expect(card).toHaveTextContent("O que o cliente viu");
     expect(screen.getByRole("img", { name: "Anúncio: Plano a partir de R$ 89" })).toHaveAttribute("src", "https://cdn.example/a.jpg");
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ampliar imagem do anúncio" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ver texto completo" })).not.toBeInTheDocument();
+  });
+
+  it("toca na imagem e ela abre em tela cheia; Escape ou fechar voltam ao cartão", () => {
+    render(<AdOriginCard ad={{ entry: "form", offer: null, title: "Plano a partir de R$ 89", body: null, mediaType: "image", imageUrl: "https://cdn.example/a.jpg" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Ampliar imagem do anúncio" }));
+    const dialog = screen.getByRole("dialog", { name: "Anúncio: Plano a partir de R$ 89" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog.querySelector("img")).toHaveAttribute("src", "https://cdn.example/a.jpg");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ampliar imagem do anúncio" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fechar imagem" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("sem anúncio não mostra nada", () => {
