@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { useSuccessOverlay } from "@/components/motion/success-overlay";
+import { normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 import { startLeadServiceAction } from "@/app/(dashboard)/leads/[id]/service-action";
 import { declineLeadAction } from "@/features/leads/decline-action";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
@@ -49,7 +51,9 @@ export function useLeadDetail({
   documents: ConfirmationDocument[];
   initialDetailsExpanded?: boolean;
 }) {
-    const { celebrate: celebrateSuccess, node: successOverlay } = useSuccessOverlay();
+    // Aceite é nível 1 (FEEDBACK.md): sem overlay; o nó continua exportado para quem ainda o monta.
+    const { node: successOverlay } = useSuccessOverlay();
+    const fire = useFeedback();
     const router = useRouter();
     const [accepted, setAccepted] = useState(lead.status !== "distributed" && lead.status !== "new");
     const [leadStatus, setLeadStatus] = useState(lead.status);
@@ -159,6 +163,7 @@ export function useLeadDetail({
     // Handle Accept Lead: one tap accepts and opens the client's WhatsApp (the tab opens inside the click).
     function handleAccept() {
       if (accepting || accepted) return;
+      fire("tap");
       const formData = new FormData();
       formData.append("leadId", lead.id);
       // Aceite com contador (11/11): ligado, nada abre no clique; o quadro conta 30 s e abre. Só no
@@ -177,13 +182,15 @@ export function useLeadDetail({
 
         if (!res?.success) {
           whatsapp.cancel();
-          toast.error(res?.error ?? "Não deu para aceitar agora. Tente de novo; se o lead sumir, outro corretor já pegou.");
+          fire("error");
+          toast.error(res?.error ? normalizeActionError({ error: res.error }, "Não deu para aceitar agora").cause : "Não deu para aceitar agora. Tente de novo; se o lead sumir, outro corretor já pegou.");
           // The accept may have been recorded before the failure: the refresh shows the real state.
           router.refresh();
           return;
         }
 
         setAccepted(true);
+        fire("confirm");
         setLeadStatus("in_contact");
         // The phone is not in the payload before acceptance: reload so WhatsApp and Ligar get it.
         router.refresh();
@@ -195,7 +202,6 @@ export function useLeadDetail({
           setHandoffUrl(url);
           return;
         }
-        celebrateSuccess("Lead aceito");
         // Celular: se a página continuar visível (o app não abriu), o quadro pede o toque.
         const leave = url && device === "mobile" ? watchWhatsAppLeave() : null;
         if (url && whatsapp.go(url)) {

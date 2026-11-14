@@ -2,7 +2,7 @@
 
 Data: 14/11/2026 · Dono: Vinicios · Padrão: `docs/design-system/FEEDBACK.md`
 Relatórios e protótipo: `reports/design/feedback-duolingo-2026-11-14/`. O protótipo `aceitar-lead-exemplo.html` é a referência visual e de tempo do botão de ação e do aceite.
-Status: **fase 0 entregue em 14/11/2026** (branch `feat/feedback-padrao`); fases 1 a 7 pendentes. Cada fase abaixo é uma branch própria, com revisão visual antes do merge.
+Status: **fases 0 e 1 entregues em 14/11/2026** (branch `feat/feedback-padrao`); fases 2 a 7 pendentes. Vitrine para testar: `/dev/feedback` (só em desenvolvimento). Cada fase abaixo é uma branch própria, com revisão visual antes do merge.
 
 Frequência: estimada pelo papel de cada tela, não por métrica. N0 a N3 = níveis do §3 do padrão.
 
@@ -40,7 +40,10 @@ Entregue: tokens (`beat`, `shake`, `celebration`, `mascot`, `duration.celebrate`
 
 ---
 
-## Fase 1 · Lite do corretor: aceite e eventos
+## Fase 1 · Lite do corretor: aceite e eventos · ENTREGUE 14/11/2026
+
+Entregue: `AcceptLeadButton` com "Aceitando…" (sem o otimista "Lead aceito"), check só depois do servidor, falha em vermelho com X, balanço, causa abaixo e volta como "Tentar de novo" após 1,4 s, base sólida verde e pressão; sem toast de erro duplicado (os toasts de sucesso com "Abrir de novo" do WhatsApp ficam, por serem trabalho externo). Aceite na ficha sem overlay, com toque, confirmação e erro via `useFeedback`. Aviso de lead novo com o mascote atento e títulos que variam sem repetir o último (`chat/notice-titles.ts`, só troca o título genérico). Celebrações da jornada: pontos e missão como nível 2 com limite diário, conquista e nível como nível 3, mola `celebrate`, confete só no nível 3. Vitrine `/dev/feedback`. Ficou para depois: as quatro superfícies do aceite seguem o visual verde aprovado em 14/11, e não o `LiteActionButton` azul; o SLA em risco não mudou (já é só texto e cor).
+
 
 | Fluxo | Onde | Nível | Mudança |
 |---|---|---|---|

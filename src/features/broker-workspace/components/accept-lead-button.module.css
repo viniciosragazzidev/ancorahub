@@ -16,7 +16,9 @@
   border-radius: 9999px;
   background: color-mix(in oklab, var(--success) 85%, black);
   color: var(--success-foreground);
-  box-shadow: 0 8px 20px color-mix(in oklab, var(--success) 28%, transparent);
+  /* Base sólida (FEEDBACK.md §4): um tom mais escuro do mesmo verde, que encolhe quando o botão afunda. */
+  box-shadow: 0 3px 0 color-mix(in oklab, var(--success) 55%, black), 0 8px 20px color-mix(in oklab, var(--success) 28%, transparent);
+  transform: translateY(0);
   font: inherit;
   font-size: var(--text-sm);
   font-weight: 600;
@@ -26,7 +28,7 @@
   opacity: 1;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color var(--duration-fast, 250ms) var(--ease-standard, ease-out), box-shadow var(--duration-fast, 250ms) var(--ease-standard, ease-out);
+  transition: background-color var(--duration-fast, 250ms) var(--ease-standard, ease-out), box-shadow 100ms var(--ease-standard, ease-out), transform 100ms var(--ease-standard, ease-out);
 }
 
 .icon {
@@ -57,13 +59,18 @@
 @media (hover: hover) and (pointer: fine) {
   .accept.accept:hover:not(:disabled) {
     background: color-mix(in oklab, var(--success) 75%, black);
-    box-shadow: 0 10px 24px color-mix(in oklab, var(--success) 36%, transparent);
+    box-shadow: 0 3px 0 color-mix(in oklab, var(--success) 55%, black), 0 10px 24px color-mix(in oklab, var(--success) 36%, transparent);
     opacity: 1;
   }
   .accept:hover:not(:disabled) .icon { transform: scale(1.08); }
 }
 
-.accept.accept:active:not(:disabled) { background: color-mix(in oklab, var(--success) 70%, black); opacity: 1; }
+.accept.accept:active:not(:disabled) {
+  background: color-mix(in oklab, var(--success) 70%, black);
+  opacity: 1;
+  transform: translateY(2px) scale(0.98);
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--success) 55%, black), 0 4px 12px color-mix(in oklab, var(--success) 22%, transparent);
+}
 
 .accept.accept:focus-visible {
   outline: 2px solid color-mix(in oklab, var(--success) 70%, transparent);
@@ -72,7 +79,21 @@
 
 /* Aceito (otimista ou confirmado): continua verde, só trava; o check do LiteSuccess ocupa o lugar do ícone. */
 .accept.accept[data-state="accepted"] { padding: 0 20px; cursor: default; opacity: 1; }
-.accept.accept[aria-busy="true"] { cursor: progress; }
+.accept.accept[aria-busy="true"] { cursor: progress; transform: translateY(1px); box-shadow: 0 2px 0 color-mix(in oklab, var(--success) 55%, black); }
+
+/* Falhou (FEEDBACK.md §4): vermelho com X e um balanço curto; depois de 1,4 s volta como "Tentar de novo". */
+.accept.accept[data-state="error"] {
+  padding: 0 20px;
+  background: var(--danger);
+  color: white;
+  box-shadow: 0 3px 0 color-mix(in oklab, var(--danger) 60%, black);
+}
+.accept.accept[data-state="error"][data-motion="on"] { animation: acceptShake 250ms cubic-bezier(0.65, 0, 0.35, 1) both; }
+
+@keyframes acceptShake {
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
 
 /* Desligado de verdade (oferta encerrada): cinza, sem sombra, ainda com forma de botão. */
 .accept.accept:disabled:not([data-state="accepted"]):not([aria-busy="true"]) {
@@ -118,9 +139,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   .accept.accept, .icon { transition: none; }
+  .accept.accept:active:not(:disabled), .accept.accept[aria-busy="true"] { transform: none; }
+  .accept.accept[data-state="error"] { animation: none; }
   .accept[data-offer-loop="on"]::before, .halo[data-offer-loop="on"]::before, .accept[data-offer-loop="on"] .icon { animation: none; }
 }
 
 :global(html[data-interface-motion="off"]) .accept[data-offer-loop="on"]::before,
 :global(html[data-interface-motion="off"]) .halo[data-offer-loop="on"]::before,
 :global(html[data-interface-motion="off"]) .accept[data-offer-loop="on"] .icon { animation: none; }
+:global(html[data-interface-motion="off"]) .accept.accept, :global(html[data-reduce-motion="1"]) .accept.accept { transform: none !important; }
