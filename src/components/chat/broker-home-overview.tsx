@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useLightAvailabilityContext } from "@/components/light/light-availability-context";
 import { Button as ActionButton } from "@/components/ui/button";
+import { LitePress } from "@/components/lite/motion";
 import { PresenceCalloutList } from "./presence-callout";
 import type { HomeSummary } from "./chat-home";
 import type { HomeNowItem, PresenceAskView, ThreadSummary } from "./types";
@@ -36,16 +37,22 @@ function ItemAction({
   expired: boolean;
   primary?: boolean;
 }) {
-  return item.acceptLeadId ? (
-    <AcceptLeadButton leadId={item.acceptLeadId} appearance="shared" disabled={expired}>
-      {expired ? "Oferta encerrada" : item.actionLabel}
-    </AcceptLeadButton>
-  ) : (
+  // Uma ação primária por tela: só o "Seu próximo passo" usa o botão cheio; o resto da lista fica secundário.
+  if (item.acceptLeadId) {
+    return (
+      <AcceptLeadButton leadId={item.acceptLeadId} appearance="shared" disabled={expired} className={primary ? undefined : layout.secondaryAction}>
+        {expired ? "Oferta encerrada" : item.actionLabel}
+      </AcceptLeadButton>
+    );
+  }
+  const link = (
     <Link href={item.href} className={primary ? page.primaryButton : page.button}>
       {item.actionLabel}
       <ArrowRight size={16} aria-hidden="true" />
     </Link>
   );
+  // O link primário não passa pelo Button (que já tem toque): ganha a escala de toque do Lite.
+  return primary ? <LitePress className={layout.press}>{link}</LitePress> : link;
 }
 
 export function BrokerHomeOverview({
@@ -149,7 +156,7 @@ export function BrokerHomeOverview({
               </Badge>
               <Button variant="ghost" className={`${page.iconButton} ${layout.mobileAction}`} aria-label="Buscar minhas conversas" onClick={onSearch}><Search size={18} aria-hidden="true" /></Button>
               <Button variant="ghost" className={`${page.iconButton} ${layout.mobileAction}`} aria-label="Nova ação" onClick={onNew}><Plus size={18} aria-hidden="true" /></Button>
-              <Button variant="secondary" onClick={(event) => shell?.openMore?.(event.currentTarget)}>
+              <Button variant="ghost" onClick={(event) => shell?.openMore?.(event.currentTarget)}>
                 <LayoutGrid size={16} aria-hidden="true" />
                 Ferramentas
               </Button>
@@ -290,14 +297,16 @@ export function BrokerHomeOverview({
           </section>
 
           {summary?.duty ? (
-            <Link href={summary.duty.href} className={`${page.card} ${layout.duty}`}>
-              <CalendarDays size={22} aria-hidden="true" />
-              <span>
-                <strong>{summary.duty.title}</strong>
-                <span>{summary.duty.detail}</span>
-              </span>
-              <ArrowRight size={18} aria-hidden="true" />
-            </Link>
+            <LitePress kind="card">
+              <Link href={summary.duty.href} className={`${page.card} ${layout.duty}`}>
+                <CalendarDays size={22} aria-hidden="true" />
+                <span>
+                  <strong>{summary.duty.title}</strong>
+                  <span>{summary.duty.detail}</span>
+                </span>
+                <ArrowRight size={18} aria-hidden="true" />
+              </Link>
+            </LitePress>
           ) : null}
           {summary?.goal ? (
             <section className={page.card} aria-label="Minha meta">

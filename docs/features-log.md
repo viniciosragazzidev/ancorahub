@@ -10,6 +10,10 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 
 - Aceitar lead mostra "Lead aceito" na hora (`useOptimistic`, botão travado contra duplo aceite) e volta com o erro da action se o servidor recusar; mensagem na conversa entra na hora como "Enviando", e em falha fica "Não enviada · Tentar de novo" sem perder o texto; mudar etapa na tela do lead (Lite) muda e fecha a folha na hora, e volta reabrindo a folha com aviso se o servidor recusar. O kanban Lite de /leads não move cartão entre etapas (só reordena colunas), por isso ficou de fora. Lógica em `src/lib/optimistic-core.ts` e `src/components/chat/user-send-core.ts`, com testes.
 
+## 13/11/2026 - Lite: feedback e foco (Motion e UX, fase 3)
+
+- Confirmação no próprio lugar com `LiteSuccess` ao registrar venda (Etapa atual; sem overlay no v2, toast de apoio) e ao salvar a ficha do cliente e as ações rápidas do perfil; `LitePress` nos cartões e links primários da home do corretor e nas linhas de conversa; uma ação primária por tela na home (Ferramentas em ghost, aceites da lista secundários); contador da Fila e da aba Leads pulsa uma vez (240 ms) só quando sobe, nada com movimento reduzido.
+
 ## 13/11/2026 - Modo corretor, etapa 6: Agenda conectada
 
 - `/agenda` do corretor reúne as tarefas abertas atribuídas a ele (retornos, tarefas com prazo e acompanhamentos de renovação) agrupadas em Atrasados, Hoje, Amanhã, Próximos e Sem prazo, pelo dia de São Paulo. Cada linha traz ícone do tipo, título, tipo e nome do lead, horário e estado textual (Atrasado, Urgente).
