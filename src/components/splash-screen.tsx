@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-import { MASCOT_VIDEO_FRAME, MASCOT_VIDEOS } from "@/components/mascot/mascot-config";
-
 import { SPLASH_KEY } from "./splash-boot";
 
 import styles from "./splash-screen.module.css";
@@ -61,19 +59,15 @@ export function SplashScreen() {
 
   if (phase === "gone") return null;
 
-  // Do repouso ao polegar levantado (animação pré-gravada, MASCOTE.md §5). Sem movimento: só o primeiro quadro.
-  const clip = MASCOT_VIDEOS.leadAccepted;
+  // Arte da splash aprovada em 14/11/2026 (design/mascote/splash/): o capitão e a marca ÂNCORA, separados
+  // para o capitão entrar e dar um pulinho enquanto a marca aparece logo depois. Fundo do mesmo azul da arte.
   return (
     <div className={styles.splash} data-phase={phase} data-splash-screen="" aria-hidden="true">
       <div className={styles.content}>
-      <div className={styles.stage}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- quadro estático local, precisa estar no HTML antes do JS */}
-        <img className={styles.still} src={clip.poster} width={MASCOT_VIDEO_FRAME.width} height={MASCOT_VIDEO_FRAME.height} alt="" fetchPriority="high" decoding="async" draggable={false} />
-        <video className={styles.clip} src={clip.src} poster={clip.poster} width={MASCOT_VIDEO_FRAME.width} height={MASCOT_VIDEO_FRAME.height} autoPlay muted playsInline preload="auto" disablePictureInPicture />
-      </div>
-        {/* Logo da Âncora Saúde. A splash é sempre branca, então o logo nunca inverte no tema escuro. */}
-        {/* eslint-disable-next-line @next/next/no-img-element -- logo local, precisa estar no HTML antes do JS */}
-        <img className={styles.logo} src="/logo.webp" width={3126} height={886} alt="" decoding="async" draggable={false} />
+        {/* eslint-disable-next-line @next/next/no-img-element -- arte local, precisa estar no HTML antes do JS */}
+        <img className={styles.hero} src="/mascote/splash-capitao.webp" width={645} height={735} alt="" fetchPriority="high" decoding="async" draggable={false} />
+        {/* eslint-disable-next-line @next/next/no-img-element -- marca local, precisa estar no HTML antes do JS */}
+        <img className={styles.wordmark} src="/mascote/splash-ancora.webp" width={710} height={240} alt="" decoding="async" draggable={false} />
       </div>
     </div>
   );

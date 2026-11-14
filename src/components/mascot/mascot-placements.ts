@@ -21,7 +21,7 @@ export type MascotPlacementConfig = {
 };
 
 export const MASCOT_PLACEMENTS: Record<MascotPlacement, MascotPlacementConfig> = {
-  splash: { enabled: true, state: "lead_accepted", size: 300, where: "src/components/splash-screen.tsx (abertura do PWA)" },
+  splash: { enabled: true, state: "lead_accepted", size: 300, where: "src/components/splash-screen.tsx (abertura do PWA); usa a arte própria do capitão, não o <Mascot>" },
   empty: { enabled: false, state: "idle", size: 96, where: "EmptyState (src/components/arc/empty-state), no lugar do ícone" },
   error: { enabled: false, state: "error", size: 112, where: "RouteError (src/components/route-error.tsx), no lugar do ícone" },
   loading: { enabled: false, state: "loading", size: 88, where: "LitePageLoading (src/components/light/lite-page-loading.tsx), acima do esqueleto" },
