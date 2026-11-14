@@ -103,7 +103,7 @@ mudança visual. Cadastros, alterações relevantes, documentos, exportações e
 | Etapa | Entrega | Estado |
 |---|---|---|
 | 1 Navegação | Início sem Dicas e Jornada, Minha carteira nos acessos, Mais reorganizado | Implementada em `feat/corretor-navegacao-etapa1` (chave `feature_broker_navigation_reorg_enabled`), sem push |
-| 2 Desempenho | Resultados concentrados e acesso à Jornada | Cartão da Jornada entregue na etapa 1; restante pendente |
+| 2 Desempenho | Resultados concentrados e acesso à Jornada | Implementada em `feat/corretor-desempenho-etapa2` (mesma chave da etapa 1): período, resultados, atendimento e conversão, metas e Minha jornada; sem push |
 | 3 Plantões | Card atual, calendário e escala em `/plantoes` | Pendente |
 | 4 Carteira | Visões, cadastro próprio, cliente antigo e vínculos | Pendente; exige decisões de domínio registradas |
 | 5 Perfil | Perfil, histórico, contratos e documentos | Pendente; exige decisões de domínio registradas |

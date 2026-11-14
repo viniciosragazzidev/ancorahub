@@ -105,6 +105,13 @@ describe("broker performance view", () => {
     expect(view.carriers[0].revenueLabel).toMatch(/R\$\s3\.000/);
   });
 
+  it("passes the existing service and conversion indicators through without inventing a zero", () => {
+    const view = buildBrokerPerformanceView(data());
+    expect(view.service).toEqual({ firstContact: { rate: 90, leads: 20 }, quoteRate: 50, saleRate: 30 });
+    const noData = buildBrokerPerformanceView(data({ current: totals({ leads: 0, quotes: 2, sales: 0 }) }));
+    expect(noData.service).toEqual({ firstContact: null, quoteRate: null, saleRate: 0 });
+  });
+
   it("shows an empty state with no insight when nothing moved", () => {
     const view = buildBrokerPerformanceView(data({ period: "hoje", current: totals(), previous: totals() }));
     expect(view.empty).toBe(true);

@@ -220,7 +220,7 @@ export const FEATURE_FLAGS = {
   BROKER_NAV_REORG: {
     key: "feature_broker_navigation_reorg_enabled", scope: "global", defaultValue: "true",
     allowedValues: ["true", "false"] as const,
-    description: "Início do corretor reorganizado (plano do modo corretor, etapa 1): sem Dicas de Atendimento e Jornada no Início, Minha carteira entre os acessos, Jornada dentro de Desempenho. Desligada, volta ao Início anterior.",
+    description: "Início do corretor reorganizado (plano do modo corretor, etapa 1): sem Dicas de Atendimento e Jornada no Início, Minha carteira entre os acessos, Jornada dentro de Desempenho. Etapa 2: Desempenho em período, resultados, atendimento e conversão, metas e Minha jornada. Desligada, volta ao Início e ao Desempenho anteriores.",
   },
   BROKER_JOURNEY: {
     key: "feature_broker_journey_enabled", scope: "global", defaultValue: "false",

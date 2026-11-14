@@ -2,6 +2,13 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 13/11/2026 - Modo corretor, etapa 2: Desempenho e Jornada
+
+- Com a chave `feature_broker_navigation_reorg_enabled` ligada e o Desempenho Lite ativo, `/desempenho` segue a ordem: seleção de período, resultados do período (frase, quatro cartões e vendas por operadora), atendimento e conversão (primeiro contato no prazo, leads que viraram cotação, cotações que viraram venda, funil e frase do período), metas e o bloco Minha jornada dentro da composição.
+- Só dados e cálculos que já existiam no Desempenho: o primeiro contato no prazo vem do motor canônico e as taxas são as mesmas da nota do funil. Sem dado no período, a linha mostra "Sem dado" em vez de 0%. Sem meta ativa, aparece um vazio explicativo.
+- Ranking, missões e evolução continuam só na Jornada; o Desempenho Lite não tinha placar, então nada foi retirado.
+- Chave desligada: Desempenho Lite e resumo do dia antigo ficam como antes. Testes de ordem e composição com a chave ligada e desligada; verificação visual local em 320, 375 e desktop com dados sintéticos (prévia removida). Sem publicação.
+
 ## 13/11/2026 - Modo corretor, etapa 1: Início reorganizado
 
 - Início do corretor com o Jack fixo e os acessos numa ordem estável: Meus leads, Minha carteira (nova linha, abre `/clientes`), Plantão, Agenda, Desempenho e Cotação. Dicas de Atendimento e Jornada saem do Início; o que pede atenção segue marcado em cada linha e no flutuante Agora.
