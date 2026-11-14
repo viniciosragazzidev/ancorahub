@@ -489,7 +489,7 @@ export function RegisterSaleWizard({
               {stepIndex > 0 ? <Button type="button" variant="secondary" disabled={pending} onClick={() => setStepIndex((current) => Math.max(0, current - 1))}>Voltar</Button> : null}
               {stepIndex < STEPS.length - 1
                 ? <Button type="button" className={styles.primary} onClick={goNext}>Continuar</Button>
-                : <Button type="button" className={styles.primary} disabled={previewMode || pending || !canConfirm} onClick={confirmSale}>{pending ? "Registrando…" : "Confirmar registro"}</Button>}
+                : <Button type="button" className={`ct-anticipate ${styles.primary}`} disabled={previewMode || pending || !canConfirm} onClick={confirmSale}>{pending ? "Registrando…" : "Confirmar registro"}</Button>}
             </footer>
           </div>
         </DialogPopup>

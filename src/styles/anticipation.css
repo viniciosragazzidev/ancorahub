@@ -1,0 +1,22 @@
+/*
+ * Antecipação (Fase 6 do Motion e UX no Lite): o botão sobe 1px e ganha a sombra `raised` quando o mouse
+ * passa por cima, sinalizando "isso faz algo importante". Só em ações raras e importantes do Lite
+ * (confirmar o registro da venda, aceitar o lead do "Seu próximo passo"); ação frequente não leva a classe.
+ *
+ * - Só com mouse de verdade (hover: hover e pointer: fine): no toque o hover "gruda" depois do toque.
+ * - Usa as propriedades `translate` e `box-shadow`, nunca `transform` nem `::after`: o `scale` do toque
+ *   (interface-motion.css) e o `::after` da área de 44px (touch-target.css) continuam valendo juntos.
+ * - 160ms (`fast`). Desligado com movimento reduzido e com o kill-switch html[data-interface-motion="off"].
+ */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  html:not([data-interface-motion="off"]) .ct-anticipate {
+    transition-property: translate, box-shadow, background-color, border-color, color, opacity, scale;
+    transition-duration: 160ms;
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  html:not([data-interface-motion="off"]) .ct-anticipate:hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]):not(:active) {
+    translate: 0 -1px;
+    box-shadow: var(--shadow-raised, 0 6px 18px oklch(0% 0 0 / 0.065), 0 1px 3px oklch(0% 0 0 / 0.035));
+  }
+}
