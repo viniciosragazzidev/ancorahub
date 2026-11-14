@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { confirmDocumentUploadAction } from "@/features/documents/actions";
 import { RegisterSaleWizard } from "./register-sale-wizard";
 
 vi.mock("next/navigation", () => {
@@ -8,7 +9,8 @@ vi.mock("next/navigation", () => {
   return { useRouter: () => router };
 });
 vi.mock("@/components/motion/success-overlay", () => ({ useSuccessOverlay: () => ({ celebrate: vi.fn(), node: null }) }));
-vi.mock("@/components/arc/file-dropzone/file-dropzone", () => ({ FileDropzone: () => <div>Escolher arquivo de teste</div> }));
+vi.mock("@/components/arc/file-dropzone/file-dropzone", () => ({ FileDropzone: ({ onFilesChange }: { onFilesChange: (files: File[]) => void }) => <button type="button" onClick={() => onFilesChange([new File(["pdf"], "confirmacao.pdf", { type: "application/pdf" })])}>Escolher arquivo de teste</button> }));
+vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => () => ({ celebrate: false }) }));
 vi.mock("@/components/arc/date-picker/date-picker", () => ({ DatePicker: ({ label }: { label: string }) => <button type="button" aria-label={label}>{label}</button> }));
 vi.mock("@/features/post-sale/actions", () => ({
   ensureLeadHolderAction: vi.fn().mockResolvedValue({ success: true, created: false }),
@@ -96,5 +98,37 @@ describe("RegisterSaleWizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     expect(screen.getByText("A definir")).toBeTruthy();
     expect(screen.queryByText("A definir a A definir")).toBeNull();
+  });
+
+  function openUpload() {
+    render(<RegisterSaleWizard lead={lead} documents={[]} requirements={[]} carriers={[]} open onOpenChange={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Escolher arquivo de teste" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enviar para aprovação" }));
+  }
+
+  it("upload que falha mostra o arquivo, a causa e Tentar de novo, sem toast", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "Arquivo maior que 10 MB." }), { status: 400 })));
+    try {
+      openUpload();
+      expect(await screen.findByRole("alert")).toHaveTextContent("Arquivo maior que 10 MB. Ele continua selecionado para tentar de novo.");
+      expect(screen.getByText("Não subiu")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("upload confirmado marca o arquivo como enviado para análise", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ filename: "confirmacao.pdf", fileUrl: "https://files.example.test/c.pdf" }), { status: 200 })));
+    vi.mocked(confirmDocumentUploadAction).mockResolvedValue({ success: true } as never);
+    try {
+      openUpload();
+      expect(await screen.findByText("Enviado para análise")).toBeTruthy();
+      expect(screen.getByText("confirmacao.pdf")).toBeTruthy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

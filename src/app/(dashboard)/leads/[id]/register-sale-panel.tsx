@@ -4,6 +4,8 @@ import { useMemo, useState, useTransition, type ComponentType, type ReactNode } 
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { useSuccessOverlay } from "@/components/motion/success-overlay";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 
 import {
   Buildings,
@@ -203,6 +205,7 @@ export function RegisterSalePanel({
   open,
   onOpenChange,
   onRegistered,
+  celebration = false,
 }: {
   leadId: string;
   documents: ConfirmationDocument[];
@@ -211,8 +214,15 @@ export function RegisterSalePanel({
   onOpenChange: (open: boolean) => void;
   /** Chamado depois que a venda é salva (a tela Lite mantém o status em estado local). */
   onRegistered?: () => void;
+  /**
+   * O corretor dono registrando a própria venda no Lite: nível 3 (FEEDBACK.md), com som de marco, vibração e
+   * o overlay quando o limite do dia deixa. Fora disso (gestão, modo normal) o comportamento continua o mesmo.
+   */
+  celebration?: boolean;
 }) {
   const { celebrate: celebrateSuccess, node: successOverlay } = useSuccessOverlay();
+  const fire = useFeedback();
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [policyNumber, setPolicyNumber] = useState("");
@@ -294,6 +304,8 @@ export function RegisterSalePanel({
 
   function submit() {
     if (pending) return;
+    setSubmitError(null);
+    if (celebration) fire("tap");
     startTransition(async () => {
       let result: Awaited<ReturnType<typeof registerSaleAction>>;
       try {
@@ -313,17 +325,29 @@ export function RegisterSalePanel({
       });
       } catch {
         // Queda de rede ou deploy no meio: a venda pode ou não ter sido salva; a atualização mostra qual.
-        toast.error("Não foi possível confirmar o registro. Atualize a página para ver se a venda entrou antes de tentar de novo.");
+        const message = "Não foi possível confirmar o registro. Atualize a página para ver se a venda entrou antes de tentar de novo.";
+        if (celebration) { fire("error"); setSubmitError(message); } else toast.error(message);
         return;
       }
 
       if ("error" in result) {
-        toast.error(result.error);
+        if (celebration) {
+          fire("error");
+          setSubmitError(actionErrorMessage(normalizeActionError(result, "Não foi possível registrar a venda agora"), "Os dados preenchidos continuam aqui"));
+        } else toast.error(result.error);
         return;
       }
 
-      toast.success("Venda registrada com ciclo de vida e lembretes de renovação agendados!");
-      celebrateSuccess("Venda registrada");
+      if (celebration) {
+        // Só depois de a venda ser persistida. A tela confirma "Venda registrada" no próprio lugar; o toast
+        // fica com o trabalho do servidor (renovação agendada).
+        const plan = fire("celebrate", { budgetKey: "venda" });
+        if (plan.celebrate) celebrateSuccess("Venda registrada");
+        toast.success("Ciclo de vida e lembretes de renovação agendados.");
+      } else {
+        toast.success("Venda registrada com ciclo de vida e lembretes de renovação agendados!");
+        celebrateSuccess("Venda registrada");
+      }
       onOpenChange(false);
       onRegistered?.();
       setTimeout(() => router.refresh(), 0);
@@ -619,8 +643,9 @@ export function RegisterSalePanel({
               onClick={submit}
               className="h-11 w-full font-semibold"
             >
-              {pending ? "Salvando..." : "Salvar venda"}
+              {pending ? "Salvando…" : submitError ? "Tentar de novo" : "Salvar venda"}
             </Button>
+            {submitError ? <p role="alert" className="text-center text-sm text-destructive">{submitError}</p> : null}
             {missingFields.length > 0 ? (
               <p className="text-center text-[11px] text-muted-foreground" aria-live="polite">
                 Falta preencher: {missingFields.join(", ")}.

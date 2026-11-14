@@ -3,12 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { X } from "lucide-react";
 
 import { pollWhatsAppConnection, startWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
 import { PairingQrPanel } from "@/components/whatsapp/whatsapp-pairing-panel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { motionTokens } from "@/components/arc/motion-tokens";
+import { LiteSuccess } from "@/components/lite/motion";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 import { derivePairingPhase, FIRST_QR_LIFETIME_SECONDS, ROTATED_QR_LIFETIME_SECONDS } from "@/features/waha-cadence/pairing-phase";
 
 import { getFirstMessageContextAction, sendFirstMessageAction, type FirstMessageContext } from "./actions";
@@ -45,6 +50,8 @@ function ConnectionPill({ connected }: { connected: boolean }) {
  * "Chamar no WhatsApp" on the computer: the first message goes from the broker's
  * own WhatsApp through the system (decision 2026-10-10); not connected, the
  * broker can connect here (guide + QR, same dialog) or open the WhatsApp.
+ * Envio com o feedback padrão (FEEDBACK.md, nível 1): "Enviando…" com spinner; o check "Mensagem enviada"
+ * só depois do servidor; falha com X por um instante, a causa abaixo e o botão volta como "Tentar de novo".
  */
 export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { leadId: string; open: boolean; onOpenChange: (open: boolean) => void; onSent?: () => void }) {
   const reduce = useReducedMotion();
@@ -58,7 +65,13 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
   const [webUrl, setWebUrl] = useState<string | null>(null);
   const [justSent, setJustSent] = useState(false);
   const [connected, setConnected] = useState(false);
+  // Envio que falhou: o X fica por um instante e o botão volta como "Tentar de novo".
+  const [sendFailed, setSendFailed] = useState<"now" | "retry" | null>(null);
+  const failTimer = useRef<number | null>(null);
+  const fire = useFeedback();
   const polling = useRef(false);
+
+  useEffect(() => () => { if (failTimer.current) window.clearTimeout(failTimer.current); }, []);
 
   // Each opening starts over from the server state (connection may have changed).
   useEffect(() => {
@@ -119,13 +132,26 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
   }
 
   async function send() {
+    if (failTimer.current) window.clearTimeout(failTimer.current);
     setError(null);
+    setSendFailed(null);
     setStep("sending");
-    const result = await sendFirstMessageAction({ leadId, text });
-    if (result.ok) { setWebUrl(result.webUrl ?? webUrl); setJustSent(true); setStep("done"); onSent?.(); return; }
-    setError(result.error);
-    if (result.code === "not_connected") setConnected(false);
-    setStep(result.code === "already_sent" ? "done" : result.code === "not_connected" ? "offer" : "compose");
+    fire("tap");
+    let result: Awaited<ReturnType<typeof sendFirstMessageAction>> | null = null;
+    let failure: unknown = null;
+    try {
+      result = await sendFirstMessageAction({ leadId, text });
+    } catch (caught) {
+      failure = caught;
+    }
+    if (result?.ok) { fire("confirm"); setWebUrl(result.webUrl ?? webUrl); setJustSent(true); setStep("done"); onSent?.(); return; }
+    if (result && result.code === "already_sent") { setError(result.error); setStep("done"); return; }
+    if (result && result.code === "not_connected") { setError(result.error); setConnected(false); setStep("offer"); return; }
+    fire("error");
+    setError(actionErrorMessage(normalizeActionError(result ?? failure, "A mensagem não foi enviada"), "O texto continua aqui"));
+    setSendFailed("now");
+    setStep("compose");
+    failTimer.current = window.setTimeout(() => setSendFailed("retry"), motionTokens.celebration.revertAfter * 1000);
   }
 
   const secondsLeft = qr.shownAt ? Math.ceil(qr.lifetime - (now - qr.shownAt) / 1_000) : qr.lifetime;
@@ -167,7 +193,13 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
                 {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   {fallbackLinks}
-                  <Button onClick={send} disabled={step === "sending" || !text.trim()}>{step === "sending" ? "Enviando..." : "Enviar"}</Button>
+                  <Button onClick={send} disabled={step === "sending" || sendFailed === "now" || !text.trim()} aria-busy={step === "sending" || undefined} data-state={step === "sending" ? "busy" : sendFailed === "now" ? "error" : undefined}>
+                    {step === "sending" ? (
+                      <><span aria-hidden="true" className="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none" />Enviando…</>
+                    ) : sendFailed === "now" ? (
+                      <><X aria-hidden="true" className="size-4 shrink-0" strokeWidth={2.6} />Não deu certo</>
+                    ) : sendFailed === "retry" ? "Tentar de novo" : "Enviar"}
+                  </Button>
                 </div>
               </>
             ) : null}
@@ -236,7 +268,7 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
 
             {step === "done" ? (
               <>
-                <DialogTitle>{justSent ? `Mensagem enviada para ${name}` : "A primeira mensagem já foi enviada"}</DialogTitle>
+                <DialogTitle>{justSent ? <LiteSuccess label={`Mensagem enviada para ${name}`} className="text-success" /> : "A primeira mensagem já foi enviada"}</DialogTitle>
                 <DialogDescription>{justSent ? "Agora continue pelo seu celular ou pelo WhatsApp Web. A resposta do cliente chega no seu WhatsApp." : `Você já escreveu para ${name}. Continue a conversa pelo seu celular ou pelo WhatsApp Web.`}</DialogDescription>
                 <ConnectionPill connected={connected} />
                 <div className="flex flex-wrap items-center justify-between gap-3">

@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { useSuccessOverlay } from "@/components/motion/success-overlay";
+import { LiteSuccess } from "@/components/lite/motion";
 import { AlertCircle, Info, Sparkles, XIcon } from "lucide-react";
+import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 import { Button } from "@/components/arc/button/button";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -119,10 +122,14 @@ export function RegisterSaleWizard({
   onRegistered?: () => void;
   previewMode?: boolean;
   previewMessage?: string | null;
-  /** false quando a tela confirma no próprio lugar (Lite: check em "Etapa atual"); o toast fica como apoio. */
+  /**
+   * false quando a tela confirma no próprio lugar (Lite: check em "Etapa atual"). Mesmo assim, registrar venda
+   * é nível 3 (FEEDBACK.md): o overlay aparece quando o limite do dia e as preferências deixam celebrar.
+   */
   successOverlay?: boolean;
 }) {
   const router = useRouter();
+  const fire = useFeedback();
   const [pending, startTransition] = useTransition();
   const { celebrate, node: successOverlay } = useSuccessOverlay();
   const [stepIndex, setStepIndex] = useState(0);
@@ -141,6 +148,8 @@ export function RegisterSaleWizard({
   const [beneficiaryId, setBeneficiaryId] = useState(lead.beneficiaries?.find((person) => person.isHolder)?.id ?? "");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadObservation, setUploadObservation] = useState("");
+  // Estado do arquivo enviado (nível 1): enviando, enviado para análise ou não subiu, sempre com o nome dele.
+  const [upload, setUpload] = useState<{ name: string; phase: "sending" | "done" | "warning" | "error"; message?: string } | null>(null);
   const [setupMessage, setSetupMessage] = useState<string | null>(null);
   const [blockingMessage, setBlockingMessage] = useState<string | null>(null);
   const uploadSectionRef = useRef<HTMLDivElement>(null);
@@ -187,6 +196,9 @@ export function RegisterSaleWizard({
 
   function uploadDocument() {
     if (!uploadFile) return;
+    const fileName = uploadFile.name;
+    setUpload({ name: fileName, phase: "sending" });
+    fire("tap");
     startTransition(async () => {
       const body = new FormData();
       body.append("file", uploadFile);
@@ -216,17 +228,20 @@ export function RegisterSaleWizard({
           statusData.append("status", "documentation_pending");
           const changed = await changeLeadStatusAction({}, statusData);
           if (!changed.success) {
-            toast.error("O documento foi enviado. Não foi possível mover a etapa para Documentação; atualize a página.");
+            fire("warning");
+            setUpload({ name: fileName, phase: "warning", message: "O arquivo foi enviado, mas a etapa não mudou para Documentação. Atualize a página." });
             router.refresh();
             return;
           }
         }
         setUploadFile(null);
         setUploadObservation("");
-        toast.success("Documento enviado para análise.", { description: "O registro da venda só libera depois da aprovação." });
+        fire("confirm");
+        setUpload({ name: fileName, phase: "done" });
         router.refresh();
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível enviar o documento. Tente novamente.");
+        fire("error");
+        setUpload({ name: fileName, phase: "error", message: actionErrorMessage(normalizeActionError(error, "O arquivo não foi enviado"), "Ele continua selecionado para tentar de novo") });
       }
     });
   }
@@ -267,15 +282,21 @@ export function RegisterSaleWizard({
           carrierId: carrierId || undefined,
         });
         if ("error" in result) {
-          setBlockingMessage(result.error);
+          fire("error");
+          setBlockingMessage(actionErrorMessage(normalizeActionError(result, "Não foi possível registrar a venda agora"), "Os dados preenchidos continuam aqui"));
           return;
         }
-        toast.success("Venda registrada. O ciclo de renovação já foi agendado.");
-        if (showSuccessOverlay) celebrate("Venda registrada");
+        // Nível 3, só depois de a venda ser persistida: som de marco, vibração de sucesso e o overlay
+        // (que não bloqueia). Sem vaga no dia ou com celebrações desligadas, vira confirmação simples.
+        const plan = fire("celebrate", { budgetKey: "venda" });
+        if (plan.celebrate || showSuccessOverlay) celebrate("Venda registrada");
+        // "Venda registrada" já aparece na tela; o toast fica só com o que é trabalho do servidor.
+        toast.success("O ciclo de renovação já foi agendado.");
         onOpenChange(false);
         onRegistered?.();
         router.refresh();
       } catch {
+        fire("error");
         setBlockingMessage("Não foi possível confirmar o registro. Atualize a página para verificar antes de tentar novamente.");
       }
     });
@@ -448,7 +469,20 @@ export function RegisterSaleWizard({
                     {selectedRequirement?.appliesPerBeneficiary ? <label className={styles.field} htmlFor="sale-v2-beneficiary">Pessoa do documento<AppSelect id="sale-v2-beneficiary" value={selectedBeneficiaryId} onValueChange={setBeneficiaryId} placeholder="Selecione a pessoa" triggerClassName={styles.control} options={people.map((person) => ({ value: person.id, label: person.name }))} /></label> : null}
                     <FileDropzone label="Arquivo" description="PDF, JPG ou PNG até 10 MB" note="Um arquivo por envio" accept="application/pdf,image/jpeg,image/png" multiple={false} maxFiles={1} maxSize={10 * 1024 * 1024} onFilesChange={(files) => setUploadFile(files[0] ?? null)} />
                     <label className={styles.field} htmlFor="sale-v2-observation">Observação (opcional)<input id="sale-v2-observation" className={styles.control} value={uploadObservation} onChange={(event) => setUploadObservation(event.target.value)} placeholder="Ex.: confirmação da operadora" /></label>
-                    <Button type="button" variant="secondary" disabled={previewMode || pending || !uploadFile} onClick={uploadDocument}>{pending ? "Enviando…" : "Enviar para aprovação"}</Button>
+                    <Button type="button" variant="secondary" disabled={previewMode || pending || !uploadFile} aria-describedby={upload?.phase === "error" ? "sale-v2-upload-state" : undefined} onClick={uploadDocument}>{upload?.phase === "sending" ? "Enviando…" : upload?.phase === "error" ? "Tentar de novo" : "Enviar para aprovação"}</Button>
+                    {upload ? (
+                      <div id="sale-v2-upload-state" className={styles.row} data-upload={upload.phase}>
+                        <span className={styles.rowMain}>
+                          <span className={styles.rowTitle}>{upload.name}</span>
+                          {upload.message ? <span className={styles.rowMeta} role={upload.phase === "error" ? "alert" : "status"}>{upload.message}</span> : null}
+                        </span>
+                        <span className={styles.rowSide}>
+                          {upload.phase === "done"
+                            ? <LiteSuccess label="Enviado para análise" className={styles.status} />
+                            : <span className={styles.status} data-status={upload.phase === "sending" ? "pending" : upload.phase === "warning" ? "pending" : "rejected"} role={upload.phase === "sending" ? "status" : undefined}>{upload.phase === "sending" ? "Enviando…" : upload.phase === "warning" ? "Enviado" : "Não subiu"}</span>}
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
 
                   {documents.length ? (
