@@ -37,7 +37,8 @@ function useRetry() {
  * do corretor numa só página. Só apresenta; abrir o plantão leva à operação em `/plantoes/agora`.
  */
 export function BrokerDutyHub({ current, calendar, calendarState }: BrokerDutyHubProps) {
-  const card = <CurrentDutyCard current={current} />;
+  // O banner fica logo abaixo do plantão atual, antes do calendário: um respiro de cor entre os dois cards.
+  const card = <><CurrentDutyCard current={current} /><DutyBanner current={current} /></>;
   return (
     <section aria-labelledby="duty-hub-title" className="lite-page" style={{ paddingBottom: "max(120px, var(--mobile-safe-bottom, 0px))" }}>
       <LitePageEnter>
@@ -55,7 +56,6 @@ export function BrokerDutyHub({ current, calendar, calendarState }: BrokerDutyHu
             {calendarState === "error" ? <CalendarUnavailable /> : null}
           </div>
         )}
-        <DutyBanner current={current} />
       </LitePageEnter>
     </section>
   );
@@ -96,7 +96,7 @@ function CurrentDutyCard({ current }: { current: DutyHubCurrent }) {
         </div>
       ) : null}
 
-      {current.state === "next" ? <p className={hub.note} style={{ paddingTop: 6 }}>Você não está de plantão agora.</p> : null}
+      {current.state === "next" ? <p className={hub.note}>Você não está de plantão agora.</p> : null}
 
       {shift && (current.state === "active" || current.state === "next") ? (
         <LiteSwap swapKey={shift.key}>
@@ -157,16 +157,16 @@ function DutyBanner({ current }: { current: DutyHubCurrent }) {
   const shift = current.shifts[0];
   const hours = { label: "Ajustar meus horários", href: "/settings?tab=disponibilidade" };
   if (current.state === "active" && shift) {
-    return <CaptainBanner className={hub.banner} tone="light" pose="peek" label="Dica do plantão"
+    return <CaptainBanner className={hub.banner} tone="light" pose="peek" size="compact" label="Dica do plantão"
       title="Plantão no ar! Quem aceita primeiro recebe mais leads."
       goal={{ value: shift.timeLabel, hint: shift.scheduleName }} action={hours} />;
   }
   if (current.state === "next" && shift) {
-    return <CaptainBanner className={hub.banner} tone="light" pose="peek" label="Dica do plantão"
+    return <CaptainBanner className={hub.banner} tone="light" pose="peek" size="compact" label="Dica do plantão"
       title={`Seu próximo plantão é ${shift.dateLabel.toLowerCase()}. Fique online uns minutos antes.`}
       goal={{ value: shift.timeLabel, hint: shift.scheduleName }} action={hours} />;
   }
-  return <CaptainBanner className={hub.banner} tone="light" pose="peek" label="Dica do plantão"
+  return <CaptainBanner className={hub.banner} tone="light" pose="peek" size="compact" label="Dica do plantão"
     title="Ainda sem plantão? Diga quando você atende e fica mais fácil entrar na escala."
     action={{ label: "Informar meus horários", href: hours.href }} />;
 }

@@ -132,3 +132,22 @@
   .banner[data-pose="peek"] { grid-template-columns: minmax(0, 1fr) 200px; padding-top: 28px; }
   .banner[data-pose="peek"] .art { width: 210px; margin: 0 -8px -128px -16px; }
 }
+
+/*
+ * Versão baixa: título menor, selo na mesma linha do título no computador e botão menor. Sem a barra.
+ * No celular: título e selo à esquerda, botão embaixo deles, o capitão no canto direito.
+ */
+.banner[data-size="compact"] { gap: 10px 8px; padding: 16px 0 16px 18px; }
+.banner[data-size="compact"] .title { font-size: var(--text-base); line-height: 1.35; }
+.banner[data-size="compact"] .goal { gap: 0; }
+.banner[data-size="compact"] .meter { display: none; }
+.banner[data-size="compact"] .action { min-height: 40px; padding: 0 18px; justify-self: start; font-size: var(--text-sm); box-shadow: 0 3px 0 oklch(18% 0.08 264); }
+.banner[data-size="compact"][data-pose="peek"] { grid-template-columns: minmax(0, 1fr) 96px; }
+.banner[data-size="compact"][data-pose="peek"] .art { width: 116px; margin: 0 -14px -40px -28px; }
+@media (min-width: 640px) {
+  .banner[data-size="compact"] { grid-template-areas: "title art" "goal art" "action art"; padding: 18px 0 18px 28px; }
+  .banner[data-size="compact"] .title { font-size: var(--text-lg); }
+  .banner[data-size="compact"] .action { min-width: 0; padding: 0 22px; }
+  .banner[data-size="compact"][data-pose="peek"] { grid-template-columns: minmax(0, 1fr) 160px; }
+  .banner[data-size="compact"][data-pose="peek"] .art { width: 160px; margin: 0 -8px -64px -12px; }
+}
