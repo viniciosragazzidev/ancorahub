@@ -23,7 +23,7 @@ import styles from "./presence-guide.module.css";
 
 /**
  * Roteiro guiado "conectar o WhatsApp e confirmar presença" (09/11, plano 2026-11-09-roteiro-guiado-presenca-whatsapp.md).
- * Uma ideia e um botão por tela, conduzido pelo mascote do Plantão. A conexão de verdade continua no
+ * Uma ideia e um botão por tela, conduzido pelo Jack, o capitão do ícone do app. A conexão de verdade continua no
  * WhatsAppConnectDialog (que passa `connection`); a presença, no cartão de presença (que passa `presence`).
  * Celular: boas-vindas → código → tela inicial → caminho → esperando → conectado → confirmar → pronto.
  * Computador: boas-vindas → QR (ou código) com o caminho ao lado → conectado → confirmar → pronto.
@@ -617,7 +617,7 @@ function Say({ title, sub, state = "idle", celebrate = false }: { title: string;
   return (
     <div className={styles.say}>
       <motion.span className={styles.mascot} initial={reduce || !celebrate ? false : { scale: 0.6, rotate: -8 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", visualDuration: 0.32, bounce: 0.3 }}>
-        <AssistantAvatar shape="onigiri" hue={28} size={52} state={state} />
+        <AssistantAvatar shape="jack" hue={null} size={52} state={state} />
       </motion.span>
       <span className={styles.sayText}>
         <span className={styles.sayTitle} role="status" aria-live="polite">{title}</span>

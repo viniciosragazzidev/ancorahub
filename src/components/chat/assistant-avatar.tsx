@@ -27,7 +27,7 @@ function moodMotion(mood: MascotMood, reduce: boolean | null): { animate: Target
   };
 }
 
-const SHAPES: Record<Exclude<MascotShape, "logo">, string> = {
+const SHAPES: Record<Exclude<MascotShape, "logo" | "jack">, string> = {
   // 64x64 viewBox; every body leaves room under it for the soft shadow.
   mochi: "M8 40c0-15 10.7-26 24-26s24 11 24 26c0 6-4 9-10 9H18c-6 0-10-3-10-9Z",
   onigiri: "M28.6 13.8c1.6-2.6 5.2-2.6 6.8 0l17.4 28.9c1.6 2.7-.3 6.3-3.4 6.3H14.6c-3.1 0-5-3.6-3.4-6.3l17.4-28.9Z",
@@ -35,24 +35,7 @@ const SHAPES: Record<Exclude<MascotShape, "logo">, string> = {
   favo: "M27 12.8a10 10 0 0 1 10 0l11.6 6.7a10 10 0 0 1 5 8.7v9.4a10 10 0 0 1-5 8.7L37 53a10 10 0 0 1-10 0l-11.6-6.7a10 10 0 0 1-5-8.7v-9.4a10 10 0 0 1 5-8.7L27 12.8Z",
   nuvem: "M18 46a10 10 0 0 1-2.6-19.7A14 14 0 0 1 42 22a11 11 0 0 1 6 20.9V46H18Z",
   salte: "M20 18h30c3.3 0 5.4 3.6 3.8 6.4L46 40c-1 1.9-3 3-5.2 3H12c-3.3 0-5.4-3.6-3.8-6.4L16 22a4.6 4.6 0 0 1 4-4Z",
-  // Jack, the little pirate: a round body under the tricorn hat (hat and eye patch drawn on top).
-  jack: "M9 41c0-13.5 10.3-23 23-23s23 9.5 23 23c0 5.4-3.8 8-9.4 8H18.4C12.8 49 9 46.4 9 41Z",
 };
-
-/** Jack's tricorn hat with a gold band and a tiny skull, and the eye patch with its strap. */
-function PirateGear() {
-  const ink = "oklch(26% 0.03 260)";
-  return (
-    <>
-      <path d="M9.5 24.5C13 13.5 22 8.5 32 8.5s19 5 22.5 16c-6.4-3.4-14.2-5-22.5-5s-16.1 1.6-22.5 5Z" fill={ink} />
-      <path d="M12.5 22.6c5.6-2.6 12.2-3.8 19.5-3.8s13.9 1.2 19.5 3.8" fill="none" stroke="oklch(80% 0.14 85)" strokeWidth="1.8" strokeLinecap="round" />
-      <circle cx="32" cy="13.6" r="2.3" fill="white" />
-      <path d="M28.6 17.4 35.4 15.2M28.6 15.2l6.8 2.2" stroke="white" strokeWidth="1" strokeLinecap="round" />
-      <path d="M13.5 30.5 23 34M31 33.4 50.5 26.5" stroke={ink} strokeWidth="1.5" strokeLinecap="round" />
-      <ellipse cx="26.5" cy="36" rx="4.6" ry="4.1" fill={ink} />
-    </>
-  );
-}
 
 /**
  * The assistant's mascot: a soft glossy body in the assistant's color with two
@@ -102,6 +85,30 @@ export function AssistantAvatar({
         }}
       >
         {initials}
+      </span>
+    );
+  }
+
+  if (shape === "jack") {
+    // Jack é o capitão pirata do ícone do app (public/mascote/jack-capitao.webp, recorte do ícone de 14/11/2026).
+    // Mesmas reações do mascote: respira trabalhando, uma passada por humor e o ponto azul esperando.
+    const { animate, transition } = moodMotion(mood, reduce);
+    const working = state === "working" && !reduce;
+    return (
+      <span style={{ position: "relative", width: size, height: size, display: "inline-grid", flex: "none" }} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
+        <motion.span
+          key={mood}
+          data-mood={mood}
+          animate={working ? { scale: [1, 1.05, 1], y: [0, -1.5, 0] } : animate}
+          transition={working ? { duration: 1.6, repeat: Infinity, ease: "easeInOut" } : transition}
+          style={{ display: "block", width: size, height: size, borderRadius: 999, transformOrigin: "50% 80%" }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- arte local pequena, usada em vários tamanhos */}
+          <img src="/mascote/jack-capitao.webp" width={size} height={size} alt="" draggable={false} style={{ display: "block", width: size, height: size, borderRadius: 999 }} />
+        </motion.span>
+        {state === "waiting" ? (
+          <span aria-hidden="true" style={{ position: "absolute", right: 0, top: 0, width: Math.max(8, size * 0.2), height: Math.max(8, size * 0.2), borderRadius: 999, background: "oklch(62% 0.2 255)", boxShadow: "0 0 0 2px var(--surface)" }} />
+        ) : null}
       </span>
     );
   }
@@ -163,7 +170,6 @@ export function AssistantAvatar({
               <ellipse cx="37.5" cy="36" rx="2.4" ry="3.4" fill={`oklch(28% 0.06 ${h})`} />
             </motion.g>
           </motion.g>
-          {shape === "jack" ? <PirateGear /> : null}
         </motion.g>
       </motion.svg>
       {state === "waiting" ? (
