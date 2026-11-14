@@ -69,7 +69,7 @@ export type ChatBlock =
   | { type: "client"; id: string; name: string; initials: string; chips: Array<{ label: string; tone?: ChatTone }> }
   /** A notification shown as in Notificações (Âncora conversation): icon by category, tag, link, unread dot. */
   | { type: "notice"; id: string; noticeType: string; leadId: string | null; title: string; message: string | null; at: string; atIso: string; unread: boolean }
-  | { type: "user"; id: string; text: string; at?: string }
+  | { type: "user"; id: string; text: string; at?: string; /** Envio otimista: "sending" até o servidor confirmar; "failed" mostra "Tentar de novo". */ status?: "sending" | "failed" }
   /** A mirrored WhatsApp message: the client, the AI qualification or the broker, each with its own light bubble. */
   | { type: "whatsapp"; id: string; text: string; at?: string; from: "client" | "qualification" | "broker"; audio?: { url: string } }
   | { type: "facts"; id: string; title: string; subtitle?: string; rows: ChatFactRow[]; href?: string; hrefLabel?: string }

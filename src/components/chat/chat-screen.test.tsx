@@ -113,4 +113,33 @@ describe("ChatScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /Ver a ficha/ }));
     expect(push).toHaveBeenCalledWith("/leads/l1");
   });
+
+  it("mostra a mensagem na hora como enviando, confirma, e em erro deixa tentar de novo", async () => {
+    let finish: (blocks: never[]) => void = () => {};
+    const onFreeText = vi.fn()
+      .mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }))
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce([{ type: "assistant", id: "ok", text: "Anotei." }]);
+    render(<ChatScreen identity={{ name: "Leads", shape: "mochi", hue: 212 }} backHref="/dashboard" script={script} onFreeText={onFreeText} />);
+    const input = screen.getByPlaceholderText("Responda aqui ou escolha uma opção acima");
+
+    fireEvent.change(input, { target: { value: "Liguei para a Maria" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByText("Liguei para a Maria")).toBeTruthy();
+    expect(screen.getByText("Enviando")).toBeTruthy();
+    await act(async () => { finish([]); });
+    expect(screen.queryByText("Enviando")).toBeNull();
+
+    fireEvent.change(input, { target: { value: "Mandei a cotação" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(screen.getByText(/Não enviada/)).toBeTruthy());
+    expect(screen.getByText("Mandei a cotação")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    await waitFor(() => expect(screen.getByText("Anotei.")).toBeTruthy());
+    expect(onFreeText).toHaveBeenLastCalledWith("Mandei a cotação");
+    expect(onFreeText).toHaveBeenCalledTimes(3);
+    expect(screen.getAllByText("Mandei a cotação")).toHaveLength(1);
+    expect(screen.queryByText(/Não enviada/)).toBeNull();
+  });
 });
