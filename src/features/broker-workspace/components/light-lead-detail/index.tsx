@@ -105,6 +105,7 @@ export function LightLeadDetail({
     return (
       <>
         <LeadSocialLayout
+          backHref="/leads?tab=minha-fila"
           detailOverlayActive={c.showSaleConfirm || c.showUpdateSheet || c.showDeclineModal}
           actions={<LeadActionBar lead={lead} c={c} inline compact />}
           header={<LeadHeaderBar name={lead.nome} statusLabel={stageLabel(c.leadStatus)} statusTone={statusTone} arrival={arrival} compact />}

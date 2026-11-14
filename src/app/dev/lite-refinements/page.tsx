@@ -11,7 +11,7 @@ import { InterfaceMotionProvider } from "@/components/motion/interface-motion-pr
 import { DatePicker } from "@/components/arc/date-picker/date-picker";
 import { Dialog, DialogPopup, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { MessageCircle, Phone, ClipboardList } from "lucide-react";
-import page from "@/components/lite/page/lite-page.module.css";
+import social from "@/features/broker-workspace/chat/lead-social.module.css";
 import "@/components/arc/venancor-scope.css";
 
 
@@ -24,7 +24,12 @@ export default function LiteRefinementPreview() {
     <p role="status" className="fixed bottom-1 left-3 z-10 rounded bg-white/90 px-2 text-xs text-muted-foreground">{notice}</p>
     <LeadSocialLayout detailOverlayActive={saleOpen}
       header={<LeadHeaderBar name="Cliente de Demonstração com Nome Completo" statusLabel="Documentação pendente" arrival={null} compact />}
-      actions={<nav aria-label="Ações do lead" className="flex gap-2"><Button size="sm" variant="ghost" className={page.iconButton} data-tone="primary" aria-label="Abrir WhatsApp do cliente" title="WhatsApp" onClick={() => setNotice("Prévia: nenhum WhatsApp foi aberto.")}><MessageCircle size={18} /></Button><Button size="sm" variant="ghost" className={page.iconButton} aria-label="Ligar para o cliente" title="Ligar" onClick={() => setNotice("Prévia: nenhuma chamada foi iniciada.")}><Phone size={18} /></Button><Button size="sm" variant="ghost" className={page.iconButton} aria-label="Alterar etapa do lead" title="Etapa" onClick={() => setNotice("Prévia: nenhuma etapa foi alterada.")}><ClipboardList size={18} /></Button></nav>}
+      backHref="/leads?tab=minha-fila"
+      actions={<nav aria-label="Ações do lead" className={social.topActions}>
+        <a href="#" className={social.topAction} data-tone="primary" aria-label="Abrir WhatsApp do cliente" onClick={(event) => { event.preventDefault(); setNotice("WhatsApp de demonstração não foi aberto"); }}><span className={social.topActionIcon} aria-hidden="true"><MessageCircle /></span><span>WhatsApp</span></a>
+        <a href="#" className={social.topAction} aria-label="Ligar para o cliente" onClick={(event) => { event.preventDefault(); setNotice("Ligação de demonstração não foi iniciada"); }}><span className={social.topActionIcon} aria-hidden="true"><Phone /></span><span>Ligar</span></a>
+        <button type="button" className={social.topAction} aria-label="Alterar etapa do lead" onClick={() => setNotice("Etapa de demonstração mantida")}><span className={social.topActionIcon} aria-hidden="true"><ClipboardList /></span><span>Etapa</span></button>
+      </nav>}
       next={<NextStepCard step={{ kind: "whatsapp", title: "Responder o cliente", detail: "O cliente respondeu e espera sua resposta.", tone: "urgent" }} />}
       details={<>
         <LeadHeaderBar name="Cliente de Demonstração com Nome Completo" statusLabel="Documentação pendente" arrival={{ text: "Recebido por você em 03/11, há 10 dias", stale: true }} />
