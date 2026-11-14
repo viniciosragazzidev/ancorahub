@@ -140,6 +140,16 @@ describe("team notice decision", () => {
     expect(effectiveNoticeSetting(notice, { enabled: false, channel: "company_number" })).toEqual({ enabled: true, channel: "company_number", freeMessageIds: [] });
   });
 
+  it("segura os avisos da direção no sábado e no domingo até segunda às 08:00", () => {
+    const saturdayNight = new Date("2026-10-03T23:30:00Z");
+    const sundayNoon = new Date("2026-10-04T15:00:00Z");
+    const monday8 = new Date("2026-10-05T11:00:00Z");
+    expect(evaluateDeliveryGuard(input({ noticeClass: "critical", weekdaysOnly: true, now: saturdayNight }))).toEqual({ kind: "hold", until: monday8, reason: "weekend" });
+    expect(evaluateDeliveryGuard(input({ noticeClass: "any_day", weekdaysOnly: true, now: sundayNoon }))).toEqual({ kind: "hold", until: monday8, reason: "weekend" });
+    expect(evaluateDeliveryGuard(input({ noticeClass: "critical", weekdaysOnly: true, now: new Date("2026-10-02T23:30:00Z") }))).toEqual({ kind: "now" });
+    for (const key of ["LEAD_CLOSING_DIRECTOR", "LEAD_CONVERTED_DIRECTOR", "DAILY_LEADS_REPORT"]) expect(teamNoticeByKey(key)?.weekdaysOnly).toBe(true);
+    expect(teamNoticeByKey("LEAD_OFFER")?.weekdaysOnly).toBeUndefined();
+  });
   it("classifies shift reminders to avoid weekend holding", () => {
     const notice = teamNoticeByKey("DUTY_SHIFT_REMINDER");
     expect(notice).toMatchObject({ class: "any_day", defaultChannel: "company_number", alwaysOn: true });

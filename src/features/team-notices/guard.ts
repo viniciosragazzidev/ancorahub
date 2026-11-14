@@ -34,6 +34,8 @@ export const DELIVERY_LIMITS = {
 
 export type GuardInput = {
   noticeClass: NoticeClass;
+  /** Aviso que não sai no sábado nem no domingo (ex.: números da direção): segura até segunda 08:00. */
+  weekdaysOnly?: boolean;
   now: Date;
   createdAt: Date;
   /** The channel this attempt uses. Limits of the company number only apply to it. */
@@ -57,7 +59,7 @@ export type GuardResult =
   | { kind: "hold"; until: Date; reason: HoldReason }
   | { kind: "drop"; reason: DropReason };
 
-export type HoldReason = "outside_business_hours" | "recipient_spacing" | "recipient_hourly_limit" | "recipient_daily_limit" | "number_spacing" | "number_hourly_limit" | "number_daily_limit";
+export type HoldReason = "weekend" | "outside_business_hours" | "recipient_spacing" | "recipient_hourly_limit" | "recipient_daily_limit" | "number_spacing" | "number_hourly_limit" | "number_daily_limit";
 export type DropReason = "stale_reminder" | "duplicate" | "reminder_daily_limit";
 
 function localParts(date: Date) {
@@ -97,6 +99,7 @@ function numberSpacing(input: GuardInput, critical: boolean): GuardResult | null
 
 export function evaluateDeliveryGuard(input: GuardInput): GuardResult {
   const { now } = input;
+  if (input.weekdaysOnly && !DELIVERY_LIMITS.businessDays.includes(localParts(now).weekday)) return { kind: "hold", until: nextBusinessOpening(now), reason: "weekend" };
   // New lead and lead information: no limits and no business hours; only the
   // company number's short spacing, so two messages never leave glued together.
   if (input.noticeClass === "critical") return numberSpacing(input, true) ?? { kind: "now" };
