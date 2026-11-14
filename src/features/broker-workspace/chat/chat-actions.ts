@@ -9,6 +9,7 @@ import type { ChatServerActionName } from "@/components/chat/types";
 import { acceptLeadOfferAction } from "@/features/leads/accept-offer-action";
 import { updateBrokerAvailabilityAction } from "@/features/leads/availability-action";
 import { addLeadNoteAction } from "@/features/leads/actions";
+import { clientMessageIdSchema } from "@/features/leads/note-idempotency";
 import { declineLeadAction } from "@/features/leads/decline-action";
 import { MOTIVOS_PERDA } from "@/features/leads/lead-status-constants";
 import { quickReminderAction } from "@/features/leads/reminder-actions";
@@ -114,8 +115,8 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
           : { ok: false, message: "O atendimento não foi encerrado. Toque de novo em alguns segundos." };
       }
       case "lead.addNote": {
-        const { leadId, content } = leadPayload.extend({ content: z.string().trim().min(1).max(2000) }).parse(payload);
-        const result = await addLeadNoteAction({}, form({ leadId, content }));
+        const { leadId, content, clientMessageId } = leadPayload.extend({ content: z.string().trim().min(1).max(2000), clientMessageId: clientMessageIdSchema.optional() }).parse(payload);
+        const result = await addLeadNoteAction({}, form({ leadId, content, ...(clientMessageId ? { clientMessageId } : {}) }));
         return result.success ? { ok: true, message: "Anotei no histórico do lead." } : { ok: false, message: "A nota não foi salva. Toque de novo em alguns segundos." };
       }
       case "duty.pause": {

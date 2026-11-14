@@ -1,5 +1,17 @@
 import type { ChatBlock } from "./types";
 
+/**
+ * Id da mensagem otimista, gerado uma vez e reaproveitado no "Tentar de novo". Vai junto ao
+ * servidor como chave de idempotência: se o primeiro envio chegou mas a resposta se perdeu
+ * (timeout), o reenvio não cria a nota duas vezes.
+ */
+export function newClientMessageId(): string {
+  const random = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  return `free-${random}`;
+}
+
 type UserBlock = Extract<ChatBlock, { type: "user" }>;
 
 /**

@@ -463,6 +463,7 @@ export function GoalFill({ percentage }: { percentage: number }) {
   const animate = useFirstTimeToday("meta-do-dia", useInterfaceMotionEnabled());
   return (
     <motion.span
+      key={animate ? "primeira-vez" : "estatico"}
       className={home.goalFill}
       data-animate={animate ? "primeira-vez" : undefined}
       initial={animate ? { scaleX: 0 } : false}
