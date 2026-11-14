@@ -9,6 +9,7 @@ import { Input } from "@/components/arc/input/input";
 import { Textarea } from "@/components/arc/textarea/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PRIOR_CONTRACTS_MAX, type PriorClientInput, type PriorClientResult } from "@/features/customers/prior-portfolio-input";
+import { useCampoMascarado } from "@/shared/input/use-campo-mascarado";
 
 import styles from "./broker-my-wallet.module.css";
 import { contractErrors, EMPTY_PRIOR_CONTRACT, PriorContractFields, type PriorContractDraft } from "./prior-contract-fields";
@@ -33,6 +34,7 @@ export function PriorClientForm({ action, onCreatedChange }: { action: PriorClie
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ clientId: string; name: string } | null>(null);
+  const telefone = useCampoMascarado("telefone", draft.telefone, (valor) => update("telefone", valor));
 
   function reset() {
     setDraft(EMPTY);
@@ -101,7 +103,7 @@ export function PriorClientForm({ action, onCreatedChange }: { action: PriorClie
   return (
     <form className={styles.sheetBody} onSubmit={submit} noValidate>
       <Input label="Nome" autoComplete="name" value={draft.nome} onChange={(event) => update("nome", event.target.value)} error={fieldErrors.nome} required maxLength={120} />
-      <Input label="Telefone" type="tel" inputMode="tel" autoComplete="tel" placeholder="11 99999-9999" value={draft.telefone} onChange={(event) => update("telefone", event.target.value)} error={fieldErrors.telefone} required />
+      <Input label="Telefone" type="tel" autoComplete="tel" placeholder="(11) 99999-9999" {...telefone} error={fieldErrors.telefone} required />
       <Input label="E-mail (opcional)" type="email" inputMode="email" autoComplete="email" value={draft.email} onChange={(event) => update("email", event.target.value)} error={fieldErrors.email} maxLength={254} />
       <Textarea label="Observação (opcional)" value={draft.observacao} onChange={(event) => update("observacao", event.target.value)} error={fieldErrors.observacao} maxLength={2000} rows={3} description="Por exemplo, de onde veio o cliente." />
 

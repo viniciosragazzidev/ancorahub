@@ -24,6 +24,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { addLeadBeneficiaryAction, removeLeadBeneficiaryAction, updateLeadBeneficiaryAction } from "@/features/post-sale/actions";
 import { cn } from "@/lib/utils";
 import embeddedStyles from "./beneficiaries-section.module.css";
+import { lerCpf } from "@/shared/input/documento";
+import { useCampoMascarado } from "@/shared/input/use-campo-mascarado";
 
 type Beneficiary = {
   id: string;
@@ -64,6 +66,13 @@ function keyFromDate(date: Date | undefined): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+/** Só avisa quando os 11 números já foram digitados e não formam um CPF válido (o servidor recusaria). */
+function avisoCpf(valor: string): string | null {
+  if (valor.replace(/\D/g, "").length < 11) return null;
+  const lido = lerCpf(valor);
+  return lido.ok ? null : lido.mensagem;
+}
+
 export function BeneficiariesSection({
   leadId,
   contactName,
@@ -94,6 +103,11 @@ export function BeneficiariesSection({
   // O formulário de inclusão abre num painel próprio; a área principal mostra só as pessoas já cadastradas.
   const [addOpen, setAddOpen] = useState(false);
   const addButtonRef = useRef<HTMLButtonElement>(null);
+  // CPF com máscara (colar "529 982 247 25" funciona) e aviso na hora quando os 11 números não fecham.
+  const cpfCampo = useCampoMascarado("cpf", cpf, setCpf);
+  const editCpfCampo = useCampoMascarado("cpf", editCpf, setEditCpf);
+  const cpfAviso = avisoCpf(cpf);
+  const editCpfAviso = avisoCpf(editCpf);
 
   const holder = beneficiaries.find((beneficiary) => beneficiary.isHolder);
   const isCompletingHolder = !holder;
@@ -292,7 +306,8 @@ export function BeneficiariesSection({
 
           <div className="space-y-1.5">
             <Label htmlFor="beneficiary-cpf">CPF, se informado</Label>
-            <Input id="beneficiary-cpf" className="min-h-11" inputMode="numeric" value={cpf} onChange={(event) => setCpf(event.target.value)} placeholder="000.000.000-00" />
+            <Input id="beneficiary-cpf" format="none" className="min-h-11" {...cpfCampo} aria-invalid={cpfAviso ? true : undefined} aria-describedby={cpfAviso ? "beneficiary-cpf-aviso" : undefined} placeholder="000.000.000-00" />
+            {cpfAviso ? <p id="beneficiary-cpf-aviso" className="text-xs text-destructive">{cpfAviso}</p> : null}
           </div>
 
           {!isCompletingHolder ? (
@@ -351,7 +366,7 @@ export function BeneficiariesSection({
               <div className="space-y-1.5"><Label htmlFor="edit-beneficiary-name">Nome</Label><Input id="edit-beneficiary-name" className="min-h-11" value={editName} onChange={(event) => setEditName(event.target.value)} /></div>
               <div className="space-y-1.5"><DatePicker id="edit-beneficiary-birth" label="Data de nascimento" className="min-h-11" value={dateFromKey(editBirthDate)} onChange={(date) => setEditBirthDate(keyFromDate(date))} locale="pt-BR" format={{ day: "2-digit", month: "2-digit", year: "numeric" }} placeholder="Selecione uma data" /></div>
               <div className="space-y-1.5"><Label htmlFor="edit-beneficiary-age">Idade, se não souber a data</Label><Input id="edit-beneficiary-age" className="min-h-11" type="number" min={0} max={120} value={editAge} onChange={(event) => setEditAge(event.target.value)} /></div>
-              <div className="space-y-1.5"><Label htmlFor="edit-beneficiary-cpf">CPF, se informado</Label><Input id="edit-beneficiary-cpf" className="min-h-11" inputMode="numeric" value={editCpf} onChange={(event) => setEditCpf(event.target.value)} placeholder={beneficiaryToEdit?.hasCpf ? "Já cadastrado. Deixe em branco para manter." : "000.000.000-00"} /></div>
+              <div className="space-y-1.5"><Label htmlFor="edit-beneficiary-cpf">CPF, se informado</Label><Input id="edit-beneficiary-cpf" format="none" className="min-h-11" {...editCpfCampo} aria-invalid={editCpfAviso ? true : undefined} aria-describedby={editCpfAviso ? "edit-beneficiary-cpf-aviso" : undefined} placeholder={beneficiaryToEdit?.hasCpf ? "Já cadastrado. Deixe em branco para manter." : "000.000.000-00"} />{editCpfAviso ? <p id="edit-beneficiary-cpf-aviso" className="text-xs text-destructive">{editCpfAviso}</p> : null}</div>
               {!beneficiaryToEdit?.isHolder ? <div className="space-y-1.5"><Label htmlFor="edit-beneficiary-relationship">Parentesco</Label><Select value={editRelationship} labels={relationshipLabels} onValueChange={(value) => setEditRelationship((value ?? "filho") as Relationship)}><SelectTrigger id="edit-beneficiary-relationship" className="min-h-11 w-full"><SelectValue placeholder="Selecione o parentesco" /></SelectTrigger><SelectContent>{Object.entries(relationshipLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div> : null}
               {beneficiaryToEdit?.hasCpf ? <p className="text-xs text-muted-foreground">O CPF existente fica protegido. Deixe o campo em branco para mantê-lo.</p> : null}
             </div>
