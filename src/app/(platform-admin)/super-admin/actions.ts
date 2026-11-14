@@ -1243,6 +1243,7 @@ const BROKER_NEWS_FLAGS = [
   { field: "brokerJourneyEnabled", flag: FEATURE_FLAGS.BROKER_JOURNEY },
   { field: "brokerNavReorgEnabled", flag: FEATURE_FLAGS.BROKER_NAV_REORG },
   { field: "brokerPriorClientsEnabled", flag: FEATURE_FLAGS.BROKER_PRIOR_CLIENTS },
+  { field: "brokerQuickSaleEnabled", flag: FEATURE_FLAGS.BROKER_QUICK_SALE },
   { field: "teamRankingEnabled", flag: FEATURE_FLAGS.TEAM_RANKING },
   { field: "engagementCampaignsEnabled", flag: FEATURE_FLAGS.ENGAGEMENT_CAMPAIGNS },
   { field: "welcomeVideoEnabled", flag: FEATURE_FLAGS.WELCOME_VIDEO },

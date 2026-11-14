@@ -641,6 +641,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Habilita o novo fluxo Lite de registro de venda para corretores.",
   },
+  BROKER_QUICK_SALE: {
+    key: "feature_broker_quick_sale_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Registrar venda em dois toques (plano Início do corretor e CRM, parte B): em Minha carteira o corretor escolhe um lead em negociação e a tela do lead abre o registro de venda (`/leads/[id]?registrar-venda=1`). Nenhuma regra de venda muda. Desligada, some o acesso e o parâmetro é ignorado.",
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<string>>;
 
 // ─── Tipo utilitário ──────────────────────────────────────────────────────────
