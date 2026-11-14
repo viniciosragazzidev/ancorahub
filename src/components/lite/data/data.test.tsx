@@ -151,6 +151,13 @@ describe("cartão do celular (Miller: no máximo 6 campos à vista)", () => {
     expect(more.map((column) => column.id)).toEqual(["fila", "valor", "criado", "unidade"]);
   });
 
+  it("a coluna actions fica sempre à vista no celular, salvo phonePriority low", () => {
+    const columns = [...wide.slice(2), { ...wide[2], id: "actions" }];
+    expect(splitPhoneDetails(columns, 4).visible.map((column) => column.id)).toContain("actions");
+    const low = columns.map((column) => column.id === "actions" ? { ...column, phonePriority: "low" as const } : column);
+    expect(splitPhoneDetails(low, 4).more.map((column) => column.id)).toContain("actions");
+  });
+
   it("até 6 campos, nada muda: sem Mais dados", () => {
     render(<LiteDataList {...base} />);
     expect(screen.queryByText(/Mais dados/)).not.toBeInTheDocument();

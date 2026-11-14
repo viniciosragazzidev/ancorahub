@@ -35,9 +35,11 @@ export const LITE_PHONE_MAX_FIELDS = 6;
 
 /** Separa os detalhes do cartão em visíveis (até o limite) e "Mais dados", respeitando a prioridade. */
 export function splitPhoneDetails<T>(details: LiteColumn<T>[], slots: number) {
+  // A coluna de ações da linha nunca vai para "Mais dados" sem pedido explícito (revisão 14/11).
+  const isHigh = (column: LiteColumn<T>) => column.phonePriority === "high" || (column.id === "actions" && column.phonePriority !== "low");
   const ordered = [
-    ...details.filter((column) => column.phonePriority === "high"),
-    ...details.filter((column) => !column.phonePriority),
+    ...details.filter(isHigh),
+    ...details.filter((column) => !column.phonePriority && !isHigh(column)),
   ];
   const visibleIds = new Set(ordered.slice(0, Math.max(0, slots)).map((column) => column.id));
   return {
