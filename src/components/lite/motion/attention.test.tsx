@@ -34,6 +34,12 @@ describe("LiteAttention", () => {
     expect((motion.transition as { repeat?: number }).repeat).toBeUndefined();
   });
 
+  it("accepts a shorter duration for small pieces like a tab badge", () => {
+    const { container } = render(<LiteAttention pulseKey={2} duration={0.24}><span>3</span></LiteAttention>);
+    const motion = readMotion(container.querySelector('[aria-hidden="true"]')!);
+    expect((motion.transition as { duration: number }).duration).toBeCloseTo(0.24);
+  });
+
   it("only fades with reduced motion: no growth and a short fade", () => {
     motionState.reduce = true;
     const { container } = render(<LiteAttention pulseKey="novo"><span>Sino</span></LiteAttention>);

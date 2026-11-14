@@ -13,6 +13,8 @@ export interface LiteAttentionProps {
    * Cada valor novo refaz a animação uma vez.
    */
   pulseKey?: string | number;
+  /** Duração do pulso em segundos (padrão `motionTokens.attention.duration`). Peças pequenas usam um token curto. */
+  duration?: number;
   children: ReactNode;
   className?: string;
 }
@@ -21,7 +23,7 @@ export interface LiteAttentionProps {
  * Chama atenção para algo que mudou. O anel é um elemento sobreposto que anima só scale e opacity,
  * uma vez, e nunca em loop. Com movimento reduzido, só opacidade e sem crescer.
  */
-export function LiteAttention({ pulseKey, children, className }: LiteAttentionProps) {
+export function LiteAttention({ pulseKey, duration = motionTokens.attention.duration, children, className }: LiteAttentionProps) {
   const reduce = useReducedMotion();
   return (
     <span className={className} style={{ position: "relative", display: "inline-flex" }}>
@@ -33,7 +35,7 @@ export function LiteAttention({ pulseKey, children, className }: LiteAttentionPr
           style={{ position: "absolute", inset: 0, borderRadius: "inherit", border: "2px solid var(--primary)", pointerEvents: "none" }}
           initial={{ opacity: motionTokens.attention.opacity, scale: 1 }}
           animate={{ opacity: 0, scale: reduce ? 1 : motionTokens.scale.attention }}
-          transition={{ duration: reduce ? motionTokens.duration.instant : motionTokens.attention.duration, ease: easeStandard }}
+          transition={{ duration: reduce ? motionTokens.duration.instant : duration, ease: easeStandard }}
         />
       ) : null}
     </span>
