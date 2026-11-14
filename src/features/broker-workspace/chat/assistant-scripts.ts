@@ -223,6 +223,7 @@ export function buildAssistantThreads(input: {
  * a Jornada abre pelo Desempenho. O que pede atenção continua marcado em cada linha e no flutuante Agora.
  */
 const HOME_V2_ORDER: readonly AssistantId[] = ["ancora", "leads", "carteira", "plantao", "agenda", "desempenho", "cotacao"];
+export const HOME_V2_PLANTAO_HREF = "/plantoes";
 
 function arrangeHomeV2(threads: ThreadSummary[]): ThreadSummary[] {
   const carteira = assistantThread("carteira", {
@@ -233,6 +234,9 @@ function arrangeHomeV2(threads: ThreadSummary[]): ThreadSummary[] {
   });
   const byId = new Map<AssistantId, ThreadSummary>();
   for (const thread of [...threads, carteira]) if (thread.assistant) byId.set(thread.assistant, thread);
+  // Plantões em uma entrada única (etapa 3): o Plantão abre o plantão atual, o calendário e a escala.
+  const plantao = byId.get("plantao");
+  if (plantao) byId.set("plantao", { ...plantao, href: HOME_V2_PLANTAO_HREF });
   return HOME_V2_ORDER.flatMap((id) => byId.get(id) ?? []);
 }
 

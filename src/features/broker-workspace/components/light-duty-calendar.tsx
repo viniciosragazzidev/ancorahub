@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, CalendarDays, Clock3, MapPin } from "lucide-react";
 
 import { Badge } from "@/components/arc/badge/badge";
@@ -18,7 +18,10 @@ import styles from "./light-duty-calendar-motion.module.css";
 
 type LightDutyCalendarProps = { calendar: BrokerDutyCalendarResult };
 
-const CARD_STYLE: React.CSSProperties = {
+/** Quantas datas "Minha escala" mostra antes de "Ver mais datas". */
+const SCHEDULE_PREVIEW_DAYS = 5;
+
+export const DUTY_CARD_STYLE: React.CSSProperties = {
   background: "var(--surface)",
   borderRadius: "var(--radius-surface)",
   boxShadow: "var(--shadow-resting)",
@@ -71,6 +74,33 @@ function getOccurrenceTime(occurrence: BrokerDutyCalendarOccurrence) {
 }
 
 export function LightDutyCalendar({ calendar }: LightDutyCalendarProps) {
+  return (
+    <section aria-labelledby="duty-calendar-page-title" className="lite-page" style={{ paddingBottom: "max(120px, var(--mobile-safe-bottom, 0px))" }}>
+      <header>
+        <h1 id="duty-calendar-page-title" className="lite-page-title">
+          Plantões
+        </h1>
+        <p className="lite-page-subtitle">
+          {calendar.occurrences.length === 1 ? "1 plantão no período" : `${calendar.occurrences.length} plantões no período`}
+        </p>
+      </header>
+      <DutyCalendarSections calendar={calendar} />
+    </section>
+  );
+}
+
+type DutyCalendarSectionsProps = {
+  calendar: BrokerDutyCalendarResult;
+  /**
+   * Entrada única de Plantões (BROKER_NAV_REORG): o cartão do plantão atual vem pronto de fora e a lista passa a
+   * ser "Minha escala" (todos os próximos plantões, sem repetir os que o cartão já mostra).
+   */
+  hub?: { current: ReactNode; coveredOccurrenceIds: readonly string[] };
+};
+
+/** Destaque (ou plantão atual), calendário e lista de plantões, com a folha de detalhes do dia. */
+export function DutyCalendarSections({ calendar, hub }: DutyCalendarSectionsProps) {
+  const [showAllDays, setShowAllDays] = useState(false);
   const firstOccurrence = calendar.occurrences[0];
   const [selectedDateKey, setSelectedDateKey] = useState(firstOccurrence?.dutyDate ?? calendar.todayKey);
   const [visibleMonth, setVisibleMonth] = useState(() => monthFromKey(firstOccurrence?.dutyDate ?? calendar.todayKey));
@@ -107,12 +137,19 @@ export function LightDutyCalendar({ calendar }: LightDutyCalendarProps) {
     return todayOnes.find((occurrence) => occurrence.inProgress) ?? todayOnes[0] ?? firstOccurrence ?? null;
   }, [calendar, firstOccurrence]);
 
+  // Minha escala: todos os próximos plantões do período, menos os que o cartão do plantão atual já mostra.
+  const scheduleCovered = useMemo(() => new Set(hub?.coveredOccurrenceIds ?? []), [hub?.coveredOccurrenceIds]);
+  const scheduleDays = useMemo(() => {
+    if (!hub) return [];
+    return Array.from(new Set(calendar.occurrences.filter((occurrence) => !scheduleCovered.has(occurrence.id)).map((occurrence) => occurrence.dutyDate)));
+  }, [calendar.occurrences, hub, scheduleCovered]);
+
   const nextSevenDays = useMemo(() => {
     const lastKey = addDaysToKey(calendar.todayKey, 6);
     // The highlight card already shows this occurrence, so keep it out of
     // the seven-day list to avoid repeating the same shift and its status.
     return calendar.occurrences.filter((occurrence) =>
-      occurrence.id !== highlight.id &&
+      occurrence.id !== highlight?.id &&
       occurrence.dutyDate >= calendar.todayKey &&
       occurrence.dutyDate <= lastKey,
     );
@@ -140,26 +177,20 @@ export function LightDutyCalendar({ calendar }: LightDutyCalendarProps) {
     ? capitalizeLabel(formatDate(sheetDateKey, { weekday: "long", day: "numeric", month: "long" }))
     : "";
 
-  return (
-    <section aria-labelledby="duty-calendar-page-title" className="lite-page" style={{ paddingBottom: "max(120px, var(--mobile-safe-bottom, 0px))" }}>
-      <header>
-        <h1 id="duty-calendar-page-title" className="lite-page-title">
-          Plantões
-        </h1>
-        <p className="lite-page-subtitle">
-          {calendar.occurrences.length === 1 ? "1 plantão no período" : `${calendar.occurrences.length} plantões no período`}
-        </p>
-      </header>
+  const visibleScheduleDays = showAllDays ? scheduleDays : scheduleDays.slice(0, SCHEDULE_PREVIEW_DAYS);
+  const hiddenScheduleDays = scheduleDays.length - SCHEDULE_PREVIEW_DAYS;
 
+  return (
+    <>
       <div className="mt-6 space-y-6">
-        {highlight ? (
+        {hub ? hub.current : highlight ? (
           <button
             type="button"
             onClick={() => openOccurrence(highlight)}
             data-tour="micro-duty-highlight"
             aria-label={`Ver plantão ${highlight.scheduleName}, das ${getOccurrenceTime(highlight)}`}
             className="w-full cursor-pointer p-4 text-left transition-transform active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100 sm:p-5"
-            style={CARD_STYLE}
+            style={DUTY_CARD_STYLE}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -190,7 +221,7 @@ export function LightDutyCalendar({ calendar }: LightDutyCalendarProps) {
             </div>
           </button>
         ) : (
-          <div className="px-4 py-10" style={CARD_STYLE}>
+          <div className="px-4 py-10" style={DUTY_CARD_STYLE}>
             <EmptyState
               label="Você não tem plantão marcado"
               icon={<CalendarDays width={24} height={24} strokeWidth={1.5} />}
@@ -200,7 +231,7 @@ export function LightDutyCalendar({ calendar }: LightDutyCalendarProps) {
           </div>
         )}
 
-        <section data-tour="micro-duty-calendar" aria-label="Calendário dos seus plantões" className="p-4 sm:p-5" style={CARD_STYLE}>
+        <section data-tour="micro-duty-calendar" aria-label="Calendário dos seus plantões" className="p-4 sm:p-5" style={DUTY_CARD_STYLE}>
           <div className="mb-2 flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Calendário</h2>
             <Button type="button" variant="secondary" size="sm" onClick={jumpToToday}>
@@ -224,8 +255,59 @@ export function LightDutyCalendar({ calendar }: LightDutyCalendarProps) {
           </p>
         </section>
 
-        {nextSevenDays.length > 0 && (
-          <section data-tour="micro-duty-upcoming" aria-labelledby="next-seven-days-title" style={CARD_STYLE}>
+        {hub ? (
+          <section data-tour="micro-duty-upcoming" aria-labelledby="my-schedule-title" style={DUTY_CARD_STYLE}>
+            <h2 id="my-schedule-title" className="px-4 pt-4 text-base font-semibold sm:px-5" style={{ color: "var(--foreground)" }}>
+              Minha escala
+            </h2>
+            {scheduleDays.length === 0 ? (
+              <p className="px-4 pb-4 pt-1 text-sm sm:px-5" style={{ color: "var(--text-secondary)" }}>
+                {calendar.occurrences.length === 0
+                  ? "Nenhum plantão marcado no período. Quando o supervisor colocar você na escala, as datas aparecem aqui."
+                  : "Nenhum outro plantão marcado no período."}
+              </p>
+            ) : (
+              <>
+                <ul className="mt-2">
+                  {visibleScheduleDays.map((dateKey, index) => {
+                    const dayOccurrences = (occurrencesByDate.get(dateKey) ?? []).filter((occurrence) => !scheduleCovered.has(occurrence.id));
+                    return (
+                      <li key={dateKey} style={index > 0 ? { borderTop: "1px solid var(--border-subtle)" } : undefined}>
+                        <button
+                          type="button"
+                          onClick={() => openDay(dateKey)}
+                          className="w-full cursor-pointer px-4 py-3 text-left transition-colors hover:bg-[var(--surface-muted)] motion-reduce:transition-none sm:px-5"
+                          aria-label={`Ver plantões de ${formatDate(dateKey, { weekday: "long", day: "numeric", month: "long" })}`}
+                        >
+                          <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+                            {dateKey === calendar.todayKey ? "Hoje" : capitalizeLabel(formatDate(dateKey, { weekday: "long", day: "numeric", month: "long" }))}
+                          </p>
+                          {dayOccurrences.map((occurrence) => (
+                            <div key={occurrence.id} className="mt-1 flex items-center justify-between gap-2">
+                              <span className="min-w-0 truncate text-sm font-medium" style={{ color: "var(--foreground)" }}>{occurrence.scheduleName}</span>
+                              <span className="flex shrink-0 items-center gap-2 text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
+                                {getOccurrenceTime(occurrence)}
+                                {occurrence.paused && <Badge tone="warning" size="sm">Pausado</Badge>}
+                              </span>
+                            </div>
+                          ))}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {hiddenScheduleDays > 0 && (
+                  <div className="px-4 pb-3 sm:px-5">
+                    <Button type="button" variant="ghost" size="sm" aria-expanded={showAllDays} onClick={() => setShowAllDays((value) => !value)}>
+                      {showAllDays ? "Mostrar menos" : `Ver mais ${hiddenScheduleDays} ${hiddenScheduleDays === 1 ? "data" : "datas"}`}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        ) : nextSevenDays.length > 0 && (
+          <section data-tour="micro-duty-upcoming" aria-labelledby="next-seven-days-title" style={DUTY_CARD_STYLE}>
             <h2 id="next-seven-days-title" className="px-4 pt-4 text-base font-semibold sm:px-5" style={{ color: "var(--foreground)" }}>
               Próximos 7 dias
             </h2>
@@ -340,6 +422,6 @@ export function LightDutyCalendar({ calendar }: LightDutyCalendarProps) {
           </ul>
         )}
       </BottomSheet>
-    </section>
+    </>
   );
 }

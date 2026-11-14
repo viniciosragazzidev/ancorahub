@@ -151,11 +151,12 @@ export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
 
 /**
  * "Mais" do corretor com o Início reorganizado (BROKER_NAV_REORG): Minha carteira em destaque, Agenda e Desempenho
- * com caminho próprio e a Jornada dentro do Desempenho (sai daqui).
+ * com caminho próprio e a Jornada dentro do Desempenho (sai daqui). Plantões é a entrada única (etapa 3): plantão
+ * atual sempre, calendário e escala quando o calendário estiver ligado.
  */
 export const LIGHT_MORE_DESTINATIONS_V2: readonly LightMoreDestination[] = [
   { href: "/clientes", label: "Minha carteira" },
-  { href: "/plantoes", label: "Plantões", requires: "dutyCalendar" },
+  { href: "/plantoes", label: "Plantões" },
   { href: "/agenda", label: "Agenda" },
   { href: "/desempenho", label: "Desempenho" },
   { href: "/cotacao", label: "Cotação", requires: "quoteSimulator" },

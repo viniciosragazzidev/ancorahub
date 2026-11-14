@@ -17,9 +17,10 @@ export default async function DutyNowPage({ searchParams }: { searchParams: Prom
   if (context.role !== "broker") notFound();
   const now = new Date();
   const { plantao, assignment } = await searchParams;
-  const [workspace, calendarEnabled] = await Promise.all([
+  const [workspace, calendarEnabled, navReorg] = await Promise.all([
     getCachedBrokerWorkspaceData().catch(() => null),
     getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR).catch(() => "false"),
+    getFeatureFlag(FEATURE_FLAGS.BROKER_NAV_REORG).catch(() => FEATURE_FLAGS.BROKER_NAV_REORG.defaultValue),
   ]);
   const assignmentId = typeof assignment === "string" ? assignment : undefined;
   const scheduleId = workspace ? presenceScheduleIdFor(workspace, assignmentId) : null;
@@ -41,7 +42,7 @@ export default async function DutyNowPage({ searchParams }: { searchParams: Prom
         <div style={{ maxWidth: 560, margin: "0 auto", padding: "48px 16px", textAlign: "center", display: "grid", gap: 12 }}>
           <p style={{ margin: 0, fontSize: "var(--text-base)", fontWeight: 500 }}>Você não está de plantão agora.</p>
           {workspace?.duty?.next ? <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "var(--text-sm)" }}>Próximo: {workspace.duty.next.scheduleName}, {new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "long" }).format(new Date(`${workspace.duty.next.dutyDate}T12:00:00-03:00`))}, {new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(workspace.duty.next.startsAt)} às {new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(workspace.duty.next.endsAt)}.</p> : null}
-          {calendarEnabled === "true" ? <Link href="/plantoes" style={{ color: "var(--chat-action)", fontSize: "var(--text-sm)" }}>Ver plantões e minha escala</Link> : null}
+          {calendarEnabled === "true" || navReorg === "true" ? <Link href="/plantoes" style={{ color: "var(--chat-action)", fontSize: "var(--text-sm)" }}>Ver plantões e minha escala</Link> : null}
         </div>
       </div>
     );

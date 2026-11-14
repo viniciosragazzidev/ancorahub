@@ -27,6 +27,14 @@ describe("Início reorganizado (BROKER_NAV_REORG)", () => {
     expect(old).toEqual(expect.arrayContaining(["insights", "jornada"]));
     expect(old).not.toContain("carteira");
   });
+  it("opens Plantão on the single entry /plantoes with the flag on and keeps /plantoes/agora with it off (etapa 3)", () => {
+    const base = { data: workspace(), now, journey: journey() };
+    const on = buildAssistantThreads({ ...base, capabilities: { quoteSimulator: false, dutyCalendar: false, homeV2: true } });
+    expect(on.find((t) => t.assistant === "plantao")?.href).toBe("/plantoes");
+    const off = buildAssistantThreads({ ...base, capabilities: { quoteSimulator: false, dutyCalendar: true } });
+    expect(off.find((t) => t.assistant === "plantao")?.href).toBe("/plantoes/agora");
+    expect(ASSISTANTS.plantao.href).toBe("/plantoes/agora");
+  });
 });
 
 describe("Jornada assistant", () => {

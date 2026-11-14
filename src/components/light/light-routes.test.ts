@@ -24,6 +24,11 @@ describe("Light routes", () => {
     expect(getLightMoreDestinations({ homeV2: true }, "supervisor").some((item) => item.label === "Minha carteira")).toBe(false);
     expect(resolveLightRoute("/jornada", new URLSearchParams("de=desempenho"))).toMatchObject({ title: "Minha jornada", parentHref: "/desempenho" });
   });
+  it("keeps Plantões in Mais as the single entry with the reorganized Início, even with the calendar off (etapa 3)", () => {
+    expect(getLightMoreDestinations({ dutyCalendar: false, homeV2: true }).some((item) => item.href === "/plantoes")).toBe(true);
+    expect(getLightMoreDestinations({ dutyCalendar: false }).some((item) => item.href === "/plantoes")).toBe(false);
+    expect(resolveLightRoute("/plantoes/agora")).toMatchObject({ parentHref: "/plantoes" });
+  });
   it("keeps the allowed route list used by the dashboard layout", () => {
     for (const path of ["/dashboard", "/minha-fila", "/agenda", "/desempenho", "/leads/abc", "/conversas/broker", "/clientes/1", "/l/token", "/settings", "/notificacoes"]) {
       expect(isLightRouteAllowed(path)).toBe(true);
