@@ -2,6 +2,10 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 14/11/2026 - Entrada sem atrito no Lite (Postel e Miller)
+
+- Módulo único `src/shared/input` (telefone BR, CPF/CNPJ com dígito verificador, valor em centavos, data dd/mm/aaaa e ISO, máscara que mantém o cursor e aceita colagem bagunçada) aplicado no telefone de Adicionar contato, Cliente que já possuo e simulador de cotação e no CPF de Pessoas da contratação; cópias locais de telefone trocadas por funções legado idênticas (formato gravado em `leads.telefone` não muda); cartão Lite no celular mostra no máximo 6 campos e o resto em "Mais dados".
+
 ## 13/11/2026 - Início do corretor e CRM, parte B: Registrar venda em dois toques
 
 - Em Minha carteira, ao lado de Adicionar contato, **Registrar venda** abre a folha `QuickRegisterSaleSheet` (`src/features/broker-workspace/components/quick-register-sale.tsx`, exportada para a entrada no Início): busca por nome ou telefone e a lista dos leads do próprio corretor em negociação, os mais adiantados no funil primeiro (Em análise, Documentação pendente, Negociação, Cotação enviada, Aguardando retorno, Em atendimento). Novo e Distribuído ficam de fora porque ainda não abrem o registro. Estados de carregamento, vazio e erro com tentar de novo.
