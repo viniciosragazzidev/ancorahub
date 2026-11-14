@@ -136,7 +136,7 @@ export function OperationView({ data, canOpenConversations = true }: { data: Ess
             </div>
           </section>
         </LiteItem>
-        <LiteItem index={7} className={local.pairItem}>
+        <LiteItem index={6} className={local.pairItem}>
           <section className={kit.panel} aria-labelledby="operation-duties-title">
             <div className={kit.cardTop}>
               <div>
@@ -171,7 +171,7 @@ export function OperationView({ data, canOpenConversations = true }: { data: Ess
       </div>
 
       <div className={local.pair}>
-        <LiteItem index={6} className={local.pairItem}>
+        <LiteItem index={7} className={local.pairItem}>
           <section className={kit.panel} aria-labelledby="operation-funnel-title">
             <h2 id="operation-funnel-title" className={kit.sectionTitle}>Funil de qualificação</h2>
             {empty ? (
