@@ -24,7 +24,8 @@ export function CaptainBanner({ label, title, goal, progress, action, art = CAPT
   action: { label: string; href: string };
   art?: CaptainBannerArt;
   /** navy: o azul da marca (Início, jornada). light: azul bem claro com texto azul-marinho (Plantões). */
-  tone?: "navy" | "light";
+  /** white: quase branco, com borda e um brilho quente (Desempenho). */
+  tone?: "navy" | "light" | "white";
   /** rise: o capitão sai pelo topo do card. peek: ele espia por cima da borda de baixo, debruçado. */
   pose?: "rise" | "peek";
   /** compact: mais baixo, para entrar entre dois cards como um respiro de cor (Plantões). */
