@@ -1,0 +1,138 @@
+/*
+ * Resumo do "Meu financeiro" do corretor, no mesmo desenho do card de nível da Minha jornada: o número que importa
+ * grande em cima, a barra do que já caiu e uma faixa de três números embaixo. Só tokens do Lite.
+ */
+.hero {
+  display: grid;
+  overflow: hidden;
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.top {
+  display: grid;
+  gap: 12px;
+  padding: 20px 20px 18px;
+  background: radial-gradient(130% 160% at 0% 0%, var(--chat-action-soft, rgb(0 43 115 / 0.1)) 0%, transparent 62%);
+}
+
+.amount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  margin: 0;
+  font-size: 36px;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: var(--tracking-display, -0.03em);
+  font-variant-numeric: tabular-nums;
+}
+
+.amount small {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.progress {
+  display: grid;
+  gap: 6px;
+}
+
+.bar {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.barFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--success);
+  transform-origin: left center;
+  animation: fill 900ms cubic-bezier(0.16, 1, 0.3, 1) 150ms both;
+}
+
+@keyframes fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.progressText {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.progressText strong {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.stat {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "icon value" "icon label";
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 1px;
+  min-width: 0;
+  padding: 14px 16px;
+}
+
+.stat + .stat {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.stat svg { grid-area: icon; }
+.stat[data-tone="approved"] svg { color: var(--chat-action, var(--primary)); }
+.stat[data-tone="received"] svg { color: var(--success); }
+.stat[data-tone="count"] svg { color: oklch(72% 0.15 85); }
+
+.stat dt {
+  grid-area: label;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stat dd {
+  grid-area: value;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-base);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 420px) {
+  .amount { font-size: 32px; }
+  .stat { grid-template-columns: minmax(0, 1fr); grid-template-areas: "icon" "value" "label"; justify-items: start; row-gap: 4px; padding: 12px; }
+  .stat dd { font-size: var(--text-sm); }
+}
+
+@media (min-width: 720px) {
+  .top { padding: 24px 28px 22px; }
+  .stat { padding: 16px 28px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barFill { animation: none; }
+}

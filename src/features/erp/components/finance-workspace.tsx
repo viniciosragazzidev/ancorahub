@@ -354,7 +354,8 @@ export function FinanceLedger({ data, branches, title, description, emptyTitle =
       description={description}
       count={data.total}
       countLabel={["lançamento", "lançamentos"]}
-      columns={ENTRY_COLUMNS}
+      // O corretor só vê os próprios lançamentos já aprovados: beneficiário e estado repetiriam o óbvio.
+      columns={data.agency ? ENTRY_COLUMNS : ENTRY_COLUMNS.filter((column) => column.id !== "beneficiary" && column.id !== "status")}
       rows={data.rows}
       rowKey={(item) => item.id}
       onRowOpen={(item) => openEntry(item.id)}

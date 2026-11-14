@@ -19,7 +19,7 @@ export async function ErpPage({ pathname, breadcrumb, title, actions, children }
     getRequiredTenantContext().then((context) => getLiteAudience(context)).catch(() => null),
   ]);
   if (audience) return <ErpSkinProvider skin="lite">
-    <main className={litePage.stack}>
+    <main className={`${litePage.stack} ${kit.liteBody}`}>
       {actions ? <div className={kit.bodyActions}>{actions}</div> : null}
       {children}
     </main>
