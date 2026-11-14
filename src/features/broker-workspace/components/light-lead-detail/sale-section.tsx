@@ -48,8 +48,8 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrat
 
       {registrationV2Enabled && mode === "broker" && !isDistributed && canStartV2Registration ? (
         <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
-          <p className="text-sm font-medium text-(--foreground)">{aiSalePrompt === "register" ? "Venda detectada pela IA" : "Registrar venda"}</p>
-          <p className="text-sm text-(--text-secondary)">Revise as pessoas, os dados do plano e envie os documentos que ainda faltam. A confirmação da operadora precisa estar aprovada para concluir.</p>
+          {aiSalePrompt === "register" ? <p className="text-sm font-medium text-(--foreground)">Venda detectada pela IA</p> : null}
+          <p className="text-sm text-(--text-secondary)">Pessoas, plano e documentos em quatro passos. Conclui com a confirmação da operadora aprovada.</p>
           <Button variant="secondary" onClick={() => setShowSaleConfirm(true)}>
             {leadStatus === "documentation_pending" ? "Continuar registro" : "Registrar venda"}
           </Button>

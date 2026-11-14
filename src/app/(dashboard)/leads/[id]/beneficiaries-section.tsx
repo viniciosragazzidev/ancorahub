@@ -22,6 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { addLeadBeneficiaryAction, removeLeadBeneficiaryAction, updateLeadBeneficiaryAction } from "@/features/post-sale/actions";
+import { cn } from "@/lib/utils";
+import embeddedStyles from "./beneficiaries-section.module.css";
 
 type Beneficiary = {
   id: string;
@@ -200,14 +202,16 @@ export function BeneficiariesSection({
     <Card className={embedded ? "rounded-none border-0 bg-transparent p-0 shadow-none" : "border-border bg-card shadow-none"}>
       <CardHeader className="gap-1">
         <CardTitle className="text-base">Pessoas da contratação</CardTitle>
-        <CardDescription>
-          O contato do lead é o titular. Adicione os dependentes que farão parte da contratação.
-        </CardDescription>
+        {embedded ? null : (
+          <CardDescription>
+            O contato do lead é o titular. Adicione os dependentes que farão parte da contratação.
+          </CardDescription>
+        )}
       </CardHeader>
       <CardContent className="space-y-3">
         <ul className="grid gap-2" aria-label="Pessoas da contratação">
           {isCompletingHolder ? (
-            <li className="flex items-start justify-between gap-3 rounded-[var(--radius-card)] border border-dashed border-border bg-muted/30 p-3 text-sm">
+            <li className={cn("flex items-start justify-between gap-3 rounded-[var(--radius-card)] border border-dashed border-border bg-muted/30 p-3 text-sm", embedded && embeddedStyles.person)}>
               <div className="min-w-0">
                 <p className="truncate font-medium">{contactName}</p>
                 <p className="mt-1 text-xs text-muted-foreground">Contato do lead · confirme a data de nascimento</p>
@@ -216,7 +220,7 @@ export function BeneficiariesSection({
             </li>
           ) : null}
           {beneficiaries.map((beneficiary) => (
-            <li className="rounded-[var(--radius-card)] border border-border bg-card p-3 text-sm" key={beneficiary.id}>
+            <li className={cn("rounded-[var(--radius-card)] border border-border bg-card p-3 text-sm", embedded && embeddedStyles.person)} key={beneficiary.id}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -248,7 +252,7 @@ export function BeneficiariesSection({
           ))}
         </ul>
 
-        <Button ref={addButtonRef} type="button" variant="outline" className="min-h-11 w-full gap-2" disabled={pending} onClick={() => setAddOpen(true)}>
+        <Button ref={addButtonRef} type="button" variant="outline" className={cn("min-h-11 w-full gap-2", embedded && embeddedStyles.add)} disabled={pending} onClick={() => setAddOpen(true)}>
           <Plus className="size-4" />
           {isCompletingHolder ? "Confirmar titular" : "Adicionar dependente"}
         </Button>

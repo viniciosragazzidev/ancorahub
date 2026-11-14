@@ -1,0 +1,91 @@
+/*
+ * Registrar venda (Lite, quatro passos). Só tokens do escopo arc-venancor: folha branca, blocos em --surface-muted
+ * sem borda, campos de 44 px com borda forte (padrão arc/input), uma cor de ação (--chat-action).
+ */
+
+.popup.popup { width: calc(100vw - 1rem); max-width: 40rem; max-height: min(92dvh, 52rem); padding: 0; overflow: hidden; }
+@media (min-width: 640px) { .popup.popup { width: 100%; } }
+.shell { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: min(92dvh, 52rem); min-height: 0; }
+
+/* Cabeçalho fixo: título, passo atual, fechar e a barra de progresso em quatro trechos. */
+.head { display: grid; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--border); }
+.headRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.titles { display: grid; gap: 2px; min-width: 0; }
+.title { margin: 0; color: var(--foreground); font-size: var(--text-lg); font-weight: 600; line-height: 1.25; }
+.stepLabel { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); }
+.close { display: grid; flex: none; place-items: center; width: 36px; height: 36px; margin: -4px -6px 0 0; border: 0; border-radius: 999px; background: transparent; color: var(--text-secondary); cursor: pointer; }
+.close:hover { background: var(--surface-muted); color: var(--foreground); }
+.close:focus-visible { outline: 2px solid var(--chat-action-text, #2563eb); outline-offset: 2px; }
+.close svg { width: 18px; height: 18px; }
+.progress { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.progress span { height: 4px; border-radius: 999px; background: var(--surface-muted); transition: background-color var(--duration-fast, 160ms) var(--ease-standard, ease); }
+.progress span[data-done="true"] { background: var(--chat-action, #2563eb); }
+
+/* Corpo rolável: um passo por vez, sempre numa coluna limitada (nada estoura a largura). */
+.body { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 16px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 20px 20px; }
+.step { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+
+.group { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.groupTitle { margin: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 600; }
+.fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+@media (min-width: 560px) { .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .wide { grid-column: 1 / -1; } }
+
+/* Campo do Lite: rótulo 500 acima de um controle de 44 px com borda forte. */
+.field { display: grid; gap: 8px; min-width: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
+.control.control { width: 100%; height: auto; min-height: var(--control-height-md, 44px); padding: 0 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-sm); font-weight: 400; box-shadow: none; outline: none; }
+.control.control:hover, .control.control:focus-within, .control.control:focus-visible, .control.control[data-state="open"], .control.control[aria-expanded="true"] { border-color: var(--foreground); }
+.control.control * { font-size: var(--text-sm); }
+.currency.currency { padding-left: 34px; }
+/* Data: mesma borda forte dos outros campos. */
+.field :global([data-slot="date-picker-trigger"]) { border-color: var(--border-strong); }
+.field :global([data-slot="date-picker-trigger"]):hover, .field :global([data-slot="date-picker-trigger"][aria-expanded="true"]) { border-color: var(--foreground); }
+/* No celular os campos de texto ficam em 16 px (o iOS não amplia a tela); seletores e datas acompanham. */
+@media (max-width: 639px) { .control.control, .control.control *, .field :global([data-slot="date-picker-trigger"]) { font-size: 16px; } }
+.textarea.textarea { min-height: 88px; padding: 10px 14px; border-radius: 18px; resize: vertical; line-height: var(--leading-body); }
+.segments { display: flex; width: 100%; }
+.segments > :global(*) { flex: 1 1 auto; }
+.segments :global([data-slot="segmented-control-item"]) { flex: 1 1 0; }
+
+/* Blocos de leitura: cinza suave, sem borda. */
+.panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 12px 14px; border-radius: var(--radius-card, 12px); background: var(--surface-muted); }
+.panelLabel { color: var(--text-muted); font-size: var(--text-xs); }
+.panelValue { min-width: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 600; overflow-wrap: anywhere; }
+.panelMeta { min-width: 0; color: var(--text-secondary); font-size: var(--text-xs); overflow-wrap: anywhere; }
+
+/* Avisos: neutro (status), da IA (ação suave) e de bloqueio (perigo). Um tom só por aviso. */
+.note { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 10px 12px; border-radius: var(--radius-card, 12px); background: var(--surface-muted); color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
+.note svg { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+.note[data-tone="action"] { background: var(--chat-action-soft); color: var(--chat-action-text); }
+.note[data-tone="danger"] { background: color-mix(in oklab, var(--danger, #dc2626) 8%, var(--surface)); color: var(--danger, #dc2626); }
+
+/* Listas (documentos, arquivos e revisão): linhas dentro de um bloco cinza, separadas por um fio branco. */
+.list { display: grid; grid-template-columns: minmax(0, 1fr); margin: 0; padding: 4px 14px; border-radius: var(--radius-card, 12px); background: var(--surface-muted); list-style: none; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 52px; padding-block: 10px; }
+.row + .row { border-top: 2px solid var(--surface); }
+.rowMain { display: grid; gap: 2px; min-width: 0; }
+.rowTitle { min-width: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; overflow-wrap: anywhere; }
+.rowMeta { color: var(--text-secondary); font-size: var(--text-xs); }
+.rowSide { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.rowValue { color: var(--foreground); font-size: var(--text-sm); font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+
+.status { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: 999px; background: var(--surface); color: var(--text-secondary); font-size: var(--text-xs); font-weight: 500; white-space: nowrap; }
+.status[data-status="approved"] { background: var(--chat-action-soft); color: var(--chat-action-text); }
+.status[data-status="rejected"] { color: var(--danger, #dc2626); }
+
+.inlineAction { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--surface); color: var(--chat-action-text); font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
+.inlineAction:hover { background: color-mix(in oklab, var(--foreground) 5%, var(--surface)); }
+.inlineAction:focus-visible { outline: 2px solid var(--chat-action-text, #2563eb); outline-offset: 2px; }
+.link { padding: 0; font-size: inherit; border: 0; background: none; color: var(--chat-action-text); font: inherit; font-weight: 600; cursor: pointer; }
+.link:hover { text-decoration: underline; }
+
+.upload { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 14px; border-radius: var(--radius-card, 12px); background: var(--surface-muted); outline: none; }
+.upload:focus-visible { box-shadow: 0 0 0 2px var(--chat-action-text, #2563eb); }
+.upload .control.control { background: var(--surface); }
+
+/* Rodapé fixo: Voltar à esquerda, a ação do passo à direita. */
+.foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px calc(12px + var(--mobile-safe-bottom, 0px)); border-top: 1px solid var(--border); background: var(--surface); }
+.foot > :only-child { margin-left: auto; }
+.primary { min-width: 9rem; }
+@media (max-width: 420px) { .primary { flex: 1; } }
+
+@media (prefers-reduced-motion: reduce) { .progress span { transition: none; } }

@@ -1,0 +1,4 @@
+/* Pessoas dentro do Registrar venda (Lite): blocos cinza sem borda, como o resto do registro. */
+.person.person { border: 0; border-radius: var(--radius-card, 12px); background: var(--surface-muted); }
+.add.add { min-height: 44px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface); color: var(--foreground); box-shadow: none; }
+.add.add:hover { border-color: var(--foreground); background: var(--surface); }

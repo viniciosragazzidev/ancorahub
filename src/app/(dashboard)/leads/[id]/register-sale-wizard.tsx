@@ -4,23 +4,21 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { useSuccessOverlay } from "@/components/motion/success-overlay";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertCircle, Info, Sparkles, XIcon } from "lucide-react";
+import { Button } from "@/components/arc/button/button";
+import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { CurrencyInput } from "@/components/ui/currency-input";
-import { Dialog, DialogDescription, DialogPanel, DialogPopup, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { FileDropzone } from "@/components/arc/file-dropzone/file-dropzone";
 import { DatePicker } from "@/components/arc/date-picker/date-picker";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { AppSelect } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { confirmDocumentUploadAction } from "@/features/documents/actions";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
 import { BeneficiariesSection } from "@/app/(dashboard)/leads/[id]/beneficiaries-section";
 import { ensureLeadHolderAction, registerSaleAction } from "@/features/post-sale/actions";
 import { requiredDocumentsStillMissing } from "@/features/post-sale/sale-registration-v2-core";
 import type { CarrierOption, ConfirmationDocument, LightLeadDetailData, LiteRequirement } from "@/features/broker-workspace/components/light-lead-detail/types";
+import styles from "./register-sale-wizard.module.css";
 
 type StepId = "people" | "plan" | "documents" | "review";
 const STEPS: Array<{ id: StepId; label: string }> = [
@@ -143,6 +141,7 @@ export function RegisterSaleWizard({
   const [setupMessage, setSetupMessage] = useState<string | null>(null);
   const [blockingMessage, setBlockingMessage] = useState<string | null>(null);
   const uploadSectionRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const people = useMemo(() => lead.beneficiaries ?? [], [lead.beneficiaries]);
   const holder = people.find((person) => person.isHolder);
@@ -159,6 +158,13 @@ export function RegisterSaleWizard({
   const canConfirm = Boolean(
     holder && policyNumber.trim() && coverageStartDate && approvedValue && hasApprovedConfirmation && missingDocuments.length === 0,
   );
+
+  // Com uma única confirmação aprovada, ela já vem escolhida: o seletor só aparece quando há mais de uma.
+  const approvedContractDocuments = approvedConfirmationDocuments.filter((document) => document.category === "contratacao");
+  const onlyApprovedConfirmationId = approvedContractDocuments.length === 1 ? approvedContractDocuments[0]!.id : "";
+  useEffect(() => {
+    if (onlyApprovedConfirmationId && !confirmationDocumentId) setConfirmationDocumentId(onlyApprovedConfirmationId);
+  }, [onlyApprovedConfirmationId, confirmationDocumentId]);
 
   useEffect(() => {
     if (!open || previewMode) return;
@@ -272,6 +278,9 @@ export function RegisterSaleWizard({
     });
   }
 
+  // Cada passo começa do topo, mesmo que o anterior tenha sido rolado até o fim.
+  useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = 0; }, [stepIndex]);
+
   function goNext() {
     setBlockingMessage(null);
     setStepIndex((current) => Math.min(STEPS.length - 1, current + 1));
@@ -291,149 +300,195 @@ export function RegisterSaleWizard({
   const requiredRequirements = requirements.filter((requirement) => requirement.required);
   const confirmationDocumentsPending = documents.some((document) => document.category === "contratacao" && document.status === "pending");
   const confirmationDocumentsRejected = documents.some((document) => document.category === "contratacao" && document.status === "rejected");
+  const confirmationStatus = approvedConfirmationDocuments.length ? "approved" : confirmationDocumentsPending ? "pending" : confirmationDocumentsRejected ? "rejected" : undefined;
+  const dateFormat = { day: "2-digit", month: "2-digit", year: "numeric" } as const;
 
   function renderRequirement(requirement: LiteRequirement, personId: string | null) {
     const status = requirementStatus(requirement, personId, documents);
     const personName = personId ? people.find((person) => person.id === personId)?.name ?? "Pessoa" : null;
     return (
-      <div key={`${requirement.id}-${personId ?? "lead"}`} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm first:pt-0 last:pb-0">
-        <span className="min-w-0">{requirement.name}{personName ? ` · ${personName}` : ""}</span>
-        <div className="flex shrink-0 items-center gap-2">
-          <Badge variant={status === "approved" ? "secondary" : "outline"}>{documentStatusLabel(status)}</Badge>
-          {status === undefined || status === "rejected" ? <Button type="button" variant="outline" className="min-h-11" onClick={() => startDocumentUpload(requirement.id, personId)}>{status === "rejected" ? "Corrigir" : "Enviar"}</Button> : null}
-        </div>
-      </div>
+      <li key={`${requirement.id}-${personId ?? "lead"}`} className={styles.row}>
+        <span className={styles.rowMain}>
+          <span className={styles.rowTitle}>{requirement.name}</span>
+          {personName ? <span className={styles.rowMeta}>{personName}</span> : null}
+        </span>
+        <span className={styles.rowSide}>
+          <span className={styles.status} data-status={status ?? "missing"}>{documentStatusLabel(status)}</span>
+          {status === undefined || status === "rejected" ? <button type="button" className={styles.inlineAction} onClick={() => startDocumentUpload(requirement.id, personId)}>{status === "rejected" ? "Corrigir" : "Enviar"}</button> : null}
+        </span>
+      </li>
     );
   }
+
+  const review: Array<{ label: string; value: string; meta?: string }> = [
+    { label: "Titular", value: holder?.name ?? lead.nome, meta: holder?.age != null ? `${holder.age} anos` : holder?.birthDate ? dateLabel(holder.birthDate) : "Idade não informada" },
+    { label: "Pessoas no plano", value: people.length ? personCountLabel(people.length) : "Titular pendente", meta: people.filter((person) => !person.isHolder).map((person) => person.name).join(", ") || "Sem dependentes cadastrados" },
+    { label: "Plano", value: lead.planName || "Plano do lead", meta: carriers.find((carrier) => carrier.id === carrierId)?.name || undefined },
+    { label: "Mensalidade", value: currencyLabel(approvedValue) },
+    { label: "Apólice ou contrato", value: policyNumber || "A informar" },
+    { label: "Vigência", value: coverageRangeLabel },
+    { label: "Pagamento", value: paymentOptions.find((option) => option.value === paymentMethod)?.label ?? "A informar" },
+    { label: "Confirmação", value: approvedConfirmationDocuments.find((document) => document.id === confirmationDocumentId)?.filename || "Pendente de aprovação" },
+  ];
+
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogPopup className="max-h-[min(92dvh,52rem)] w-[calc(100vw_-_1rem)] max-w-3xl overflow-y-auto sm:w-full">
-          <DialogPanel className="space-y-5 p-1 sm:p-2">
-            <header className="space-y-1">
-              <DialogTitle className="text-xl font-semibold">Registrar venda</DialogTitle>
-              <DialogDescription>Revise os dados, envie o que falta e conclua o registro em quatro passos.</DialogDescription>
+        <DialogPopup className={`arc-venancor ${styles.popup}`}>
+          <div className={styles.shell}>
+            <header className={styles.head}>
+              <div className={styles.headRow}>
+                <div className={styles.titles}>
+                  <DialogTitle className={styles.title}>Registrar venda</DialogTitle>
+                  <DialogDescription className={styles.stepLabel}>Passo {stepIndex + 1} de {STEPS.length} · {currentStep.label}</DialogDescription>
+                </div>
+                <button type="button" className={styles.close} aria-label="Fechar" disabled={pending} onClick={() => handleOpenChange(false)}><XIcon aria-hidden="true" /></button>
+              </div>
+              <div role="progressbar" aria-label="Progresso do registro" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={stepIndex + 1} aria-valuetext={`Passo ${stepIndex + 1} de ${STEPS.length}: ${currentStep.label}`} className={styles.progress}>
+                {STEPS.map((step, index) => <span key={step.id} data-done={index <= stepIndex ? "true" : undefined} />)}
+              </div>
             </header>
 
-            <nav aria-label="Etapas do registro da venda" className="space-y-2">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <p className="font-medium">Passo {stepIndex + 1} de {STEPS.length} · {currentStep.label}</p>
-                <span className="text-xs text-muted-foreground">{Math.round(((stepIndex + 1) / STEPS.length) * 100)}%</span>
-              </div>
-              <div role="progressbar" aria-label="Progresso do registro" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={stepIndex + 1} aria-valuetext={`Passo ${stepIndex + 1} de ${STEPS.length}: ${currentStep.label}`} className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <span className="block h-full rounded-full bg-primary " style={{ width: `${((stepIndex + 1) / STEPS.length) * 100}%` }} />
-              </div>
-            </nav>
+            <div ref={bodyRef} className={styles.body}>
+              {visibleSetupMessage ? <p role="status" className={styles.note}><Info aria-hidden="true" />{visibleSetupMessage}</p> : null}
+              {stepIndex === 0 && lead.status === "converted" && lead.aiSalePrompt === "register" ? <p className={styles.note} data-tone="action"><Sparkles aria-hidden="true" />Venda detectada pela IA. Complete os dados e a aprovação da confirmação da operadora para registrar no pós-venda.</p> : null}
+              {blockingMessage ? <p role="alert" className={styles.note} data-tone="danger"><AlertCircle aria-hidden="true" />{blockingMessage}</p> : null}
 
-            {visibleSetupMessage ? <p role="status" className="rounded-xl bg-muted px-3 py-2 text-sm text-muted-foreground">{visibleSetupMessage}</p> : null}
-            {stepIndex === 0 && lead.status === "converted" && lead.aiSalePrompt === "register" ? <p className="rounded-xl border border-emerald-300/60 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">Venda detectada pela IA. Complete os dados e a aprovação da confirmação da operadora para registrar no pós-venda.</p> : null}
-            {blockingMessage ? <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{blockingMessage}</p> : null}
-
-            {stepIndex === 0 ? (
-              <section className="space-y-4">
-                <header className="space-y-1">
-                  <h2 className="text-base font-semibold">Quem fará parte do plano</h2>
-                  <p className="text-sm text-muted-foreground">O contato do lead é usado como titular. Confira idade, CPF e dependentes antes de avançar.</p>
-                </header>
-                <div className="grid gap-2 border-b border-border pb-3 text-sm sm:grid-cols-2">
-                  <div><p className="text-xs text-muted-foreground">Contato do titular</p><p className="mt-1 font-medium">{lead.nome}</p><p className="text-xs text-muted-foreground">{lead.telefone || "Telefone não informado"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">E-mail</p><p className="mt-1 break-all font-medium">{lead.email || "Não informado"}</p></div>
-                </div>
-                {missingPeople > 0 ? <p role="status" className="rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">O lead indica {lead.livesCount} vidas. {missingPeople === 1 ? "Falta cadastrar 1 pessoa" : "Faltam " + missingPeople + " pessoas para cadastrar"}, se fizerem parte da contratação.</p> : null}
-                <BeneficiariesSection key={lead.id + ":" + beneficiariesVersion} leadId={lead.id} contactName={lead.nome} initialBeneficiaries={people.map((person) => ({ ...person, age: person.age ?? null, cpf: person.cpf ?? null, hasCpf: person.hasCpf ?? Boolean(person.cpf) }))} onChanged={() => router.refresh()} embedded />
-                {!holder ? <p role="status" className="text-sm text-amber-700 dark:text-amber-300">Os dados do titular estão sendo preparados. Se faltarem nascimento ou idade, complete nesta etapa.</p> : null}
-              </section>
-            ) : null}
-
-            {stepIndex === 1 ? (
-              <Card className="border-border shadow-none">
-                <CardHeader className="pb-2"><CardTitle className="text-base">Plano e condições da venda</CardTitle><CardDescription>O plano selecionado no lead é mantido. Informe os dados finais aprovados.</CardDescription></CardHeader>
-                <CardContent className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5"><Label>Plano do lead</Label><div className="flex min-h-11 items-center rounded-xl border border-border bg-muted/30 px-3 text-sm">{lead.planName || "Plano não informado no lead"}</div></div>
-                  {carriers.length ? <div className="space-y-1.5"><Label htmlFor="sale-v2-carrier">Operadora</Label><AppSelect id="sale-v2-carrier" value={carrierId} onValueChange={setCarrierId} placeholder="Selecione a operadora" triggerClassName="min-h-11" options={carriers.map((carrier) => ({ value: carrier.id, label: carrier.name }))} /></div> : null}
-                  <div className="space-y-1.5"><Label htmlFor="sale-v2-policy">Número da apólice ou contrato</Label><Input id="sale-v2-policy" className="min-h-11" value={policyNumber} onChange={(event) => setPolicyNumber(event.target.value)} placeholder="Ex.: 123456789" /></div>
-                  <div className="space-y-1.5"><Label htmlFor="sale-v2-value">Mensalidade aprovada</Label><CurrencyInput id="sale-v2-value" className="min-h-11" value={approvedValue} onChange={setApprovedValue} placeholder="0,00" /></div>
-                  <div className="space-y-1.5"><DatePicker label="Início da vigência" value={dateFromKey(coverageStartDate)} onChange={(date) => setCoverageStartDate(keyFromDate(date))} locale="pt-BR" format={{ day: "2-digit", month: "2-digit", year: "numeric" }} placeholder="Selecione uma data" /></div>
-                  <div className="space-y-1.5"><Label htmlFor="sale-v2-term">Prazo</Label><AppSelect id="sale-v2-term" value={String(contractTermMonths)} onValueChange={(value) => setContractTermMonths(Number(value))} triggerClassName="min-h-11" options={[{ value: "12", label: "12 meses" }, { value: "24", label: "24 meses" }, { value: "36", label: "36 meses" }]} /></div>
-                  <div className="space-y-1.5"><DatePicker label="Vencimento" value={dateFromKey(computedExpirationDate)} onChange={(date) => setCustomExpirationDate(keyFromDate(date))} locale="pt-BR" format={{ day: "2-digit", month: "2-digit", year: "numeric" }} placeholder="Selecione uma data" /></div>
-                  <div className="space-y-1.5"><Label htmlFor="sale-v2-payment">Forma de pagamento</Label><AppSelect id="sale-v2-payment" value={paymentMethod} onValueChange={setPaymentMethod} triggerClassName="min-h-11" options={paymentOptions} /></div>
-                  <div className="space-y-1.5"><Label htmlFor="sale-v2-renewal">Renovação</Label><AppSelect id="sale-v2-renewal" value={renewalType} onValueChange={setRenewalType} triggerClassName="min-h-11" options={renewalOptions} /></div>
-                  <div className="space-y-1.5"><Label htmlFor="sale-v2-contact">Contato para renovação</Label><AppSelect id="sale-v2-contact" value={renewalContactPreference} onValueChange={setRenewalContactPreference} triggerClassName="min-h-11" options={[{ value: "whatsapp", label: "WhatsApp" }, { value: "phone", label: "Ligação" }, { value: "email", label: "E-mail" }]} /></div>
-                  <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="sale-v2-notes">Observações do pós-venda</Label><Textarea id="sale-v2-notes" rows={3} value={postSaleNotes} onChange={(event) => setPostSaleNotes(event.target.value)} placeholder="Informações úteis para acompanhar este contrato" /></div>
-                </CardContent>
-              </Card>
-            ) : null}
-
-            {stepIndex === 2 ? (
-              <Card className="border-border shadow-none">
-                <CardHeader className="pb-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div><CardTitle className="text-base">Documentos da venda</CardTitle><CardDescription>A confirmação da operadora continua obrigatória e precisa estar aprovada.</CardDescription></div>
-                    <Button type="button" variant="outline" size="sm" onClick={() => router.refresh()}>Atualizar aprovação</Button>
+              {stepIndex === 0 ? (
+                <section className={styles.step} aria-label="Pessoas">
+                  <div className={styles.panel}>
+                    <span className={styles.panelLabel}>Contato do titular</span>
+                    <span className={styles.panelValue}>{lead.nome}</span>
+                    <span className={styles.panelMeta}>{[lead.telefone || "Telefone não informado", lead.email || null].filter(Boolean).join(" · ")}</span>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {!approvedConfirmationDocuments.length ? (
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-                      <div className="min-w-0"><p className="font-medium">Confirmação da operadora</p><p className="mt-1">{confirmationDocumentsPending ? "Aguardando aprovação" : confirmationDocumentsRejected ? "Precisa de correção" : "Falta enviar"}. O registro da venda libera depois da aprovação.</p></div>
-                      {!confirmationDocumentsPending ? <Button type="button" variant="outline" className="min-h-11 shrink-0" onClick={() => startDocumentUpload("", null)}>{confirmationDocumentsRejected ? "Corrigir" : "Enviar"}</Button> : null}
+                  {missingPeople > 0 ? <p role="status" className={styles.note}><Info aria-hidden="true" />O lead indica {lead.livesCount} vidas. {missingPeople === 1 ? "Falta cadastrar 1 pessoa" : "Faltam " + missingPeople + " pessoas para cadastrar"}, se fizerem parte da contratação.</p> : null}
+                  <BeneficiariesSection key={lead.id + ":" + beneficiariesVersion} leadId={lead.id} contactName={lead.nome} initialBeneficiaries={people.map((person) => ({ ...person, age: person.age ?? null, cpf: person.cpf ?? null, hasCpf: person.hasCpf ?? Boolean(person.cpf) }))} onChanged={() => router.refresh()} embedded />
+                  {!holder ? <p className={styles.note}><Info aria-hidden="true" />Os dados do titular estão sendo preparados. Se faltarem nascimento ou idade, complete nesta etapa.</p> : null}
+                </section>
+              ) : null}
+
+              {stepIndex === 1 ? (
+                <section className={styles.step} aria-label="Plano">
+                  <div className={styles.panel}>
+                    <span className={styles.panelLabel}>Plano do lead</span>
+                    <span className={styles.panelValue}>{lead.planName || "Plano não informado no lead"}</span>
+                  </div>
+                  <div className={styles.group}>
+                    <h3 className={styles.groupTitle}>Contrato</h3>
+                    <div className={styles.fields}>
+                      {carriers.length ? <label className={`${styles.field} ${styles.wide}`} htmlFor="sale-v2-carrier">Operadora<AppSelect id="sale-v2-carrier" value={carrierId} onValueChange={setCarrierId} placeholder="Selecione a operadora" triggerClassName={styles.control} options={carriers.map((carrier) => ({ value: carrier.id, label: carrier.name }))} /></label> : null}
+                      <label className={styles.field} htmlFor="sale-v2-policy">Número da apólice ou contrato<input id="sale-v2-policy" className={styles.control} value={policyNumber} onChange={(event) => setPolicyNumber(event.target.value)} placeholder="Ex.: 123456789" autoComplete="off" /></label>
+                      <label className={styles.field} htmlFor="sale-v2-value">Mensalidade aprovada<CurrencyInput id="sale-v2-value" className={`${styles.control} ${styles.currency}`} value={approvedValue} onChange={setApprovedValue} placeholder="0,00" /></label>
                     </div>
-                  ) : null}
-                  <div className="space-y-2">
-                    <Label htmlFor="sale-v2-confirmation">Confirmação aprovada</Label>
-                    <AppSelect id="sale-v2-confirmation" value={confirmationDocumentId} onValueChange={setConfirmationDocumentId} placeholder="Selecione o documento aprovado" triggerClassName="min-h-11" options={approvedConfirmationDocuments.map((document) => ({ value: document.id, label: document.filename }))} />
                   </div>
+                  <div className={styles.group}>
+                    <h3 className={styles.groupTitle}>Vigência</h3>
+                    <div className={styles.fields}>
+                      <div className={styles.field}><DatePicker label="Início da vigência" value={dateFromKey(coverageStartDate)} onChange={(date) => setCoverageStartDate(keyFromDate(date))} locale="pt-BR" format={dateFormat} placeholder="Selecione uma data" /></div>
+                      <div className={styles.field}><DatePicker label="Vencimento" value={dateFromKey(computedExpirationDate)} onChange={(date) => setCustomExpirationDate(keyFromDate(date))} locale="pt-BR" format={dateFormat} placeholder="Calculado pelo prazo" /></div>
+                      <div className={`${styles.field} ${styles.wide}`}>
+                        <span id="sale-v2-term-label">Prazo</span>
+                        <SegmentedControl className={styles.segments} label="Prazo" value={String(contractTermMonths)} onValueChange={(value) => { setContractTermMonths(Number(value)); setCustomExpirationDate(""); }} options={[{ value: "12", label: "12 meses" }, { value: "24", label: "24 meses" }, { value: "36", label: "36 meses" }]} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className={styles.group}>
+                    <h3 className={styles.groupTitle}>Pagamento e renovação</h3>
+                    <div className={styles.fields}>
+                      <label className={styles.field} htmlFor="sale-v2-payment">Forma de pagamento<AppSelect id="sale-v2-payment" value={paymentMethod} onValueChange={setPaymentMethod} triggerClassName={styles.control} options={paymentOptions} /></label>
+                      <label className={styles.field} htmlFor="sale-v2-renewal">Renovação<AppSelect id="sale-v2-renewal" value={renewalType} onValueChange={setRenewalType} triggerClassName={styles.control} options={renewalOptions} /></label>
+                      <div className={`${styles.field} ${styles.wide}`}>
+                        <span>Contato para renovação</span>
+                        <SegmentedControl className={styles.segments} label="Contato para renovação" value={renewalContactPreference} onValueChange={setRenewalContactPreference} options={[{ value: "whatsapp", label: "WhatsApp" }, { value: "phone", label: "Ligação" }, { value: "email", label: "E-mail" }]} />
+                      </div>
+                      <label className={`${styles.field} ${styles.wide}`} htmlFor="sale-v2-notes">Observações do pós-venda (opcional)<textarea id="sale-v2-notes" rows={3} className={`${styles.control} ${styles.textarea}`} value={postSaleNotes} onChange={(event) => setPostSaleNotes(event.target.value)} placeholder="Informações úteis para acompanhar este contrato" /></label>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
+              {stepIndex === 2 ? (
+                <section className={styles.step} aria-label="Documentos">
+                  <div className={styles.group}>
+                    <ul className={styles.list}>
+                      <li className={styles.row}>
+                        <span className={styles.rowMain}>
+                          <span className={styles.rowTitle}>Confirmação da operadora</span>
+                          <span className={styles.rowMeta}>{confirmationStatus === "approved" ? "Pronta para o registro" : <>Libera o registro depois de aprovada. <button type="button" className={styles.link} onClick={() => router.refresh()}>Atualizar</button></>}</span>
+                        </span>
+                        <span className={styles.rowSide}>
+                          <span className={styles.status} data-status={confirmationStatus ?? "missing"}>{documentStatusLabel(confirmationStatus)}</span>
+                          {!confirmationStatus || confirmationStatus === "rejected" ? <button type="button" className={styles.inlineAction} onClick={() => startDocumentUpload("", null)}>{confirmationStatus === "rejected" ? "Corrigir" : "Enviar"}</button> : null}
+                        </span>
+                      </li>
+                    </ul>
+                    {approvedConfirmationDocuments.length > 0 && !onlyApprovedConfirmationId ? (
+                      <label className={styles.field} htmlFor="sale-v2-confirmation">Confirmação aprovada<AppSelect id="sale-v2-confirmation" value={confirmationDocumentId} onValueChange={setConfirmationDocumentId} placeholder="Selecione o documento aprovado" triggerClassName={styles.control} options={approvedConfirmationDocuments.map((document) => ({ value: document.id, label: document.filename }))} /></label>
+                    ) : null}
+                  </div>
+
                   {requiredRequirements.length ? (
-                    <div className="space-y-2 border-t border-border pt-3">
-                      <p className="text-sm font-medium">Documentos obrigatórios</p>
-                      <div className="divide-y divide-border">
+                    <div className={styles.group}>
+                      <h3 className={styles.groupTitle}>Documentos obrigatórios</h3>
+                      <ul className={styles.list}>
                         {requiredRequirements.flatMap((requirement) => requirement.appliesPerBeneficiary
                           ? people.map((person) => renderRequirement(requirement, person.id))
                           : [renderRequirement(requirement, null)])}
-                      </div>
+                      </ul>
+                      {missingDocuments.length ? <p className={styles.rowMeta}>{requirementCountMessage(missingDocuments.length)}</p> : null}
                     </div>
                   ) : null}
-                  {missingDocuments.length ? <p className="text-sm text-muted-foreground">{requirementCountMessage(missingDocuments.length)}</p> : null}
-                  <div ref={uploadSectionRef} tabIndex={-1} className="space-y-3 rounded-xl border border-dashed border-border p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <p className="text-sm font-medium">Enviar documento agora</p>
-                    {requirements.length ? <div className="space-y-1.5"><Label htmlFor="sale-v2-requirement">Tipo de documento</Label><AppSelect id="sale-v2-requirement" value={requirementId} onValueChange={setRequirementId} placeholder="Confirmação da operadora" triggerClassName="min-h-11" options={requirements.map((item) => ({ value: item.id, label: item.name }))} /></div> : null}
-                    {selectedRequirement?.appliesPerBeneficiary ? <div className="space-y-1.5"><Label htmlFor="sale-v2-beneficiary">Pessoa do documento</Label><AppSelect id="sale-v2-beneficiary" value={selectedBeneficiaryId} onValueChange={setBeneficiaryId} placeholder="Selecione a pessoa" triggerClassName="min-h-11" options={people.map((person) => ({ value: person.id, label: person.name }))} /></div> : null}
-                    <FileDropzone label="Arquivo" description="PDF, JPG ou PNG até 10 MB" accept="application/pdf,image/jpeg,image/png" multiple={false} maxFiles={1} maxSize={10 * 1024 * 1024} onFilesChange={(files) => setUploadFile(files[0] ?? null)} />
-                    <div className="space-y-1.5"><Label htmlFor="sale-v2-observation">Observação (opcional)</Label><Input id="sale-v2-observation" value={uploadObservation} onChange={(event) => setUploadObservation(event.target.value)} placeholder="Ex.: confirmação da operadora" /></div>
-                    <Button type="button" variant="outline" className="min-h-11 w-full" disabled={previewMode || pending || !uploadFile} onClick={uploadDocument}>{pending ? "Enviando…" : "Enviar para aprovação"}</Button>
-                  </div>
-                  {documents.length ? <div className="space-y-2"><p className="text-sm font-medium">Arquivos enviados</p>{documents.map((document) => <div key={document.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-2 text-sm"><span className="min-w-0 break-all">{document.filename}</span><Badge variant={document.status === "approved" ? "secondary" : "outline"}>{documentStatusLabel(document.status)}</Badge></div>)}</div> : null}
-                </CardContent>
-              </Card>
-            ) : null}
 
-            {stepIndex === 3 ? (
-              <Card className="border-border shadow-none">
-                <CardHeader className="pb-2"><CardTitle className="text-base">Revise antes de confirmar</CardTitle><CardDescription>A venda só será registrada quando os dados e documentos obrigatórios estiverem aprovados.</CardDescription></CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Titular</p><p className="mt-1 font-medium">{holder?.name ?? lead.nome}</p><p className="text-xs text-muted-foreground">{holder?.age != null ? `${holder.age} anos` : holder?.birthDate ? dateLabel(holder.birthDate) : "Idade não informada"}</p></div>
-                    <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Pessoas no plano</p><p className="mt-1 font-medium">{people.length ? personCountLabel(people.length) : "Titular pendente"}</p><p className="text-xs text-muted-foreground">{people.filter((person) => !person.isHolder).map((person) => person.name).join(", ") || "Sem dependentes cadastrados"}</p></div>
-                    <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Plano e operadora</p><p className="mt-1 font-medium">{lead.planName || "Plano do lead"}</p><p className="text-xs text-muted-foreground">{carriers.find((carrier) => carrier.id === carrierId)?.name || "Operadora não alterada"}</p></div>
-                    <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Mensalidade</p><p className="mt-1 font-medium">{currencyLabel(approvedValue)}</p></div>
-                    <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Apólice ou contrato</p><p className="mt-1 font-medium">{policyNumber || "A informar"}</p></div>
-                    <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Vigência</p><p className="mt-1 font-medium">{coverageRangeLabel}</p></div>
-                    <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Pagamento</p><p className="mt-1 font-medium">{paymentOptions.find((option) => option.value === paymentMethod)?.label}</p></div>
-                    <div className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">Confirmação</p><p className="mt-1 font-medium">{approvedConfirmationDocuments.find((document) => document.id === confirmationDocumentId)?.filename || "Pendente de aprovação"}</p></div>
+                  <div ref={uploadSectionRef} tabIndex={-1} className={styles.upload}>
+                    <h3 className={styles.groupTitle}>Enviar documento agora</h3>
+                    {requirements.length ? <label className={styles.field} htmlFor="sale-v2-requirement">Tipo de documento<AppSelect id="sale-v2-requirement" value={requirementId} onValueChange={setRequirementId} placeholder="Confirmação da operadora" triggerClassName={styles.control} options={requirements.map((item) => ({ value: item.id, label: item.name }))} /></label> : null}
+                    {selectedRequirement?.appliesPerBeneficiary ? <label className={styles.field} htmlFor="sale-v2-beneficiary">Pessoa do documento<AppSelect id="sale-v2-beneficiary" value={selectedBeneficiaryId} onValueChange={setBeneficiaryId} placeholder="Selecione a pessoa" triggerClassName={styles.control} options={people.map((person) => ({ value: person.id, label: person.name }))} /></label> : null}
+                    <FileDropzone label="Arquivo" description="PDF, JPG ou PNG até 10 MB" note="Um arquivo por envio" accept="application/pdf,image/jpeg,image/png" multiple={false} maxFiles={1} maxSize={10 * 1024 * 1024} onFilesChange={(files) => setUploadFile(files[0] ?? null)} />
+                    <label className={styles.field} htmlFor="sale-v2-observation">Observação (opcional)<input id="sale-v2-observation" className={styles.control} value={uploadObservation} onChange={(event) => setUploadObservation(event.target.value)} placeholder="Ex.: confirmação da operadora" /></label>
+                    <Button type="button" variant="secondary" disabled={previewMode || pending || !uploadFile} onClick={uploadDocument}>{pending ? "Enviando…" : "Enviar para aprovação"}</Button>
                   </div>
-                  {!canConfirm ? <p role="status" className="rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">{!holder ? "Complete os dados do titular." : approvedConfirmationDocuments.length === 0 ? "Falta anexar e aprovar a confirmação da operadora." : !confirmationDocumentId ? "Selecione a confirmação da operadora já aprovada." : missingDocuments.length ? requirementCountMessage(missingDocuments.length) : "Preencha o número do contrato, a vigência e o valor aprovado."}</p> : null}
-                </CardContent>
-              </Card>
-            ) : null}
 
-            <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
-              <Button type="button" variant="outline" className="min-h-11" disabled={pending || stepIndex === 0} onClick={() => setStepIndex((current) => Math.max(0, current - 1))}>Voltar</Button>
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" className="min-h-11" disabled={pending} onClick={() => handleOpenChange(false)}>Fechar</Button>
-                {stepIndex < STEPS.length - 1 ? <Button type="button" className="min-h-11" onClick={goNext}>Continuar</Button> : <Button type="button" className="min-h-11" disabled={previewMode || pending || !canConfirm} onClick={confirmSale}>{pending ? "Registrando…" : "Confirmar registro da venda"}</Button>}
-              </div>
+                  {documents.length ? (
+                    <div className={styles.group}>
+                      <h3 className={styles.groupTitle}>Arquivos enviados</h3>
+                      <ul className={styles.list}>
+                        {documents.map((document) => (
+                          <li key={document.id} className={styles.row}>
+                            <span className={styles.rowMain}><span className={styles.rowTitle}>{document.filename}</span></span>
+                            <span className={styles.status} data-status={document.status}>{documentStatusLabel(document.status)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {stepIndex === 3 ? (
+                <section className={styles.step} aria-label="Revisão">
+                  <ul className={styles.list}>
+                    {review.map((item) => (
+                      <li key={item.label} className={styles.row}>
+                        <span className={styles.rowMeta}>{item.label}</span>
+                        <span className={styles.rowMain} style={{ justifyItems: "end" }}>
+                          <span className={styles.rowValue}>{item.value}</span>
+                          {item.meta ? <span className={styles.rowMeta} style={{ textAlign: "right" }}>{item.meta}</span> : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {!canConfirm ? <p role="status" className={styles.note}><Info aria-hidden="true" />{!holder ? "Complete os dados do titular." : approvedConfirmationDocuments.length === 0 ? "Falta anexar e aprovar a confirmação da operadora." : !confirmationDocumentId ? "Selecione a confirmação da operadora já aprovada." : missingDocuments.length ? requirementCountMessage(missingDocuments.length) : "Preencha o número do contrato, a vigência e o valor aprovado."}</p> : null}
+                </section>
+              ) : null}
+            </div>
+
+            <footer className={styles.foot}>
+              {stepIndex > 0 ? <Button type="button" variant="secondary" disabled={pending} onClick={() => setStepIndex((current) => Math.max(0, current - 1))}>Voltar</Button> : null}
+              {stepIndex < STEPS.length - 1
+                ? <Button type="button" className={styles.primary} onClick={goNext}>Continuar</Button>
+                : <Button type="button" className={styles.primary} disabled={previewMode || pending || !canConfirm} onClick={confirmSale}>{pending ? "Registrando…" : "Confirmar registro"}</Button>}
             </footer>
-          </DialogPanel>
+          </div>
         </DialogPopup>
       </Dialog>
       {successOverlay}
