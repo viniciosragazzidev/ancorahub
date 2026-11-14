@@ -26,7 +26,11 @@ describe("SplashScreen", () => {
     const splash = container.querySelector("[data-splash-screen]") as HTMLElement;
     expect(splash).not.toBeNull();
     expect(splash.getAttribute("aria-hidden")).toBe("true");
-    expect(container.querySelector("img")!.getAttribute("src")).toBe("/mascote/positivo.webp");
+    expect(container.querySelector("img")!.getAttribute("src")).toBe("/mascote/lead-accepted-poster.webp");
+    const clip = container.querySelector("video")!;
+    expect(clip.getAttribute("src")).toBe("/mascote/lead-accepted.mp4");
+    expect(clip.muted).toBe(true);
+    expect(container.querySelector("img[src=\"/logo.webp\"]")).not.toBeNull();
     expect(sessionStorage.getItem(SPLASH_KEY)).toBe("1");
 
     // A entrada (0,4 s) já passou (performance.now = 1000): sai nos próximos quadros, sem esperar 2 s.

@@ -29,6 +29,21 @@ Estados: `idle`, `welcome`, `loading`, `lead_accepted`, `lead_converted`, `succe
 
 Regras (de `FEEDBACK.md`): comemorar só depois da confirmação do servidor; nunca mostrar dados de cliente junto do mascote; nenhum loop fora de `loading`; respeitar `prefers-reduced-motion`, "Menos animação" e o kill-switch (o mascote fica parado e a Rive nem é carregada).
 
+## 1.1 Animações pré-gravadas (Higgsfield)
+
+Em 14/11/2026, três animações foram geradas no Higgsfield pelo MCP, com o modelo Wan 2.7 (3 créditos cada, 2 s, 720p). O primeiro e o último quadro foram fixados nas poses aprovadas, para o personagem voltar exatamente à pose:
+
+| Arquivo | Do quadro → ao quadro | Usado em |
+|---|---|---|
+| `public/mascote/welcome.mp4` | positivo → positivo (pisca e sorri) | `welcome`, `success` |
+| `public/mascote/lead-accepted.mp4` | repouso → positivo (levanta o polegar) | `lead_accepted` e a splash |
+| `public/mascote/lead-converted.mp4` | positivo → positivo (punho no ar e salto) | `lead_converted` |
+
+- Ficaram em H.264, 480 x 640, sem som, de 40 a 120 KB, com fundo branco puro e um pôster (primeiro quadro) em WebP. Originais e as imagens de entrada estão em `design/mascote/higgsfield/`.
+- O `Mascot` toca o vídeo só com movimento ligado e tema claro. O branco some com `mix-blend-mode: multiply` sobre superfícies claras. No tema escuro, com movimento reduzido ou se o vídeo falhar, usa a arte de reserva. A arte fica visível até o vídeo começar a tocar.
+- São vídeos, não um rig: não reagem nem misturam estados. O rig da Rive (§2 e §3) continua sendo o objetivo para um personagem articulado.
+- Para gerar outra: envie a pose em fundo branco 768 x 1024 (como em `design/mascote/higgsfield/`), use `start_image` e `end_image` iguais à pose final, 2 s, 720p, câmera parada e sem cenário. Converta com o comando de ffmpeg da seção 7.
+
 ## 2. Por que ainda não é articulado
 
 As referências (`design/mascote/referencias/`) são imagens achatadas: pranchas de 1536 px e GIFs de cerca de 410 px. Não há camadas, SVG nem `.riv`. Uma imagem inteira se movendo é só a reserva provisória. Para o rig, um designer precisa redesenhar em vetor, cada peça numa camada, com o ponto de giro marcado:
@@ -66,6 +81,8 @@ Para ligar o rig: salve o arquivo em `public/mascote/mascote.riv`, troque `MASCO
 
 ## 5. Splash
 
+- Mostra o mascote fazendo o positivo (`lead-accepted.mp4`) e, embaixo, o logo da Âncora (`/logo.webp`, 40 px de altura). A splash é sempre branca, então o logo nunca inverte.
+
 - Vem no HTML do servidor: aparece antes do JavaScript e emenda com a tela branca do PWA instalado (`background_color: #ffffff` no manifest).
 - Some quando o app fica pronto: dois quadros depois da hidratação, respeitando só os 0,4 s de entrada. Nunca espera a animação inteira.
 - Uma vez por sessão (`sessionStorage`, chave `__ancora_splash_shown`). Um script inline marca `html[data-splash="done"]` antes da pintura, então nada pisca nas próximas cargas.
@@ -80,6 +97,8 @@ Para ligar o rig: salve o arquivo em `public/mascote/mascote.riv`, troque `MASCO
 4. Atualize as tabelas deste documento e rode `npx vitest run src/components/mascot`.
 
 ## 7. Como testar
+
+- Conversão de um vídeo novo: `ffmpeg -i entrada.mp4 -an -vf "scale=480:-2:flags=lanczos,curves=all=0/0 0.93/1 1/1,format=yuv420p" -c:v libx264 -profile:v main -crf 27 -preset slow -movflags +faststart public/mascote/nome.mp4`. O `curves` leva o fundo quase branco a branco puro.
 
 - `/dev/mascote` em desenvolvimento: estados, lead aceito com sucesso e falha, splash de novo e interruptores.
 - Celular Android e PWA instalado: abra o app pela rede local ou pelo ambiente de teste e confira a splash, a saída e o desempenho no "Monitor de desempenho" do Chrome remoto (meta 60 fps).
