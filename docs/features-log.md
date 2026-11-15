@@ -932,6 +932,10 @@ Novo componente `Mascot` (`src/components/mascot`), com os estados idle, welcome
 
 As respostas sugeridas do chat seguem os níveis do padrão, numa tabela única (`src/components/chat/chat-feedback.ts`). A resposta escolhida aparece como "Enviando" até o servidor confirmar. Se falhar, vira "Não enviada · Tentar de novo", balança uma vez e as opções voltam a valer. O mascote do cabeçalho fica pensando enquanto a ação roda. Tocam som: pausar ou retomar o plantão, falhas e acertos parciais. Nota, etapa, retorno e aceite ficam em silêncio, só com vibração no celular. Plano: `docs/implementations/active/2026-11-14-feedback-padrao.md`.
 
+## 14/11/2026 - Egress de conversas, F1 incremental
+
+`/conversas` recebe deltas autenticados por cursor `sent_at + id`; a lista inicial usa uma prévia compacta e agregados SQL por conversa, e o corpo completo só é enviado para o chat aberto. O cliente mescla mensagens, prévias, contadores e status sem recarregar a página em cada evento realtime. Mudanças fora do delta, cursor inválido e volume acima dos limites usam recarga completa de segurança a cada 2 minutos. Plano e limites: `docs/implementations/active/2026-11-14-conversas-incremental-f1.md`.
+
 ## 14/11/2026 - Feedback padrão em todo o modo Lite (fases 2 a 5)
 
 O Lite inteiro (corretor, supervisor, gestor e Diretor Lite) responde no padrão de `docs/design-system/FEEDBACK.md`: estados de envio, sucesso só depois do servidor, erro com a causa, o que continua valendo e "Tentar de novo", e som e vibração por nível. As ações do chat ganham nível e "Não enviada · Tentar de novo". A ficha, a agenda, os clientes, o plantão, a meta do dia (nível 2), as configurações, o supervisor, o gestor e as telas do diretor deixam de usar toast para o que cabe no objeto. A venda registrada comemora em tela cheia com o capitão (nível 3). O que ficou de fora está no plano: `docs/implementations/active/2026-11-14-feedback-padrao.md`.
