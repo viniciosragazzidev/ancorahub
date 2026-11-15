@@ -7,16 +7,15 @@ import { Building2, CalendarDays, CalendarX2, Clock3, MapPin, MonitorSmartphone 
 
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
-import buttonStyles from "@/components/arc/button/button.module.css";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import "@/components/arc/venancor-scope.css";
 import { LitePageEnter, LiteSwap } from "@/components/lite/motion";
-import { cn } from "@/lib/utils";
 import type { BrokerDutyCalendarResult } from "../duty-calendar";
 import type { DutyHubCurrent, DutyHubShift } from "../duty-hub";
 import { DUTY_CARD_STYLE, DutyCalendarSections } from "./light-duty-calendar";
 import { CaptainBanner } from "@/components/lite/banner/captain-banner";
+import { PresenceCallout } from "@/components/chat/presence-callout";
 import hub from "./duty-hub.module.css";
 
 export type BrokerDutyHubProps = {
@@ -40,7 +39,7 @@ export function BrokerDutyHub({ current, calendar, calendarState }: BrokerDutyHu
   // O banner fica logo abaixo do plantão atual, antes do calendário: um respiro de cor entre os dois cards.
   const card = <><CurrentDutyCard current={current} /><DutyBanner current={current} /></>;
   return (
-    <section aria-labelledby="duty-hub-title" className="lite-page" style={{ paddingBottom: "max(120px, var(--mobile-safe-bottom, 0px))" }}>
+    <section aria-labelledby="duty-hub-title" className="arc-venancor lite-page" style={{ paddingBottom: "max(120px, var(--mobile-safe-bottom, 0px))" }}>
       <LitePageEnter>
         <header>
           <h1 id="duty-hub-title" className="lite-page-title">Plantões</h1>
@@ -136,12 +135,16 @@ function ShiftDetails({ shift }: { shift: DutyHubShift }) {
         </div>
       </dl>
       {shift.hint || shift.href ? (
-        <div className={hub.foot} style={{ paddingTop: 16 }}>
+        <div className={hub.foot}>
           {shift.hint ? <p className={hub.hint}>{shift.hint}</p> : null}
-          {shift.href ? (
-            <Link href={shift.href} className={cn(buttonStyles.button, buttonStyles.primary, buttonStyles.md, "w-full sm:w-auto sm:justify-self-start")}>
-              Abrir plantão
-            </Link>
+          {/* Confirmação em aberto (15/11/2026): o botão já confirma a presença aqui; abrir o plantão vira um link. */}
+          {shift.ask && shift.ask.status !== "confirmed" ? (
+            <>
+              <PresenceCallout ask={shift.ask} variant="inline" />
+              {shift.href ? <Link href={shift.href} className={hub.secondaryLink}>Ver o plantão</Link> : null}
+            </>
+          ) : shift.href ? (
+            <Link href={shift.href} className={hub.cta}>Abrir plantão</Link>
           ) : null}
         </div>
       ) : null}

@@ -73,7 +73,8 @@ async function shrink(file: File): Promise<Blob> {
  * the photo goes to the director/manager and the broker stays paused until they
  * validate it and release him (decision of 2026-10-12).
  */
-export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskView; variant?: "home" | "chat" }) {
+/** inline (15/11/2026): só a ação (botão, estados e roteiros), dentro do card "Seu plantão atual" de Plantões. */
+export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskView; variant?: "home" | "chat" | "inline" }) {
   const router = useRouter();
   // Kill-switch (html[data-interface-motion="off"]) também desliga, não só o movimento reduzido do sistema.
   const motionOn = useInterfaceMotionEnabled();
@@ -231,14 +232,15 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
     <motion.section
       className={styles.presence}
       data-variant={variant}
+      data-mode={ask.mode}
       data-done={done}
       aria-label="Confirmar presença no plantão"
       initial={reduce ? false : { opacity: 0, y: 10, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.32, ease }}
     >
-      {!done && !reduce ? <span className={styles.presenceHalo} aria-hidden="true" /> : null}
-      <div className={styles.presenceHead}>
+      {!done && !reduce && variant !== "inline" ? <span className={styles.presenceHalo} aria-hidden="true" /> : null}
+      {variant === "inline" ? null : <div className={styles.presenceHead}>
         <span className={styles.presenceMascot}>
           <AssistantAvatar shape="onigiri" hue={28} size={44} state={sending || waiting ? "working" : done ? "idle" : "waiting"} />
         </span>
@@ -263,7 +265,7 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
                 : `${ask.scheduleName}. Um toque e você começa a receber leads.`}
           </span>
         </span>
-      </div>
+      </div>}
 
       <AnimatePresence mode="wait" initial={false}>
         {preview ? (

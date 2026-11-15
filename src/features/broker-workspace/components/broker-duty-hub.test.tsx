@@ -69,6 +69,19 @@ describe("BrokerDutyHub", () => {
     expect(screen.getByText("1 plantão nesta data")).toBeTruthy();
   });
 
+  it("confirms the presence right on the card while it is pending (15/11/2026)", () => {
+    const ask = { assignmentId: "a-1", scheduleName: "Plantão PME", branchName: null, mode: "online" as const, startsAt: "2026-09-30T16:00:00.000Z", endsAt: "2026-09-30T20:00:00.000Z", status: "pending" as const, photoId: null };
+    render(<BrokerDutyHub
+      current={current({ state: "active", shifts: [shift({ situation: { label: "Confirme sua presença", tone: "warning" }, hint: "Confirme sua presença para começar a receber leads.", href: "/plantoes/agora?assignment=a-1", ask })], coveredOccurrenceIds: [] })}
+      calendar={null}
+      calendarState="disabled"
+    />);
+    const card = screen.getByRole("region", { name: "Seu plantão atual" });
+    expect(within(card).getByRole("button", { name: "Confirmar presença" })).toBeTruthy();
+    expect(within(card).queryByRole("link", { name: "Abrir plantão" })).toBeNull();
+    expect(within(card).getByRole("link", { name: "Ver o plantão" }).getAttribute("href")).toBe("/plantoes/agora?assignment=a-1");
+  });
+
   it("lets the broker choose between two plantões running now", async () => {
     render(<BrokerDutyHub
       current={current({ state: "active", shifts: [shift({ href: "/plantoes/agora?plantao=s-pme" }), shift({ key: "active:s-pres", scheduleName: "Presencial Tarde", modality: "Presencial", href: "/plantoes/agora?plantao=s-pres" })], coveredOccurrenceIds: [] })}
