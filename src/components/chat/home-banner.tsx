@@ -34,7 +34,7 @@ export function HomeBanner({ highlights, className }: { highlights: HomeHighligh
  * Boas-vindas do Início no computador (14/11/2026): o banner abre a tela, no topo, no lugar do título solto. A frase
  * cumprimenta pelo nome; o selo e o atalho levam à missão da semana, quando houver; sem missão, o atalho leva à fila.
  */
-export function HomeWelcomeBanner({ greeting, firstName, highlights, subtitle, duty, goal: dayGoal, className }: {
+export function HomeWelcomeBanner({ greeting, firstName, highlights, subtitle, duty, goal: dayGoal, nextAction, nextActionSlot, className }: {
   greeting: string;
   firstName: string;
   highlights: HomeHighlights | null;
@@ -42,15 +42,18 @@ export function HomeWelcomeBanner({ greeting, firstName, highlights, subtitle, d
   subtitle?: ReactNode;
   duty?: { title: string; detail: string } | null;
   goal?: { name: string; currentValue: string; targetValue: string; percentage: number } | null;
+  /** O próximo passo vira o botão do banner (15/11/2026), no lugar do botão azul que ficava embaixo. */
+  nextAction?: { label: string; href: string } | null;
+  nextActionSlot?: (className: string) => ReactNode;
   className?: string;
 }) {
   const mission = highlights?.mission ?? null;
   // Os números do dia já estão nos cartões logo abaixo: o selo mostra a missão da semana, quando houver.
   const open = mission && mission.progress && !mission.progress.completed ? mission.progress : null;
   const goal = open ? { value: `Falta${open.remaining === 1 ? "" : "m"} ${Math.max(0, open.remaining).toLocaleString("pt-BR")}`, hint: mission!.title } : undefined;
-  const action = open && mission
+  const action = nextAction ?? (open && mission
     ? { label: "Ver a missão", href: mission.href }
-    : { label: "Ver minha fila", href: "/minha-fila" };
+    : { label: "Ver minha fila", href: "/minha-fila" });
   // Fatos do dia e da semana (15/11/2026): o que não está nos cartões de números logo abaixo.
   const best = highlights?.ranks.length ? [...highlights.ranks].sort((a, b) => a.position / a.total - b.position / b.total)[0] : null;
   const dutyFact = duty ? { label: duty.title.split(":")[0], value: duty.detail } : { label: "Plantão", value: "Nenhum marcado" };
@@ -60,5 +63,5 @@ export function HomeWelcomeBanner({ greeting, firstName, highlights, subtitle, d
     best ? { label: "Sua semana", value: `${best.position}º ${best.label}` } : null,
     highlights?.acceptTime ? { label: "Aceite médio", value: highlights.acceptTime } : null,
   ].filter((fact): fact is { label: string; value: string } => fact !== null);
-  return <CaptainBanner className={className} label="Boas-vindas" title={`${greeting}, ${firstName}! Bem-vindo a bordo.`} subtitle={subtitle} facts={facts} goal={goal} action={action} />;
+  return <CaptainBanner className={className} label="Boas-vindas" title={`${greeting}, ${firstName}! Bem-vindo a bordo.`} subtitle={subtitle} facts={facts} goal={goal} action={action} actionSlot={nextActionSlot} />;
 }
