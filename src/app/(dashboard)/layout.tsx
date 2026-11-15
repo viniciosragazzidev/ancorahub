@@ -57,7 +57,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   // is resolved. Starting them together keeps client-side route transitions from
   // serializing the shell, preference, branding and pathname lookups.
   const experienceModePromise = getExperienceMode(context);
-  const illustrationsPromise = context.role === "director" || context.role === "broker"
+  const illustrationsPromise = ["director", "broker", "supervisor", "manager"].includes(context.role)
     ? getFeatureFlag(FEATURE_FLAGS.UI_CONTEXTUAL_ILLUSTRATIONS).catch(() => "false")
     : Promise.resolve("false");
   const brokerDutyCalendarFlagPromise = context.role === "broker"
@@ -283,7 +283,10 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
 
   return (
     <AgentDrawerProvider>
-      <ContextualIllustrationsProvider enabled={illustrationsSetting === "true" && (isLightBroker || (context.role === "director" && directorLiteStyleEnabled))}>
+      <ContextualIllustrationsProvider
+        enabled={illustrationsSetting === "true" && (isLightBroker || (context.role === "director" && directorLiteStyleEnabled))}
+        assistantAvatarsEnabled={illustrationsSetting === "true" && (isLightBroker || isLightSupervisor || isLightManager || (context.role === "director" && directorLiteStyleEnabled))}
+      >
       <AppShell
         viewAs={viewAsState}
         cleanUiEnabled={cleanUiEnabled}

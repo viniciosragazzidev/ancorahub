@@ -715,6 +715,18 @@ sem movimento novo, prioridade de rede ou consulta de dados própria. O controle
 feature_ui_contextual_illustrations no Super-admin restaura a apresentação anterior.
 Mapa e verificação: docs/implementations/active/2026-10-28-contextual-illustrations.md.
 
+Em 14/11/2026, Vinicios autorizou ampliar a mesma exceção aos avatares decorativos
+dos assistentes por área no Lite de corretor, gestor e supervisor, e ao cabeçalho da
+conversa correspondente. O mapeamento usa dez retratos do universo do Capitão Âncora,
+em 32 px na conversa e no tamanho já existente da linha; sem texto, borda, token,
+primitive ou movimento novos. Jack/Notificações, marca verificada e avatares pessoais
+continuam inalterados; linhas de leads individuais mantêm iniciais e temperatura.
+O controle Super-admin da flag passa a incluir esses retratos nos três papéis Lite;
+os objetos 3D de seção/vazio preservam o escopo anterior, apenas Diretor e Corretor.
+Com a flag desligada ou erro de carregamento, a apresentação abstrata existente volta.
+Assets e regras: docs/design-system/MASCOTE.md §9 e
+docs/implementations/completed/2026-11-14-mascote-assets-contextuais.md.
+
 ## Feedback e movimento · 14/11/2026
 
 O padrão geral de resposta a ações e eventos (camadas visual, texto, som, vibração e mascote; níveis 0 a 3; estados do botão de ação) está em `docs/design-system/FEEDBACK.md` e vale para todo o app. No modo descrito neste documento valem os níveis 0 a 2: o CTA Deep Sapphire ganha os estados enviando, confirmado e falhou, sem base sólida, sem bounce e sem confete. Plano de adoção por rota: `docs/implementations/active/2026-11-14-feedback-padrao.md`.

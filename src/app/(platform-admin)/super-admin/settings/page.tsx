@@ -1280,15 +1280,15 @@ export default async function SuperAdminSettingsPage() {
             <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Ilustrações contextuais</CardTitle>
-                <CardDescription>Imagens pequenas de orientação, atendimento e organização no Diretor Lite e Corretor Lite.</CardDescription>
+                <CardDescription>Imagens de orientação no Diretor/Corretor Lite e retratos dos assistentes por área no Lite de corretor, gestor e supervisor.</CardDescription>
               </CardHeader>
               <CardContent>
                 <form action={updateContextualIllustrationsAction} className="flex flex-wrap items-center justify-between gap-4">
                   <label className="flex items-center gap-2 text-sm">
                     <Checkbox name="contextualIllustrationsEnabled" value="true" defaultChecked={contextualIllustrationsEnabled} />
-                    <span>Mostrar ilustrações contextuais</span>
+                    <span>Mostrar ilustrações e avatares contextuais</span>
                   </label>
-                  <Button type="submit" variant="outline">Salvar ilustrações</Button>
+                  <Button type="submit" variant="outline">Salvar apresentação</Button>
                   <p className="w-full text-xs text-muted-foreground">Desativar restaura a apresentação anterior. Alterações ficam na auditoria da plataforma.</p>
                 </form>
               </CardContent>

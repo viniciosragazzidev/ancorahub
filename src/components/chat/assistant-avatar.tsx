@@ -1,11 +1,13 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useState } from "react";
 import { motion, useReducedMotion, type TargetAndTransition, type Transition } from "motion/react";
+import Image from "next/image";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
+import { useContextualAssistantAvatarsEnabled } from "@/components/illustrations/contextual-illustration";
 
-import type { MascotShape } from "./types";
+import type { AssistantAvatarAsset, MascotShape } from "./types";
 
 export type MascotMood = "idle" | "alert" | "thinking" | "cheer";
 
@@ -37,6 +39,19 @@ const SHAPES: Record<Exclude<MascotShape, "logo" | "jack">, string> = {
   salte: "M20 18h30c3.3 0 5.4 3.6 3.8 6.4L46 40c-1 1.9-3 3-5.2 3H12c-3.3 0-5.4-3.6-3.8-6.4L16 22a4.6 4.6 0 0 1 4-4Z",
 };
 
+const AREA_ASSETS: Record<AssistantAvatarAsset, string> = {
+  leads: "/mascote/areas/leads.webp",
+  carteira: "/mascote/areas/carteira.webp",
+  plantao: "/mascote/areas/plantao.webp",
+  agenda: "/mascote/areas/agenda.webp",
+  cotacao: "/mascote/areas/cotacao.webp",
+  desempenho: "/mascote/areas/desempenho.webp",
+  dicas: "/mascote/areas/dicas.webp",
+  jornada: "/mascote/areas/jornada.webp",
+  equipe: "/mascote/areas/equipe.webp",
+  mensagens: "/mascote/areas/mensagens.webp",
+};
+
 /**
  * The assistant's mascot: a soft glossy body in the assistant's color with two
  * eyes. "working" breathes, "waiting" shows the blue dot. The logo variant is
@@ -50,6 +65,7 @@ export function AssistantAvatar({
   mood = "idle",
   initials,
   temperature,
+  avatarAsset,
   label,
 }: {
   shape: MascotShape;
@@ -65,10 +81,13 @@ export function AssistantAvatar({
   /** Lead conversations show initials instead of a mascot. */
   initials?: string;
   temperature?: "hot" | "warm" | "cold" | null;
+  avatarAsset?: AssistantAvatarAsset;
   label?: string;
 }) {
   const id = useId().replace(/:/g, "");
   const reduce = useReducedMotion();
+  const contextualAssistantAvatarsEnabled = useContextualAssistantAvatarsEnabled();
+  const [failedAsset, setFailedAsset] = useState<AssistantAvatarAsset | null>(null);
   const h = hue ?? 220;
 
   if (initials) {
@@ -105,6 +124,39 @@ export function AssistantAvatar({
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- arte local pequena, usada em vários tamanhos */}
           <img src="/mascote/jack-capitao.webp" width={size} height={size} alt="" draggable={false} style={{ display: "block", width: size, height: size, borderRadius: 999 }} />
+        </motion.span>
+        {state === "waiting" ? (
+          <span aria-hidden="true" style={{ position: "absolute", right: 0, top: 0, width: Math.max(8, size * 0.2), height: Math.max(8, size * 0.2), borderRadius: 999, background: "oklch(36% 0.14 262)", boxShadow: "0 0 0 2px var(--surface)" }} />
+        ) : null}
+      </span>
+    );
+  }
+
+  if (avatarAsset && contextualAssistantAvatarsEnabled && failedAsset !== avatarAsset) {
+    const { animate, transition } = moodMotion(mood, reduce);
+    const working = state === "working" && !reduce;
+    return (
+      <span style={{ position: "relative", width: size, height: size, display: "inline-grid", flex: "none" }} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
+        <motion.span
+          key={mood}
+          data-mood={mood}
+          animate={working ? { scale: [1, 1.05, 1], y: [0, -1.5, 0] } : animate}
+          transition={working ? { duration: 1.6, repeat: Infinity, ease: "easeInOut" } : transition}
+          style={{ display: "grid", width: size, height: size, placeItems: "center", transformOrigin: "50% 80%" }}
+        >
+          <Image
+            src={AREA_ASSETS[avatarAsset]}
+            width={size}
+            height={size}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            unoptimized
+            loading="lazy"
+            decoding="async"
+            onError={() => setFailedAsset(avatarAsset)}
+            style={{ display: "block", width: size, height: size, objectFit: "contain" }}
+          />
         </motion.span>
         {state === "waiting" ? (
           <span aria-hidden="true" style={{ position: "absolute", right: 0, top: 0, width: Math.max(8, size * 0.2), height: Math.max(8, size * 0.2), borderRadius: 999, background: "oklch(36% 0.14 262)", boxShadow: "0 0 0 2px var(--surface)" }} />
