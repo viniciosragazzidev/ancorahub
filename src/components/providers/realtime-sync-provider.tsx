@@ -74,6 +74,30 @@ function isPathWithin(pathname: string, route: string) {
 }
 
 const CONVERSATION_DATA_ROUTES = ["/dashboard", "/leads", "/mensagens", "/minha-fila"];
+/**
+ * /leads sub-areas that show no conversation data. Directors get a conversation
+ * signal every 10 s on a busy hour; each one re-read the whole distribution page
+ * (3.4k Meta ads, campaigns, queues): Supabase egress, 15/11.
+ */
+const CONVERSATION_FREE_ROUTES = ["/leads/distribuicao", "/leads/arquivados", "/leads/dashboard"];
+/**
+ * Summary pages (panel and lead list) follow conversations at most once a minute:
+ * they show counters, not the message itself.
+ */
+const CONVERSATION_SUMMARY_ROUTES = ["/dashboard", "/leads"];
+export const CONVERSATION_SUMMARY_REFRESH_MS = 60_000;
+
+/** True when a conversation signal on this page only updates summary counters. */
+export function isConversationSummaryRefresh(detail: RealtimeSyncBrowserDetail, pathname: string): boolean {
+  return detail.kind === "domain.invalidated"
+    && detail.domain === "conversations"
+    && CONVERSATION_SUMMARY_ROUTES.includes(pathname);
+}
+
+/** Wait before a summary page follows a conversation signal (0 = now). */
+export function conversationSummaryDelay(lastRefreshAt: number, now: number): number {
+  return Math.max(0, lastRefreshAt + CONVERSATION_SUMMARY_REFRESH_MS - now);
+}
 const WHATSAPP_CONNECTION_ROUTES = ["/integrations/whatsapp", "/settings"];
 
 /**
@@ -86,6 +110,7 @@ export function shouldScheduleShellRefresh(detail: RealtimeSyncBrowserDetail, pa
 
   if (detail.domain === "conversations") {
     if (isPathWithin(pathname, "/conversas")) return false;
+    if (CONVERSATION_FREE_ROUTES.some((route) => isPathWithin(pathname, route))) return false;
     return CONVERSATION_DATA_ROUTES.some((route) => isPathWithin(pathname, route));
   }
 
@@ -208,6 +233,22 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
    * Client-only state sync: updates the local revision, dispatches browser
    * events, and schedules a coalesced server refresh.
    */
+  const summaryRefreshAtRef = useRef(0);
+  const summaryTimerRef = useRef<number | null>(null);
+  /** Conversation signals on summary pages: one refresh per minute, the last one never lost. */
+  const scheduleSummaryRefresh = useCallback(() => {
+    if (summaryTimerRef.current !== null) return;
+    const wait = conversationSummaryDelay(summaryRefreshAtRef.current, Date.now());
+    summaryTimerRef.current = window.setTimeout(() => {
+      summaryTimerRef.current = null;
+      summaryRefreshAtRef.current = Date.now();
+      scheduleServerRefresh();
+    }, wait);
+  }, [scheduleServerRefresh]);
+  useEffect(() => () => {
+    if (summaryTimerRef.current !== null) window.clearTimeout(summaryTimerRef.current);
+  }, []);
+
   const syncClientState = useCallback((detail: RealtimeSyncBrowserDetail, broadcast = true) => {
     setLastSyncedAt(Date.now());
     try {
@@ -216,9 +257,13 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
       // Browser storage unavailable — the coalesced refresh is still sufficient.
     }
     dispatchRealtimeSyncEvent(detail);
-    if (shouldScheduleShellRefresh(detail, window.location.pathname)) scheduleServerRefresh();
+    const pathname = window.location.pathname;
+    if (shouldScheduleShellRefresh(detail, pathname)) {
+      if (isConversationSummaryRefresh(detail, pathname)) scheduleSummaryRefresh();
+      else scheduleServerRefresh();
+    }
     if (broadcast) localBroadcastRef.current?.postMessage({ type: "local-first.invalidate", detail });
-  }, [scheduleServerRefresh]);
+  }, [scheduleServerRefresh, scheduleSummaryRefresh]);
 
   const reconcileRecentNotifications = useCallback(async (notificationId?: string) => {
     // Pop-up off: the notification stays unread in the bell, nothing is queued.
