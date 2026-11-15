@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigation = vi.hoisted(() => ({ pathname: "/plantoes/agora" }));
 vi.mock("@/features/leads/accept-offer-action", () => ({ acceptLeadOfferAction: vi.fn() }));
+vi.mock("@/features/leads/availability-action", () => ({ updateBrokerAvailabilityAction: vi.fn() }));
 // O painel de Registrar venda chama uma server action (código só de servidor); aqui basta um marcador.
 vi.mock("@/features/broker-workspace/components/quick-register-sale", () => ({ QuickRegisterSaleSheet: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="Registrar venda" /> : null) }));
 vi.mock("next/navigation", () => ({ usePathname: () => navigation.pathname, useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), back: vi.fn(), replace: vi.fn() }) }));

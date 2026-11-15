@@ -14,7 +14,8 @@ import { Button as ArcButton } from "@/components/arc/button/button";
 import { Badge as ArcBadge } from "@/components/arc/badge/badge";
 import { Avatar } from "@/components/arc/avatar/avatar";
 import { Button } from "@/components/ui/button";
-import { Activity, AlarmClock, ArrowUpRight, CheckCircle2, Headset, Inbox, ListTodo } from "lucide-react";
+import { Activity, AlarmClock, ArrowUpRight, CheckCircle2, Headset, House, Inbox, ListTodo } from "lucide-react";
+import { LightAvailabilityPill } from "@/components/light-top-nav";
 import sharedPage from "@/components/lite/page/lite-page.module.css";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useLightAvailabilityContext } from "@/components/light/light-availability-context";
@@ -317,7 +318,11 @@ export function ChatHome({
     <aside className={home.sidebar}>
       <header className={home.header} data-tour="home-header">
         {redesigned ? <ArcButton variant="ghost" className={sharedPage.iconButton} data-tour="home-me" aria-label="Abrir menu e disponibilidade" onClick={() => shell?.openMore?.()}>{initialsOf(viewerName)}</ArcButton> : <button type="button" className={home.me} data-tour="home-me" aria-label="Abrir menu e disponibilidade" onClick={() => shell?.openMore?.()}>{initialsOf(viewerName)}</button>}
-        <Link href="/dashboard" className={home.helloLink}>{redesigned ? <p className={home.hello}>Olá, {firstName}</p> : <h1 className={home.hello}>Olá, {firstName}</h1>}</Link>
+        {/* No computador (15/11/2026) o "Olá" dá lugar a um botão de casa: é o caminho de volta ao Início em qualquer tela. */}
+        <Link href="/dashboard" className={home.helloLink} title="Voltar ao Início">
+          {redesigned ? <p className={home.hello}>Olá, {firstName}</p> : <h1 className={home.hello}>Olá, {firstName}</h1>}
+          <span className={home.homeButton}><House size={18} strokeWidth={1.9} aria-hidden="true" /><span className={home.srOnly}>Início</span></span>
+        </Link>
         <div className={home.headerTools} data-tour="home-tools">
           {!showWhatsAppStatus || isSupervisor || (isManager && mode !== "rail") ? null : <WhatsAppStatusButton />}
           {redesigned ? <ArcButton variant="ghost" className={sharedPage.iconButton} aria-label={searching ? "Fechar busca" : "Buscar"} aria-pressed={searching} onClick={() => { setSearching((value) => !value); setQuery(""); }}><SearchIcon /></ArcButton> : <button type="button" className={styles.iconButton} aria-label={searching ? "Fechar busca" : "Buscar"} aria-pressed={searching} onClick={() => { setSearching((value) => !value); setQuery(""); }}><SearchIcon /></button>}
@@ -390,6 +395,14 @@ export function ChatHome({
       <section className={home.center} aria-label="Seu dia">
         <motion.div initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }} className={home.centerInner}>
           {/* Computador (14/11/2026): o banner de boas-vindas abre a tela no lugar do título; supervisor e gestor seguem com o título. */}
+          {/* Faixa acima do banner (15/11/2026): a data de hoje e a disponibilidade, que no computador só ficava no menu. */}
+          {!isSupervisor && !isManager ? (
+            <div className={home.centerTop}>
+              <p className={home.centerDate}>{new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "numeric", month: "long" }).format(now)}</p>
+              {shell ? <LightAvailabilityPill availability={shell.availability} isPending={shell.isPending}
+                onToggle={() => shell.setStatus(shell.availability === "available" ? "paused" : "available")} className={home.centerAvailability} /> : null}
+            </div>
+          ) : null}
           {!isSupervisor && !isManager ? (
             <HomeWelcomeBanner className={home.welcomeBanner} greeting={greeting(now)} firstName={firstName} highlights={highlights} />
           ) : <h2 className={home.centerTitle}>{greeting(now)}, {firstName}</h2>}
