@@ -19,6 +19,7 @@ import { updateRule, restoreRules, reverseEvent } from "@/features/journey/direc
 import { RelationshipJourneyLite } from "@/features/relationship/components/director-lite/relationship-journey-lite";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import litePage from "@/components/lite/page/lite-page.module.css";
+import { getHomeAnnouncement, todayInSaoPaulo } from "@/features/home-announcement/service";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,8 @@ export default async function RelationshipPage({ searchParams }: { searchParams:
     ]);
     const [audienceOptions, broadcasts] = messageData;
     const historyItems = broadcasts.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }));
+    // Aviso do Início (15/11/2026): só o diretor publica o banner que todos os corretores veem.
+    const announcement = context.role === "director" ? { initial: await getHomeAnnouncement(context.tenantId), today: todayInSaoPaulo() } : null;
     // Diretor com a chave ligada e a rota fora do opt-out: mesmos dados e mesmas Server Actions, visual Lite.
     if (await isDirectorLitePageOnServer(context, "/relacionamento")) {
       return (
@@ -54,6 +57,7 @@ export default async function RelationshipPage({ searchParams }: { searchParams:
               data={data}
               actions={{ createCampaign, pauseCampaign, updateRule, restoreRules, reverseEvent }}
               today={new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date())}
+              announcement={announcement}
             />
           </main>
         </>
@@ -69,6 +73,7 @@ export default async function RelationshipPage({ searchParams }: { searchParams:
           history={historyItems}
           data={data}
           actions={{ createCampaign, pauseCampaign, updateRule, restoreRules, reverseEvent }}
+          announcement={announcement}
         />
       </>
     );

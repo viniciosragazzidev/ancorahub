@@ -228,3 +228,8 @@
   .centerTop + .welcomeBanner.welcomeBanner { margin-top: 12px; }
   .center:has(.centerTop) { padding-top: 20px; }
 }
+
+/* Aviso da diretoria no topo (15/11/2026): junto da data, como o banner de boas-vindas. */
+@media (min-width: 1024px) {
+  .centerTop + .announcementBanner.announcementBanner { margin-top: 16px; }
+}

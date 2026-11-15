@@ -13,13 +13,16 @@ import type { DirectorJourneyActions, DirectorJourneyData } from "@/features/jou
 
 import type { AudienceOptions } from "../../audience";
 import type { BroadcastSummary } from "../../service";
+import { HomeAnnouncementEditor } from "@/features/home-announcement/components/home-announcement-editor";
+import type { HomeAnnouncement } from "@/features/home-announcement/announcement";
+
 import { DirectorJourneyLite } from "./journey-lite";
 import { RelationshipMessagesLite } from "./relationship-messages-lite";
 import styles from "./relationship-lite.module.css";
 
 type HistoryItem = Omit<BroadcastSummary, "createdAt"> & { createdAt: string };
 
-export function RelationshipJourneyLite({ relationshipEnabled, journeyEnabled, options, history, data, actions, today }: {
+export function RelationshipJourneyLite({ relationshipEnabled, journeyEnabled, options, history, data, actions, today, announcement }: {
   relationshipEnabled: boolean;
   journeyEnabled: boolean;
   options: AudienceOptions | null;
@@ -28,6 +31,8 @@ export function RelationshipJourneyLite({ relationshipEnabled, journeyEnabled, o
   actions: DirectorJourneyActions;
   /** Dia de hoje em São Paulo ("AAAA-MM-DD"), calculado no servidor. */
   today: string;
+  /** Aviso do Início (só diretor): a aba aparece quando vem. */
+  announcement?: { initial: HomeAnnouncement | null } | null;
 }) {
   const [tab, setTab] = useState("messages");
   return (
@@ -36,6 +41,7 @@ export function RelationshipJourneyLite({ relationshipEnabled, journeyEnabled, o
         <TabsList aria-label="Central de relacionamento" className="w-max">
           <TabsTrigger value="messages">Mensagens</TabsTrigger>
           {journeyEnabled ? <TabsTrigger value="journey">Jornada da equipe</TabsTrigger> : null}
+          {announcement ? <TabsTrigger value="announcement">Aviso do Início</TabsTrigger> : null}
         </TabsList>
       </div>
       <TabsContent value="messages" className={styles.panel}>
@@ -47,6 +53,7 @@ export function RelationshipJourneyLite({ relationshipEnabled, journeyEnabled, o
         )}
       </TabsContent>
       {journeyEnabled && data ? <TabsContent value="journey" className={styles.panel}><DirectorJourneyLite data={data} actions={actions} today={today} /></TabsContent> : null}
+      {announcement ? <TabsContent value="announcement" className={styles.panel}><HomeAnnouncementEditor initial={announcement.initial} today={today} /></TabsContent> : null}
     </Tabs>
   );
 }

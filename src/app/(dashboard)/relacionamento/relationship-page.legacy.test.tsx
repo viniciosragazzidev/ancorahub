@@ -34,6 +34,8 @@ vi.mock("@/features/journey/director-queries", async () => {
 });
 vi.mock("@/shared/db", async () => ({ schema: await import("@/shared/db/schema"), getDatabase: () => ({}) }));
 vi.mock("@/features/leads/lead-authorization", () => ({ buildLeadScopeWhere: () => undefined }));
+vi.mock("@/features/home-announcement/service", () => ({ getHomeAnnouncement: async () => null, todayInSaoPaulo: () => "2026-11-15" }));
+vi.mock("@/features/home-announcement/actions", () => ({ saveHomeAnnouncementAction: async () => ({ ok: false, error: "x" }) }));
 vi.mock("@/features/director-lite/style-flag", () => ({ isDirectorLitePageOnServer: async () => fixtures.liteStyle.current }));
 vi.mock("@/components/dashboard-header", () => ({
   DashboardHeader: ({ breadcrumb, title }: { breadcrumb?: string; title?: string }) => <header data-testid="dashboard-header">{breadcrumb} / {title}</header>,

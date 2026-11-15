@@ -5,10 +5,18 @@ import type { ReactNode } from "react";
  * (com a chave dela ligada) ou para o desempenho. Nunca aparece para supervisor e gestor (o Início deles não chama).
  */
 import { CaptainBanner } from "@/components/lite/banner/captain-banner";
+import { announcementArt, type HomeAnnouncementView } from "@/features/home-announcement/announcement";
 
 import type { HomeHighlights } from "./week-ranking";
 
-export function HomeBanner({ highlights, className }: { highlights: HomeHighlights | null; className?: string }) {
+/** Aviso publicado pela diretoria (Relacionamento > Aviso do Início, 15/11/2026): título, texto, botão, personagem e cor. */
+export function AnnouncementBanner({ announcement, className }: { announcement: HomeAnnouncementView; className?: string }) {
+  return <CaptainBanner className={className} label="Aviso da diretoria" title={announcement.title} subtitle={announcement.body || undefined}
+    art={announcementArt(announcement.art)} tone={announcement.tone} action={announcement.button ?? undefined} />;
+}
+
+export function HomeBanner({ highlights, announcement = null, className }: { highlights: HomeHighlights | null; announcement?: HomeAnnouncementView | null; className?: string }) {
+  if (announcement) return <AnnouncementBanner announcement={announcement} className={className} />;
   const mission = highlights?.mission ?? null;
   const progress = mission?.progress ?? null;
   if (mission && progress && !progress.completed) {
