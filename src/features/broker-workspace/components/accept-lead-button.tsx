@@ -15,6 +15,7 @@ import { normalizeActionError } from "@/lib/feedback/action-error";
 import { useFeedback } from "@/lib/feedback/use-feedback";
 
 import { acceptLeadOfferAction } from "@/features/leads/accept-offer-action";
+import { useDevLab } from "@/lib/dev-lab";
 import { currentWhatsAppDevice, openWhatsApp, prepareWhatsAppWindow, watchWhatsAppLeave } from "@/lib/whatsapp-open";
 import { rememberWhatsAppHandoff, reportWhatsAppOpenFailed, useAcceptHandoffEnabled } from "@/features/broker-workspace/whatsapp-handoff/handoff-store";
 
@@ -73,6 +74,8 @@ export function AcceptLeadButton({ leadId, className, children, style, appearanc
   const revertTimer = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const errorId = useId();
+  // Laboratório de fluxos (/dev/laboratorio): resposta simulada no lugar da Server Action.
+  const lab = useDevLab();
 
   useEffect(() => () => { if (revertTimer.current) window.clearTimeout(revertTimer.current); }, []);
 
@@ -87,11 +90,11 @@ export function AcceptLeadButton({ leadId, className, children, style, appearanc
     // recente, então aos 30 s falhava: lá o WhatsApp abre direto, aproveitando este toque.
     const device = currentWhatsAppDevice();
     const counting = handoff && device === "desktop";
-    const whatsapp = counting ? { go: () => false, cancel: () => {} } : prepareWhatsAppWindow(device);
+    const whatsapp = counting || lab?.afterLeadAccepted ? { go: () => false, cancel: () => {} } : prepareWhatsAppWindow(device);
     startTransition(async () => {
       let result: Awaited<ReturnType<typeof acceptLeadOfferAction>>;
       try {
-        result = await acceptLeadOfferAction(leadId);
+        result = lab?.acceptLead ? await lab.acceptLead(leadId) : await acceptLeadOfferAction(leadId);
       } catch {
         result = { success: false };
       }
@@ -114,6 +117,7 @@ export function AcceptLeadButton({ leadId, className, children, style, appearanc
       fire("confirm");
       if (arcToLeads) flyLeadArc(origin, { motionEnabled });
       const url = result.whatsappUrl;
+      if (lab?.afterLeadAccepted) { lab.afterLeadAccepted(leadId, url ?? null); return; }
       // Celular: vigia se o app abriu; se a página continuar visível, a tela do lead pede o toque.
       const leave = !counting && url && device === "mobile" ? watchWhatsAppLeave() : null;
       if (counting && url) {

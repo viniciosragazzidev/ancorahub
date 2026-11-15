@@ -7,6 +7,7 @@ import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-
 import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
 import { fireFeedback } from "@/lib/feedback/use-feedback";
 import { announceAchievement } from "@/components/lite/celebration/achievement-host";
+import { useDevLab } from "@/lib/dev-lab";
 
 import { AssistantAvatar } from "./assistant-avatar";
 import { CameraCapture, canUseInPageCamera } from "./camera-capture";
@@ -75,8 +76,10 @@ async function shrink(file: File): Promise<Blob> {
  * validate it and release him (decision of 2026-10-12).
  */
 /** inline (15/11/2026): só a ação (botão, estados e roteiros), dentro do card "Seu plantão atual" de Plantões. */
-export function PresenceCallout({ ask, variant = "home", doneAction }: { ask: PresenceAskView; variant?: "home" | "chat" | "inline"; /** Depois de confirmado (inline): a próxima ação, como "Abrir plantão". */ doneAction?: ReactNode }) {
+export function PresenceCallout({ ask, variant = "home", doneAction, pendingAction }: { ask: PresenceAskView; variant?: "home" | "chat" | "inline"; /** Depois de confirmado (inline): a próxima ação, como "Abrir plantão". */ doneAction?: ReactNode; /** Antes de confirmar (inline): um atalho secundário, como "Ver o plantão". */ pendingAction?: ReactNode }) {
   const router = useRouter();
+  // Laboratório de fluxos (/dev/laboratorio): confirmação e checagem do WhatsApp simuladas.
+  const lab = useDevLab();
   // Kill-switch (html[data-interface-motion="off"]) também desliga, não só o movimento reduzido do sistema.
   const motionOn = useInterfaceMotionEnabled();
   const reduce = Boolean(useReducedMotion()) || !motionOn;
@@ -130,8 +133,9 @@ export function PresenceCallout({ ask, variant = "home", doneAction }: { ask: Pr
     body.set("assignmentId", ask.assignmentId);
     if (photo) body.set("photo", photo, "local.jpg");
     try {
-      const response = await fetch("/api/duty/presence", { method: "POST", body });
-      const result = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; code?: string; awaitingRelease?: boolean };
+      const simulated = lab?.confirmPresence ? await lab.confirmPresence(ask.assignmentId) : null;
+      const response = simulated ? { ok: simulated.ok } : await fetch("/api/duty/presence", { method: "POST", body });
+      const result = (simulated ?? await (response as Response).json().catch(() => ({}))) as { ok?: boolean; error?: string; code?: string; awaitingRelease?: boolean };
       if (result.code === WHATSAPP_REQUIRED_CODE) {
         await openWhatsApp(photo, undefined, true);
         return;
@@ -146,7 +150,7 @@ export function PresenceCallout({ ask, variant = "home", doneAction }: { ask: Pr
       });
       if (!celebrated) fireFeedback("confirm");
       // Pelo roteiro, a tela atualiza quando o corretor sai dele ("Ir para o Plantão").
-      if (!viaGuide) window.setTimeout(() => router.refresh(), 1600);
+      if (!viaGuide && !lab) window.setTimeout(() => router.refresh(), 1600);
     } catch (error) {
       // Causa normalizada (nunca texto técnico) + o que continua valendo; o botão vira "Tentar de novo".
       const message = actionErrorMessage(normalizeActionError(error, "Não consegui confirmar agora"), "Sua presença ainda não foi registrada");
@@ -213,7 +217,7 @@ export function PresenceCallout({ ask, variant = "home", doneAction }: { ask: Pr
     }
     // Regra de 06/11: sem WhatsApp conectado, abre a conexão antes (no presencial, antes da foto).
     setChecking(true);
-    const gate = await loadPresenceGate().catch(() => null);
+    const gate = await (lab?.presenceGate ? (lab.presenceGate() as ReturnType<typeof loadPresenceGate>) : loadPresenceGate()).catch(() => null);
     setChecking(false);
     if (gate?.required && !gate.connected) {
       await openWhatsApp(null, gate.connection);
@@ -331,6 +335,8 @@ export function PresenceCallout({ ask, variant = "home", doneAction }: { ask: Pr
           ) : needsWhatsApp || resumable ? "Continuar de onde parei" : state.kind === "error" ? "Tentar de novo" : "Confirmar presença"}
         </motion.button>
       )}
+
+      {!done && !waiting && pendingAction ? pendingAction : null}
 
       {whatsapp ? (
         <WhatsAppConnectDialog
