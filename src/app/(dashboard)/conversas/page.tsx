@@ -31,6 +31,8 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { brokerWhatsAppMessageSourceCondition, isRecentWhatsAppReplyFilter } from "@/features/dashboard/whatsapp-activity-query";
 import { loadedLeadMessageScope } from "@/features/conversations/loaded-lead-message-scope";
 import { OPEN_THREAD_MESSAGE_LIMIT, pickMessageIdsToLoad, summarizeIndexRows, type MessageIndexRow } from "@/features/conversations/message-window";
+import { buildConversationMessageIndexQuery, mapConversationMessageIndexResult } from "@/features/conversations/message-index-query";
+import { pickConversationSnapshotCursor } from "@/features/conversations/incremental-sync";
 import { resolveConversationTab } from "@/features/conversations/conversation-tab";
 
 // Não gerar estaticamente — a página depende de sessão e executa queries pesadas de AI
@@ -81,6 +83,7 @@ export default async function ConversationsPage({
 
   const db = getDatabase();
   const now = new Date();
+  let initialSyncCursor = { sentAt: now.toISOString(), id: "" };
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   const isDirector = context.role === "director";
@@ -220,7 +223,6 @@ export default async function ConversationsPage({
       .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.role, "director")))).map((row) => row.userId));
     const leadIds = leads.map((lead) => lead.id);
     const scopeMessagesToLoadedLeads = Boolean(brokerId || repliedLast7Days || distributedLeadsTab);
-
     // With more than one official number, every message says which number
     // received or sent it (the reply goes out on the number the customer wrote to).
     const officialChannels = await db
@@ -315,18 +317,16 @@ export default async function ConversationsPage({
       message: schema.whatsappMessages,
       leads: leads.map((lead) => ({ id: lead.id, phone: lead.telefone })),
     });
-    const [listIndexRows, documentRows, aiConversationRows] = leadIds.length
+    const [listIndexResult, documentRows, aiConversationRows] = leadIds.length
       ? await Promise.all([
-          // Filtered (one broker / replied): the newest 2000 of the visible leads only, still bounded.
-          // Unfiltered, the newest 2000 of the company alone left out every lead whose last message
-          // was older than them (22/10: qualified leads of the day before missing from the list), so
-          // the loaded leads' own messages are read too and both are merged.
-          scopeMessagesToLoadedLeads
-            ? loadMessageIndex(loadedLeadsScope, 2000)
-            : Promise.all([loadMessageIndex(undefined, 2000), loadMessageIndex(loadedLeadsScope, 4000)]).then(([recent, ofLoadedLeads]) => {
-              const seen = new Set(recent.map((message) => message.id));
-              return [...recent, ...ofLoadedLeads.filter((message) => !seen.has(message.id))];
-            }),
+          db.execute(buildConversationMessageIndexQuery({
+            tenantId: context.tenantId,
+            loadedLeadScope: loadedLeadsScope,
+            includeGlobalRecent: !scopeMessagesToLoadedLeads,
+            loadedMessageLimit: scopeMessagesToLoadedLeads ? 2_000 : 4_000,
+            coexChannelIds: coexChannels.map((channel) => channel.id),
+          }))
+            .then(mapConversationMessageIndexResult),
           db
             .select({
               id: schema.leadDocuments.id,
@@ -367,7 +367,9 @@ export default async function ConversationsPage({
               ),
             ),
         ])
-      : ([[], [], []] as const);
+      : ([{ rows: [], cursor: null }, [], []] as const);
+
+    const listIndexRows = listIndexResult.rows;
 
     // Texto e mídia só do que a tela mostra: prévia de cada conversa e o histórico da aberta (?leadId=).
     const openLead = leadId ? leads.find((lead) => lead.id === leadId) : undefined;
@@ -394,7 +396,19 @@ export default async function ConversationsPage({
       : [];
     const listIndexIds = new Set((listIndexRows as MessageIndexRow[]).map((row) => row.id));
     const indexRows = [...(listIndexRows as MessageIndexRow[]), ...openThreadIndexRows.filter((row) => !listIndexIds.has(row.id))];
-    const messageRows = await loadMessagesById(pickMessageIdsToLoad(indexRows, { openThread }));
+    const listConversationKeys = new Set((listIndexRows as MessageIndexRow[]).map((row) => row.conversationKey).filter((key): key is string => Boolean(key)));
+    const openRowsWithoutListAggregate = openThreadIndexRows.filter((row) => {
+      const key = row.leadId
+        ? `lead:${row.leadId}`
+        : `phone:${normalizePhone(row.phone ?? "").slice(-8)}`;
+      return key !== "phone:" && !listConversationKeys.has(key);
+    });
+    initialSyncCursor = pickConversationSnapshotCursor(
+      listIndexResult.cursor,
+      openRowsWithoutListAggregate.map(({ id, sentAt }) => ({ id, sentAt })),
+      now,
+    );
+    const messageRows = await loadMessagesById(pickMessageIdsToLoad(indexRows, { openThread, previewPerConversation: 0 }));
     const fullMessageById = new Map(messageRows.map((message) => [message.id, message]));
 
     const failedMessageEventKeys = isDirector
@@ -451,6 +465,7 @@ export default async function ConversationsPage({
     const rowsByLeadId = new Map<string, MessageRow[]>();
     const rowsByPhoneSuffix = new Map<string, MessageRow[]>();
     const statsByLead = new Map<string, ReturnType<typeof summarizeIndexRows>>();
+    const latestPreviewByLead = new Map<string, MessageIndexRow>();
     const addTo = (map: Map<string, MessageRow[]>, key: string, message: MessageRow) => {
       const list = map.get(key);
       if (list) list.push(message);
@@ -473,6 +488,8 @@ export default async function ConversationsPage({
           (Boolean(msg.phone && lead.telefone) && samePhone(msg.phone ?? "", lead.telefone)),
       );
       statsByLead.set(lead.id, summarizeIndexRows(matchedIndex));
+      const latestPreview = [...matchedIndex].sort((a, b) => b.sentAt.getTime() - a.sentAt.getTime())[0];
+      if (latestPreview) latestPreviewByLead.set(lead.id, latestPreview);
       const rawMatched = matchedIndex
         .flatMap((row) => fullMessageById.get(row.id) ?? [])
         .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
@@ -480,7 +497,15 @@ export default async function ConversationsPage({
         ["incoming", "inbound"].includes(message.direction)
         && [META_CLOUD_PROVIDER, "meta_cloud_api"].includes(message.provider ?? ""),
       );
-      replyBlockedByLead.set(lead.id, sourceChannelFailure(latestInbound?.communicationChannelId)?.message ?? null);
+      const latestInboundIndex = [...matchedIndex]
+        .filter((row) => row.latestInboundChannelId && row.latestInboundAt)
+        .sort((a, b) => (b.latestInboundAt?.getTime() ?? 0) - (a.latestInboundAt?.getTime() ?? 0))[0];
+      const latestInboundChannelId = latestInbound && latestInboundIndex
+        ? latestInbound.sentAt.getTime() > (latestInboundIndex.latestInboundAt?.getTime() ?? 0)
+          ? latestInbound.communicationChannelId
+          : latestInboundIndex.latestInboundChannelId
+        : latestInbound?.communicationChannelId ?? latestInboundIndex?.latestInboundChannelId;
+      replyBlockedByLead.set(lead.id, sourceChannelFailure(latestInboundChannelId)?.message ?? null);
 
       const seenIds = new Set<string>();
       const seenContentKeys = new Set<string>();
@@ -637,29 +662,33 @@ export default async function ConversationsPage({
       );
     });
 
-    // Conversas sem lead: total e mensagem recebida vêm do índice; o texto, só da prévia carregada.
+    // Conversas sem lead: o índice traz a última prévia e contadores. Corpos completos ficam no chat aberto.
     const unlinkedStatsByPhone = new Map<string, ReturnType<typeof summarizeIndexRows>>();
+    const unlinkedPreviewByPhone = new Map<string, MessageIndexRow>();
     {
       const unlinkedIndexByPhone = new Map<string, MessageIndexRow[]>();
       for (const row of indexRows as MessageIndexRow[]) {
         if (!row.phone || !shouldCreateSyntheticCustomerConversation(row, leadPhones, brokerPhones)) continue;
         const key = row.phone.replace(/\D/g, "");
         unlinkedIndexByPhone.set(key, [...(unlinkedIndexByPhone.get(key) ?? []), row]);
+        const currentPreview = unlinkedPreviewByPhone.get(key);
+        if (!currentPreview || row.sentAt.getTime() > currentPreview.sentAt.getTime()) unlinkedPreviewByPhone.set(key, row);
       }
       for (const [phone, rows] of unlinkedIndexByPhone) unlinkedStatsByPhone.set(phone, summarizeIndexRows(rows));
     }
 
-    const unlinkedByPhone = new Map<string, typeof unlinkedMessages>();
+    const unlinkedOpenByPhone = new Map<string, typeof unlinkedMessages>();
     for (const msg of unlinkedMessages) {
       if (!msg.phone) continue;
       const key = msg.phone.replace(/\D/g, "");
-      const current = unlinkedByPhone.get(key) || [];
+      const current = unlinkedOpenByPhone.get(key) || [];
       current.push(msg);
-      unlinkedByPhone.set(key, current);
+      unlinkedOpenByPhone.set(key, current);
     }
 
     const syntheticLeadConversations: ConversationItem[] = [];
-    for (const [phone, msgs] of unlinkedByPhone.entries()) {
+    for (const [phone, latestIndex] of unlinkedPreviewByPhone.entries()) {
+      const msgs = unlinkedOpenByPhone.get(phone) ?? [];
       msgs.sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
       const latest = msgs[msgs.length - 1];
       const latestInbound = [...msgs].reverse().find((message) =>
@@ -668,6 +697,10 @@ export default async function ConversationsPage({
       );
       const rawBody = latest?.body || "Conversa iniciada pelo WhatsApp";
       const snippet = rawBody.length > 80 ? `${rawBody.slice(0, 80)}...` : rawBody;
+      const latestPreviewAt = latest && latest.sentAt.getTime() > latestIndex.sentAt.getTime() ? latest.sentAt : latestIndex.sentAt;
+      const latestPreviewBody = latest && latest.sentAt.getTime() > latestIndex.sentAt.getTime()
+        ? snippet
+        : latestIndex.previewBody || snippet;
       const syntheticId = `unassigned-${phone}`;
 
       syntheticLeadConversations.push({
@@ -684,8 +717,8 @@ export default async function ConversationsPage({
         corretorNome: "Não atribuído",
         branchName: "Entrada Geral",
         consentimentoLgpd: false,
-        createdAt: latest?.sentAt.toISOString() || new Date().toISOString(),
-        stageEnteredAt: latest?.sentAt.toISOString() || new Date().toISOString(),
+        createdAt: latestPreviewAt.toISOString(),
+        stageEnteredAt: latestPreviewAt.toISOString(),
         planName: null,
         carrierName: null,
         messages: msgs.map((m) => ({
@@ -712,15 +745,13 @@ export default async function ConversationsPage({
             : {}),
         })),
         documents: [],
-        replyBlockedMessage: sourceChannelFailure(latestInbound?.communicationChannelId)?.message ?? null,
+        replyBlockedMessage: sourceChannelFailure(latestInbound?.communicationChannelId ?? latestIndex.latestInboundChannelId ?? null)?.message ?? null,
         ...(unlinkedStatsByPhone.get(phone) ?? {}),
-        latestMessage: latest
-          ? {
-              body: snippet,
-              direction: latest.direction,
-              sentAt: latest.sentAt.toISOString(),
-            }
-          : null,
+        latestMessage: {
+          body: latestPreviewBody,
+          direction: latest && latest.sentAt.getTime() > latestIndex.sentAt.getTime() ? latest.direction : latestIndex.direction,
+          sentAt: latestPreviewAt.toISOString(),
+        },
       });
     }
 
@@ -728,7 +759,13 @@ export default async function ConversationsPage({
       const messages = messagesByLead.get(lead.id) || [];
       const documents = documentsByLead.get(lead.id) || [];
       const aiConversation = aiConversationByLead.get(lead.id) || null;
-      const latestMessage = messages.filter((message) => !message.transition).at(-1);
+      const latestOpenMessage = messages.filter((message) => !message.transition).at(-1);
+      const latestPreview = latestPreviewByLead.get(lead.id);
+      const latestMessage = latestOpenMessage && (!latestPreview || Date.parse(latestOpenMessage.sentAt) >= latestPreview.sentAt.getTime())
+        ? { body: latestOpenMessage.body, direction: latestOpenMessage.direction, sentAt: latestOpenMessage.sentAt }
+        : latestPreview
+          ? { body: latestPreview.previewBody ?? "", direction: latestPreview.direction, sentAt: latestPreview.sentAt.toISOString() }
+          : null;
 
       return {
         id: lead.id,
@@ -763,13 +800,7 @@ export default async function ConversationsPage({
         ...(statsByLead.get(lead.id) ?? {}),
         documents,
         aiConversation,
-        latestMessage: latestMessage
-          ? {
-              body: latestMessage.body,
-              direction: latestMessage.direction,
-              sentAt: latestMessage.sentAt,
-            }
-          : null,
+        latestMessage,
       };
     });
 
@@ -777,7 +808,7 @@ export default async function ConversationsPage({
     // persisted. Leads without history stay in Leads/Distribuição and must
     // not appear as empty rows in the Conversations workspace.
     const allConversations = [...mappedLeadConversations, ...(distributedLeadsTab ? [] : syntheticLeadConversations)]
-      .filter((conversation) => conversation.messages.length > 0);
+      .filter((conversation) => (conversation.messageCount ?? 0) > 0 || conversation.messages.length > 0);
     const uniqueConversationsByPhone = new Map<string, ConversationItem>();
 
     for (const conv of allConversations) {
@@ -805,13 +836,10 @@ export default async function ConversationsPage({
         uniqueConversationsByPhone.set(phone, {
           ...primary,
           messages: mergedMessages,
-          latestMessage: mergedMessages[mergedMessages.length - 1]
-            ? {
-                body: mergedMessages[mergedMessages.length - 1].body,
-                direction: mergedMessages[mergedMessages.length - 1].direction,
-                sentAt: mergedMessages[mergedMessages.length - 1].sentAt,
-              }
-            : primary.latestMessage,
+          latestMessage: [primary.latestMessage, secondary.latestMessage]
+            .filter((item): item is NonNullable<typeof item> => Boolean(item))
+            .sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt))
+            .at(-1) ?? primary.latestMessage,
           aiConversation: primary.aiConversation || secondary.aiConversation,
           messageCount: Math.max(primary.messageCount ?? 0, secondary.messageCount ?? 0) || undefined,
           hasIncoming: Boolean(primary.hasIncoming || secondary.hasIncoming),
@@ -837,7 +865,7 @@ export default async function ConversationsPage({
     // "WhatsApp coex": only the conversations that went through a coexistence number.
     if (coexTab) {
       const coexChannelIds = new Set(coexChannels.map((channel) => channel.id));
-      const coexMessages = (indexRows as MessageIndexRow[]).filter((message) => message.communicationChannelId && coexChannelIds.has(message.communicationChannelId));
+      const coexMessages = (indexRows as MessageIndexRow[]).filter((message) => message.conversationHasCoex || (message.communicationChannelId && coexChannelIds.has(message.communicationChannelId)));
       const coexLeadIds = new Set(coexMessages.map((message) => message.leadId).filter((id): id is string => Boolean(id)));
       const phoneKey = (phone: string | null | undefined) => String(phone ?? "").replace(/\D/g, "").slice(-8);
       const coexPhones = new Set(coexMessages.map((message) => phoneKey(message.phone)).filter((key) => key.length === 8));
@@ -1180,6 +1208,7 @@ export default async function ConversationsPage({
       role={context.role}
       branches={branches}
       conversations={finalConversations}
+      initialSyncCursor={initialSyncCursor}
       initialLeadId={leadId}
       userId={context.userId}
       tenantId={context.tenantId}

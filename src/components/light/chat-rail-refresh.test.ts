@@ -11,12 +11,18 @@ describe("barra de conversas do Lite (egress, 03/11)", () => {
   });
 
   it("does not load the rail twice when the layout refresh already brings it (manager Lite)", () => {
-    expect(railRealtimeDecision({ detail: conversations, pathname: "/dashboard", serverRendersRail: true, visible: true })).toBe("skip");
+    expect(railRealtimeDecision({ detail: conversations, pathname: "/leads/lead-1", serverRendersRail: true, visible: true })).toBe("skip");
     expect(railRealtimeDecision({ detail: { kind: "notification.created" }, pathname: "/equipe", serverRendersRail: true, visible: true })).toBe("skip");
   });
 
   it("still loads it for the manager when the signal does not refresh the layout", () => {
     expect(railRealtimeDecision({ detail: conversations, pathname: "/equipe/minha", serverRendersRail: true, visible: true })).toBe("load");
+  });
+
+  it("loads the rail itself on summary pages, whose layout follows conversations once a minute (15/11)", () => {
+    expect(railRealtimeDecision({ detail: conversations, pathname: "/dashboard", serverRendersRail: true, visible: true })).toBe("load");
+    expect(railRealtimeDecision({ detail: conversations, pathname: "/leads", serverRendersRail: true, visible: true })).toBe("load");
+    expect(railRealtimeDecision({ detail: { kind: "domain.invalidated", domain: "leads" }, pathname: "/leads", serverRendersRail: true, visible: true })).toBe("skip");
   });
 
   it("loads at most once every 10 s", () => {

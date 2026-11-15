@@ -2,6 +2,7 @@ import { and, eq, isNotNull } from "drizzle-orm";
 
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
+import { createDutyConfigCache } from "./duty-config-cache";
 
 type DutyRosterRow = { scheduleId: string; dutyDate: string | null; brokerId?: string };
 
@@ -50,6 +51,13 @@ export function selectEffectiveDutyAssignments<T extends DutyRosterRow>(
  */
 export async function getPublishedDutyScheduleIds(tenantId: string, today: string): Promise<Set<string> | null> {
   if ((await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) !== "true") return null;
+  const ids = await publishedScheduleIdsCache.get(`${tenantId}|${today}`, () => loadPublishedDutyScheduleIds(tenantId, today));
+  return new Set(ids);
+}
+
+const publishedScheduleIdsCache = createDutyConfigCache<string[]>();
+
+async function loadPublishedDutyScheduleIds(tenantId: string, today: string): Promise<string[]> {
   const rows = await getDatabase()
     .selectDistinct({ scheduleId: schema.dutyRosterAssignments.scheduleId })
     .from(schema.dutyRosterAssignments)
@@ -59,7 +67,7 @@ export async function getPublishedDutyScheduleIds(tenantId: string, today: strin
       eq(schema.dutyRosterAssignments.status, "active"),
       isNotNull(schema.dutyRosterAssignments.monthlyPlanId),
     ));
-  return new Set(rows.map((row) => row.scheduleId));
+  return rows.map((row) => row.scheduleId);
 }
 
 /** Convenience for resolvers: filter rows loaded for `now` to the ones in force. */

@@ -8,8 +8,8 @@ import { motion, useReducedMotion } from "motion/react";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
 
-import type { RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
-import { useVisibleRealtimeRefresh, type VisibleRefreshTiming } from "@/components/providers/use-visible-realtime-refresh";
+import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
+import { visibleRefreshDelay, type VisibleRefreshTiming } from "@/components/providers/use-visible-realtime-refresh";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Message, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader } from "@/components/ui/message";
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
@@ -117,6 +117,15 @@ import {
 } from "@/features/conversations/components/media-bubble";
 import { MediaAttachButton } from "@/features/conversations/components/media-attach-button";
 import { mediaPlaceholderLabel } from "@/features/conversations/media-kinds";
+import { OPEN_THREAD_MESSAGE_LIMIT } from "@/features/conversations/message-window";
+import {
+  conversationDeltaResponseAction,
+  handleConversationRealtimeSignal,
+  mergeConversationIncrementalUpdates,
+  shouldRefreshAfterConversationNetworkError,
+  shouldRefreshConversationServer,
+  type ConversationIncrementalPatch,
+} from "@/features/conversations/incremental-sync";
 
 export type ConversationMessage = {
   id: string;
@@ -200,17 +209,14 @@ export type ConversationItem = {
 
 type ViewFilter = "all" | "qualified" | "closing" | "converted" | "ai_active" | "human_active" | "with_messages" | "without_messages";
 
-// 14/11 (egress): cada recarga reenvia a tela inteira (~2 MB). Com uma conversa aberta, no máximo uma a cada 20 s
-// (a mensagem nova ainda chega rápido); só com a lista, uma a cada 60 s.
+// Signals are coalesced before asking the incremental endpoint; no signal refreshes the full page.
 const CONVERSATIONS_REFRESH_TIMING: VisibleRefreshTiming = { coalesceMs: 3_000, maxWaitMs: 10_000, minGapMs: 20_000 };
-const CONVERSATIONS_LIST_REFRESH_TIMING: VisibleRefreshTiming = { coalesceMs: 3_000, maxWaitMs: 10_000, minGapMs: 60_000 };
-const isConversationInvalidation = (detail: RealtimeSyncBrowserDetail | undefined) =>
-  detail?.kind === "domain.invalidated" && detail.domain === "conversations";
 
 export function ConversationsWorkspace({
   role,
   branches,
   conversations: initialConversations,
+  initialSyncCursor,
   initialLeadId,
   userId,
   tenantId,
@@ -223,6 +229,7 @@ export function ConversationsWorkspace({
   role: string;
   branches: { id: string; name: string }[];
   conversations: ConversationItem[];
+  initialSyncCursor: { sentAt: string; id: string };
   initialLeadId?: string;
   userId?: string;
   tenantId?: string;
@@ -241,10 +248,15 @@ export function ConversationsWorkspace({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [conversations, setConversations] = useState(initialConversations);
+  const conversationsRef = useRef(conversations);
+  conversationsRef.current = conversations;
+  const cursorRef = useRef(initialSyncCursor);
   const [selectedId, setSelectedId] = useState<string | null>(
     // 03/11 (egress): só abre a conversa pedida na URL. Sem ela, a tela espera o clique.
     initialLeadId && initialConversations.some((item) => item.id === initialLeadId) ? initialLeadId : null,
   );
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
   const [mobileView, setMobileView] = useState<"list" | "chat">(
     initialLeadId ? "chat" : "list",
   );
@@ -255,13 +267,169 @@ export function ConversationsWorkspace({
     const sync = window.setTimeout(() => setConversations(initialConversations), 0);
     return () => window.clearTimeout(sync);
   }, [initialConversations]);
+  useEffect(() => {
+    cursorRef.current = initialSyncCursor;
+  }, [initialSyncCursor]);
 
-  // The Director workspace consumes the same opaque conversation signal as
-  // Lite. The resulting refresh re-runs server-side tenant and lead scoping.
-  // 24/10: one refresh per message re-sent the whole workspace (hundreds of leads and their
-  // messages) and froze clicks. Signals are gathered for 3 s (10 s at most) into one refresh.
-  // 02/11 (egress): only while the tab is visible, and at most one refresh every 15 s.
-  useVisibleRealtimeRefresh(isConversationInvalidation, selectedId ? CONVERSATIONS_REFRESH_TIMING : CONVERSATIONS_LIST_REFRESH_TIMING);
+  // Realtime message signals now read only scoped message deltas. A full server
+  // refresh remains the safety net for non-message changes and stale cursors.
+  useEffect(() => {
+    let timer: number | null = null;
+    let fallbackTimer: number | null = null;
+    let firstAt = 0;
+    let lastSyncAt = 0;
+    let lastFullRefreshAt = Date.now();
+    let lastConversationSignalAt = Date.now();
+    let lastNetworkErrorRefreshAt: number | null = null;
+    let inFlight = false;
+    let pending = false;
+    let pendingWhileHidden = false;
+    let hiddenAt: number | null = null;
+
+    const fullRefresh = () => {
+      lastFullRefreshAt = Date.now();
+      router.refresh();
+    };
+    const refreshAfterNetworkError = () => {
+      const now = Date.now();
+      if (!shouldRefreshAfterConversationNetworkError(lastNetworkErrorRefreshAt, now)) return;
+      lastNetworkErrorRefreshAt = now;
+      fullRefresh();
+    };
+
+    const sync = async () => {
+      timer = null;
+      if (document.visibilityState !== "visible") {
+        pendingWhileHidden = true;
+        return;
+      }
+      if (inFlight) {
+        pending = true;
+        return;
+      }
+      const current = conversationsRef.current;
+      const currentIds = current.map((conversation) => conversation.id);
+      const selectedId = selectedIdRef.current;
+      const conversationIds = [
+        ...(selectedId ? [selectedId] : []),
+        ...currentIds.filter((id) => id !== selectedId),
+      ].slice(0, 800);
+      if (!conversationIds.length) return;
+      inFlight = true;
+      lastSyncAt = Date.now();
+      try {
+        const response = await fetch("/api/conversations/incremental", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          body: JSON.stringify({
+            cursor: cursorRef.current,
+            conversationIds,
+            openConversationId: selectedId,
+          }),
+        });
+        const payload = await response.json().catch(() => null) as {
+          requiresFullRefresh?: boolean;
+          nextCursor?: { sentAt: string; id: string };
+          updates?: ConversationIncrementalPatch<ConversationMessage>[];
+        } | null;
+        const responseAction = conversationDeltaResponseAction({
+          status: response.status,
+          ok: response.ok,
+          validPayload: Boolean(payload?.nextCursor && Array.isArray(payload.updates)),
+          requiresFullRefresh: Boolean(payload?.requiresFullRefresh),
+        });
+        if (responseAction === "full_refresh") {
+          fullRefresh();
+          return;
+        }
+        if (responseAction === "throttled_refresh") {
+          refreshAfterNetworkError();
+          return;
+        }
+        if (!payload?.nextCursor || !Array.isArray(payload.updates)) return;
+        cursorRef.current = payload.nextCursor;
+        const merged = mergeConversationIncrementalUpdates(
+          conversationsRef.current,
+          payload.updates,
+          { openConversationId: selectedIdRef.current, messageLimit: OPEN_THREAD_MESSAGE_LIMIT },
+        );
+        if (merged.missingIds.length) {
+          fullRefresh();
+          return;
+        }
+        setConversations(merged.conversations);
+      } catch {
+        // A transport error also falls back to the authorized server snapshot.
+        refreshAfterNetworkError();
+      } finally {
+        inFlight = false;
+        if (pending) {
+          pending = false;
+          schedule();
+        }
+      }
+    };
+
+    const schedule = () => {
+      if (document.visibilityState !== "visible") {
+        pendingWhileHidden = true;
+        return;
+      }
+      const now = Date.now();
+      if (timer === null) firstAt = now;
+      else window.clearTimeout(timer);
+      timer = window.setTimeout(
+        () => void sync(),
+        visibleRefreshDelay(CONVERSATIONS_REFRESH_TIMING, firstAt, lastSyncAt, now),
+      );
+    };
+    const onSignal = (event: Event) => {
+      handleConversationRealtimeSignal(
+        (event as CustomEvent<RealtimeSyncBrowserDetail>).detail,
+        () => {
+          lastConversationSignalAt = Date.now();
+          schedule();
+        },
+      );
+    };
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") {
+        hiddenAt = Date.now();
+        return;
+      }
+      const now = Date.now();
+      const longHidden = hiddenAt !== null && now - hiddenAt >= 120_000;
+      const realtimeLive = document.documentElement.dataset.realtimeLive === "1";
+      if (longHidden && shouldRefreshConversationServer({
+        realtimeLive,
+        lastFullRefreshAt,
+        lastSignalAt: lastConversationSignalAt,
+        now,
+      })) fullRefresh();
+      else if (pendingWhileHidden) schedule();
+      hiddenAt = null;
+      pendingWhileHidden = false;
+    };
+
+    window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onSignal);
+    document.addEventListener("visibilitychange", onVisibility);
+    fallbackTimer = window.setInterval(() => {
+      const now = Date.now();
+      if (document.visibilityState === "visible" && shouldRefreshConversationServer({
+        realtimeLive: document.documentElement.dataset.realtimeLive === "1",
+        lastFullRefreshAt,
+        lastSignalAt: lastConversationSignalAt,
+        now,
+      })) fullRefresh();
+    }, 10_000);
+    return () => {
+      window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onSignal);
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (timer !== null) window.clearTimeout(timer);
+      if (fallbackTimer !== null) window.clearInterval(fallbackTimer);
+    };
+  }, [router, currentTab]);
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ViewFilter>("all");
@@ -272,7 +440,7 @@ export function ConversationsWorkspace({
 
   const selected = conversations.find((conversation) => conversation.id === selectedId) ?? null;
   const messagesWithHistory = useMemo(
-    () => conversations.filter((conversation) => conversation.messages.length > 0).length,
+    () => conversations.filter((conversation) => (conversation.messageCount ?? conversation.messages.length) > 0).length,
     [conversations],
   );
   const filtered = useMemo(() => {
@@ -295,8 +463,8 @@ export function ConversationsWorkspace({
             : filter === "human_active"
               ? conversation.aiConversation?.status === "HUMAN_ACTIVE" || conversation.aiConversation?.status === "WAITING_HUMAN"
               : filter === "with_messages"
-                ? conversation.messages.length > 0
-                : conversation.messages.length === 0);
+                ? (conversation.messageCount ?? conversation.messages.length) > 0
+                : (conversation.messageCount ?? conversation.messages.length) === 0);
       const matchesBranch = branchFilter === "all" || conversation.branchId === branchFilter;
       const matchesTag = tagFilter === "all" || Boolean(conversation.tags?.some((tag) => tag.id === tagFilter));
 
@@ -1966,7 +2134,7 @@ function getConversationStatusLabel(status: string, qualificationStatus?: string
 }
 
 function ConversationRow({ active, conversation, onClick, directorSkinEnabled, viewerRole }: { active: boolean; conversation: ConversationItem; onClick: () => void; directorSkinEnabled: boolean; viewerRole?: string }) {
-  const hasHistory = conversation.messages.length > 0;
+  const hasHistory = (conversation.messageCount ?? conversation.messages.length) > 0;
   const visibleMessageCount = conversation.messageCount ?? conversation.messages.filter((message) => !message.transition).length;
   const preview = conversation.latestMessage?.body ?? "Nenhuma mensagem sincronizada.";
   const displayBrokerName = brokerDisplayName(conversation.corretorNome);

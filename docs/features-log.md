@@ -912,6 +912,18 @@ Novo componente `Mascot` (`src/components/mascot`), com os estados idle, welcome
 
 As respostas sugeridas do chat seguem os níveis do padrão, numa tabela única (`src/components/chat/chat-feedback.ts`). A resposta escolhida aparece como "Enviando" até o servidor confirmar. Se falhar, vira "Não enviada · Tentar de novo", balança uma vez e as opções voltam a valer. O mascote do cabeçalho fica pensando enquanto a ação roda. Tocam som: pausar ou retomar o plantão, falhas e acertos parciais. Nota, etapa, retorno e aceite ficam em silêncio, só com vibração no celular. Plano: `docs/implementations/active/2026-11-14-feedback-padrao.md`.
 
+## 14/11/2026 - Egress de conversas, F1 incremental
+
+`/conversas` recebe deltas autenticados por cursor `sent_at + id`; a lista inicial usa prévia compacta e agregados por conversa, e o corpo completo só é enviado para o chat aberto. O delta limita o escopo por lead visível, associa por telefone apenas mensagens sem `lead_id`, soma contadores posteriores ao cursor e carrega apenas o status da IA. O resumo usa contagens sem corpo e `distinct on` para a última prévia. Com realtime ativo, refresh integral só ocorre após 10 minutos sem sinais ou em fallback; com realtime fora, o provider preserva o refresh para todos os domínios. Plano e limitações: `docs/implementations/active/2026-11-14-conversas-incremental-f1.md`.
+
+## 15/11/2026 - Egress de conversas, ajustes da segunda revisão
+
+O cursor inicial agora é calculado na mesma consulta dos agregados e representa a última tupla realmente incluída; comparações e ordenação usam milissegundos mais `id` para não repetir mensagens com microssegundos. O delta também detecta mudanças em `ai_conversations.updated_at` sem mensagem nova. Erros de rede limitam o refresh integral a um por minuto. Detalhes e limitações: `docs/implementations/active/2026-11-14-conversas-incremental-f1.md`.
+
+## 15/11/2026 - Egress de conversas, ajustes da terceira revisão
+
+F1 foi rebaseado sobre F0/F5. Em `/conversas`, sinais de conversa chamam só o delta; respostas inválidas e erros não OK respeitam o limite de refresh, exceto `409 requiresFullRefresh`. Mantida a limitação de status da IA sem sinal próprio até o refresh completo, no máximo em 10 minutos sem sinais. Plano: `docs/implementations/active/2026-11-14-conversas-incremental-f1.md`.
+
 ## 14/11/2026 - Feedback padrão em todo o modo Lite (fases 2 a 5)
 
 O Lite inteiro (corretor, supervisor, gestor e Diretor Lite) responde no padrão de `docs/design-system/FEEDBACK.md`: estados de envio, sucesso só depois do servidor, erro com a causa, o que continua valendo e "Tentar de novo", e som e vibração por nível. As ações do chat ganham nível e "Não enviada · Tentar de novo". A ficha, a agenda, os clientes, o plantão, a meta do dia (nível 2), as configurações, o supervisor, o gestor e as telas do diretor deixam de usar toast para o que cabe no objeto. A venda registrada comemora em tela cheia com o capitão (nível 3). O que ficou de fora está no plano: `docs/implementations/active/2026-11-14-feedback-padrao.md`.
