@@ -3,7 +3,7 @@ import { PgDialect } from "drizzle-orm/pg-core";
 
 import { schema } from "@/shared/db";
 import { loadedLeadMessageScope } from "./loaded-lead-message-scope";
-import { buildConversationMessageIndexQuery, conversationMessageVisibilityFilter, mapConversationMessageIndexRows } from "./message-index-query";
+import { buildConversationMessageIndexQuery, conversationMessageVisibilityFilter, mapConversationMessageIndexResult, mapConversationMessageIndexRows } from "./message-index-query";
 
 describe("SQL index of conversation previews", () => {
   it("applies the same tenant, Status, placeholder and coexistence-history filters to every read", () => {
@@ -40,6 +40,10 @@ describe("SQL index of conversation previews", () => {
     expect(query.sql).toContain("inbound_ranked");
     expect(query.sql).toContain("left(body, 80) || '...' else coalesce(body, '') end as preview_body");
     expect(query.sql).toContain("where preview_rank = 1");
+    expect(query.sql).toContain("latest_candidate_cursor");
+    expect(query.sql).toContain("date_trunc('milliseconds', sent_at)");
+    expect(query.sql).toContain("snapshot_cursor_sent_at");
+    expect(query.sql).toContain("statement_timestamp()");
     expect(query.sql).not.toMatch(/select\s+.*body/i);
     expect(query.sql).toContain("not ilike");
     expect(query.sql).toContain("'[text]'");
@@ -94,5 +98,35 @@ describe("SQL index of conversation previews", () => {
       conversationHasIncoming: true,
       conversationHasCoex: false,
     }]);
+  });
+
+  it("maps the exact cursor from the same index snapshot, including an empty snapshot", () => {
+    const indexed = mapConversationMessageIndexResult({ rows: [{
+      id: "message-recent",
+      lead_id: "lead-a",
+      client_id: null,
+      phone: "5511999991234",
+      direction: "inbound",
+      provider: "meta_cloud",
+      preview_body: "recente",
+      sent_at: "2026-11-14T12:00:00.123Z",
+      communication_channel_id: null,
+      conversation_key: "lead:lead-a",
+      conversation_message_count: "1",
+      conversation_has_incoming: true,
+      conversation_has_coex: false,
+      snapshot_cursor_sent_at: "2026-11-14T12:00:00.123Z",
+      snapshot_cursor_id: "message-recent",
+    }] });
+    expect(indexed.rows).toHaveLength(1);
+    expect(indexed.cursor).toEqual({ sentAt: "2026-11-14T12:00:00.123Z", id: "message-recent" });
+
+    const empty = mapConversationMessageIndexResult({ rows: [{
+      id: null,
+      snapshot_cursor_sent_at: "2026-11-14T12:00:00.000Z",
+      snapshot_cursor_id: "",
+    }] });
+    expect(empty.rows).toEqual([]);
+    expect(empty.cursor).toEqual({ sentAt: "2026-11-14T12:00:00.000Z", id: "" });
   });
 });

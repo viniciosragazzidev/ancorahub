@@ -142,9 +142,10 @@ export async function POST(request: NextRequest) {
       ? loadedLeadMessageScope({ message, leads: visibleLeadRows })
       : undefined;
     const cursorAt = new Date(parsed.data.cursor.sentAt);
+    const cursorSentAt = sql<Date>`date_trunc('milliseconds', ${message.sentAt})`;
     const afterCursor = or(
-      gt(message.sentAt, cursorAt),
-      and(eq(message.sentAt, cursorAt), gt(message.id, parsed.data.cursor.id)),
+      gt(cursorSentAt, cursorAt),
+      and(eq(cursorSentAt, cursorAt), gt(message.id, parsed.data.cursor.id)),
     )!;
     const matchedSynthetic = syntheticSuffixes.length
       ? and(isNull(message.leadId), isNull(message.clientId), inArray(suffixColumn, syntheticSuffixes))
@@ -157,7 +158,7 @@ export async function POST(request: NextRequest) {
           clientId: message.clientId,
           phone: message.phone,
           direction: message.direction,
-          sentAt: message.sentAt,
+          sentAt: cursorSentAt,
         })
         .from(message)
         .where(and(
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest) {
           conversationMessageVisibilityFilter(context.tenantId),
           afterCursor,
         ))
-        .orderBy(asc(message.sentAt), asc(message.id))
+        .orderBy(asc(cursorSentAt), asc(message.id))
         .limit(MAX_DELTA_MESSAGES + 1)
       : [];
     if (changedRows.length > MAX_DELTA_MESSAGES) return withNoStore({ requiresFullRefresh: true, reason: "delta_too_large" }, 409);
@@ -216,21 +217,28 @@ export async function POST(request: NextRequest) {
       ...affectedLeads.map((lead) => lead.id),
       ...(openLead ? [openLead.id] : []),
     ])];
-    const aiConversationRows = statusLeadIds.length
+    const aiLeadIds = [...new Set([...visibleLeadIds, ...(openLead ? [openLead.id] : [])])];
+    const aiConversationRows = aiLeadIds.length
       ? await db.select({
           id: schema.aiConversations.id,
           leadId: schema.aiConversations.leadId,
           status: schema.aiConversations.status,
           assignedUserId: schema.aiConversations.assignedUserId,
+          updatedAfterCursor: sql<boolean>`${schema.aiConversations.updatedAt} > ${cursorAt}`,
         })
         .from(schema.aiConversations)
         .where(and(
           eq(schema.aiConversations.tenantId, context.tenantId),
-          inArray(schema.aiConversations.leadId, statusLeadIds),
+          inArray(schema.aiConversations.leadId, aiLeadIds),
+          or(
+            statusLeadIds.length ? inArray(schema.aiConversations.leadId, statusLeadIds) : undefined,
+            gt(schema.aiConversations.updatedAt, cursorAt),
+          ),
         ))
         .orderBy(desc(schema.aiConversations.updatedAt), desc(schema.aiConversations.id))
       : [];
     const aiStatusByLeadId = new Map<string, { id: string; status: string; assignedUserId: string | null }>();
+    const aiChangedLeadIds = new Set<string>();
     for (const row of aiConversationRows) {
       if (row.leadId && !aiStatusByLeadId.has(row.leadId)) {
         aiStatusByLeadId.set(row.leadId, {
@@ -238,6 +246,9 @@ export async function POST(request: NextRequest) {
           status: row.status,
           assignedUserId: row.assignedUserId,
         });
+      }
+      if (row.leadId && row.updatedAfterCursor === true) {
+        aiChangedLeadIds.add(row.leadId);
       }
     }
 
@@ -263,7 +274,8 @@ export async function POST(request: NextRequest) {
               count(*) as message_count_delta,
               bool_or(direction not in ('outgoing', 'outbound', 'transition')) as has_incoming_delta
             from matching
-            where sent_at > ${cursorAt} or (sent_at = ${cursorAt} and id > ${parsed.data.cursor.id})
+            where date_trunc('milliseconds', sent_at) > ${cursorAt}
+              or (date_trunc('milliseconds', sent_at) = ${cursorAt} and id > ${parsed.data.cursor.id})
             group by conversation_key
           ), latest as (
             select distinct on (conversation_key)
@@ -280,7 +292,7 @@ export async function POST(request: NextRequest) {
               end as conversation_key
             from whatsapp_messages
             where ${and(eq(message.tenantId, context.tenantId), conversationMessageVisibilityFilter(context.tenantId), summaryFilter)}
-            order by conversation_key, sent_at desc, id desc
+            order by conversation_key, date_trunc('milliseconds', sent_at) desc, id desc
           )
           select latest.*, coalesce(delta_counts.message_count_delta, 0) as message_count_delta,
             coalesce(delta_counts.has_incoming_delta, false) as has_incoming_delta
@@ -322,7 +334,7 @@ export async function POST(request: NextRequest) {
       })
         .from(message)
         .where(and(eq(message.tenantId, context.tenantId), openScope, conversationMessageVisibilityFilter(context.tenantId), afterCursor))
-        .orderBy(desc(message.sentAt), desc(message.id))
+        .orderBy(desc(cursorSentAt), desc(message.id))
         .limit(301);
       if (openCursorMessages.length > 300) return withNoStore({ requiresFullRefresh: true, reason: "open_thread_delta_too_large" }, 409);
       threadMessages = openCursorMessages;
@@ -448,22 +460,24 @@ export async function POST(request: NextRequest) {
     const compareLatestFirst = (left: Record<string, unknown>, right: Record<string, unknown>) =>
       new Date(String(right.sent_at)).getTime() - new Date(String(left.sent_at)).getTime()
       || String(right.id).localeCompare(String(left.id));
-    const leadUpdates = affectedLeads.flatMap((lead) => {
+    const leadUpdates = visibleLeadRows.filter((lead) => affectedIds.has(lead.id) || aiChangedLeadIds.has(lead.id)).flatMap((lead) => {
       const matching = summaryRows.filter((row) =>
         row.lead_id === lead.id || (!row.lead_id && lead.phone && typeof row.phone === "string" && samePhone(row.phone, lead.phone)),
       );
-      if (!matching.length) return [];
-      const latest = [...matching].sort(compareLatestFirst)[0]!;
+      if (!matching.length && !aiChangedLeadIds.has(lead.id)) return [];
+      const latest = matching.length ? [...matching].sort(compareLatestFirst)[0] : null;
       return [{
         id: lead.id,
-        latestMessage: {
-          body: compactPreview(String(latest.body ?? "")),
-          direction: String(latest.direction),
-          sentAt: new Date(String(latest.sent_at)).toISOString(),
-        },
-        messageCountDelta: matching.reduce((sum, row) => sum + Number(row.message_count_delta ?? 0), 0),
-        hasIncomingDelta: matching.some((row) => Boolean(row.has_incoming_delta)),
-        ...(statusLeadIds.includes(lead.id)
+        ...(latest ? {
+          latestMessage: {
+            body: compactPreview(String(latest.body ?? "")),
+            direction: String(latest.direction),
+            sentAt: new Date(String(latest.sent_at)).toISOString(),
+          },
+          messageCountDelta: matching.reduce((sum, row) => sum + Number(row.message_count_delta ?? 0), 0),
+          hasIncomingDelta: matching.some((row) => Boolean(row.has_incoming_delta)),
+        } : {}),
+        ...(statusLeadIds.includes(lead.id) || aiChangedLeadIds.has(lead.id)
           ? { aiConversationStatus: aiStatusByLeadId.get(lead.id) ?? null }
           : {}),
         ...(lead.id === parsed.data.openConversationId
@@ -512,7 +526,10 @@ export async function POST(request: NextRequest) {
       }];
     });
     const openConversationId = parsed.data.openConversationId;
-    const openThreadStatusUpdate = openConversationId && !affectedIds.has(openConversationId) && (openLead || openSyntheticPhone)
+    const openThreadStatusUpdate = openConversationId
+      && !affectedIds.has(openConversationId)
+      && !aiChangedLeadIds.has(openConversationId)
+      && (openLead || openSyntheticPhone)
       ? [{
           id: openConversationId,
           ...(openLead && statusLeadIds.includes(openLead.id)

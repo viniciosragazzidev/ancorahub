@@ -120,6 +120,7 @@ import { mediaPlaceholderLabel } from "@/features/conversations/media-kinds";
 import { OPEN_THREAD_MESSAGE_LIMIT } from "@/features/conversations/message-window";
 import {
   mergeConversationIncrementalUpdates,
+  shouldRefreshAfterConversationNetworkError,
   shouldRefreshConversationServer,
   type ConversationIncrementalPatch,
 } from "@/features/conversations/incremental-sync";
@@ -278,6 +279,7 @@ export function ConversationsWorkspace({
     let lastSyncAt = 0;
     let lastFullRefreshAt = Date.now();
     let lastConversationSignalAt = Date.now();
+    let lastNetworkErrorRefreshAt: number | null = null;
     let inFlight = false;
     let pending = false;
     let pendingWhileHidden = false;
@@ -286,6 +288,12 @@ export function ConversationsWorkspace({
     const fullRefresh = () => {
       lastFullRefreshAt = Date.now();
       router.refresh();
+    };
+    const refreshAfterNetworkError = () => {
+      const now = Date.now();
+      if (!shouldRefreshAfterConversationNetworkError(lastNetworkErrorRefreshAt, now)) return;
+      lastNetworkErrorRefreshAt = now;
+      fullRefresh();
     };
 
     const sync = async () => {
@@ -341,7 +349,7 @@ export function ConversationsWorkspace({
         setConversations(merged.conversations);
       } catch {
         // A transport error also falls back to the authorized server snapshot.
-        fullRefresh();
+        refreshAfterNetworkError();
       } finally {
         inFlight = false;
         if (pending) {

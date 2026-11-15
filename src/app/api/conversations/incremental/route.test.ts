@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   executeRows: [] as Array<Array<Record<string, unknown>>>,
   selectLimits: [] as number[],
   whereConditions: [] as unknown[],
+  orderByCalls: [] as unknown[][],
   executeQueries: [] as Array<{ text: string }>,
   context: vi.fn(),
   database: null as unknown,
@@ -55,7 +56,7 @@ vi.mock("@/shared/db", () => {
         from: vi.fn(() => query),
         innerJoin: vi.fn(() => query),
         where: vi.fn((condition: unknown) => { mocks.whereConditions.push(condition); return query; }),
-        orderBy: vi.fn(() => query),
+        orderBy: vi.fn((...args: unknown[]) => { mocks.orderByCalls.push(args); return query; }),
         limit: vi.fn((limit: number) => { mocks.selectLimits.push(limit); return Promise.resolve(rows); }),
         then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) => Promise.resolve(rows).then(resolve, reject),
       };
@@ -121,6 +122,7 @@ beforeEach(() => {
   mocks.executeRows = [];
   mocks.selectLimits = [];
   mocks.whereConditions = [];
+  mocks.orderByCalls = [];
   mocks.executeQueries = [];
   mocks.context.mockResolvedValue({ tenantId: "tenant-1", userId: "director-1", role: "director" });
 });
@@ -154,6 +156,30 @@ describe("POST /api/conversations/incremental", () => {
 
     expect(response.status).toBe(200);
     expect(containsNode(mocks.whereConditions[1], (node) => node.kind === "gt" && node.left === "whatsappMessages.id" && node.right === "m-10")).toBe(true);
+  });
+
+  it("truncates microseconds to milliseconds for comparisons, ordering and delta counts", async () => {
+    mocks.selectRows = [[lead], [changed()], [{ id: "ai-1", leadId: "lead-1", status: "AI_ACTIVE", assignedUserId: null }]];
+    mocks.executeRows = [[summary()]];
+
+    const response = await POST(request({}));
+    const deltaQuery = mocks.executeQueries[0]!.text;
+    const messageOrder = mocks.orderByCalls.find((args) => args.some((arg) =>
+      (arg as { kind?: string; column?: { kind?: string; text?: string } }).kind === "asc"
+      && (arg as { column?: { text?: string } }).column?.text?.includes("date_trunc('milliseconds'"),
+    ));
+
+    expect(response.status).toBe(200);
+    expect(containsNode(mocks.whereConditions[1], (node) =>
+      node.kind === "gt"
+      && Boolean(node.left && typeof node.left === "object"
+        && String((node.left as { text?: string }).text).includes("date_trunc('milliseconds'")),
+    )).toBe(true);
+    expect(messageOrder).toBeDefined();
+    expect((messageOrder?.[1] as { column?: unknown })?.column).toBe("whatsappMessages.id");
+    expect(deltaQuery).toContain("date_trunc('milliseconds', sent_at) >");
+    expect(deltaQuery).toContain("date_trunc('milliseconds', sent_at) =");
+    expect(deltaQuery).toContain("id >");
   });
 
   it("returns the bounded fallback when more than 500 messages are behind the cursor", async () => {
@@ -217,5 +243,31 @@ describe("POST /api/conversations/incremental", () => {
     expect(queryText).toContain("select distinct on (conversation_key)");
     expect(queryText).toContain("left(body, 120) as body");
     expect(queryText.slice(0, queryText.indexOf("), delta_counts"))).not.toMatch(/\bbody\b/);
+  });
+
+  it("returns an AI status change for a loaded lead even when no message changed", async () => {
+    const currentCursor = cursor();
+    mocks.selectRows = [
+      [lead],
+      [],
+      [{
+        id: "ai-1",
+        leadId: "lead-1",
+        status: "WAITING_HUMAN",
+        assignedUserId: "broker-1",
+        updatedAfterCursor: true,
+      }],
+    ];
+
+    const response = await POST(request({ cursor: currentCursor }));
+    const payload = await response.json() as { updates: Array<Record<string, unknown>> };
+
+    expect(response.status).toBe(200);
+    expect(payload.updates).toEqual([{
+      id: "lead-1",
+      aiConversationStatus: { id: "ai-1", status: "WAITING_HUMAN", assignedUserId: "broker-1" },
+    }]);
+    expect(payload.updates[0]).not.toHaveProperty("messageCountDelta");
+    expect(containsNode(mocks.whereConditions, (node) => node.kind === "gt" && node.left === "aiConversations.updatedAt")).toBe(true);
   });
 });
