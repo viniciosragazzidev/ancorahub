@@ -43,5 +43,5 @@ export function AcceptLeadIcon() {
 /** Etiqueta "Oferta pendente" dentro do botão: o estado não depende só da cor ou da animação. */
 export function OfferPendingTag() {
   // O ":" só para leitor de tela: o nome do botão fica "Oferta pendente: Aceitar ...".
-  return <><span className={styles.pendingTag}>Oferta pendente</span><span className="sr-only">:</span>{" "}</>;
+  return <><span className={styles.pendingTag} data-offer-tag="">Oferta pendente</span><span className="sr-only">:</span>{" "}</>;
 }
