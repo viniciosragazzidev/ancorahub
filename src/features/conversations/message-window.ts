@@ -13,9 +13,18 @@ export type MessageIndexRow = {
   direction: string;
   sentAt: Date;
   communicationChannelId: string | null;
+  provider?: string | null;
+  previewBody?: string;
+  latestInboundChannelId?: string | null;
+  latestInboundAt?: Date | null;
+  /** SQL preview query returns one row per conversation and carries its aggregate. */
+  conversationKey?: string;
+  conversationMessageCount?: number;
+  conversationHasIncoming?: boolean;
+  conversationHasCoex?: boolean;
 };
 
-/** Mensagens completas por conversa na lista: a última vira a prévia, as demais cobrem a deduplicação. */
+/** Limite para helpers usados por callers que ainda pedem mais de uma linha de prévia. */
 export const PREVIEW_MESSAGES_PER_CONVERSATION = 3;
 /** Histórico da conversa aberta: as mais recentes, o suficiente para a tela sem reler o lead inteiro. */
 export const OPEN_THREAD_MESSAGE_LIMIT = 300;
@@ -23,11 +32,11 @@ export const OPEN_THREAD_MESSAGE_LIMIT = 300;
 const digits = (phone: string | null | undefined) => String(phone ?? "").replace(/\D/g, "");
 const phoneSuffix = (phone: string | null | undefined) => digits(phone).slice(-8);
 
-/** Mesma chave de conversa da lista: o lead quando há, senão os 8 últimos dígitos do telefone. */
+/** Chave da lista: lead vinculado ou telefone normalizado completo da conversa sem lead. */
 export function conversationKey(row: Pick<MessageIndexRow, "leadId" | "phone">): string | null {
   if (row.leadId) return `lead:${row.leadId}`;
-  const suffix = phoneSuffix(row.phone);
-  return suffix.length === 8 ? `phone:${suffix}` : null;
+  const phone = digits(row.phone);
+  return phone.length >= 8 ? `phone:${phone}` : null;
 }
 
 export function isIncomingDirection(direction: string) {
@@ -79,13 +88,31 @@ export function pickMessageIdsToLoad(
 }
 
 /** Total e se há mensagem recebida, a partir do índice: alimentam o "N mensagens" e o filtro Atendente Virtual. */
-export function summarizeIndexRows(rows: Iterable<Pick<MessageIndexRow, "id" | "direction">>) {
+export function summarizeIndexRows(rows: Iterable<Pick<MessageIndexRow, "id" | "direction" | "leadId" | "phone"> & Partial<Pick<MessageIndexRow, "conversationKey" | "conversationMessageCount" | "conversationHasIncoming">>>) {
+  const materialized = [...rows];
   const seen = new Set<string>();
+  const aggregateByConversation = new Map<string, { count: number; hasIncoming: boolean }>();
+  const fallbackSeen = new Set<string>();
   let hasIncoming = false;
-  for (const row of rows) {
+  for (const row of materialized) {
+    if (row.conversationKey && typeof row.conversationMessageCount === "number") {
+      const current = aggregateByConversation.get(row.conversationKey);
+      aggregateByConversation.set(row.conversationKey, {
+        count: Math.max(current?.count ?? 0, row.conversationMessageCount),
+        hasIncoming: Boolean(current?.hasIncoming || row.conversationHasIncoming),
+      });
+      continue;
+    }
+  }
+  for (const row of materialized) {
+    const key = row.conversationKey ?? conversationKey(row);
+    if (key && aggregateByConversation.has(key)) continue;
     if (seen.has(row.id)) continue;
     seen.add(row.id);
+    fallbackSeen.add(row.id);
     if (isIncomingDirection(row.direction)) hasIncoming = true;
   }
-  return { messageCount: seen.size, hasIncoming };
+  const messageCount = [...aggregateByConversation.values()].reduce((sum, item) => sum + item.count, fallbackSeen.size);
+  hasIncoming ||= [...aggregateByConversation.values()].some((item) => item.hasIncoming);
+  return { messageCount, hasIncoming };
 }

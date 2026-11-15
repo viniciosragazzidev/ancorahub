@@ -33,6 +33,7 @@ function renderWorkspace(enabled: boolean, pathname = "/conversas") {
           role="director"
           branches={[]}
           conversations={[]}
+          initialSyncCursor={{ sentAt: "2026-11-14T12:00:00.000Z", id: "" }}
           userId="fixture-director"
           tenantId="fixture-tenant"
           leadTags={[]}
@@ -62,6 +63,7 @@ function renderLegacyWorkspaceSnapshot() {
               role="director"
               branches={[]}
               conversations={[]}
+              initialSyncCursor={{ sentAt: "2026-11-14T12:00:00.000Z", id: "" }}
               userId="fixture-director"
               tenantId="fixture-tenant"
             />
@@ -109,6 +111,7 @@ function renderSelectedConversation(corretorNome: string | null = "Marina Exempl
           role="director"
           branches={[{ id: "branch-centro", name: "Centro" }]}
           conversations={[conversation]}
+          initialSyncCursor={{ sentAt: "2026-11-14T12:00:00.000Z", id: "" }}
           initialLeadId={conversation.id}
           userId="fixture-director"
           tenantId="fixture-tenant"

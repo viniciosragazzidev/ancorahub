@@ -303,6 +303,7 @@ export default async function DirectorShellRealPage({
           role={papel?.roleKey ?? "director"}
           branches={papel ? [] : demoBranches}
           conversations={previewConversations}
+          initialSyncCursor={{ sentAt: new Date(Date.now() - 10_000).toISOString(), id: "" }}
           initialLeadId={previewConversations.find((conversation) => conversation.id === "lead-fixture-ana")?.id ?? previewConversations[0]?.id}
           userId="fixture-director"
           tenantId="fixture-tenant"

@@ -12,6 +12,7 @@ export function ConversationsFrame({
   role,
   branches,
   conversations,
+  initialSyncCursor,
   initialLeadId,
   userId,
   tenantId,
@@ -30,6 +31,7 @@ export function ConversationsFrame({
   role: string;
   branches: { id: string; name: string }[];
   conversations: ConversationItem[];
+  initialSyncCursor: { sentAt: string; id: string };
   initialLeadId?: string;
   userId?: string;
   tenantId?: string;
@@ -70,6 +72,7 @@ export function ConversationsFrame({
       role={role}
       branches={branches}
       conversations={conversations}
+      initialSyncCursor={initialSyncCursor}
       initialLeadId={initialLeadId}
       userId={userId}
       tenantId={tenantId}
