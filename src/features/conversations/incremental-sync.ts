@@ -2,6 +2,7 @@ export type ConversationIncrementalMessage = {
   id: string;
   sentAt: string;
 };
+export type ConversationSyncCursor = { sentAt: string; id: string };
 export type IncrementalProviderFailure = { code: string; title: string; message: string } | null;
 export type ConversationAiStatusPatch = {
   id: string;
@@ -127,6 +128,34 @@ export function shouldRefreshConversationServer(input: {
     return input.now - input.lastFullRefreshAt >= CONVERSATION_OFFLINE_REFRESH_AFTER_MS;
   }
   return input.now - Math.max(input.lastSignalAt, input.lastFullRefreshAt) >= CONVERSATION_STALE_REFRESH_AFTER_MS;
+}
+
+/** Pick the last message tuple represented in the initial index snapshot. */
+export function pickConversationSnapshotCursor(
+  indexedCursor: ConversationSyncCursor | null,
+  additionalIncludedMessages: readonly { id: string; sentAt: Date | string }[],
+  fallbackAt: Date,
+): ConversationSyncCursor {
+  let latest = indexedCursor
+    ? { sentAt: new Date(indexedCursor.sentAt).toISOString(), id: indexedCursor.id }
+    : { sentAt: fallbackAt.toISOString(), id: "" };
+  let latestAt = Date.parse(latest.sentAt);
+  for (const message of additionalIncludedMessages) {
+    const sentAt = message.sentAt instanceof Date ? message.sentAt : new Date(message.sentAt);
+    if (!Number.isFinite(sentAt.getTime())) continue;
+    const time = sentAt.getTime();
+    if (time > latestAt || (time === latestAt && message.id > latest.id)) {
+      latest = { sentAt: sentAt.toISOString(), id: message.id };
+      latestAt = time;
+    }
+  }
+  return latest;
+}
+
+export const CONVERSATION_NETWORK_ERROR_REFRESH_INTERVAL_MS = 60_000;
+
+export function shouldRefreshAfterConversationNetworkError(lastRefreshAt: number | null, now: number) {
+  return lastRefreshAt === null || now - lastRefreshAt >= CONVERSATION_NETWORK_ERROR_REFRESH_INTERVAL_MS;
 }
 
 export function isValidConversationCursor(value: unknown, now = Date.now()) {
