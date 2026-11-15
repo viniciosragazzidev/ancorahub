@@ -5,6 +5,7 @@
  * (leads por fila, temperatura, requalificação, plantões agora e WhatsApp), em cartões com ícone, anel e
  * barras, com entrada em cascata. Sem dados de venda por enquanto. Período e unidade ficam no cabeçalho da aba.
  */
+import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { ArrowRight } from "lucide-react";
@@ -89,6 +90,8 @@ export function operationInsight(data: EssentialDashboard): string | null {
 export function OperationView({ data, canOpenConversations = true }: { data: EssentialDashboard; canOpenConversations?: boolean }) {
   const { totals, rows, label } = data.queues;
   const { whatsapp, duties } = data;
+  // Paginação de 8 em 8 na lista do WhatsApp dos corretores (14/11/2026).
+  const { pageRows: whatsappPage, pagination: whatsappPagination } = useLitePages(whatsapp.brokers, 8);
   const cards = [
     { key: "arrived", label: "Entraram", value: totals.arrived, context: label, Icon: Users },
     { key: "qualified", label: "Qualificados", value: totals.qualified, context: `${share(totals.qualified, totals.arrived)}% do que entrou`, Icon: UserCheck },
@@ -250,7 +253,7 @@ export function OperationView({ data, canOpenConversations = true }: { data: Ess
               </dl>
               {whatsapp.brokers.length ? (
                 <ul className={kit.carrierList} aria-label="Corretores conectados, com atendimentos ativos">
-                  {whatsapp.brokers.map((broker) => {
+                  {whatsappPage.map((broker) => {
                     const body = (
                       <>
                         <span className={kit.carrierName}>{broker.name}</span>
@@ -271,6 +274,7 @@ export function OperationView({ data, canOpenConversations = true }: { data: Ess
               ) : (
                 <p className={kit.empty}>Nenhum atendimento ativo agora nos WhatsApp conectados.</p>
               )}
+              <LitePagination {...whatsappPagination} label="Páginas dos corretores no WhatsApp" />
             </>
           ) : null}
         </section>

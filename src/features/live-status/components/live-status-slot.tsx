@@ -14,13 +14,13 @@ function statusStripClassName(role: TenantContext["role"], className?: string) {
 }
 
 /** A faixa é um Server Component suspensível: o resto da página pode pintar antes das consultas agregadas. */
-export async function LiveStatusSlot({ context, className }: { context: TenantContext; className?: string }) {
+export async function LiveStatusSlot({ context, className, compact = false }: { context: TenantContext; className?: string; compact?: boolean }) {
   const payload = await getLiveStatuses(context).catch((error) => {
     console.warn("[live-status] strip unavailable", { message: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
     return null;
   });
   if (!payload || (!payload.statuses.length && !payload.seals.length)) return null;
-  return <LiveStatusHost initial={payload} className={statusStripClassName(context.role, className)} />;
+  return <LiveStatusHost initial={payload} className={statusStripClassName(context.role, className)} compact={compact} />;
 }
 
 /** Reserva o mesmo conjunto de cartões enquanto a faixa carrega. */
@@ -48,11 +48,11 @@ export function LiveStatusFallback({ role, className }: { role: TenantContext["r
 }
 
 /** Use somente depois de a tela Lite confirmar a chave. Desligada, não emite nenhum elemento no HTML. */
-export function LiveStatusBoundary({ context, enabled, className }: { context: TenantContext; enabled: boolean; className?: string }) {
+export function LiveStatusBoundary({ context, enabled, className, compact = false }: { context: TenantContext; enabled: boolean; className?: string; compact?: boolean }) {
   if (!enabled) return null;
   return (
     <Suspense fallback={<LiveStatusFallback role={context.role} className={className} />}>
-      <LiveStatusSlot context={context} className={className} />
+      <LiveStatusSlot context={context} className={className} compact={compact} />
     </Suspense>
   );
 }

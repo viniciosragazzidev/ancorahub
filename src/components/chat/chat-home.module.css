@@ -199,3 +199,9 @@
   .tabs { padding-inline: 16px; }
   .search { padding-inline: 16px; }
 }
+
+/* Banner de boas-vindas no topo do Início no computador (14/11/2026): o capitão sai pelo topo, por isso o respiro em cima. */
+.welcomeBanner.welcomeBanner { width: 100%; margin-top: 64px; text-align: left; }
+@media (min-width: 1024px) {
+  .welcomeBanner + .centerSubtitle { margin-top: 4px; }
+}

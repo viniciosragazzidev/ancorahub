@@ -178,6 +178,8 @@ export interface LiteLiveStatusStripProps {
   title?: string;
   onDue?: (id: string) => void;
   className?: string;
+  /** Só mini cards (sem os cartões grandes), com os leads frios ao lado do plantão. */
+  compact?: boolean;
 }
 
 /** Em ordem: sem número e sem alerta. Vira linha compacta em vez de cartão (14/11/2026). */
@@ -203,15 +205,46 @@ function LiteLiveStatusRow({ status }: { status: LiveStatus }) {
   );
 }
 
+/** Mini card dos leads frios (14/11/2026): só quantos já foram tentados e quando sai a próxima requalificação. */
+function LiteColdLeadsRow({ status }: { status: LiveStatus }) {
+  const now = useNowSeconds();
+  const attempted = status.breakdown?.find((item) => item.label === "já tentados")?.value ?? 0;
+  const event = status.nextEvent;
+  const when = !event ? null
+    : now === null ? formatAbsoluteTime(event.at, status.generatedAt)
+      : new Date(event.at).getTime() <= now ? "agora" : `em ${formatCountdown(new Date(event.at).getTime() - now)}`;
+  const detail = [`${attempted.toLocaleString("pt-BR")} já ${attempted === 1 ? "tentado" : "tentados"}`, when ? `próxima requalificação ${when}` : null].filter(Boolean).join(" · ");
+  return (
+    <li className={styles.row} data-severity={status.severity} aria-labelledby={`live-${status.id}`}>
+      <span className={styles.rowDot} aria-hidden="true"><span className={styles.dot} /></span>
+      <span className={styles.rowText}>
+        <span id={`live-${status.id}`} className={styles.rowLabel}>{status.label}</span>
+        <span className={`${styles.rowEmpty} ${styles.timer}`}>{detail}</span>
+      </span>
+      {status.action ? (
+        <Link href={status.action.href} className={styles.rowAction} aria-label={`${status.action.label}: ${status.label}`}>
+          {status.action.label}<span aria-hidden="true" className={styles.arrow}>→</span>
+        </Link>
+      ) : null}
+    </li>
+  );
+}
+
 /**
  * Faixa "Agora na operação" em dois níveis (14/11/2026): o que tem número ou pede atenção vira cartão (grade que
  * se ajusta à quantidade), o que está em ordem vira lista compacta embaixo. Assim nenhum cartão vazio estica a
  * linha. Sem status, não ocupa espaço.
  */
-export function LiteLiveStatusStrip({ statuses, seals = [], title = "Agora na operação", onDue, className }: LiteLiveStatusStripProps) {
+export function LiteLiveStatusStrip({ statuses, seals = [], title = "Agora na operação", onDue, className, compact = false }: LiteLiveStatusStripProps) {
   if (!statuses.length && !seals.length) return null;
-  const active = statuses.filter((status) => !isCalmStatus(status));
-  const calm = statuses.filter(isCalmStatus);
+  // Compacto (Distribuição, 14/11/2026): sem cartões grandes; só os mini cards, com os leads frios ao lado do plantão.
+  const cold = compact ? statuses.find((status) => status.id === "frios") ?? null : null;
+  const active = compact ? [] : statuses.filter((status) => !isCalmStatus(status));
+  const calmBase = statuses.filter((status) => isCalmStatus(status) && status.id !== cold?.id);
+  const dutyIndex = calmBase.findIndex((status) => status.id === "plantao");
+  const calm: Array<LiveStatus & { cold?: true }> = cold
+    ? [...calmBase.slice(0, dutyIndex + 1), { ...cold, cold: true as const }, ...calmBase.slice(dutyIndex + 1)]
+    : calmBase;
   return (
     <section className={[styles.strip, className].filter(Boolean).join(" ")} aria-label={title} data-live-status-strip="">
       <header className={styles.stripHead}>
@@ -225,9 +258,9 @@ export function LiteLiveStatusStrip({ statuses, seals = [], title = "Agora na op
       ) : null}
       {calm.length ? (
         <div className={styles.calm}>
-          <p className={styles.calmTitle}>Em ordem</p>
+          {compact ? null : <p className={styles.calmTitle}>Em ordem</p>}
           <ul className={styles.calmList}>
-            {calm.map((status) => <LiteLiveStatusRow key={status.id} status={status} />)}
+            {calm.map((status) => status.cold ? <LiteColdLeadsRow key={status.id} status={status} /> : <LiteLiveStatusRow key={status.id} status={status} />)}
           </ul>
         </div>
       ) : null}

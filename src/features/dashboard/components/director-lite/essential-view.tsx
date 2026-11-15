@@ -4,6 +4,7 @@
  * Painel essencial do diretor (chave ligada): só três blocos, nesta ordem.
  * 1) Plantões acontecendo agora · 2) Leads por fila na janela · 3) WhatsApp dos corretores.
  */
+import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { ArrowRight, CalendarCheck } from "lucide-react";
@@ -200,6 +201,8 @@ function QueuesBlock({ rows, totals, label, empty }: { rows: EssentialQueue[]; t
 }
 
 function WhatsAppBlock({ whatsapp, label, canOpenConversations }: { whatsapp: EssentialDashboard["whatsapp"]; label: string; canOpenConversations: boolean }) {
+  // Paginação de 8 em 8 (14/11/2026): com muitos corretores conectados a lista não empurra o resto do painel.
+  const { pageRows: brokerPage, pagination } = useLitePages(whatsapp.brokers, 8);
   return (
     <LiteReveal as="section" className={styles.card} label="WhatsApp dos corretores" delay={staggerDelay(2)}>
       <header className={styles.cardHeader}>
@@ -237,7 +240,7 @@ function WhatsAppBlock({ whatsapp, label, canOpenConversations }: { whatsapp: Es
         </div>
         {whatsapp.brokers.length ? (
           <ul className={styles.nameList} aria-label="Corretores conectados, com atendimentos ativos">
-            {whatsapp.brokers.map((broker, index) => (
+            {brokerPage.map((broker, index) => (
               <LiteItem as="li" key={broker.id} index={index}>
                 {canOpenConversations ? (
                   <Link href={`/conversas?tab=leads&brokerId=${encodeURIComponent(broker.id)}`} className={styles.nameRow} title={`Ver conversas de ${broker.name}`}>
@@ -257,6 +260,7 @@ function WhatsAppBlock({ whatsapp, label, canOpenConversations }: { whatsapp: Es
         ) : (
           <p className={styles.emptyLine}>Nenhum atendimento ativo agora nos WhatsApp conectados.</p>
         )}
+        <LitePagination {...pagination} label="Páginas dos corretores no WhatsApp" />
       </div>
       )}
     </LiteReveal>
