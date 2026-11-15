@@ -7,6 +7,7 @@ import { GoalFill } from "./chat-home";
 
 // chat-home importa a folha de venda rápida, que puxa uma server action (server-only não existe no vitest).
 vi.mock("@/features/broker-workspace/components/quick-register-sale", () => ({ QuickRegisterSaleSheet: () => null }));
+vi.mock("@/features/leads/availability-action", () => ({ updateBrokerAvailabilityAction: vi.fn() }));
 
 const data: HomeHighlights = {
   ranks: [
