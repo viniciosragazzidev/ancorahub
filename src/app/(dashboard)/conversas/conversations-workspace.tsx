@@ -118,7 +118,11 @@ import {
 import { MediaAttachButton } from "@/features/conversations/components/media-attach-button";
 import { mediaPlaceholderLabel } from "@/features/conversations/media-kinds";
 import { OPEN_THREAD_MESSAGE_LIMIT } from "@/features/conversations/message-window";
-import { mergeConversationIncrementalUpdates, type ConversationIncrementalPatch } from "@/features/conversations/incremental-sync";
+import {
+  mergeConversationIncrementalUpdates,
+  shouldRefreshConversationServer,
+  type ConversationIncrementalPatch,
+} from "@/features/conversations/incremental-sync";
 
 export type ConversationMessage = {
   id: string;
@@ -273,6 +277,7 @@ export function ConversationsWorkspace({
     let firstAt = 0;
     let lastSyncAt = 0;
     let lastFullRefreshAt = Date.now();
+    let lastConversationSignalAt = Date.now();
     let inFlight = false;
     let pending = false;
     let pendingWhileHidden = false;
@@ -335,7 +340,8 @@ export function ConversationsWorkspace({
         }
         setConversations(merged.conversations);
       } catch {
-        // Keep the last good view; the two-minute server refresh below reconciles it.
+        // A transport error also falls back to the authorized server snapshot.
+        fullRefresh();
       } finally {
         inFlight = false;
         if (pending) {
@@ -359,29 +365,44 @@ export function ConversationsWorkspace({
       );
     };
     const onSignal = (event: Event) => {
-      if (isConversationInvalidation((event as CustomEvent<RealtimeSyncBrowserDetail>).detail)) schedule();
+      if (isConversationInvalidation((event as CustomEvent<RealtimeSyncBrowserDetail>).detail)) {
+        lastConversationSignalAt = Date.now();
+        schedule();
+      }
     };
     const onVisibility = () => {
       if (document.visibilityState !== "visible") {
         hiddenAt = Date.now();
         return;
       }
-      if (hiddenAt !== null && Date.now() - hiddenAt >= 120_000) fullRefresh();
+      const now = Date.now();
+      const longHidden = hiddenAt !== null && now - hiddenAt >= 120_000;
+      const realtimeLive = document.documentElement.dataset.realtimeLive === "1";
+      if (longHidden && shouldRefreshConversationServer({
+        realtimeLive,
+        lastFullRefreshAt,
+        lastSignalAt: lastConversationSignalAt,
+        now,
+      })) fullRefresh();
       else if (pendingWhileHidden) schedule();
       hiddenAt = null;
       pendingWhileHidden = false;
     };
 
-    document.documentElement.dataset.conversationsIncremental = "1";
     window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onSignal);
     document.addEventListener("visibilitychange", onVisibility);
     fallbackTimer = window.setInterval(() => {
-      if (document.visibilityState === "visible" && Date.now() - lastFullRefreshAt >= 120_000) fullRefresh();
+      const now = Date.now();
+      if (document.visibilityState === "visible" && shouldRefreshConversationServer({
+        realtimeLive: document.documentElement.dataset.realtimeLive === "1",
+        lastFullRefreshAt,
+        lastSignalAt: lastConversationSignalAt,
+        now,
+      })) fullRefresh();
     }, 10_000);
     return () => {
       window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onSignal);
       document.removeEventListener("visibilitychange", onVisibility);
-      delete document.documentElement.dataset.conversationsIncremental;
       if (timer !== null) window.clearTimeout(timer);
       if (fallbackTimer !== null) window.clearInterval(fallbackTimer);
     };

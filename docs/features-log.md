@@ -934,7 +934,7 @@ As respostas sugeridas do chat seguem os níveis do padrão, numa tabela única 
 
 ## 14/11/2026 - Egress de conversas, F1 incremental
 
-`/conversas` recebe deltas autenticados por cursor `sent_at + id`; a lista inicial usa uma prévia compacta e agregados SQL por conversa, e o corpo completo só é enviado para o chat aberto. O cliente mescla mensagens, prévias, contadores e status sem recarregar a página em cada evento realtime. Mudanças fora do delta, cursor inválido e volume acima dos limites usam recarga completa de segurança a cada 2 minutos. Plano e limites: `docs/implementations/active/2026-11-14-conversas-incremental-f1.md`.
+`/conversas` recebe deltas autenticados por cursor `sent_at + id`; a lista inicial usa prévia compacta e agregados por conversa, e o corpo completo só é enviado para o chat aberto. O delta limita o escopo por lead visível, associa por telefone apenas mensagens sem `lead_id`, soma contadores posteriores ao cursor e carrega apenas o status da IA. O resumo usa contagens sem corpo e `distinct on` para a última prévia. Com realtime ativo, refresh integral só ocorre após 10 minutos sem sinais ou em fallback; com realtime fora, o provider preserva o refresh para todos os domínios. Plano e limitações: `docs/implementations/active/2026-11-14-conversas-incremental-f1.md`.
 
 ## 14/11/2026 - Feedback padrão em todo o modo Lite (fases 2 a 5)
 
