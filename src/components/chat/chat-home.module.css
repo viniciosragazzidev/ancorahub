@@ -158,3 +158,29 @@
   .bannerMobile.bannerMobile { display: none; }
   .bannerCenter.bannerCenter { display: grid; }
 }
+
+/*
+ * Início no computador, refino 14/11/2026: o conteúdo começa no topo e alinha à esquerda numa coluna de até 960px
+ * (antes, centralizado no meio da tela com sobra dos lados), sem o ícone acima da saudação. Os números viram cartões
+ * brancos com borda fina e ícone em quadrado de cor, quatro lado a lado. O Agora fica no painel; o botão flutuante
+ * some no computador. O banner fecha a coluna, inteiro.
+ */
+.statTop { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.statIcon { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border-radius: 10px; background: var(--chat-action-soft, rgb(0 43 115 / 0.1)); color: var(--chat-action, var(--primary)); }
+.statAlert .statIcon { background: oklch(72% 0.15 85 / 0.16); color: oklch(55% 0.13 65); }
+@media (min-width: 1024px) {
+  .center { place-items: start center; padding: 40px 40px 56px; }
+  .centerInner { max-width: 960px; justify-items: stretch; gap: 20px; }
+  .centerTitle { text-align: left; font-size: 36px; line-height: 1.1; }
+  .centerSubtitle { max-width: none; margin: -12px 0 0; text-align: left; }
+  .centerActions { max-width: none; padding: 0; }
+  .stats { margin: 0; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .stat { align-content: start; gap: 0; padding: 16px 18px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
+  .statLabel { overflow: hidden; color: var(--text-secondary); font-size: var(--text-sm); font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
+  .statValue { margin-top: 14px; font-size: 28px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+  .statAlert .statValue { color: oklch(55% 0.13 65); }
+  .centerHighlights { margin: 0; }
+  .nowLauncher { display: none; }
+  .bannerCenter.bannerCenter { margin-top: 44px; }
+  .bannerCenter.bannerCenter:not([data-goal]) { margin-top: 64px; }
+}

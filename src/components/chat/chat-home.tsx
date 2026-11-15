@@ -14,7 +14,7 @@ import { Button as ArcButton } from "@/components/arc/button/button";
 import { Badge as ArcBadge } from "@/components/arc/badge/badge";
 import { Avatar } from "@/components/arc/avatar/avatar";
 import { Button } from "@/components/ui/button";
-import { ArrowUpRight, ListTodo } from "lucide-react";
+import { Activity, AlarmClock, ArrowUpRight, CheckCircle2, Headset, Inbox, ListTodo } from "lucide-react";
 import sharedPage from "@/components/lite/page/lite-page.module.css";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useLightAvailabilityContext } from "@/components/light/light-availability-context";
@@ -120,6 +120,14 @@ function NowSection({ data, mobile = false, floating = false, onNavigate }: { da
 function initialsOf(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("pt-BR")).join("") || "?";
 }
+
+/** Ícone de cada número do Início no computador (14/11/2026), no quadrado de cor dos cartões do Lite. */
+const STAT_ICON: Record<string, ReactNode> = {
+  "Recebidos hoje": <Inbox size={16} />,
+  "Aceitos hoje": <CheckCircle2 size={16} />,
+  "Em atendimento": <Headset size={16} />,
+  "Contato atrasando": <AlarmClock size={16} />,
+};
 
 function greeting(now: Date) {
   const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23" }).format(now));
@@ -360,7 +368,7 @@ export function ChatHome({
       { label: "Recebidos hoje", value: summary.receivedToday },
       { label: "Aceitos hoje", value: summary.acceptedToday },
       { label: "Em atendimento", value: summary.inServiceNow },
-      { label: "Primeiro contato atrasando", value: summary.slaAtRiskNow, alert: summary.slaAtRiskNow > 0 },
+      { label: "Contato atrasando", value: summary.slaAtRiskNow, alert: summary.slaAtRiskNow > 0 },
     ]
     : [];
 
@@ -381,7 +389,6 @@ export function ChatHome({
 
       <section className={home.center} aria-label="Seu dia">
         <motion.div initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }} className={home.centerInner}>
-          <ContextualIllustration name="guidance" size="lg" fallback={<AssistantAvatar shape="logo" hue={null} size={56} />} />
           <h2 className={home.centerTitle}>{greeting(now)}, {firstName}</h2>
           {hasNowItems ? <p className={home.centerSubtitle}>Veja o que precisa da sua atenção agora.</p> : next ? (
             <p className={home.centerSubtitle}>
@@ -394,7 +401,8 @@ export function ChatHome({
                 ? `${waitingAssistants.map((thread) => thread.name).join(", ")} ${waitingAssistants.length === 1 ? "tem algo" : "têm algo"} para você. Escolha uma conversa à esquerda.`
                 : "Tudo em dia. Escolha uma conversa à esquerda para começar."}
           </p>}
-          {!floatingNow && summary?.now ? <NowSection data={summary.now} /> : null}
+          {/* No computador o Agora fica no painel quando há pendência (14/11/2026); o botão flutuante é só do celular. */}
+          {summary?.now && (!floatingNow || hasNowItems) ? <NowSection data={summary.now} /> : null}
           {showNext && next?.acceptLeadId ? (
             <AcceptLeadButton leadId={next.acceptLeadId} className={styles.pill} style={{ marginTop: 6 }} offerPending>{next.label}</AcceptLeadButton>
           ) : showNext && next ? (
@@ -415,8 +423,11 @@ export function ChatHome({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2, delay: reduce ? 0 : 0.08 + index * 0.04 }}
                 >
+                  <span className={home.statTop}>
+                    <span className={home.statIcon} aria-hidden="true">{STAT_ICON[stat.label] ?? <Activity size={16} />}</span>
+                    <span className={home.statLabel}>{stat.label}</span>
+                  </span>
                   <span className={home.statValue}>{stat.value}</span>
-                  <span className={home.statLabel}>{stat.label}</span>
                 </motion.li>
               ))}
             </ul>
