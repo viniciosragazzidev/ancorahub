@@ -116,8 +116,8 @@ export function shouldScheduleShellRefresh(detail: RealtimeSyncBrowserDetail, pa
   }
 
   if (detail.domain === "whatsapp_connection") {
-    if (isPathWithin(pathname, "/conversas")) return false;
-    return WHATSAPP_CONNECTION_ROUTES.some((route) => isPathWithin(pathname, route));
+    return isPathWithin(pathname, "/conversas")
+      || WHATSAPP_CONNECTION_ROUTES.some((route) => isPathWithin(pathname, route));
   }
 
   return true;
@@ -179,6 +179,13 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   }, []);
 
   const isEligibleForLeadNotifications = role === "director" || role === "manager" || role === "broker";
+
+  useEffect(() => {
+    document.documentElement.dataset.realtimeLive = isRealtimeLive ? "1" : "0";
+    return () => {
+      delete document.documentElement.dataset.realtimeLive;
+    };
+  }, [isRealtimeLive]);
 
   /**
    * Coalesced server refresh: events arriving within REFRESH_COALESCE_MS are
@@ -422,10 +429,6 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
     if (isRealtimeLive) return;
     const interval = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      if (document.documentElement.dataset.conversationsIncremental === "1") {
-        dispatchRealtimeSyncEvent({ kind: "domain.invalidated", domain: "conversations" });
-        return;
-      }
       scheduleServerRefresh();
     }, FALLBACK_REFRESH_MS);
     return () => window.clearInterval(interval);

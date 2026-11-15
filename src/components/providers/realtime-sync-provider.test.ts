@@ -38,6 +38,7 @@ describe("shouldScheduleShellRefresh", () => {
 
     expect(shouldScheduleShellRefresh(connectionEvent, "/settings")).toBe(true);
     expect(shouldScheduleShellRefresh(connectionEvent, "/integrations/whatsapp")).toBe(true);
+    expect(shouldScheduleShellRefresh(connectionEvent, "/conversas")).toBe(true);
     expect(shouldScheduleShellRefresh(connectionEvent, "/leads/lead-1")).toBe(false);
   });
 

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { isValidConversationCursor, mergeConversationIncrementalUpdates, parseSyntheticConversationPhone } from "./incremental-sync";
+import {
+  isValidConversationCursor,
+  mergeConversationIncrementalUpdates,
+  parseSyntheticConversationPhone,
+  shouldRefreshConversationServer,
+} from "./incremental-sync";
 
 type Message = { id: string; sentAt: string; direction: string; providerStatus: string | null };
 type Conversation = {
@@ -9,6 +14,14 @@ type Conversation = {
   latestMessage: { body: string; direction: string; sentAt: string } | null;
   messageCount?: number;
   hasIncoming?: boolean;
+  aiConversation?: {
+    id: string;
+    status: string;
+    assignedUserId: string | null;
+    aiModel: string | null;
+    transferReason: string | null;
+    qualificationSummary: string | null;
+  } | null;
   messages: Message[];
 };
 
@@ -39,8 +52,8 @@ describe("conversation incremental merge", () => {
     const result = mergeConversationIncrementalUpdates([first, untouched], [{
       id: "lead-a",
       latestMessage: { body: "Nova", direction: "incoming", sentAt: at(3) },
-      messageCount: 5,
-      hasIncoming: true,
+      messageCountDelta: 1,
+      hasIncomingDelta: true,
       messages: [message("m1", 1), message("m2", 3)],
       messageStatuses: [{ id: "m1", providerStatus: "read" }],
     }], { openConversationId: "lead-a" });
@@ -60,8 +73,8 @@ describe("conversation incremental merge", () => {
     const result = mergeConversationIncrementalUpdates< Message, Conversation >([], [{
       id: "lead-outside-current-list",
       latestMessage: { body: "", direction: "incoming", sentAt: at(1) },
-      messageCount: 1,
-      hasIncoming: true,
+      messageCountDelta: 1,
+      hasIncomingDelta: true,
     }]);
     expect(result.missingIds).toEqual(["lead-outside-current-list"]);
     expect(result.conversations).toEqual([]);
@@ -88,12 +101,57 @@ describe("conversation incremental merge", () => {
     });
   });
 
+  it("sums only cursor increments and merges AI status without clearing existing context", () => {
+    const current: Conversation = {
+      id: "lead-a",
+      nome: "Ana",
+      latestMessage: { body: "Atual", direction: "incoming", sentAt: at(2) },
+      messageCount: 40,
+      hasIncoming: false,
+      aiConversation: {
+        id: "ai-1",
+        status: "AI_ACTIVE",
+        assignedUserId: null,
+        aiModel: "haiku",
+        transferReason: "contexto preservado",
+        qualificationSummary: "resumo preservado",
+      },
+      messages: [],
+    };
+    const result = mergeConversationIncrementalUpdates([current], [{
+      id: "lead-a",
+      messageCountDelta: 2,
+      hasIncomingDelta: true,
+      aiConversationStatus: { id: "ai-1", status: "HUMAN_ACTIVE", assignedUserId: "user-1" },
+    }]);
+
+    expect(result.conversations[0]).toMatchObject({
+      messageCount: 42,
+      hasIncoming: true,
+      aiConversation: {
+        id: "ai-1",
+        status: "HUMAN_ACTIVE",
+        assignedUserId: "user-1",
+        aiModel: "haiku",
+        transferReason: "contexto preservado",
+        qualificationSummary: "resumo preservado",
+      },
+    });
+  });
+
   it("accepts only recent, well-formed server cursors", () => {
     const now = Date.parse("2026-11-14T12:00:00.000Z");
     expect(isValidConversationCursor({ sentAt: "2026-11-14T11:59:00.000Z", id: "m1" }, now)).toBe(true);
     expect(isValidConversationCursor({ sentAt: "not-a-date", id: "m1" }, now)).toBe(false);
     expect(isValidConversationCursor({ sentAt: "2026-11-14T11:50:00.000Z", id: "m1" }, now)).toBe(false);
     expect(isValidConversationCursor({ sentAt: "2026-11-14T12:01:00.000Z", id: "m1" }, now)).toBe(false);
+  });
+
+  it("refreshes fully only while realtime is down or after ten minutes without a signal", () => {
+    expect(shouldRefreshConversationServer({ realtimeLive: true, lastFullRefreshAt: 0, lastSignalAt: 100, now: 599_999 })).toBe(false);
+    expect(shouldRefreshConversationServer({ realtimeLive: true, lastFullRefreshAt: 0, lastSignalAt: 100, now: 600_100 })).toBe(true);
+    expect(shouldRefreshConversationServer({ realtimeLive: false, lastFullRefreshAt: 0, lastSignalAt: 100, now: 119_999 })).toBe(false);
+    expect(shouldRefreshConversationServer({ realtimeLive: false, lastFullRefreshAt: 0, lastSignalAt: 100, now: 120_000 })).toBe(true);
   });
 
   it("accepts a full phone only from a well-formed synthetic conversation id", () => {
