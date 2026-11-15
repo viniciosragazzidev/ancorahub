@@ -31,7 +31,8 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { brokerWhatsAppMessageSourceCondition, isRecentWhatsAppReplyFilter } from "@/features/dashboard/whatsapp-activity-query";
 import { loadedLeadMessageScope } from "@/features/conversations/loaded-lead-message-scope";
 import { OPEN_THREAD_MESSAGE_LIMIT, pickMessageIdsToLoad, summarizeIndexRows, type MessageIndexRow } from "@/features/conversations/message-window";
-import { buildConversationMessageIndexQuery, mapConversationMessageIndexRows } from "@/features/conversations/message-index-query";
+import { buildConversationMessageIndexQuery, mapConversationMessageIndexResult } from "@/features/conversations/message-index-query";
+import { pickConversationSnapshotCursor } from "@/features/conversations/incremental-sync";
 import { resolveConversationTab } from "@/features/conversations/conversation-tab";
 
 // Não gerar estaticamente — a página depende de sessão e executa queries pesadas de AI
@@ -82,6 +83,7 @@ export default async function ConversationsPage({
 
   const db = getDatabase();
   const now = new Date();
+  let initialSyncCursor = { sentAt: now.toISOString(), id: "" };
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   const isDirector = context.role === "director";
@@ -315,7 +317,7 @@ export default async function ConversationsPage({
       message: schema.whatsappMessages,
       leads: leads.map((lead) => ({ id: lead.id, phone: lead.telefone })),
     });
-    const [listIndexRows, documentRows, aiConversationRows] = leadIds.length
+    const [listIndexResult, documentRows, aiConversationRows] = leadIds.length
       ? await Promise.all([
           db.execute(buildConversationMessageIndexQuery({
             tenantId: context.tenantId,
@@ -324,7 +326,7 @@ export default async function ConversationsPage({
             loadedMessageLimit: scopeMessagesToLoadedLeads ? 2_000 : 4_000,
             coexChannelIds: coexChannels.map((channel) => channel.id),
           }))
-            .then(mapConversationMessageIndexRows),
+            .then(mapConversationMessageIndexResult),
           db
             .select({
               id: schema.leadDocuments.id,
@@ -365,7 +367,9 @@ export default async function ConversationsPage({
               ),
             ),
         ])
-      : ([[], [], []] as const);
+      : ([{ rows: [], cursor: null }, [], []] as const);
+
+    const listIndexRows = listIndexResult.rows;
 
     // Texto e mídia só do que a tela mostra: prévia de cada conversa e o histórico da aberta (?leadId=).
     const openLead = leadId ? leads.find((lead) => lead.id === leadId) : undefined;
@@ -392,6 +396,18 @@ export default async function ConversationsPage({
       : [];
     const listIndexIds = new Set((listIndexRows as MessageIndexRow[]).map((row) => row.id));
     const indexRows = [...(listIndexRows as MessageIndexRow[]), ...openThreadIndexRows.filter((row) => !listIndexIds.has(row.id))];
+    const listConversationKeys = new Set((listIndexRows as MessageIndexRow[]).map((row) => row.conversationKey).filter((key): key is string => Boolean(key)));
+    const openRowsWithoutListAggregate = openThreadIndexRows.filter((row) => {
+      const key = row.leadId
+        ? `lead:${row.leadId}`
+        : `phone:${normalizePhone(row.phone ?? "").slice(-8)}`;
+      return key !== "phone:" && !listConversationKeys.has(key);
+    });
+    initialSyncCursor = pickConversationSnapshotCursor(
+      listIndexResult.cursor,
+      openRowsWithoutListAggregate.map(({ id, sentAt }) => ({ id, sentAt })),
+      now,
+    );
     const messageRows = await loadMessagesById(pickMessageIdsToLoad(indexRows, { openThread, previewPerConversation: 0 }));
     const fullMessageById = new Map(messageRows.map((message) => [message.id, message]));
 
@@ -1192,7 +1208,7 @@ export default async function ConversationsPage({
       role={context.role}
       branches={branches}
       conversations={finalConversations}
-      initialSyncCursor={{ sentAt: new Date(now.getTime() - 10_000).toISOString(), id: "" }}
+      initialSyncCursor={initialSyncCursor}
       initialLeadId={leadId}
       userId={context.userId}
       tenantId={context.tenantId}

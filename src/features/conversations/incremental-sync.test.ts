@@ -4,6 +4,8 @@ import {
   isValidConversationCursor,
   mergeConversationIncrementalUpdates,
   parseSyntheticConversationPhone,
+  pickConversationSnapshotCursor,
+  shouldRefreshAfterConversationNetworkError,
   shouldRefreshConversationServer,
 } from "./incremental-sync";
 
@@ -31,6 +33,35 @@ const message = (id: string, second: number, overrides: Partial<Message> = {}): 
 });
 
 describe("conversation incremental merge", () => {
+  it("starts at the last indexed tuple so the first empty sync does not count a recent message twice", () => {
+    const snapshotCursor = pickConversationSnapshotCursor(
+      { sentAt: "2026-11-14T12:00:05.123Z", id: "recent-message" },
+      [],
+      new Date("2026-11-14T12:00:10.000Z"),
+    );
+    const current: Conversation = {
+      id: "lead-a",
+      nome: "Ana",
+      latestMessage: { body: "Recente", direction: "incoming", sentAt: snapshotCursor.sentAt },
+      messageCount: 1,
+      hasIncoming: true,
+      messages: [{ id: snapshotCursor.id, sentAt: snapshotCursor.sentAt, direction: "incoming", providerStatus: null }],
+    };
+
+    const firstSync = mergeConversationIncrementalUpdates([current], [], { openConversationId: null });
+
+    expect(snapshotCursor).toEqual({ sentAt: "2026-11-14T12:00:05.123Z", id: "recent-message" });
+    expect(firstSync.conversations[0]?.messageCount).toBe(1);
+  });
+
+  it("uses the message id to choose the maximum tuple after millisecond normalization", () => {
+    expect(pickConversationSnapshotCursor(
+      { sentAt: "2026-11-14T12:00:05.123Z", id: "m-10" },
+      [{ sentAt: "2026-11-14T12:00:05.123456Z", id: "m-11" }],
+      new Date("2026-11-14T12:00:10.000Z"),
+    )).toEqual({ sentAt: "2026-11-14T12:00:05.123Z", id: "m-11" });
+  });
+
   it("updates only the server-scoped item, deduplicates and orders messages, and preserves local lead fields", () => {
     const first: Conversation = {
       id: "lead-a",
@@ -152,6 +183,12 @@ describe("conversation incremental merge", () => {
     expect(shouldRefreshConversationServer({ realtimeLive: true, lastFullRefreshAt: 0, lastSignalAt: 100, now: 600_100 })).toBe(true);
     expect(shouldRefreshConversationServer({ realtimeLive: false, lastFullRefreshAt: 0, lastSignalAt: 100, now: 119_999 })).toBe(false);
     expect(shouldRefreshConversationServer({ realtimeLive: false, lastFullRefreshAt: 0, lastSignalAt: 100, now: 120_000 })).toBe(true);
+  });
+
+  it("throttles full refreshes caused by repeated network errors to one per minute", () => {
+    expect(shouldRefreshAfterConversationNetworkError(null, 10_000)).toBe(true);
+    expect(shouldRefreshAfterConversationNetworkError(10_000, 69_999)).toBe(false);
+    expect(shouldRefreshAfterConversationNetworkError(10_000, 70_000)).toBe(true);
   });
 
   it("accepts a full phone only from a well-formed synthetic conversation id", () => {
