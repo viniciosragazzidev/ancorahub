@@ -11,3 +11,19 @@
 .label { min-width: 0; font-size: var(--text-sm, 14px); font-weight: 600; line-height: 1.25; }
 @media (max-width: 359px) { .root { padding-inline: 16px; } .grid { gap: 6px; } .action { gap: 8px; padding-inline: 10px; } .icon { width: 36px; height: 36px; } }
 @media (prefers-reduced-motion: reduce) { .action { transition: none; } .action:active { transform: none; } }
+
+/* Computador (14/11/2026): os atalhos e o cartão do financeiro numa linha só, cartões brancos com borda fina. */
+@media (min-width: 1024px) {
+  .root { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; column-gap: 12px; }
+  .title { grid-column: 1 / -1; }
+  .grid { grid-column: span 2; gap: 12px; }
+  .root > :last-child:not(.grid):not(.title) { grid-column: span 1; min-width: 0; }
+  .action { min-height: 64px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
+  .action:hover { background: var(--surface-muted); }
+}
+/* No centro do computador: sem o recuo lateral do celular, e o cartão do financeiro no mesmo desenho dos atalhos. */
+@media (min-width: 1024px) {
+  .root.root { padding: 0; }
+  .root.root > :last-child:not(.grid):not(.title) { min-height: 64px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
+  .root.root > :last-child:not(.grid):not(.title):hover { background: var(--surface-muted); }
+}
