@@ -200,7 +200,10 @@ export type ConversationItem = {
 
 type ViewFilter = "all" | "qualified" | "closing" | "converted" | "ai_active" | "human_active" | "with_messages" | "without_messages";
 
-const CONVERSATIONS_REFRESH_TIMING: VisibleRefreshTiming = { coalesceMs: 3_000, maxWaitMs: 10_000, minGapMs: 15_000 };
+// 14/11 (egress): cada recarga reenvia a tela inteira (~2 MB). Com uma conversa aberta, no máximo uma a cada 20 s
+// (a mensagem nova ainda chega rápido); só com a lista, uma a cada 60 s.
+const CONVERSATIONS_REFRESH_TIMING: VisibleRefreshTiming = { coalesceMs: 3_000, maxWaitMs: 10_000, minGapMs: 20_000 };
+const CONVERSATIONS_LIST_REFRESH_TIMING: VisibleRefreshTiming = { coalesceMs: 3_000, maxWaitMs: 10_000, minGapMs: 60_000 };
 const isConversationInvalidation = (detail: RealtimeSyncBrowserDetail | undefined) =>
   detail?.kind === "domain.invalidated" && detail.domain === "conversations";
 
@@ -258,7 +261,7 @@ export function ConversationsWorkspace({
   // 24/10: one refresh per message re-sent the whole workspace (hundreds of leads and their
   // messages) and froze clicks. Signals are gathered for 3 s (10 s at most) into one refresh.
   // 02/11 (egress): only while the tab is visible, and at most one refresh every 15 s.
-  useVisibleRealtimeRefresh(isConversationInvalidation, CONVERSATIONS_REFRESH_TIMING);
+  useVisibleRealtimeRefresh(isConversationInvalidation, selectedId ? CONVERSATIONS_REFRESH_TIMING : CONVERSATIONS_LIST_REFRESH_TIMING);
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ViewFilter>("all");

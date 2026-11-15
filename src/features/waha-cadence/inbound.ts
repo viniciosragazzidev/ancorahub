@@ -842,6 +842,26 @@ async function markIgnored(db: ReturnType<typeof getDatabase>, eventId: string, 
 }
 
 /**
+ * Egress (14/11): cada mensagem que chegava relia os telefones de todos os corretores e os números oficiais
+ * (~85 mil vezes por dia). As listas ficam 30 s em memória por empresa; um telefone novo vale em até 30 s.
+ * Em teste não há cache (cada teste monta o próprio banco).
+ */
+const PHONE_LIST_TTL_MS = 30_000;
+const phoneListCache = new Map<string, { at: number; value: Promise<(string | null)[]> }>();
+function cachedPhoneList(key: string, load: () => Promise<(string | null)[]>) {
+  if (process.env.NODE_ENV === "test") return load();
+  const now = Date.now();
+  const hit = phoneListCache.get(key);
+  if (hit && now - hit.at < PHONE_LIST_TTL_MS) return hit.value;
+  const value = load();
+  phoneListCache.set(key, { at: now, value });
+  value.catch(() => {
+    if (phoneListCache.get(key)?.value === value) phoneListCache.delete(key);
+  });
+  return value;
+}
+
+/**
  * Whether the phone belongs to a broker or team member in the tenant.
  */
 export async function isBrokerOrTeamPhone(
@@ -849,13 +869,12 @@ export async function isBrokerOrTeamPhone(
   tenantId: string,
   normalizedPhone: string,
 ): Promise<boolean> {
-  const brokers = await db
+  const phones = await cachedPhoneList(`brokers:${tenantId}`, async () => (await db
     .select({ phone: schema.brokerProfiles.phone })
     .from(schema.brokerProfiles)
-    .where(eq(schema.brokerProfiles.tenantId, tenantId));
+    .where(eq(schema.brokerProfiles.tenantId, tenantId))).map((entry) => entry.phone));
 
-  return brokers
-    .some((entry) => Boolean(entry.phone) && samePhoneSubscriber(entry.phone!, normalizedPhone));
+  return phones.some((phone) => Boolean(phone) && samePhoneSubscriber(phone!, normalizedPhone));
 }
 
 /**
@@ -869,27 +888,29 @@ async function isTenantOfficialNumberPhone(
   tenantId: string,
   normalizedPhone: string,
 ): Promise<boolean> {
-  const [numbers, channels] = await Promise.all([
-    db
-      .select({ phone: schema.wahaNumbers.displayPhoneNumber })
-      .from(schema.wahaNumbers)
-      .where(
-        or(
-          eq(schema.wahaNumbers.tenantId, tenantId),
-          isNull(schema.wahaNumbers.tenantId),
+  const phones = await cachedPhoneList(`official:${tenantId}`, async () => {
+    const [numbers, channels] = await Promise.all([
+      db
+        .select({ phone: schema.wahaNumbers.displayPhoneNumber })
+        .from(schema.wahaNumbers)
+        .where(
+          or(
+            eq(schema.wahaNumbers.tenantId, tenantId),
+            isNull(schema.wahaNumbers.tenantId),
+          ),
         ),
-      ),
-    db
-      .select({ phone: schema.communicationChannels.displayPhoneNumber })
-      .from(schema.communicationChannels)
-      .where(
-        and(
-          eq(schema.communicationChannels.tenantId, tenantId),
-          eq(schema.communicationChannels.status, "active"),
+      db
+        .select({ phone: schema.communicationChannels.displayPhoneNumber })
+        .from(schema.communicationChannels)
+        .where(
+          and(
+            eq(schema.communicationChannels.tenantId, tenantId),
+            eq(schema.communicationChannels.status, "active"),
+          ),
         ),
-      ),
-  ]);
-  return [...numbers, ...channels]
-    .some((entry) => Boolean(entry.phone) && samePhoneSubscriber(entry.phone!, normalizedPhone));
+    ]);
+    return [...numbers, ...channels].map((entry) => entry.phone);
+  });
+  return phones.some((phone) => Boolean(phone) && samePhoneSubscriber(phone!, normalizedPhone));
 }
 
