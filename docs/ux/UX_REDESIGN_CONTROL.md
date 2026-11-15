@@ -9,6 +9,8 @@ outros personagens, rostos ou símbolo de âncora repetido. Jack/Notificações,
 verificada e avatares individuais permanecem como estão; texto e indicadores atuais
 comunicam conteúdo e estado.
 
+Na lista lateral, os objetos das áreas usam 35 × 35 px centralizados no slot de 44 × 44 px, cerca de 20% menores para reduzir o peso visual sem diminuir a área de toque da linha. Jack, marca verificada e avatares de leads permanecem no tamanho atual.
+
 Usa o provider e a flag global auditada existentes. A flag desligada e erro de imagem
 restauram as formas abstratas. Sem mudança de rota, hierarquia, ação, permissão, token,
 primitive ou movimento; UX-M1.10 permanece pendente. Registro e evidências:
