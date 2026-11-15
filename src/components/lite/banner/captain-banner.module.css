@@ -81,6 +81,9 @@
   place-items: center;
   grid-area: action;
   min-height: 48px;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
   margin-right: 16px;
   border-radius: var(--radius-control);
   background: white;

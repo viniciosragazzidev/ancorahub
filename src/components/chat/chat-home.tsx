@@ -414,11 +414,14 @@ export function ChatHome({
           {/* Corretor (15/11/2026): o próximo passo e os fatos do dia entram no banner; supervisor e gestor seguem com título e frase. */}
           {!isSupervisor && !isManager ? (
             <HomeWelcomeBanner className={home.welcomeBanner} greeting={greeting(now)} firstName={firstName} highlights={highlights}
-              subtitle={centerSubtitle} duty={summary?.duty ?? null} goal={summary?.goal ?? null} />
+              subtitle={centerSubtitle} duty={summary?.duty ?? null} goal={summary?.goal ?? null}
+              nextAction={showNext && next ? { label: next.label, href: next.href } : !summary?.now && nextLead ? { label: `Atender ${nextLead.name.split(" ")[0]}`, href: nextLead.href } : null}
+              nextActionSlot={showNext && next?.acceptLeadId ? (className) => <AcceptLeadButton leadId={next.acceptLeadId!} className={className} offerPending>{next.label}</AcceptLeadButton> : undefined} />
           ) : <><h2 className={home.centerTitle}>{greeting(now)}, {firstName}</h2><p className={home.centerSubtitle}>{centerSubtitle}</p></>}
           {/* Sem o bloco Agora no topo do computador (pedido 14/11/2026): as pendências ficam na aba Leads da lista ao lado. */}
           {summary?.now && !floatingNow ? <NowSection data={summary.now} /> : null}
-          {showNext && next?.acceptLeadId ? (
+          {/* Corretor: o próximo passo é o botão branco do banner; o botão azul embaixo fica só para supervisor e gestor. */}
+          {!(isSupervisor || isManager) ? null : showNext && next?.acceptLeadId ? (
             <AcceptLeadButton leadId={next.acceptLeadId} className={styles.pill} style={{ marginTop: 6 }} offerPending>{next.label}</AcceptLeadButton>
           ) : showNext && next ? (
             <LitePress><Link href={next.href} className={styles.pill} style={{ marginTop: 6 }}>{next.label}</Link></LitePress>

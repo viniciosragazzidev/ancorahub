@@ -13,7 +13,7 @@ export type CaptainBannerArt = { src: string; width: number; height: number };
 /** Arte provisória (o capitão com o baú) até as artes próprias de cada banner chegarem. */
 export const CAPTAIN_TREASURE_ART: CaptainBannerArt = { src: "/mascote/venda-capitao.webp", width: 584, height: 640 };
 
-export function CaptainBanner({ label, title, subtitle, facts, goal, progress, action, art = CAPTAIN_TREASURE_ART, tone = "navy", pose = "rise", size = "regular", className }: {
+export function CaptainBanner({ label, title, subtitle, facts, goal, progress, action, actionSlot, art = CAPTAIN_TREASURE_ART, tone = "navy", pose = "rise", size = "regular", className }: {
   /** Nome acessível da região. */
   label: string;
   title: ReactNode;
@@ -26,6 +26,8 @@ export function CaptainBanner({ label, title, subtitle, facts, goal, progress, a
   /** 0 a 100: barra dourada sob o selo. */
   progress?: number | null;
   action: { label: string; href: string };
+  /** Troca o link do botão por outro controle com o mesmo desenho (Início: o aceite da oferta). */
+  actionSlot?: (className: string) => ReactNode;
   art?: CaptainBannerArt;
   /** navy: o azul da marca (Início, jornada). light: azul bem claro com texto azul-marinho (Plantões). */
   /** white: quase branco, com borda e um brilho quente (Desempenho). */
@@ -70,7 +72,7 @@ export function CaptainBanner({ label, title, subtitle, facts, goal, progress, a
           ) : null}
         </div>
       ) : null}
-      <Link className={styles.action} href={action.href}>{action.label}</Link>
+      {actionSlot ? actionSlot(styles.action) : <Link className={styles.action} href={action.href}>{action.label}</Link>}
       {/* eslint-disable-next-line @next/next/no-img-element -- arte local do mascote */}
       <img className={styles.art} src={art.src} width={art.width} height={art.height} alt="" aria-hidden="true" draggable={false} />
     </section>
