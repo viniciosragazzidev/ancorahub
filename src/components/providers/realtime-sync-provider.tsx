@@ -86,6 +86,7 @@ const CONVERSATION_FREE_ROUTES = ["/leads/distribuicao", "/leads/arquivados", "/
  */
 const CONVERSATION_SUMMARY_ROUTES = ["/dashboard", "/leads"];
 export const CONVERSATION_SUMMARY_REFRESH_MS = 60_000;
+const SUMMARY_SIGNAL: RealtimeSyncBrowserDetail = { kind: "domain.invalidated", domain: "conversations" };
 
 /** True when a conversation signal on this page only updates summary counters. */
 export function isConversationSummaryRefresh(detail: RealtimeSyncBrowserDetail, pathname: string): boolean {
@@ -241,6 +242,8 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
     const wait = conversationSummaryDelay(summaryRefreshAtRef.current, Date.now());
     summaryTimerRef.current = window.setTimeout(() => {
       summaryTimerRef.current = null;
+      // Left the summary page meanwhile (e.g. to /leads/distribuicao): that page did not ask for it.
+      if (!isConversationSummaryRefresh(SUMMARY_SIGNAL, window.location.pathname)) return;
       summaryRefreshAtRef.current = Date.now();
       scheduleServerRefresh();
     }, wait);
