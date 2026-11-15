@@ -94,6 +94,7 @@ function NowSection({ data, mobile = false, floating = false, onNavigate }: { da
               key={item.id}
               className={home.nowItem}
               data-tone={item.tone ?? "normal"}
+              data-offer={item.acceptLeadId && !floating ? "" : undefined}
               layout={!reduce}
               initial={reduce || floating ? false : { opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
@@ -106,7 +107,7 @@ function NowSection({ data, mobile = false, floating = false, onNavigate }: { da
                 <span className={home.nowItemDetail}>{item.detail}</span>
                 {item.expiresAt ? <span className={home.nowCountdown}>{formatCountdown(item.expiresAt, clock)}</span> : null}
               </div>
-              <div className={floating ? home.nowItemActions : undefined}>{item.acceptLeadId ? (
+              <div className={floating ? home.nowItemActions : item.acceptLeadId ? home.nowItemOffer : undefined}>{item.acceptLeadId ? (
                 <AcceptLeadButton appearance="shared" leadId={item.acceptLeadId} className={index === 0 ? undefined : home.secondaryAction} offerPending={index === 0 && !floating} disabled={Boolean(item.expiresAt && Date.parse(item.expiresAt) <= clock)}>{item.expiresAt && Date.parse(item.expiresAt) <= clock ? "Oferta encerrada" : item.actionLabel}</AcceptLeadButton>
               ) : (
                 <Button asChild variant="secondary" className={floating && index === 0 ? sharedPage.primaryButton : sharedPage.button}><Link href={item.href} onClick={onNavigate}>{item.actionLabel}<ArrowUpRight size={16} aria-hidden="true" /></Link></Button>

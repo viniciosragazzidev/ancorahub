@@ -233,3 +233,15 @@
 @media (min-width: 1024px) {
   .centerTop + .announcementBanner.announcementBanner { margin-top: 16px; }
 }
+
+/* Oferta no Agora (15/11/2026): o botão de aceitar (com "Oferta pendente") vai para baixo do texto, na largura toda,
+ * em vez de espremer o nome e o detalhe numa coluna estreita. */
+.nowItem[data-offer] { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.nowItemOffer { display: grid; min-width: 0; }
+.nowItemOffer > * { width: 100%; min-width: 0; }
+.nowItemOffer button { width: 100%; min-width: 0; height: auto; min-height: 50px; white-space: normal; text-align: center; }
+/* No celular o selo "Oferta pendente" sai deste botão (o card já diz "Aceite em até X min" e o anel continua
+ * pulsando): sem ele o raio e "Aceitar e chamar no WhatsApp" cabem inteiros. */
+@media (max-width: 480px) {
+  .nowItemOffer button [data-offer-tag] { display: none; }
+}
