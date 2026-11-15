@@ -47,7 +47,9 @@ export function ThreadRow({ thread, now, index = 0, active = false, timeOnly = f
     >
       <LitePress kind="row">
         <Link href={thread.href} className={`${styles.thread} ${active ? styles.threadActive : ""}`} aria-current={active ? "page" : undefined} data-attention={thread.attention ? "true" : undefined} data-tour={thread.assistant ? `thread-${thread.assistant}` : undefined} aria-label={`${thread.name}: ${thread.preview}${thread.waitingYou ? " (esperando você)" : ""}`}>
-          <AssistantAvatar shape={thread.shape} hue={thread.hue} initials={thread.initials} temperature={thread.temperature} />
+          <span className={styles.threadAvatarSlot}>
+            <AssistantAvatar shape={thread.shape} hue={thread.hue} size={thread.avatarAsset ? 35 : 44} avatarAsset={thread.avatarAsset} initials={thread.initials} temperature={thread.temperature} />
+          </span>
           <span className={styles.threadMain}>
             <span className={styles.threadTop}>
               <span className={styles.threadName}>{thread.name}</span>

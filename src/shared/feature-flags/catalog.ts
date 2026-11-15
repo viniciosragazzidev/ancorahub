@@ -54,7 +54,7 @@ export const FEATURE_FLAGS = {
     scope: "global",
     defaultValue: "true",
     allowedValues: ["true", "false"] as const,
-    description: "Mostra ilustrações contextuais no Diretor Lite e Corretor Lite. Desligar restaura os ícones e estados anteriores.",
+    description: "Mostra ilustrações de seção/vazio no Diretor e Corretor Lite, além de avatares por área no Lite de corretor, gestor e supervisor. Desligar restaura a apresentação anterior.",
   },
   WHATSAPP_PLANTAO_NOTICE: {
     key: "feature_whatsapp_plantao_notice_enabled",

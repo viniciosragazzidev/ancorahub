@@ -9,7 +9,7 @@ import { AssistantAvatar } from "./assistant-avatar";
 import { ChatBlockView, ChoiceList, MessageEnter, TypingIndicator } from "./chat-blocks";
 import { Composer, type Mention } from "./composer";
 import styles from "./chat.module.css";
-import type { ChatAction, ChatBlock, ChatChoice, ChatLeadRow, ChatProgress, ChatScript, MascotShape, ChatListItem } from "./types";
+import type { AssistantAvatarAsset, ChatAction, ChatBlock, ChatChoice, ChatLeadRow, ChatProgress, ChatScript, MascotShape, ChatListItem } from "./types";
 import { fetchMentionBlocks, isDataMention } from "./mention-client";
 import { appendSending, newClientMessageId, settleSend, startRetry } from "./user-send-core";
 import { openWhatsApp } from "@/lib/whatsapp-open";
@@ -20,7 +20,7 @@ import { feedbackOnChoose, feedbackOnResult } from "./chat-feedback";
 export type ChatActionResult = { ok: boolean; message?: string; followUp?: ChatBlock[]; warning?: boolean };
 export type ChatActionRunner = (action: Extract<ChatAction, { kind: "server" }>, choice: ChatChoice) => Promise<ChatActionResult>;
 
-type Identity = { name: string; shape: MascotShape; hue: number | null; initials?: string; temperature?: "hot" | "warm" | "cold" | null };
+type Identity = { name: string; shape: MascotShape; hue: number | null; avatarAsset?: AssistantAvatarAsset; initials?: string; temperature?: "hot" | "warm" | "cold" | null };
 
 /** Blocks opened by a "next" action (questions, buttons) stay hidden until that reply is chosen. */
 function hiddenQuestionIds(blocks: ChatBlock[]) {
@@ -424,7 +424,7 @@ export function ChatScreen({
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>}
         <div className={styles.headerIdentity}>
-          <AssistantAvatar shape={identity.shape} hue={identity.hue} size={32} state={working ? "working" : "idle"} mood={working ? "thinking" : "idle"} initials={identity.initials} temperature={identity.temperature} />
+          <AssistantAvatar shape={identity.shape} hue={identity.hue} avatarAsset={identity.avatarAsset} size={32} state={working ? "working" : "idle"} mood={working ? "thinking" : "idle"} initials={identity.initials} temperature={identity.temperature} />
           <div style={{ minWidth: 0 }}>
             <div className={styles.headerName}>{identity.name}</div>
             {status ? (
@@ -449,7 +449,7 @@ export function ChatScreen({
           {working ? (
             <MessageEnter key="working">
               <div className={styles.workingRow}>
-                <AssistantAvatar shape={identity.shape} hue={identity.hue} size={40} state="working" />
+                <AssistantAvatar shape={identity.shape} hue={identity.hue} avatarAsset={identity.avatarAsset} size={40} state="working" />
                 {workingLabel ? <span className={styles.shimmerText} role="status">{workingLabel}</span> : null}
               </div>
             </MessageEnter>

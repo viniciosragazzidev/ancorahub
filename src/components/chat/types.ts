@@ -12,6 +12,9 @@ export type AssistantId = "ancora" | "leads" | "carteira" | "plantao" | "agenda"
 /** Mascot drawn by AssistantAvatar. "logo" is the company mark (verified Âncora thread). */
 export type MascotShape = "mochi" | "onigiri" | "cubo" | "favo" | "nuvem" | "salte" | "logo" | "jack";
 
+/** Personagem do universo Âncora que identifica uma área no Lite. */
+export type AssistantAvatarAsset = "leads" | "carteira" | "plantao" | "agenda" | "cotacao" | "desempenho" | "dicas" | "jornada" | "equipe" | "mensagens";
+
 /** What a chosen reply does. Server actions are run by the screen through a registry, never by the script. */
 export type ChatAction =
   | { kind: "href"; href: string }
@@ -158,6 +161,8 @@ export type ThreadSummary = {
   attention?: boolean;
   href: string;
   shape: MascotShape;
+  /** Arte contextual da área; volta ao mascote abstrato quando a flag está desligada. */
+  avatarAsset?: AssistantAvatarAsset;
   /** 0-359 color of the mascot; null for the logo/lead initials. */
   hue: number | null;
   /** Lead threads: initials shown instead of a mascot. */

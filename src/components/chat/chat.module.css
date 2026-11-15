@@ -73,6 +73,7 @@
   padding: 10px var(--chat-gutter); text-decoration: none; color: inherit; border-radius: var(--radius-control);
   transition: background-color var(--duration-fast) var(--ease-standard);
 }
+.threadAvatarSlot { width: 44px; height: 44px; display: grid; place-items: center; }
 .thread:hover { background: var(--surface-muted); }
 /* The conversation open beside the rail (computers). */
 .threadActive, .threadActive:hover { background: var(--surface); box-shadow: var(--shadow-resting); }
