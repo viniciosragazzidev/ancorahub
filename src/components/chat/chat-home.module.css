@@ -184,3 +184,8 @@
   .bannerCenter.bannerCenter { margin-top: 44px; }
   .bannerCenter.bannerCenter:not([data-goal]) { margin-top: 64px; }
 }
+
+/* Lista lateral do computador mais clara (14/11/2026): metade do cinza de antes, ainda separada do centro pela borda. */
+@media (min-width: 1024px) {
+  .sidebar { background: color-mix(in oklab, var(--surface-muted) 45%, var(--surface)); }
+}
