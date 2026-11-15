@@ -34,6 +34,7 @@ import { extraShiftWindow, findRunningDutySchedule, getRelevantDutyWindow, isExt
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { countLeadsReceivedInDuty, type DutyLeadCap } from "./duty-lead-cap";
 import { selectBrokerDutyScheduleIds } from "./shared-duty-roster";
+import { createDutyConfigCache } from "./duty-config-cache";
 import { findBranchDefaultQueueName, findPostSaleExemptionQueueName, getQueueName, isPostSaleQueueName, postSaleTransferAuditAction } from "./post-sale-transfer";
 
 const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
@@ -74,8 +75,9 @@ async function getRosterBrokerIds(
   const db = getDatabase();
   const local = getLocalDutyParts(date);
 
-  // 1. Find plantões active right now for this branch
-  const activeSchedules = await db.select({
+  // 1. Find plantões active right now for this branch. The weekday's schedules are
+  // cached for a few seconds (egress 15/11); the clock and validity filters run here.
+  const weekdaySchedules = await branchWeekdaySchedulesCache.get(`${tenantId}|${branchId}|${local.weekday}`, () => db.select({
     id: schema.unitDutySchedules.id,
     webhookCredentialId: schema.unitDutySchedules.webhookCredentialId,
     dayOfWeek: schema.unitDutySchedules.dayOfWeek,
@@ -92,11 +94,8 @@ async function getRosterBrokerIds(
       or(eq(schema.unitDutySchedules.branchId, branchId), isNull(schema.unitDutySchedules.branchId)),
       eq(schema.unitDutySchedules.dayOfWeek, local.weekday),
       eq(schema.unitDutySchedules.status, "active"),
-      lte(schema.unitDutySchedules.startsAt, local.time),
-      gt(schema.unitDutySchedules.endsAt, local.time),
-      lte(schema.unitDutySchedules.validFrom, date),
-      or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, date)),
-    ));
+    )));
+  const activeSchedules = selectSchedulesRunningAt(weekdaySchedules, local.time, date);
 
   const scopedSchedules = exclusiveScheduleIds?.length
     ? activeSchedules.filter((schedule) => exclusiveScheduleIds.includes(schedule.id))
@@ -1910,3 +1909,15 @@ export async function distributeQualifiedLead(input: {
   };
 
 }
+
+type BranchWeekdaySchedule = { id: string; webhookCredentialId: string | null; dayOfWeek: number; startsAt: string; endsAt: string; timezone: string; attendanceMode: string; validFrom: Date; validUntil: Date | null };
+const branchWeekdaySchedulesCache = createDutyConfigCache<BranchWeekdaySchedule[]>();
+
+/** Same rule the SQL applied: started (HH:MM text compare), not ended, inside the validity window. */
+export function selectSchedulesRunningAt<T extends Pick<BranchWeekdaySchedule, "startsAt" | "endsAt" | "validFrom" | "validUntil">>(schedules: readonly T[], time: string, date: Date): T[] {
+  return schedules.filter((schedule) => schedule.startsAt <= time
+    && schedule.endsAt > time
+    && schedule.validFrom.getTime() <= date.getTime()
+    && (schedule.validUntil === null || schedule.validUntil.getTime() > date.getTime()));
+}
+

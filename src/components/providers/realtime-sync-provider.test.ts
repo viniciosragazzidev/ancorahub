@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { REFRESH_COALESCE_MS, REFRESH_MAX_WAIT_MS, refreshDelay, RESUME_REFRESH_AFTER_MS, shouldDelayRealtimeUnavailable, shouldRefreshOnResume, shouldScheduleShellRefresh } from "./realtime-sync-provider";
+import { REFRESH_COALESCE_MS, REFRESH_MAX_WAIT_MS, conversationSummaryDelay, CONVERSATION_SUMMARY_REFRESH_MS, isConversationSummaryRefresh, refreshDelay, RESUME_REFRESH_AFTER_MS, shouldDelayRealtimeUnavailable, shouldRefreshOnResume, shouldScheduleShellRefresh } from "./realtime-sync-provider";
 import { logSupabaseRealtimeDiagnostic } from "@/utils/supabase/client";
 
 describe("shouldScheduleShellRefresh", () => {
@@ -80,5 +80,30 @@ describe("shouldRefreshOnResume", () => {
   it("skips quick tab switches and first loads", () => {
     expect(shouldRefreshOnResume(1_000, 1_000 + RESUME_REFRESH_AFTER_MS - 1)).toBe(false);
     expect(shouldRefreshOnResume(null, 50_000)).toBe(false);
+  });
+});
+
+describe("conversation signals on pages without messages (egress 15/11)", () => {
+  const conversationEvent = { kind: "domain.invalidated", domain: "conversations" } as const;
+
+  it("does not reload the distribution and archived areas for a WhatsApp message", () => {
+    expect(shouldScheduleShellRefresh(conversationEvent, "/leads/distribuicao")).toBe(false);
+    expect(shouldScheduleShellRefresh(conversationEvent, "/leads/distribuicao/plantao")).toBe(false);
+    expect(shouldScheduleShellRefresh(conversationEvent, "/leads/arquivados")).toBe(false);
+    expect(shouldScheduleShellRefresh({ kind: "domain.invalidated", domain: "leads" }, "/leads/distribuicao")).toBe(true);
+  });
+
+  it("throttles only the summary pages, never the lead detail", () => {
+    expect(isConversationSummaryRefresh(conversationEvent, "/dashboard")).toBe(true);
+    expect(isConversationSummaryRefresh(conversationEvent, "/leads")).toBe(true);
+    expect(isConversationSummaryRefresh(conversationEvent, "/leads/lead-1")).toBe(false);
+    expect(isConversationSummaryRefresh(conversationEvent, "/minha-fila")).toBe(false);
+    expect(isConversationSummaryRefresh({ kind: "domain.invalidated", domain: "leads" }, "/dashboard")).toBe(false);
+  });
+
+  it("waits out the rest of the minute after the last summary refresh", () => {
+    expect(conversationSummaryDelay(0, 1_000_000)).toBe(0);
+    expect(conversationSummaryDelay(1_000_000, 1_000_000 + 20_000)).toBe(CONVERSATION_SUMMARY_REFRESH_MS - 20_000);
+    expect(conversationSummaryDelay(1_000_000, 1_000_000 + CONVERSATION_SUMMARY_REFRESH_MS + 1)).toBe(0);
   });
 });
