@@ -1,6 +1,6 @@
 # Inicialização do PWA no dashboard
 
-**Status:** implementação e build concluídos; publicação da branch e validação em PWA/dispositivo pendentes.
+**Status:** implementação, build e envio da branch concluídos; validação de abertura em PWA/dispositivo pendente porque o preview 3005 não responde.
 **Prioridade:** solicitação explícita do Vinicios antes do envio da branch de assets.
 
 ## Comportamento acordado
@@ -25,7 +25,9 @@ Não altera landing no navegador comum, fluxo de login, atalhos do manifesto, se
 - `npx eslint src/app/page.tsx src/app/manifest.ts`: passou.
 - `npm run agent:docs`: passou, com 23 referências verificadas; `git diff --check`: passou.
 - `npm run build`: Turbopack parou antes de compilar porque rejeitou o symlink compartilhado de `node_modules` do worktree. `npm run build -- --webpack`: passou, incluindo TypeScript e 170 páginas estáticas; houve avisos não fatais já existentes em `unpdf` e nas rotas dinâmicas que leem `headers`.
+- O manifesto compilado em `.next/server/app/manifest.webmanifest.body` confirma `"start_url":"/dashboard"`.
 - A suíte de testes não foi executada. A validação real de instalação/abertura PWA depende do preview 3005 responder; na revisão anterior, a porta tinha processo escutando, mas a página não respondeu após 30 segundos.
+- A branch `codex/mascote-assets` foi enviada ao `origin` no commit `f6da46f6`. Após sincronizar o preview, `/` e `/manifest.webmanifest` continuam sem resposta (HTTP 000 após 7 segundos); o servidor não foi reiniciado.
 
 ## Rollback
 
