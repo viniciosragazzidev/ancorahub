@@ -8,9 +8,9 @@ const row = (id: string, minute: number, overrides: Partial<MessageIndexRow> = {
 });
 
 describe("conversation key", () => {
-  it("groups by lead, otherwise by the last 8 phone digits", () => {
+  it("groups by lead, otherwise by the normalized full phone", () => {
     expect(conversationKey({ leadId: "l1", phone: "5511999990000" })).toBe("lead:l1");
-    expect(conversationKey({ leadId: null, phone: "+55 (11) 99999-0000" })).toBe("phone:99990000");
+    expect(conversationKey({ leadId: null, phone: "+55 (11) 99999-0000" })).toBe("phone:5511999990000");
     expect(conversationKey({ leadId: null, phone: "123" })).toBeNull();
   });
 });
@@ -40,6 +40,19 @@ describe("messages loaded in full", () => {
     const rows = Array.from({ length: 6 }, (_, i) => row(`u${i}`, i, { phone: "5521911112222" }));
     expect(pickMessageIdsToLoad(rows, { openThread: { leadId: null, phone: "5521911112222" } })).toHaveLength(6);
   });
+
+  it("can keep all full message bodies for the open thread only", () => {
+    const rows = [
+      row("preview-a", 10, { leadId: "lead-b" }),
+      row("open-a1", 1, { leadId: "lead-a" }),
+      row("open-a2", 2, { leadId: "lead-a" }),
+      row("preview-b", 9, { leadId: "lead-b" }),
+    ];
+    expect(pickMessageIdsToLoad(rows, {
+      previewPerConversation: 0,
+      openThread: { leadId: "lead-a", phone: "5511999990000" },
+    })).toEqual(["open-a2", "open-a1"]);
+  });
 });
 
 describe("index summary", () => {
@@ -47,5 +60,26 @@ describe("index summary", () => {
     expect(summarizeIndexRows([row("1", 1, { direction: "outbound" }), row("1", 1, { direction: "outbound" }), row("2", 2, { direction: "outgoing" })]))
       .toEqual({ messageCount: 2, hasIncoming: false });
     expect(summarizeIndexRows([row("1", 1, { direction: "outbound" }), row("2", 2, { direction: "inbound" })]).hasIncoming).toBe(true);
+  });
+
+  it("uses SQL aggregates once per conversation without double-counting open-thread rows", () => {
+    const leadPreview = row("lead-preview", 5, {
+      leadId: "lead-a",
+      conversationKey: "lead:lead-a",
+      conversationMessageCount: 14,
+      conversationHasIncoming: true,
+    });
+    const phonePreview = row("phone-preview", 4, {
+      phone: "5511999990000",
+      conversationKey: "phone:5511999990000",
+      conversationMessageCount: 3,
+      conversationHasIncoming: false,
+    });
+    const openHistory = [row("old-lead-message", 1, { leadId: "lead-a" }), leadPreview];
+
+    expect(summarizeIndexRows([leadPreview, ...openHistory, phonePreview])).toEqual({
+      messageCount: 17,
+      hasIncoming: true,
+    });
   });
 });

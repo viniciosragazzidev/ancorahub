@@ -421,7 +421,12 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   useEffect(() => {
     if (isRealtimeLive) return;
     const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") scheduleServerRefresh();
+      if (document.visibilityState !== "visible") return;
+      if (document.documentElement.dataset.conversationsIncremental === "1") {
+        dispatchRealtimeSyncEvent({ kind: "domain.invalidated", domain: "conversations" });
+        return;
+      }
+      scheduleServerRefresh();
     }, FALLBACK_REFRESH_MS);
     return () => window.clearInterval(interval);
   }, [isRealtimeLive, scheduleServerRefresh]);
