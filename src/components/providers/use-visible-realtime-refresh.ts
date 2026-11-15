@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
 
 export type VisibleRefreshTiming = {
@@ -29,7 +29,11 @@ export function useVisibleRealtimeRefresh(
   timing: VisibleRefreshTiming,
 ) {
   const router = useRouter();
-  const { coalesceMs, maxWaitMs, minGapMs } = timing;
+  // O intervalo pode mudar (ex.: conversa aberta x só a lista) sem reiniciar o efeito: nada pendente se perde.
+  const timingRef = useRef(timing);
+  useEffect(() => {
+    timingRef.current = timing;
+  });
 
   useEffect(() => {
     let timer: number | null = null;
@@ -50,7 +54,7 @@ export function useVisibleRealtimeRefresh(
       const now = Date.now();
       if (timer === null) firstAt = now;
       else window.clearTimeout(timer);
-      timer = window.setTimeout(refresh, visibleRefreshDelay({ coalesceMs, maxWaitMs, minGapMs }, firstAt, lastRefreshAt, now));
+      timer = window.setTimeout(refresh, visibleRefreshDelay(timingRef.current, firstAt, lastRefreshAt, now));
     };
     const onSignal = (event: Event) => {
       if (!matches((event as CustomEvent<RealtimeSyncBrowserDetail>).detail)) return;
@@ -73,5 +77,5 @@ export function useVisibleRealtimeRefresh(
       document.removeEventListener("visibilitychange", onVisibility);
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [router, matches, coalesceMs, maxWaitMs, minGapMs]);
+  }, [router, matches]);
 }
