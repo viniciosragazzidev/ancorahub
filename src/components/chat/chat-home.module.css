@@ -149,10 +149,11 @@
 
 /* Banner do fim do Início: no celular fecha a lista; no computador, o centro. O capitão sai uns 30px pelo topo, 36px de respiro bastam (era 64/72, sobrava espaço, pedido 14/11). */
 /* Seletores dobrados: vencem o display do próprio banner, qualquer que seja a ordem das folhas. */
-.bannerMobile.bannerMobile { margin: 36px 16px 24px; }
+.bannerMobile.bannerMobile { margin: 32px 16px 24px; }
 .bannerCenter.bannerCenter { display: none; width: 100%; margin-top: 36px; text-align: left; }
 /* Sem meta (Minha jornada, Meu desempenho) o card é mais baixo e o capitão sobe mais (~70px no celular, ~85px no computador). */
-.bannerMobile.bannerMobile:not([data-goal]) { margin-top: 76px; }
+/* Celular (15/11/2026): o capitão sai só ~25px pelo topo; 36px bastam, era 76 e sobrava vazio depois do placar. */
+.bannerMobile.bannerMobile:not([data-goal]) { margin-top: 36px; }
 .bannerCenter.bannerCenter:not([data-goal]) { margin-top: 92px; }
 @media (min-width: 1024px) {
   .bannerMobile.bannerMobile { display: none; }
@@ -194,7 +195,8 @@
  * avatar e os botões, com recuo menor. */
 @media (min-width: 1024px) {
   .header { grid-template-columns: auto minmax(0, 1fr) auto; padding: 14px 16px 10px; gap: 8px; }
-  .helloLink { visibility: hidden; }
+  .helloLink { justify-self: start; }
+  .helloLink .hello { display: none; }
   .headerTools { gap: 6px; }
   .tabs { padding-inline: 16px; }
   .search { padding-inline: 16px; }
@@ -204,4 +206,25 @@
 .welcomeBanner.welcomeBanner { width: 100%; margin-top: 64px; text-align: left; }
 @media (min-width: 1024px) {
   .welcomeBanner + .centerSubtitle { margin-top: 4px; }
+}
+
+/* Botão de casa no cabeçalho da lista (15/11/2026): só no computador, no lugar do "Olá". */
+.homeButton { display: none; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (min-width: 1024px) {
+  .homeButton { position: relative; display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 9999px; background: var(--surface); color: var(--foreground); box-shadow: inset 0 0 0 1px var(--border); transition: background-color 160ms ease; }
+  .helloLink:hover .homeButton { background: var(--surface-muted); }
+  .helloLink:focus-visible { outline: none; }
+  .helloLink:focus-visible .homeButton { outline: 2px solid var(--chat-action); outline-offset: 2px; }
+}
+
+/* Faixa acima do banner (15/11/2026): data à esquerda e a disponibilidade logo ao lado, longe do capitão (à direita). */
+.centerTop { display: none; }
+@media (min-width: 1024px) {
+  .centerTop { display: flex; align-items: center; gap: 12px; width: 100%; }
+  .centerDate { margin: 0; font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); }
+  .centerDate::first-letter { text-transform: uppercase; }
+  .centerAvailability.centerAvailability { height: 32px; box-shadow: inset 0 0 0 1px var(--border); }
+  .centerTop + .welcomeBanner.welcomeBanner { margin-top: 12px; }
+  .center:has(.centerTop) { padding-top: 20px; }
 }
