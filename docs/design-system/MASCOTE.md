@@ -120,3 +120,37 @@ Cada área que pode mostrar o mascote já tem a vaga no código (`src/components
 Em `/dev/mascote`, "Mostrar todas as vagas" liga todas só neste aparelho e só em desenvolvimento, para ver cada área com o mascote antes de decidir.
 
 Para trocar o visual de uma vaga: gere a pose (§1.1), salve em `public/mascote/`, aponte o estado em `mascot-config.ts` (`MASCOT_ART`, `MASCOT_STATE_ART` ou `MASCOT_VIDEOS`) e ligue a vaga.
+
+## 9. Avatares contextuais por área
+
+Em 14/11/2026, Vinicios autorizou dez retratos decorativos para substituir os
+avatares abstratos dos assistentes no Lite. Eles seguem a paleta da prancha de
+referência do Capitão Âncora (`#002B73`, `#0B5ED7`, `#00B26B`, `#7ED957`, `#FFC400`,
+`#FF8A65`, `#FFF6E9`, `#1F2937`), fundo transparente e sem texto. O capitão e o
+ajudante mantêm roupa, cores e proporções reconhecíveis; os pequenos objetos mostram
+o contexto da área.
+
+| Arquivo | Contexto visual |
+|---|---|
+| `public/mascote/areas/leads.webp` | Capitão procurando oportunidades com a luneta |
+| `public/mascote/areas/carteira.webp` | Ajudante conferindo o livro de clientes |
+| `public/mascote/areas/plantao.webp` | Capitão com relógio e sino de turno |
+| `public/mascote/areas/agenda.webp` | Capitão consultando o calendário |
+| `public/mascote/areas/cotacao.webp` | Capitão comparando fichas de planos |
+| `public/mascote/areas/desempenho.webp` | Capitão com gráfico e medalha |
+| `public/mascote/areas/dicas.webp` | Ajudante com lanterna e nota |
+| `public/mascote/areas/jornada.webp` | Capitão seguindo mapa com bússola |
+| `public/mascote/areas/equipe.webp` | Capitão apresentando o ajudante |
+| `public/mascote/areas/mensagens.webp` | Ajudante levando um envelope da Âncora |
+
+Cada arquivo mede 160 × 160 px, WebP com canal alfa e fica abaixo de 13 KB. A prancha
+de revisão está em `design/mascote/areas/visao-geral.png`. O mapa tipado vive em
+`src/components/chat/assistant-avatar.tsx`. A flag já auditada
+`feature_ui_contextual_illustrations` controla sua exibição no Lite de corretor,
+gestor e supervisor; o mesmo controle continua limitando ilustrações de seção/vazio
+ao escopo anterior. Desligada ou em falha de carregamento, o avatar abstrato segue
+visível.
+O desenho é decorativo: estado, ação, nome e permissão continuam no conteúdo existente.
+Os retratos não são aplicados a Jack/Notificações, à marca verificada nem a pessoas ou
+leads individuais. Sem rig, animação nova, dependência ou chamada de rede externa.
+Plano, prompts e evidências: `docs/implementations/completed/2026-11-14-mascote-assets-contextuais.md`.

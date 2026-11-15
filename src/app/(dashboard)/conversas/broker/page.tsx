@@ -170,7 +170,7 @@ export default async function BrokerConversationsPage({ searchParams }: { search
         {/* A key per screen: the list and each analysis share the URL path, so the chat must restart (it kept the previous lead). */}
         <AssistantChat
           key={`insight-${insightItem.id}`}
-          identity={{ name: `Análise · ${insightItem.name.split(" ")[0]}`, shape: insightsAssistant.shape, hue: insightsAssistant.hue }}
+          identity={{ name: `Análise · ${insightItem.name.split(" ")[0]}`, shape: insightsAssistant.shape, hue: insightsAssistant.hue, avatarAsset: insightsAssistant.avatarAsset }}
           script={buildLeadInsightScript({ item: insightItem, now: new Date(), analyzing })}
           agentId="insights"
         />
@@ -187,7 +187,7 @@ export default async function BrokerConversationsPage({ searchParams }: { search
       <>
         <AssistantChat
           key="insights-home"
-          identity={{ name: insightsAssistant.name, shape: insightsAssistant.shape, hue: insightsAssistant.hue }}
+          identity={{ name: insightsAssistant.name, shape: insightsAssistant.shape, hue: insightsAssistant.hue, avatarAsset: insightsAssistant.avatarAsset }}
           script={buildInsightsScript({ insights, whatsappConnected: connection?.status === "ready", now: new Date() })}
           agentId="insights"
         />

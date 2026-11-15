@@ -15,10 +15,10 @@ import { rememberWhatsAppHandoff, useAcceptHandoffEnabled } from "@/features/bro
 
 import { ChatScreen } from "./chat-screen";
 import type { Mention } from "./composer";
-import type { ChatBlock, ChatScript, MascotShape } from "./types";
+import type { AssistantAvatarAsset, ChatBlock, ChatScript, MascotShape } from "./types";
 
 /** An assistant conversation: the script plays, replies run the broker's actions. */
-export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false }: { identity: { name: string; shape: MascotShape; hue: number | null }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Jack's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean }) {
+export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false }: { identity: { name: string; shape: MascotShape; hue: number | null; avatarAsset?: AssistantAvatarAsset }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Jack's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean }) {
   const router = useRouter();
   const assist = useAssist();
   // Aceite com contador (11/11): ligado, o WhatsApp abre na tela do lead depois de 30 s.

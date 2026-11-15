@@ -5,9 +5,22 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 const IllustrationsEnabled = createContext(false);
+const AssistantAvatarsEnabled = createContext(false);
 
-export function ContextualIllustrationsProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
-  return <IllustrationsEnabled.Provider value={enabled}>{children}</IllustrationsEnabled.Provider>;
+export function ContextualIllustrationsProvider({ enabled, assistantAvatarsEnabled = enabled, children }: { enabled: boolean; assistantAvatarsEnabled?: boolean; children: ReactNode }) {
+  return (
+    <IllustrationsEnabled.Provider value={enabled}>
+      <AssistantAvatarsEnabled.Provider value={assistantAvatarsEnabled}>{children}</AssistantAvatarsEnabled.Provider>
+    </IllustrationsEnabled.Provider>
+  );
+}
+
+export function useContextualIllustrationsEnabled() {
+  return useContext(IllustrationsEnabled);
+}
+
+export function useContextualAssistantAvatarsEnabled() {
+  return useContext(AssistantAvatarsEnabled);
 }
 
 const assets = {
@@ -30,7 +43,7 @@ export function ContextualIllustration({ name, size = "md", fallback = null, cla
   fallback?: ReactNode;
   className?: string;
 }) {
-  const enabled = useContext(IllustrationsEnabled);
+  const enabled = useContextualIllustrationsEnabled();
   const [failed, setFailed] = useState(false);
   if (!enabled || failed) return fallback;
   return (

@@ -1,3 +1,19 @@
+## 2026-11-14: retratos dos assistentes por área
+
+Pedido e autorização explícita de Vinicios. Papel inicial: corretor Lite; mesmas
+associações visuais são reutilizadas nas áreas de equipe do gestor e supervisor.
+Ação principal continua sendo abrir o assistente ou módulo pelo item da lista. Dez
+retratos decorativos do universo do Capitão Âncora identificam Leads, Carteira,
+Plantão, Agenda, Cotação, Desempenho, Dicas, Jornada, Equipe e Mensagens. A mesma peça
+acompanha o cabeçalho da conversa quando existe. Jack/Notificações, marca verificada
+e avatares individuais ficam como estão; texto e indicadores existentes comunicam
+conteúdo e estado.
+
+Usa o provider e a flag global auditada existentes. A flag desligada e erro de imagem
+restauram as formas abstratas. Sem mudança de rota, hierarquia, ação, permissão, token,
+primitive ou movimento; UX-M1.10 permanece pendente. Registro e evidências:
+`docs/implementations/completed/2026-11-14-mascote-assets-contextuais.md`.
+
 ## 2026-11-13: conversa como foco, ícones e dados pelo olho
 
 Vinicios refinou explicitamente o escopo nesta sessão: limpar a tela; conversa ocupa a área principal; informações do lead somente no painel deslizante aberto pelo olho junto do nome; WhatsApp/Ligar/Etapa como ícones no topo, centralizados e com espaçamento consistente; retirar faixa de conectar WhatsApp de todas as rotas e Cotações da ficha do corretor; compactar campos. Cancelou a redução geral de fonte antes de ela ser aplicada. Registrar venda fica com Claude, sem alterações diretas remanescentes nos arquivos do seu formulário.

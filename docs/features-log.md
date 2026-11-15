@@ -939,3 +939,7 @@ As respostas sugeridas do chat seguem os níveis do padrão, numa tabela única 
 ## 14/11/2026 - Feedback padrão em todo o modo Lite (fases 2 a 5)
 
 O Lite inteiro (corretor, supervisor, gestor e Diretor Lite) responde no padrão de `docs/design-system/FEEDBACK.md`: estados de envio, sucesso só depois do servidor, erro com a causa, o que continua valendo e "Tentar de novo", e som e vibração por nível. As ações do chat ganham nível e "Não enviada · Tentar de novo". A ficha, a agenda, os clientes, o plantão, a meta do dia (nível 2), as configurações, o supervisor, o gestor e as telas do diretor deixam de usar toast para o que cabe no objeto. A venda registrada comemora em tela cheia com o capitão (nível 3). O que ficou de fora está no plano: `docs/implementations/active/2026-11-14-feedback-padrao.md`.
+
+## 14/11/2026 - Avatares contextuais dos assistentes
+
+Dez assets WebP transparentes do universo do Capitão Âncora identificam visualmente os assistentes por área no Lite de corretor, gestor e supervisor: Leads, Carteira, Plantão, Agenda, Cotação, Desempenho, Dicas, Jornada, Equipe e Mensagens. Também acompanham o cabeçalho de conversa; no mesmo controle global auditado, desligado ou com erro de carregamento, retornam os avatares abstratos. O controle não amplia as ilustrações de seção/vazio para gestor e supervisor. Jack/Notificações, leads individuais, conteúdo e sinais de estado permanecem inalterados. Plano e evidências: `docs/implementations/completed/2026-11-14-mascote-assets-contextuais.md`.
