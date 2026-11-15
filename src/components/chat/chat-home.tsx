@@ -388,6 +388,14 @@ export function ChatHome({
     </div>;
   }
 
+  const centerSubtitle = hasNowItems ? "Veja o que precisa da sua atenção agora." : next ? (
+    <>A próxima coisa é <strong className={home.nextLabel} data-urgent={next.urgent}>{next.label}</strong>. {next.detail}</>
+  ) : nextLead
+    ? isSupervisor ? `O lead de ${nextLead.name.split(" ")[0]} está com o contato atrasado. Comece por ele.` : `${nextLead.name.split(" ")[0]} está esperando você. Escolha uma conversa à esquerda ou comece por ela.`
+    : waitingAssistants.length
+      ? `${waitingAssistants.map((thread) => thread.name).join(", ")} ${waitingAssistants.length === 1 ? "tem algo" : "têm algo"} para você. Escolha uma conversa à esquerda.`
+      : "Tudo em dia. Escolha uma conversa à esquerda para começar.";
+
   return (
     <div className={`${styles.root} ${home.page}`}>
       {aside}
@@ -403,20 +411,11 @@ export function ChatHome({
                 onToggle={() => shell.setStatus(shell.availability === "available" ? "paused" : "available")} className={home.centerAvailability} /> : null}
             </div>
           ) : null}
+          {/* Corretor (15/11/2026): o próximo passo e os fatos do dia entram no banner; supervisor e gestor seguem com título e frase. */}
           {!isSupervisor && !isManager ? (
-            <HomeWelcomeBanner className={home.welcomeBanner} greeting={greeting(now)} firstName={firstName} highlights={highlights} />
-          ) : <h2 className={home.centerTitle}>{greeting(now)}, {firstName}</h2>}
-          {hasNowItems ? <p className={home.centerSubtitle}>Veja o que precisa da sua atenção agora.</p> : next ? (
-            <p className={home.centerSubtitle}>
-              A próxima coisa é <strong className={home.nextLabel} data-urgent={next.urgent}>{next.label}</strong>. {next.detail}
-            </p>
-          ) : <p className={home.centerSubtitle}>
-            {nextLead
-              ? isSupervisor ? `O lead de ${nextLead.name.split(" ")[0]} está com o contato atrasado. Comece por ele.` : `${nextLead.name.split(" ")[0]} está esperando você. Escolha uma conversa à esquerda ou comece por ela.`
-              : waitingAssistants.length
-                ? `${waitingAssistants.map((thread) => thread.name).join(", ")} ${waitingAssistants.length === 1 ? "tem algo" : "têm algo"} para você. Escolha uma conversa à esquerda.`
-                : "Tudo em dia. Escolha uma conversa à esquerda para começar."}
-          </p>}
+            <HomeWelcomeBanner className={home.welcomeBanner} greeting={greeting(now)} firstName={firstName} highlights={highlights}
+              subtitle={centerSubtitle} duty={summary?.duty ?? null} goal={summary?.goal ?? null} />
+          ) : <><h2 className={home.centerTitle}>{greeting(now)}, {firstName}</h2><p className={home.centerSubtitle}>{centerSubtitle}</p></>}
           {/* Sem o bloco Agora no topo do computador (pedido 14/11/2026): as pendências ficam na aba Leads da lista ao lado. */}
           {summary?.now && !floatingNow ? <NowSection data={summary.now} /> : null}
           {showNext && next?.acceptLeadId ? (
