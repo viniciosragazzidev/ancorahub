@@ -855,7 +855,9 @@ function cachedPhoneList(key: string, load: () => Promise<(string | null)[]>) {
   if (hit && now - hit.at < PHONE_LIST_TTL_MS) return hit.value;
   const value = load();
   phoneListCache.set(key, { at: now, value });
-  value.catch(() => phoneListCache.delete(key));
+  value.catch(() => {
+    if (phoneListCache.get(key)?.value === value) phoneListCache.delete(key);
+  });
   return value;
 }
 
