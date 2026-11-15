@@ -26,6 +26,12 @@ const requestSchema = z.object({
 const MAX_DELTA_MESSAGES = 500;
 const responseHeaders = { "Cache-Control": "no-store, private" };
 
+
+/** ISO with milliseconds: String(Date) drops them and the cursor is in ms. */
+function toIso(value: unknown) {
+  return value instanceof Date ? value.toISOString() : new Date(String(value)).toISOString();
+}
+
 function withNoStore(payload: unknown, status = 200) {
   return NextResponse.json(payload, { status, headers: responseHeaders });
 }
@@ -442,7 +448,7 @@ export async function POST(request: NextRequest) {
             provider: typeof row.provider === "string" ? row.provider : null,
             communicationChannelId,
           }),
-          sentAt: new Date(String(row.sentAt)).toISOString(),
+          sentAt: toIso(row.sentAt),
           ...(hasSupportedMedia
             ? {
                 media: {
@@ -472,7 +478,7 @@ export async function POST(request: NextRequest) {
           latestMessage: {
             body: compactPreview(String(latest.body ?? "")),
             direction: String(latest.direction),
-            sentAt: new Date(String(latest.sent_at)).toISOString(),
+            sentAt: toIso(latest.sent_at),
           },
           messageCountDelta: matching.reduce((sum, row) => sum + Number(row.message_count_delta ?? 0), 0),
           hasIncomingDelta: matching.some((row) => Boolean(row.has_incoming_delta)),
@@ -506,7 +512,7 @@ export async function POST(request: NextRequest) {
         latestMessage: {
           body: compactPreview(String(latest.body ?? "")),
           direction: String(latest.direction),
-          sentAt: new Date(String(latest.sent_at)).toISOString(),
+          sentAt: toIso(latest.sent_at),
         },
         messageCountDelta: matching.reduce((sum, row) => sum + Number(row.message_count_delta ?? 0), 0),
         hasIncomingDelta: matching.some((row) => Boolean(row.has_incoming_delta)),
