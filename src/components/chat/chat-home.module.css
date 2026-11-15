@@ -50,7 +50,7 @@
 
 /* Computers: the list on the side, the team at the center (reference: desktop home). */
 @media (min-width: 1024px) {
-  .page { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: var(--app-dvh, 100dvh); }
+  .page { display: grid; grid-template-columns: 270px minmax(0, 1fr); height: var(--app-dvh, 100dvh); }
   .sidebar { border-right: 1px solid var(--border); background: var(--surface-muted); overflow-y: auto; padding-bottom: 24px; }
   .center { display: grid; place-items: center; overflow-y: auto; padding: 48px 32px; }
   .centerInner { width: 100%; max-width: 760px; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 6px; }
@@ -131,7 +131,7 @@
   .nowPanel .nowItemActions { grid-column: 2; justify-content: flex-start; margin-top: var(--space-1); }
 }
 .nowLauncher > button { pointer-events: auto; }
-@media (min-width: 1024px) { .nowLauncher { left: 360px; } }
+@media (min-width: 1024px) { .nowLauncher { left: 270px; } }
 
 @media (min-width: 1024px) {
   .nowMobile { display: none; }
@@ -180,7 +180,7 @@
   .statValue { margin-top: 14px; font-size: 28px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
   .statAlert .statValue { color: oklch(55% 0.13 65); }
   .centerHighlights { margin: 0; }
-  .nowLauncher { display: none; }
+  .nowLauncher.nowLauncher { display: none; }
   .bannerCenter.bannerCenter { margin-top: 44px; }
   .bannerCenter.bannerCenter:not([data-goal]) { margin-top: 64px; }
 }
@@ -188,4 +188,14 @@
 /* Lista lateral do computador mais clara (14/11/2026): metade do cinza de antes, ainda separada do centro pela borda. */
 @media (min-width: 1024px) {
   .sidebar { background: color-mix(in oklab, var(--surface-muted) 45%, var(--surface)); }
+}
+
+/* Lista lateral de 270px (14/11/2026): no computador o "Olá" sai do cabeçalho (o centro já cumprimenta) e ficam o
+ * avatar e os botões, com recuo menor. */
+@media (min-width: 1024px) {
+  .header { grid-template-columns: auto minmax(0, 1fr) auto; padding: 14px 16px 10px; gap: 8px; }
+  .helloLink { visibility: hidden; }
+  .headerTools { gap: 6px; }
+  .tabs { padding-inline: 16px; }
+  .search { padding-inline: 16px; }
 }

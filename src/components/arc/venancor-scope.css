@@ -153,8 +153,8 @@
 .lite-rail { display: none; }
 .lite-split, .lite-main { display: contents; }
 @media (min-width: 1024px) {
-  .lite-split { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: var(--app-dvh, 100dvh); overflow: hidden; }
-  .lite-rail { display: block; height: var(--app-dvh, 100dvh); overflow: hidden; border-right: 1px solid var(--border, rgb(16 16 40 / 0.08)); background: var(--surface-muted, #f1f1f5); }
+  .lite-split { display: grid; grid-template-columns: 270px minmax(0, 1fr); height: var(--app-dvh, 100dvh); overflow: hidden; }
+  .lite-rail { display: block; height: var(--app-dvh, 100dvh); overflow: hidden; border-right: 1px solid var(--border, rgb(16 16 40 / 0.08)); background: color-mix(in oklab, var(--surface-muted, #f1f1f5) 45%, var(--surface, #fff)); } /* mais clara (14/11/2026), igual à lista do Início */
   .lite-main { display: block; min-width: 0; height: var(--app-dvh, 100dvh); overflow: hidden; }
 }
 .lite-rail [data-radix-scroll-area-viewport] { overscroll-behavior: contain; }
