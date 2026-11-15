@@ -9,7 +9,7 @@ import { BrokerDutyHub } from "@/features/broker-workspace/components/broker-dut
 import type { BrokerDutyCalendarOccurrence } from "@/features/broker-workspace/duty-calendar";
 import type { DutyHubCurrent, DutyHubShift } from "@/features/broker-workspace/duty-hub";
 
-/** Dev-only showcase of the broker Plantões with example data. /dev/plantoes?estado=next|active|none */
+/** Dev-only showcase of the broker Plantões with example data. /dev/plantoes?estado=next|active|confirmar|none */
 const shift: DutyHubShift = {
   key: "s1", scheduleName: "Plantão PME Centro", dateLabel: "Hoje", timeLabel: "13:00 às 17:00", place: "Unidade Centro", modality: "Online",
   situation: { label: "Confirmado", tone: "success" }, hint: "Fique disponível: os leads chegam por ordem de quem aceita primeiro.", href: "/plantoes/agora",
@@ -23,6 +23,8 @@ function Showcase() {
   const state = useSearchParams().get("estado") ?? "next";
   const current: DutyHubCurrent = state === "none" ? { state: "none", shifts: [], coveredOccurrenceIds: [] }
     : state === "active" ? { state: "active", shifts: [shift], coveredOccurrenceIds: [] }
+      : state === "confirmar" ? { state: "active", coveredOccurrenceIds: [], shifts: [{ ...shift, situation: { label: "Confirme sua presença", tone: "warning" }, hint: "Confirme sua presença para começar a receber leads.", href: "/plantoes/agora?assignment=a",
+        ask: { assignmentId: "a", scheduleName: shift.scheduleName, branchName: null, mode: "online", startsAt: "2026-11-15T12:00:00.000Z", endsAt: "2026-11-15T22:00:00.000Z", status: "pending", photoId: null } }] }
       : { state: "next", shifts: [{ ...shift, dateLabel: "Amanhã", situation: { label: "Próximo plantão", tone: "neutral" }, hint: null, href: null }], coveredOccurrenceIds: [] };
   const occurrences = state === "none" ? [] : [occurrence("17", "Plantão PME Centro", "13:00", "17:00"), occurrence("19", "Plantão Individual", "09:00", "13:00"), occurrence("21", "Plantão PME Centro", "13:00", "17:00")];
   return <BrokerDutyHub current={current} calendarState="ready"
@@ -31,5 +33,5 @@ function Showcase() {
 
 export default function DutyShowcasePage() {
   if (process.env.NODE_ENV !== "development") notFound();
-  return <main className="arc-venancor"><Suspense fallback={null}><Showcase /></Suspense></main>;
+  return <main><Suspense fallback={null}><Showcase /></Suspense></main>;
 }

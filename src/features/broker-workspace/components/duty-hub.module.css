@@ -74,20 +74,55 @@
 .fact dt { grid-area: label; overflow: hidden; color: var(--text-muted); font-size: var(--text-xs); white-space: nowrap; text-overflow: ellipsis; }
 .fact dd { grid-area: value; margin: 0; overflow: hidden; font-size: var(--text-sm); font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
 
+/* Fim do card (refino 15/11/2026): a dica em texto simples, sem a caixa cinza, e a ação encorpada logo abaixo. */
 .foot {
   display: grid;
-  gap: 12px;
-  padding: 0 20px 20px;
+  gap: 14px;
+  padding: 18px 20px 20px;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .hint {
   margin: 0;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: var(--surface-muted);
   color: var(--text-secondary);
   font-size: var(--text-sm);
-  line-height: 1.45;
+  line-height: 1.5;
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 28px;
+  border-radius: 9999px;
+  background: var(--chat-action);
+  color: white;
+  font-size: var(--text-base);
+  font-weight: 500;
+  text-decoration: none;
+  box-shadow: 0 4px 0 color-mix(in oklab, var(--chat-action) 70%, black);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.cta:active { transform: translateY(3px); box-shadow: 0 1px 0 color-mix(in oklab, var(--chat-action) 70%, black); }
+.cta:focus-visible { outline: 2px solid var(--chat-action); outline-offset: 3px; }
+
+.secondaryLink {
+  justify-self: center;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+}
+.secondaryLink:hover { background: var(--surface-muted); color: var(--foreground); }
+
+@media (prefers-reduced-motion: reduce) { .cta { transition: none; } }
+@media (min-width: 720px) {
+  .cta { width: auto; min-width: 260px; justify-self: start; }
+  .secondaryLink { justify-self: start; }
 }
 
 .note {
@@ -129,7 +164,7 @@
   .head { padding: 20px 28px 0; }
   .top { padding: 22px 28px 24px; }
   .fact { padding: 16px 28px; }
-  .foot { padding: 0 28px 24px; }
+  .foot { padding: 20px 28px 24px; }
   .note { padding: 0 28px; }
 }
 

@@ -505,3 +505,17 @@ button.leadCardAction:disabled { opacity: 0.6; cursor: default; }
   .operatorRow { flex-wrap: wrap; gap: 2px 12px; }
   .operatorRow dd { white-space: normal; }
 }
+
+/* Confirmação dentro do card de Plantões (15/11/2026): sem moldura própria, só a ação. */
+.presence[data-variant="inline"] { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; gap: 10px; }
+.presence[data-mode="online"] .presenceButton { background: var(--chat-action); }
+.presence[data-variant="inline"] .presenceButton { width: 100%; min-height: 52px; font-size: var(--text-base); box-shadow: 0 4px 0 color-mix(in oklab, var(--chat-action) 70%, black); transition: transform 120ms ease, box-shadow 120ms ease; }
+.presence[data-variant="inline"][data-mode="presencial"] .presenceButton { box-shadow: 0 4px 0 oklch(48% 0.16 var(--presence-hue)); }
+.presence[data-variant="inline"] .presenceButton:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 color-mix(in oklab, var(--chat-action) 70%, black); }
+.presence[data-variant="inline"] .presenceDone,
+.presence[data-variant="inline"] .presenceWaitingPill { min-height: 52px; }
+@media (min-width: 720px) {
+  .presence[data-variant="inline"] .presenceButton { width: auto; min-width: 260px; justify-self: start; padding: 0 28px; }
+  .presence[data-variant="inline"] .presenceDone,
+  .presence[data-variant="inline"] .presenceWaiting { justify-self: start; min-width: 260px; }
+}

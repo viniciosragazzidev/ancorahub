@@ -1,5 +1,6 @@
 import type { BrokerDutyCalendarOccurrence, BrokerDutyCalendarResult } from "./duty-calendar";
 import type { BrokerActiveDuty, BrokerWorkspaceData, DutyPresenceAsk } from "./queries";
+import type { PresenceAskView } from "@/components/chat/types";
 
 /**
  * Plantões em uma entrada única (plano do modo corretor, etapa 3): o cartão "Seu plantão atual" de `/plantoes`.
@@ -25,6 +26,8 @@ export type DutyHubShift = {
   hint: string | null;
   /** Abre a operação do plantão (ou a confirmação de presença). Null quando ainda não há o que abrir. */
   href: string | null;
+  /** Confirmação de presença em aberto (15/11/2026): o card confirma ali mesmo, sem abrir o plantão. */
+  ask?: PresenceAskView | null;
 };
 
 export type DutyHubCurrent =
@@ -63,6 +66,12 @@ function modalityOf(mode: string | undefined | null): DutyHubShift["modality"] {
   return null;
 }
 
+const askView = (ask: PresenceAsk): PresenceAskView => ({
+  assignmentId: ask.assignmentId, scheduleName: ask.scheduleName, branchName: ask.branchName, mode: ask.mode,
+  startsAt: ask.startsAt.toISOString(), endsAt: ask.endsAt.toISOString(), status: ask.status, photoId: ask.photoId,
+  ...(ask.startInterval ? { startInterval: true } : {}),
+});
+
 const askHref = (ask: PresenceAsk) => `/plantoes/agora?assignment=${encodeURIComponent(ask.assignmentId)}`;
 
 function askSituation(ask: PresenceAsk): Pick<DutyHubShift, "situation" | "hint"> {
@@ -93,6 +102,7 @@ function activeShift(duty: ActiveDuty, ask: PresenceAsk | undefined, todayKey: s
     modality: modalityOf(duty.attendanceMode),
     ...state,
     href: ask ? askHref(ask) : base,
+    ask: ask ? askView(ask) : null,
   };
 }
 
@@ -141,6 +151,7 @@ export function buildDutyHubCurrent(input: {
         modality: modalityOf(ask.mode),
         ...askSituation(ask),
         href: askHref(ask),
+        ask: askView(ask),
       }],
       coveredOccurrenceIds: occurrences.filter((item) => item.scheduleId === ask.scheduleId && item.dutyDate === dutyDate).map((item) => item.id),
     };
