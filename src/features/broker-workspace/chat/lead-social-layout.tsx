@@ -50,7 +50,7 @@ export function LeadSocialLayout({ header, next, details, side, conversation, de
         {backHref ? <BackButton fallbackHref={backHref} /> : null}
         <div className={styles.phoneHeaderMain}>{header}</div>
         {!detailOverlayActive && (next || details || side) ? (
-          <BottomSheet className="arc-venancor" trigger={<Button ref={eye} variant="ghost" size="sm" className={page.iconButton} aria-label="Ver dados do cliente" title="Ver dados do cliente"><Eye size={20} aria-hidden="true" /></Button>}
+          <BottomSheet className="arc-venancor" trigger={<Button ref={eye} variant="ghost" size="sm" className={styles.dataButton} aria-label="Ver dados do cliente" title="Ver dados do cliente"><Eye size={18} aria-hidden="true" /><span className={styles.dataShort} aria-hidden="true">Dados</span><span className={styles.dataLong} aria-hidden="true">Dados do lead</span></Button>}
             title="Dados do cliente" closeLabel="Fechar dados do cliente" detents={[0.92]}>
             <div className="flex min-w-0 flex-col gap-4 pb-6">
               {next}

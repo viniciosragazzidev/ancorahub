@@ -31,3 +31,27 @@
 /* Celular estreito: as três ações continuam numa linha. */
 @media (max-width: 359px) { .topActions { gap: 6px; } .topAction { padding: 0 12px 0 10px; font-size: 12.5px; gap: 5px; } }
 @media (prefers-reduced-motion: reduce) { .topAction { transition: none; } .topAction:active { transform: none; } }
+
+/* Olho com texto (15/11/2026): "Dados" no celular e "Dados do lead" no computador, para ficar claro o que abre. */
+.dataButton.dataButton {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px 0 10px;
+  border-radius: 9999px;
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+.dataButton.dataButton:hover { background: var(--border-subtle); }
+.dataButton svg { flex: none; width: 16px; height: 16px; }
+.dataLong { display: none; }
+@media (min-width: 640px) {
+  .dataShort { display: none; }
+  .dataLong { display: inline; }
+}
