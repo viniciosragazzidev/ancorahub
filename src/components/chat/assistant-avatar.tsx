@@ -40,23 +40,19 @@ const SHAPES: Record<Exclude<MascotShape, "logo" | "jack">, string> = {
 };
 
 const AREA_ASSETS: Record<AssistantAvatarAsset, string> = {
-  leads: "/mascote/areas/leads.webp",
-  carteira: "/mascote/areas/carteira.webp",
-  plantao: "/mascote/areas/plantao.webp",
-  agenda: "/mascote/areas/agenda.webp",
-  cotacao: "/mascote/areas/cotacao.webp",
-  desempenho: "/mascote/areas/desempenho.webp",
-  dicas: "/mascote/areas/dicas.webp",
-  jornada: "/mascote/areas/jornada.webp",
-  equipe: "/mascote/areas/equipe.webp",
-  mensagens: "/mascote/areas/mensagens.webp",
+  leads: "/assistant-areas/leads.webp",
+  carteira: "/assistant-areas/carteira.webp",
+  plantao: "/assistant-areas/plantao.webp",
+  agenda: "/assistant-areas/agenda.webp",
+  cotacao: "/assistant-areas/cotacao.webp",
+  desempenho: "/assistant-areas/desempenho.webp",
+  dicas: "/assistant-areas/dicas.webp",
+  jornada: "/assistant-areas/jornada.webp",
+  equipe: "/assistant-areas/equipe.webp",
+  mensagens: "/assistant-areas/mensagens.webp",
 };
 
-/**
- * The assistant's mascot: a soft glossy body in the assistant's color with two
- * eyes. "working" breathes, "waiting" shows the blue dot. The logo variant is
- * the verified company mark.
- */
+/** Visual do assistente: ilustração da área, forma abstrata ou marca verificada. */
 export function AssistantAvatar({
   shape,
   hue,
