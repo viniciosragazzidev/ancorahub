@@ -272,8 +272,10 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
                       <Icon
                         weight={isActive ? "fill" : "regular"}
                         className={cn(
-                          "size-[1.15rem] shrink-0 transition-[color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
-                          directorLite ? "text-(--text-secondary)" : isActive ? "text-sidebar-primary" : item.isWhatsApp ? "text-emerald-600 dark:text-emerald-300" : item.iconTone,
+                          // PROTOTYPE: Director Lite glyph at 80%; keep the icon circle and menu hit target unchanged.
+                          directorLite ? "size-[0.92rem] text-(--text-secondary)" : "size-[1.15rem]",
+                          "shrink-0 transition-[color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
+                          directorLite ? undefined : isActive ? "text-sidebar-primary" : item.isWhatsApp ? "text-emerald-600 dark:text-emerald-300" : item.iconTone,
                         )}
                       />
 
