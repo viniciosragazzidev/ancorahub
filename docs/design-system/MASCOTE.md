@@ -121,36 +121,35 @@ Em `/dev/mascote`, "Mostrar todas as vagas" liga todas só neste aparelho e só 
 
 Para trocar o visual de uma vaga: gere a pose (§1.1), salve em `public/mascote/`, aponte o estado em `mascot-config.ts` (`MASCOT_ART`, `MASCOT_STATE_ART` ou `MASCOT_VIDEOS`) e ligue a vaga.
 
-## 9. Avatares contextuais por área
+## 9. Assets contextuais dos assistentes por rota
 
-Em 14/11/2026, Vinicios autorizou dez retratos decorativos para substituir os
-avatares abstratos dos assistentes no Lite. Eles seguem a paleta da prancha de
-referência do Capitão Âncora (`#002B73`, `#0B5ED7`, `#00B26B`, `#7ED957`, `#FFC400`,
-`#FF8A65`, `#FFF6E9`, `#1F2937`), fundo transparente e sem texto. O capitão e o
-ajudante mantêm roupa, cores e proporções reconhecíveis; os pequenos objetos mostram
-o contexto da área.
+Em 15/11/2026, Vinicios pediu substituir as artes repetitivas com o Capitão/ajudante
+por ilustrações de objetos próprios de cada área. As dez imagens usam a paleta oficial
+(`#002B73`, `#0B5ED7`, `#00B26B`, `#7ED957`, `#FFC400`, `#FFF6E9`, `#1F2937`), fundo
+transparente e nenhum texto, personagem, rosto, pirata ou símbolo de âncora repetido.
 
 | Arquivo | Contexto visual |
 |---|---|
-| `public/mascote/areas/leads.webp` | Capitão procurando oportunidades com a luneta |
-| `public/mascote/areas/carteira.webp` | Ajudante conferindo o livro de clientes |
-| `public/mascote/areas/plantao.webp` | Capitão com relógio e sino de turno |
-| `public/mascote/areas/agenda.webp` | Capitão consultando o calendário |
-| `public/mascote/areas/cotacao.webp` | Capitão comparando fichas de planos |
-| `public/mascote/areas/desempenho.webp` | Capitão com gráfico e medalha |
-| `public/mascote/areas/dicas.webp` | Ajudante com lanterna e nota |
-| `public/mascote/areas/jornada.webp` | Capitão seguindo mapa com bússola |
-| `public/mascote/areas/equipe.webp` | Capitão apresentando o ajudante |
-| `public/mascote/areas/mensagens.webp` | Ajudante levando um envelope da Âncora |
+| `public/assistant-areas/leads.webp` | Cartão de contato com lupa e marcador de novo lead |
+| `public/assistant-areas/carteira.webp` | Pasta com registros e separadores coloridos, sem pictograma de pessoas |
+| `public/assistant-areas/plantao.webp` | Sino de atendimento com relógio |
+| `public/assistant-areas/agenda.webp` | Calendário com data marcada e confirmação |
+| `public/assistant-areas/cotacao.webp` | Planos de saúde comparados com selo de seleção |
+| `public/assistant-areas/desempenho.webp` | Gráfico crescente com medalha |
+| `public/assistant-areas/dicas.webp` | Lâmpada e nota prática |
+| `public/assistant-areas/jornada.webp` | Mapa com rota, origem e destino |
+| `public/assistant-areas/equipe.webp` | Cartões de perfil abstratos conectados em rede |
+| `public/assistant-areas/mensagens.webp` | Balões de conversa e envelope |
 
-Cada arquivo mede 160 × 160 px, WebP com canal alfa e fica abaixo de 13 KB. A prancha
-de revisão está em `design/mascote/areas/visao-geral.png`. O mapa tipado vive em
+Cada arquivo mede 160 × 160 px, WebP com canal alfa e fica abaixo de 8 KB. A prancha
+de revisão está em `design/assistant-areas/visao-geral.png`. O mapa tipado vive em
 `src/components/chat/assistant-avatar.tsx`. A flag já auditada
 `feature_ui_contextual_illustrations` controla sua exibição no Lite de corretor,
 gestor e supervisor; o mesmo controle continua limitando ilustrações de seção/vazio
 ao escopo anterior. Desligada ou em falha de carregamento, o avatar abstrato segue
 visível.
 O desenho é decorativo: estado, ação, nome e permissão continuam no conteúdo existente.
-Os retratos não são aplicados a Jack/Notificações, à marca verificada nem a pessoas ou
-leads individuais. Sem rig, animação nova, dependência ou chamada de rede externa.
-Plano, prompts e evidências: `docs/implementations/completed/2026-11-14-mascote-assets-contextuais.md`.
+As ilustrações não substituem Jack/Notificações, a marca verificada, os avatares
+pessoais ou os retratos dos leads. Sem rig, animação nova, dependência ou chamada de
+rede externa. Plano, prompts e evidências:
+`docs/implementations/active/2026-11-15-assets-visuais-por-rota.md`.

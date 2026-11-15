@@ -715,17 +715,18 @@ sem movimento novo, prioridade de rede ou consulta de dados própria. O controle
 feature_ui_contextual_illustrations no Super-admin restaura a apresentação anterior.
 Mapa e verificação: docs/implementations/active/2026-10-28-contextual-illustrations.md.
 
-Em 14/11/2026, Vinicios autorizou ampliar a mesma exceção aos avatares decorativos
-dos assistentes por área no Lite de corretor, gestor e supervisor, e ao cabeçalho da
-conversa correspondente. O mapeamento usa dez retratos do universo do Capitão Âncora,
-em 32 px na conversa e no tamanho já existente da linha; sem texto, borda, token,
-primitive ou movimento novos. Jack/Notificações, marca verificada e avatares pessoais
-continuam inalterados; linhas de leads individuais mantêm iniciais e temperatura.
-O controle Super-admin da flag passa a incluir esses retratos nos três papéis Lite;
-os objetos 3D de seção/vazio preservam o escopo anterior, apenas Diretor e Corretor.
-Com a flag desligada ou erro de carregamento, a apresentação abstrata existente volta.
-Assets e regras: docs/design-system/MASCOTE.md §9 e
-docs/implementations/completed/2026-11-14-mascote-assets-contextuais.md.
+Em 14/11/2026, Vinicios autorizou imagens contextuais nos assistentes por área do
+Lite de corretor, gestor e supervisor e no cabeçalho da conversa correspondente.
+Em 15/11, pediu substituir os retratos repetitivos do Capitão/ajudante por dez objetos
+3D próprios de cada rota, em 32 px na conversa e no tamanho já existente da linha.
+As imagens não incluem Jack, outros personagens, rostos ou âncora repetida; sem
+texto, borda, token, primitive ou movimento novos. Jack/Notificações, marca verificada,
+avatares pessoais e retratos de leads continuam inalterados. O controle Super-admin
+da flag continua incluindo os assets nos três papéis Lite; os objetos 3D de seção/vazio
+preservam o escopo anterior, apenas Diretor e Corretor. Com a flag desligada ou erro
+de carregamento, a apresentação abstrata existente volta. Mapa e evidências:
+docs/design-system/MASCOTE.md §9 e
+docs/implementations/active/2026-11-15-assets-visuais-por-rota.md.
 
 ## Feedback e movimento · 14/11/2026
 

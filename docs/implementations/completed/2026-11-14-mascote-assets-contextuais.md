@@ -1,6 +1,6 @@
-# Avatares contextuais do Capitão Âncora
+# Primeira versão: avatares contextuais do Capitão Âncora
 
-**Status:** assets e integração publicados em `preview/3005`; a declaração duplicada que causava erro de compilação foi removida e o preview voltou a servir a tela inicial.
+**Status:** versão inicial histórica. Em 15/11, Vinicios pediu substituir as artes de personagens pelos objetos específicos por rota registrados em `docs/implementations/active/2026-11-15-assets-visuais-por-rota.md`.
 **Pedido e prioridade:** Vinicios, 2026-11-14. Promovido a P1 após autorização explícita nesta conversa.
 
 ## Objetivo

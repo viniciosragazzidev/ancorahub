@@ -1,18 +1,18 @@
-## 2026-11-14: retratos dos assistentes por área
+## 2026-11-15: assets próprios por rota nos assistentes
 
-Pedido e autorização explícita de Vinicios. Papel inicial: corretor Lite; mesmas
-associações visuais são reutilizadas nas áreas de equipe do gestor e supervisor.
-Ação principal continua sendo abrir o assistente ou módulo pelo item da lista. Dez
-retratos decorativos do universo do Capitão Âncora identificam Leads, Carteira,
-Plantão, Agenda, Cotação, Desempenho, Dicas, Jornada, Equipe e Mensagens. A mesma peça
-acompanha o cabeçalho da conversa quando existe. Jack/Notificações, marca verificada
-e avatares individuais ficam como estão; texto e indicadores existentes comunicam
-conteúdo e estado.
+Revisão pedida por Vinicios. Papel inicial: corretor Lite; mesmas associações visuais
+são reutilizadas nas áreas de equipe do gestor e supervisor. A ação continua sendo
+abrir o assistente ou módulo pela linha. Dez objetos 3D decorativos identificam Leads,
+Carteira, Plantão, Agenda, Cotação, Desempenho, Dicas, Jornada, Equipe e Mensagens;
+a arte correspondente acompanha o cabeçalho da conversa quando existe. Não há Jack,
+outros personagens, rostos ou símbolo de âncora repetido. Jack/Notificações, marca
+verificada e avatares individuais permanecem como estão; texto e indicadores atuais
+comunicam conteúdo e estado.
 
 Usa o provider e a flag global auditada existentes. A flag desligada e erro de imagem
 restauram as formas abstratas. Sem mudança de rota, hierarquia, ação, permissão, token,
 primitive ou movimento; UX-M1.10 permanece pendente. Registro e evidências:
-`docs/implementations/completed/2026-11-14-mascote-assets-contextuais.md`.
+`docs/implementations/active/2026-11-15-assets-visuais-por-rota.md`.
 
 ## 2026-11-13: conversa como foco, ícones e dados pelo olho
 
