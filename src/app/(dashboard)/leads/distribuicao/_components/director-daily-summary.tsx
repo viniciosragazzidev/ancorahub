@@ -34,8 +34,8 @@ const PERIOD_OPTIONS = [
   { value: "custom", label: "Escolher datas" },
 ];
 
-/** O capitão no convés, mão no leme, lançando envelopes com a âncora para três marujos (arte de 14/11/2026). */
-const DISTRIBUTION_ART: CaptainBannerArt = { src: "/mascote/distribuicao-capitao.webp", width: 800, height: 533 };
+/** O capitão no leme, ao lado do baú de envelopes, lançando um para o marujo (arte de 14/11/2026). */
+const DISTRIBUTION_ART: CaptainBannerArt = { src: "/mascote/distribuicao-capitao-bau.webp", width: 800, height: 539 };
 
 const STATUS_LABEL: Record<string, string> = { available: "Disponível", busy: "Em atendimento", break: "Pausa", paused: "Pausa" };
 

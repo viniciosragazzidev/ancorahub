@@ -48,10 +48,8 @@ describe("ChatHome", () => {
           { id: "return", title: "Retorno de demonstração", detail: "Retorno vencido", actionLabel: "Ver retorno", href: "/agenda" },
         ] } }} />);
     const opener = screen.getByRole("button", { name: "Abrir Agora: 2 pendências" });
-    // No computador o Agora fica no painel "Seu dia" (14/11/2026); na lista de conversas, nunca.
-    const center = screen.getByRole("region", { name: "Seu dia" });
-    expect(within(center).getByText(longName)).toBeTruthy();
-    expect(screen.getAllByText(longName)).toHaveLength(1);
+    expect(screen.queryByText(longName)).toBeNull();
+    expect(screen.queryByRole("link", { name: "Responder" })).toBeNull();
     opener.focus();
     fireEvent.click(opener);
     const dialog = screen.getByRole("dialog", { name: "Agora" });

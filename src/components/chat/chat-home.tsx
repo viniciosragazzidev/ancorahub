@@ -401,8 +401,8 @@ export function ChatHome({
                 ? `${waitingAssistants.map((thread) => thread.name).join(", ")} ${waitingAssistants.length === 1 ? "tem algo" : "têm algo"} para você. Escolha uma conversa à esquerda.`
                 : "Tudo em dia. Escolha uma conversa à esquerda para começar."}
           </p>}
-          {/* No computador o Agora fica no painel quando há pendência (14/11/2026); o botão flutuante é só do celular. */}
-          {summary?.now && (!floatingNow || hasNowItems) ? <NowSection data={summary.now} /> : null}
+          {/* Sem o bloco Agora no topo do computador (pedido 14/11/2026): as pendências ficam na aba Leads da lista ao lado. */}
+          {summary?.now && !floatingNow ? <NowSection data={summary.now} /> : null}
           {showNext && next?.acceptLeadId ? (
             <AcceptLeadButton leadId={next.acceptLeadId} className={styles.pill} style={{ marginTop: 6 }} offerPending>{next.label}</AcceptLeadButton>
           ) : showNext && next ? (
