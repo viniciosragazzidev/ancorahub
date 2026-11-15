@@ -219,6 +219,20 @@ describe("POST /api/conversations/incremental", () => {
     expect((mocks.database as { select: ReturnType<typeof vi.fn> }).select).not.toHaveBeenCalled();
   });
 
+  it("keeps the milliseconds of sent_at in the response (cursor is in ms)", async () => {
+    const sentAt = new Date(Date.now() - 10_000);
+    sentAt.setMilliseconds(123);
+    mocks.selectRows = [[lead], [changed({ sentAt })], []];
+    mocks.executeRows = [[summary({ sent_at: sentAt })]];
+
+    const response = await POST(request({}));
+    const payload = await response.json() as { updates: Array<{ latestMessage?: { sentAt: string } }> };
+
+    expect(response.status).toBe(200);
+    expect(payload.updates[0]?.latestMessage?.sentAt).toBe(sentAt.toISOString());
+    expect(payload.updates[0]?.latestMessage?.sentAt).toMatch(/.123Z$/);
+  });
+
   it("returns one truncated latest preview and aggregate cursor increments, plus AI status columns", async () => {
     mocks.selectRows = [[lead], [changed()], [{ id: "ai-1", leadId: "lead-1", status: "HUMAN_ACTIVE", assignedUserId: "broker-1" }]];
     mocks.executeRows = [[summary({ body: "x".repeat(120) })]];
