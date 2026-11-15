@@ -140,7 +140,7 @@ function ShiftDetails({ shift }: { shift: DutyHubShift }) {
           {/* Confirmação em aberto (15/11/2026): o botão já confirma a presença aqui; abrir o plantão vira um link. */}
           {shift.ask && shift.ask.status !== "confirmed" ? (
             <>
-              <PresenceCallout ask={shift.ask} variant="inline" />
+              <PresenceCallout ask={shift.ask} variant="inline" doneAction={shift.href ? <Link href={shift.href} className={hub.cta}>Abrir plantão</Link> : null} />
               {shift.href ? <Link href={shift.href} className={hub.secondaryLink}>Ver o plantão</Link> : null}
             </>
           ) : shift.href ? (

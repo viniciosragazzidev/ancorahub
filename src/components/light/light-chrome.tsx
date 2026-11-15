@@ -1,5 +1,6 @@
 "use client";
 
+import { AchievementHost } from "@/components/lite/celebration/achievement-host";
 import { CHAT_RAIL_REFRESH_EVENT } from "@/components/chat/chat-events";
 import { TipHost } from "@/components/chat/tip-host";
 import Link from "next/link";
@@ -162,6 +163,8 @@ export function LightChrome({
       {/* Never while viewing as someone: it would show and mark seen the broker's own celebrations. */}
       {journeyEnabled && audience === "broker" && !viewAs.viewingAs ? <CelebrationHost /> : null}
       {audience === "broker" ? <TipHost /> : null}
+      {/* Conquistas do corretor (15/11/2026): presença confirmada e WhatsApp conectado, na tela do capitão. */}
+      {audience === "broker" && !viewAs.viewingAs ? <AchievementHost /> : null}
       {audience === "broker" ? <Suspense fallback={null}><LiteMicroTour pathname={pathname} /></Suspense> : null}
     </LightAvailabilityProvider>
   );
