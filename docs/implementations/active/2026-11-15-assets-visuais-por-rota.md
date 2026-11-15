@@ -1,6 +1,6 @@
 # Assets visuais sem mascote por rota
 
-**Status:** dez artes e comportamento PWA publicados em `codex/mascote-assets`; redução de 20% dos avatares de rota implementada e validada no branch `codex/assistant-avatar-scale`; build e sincronização final do preview em andamento.
+**Status:** dez artes por área, entrada do PWA no dashboard e avatares de rota 20% menores integrados sobre o topo remoto atual. Build de produção, type-check, lint direcionado, documentação e testes focados passaram. A confirmação visual no preview 3005 está pendente porque a porta não respondeu a HTTP.
 **Prioridade:** P1 atual, substitui temporariamente ERP geral conforme foco semanal.
 
 ## Objetivo e contexto
@@ -60,8 +60,10 @@ Ferramenta: `image_gen` integrado, uma geração por asset; a imagem de Leads pr
 - Revisão em miniatura: `design/assistant-areas/visao-geral.png`; tamanho do avatar (44 px): `design/assistant-areas/visao-geral-44px.png`; contraste escuro: `design/assistant-areas/visao-geral-44px-escuro.png`.
 - Sharp confirmou os dez arquivos em WebP com alpha real, 160 × 160 px; total de 60.170 bytes. Nenhum caminho antigo de asset permanece no código runtime.
 - ESLint de `src/components/chat/assistant-avatar.tsx`, `git diff --check` e `npm run agent:docs` passaram (23 referências). Os testes existentes foram ajustados para `/assistant-areas/`.
-- Após sincronizar a branch, conferir HTTP 200 para `/` e para os dez assets no preview 3005 e registrar a resposta aqui.
+- Preview `3005`: após alinhar o checkout do servidor ao commit `2224ac07`, `GET /` expirou em 5 segundos; a validação de HTTP 200 para a página e os dez assets fica pendente. O servidor não foi reiniciado.
 - A conferência visual da redução de 20% fica limitada às linhas de Assistentes; o slot e o clique continuam com a dimensão anterior.
 - O teste focado `src/components/chat/thread-row.test.tsx` passou (3/3); ESLint direcionado, `agent:docs` e `type-check` também passaram.
+- Na integração preparada sobre `origin/feat/diretor-visual-lite` (ponta `6f3f8088`), `npm run type-check` passou; ESLint direcionado passou; `npm run agent:docs` validou 23 referências; Vitest focado passou em 5 arquivos (43 testes).
+- `npm run build` passou na árvore runtime correspondente do preview `2224ac07`, com `SKIP_BUILD_TYPECHECK=1` e `NEXT_BUILD_FS_CACHE=1` (parâmetros do harness de build): compilação concluída e 170 páginas estáticas geradas.
 - A suíte completa falha em `src/features/custom-roles/action-areas.test.ts`, que aponta seis arquivos de ação sem mapeamento. A falha é alheia à renderização de avatares.
 - O `npm run lint` geral para no scanner de encoding por mojibake preexistente em quatro arquivos fora do escopo; ESLint direcionado dos arquivos alterados passou.

@@ -1,6 +1,6 @@
 # Inicialização do PWA no dashboard
 
-**Status:** implementação, build e envio da branch concluídos; validação de abertura em PWA/dispositivo pendente porque o preview 3005 não responde.
+**Status:** comportamento integrado sobre a ponta remota atual e build validado; a abertura real em PWA/dispositivo segue pendente porque o preview 3005 não responde a HTTP.
 **Prioridade:** solicitação explícita do Vinicios antes do envio da branch de assets.
 
 ## Comportamento acordado
