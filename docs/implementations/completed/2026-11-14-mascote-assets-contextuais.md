@@ -1,6 +1,6 @@
 # Avatares contextuais do Capitão Âncora
 
-**Status:** assets e integração publicados em `preview/3005`; a correção complementar do erro de compilação da tela Jornada está em validação e será sincronizada com o preview.
+**Status:** assets e integração publicados em `preview/3005`; a declaração duplicada que causava erro de compilação foi removida e o preview voltou a servir a tela inicial.
 **Pedido e prioridade:** Vinicios, 2026-11-14. Promovido a P1 após autorização explícita nesta conversa.
 
 ## Objetivo
@@ -72,4 +72,4 @@ Jack/Notificações mantém o asset `jack-capitao.webp`. Leads individuais conti
 
 - Causa identificada para HTTP 500 na rota inicial: a tela Jornada declarava duas funções `JourneyBanner`; a versão compartilhada mais recente usa `CaptainBanner` e foi preservada. Removida somente a implementação inline antiga, sem uso.
 - ESLint direto em `src/features/journey/components/journey-screen.tsx` e `git diff --check` passaram antes da sincronização. A declaração restante foi conferida no arquivo. `agent:verify --level fast` validou docs (23 referências), mas o type-check ultrapassou 3,7 GB e foi interrompido para priorizar a recuperação do preview lento.
-- A confirmação final de recuperação depende da reinicialização autorizada do processo da porta 3005 e da resposta HTTP após a atualização do preview.
+- O processo da porta 3005 foi reiniciado após a sincronização do merge `963d865c`. O Turbopack iniciou, mas ficou compilando `/` sem resposta e chegou a 6,9 GB; a documentação local do Next confirma `--webpack` como modo suportado. Reiniciado em Webpack, o preview ficou `Ready` em 1,6 s, `GET /` respondeu 200 em 1,45 s após a compilação inicial e `GET /mascote/areas/agenda.webp` respondeu 200 (10.338 bytes, 0,15 s).
