@@ -15,6 +15,7 @@ import { getBrokerFinanceSummary } from "@/features/erp/broker-finance";
 import { isBrokerQuickSaleEnabled } from "@/features/broker-workspace/quick-sale-flag";
 import { BrokerFinanceSummaryCard } from "@/features/erp/components/broker-finance-summary-card";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
+import { getLiveHomeAnnouncement } from "@/features/home-announcement/service";
 
 const TIME_ZONE = "America/Sao_Paulo";
 const time = (date: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
@@ -110,7 +111,7 @@ export async function ChatHomeContent() {
   // same tenant and user, both come from the authenticated context).
   const context = await getRequiredTenantContext().catch(() => null);
   if (!context) return <LightDashboardUnavailable />;
-  const [rail, data, highlights, journey, firstSteps, floatingNow, journeyFlag, homeActionsFlag, financeSummary, quickSaleEnabled] = await Promise.all([
+  const [rail, data, highlights, journey, firstSteps, floatingNow, journeyFlag, homeActionsFlag, financeSummary, quickSaleEnabled, announcement] = await Promise.all([
     getChatRailData(),
     getCachedBrokerWorkspaceData().catch(() => null),
     getBrokerHighlights(context.tenantId, context.userId).catch(() => null),
@@ -122,6 +123,8 @@ export async function ChatHomeContent() {
     // Meu mês: null sem o módulo financeiro liberado, sem permissão ou com a chave desligada.
     context.role === "broker" ? getBrokerFinanceSummary(context).catch(() => null) : Promise.resolve(null),
     context.role === "broker" ? isBrokerQuickSaleEnabled().catch(() => false) : Promise.resolve(false),
+    // Aviso da diretoria (Relacionamento > Aviso do Início): vale para todo corretor da empresa.
+    getLiveHomeAnnouncement(context.tenantId).catch(() => null),
   ]);
   if (!rail || !data) return <LightDashboardUnavailable />;
   return (
@@ -140,6 +143,7 @@ export async function ChatHomeContent() {
       presenceAsks={presenceAsksOf(data)}
       firstSteps={firstSteps}
       highlights={highlightsOf(highlights, journey, journeyFlag === "true")}
+      announcement={announcement}
     />
   );
 }

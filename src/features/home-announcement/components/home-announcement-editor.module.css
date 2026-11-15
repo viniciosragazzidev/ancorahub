@@ -1,0 +1,91 @@
+/* Editor do aviso do Início (15/11/2026). Só tokens; as amostras de cor repetem as três cores do próprio banner. */
+
+.status {
+  display: inline-flex;
+  flex: none;
+  justify-self: start;
+  width: fit-content;
+  margin-top: 8px;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.statusDot { width: 8px; height: 8px; border-radius: 9999px; background: var(--text-muted); }
+.status[data-live] { color: var(--success); }
+.status[data-live] .statusDot { background: var(--success); }
+
+.preview {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 24px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--surface-muted);
+}
+.previewLabel { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); font-weight: 500; }
+/* O capitão sai uns 60px pelo topo do card. */
+.previewBanner.previewBanner { margin-top: 40px; }
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.toggle input { width: 18px; height: 18px; margin: 0; accent-color: var(--primary); }
+
+.group { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
+
+.arts { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.art {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  text-align: center;
+  cursor: pointer;
+  transition: box-shadow 160ms ease, background-color 160ms ease;
+}
+.art:hover { background: var(--surface-muted); }
+.art img { width: auto; height: 72px; object-fit: contain; pointer-events: none; }
+.art[data-selected] { box-shadow: inset 0 0 0 2px var(--chat-action); color: var(--foreground); }
+.art:has(input:focus-visible), .tone:has(input:focus-visible) { outline: 2px solid var(--chat-action); outline-offset: 2px; }
+
+.tones { display: flex; flex-wrap: wrap; gap: 8px; }
+.tone {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px 0 8px;
+  border-radius: 9999px;
+  box-shadow: inset 0 0 0 1px var(--border);
+  background: var(--surface);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.tone[data-selected] { box-shadow: inset 0 0 0 2px var(--chat-action); }
+.swatch { width: 28px; height: 28px; border-radius: 9999px; box-shadow: inset 0 0 0 1px var(--border); }
+.swatch[data-tone="navy"] { background: #002b73; }
+.swatch[data-tone="light"] { background: oklch(95% 0.03 240); }
+.swatch[data-tone="white"] { background: var(--surface); }
+
+.error { flex-basis: 100%; margin: 0; color: var(--danger); font-size: var(--text-sm); }
+
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Campos lado a lado alinhados pelo topo (o campo com dica não empurra o vizinho). */
+.alignTop > * { align-content: start; }

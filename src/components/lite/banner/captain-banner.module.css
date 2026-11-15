@@ -245,3 +245,17 @@
   .banner[data-tone="white"][data-pose="rise"] { grid-template-columns: minmax(0, 1fr) 140px; }
   .banner[data-tone="white"][data-pose="rise"] .art { width: 196px; margin: -56px -30px -20px -18px; }
 }
+
+/* Subtítulo e fatos nos tons claros (aviso do Início, 15/11/2026): texto azul-marinho, não branco. */
+.banner[data-tone="light"] .subtitle,
+.banner[data-tone="white"] .subtitle { color: oklch(30% 0.12 262 / 0.78); }
+.banner[data-tone="light"] .subtitle strong,
+.banner[data-tone="white"] .subtitle strong { color: var(--banner-blue); }
+.banner[data-tone="light"] .facts,
+.banner[data-tone="white"] .facts { border-top-color: oklch(30% 0.12 262 / 0.14); }
+.banner[data-tone="light"] .fact,
+.banner[data-tone="white"] .fact { border-left-color: oklch(30% 0.12 262 / 0.14); }
+.banner[data-tone="light"] .fact span,
+.banner[data-tone="white"] .fact span { color: oklch(30% 0.12 262 / 0.66); }
+.banner[data-tone="light"] .fact strong,
+.banner[data-tone="white"] .fact strong { color: var(--banner-blue); }

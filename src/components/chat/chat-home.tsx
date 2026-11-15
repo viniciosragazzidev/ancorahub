@@ -40,7 +40,8 @@ import type { WhatsAppActivitySummary } from "@/features/dashboard/whatsapp-acti
 import { WhatsAppActivityCard } from "@/features/dashboard/components/whatsapp-activity-card";
 import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
 import { BrokerHomeOverview } from "./broker-home-overview";
-import { HomeBanner, HomeWelcomeBanner } from "./home-banner";
+import { AnnouncementBanner, HomeBanner, HomeWelcomeBanner } from "./home-banner";
+import type { HomeAnnouncementView } from "@/features/home-announcement/announcement";
 import { HomeQuickActions, homeQuickActions } from "./home-quick-actions";
 import { QuickRegisterSaleSheet } from "@/features/broker-workspace/components/quick-register-sale";
 import { RisePulse, useRisePulseKey } from "@/components/light/rise-pulse";
@@ -198,6 +199,7 @@ export function ChatHome({
   homeActions = false,
   financeCard = null,
   quickSaleEnabled = false,
+  announcement = null,
 }: {
   viewerName: string;
   assistants: ThreadSummary[];
@@ -226,6 +228,8 @@ export function ChatHome({
   financeCard?: ReactNode;
   /** Registrar venda em dois toques (BROKER_QUICK_SALE): escolher o lead e abrir o registro dele. */
   quickSaleEnabled?: boolean;
+  /** Aviso da diretoria no ar: ocupa o banner do capitão no lugar do padrão. */
+  announcement?: HomeAnnouncementView | null;
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const reduce = useReducedMotion();
@@ -339,7 +343,7 @@ export function ChatHome({
       {/* Organizado: Sua semana desce para o fim, depois do trabalho. */}
       {mode === "page" && !redesigned && highlights && organized ? <WeekRanking data={highlights} className={home.weekAtEnd} /> : null}
       {/* Banner do fim (14/11/2026): no celular fecha a lista; no computador fica no fim do centro. */}
-      {mode === "page" && !redesigned && !isSupervisor && !isManager ? <HomeBanner highlights={highlights} className={home.bannerMobile} /> : null}
+      {mode === "page" && !redesigned && !isSupervisor && !isManager ? <HomeBanner highlights={highlights} announcement={announcement} className={home.bannerMobile} /> : null}
     </aside>
   );
 
@@ -382,7 +386,7 @@ export function ChatHome({
       <BrokerHomeOverview viewerName={viewerName} nowIso={nowIso} summary={summary} nextLead={nextLead} rail={aside} conversations={list} presenceAsks={currentPresenceAsks}
         onSearch={() => { setQuery(""); setSearching(true); requestAnimationFrame(() => searchRef.current?.focus()); }} onNew={() => setNewOpen(true)}
         learning={firstSteps || highlights ? <>{firstSteps ? <FirstStepsCard steps={firstSteps} /> : null}{highlights ? <WeekRanking data={highlights} /> : null}</> : null}
-        banner={<HomeBanner highlights={highlights} />} />
+        banner={<HomeBanner highlights={highlights} announcement={announcement} />} />
       {!hasPriority ? <><LiteWelcome variant="broker" /><LiteTour variant="broker" /></> : null}
       {sheet}
     </div>;
@@ -412,7 +416,12 @@ export function ChatHome({
             </div>
           ) : null}
           {/* Corretor (15/11/2026): o próximo passo e os fatos do dia entram no banner; supervisor e gestor seguem com título e frase. */}
-          {!isSupervisor && !isManager ? (
+          {!isSupervisor && !isManager && announcement ? (
+            <>
+              <AnnouncementBanner announcement={announcement} className={`${home.welcomeBanner} ${home.announcementBanner}`} />
+              <p className={home.centerSubtitle}>{centerSubtitle}</p>
+            </>
+          ) : !isSupervisor && !isManager ? (
             <HomeWelcomeBanner className={home.welcomeBanner} greeting={greeting(now)} firstName={firstName} highlights={highlights}
               subtitle={centerSubtitle} duty={summary?.duty ?? null} goal={summary?.goal ?? null}
               nextAction={showNext && next ? { label: next.label, href: next.href } : !summary?.now && nextLead ? { label: `Atender ${nextLead.name.split(" ")[0]}`, href: nextLead.href } : null}

@@ -25,7 +25,8 @@ export function CaptainBanner({ label, title, subtitle, facts, goal, progress, a
   goal?: { value: ReactNode; hint?: ReactNode };
   /** 0 a 100: barra dourada sob o selo. */
   progress?: number | null;
-  action: { label: string; href: string };
+  /** Sem ação e sem actionSlot o banner fica sem botão (aviso do Início sem link). */
+  action?: { label: string; href: string };
   /** Troca o link do botão por outro controle com o mesmo desenho (Início: o aceite da oferta). */
   actionSlot?: (className: string) => ReactNode;
   art?: CaptainBannerArt;
@@ -72,7 +73,7 @@ export function CaptainBanner({ label, title, subtitle, facts, goal, progress, a
           ) : null}
         </div>
       ) : null}
-      {actionSlot ? actionSlot(styles.action) : <Link className={styles.action} href={action.href}>{action.label}</Link>}
+      {actionSlot ? actionSlot(styles.action) : action ? <Link className={styles.action} href={action.href} target={action.href.startsWith("http") ? "_blank" : undefined} rel={action.href.startsWith("http") ? "noreferrer" : undefined}>{action.label}</Link> : null}
       {/* eslint-disable-next-line @next/next/no-img-element -- arte local do mascote */}
       <img className={styles.art} src={art.src} width={art.width} height={art.height} alt="" aria-hidden="true" draggable={false} />
     </section>
