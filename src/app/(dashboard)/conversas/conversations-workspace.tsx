@@ -119,6 +119,8 @@ import { MediaAttachButton } from "@/features/conversations/components/media-att
 import { mediaPlaceholderLabel } from "@/features/conversations/media-kinds";
 import { OPEN_THREAD_MESSAGE_LIMIT } from "@/features/conversations/message-window";
 import {
+  conversationDeltaResponseAction,
+  handleConversationRealtimeSignal,
   mergeConversationIncrementalUpdates,
   shouldRefreshAfterConversationNetworkError,
   shouldRefreshConversationServer,
@@ -209,8 +211,6 @@ type ViewFilter = "all" | "qualified" | "closing" | "converted" | "ai_active" | 
 
 // Signals are coalesced before asking the incremental endpoint; no signal refreshes the full page.
 const CONVERSATIONS_REFRESH_TIMING: VisibleRefreshTiming = { coalesceMs: 3_000, maxWaitMs: 10_000, minGapMs: 20_000 };
-const isConversationInvalidation = (detail: RealtimeSyncBrowserDetail | undefined) =>
-  detail?.kind === "domain.invalidated" && detail.domain === "conversations";
 
 export function ConversationsWorkspace({
   role,
@@ -333,10 +333,21 @@ export function ConversationsWorkspace({
           nextCursor?: { sentAt: string; id: string };
           updates?: ConversationIncrementalPatch<ConversationMessage>[];
         } | null;
-        if (!response.ok || payload?.requiresFullRefresh || !payload?.nextCursor || !Array.isArray(payload.updates)) {
+        const responseAction = conversationDeltaResponseAction({
+          status: response.status,
+          ok: response.ok,
+          validPayload: Boolean(payload?.nextCursor && Array.isArray(payload.updates)),
+          requiresFullRefresh: Boolean(payload?.requiresFullRefresh),
+        });
+        if (responseAction === "full_refresh") {
           fullRefresh();
           return;
         }
+        if (responseAction === "throttled_refresh") {
+          refreshAfterNetworkError();
+          return;
+        }
+        if (!payload?.nextCursor || !Array.isArray(payload.updates)) return;
         cursorRef.current = payload.nextCursor;
         const merged = mergeConversationIncrementalUpdates(
           conversationsRef.current,
@@ -374,10 +385,13 @@ export function ConversationsWorkspace({
       );
     };
     const onSignal = (event: Event) => {
-      if (isConversationInvalidation((event as CustomEvent<RealtimeSyncBrowserDetail>).detail)) {
-        lastConversationSignalAt = Date.now();
-        schedule();
-      }
+      handleConversationRealtimeSignal(
+        (event as CustomEvent<RealtimeSyncBrowserDetail>).detail,
+        () => {
+          lastConversationSignalAt = Date.now();
+          schedule();
+        },
+      );
     };
     const onVisibility = () => {
       if (document.visibilityState !== "visible") {

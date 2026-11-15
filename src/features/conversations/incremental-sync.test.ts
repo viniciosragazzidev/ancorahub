@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { shouldScheduleShellRefresh } from "@/components/providers/realtime-sync-provider";
 
 import {
+  conversationDeltaResponseAction,
+  handleConversationRealtimeSignal,
   isValidConversationCursor,
   mergeConversationIncrementalUpdates,
   parseSyntheticConversationPhone,
@@ -189,6 +192,32 @@ describe("conversation incremental merge", () => {
     expect(shouldRefreshAfterConversationNetworkError(null, 10_000)).toBe(true);
     expect(shouldRefreshAfterConversationNetworkError(10_000, 69_999)).toBe(false);
     expect(shouldRefreshAfterConversationNetworkError(10_000, 70_000)).toBe(true);
+  });
+
+  it("throttles non-OK and invalid JSON responses but leaves a 409 full-refresh request unthrottled", () => {
+    expect(conversationDeltaResponseAction({ status: 503, ok: false, validPayload: false, requiresFullRefresh: false }))
+      .toBe("throttled_refresh");
+    expect(conversationDeltaResponseAction({ status: 200, ok: true, validPayload: false, requiresFullRefresh: false }))
+      .toBe("throttled_refresh");
+    expect(conversationDeltaResponseAction({ status: 409, ok: false, validPayload: true, requiresFullRefresh: true }))
+      .toBe("full_refresh");
+  });
+
+  it("routes conversation signals to incremental sync only", () => {
+    const incrementalRoute = vi.fn();
+    const routerRefresh = vi.fn();
+    const signal = { kind: "domain.invalidated", domain: "conversations" } as const;
+    if (shouldScheduleShellRefresh(signal, "/conversas")) routerRefresh();
+    const handled = handleConversationRealtimeSignal(signal, incrementalRoute);
+
+    expect(handled).toBe(true);
+    expect(incrementalRoute).toHaveBeenCalledOnce();
+    expect(incrementalRoute).toHaveBeenCalledWith();
+    expect(routerRefresh).not.toHaveBeenCalled();
+    expect(handleConversationRealtimeSignal(
+      { kind: "domain.invalidated", domain: "leads" },
+      incrementalRoute,
+    )).toBe(false);
   });
 
   it("accepts a full phone only from a well-formed synthetic conversation id", () => {

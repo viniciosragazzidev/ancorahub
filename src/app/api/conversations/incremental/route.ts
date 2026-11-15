@@ -421,7 +421,7 @@ export async function POST(request: NextRequest) {
     }));
 
     const mappedThreadMessages = threadMessages
-      .sort((left, right) => new Date(String(left.sentAt)).getTime() - new Date(String(right.sentAt)).getTime())
+      .sort((left, right) => (left.sentAt as Date).getTime() - (right.sentAt as Date).getTime())
       .map((row) => {
         const id = String(row.id);
         const mediaKind = typeof row.mediaKind === "string" ? row.mediaKind : null;
@@ -458,7 +458,7 @@ export async function POST(request: NextRequest) {
       });
 
     const compareLatestFirst = (left: Record<string, unknown>, right: Record<string, unknown>) =>
-      new Date(String(right.sent_at)).getTime() - new Date(String(left.sent_at)).getTime()
+      (right.sent_at as Date).getTime() - (left.sent_at as Date).getTime()
       || String(right.id).localeCompare(String(left.id));
     const leadUpdates = visibleLeadRows.filter((lead) => affectedIds.has(lead.id) || aiChangedLeadIds.has(lead.id)).flatMap((lead) => {
       const matching = summaryRows.filter((row) =>
