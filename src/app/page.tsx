@@ -21,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
+const PWA_DISPLAY_MODES = ["standalone", "window-controls-overlay"] as const;
+
 // ─── Section Wrapper ────────────────────────────────────────────────────────
 
 function Section({
@@ -699,6 +701,16 @@ function Footer() {
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
+  useEffect(() => {
+    const hasPwaDisplayMode = typeof window.matchMedia === "function" &&
+      PWA_DISPLAY_MODES.some((mode) => window.matchMedia(`(display-mode: ${mode})`).matches);
+    const isIosHomeScreenApp = Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+
+    if (hasPwaDisplayMode || isIosHomeScreenApp) {
+      window.location.replace("/dashboard");
+    }
+  }, []);
+
   return (
     <div className="h-dvh overflow-y-auto overscroll-contain">
       <Nav />
