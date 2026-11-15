@@ -1,6 +1,6 @@
 # Assets visuais sem mascote por rota
 
-**Status:** dez artes geradas, integradas no worktree e registradas; sincronização e conferência HTTP do preview pendentes.
+**Status:** dez artes e comportamento PWA publicados em `codex/mascote-assets`; redução de 20% dos avatares de rota implementada e validada no branch `codex/assistant-avatar-scale`; build e sincronização final do preview em andamento.
 **Prioridade:** P1 atual, substitui temporariamente ERP geral conforme foco semanal.
 
 ## Objetivo e contexto
@@ -29,6 +29,10 @@ Trocar as artes repetitivas do Capitão/ajudante que hoje aparecem como avatares
 - Atualizar os contratos de design e o registro de implementação, preservando o controle `feature_ui_contextual_illustrations`, dimensões, alt vazio e fallback abstrato.
 - Não alterar Jack/Notificações, marca verificada, avatares pessoais, estados, links, layout, permissões, tokens, regras de negócio ou dependências.
 
+## Ajuste de escala da lista lateral
+
+O avatar das áreas com `avatarAsset` é exibido a 35 × 35 px (aprox. 20% menor que os 44 px anteriores), centralizado no slot de 44 × 44 px já reservado pela linha. Assim o ícone fica mais leve sem reduzir o alvo da linha nem alterar Jack/Notificações, iniciais de leads ou avatares pessoais. Com a flag visual desligada, a forma abstrata de fallback também respeita os 35 px.
+
 ## Verificação visual
 
 As pranchas de 44 px foram revisadas em fundo claro e escuro. Cada rota tem objeto principal distinto, sem personagem e com leitura clara no tamanho de avatar. As fichas de Carteira foram simplificadas para não repetir os símbolos abstratos de pessoas usados por Equipe.
@@ -55,5 +59,9 @@ Ferramenta: `image_gen` integrado, uma geração por asset; a imagem de Leads pr
 - Os dez originais têm 1254 × 1254 px; as saídas finais em `public/assistant-areas/` são WebP de 160 × 160 px, com alpha verdadeiro, entre 5.3 e 7.7 KB cada.
 - Revisão em miniatura: `design/assistant-areas/visao-geral.png`; tamanho do avatar (44 px): `design/assistant-areas/visao-geral-44px.png`; contraste escuro: `design/assistant-areas/visao-geral-44px-escuro.png`.
 - Sharp confirmou os dez arquivos em WebP com alpha real, 160 × 160 px; total de 60.170 bytes. Nenhum caminho antigo de asset permanece no código runtime.
-- ESLint de `src/components/chat/assistant-avatar.tsx`, `git diff --check` e `npm run agent:docs` passaram (23 referências). Os testes existentes foram ajustados para `/assistant-areas/`; a suíte de testes não foi executada nesta solicitação.
+- ESLint de `src/components/chat/assistant-avatar.tsx`, `git diff --check` e `npm run agent:docs` passaram (23 referências). Os testes existentes foram ajustados para `/assistant-areas/`.
 - Após sincronizar a branch, conferir HTTP 200 para `/` e para os dez assets no preview 3005 e registrar a resposta aqui.
+- A conferência visual da redução de 20% fica limitada às linhas de Assistentes; o slot e o clique continuam com a dimensão anterior.
+- O teste focado `src/components/chat/thread-row.test.tsx` passou (3/3); ESLint direcionado, `agent:docs` e `type-check` também passaram.
+- A suíte completa falha em `src/features/custom-roles/action-areas.test.ts`, que aponta seis arquivos de ação sem mapeamento. A falha é alheia à renderização de avatares.
+- O `npm run lint` geral para no scanner de encoding por mojibake preexistente em quatro arquivos fora do escopo; ESLint direcionado dos arquivos alterados passou.

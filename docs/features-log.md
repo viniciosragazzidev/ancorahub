@@ -2,6 +2,10 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 15/11/2026 - Ícones dos assistentes mais leves
+
+- Os objetos visuais das áreas na lista lateral passam de 44 px para 35 px, centralizados no slot de 44 px existente. A linha mantém sua área de toque; Jack, marca verificada, iniciais e avatares pessoais não mudam.
+
 ## 15/11/2026 - PWA abre direto no dashboard
 
 - O manifesto do PWA passa a iniciar em `/dashboard`. Se uma instalação existente ainda abrir a raiz, a landing detecta `standalone`, `window-controls-overlay` ou o modo de tela inicial do iOS e redireciona ao dashboard. No navegador comum, `/` continua exibindo a landing. O dashboard mantém sua autenticação e resolução de papel no servidor.
