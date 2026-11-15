@@ -3,12 +3,20 @@ export type ConversationIncrementalMessage = {
   sentAt: string;
 };
 export type IncrementalProviderFailure = { code: string; title: string; message: string } | null;
+export type ConversationAiStatusPatch = {
+  id: string;
+  status: string;
+  assignedUserId: string | null;
+} | null;
 
 export type ConversationIncrementalPatch<TMessage extends ConversationIncrementalMessage> = {
   id: string;
   latestMessage?: { body: string; direction: string; sentAt: string } | null;
-  messageCount?: number;
-  hasIncoming?: boolean;
+  /** Number of messages newer than the request cursor; the client adds it to its snapshot. */
+  messageCountDelta?: number;
+  /** True only when an incoming message arrived after the request cursor. */
+  hasIncomingDelta?: boolean;
+  aiConversationStatus?: ConversationAiStatusPatch;
   replyBlockedMessage?: string | null;
   messages?: TMessage[];
   messageStatuses?: Array<{
@@ -23,6 +31,12 @@ type ConversationWithIncrementalState<TMessage extends ConversationIncrementalMe
   latestMessage: { body: string; direction: string; sentAt: string } | null;
   messageCount?: number;
   hasIncoming?: boolean;
+  aiConversation?: {
+    id: string;
+    status: string;
+    assignedUserId: string | null;
+    [key: string]: unknown;
+  } | null;
   replyBlockedMessage?: string | null;
   messages: TMessage[];
 };
@@ -68,8 +82,23 @@ export function mergeConversationIncrementalUpdates<
     byId.set(update.id, {
       ...conversation,
       ...(update.latestMessage !== undefined ? { latestMessage: update.latestMessage } : {}),
-      ...(update.messageCount !== undefined ? { messageCount: update.messageCount } : {}),
-      ...(update.hasIncoming !== undefined ? { hasIncoming: update.hasIncoming } : {}),
+      ...(update.messageCountDelta !== undefined
+        ? { messageCount: (conversation.messageCount ?? conversation.messages.length) + update.messageCountDelta }
+        : {}),
+      ...(update.hasIncomingDelta ? { hasIncoming: true } : {}),
+      ...(update.aiConversationStatus !== undefined
+        ? {
+            aiConversation: update.aiConversationStatus
+              ? {
+                  ...conversation.aiConversation,
+                  ...update.aiConversationStatus,
+                  aiModel: conversation.aiConversation?.aiModel ?? null,
+                  transferReason: conversation.aiConversation?.transferReason ?? null,
+                  qualificationSummary: conversation.aiConversation?.qualificationSummary ?? null,
+                }
+              : null,
+          }
+        : {}),
       ...(update.replyBlockedMessage !== undefined ? { replyBlockedMessage: update.replyBlockedMessage } : {}),
       messages: mergedMessages,
     });
@@ -82,6 +111,22 @@ export function mergeConversationIncrementalUpdates<
   });
 
   return { conversations, missingIds };
+}
+
+export const CONVERSATION_OFFLINE_REFRESH_AFTER_MS = 2 * 60_000;
+export const CONVERSATION_STALE_REFRESH_AFTER_MS = 10 * 60_000;
+
+/** Offline pages reconcile on a short interval; a healthy but silent socket gets a long safety refresh. */
+export function shouldRefreshConversationServer(input: {
+  realtimeLive: boolean;
+  lastFullRefreshAt: number;
+  lastSignalAt: number;
+  now: number;
+}) {
+  if (!input.realtimeLive) {
+    return input.now - input.lastFullRefreshAt >= CONVERSATION_OFFLINE_REFRESH_AFTER_MS;
+  }
+  return input.now - Math.max(input.lastSignalAt, input.lastFullRefreshAt) >= CONVERSATION_STALE_REFRESH_AFTER_MS;
 }
 
 export function isValidConversationCursor(value: unknown, now = Date.now()) {

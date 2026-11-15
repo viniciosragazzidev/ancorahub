@@ -137,14 +137,10 @@ export async function POST(request: NextRequest) {
       return withNoStore({ requiresFullRefresh: true, reason: "open_synthetic_conversation_scope_changed" }, 409);
     }
 
-    const phoneSuffixes = [...new Set(visibleLeadRows
-      .map((lead) => normalizePhone(lead.phone ?? "").slice(-8))
-      .filter((suffix) => suffix.length === 8))];
     const suffixColumn = sql`right(regexp_replace(coalesce(${message.phone}, ''), '[^0-9]', '', 'g'), 8)`;
-    const matchedVisibleLead = or(
-      visibleLeadIds.length ? inArray(message.leadId, visibleLeadIds) : undefined,
-      phoneSuffixes.length ? inArray(suffixColumn, phoneSuffixes) : undefined,
-    );
+    const matchedVisibleLead = visibleLeadRows.length
+      ? loadedLeadMessageScope({ message, leads: visibleLeadRows })
+      : undefined;
     const cursorAt = new Date(parsed.data.cursor.sentAt);
     const afterCursor = or(
       gt(message.sentAt, cursorAt),
@@ -189,10 +185,12 @@ export async function POST(request: NextRequest) {
     }
     const affectedIds = new Set<string>();
     for (const row of changedRows) {
-      if (row.leadId && leadById.has(row.leadId)) affectedIds.add(row.leadId);
       const suffix = normalizePhone(row.phone ?? "").slice(-8);
-      for (const lead of leadsByPhoneSuffix.get(suffix) ?? []) {
-        if (row.phone && lead.phone && samePhone(row.phone, lead.phone)) affectedIds.add(lead.id);
+      if (row.leadId && leadById.has(row.leadId)) affectedIds.add(row.leadId);
+      if (!row.leadId && row.phone) {
+        for (const lead of leadsByPhoneSuffix.get(suffix) ?? []) {
+          if (lead.phone && samePhone(row.phone, lead.phone)) affectedIds.add(lead.id);
+        }
       }
       if (!row.leadId && !row.clientId && row.phone) {
         for (const item of syntheticByPhoneSuffix.get(suffix) ?? []) {
@@ -202,20 +200,73 @@ export async function POST(request: NextRequest) {
     }
     const affectedLeads = visibleLeadRows.filter((lead) => affectedIds.has(lead.id));
     const affectedSynthetic = requestedSyntheticPhones.filter(({ id }) => affectedIds.has(id));
-    const affectedSuffixes = [...new Set(affectedLeads
-      .map((lead) => normalizePhone(lead.phone ?? "").slice(-8))
-      .filter((suffix) => suffix.length === 8))];
+    const affectedLeadScope = affectedLeads.length
+      ? loadedLeadMessageScope({ message, leads: affectedLeads })
+      : undefined;
+    const affectedSyntheticScope = affectedSynthetic.length
+      ? and(
+          isNull(message.leadId),
+          isNull(message.clientId),
+          inArray(suffixColumn, [...new Set(affectedSynthetic.map(({ phone }) => phone.slice(-8)))]),
+        )
+      : undefined;
+    const summaryFilter = or(affectedLeadScope, affectedSyntheticScope);
 
-    const summaryFilter = or(
-      affectedLeads.length ? inArray(message.leadId, affectedLeads.map((lead) => lead.id)) : undefined,
-      [...affectedSuffixes, ...affectedSynthetic.map(({ phone }) => phone.slice(-8))].length
-        ? inArray(suffixColumn, [...new Set([...affectedSuffixes, ...affectedSynthetic.map(({ phone }) => phone.slice(-8))])])
-        : undefined,
-    );
+    const statusLeadIds = [...new Set([
+      ...affectedLeads.map((lead) => lead.id),
+      ...(openLead ? [openLead.id] : []),
+    ])];
+    const aiConversationRows = statusLeadIds.length
+      ? await db.select({
+          id: schema.aiConversations.id,
+          leadId: schema.aiConversations.leadId,
+          status: schema.aiConversations.status,
+          assignedUserId: schema.aiConversations.assignedUserId,
+        })
+        .from(schema.aiConversations)
+        .where(and(
+          eq(schema.aiConversations.tenantId, context.tenantId),
+          inArray(schema.aiConversations.leadId, statusLeadIds),
+        ))
+        .orderBy(desc(schema.aiConversations.updatedAt), desc(schema.aiConversations.id))
+      : [];
+    const aiStatusByLeadId = new Map<string, { id: string; status: string; assignedUserId: string | null }>();
+    for (const row of aiConversationRows) {
+      if (row.leadId && !aiStatusByLeadId.has(row.leadId)) {
+        aiStatusByLeadId.set(row.leadId, {
+          id: row.id,
+          status: row.status,
+          assignedUserId: row.assignedUserId,
+        });
+      }
+    }
+
     const summaryRows = summaryFilter
       ? asRows(await db.execute(sql`
           with matching as (
             select
+              id,
+              lead_id,
+              client_id,
+              phone,
+              direction,
+              sent_at,
+              case
+                when lead_id is not null then 'lead:' || lead_id
+                else 'phone:' || right(regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g'), 8)
+              end as conversation_key
+            from whatsapp_messages
+            where ${and(eq(message.tenantId, context.tenantId), conversationMessageVisibilityFilter(context.tenantId), summaryFilter)}
+          ), delta_counts as (
+            select
+              conversation_key,
+              count(*) as message_count_delta,
+              bool_or(direction not in ('outgoing', 'outbound', 'transition')) as has_incoming_delta
+            from matching
+            where sent_at > ${cursorAt} or (sent_at = ${cursorAt} and id > ${parsed.data.cursor.id})
+            group by conversation_key
+          ), latest as (
+            select distinct on (conversation_key)
               id,
               lead_id,
               client_id,
@@ -228,18 +279,13 @@ export async function POST(request: NextRequest) {
                 else 'phone:' || right(regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g'), 8)
               end as conversation_key
             from whatsapp_messages
-            where ${and(conversationMessageVisibilityFilter(context.tenantId), summaryFilter)}
-          ), ranked as (
-            select
-              matching.*,
-              count(*) over (partition by conversation_key) as message_count,
-              bool_or(direction not in ('outgoing', 'outbound', 'transition')) over (partition by conversation_key) as has_incoming,
-              row_number() over (partition by conversation_key order by sent_at desc, id desc) as latest_rank
-            from matching
+            where ${and(eq(message.tenantId, context.tenantId), conversationMessageVisibilityFilter(context.tenantId), summaryFilter)}
+            order by conversation_key, sent_at desc, id desc
           )
-          select id, lead_id, client_id, phone, direction, body, sent_at, conversation_key, message_count, has_incoming
-          from ranked
-          where latest_rank = 1
+          select latest.*, coalesce(delta_counts.message_count_delta, 0) as message_count_delta,
+            coalesce(delta_counts.has_incoming_delta, false) as has_incoming_delta
+          from latest
+          left join delta_counts using (conversation_key)
         `))
       : [];
 
@@ -399,13 +445,15 @@ export async function POST(request: NextRequest) {
         };
       });
 
+    const compareLatestFirst = (left: Record<string, unknown>, right: Record<string, unknown>) =>
+      new Date(String(right.sent_at)).getTime() - new Date(String(left.sent_at)).getTime()
+      || String(right.id).localeCompare(String(left.id));
     const leadUpdates = affectedLeads.flatMap((lead) => {
       const matching = summaryRows.filter((row) =>
-        row.lead_id === lead.id || (lead.phone && typeof row.phone === "string" && samePhone(row.phone, lead.phone)),
+        row.lead_id === lead.id || (!row.lead_id && lead.phone && typeof row.phone === "string" && samePhone(row.phone, lead.phone)),
       );
       if (!matching.length) return [];
-      const latest = [...matching].sort((left, right) => new Date(String(right.sent_at)).getTime() - new Date(String(left.sent_at)).getTime())[0]!;
-      const count = matching.reduce((sum, row) => sum + Number(row.message_count ?? 0), 0);
+      const latest = [...matching].sort(compareLatestFirst)[0]!;
       return [{
         id: lead.id,
         latestMessage: {
@@ -413,8 +461,11 @@ export async function POST(request: NextRequest) {
           direction: String(latest.direction),
           sentAt: new Date(String(latest.sent_at)).toISOString(),
         },
-        messageCount: count,
-        hasIncoming: matching.some((row) => Boolean(row.has_incoming)),
+        messageCountDelta: matching.reduce((sum, row) => sum + Number(row.message_count_delta ?? 0), 0),
+        hasIncomingDelta: matching.some((row) => Boolean(row.has_incoming_delta)),
+        ...(statusLeadIds.includes(lead.id)
+          ? { aiConversationStatus: aiStatusByLeadId.get(lead.id) ?? null }
+          : {}),
         ...(lead.id === parsed.data.openConversationId
           ? { replyBlockedMessage: sourceChannelFailure(latestInboundChannelId)?.message ?? null }
           : {}),
@@ -435,7 +486,7 @@ export async function POST(request: NextRequest) {
         !row.lead_id && !row.client_id && typeof row.phone === "string" && samePhone(row.phone, phone),
       );
       if (!matching.length) return [];
-      const latest = [...matching].sort((left, right) => new Date(String(right.sent_at)).getTime() - new Date(String(left.sent_at)).getTime())[0]!;
+      const latest = [...matching].sort(compareLatestFirst)[0]!;
       return [{
         id,
         latestMessage: {
@@ -443,8 +494,8 @@ export async function POST(request: NextRequest) {
           direction: String(latest.direction),
           sentAt: new Date(String(latest.sent_at)).toISOString(),
         },
-        messageCount: matching.reduce((sum, row) => sum + Number(row.message_count ?? 0), 0),
-        hasIncoming: matching.some((row) => Boolean(row.has_incoming)),
+        messageCountDelta: matching.reduce((sum, row) => sum + Number(row.message_count_delta ?? 0), 0),
+        hasIncomingDelta: matching.some((row) => Boolean(row.has_incoming_delta)),
         ...(id === parsed.data.openConversationId
           ? { replyBlockedMessage: sourceChannelFailure(latestInboundChannelId)?.message ?? null }
           : {}),
@@ -464,6 +515,9 @@ export async function POST(request: NextRequest) {
     const openThreadStatusUpdate = openConversationId && !affectedIds.has(openConversationId) && (openLead || openSyntheticPhone)
       ? [{
           id: openConversationId,
+          ...(openLead && statusLeadIds.includes(openLead.id)
+            ? { aiConversationStatus: aiStatusByLeadId.get(openLead.id) ?? null }
+            : {}),
           replyBlockedMessage: sourceChannelFailure(latestInboundChannelId)?.message ?? null,
           messages: mappedThreadMessages,
           messageStatuses: threadStatuses.map(({ id, providerStatus, providerFailure }) => ({ id, providerStatus, providerFailure })),
