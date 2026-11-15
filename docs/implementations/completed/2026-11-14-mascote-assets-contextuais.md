@@ -1,6 +1,6 @@
 # Avatares contextuais do Capitão Âncora
 
-**Status:** assets e integração implementados no worktree; validações dirigidas passaram. Build e verificações globais registram dívida preexistente descrita abaixo; sem publicação.
+**Status:** assets e integração publicados em `preview/3005`; a correção complementar do erro de compilação da tela Jornada está em validação e será sincronizada com o preview.
 **Pedido e prioridade:** Vinicios, 2026-11-14. Promovido a P1 após autorização explícita nesta conversa.
 
 ## Objetivo
@@ -63,7 +63,13 @@ Jack/Notificações mantém o asset `jack-capitao.webp`. Leads individuais conti
 - Assets: 10/10 abrem em Sharp como WebP 160 × 160 com alfa verdadeiro; tamanhos de 7.9 a 12.1 KB. A prancha `design/mascote/areas/visao-geral.png` foi revisada em miniatura.
 - Testes dirigidos: `npm test -- src/components/chat/assistant-avatar.test.tsx src/features/broker-workspace/chat/assistant-scripts.test.ts src/components/illustrations/contextual-illustration.test.tsx src/features/supervisor-workspace/chat.test.ts` — 4 arquivos, 40 testes passaram.
 - ESLint direto nos 19 arquivos TS/TSX alterados passou. `git diff --check` passou. `npm run agent:docs` validou as 23 referências do harness.
-- `agent:verify --level full` registrou a evidência em `reports/agent/verification/2026-11-15T03-08-16.375Z.md`: docs, escopo, arquitetura, segurança e desempenho passaram; lint global foi bloqueado por 987 achados preexistentes de mojibake em `docs/business-rules.md`, `src/features/lead-distribution/monthly-duty-actions.ts`, `src/features/leads/management-actions.test.ts` e `src/features/reports/metrics/lead-quality-period.test.ts`. O type-check segue bloqueado por duas declarações duplicadas de `JourneyBanner` em `src/features/journey/components/journey-screen.tsx`, que não foi alterado. O harness parou antes de chamar a suíte completa e o build.
+- `agent:verify --level full` registrou a evidência em `reports/agent/verification/2026-11-15T03-08-16.375Z.md`: docs, escopo, arquitetura, segurança e desempenho passaram; lint global foi bloqueado por 987 achados preexistentes de mojibake em `docs/business-rules.md`, `src/features/lead-distribution/monthly-duty-actions.ts`, `src/features/leads/management-actions.test.ts` e `src/features/reports/metrics/lead-quality-period.test.ts`. Naquela execução, o type-check e o build foram bloqueados por duas declarações de `JourneyBanner` em `src/features/journey/components/journey-screen.tsx`; a suíte completa não foi chamada.
 - `npm run build -- --webpack` chegou à compilação e falhou no mesmo `JourneyBanner` duplicado em `journey-screen.tsx`; não houve erro atribuído a estes assets ou ao mapeamento. A tentativa padrão Turbopack também não opera neste worktree porque seu `node_modules` é um junction para a pasta de dependências compartilhada fora da raiz do projeto.
 - Commit de assets/código `8ab845ff`; merge na branch `preview/3005` em `68fd29e4`. A pasta do servidor foi destacada nesse merge. Na conferência de 15/11, o listener de `localhost:3005` estava ativo mas não respondeu às requisições HTTP (`HTTP 000`, timeout de 8 s); o servidor não foi parado nem reiniciado conforme a regra do projeto.
 - Sem QA autenticado ou avanço de UX-M1.10; mudança visual isolada, papéis, áreas e falha/off do controle cobertos pelos testes dirigidos. Nenhuma alteração de dados, migration, permissões ou dependência.
+
+## Recuperação do preview · 15/11/2026
+
+- Causa identificada para HTTP 500 na rota inicial: a tela Jornada declarava duas funções `JourneyBanner`; a versão compartilhada mais recente usa `CaptainBanner` e foi preservada. Removida somente a implementação inline antiga, sem uso.
+- ESLint direto em `src/features/journey/components/journey-screen.tsx` e `git diff --check` passaram antes da sincronização. A declaração restante foi conferida no arquivo. `agent:verify --level fast` validou docs (23 referências), mas o type-check ultrapassou 3,7 GB e foi interrompido para priorizar a recuperação do preview lento.
+- A confirmação final de recuperação depende da reinicialização autorizada do processo da porta 3005 e da resposta HTTP após a atualização do preview.
