@@ -31,6 +31,8 @@ import { fetchRoutingRules } from "@/features/lead-distribution/routing-engine";
 import { DirectorDailySummary } from "./_components/director-daily-summary";
 import { AssignSection } from "./_components/assign-section";
 import { DistributionTabIntro } from "./_components/distribution-tab-intro";
+import { LiveStatusBoundary } from "@/features/live-status/components/live-status-slot";
+import { shouldShowLiveStatusStrip } from "@/features/live-status/flag";
 import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-summary-service";
 import { DutyOperationsWorkspace } from "./plantao/_components/duty-operations-workspace";
 import { UnitQueueModeCard } from "./plantao/_components/unit-queue-mode-card";
@@ -51,8 +53,6 @@ import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag"
 import { canViewDistributionQueues } from "./_components/director-distribution-tabs";
 import { DirectorDistributionHealth } from "./_components/director-distribution-health";
 import directorDistributionStyles from "./_components/director-distribution-page.module.css";
-import { LiveStatusBoundary } from "@/features/live-status/components/live-status-slot";
-import { shouldShowLiveStatusStrip } from "@/features/live-status/flag";
 
 export const dynamic = "force-dynamic";
 
@@ -833,13 +833,12 @@ export default async function LeadDistributionPage({
 
   const directorLite = await isDirectorLitePageOnServer(context, "/leads/distribuicao");
   if (directorLite && ["resumo_dia", "roteamento", "filas", "plantao", "saude_historico"].includes(view)) {
-    const liveEnabled = view === "resumo_dia" && await shouldShowLiveStatusStrip(context);
-    const live = liveEnabled ? <LiveStatusBoundary context={context} enabled /> : null;
     return (
       <>
         <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" />
         <main className={directorDistributionStyles.page}>
-          {live}
+          {/* Agora na operação só em mini cards (14/11/2026): os cartões grandes saíram; frios ao lado do plantão. */}
+          {view === "resumo_dia" && await shouldShowLiveStatusStrip(context) ? <LiveStatusBoundary context={context} enabled compact /> : null}
           {view === "resumo_dia" ? (
             <section className={directorDistributionStyles.stack} aria-label="Resumo diário da distribuição">
               {assignSection}

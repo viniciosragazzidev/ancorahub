@@ -28,3 +28,23 @@ export function HomeBanner({ highlights, className }: { highlights: HomeHighligh
   return <CaptainBanner className={className} label="Meu desempenho" title="Bora fazer o dia de hoje valer? Seus números estão aqui."
     action={{ label: "Ver meu desempenho", href: "/desempenho" }} />;
 }
+
+/**
+ * Boas-vindas do Início no computador (14/11/2026): o banner abre a tela, no topo, no lugar do título solto. A frase
+ * cumprimenta pelo nome; o selo e o atalho levam à missão da semana, quando houver; sem missão, o atalho leva à fila.
+ */
+export function HomeWelcomeBanner({ greeting, firstName, highlights, className }: {
+  greeting: string;
+  firstName: string;
+  highlights: HomeHighlights | null;
+  className?: string;
+}) {
+  const mission = highlights?.mission ?? null;
+  // Os números do dia já estão nos cartões logo abaixo: o selo mostra a missão da semana, quando houver.
+  const open = mission && mission.progress && !mission.progress.completed ? mission.progress : null;
+  const goal = open ? { value: `Falta${open.remaining === 1 ? "" : "m"} ${Math.max(0, open.remaining).toLocaleString("pt-BR")}`, hint: mission!.title } : undefined;
+  const action = open && mission
+    ? { label: "Ver a missão", href: mission.href }
+    : { label: "Ver minha fila", href: "/minha-fila" };
+  return <CaptainBanner className={className} label="Boas-vindas" title={`${greeting}, ${firstName}! Bem-vindo a bordo.`} goal={goal} action={action} />;
+}

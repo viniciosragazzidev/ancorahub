@@ -1,5 +1,6 @@
 "use client";
 
+import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -152,6 +153,8 @@ function QueuesToday({ queues, received }: { queues: CommandCenterData["today"][
 function BrokersWhatsAppReadiness({ whatsapp }: { whatsapp: CommandCenterData["whatsapp"] }) {
   const missing = whatsapp.total - whatsapp.connected;
   const percent = whatsapp.total ? Math.round((whatsapp.connected / whatsapp.total) * 100) : 0;
+  // Paginação de 8 em 8 (14/11/2026) na lista de quem ainda não conectou.
+  const { pageRows: notConnectedPage, pagination } = useLitePages(whatsapp.notConnected, 8);
   return (
     <Card variant="overview">
       <SectionCardHeader
@@ -183,16 +186,17 @@ function BrokersWhatsAppReadiness({ whatsapp }: { whatsapp: CommandCenterData["w
           <span className="text-xs text-muted-foreground">{percent}% de {whatsapp.total} {whatsapp.total === 1 ? "corretor ativo" : "corretores ativos"}</span>
           {whatsapp.notConnected.length ? (
             <ul className="grid gap-1 border-t border-border pt-3" aria-label="Corretores sem WhatsApp conectado">
-              {whatsapp.notConnected.map((broker) => (
+              {notConnectedPage.map((broker) => (
                 <li key={broker.id}>
                   <Link href={`/equipe/${broker.id}`} className="block truncate text-sm hover:text-ds-electric-blue focus-visible:outline-none" title={broker.name}>{broker.name}</Link>
                 </li>
               ))}
-              {missing > whatsapp.notConnected.length ? (
+              {missing > whatsapp.notConnected.length && pagination.page === pagination.totalPages ? (
                 <li className="text-xs text-muted-foreground">e mais {missing - whatsapp.notConnected.length}</li>
               ) : null}
             </ul>
           ) : null}
+          <LitePagination {...pagination} label="Páginas dos corretores sem WhatsApp" />
         </div>
       ) : null}
     </Card>

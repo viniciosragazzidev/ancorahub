@@ -81,7 +81,7 @@ export function useLiveStatuses(initial: LiveStatusPayload) {
   return { payload, onDue, refresh };
 }
 
-export function LiveStatusHost({ initial, title, className }: { initial: LiveStatusPayload; title?: string; className?: string }) {
+export function LiveStatusHost({ initial, title, className, compact = false }: { initial: LiveStatusPayload; title?: string; className?: string; compact?: boolean }) {
   const { payload, onDue } = useLiveStatuses(initial);
-  return <LiteLiveStatusStrip statuses={payload.statuses} seals={payload.seals} title={title} onDue={onDue} className={className} />;
+  return <LiteLiveStatusStrip statuses={payload.statuses} seals={payload.seals} title={title} onDue={onDue} className={className} compact={compact} />;
 }

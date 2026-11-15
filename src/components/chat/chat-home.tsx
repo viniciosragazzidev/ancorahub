@@ -39,7 +39,7 @@ import type { WhatsAppActivitySummary } from "@/features/dashboard/whatsapp-acti
 import { WhatsAppActivityCard } from "@/features/dashboard/components/whatsapp-activity-card";
 import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
 import { BrokerHomeOverview } from "./broker-home-overview";
-import { HomeBanner } from "./home-banner";
+import { HomeBanner, HomeWelcomeBanner } from "./home-banner";
 import { HomeQuickActions, homeQuickActions } from "./home-quick-actions";
 import { QuickRegisterSaleSheet } from "@/features/broker-workspace/components/quick-register-sale";
 import { RisePulse, useRisePulseKey } from "@/components/light/rise-pulse";
@@ -389,7 +389,10 @@ export function ChatHome({
 
       <section className={home.center} aria-label="Seu dia">
         <motion.div initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }} className={home.centerInner}>
-          <h2 className={home.centerTitle}>{greeting(now)}, {firstName}</h2>
+          {/* Computador (14/11/2026): o banner de boas-vindas abre a tela no lugar do título; supervisor e gestor seguem com o título. */}
+          {!isSupervisor && !isManager ? (
+            <HomeWelcomeBanner className={home.welcomeBanner} greeting={greeting(now)} firstName={firstName} highlights={highlights} />
+          ) : <h2 className={home.centerTitle}>{greeting(now)}, {firstName}</h2>}
           {hasNowItems ? <p className={home.centerSubtitle}>Veja o que precisa da sua atenção agora.</p> : next ? (
             <p className={home.centerSubtitle}>
               A próxima coisa é <strong className={home.nextLabel} data-urgent={next.urgent}>{next.label}</strong>. {next.detail}
@@ -457,7 +460,6 @@ export function ChatHome({
               ) : null}
             </div>
           ) : null}
-          {!isSupervisor && !isManager ? <HomeBanner highlights={highlights} className={home.bannerCenter} /> : null}
         </motion.div>
       </section>
 
