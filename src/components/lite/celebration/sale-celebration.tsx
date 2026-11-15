@@ -29,9 +29,45 @@ export interface SaleCelebrationProps {
   /** Até três números (ex.: valor mensal, vidas, vendas no mês). Sem dado pessoal do cliente. */
   stats?: SaleCelebrationStat[];
   continueLabel?: string;
+  /** Outra conquista (15/11/2026): presença no plantão, WhatsApp conectado. Padrão: o capitão com o baú. */
+  art?: { src: string; width: number; height: number };
+  /** Selo que pula no canto do capitão. */
+  badge?: "check" | "whatsapp";
+  /** Chave do limite diário da celebração (padrão "venda"). */
+  budgetKey?: string;
+  /** false quando quem abriu já tocou o som e a vibração (fila de conquistas). */
+  feedback?: boolean;
+  /** Rótulo dos números para leitores de tela. */
+  statsLabel?: string;
 }
 
 const ART = { src: "/mascote/venda-capitao.webp", width: 584, height: 640 };
+
+/** Confete curto (só nível 3 do Lite): cor, deslocamento e giro de cada pedaço. */
+const CONFETTI = [
+  { color: "oklch(84% 0.16 85)", x: -120, y: -150, r: 200 }, { color: "var(--success)", x: 110, y: -170, r: -160 },
+  { color: "var(--chat-action)", x: -160, y: -40, r: 120 }, { color: "oklch(70% 0.17 28)", x: 150, y: -60, r: -220 },
+  { color: "oklch(84% 0.16 85)", x: -70, y: -200, r: 260 }, { color: "var(--chat-action)", x: 70, y: -210, r: -140 },
+  { color: "var(--success)", x: -150, y: 40, r: 180 }, { color: "oklch(84% 0.16 85)", x: 160, y: 30, r: -200 },
+  { color: "oklch(70% 0.17 28)", x: -30, y: -230, r: 140 }, { color: "var(--success)", x: 30, y: -180, r: -240 },
+  { color: "var(--chat-action)", x: -190, y: -110, r: 220 }, { color: "oklch(84% 0.16 85)", x: 190, y: -120, r: -180 },
+];
+
+function WhatsAppGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+      <path fill="currentColor" d="M12 2.2a9.7 9.7 0 0 0-8.4 14.6L2.3 21.7l5-1.3A9.7 9.7 0 1 0 12 2.2Zm0 17.7c-1.5 0-2.9-.4-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 19.9Zm4.4-6c-.2-.1-1.4-.7-1.7-.8-.2-.1-.4-.1-.5.1l-.8 1c-.1.2-.3.2-.5.1a6.6 6.6 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.5-.4h-.5a.9.9 0 0 0-.7.3c-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.4-.6 1.6-1.1.2-.6.2-1 .1-1.1l-.5-.3Z" />
+    </svg>
+  );
+}
+
+function CheckGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+      <path d="M5 12.5 10 17.5 19 7" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 /** Brilhos em volta do capitão: posição (% da área), tamanho em px e atraso do piscar. */
 const SPARKLES: Array<{ x: number; y: number; size: number; delay: number }> = [
@@ -54,7 +90,7 @@ function Sparkle({ size }: { size: number }) {
   );
 }
 
-export function SaleCelebration({ open, onClose, celebrationKey, title = "Venda registrada!", message = "Mais uma família protegida. Bom trabalho.", stats = [], continueLabel = "Continuar" }: SaleCelebrationProps) {
+export function SaleCelebration({ open, onClose, celebrationKey, title = "Venda registrada!", message = "Mais uma família protegida. Bom trabalho.", stats = [], continueLabel = "Continuar", art = ART, badge, budgetKey = "venda", feedback = true, statsLabel = "Resumo da venda" }: SaleCelebrationProps) {
   const interfaceMotion = useInterfaceMotionEnabled();
   const motionOn = interfaceMotion && !prefersLessMotion();
   const titleId = useId();
@@ -62,12 +98,12 @@ export function SaleCelebration({ open, onClose, celebrationKey, title = "Venda 
 
   useEffect(() => {
     if (!open) return;
-    fireFeedbackOnce(`sale-celebration:${celebrationKey}`, "celebrate", { budgetKey: "venda" }, motionOn);
+    if (feedback) fireFeedbackOnce(`sale-celebration:${celebrationKey}`, "celebrate", { budgetKey }, motionOn);
     const focus = window.setTimeout(() => button.current?.focus({ preventScroll: true }), 50);
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => { window.clearTimeout(focus); window.removeEventListener("keydown", onKey); };
-  }, [open, celebrationKey, motionOn, onClose]);
+  }, [open, celebrationKey, motionOn, onClose, feedback, budgetKey]);
 
   if (typeof document === "undefined") return null;
 
@@ -96,6 +132,20 @@ export function SaleCelebration({ open, onClose, celebrationKey, title = "Venda 
         >
           <div className={styles.column}>
             <div className={styles.stage}>
+              {motionOn ? (
+                <motion.span className={styles.burst} aria-hidden="true"
+                  initial={{ opacity: 0, scale: 0.4, rotate: 0 }}
+                  animate={{ opacity: [0, 1, 0.75], scale: [0.4, 1.08, 1], rotate: 40 }}
+                  transition={{ duration: 1.6, ease: easeEnter, rotate: { duration: 6, ease: "linear" } }} />
+              ) : null}
+              {motionOn
+                ? CONFETTI.map((piece, index) => (
+                    <motion.span key={`c${index}`} className={styles.confetti} style={{ background: piece.color }} aria-hidden="true"
+                      initial={{ opacity: 0, x: 0, y: 0, rotate: 0, scale: 0.6 }}
+                      animate={{ opacity: [0, 1, 1, 0], x: [0, piece.x, piece.x * 1.15], y: [0, piece.y, piece.y + 220], rotate: piece.r * 2, scale: 1 }}
+                      transition={{ duration: 1.9, delay: 0.5 + (index % 4) * 0.04, ease: [0.2, 0.7, 0.3, 1], times: [0, 0.12, 0.7, 1] }} />
+                  ))
+                : null}
               {motionOn
                 ? SPARKLES.map((sparkle, index) => (
                     <motion.span
@@ -112,22 +162,30 @@ export function SaleCelebration({ open, onClose, celebrationKey, title = "Venda 
                 : null}
               <motion.img
                 className={styles.hero}
-                src={ART.src}
-                width={ART.width}
-                height={ART.height}
+                src={art.src}
+                width={art.width}
+                height={art.height}
                 alt=""
                 draggable={false}
                 initial={motionOn ? { opacity: 0, scale: 0.6, y: 24 } : false}
                 animate={motionOn ? { opacity: 1, scale: [0.6, 1.06, 1], y: [24, -12, 0] } : { opacity: 1, scale: 1, y: 0 }}
                 transition={motionOn ? { duration: 0.62, times: [0, 0.6, 1], ease: easeEnter, opacity: { duration: motionTokens.duration.fast } } : { duration: 0 }}
               />
+              {badge ? (
+                <motion.span className={styles.badge} data-badge={badge} aria-hidden="true"
+                  initial={motionOn ? { opacity: 0, scale: 0, rotate: -30 } : false}
+                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                  transition={motionOn ? { type: "spring", visualDuration: 0.45, bounce: 0.55, delay: 0.5 } : { duration: 0 }}>
+                  {badge === "whatsapp" ? <WhatsAppGlyph /> : <CheckGlyph />}
+                </motion.span>
+              ) : null}
             </div>
 
             <motion.h2 id={titleId} className={styles.title} {...rise(0.36)}>{title}</motion.h2>
             <motion.p className={styles.message} {...rise(0.44)}>{message}</motion.p>
 
             {stats.length ? (
-              <ul className={styles.stats} aria-label="Resumo da venda">
+              <ul className={styles.stats} aria-label={statsLabel}>
                 {stats.slice(0, 3).map((stat, index) => (
                   <motion.li key={stat.label} className={styles.stat} {...rise(0.52 + index * motionTokens.beat.text)}>
                     <span className={styles.statLabel}>{stat.label}</span>

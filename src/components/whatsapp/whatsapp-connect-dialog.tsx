@@ -1,5 +1,6 @@
 "use client";
 
+import { announceAchievement } from "@/components/lite/celebration/achievement-host";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { WhatsappLogo } from "@/components/huge-icons";
@@ -319,7 +320,9 @@ export function WhatsAppConnectDialog({
       onReady?.();
       return;
     }
-    if (variant !== "presence") toast.success(PAIRING_TOASTS.connected);
+    // WhatsApp conectado (15/11/2026): a tela de conquista do capitão comemora quando o dialog fecha; sem anfitrião, o toast.
+    const celebrated = announceAchievement({ kind: "whatsapp", key: `whatsapp:${Date.now()}`, phoneSuffix: phone ? phone.slice(-4) : null });
+    if (variant !== "presence" && !celebrated) toast.success(PAIRING_TOASTS.connected);
     // Mantém a tela de sucesso visível antes de fechar. O pai só é avisado
     // depois: ele pode trocar de árvore ao ver "conectado" e desmontar este
     // dialog no meio da animação.

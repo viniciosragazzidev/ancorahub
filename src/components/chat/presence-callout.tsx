@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { actionErrorMessage, normalizeActionError } from "@/lib/feedback/action-error";
 import { fireFeedback } from "@/lib/feedback/use-feedback";
+import { announceAchievement } from "@/components/lite/celebration/achievement-host";
 
 import { AssistantAvatar } from "./assistant-avatar";
 import { CameraCapture, canUseInPageCamera } from "./camera-capture";
@@ -74,7 +75,7 @@ async function shrink(file: File): Promise<Blob> {
  * validate it and release him (decision of 2026-10-12).
  */
 /** inline (15/11/2026): só a ação (botão, estados e roteiros), dentro do card "Seu plantão atual" de Plantões. */
-export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskView; variant?: "home" | "chat" | "inline" }) {
+export function PresenceCallout({ ask, variant = "home", doneAction }: { ask: PresenceAskView; variant?: "home" | "chat" | "inline"; /** Depois de confirmado (inline): a próxima ação, como "Abrir plantão". */ doneAction?: ReactNode }) {
   const router = useRouter();
   // Kill-switch (html[data-interface-motion="off"]) também desliga, não só o movimento reduzido do sistema.
   const motionOn = useInterfaceMotionEnabled();
@@ -139,7 +140,11 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
       const at = hhmm(new Date().toISOString());
       setState(result.awaitingRelease ? { kind: "waiting", preview } : { kind: "done", preview, at });
       if (viaGuide) setWhatsapp((current) => (current ? { ...current, stage: result.awaitingRelease ? "waiting" : "done", confirmedAt: at } : current));
-      fireFeedback("confirm");
+      // Presença confirmada (15/11/2026): a tela de conquista do capitão comemora; sem anfitrião, só a confirmação.
+      const celebrated = !result.awaitingRelease && announceAchievement({
+        kind: "duty", key: `duty:${ask.assignmentId}:${ask.startsAt}`, scheduleName: ask.scheduleName, until: hhmm(ask.endsAt), mode: ask.mode, startInterval: ask.startInterval,
+      });
+      if (!celebrated) fireFeedback("confirm");
       // Pelo roteiro, a tela atualiza quando o corretor sai dele ("Ir para o Plantão").
       if (!viaGuide) window.setTimeout(() => router.refresh(), 1600);
     } catch (error) {
@@ -299,7 +304,13 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
           </svg>
           {state.at ? `Confirmado às ${state.at}` : "Confirmado"}
         </motion.p>
-      ) : waiting ? (
+      ) : null}
+      {done && doneAction ? (
+        <motion.div initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, ease, delay: reduce ? 0 : 0.16 }} style={{ display: "grid" }}>
+          {doneAction}
+        </motion.div>
+      ) : null}
+      {done ? null : waiting ? (
         <div className={styles.presenceWaiting}>
           <p className={styles.presenceWaitingPill} role="status"><span className={styles.presenceClock} aria-hidden="true" />Aguardando o diretor liberar</p>
           <button type="button" className={styles.presenceRetake} onClick={() => { void start(); }}>Tirar outra foto</button>

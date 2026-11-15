@@ -41,9 +41,9 @@ Movimento reduzido não silencia: som e vibração seguem só os próprios inter
 | Nível | Nome | Exemplos | Visual | Som | Vibração | Limite |
 |---|---|---|---|---|---|---|
 | 0 | Silencioso | filtrar, abrir ficha, trocar aba, salvar nota, mudar etapa | pressão (`scale.press*`, 100 a 160ms) e o novo estado no próprio objeto | não | não | até 160ms |
-| 1 | Confirmação | aceitar lead, agendar retorno, enviar cotação, marcar presença, salvar configuração | botão com estados (§4), check desenhado e texto no ritmo | só `confirm`, em ação ocasional | `tap` no toque, `confirm` na confirmação | até 320ms |
+| 1 | Confirmação | aceitar lead, agendar retorno, enviar cotação, salvar configuração | botão com estados (§4), check desenhado e texto no ritmo | só `confirm`, em ação ocasional | `tap` no toque, `confirm` na confirmação | até 320ms |
 | 2 | Marco no contexto | meta do dia batida, missão concluída, primeira venda do mês | anel único (`LiteAttention`), número que rola, mascote comemora uma vez | `milestone` | `success` | até 600ms; no máximo 1 por dia por tipo |
-| 3 | Celebração | venda registrada, subir de nível, marco de plantão (5, 10, 25, 50) | overlay sem bloquear (`CelebrationLayer`), mascote, confete curto só no Lite | `milestone` | `success` | até 1,4s; espera a oferta de lead sair; no máximo 3 por dia |
+| 3 | Celebração | venda registrada, subir de nível, marco de plantão (5, 10, 25, 50), presença confirmada no plantão (uma vez por plantão), WhatsApp conectado | overlay sem bloquear (`CelebrationLayer`), mascote, confete curto só no Lite | `milestone` | `success` | até 1,4s; espera a oferta de lead sair; no máximo 3 por dia |
 
 Eventos que chegam sem ação do usuário:
 
@@ -106,6 +106,7 @@ Receita nova em `src/lib/sounds/recipes.ts`: `milestoneSound` (três notas subin
 - `useFeedback()` devolve `fire(tipo, opções)`, com tipo `tap`, `confirm`, `milestone`, `celebrate`, `notify`, `error` ou `warning`. Fora do React, use `fireFeedback`. O limite diário de celebrações fica no aparelho (`ancora:feedback-budget`). Ele toca som e vibração conforme o nível, respeita as preferências, o `prefers-reduced-motion` e o kill-switch, e devolve as flags para o componente visual (`motion`, `celebrate`). Nenhum código chama `playSound` ou `navigator.vibrate` direto, exceto o próprio hook.
 - `LiteActionButton` (§4) cobre o caso comum de ação com servidor.
 - `CelebrationLayer` e `useSuccessOverlay` passam a receber o nível e a respeitar `celebration.maxPerDay`.
+- Conquistas do corretor (15/11/2026): `announceAchievement` e `AchievementHost` (`src/components/lite/celebration/achievement-host.tsx`) abrem a tela de conquista do capitão (a mesma da venda) para a presença confirmada no plantão e o WhatsApp conectado. Uma de cada vez, depois da oferta de lead e dos diálogos abertos; sem o anfitrião montado, a tela de origem dá a confirmação de nível 1.
 - Mascote: `AssistantAvatar` ganha a prop `mood` (`idle`, `alert`, `thinking`, `cheer`), com uma passada por troca. Com animações desligadas, mostra a pose final parada. Rive fica para depois de uma prova com um mascote só, medindo o peso no celular.
 
 ---

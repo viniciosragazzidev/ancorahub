@@ -135,3 +135,49 @@
 @media (prefers-reduced-motion: reduce) {
   .continue, .continue:active { transform: none; transition: none; }
 }
+
+/* Conquistas (15/11/2026): raios girando atrás do capitão, confete curto e um selo que pula. Só nível 3 do Lite. */
+.burst {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(92vw, 380px);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 9999px;
+  background:
+    radial-gradient(closest-side, color-mix(in oklab, var(--success) 18%, transparent), transparent 70%),
+    repeating-conic-gradient(from 0deg, color-mix(in oklab, oklch(84% 0.16 85) 26%, transparent) 0deg 10deg, transparent 10deg 30deg);
+  mask: radial-gradient(closest-side, black 55%, transparent 100%);
+  pointer-events: none;
+}
+.confetti {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 12px;
+  height: 18px;
+  margin: -9px 0 0 -6px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+.badge {
+  position: absolute;
+  left: calc(50% + min(18vw, 72px));
+  top: calc(50% + min(14vw, 56px));
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 9999px;
+  background: var(--success);
+  color: white;
+  box-shadow: 0 0 0 5px var(--surface), 0 8px 20px color-mix(in oklab, var(--success) 40%, transparent);
+}
+.badge[data-badge="whatsapp"] { background: oklch(68% 0.17 150); }
+/* Camadas: raios atrás, capitão no meio, confete e selo por cima. */
+.burst { z-index: 0; }
+.hero { position: relative; z-index: 1; }
+.confetti { z-index: 2; }
+.badge { z-index: 3; }
+.sparkle { z-index: 2; }
