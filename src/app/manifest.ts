@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "AncoraHub — Âncora Saúde",
     short_name: "AncoraHub",
     description: "Plataforma de Gestão de Leads e Qualificação IA da Âncora Saúde.",
-    start_url: "/",
+    start_url: "/dashboard",
     display: "standalone",
     // Mesmo azul da splash: a tela do PWA instalado emenda com a splash sem piscar.
     background_color: "#002b73",

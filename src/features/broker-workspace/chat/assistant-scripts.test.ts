@@ -27,7 +27,7 @@ describe("Início reorganizado (BROKER_NAV_REORG)", () => {
     expect(threads.map((t) => t.assistant)).toEqual(["ancora", "leads", "plantao", "agenda", "desempenho", "cotacao"]);
     const wallet = threads.find((t) => t.assistant === "leads");
     const leadsBefore = split.find((t) => t.assistant === "leads");
-    expect(wallet).toMatchObject({ name: "Minha carteira", href: "/leads?tab=minha-fila", shape: ASSISTANTS.carteira.shape, preview: leadsBefore?.preview, waitingYou: leadsBefore?.waitingYou });
+    expect(wallet).toMatchObject({ name: "Minha carteira", href: "/leads?tab=minha-fila", shape: ASSISTANTS.carteira.shape, avatarAsset: "carteira", preview: leadsBefore?.preview, waitingYou: leadsBefore?.waitingYou });
   });
   it("leaves out Cotação when the simulator is off and keeps the old Início when the flag is off", () => {
     const base = { data: workspace(), now, journey: journey() };
@@ -46,12 +46,31 @@ describe("Início reorganizado (BROKER_NAV_REORG)", () => {
   });
 });
 
+describe("assistant avatar art direction", () => {
+  it("maps each area and its team version to the same contextual character", () => {
+    expect(Object.fromEntries(Object.entries(ASSISTANTS).map(([id, definition]) => [id, definition.avatarAsset]))).toMatchObject({
+      leads: "leads",
+      carteira: "carteira",
+      plantao: "plantao",
+      agenda: "agenda",
+      cotacao: "cotacao",
+      desempenho: "desempenho",
+      insights: "dicas",
+      jornada: "jornada",
+      equipe: "equipe",
+      "equipe-leads": "leads",
+      "equipe-plantao": "plantao",
+      "equipe-desempenho": "desempenho",
+    });
+  });
+});
+
 describe("Jornada assistant", () => {
   it("only appears with the journey capability and uses its own identity", () => {
     const input = { data: workspace(), now, journey: journey(), capabilities: { quoteSimulator: false, dutyCalendar: false } };
     expect(buildAssistantThreads(input).some((t) => t.assistant === "jornada")).toBe(false);
     const thread = buildAssistantThreads({ ...input, capabilities: { ...input.capabilities, journey: true } }).find((t) => t.assistant === "jornada");
-    expect(thread).toMatchObject({ name: "Jornada", hue: 85, href: "/jornada", waitingYou: false, preview: "Consultor, 85 pts na semana. 0 missões abertas." });
+    expect(thread).toMatchObject({ name: "Jornada", hue: 85, avatarAsset: "jornada", href: "/jornada", waitingYou: false, preview: "Consultor, 85 pts na semana. 0 missões abertas." });
   });
   it("keeps pending leads ahead of new celebrations and timestamps the latest event", () => {
     const data = journey(); data.celebrations = [{ ...dailySummary, seenAt: null }];

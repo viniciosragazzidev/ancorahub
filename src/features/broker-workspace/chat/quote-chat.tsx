@@ -100,7 +100,7 @@ function QuoteConversation({ onRestart }: { onRestart: () => void }) {
   return (
     <div className="arc-venancor">
       <ChatScreen
-        identity={{ name: definition.name, shape: definition.shape, hue: definition.hue }}
+        identity={{ name: definition.name, shape: definition.shape, hue: definition.hue, avatarAsset: definition.avatarAsset }}
         backHref="/dashboard"
         script={script}
         onLocalChoice={onLocalChoice}

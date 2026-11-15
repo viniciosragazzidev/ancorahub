@@ -2,6 +2,7 @@ import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import type { BrokerJourneyData, JourneyCelebration } from "@/features/engagement/journey-types";
 import type {
   AssistantId,
+  AssistantAvatarAsset,
   ChatBlock,
   ChatChoice,
   ChatScript,
@@ -21,23 +22,24 @@ type AssistantDefinition = {
   hue: number | null;
   verified?: boolean;
   href: string;
+  avatarAsset?: AssistantAvatarAsset;
 };
 
 export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
   ancora: { name: "Jack", shape: "jack", hue: 175, verified: true, href: "/dashboard/c/ancora" },
-  leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/minha-fila" },
+  leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/minha-fila", avatarAsset: "leads" },
   // Início reorganizado (BROKER_NAV_REORG): a carteira abre a página, não uma conversa.
-  carteira: { name: "Minha carteira", shape: "salte", hue: 190, href: "/clientes" },
-  plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/plantoes/agora" },
-  agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/agenda" },
-  cotacao: { name: "Cotação", shape: "favo", hue: 268, href: "/cotacao" },
-  desempenho: { name: "Desempenho", shape: "nuvem", hue: 330, href: "/desempenho" },
-  insights: { name: "Dicas de Atendimento", shape: "salte", hue: 200, href: "/conversas/broker" },
-  jornada: { name: "Jornada", shape: "favo", hue: 85, href: "/jornada" },
-  equipe: { name: "Equipe", shape: "mochi", hue: 150, href: "/equipe/minha" },
-  "equipe-leads": { name: "Leads da equipe", shape: "cubo", hue: 212, href: "/leads" },
-  "equipe-plantao": { name: "Plantão da equipe", shape: "onigiri", hue: 28, href: "/equipe/plantao" },
-  "equipe-desempenho": { name: "Desempenho da equipe", shape: "nuvem", hue: 330, href: "/equipe/desempenho" },
+  carteira: { name: "Minha carteira", shape: "salte", hue: 190, href: "/clientes", avatarAsset: "carteira" },
+  plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/plantoes/agora", avatarAsset: "plantao" },
+  agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/agenda", avatarAsset: "agenda" },
+  cotacao: { name: "Cotação", shape: "favo", hue: 268, href: "/cotacao", avatarAsset: "cotacao" },
+  desempenho: { name: "Desempenho", shape: "nuvem", hue: 330, href: "/desempenho", avatarAsset: "desempenho" },
+  insights: { name: "Dicas de Atendimento", shape: "salte", hue: 200, href: "/conversas/broker", avatarAsset: "dicas" },
+  jornada: { name: "Jornada", shape: "favo", hue: 85, href: "/jornada", avatarAsset: "jornada" },
+  equipe: { name: "Equipe", shape: "mochi", hue: 150, href: "/equipe/minha", avatarAsset: "equipe" },
+  "equipe-leads": { name: "Leads da equipe", shape: "cubo", hue: 212, href: "/leads", avatarAsset: "leads" },
+  "equipe-plantao": { name: "Plantão da equipe", shape: "onigiri", hue: 28, href: "/equipe/plantao", avatarAsset: "plantao" },
+  "equipe-desempenho": { name: "Desempenho da equipe", shape: "nuvem", hue: 330, href: "/equipe/desempenho", avatarAsset: "desempenho" },
 };
 
 /** Assistants that only exist in the supervisor Lite. */
@@ -170,6 +172,7 @@ function assistantThread(id: AssistantId, values: Pick<ThreadSummary, "preview" 
     href: assistant.href,
     shape: assistant.shape,
     hue: assistant.hue,
+    avatarAsset: assistant.avatarAsset,
     ...values,
   };
 }
@@ -242,7 +245,7 @@ function arrangeHomeV2(threads: ThreadSummary[], walletUnified: boolean): Thread
   // na aba Em atendimento; a aba Clientes fica ao lado. A linha separada da carteira sai.
   const leads = byId.get("leads");
   if (walletUnified && leads) {
-    byId.set("leads", { ...leads, name: ASSISTANTS.carteira.name, shape: ASSISTANTS.carteira.shape, hue: ASSISTANTS.carteira.hue, href: "/leads?tab=minha-fila" });
+    byId.set("leads", { ...leads, name: ASSISTANTS.carteira.name, shape: ASSISTANTS.carteira.shape, hue: ASSISTANTS.carteira.hue, avatarAsset: ASSISTANTS.carteira.avatarAsset, href: "/leads?tab=minha-fila" });
     byId.delete("carteira");
   }
   return HOME_V2_ORDER.flatMap((id) => byId.get(id) ?? []);

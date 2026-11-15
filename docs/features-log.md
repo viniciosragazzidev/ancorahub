@@ -2,6 +2,14 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 15/11/2026 - Ícones dos assistentes mais leves
+
+- Os objetos visuais das áreas na lista lateral passam de 44 px para 35 px, centralizados no slot de 44 px existente. A linha mantém sua área de toque; Jack, marca verificada, iniciais e avatares pessoais não mudam.
+
+## 15/11/2026 - PWA abre direto no dashboard
+
+- O manifesto do PWA passa a iniciar em `/dashboard`. Se uma instalação existente ainda abrir a raiz, a landing detecta `standalone`, `window-controls-overlay` ou o modo de tela inicial do iOS e redireciona ao dashboard. No navegador comum, `/` continua exibindo a landing. O dashboard mantém sua autenticação e resolução de papel no servidor.
+
 ## 14/11/2026 - Entrada sem atrito no Lite (Postel e Miller)
 
 - Módulo único `src/shared/input` (telefone BR, CPF/CNPJ com dígito verificador, valor em centavos, data dd/mm/aaaa e ISO, máscara que mantém o cursor e aceita colagem bagunçada) aplicado no telefone de Adicionar contato, Cliente que já possuo e simulador de cotação e no CPF de Pessoas da contratação; cópias locais de telefone trocadas por funções legado idênticas (formato gravado em `leads.telefone` não muda); cartão Lite no celular mostra no máximo 6 campos e o resto em "Mais dados".
@@ -927,3 +935,7 @@ F1 foi rebaseado sobre F0/F5. Em `/conversas`, sinais de conversa chamam só o d
 ## 14/11/2026 - Feedback padrão em todo o modo Lite (fases 2 a 5)
 
 O Lite inteiro (corretor, supervisor, gestor e Diretor Lite) responde no padrão de `docs/design-system/FEEDBACK.md`: estados de envio, sucesso só depois do servidor, erro com a causa, o que continua valendo e "Tentar de novo", e som e vibração por nível. As ações do chat ganham nível e "Não enviada · Tentar de novo". A ficha, a agenda, os clientes, o plantão, a meta do dia (nível 2), as configurações, o supervisor, o gestor e as telas do diretor deixam de usar toast para o que cabe no objeto. A venda registrada comemora em tela cheia com o capitão (nível 3). O que ficou de fora está no plano: `docs/implementations/active/2026-11-14-feedback-padrao.md`.
+
+## 15/11/2026 - Ilustrações contextuais próprias por rota
+
+Revisão das imagens decorativas dos assistentes do Lite: dez assets WebP transparentes, sem Jack ou outros personagens, passam a usar objetos distintos que identificam Leads, Carteira, Plantão, Agenda, Cotação, Desempenho, Dicas, Jornada, Equipe e Mensagens. Também acompanham o cabeçalho de conversa; no mesmo controle global auditado, desligado ou com erro de carregamento, retornam os avatares abstratos. O controle não amplia as ilustrações de seção/vazio para gestor e supervisor. Jack/Notificações, leads individuais, conteúdo e sinais de estado permanecem inalterados. Plano e evidências: `docs/implementations/active/2026-11-15-assets-visuais-por-rota.md`.

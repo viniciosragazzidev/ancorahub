@@ -1,3 +1,21 @@
+## 2026-11-15: assets próprios por rota nos assistentes
+
+Revisão pedida por Vinicios. Papel inicial: corretor Lite; mesmas associações visuais
+são reutilizadas nas áreas de equipe do gestor e supervisor. A ação continua sendo
+abrir o assistente ou módulo pela linha. Dez objetos 3D decorativos identificam Leads,
+Carteira, Plantão, Agenda, Cotação, Desempenho, Dicas, Jornada, Equipe e Mensagens;
+a arte correspondente acompanha o cabeçalho da conversa quando existe. Não há Jack,
+outros personagens, rostos ou símbolo de âncora repetido. Jack/Notificações, marca
+verificada e avatares individuais permanecem como estão; texto e indicadores atuais
+comunicam conteúdo e estado.
+
+Na lista lateral, os objetos das áreas usam 35 × 35 px centralizados no slot de 44 × 44 px, cerca de 20% menores para reduzir o peso visual sem diminuir a área de toque da linha. Jack, marca verificada e avatares de leads permanecem no tamanho atual.
+
+Usa o provider e a flag global auditada existentes. A flag desligada e erro de imagem
+restauram as formas abstratas. Sem mudança de rota, hierarquia, ação, permissão, token,
+primitive ou movimento; UX-M1.10 permanece pendente. Registro e evidências:
+`docs/implementations/active/2026-11-15-assets-visuais-por-rota.md`.
+
 ## 2026-11-13: conversa como foco, ícones e dados pelo olho
 
 Vinicios refinou explicitamente o escopo nesta sessão: limpar a tela; conversa ocupa a área principal; informações do lead somente no painel deslizante aberto pelo olho junto do nome; WhatsApp/Ligar/Etapa como ícones no topo, centralizados e com espaçamento consistente; retirar faixa de conectar WhatsApp de todas as rotas e Cotações da ficha do corretor; compactar campos. Cancelou a redução geral de fonte antes de ela ser aplicada. Registrar venda fica com Claude, sem alterações diretas remanescentes nos arquivos do seu formulário.

@@ -21,7 +21,7 @@ function minutesSince(date: Date | null, now: Date) {
 
 function thread(id: "ancora" | "equipe" | "equipe-leads" | "equipe-plantao" | "equipe-desempenho", values: Pick<ThreadSummary, "preview" | "at" | "unread" | "waitingYou">): ThreadSummary {
   const definition = ASSISTANTS[id];
-  return { id: `assistant:${id}`, kind: "assistant", assistant: id, name: definition.name, verified: definition.verified, href: definition.href, shape: definition.shape, hue: definition.hue, ...values };
+  return { id: `assistant:${id}`, kind: "assistant", assistant: id, name: definition.name, verified: definition.verified, href: definition.href, shape: definition.shape, hue: definition.hue, avatarAsset: definition.avatarAsset, ...values };
 }
 
 /** Who on the team needs the supervisor first (late first contacts, then waiting ones). */

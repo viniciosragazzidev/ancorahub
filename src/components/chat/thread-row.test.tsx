@@ -2,6 +2,8 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { ContextualIllustrationsProvider } from "@/components/illustrations/contextual-illustration";
+
 import { ThreadList } from "./thread-row";
 import type { ThreadSummary } from "./types";
 
@@ -30,5 +32,23 @@ describe("ThreadList grouped by day", () => {
   it("keeps the flat list when not grouped", () => {
     render(<ThreadList now={now} emptyText="vazio" threads={[lead("1", "A", null)]} />);
     expect(screen.queryByRole("region")).toBeNull();
+  });
+
+  it("shows area avatars 20% smaller inside the existing row slot", () => {
+    const agenda: ThreadSummary = {
+      id: "agenda", kind: "assistant", assistant: "agenda", name: "Agenda", preview: "Sem retornos hoje.", at: null,
+      unread: false, waitingYou: false, href: "/dashboard/c/agenda", shape: "cubo", avatarAsset: "agenda", hue: 150,
+    };
+    const { container } = render(
+      <ContextualIllustrationsProvider enabled>
+        <ThreadList now={now} emptyText="vazio" threads={[agenda]} />
+      </ContextualIllustrationsProvider>,
+    );
+
+    const image = container.querySelector("img");
+    expect(image?.getAttribute("src")?.endsWith("/assistant-areas/agenda.webp")).toBe(true);
+    expect(image?.style.width).toBe("35px");
+    expect(image?.style.height).toBe("35px");
+    expect(image?.parentElement?.parentElement?.parentElement?.className).toContain("threadAvatarSlot");
   });
 });

@@ -47,7 +47,7 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
       const now = new Date();
       return {
         viewerName: data.viewer.name,
-        assistants: [...buildSupervisorThreads(data, now), { id: "assistant:mensagens", kind: "assistant", name: "Mensagens da equipe", verified: true, preview: "As conversas de WhatsApp dos seus corretores.", at: now.toISOString(), unread: false, waitingYou: false, href: "/mensagens", shape: "onigiri", hue: 30 }],
+        assistants: [...buildSupervisorThreads(data, now), { id: "assistant:mensagens", kind: "assistant", name: "Mensagens da equipe", verified: true, preview: "As conversas de WhatsApp dos seus corretores.", at: now.toISOString(), unread: false, waitingYou: false, href: "/mensagens", shape: "onigiri", hue: 30, avatarAsset: "mensagens" }],
         // Every open lead of the team (late first), not only the ones waiting for first contact.
         leads: await getSupervisorLiteRadar(context, now)
           .then((radar) => buildTeamLeadThreads(radar.leads, data.slaMinutes, now))
@@ -65,10 +65,10 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
       return {
         viewerName: data.viewerName,
         assistants: [
-          { id: "assistant:equipe-leads", kind: "assistant", assistant: "equipe-leads", name: "Leads da unidade", verified: true, pinned: true, preview: waiting ? `${waiting} ${waiting === 1 ? "lead aguardando" : "leads aguardando"} distribuição manual.` : "Nenhum lead aguardando distribuição manual.", at: now.toISOString(), unread: false, waitingYou: waiting > 0, href: "/leads", shape: "favo", hue: 252 },
-          { id: "assistant:equipe", kind: "assistant", assistant: "equipe", name: "Minha unidade", verified: true, preview: `${inService} ${inService === 1 ? "corretor" : "corretores"} em atendimento na unidade.`, at: now.toISOString(), unread: false, waitingYou: late > 0, href: "/equipe", shape: "mochi", hue: 150 },
-          { id: "assistant:clientes", kind: "assistant", name: "Clientes da unidade", verified: true, preview: "Clientes conquistados pela unidade e renovações.", at: now.toISOString(), unread: false, waitingYou: false, href: "/clientes", shape: "cubo", hue: 210 },
-          { id: "assistant:mensagens", kind: "assistant", name: "Mensagens da unidade", verified: true, preview: "As conversas de WhatsApp dos corretores da unidade.", at: now.toISOString(), unread: false, waitingYou: false, href: "/mensagens", shape: "onigiri", hue: 30 },
+          { id: "assistant:equipe-leads", kind: "assistant", assistant: "equipe-leads", name: "Leads da unidade", verified: true, pinned: true, preview: waiting ? `${waiting} ${waiting === 1 ? "lead aguardando" : "leads aguardando"} distribuição manual.` : "Nenhum lead aguardando distribuição manual.", at: now.toISOString(), unread: false, waitingYou: waiting > 0, href: "/leads", shape: "favo", hue: 252, avatarAsset: "leads" },
+          { id: "assistant:equipe", kind: "assistant", assistant: "equipe", name: "Minha unidade", verified: true, preview: `${inService} ${inService === 1 ? "corretor" : "corretores"} em atendimento na unidade.`, at: now.toISOString(), unread: false, waitingYou: late > 0, href: "/equipe", shape: "mochi", hue: 150, avatarAsset: "equipe" },
+          { id: "assistant:clientes", kind: "assistant", name: "Clientes da unidade", verified: true, preview: "Clientes conquistados pela unidade e renovações.", at: now.toISOString(), unread: false, waitingYou: false, href: "/clientes", shape: "cubo", hue: 210, avatarAsset: "carteira" },
+          { id: "assistant:mensagens", kind: "assistant", name: "Mensagens da unidade", verified: true, preview: "As conversas de WhatsApp dos corretores da unidade.", at: now.toISOString(), unread: false, waitingYou: false, href: "/mensagens", shape: "onigiri", hue: 30, avatarAsset: "mensagens" },
           { id: "assistant:ancora", kind: "assistant", assistant: "ancora", name: "Notificações", verified: true, preview: "Avisos e atualizações da unidade.", at: now.toISOString(), unread: false, waitingYou: false, href: "/notificacoes", shape: "jack", hue: 175 },
         ],
         leads: buildTeamLeadThreads(data.leads, data.slaMinutes, now), nowIso: now.toISOString(), canQuote: false, leadsBadgeCount: waiting,
