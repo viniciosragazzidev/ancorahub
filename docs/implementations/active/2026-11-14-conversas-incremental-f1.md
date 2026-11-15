@@ -23,6 +23,13 @@ Tenant, papel e escopo são revalidados no endpoint. A consulta inicial e a incr
 - `ai_conversations.updated_at` existe no schema. O delta consulta status atualizado depois do cursor para os leads carregados, incluindo mudanças para atendimento humano sem nova mensagem. O cursor continua sendo orientado por mensagens; um status de IA silencioso pode ser reenviado em outro delta enquanto nenhuma mensagem posterior avançar o cursor.
 - Erros de transporte do delta acionam recarga integral no máximo uma vez por minuto.
 
+## Correções da terceira revisão
+
+- O F1 foi rebaseado sobre a origin que já contém F0 e F5. `/conversas` não usa mais `useVisibleRealtimeRefresh`: sinal de conversa agenda apenas `POST /api/conversations/incremental`. O provider de F5 continua definindo `document.documentElement.dataset.realtimeLive`; seu roteamento, resumo limitado a um por minuto e rail foram preservados. `use-visible-realtime-refresh.ts` segue em uso pelo workspace Lite do corretor, com `timingRef` mantido.
+- Resposta não OK, JSON inválido ou payload delta inválido usam o limite de uma recarga integral por 60 segundos. `409` com `requiresFullRefresh` segue imediato e sem limite.
+- A ordenação da conversa aberta e a escolha da última prévia usam `Date.getTime()` diretamente.
+- Limitação aceita: uma mudança de status da IA sem mensagem não gera sinal incremental; aparece no próximo refresh completo, que ocorre após até 10 minutos sem sinais quando o realtime está ativo. Uma nova mensagem pode adiantar a reconciliação pelo delta.
+
 ## Limites e validação
 
 A primeira versão do endpoint cobre as conversas que já estão na lista atual. Permanecem conhecidas: (1) mensagem retroativa com `sent_at` anterior ou igual ao cursor não entra no delta; (2) a lista permanece limitada aos 800 IDs enviados pelo cliente, então itens fora desse recorte só entram na recarga integral. O cursor continua serializado em ISO de milissegundos, mas a comparação e o desempate usam a mesma precisão e `id`. Mais de 500 mensagens no delta, mais de 300 mensagens novas na conversa aberta, mudança de escopo, cursor vencido ou erro de contrato acionam a recarga integral. Não foi feita medição de egress em produção nem leitura/escrita no banco nesta tarefa.

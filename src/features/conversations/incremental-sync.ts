@@ -158,6 +158,28 @@ export function shouldRefreshAfterConversationNetworkError(lastRefreshAt: number
   return lastRefreshAt === null || now - lastRefreshAt >= CONVERSATION_NETWORK_ERROR_REFRESH_INTERVAL_MS;
 }
 
+export type ConversationDeltaResponseAction = "apply" | "throttled_refresh" | "full_refresh";
+
+export function conversationDeltaResponseAction(input: {
+  status: number;
+  ok: boolean;
+  validPayload: boolean;
+  requiresFullRefresh: boolean;
+}): ConversationDeltaResponseAction {
+  if (input.status === 409 && input.requiresFullRefresh) return "full_refresh";
+  if (!input.ok || !input.validPayload || input.requiresFullRefresh) return "throttled_refresh";
+  return "apply";
+}
+
+export function handleConversationRealtimeSignal(
+  detail: { kind?: string; domain?: string } | undefined,
+  requestIncrementalSync: () => void,
+) {
+  if (detail?.kind !== "domain.invalidated" || detail.domain !== "conversations") return false;
+  requestIncrementalSync();
+  return true;
+}
+
 export function isValidConversationCursor(value: unknown, now = Date.now()) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const cursor = value as Record<string, unknown>;

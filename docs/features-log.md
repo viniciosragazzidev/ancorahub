@@ -44,26 +44,6 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 - Chave `feature_broker_lite_finance_enabled` (global, ligada por padrão porque a tela já depende do ERP ligado pela direção), no card Novidades do corretor do Super-admin, auditada. Desligada, a rota volta ao Início e o resumo devolve null. Sem migration.
 - Pendências: o ERP não mostra ao corretor repasses ainda não liquidados nem parcelas aguardando aprovação como valor a receber; parcelas sem lançamento conferido aparecem só como previstas. Fórmula de saldo líquido e regra da segunda parcela seguem pendentes (DEC-183/184).
 
-## 13/11/2026 - Lite: polimento de movimento (antecipação, follow-through, arco, profundidade)
-
-- Hover que sobe 1px só no confirmar venda e no aceitar do "Seu próximo passo" (`ct-anticipate`); mola de assentamento só no que chega (folha "O que você quer fazer?", check do `LiteSuccess`, cartão novo em "Agora"); ponto em arco do aceite até a contagem de Leads, no máximo 1 vez a cada 10 min; coluna erguida do kanban respeita o kill-switch. Tudo desligado com movimento reduzido. Detalhes em `docs/ux/motion-frequencia.md`.
-
-## 13/11/2026 - Lite: movimento por frequência de uso
-
-- Meta do dia e ranking da semana animam só na primeira abertura do dia (`useFirstTimeToday`, dia de São Paulo); avisos ocasionais e tour em até 320ms; gradiente do consentimento sem loop. Tabela em `docs/ux/motion-frequencia.md`.
-
-## 13/11/2026 - Lite: alvos de toque de 44px no celular
-
-- Em telas de toque (`pointer: coarse`), os botões de ícone e os tamanhos xs/sm ganham área de toque de 44x44 (`ct-touch`, `src/styles/touch-target.css`) sem mudar o visual. No Lite, o composer (enviar, áudio, ferramentas) tem 44px e o botão principal fica com altura mínima de 44px. Desktop e modo normal não mudam.
-
-## 13/11/2026 - Lite: resposta otimista nas 3 ações mais frequentes do corretor
-
-- Aceitar lead mostra "Lead aceito" na hora (`useOptimistic`, botão travado contra duplo aceite) e volta com o erro da action se o servidor recusar; mensagem na conversa entra na hora como "Enviando", e em falha fica "Não enviada · Tentar de novo" sem perder o texto; mudar etapa na tela do lead (Lite) muda e fecha a folha na hora, e volta reabrindo a folha com aviso se o servidor recusar. O kanban Lite de /leads não move cartão entre etapas (só reordena colunas), por isso ficou de fora. Lógica em `src/lib/optimistic-core.ts` e `src/components/chat/user-send-core.ts`, com testes.
-
-## 13/11/2026 - Lite: feedback e foco (Motion e UX, fase 3)
-
-- Confirmação no próprio lugar com `LiteSuccess` ao registrar venda (Etapa atual; sem overlay no v2, toast de apoio) e ao salvar a ficha do cliente e as ações rápidas do perfil; `LitePress` nos cartões e links primários da home do corretor e nas linhas de conversa; uma ação primária por tela na home (Ferramentas em ghost, aceites da lista secundários); contador da Fila e da aba Leads pulsa uma vez (240 ms) só quando sobe, nada com movimento reduzido.
-
 ## 13/11/2026 - Modo corretor, etapa 6: Agenda conectada
 
 - `/agenda` do corretor reúne as tarefas abertas atribuídas a ele (retornos, tarefas com prazo e acompanhamentos de renovação) agrupadas em Atrasados, Hoje, Amanhã, Próximos e Sem prazo, pelo dia de São Paulo. Cada linha traz ícone do tipo, título, tipo e nome do lead, horário e estado textual (Atrasado, Urgente).
@@ -940,10 +920,10 @@ As respostas sugeridas do chat seguem os níveis do padrão, numa tabela única 
 
 O cursor inicial agora é calculado na mesma consulta dos agregados e representa a última tupla realmente incluída; comparações e ordenação usam milissegundos mais `id` para não repetir mensagens com microssegundos. O delta também detecta mudanças em `ai_conversations.updated_at` sem mensagem nova. Erros de rede limitam o refresh integral a um por minuto. Detalhes e limitações: `docs/implementations/active/2026-11-14-conversas-incremental-f1.md`.
 
+## 15/11/2026 - Egress de conversas, ajustes da terceira revisão
+
+F1 foi rebaseado sobre F0/F5. Em `/conversas`, sinais de conversa chamam só o delta; respostas inválidas e erros não OK respeitam o limite de refresh, exceto `409 requiresFullRefresh`. Mantida a limitação de status da IA sem sinal próprio até o refresh completo, no máximo em 10 minutos sem sinais. Plano: `docs/implementations/active/2026-11-14-conversas-incremental-f1.md`.
+
 ## 14/11/2026 - Feedback padrão em todo o modo Lite (fases 2 a 5)
 
 O Lite inteiro (corretor, supervisor, gestor e Diretor Lite) responde no padrão de `docs/design-system/FEEDBACK.md`: estados de envio, sucesso só depois do servidor, erro com a causa, o que continua valendo e "Tentar de novo", e som e vibração por nível. As ações do chat ganham nível e "Não enviada · Tentar de novo". A ficha, a agenda, os clientes, o plantão, a meta do dia (nível 2), as configurações, o supervisor, o gestor e as telas do diretor deixam de usar toast para o que cabe no objeto. A venda registrada comemora em tela cheia com o capitão (nível 3). O que ficou de fora está no plano: `docs/implementations/active/2026-11-14-feedback-padrao.md`.
-
-## 14/11/2026 - Avatares contextuais dos assistentes
-
-Dez assets WebP transparentes do universo do Capitão Âncora identificam visualmente os assistentes por área no Lite de corretor, gestor e supervisor: Leads, Carteira, Plantão, Agenda, Cotação, Desempenho, Dicas, Jornada, Equipe e Mensagens. Também acompanham o cabeçalho de conversa; no mesmo controle global auditado, desligado ou com erro de carregamento, retornam os avatares abstratos. O controle não amplia as ilustrações de seção/vazio para gestor e supervisor. Jack/Notificações, leads individuais, conteúdo e sinais de estado permanecem inalterados. Plano e evidências: `docs/implementations/completed/2026-11-14-mascote-assets-contextuais.md`.
