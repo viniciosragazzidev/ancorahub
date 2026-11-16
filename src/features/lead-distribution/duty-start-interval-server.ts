@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gt, inArray, isNull, lte, max, ne, or } from "drizzle-orm";
+import { and, count, eq, gt, gte, inArray, isNull, lte, max, ne, or } from "drizzle-orm";
 
 import { getLocalDutyParts } from "@/features/leads/assignment";
 
@@ -8,7 +8,7 @@ import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/querie
 import { getDatabase, schema } from "@/shared/db";
 import { filterPausedDutyAssignmentsBeforeResolution, resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getPresenceEligibleAssignments } from "./duty-presence";
-import { DUTY_START_INTERVAL_MINUTES, dutyStartIntervalReleaseAt, resolveDutyStartInterval } from "./duty-start-interval";
+import { DUTY_START_INTERVAL_MINUTES, dutyStartIntervalCapReached, dutyStartIntervalReleaseAt, resolveDutyStartInterval } from "./duty-start-interval";
 
 type DatabaseLike = Pick<ReturnType<typeof getDatabase>, "select">;
 
@@ -43,6 +43,24 @@ export async function loadDutyStartIntervalAnchors(db: DatabaseLike, input: { te
 }
 
 /**
+ * Ofertas (exceto CANCELLED) de cada corretor desde o início da ocorrência, em qualquer fila: o teto de 3 do começo
+ * do plantão (16/11/2026).
+ */
+export async function loadDutyStartOfferCounts(db: DatabaseLike, input: { tenantId: string; brokerIds: readonly string[]; since: Date; now: Date }) {
+  const counts = new Map<string, number>();
+  if (!input.brokerIds.length) return counts;
+  const rows = await db.select({ brokerId: schema.leadOffers.brokerId, total: count() }).from(schema.leadOffers).where(and(
+    eq(schema.leadOffers.tenantId, input.tenantId),
+    inArray(schema.leadOffers.brokerId, [...input.brokerIds]),
+    gte(schema.leadOffers.offeredAt, input.since),
+    lte(schema.leadOffers.offeredAt, input.now),
+    ne(schema.leadOffers.status, "CANCELLED"),
+  )).groupBy(schema.leadOffers.brokerId);
+  for (const row of rows) if (row.brokerId) counts.set(row.brokerId, Number(row.total));
+  return counts;
+}
+
+/**
  * Corretores que estão no intervalo de início agora, com o momento em que voltam a poder receber.
  * Fail-open: com a flag desligada ou qualquer erro, devolve vazio e a distribuição fica como antes.
  */
@@ -61,16 +79,30 @@ export async function resolveDutyStartIntervalHolds(input: {
     if (!(await isDutyStartOfferIntervalEnabled())) return empty;
     const now = input.now ?? new Date();
     const activeBySchedule = new Map<string, { endsAt: Date; confirmed: number; pending: number }>();
-    for (const [scheduleId, count] of input.startPresenceBySchedule) {
-      const state = resolveDutyStartInterval({ occurrenceStartsAt: count.startsAt, now, confirmedCount: count.confirmed, pendingCount: count.pending });
-      if (state.active) activeBySchedule.set(scheduleId, { endsAt: state.endsAt, confirmed: state.confirmedCount, pending: state.pendingCount });
+    const startsAtBySchedule = new Map<string, Date>();
+    for (const [scheduleId, presence] of input.startPresenceBySchedule) {
+      const state = resolveDutyStartInterval({ occurrenceStartsAt: presence.startsAt, now, confirmedCount: presence.confirmed, pendingCount: presence.pending });
+      if (state.active) {
+        activeBySchedule.set(scheduleId, { endsAt: state.endsAt, confirmed: state.confirmedCount, pending: state.pendingCount });
+        startsAtBySchedule.set(scheduleId, presence.startsAt);
+      }
     }
     if (!activeBySchedule.size) return empty;
     const brokerIds = input.brokerIds.filter((brokerId) => activeBySchedule.has(input.scheduleIdByBroker.get(brokerId) ?? ""));
-    const anchors = await loadDutyStartIntervalAnchors(input.db ?? getDatabase(), { tenantId: input.tenantId, brokerIds, now });
+    const db = input.db ?? getDatabase();
+    const earliestStart = [...startsAtBySchedule.values()].reduce((earliest, at) => (at < earliest ? at : earliest));
+    const [anchors, offerCounts] = await Promise.all([
+      loadDutyStartIntervalAnchors(db, { tenantId: input.tenantId, brokerIds, now }),
+      loadDutyStartOfferCounts(db, { tenantId: input.tenantId, brokerIds, since: earliestStart, now }),
+    ]);
     for (const brokerId of brokerIds) {
       const scheduleId = input.scheduleIdByBroker.get(brokerId)!;
       const active = activeBySchedule.get(scheduleId)!;
+      // Teto de 3 no começo do plantão: com 3 leads, espera o intervalo acabar (todos confirmarem ou a janela fechar).
+      if (dutyStartIntervalCapReached(offerCounts.get(brokerId) ?? 0) && active.endsAt > now) {
+        holds.set(brokerId, { retryAt: active.endsAt, scheduleId, ...active });
+        continue;
+      }
       const anchor = anchors.get(brokerId);
       const retryAt = anchor ? dutyStartIntervalReleaseAt({ ...anchor, now, intervalEndsAt: active.endsAt }) : null;
       if (retryAt) holds.set(brokerId, { retryAt, scheduleId, ...active });
