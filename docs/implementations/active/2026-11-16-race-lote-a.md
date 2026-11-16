@@ -76,6 +76,8 @@ Fechar concorrências de proposta/venda, documentos, atribuição, plantões, co
 - Arquivos: `src/features/leads/phone-dedup-lock.ts`, seus testes unitário e PostgreSQL opt-in, `manual-create.ts`, `bulk-import.ts`, `marketing-import/service.ts`, `create-lead-from-webhook-sync.ts`, `src/app/api/webhooks/openwa/[tenantId]/route.ts` e `src/features/waha-cadence/inbound.ts`.
 - Testes: teste unitário concorrente com `Promise.all` e barreira; integração PostgreSQL concorrente adicionada, skip sem `ERP_TEST_DATABASE_URL`. `npx vitest run ...` passou com 28 testes e 1 skip (incluindo o DB opt-in); `npx tsc --noEmit` passou.
 
+- Correção integrada com F7: OpenWA usa `openWaPhoneCandidateFilter` nas leituras iniciais e nas releituras protegidas pelo lock. Telefones recebidos com menos de 8 dígitos fazem varredura do tenant; candidatos salvos com menos de 8 dígitos continuam incluídos para preservar `openWaSamePhone`.
+
 ### Item 9 concluído
 
 - Commit: a pré-confirmação só aparece para Diretor com `duty_schedules_manage`, quando há presença confirmada agora e exatamente uma assignment ativa do mesmo corretor começa no instante UTC em que o turno atual termina. A tolerância é 0 minuto; sobreposição, lacuna, ambiguidade ou próxima presença já ausente/expirada não exibem a ação.

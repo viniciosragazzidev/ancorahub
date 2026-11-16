@@ -34,4 +34,12 @@ describe("OpenWA phone candidates (egress 16/11)", () => {
   it("keeps the full scan for a sender shorter than 8 digits", () => {
     expect(openWaPhoneCandidateFilter({} as never, "1234567")).toBeUndefined();
   });
+
+  it("keeps a stored phone shorter than 8 digits when the sender is longer", () => {
+    const sender = "55219999123456";
+    const stored = "123456";
+    expect(openWaSamePhone(stored, sender)).toBe(true);
+    expect(isCandidate(stored, sender)).toBe(true);
+    expect(openWaPhoneCandidateFilter({} as never, sender)).toBeDefined();
+  });
 });

@@ -2,6 +2,11 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 16/11/2026 - Auditoria de concorrência, Lote A
+
+- Claims no PostgreSQL impedem efeitos duplicados ao converter proposta em venda, registrar venda com documentos aprovados, assumir investigação, revisar documentos, mover escala, aceitar convite e consumir retry da qualificação.
+- Criação de lead por telefone usa um lock transacional por tenant nos caminhos manual, CSV, importação, Meta, OpenWA e WAHA. OpenWA usa o filtro compartilhado de candidatos também durante a releitura protegida, preservando telefones curtos. A pré-confirmação de turno estritamente contíguo usa a ocorrência única e UPDATE condicional auditado.
+
 ## 15/11/2026 - Ícones dos assistentes mais leves
 
 - Os objetos visuais das áreas na lista lateral passam de 44 px para 35 px, centralizados no slot de 44 px existente. A linha mantém sua área de toque; Jack, marca verificada, iniciais e avatares pessoais não mudam.
