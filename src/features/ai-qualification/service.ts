@@ -20,6 +20,7 @@ import { reopenColdLeadForQualification } from "@/features/qualification-engine/
 import { parseOptOut, parseWrongNumber, type QuickReplyMessageKind } from "@/features/ai-agent/quick-reply";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
+import { incrementAiQualificationRetry } from "./retry-count";
 
 const questions = [
   { key: "city", prompt: "Para começar, em qual cidade você pretende contratar o plano?" },
@@ -183,8 +184,10 @@ export async function processAiQualificationMessage(input: { tenantId: string; l
   const current = questions[currentIndex] ?? questions[0];
   let value = input.text.trim();
   let message: string | null = null;
+  let maxRetries = 2;
   try {
     const config = await getOrCreateConfig(input.tenantId);
+    maxRetries = config?.maxRetries ?? maxRetries;
     let systemPromptOverride = "Você é o qualificador da Âncora Corretora. Não solicite documentos, senhas, CPF ou dados de saúde. Retorne somente JSON válido no formato {value:string|null,valid:boolean,message:string|null}. Valide a resposta para a pergunta indicada e escreva uma orientação curta em português se precisar repetir.";
     if (config?.businessContext?.trim()) {
       systemPromptOverride += `\n\nCONTEXTO E BASE DE CONHECIMENTO DA EMPRESA:\n${config.businessContext.trim()}`;
@@ -202,7 +205,16 @@ export async function processAiQualificationMessage(input: { tenantId: string; l
     if (parsed.success) { value = parsed.data.value ?? ""; message = parsed.data.message; }
   } catch (error) { console.warn("[ai-qualification] response parsing fallback", error); }
   if (!value) {
-    await db.update(schema.aiQualificationSessions).set({ status: "waiting_customer", retryCount: session.retryCount + 1, updatedAt: new Date() }).where(eq(schema.aiQualificationSessions.id, session.id));
+    const retryAt = new Date();
+    const retried = await incrementAiQualificationRetry(db, { id: session.id, tenantId: input.tenantId, maxRetries, now: retryAt });
+    if (!retried) {
+      // The counter is capped; release this claimed turn so the existing fallback prompt can continue.
+      await db.update(schema.aiQualificationSessions).set({ status: "waiting_customer", updatedAt: retryAt }).where(and(
+        eq(schema.aiQualificationSessions.id, session.id),
+        eq(schema.aiQualificationSessions.tenantId, input.tenantId),
+        eq(schema.aiQualificationSessions.status, "processing"),
+      ));
+    }
     const reply = message ?? `Não consegui entender. ${current.prompt}`;
     await queueReply(input, session.id, reply, session.version);
     return { processed: true, completed: false, reply };

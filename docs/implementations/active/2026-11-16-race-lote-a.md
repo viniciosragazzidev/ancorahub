@@ -59,8 +59,13 @@ Fechar concorrências de proposta/venda, documentos, atribuição, plantões, co
 
 ### Item 6 concluído
 
-- Commit em preparação: o convite é consumido no início da transação por `UPDATE` condicionado a tenant, id, status `PENDING` e validade futura com `RETURNING`; ativação, associação, termos, auditoria e aviso posterior só ocorrem para o vencedor.
+- Commit `dbf07ffb`: o convite é consumido no início da transação por `UPDATE` condicionado a tenant, id, status `PENDING` e validade futura com `RETURNING`; ativação, associação, termos, auditoria e aviso posterior só ocorrem para o vencedor.
 - Testes: duas aceitações com `Promise.all` e barreira unitária; teste PostgreSQL isolado adicionado com a mesma barreira e skip condicional. Vitest passou: 8 testes e 1 skip pela URL de banco ausente; `npx tsc --noEmit` passou.
 - Botão de ativação já fica desabilitado durante o envio.
 
-Item 7 em andamento. Arquivos, testes, commits e riscos serão atualizados na conclusão.
+### Item 7 concluído
+
+- Commit em preparação: o retry usa incremento SQL atômico, condicionado ao tenant, sessão em processamento e `retry_count < maxRetries`, com `RETURNING`; no teto, libera a sessão sem aumentar o contador.
+- Testes: duas tentativas simultâneas com barreira geram um incremento; teste PostgreSQL isolado adicionado e skip condicional. Vitest passou: 10 testes, 1 skip sem URL de banco; `npx tsc --noEmit` passou.
+
+Item 8 em andamento. Arquivos, testes, commits e riscos serão atualizados na conclusão.
