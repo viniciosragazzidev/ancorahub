@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useDevLab } from "@/lib/dev-lab";
 
 import { distributeTeamListAction, importTeamListAction, reviewTeamListAction } from "./actions";
-import { SUPERVISOR_IMPORT_MAX, planShares, type ReviewedContact, type TeamListApi } from "./parse-contacts";
+import { SUPERVISOR_IMPORT_MAX, planShares, vcardToLines, type ReviewedContact, type TeamListApi } from "./parse-contacts";
 
 export type TeamListBroker = { id: string; name: string; availability: string };
 export type TeamListPendingLead = { id: string; name: string };
@@ -53,9 +53,29 @@ export function TeamListImport({ pending, team }: { pending: TeamListPendingLead
     setOpen(true);
   }
 
+  /**
+   * Excel (.xlsx/.xls), contatos do celular (.vcf), CSV ou texto: tudo vira texto aqui mesmo, uma linha por contato,
+   * e aparece na caixa para a supervisora ver antes de conferir. O .vcf pode trazer fotos enormes: só nome,
+   * telefone e e-mail seguem.
+   */
   async function readFile(file: File) {
-    setText(await file.text());
+    setReviewError(null);
     setReview(null);
+    try {
+      const name = file.name.toLowerCase();
+      if (/\.(xlsx|xls)$/.test(name)) {
+        const XLSX = await import("xlsx");
+        const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, blankrows: false });
+        setText(rows.map((row) => row.map((cell) => String(cell ?? "").trim()).filter(Boolean).join("\t")).filter(Boolean).join("\n"));
+        return;
+      }
+      const content = await file.text();
+      setText(/BEGIN:VCARD/i.test(content) ? vcardToLines(content) : content);
+    } catch {
+      setReviewError("Não consegui abrir esse arquivo. Tente salvar como CSV ou copiar e colar os contatos.");
+    }
   }
 
   async function runReview() {
@@ -99,8 +119,8 @@ export function TeamListImport({ pending, team }: { pending: TeamListPendingLead
                 placeholder={"Maria Silva (21) 99876-5432 maria@email.com\nJoão Souza 11912345678"}
               />
               <label className="w-max cursor-pointer text-sm font-medium text-(--chat-action-text)">
-                Ou enviar arquivo CSV
-                <input type="file" accept=".csv,.txt,text/csv,text/plain" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file); }} />
+                Ou enviar arquivo (Excel, CSV ou contatos do celular)
+                <input type="file" accept=".xlsx,.xls,.csv,.txt,.vcf,text/csv,text/plain,text/vcard,text/x-vcard" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file); }} />
               </label>
               {reviewError ? <p role="alert" className="text-sm text-(--danger)">{reviewError}</p> : null}
             </SheetBody>

@@ -57,9 +57,14 @@ function cleanName(value: string) {
     .trim();
 }
 
-/** Uma linha de texto livre (colado do WhatsApp, Excel ou bloco de notas) vira nome, telefone e e-mail. */
-export function parseContactLine(raw: string, line: number): ParsedContact | null {
-  let rest = raw.trim();
+/** Rótulos que vêm em listas copiadas ("Nome: Maria", "Tel: 21 9...", "E-mail: ..."). */
+const LABEL = /\b(nome|name|telefone|tel|celular|cel|whatsapp|whats|zap|fone|phone|e-?mail|contato)\s*[:=]\s*/gi;
+
+type Piece = { line: number; name: string; phoneRaw: string | null; email: string | null };
+
+/** O que uma linha tem, ainda sem decidir se é um contato inteiro ou parte de um (nome numa linha, telefone na outra). */
+function extract(raw: string, line: number): Piece | null {
+  let rest = raw.replace(LABEL, " ").trim();
   if (!rest) return null;
   const email = rest.match(EMAIL)?.[0]?.toLowerCase() ?? null;
   if (email) rest = rest.replace(EMAIL, " ");
@@ -67,7 +72,11 @@ export function parseContactLine(raw: string, line: number): ParsedContact | nul
   if (phoneRaw) rest = rest.replace(phoneRaw, " ");
   const name = titleCase(cleanName(rest));
   if (!name && !phoneRaw && !email) return null;
+  return { line, name, phoneRaw, email };
+}
 
+function finish(piece: Piece): ParsedContact {
+  const { line, name, phoneRaw, email } = piece;
   const read = phoneRaw ? lerTelefone(phoneRaw) : null;
   const phone = read?.ok && read.celular ? read.e164 : null;
   const problem = !phoneRaw
@@ -82,21 +91,66 @@ export function parseContactLine(raw: string, line: number): ParsedContact | nul
   return { line, name, phone, phoneLabel: read?.ok ? read.exibicao : phoneRaw, email, problem };
 }
 
-/** O texto inteiro (ou o CSV) vira a lista organizada, com no máximo 50 contatos. */
+/** Uma linha de texto livre (colado do WhatsApp, Excel ou bloco de notas) vira nome, telefone e e-mail. */
+export function parseContactLine(raw: string, line: number): ParsedContact | null {
+  const piece = extract(raw, line);
+  return piece ? finish(piece) : null;
+}
+
+/**
+ * Junta contato quebrado em linhas: "Maria Silva" numa linha e "(21) 99876-5432" (e/ou o e-mail) nas de baixo,
+ * como vem de lista copiada do WhatsApp. Só junta peças que se completam: nome sem telefone + telefone sem nome.
+ */
+function mergeBrokenContacts(pieces: Piece[]): Piece[] {
+  const merged: Piece[] = [];
+  for (const piece of pieces) {
+    const last = merged.at(-1);
+    const lastNeedsPhone = last && last.name.length >= 2 && !last.phoneRaw;
+    const lastNeedsName = last && !last.name && last.phoneRaw;
+    const isPhoneOnly = !piece.name && piece.phoneRaw;
+    const isNameOnly = piece.name.length >= 2 && !piece.phoneRaw;
+    const isEmailOnly = !piece.name && !piece.phoneRaw && piece.email;
+    if (last && lastNeedsPhone && (isPhoneOnly || (isEmailOnly && !last.email))) {
+      merged[merged.length - 1] = { ...last, phoneRaw: last.phoneRaw ?? piece.phoneRaw, email: last.email ?? piece.email };
+    } else if (last && lastNeedsName && isNameOnly) {
+      merged[merged.length - 1] = { ...last, name: piece.name, email: last.email ?? piece.email };
+    } else if (last && isEmailOnly && !last.email && last.phoneRaw) {
+      merged[merged.length - 1] = { ...last, email: piece.email };
+    } else {
+      merged.push(piece);
+    }
+  }
+  return merged;
+}
+
+/** Contatos exportados do celular (.vcf): cada cartão vira uma linha "nome  telefone  e-mail". */
+export function vcardToLines(text: string): string {
+  const unfolded = text.replace(/\r/g, "").replace(/\n[ \t]/g, "");
+  const cards = unfolded.split(/BEGIN:VCARD/i).slice(1);
+  return cards.map((card) => {
+    const field = (name: string) => card.split("\n").filter((row) => new RegExp(`^(item\\d+\\.)?${name}[;:]`, "i").test(row)).map((row) => row.slice(row.indexOf(":") + 1).trim());
+    const fullName = field("FN")[0] || (field("N")[0] ?? "").split(";").filter(Boolean).reverse().join(" ");
+    const tels = card.split("\n").filter((row) => /^(item\d+\.)?TEL[;:]/i.test(row));
+    // Celular primeiro: é o que tem WhatsApp.
+    const tel = (tels.find((row) => /CELL|MOBILE/i.test(row)) ?? tels[0] ?? "");
+    const phone = tel ? tel.slice(tel.indexOf(":") + 1).replace(/^tel:/i, "").trim() : "";
+    return [fullName.replace(/\\,/g, ","), phone, field("EMAIL")[0] ?? ""].join("\t");
+  }).join("\n");
+}
+
+/** O texto inteiro (ou o CSV, ou o .vcf) vira a lista organizada, com no máximo 50 contatos. */
 export function parseContactList(text: string, max = SUPERVISOR_IMPORT_MAX): ParsedList {
-  const lines = text.replace(/\r/g, "").split("\n");
-  const contacts: ParsedContact[] = [];
-  let overflow = 0;
+  const source = /BEGIN:VCARD/i.test(text) ? vcardToLines(text) : text;
+  const lines = source.replace(/\r/g, "").split("\n");
+  const pieces: Piece[] = [];
   lines.forEach((raw, index) => {
     if (index === 0 && HEADER.test(raw)) return;
-    const contact = parseContactLine(raw, index + 1);
-    if (!contact) return;
-    if (contacts.length >= max) {
-      overflow += 1;
-      return;
-    }
-    contacts.push(contact);
+    const piece = extract(raw, index + 1);
+    if (piece) pieces.push(piece);
   });
+  const all = mergeBrokenContacts(pieces).map(finish);
+  const contacts = all.slice(0, max);
+  const overflow = all.length - contacts.length;
   // Repetido dentro da própria lista: o primeiro fica, os outros avisam.
   const seen = new Set<string>();
   for (const contact of contacts) {
