@@ -41,11 +41,12 @@ const transferDate = liteDateFormatter({ dateStyle: "medium", timeStyle: "short"
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 /** Abas da área de equipe: membros e unidades (a visão Unidades segue a tela atual). */
-export function TeamTabsLite({ active }: { active: "membros" | "unidades" }) {
+export function TeamTabsLite({ active }: { active: "membros" | "unidades" | "equipes" }) {
   return (
     <nav className={styles.tabs} aria-label="Equipe e unidades">
       <Link href="/equipe" className={styles.tab} aria-current={active === "membros" ? "page" : undefined}>Membros</Link>
       <Link href="/equipe?visao=unidades" className={styles.tab} aria-current={active === "unidades" ? "page" : undefined}>Unidades</Link>
+      <Link href="/equipe?visao=equipes" className={styles.tab} aria-current={active === "equipes" ? "page" : undefined}>Equipes</Link>
     </nav>
   );
 }
