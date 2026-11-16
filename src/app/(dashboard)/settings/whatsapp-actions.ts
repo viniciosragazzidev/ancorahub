@@ -596,6 +596,10 @@ export async function requestWhatsAppPairingCode(input: { phone: string }) {
   const phone = pairingPhoneDigits(input.phone);
   if (!phone) return { success: false as const, code: "INVALID_PHONE", error: "Confira o número: DDD + celular." };
 
+  // Sessão quebrada (16/11/2026, caso Edinaldo): pedir código numa sessão em FAILED sempre falha. A tela recria a
+  // sessão (forceNew) e pede de novo, sem o corretor ver "Confira a internet".
+  if (connection.status === "error") return { success: false as const, code: "SESSION_FAILED", error: "A sessão do WhatsApp precisa ser recriada." };
+
   const key = `${context.tenantId}:${context.userId}`;
   const waitMs = (lastPairingCodeAt.get(key) ?? 0) + PAIRING_CODE_COOLDOWN_MS - Date.now();
   if (waitMs > 0) return { success: false as const, code: "PAIRING_COOLDOWN", error: "Aguarde para gerar outro código.", retryInMs: waitMs };
@@ -617,10 +621,16 @@ export async function requestWhatsAppPairingCode(input: { phone: string }) {
     return { success: true as const, pairingCode: result.code, retryInMs: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível gerar o código.";
-    const code = /INVALID_PHONE/.test(message) ? "INVALID_PHONE"
+    let code: string = /INVALID_PHONE/.test(message) ? "INVALID_PHONE"
       : /ALREADY_CONNECTED/.test(message) ? "ALREADY_CONNECTED"
         : /\b404\b|não foi encontrada/i.test(message) ? "PAIRING_CODE_UNSUPPORTED"
           : wahaActionErrorCode(message);
+    // Falha genérica: confere se a sessão caiu (FAILED/STOPPED). Aí a resposta certa é recriar, não "tente de novo".
+    if (!["INVALID_PHONE", "ALREADY_CONNECTED", "PAIRING_CODE_UNSUPPORTED"].includes(code)) {
+      const state = await readConnectionState(connection.sessionName).catch(() => null);
+      const provider = String(state?.providerStatus ?? state?.status ?? "").toUpperCase();
+      if (/FAILED|STOPPED/.test(provider) || /FAILED|STOPPED/i.test(message)) code = "SESSION_FAILED";
+    }
     return { success: false as const, code, error: message };
   }
 }
