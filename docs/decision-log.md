@@ -1,5 +1,13 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-188 - Pré-confirmação administrativa de plantão contíguo
+
+**Estado:** aceita para implementação. **Data:** 2026-11-16.
+
+Quando o mesmo corretor tem uma participação de plantão imediatamente após outra e sua presença no turno atual já foi confirmada, Diretor ou Gestor autorizado pode confirmar antecipadamente a ocorrência seguinte. Contiguidade exige igualdade exata entre o instante final do turno atual e o instante inicial do seguinte; a tolerância é zero minutos. A confirmação atualiza a linha de presença existente de `pending` para `confirmed`, não cria segunda linha para a mesma assignment/turno, registra o usuário que a marcou e compete por compare-and-set com a confirmação do corretor. O Gestor fica no escopo efetivo da unidade. A ação exige a permissão existente `duty_schedules_manage` e a flag atual de presença; não cria uma permissão ou flag nova.
+
+Implementação: `docs/implementations/active/2026-11-16-race-lote-a.md`.
+
 ## DEC-186 - ERP nas duas peles do design system e endurecimento de cargos
 
 **Estado:** aceita. **Data:** 2026-11-12.
