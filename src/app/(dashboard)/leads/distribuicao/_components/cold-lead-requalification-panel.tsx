@@ -29,7 +29,7 @@ export function ColdLeadRequalificationPanel({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirmationIds, setConfirmationIds] = useState<string[] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [result, setResult] = useState<{ sent: number; skipped: Array<{ leadId: string; name: string; reason: string }> } | null>(null);
+  const [result, setResult] = useState<{ sent: number; skipped: Array<{ leadId: string; name: string; reason: string }>; fallback?: { phoneSuffix: string; sent: number } | null } | null>(null);
   const queueReview = useMemo(() => leadsByQueue[queueId] ?? EMPTY_QUEUE_REVIEW, [leadsByQueue, queueId]);
   const allLeads = useMemo(() => [...queueReview.noResponse, ...queueReview.respondedStillCold], [queueReview]);
   const eligibleIds = allLeads.map((lead) => lead.id);
@@ -95,6 +95,7 @@ export function ColdLeadRequalificationPanel({
           {result ? (
             <div role="status" className="rounded-[var(--radius-card)] border border-border/70 bg-muted/20 p-3 text-sm">
               <p className="font-semibold">{result.sent} reenviado(s), {result.skipped.length} pulado(s)</p>
+              {result.fallback?.sent ? <p className="mt-1 text-xs text-muted-foreground">{result.fallback.sent} enviado(s) pelo número final {result.fallback.phoneSuffix}: o número da conversa ainda não tem o modelo de lembrete aprovado.</p> : null}
               {result.skipped.length ? <ul className="mt-2 space-y-1 text-xs text-muted-foreground">{result.skipped.map((item, index) => <li key={`${item.leadId}-${index}`}><strong className="text-foreground">{item.name}:</strong> {item.reason}</li>)}</ul> : null}
             </div>
           ) : null}

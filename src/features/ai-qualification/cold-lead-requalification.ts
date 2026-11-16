@@ -12,6 +12,7 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
+import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { ensureColdLeadReactivationRule } from "./followup-service";
 import { isEligibleColdLeadForReactivation } from "./cold-lead-reactivation-policy";
 import {
@@ -172,9 +173,68 @@ async function readOutboundHistory(tenantId: string, leadIds: string[]) {
   return rows.filter((row) => row.idempotencyKey.startsWith(REQUALIFICATION_PREFIX) || row.idempotencyKey === `${LEGACY_PREFIX}${row.recipientId}`);
 }
 
+const REQUALIFICATION_TEMPLATE = "anc_t1_lembrete";
+
+const errorCode = (error: unknown) => (error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : null);
+
 function reasonFromError(error: unknown) {
-  if (error && typeof error === "object" && "code" in error && typeof error.code === "string") return error.code;
+  const code = errorCode(error);
+  if (code === "FIRST_CONTACT_TEMPLATE_UNAVAILABLE") return "Nenhum número oficial tem o modelo de lembrete aprovado.";
+  if (code) return code;
   return error instanceof Error ? error.message.slice(0, 120) : "Falha ao preparar a mensagem oficial.";
+}
+
+type FallbackChannel = { id: string; phoneSuffix: string };
+
+/**
+ * Reserva (16/11/2026): o modelo de lembrete só vale dentro da conta (WABA) em que foi aprovado. Quando o número
+ * da última conversa do lead não tem o modelo (Plantão, Âncora Corretora), o reenvio sai pelo número oficial
+ * ativo que tem, de preferência o padrão. Sem nenhum, segue o erro de antes.
+ */
+async function findTemplateFallbackChannel(tenantId: string): Promise<FallbackChannel | null> {
+  const [row] = await getDatabase().select({ id: schema.communicationChannels.id, phone: schema.communicationChannels.displayPhoneNumber })
+    .from(schema.communicationChannels)
+    .innerJoin(schema.metaWhatsAppTemplates, and(
+      eq(schema.metaWhatsAppTemplates.tenantId, schema.communicationChannels.tenantId),
+      eq(schema.metaWhatsAppTemplates.wabaId, schema.communicationChannels.wabaId),
+      eq(schema.metaWhatsAppTemplates.name, REQUALIFICATION_TEMPLATE),
+      eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
+      eq(schema.metaWhatsAppTemplates.category, "UTILITY"),
+    ))
+    .where(and(
+      eq(schema.communicationChannels.tenantId, tenantId),
+      inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api"]),
+      eq(schema.communicationChannels.status, "active"),
+      eq(schema.communicationChannels.registrationStatus, "registered"),
+      isNull(schema.communicationChannels.branchId),
+    ))
+    .orderBy(desc(schema.communicationChannels.isDefault), asc(schema.communicationChannels.createdAt))
+    .limit(1);
+  return row ? { id: row.id, phoneSuffix: (row.phone ?? "").replace(/\D/g, "").slice(-4) } : null;
+}
+
+/** Enfileira o lembrete pelo número da conversa; sem o modelo lá, pela reserva. Devolve qual foi usado. */
+async function enqueueRequalification(
+  input: Omit<Parameters<typeof enqueueMetaTemplateMessage>[0], "requireApprovedMetaTemplate" | "templateName" | "channelId" | "strictSourceChannel">,
+  fallback: () => Promise<FallbackChannel | null>,
+) {
+  const base = { ...input, requireApprovedMetaTemplate: true, templateName: REQUALIFICATION_TEMPLATE };
+  try {
+    return { queued: await enqueueMetaTemplateMessage(base), via: null as FallbackChannel | null };
+  } catch (error) {
+    if (errorCode(error) !== "FIRST_CONTACT_TEMPLATE_UNAVAILABLE") throw error;
+    const channel = await fallback();
+    if (!channel) throw error;
+    // strictSourceChannel: usa exatamente este número, sem voltar para o da conversa.
+    const queued = await enqueueMetaTemplateMessage({ ...base, channelId: channel.id, strictSourceChannel: true });
+    return { queued, via: channel };
+  }
+}
+
+/** Busca a reserva uma vez por rodada. */
+function lazyFallback(tenantId: string) {
+  let cached: Promise<FallbackChannel | null> | null = null;
+  return () => (cached ??= findTemplateFallbackChannel(tenantId).catch(() => null));
 }
 
 async function persistSentMessage(tenantId: string, leadId: string, outboundId: string) {
@@ -209,6 +269,8 @@ async function persistSentMessage(tenantId: string, leadId: string, outboundId: 
 export type ColdLeadRequalificationResult = {
   sent: number;
   skipped: Array<{ leadId: string; name: string; reason: string }>;
+  /** Enviados pela reserva: o número da conversa não tinha o modelo aprovado. */
+  fallback?: { phoneSuffix: string; sent: number } | null;
 };
 
 export async function requalifyColdLeadsManually(context: TenantContext, input: { queueId: string; leadIds: string[]; now?: Date }): Promise<ColdLeadRequalificationResult> {
@@ -235,7 +297,8 @@ export async function requalifyColdLeadsManually(context: TenantContext, input: 
     )).limit(1);
   const queuePolicy = normalizeColdLeadRequalificationPolicy(readDistributionPolicy(policyRow?.policy).coldLeadRequalification);
   const since = operationDayStart(now);
-  const outgoing: Array<{ leadId: string; name: string; outboundId: string }> = [];
+  const outgoing: Array<{ leadId: string; name: string; outboundId: string; via: FallbackChannel | null }> = [];
+  const fallback = lazyFallback(context.tenantId);
   const skipped: ColdLeadRequalificationResult["skipped"] = [];
   let history: Array<OutboundHistory & { recipientId: string | null }> = [];
 
@@ -311,7 +374,7 @@ export async function requalifyColdLeadsManually(context: TenantContext, input: 
         continue;
       }
       try {
-        const queued = await enqueueMetaTemplateMessage({
+        const { queued, via } = await enqueueRequalification({
           tenantId: context.tenantId,
           recipientType: "lead",
           recipientId: lead.id,
@@ -320,10 +383,8 @@ export async function requalifyColdLeadsManually(context: TenantContext, input: 
           variables: [lead.nome || "Cliente", "Assistente Ancora Saude", "Ancora Saude"],
           requestedBy: context.userId,
           idempotencyKey: `${REQUALIFICATION_PREFIX}manual:${lead.id}:${(historyByLead.get(leadId)?.length ?? 0) + 1}`,
-          requireApprovedMetaTemplate: true,
-          templateName: "anc_t1_lembrete",
-        });
-        outgoing.push({ leadId, name: lead.nome, outboundId: queued.id });
+        }, fallback);
+        outgoing.push({ leadId, name: lead.nome, outboundId: queued.id, via });
       } catch (error) {
         const reason = reasonFromError(error);
         skipped.push({ leadId, name: lead.nome, reason });
@@ -337,13 +398,15 @@ export async function requalifyColdLeadsManually(context: TenantContext, input: 
   }
 
   let sent = 0;
+  let viaFallback: { phoneSuffix: string; sent: number } | null = null;
   // Bulk work: 2 at a time on the background DB sockets, so the pages keep theirs (24/10).
   await runInBackgroundPool(() => runWithConcurrency(outgoing, 2, async (queued) => {
     const delivery = await processMetaOutboundBatch(1, context.tenantId, queued.outboundId).catch(() => null);
     if (delivery?.sent) {
       await persistSentMessage(context.tenantId, queued.leadId, queued.outboundId);
-      await recordAudit({ tenantId: context.tenantId, actorUserId: context.userId, leadId: queued.leadId, action: "cold_lead_requalification.manual.sent", metadata: { outboundId: queued.outboundId } });
+      await recordAudit({ tenantId: context.tenantId, actorUserId: context.userId, leadId: queued.leadId, action: "cold_lead_requalification.manual.sent", metadata: { outboundId: queued.outboundId, fallbackChannelId: queued.via?.id ?? null } });
       sent += 1;
+      if (queued.via) viaFallback = { phoneSuffix: queued.via.phoneSuffix, sent: (viaFallback?.sent ?? 0) + 1 };
     } else {
       const [row] = await db.select({ status: schema.whatsappOutboundMessages.status, providerErrorCode: schema.whatsappOutboundMessages.providerErrorCode })
         .from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.id, queued.outboundId), eq(schema.whatsappOutboundMessages.tenantId, context.tenantId))).limit(1);
@@ -352,7 +415,7 @@ export async function requalifyColdLeadsManually(context: TenantContext, input: 
       await recordAudit({ tenantId: context.tenantId, actorUserId: context.userId, leadId: queued.leadId, action: "cold_lead_requalification.manual.skipped", metadata: { reason } });
     }
   }));
-  return { sent, skipped };
+  return { sent, skipped, fallback: viaFallback };
 }
 
 export type ColdLeadRequalificationSweepResult = { tenantsChecked: number; candidates: number; queued: number; sent: number; skipped: number; locked: number };
@@ -366,6 +429,7 @@ export async function runColdLeadRequalificationSweep(tenantIdFilter?: string, n
   ));
   const summary = { ...disabled, tenantsChecked: tenants.length };
   for (const { id: tenantId } of tenants) {
+    const fallback = lazyFallback(tenantId);
     await ensureColdLeadReactivationRule(tenantId);
     const tenantEnabled = await getActiveTenantRule(tenantId);
     if (!tenantEnabled) continue;
@@ -466,13 +530,12 @@ export async function runColdLeadRequalificationSweep(tenantIdFilter?: string, n
         if (!isWithinRequalificationBusinessWindow(now)) continue;
         const attempt = history.length + 1;
         try {
-          const queued = await enqueueMetaTemplateMessage({
+          const { queued } = await enqueueRequalification({
             tenantId, recipientType: "lead", recipientId: lead.id, destinationPhone: lead.telefone,
             purpose: "leadQualification", variables: [lead.nome || "Cliente", "Assistente Ancora Saude", "Ancora Saude"],
-            idempotencyKey: `${REQUALIFICATION_PREFIX}auto:${lead.id}:${attempt}`, requireApprovedMetaTemplate: true,
-            templateName: "anc_t1_lembrete",
+            idempotencyKey: `${REQUALIFICATION_PREFIX}auto:${lead.id}:${attempt}`,
             scheduledAt: nextRequalificationBusinessWindowAt(now),
-          });
+          }, fallback);
           if (!queued.duplicate) queuedCount += 1;
           const delivery = await processMetaOutboundBatch(1, tenantId, queued.id).catch(() => null);
           if (delivery?.sent) {
