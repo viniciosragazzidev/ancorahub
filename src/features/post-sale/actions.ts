@@ -24,6 +24,7 @@ import { resolveAccessContext } from "@/shared/auth/access-context";
 import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 import { canEnsureLeadHolder } from "./register-sale-access";
 import { hasEffectiveRouteAccess } from "@/features/custom-roles/service";
+import { lockSaleEvidence, saleEvidenceIssue, saleEvidenceIssueMessage } from "./sale-document-validation";
 
 const registerSaleInput = z.object({
   leadId: z.string().min(1),
@@ -201,24 +202,46 @@ export async function removeLeadBeneficiaryAction(beneficiaryId: string) {
   if (!z.string().uuid().safeParse(beneficiaryId).success) return { error: "Beneficiário inválido." };
   const context = await getRequiredTenantContext();
   const db = getDatabase();
-  const [beneficiary] = await db.select({ id: schema.leadBeneficiaries.id, leadId: schema.leadBeneficiaries.leadId, isHolder: schema.leadBeneficiaries.isHolder }).from(schema.leadBeneficiaries).innerJoin(schema.leads, eq(schema.leadBeneficiaries.leadId, schema.leads.id)).where(and(eq(schema.leadBeneficiaries.id, beneficiaryId), eq(schema.leadBeneficiaries.tenantId, context.tenantId), context.role === "broker" ? eq(schema.leads.corretorId, context.userId) : context.role === "manager" ? eq(schema.leads.branchId, context.branchId ?? "") : undefined)).limit(1);
-  if (!beneficiary) return { error: "Beneficiário não encontrado." };
-  if (beneficiary.isHolder) return { error: "O titular não pode ser removido. Substitua-o antes." };
-  const [quotedLineItem] = await db.select({ id: schema.quoteLineItems.id }).from(schema.quoteLineItems).where(and(eq(schema.quoteLineItems.tenantId, context.tenantId), eq(schema.quoteLineItems.beneficiaryId, beneficiary.id))).limit(1);
-  if (quotedLineItem) return { error: "Este beneficiário já faz parte de uma cotação. Exclua ou substitua a cotação antes de removê-lo." };
-  const [linkedDocument] = await db.select({ id: schema.leadDocuments.id }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.tenantId, context.tenantId), eq(schema.leadDocuments.beneficiaryId, beneficiary.id))).limit(1);
-  if (linkedDocument) return { error: "Este beneficiário possui documentos vinculados. Remova ou substitua os documentos antes de excluí-lo." };
   try {
-    await db.delete(schema.leadBeneficiaries).where(and(eq(schema.leadBeneficiaries.id, beneficiary.id), eq(schema.leadBeneficiaries.tenantId, context.tenantId)));
+    return await db.transaction(async (tx) => {
+      // Use the same aggregate lock as sale registration and beneficiary edits.
+      const [lead] = await tx.select({ id: schema.leads.id, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId })
+        .from(schema.leads)
+        .where(and(eq(schema.leads.id, sql`(select lead_id from lead_beneficiaries where id = ${beneficiaryId} and tenant_id = ${context.tenantId})`), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt)))
+        .limit(1)
+        .for("update");
+      if (!lead) return { error: "Beneficiário não encontrado." };
+      if ((context.role === "broker" && lead.corretorId !== context.userId) || (context.role === "manager" && lead.branchId !== context.branchId)) {
+        return { error: "Beneficiário não encontrado." };
+      }
+      const [beneficiary] = await tx.select({ id: schema.leadBeneficiaries.id, leadId: schema.leadBeneficiaries.leadId, isHolder: schema.leadBeneficiaries.isHolder })
+        .from(schema.leadBeneficiaries)
+        .where(and(eq(schema.leadBeneficiaries.id, beneficiaryId), eq(schema.leadBeneficiaries.tenantId, context.tenantId), eq(schema.leadBeneficiaries.leadId, lead.id)))
+        .limit(1)
+        .for("update");
+      if (!beneficiary) return { error: "Beneficiário não encontrado." };
+      if (beneficiary.isHolder) return { error: "O titular não pode ser removido. Substitua-o antes." };
+      const [quotedLineItem] = await tx.select({ id: schema.quoteLineItems.id }).from(schema.quoteLineItems).where(and(eq(schema.quoteLineItems.tenantId, context.tenantId), eq(schema.quoteLineItems.beneficiaryId, beneficiary.id))).limit(1);
+      if (quotedLineItem) return { error: "Este beneficiário já faz parte de uma cotação. Exclua ou substitua a cotação antes de removê-lo." };
+      const [linkedDocument] = await tx.select({ id: schema.leadDocuments.id }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.tenantId, context.tenantId), eq(schema.leadDocuments.beneficiaryId, beneficiary.id))).limit(1);
+      if (linkedDocument) return { error: "Este beneficiário possui documentos vinculados. Remova ou substitua os documentos antes de excluí-lo." };
+      const [removed] = await tx.delete(schema.leadBeneficiaries).where(and(
+        eq(schema.leadBeneficiaries.id, beneficiary.id),
+        eq(schema.leadBeneficiaries.tenantId, context.tenantId),
+        eq(schema.leadBeneficiaries.leadId, lead.id),
+      )).returning({ id: schema.leadBeneficiaries.id });
+      if (!removed) return { error: "Beneficiário removido por outra pessoa. Atualize a tela." };
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_beneficiary", entidadeId: removed.id, acao: "removeu" });
+      return { success: true };
+    });
   } catch {
     return { error: "Não foi possível excluir este beneficiário porque ele passou a ter vínculos operacionais. Atualize a página e tente novamente." };
   }
-  await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_beneficiary", entidadeId: beneficiary.id, acao: "removeu" });
-  return { success: true };
 }
 
 /** Already converted, or an active sale exists: a second registration would duplicate client, commissions and reminders. */
 class SaleAlreadyRegisteredError extends Error {}
+class SaleDocumentValidationError extends Error {}
 
 type RegisterSaleResult = { success: true; saleId: string; activeCustomerId: string } | { success?: undefined; error: string };
 
@@ -234,6 +257,7 @@ export async function registerSaleAction(rawInput: z.input<typeof registerSaleIn
     return await registerSale(parsed.data);
   } catch (error) {
     if (error instanceof SaleAlreadyRegisteredError) return { error: error.message };
+    if (error instanceof SaleDocumentValidationError) return { error: error.message };
     console.error("[register-sale] failed", { leadId: parsed.data.leadId, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
     const message = error instanceof Error ? error.message : "";
     // Scope and cargo messages are written for the user; anything else is generic.
@@ -256,11 +280,11 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
   const beneficiaries = await db.select().from(schema.leadBeneficiaries).where(and(eq(schema.leadBeneficiaries.leadId, lead.id), eq(schema.leadBeneficiaries.tenantId, context.tenantId)));
   if (!beneficiaries.some((beneficiary) => beneficiary.isHolder)) return { error: "Cadastre o titular e os beneficiários antes de registrar a venda." };
 
-  const [confirmation] = await db.select({ id: schema.leadDocuments.id, status: schema.leadDocuments.status }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.id, input.confirmationDocumentId), eq(schema.leadDocuments.leadId, lead.id), eq(schema.leadDocuments.tenantId, context.tenantId))).limit(1);
+  const [confirmation] = await db.select({ id: schema.leadDocuments.id, status: schema.leadDocuments.status }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.id, input.confirmationDocumentId), eq(schema.leadDocuments.leadId, lead.id), eq(schema.leadDocuments.tenantId, context.tenantId), isNull(schema.leadDocuments.deletedAt))).limit(1);
   if (!confirmation || confirmation.status !== "approved") return { error: "A confirmação da operadora precisa estar anexada e aprovada." };
 
   const requirements = await db.select({ id: schema.documentRequirements.id, required: schema.documentRequirements.required, appliesPerBeneficiary: schema.documentRequirements.appliesPerBeneficiary }).from(schema.documentRequirements).where(and(eq(schema.documentRequirements.tenantId, context.tenantId), or(isNull(schema.documentRequirements.planId), eq(schema.documentRequirements.planId, lead.planId ?? ""))));
-  const documents = await db.select({ requirementId: schema.leadDocuments.requirementId, beneficiaryId: schema.leadDocuments.beneficiaryId, status: schema.leadDocuments.status }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.leadId, lead.id), eq(schema.leadDocuments.tenantId, context.tenantId)));
+  const documents = await db.select({ requirementId: schema.leadDocuments.requirementId, beneficiaryId: schema.leadDocuments.beneficiaryId, status: schema.leadDocuments.status }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.leadId, lead.id), eq(schema.leadDocuments.tenantId, context.tenantId), isNull(schema.leadDocuments.deletedAt)));
   const missing = requirements.filter((requirement) => requirement.required && (requirement.appliesPerBeneficiary ? beneficiaries.some((beneficiary) => !documents.some((document) => document.requirementId === requirement.id && document.beneficiaryId === beneficiary.id && document.status === "approved")) : !documents.some((document) => document.requirementId === requirement.id && document.status === "approved")));
   if (missing.length) return { error: "Ainda existem documentos obrigatórios pendentes ou rejeitados." };
 
@@ -300,7 +324,7 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
   let soldFrom: { status: string; stageEnteredAt: Date | null } | null = null;
   await db.transaction(async (tx) => {
     // Lock the lead and check again inside the transaction: two concurrent submits register one sale.
-    const [locked] = await tx.select({ status: schema.leads.status, stageEnteredAt: schema.leads.stageEnteredAt, qualificationDetails: schema.leads.qualificationDetails }).from(schema.leads)
+    const [locked] = await tx.select({ status: schema.leads.status, stageEnteredAt: schema.leads.stageEnteredAt, qualificationDetails: schema.leads.qualificationDetails, planId: schema.leads.planId }).from(schema.leads)
       .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId))).limit(1).for("update");
     const lockedAiSale = Boolean(locked) && aiSaleRegistrationPending(locked!.status, locked!.qualificationDetails);
     const [activeSale] = await tx.select({ id: schema.sales.id }).from(schema.sales)
@@ -309,6 +333,14 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
     const block = saleRegistrationBlockedReason({ status: locked.status, aiRegistrationPending: lockedAiSale, hasActiveSale: Boolean(activeSale) });
     if (block === "lost") throw new SaleAlreadyRegisteredError("Este lead está perdido. Reabra o lead antes de registrar a venda.");
     if (block === "already_registered") throw new SaleAlreadyRegisteredError(activeSale ? "Este lead já tem uma venda ativa registrada." : "A venda deste lead já foi registrada.");
+    const lockedEvidence = await lockSaleEvidence(tx, {
+      tenantId: context.tenantId,
+      leadId: lead.id,
+      planId: locked.planId,
+      confirmationDocumentId: input.confirmationDocumentId,
+    });
+    const evidenceIssue = saleEvidenceIssue(lockedEvidence);
+    if (evidenceIssue) throw new SaleDocumentValidationError(saleEvidenceIssueMessage(evidenceIssue) ?? "Revise os documentos obrigatórios antes de registrar a venda.");
     // Já convertido pela IA: a etapa não muda de novo e o desfecho já foi avisado na conversão.
     soldFrom = lockedAiSale ? null : { status: locked.status, stageEnteredAt: locked.stageEnteredAt ?? null };
 
