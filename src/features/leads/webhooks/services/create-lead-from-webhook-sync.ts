@@ -10,6 +10,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 
 import { samePhone } from "@/features/communication-channels/service";
+import { lockLeadCreationByPhone } from "@/features/leads/phone-dedup-lock";
 import { lpFormPayloadSchema } from "../schemas/lp-form-payload.schema";
 import type { ReceiveLeadWebhookResult } from "../types/lead-webhook.types";
 import { hashNormalizedWebhookPayload, normalizeLeadEmail, normalizeLeadName, normalizeLeadPhone } from "../utils/lead-webhook.utils";
@@ -111,7 +112,6 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
   const normalizedName = normalizeLeadName(data.nome);
   const normalizedPhone = normalizeLeadPhone(data.telefone);
   // The payload has at least 10 digits; samePhone matches on the last 8 at least.
-  const phoneKey = normalizedPhone.replace(/\D/g, "").slice(-8);
   const normalizedEmail = normalizeLeadEmail(data.email);
   const qualificationEngineEnabled = await getSystemSetting("feature_qualification_engine_enabled").then((value) => value === "true").catch(() => false);
   const bypassPlantao = input.bypassPlantao ?? (await getSystemSetting(`feature_${input.leadSource?.channel ?? "webhook"}_bypass_plantao`).then((v) => v === "true").catch(() => false));
@@ -139,7 +139,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
     // Meta delivers each message of a contact on its own: two arriving together
     // both read "no lead" and each created one. This phone's turn in the tenant
     // lasts until the transaction ends, so the second one finds the first lead.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${tenantId}), hashtext(${phoneKey}))`);
+    const phoneKey = await lockLeadCreationByPhone(tx, tenantId, normalizedPhone);
     const existingLeads = await tx
       .select({
         id: schema.leads.id, status: schema.leads.status, telefone: schema.leads.telefone, sourceMetadata: schema.leads.sourceMetadata,

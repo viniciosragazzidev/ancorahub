@@ -9,6 +9,8 @@ import { getDatabase, schema } from "@/shared/db";
 import type { TenantContext } from "@/shared/auth/tenant-context";
 import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
+import { leadPhoneLockKey, lockLeadCreationByPhone, sameLeadPhone } from "@/features/leads/phone-dedup-lock";
+import type { DatabaseExecutor } from "@/shared/db";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 const BATCH_SIZE = 200;
@@ -156,7 +158,7 @@ function tipoValidation(row: RawRow, type: ImportType, errors: string[]) {
 }
 
 async function checkDuplicate(
-  db: ReturnType<typeof getDatabase>,
+  db: DatabaseExecutor,
   tenantId: string,
   row: NormalizedRow,
 ): Promise<"duplicate" | "new"> {
@@ -173,35 +175,22 @@ async function checkDuplicate(
     if (existing.length > 0) return "duplicate";
   }
 
-  // Rule 2: Same phone + same campaign
-  if (row.campanha) {
-    const existing = await db.select({ id: schema.leads.id })
+  // Rules 2 and 3: compare normalized phone variants while the caller holds
+  // the shared tenant + last-eight transaction lock.
+  if (row.campanha || row.capturedAt) {
+    const phoneKey = leadPhoneLockKey(row.telefone);
+    const candidates = await db.select({ telefone: schema.leads.telefone, sourceCampaign: schema.leads.sourceCampaign, capturedAt: schema.leads.capturedAt })
       .from(schema.leads)
-      .where(and(
-        eq(schema.leads.tenantId, tenantId),
-        eq(schema.leads.telefone, row.telefone),
-        eq(schema.leads.sourceCampaign, row.campanha),
-      ))
-      .limit(1);
-    if (existing.length > 0) return "duplicate";
-  }
-
-  // Rule 3: Same phone + same day
-  if (row.capturedAt) {
-    const dayStart = new Date(row.capturedAt);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(dayStart);
-    dayEnd.setDate(dayEnd.getDate() + 1);
-    const existing = await db.select({ id: schema.leads.id })
-      .from(schema.leads)
-      .where(and(
-        eq(schema.leads.tenantId, tenantId),
-        eq(schema.leads.telefone, row.telefone),
-        sql`${schema.leads.capturedAt} >= ${dayStart.toISOString()}::timestamptz`,
-        sql`${schema.leads.capturedAt} < ${dayEnd.toISOString()}::timestamptz`,
-      ))
-      .limit(1);
-    if (existing.length > 0) return "duplicate";
+      .where(and(eq(schema.leads.tenantId, tenantId), sql`right(regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g'), 8) = ${phoneKey}`));
+    const samePhoneCandidates = candidates.filter((candidate) => candidate.telefone && sameLeadPhone(candidate.telefone, row.telefone));
+    if (row.campanha && samePhoneCandidates.some((candidate) => candidate.sourceCampaign === row.campanha)) return "duplicate";
+    if (row.capturedAt) {
+      const dayStart = new Date(row.capturedAt);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+      if (samePhoneCandidates.some((candidate) => candidate.capturedAt && candidate.capturedAt >= dayStart && candidate.capturedAt < dayEnd)) return "duplicate";
+    }
   }
 
   // Rule 4: Same email + same day
@@ -316,13 +305,25 @@ export async function importMetaLeads(
     let imported = 0;
     let duplicates = 0;
     const invalid: Array<{ row: number; message: string }> = [];
-    let insertBuffer: Array<{ normalized: NormalizedRow; leadId: string }> = [];
+    let insertBuffer: Array<{ normalized: NormalizedRow; leadId: string; index: number }> = [];
     const importedLeadIds: string[] = [];
 
-    async function flushBuffer(b: Array<{ normalized: NormalizedRow; leadId: string }>) {
+    async function flushBuffer(b: Array<{ normalized: NormalizedRow; leadId: string; index: number }>) {
       if (b.length === 0) return;
-      await db.transaction(async (tx) => {
+      const insertedIds = await db.transaction(async (tx) => {
+        const committedIds: string[] = [];
+        const orderedPhoneKeys = [...new Set(b.map((item) => leadPhoneLockKey(item.normalized.telefone)))].sort();
+        for (const phoneKey of orderedPhoneKeys) await lockLeadCreationByPhone(tx, context.tenantId, phoneKey);
         for (const item of b) {
+          const duplicate = await checkDuplicate(tx, context.tenantId, item.normalized);
+          if (duplicate === "duplicate") {
+            await tx.insert(schema.marketingImportResults).values({
+              id: randomUUID(), importId, rowIndex: item.index,
+              status: "duplicate", externalLeadId: item.normalized.externalId || null, nome: item.normalized.nome,
+              telefone: item.normalized.telefone, email: item.normalized.email,
+            });
+            continue;
+          }
           const capturedAt = item.normalized.capturedAt ?? null;
           const sourceMetadata = {
             import_id: importId,
@@ -372,14 +373,22 @@ export async function importMetaLeads(
             metadata: sourceMetadata,
           });
 
-          const { startAiQualificationForLead } = await import("@/features/ai-qualification/service");
-          void startAiQualificationForLead({
-            tenantId: context.tenantId,
-            leadId: item.leadId,
-            actorUserId: context.userId,
-          }).catch((err) => console.error("[marketing-import] qualification autostart error:", err));
+          committedIds.push(item.leadId);
         }
+        return committedIds;
       });
+      const committed = new Set(insertedIds);
+      for (const item of b) {
+        if (committed.has(item.leadId)) {
+          importedLeadIds.push(item.leadId);
+          imported++;
+          const { startAiQualificationForLead } = await import("@/features/ai-qualification/service");
+          void startAiQualificationForLead({ tenantId: context.tenantId, leadId: item.leadId, actorUserId: context.userId })
+            .catch((err) => console.error("[marketing-import] qualification autostart error:", err));
+        } else {
+          duplicates++;
+        }
+      }
     }
 
     // Process each row
@@ -401,28 +410,9 @@ export async function importMetaLeads(
         continue;
       }
 
-      // Check duplicates
-      const dupResult = await checkDuplicate(db, context.tenantId, normalized);
-      if (dupResult === "duplicate") {
-        duplicates++;
-        await db.insert(schema.marketingImportResults).values({
-          id: randomUUID(),
-          importId,
-          rowIndex: index,
-          status: "duplicate",
-          externalLeadId: normalized.externalId || null,
-          nome: normalized.nome,
-          telefone: normalized.telefone,
-          email: normalized.email,
-        });
-        continue;
-      }
-
       // New lead - add to buffer
       const leadId = randomUUID();
-      insertBuffer.push({ normalized, leadId });
-      importedLeadIds.push(leadId);
-      imported++;
+      insertBuffer.push({ normalized, leadId, index });
 
       // Flush buffer when full
       if (insertBuffer.length >= BATCH_SIZE) {

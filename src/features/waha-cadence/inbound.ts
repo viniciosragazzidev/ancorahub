@@ -16,6 +16,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence";
 import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-message";
+import { lockLeadCreationByPhone } from "@/features/leads/phone-dedup-lock";
 import {
   phoneHash,
   normalizePhone,
@@ -761,18 +762,39 @@ async function resolveContact(
     })
   ) {
     const newLeadId = randomUUID();
-    await db.insert(schema.leads).values({
-      id: newLeadId,
-      tenantId,
-      corretorId: source.kind === "connection" ? source.connection.userId : undefined,
-      nome: `Lead WhatsApp (${normalizedPhone.slice(-4)})`,
-      telefone: normalizedPhone,
-      origem: "webhook",
-      status: "new",
-      serviceStartedAt: new Date(),
+    const resolution = await db.transaction(async (tx) => {
+      const phoneKey = await lockLeadCreationByPhone(tx, tenantId, normalizedPhone);
+      const candidateLeads = await tx.select({ id: schema.leads.id, telefone: schema.leads.telefone, corretorId: schema.leads.corretorId })
+        .from(schema.leads)
+        .where(and(eq(schema.leads.tenantId, tenantId), sql`right(regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g'), 8) = ${phoneKey}`));
+      const matchingLead = candidateLeads.find((candidate) => samePhoneSubscriber(candidate.telefone, normalizedPhone));
+      if (matchingLead) {
+        const ownedByConnection = source.kind !== "connection" || matchingLead.corretorId === source.connection.userId;
+        return { leadId: ownedByConnection ? matchingLead.id : null, clientId: null, created: false };
+      }
+      const candidateClients = await tx.select({ id: schema.clients.id, telefone: schema.clients.telefone, corretorId: schema.clients.corretorId })
+        .from(schema.clients)
+        .where(and(eq(schema.clients.tenantId, tenantId), sql`right(regexp_replace(${schema.clients.telefone}, '[^0-9]', '', 'g'), 8) = ${phoneKey}`));
+      const matchingClient = candidateClients.find((candidate) => samePhoneSubscriber(candidate.telefone, normalizedPhone));
+      if (matchingClient) {
+        const ownedByConnection = source.kind !== "connection" || matchingClient.corretorId === source.connection.userId;
+        return { leadId: null, clientId: ownedByConnection ? matchingClient.id : null, created: false };
+      }
+      await tx.insert(schema.leads).values({
+        id: newLeadId,
+        tenantId,
+        corretorId: source.kind === "connection" ? source.connection.userId : undefined,
+        nome: `Lead WhatsApp (${normalizedPhone.slice(-4)})`,
+        telefone: normalizedPhone,
+        origem: "webhook",
+        status: "new",
+        serviceStartedAt: new Date(),
+      });
+      return { leadId: newLeadId, clientId: null, created: true };
     });
-    leadId = newLeadId;
-    console.info("[waha/inbound] new_lead_created", { tenantId, leadId: newLeadId });
+    leadId = resolution.leadId;
+    clientId = resolution.clientId;
+    if (resolution.created) console.info("[waha/inbound] new_lead_created", { tenantId, leadId: newLeadId });
   }
 
   return { leadId, clientId, runId, formerOwnerLead };

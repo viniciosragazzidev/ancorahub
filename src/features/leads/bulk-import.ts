@@ -4,7 +4,7 @@ import { requireCargoCapability } from "@/shared/auth/authorization";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasCapability } from "@/shared/auth/permissions";
@@ -63,6 +63,7 @@ function parseCsv(text: string) {
 
 import { ensureBrazilPhone as normalizePhone } from "@/shared/utils/phone";
 import { runInBackgroundPool } from "@/shared/db/background-pool";
+import { lockLeadCreationByPhone, sameLeadPhone } from "./phone-dedup-lock";
 
 export async function importLeadsFromCsvAction(formData: FormData) {
   try {
@@ -210,22 +211,19 @@ export async function importLeadsFromCsvAction(formData: FormData) {
         if (!/^(?:55)?(?:[1-9]{2})9\d{8}$/.test(telefone)) throw new Error("telefone inválido");
         if (email && !z.string().email().safeParse(email).success) throw new Error("e-mail inválido");
 
-        const [existing] = await db
-          .select({ id: schema.leads.id })
-          .from(schema.leads)
-          .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.telefone, telefone)))
-          .limit(1);
-
-        if (existing) {
-          duplicates += 1;
-          continue;
-        }
-
         const leadId = randomUUID();
+        const inserted = await db.transaction(async (tx) => {
+          const phoneKey = await lockLeadCreationByPhone(tx, context.tenantId, telefone);
+          const candidates = await tx.select({ id: schema.leads.id, telefone: schema.leads.telefone })
+            .from(schema.leads)
+            .where(and(
+              eq(schema.leads.tenantId, context.tenantId),
+              sql`right(regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g'), 8) = ${phoneKey}`,
+            ));
+          if (candidates.some((candidate) => candidate.telefone && sameLeadPhone(candidate.telefone, telefone))) return false;
 
-        if (shouldQualifyLead) {
-          // Qualification Engine Active: Lead enters qualification first, and is targeted to targetQueueId
-          await db.transaction(async (tx) => {
+          if (shouldQualifyLead) {
+            // Qualification Engine Active: Lead enters qualification first, and is targeted to targetQueueId
             await tx.insert(schema.leads).values({
               id: leadId,
               tenantId: context.tenantId,
@@ -265,20 +263,10 @@ export async function importLeadsFromCsvAction(formData: FormData) {
               entidadeId: leadId,
               acao: "lead.bulk_imported_with_qualification",
             });
-          });
-
-          void startAiQualificationForLead({
-            tenantId: context.tenantId,
-            leadId,
-            actorUserId: context.userId,
-          }).catch(console.error);
-
-        } else {
-          // Qualification Engine Inactive: persist first, then use the same
-          // durable offer engine as every other automatic lead entry.
-          const distributionState = buildBulkImportDistributionState();
-
-          await db.transaction(async (tx) => {
+          } else {
+            // Qualification Engine Inactive: persist first, then use the same
+            // durable offer engine as every other automatic lead entry.
+            const distributionState = buildBulkImportDistributionState();
             await tx.insert(schema.leads).values({
               id: leadId,
               tenantId: context.tenantId,
@@ -314,8 +302,17 @@ export async function importLeadsFromCsvAction(formData: FormData) {
               entidadeId: leadId,
               acao: "lead.bulk_imported",
             });
-          });
+          }
+          return true;
+        });
 
+        if (!inserted) {
+          duplicates += 1;
+          continue;
+        }
+        if (shouldQualifyLead) {
+          void startAiQualificationForLead({ tenantId: context.tenantId, leadId, actorUserId: context.userId }).catch(console.error);
+        } else {
           distributionLeadIds.push(leadId);
         }
 

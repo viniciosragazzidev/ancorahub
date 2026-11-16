@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -56,7 +56,7 @@ export function normalizeCnpj(value: string | null | undefined) {
 }
 
 import { notifyNewLead, notifyLeadArrived } from "@/features/notifications/send-push-helper";
-import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
+import { lockLeadCreationByPhone, sameLeadPhone } from "./phone-dedup-lock";
 
 export async function createManualLead(rawInput: unknown) {
   const input = leadInput.parse(rawInput);
@@ -95,7 +95,8 @@ export async function createManualLead(rawInput: unknown) {
       throw new Error("O plano de interesse não está disponível para esta corretora.");
     }
   }
-  const [duplicate] = await db.select({ id: schema.leads.id, nome: schema.leads.nome, createdAt: schema.leads.createdAt, corretorNome: schema.user.name }).from(schema.leads).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.telefone, telefone))).orderBy(asc(schema.leads.createdAt)).limit(1);
+  const duplicateCandidates = await db.select({ id: schema.leads.id, nome: schema.leads.nome, telefone: schema.leads.telefone, createdAt: schema.leads.createdAt, corretorNome: schema.user.name }).from(schema.leads).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(and(eq(schema.leads.tenantId, context.tenantId), sql`right(regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g'), 8) = ${telefone.replace(/\D/g, "").slice(-8)}`)).orderBy(asc(schema.leads.createdAt));
+  const duplicate = duplicateCandidates.find((candidate) => candidate.telefone && sameLeadPhone(candidate.telefone, telefone));
   if (duplicate && input.duplicateConfirmed !== "true") return { duplicate: duplicate as DuplicateLeadNotice };
   const corretorId = context.role === "broker" ? context.userId : null;
   const leadId = randomUUID();
@@ -103,50 +104,59 @@ export async function createManualLead(rawInput: unknown) {
   if (input.tipo !== "PF" && input.formData.cnpj && !cnpj) {
     throw new Error("Informe um CNPJ com 14 dígitos para a empresa.");
   }
-  let companyId: string | null = null;
-  if (input.tipo !== "PF" && input.formData.razaoSocial?.trim()) {
-    const [existingCompany] = await db.select({ id: schema.companies.id })
-      .from(schema.companies)
-      .where(and(eq(schema.companies.tenantId, context.tenantId), cnpj ? eq(schema.companies.cnpj, cnpj) : eq(schema.companies.legalName, input.formData.razaoSocial.trim())))
-      .limit(1);
-    companyId = existingCompany?.id ?? randomUUID();
-    if (!existingCompany) {
-      await db.insert(schema.companies).values({
-        id: companyId,
-        tenantId: context.tenantId,
-        branchId: branchId,
-        name: input.formData.razaoSocial.trim(),
-        legalName: input.formData.razaoSocial.trim(),
-        cnpj,
-        employeeCount: input.formData.funcionarios ? Number(input.formData.funcionarios) : null,
-        createdBy: context.userId,
-      });
-    }
-  }
   const assigned = Boolean(corretorId);
-  await db.insert(schema.leads).values({
-    id: leadId,
-    tenantId: context.tenantId,
-    branchId: branchId,
-    companyId,
-    corretorId,
-    planId: input.planoInteresseId || null,
-    nome: input.nome,
-    telefone,
-    email: input.email || null,
-    origem: "manual",
-    tipo: input.tipo,
-    status: assigned ? "distributed" : "new",
-    distributionStatus: assigned ? "assigned" : "queued",
-    assignmentSource: assigned ? "automatic" : null,
-    assignmentStrategy: assigned ? "capacity" : null,
-    distributionUpdatedAt: new Date(),
-    assignedAt: assigned ? new Date() : null,
-    consentimentoLgpd: true,
-    formData: input.formData,
+  const creation = await db.transaction(async (tx) => {
+    const phoneKey = await lockLeadCreationByPhone(tx, context.tenantId, telefone);
+    const candidates = await tx.select({ id: schema.leads.id, nome: schema.leads.nome, telefone: schema.leads.telefone, createdAt: schema.leads.createdAt, corretorNome: schema.user.name }).from(schema.leads).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(and(eq(schema.leads.tenantId, context.tenantId), sql`right(regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g'), 8) = ${phoneKey}`)).orderBy(asc(schema.leads.createdAt));
+    const racedDuplicate = candidates.find((candidate) => candidate.telefone && sameLeadPhone(candidate.telefone, telefone));
+    if (racedDuplicate && input.duplicateConfirmed !== "true") return { duplicate: racedDuplicate } as const;
+
+    let companyId: string | null = null;
+    if (input.tipo !== "PF" && input.formData.razaoSocial?.trim()) {
+      const [existingCompany] = await tx.select({ id: schema.companies.id })
+        .from(schema.companies)
+        .where(and(eq(schema.companies.tenantId, context.tenantId), cnpj ? eq(schema.companies.cnpj, cnpj) : eq(schema.companies.legalName, input.formData.razaoSocial.trim())))
+        .limit(1);
+      companyId = existingCompany?.id ?? randomUUID();
+      if (!existingCompany) {
+        await tx.insert(schema.companies).values({
+          id: companyId,
+          tenantId: context.tenantId,
+          branchId,
+          name: input.formData.razaoSocial.trim(),
+          legalName: input.formData.razaoSocial.trim(),
+          cnpj,
+          employeeCount: input.formData.funcionarios ? Number(input.formData.funcionarios) : null,
+          createdBy: context.userId,
+        });
+      }
+    }
+    await tx.insert(schema.leads).values({
+      id: leadId,
+      tenantId: context.tenantId,
+      branchId,
+      companyId,
+      corretorId,
+      planId: input.planoInteresseId || null,
+      nome: input.nome,
+      telefone,
+      email: input.email || null,
+      origem: "manual",
+      tipo: input.tipo,
+      status: assigned ? "distributed" : "new",
+      distributionStatus: assigned ? "assigned" : "queued",
+      assignmentSource: assigned ? "automatic" : null,
+      assignmentStrategy: assigned ? "capacity" : null,
+      distributionUpdatedAt: new Date(),
+      assignedAt: assigned ? new Date() : null,
+      consentimentoLgpd: true,
+      formData: input.formData,
+    });
+    await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId, userId: context.userId, tipo: assigned ? "system_alert" : "note", conteudo: assigned ? "Lead criado e distribuído automaticamente para um corretor disponível." : "Lead criado manualmente; aguardando corretor disponível." });
+    await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: leadId, acao: "criou" });
+    return { leadId } as const;
   });
-  await db.insert(schema.leadInteractions).values({ id: randomUUID(), leadId, userId: context.userId, tipo: assigned ? "system_alert" : "note", conteudo: assigned ? "Lead criado e distribuído automaticamente para um corretor disponível." : "Lead criado manualmente; aguardando corretor disponível." });
-  await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: leadId, acao: "criou" });
+  if ("duplicate" in creation) return { duplicate: creation.duplicate as DuplicateLeadNotice };
   void publishLeadInvalidation({
     tenantId: context.tenantId,
     actorId: context.userId,

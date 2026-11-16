@@ -65,7 +65,15 @@ Fechar concorrências de proposta/venda, documentos, atribuição, plantões, co
 
 ### Item 7 concluído
 
-- Commit em preparação: o retry usa incremento SQL atômico, condicionado ao tenant, sessão em processamento e `retry_count < maxRetries`, com `RETURNING`; no teto, libera a sessão sem aumentar o contador.
+- Commit `64c6d6ff`: o retry usa incremento SQL atômico, condicionado ao tenant, sessão em processamento e `retry_count < maxRetries`, com `RETURNING`; no teto, libera a sessão sem aumentar o contador.
 - Testes: duas tentativas simultâneas com barreira geram um incremento; teste PostgreSQL isolado adicionado e skip condicional. Vitest passou: 10 testes, 1 skip sem URL de banco; `npx tsc --noEmit` passou.
 
-Item 8 em andamento. Arquivos, testes, commits e riscos serão atualizados na conclusão.
+### Item 8 concluído
+
+- Um helper `lockLeadCreationByPhone` concentra a chave original do Meta: lock transacional PostgreSQL por `hashtext(tenantId)` e `hashtext(últimos 8 dígitos)`. Meta webhook, cadastro manual, CSV/bulk, importação Meta Ads, OpenWA e o ramo de lead sintético do WAHA passam pelo helper e releem leads do tenant dentro da transação antes de inserir.
+- Cadastro manual continua aceitando duplicata somente com a confirmação explícita já existente. O bulk/importação contam a duplicata encontrada durante a transação e só disparam distribuição/qualificação para linhas realmente inseridas. OpenWA também passou a validar o ID da mensagem antes de criar lead.
+- O ramo atual de lead sintético WAHA está fechado por `shouldCreateSyntheticLead` (sempre `false`); a proteção foi aplicada ao ramo sem alterar essa política.
+- Arquivos: `src/features/leads/phone-dedup-lock.ts`, seus testes unitário e PostgreSQL opt-in, `manual-create.ts`, `bulk-import.ts`, `marketing-import/service.ts`, `create-lead-from-webhook-sync.ts`, `src/app/api/webhooks/openwa/[tenantId]/route.ts` e `src/features/waha-cadence/inbound.ts`.
+- Testes: teste unitário concorrente com `Promise.all` e barreira; integração PostgreSQL concorrente adicionada, skip sem `ERP_TEST_DATABASE_URL`. `npx vitest run ...` passou com 28 testes e 1 skip (incluindo o DB opt-in); `npx tsc --noEmit` passou.
+
+Item 9 em andamento. Arquivos, testes, commits e riscos serão atualizados na conclusão.

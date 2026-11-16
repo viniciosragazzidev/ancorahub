@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual, randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { after, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getDatabase, schema } from "@/shared/db";
@@ -10,6 +10,7 @@ import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-message";
 import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence/trigger";
 import { backgroundRoute } from "@/shared/db/background-pool";
+import { lockLeadCreationByPhone } from "@/features/leads/phone-dedup-lock";
 
 type OpenWaPayload = { id?: string; messageId?: string; from?: string; to?: string; sender?: string; recipient?: string; chatId?: string; body?: string; text?: string; type?: string; timestamp?: number; direction?: string; fromMe?: boolean; data?: OpenWaPayload; content?: { text?: string; body?: string }; message?: { text?: string; body?: string; type?: string } };
 
@@ -62,9 +63,12 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ tena
   const rawMessageKind = String(event.type ?? event.message?.type ?? "").toLowerCase();
   const messageKind = (["audio", "image", "document", "video", "sticker"] as const).includes(rawMessageKind as "audio" | "image" | "document" | "video" | "sticker") ? rawMessageKind as "audio" | "image" | "document" | "video" | "sticker" : "text";
   if (!phone) { console.info("[OpenWA] mensagem descartada: payload sem telefone"); return NextResponse.json({ accepted: true, discarded: true }); }
+  const providerMessageId = event.id ?? event.messageId ?? null;
+  if (!providerMessageId) return NextResponse.json({ accepted: true, discarded: true });
+  const phoneKey = phone.replace(/\D/g, "").slice(-8);
   const [leads, clients, brokers, numbers, channels] = await Promise.all([
-    db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status }).from(schema.leads).where(eq(schema.leads.tenantId, tenantId)),
-    db.select({ id: schema.clients.id, phone: schema.clients.telefone }).from(schema.clients).where(eq(schema.clients.tenantId, tenantId)),
+    db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status }).from(schema.leads).where(and(eq(schema.leads.tenantId, tenantId), sql`right(regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g'), 8) = ${phoneKey}`)),
+    db.select({ id: schema.clients.id, phone: schema.clients.telefone }).from(schema.clients).where(and(eq(schema.clients.tenantId, tenantId), sql`right(regexp_replace(${schema.clients.telefone}, '[^0-9]', '', 'g'), 8) = ${phoneKey}`)),
     db.select({ phone: schema.brokerProfiles.phone }).from(schema.brokerProfiles).where(eq(schema.brokerProfiles.tenantId, tenantId)),
     db.select({ phone: schema.wahaNumbers.displayPhoneNumber }).from(schema.wahaNumbers).where(eq(schema.wahaNumbers.tenantId, tenantId)),
     db.select({ phone: schema.communicationChannels.displayPhoneNumber }).from(schema.communicationChannels).where(eq(schema.communicationChannels.tenantId, tenantId)),
@@ -73,18 +77,34 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ tena
   const isInternal = [...brokers, ...numbers, ...channels].some((b) => b.phone && samePhone(b.phone));
   const matchingLeads = isInternal ? [] : leads.filter((item) => samePhone(item.phone));
   const isOutgoing = event.direction === "outgoing" || event.fromMe === true;
-  let lead = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(item.status)) ?? matchingLeads[0];
-  const client = isInternal ? undefined : clients.find((item) => samePhone(item.phone));
+  let lead: { id: string; phone: string; status: (typeof schema.leads.$inferSelect)["status"] } | null = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"].includes(item.status)) ?? matchingLeads[0] ?? null;
+  let client: (typeof clients)[number] | null = isInternal ? null : clients.find((item) => samePhone(item.phone)) ?? null;
+  let createdLead = false;
   if (!lead && !client && !isOutgoing && !isInternal) {
     const leadId = randomUUID();
-    await db.insert(schema.leads).values({ id: leadId, tenantId, nome: `Lead WhatsApp (${phone.slice(-4)})`, telefone: phone, origem: "webhook", status: "new", serviceStartedAt: new Date() });
-    lead = { id: leadId, phone, status: "new" };
-    await enqueueLeadDistributionJob({ tenantId, leadId });
-    console.info("[OpenWA] novo lead criado", { tenantId, leadId });
+    const resolved = await db.transaction(async (tx) => {
+      const lockedPhoneKey = await lockLeadCreationByPhone(tx, tenantId, phone);
+      const existingLeads = await tx.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status })
+        .from(schema.leads)
+        .where(and(eq(schema.leads.tenantId, tenantId), sql`right(regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g'), 8) = ${lockedPhoneKey}`));
+      const matchingLead = existingLeads.find((item) => samePhone(item.phone));
+      if (matchingLead) return { lead: matchingLead, client: null, created: false };
+      const existingClients = await tx.select({ id: schema.clients.id, phone: schema.clients.telefone }).from(schema.clients)
+        .where(and(eq(schema.clients.tenantId, tenantId), sql`right(regexp_replace(${schema.clients.telefone}, '[^0-9]', '', 'g'), 8) = ${lockedPhoneKey}`));
+      const matchingClient = existingClients.find((item) => samePhone(item.phone));
+      if (matchingClient) return { lead: null, client: matchingClient, created: false };
+      await tx.insert(schema.leads).values({ id: leadId, tenantId, nome: `Lead WhatsApp (${phone.slice(-4)})`, telefone: phone, origem: "webhook", status: "new", serviceStartedAt: new Date() });
+      return { lead: { id: leadId, phone, status: "new" as const }, client: null, created: true };
+    });
+    lead = resolved.lead;
+    client = resolved.client ?? client;
+    createdLead = resolved.created;
+    if (createdLead) {
+      await enqueueLeadDistributionJob({ tenantId, leadId });
+      console.info("[OpenWA] novo lead criado", { tenantId, leadId });
+    }
   }
   if (!lead && !client && !isInternal) { console.info("[OpenWA] mensagem descartada: contato não vinculado"); return NextResponse.json({ accepted: true, discarded: true }); }
-  const providerMessageId = event.id ?? event.messageId ?? null;
-  if (!providerMessageId) return NextResponse.json({ accepted: true, discarded: true });
   // Internal conversation history owns inbound messages only; outgoing messages
   // are represented by the outbox and must not be duplicated by WAHA echoes.
   if (isInternal && isOutgoing) return NextResponse.json({ accepted: true, discarded: true });
