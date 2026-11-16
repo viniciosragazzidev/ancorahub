@@ -5,19 +5,19 @@ import { useRouter } from "next/navigation";
 
 import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
 
-// 2 min (egress 16/11): lead and offer changes already arrive by realtime signal.
-const POLL_MS = 120_000;
+// 60 s (egress 16/11): plantão and presence edits send no signal, so this stays the fallback.
+const POLL_MS = 60_000;
 const SIGNAL_DEBOUNCE_MS = 2_000;
 
-/**
- * Keeps the plantão page following the rotation (29/10): refreshes when a lead or offer changes
- * (realtime signal, 2 s debounce) and every 30 s while visible, so the cards slide to the new turn.
- */
 /** Conversation signals (a director gets one every ~10 s) never change the rotation: skip them (egress 16/11). */
 export function isRotationSignal(detail: RealtimeSyncBrowserDetail | undefined) {
   return detail?.kind === "domain.invalidated" && detail.domain !== "conversations";
 }
 
+/**
+ * Keeps the plantão page following the rotation (29/10): refreshes when a lead or offer changes
+ * (realtime signal, 2 s debounce) and every 60 s while visible, so the cards slide to the new turn.
+ */
 export function DutyTurnAutoRefresh() {
   const router = useRouter();
   useEffect(() => {
