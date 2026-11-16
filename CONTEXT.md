@@ -27,6 +27,7 @@
 
 ## Distribuição de leads
 
+- **Pré-confirmação do plantão seguinte**: registro administrativo de presença para a próxima participação do mesmo corretor quando ela começa exatamente ao fim do turno confirmado.
 - **Participação na escala**: compromisso de um corretor com um plantão, distinto da elegibilidade para receber leads. Pode ser planejada para um cadastro desativado sem reativar seu acesso ou torná-lo disponível para distribuição.
 - **Plantão multiunidade/multidia**: criação coordenada de regras de plantão independentes para mais de uma unidade e/ou dia da semana. Não é uma regra compartilhada: cada combinação de unidade, fila e dia conserva escala, cobertura e histórico próprios.
 - **Central de distribuição**: superfície operacional única para configurar filas, acompanhar exceções e explicar decisões. Ela não substitui o motor: toda ação manual, qualificação e automação deve usar o mesmo resolver determinístico.
