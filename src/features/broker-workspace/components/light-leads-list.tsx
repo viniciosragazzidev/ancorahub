@@ -46,9 +46,11 @@ export type LightLeadItem = {
   lostReason?: string | null;
   /** The plantão that handed the lead out ("PME", "PRESENCIAL TARDE"). */
   dutyName?: string | null;
+  /** Lead da lista interna da equipe (importado e distribuído pela supervisão): aba própria. */
+  isTeamList?: boolean;
 };
 
-type FilterTab = "new" | "active" | "returns" | "risk" | "closed";
+type FilterTab = "new" | "active" | "returns" | "risk" | "team" | "closed";
 
 const ACTIVE_STATUSES = ["in_contact", "quote_sent", "negotiation", "documentation_pending"];
 
@@ -63,21 +65,25 @@ const isRiskLead = (lead: LightLeadItem) => !isLostLead(lead) && !isWonLead(lead
 const needsYouNow = (lead: LightLeadItem) =>
   !isLostLead(lead) && !isWonLead(lead) && (isNewLead(lead) || Boolean(lead.isAwaitingResponse) || Boolean(lead.isOverdue) || Boolean(lead.isSlaAtRisk));
 
+// 16/11: os leads da lista da supervisão ficam numa aba só deles, fora das etapas dos leads do corretor.
+const own = (test: (lead: LightLeadItem) => boolean) => (lead: LightLeadItem) => !lead.isTeamList && test(lead);
 const TAB_FILTERS: Record<FilterTab, (lead: LightLeadItem) => boolean> = {
-  new: isNewLead,
-  active: isActiveLead,
-  returns: isReturnLead,
-  risk: isRiskLead,
+  new: own(isNewLead),
+  active: own(isActiveLead),
+  returns: own(isReturnLead),
+  risk: own(isRiskLead),
+  team: (lead) => Boolean(lead.isTeamList) && !isWonLead(lead) && !isLostLead(lead),
   closed: (lead) => isWonLead(lead) || isLostLead(lead),
 };
 
-const QUERY_FILTERS: Record<string, FilterTab> = { awaiting: "new", new: "new", active: "active", returns: "returns", risk: "risk", closed: "closed", finished: "closed", lost: "closed" };
+const QUERY_FILTERS: Record<string, FilterTab> = { equipe: "team", team: "team", awaiting: "new", new: "new", active: "active", returns: "returns", risk: "risk", closed: "closed", finished: "closed", lost: "closed" };
 
 const EMPTY_COPY: Record<FilterTab, { title: string; description: string }> = {
   new: { title: "Nenhum lead novo", description: "Fique disponível no plantão para receber os próximos leads." },
   active: { title: "Nenhum atendimento em andamento", description: "Aceite um lead novo para começar um atendimento." },
   returns: { title: "Nenhum retorno pendente", description: "Leads sem atualização há mais de 3 dias aparecem aqui." },
   risk: { title: "Nenhum lead com prazo em risco", description: "Leads sem primeiro contato perto do limite aparecem aqui." },
+  team: { title: "Nenhum lead da supervisão", description: "Quando sua supervisão distribuir a lista da equipe, os leads aparecem aqui." },
   closed: { title: "Nada fechado ainda", description: "Vendas concluídas e leads perdidos aparecem aqui." },
 };
 
@@ -303,6 +309,7 @@ export function LightLeadsList({
       active: leads.filter(TAB_FILTERS.active).length,
       returns: leads.filter(TAB_FILTERS.returns).length,
       risk: leads.filter(TAB_FILTERS.risk).length,
+      team: leads.filter(TAB_FILTERS.team).length,
       closed: leads.filter(TAB_FILTERS.closed).length,
     }),
     [leads],
@@ -327,10 +334,10 @@ export function LightLeadsList({
   const dayGroups = useMemo(() => groupByArrivalDay(visible, (lead) => lead.arrivedAt, new Date(), (lead) => lead.name), [visible]);
 
   // "Em risco" only takes room in the bar while there is something at risk (or the broker came from the Inicio card).
-  const tabs = (["new", "active", "returns", "risk", "closed"] as const).filter((value) => value !== "risk" || counts.risk > 0 || filter === "risk");
+  const tabs = (["new", "active", "returns", "risk", "team", "closed"] as const).filter((value) => (value !== "risk" && value !== "team") || counts[value] > 0 || filter === value);
   const options = tabs.map((value) => ({
     id: value,
-    label: { new: "Novos", active: "Atendendo", returns: "Retornos", risk: "Em risco", closed: "Fechados" }[value],
+    label: { new: "Novos", active: "Atendendo", returns: "Retornos", risk: "Em risco", team: "Da supervisão", closed: "Fechados" }[value],
     count: counts[value],
   }));
 

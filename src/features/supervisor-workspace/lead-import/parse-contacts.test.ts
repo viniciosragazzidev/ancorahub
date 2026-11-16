@@ -69,6 +69,11 @@ describe("planShares", () => {
     expect(planShares(10, ["a", "b", "c"])).toEqual({ shares: [{ brokerId: "a", count: 4 }, { brokerId: "b", count: 3 }, { brokerId: "c", count: 3 }], left: 0 });
   });
 
+  it("never gives one broker more than the cap per distribution", () => {
+    expect(planShares(3819, ["a", "b"])).toEqual({ shares: [{ brokerId: "a", count: 50 }, { brokerId: "b", count: 50 }], left: 3719 });
+    expect(planShares(500, ["a"], { a: 120 }).shares).toEqual([{ brokerId: "a", count: 50 }]);
+  });
+
   it("never hands out more than the total with chosen quantities", () => {
     expect(planShares(5, ["a", "b"], { a: 3, b: 4 })).toEqual({ shares: [{ brokerId: "a", count: 3 }, { brokerId: "b", count: 2 }], left: 0 });
     expect(planShares(5, ["a", "b"], { a: 1 })).toEqual({ shares: [{ brokerId: "a", count: 1 }], left: 4 });

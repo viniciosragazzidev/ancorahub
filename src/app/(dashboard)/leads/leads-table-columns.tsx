@@ -459,6 +459,7 @@ export const getLeadsColumns = (
           </span>
           {isPlantaoAtivo ? <Badge variant="warning" size="sm">Plantão ativo</Badge> : null}
           {isManagementInvestigation ? <Badge variant="secondary" size="sm">Investigação da gestão</Badge> : null}
+          {row.original.isTeamList ? <Badge variant="secondary" size="sm">Lead de equipe</Badge> : null}
           {returnedUnaccepted && !broker ? (
             <span className="flex items-center gap-1.5 text-[11px] font-medium text-warning" title="Já passou por um corretor que não aceitou/atendeu a tempo; aguardando novo corretor">
               <span className="size-2 shrink-0 animate-pulse rounded-full bg-warning motion-reduce:animate-none" aria-hidden="true" />

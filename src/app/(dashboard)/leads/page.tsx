@@ -36,7 +36,9 @@ import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getSupervisorLiteRadar } from "@/features/supervisor-workspace/lite-queries";
 import { SupervisorLeadsRadar } from "@/features/supervisor-workspace/supervisor-leads-radar";
 import { withRadarSignals } from "@/features/supervisor-workspace/radar-signals";
-import { isSupervisorImportEnabled, countPendingSupervisorLeads, listSupervisorTeamBrokers } from "@/features/supervisor-workspace/lead-import/service";
+import { isSupervisorImportEnabled, countPendingSupervisorLeads, listSupervisorTeamBrokers, listSupervisorTeamList } from "@/features/supervisor-workspace/lead-import/service";
+import { TeamListManager } from "@/features/supervisor-workspace/lead-import/team-list-manager";
+import { TeamListSwitch } from "@/features/supervisor-workspace/lead-import/team-list-switch";
 import { TeamListImport } from "@/features/supervisor-workspace/lead-import/team-list-import";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import type { TenantContext } from "@/shared/auth/types";
@@ -59,6 +61,7 @@ import type { ExtendedColumnFilter, ExtendedColumnSort, JoinOperator } from "@/t
 import { withPerfSpan, withRequestTiming } from "@/shared/observability/request-timing";
 import { getLocalDutyParts } from "@/features/leads/assignment";
 import { isManagementInvestigation } from "@/features/lead-distribution/duty-leads-shift-groups";
+import { TEAM_LIST_SOURCE } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 import {
   getCachedLeadsBranches,
   getCachedPausedBranchCount,
@@ -74,16 +77,21 @@ export default async function LeadsPage(props: Parameters<typeof LeadsPageConten
   return result;
 }
 
-async function SupervisorRadarContent({ context, search }: { context: TenantContext; search: string }) {
+async function SupervisorRadarContent({ context, search, view = "equipe" }: { context: TenantContext; search: string; view?: "equipe" | "lista" }) {
   const [radar, importEnabled] = await Promise.all([getSupervisorLiteRadar(context), isSupervisorImportEnabled()]);
   const leads = await withRadarSignals(context.tenantId, radar.leads.map((lead) => ({ ...lead, assignedAt: lead.assignedAt?.toISOString() ?? null, firstContactAt: lead.firstContactAt?.toISOString() ?? null, stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null })));
   // Lista interna da equipe (16/11/2026): importar contatos e distribuir só para a equipe do supervisor.
   const canImport = importEnabled && context.role === "supervisor";
-  const [pending, team] = canImport ? await Promise.all([countPendingSupervisorLeads(context), listSupervisorTeamBrokers(context)]) : [0, []];
-  const action = canImport
-    ? <TeamListImport pending={pending} team={team.map((broker) => ({ id: broker.id, name: broker.name, availability: broker.availability ?? "available" }))} />
-    : undefined;
-  return <SupervisorLeadsRadar data={{ ...radar, leads }} now={new Date().toISOString()} search={search} action={action} />;
+  const [pending, teamRows] = canImport ? await Promise.all([countPendingSupervisorLeads(context), listSupervisorTeamBrokers(context)]) : [0, []];
+  const team = teamRows.map((broker) => ({ id: broker.id, name: broker.name, availability: broker.availability ?? "available" }));
+  // 16/11: lead dos corretores e lista importada pela supervisão ficam em vistas separadas.
+  if (canImport && view === "lista") {
+    const list = await listSupervisorTeamList(context);
+    return <TeamListManager rows={list.rows} totals={list.totals} team={team} switcher={<TeamListSwitch value="lista" pending={pending} />} />;
+  }
+  const action = canImport ? <TeamListImport pending={pending} team={team} /> : undefined;
+  const switcher = canImport ? <TeamListSwitch value="equipe" pending={pending} /> : undefined;
+  return <SupervisorLeadsRadar data={{ ...radar, leads }} now={new Date().toISOString()} search={search} action={action} switcher={switcher} />;
 }
 
 function SupervisorRadarLoading() {
@@ -101,6 +109,7 @@ async function LeadsPageContent({
     attention?: string;
     status?: string;
     search?: string;
+    vista?: string;
     branch?: string;
     new?: string;
     tipo?: string;
@@ -154,7 +163,7 @@ async function LeadsPageContent({
 
   if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
     const params = await searchParams;
-    return <Suspense fallback={<SupervisorRadarLoading />}><SupervisorRadarContent context={context} search={params.search ?? ""} /></Suspense>;
+    return <Suspense fallback={<SupervisorRadarLoading />}><SupervisorRadarContent context={context} search={params.search ?? ""} view={params.vista === "lista" ? "lista" : "equipe"} /></Suspense>;
   }
 
   // ─── Modo Lite (corretor) ──────────────────────────────────────────────
@@ -182,6 +191,7 @@ async function LeadsPageContent({
         assignedAt: schema.leads.assignedAt,
         motivoPerda: schema.leads.motivoPerda,
         dutyName: schema.unitDutySchedules.name,
+        sourceChannel: schema.leads.sourceChannel,
       })
       .from(schema.leads)
       .leftJoin(schema.carrierPlans, eq(schema.leads.planId, schema.carrierPlans.id))
@@ -238,6 +248,7 @@ async function LeadsPageContent({
         // When it reached this broker, like the Fila: a lead created days ago and handed out today is today's.
         arrivedAt: lead.assignedAt ?? lead.createdAt,
         dutyName: lead.dutyName,
+        isTeamList: lead.sourceChannel === TEAM_LIST_SOURCE,
         lostReason: lead.status === "lost" ? lead.motivoPerda : null,
         updatedAt: lead.stageEnteredAt,
         dueAt,
@@ -697,6 +708,19 @@ async function LeadsPageContent({
   const isLeadOnActiveDuty = (lead: { branchId: string | null; corretorId: string | null }) => Boolean(
     lead.branchId && lead.corretorId && activeDutyBrokerKeys.has(`${lead.branchId}:${lead.corretorId}`),
   );
+  // Lista interna da equipe (16/11): na coluna Fila, o nome da equipe que importou ("Equipe Valéria Gentil").
+  const teamListSupervisorIds = [...new Set([...leads, ...unassignedRows].flatMap((lead) => {
+    const supervisorId = lead.sourceChannel === TEAM_LIST_SOURCE ? (lead.sourceMetadata as { supervisorId?: unknown } | null)?.supervisorId : null;
+    return typeof supervisorId === "string" ? [supervisorId] : [];
+  }))];
+  const teamListNames = new Map((teamListSupervisorIds.length
+    ? await getDatabase().select({ id: schema.user.id, name: schema.user.name }).from(schema.user).where(inArray(schema.user.id, teamListSupervisorIds))
+    : []).map((row) => [row.id, `Equipe ${row.name}`]));
+  const teamQueueName = (lead: { sourceChannel: string | null; sourceMetadata: unknown; queueName: string | null }) => {
+    if (lead.sourceChannel !== TEAM_LIST_SOURCE) return lead.queueName;
+    const supervisorId = (lead.sourceMetadata as { supervisorId?: unknown } | null)?.supervisorId;
+    return (typeof supervisorId === "string" ? teamListNames.get(supervisorId) : null) ?? "Lista da equipe";
+  };
   const returnedUnacceptedIds = await getReturnedUnacceptedLeadIds(context.tenantId, [...leads, ...unassignedRows].filter((lead) => !lead.corretorId).map((lead) => lead.id));
 
   // Merge legacy carrier plans with global + private catalog plans
@@ -861,6 +885,8 @@ async function LeadsPageContent({
                 isPlantaoAtivo: isLeadOnActiveDuty(lead),
                 returnedUnaccepted: returnedUnacceptedIds.has(lead.id),
                 isManagementInvestigation: isManagementInvestigation(lead, managementUserIds),
+                isTeamList: lead.sourceChannel === TEAM_LIST_SOURCE,
+                queueName: teamQueueName(lead),
                 createdAt: lead.createdAt.toISOString(),
                 assignedAt: lead.assignedAt?.toISOString() ?? null,
                 stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,
@@ -901,6 +927,8 @@ async function LeadsPageContent({
                 isPlantaoAtivo: isLeadOnActiveDuty(lead),
                 returnedUnaccepted: returnedUnacceptedIds.has(lead.id),
                 isManagementInvestigation: isManagementInvestigation(lead, managementUserIds),
+                isTeamList: lead.sourceChannel === TEAM_LIST_SOURCE,
+                queueName: teamQueueName(lead),
                 createdAt: lead.createdAt.toISOString(),
                 assignedAt: lead.assignedAt?.toISOString() ?? null,
                 stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,

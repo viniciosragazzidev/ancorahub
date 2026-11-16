@@ -144,6 +144,7 @@ function LeadKanbanCard({ lead, selected, onToggle, onOpen, onQuote, commercialV
         <span className={styles.meta} id={`${detailsId}-meta`}>
           <span className={styles.badge} data-tone={lead.status === "converted" ? "success" : lead.status === "lost" ? "danger" : "neutral"}>{liteStageLabel(lead.status)}</span>
           {lead.isManagementInvestigation ? <span className={styles.badge} data-tone="neutral">Investigação da gestão</span> : null}
+          {lead.isTeamList ? <span className={styles.badge} data-tone="neutral">Lead de equipe</span> : null}
           <span className={styles.badge} data-tone="neutral">{lead.tipo}</span>
           <span className={styles.badge} data-tone={healthTone(health)}>{health.label}</span>
           {hideArrival ? null : <span className={styles.arrival}>{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>}

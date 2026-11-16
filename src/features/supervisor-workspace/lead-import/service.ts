@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { getFeatureFlag } from "@/features/system-settings/queries";
@@ -10,6 +10,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 
 import { lerTelefone } from "@/shared/input/telefone";
+
+import { teamListClientReplied } from "./team-list-sql";
 
 import { EMAIL, SUPERVISOR_IMPORT_CHUNK, SUPERVISOR_IMPORT_WEEKLY_MAX, buildContact, cleanName, planShares, titleCase } from "./parse-contacts";
 
@@ -64,6 +66,57 @@ export async function countPendingSupervisorLeads(context: TenantContext) {
   if (context.role !== "supervisor") return 0;
   const [row] = await getDatabase().select({ total: count() }).from(schema.leads).where(pendingWhere(context));
   return Number(row?.total ?? 0);
+}
+
+export type TeamListRow = {
+  id: string;
+  name: string;
+  phone: string;
+  status: string;
+  brokerId: string | null;
+  brokerName: string | null;
+  replied: boolean;
+  createdAt: string;
+  assignedAt: string | null;
+};
+
+/**
+ * "Lista importada" do supervisor: tudo o que ele importou (para distribuir e já distribuído), com quem está e se
+ * o cliente já respondeu. Uma consulta para as linhas (até 2.000, as mais novas) e uma para os totais.
+ */
+export async function listSupervisorTeamList(context: TenantContext) {
+  if (context.role !== "supervisor") return { rows: [] as TeamListRow[], totals: { all: 0, pending: 0, distributed: 0, replied: 0 } };
+  const db = getDatabase();
+  const replied = teamListClientReplied();
+  const alive = and(ownImport(context), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt));
+  const [rows, [totals]] = await Promise.all([
+    db.select({
+      id: schema.leads.id,
+      name: schema.leads.nome,
+      phone: schema.leads.telefone,
+      status: schema.leads.status,
+      brokerId: schema.leads.corretorId,
+      brokerName: schema.user.name,
+      replied: sql<boolean>`${replied}`,
+      createdAt: schema.leads.createdAt,
+      assignedAt: schema.leads.assignedAt,
+    }).from(schema.leads)
+      .leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId))
+      .where(alive)
+      .orderBy(desc(schema.leads.createdAt))
+      .limit(2000),
+    db.select({
+      all: count(),
+      pending: sql<number>`count(*) filter (where ${schema.leads.corretorId} is null)`,
+      replied: sql<number>`count(*) filter (where ${replied})`,
+    }).from(schema.leads).where(alive),
+  ]);
+  const all = Number(totals?.all ?? 0);
+  const pending = Number(totals?.pending ?? 0);
+  return {
+    rows: rows.map((row) => ({ ...row, replied: Boolean(row.replied), createdAt: row.createdAt.toISOString(), assignedAt: row.assignedAt?.toISOString() ?? null })),
+    totals: { all, pending, distributed: all - pending, replied: Number(totals?.replied ?? 0) },
+  };
 }
 
 /** Telefones (últimos 11 dígitos) que já existem na empresa. Uma consulta, para a lista inteira. */
@@ -177,7 +230,7 @@ export function teamListNotice(received: number) {
  * escolhida (os mais antigos primeiro). Atribuição direta, sem mensagem para o cliente, sem WhatsApp ao corretor e
  * sem prazo de SLA (lista fria). Um UPDATE em bloco por corretor.
  */
-export async function distributeSupervisorLeads(context: TenantContext, input: { counts: Record<string, number> }) {
+export async function distributeSupervisorLeads(context: TenantContext, input: { counts: Record<string, number>; leadIds?: string[] }) {
   await assertSupervisor(context);
   const team = await listSupervisorTeamBrokers(context);
   const teamIds = new Set(team.map((broker) => broker.id));
@@ -185,17 +238,23 @@ export async function distributeSupervisorLeads(context: TenantContext, input: {
   if (!wanted.length || wanted.some(([id]) => !teamIds.has(id))) throw new SupervisorImportError("Escolha corretores da sua equipe.");
 
   const db = getDatabase();
-  const pendingTotal = await countPendingSupervisorLeads(context);
+  // Selecionados na lista: só eles entram. Sem seleção: os mais antigos que esperam.
+  const only = input.leadIds?.length ? inArray(schema.leads.id, input.leadIds) : undefined;
+  const [pendingRow] = await db.select({ total: count() }).from(schema.leads).where(and(pendingWhere(context), only));
+  const pendingTotal = Number(pendingRow?.total ?? 0);
   if (!pendingTotal) throw new SupervisorImportError("Esses leads já foram distribuídos. Atualize a página.");
   const { shares } = planShares(pendingTotal, wanted.map(([id]) => id), Object.fromEntries(wanted));
   const now = new Date();
   const received = new Map<string, number>();
   await db.transaction(async (tx) => {
     for (const share of shares) {
-      const pick = tx.select({ id: schema.leads.id }).from(schema.leads).where(pendingWhere(context)).orderBy(asc(schema.leads.createdAt)).limit(share.count).for("update", { skipLocked: true });
+      const pick = tx.select({ id: schema.leads.id }).from(schema.leads).where(and(pendingWhere(context), only)).orderBy(asc(schema.leads.createdAt)).limit(share.count).for("update", { skipLocked: true });
       const updated = await tx.update(schema.leads).set({
         corretorId: share.brokerId,
-        status: "distributed",
+        // Já aceito (16/11): a supervisão escolheu o corretor, então não há passo de aceitar. O lead entra
+        // em atendimento com o telefone liberado; o primeiro contato fica para quando o corretor chamar.
+        status: "in_contact",
+        serviceStartedAt: now,
         distributionStatus: "assigned",
         distributionOrigin: "unit",
         assignedAt: now,

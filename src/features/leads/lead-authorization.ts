@@ -6,6 +6,7 @@ import { AuthorizationService } from "@/shared/auth/authorization-service";
 import type { ResourceScopeDescriptor, TenantContext } from "@/shared/auth/types";
 import { schema } from "@/shared/db";
 import { inSupervisorTeam } from "@/features/team/supervisor-scope";
+import { visibleToManagement } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 
 export type LeadResourceInput = {
   tenantId: string;
@@ -98,6 +99,8 @@ export function buildLeadScopeWhere(
 
   // 1. Tenant-wide (Diretores)
   if (constraints.tenantWide) {
+    // Lista interna da equipe (16/11): só depois que o cliente respondeu ao corretor.
+    conditions.push(visibleToManagement(table));
     if (options?.requestedBranchId) {
       conditions.push(eq(table.branchId, options.requestedBranchId));
     }
@@ -117,6 +120,9 @@ export function buildLeadScopeWhere(
     conditions.push(sql`false`);
     return and(...conditions)!;
   }
+
+  // Lista interna da equipe (16/11): só depois que o cliente respondeu ao corretor.
+  conditions.push(visibleToManagement(table));
 
   // Interseção estrita: requestedScope ∩ allowedScope
   if (options?.requestedBranchId) {

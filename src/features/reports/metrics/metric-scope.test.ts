@@ -58,7 +58,9 @@ describe("resolveReportDataScope", () => {
   it("allows tenant-wide data only when the canonical scope explicitly grants it", async () => {
     resolveAccessContext.mockResolvedValue(accessContext("GLOBAL", { tenantWide: true, ownership: "ANY" }));
     const scope = await resolveReportDataScope(manager);
-    expect(scope.leadScope).toBeUndefined();
+    // Sem corte por unidade; só o filtro da lista interna da equipe (lead importado aparece depois que responde).
+    expect(scope.leadScope).toBeTruthy();
+    expect(scope.canSeeUnits).toBe(true);
     expect(scope.tenantId).toBe(manager.tenantId);
     expect(scope.canCompareUnits).toBe(false);
   });

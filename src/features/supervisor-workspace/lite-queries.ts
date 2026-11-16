@@ -9,6 +9,7 @@ import { getSupervisorWorkspaceData } from "@/features/supervisor-workspace/quer
 import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/supervisor-scope";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
+import { isTeamListLead } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 import { addDays, zonedMidnight } from "@/features/lead-distribution/monthly-duty-plan";
 
 const TZ = "America/Sao_Paulo";
@@ -68,6 +69,8 @@ export async function getSupervisorLiteRadar(context: TenantContext, now = new D
       .where(and(
         eq(schema.leads.tenantId, context.tenantId),
         inArray(schema.leads.corretorId, brokerIds),
+        // 16/11: a lista importada pela supervisão tem a vista própria ("Lista importada").
+        sql`not ${isTeamListLead()}`,
         inSupervisorTeam(schema.leads.corretorId, context.tenantId, context.userId),
         inArray(schema.leads.status, [...TEAM_ACTIVE]),
         isNull(schema.leads.deletedAt),
@@ -79,6 +82,8 @@ export async function getSupervisorLiteRadar(context: TenantContext, now = new D
       .where(and(
         eq(schema.leads.tenantId, context.tenantId),
         inArray(schema.leads.corretorId, brokerIds),
+        // 16/11: a lista importada pela supervisão tem a vista própria ("Lista importada").
+        sql`not ${isTeamListLead()}`,
         inSupervisorTeam(schema.leads.corretorId, context.tenantId, context.userId),
         isNull(schema.leads.deletedAt),
         isNull(schema.leads.archivedAt),
@@ -86,6 +91,8 @@ export async function getSupervisorLiteRadar(context: TenantContext, now = new D
     db.select({ total: count() }).from(schema.leads).where(and(
       eq(schema.leads.tenantId, context.tenantId),
       inArray(schema.leads.corretorId, brokerIds),
+        // 16/11: a lista importada pela supervisão tem a vista própria ("Lista importada").
+        sql`not ${isTeamListLead()}`,
       inSupervisorTeam(schema.leads.corretorId, context.tenantId, context.userId),
       inArray(schema.leads.status, [...TEAM_ACTIVE]),
       isNotNull(schema.leads.firstContactAt),
