@@ -8,6 +8,17 @@ import { SELF_CONFIRM_TOLERANCE_MINUTES } from "./duty-presence-domain";
  */
 export const DUTY_START_INTERVAL_MINUTES = 8;
 export const DUTY_START_INTERVAL_MAX_CONFIRMED = 3;
+/**
+ * Teto do começo do plantão (16/11/2026, pedido do Vinicios): com o intervalo ativo, cada corretor recebe no máximo
+ * 3 leads desde o início da ocorrência; com 3, espera até todos confirmarem ou a janela acabar. Sem o teto, quem
+ * confirmava cedo somava um lead a cada 8 min a janela inteira (um corretor chegou a 6).
+ */
+export const DUTY_START_INTERVAL_MAX_LEADS = 3;
+
+/** Bateu o teto do começo do plantão: só volta a receber quando o intervalo acabar. */
+export function dutyStartIntervalCapReached(offersSinceStart: number) {
+  return offersSinceStart >= DUTY_START_INTERVAL_MAX_LEADS;
+}
 
 export type DutyStartIntervalState =
   | { active: true; endsAt: Date; confirmedCount: number; pendingCount: number }

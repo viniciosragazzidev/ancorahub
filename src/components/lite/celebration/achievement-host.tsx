@@ -47,7 +47,7 @@ function screenOf(achievement: Achievement): { title: string; message: string; s
   return {
     title: "Presença confirmada!",
     message: achievement.startInterval
-      ? "Você está no plantão. Enquanto os colegas confirmam, chega um lead a cada 8 min."
+      ? "Você está no plantão. Enquanto os colegas confirmam, chega um lead a cada 8 min, até 3."
       : "Você está no plantão. Fique de olho: os leads já podem chegar.",
     stats: [
       { label: "Plantão", value: achievement.scheduleName },

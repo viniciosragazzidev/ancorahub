@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dutyStartIntervalReleaseAt, leadWaitsDutyStartInterval, resolveDutyStartInterval } from "./duty-start-interval";
+import { DUTY_START_INTERVAL_MAX_LEADS, dutyStartIntervalCapReached, dutyStartIntervalReleaseAt, leadWaitsDutyStartInterval, resolveDutyStartInterval } from "./duty-start-interval";
 
 const start = new Date("2026-11-11T12:00:00.000Z");
 const at = (minutes: number) => new Date(start.getTime() + minutes * 60_000);
@@ -47,5 +47,15 @@ describe("dutyStartIntervalReleaseAt", () => {
 
   it("não passa do fim da janela", () => {
     expect(dutyStartIntervalReleaseAt({ lastOfferAt: at(56), lastAssignedAt: null, now: at(57), intervalEndsAt: at(60) })).toEqual(at(60));
+  });
+});
+
+describe("teto do começo do plantão (16/11/2026)", () => {
+  it("no máximo 3 leads por corretor enquanto o intervalo vale", () => {
+    expect(DUTY_START_INTERVAL_MAX_LEADS).toBe(3);
+    expect(dutyStartIntervalCapReached(0)).toBe(false);
+    expect(dutyStartIntervalCapReached(2)).toBe(false);
+    expect(dutyStartIntervalCapReached(3)).toBe(true);
+    expect(dutyStartIntervalCapReached(6)).toBe(true);
   });
 });

@@ -1602,7 +1602,7 @@ export default async function SuperAdminSettingsPage() {
               <CardHeader>
                 <CardTitle>Intervalo de início de plantão</CardTitle>
                 <CardDescription>
-                  Na primeira hora do plantão, enquanto há escalados por confirmar presença e só 1 a 3 confirmaram, cada confirmado recebe no máximo um lead a cada 8 minutos. Lead quente não espera. O intervalo acaba quando todos confirmam, quando o 4º confirma ou 1 hora depois do início.
+                  Na primeira hora do plantão, enquanto há escalados por confirmar presença e só 1 a 3 confirmaram, cada confirmado recebe no máximo um lead a cada 8 minutos e no máximo 3 leads no total. Lead quente não espera. O intervalo acaba quando todos confirmam, quando o 4º confirma ou 1 hora depois do início.
                 </CardDescription>
               </CardHeader>
               <CardContent>

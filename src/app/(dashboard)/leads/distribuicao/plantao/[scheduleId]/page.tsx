@@ -679,7 +679,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
             {startInterval ? (
               <p role="status" className="flex items-start gap-2 text-xs text-muted-foreground">
                 <Clock3 className="mt-px size-3.5 shrink-0 text-primary" aria-hidden />
-                <span>Começo do plantão: 1 lead a cada 8 min por corretor até todos confirmarem ({startInterval.confirmed} de {startInterval.confirmed + startInterval.pending} confirmados · até {new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(startInterval.endsAt)}).</span>
+                <span>Começo do plantão: 1 lead a cada 8 min por corretor, no máximo 3, até todos confirmarem ({startInterval.confirmed} de {startInterval.confirmed + startInterval.pending} confirmados · até {new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(startInterval.endsAt)}).</span>
               </p>
             ) : null}
             {turnState ? <p className="text-xs text-muted-foreground">Rodízio: cada um tem sua vez, na ordem em que chegou. Quem recebe vai para o fim; lead expirado ou recusado gasta a vez e conta como pulo.{context.role === "director" ? " Para passar alguém na frente, arraste o card pelo ícone de arrastar até a posição desejada." : ""}</p> : null}
