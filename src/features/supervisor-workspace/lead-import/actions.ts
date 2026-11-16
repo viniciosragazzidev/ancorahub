@@ -5,8 +5,10 @@ import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
-import { SUPERVISOR_IMPORT_MAX } from "./parse-contacts";
-import { SupervisorImportError, distributeSupervisorLeads, importSupervisorContacts, reviewSupervisorList } from "./service";
+import { askListStructure } from "./ai-structure";
+import { AI_TABLE_ROWS, AI_TEXT_LINES } from "./organize";
+import { SUPERVISOR_IMPORT_CHUNK, SUPERVISOR_IMPORT_MAX } from "./parse-contacts";
+import { SupervisorImportError, distributeSupervisorLeads, importSupervisorContacts, isSupervisorImportEnabled, reviewSupervisorList } from "./service";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -22,13 +24,28 @@ async function run<T>(work: () => Promise<T>): Promise<Result<T>> {
   }
 }
 
-export async function reviewTeamListAction(text: string) {
-  return run(async () => reviewSupervisorList(await getRequiredTenantContext(), z.string().max(60_000).parse(text)));
+const structureSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("tabela"), rows: z.array(z.array(z.string().max(80)).max(15)).max(AI_TABLE_ROWS) }),
+  z.object({ kind: z.literal("texto"), lines: z.array(z.string().max(200)).max(AI_TEXT_LINES) }),
+]);
+
+/** Ajuda da IA quando a leitura automática fica em dúvida. Só a estrutura, mascarada. */
+export async function structureTeamListAction(request: z.infer<typeof structureSchema>) {
+  return run(async () => {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "supervisor" || !(await isSupervisorImportEnabled())) throw new SupervisorImportError("Só o supervisor importa a lista da equipe.");
+    return askListStructure(context, structureSchema.parse(request));
+  });
+}
+
+export async function reviewTeamListAction(phones: string[]) {
+  return run(async () => reviewSupervisorList(await getRequiredTenantContext(), z.array(z.string().max(30)).max(SUPERVISOR_IMPORT_MAX).parse(phones)));
 }
 
 const importSchema = z.object({
   consent: z.boolean(),
-  contacts: z.array(z.object({ name: z.string().max(120), phone: z.string().max(20), email: z.string().max(160).nullable() })).min(1).max(SUPERVISOR_IMPORT_MAX),
+  importId: z.string().uuid(),
+  contacts: z.array(z.object({ name: z.string().max(120), phone: z.string().max(30), email: z.string().max(160).nullable(), note: z.string().max(300).nullable() })).min(1).max(SUPERVISOR_IMPORT_CHUNK),
 });
 
 export async function importTeamListAction(input: z.infer<typeof importSchema>) {
@@ -39,11 +56,7 @@ export async function importTeamListAction(input: z.infer<typeof importSchema>) 
   });
 }
 
-const distributeSchema = z.object({
-  leadIds: z.array(z.string().min(1)).min(1).max(500),
-  brokerIds: z.array(z.string().min(1)).min(1).max(100),
-  counts: z.record(z.string(), z.number().int().min(0).max(500)).optional(),
-});
+const distributeSchema = z.object({ counts: z.record(z.string().min(1), z.number().int().min(0).max(SUPERVISOR_IMPORT_MAX)) });
 
 export async function distributeTeamListAction(input: z.infer<typeof distributeSchema>) {
   return run(async () => {
