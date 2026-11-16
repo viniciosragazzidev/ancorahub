@@ -47,8 +47,14 @@ Fechar concorrências de proposta/venda, documentos, atribuição, plantões, co
 
 ### Item 4 concluído
 
-- Commit em preparação: revisão individual, lote e remoção usam condições por status pendente/ativo e `RETURNING`; notificações, checklist, timeline e atualização da UI ficam limitados às linhas retornadas. Perda de disputa retorna mensagem de conflito.
+- Commit `07830ca7`: revisão individual, lote e remoção usam condições por status pendente/ativo e `RETURNING`; notificações, checklist, timeline e atualização da UI ficam limitados às linhas retornadas. Perda de disputa retorna mensagem de conflito.
 - Testes: concorrência de duas revisões com barreira, comportamento do lote parcial e ficha Lite. Vitest passou: 15 testes; integração PostgreSQL de R10 ficou skip sem `ERP_TEST_DATABASE_URL`. `npx tsc --noEmit` passou.
 - Botões de aprovação e remoção ficam desabilitados durante o envio nas telas alteradas.
 
-Item 5 em andamento. Arquivos, testes, commits e riscos serão atualizados na conclusão.
+### Item 5 concluído
+
+- Commit em preparação: mover plantão relê e trava a assignment de origem dentro da transação, valida o snapshot integral e faz `UPDATE` condicional com `RETURNING`; auditoria de sobreposição e auditoria da mudança só são gravadas para o vencedor.
+- Testes: disputa de duas movimentações com `Promise.all` e barreira unitária; teste PostgreSQL isolado adicionado com a mesma barreira e skip condicional. Vitest passou: 16 testes, 3 skip por suítes PostgreSQL opt-in sem URL de teste; `npx tsc --noEmit` passou.
+- O seletor de turno já é desabilitado durante a action.
+
+Item 6 em andamento. Arquivos, testes, commits e riscos serão atualizados na conclusão.

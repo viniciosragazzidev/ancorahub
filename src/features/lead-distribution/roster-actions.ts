@@ -14,6 +14,7 @@ import { getRosterBrokerAccountFilter } from "./roster-broker-account-filter";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { lockMonthlyDutyPlans, removeDatedRosterAssignmentFromMonthlyPlans } from "./monthly-duty-plan-assignments";
 import { shiftEnd } from "./monthly-duty-plan";
+import { moveWeeklyRosterAssignment } from "./roster-assignment-move";
 
 export type RosterActionState = { success?: boolean; error?: string; message?: string };
 
@@ -198,7 +199,7 @@ export async function moveRosterAssignmentAction(_previous: RosterActionState, f
   try {
     const input = parseInput(formData);
     const { context, db, schedule } = await assertRosterScope(input.scheduleId, input.brokerId);
-    const [assignment] = await db.select({ id: schema.dutyRosterAssignments.id, brokerId: schema.dutyRosterAssignments.brokerId, tenantId: schema.dutyRosterAssignments.tenantId, scheduleId: schema.dutyRosterAssignments.scheduleId })
+    const [assignment] = await db.select({ id: schema.dutyRosterAssignments.id, brokerId: schema.dutyRosterAssignments.brokerId, tenantId: schema.dutyRosterAssignments.tenantId, scheduleId: schema.dutyRosterAssignments.scheduleId, dayOfWeek: schema.dutyRosterAssignments.dayOfWeek, startsAt: schema.dutyRosterAssignments.startsAt, endsAt: schema.dutyRosterAssignments.endsAt })
       .from(schema.dutyRosterAssignments)
       .where(and(eq(schema.dutyRosterAssignments.id, assignmentId.data), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active"), isNull(schema.dutyRosterAssignments.dutyDate)))
       .limit(1);
@@ -207,10 +208,18 @@ export async function moveRosterAssignmentAction(_previous: RosterActionState, f
     const overlapWarning = await db.transaction(async (tx): Promise<BrokerOverlapWarning> => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${input.dayOfWeek}`}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-broker:${input.brokerId}:${input.dayOfWeek}`}))`);
-      const overlap = await findBrokerOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, schedule, assignment.id);
+      const moved = await moveWeeklyRosterAssignment(tx, {
+        expected: assignment,
+        target: { scheduleId: schedule.id, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, actorId: context.userId, now: new Date() },
+        prepare: async (lockedAssignment) => {
+          const overlap = await findBrokerOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, schedule, lockedAssignment.id);
+          await assertScheduleCapacity(tx, context.tenantId, schedule.id, input.dayOfWeek, schedule.maximumBrokers, lockedAssignment.id);
+          return overlap;
+        },
+      });
+      if (!moved) throw new Error("Esta alocação foi alterada por outra pessoa. Atualize a escala antes de mover.");
+      const overlap = moved.prepared;
       if (overlap) await auditOverlapAllowed(tx, context.userId, input.brokerId);
-      await assertScheduleCapacity(tx, context.tenantId, schedule.id, input.dayOfWeek, schedule.maximumBrokers, assignment.id);
-      await tx.update(schema.dutyRosterAssignments).set({ scheduleId: schedule.id, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, updatedBy: context.userId, updatedAt: new Date() }).where(and(eq(schema.dutyRosterAssignments.id, assignment.id), eq(schema.dutyRosterAssignments.tenantId, context.tenantId)));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_roster_assignment.moved" });
       return overlap;
     });
