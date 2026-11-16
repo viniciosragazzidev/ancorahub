@@ -20,6 +20,7 @@ import type { DutyBrokerTurnStats, DutyQueueOrderPreview } from "@/features/lead
 import { cn } from "@/lib/utils";
 
 import styles from "./duty-queue-order-board.module.css";
+import { isRotationSignal } from "./duty-turn-auto-refresh";
 
 const timeZone = "America/Sao_Paulo";
 const POLL_MS = 60_000;
@@ -183,7 +184,7 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
     let timer: number | null = null;
     const onRealtime = (event: Event) => {
       const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
-      if (detail?.kind !== "domain.invalidated") return;
+      if (!isRotationSignal(detail)) return;
       if (timer !== null) window.clearTimeout(timer);
       timer = window.setTimeout(() => { timer = null; refresh(); }, SIGNAL_DEBOUNCE_MS);
     };
