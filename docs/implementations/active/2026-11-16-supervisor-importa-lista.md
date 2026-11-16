@@ -1,6 +1,6 @@
 # Supervisor importa lista de contatos e distribui para a equipe (16/11/2026)
 
-Status: **plano, aguardando aprovação**. Dono: Vinicios. Ideia de uma supervisora.
+Status: **aprovado com ajustes (16/11)**, em implementação. Dono: Vinicios. Ideia de uma supervisora.
 
 ## O que é
 
@@ -54,10 +54,17 @@ Depois de importar, a mesma gaveta pergunta para quem vão os leads:
 - **Deixar para depois:** o que não for distribuído fica em **Para distribuir**, um filtro novo na página da equipe,
   e pode ser distribuído depois com a mesma tela.
 
-Ao distribuir:
+Ajustes do Vinicios (16/11):
 
-- Cada lead vai direto para o corretor, com status distribuído, como na atribuição direta do diretor. O corretor
-  recebe o aviso de lead novo de sempre.
+- A escolha (quem recebe e quantos) é feita **depois** de importar, numa tela bem simples, e **nada é distribuído até
+  tocar em Distribuir**.
+- **Nenhuma mensagem ao corretor pelo número oficial.** Só um aviso dentro do CRM: "Sua supervisora importou uma lista
+  de leads interna da equipe. Ela está disponível na área de leads da equipe no seu CRM."
+
+Ao tocar em Distribuir:
+
+- Cada lead vai direto para o corretor, com status distribuído, como na atribuição direta do diretor, sem WhatsApp
+  (`skipBrokerWhatsApp`). Cada corretor que recebeu leads ganha um aviso no CRM com o texto acima.
 - **Não** dispara mensagem automática para o cliente nem qualificação por IA: é contato frio, e o corretor faz o
   primeiro contato.
 - Não conta para o rodízio nem para o limite do plantão.

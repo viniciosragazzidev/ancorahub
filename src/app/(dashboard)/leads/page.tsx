@@ -36,6 +36,8 @@ import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getSupervisorLiteRadar } from "@/features/supervisor-workspace/lite-queries";
 import { SupervisorLeadsRadar } from "@/features/supervisor-workspace/supervisor-leads-radar";
 import { withRadarSignals } from "@/features/supervisor-workspace/radar-signals";
+import { isSupervisorImportEnabled, listPendingSupervisorLeads, listSupervisorTeamBrokers } from "@/features/supervisor-workspace/lead-import/service";
+import { TeamListImport } from "@/features/supervisor-workspace/lead-import/team-list-import";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import type { TenantContext } from "@/shared/auth/types";
 import { LightLeadsList, type LightLeadItem } from "@/features/broker-workspace/components/light-leads-list";
@@ -73,9 +75,15 @@ export default async function LeadsPage(props: Parameters<typeof LeadsPageConten
 }
 
 async function SupervisorRadarContent({ context, search }: { context: TenantContext; search: string }) {
-  const radar = await getSupervisorLiteRadar(context);
+  const [radar, importEnabled] = await Promise.all([getSupervisorLiteRadar(context), isSupervisorImportEnabled()]);
   const leads = await withRadarSignals(context.tenantId, radar.leads.map((lead) => ({ ...lead, assignedAt: lead.assignedAt?.toISOString() ?? null, firstContactAt: lead.firstContactAt?.toISOString() ?? null, stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null })));
-  return <SupervisorLeadsRadar data={{ ...radar, leads }} now={new Date().toISOString()} search={search} />;
+  // Lista interna da equipe (16/11/2026): importar contatos e distribuir só para a equipe do supervisor.
+  const canImport = importEnabled && context.role === "supervisor";
+  const [pending, team] = canImport ? await Promise.all([listPendingSupervisorLeads(context), listSupervisorTeamBrokers(context)]) : [[], []];
+  const action = canImport
+    ? <TeamListImport pending={pending.map((lead) => ({ id: lead.id, name: lead.name }))} team={team.map((broker) => ({ id: broker.id, name: broker.name, availability: broker.availability ?? "available" }))} />
+    : undefined;
+  return <SupervisorLeadsRadar data={{ ...radar, leads }} now={new Date().toISOString()} search={search} action={action} />;
 }
 
 function SupervisorRadarLoading() {

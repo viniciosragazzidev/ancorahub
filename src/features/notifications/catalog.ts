@@ -32,6 +32,7 @@ export const notificationCapabilities = [
   { id: "supervisor_team_invite", label: "Convite para equipe do supervisor", description: "Avisa o corretor quando um supervisor da unidade convida para a equipe e informa o resultado ao supervisor.", channels: "Toast + push" },
   { id: "relationship_message", label: "Mensagens da Central de relacionamento", description: "Avisos, reconhecimentos e pedidos de confirmação que a direção envia aos corretores.", channels: "Toast + push" },
   { id: "ai_budget", label: "Orçamento de IA", description: "Avisa os diretores quando o gasto do mês com a IA chega a 80% e a 100% do orçamento definido no Super-admin.", channels: "Toast + push" },
+  { id: "team_list_distributed", label: "Lista interna da equipe", description: "Avisa o corretor no CRM quando o supervisor distribui para ele leads de uma lista interna da equipe. Sem WhatsApp.", channels: "Toast + push" },
   { id: "lead_ai_insight", label: "Insight e Diagnóstico de IA na Conversa", description: "Notifica o corretor e a gestão quando a IA identifica sinais de compra, objeções críticas ou sugere avanço no funil.", channels: "Toast + push" },
 ] as const;
 
