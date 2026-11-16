@@ -193,9 +193,11 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
         const result = await bulkReviewDocumentsAction(selected, next);
         if (result.error) fail("queue", result.error, options);
         else {
-          const verb = next === "approved" ? (selected.length === 1 ? "aprovado" : "aprovados") : (selected.length === 1 ? "rejeitado" : "rejeitados");
-          confirm("queue", `${selected.length} ${selected.length === 1 ? "documento" : "documentos"} ${verb}`);
-          setDocs((current) => current.map((doc) => (selected.includes(doc.id) ? { ...doc, status: next } : doc)));
+          const updatedIds = result.updatedDocumentIds ?? selected;
+          const verb = next === "approved" ? (updatedIds.length === 1 ? "aprovado" : "aprovados") : (updatedIds.length === 1 ? "rejeitado" : "rejeitados");
+          confirm("queue", result.message ?? `${updatedIds.length} ${updatedIds.length === 1 ? "documento" : "documentos"} ${verb}`);
+          setDocs((current) => current.map((doc) => (updatedIds.includes(doc.id) ? { ...doc, status: next } : doc)));
+          if (updatedIds.length !== selected.length) router.refresh();
           multiSelect.clear();
         }
       } catch (error) {

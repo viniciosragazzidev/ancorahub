@@ -168,11 +168,13 @@ export function DocumentsWorkspace({
         const res = await bulkReviewDocumentsAction(ids, status);
         if (res.error) toast.error(res.error);
         else {
-          toast.success(`Processamento em lote concluído (${ids.length} itens).`);
+          const updatedIds = res.updatedDocumentIds ?? ids;
+          toast.success(res.message ?? `Processamento em lote concluído (${updatedIds.length} itens).`);
           setPendingDocs((current) =>
-            current.map((d) => (ids.includes(d.id) ? { ...d, status } : d))
+            current.map((d) => (updatedIds.includes(d.id) ? { ...d, status } : d))
           );
           multiSelect.clear();
+          if (updatedIds.length !== ids.length) router.refresh();
         }
       } catch (error) {
         if (isVersionSkewError(error)) reloadAfterDeploymentUpdate();

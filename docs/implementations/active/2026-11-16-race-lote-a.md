@@ -41,8 +41,14 @@ Fechar concorrências de proposta/venda, documentos, atribuição, plantões, co
 
 ### Item 3 concluído
 
-- Commit em preparação: claim condicional por tenant, id, unidade, status e corretor esperado; efeitos e invalidação só ocorrem com linha retornada.
-- Testes: disputa concorrente com barreira permite um claim; teste da action prova que o perdedor não grava interação nem auditoria.
+- Commit `c5d12227`: claim condicional por tenant, id, unidade, status e corretor esperado; efeitos e invalidação só ocorrem com linha retornada.
+- Testes: disputa concorrente com barreira permite um claim; teste da action prova que o perdedor não grava interação nem auditoria. Vitest passou: 36 testes.
 - Botões existentes nas duas telas já ficam desabilitados durante o envio.
 
-Item 4 em andamento. Arquivos, testes, commits e riscos serão atualizados na conclusão.
+### Item 4 concluído
+
+- Commit em preparação: revisão individual, lote e remoção usam condições por status pendente/ativo e `RETURNING`; notificações, checklist, timeline e atualização da UI ficam limitados às linhas retornadas. Perda de disputa retorna mensagem de conflito.
+- Testes: concorrência de duas revisões com barreira, comportamento do lote parcial e ficha Lite. Vitest passou: 15 testes; integração PostgreSQL de R10 ficou skip sem `ERP_TEST_DATABASE_URL`. `npx tsc --noEmit` passou.
+- Botões de aprovação e remoção ficam desabilitados durante o envio nas telas alteradas.
+
+Item 5 em andamento. Arquivos, testes, commits e riscos serão atualizados na conclusão.
