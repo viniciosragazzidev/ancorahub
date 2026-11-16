@@ -188,8 +188,9 @@ export async function startWhatsAppConnection(options: { forceNew?: boolean } = 
   const sessionName = generateWahaSessionName(context.tenantId, context.userId);
 
   try {
+    const id = encodeURIComponent(sessionName);
     const result = await vpsRequest(options.forceNew
-      ? `/internal/waha/connections/${encodeURIComponent(sessionName)}/reconnect`
+      ? `/internal/waha/connections/${id}/reconnect`
       : "/internal/waha/connections", {
       method: "POST",
       ...(options.forceNew ? {} : { body: {
@@ -201,6 +202,11 @@ export async function startWhatsAppConnection(options: { forceNew?: boolean } = 
       // Cada etapa tem timeout próprio no Fastify; 60s evita que a Server
       // Action abandone o processo enquanto o WAHA ainda confirma a remoção.
       timeoutMs: options.forceNew ? 60_000 : 15_000,
+    }).catch(async (error: unknown) => {
+      // A API de produção (corretop-infra) não tem /reconnect (404); lá a recriação é /recover, que limpa a
+      // sessão FAILED e começa de novo (16/11/2026: sem isso, a sessão quebrada nunca era recriada).
+      if (!options.forceNew || !(error instanceof Error) || !/\b404\b|não foi encontrada/i.test(error.message)) throw error;
+      return vpsRequest(`/internal/waha/connections/${id}/recover`, { method: "POST", timeoutMs: 60_000 });
     });
 
     let status = normalizeWahaUiStatus(result.status ?? "STARTING");
