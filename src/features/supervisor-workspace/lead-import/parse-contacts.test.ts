@@ -35,6 +35,35 @@ describe("parseContactList", () => {
   });
 });
 
+describe("other list formats", () => {
+  it("joins a name and the phone on the lines below it (copied from WhatsApp)", () => {
+    const list = parseContactList("Maria Silva\n(21) 99876-5432\nmaria@exemplo.com\n\nJoão Souza\n+55 11 91234-5678\nPaula 21987650001");
+    expect(list.contacts.map((c) => [c.name, c.phone, c.email, c.problem])).toEqual([
+      ["Maria Silva", "5521998765432", "maria@exemplo.com", null],
+      ["João Souza", "5511912345678", null, null],
+      ["Paula", "5521987650001", null, null],
+    ]);
+  });
+
+  it("reads labelled blocks (Nome:, Tel:, E-mail:)", () => {
+    const list = parseContactList("Nome: Carla Dias\nTel: 21 98765-0009\nE-mail: carla@exemplo.com");
+    expect(list.contacts).toHaveLength(1);
+    expect(list.contacts[0]).toMatchObject({ name: "Carla Dias", phone: "5521987650009", email: "carla@exemplo.com", problem: null });
+  });
+
+  it("reads contacts exported from the phone (.vcf), preferring the mobile number", () => {
+    const vcf = [
+      "BEGIN:VCARD", "VERSION:3.0", "N:Lima;Bruno;;;", "FN:Bruno Lima", "TEL;TYPE=HOME:2122223333", "TEL;TYPE=CELL:+55 21 98765-0010", "EMAIL;TYPE=INTERNET:bruno@exemplo.com", "END:VCARD",
+      "BEGIN:VCARD", "VERSION:3.0", "N:Souza;Ana;;;", "TEL;TYPE=CELL:21987650011", "END:VCARD",
+    ].join("\r\n");
+    const list = parseContactList(vcf);
+    expect(list.contacts.map((c) => [c.name, c.phone, c.email])).toEqual([
+      ["Bruno Lima", "5521987650010", "bruno@exemplo.com"],
+      ["Ana Souza", "5521987650011", null],
+    ]);
+  });
+});
+
 describe("planShares", () => {
   it("splits equally and gives the remainder to the first ones", () => {
     expect(planShares(10, ["a", "b", "c"])).toEqual({ shares: [{ brokerId: "a", count: 4 }, { brokerId: "b", count: 3 }, { brokerId: "c", count: 3 }], left: 0 });
