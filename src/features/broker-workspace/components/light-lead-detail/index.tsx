@@ -18,7 +18,7 @@ import { stageLabel } from "./format";
 import { ClosingOutcomeCard } from "./closing-outcome-card";
 import { ClientInfoCard, IdentityHeader } from "./identity-zone";
 import { LeadNotices } from "./lead-notices";
-import { PeopleDataSection } from "./people-data-section";
+import { PeopleDataSection, PeopleReadOnly } from "./people-data-section";
 import { useQuickSaleAutoOpen } from "./quick-sale-auto-open";
 import { SaleDocSheet } from "./sale-doc-sheet";
 import { SaleSection } from "./sale-section";
@@ -90,7 +90,10 @@ export function LightLeadDetail({
   if (variant === "details") {
     return (
       <div className="arc-venancor flex w-full flex-col gap-4 text-foreground">
-        <ClientInfoCard lead={lead} c={c} mode="management" />
+        {/* As mesmas informações do corretor (16/11/2026), só para leitura: de onde veio, cliente com resumo, pessoas. */}
+        <AdOriginCard ad={lead.adContext} />
+        <ClientInfoCard lead={lead} c={c} mode="management" withSummary />
+        <PeopleReadOnly lead={lead} />
         <SaleSection c={c} mode="management" />
         {commercialValuesEnabled && isManagement ? <LeadQuotesSection key={lead.id} leadId={lead.id} leadName={lead.nome} leadPhone={lead.telefone} beneficiaryCount={lead.livesCount} plans={quotePlans} monthlyValue={lead.monthlyValue} livesCount={lead.livesCount} commercialValueSource={lead.commercialValueSource} canDeleteQuotes={isManagement} /> : null}
         <DetailsZone lead={lead} c={c} showAiInsight={false} />

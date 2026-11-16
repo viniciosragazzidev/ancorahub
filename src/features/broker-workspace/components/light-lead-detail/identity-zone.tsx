@@ -62,7 +62,9 @@ const qualificationLabels: Record<string, string> = {
 export function ClientInfoCard({ lead, c, mode = "broker", withSummary = false }: { lead: LightLeadDetailData; c: Pick<LeadDetailController, "isDistributed">; mode?: "broker" | "management"; /** The AI summary on top (lead screen, where the chat no longer repeats it). */ withSummary?: boolean }) {
   // Contact data stays hidden until the broker accepts.
   const merged = [...new Map([...buildLeadClientInfo(lead), ...(lead.clientInfo ?? [])].map((item) => [item.key, item])).values()];
-  const info = mode === "broker" && lead.isCurrentBroker && !c.isDistributed ? merged : redactClientInfo(merged);
+  // Supervisor e gerente veem o contato dos leads da equipe (16/11/2026); o servidor só manda quando o lead está no escopo.
+  const reveal = mode === "management" ? Boolean(lead.contactVisible) : lead.isCurrentBroker && !c.isDistributed;
+  const info = reveal ? merged : redactClientInfo(merged);
   const qualification = lead.qualificationStatus ?? lead.qualificationState;
   const normalizedQualification = qualification?.toLowerCase() ?? "";
   // The broker never sees the qualification (Frio, Morno...): management only (Vinicios, 18/10, urgent).
