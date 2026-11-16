@@ -53,8 +53,14 @@ Fechar concorrências de proposta/venda, documentos, atribuição, plantões, co
 
 ### Item 5 concluído
 
-- Commit em preparação: mover plantão relê e trava a assignment de origem dentro da transação, valida o snapshot integral e faz `UPDATE` condicional com `RETURNING`; auditoria de sobreposição e auditoria da mudança só são gravadas para o vencedor.
+- Commit `ccddbd2a`: mover plantão relê e trava a assignment de origem dentro da transação, valida o snapshot integral e faz `UPDATE` condicional com `RETURNING`; auditoria de sobreposição e auditoria da mudança só são gravadas para o vencedor.
 - Testes: disputa de duas movimentações com `Promise.all` e barreira unitária; teste PostgreSQL isolado adicionado com a mesma barreira e skip condicional. Vitest passou: 16 testes, 3 skip por suítes PostgreSQL opt-in sem URL de teste; `npx tsc --noEmit` passou.
 - O seletor de turno já é desabilitado durante a action.
 
-Item 6 em andamento. Arquivos, testes, commits e riscos serão atualizados na conclusão.
+### Item 6 concluído
+
+- Commit em preparação: o convite é consumido no início da transação por `UPDATE` condicionado a tenant, id, status `PENDING` e validade futura com `RETURNING`; ativação, associação, termos, auditoria e aviso posterior só ocorrem para o vencedor.
+- Testes: duas aceitações com `Promise.all` e barreira unitária; teste PostgreSQL isolado adicionado com a mesma barreira e skip condicional. Vitest passou: 8 testes e 1 skip pela URL de banco ausente; `npx tsc --noEmit` passou.
+- Botão de ativação já fica desabilitado durante o envio.
+
+Item 7 em andamento. Arquivos, testes, commits e riscos serão atualizados na conclusão.

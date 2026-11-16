@@ -11,6 +11,7 @@ import { classifyExistingTeamIdentity } from "@/features/team/identity-reuse-pol
 import { enqueueBrokerAccountActivationNotice, type BrokerAccountActivationNoticeStatus } from "@/features/team/broker-account-activation-delivery";
 import { isOnboardingPasswordLongEnough } from "@/features/team/onboarding-password-policy";
 import { promotePendingRosterEntries } from "@/features/lead-distribution/duty-roster-pending";
+import { claimPendingInvitation } from "./invitation-accept-claim";
 
 const completeOnboardingSchema = z.object({
   invitationId: z.string().uuid(),
@@ -127,6 +128,9 @@ export async function completeOnboardingAction(
 
     // 5. Run transactional activation
     await db.transaction(async (tx) => {
+      const acceptedAt = new Date();
+      const claimedInvitation = await claimPendingInvitation(tx, { id: invitation.id, tenantId: invitation.tenantId, email: accessEmail, now: acceptedAt });
+      if (!claimedInvitation) throw new Error("O convite expirou ou já foi usado por outra pessoa. Peça um novo convite ao gestor.");
       let acceptedSupervisorId: string | null = null;
       if (invitation.role === "broker" && invitation.supervisorId) {
         const [supervisor] = await tx.select({ userId: schema.tenantMemberships.userId })
@@ -294,16 +298,6 @@ export async function completeOnboardingAction(
 
       // Plantões the broker was put on before having an account become real roster rows now.
       await promotePendingRosterEntries(tx, { tenantId: invitation.tenantId, brokerProfileId: profile.id, userId, branchId: invitation.branchId ?? profile.branchId });
-
-      // Accept invitation
-      await tx
-        .update(schema.brokerInvitations)
-        .set({
-          email: accessEmail,
-          status: "ACCEPTED",
-          acceptedAt: new Date(),
-        })
-        .where(and(eq(schema.brokerInvitations.id, invitation.id), eq(schema.brokerInvitations.tenantId, invitation.tenantId)));
 
       // Set onboarding complete
       const onboardingId = randomUUID();
