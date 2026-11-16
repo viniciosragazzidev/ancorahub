@@ -16,7 +16,6 @@ import { BrokerDutyHub } from "@/features/broker-workspace/components/broker-dut
 import type { DutyHubCurrent } from "@/features/broker-workspace/duty-hub";
 import { WhatsAppHandoff } from "@/features/broker-workspace/whatsapp-handoff/whatsapp-handoff";
 import { DevLabProvider, type DevLab } from "@/lib/dev-lab";
-import { parseContactList } from "@/features/supervisor-workspace/lead-import/parse-contacts";
 import { TeamListImport } from "@/features/supervisor-workspace/lead-import/team-list-import";
 import { SupervisorLeadsRadar } from "@/features/supervisor-workspace/supervisor-leads-radar";
 
@@ -76,23 +75,26 @@ export function FlowLab() {
     },
     presenceGate: async () => ({ required: false, connected: true }),
     teamList: {
-      review: async (text) => {
+      // Simula a IA: devolve o mapa do jeito que a leitura automática faria (ou nada, em "falha").
+      structure: async (request) => {
         await wait(delay);
-        const parsed = parseContactList(text);
-        return { ok: true, data: { overflow: parsed.overflow, contacts: parsed.contacts.map((c) => ({ ...c, duplicate: c.phone === LAB_KNOWN_PHONE })) } };
+        if (outcome === "falha" || request.kind !== "tabela") return { ok: true, data: null };
+        return { ok: true, data: { kind: "tabela", header: null, name: 0, phone: 1, email: null } };
+      },
+      review: async (phones) => {
+        await wait(delay);
+        return { ok: true, data: { known: phones.filter((phone) => phone === LAB_KNOWN_PHONE), weekLeft: 5000 } };
       },
       importContacts: async (input) => {
         await wait(delay);
-        if (outcome === "falha") return { ok: false, error: "Não consegui importar agora. Nada foi gravado." };
-        const stamp = Date.now();
-        return { ok: true, data: { imported: input.contacts.length, duplicates: 0, importId: `lab-${stamp}`, leads: input.contacts.map((c, index) => ({ id: `lab-${stamp}-${index}`, name: c.name })) } };
+        if (outcome === "falha") return { ok: false, error: "Não consegui importar agora." };
+        return { ok: true, data: { imported: input.contacts.length, duplicates: 0 } };
       },
       distribute: async (input) => {
         await wait(delay);
         if (outcome === "falha") return { ok: false, error: "Não consegui distribuir agora. Os leads continuam aqui." };
-        const counts = input.counts ?? {};
-        const distributed = Object.values(counts).reduce((sum, value) => sum + value, 0);
-        return { ok: true, data: { distributed, left: input.leadIds.length - distributed, perBroker: counts } };
+        const distributed = Object.values(input.counts).reduce((sum, value) => sum + value, 0);
+        return { ok: true, data: { distributed, left: 0, perBroker: input.counts } };
       },
     },
   }), [delay, outcome, mode]);
@@ -136,7 +138,7 @@ export function FlowLab() {
           <SupervisorLeadsRadar
             data={{ team: [], leads: [], funnel: { new: 0, firstContact: 0, service: 0, quote: 0, closing: 0 }, slaMinutes: 15 }}
             now={new Date().toISOString()}
-            action={<TeamListImport pending={[]} team={LAB_TEAM} />}
+            action={<TeamListImport pending={0} team={LAB_TEAM} />}
           />
         ) : (
           <main className={`arc-venancor ${styles.buttons}`}>

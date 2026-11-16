@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Minus, Plus, UploadSimple } from "@phosphor-icons/react";
+import { FileXls, Minus, Plus, UploadSimple, X } from "@phosphor-icons/react";
 
 import { Button } from "@/components/arc/button/button";
 import { LiteActionButton } from "@/components/lite/controls/action-button";
@@ -11,137 +11,277 @@ import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
 import { useDevLab } from "@/lib/dev-lab";
 
-import { distributeTeamListAction, importTeamListAction, reviewTeamListAction } from "./actions";
-import { SUPERVISOR_IMPORT_MAX, planShares, vcardToLines, type ReviewedContact, type TeamListApi } from "./parse-contacts";
+import { distributeTeamListAction, importTeamListAction, reviewTeamListAction, structureTeamListAction } from "./actions";
+import { applyTableAnswer, applyTextAnswer, organizeTable, organizeText, tableRequest, textRequest, textToTable, type Organized, type SourceTable } from "./organize";
+import { SUPERVISOR_IMPORT_CHUNK, SUPERVISOR_IMPORT_MAX, planShares, vcardToLines, type ParsedContact, type TeamListApi } from "./parse-contacts";
 import styles from "./team-list-import.module.css";
 
 export type TeamListBroker = { id: string; name: string; availability: string };
-export type TeamListPendingLead = { id: string; name: string };
 
 const realApi: TeamListApi = {
+  structure: structureTeamListAction,
   review: reviewTeamListAction,
   importContacts: importTeamListAction,
   distribute: distributeTeamListAction,
 };
 
 type Step = "lista" | "conferir" | "distribuir";
+type Review = { organized: Organized; known: Set<string>; weekLeft: number; cut: number };
 
-const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
+const fmt = (n: number) => n.toLocaleString("pt-BR");
+const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${fmt(n)} ${many}`);
+const isReady = (contact: ParsedContact) => Boolean(contact.phone && !contact.problem);
+
+/** "A · CLIENTE", "B · CONTATO" → "A, B e C". */
+function joinColumns(labels: string[]) {
+  const short = labels.map((label) => label.split(" · ")[1] ?? label);
+  return short.length <= 1 ? short.join("") : `${short.slice(0, -1).join(", ")} e ${short.at(-1)}`;
+}
 
 /**
- * Lista interna da equipe (16/11/2026): colar ou enviar até 50 contatos, conferir e, depois, escolher quem recebe.
- * Nada vai para os corretores antes de tocar em Distribuir.
+ * Lista interna da equipe. 16/11/2026: a lista entra inteira (até 5.000 por semana), lida por colunas e, na dúvida,
+ * com ajuda da IA. Uma busca de repetidos no banco, gravação em blocos de 1.000. Nada vai para os corretores antes
+ * de tocar em Distribuir.
  */
-export function TeamListImport({ pending, team }: { pending: TeamListPendingLead[]; team: TeamListBroker[] }) {
+export function TeamListImport({ pending, team }: { pending: number; team: TeamListBroker[] }) {
   const router = useRouter();
   const lab = useDevLab();
   const api = lab?.teamList ?? realApi;
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<Step>(pending.length ? "distribuir" : "lista");
+  const [step, setStep] = useState<Step>(pending ? "distribuir" : "lista");
   const [text, setText] = useState("");
-  const [reviewing, setReviewing] = useState(false);
+  const [file, setFile] = useState<{ name: string; tables: SourceTable[] } | null>(null);
+  const [sheet, setSheet] = useState(0);
+  const [reviewing, setReviewing] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
-  const [review, setReview] = useState<{ contacts: ReviewedContact[]; overflow: number } | null>(null);
+  const [review, setReview] = useState<Review | null>(null);
   const [consent, setConsent] = useState(false);
-  const [pendingLeads, setPendingLeads] = useState(pending);
+  const [pendingCount, setPendingCount] = useState(pending);
+  const [progress, setProgress] = useState("Importando…");
+  const [notice, setNotice] = useState<string | null>(null);
+  // Blocos já gravados desta lista: "Tentar de novo" continua de onde parou.
+  const sent = useRef<{ importId: string; upTo: number; imported: number; duplicates: number } | null>(null);
   // O painel vai direto para o body: o cabeçalho da página prende elementos fixos e cortava o painel.
   const [mounted, setMounted] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- só sabe que está no navegador depois de montar
   useEffect(() => setMounted(true), []);
 
-  const ready = review?.contacts.filter((c) => c.phone && !c.problem && !c.duplicate) ?? [];
-  const duplicates = review?.contacts.filter((c) => c.duplicate) ?? [];
-  const problems = review?.contacts.filter((c) => c.problem) ?? [];
+  const view = useMemo(() => {
+    if (!review) return null;
+    const contacts = review.organized.contacts;
+    const ready = contacts.filter((contact) => isReady(contact) && !review.known.has(contact.phone!));
+    const room = Math.min(review.weekLeft, SUPERVISOR_IMPORT_MAX);
+    const toImport = ready.slice(0, room);
+    const inCrm = contacts.filter((contact) => isReady(contact) && review.known.has(contact.phone!));
+    const groups = new Map<string, number[]>();
+    for (const contact of contacts) {
+      if (!contact.problem) continue;
+      groups.set(contact.problem, [...(groups.get(contact.problem) ?? []), contact.line]);
+    }
+    if (inCrm.length) groups.set("Já está no CRM.", inCrm.map((contact) => contact.line));
+    const outside = [...groups].sort((a, b) => b[1].length - a[1].length);
+    return { toImport, later: ready.length - toImport.length, outside, outsideTotal: outside.reduce((sum, [, lines]) => sum + lines.length, 0), fixed: toImport.filter((contact) => contact.fixed).length };
+  }, [review]);
 
   function openSheet() {
-    setStep(pendingLeads.length ? "distribuir" : "lista");
+    setStep(pendingCount ? "distribuir" : "lista");
     setOpen(true);
   }
 
-  /**
-   * Excel (.xlsx/.xls), contatos do celular (.vcf), CSV ou texto: tudo vira texto aqui mesmo, uma linha por contato,
-   * e aparece na caixa para a supervisora ver antes de conferir. O .vcf pode trazer fotos enormes: só nome,
-   * telefone e e-mail seguem.
-   */
-  async function readFile(file: File) {
-    setReviewError(null);
+  function resetList() {
+    setText("");
+    setFile(null);
+    setSheet(0);
     setReview(null);
+    setReviewError(null);
+    setConsent(false);
+    sent.current = null;
+  }
+
+  /** Excel (todas as abas), CSV, texto ou contatos do celular (.vcf). Planilha fica em colunas, sem virar texto. */
+  async function readFile(picked: File) {
+    resetList();
     try {
-      const name = file.name.toLowerCase();
+      const name = picked.name.toLowerCase();
       if (/\.(xlsx|xls)$/.test(name)) {
         const XLSX = await import("xlsx");
-        const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, blankrows: false });
-        setText(rows.map((row) => row.map((cell) => String(cell ?? "").trim()).filter(Boolean).join("\t")).filter(Boolean).join("\n"));
+        const workbook = XLSX.read(await picked.arrayBuffer(), { type: "array" });
+        const tables = workbook.SheetNames.map((sheetName) => {
+          const raw = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], { header: 1, raw: false, blankrows: false, defval: "" });
+          return { name: sheetName, rows: raw.map((row) => Array.from(row, (value) => String(value ?? "").trim())) };
+        }).filter((table) => table.rows.length);
+        if (!tables.length) throw new Error("vazio");
+        // Começa pela aba com mais linhas; a supervisora troca se quiser.
+        const biggest = tables.reduce((best, table, index) => (table.rows.length > tables[best].rows.length ? index : best), 0);
+        setFile({ name: picked.name, tables });
+        setSheet(biggest);
         return;
       }
-      const content = await file.text();
-      setText(/BEGIN:VCARD/i.test(content) ? vcardToLines(content) : content);
+      const content = await picked.text();
+      const plain = /BEGIN:VCARD/i.test(content) ? vcardToLines(content) : content;
+      const table = textToTable(plain);
+      if (table) setFile({ name: picked.name, tables: [{ name: picked.name, rows: table }] });
+      else setText(plain);
     } catch {
-      setReviewError("Não consegui abrir esse arquivo. Tente salvar como CSV ou copiar e colar os contatos.");
+      setReviewError("Não consegui abrir esse arquivo. Tente salvar como Excel ou CSV, ou copiar e colar os contatos.");
     }
   }
 
   async function runReview() {
-    setReviewing(true);
     setReviewError(null);
-    const result = await api.review(text).catch(() => ({ ok: false as const, error: "Não consegui ler a lista agora. Tente de novo." }));
-    setReviewing(false);
+    setReviewing("Lendo a lista…");
+    const rows = file?.tables[sheet]?.rows ?? null;
+    let organized = rows ? organizeTable(rows) : organizeText(text);
+    if (!organized.confident) {
+      // Camada 2: a IA só vê o formato (números e e-mails mascarados) e devolve o mapa, que é conferido aqui.
+      const request = rows ? tableRequest(rows) : textRequest(text);
+      if (request) {
+        setReviewing("Organizando com ajuda da IA…");
+        const answer = await api.structure(request).catch(() => null);
+        if (answer?.ok && answer.data) {
+          const applied = rows ? applyTableAnswer(rows, answer.data) : applyTextAnswer(text, answer.data);
+          if (applied?.contacts.length) organized = applied;
+        }
+      }
+    }
+    if (!organized.contacts.length) {
+      setReviewing(null);
+      setReviewError("Não achei contatos nessa lista. Confira se tem uma coluna de nome e outra de celular.");
+      return;
+    }
+    const cut = Math.max(0, organized.contacts.length - SUPERVISOR_IMPORT_MAX);
+    organized = { ...organized, contacts: organized.contacts.slice(0, SUPERVISOR_IMPORT_MAX) };
+    setReviewing("Procurando quem já está no CRM…");
+    const phones = [...new Set(organized.contacts.filter(isReady).map((contact) => contact.phone!))];
+    const result = await api.review(phones).catch(() => ({ ok: false as const, error: "Não consegui conferir a lista agora. Tente de novo." }));
+    setReviewing(null);
     if (!result.ok) {
       setReviewError(result.error);
       return;
     }
-    setReview(result.data);
+    sent.current = null;
+    setReview({ organized, known: new Set(result.data.known), weekLeft: result.data.weekLeft, cut });
     setStep("conferir");
   }
 
+  async function importAll() {
+    if (!view) return { ok: false as const, message: "Confira a lista de novo." };
+    const state = sent.current ?? { importId: crypto.randomUUID(), upTo: 0, imported: 0, duplicates: 0 };
+    sent.current = state;
+    const total = view.toImport.length;
+    while (state.upTo < total) {
+      setProgress(`Importando… ${fmt(state.upTo)} de ${fmt(total)}`);
+      const chunk = view.toImport.slice(state.upTo, state.upTo + SUPERVISOR_IMPORT_CHUNK);
+      const result = await api.importContacts({
+        consent,
+        importId: state.importId,
+        contacts: chunk.map((contact) => ({ name: contact.name, phone: contact.phone!, email: contact.email, note: contact.note })),
+      }).catch(() => ({ ok: false as const, error: "A conexão caiu no meio da importação." }));
+      if (!result.ok) {
+        const done = state.imported ? ` ${plural(state.imported, "contato já entrou", "contatos já entraram")}; o resto continua aqui.` : "";
+        return { ok: false as const, message: `${result.error}${done}` };
+      }
+      state.upTo += chunk.length;
+      state.imported += result.data.imported;
+      state.duplicates += result.data.duplicates;
+    }
+    setPendingCount((current) => current + state.imported);
+    setNotice(`${plural(state.imported, "contato importado", "contatos importados")}.${state.duplicates ? ` ${plural(state.duplicates, "já estava", "já estavam")} no CRM.` : ""} Agora escolha quem recebe.`);
+    return { ok: true as const };
+  }
+
   const title = step === "distribuir" ? "Distribuir para a equipe" : "Importar contatos";
-  const description = step === "lista" ? `Cole ou envie até ${SUPERVISOR_IMPORT_MAX} contatos. Eles ficam só com a sua equipe.`
+  const description = step === "lista" ? "Cole a lista ou envie a planilha. Os contatos ficam só com a sua equipe."
     : step === "conferir" ? "Confira antes de importar. Nada vai para os corretores agora."
       : "Escolha quem recebe. Só vai para os corretores quando você tocar em Distribuir.";
+  const table = file?.tables[sheet];
 
   return (
     <>
       <Button variant="secondary" size="sm" onClick={openSheet}>
         <UploadSimple size={16} aria-hidden="true" />
-        {pendingLeads.length ? `Distribuir lista (${pendingLeads.length})` : "Importar contatos"}
+        {pendingCount ? `Distribuir lista (${fmt(pendingCount)})` : "Importar contatos"}
       </Button>
       {mounted ? createPortal(<div className="arc-venancor"><LiteSidePanel open={open} onOpenChange={setOpen} title={title} description={description}>
         {step === "lista" ? (
           <div className={form.form}>
-            <div className={form.field}>
-              <label className={form.label} htmlFor="team-list-text">Um contato por linha</label>
-              <textarea
-                id="team-list-text"
-                className={`${form.textarea} ${styles.list}`}
-                value={text}
-                onChange={(event) => { setText(event.target.value); setReview(null); }}
-                placeholder={"Maria Silva (21) 99876-5432 maria@email.com\nJoão Souza 11912345678"}
-              />
-              <p className={form.hint}>Nome, celular e e-mail, em qualquer ordem. Também serve nome numa linha e telefone na de baixo.</p>
-            </div>
-            <label className={styles.file}>
-              <UploadSimple size={16} aria-hidden="true" />
-              Enviar arquivo (Excel, CSV ou contatos do celular)
-              <input type="file" accept=".xlsx,.xls,.csv,.txt,.vcf,text/csv,text/plain,text/vcard,text/x-vcard" className={styles.srOnly} onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file); event.target.value = ""; }} />
-            </label>
+            {file && table ? (
+              <>
+                <ul className={styles.rows}>
+                  <li className={`${styles.row} ${styles.fileRow}`}>
+                    <FileXls size={20} aria-hidden="true" />
+                    <span className={styles.fileText}>
+                      <span className={styles.name}>{file.name}</span>
+                      <span className={styles.detail}>{plural(table.rows.length, "linha", "linhas")}{file.tables.length > 1 ? ` na aba ${table.name}` : ""}</span>
+                    </span>
+                    <button type="button" className={styles.iconButton} aria-label="Tirar o arquivo" onClick={resetList}><X size={16} /></button>
+                  </li>
+                </ul>
+                {file.tables.length > 1 ? (
+                  <div className={form.field}>
+                    <label className={form.label} htmlFor="team-list-sheet">Aba da planilha</label>
+                    <select id="team-list-sheet" className={form.input} value={sheet} onChange={(event) => { setSheet(Number(event.target.value)); setReview(null); }}>
+                      {file.tables.map((item, index) => <option key={item.name} value={index}>{`${item.name} (${plural(item.rows.length, "linha", "linhas")})`}</option>)}
+                    </select>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div className={form.field}>
+                <label className={form.label} htmlFor="team-list-text">Lista de contatos</label>
+                <textarea
+                  id="team-list-text"
+                  className={`${form.textarea} ${styles.list}`}
+                  value={text}
+                  onChange={(event) => { setText(event.target.value); setReview(null); }}
+                  placeholder={"Maria Silva (21) 99876-5432 maria@email.com\nJoão Souza 11912345678"}
+                />
+                <p className={form.hint}>Em qualquer formato: colado do Excel, do WhatsApp ou um por linha. O sistema separa nome, celular e e-mail.</p>
+              </div>
+            )}
+            {!file ? (
+              <label className={styles.file}>
+                <UploadSimple size={16} aria-hidden="true" />
+                Enviar arquivo (Excel, CSV ou contatos do celular)
+                <input type="file" accept=".xlsx,.xls,.csv,.txt,.vcf,text/csv,text/plain,text/vcard,text/x-vcard" className={styles.srOnly} onChange={(event) => { const picked = event.target.files?.[0]; if (picked) void readFile(picked); event.target.value = ""; }} />
+              </label>
+            ) : null}
             {reviewError ? <p role="alert" className={styles.error}>{reviewError}</p> : null}
             <div className={form.actions}>
-              <Button onClick={runReview} disabled={!text.trim() || reviewing}>{reviewing ? "Lendo a lista…" : "Conferir"}</Button>
+              <Button onClick={runReview} disabled={(!file && !text.trim()) || Boolean(reviewing)}>{reviewing ?? "Conferir"}</Button>
             </div>
           </div>
         ) : null}
 
-        {step === "conferir" && review ? (
+        {step === "conferir" && review && view ? (
           <div className={form.form}>
             <dl className={form.summary}>
-              <div><dt>Prontos</dt><dd>{ready.length}</dd></div>
-              <div><dt>Ficam de fora</dt><dd>{duplicates.length + problems.length}</dd></div>
+              <div><dt>Vão entrar</dt><dd>{fmt(view.toImport.length)}</dd></div>
+              <div><dt>Ficam de fora</dt><dd>{fmt(view.outsideTotal)}</dd></div>
             </dl>
-            {review.overflow ? <p className={form.hint}>{plural(review.overflow, "contato ficou", "contatos ficaram")} para a próxima importação (limite de {SUPERVISOR_IMPORT_MAX}).</p> : null}
-            <ContactList title="Prontos para importar" items={ready.map((c) => ({ key: `${c.line}`, name: c.name, detail: [c.phoneLabel, c.email].filter(Boolean).join(" · ") }))} />
-            <ContactList title="Ficam de fora" muted items={[...duplicates.map((c) => ({ key: `d${c.line}`, name: c.name || c.phoneLabel || `Linha ${c.line}`, detail: "Já está no sistema" })), ...problems.map((c) => ({ key: `p${c.line}`, name: c.name || c.phoneLabel || `Linha ${c.line}`, detail: c.problem ?? "" }))]} />
+            <ReadAs organized={review.organized} />
+            {view.later || review.cut ? (
+              <p className={form.hint}>
+                {view.later ? `${plural(view.later, "contato fica", "contatos ficam")} para depois: o limite é de ${fmt(review.weekLeft)} até a semana virar. ` : ""}
+                {review.cut ? `A lista passou de ${fmt(SUPERVISOR_IMPORT_MAX)} contatos: ${plural(review.cut, "ficou", "ficaram")} fora desta vez.` : ""}
+              </p>
+            ) : null}
+            <ContactList
+              title="Vão entrar"
+              items={[
+                ...view.toImport.slice(0, 5).map((contact) => ({ key: `r${contact.line}`, name: contact.name, detail: [contact.phoneLabel, contact.email, contact.fixed].filter(Boolean).join(" · ") })),
+                ...(view.toImport.length > 5 ? [{ key: "more", name: `e mais ${fmt(view.toImport.length - 5)}`, detail: view.fixed ? `${plural(view.fixed, "celular ganhou", "celulares ganharam")} o 9 que faltava.` : "" }] : []),
+              ]}
+            />
+            <ContactList
+              title="Ficam de fora"
+              muted
+              items={view.outside.map(([reason, lines]) => ({
+                key: reason,
+                name: `${fmt(lines.length)} · ${reason.replace(/\.$/, "")}`,
+                detail: `${lines.length === 1 ? "Linha" : "Linhas"} ${lines.slice(0, 6).join(", ")}${lines.length > 6 ? "…" : ""}`,
+              }))}
+            />
             <label className={styles.consent}>
               <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
               <span>Tenho autorização para contatar essas pessoas.</span>
@@ -149,22 +289,18 @@ export function TeamListImport({ pending, team }: { pending: TeamListPendingLead
             <div className={form.actions}>
               <Button variant="ghost" onClick={() => setStep("lista")}>Voltar</Button>
               <LiteActionButton
-                busyLabel="Importando…"
+                busyLabel={progress}
                 doneLabel="Importado"
-                disabled={!ready.length || !consent}
-                keeps="A lista continua aqui para tentar de novo."
-                onAction={async () => {
-                  const result = await api.importContacts({ consent, contacts: ready.map((c) => ({ name: c.name, phone: c.phone!, email: c.email })) });
-                  if (!result.ok) return { ok: false, message: result.error };
-                  setPendingLeads((current) => [...current, ...result.data.leads]);
-                  return { ok: true };
-                }}
+                disabled={!view.toImport.length || !consent}
+                keeps="A lista continua aqui."
+                onAction={importAll}
                 onDone={() => {
                   router.refresh();
+                  resetList();
                   setStep("distribuir");
                 }}
               >
-                {`Importar ${plural(ready.length, "contato", "contatos")}`}
+                {`Importar ${plural(view.toImport.length, "contato", "contatos")}`}
               </LiteActionButton>
             </div>
           </div>
@@ -173,17 +309,36 @@ export function TeamListImport({ pending, team }: { pending: TeamListPendingLead
         {step === "distribuir" ? (
           <Distribute
             api={api}
-            leads={pendingLeads}
+            total={pendingCount}
             team={team}
+            notice={notice}
             onDistributed={(left) => {
-              setPendingLeads((current) => current.slice(current.length - left));
+              setPendingCount(left);
+              setNotice(null);
               router.refresh();
             }}
-            onImportMore={() => { setText(""); setReview(null); setStep("lista"); }}
+            onImportMore={() => { resetList(); setNotice(null); setStep("lista"); }}
           />
         ) : null}
       </LiteSidePanel></div>, document.body) : null}
     </>
+  );
+}
+
+/** Como a lista foi lida, em uma frase: a supervisora vê se o sistema entendeu a planilha. */
+function ReadAs({ organized }: { organized: Organized }) {
+  const map = organized.map;
+  const ai = organized.aiUsed ? " Organizado com ajuda da IA." : "";
+  if (!map) return <p className={form.hint}>{`Lido linha a linha: nome, celular e e-mail separados em cada contato.${ai}`}</p>;
+  const label = (index: number) => organized.columns[index] ?? "";
+  const extras = map.extras.map(label);
+  return (
+    <p className={form.hint}>
+      {`Coluna ${label(map.name)} é o nome e ${label(map.phone)} é o celular`}
+      {map.email !== null ? `; ${label(map.email)} é o e-mail` : ""}
+      {extras.length ? `. ${extras.length === 1 ? "A coluna" : "As colunas"} ${joinColumns(extras)} ${extras.length === 1 ? "vai" : "vão"} para a anotação do lead.` : "."}
+      {ai}
+    </p>
   );
 }
 
@@ -196,7 +351,7 @@ function ContactList({ title, items, muted = false }: { title: string; items: Ar
         {items.map((item) => (
           <li key={item.key} className={styles.row} data-muted={muted || undefined}>
             <span className={styles.name}>{item.name}</span>
-            <span className={styles.detail}>{item.detail}</span>
+            {item.detail ? <span className={styles.detail}>{item.detail}</span> : null}
           </li>
         ))}
       </ul>
@@ -205,10 +360,11 @@ function ContactList({ title, items, muted = false }: { title: string; items: Ar
 }
 
 /** Marcar os corretores e, se quiser, ajustar quantos cada um recebe. Começa dividindo igual entre os disponíveis. */
-function Distribute({ api, leads, team, onDistributed, onImportMore }: {
+function Distribute({ api, total, team, notice, onDistributed, onImportMore }: {
   api: TeamListApi;
-  leads: TeamListPendingLead[];
+  total: number;
   team: TeamListBroker[];
+  notice: string | null;
   onDistributed: (left: number) => void;
   onImportMore: () => void;
 }) {
@@ -218,7 +374,6 @@ function Distribute({ api, leads, team, onDistributed, onImportMore }: {
   });
   const [manual, setManual] = useState<Record<string, number> | null>(null);
   const [result, setResult] = useState<string | null>(null);
-  const total = leads.length;
 
   const counts = useMemo(() => {
     if (manual) return manual;
@@ -233,13 +388,13 @@ function Distribute({ api, leads, team, onDistributed, onImportMore }: {
     setChosen((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
   }
 
-  function change(id: string, delta: number) {
-    const base = { ...counts };
-    const next = Math.max(0, (base[id] ?? 0) + delta);
-    if (delta > 0 && left <= 0) return;
-    base[id] = next;
+  /** Quantidade digitada ou no − e +: nunca passa do que sobra. */
+  function set(id: string, wanted: number) {
+    const base = Object.fromEntries(chosen.map((brokerId) => [brokerId, counts[brokerId] ?? 0]));
+    const others = given - (base[id] ?? 0);
+    base[id] = Math.max(0, Math.min(Math.floor(wanted) || 0, total - others));
     setManual(base);
-    if (!chosen.includes(id) && next > 0) setChosen((current) => [...current, id]);
+    if (!chosen.includes(id) && base[id] > 0) setChosen((current) => [...current, id]);
   }
 
   if (!total) {
@@ -255,32 +410,44 @@ function Distribute({ api, leads, team, onDistributed, onImportMore }: {
 
   return (
     <div className={form.form}>
-      {result ? <p role="status" className={styles.done}>{result}</p> : null}
+      {result || notice ? <p role="status" className={styles.done}>{result ?? notice}</p> : null}
       <dl className={form.summary}>
-        <div><dt>Para distribuir</dt><dd>{total}</dd></div>
-        <div><dt>Ficam para depois</dt><dd>{left}</dd></div>
+        <div><dt>Para distribuir</dt><dd>{fmt(total)}</dd></div>
+        <div><dt>Ficam para depois</dt><dd>{fmt(left)}</dd></div>
       </dl>
       {team.length ? (
-        <ul className={form.checks} aria-label="Corretores da equipe">
-          {team.map((broker) => {
-            const on = chosen.includes(broker.id);
-            const value = on ? counts[broker.id] ?? 0 : 0;
-            return (
-              <li key={broker.id} className={styles.broker}>
-                <label className={form.check}>
-                  <input type="checkbox" checked={on} onChange={() => toggle(broker.id)} />
-                  <span className={styles.name}>{broker.name}</span>
-                  {broker.availability !== "available" ? <span className={styles.detail}>Pausado</span> : null}
-                </label>
-                <span className={styles.stepper}>
-                  <button type="button" aria-label={`Menos um para ${broker.name}`} disabled={!on || value === 0} onClick={() => change(broker.id, -1)}><Minus size={14} /></button>
-                  <span aria-label={`${value} leads para ${broker.name}`}>{value}</span>
-                  <button type="button" aria-label={`Mais um para ${broker.name}`} disabled={!on || left <= 0} onClick={() => change(broker.id, 1)}><Plus size={14} /></button>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <ul className={form.checks} aria-label="Corretores da equipe">
+            {team.map((broker) => {
+              const on = chosen.includes(broker.id);
+              const value = on ? counts[broker.id] ?? 0 : 0;
+              return (
+                <li key={broker.id} className={styles.broker}>
+                  <label className={form.check}>
+                    <input type="checkbox" checked={on} onChange={() => toggle(broker.id)} />
+                    <span className={styles.name}>{broker.name}</span>
+                    {broker.availability !== "available" ? <span className={styles.detail}>Pausado</span> : null}
+                  </label>
+                  <span className={styles.stepper}>
+                    <button type="button" aria-label={`Menos um para ${broker.name}`} disabled={!on || value === 0} onClick={() => set(broker.id, value - 1)}><Minus size={14} /></button>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={total}
+                      value={value}
+                      disabled={!on}
+                      aria-label={`Leads para ${broker.name}`}
+                      onChange={(event) => set(broker.id, Number(event.target.value))}
+                    />
+                    <button type="button" aria-label={`Mais um para ${broker.name}`} disabled={!on || left <= 0} onClick={() => set(broker.id, value + 1)}><Plus size={14} /></button>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          {manual ? <Button variant="ghost" size="sm" onClick={() => setManual(null)}>Dividir igual de novo</Button> : null}
+        </>
       ) : <p className={form.hint}>Sua equipe ainda não tem corretores ativos.</p>}
       <div className={form.actions}>
         <LiteActionButton
@@ -291,8 +458,8 @@ function Distribute({ api, leads, team, onDistributed, onImportMore }: {
           disabled={!given}
           keeps="Os leads continuam esperando aqui."
           onAction={async () => {
-            const brokerIds = chosen.filter((id) => (counts[id] ?? 0) > 0);
-            const response = await api.distribute({ leadIds: leads.map((lead) => lead.id), brokerIds, counts: Object.fromEntries(brokerIds.map((id) => [id, counts[id] ?? 0])) });
+            const picked = Object.fromEntries(chosen.filter((id) => (counts[id] ?? 0) > 0).map((id) => [id, counts[id] ?? 0]));
+            const response = await api.distribute({ counts: picked });
             if (!response.ok) return { ok: false, message: response.error };
             setResult(`${plural(response.data.distributed, "lead foi", "leads foram")} para a equipe. Cada corretor recebeu um aviso no CRM.`);
             onDistributed(response.data.left);

@@ -29,7 +29,7 @@ describe("parseContactList", () => {
 
   it("keeps at most 50 and says how many were left out", () => {
     const text = Array.from({ length: 53 }, (_, i) => `Pessoa ${String.fromCharCode(65 + (i % 26))} 21 9${String(80000000 + i).padStart(8, "0")}`).join("\n");
-    const list = parseContactList(text);
+    const list = parseContactList(text, 50);
     expect(list.contacts).toHaveLength(50);
     expect(list.overflow).toBe(3);
   });

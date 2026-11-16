@@ -1,9 +1,14 @@
 import { lerTelefone } from "@/shared/input/telefone";
 
-/** Lista interna da equipe (16/11/2026): no máximo 50 contatos por importação. */
-export const SUPERVISOR_IMPORT_MAX = 50;
-/** Limite por dia de cada supervisor, contra abuso. */
-export const SUPERVISOR_IMPORT_DAILY_MAX = 300;
+/**
+ * Lista interna da equipe. 16/11/2026 (planilha de 4.000 leads): a lista entra inteira de uma vez, com uma só busca
+ * de repetidos no banco, em vez de lotes de 50 (cada lote seria uma busca). O freio é por semana.
+ */
+export const SUPERVISOR_IMPORT_MAX = 5000;
+/** Limite de cada supervisor a cada 7 dias. */
+export const SUPERVISOR_IMPORT_WEEKLY_MAX = 5000;
+/** A tela grava em blocos deste tamanho (o corpo de uma Server Action vai até 1 MB). */
+export const SUPERVISOR_IMPORT_CHUNK = 1000;
 
 export type ParsedContact = {
   /** Linha da lista original (1, 2, 3...), para a pessoa achar o contato. */
@@ -14,17 +19,40 @@ export type ParsedContact = {
   /** "(21) 99999-9999", para mostrar. */
   phoneLabel: string | null;
   email: string | null;
+  /** Colunas que sobraram da planilha (operadora, "Possui CNPJ"...), guardadas na anotação do lead. */
+  note: string | null;
+  /** O que o sistema arrumou sozinho, para a supervisora ver ("Colocamos o 9 que faltava."). */
+  fixed: string | null;
   problem: string | null;
 };
+
+/** O que a tela manda para o servidor conferir e importar. O servidor relê tudo. */
+export type ContactDraft = { line: number; name: string; phone: string; email: string | null; note: string | null };
+
+/** Pedido de ajuda à IA: só a estrutura, com números e e-mails mascarados. */
+export type StructureRequest =
+  | { kind: "tabela"; rows: string[][] }
+  | { kind: "texto"; lines: string[] };
+/** Resposta da IA: o mapa das colunas ou quais linhas formam cada contato. Nunca os dados. */
+export type StructureAnswer =
+  | { kind: "tabela"; header: number | null; name: number; phone: number; email: number | null }
+  | { kind: "texto"; groups: number[][] };
+
+type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
 /** O contato depois do "Conferir": `duplicate` = o telefone já está no sistema. */
 export type ReviewedContact = ParsedContact & { duplicate: boolean };
 
 /** Respostas do servidor que a gaveta usa (as Server Actions de verdade ou o laboratório). */
 export type TeamListApi = {
-  review: (text: string) => Promise<{ ok: true; data: { contacts: ReviewedContact[]; overflow: number } } | { ok: false; error: string }>;
-  importContacts: (input: { consent: boolean; contacts: Array<{ name: string; phone: string; email: string | null }> }) => Promise<{ ok: true; data: { imported: number; duplicates: number; importId: string; leads: Array<{ id: string; name: string }> } } | { ok: false; error: string }>;
-  distribute: (input: { leadIds: string[]; brokerIds: string[]; counts?: Record<string, number> }) => Promise<{ ok: true; data: { distributed: number; left: number; perBroker: Record<string, number> } } | { ok: false; error: string }>;
+  /** Só quando a leitura automática fica em dúvida. `null` = IA indisponível: segue a leitura automática. */
+  structure: (request: StructureRequest) => Promise<Result<StructureAnswer | null>>;
+  /** Uma busca só: quais desses celulares (55DDDnúmero) já estão no CRM. Devolve os que já estão. */
+  review: (phones: string[]) => Promise<Result<{ known: string[]; weekLeft: number }>>;
+  /** Um bloco de até SUPERVISOR_IMPORT_CHUNK. `importId` junta os blocos da mesma lista. */
+  importContacts: (input: { consent: boolean; importId: string; contacts: Array<Omit<ContactDraft, "line">> }) => Promise<Result<{ imported: number; duplicates: number }>>;
+  /** Quantos leads cada corretor recebe. O servidor escolhe os mais antigos da lista. */
+  distribute: (input: { counts: Record<string, number> }) => Promise<Result<{ distributed: number; left: number; perBroker: Record<string, number> }>>;
 };
 
 export type ParsedList = {
@@ -33,12 +61,12 @@ export type ParsedList = {
   overflow: number;
 };
 
-const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+export const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 /** Sequência que parece telefone: dígitos com espaço, ponto, traço, parênteses e +. */
-const PHONE = /\+?\(?\d[\d\s().-]{7,}\d/;
-const HEADER = /^(nome|name|contato)\b.*\b(telefone|celular|whats|phone|fone)/i;
+export const PHONE = /\+?\(?\d[\d\s().-]{7,}\d/;
+const HEADER = /^(nome|name|contato|cliente)\b.*\b(telefone|celular|whats|phone|fone|contato)/i;
 
-function titleCase(value: string) {
+export function titleCase(value: string) {
   return value
     .toLowerCase()
     .split(/\s+/)
@@ -47,7 +75,7 @@ function titleCase(value: string) {
     .join(" ");
 }
 
-function cleanName(value: string) {
+export function cleanName(value: string) {
   return value
     .replace(/["'`]/g, "")
     .replace(/[;,|\t]+/g, " ")
@@ -75,10 +103,14 @@ function extract(raw: string, line: number): Piece | null {
   return { line, name, phoneRaw, email };
 }
 
-function finish(piece: Piece): ParsedContact {
-  const { line, name, phoneRaw, email } = piece;
+/** Monta o contato e diz o que está errado. Usado pela tela, pela leitura da planilha e de novo pelo servidor. */
+export function buildContact(input: { line: number; name: string; phoneRaw: string | null; email: string | null; note?: string | null }): ParsedContact {
+  const { line, name, phoneRaw, email } = input;
   const read = phoneRaw ? lerTelefone(phoneRaw) : null;
   const phone = read?.ok && read.celular ? read.e164 : null;
+  // Celular antigo com 8 dígitos: lerTelefone já coloca o 9; a supervisora vê que foi corrigido.
+  const national = (phoneRaw ?? "").replace(/\D/g, "").replace(/^0+/, "").replace(/^55(?=\d{10,11}$)/, "");
+  const fixed = phone && national.length === 10 ? "Colocamos o 9 que faltava." : null;
   const problem = !phoneRaw
     ? "Sem telefone."
     : !read?.ok
@@ -88,7 +120,22 @@ function finish(piece: Piece): ParsedContact {
         : name.length < 2
           ? "Sem nome."
           : null;
-  return { line, name, phone, phoneLabel: read?.ok ? read.exibicao : phoneRaw, email, problem };
+  return { line, name, phone, phoneLabel: read?.ok ? read.exibicao : phoneRaw, email, note: input.note?.trim() ? input.note.trim().slice(0, 300) : null, fixed, problem };
+}
+
+function finish(piece: Piece): ParsedContact {
+  return buildContact(piece);
+}
+
+/** Repetido dentro da própria lista: o primeiro fica, os outros avisam. */
+export function markRepeated(contacts: ParsedContact[]) {
+  const seen = new Set<string>();
+  for (const contact of contacts) {
+    if (!contact.phone || contact.problem) continue;
+    if (seen.has(contact.phone)) contact.problem = "Repetido nesta lista.";
+    else seen.add(contact.phone);
+  }
+  return contacts;
 }
 
 /** Uma linha de texto livre (colado do WhatsApp, Excel ou bloco de notas) vira nome, telefone e e-mail. */
@@ -149,15 +196,8 @@ export function parseContactList(text: string, max = SUPERVISOR_IMPORT_MAX): Par
     if (piece) pieces.push(piece);
   });
   const all = mergeBrokenContacts(pieces).map(finish);
-  const contacts = all.slice(0, max);
+  const contacts = markRepeated(all.slice(0, max));
   const overflow = all.length - contacts.length;
-  // Repetido dentro da própria lista: o primeiro fica, os outros avisam.
-  const seen = new Set<string>();
-  for (const contact of contacts) {
-    if (!contact.phone || contact.problem) continue;
-    if (seen.has(contact.phone)) contact.problem = "Repetido nesta lista.";
-    else seen.add(contact.phone);
-  }
   return { contacts, overflow };
 }
 
