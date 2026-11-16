@@ -566,8 +566,30 @@ export function WhatsAppConnectDialog({
     setCodeIssue(null);
     try {
       if (!connection.sessionId && !connectingRef.current) runStart({ forceNew: false });
+      // Sessão quebrada (SESSION_FAILED): recria uma vez, sem o corretor perceber, e pede o código de novo.
+      let recreated = false;
       for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt += 1) {
         const result = await requestWhatsAppPairingCode({ phone: `55${pairingPhone}` });
+        if (!result.success && result.code === "SESSION_FAILED") {
+          if (recreated) {
+            reportCodeIssue("O WhatsApp do servidor está instável agora. Tente de novo em 1 minuto.");
+            return;
+          }
+          recreated = true;
+          const restarted = await startWhatsAppConnection({ forceNew: true }).catch(() => null);
+          if (restarted?.success) {
+            setConnection((current) => ({
+              ...current,
+              sessionId: restarted.sessionId ?? current.sessionId,
+              sessionName: restarted.sessionId ?? current.sessionName,
+              status: restarted.status ?? "initializing",
+              qrCode: null,
+            }));
+            setProviderStatus(restarted.providerStatus ?? null);
+          }
+          await sleep(1_500);
+          continue;
+        }
         if (result.success && result.pairingCode) {
           pairingCodeRef.current = result.pairingCode;
           setPairingCode(result.pairingCode);
@@ -629,7 +651,8 @@ export function WhatsAppConnectDialog({
       if (ready) {
         if (connection.sessionId) void pollOnce();
       } else {
-        runStart({ forceNew: false });
+        // Sessão em erro (FAILED no WAHA) não volta sozinha: abrir recria em vez de reaproveitar (16/11/2026).
+        runStart({ forceNew: connection.status === "error" });
       }
       return;
     }
