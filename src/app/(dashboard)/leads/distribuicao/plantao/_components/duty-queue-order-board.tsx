@@ -20,9 +20,11 @@ import type { DutyBrokerTurnStats, DutyQueueOrderPreview } from "@/features/lead
 import { cn } from "@/lib/utils";
 
 import styles from "./duty-queue-order-board.module.css";
+import { isRotationSignal } from "./duty-turn-auto-refresh";
 
 const timeZone = "America/Sao_Paulo";
-const POLL_MS = 60_000;
+// 2 min (egress 16/11): lead and offer changes already arrive by realtime signal.
+const POLL_MS = 120_000;
 const SIGNAL_DEBOUNCE_MS = 2_000;
 
 function subscribeMotionPreference(onChange: () => void) {
@@ -183,7 +185,7 @@ export function DutyQueueOrderBoard({ previews, canReorder }: { previews: DutyQu
     let timer: number | null = null;
     const onRealtime = (event: Event) => {
       const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
-      if (detail?.kind !== "domain.invalidated") return;
+      if (!isRotationSignal(detail)) return;
       if (timer !== null) window.clearTimeout(timer);
       timer = window.setTimeout(() => { timer = null; refresh(); }, SIGNAL_DEBOUNCE_MS);
     };
