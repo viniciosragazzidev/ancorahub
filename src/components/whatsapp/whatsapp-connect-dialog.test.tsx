@@ -109,6 +109,68 @@ describe("WhatsAppConnectDialog mobile access", () => {
     expect(await screen.findByText("Digite o código no WhatsApp")).toBeInTheDocument();
   });
 
+  // 16/11/2026: sessão quebrada (FAILED) e cliques repetidos.
+  it("recreates a broken session when opening and waits for it before asking the code", async () => {
+    let finishStart: (value: unknown) => void = () => undefined;
+    mocks.start.mockImplementationOnce(() => new Promise((resolve) => { finishStart = resolve; }));
+    mocks.poll.mockResolvedValue({ ...readySnapshot, status: "initializing", providerStatus: "SCAN_QR_CODE" });
+    mocks.requestCode.mockResolvedValue({ success: true, pairingCode: "ABCD-1234", retryInMs: null });
+    render(<WhatsAppConnectDialog initial={{ ...readyConnection, status: "error" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Conectar WhatsApp" }));
+    await waitFor(() => expect(mocks.start).toHaveBeenCalledWith({ forceNew: true }));
+    fireEvent.click(await screen.findByRole("button", { name: "Gerar código" }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mocks.requestCode).not.toHaveBeenCalled();
+    finishStart({ success: true, status: "initializing", sessionId: "session-synthetic", providerStatus: "SCAN_QR_CODE" });
+    await waitFor(() => expect(mocks.requestCode).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("img", { name: "Código A B C D 1 2 3 4" })).toBeInTheDocument();
+    expect(mocks.start).toHaveBeenCalledTimes(1);
+  });
+
+  it("recreates the session once when the code says it is broken, then shows the code", async () => {
+    mocks.start.mockResolvedValue({ success: true, status: "initializing", sessionId: "session-synthetic", providerStatus: "SCAN_QR_CODE" });
+    mocks.poll.mockResolvedValue({ ...readySnapshot, status: "initializing", providerStatus: "SCAN_QR_CODE" });
+    mocks.requestCode
+      .mockResolvedValueOnce({ success: false, code: "SESSION_FAILED", error: "quebrada" })
+      .mockResolvedValue({ success: true, pairingCode: "WXYZ-5678", retryInMs: null });
+    render(<WhatsAppConnectDialog initial={{ ...readyConnection, status: "disconnected" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Conectar WhatsApp" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Gerar código" }));
+    expect(await screen.findByRole("img", { name: "Código W X Y Z 5 6 7 8" }, { timeout: 4_000 })).toBeInTheDocument();
+    expect(mocks.start).toHaveBeenCalledWith({ forceNew: true });
+    expect(mocks.requestCode).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops after one recreation and says the server is unstable instead of blaming the internet", async () => {
+    mocks.start.mockResolvedValue({ success: true, status: "initializing", sessionId: "session-synthetic", providerStatus: "SCAN_QR_CODE" });
+    mocks.poll.mockResolvedValue({ ...readySnapshot, status: "initializing", providerStatus: "SCAN_QR_CODE" });
+    mocks.requestCode.mockResolvedValue({ success: false, code: "SESSION_FAILED", error: "quebrada" });
+    render(<WhatsAppConnectDialog initial={{ ...readyConnection, status: "disconnected" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Conectar WhatsApp" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Gerar código" }));
+    await waitFor(() => expect(mocks.error).toHaveBeenCalledWith(expect.stringMatching(/instável/), expect.anything()), { timeout: 4_000 });
+    expect(mocks.requestCode).toHaveBeenCalledTimes(2);
+    expect(mocks.start.mock.calls.filter(([options]) => options?.forceNew === true)).toHaveLength(1);
+  });
+
+  it("asks for only one code when the broker taps Gerar código several times", async () => {
+    let finishCode: (value: unknown) => void = () => undefined;
+    mocks.start.mockResolvedValue({ success: true, status: "initializing", sessionId: "session-synthetic", providerStatus: "SCAN_QR_CODE" });
+    mocks.poll.mockResolvedValue({ ...readySnapshot, status: "initializing", providerStatus: "SCAN_QR_CODE" });
+    mocks.requestCode.mockImplementation(() => new Promise((resolve) => { finishCode = resolve; }));
+    render(<WhatsAppConnectDialog initial={{ ...readyConnection, status: "disconnected" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Conectar WhatsApp" }));
+    const button = await screen.findByRole("button", { name: "Gerar código" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    fireEvent.click(button);
+    await waitFor(() => expect(mocks.requestCode).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mocks.requestCode).toHaveBeenCalledTimes(1);
+    finishCode({ success: true, pairingCode: "ABCD-1234", retryInMs: null });
+    expect(await screen.findByRole("img", { name: "Código A B C D 1 2 3 4" })).toBeInTheDocument();
+  });
+
   it("can toggle the connected chat on mobile", async () => {
     render(<WhatsAppConnectDialog initial={readyConnection} />);
     fireEvent.click(screen.getByRole("button", { name: "WhatsApp conectado" }));
