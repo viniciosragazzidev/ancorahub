@@ -16,12 +16,12 @@ Fechar concorrências de proposta/venda, documentos, atribuição, plantões, co
 6. Aceitar convite: claim pending e não expirado antes da ativação.
 7. Retry da qualificação: incremento condicional limitado por maxRetries.
 8. Criar lead: protocolo único de lock por tenant e últimos 8 dígitos aplicado ao webhook Meta, cadastro manual, CSV, marketing import, OpenWA e WAHA, com releitura transacional. A confirmação manual de duplicata permanece válida.
-9. Pré-confirmação de plantão contíguo: gestão pode confirmar a próxima assignment sem criar presença duplicada; a janela é estritamente contígua, com tolerância de 0 minuto, e o evento identifica quem confirmou.
+9. Pré-confirmação de plantão contíguo: Diretor autorizado pode confirmar a próxima assignment sem criar presença duplicada; a janela é estritamente contígua, com tolerância de 0 minuto, e o evento identifica quem confirmou.
 
 ## Decisões adotadas
 
 - “Logo em seguida” significa que início do próximo turno é exatamente igual ao fim do turno confirmado, no mesmo instante UTC calculado para a ocorrência. Não há tolerância adicional: uma lacuna de qualquer duração não oferece a ação.
-- A ação fica disponível a Diretor e Gestor conforme o acesso atual à tela/ação de plantões; o Gestor continua limitado à unidade efetiva. Cargo customizado precisa manter `duty_schedules_manage`. Corretor e Supervisor sem acesso de gerenciamento não podem usar a ação.
+- A ação fica disponível só a Diretor com `duty_schedules_manage`. A matriz base (`permissions.ts`) concede essa capacidade apenas ao Diretor; o Gestor pode acompanhar a unidade, mas a autorização de escrita da presença não foi ampliada. Cargo customizado continua sujeito ao gate `duty_schedules_manage`. Corretor, Gestor e Supervisor sem autorização de escrita não podem usar a ação.
 - Reutilizar a flag existente de confirmação de presença. Não criar nova flag nem mudar a matriz de cargos.
 
 ## Validação e limites
@@ -76,4 +76,10 @@ Fechar concorrências de proposta/venda, documentos, atribuição, plantões, co
 - Arquivos: `src/features/leads/phone-dedup-lock.ts`, seus testes unitário e PostgreSQL opt-in, `manual-create.ts`, `bulk-import.ts`, `marketing-import/service.ts`, `create-lead-from-webhook-sync.ts`, `src/app/api/webhooks/openwa/[tenantId]/route.ts` e `src/features/waha-cadence/inbound.ts`.
 - Testes: teste unitário concorrente com `Promise.all` e barreira; integração PostgreSQL concorrente adicionada, skip sem `ERP_TEST_DATABASE_URL`. `npx vitest run ...` passou com 28 testes e 1 skip (incluindo o DB opt-in); `npx tsc --noEmit` passou.
 
-Item 9 em andamento. Arquivos, testes, commits e riscos serão atualizados na conclusão.
+### Item 9 concluído
+
+- Commit: a pré-confirmação só aparece para Diretor com `duty_schedules_manage`, quando há presença confirmada agora e exatamente uma assignment ativa do mesmo corretor começa no instante UTC em que o turno atual termina. A tolerância é 0 minuto; sobreposição, lacuna, ambiguidade ou próxima presença já ausente/expirada não exibem a ação.
+- `preconfirmContiguousDutyTarget` relê e trava a assignment atual, a confirmação atual e a assignment seguinte em uma transação. `claimDutyPresencePreconfirmation` cria a linha pendente com `ON CONFLICT DO NOTHING` e transiciona somente `pending → confirmed` com `UPDATE ... RETURNING`; o corretor usa a mesma linha e seu upsert não sobrescreve uma confirmação ganha por outro ator. Auditoria do Diretor é inserida na transação somente para a transição vencedora; repetição retorna estado já confirmado.
+- A tela de plantões mostra a ação na linha da assignment atual somente quando a próxima ocorrência atende às regras. O botão desabilita durante o envio e dá confirmação inline.
+- Testes unitários: disputa de dois Diretores com barreira, corrida entre pré-confirmação e confirmação do corretor, contiguidade exata, lacuna, presença inelegível e ambiguidade. Vitest focado: 39 passaram e 1 integração PostgreSQL foi skip. O teste PostgreSQL isolado cobre duas pré-confirmações concorrentes, uma única transição/auditoria e corrida com confirmação do corretor; ficou skip porque `ERP_TEST_DATABASE_URL` não está configurada. `npx tsc --noEmit` e ESLint focado passaram.
+- Risco residual: a validação simultânea em PostgreSQL não foi executada nesta máquina; o teste opt-in exige a instância sintética `erp_test` local na porta 5442 com arquivo de proveniência. Não houve migration, DDL ou escrita em banco real.

@@ -7,6 +7,7 @@ import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features
 import { getDatabase, schema } from "@/shared/db";
 import { DEFAULT_EXTRA_SHIFT_STARTS_AT, effectiveAttendanceMode, extendedShiftHourLabel, extraShiftWindow, findDutyOccurrenceConfirmation, formatDutyPresenceHourLabel, getRelevantDutyWindow, getSelfDutyConfirmationWindowState, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
 import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "./dated-duty-roster";
+import { saveOwnDutyPresenceAnswer, type SelfDutyPresenceAnswer } from "./duty-presence-self-confirm";
 
 export { SELF_CONFIRM_LATE_MESSAGE, SELF_CONFIRM_OPENS_MINUTES, SELF_CONFIRM_TOLERANCE_MINUTES } from "./duty-presence-domain";
 
@@ -533,34 +534,27 @@ export async function confirmOwnDutyPresence(input: { tenantId: string; brokerId
   if (windowState === "late") return { ok: false, reason: "late" };
   if (windowState !== "available") return { ok: false, reason: "outside_window" };
   if (presencial && !input.photoStorageKey) return { ok: false, reason: "photo_required" };
-  const answer = presencial
+  const answer: SelfDutyPresenceAnswer = presencial
     ? { status: "pending", confirmedAt: null, confirmedBy: null, photoStorageKey: input.photoStorageKey, photoTakenAt: now, updatedAt: now }
-    : { status: "confirmed", confirmedAt: now, confirmedBy: null, updatedAt: now };
-  const [row] = await db.insert(schema.dutyPresenceConfirmations).values({
-    id: randomUUID(),
+    : { status: "confirmed", confirmedAt: now, confirmedBy: null, photoStorageKey: null, photoTakenAt: null, updatedAt: now };
+  const saved = await saveOwnDutyPresenceAnswer(db, {
     tenantId: input.tenantId,
     scheduleId: occurrence.scheduleId,
     assignmentId: occurrence.assignmentId,
     brokerId: input.brokerId,
     dutyDate: occurrence.window.dutyDate,
-    shiftStartsAt: occurrence.window.startsAt,
-    shiftEndsAt: occurrence.window.endsAt,
-    notificationStatus: "sent",
-    createdAt: now,
-    ...answer,
-  }).onConflictDoUpdate({
-    target: [schema.dutyPresenceConfirmations.tenantId, schema.dutyPresenceConfirmations.assignmentId, schema.dutyPresenceConfirmations.dutyDate, schema.dutyPresenceConfirmations.shiftStartsAt, schema.dutyPresenceConfirmations.shiftEndsAt],
-    set: answer,
-    setWhere: presencial
-      ? and(ne(schema.dutyPresenceConfirmations.status, "absent"), or(ne(schema.dutyPresenceConfirmations.status, "confirmed"), isNull(schema.dutyPresenceConfirmations.confirmedBy)))
-      : ne(schema.dutyPresenceConfirmations.status, "absent"),
-  }).returning({ id: schema.dutyPresenceConfirmations.id });
-  if (!row) return { ok: false, reason: "absent" };
+    startsAt: occurrence.window.startsAt,
+    endsAt: occurrence.window.endsAt,
+    now,
+    answer,
+  });
+  if (saved.kind === "already_confirmed") return { ok: true, confirmationId: saved.confirmationId, awaitingRelease: presencial && !saved.confirmedBy };
+  if (saved.kind !== "saved") return { ok: false, reason: saved.kind === "absent" ? "absent" : "outside_window" };
   await db.insert(schema.auditLogs).values({
     id: randomUUID(), userId: input.brokerId, entidade: "duty_presence_confirmation",
-    entidadeId: row.id, acao: presencial ? "duty_presence_photo_sent" : "duty_presence_confirmed_app", createdAt: now,
+    entidadeId: saved.confirmationId, acao: presencial ? "duty_presence_photo_sent" : "duty_presence_confirmed_app", createdAt: now,
   });
-  return { ok: true, confirmationId: row.id, awaitingRelease: presencial };
+  return { ok: true, confirmationId: saved.confirmationId, awaitingRelease: presencial };
 }
 
 /**

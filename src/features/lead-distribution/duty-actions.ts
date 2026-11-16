@@ -24,6 +24,7 @@ import { isTypeUsableByUnit } from "./manager-unit-scope";
 import { isHotLeadEarlyDistributionEnabled, notHeldByRunningQualificationSql } from "./qualification-hold";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { publishNotification } from "@/features/notifications/send-push-helper";
+import { preconfirmContiguousDutyTarget } from "./duty-presence-preconfirm";
 
 export type DutyActionState = { success?: boolean; error?: string; message?: string; scheduleId?: string; scheduleIds?: string[] };
 
@@ -691,6 +692,29 @@ export async function releaseDutyPresenceAction(scheduleId: string, assignmentId
     return await releaseDutyPresenceManually({ tenantId: context.tenantId, assignmentId, releasedBy: context.userId, note: parsedNote });
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível liberar o corretor." };
+  }
+}
+
+/** Director with duty_schedules_manage can pre-confirm exactly one contiguous next occurrence. */
+export async function preconfirmContiguousDutyPresenceAction(scheduleId: string, assignmentId: string, targetAssignmentId: string): Promise<{ ok: true; alreadyConfirmed?: boolean } | { ok: false; reason: string }> {
+  try {
+    const parsedScheduleId = z.string().uuid().parse(scheduleId);
+    const parsedAssignmentId = z.string().uuid().parse(assignmentId);
+    const parsedTargetAssignmentId = z.string().uuid().parse(targetAssignmentId);
+    const { context } = await findScheduleForMutation(parsedScheduleId);
+    if (context.role !== "director") throw new Error("Somente Diretores com permissão de gerenciar plantões podem pré-confirmar presença.");
+    const result = await preconfirmContiguousDutyTarget({
+      tenantId: context.tenantId,
+      scheduleId: parsedScheduleId,
+      sourceAssignmentId: parsedAssignmentId,
+      expectedTargetAssignmentId: parsedTargetAssignmentId,
+      actorId: context.userId,
+    });
+    if (result.kind === "unavailable") return { ok: false, reason: "A presença ou o turno contíguo mudou. Atualize a página antes de tentar novamente." };
+    revalidateDutyWorkspace();
+    return { ok: true, alreadyConfirmed: result.kind === "already_confirmed" };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível pré-confirmar o próximo plantão." };
   }
 }
 

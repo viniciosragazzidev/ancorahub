@@ -41,9 +41,12 @@ import { DutyTurnSortableGrid } from "../_components/duty-turn-sortable-grid";
 import { BrokerPresenceInviteButton } from "../_components/broker-presence-invite-button";
 import { BrokerPresenceReleaseButton } from "../_components/broker-presence-release-button";
 import { BrokerPauseButton } from "../_components/broker-pause-button";
+import { BrokerPresencePreconfirmButton } from "../_components/broker-presence-preconfirm-button";
 import { BrokerCapacityBar, BrokerLiveStatus } from "../_components/broker-live-status";
 import { PendingRoster } from "../_components/pending-roster";
 import { getDutySwapNotices } from "@/features/lead-distribution/duty-swap-queries";
+import { requireCargoCapability } from "@/shared/auth/authorization";
+import { listContiguousNextDutyTargets } from "@/features/lead-distribution/duty-presence-preconfirm";
 import { swapNoticeText } from "@/features/lead-distribution/duty-swap";
 import { ScheduleEscalarButton } from "../_components/schedule-escalar-button";
 import { listInvitedBrokers, listPendingRosterEntries } from "@/features/lead-distribution/duty-roster-pending";
@@ -200,6 +203,20 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
       </main>
     </>;
   }
+  let canPreconfirmDuty = context.role === "director" && presenceEnabled;
+  if (canPreconfirmDuty) {
+    try { await requireCargoCapability(context, "duty_schedules_manage"); }
+    catch { canPreconfirmDuty = false; }
+  }
+  const preconfirmTargets = canPreconfirmDuty
+    ? await listContiguousNextDutyTargets(context.tenantId, roster.map((entry) => ({
+      assignmentId: entry.id,
+      brokerId: entry.brokerId,
+      presenceStatus: entry.presenceStatus,
+      startsAt: entry.occurrenceStartsAt,
+      endsAt: entry.occurrenceEndsAt,
+    })), now)
+    : new Map();
   const confirmedCount = roster.filter((entry) => entry.presenceStatus === "confirmed").length;
   // A plantão split in shifts shows its roster by shift (whole-day brokers in both).
   const shiftSections = dutyShifts(schedule)?.filter((shift) => shift.key !== "dia").map((shift) => ({
@@ -759,6 +776,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                     {entry.onlineOverride ? <Badge variant="info" title="Online neste plantão presencial: confirma com um toque, sem foto">Online</Badge> : null}
                     {presenceEnabled && entry.presenceStatus === "confirmed" ? <Badge variant="success" aria-label={`${entry.releasedByName ? `Liberado por ${entry.releasedByName}` : "Presença confirmada"}${entry.confirmedAt ? ` às ${dateTime.format(entry.confirmedAt)}` : ""}`} title={`${entry.releasedByName ? `Liberado por ${entry.releasedByName}` : "Confirmado"}${entry.confirmedAt ? ` em ${dateTime.format(entry.confirmedAt)}` : ""}`}><CheckCircle2 className="size-3.5" aria-hidden="true" /></Badge> : null}
                     {presenceEnabled && entry.presenceStatus === "pending" ? <Badge variant="warning" aria-label="Aguardando confirmação" title={entry.notificationErrorCode ? "Não foi possível enviar o lembrete" : "Aguardando confirmação"}><Clock3 className="size-3.5" aria-hidden="true" /></Badge> : null}
+                    {preconfirmTargets.get(entry.id) ? <BrokerPresencePreconfirmButton scheduleId={schedule.id} assignmentId={entry.id} targetAssignmentId={preconfirmTargets.get(entry.id)!.assignmentId} targetScheduleName={preconfirmTargets.get(entry.id)!.scheduleName} /> : null}
                     {presenceEnabled && entry.attendanceMode !== "presencial" && !entry.absent ? <BrokerPresenceInviteButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} /> : null}
                     {/* Presencial with a photo: release only from the drawer, where the photo is (validation is mandatory). */}
                     {entry.attendanceMode === "presencial" && entry.presencePhotoId && entry.onSitePending && !entry.absent ? <Badge variant="warning" title="O corretor guarda o lugar na vez pela hora da foto">{entry.photoTakenAt ? `Foto para validar · há ${Math.max(0, Math.round((now.getTime() - entry.photoTakenAt.getTime()) / 60_000))} min` : "Foto para validar"}</Badge> : null}

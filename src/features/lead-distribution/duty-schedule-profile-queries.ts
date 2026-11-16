@@ -574,6 +574,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       notificationStatus: presence?.notificationStatus ?? null,
       notificationErrorCode: presence?.notificationErrorCode ?? null,
       dutyDate: occurrence?.dutyDate ?? null,
+      occurrenceStartsAt: occurrence?.startsAt ?? null,
+      occurrenceEndsAt: occurrence?.endsAt ?? null,
       /**
        * Date the swap works with: the row's published date, or the single date of a weekly row whose
        * plantão happens once (validity with one day of its weekday). Null = repeating weekly row, not swappable.
