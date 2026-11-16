@@ -56,6 +56,22 @@ describe("documentos Lite", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/documentos rejeitados$/);
   });
 
+  it("reflete somente as linhas retornadas pelo claim concorrente do lote", async () => {
+    actions.bulkReviewDocumentsAction.mockResolvedValueOnce({
+      success: true,
+      updatedDocumentIds: ["doc-2"],
+      message: "1 documento atualizado. Alguns itens já estavam revisados ou não estão mais disponíveis. Atualize a lista.",
+    } as never);
+    renderDocs();
+    fireEvent.click(within(table()).getByRole("checkbox", { name: "Selecionar todos" }));
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("region", { name: "Ações em lote" })).getByRole("button", { name: "Rejeitar" }));
+    });
+
+    expect(screen.getByRole("status")).toHaveTextContent("1 documento atualizado");
+    expect(within(table()).getAllByRole("row")).toHaveLength(9);
+  });
+
   it("resumo da fila mostra pendentes e a idade do pendente mais antigo", () => {
     render(<DocumentsLite carriers={CARRIER_FIXTURES} plans={PLAN_FIXTURES} initialRequirements={REQUIREMENT_FIXTURES} initialPendingDocs={DOC_FIXTURES} generatedAt={new Date(Date.UTC(2026, 9, 27, 8, 10))} />);
     const summary = within(screen.getByRole("group", { name: "Resumo da fila" }));

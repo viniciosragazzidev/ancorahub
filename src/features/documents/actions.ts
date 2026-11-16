@@ -11,6 +11,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import { buildDocumentLeadScope } from "./document-scope";
+import { claimPendingDocumentsForReview } from "./document-review-claim";
 
 // ─── Requirements Actions ──────────────────────────────────────────────────
 
@@ -23,7 +24,7 @@ const requirementInput = z.object({
   appliesPerBeneficiary: z.coerce.boolean().optional(),
 });
 
-export type DocumentActionState = { success?: boolean; error?: string };
+export type DocumentActionState = { success?: boolean; error?: string; message?: string; updatedDocumentIds?: string[] };
 
 const documentCategory = z.enum(["identificacao", "proposta", "contratacao", "pos_venda", "outros"]);
 
@@ -349,24 +350,15 @@ export async function reviewDocumentAction({
     let reviewedFileName = "";
 
     await db.transaction(async (tx) => {
-      const [doc] = await tx
-        .update(schema.leadDocuments)
-        .set({
-          status,
-          reviewedBy: context.userId,
-          reviewedAt: new Date(),
-          reviewComment: reviewComment?.trim().slice(0, 500) || null,
-        })
-        .where(
-          and(
-            eq(schema.leadDocuments.id, documentId),
-            eq(schema.leadDocuments.tenantId, context.tenantId),
-            eq(schema.leadDocuments.leadId, leadId),
-            eq(schema.leadDocuments.status, "pending"),
-            isNull(schema.leadDocuments.deletedAt),
-          )
-        )
-        .returning({ filename: schema.leadDocuments.filename, requirementId: schema.leadDocuments.requirementId, beneficiaryId: schema.leadDocuments.beneficiaryId });
+      const [doc] = await claimPendingDocumentsForReview(tx, {
+        documentIds: [documentId],
+        tenantId: context.tenantId,
+        leadId,
+        status,
+        reviewerId: context.userId,
+        reviewComment: reviewComment?.trim().slice(0, 500) || null,
+        now: new Date(),
+      });
 
       if (!doc) throw new Error("Documento já revisado ou removido por outra pessoa. Atualize a lista.");
       reviewedFileName = doc.filename;
@@ -534,20 +526,13 @@ export async function bulkReviewDocumentsAction(
       allowedDocsToNotify = allowedDocs;
       const allowedIds = allowedDocs.map((d) => d.id);
 
-      const changedDocs = await tx
-        .update(schema.leadDocuments)
-        .set({
-          status,
-          reviewedBy: context.userId,
-          reviewedAt: new Date(),
-        })
-        .where(and(
-          inArray(schema.leadDocuments.id, allowedIds),
-          eq(schema.leadDocuments.tenantId, context.tenantId),
-          eq(schema.leadDocuments.status, "pending"),
-          isNull(schema.leadDocuments.deletedAt),
-        ))
-        .returning({ id: schema.leadDocuments.id, leadId: schema.leadDocuments.leadId, filename: schema.leadDocuments.filename, requirementId: schema.leadDocuments.requirementId, beneficiaryId: schema.leadDocuments.beneficiaryId });
+      const changedDocs = await claimPendingDocumentsForReview(tx, {
+        documentIds: allowedIds,
+        tenantId: context.tenantId,
+        status,
+        reviewerId: context.userId,
+        now: new Date(),
+      });
 
       allowedDocsToNotify = changedDocs;
 
@@ -599,7 +584,13 @@ export async function bulkReviewDocumentsAction(
       }
     }
 
-    return { success: true };
+    if (allowedDocsToNotify.length === 0) return { error: "Os documentos selecionados já foram revisados ou removidos. Atualize a lista." };
+    const updatedDocumentIds = allowedDocsToNotify.map((document) => document.id);
+    const staleCount = new Set(documentIds).size - updatedDocumentIds.length;
+    const message = staleCount > 0
+      ? `${updatedDocumentIds.length} ${updatedDocumentIds.length === 1 ? "documento atualizado" : "documentos atualizados"}. Alguns itens já estavam revisados ou não estão mais disponíveis. Atualize a lista.`
+      : undefined;
+    return { success: true, message, updatedDocumentIds };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erro ao processar lote." };
   }
