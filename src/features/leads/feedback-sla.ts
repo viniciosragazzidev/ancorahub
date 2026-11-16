@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, lt, or, isNull } from "drizzle-orm";
+import { and, eq, inArray, lt, or, isNull, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import type { TenantContext } from "@/shared/auth/types";
@@ -10,6 +10,7 @@ import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
 import { isWithinBusinessHours } from "@/shared/time/business-hours";
+import { isTeamListLead } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 
 export type FeedbackSlaResult = { checked: number; released: number; reassigned: number; notifications: number };
 
@@ -28,7 +29,8 @@ export async function runFeedbackSlaSweep(tenantId?: string): Promise<FeedbackSl
     const cutoff = new Date(Date.now() - minutes * 60_000);
     const leads = await db.select({ id: schema.leads.id, nome: schema.leads.nome, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, distributionOrigin: schema.leads.distributionOrigin, assignmentSource: schema.leads.assignmentSource, assignedAt: schema.leads.assignedAt })
       .from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, tenant.id), isNull(schema.leads.deletedAt), eq(schema.leads.status, "distributed"), isNull(schema.leads.firstContactAt), isNull(schema.leads.serviceStartedAt), lt(schema.leads.assignedAt, cutoff), or(eq(schema.leads.distributionStatus, "assigned"), eq(schema.leads.distributionStatus, "queued"))));
+      // 16/11: lead da lista da equipe nunca é redistribuído pelo prazo de primeiro contato.
+      .where(and(eq(schema.leads.tenantId, tenant.id), isNull(schema.leads.deletedAt), sql`not ${isTeamListLead()}`, eq(schema.leads.status, "distributed"), isNull(schema.leads.firstContactAt), isNull(schema.leads.serviceStartedAt), lt(schema.leads.assignedAt, cutoff), or(eq(schema.leads.distributionStatus, "assigned"), eq(schema.leads.distributionStatus, "queued"))));
     result.checked += leads.length;
     if (!leads.length) continue;
     const [actor] = await db.select({ userId: schema.tenantMemberships.userId }).from(schema.tenantMemberships)

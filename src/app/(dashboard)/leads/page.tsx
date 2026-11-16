@@ -714,8 +714,10 @@ async function LeadsPageContent({
     return typeof supervisorId === "string" ? [supervisorId] : [];
   }))];
   const teamListNames = new Map((teamListSupervisorIds.length
-    ? await getDatabase().select({ id: schema.user.id, name: schema.user.name }).from(schema.user).where(inArray(schema.user.id, teamListSupervisorIds))
-    : []).map((row) => [row.id, `Equipe ${row.name}`]));
+    ? await getDatabase().select({ id: schema.user.id, name: schema.user.name, teamName: schema.supervisorTeams.name }).from(schema.user)
+      .leftJoin(schema.supervisorTeams, and(eq(schema.supervisorTeams.supervisorId, schema.user.id), eq(schema.supervisorTeams.tenantId, context.tenantId)))
+      .where(inArray(schema.user.id, teamListSupervisorIds))
+    : []).map((row) => [row.id, row.teamName?.trim() || `Equipe ${row.name}`]));
   const teamQueueName = (lead: { sourceChannel: string | null; sourceMetadata: unknown; queueName: string | null }) => {
     if (lead.sourceChannel !== TEAM_LIST_SOURCE) return lead.queueName;
     const supervisorId = (lead.sourceMetadata as { supervisorId?: unknown } | null)?.supervisorId;
