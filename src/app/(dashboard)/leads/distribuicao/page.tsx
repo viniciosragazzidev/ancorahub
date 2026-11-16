@@ -53,8 +53,15 @@ import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag"
 import { canViewDistributionQueues } from "./_components/director-distribution-tabs";
 import { DirectorDistributionHealth } from "./_components/director-distribution-health";
 import directorDistributionStyles from "./_components/director-distribution-page.module.css";
+import { TtlCache } from "@/shared/cache/ttl-cache";
 
 export const dynamic = "force-dynamic";
+
+// Meta campaign and ad names only change on the Meta sync, but this page
+// re-renders on every refresh (egress 16/11: ~3.5k + ~500 rows each time).
+const META_NAMES_TTL_MS = 5 * 60_000;
+const metaCampaignsCache = new TtlCache<Array<{ campaignId: string; name: string; status: string }>>(META_NAMES_TTL_MS, 50);
+const metaAdsCache = new TtlCache<Array<{ adId: string; name: string; status: string; campaignId: string | null }>>(META_NAMES_TTL_MS, 50);
 
 type QueueFilter = "all" | "unassigned" | "queued" | "returned_to_queue" | "manual_hold";
 
@@ -439,7 +446,7 @@ export default async function LeadDistributionPage({
           isNull(schema.leadDistributionPolicies.profileKey),
         ),
       ),
-    db
+    metaCampaignsCache.getOrLoad(context.tenantId, () => db
       .select({
         campaignId: schema.metaCampaigns.campaignId,
         name: schema.metaCampaigns.name,
@@ -447,8 +454,8 @@ export default async function LeadDistributionPage({
       })
       .from(schema.metaCampaigns)
       .where(eq(schema.metaCampaigns.tenantId, context.tenantId))
-      .orderBy(schema.metaCampaigns.name),
-    db
+      .orderBy(schema.metaCampaigns.name)),
+    metaAdsCache.getOrLoad(context.tenantId, () => db
       .select({
         adId: schema.metaAds.adId,
         name: schema.metaAds.name,
@@ -461,7 +468,7 @@ export default async function LeadDistributionPage({
         and(eq(schema.metaAdSets.tenantId, schema.metaAds.tenantId), eq(schema.metaAdSets.adSetId, schema.metaAds.adSetId)),
       )
       .where(eq(schema.metaAds.tenantId, context.tenantId))
-      .orderBy(schema.metaAds.name),
+      .orderBy(schema.metaAds.name)),
     db
       .select({
         campaignId: schema.metaCampaignQueueRoutes.campaignId,

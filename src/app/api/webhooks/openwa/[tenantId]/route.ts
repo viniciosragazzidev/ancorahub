@@ -11,6 +11,7 @@ import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-me
 import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence/trigger";
 import { backgroundRoute } from "@/shared/db/background-pool";
 import { lockLeadCreationByPhone } from "@/features/leads/phone-dedup-lock";
+import { openWaPhoneCandidateFilter, openWaSamePhone } from "@/features/openwa/phone-candidates";
 
 type OpenWaPayload = { id?: string; messageId?: string; from?: string; to?: string; sender?: string; recipient?: string; chatId?: string; body?: string; text?: string; type?: string; timestamp?: number; direction?: string; fromMe?: boolean; data?: OpenWaPayload; content?: { text?: string; body?: string }; message?: { text?: string; body?: string; type?: string } };
 
@@ -69,11 +70,12 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ tena
   const [leads, clients, brokers, numbers, channels] = await Promise.all([
     db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status }).from(schema.leads).where(and(eq(schema.leads.tenantId, tenantId), sql`right(regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g'), 8) = ${phoneKey}`)),
     db.select({ id: schema.clients.id, phone: schema.clients.telefone }).from(schema.clients).where(and(eq(schema.clients.tenantId, tenantId), sql`right(regexp_replace(${schema.clients.telefone}, '[^0-9]', '', 'g'), 8) = ${phoneKey}`)),
-    db.select({ phone: schema.brokerProfiles.phone }).from(schema.brokerProfiles).where(eq(schema.brokerProfiles.tenantId, tenantId)),
-    db.select({ phone: schema.wahaNumbers.displayPhoneNumber }).from(schema.wahaNumbers).where(eq(schema.wahaNumbers.tenantId, tenantId)),
-    db.select({ phone: schema.communicationChannels.displayPhoneNumber }).from(schema.communicationChannels).where(eq(schema.communicationChannels.tenantId, tenantId)),
+    db.select({ phone: schema.brokerProfiles.phone }).from(schema.brokerProfiles).where(and(eq(schema.brokerProfiles.tenantId, tenantId), openWaPhoneCandidateFilter(schema.brokerProfiles.phone, phone))),
+    db.select({ phone: schema.wahaNumbers.displayPhoneNumber }).from(schema.wahaNumbers).where(and(eq(schema.wahaNumbers.tenantId, tenantId), openWaPhoneCandidateFilter(schema.wahaNumbers.displayPhoneNumber, phone))),
+    db.select({ phone: schema.communicationChannels.displayPhoneNumber }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, tenantId), openWaPhoneCandidateFilter(schema.communicationChannels.displayPhoneNumber, phone))),
   ]);
-  const samePhone = (value: string) => { const candidate = value.replace(/\D/g, ""); return candidate === phone || candidate.endsWith(phone) || phone.endsWith(candidate) || candidate.slice(-11) === phone.slice(-11); };
+  // Only candidates sharing the last 8 digits come back (egress 16/11); the match rule is unchanged.
+  const samePhone = (value: string) => openWaSamePhone(value, phone);
   const isInternal = [...brokers, ...numbers, ...channels].some((b) => b.phone && samePhone(b.phone));
   const matchingLeads = isInternal ? [] : leads.filter((item) => samePhone(item.phone));
   const isOutgoing = event.direction === "outgoing" || event.fromMe === true;

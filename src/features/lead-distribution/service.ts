@@ -1085,7 +1085,11 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     for (const [branchId, result] of rosterResults) {
       for (const brokerId of result.brokerIds ?? []) if (!plantaoBranchOf.has(brokerId)) plantaoBranchOf.set(brokerId, branchId);
     }
-    const membershipBrokers = await db
+    // When every unit resolved to a plantão roster, only rostered brokers can
+    // pass the filter below, so load just those instead of the whole unit
+    // (egress 16/11: ~217 rows per step, ~160k steps a day). Same result.
+    const rosterOnlyLoad = rosterResults.every(([, result]) => result.brokerIds !== null);
+    const membershipBrokers = rosterOnlyLoad && !plantaoBranchOf.size ? [] : await db
       .select({
         id: schema.user.id,
         branchId: schema.tenantMemberships.branchId,
@@ -1103,9 +1107,11 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       )
       .where(and(
         eq(schema.tenantMemberships.tenantId, context.tenantId),
-        plantaoBranchOf.size
-          ? or(inArray(schema.tenantMemberships.branchId, branchIds), inArray(schema.user.id, [...plantaoBranchOf.keys()]))
-          : inArray(schema.tenantMemberships.branchId, branchIds),
+        rosterOnlyLoad
+          ? inArray(schema.user.id, [...plantaoBranchOf.keys()])
+          : plantaoBranchOf.size
+            ? or(inArray(schema.tenantMemberships.branchId, branchIds), inArray(schema.user.id, [...plantaoBranchOf.keys()]))
+            : inArray(schema.tenantMemberships.branchId, branchIds),
         eq(schema.tenantMemberships.role, "broker"),
         eq(schema.tenantMemberships.status, "active"),
         eq(schema.tenantMemberships.availabilityStatus, "available"),
