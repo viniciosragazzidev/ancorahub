@@ -632,6 +632,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Habilita a carteira avançada e os retornos de clientes do Corretor Lite.",
   },
+  SUPERVISOR_LEAD_IMPORT: {
+    key: "feature_supervisor_lead_import_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Lista interna da equipe (16/11/2026): em Leads da equipe, o supervisor importa até 50 contatos por vez e distribui para os corretores da equipe dele, só ao tocar em Distribuir. Os leads ficam fora da distribuição automática e do plantão; o corretor recebe só um aviso no CRM, sem WhatsApp. Sem migração.",
+  },
   BROKER_PRIOR_CLIENTS: {
     key: "feature_broker_prior_clients_enabled",
     scope: "global",

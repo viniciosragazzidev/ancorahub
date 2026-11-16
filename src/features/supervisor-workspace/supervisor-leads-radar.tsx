@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { Badge, type BadgeTone } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
@@ -141,7 +141,7 @@ function RadarRow({ item, index, isManager, slaMinutes, now, selectable = false,
  * The manager's (unit) or supervisor's (team) lead list, built from the same Arc pieces as the
  * broker's queue: the phone-book list, what needs attention first, the rest grouped by the day it arrived.
  */
-export function SupervisorLeadsRadar({ data, now, search = "", audience = "supervisor", initialTab, postSaleEnabled = false }: { initialTab?: Tab; data: { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number }; now: string; search?: string; audience?: "supervisor" | "manager"; postSaleEnabled?: boolean }) {
+export function SupervisorLeadsRadar({ data, now, search = "", audience = "supervisor", initialTab, postSaleEnabled = false, action }: { initialTab?: Tab; data: { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number }; now: string; search?: string; audience?: "supervisor" | "manager"; postSaleEnabled?: boolean; /** Ação no topo da página (Importar contatos da lista interna da equipe). */ action?: ReactNode }) {
   const isManager = audience === "manager";
   const currentTime = useMemo(() => new Date(now), [now]);
   const [query, setQuery] = useState(search);
@@ -221,6 +221,7 @@ export function SupervisorLeadsRadar({ data, now, search = "", audience = "super
   return (
     <PeoplePage
       title={isManager ? "Leads da unidade" : "Leads da equipe"}
+      action={action}
       subtitle={attentionTotal
         ? <><span className="font-medium text-(--danger)">{attentionTotal === 1 ? "1 lead precisa" : `${attentionTotal} leads precisam`} de você</span> · {data.leads.length} em aberto</>
         : `Tudo em dia · ${data.leads.length === 1 ? "1 lead em aberto" : `${data.leads.length} leads em aberto`}`}

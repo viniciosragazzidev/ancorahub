@@ -7,6 +7,8 @@
  */
 import { createContext, useContext } from "react";
 
+import type { TeamListApi } from "@/features/supervisor-workspace/lead-import/parse-contacts";
+
 export type DevLab = {
   /** No lugar de acceptLeadOfferAction. */
   acceptLead?: (leadId: string) => Promise<{ success: boolean; error?: string; whatsappUrl?: string }>;
@@ -16,6 +18,8 @@ export type DevLab = {
   confirmPresence?: (assignmentId: string) => Promise<{ ok: boolean; error?: string; awaitingRelease?: boolean }>;
   /** No lugar da checagem do WhatsApp antes da presença. */
   presenceGate?: () => Promise<{ required: boolean; connected: boolean } | null>;
+  /** Lista interna da equipe do supervisor: no lugar das Server Actions de conferir, importar e distribuir. */
+  teamList?: TeamListApi;
 };
 
 const DevLabContext = createContext<DevLab | null>(null);
