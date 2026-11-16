@@ -176,6 +176,8 @@ export function WhatsAppConnectDialog({
   const phoneLoaded = useRef(false);
   const pairingCodeRef = useRef<string | null>(null);
   const generatingRef = useRef(false);
+  /** Início/recriação da sessão em andamento: o pedido de código espera por ele em vez de correr junto (16/11/2026). */
+  const startInFlight = useRef<Promise<void> | null>(null);
 
   const ready = connection.status === "ready";
   const secondsLeft = qrShownAt ? Math.min(qrLifetime, Math.ceil(qrLifetime - (now - qrShownAt) / 1_000)) : qrLifetime;
@@ -500,6 +502,9 @@ export function WhatsAppConnectDialog({
     lastStartAt.current = clock();
     acting.current = true;
     setConnection((current) => ({ ...current, status: "initializing", qrCode: null, connectedAt: null }));
+    let finishStart: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => { finishStart = resolve; });
+    startInFlight.current = started;
 
     startTransition(async () => {
       try {
@@ -530,6 +535,8 @@ export function WhatsAppConnectDialog({
         showUnexpectedActionError(error);
       } finally {
         acting.current = false;
+        if (startInFlight.current === started) startInFlight.current = null;
+        finishStart();
         // Sem esperar o próximo tick: o QR/estado real aparece já.
         wake.current?.();
       }
@@ -566,6 +573,9 @@ export function WhatsAppConnectDialog({
     setCodeIssue(null);
     try {
       if (!connection.sessionId && !connectingRef.current) runStart({ forceNew: false });
+      // Abrir o roteiro já começa (ou recria) a sessão: pedir o código junto pegava a sessão ainda quebrada e
+      // disparava uma segunda recriação. Espera a primeira terminar.
+      if (startInFlight.current) await startInFlight.current;
       // Sessão quebrada (SESSION_FAILED): recria uma vez, sem o corretor perceber, e pede o código de novo.
       let recreated = false;
       for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt += 1) {
@@ -576,7 +586,9 @@ export function WhatsAppConnectDialog({
             return;
           }
           recreated = true;
-          const restarted = await startWhatsAppConnection({ forceNew: true }).catch(() => null);
+          // Sem o polling no meio: ele leria a sessão ainda em FAILED e dispararia outra recriação por cima.
+          acting.current = true;
+          const restarted = await startWhatsAppConnection({ forceNew: true }).catch(() => null).finally(() => { acting.current = false; });
           if (restarted?.success) {
             setConnection((current) => ({
               ...current,
