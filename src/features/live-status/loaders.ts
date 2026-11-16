@@ -30,6 +30,7 @@ import { buildWaitingBrokerStatus } from "./providers/waiting-broker";
 import { buildWhatsAppQueueStatus } from "./providers/whatsapp-queue";
 import { liveLeadScope } from "./scope";
 import type { LiveScope, LiveSeal, LiveStatus } from "./types";
+import { isTeamListLead } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 
 /**
  * Uma consulta agregada por status, sempre com tenant e o recorte do papel, e sempre limitada por data ou estado
@@ -308,6 +309,7 @@ export async function loadFirstContact(scope: LiveScope, now: Date): Promise<Liv
         liveLeadScope(scope),
         alive(),
         isNotNull(schema.leads.corretorId),
+        sql`not ${isTeamListLead()}`,
         eq(schema.leads.status, "distributed"),
         isNull(schema.leads.firstContactAt),
         isNull(schema.leads.serviceStartedAt),

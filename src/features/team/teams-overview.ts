@@ -29,8 +29,14 @@ const importedBy = (supervisorIds: string[]) => and(
   inArray(sql<string>`${schema.leads.sourceMetadata}->>'supervisorId'`, supervisorIds),
 );
 
+/** Nome e foto que a supervisora salvou no perfil da equipe; sem perfil, "Equipe <supervisora>". */
+const teamJoin = and(eq(schema.supervisorTeams.supervisorId, schema.tenantMemberships.userId), eq(schema.supervisorTeams.tenantId, schema.tenantMemberships.tenantId));
+const teamLabel = (teamName: string | null, supervisorName: string) => teamName?.trim() || `Equipe ${supervisorName}`;
+
 export type TeamSummary = {
   supervisorId: string;
+  teamName: string;
+  teamImage: string | null;
   supervisorName: string;
   supervisorImage: string | null;
   branchName: string | null;
@@ -49,9 +55,12 @@ export async function listTeams(context: TenantContext): Promise<TeamSummary[]> 
     name: schema.user.name,
     image: schema.user.image,
     branchName: schema.branches.name,
+    teamName: schema.supervisorTeams.name,
+    teamImage: schema.supervisorTeams.imageUrl,
   }).from(schema.tenantMemberships)
     .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
     .leftJoin(schema.branches, eq(schema.branches.id, schema.tenantMemberships.branchId))
+    .leftJoin(schema.supervisorTeams, teamJoin)
     .where(and(
       eq(schema.tenantMemberships.tenantId, context.tenantId),
       eq(schema.tenantMemberships.role, "supervisor"),
@@ -87,6 +96,8 @@ export async function listTeams(context: TenantContext): Promise<TeamSummary[]> 
     const list = lists.get(supervisor.id);
     return {
       supervisorId: supervisor.id,
+      teamName: teamLabel(supervisor.teamName, supervisor.name),
+      teamImage: supervisor.teamImage,
       supervisorName: supervisor.name,
       supervisorImage: supervisor.image,
       branchName: supervisor.branchName,
@@ -103,6 +114,7 @@ export type TeamBroker = { id: string; name: string; email: string; availability
 export type TeamLeadRow = { id: string; name: string; phone: string; status: string; brokerName: string | null; date: string; replied: boolean };
 export type TeamDetail = {
   supervisor: { id: string; name: string; email: string; image: string | null; branchName: string | null; availability: string };
+  team: { name: string; image: string | null; description: string };
   brokers: TeamBroker[];
   companyLeads: TeamLeadRow[];
   listLeads: TeamLeadRow[];
@@ -119,9 +131,13 @@ export async function getTeamDetail(context: TenantContext, supervisorId: string
     image: schema.user.image,
     branchName: schema.branches.name,
     availability: schema.tenantMemberships.availabilityStatus,
+    teamName: schema.supervisorTeams.name,
+    teamImage: schema.supervisorTeams.imageUrl,
+    teamDescription: schema.supervisorTeams.description,
   }).from(schema.tenantMemberships)
     .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
     .leftJoin(schema.branches, eq(schema.branches.id, schema.tenantMemberships.branchId))
+    .leftJoin(schema.supervisorTeams, teamJoin)
     .where(and(
       eq(schema.tenantMemberships.tenantId, context.tenantId),
       eq(schema.tenantMemberships.userId, supervisorId),
@@ -178,7 +194,8 @@ export async function getTeamDetail(context: TenantContext, supervisorId: string
   const counts = new Map(perBroker.map((row) => [row.brokerId, row]));
   const iso = (value: Date | string) => (value instanceof Date ? value.toISOString() : new Date(value).toISOString());
   return {
-    supervisor: { ...supervisor, availability: supervisor.availability ?? "available" },
+    supervisor: { id: supervisor.id, name: supervisor.name, email: supervisor.email, image: supervisor.image, branchName: supervisor.branchName, availability: supervisor.availability ?? "available" },
+    team: { name: teamLabel(supervisor.teamName, supervisor.name), image: supervisor.teamImage, description: supervisor.teamDescription ?? "" },
     brokers: members.map((member) => ({
       ...member,
       availability: member.availability ?? "available",

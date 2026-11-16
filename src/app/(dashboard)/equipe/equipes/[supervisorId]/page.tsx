@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import litePage from "@/components/lite/page/lite-page.module.css";
+import { isTeamMemberProfileEnabled } from "@/features/team/member-profile";
 import { canSeeTeams, getTeamDetail } from "@/features/team/teams-overview";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
@@ -15,19 +16,19 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
   const context = await getRequiredTenantContext();
   if (!canSeeTeams(context)) redirect("/access-denied");
   const [{ supervisorId }, { aba }] = await Promise.all([params, searchParams]);
-  const detail = await getTeamDetail(context, decodeURIComponent(supervisorId));
+  const [detail, canViewProfile] = await Promise.all([getTeamDetail(context, decodeURIComponent(supervisorId)), isTeamMemberProfileEnabled()]);
   if (!detail) notFound();
   const tab = TABS.find((value) => value === aba) ?? "corretores";
   return (
     <>
       <DashboardHeader
         breadcrumb="Equipes"
-        title={`Equipe ${detail.supervisor.name}`}
+        title={detail.team.name}
       />
       <main className={litePage.stack}>
         <div className={`arc-venancor ${litePage.stack}`} data-skin="diretor">
           <Link href="/equipe?visao=equipes" className={litePage.button}>Todas as equipes</Link>
-          <TeamDetailLite detail={detail} tab={tab} />
+          <TeamDetailLite detail={detail} tab={tab} canViewProfile={canViewProfile} />
         </div>
       </main>
     </>

@@ -4,6 +4,7 @@ import { and, eq, gte, lte, inArray, isNull, isNotNull, count, avg, sql } from "
 
 import { getDatabase, schema } from "@/shared/db";
 import { percentage } from "@/features/reports/metrics/metrics-math";
+import { isTeamListLead } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 
 export type BrokerDailySummaryItem = {
   brokerId: string;
@@ -160,6 +161,7 @@ export async function fetchBrokerDailySummary(
         inArray(schema.leads.corretorId, brokerIds),
         inArray(schema.leads.status, activeStatuses),
         isNull(schema.leads.firstContactAt),
+        sql`not ${isTeamListLead()}`,
       ),
     )
     .groupBy(schema.leads.corretorId);

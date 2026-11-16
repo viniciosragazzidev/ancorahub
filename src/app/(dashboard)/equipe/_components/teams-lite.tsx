@@ -16,12 +16,25 @@ import { liteDateFormatter } from "@/components/lite/format/date";
 import page from "@/components/lite/page/lite-page.module.css";
 import { formatLeadPhone } from "@/features/leads/format-lead-phone";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
+import { teamAvatarHue } from "@/features/supervisor-workspace/my-team-page";
 import type { TeamBroker, TeamDetail, TeamLeadRow, TeamSummary } from "@/features/team/teams-overview";
 
 import styles from "./team-lite.module.css";
 
 const fmt = (n: number) => n.toLocaleString("pt-BR");
 const normalize = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const initialsOf = (name: string) => name.split(/\s+/).filter((word) => word.length > 2 || /^[A-ZÀ-Ú]/.test(word)).slice(0, 2).map((word) => word[0]?.toUpperCase()).join("") || "E";
+
+/** Logo da equipe: a foto que a supervisora salvou ou as iniciais na cor da equipe (mesma cor do perfil dela). */
+function TeamLogo({ name, image, size }: { name: string; image: string | null; size: "sm" | "lg" }) {
+  return (
+    <span className={styles.teamLogo} data-size={size} style={{ "--team-hue": teamAvatarHue(name) } as React.CSSProperties} aria-hidden="true">
+      {/* eslint-disable-next-line @next/next/no-img-element -- foto pequena salva como data URL no perfil da equipe */}
+      {image ? <img src={image} alt="" /> : <span>{initialsOf(name.replace(/^Equipe\s+/i, ""))}</span>}
+    </span>
+  );
+}
+
 const AVAILABILITY: Record<string, string> = { available: "Disponível", paused: "Pausado", offline: "Offline", busy: "Ocupado" };
 
 function SearchBox({ value, onChange, label, placeholder }: { value: string; onChange: (value: string) => void; label: string; placeholder: string }) {
@@ -40,11 +53,20 @@ export function TeamsListLite({ teams }: { teams: TeamSummary[] }) {
   const [query, setQuery] = useState("");
   const rows = useMemo(() => {
     const q = normalize(query.trim());
-    return q ? teams.filter((team) => normalize(team.supervisorName).includes(q) || normalize(team.branchName ?? "").includes(q)) : teams;
+    return q ? teams.filter((team) => normalize(team.teamName).includes(q) || normalize(team.supervisorName).includes(q) || normalize(team.branchName ?? "").includes(q)) : teams;
   }, [teams, query]);
   const columns: LiteColumn<TeamSummary>[] = [
-    { id: "team", label: "Equipe", primary: true, render: (team) => <Link href={`/equipe/equipes/${encodeURIComponent(team.supervisorId)}`}>{`Equipe ${team.supervisorName}`}</Link> },
-    { id: "branch", label: "Unidade", secondary: true, render: (team) => team.branchName ?? "Sem unidade" },
+    {
+      id: "team", label: "Equipe", primary: true,
+      render: (team) => (
+        <span className={styles.teamCell}>
+          <TeamLogo name={team.teamName} image={team.teamImage} size="sm" />
+          <Link href={`/equipe/equipes/${encodeURIComponent(team.supervisorId)}`} className={`${page.cellTitle} ${page.cellLink}`}>{team.teamName}</Link>
+        </span>
+      ),
+    },
+    { id: "supervisor", label: "Supervisora", secondary: true, nowrap: true, render: (team) => team.supervisorName },
+    { id: "branch", label: "Unidade", render: (team) => team.branchName ?? "Sem unidade" },
     { id: "brokers", label: "Corretores", numeric: true, render: (team) => fmt(team.brokers) },
     { id: "company", label: "Leads da empresa em aberto", numeric: true, render: (team) => fmt(team.companyOpen) },
     { id: "list", label: "Lista importada", numeric: true, render: (team) => fmt(team.listTotal) },
@@ -68,7 +90,7 @@ export function TeamsListLite({ teams }: { teams: TeamSummary[] }) {
 
 type Tab = "corretores" | "empresa" | "lista";
 
-export function TeamDetailLite({ detail, tab }: { detail: TeamDetail; tab: Tab }) {
+export function TeamDetailLite({ detail, tab, canViewProfile }: { detail: TeamDetail; tab: Tab; canViewProfile: boolean }) {
   const base = `/equipe/equipes/${encodeURIComponent(detail.supervisor.id)}`;
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "corretores", label: `Corretores (${fmt(detail.brokers.length)})` },
@@ -77,6 +99,13 @@ export function TeamDetailLite({ detail, tab }: { detail: TeamDetail; tab: Tab }
   ];
   return (
     <div className={page.stack}>
+      <section className={styles.teamHero} aria-label="Equipe">
+        <TeamLogo name={detail.team.name} image={detail.team.image} size="lg" />
+        <span className={styles.teamHeroText}>
+          <strong>{detail.team.name}</strong>
+          <span>{detail.team.description || `Supervisão de ${detail.supervisor.name}`}</span>
+        </span>
+      </section>
       <section className={page.stats} aria-label="Resumo da equipe">
         <div className={page.stat}><span className={page.statLabel}>Supervisora</span><span className={page.statValue}>{detail.supervisor.name}</span><span className={page.statHint}>{[detail.supervisor.branchName ?? "Sem unidade", AVAILABILITY[detail.supervisor.availability] ?? detail.supervisor.availability].join(" · ")}</span></div>
         <div className={page.stat}><span className={page.statLabel}>Corretores</span><span className={page.statValue}>{fmt(detail.brokers.length)}</span></div>
@@ -86,21 +115,23 @@ export function TeamDetailLite({ detail, tab }: { detail: TeamDetail; tab: Tab }
       <nav className={styles.tabs} aria-label="Dados da equipe">
         {tabs.map((item) => <Link key={item.id} href={`${base}?aba=${item.id}`} className={styles.tab} aria-current={tab === item.id ? "page" : undefined}>{item.label}</Link>)}
       </nav>
-      {tab === "corretores" ? <BrokersTable brokers={detail.brokers} /> : null}
+      {tab === "corretores" ? <BrokersTable brokers={detail.brokers} canViewProfile={canViewProfile} /> : null}
       {tab === "empresa" ? <LeadsTable key="empresa" rows={detail.companyLeads} kind="empresa" total={detail.totals.company} /> : null}
       {tab === "lista" ? <LeadsTable key="lista" rows={detail.listLeads} kind="lista" total={detail.totals.list} /> : null}
     </div>
   );
 }
 
-function BrokersTable({ brokers }: { brokers: TeamBroker[] }) {
+function BrokersTable({ brokers, canViewProfile }: { brokers: TeamBroker[]; canViewProfile: boolean }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const rows = useMemo(() => {
     const q = normalize(query.trim());
     return q ? brokers.filter((broker) => normalize(broker.name).includes(q) || normalize(broker.email).includes(q)) : brokers;
   }, [brokers, query]);
   const columns: LiteColumn<TeamBroker>[] = [
-    { id: "name", label: "Corretor", primary: true, nowrap: true, render: (broker) => broker.name },
+    // Nome do corretor abre o perfil dele (o mesmo da aba Membros).
+    { id: "name", label: "Corretor", primary: true, nowrap: true, render: (broker) => (canViewProfile ? <Link href={`/equipe/${encodeURIComponent(broker.id)}`} className={`${page.cellTitle} ${page.cellLink}`} title={broker.name}>{broker.name}</Link> : broker.name) },
     { id: "email", label: "E-mail", secondary: true, render: (broker) => broker.email },
     { id: "availability", label: "Situação", render: (broker) => <span className={page.badge} data-tone={broker.availability === "available" ? "success" : undefined}>{AVAILABILITY[broker.availability] ?? broker.availability}</span> },
     { id: "company", label: "Leads da empresa em aberto", numeric: true, render: (broker) => fmt(broker.companyOpen) },
@@ -109,7 +140,7 @@ function BrokersTable({ brokers }: { brokers: TeamBroker[] }) {
   return (
     <section className={page.stack} aria-label="Corretores da equipe">
       <SearchBox value={query} onChange={setQuery} label="Buscar corretor" placeholder="Buscar por nome ou e-mail" />
-      <LiteResponsiveData caption="Corretores da equipe" columns={columns} rows={rows} rowKey={(broker) => broker.id} empty={<p>{query ? "Nenhum corretor com essa busca." : "Esta equipe ainda não tem corretores ativos."}</p>} />
+      <LiteResponsiveData caption="Corretores da equipe" columns={columns} rows={rows} rowKey={(broker) => broker.id} onRowOpen={canViewProfile ? (broker) => router.push(`/equipe/${encodeURIComponent(broker.id)}`) : undefined} empty={<p>{query ? "Nenhum corretor com essa busca." : "Esta equipe ainda não tem corretores ativos."}</p>} />
     </section>
   );
 }

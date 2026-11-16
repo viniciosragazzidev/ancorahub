@@ -9,6 +9,7 @@ import { getTeamOfferStats, statsWindow } from "@/features/engagement/broker-sta
 import { rankBroker, type BrokerOfferStats, type RankPosition } from "@/features/engagement/ranking";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
+import { isTeamListLead } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 
 const WAITING = ["new", "distributed"] as const;
 const IN_SERVICE = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
@@ -126,13 +127,15 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
         late: sql<number>`count(*) filter (where ${inArray(schema.leads.status, [...WAITING])} and ${schema.leads.firstContactAt} is null and ${schema.leads.assignedAt} < ${lateBefore.toISOString()}::timestamptz)`,
         receivedToday: sql<number>`count(*) filter (where ${schema.leads.assignedAt} >= ${today.toISOString()}::timestamptz)`,
       }).from(schema.leads)
-        .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, teamIds), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
+        // 16/11: a lista importada pela supervisão não entra em "aguardando contato", "atrasado" nem atenção.
+        .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, teamIds), sql`not ${isTeamListLead()}`, isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
         .groupBy(schema.leads.corretorId),
       db.select({ leadId: schema.leads.id, name: schema.leads.nome, brokerId: schema.leads.corretorId, assignedAt: schema.leads.assignedAt })
         .from(schema.leads)
         .where(and(
           eq(schema.leads.tenantId, context.tenantId),
           inArray(schema.leads.corretorId, teamIds),
+          sql`not ${isTeamListLead()}`,
           inArray(schema.leads.status, [...WAITING]),
           isNull(schema.leads.firstContactAt),
           isNull(schema.leads.deletedAt),

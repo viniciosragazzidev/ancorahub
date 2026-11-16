@@ -158,6 +158,8 @@ export async function getSupervisorLiteMemberPulse(input: {
   const leadScope = and(
     eq(schema.leads.tenantId, context.tenantId),
     eq(schema.leads.corretorId, memberId),
+    // 16/11: a lista importada fica fora do atraso e da atenção do corretor (tem a vista própria).
+    sql`not ${isTeamListLead()}`,
     isSupervisor ? inSupervisorTeam(schema.leads.corretorId, context.tenantId, context.userId) : eq(schema.leads.branchId, context.branchId),
     isNull(schema.leads.deletedAt),
     isNull(schema.leads.archivedAt),
