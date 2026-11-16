@@ -287,9 +287,10 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
     closingNoticesSummary = formatClosingNoticePreview({ congratulations, directorRecipients: directorAttempts });
   }
   if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
-    const [timeline, supplements] = await Promise.all([
+    const [timeline, supplements, adContext] = await Promise.all([
       getLeadTimeline(id),
       getTeamLeadPresentationSupplements(context, id, lead.corretorId),
+      loadBrokerAdContext(context.tenantId, lead),
     ]);
     if (!supplements) notFound();
     const lightLead = buildTeamLeadLightDetail({
@@ -315,7 +316,7 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
       ownerImage: lead.corretorImage,
       branchName: lead.branchNome,
       planName: lead.productName,
-    }, supplements.beneficiaries);
+    }, supplements.beneficiaries, adContext);
     return <SupervisorLeadDetail
       lead={{ id: lead.id, name: lead.nome, status: lead.status, ownerId: lead.corretorId, ownerName: lead.corretorNome, ownerImage: lead.corretorImage, productName: lead.productName, assignedAt: lead.assignedAt, branchName: lead.branchNome }}
       lightLead={lightLead}

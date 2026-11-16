@@ -4,7 +4,6 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { getLeadDocuments, getRequirementsForLead } from "@/features/documents/actions";
 import { buildLeadClientInfo } from "@/features/leads/client-info";
-import { redactClientInfo } from "@/features/broker-workspace/lead-contact-privacy";
 import { readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
 import { buildConversationLeadScope } from "@/features/conversations/lead-scope";
 import { getTeamConversation } from "@/features/team-conversations/queries";
@@ -43,6 +42,8 @@ type Beneficiary = {
   id: string;
   name: string;
   birthDate: string;
+  age?: number | null;
+  hasCpf?: boolean;
   relationship: string;
   isHolder: boolean;
 };
@@ -68,11 +69,18 @@ function readFormData(value: unknown): Record<string, string | null> {
   return Object.fromEntries(["dependentes", "mediaIdades", "razaoSocial", "cnpj", "funcionarios", "cidade", "city"].map((key) => [key, readText(data[key])]));
 }
 
-export function buildTeamLeadLightDetail(lead: TeamLeadPresentationFields, beneficiaries: Beneficiary[]): LightLeadDetailData {
+/**
+ * O lead da equipe com as mesmas informações que o corretor vê (16/11/2026, pedido do Vinicios): contato, de onde
+ * veio, resumo, pessoas do plano. Só chega aqui lead do escopo da equipe (getTeamLeadPresentationSupplements confere).
+ */
+export function buildTeamLeadLightDetail(lead: TeamLeadPresentationFields, beneficiaries: Beneficiary[], adContext: LightLeadDetailData["adContext"] = null): LightLeadDetailData {
   const details = asRecord(lead.qualificationDetails);
   const formData = readFormData(lead.formData);
+  // Só chega aqui lead do escopo da equipe (getTeamLeadPresentationSupplements confere antes): o supervisor vê o
+  // contato do cliente para acompanhar e ajudar o corretor (16/11/2026, pedido do Vinicios).
   const clientInfo = buildLeadClientInfo({
-    email: null,
+    telefone: lead.phone,
+    email: lead.email,
     tipo: lead.tipo,
     sourceChannel: lead.sourceChannel,
     sourceMetadata: lead.sourceMetadata,
@@ -85,8 +93,9 @@ export function buildTeamLeadLightDetail(lead: TeamLeadPresentationFields, benef
   return {
     id: lead.id,
     nome: lead.name ?? "Lead",
-    telefone: null,
-    email: null,
+    telefone: lead.phone,
+    email: lead.email,
+    contactVisible: true,
     status: lead.status,
     qualificationStatus: lead.qualificationStatus,
     qualificationState: lead.qualificationState,
@@ -97,20 +106,21 @@ export function buildTeamLeadLightDetail(lead: TeamLeadPresentationFields, benef
     summary: readText(details.resumoAtendimento) ?? readText(details.resumoNecessidade),
     livesCount: lives === null || lives === undefined ? null : Number(lives) || null,
     urgency: readText(details.urgenciaContratacao),
-    city: readText(details.city) ?? readText(formData.cidade),
+    city: readText(details.cidade) ?? readText(details.city) ?? readText(formData.cidade),
     createdAt: lead.createdAt,
     assignedAt: lead.assignedAt,
     isCurrentBroker: false,
     tipo: lead.tipo,
     origem: lead.origem,
     sourceCampaign: lead.sourceCampaign,
+    adContext,
     tipoCnpj: metaDetails.tipoCnpj,
     beneficiaries,
     formData,
     consentimentoLgpd: lead.consentimentoLgpd ?? false,
     aiIntelligence: details.aiIntelligence ?? null,
     aiPolicyResult: details.aiPolicyResult ?? null,
-    clientInfo: redactClientInfo(clientInfo),
+    clientInfo,
   };
 }
 
@@ -129,6 +139,8 @@ export async function getTeamLeadPresentationSupplements(context: TenantContext,
       id: schema.leadBeneficiaries.id,
       name: schema.leadBeneficiaries.name,
       birthDate: schema.leadBeneficiaries.birthDate,
+      age: schema.leadBeneficiaries.age,
+      cpf: schema.leadBeneficiaries.cpf,
       relationship: schema.leadBeneficiaries.relationship,
       isHolder: schema.leadBeneficiaries.isHolder,
     })
@@ -157,6 +169,7 @@ export async function getTeamLeadPresentationSupplements(context: TenantContext,
       appliesPerBeneficiary: Boolean(requirement.appliesPerBeneficiary),
     })),
     documents: documents.map((document) => ({ id: document.id, filename: document.filename, status: document.status })),
-    beneficiaries: beneficiaries.map((beneficiary) => ({ ...beneficiary, birthDate: String(beneficiary.birthDate) })),
+    // CPF nunca sai do servidor para a gestão; só se ele foi informado (o mesmo que o corretor vê).
+    beneficiaries: beneficiaries.map(({ cpf, ...beneficiary }) => ({ ...beneficiary, birthDate: String(beneficiary.birthDate), hasCpf: Boolean(cpf) })),
   };
 }
