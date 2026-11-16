@@ -161,3 +161,11 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+button.tab {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}

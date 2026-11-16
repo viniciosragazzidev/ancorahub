@@ -16,6 +16,8 @@ import { TeamMembersTable } from "./team-members-table";
 import { hasEffectiveCapability, isCustomRolesEnabled } from "@/features/custom-roles/service";
 import { TeamManagementTabs } from "./team-management-tabs";
 import { UnitsView } from "./units-view";
+import { TeamsView } from "./teams-view";
+import { canSeeTeams } from "@/features/team/teams-overview";
 import { getPendingBrokerTransferRequestsAction } from "@/features/supervisor-workspace/transfer-actions";
 import { TransferRequestsPanel } from "@/features/supervisor-workspace/transfer-requests-panel";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
@@ -40,6 +42,11 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const podeGerirEquipe = !context.customRoleId || await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId, permission: "convidar_corretor" });
   const diretorSemCargo = context.role === "director" && !context.customRoleId;
   const params = await searchParams;
+  // Equipes (16/11): uma por supervisora, com corretores, leads da empresa e lista importada.
+  if (params.visao === "equipes") {
+    if (!canSeeTeams(context)) redirect("/access-denied");
+    return <TeamsView context={context} />;
+  }
   if (params.visao === "unidades") {
     if (context.role !== "director" && !(context.role === "manager" && context.branchId)) redirect("/access-denied");
     return <UnitsView context={context} />;
