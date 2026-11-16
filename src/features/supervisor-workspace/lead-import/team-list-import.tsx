@@ -1,18 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Minus, Plus, UploadSimple } from "@phosphor-icons/react";
 
 import { Button } from "@/components/arc/button/button";
 import { LiteActionButton } from "@/components/lite/controls/action-button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Textarea } from "@/components/ui/textarea";
+import { LiteSidePanel } from "@/components/lite/data/side-panel";
+import form from "@/components/lite/page/lite-form.module.css";
 import { useDevLab } from "@/lib/dev-lab";
 
 import { distributeTeamListAction, importTeamListAction, reviewTeamListAction } from "./actions";
 import { SUPERVISOR_IMPORT_MAX, planShares, vcardToLines, type ReviewedContact, type TeamListApi } from "./parse-contacts";
+import styles from "./team-list-import.module.css";
 
 export type TeamListBroker = { id: string; name: string; availability: string };
 export type TeamListPendingLead = { id: string; name: string };
@@ -43,6 +44,10 @@ export function TeamListImport({ pending, team }: { pending: TeamListPendingLead
   const [review, setReview] = useState<{ contacts: ReviewedContact[]; overflow: number } | null>(null);
   const [consent, setConsent] = useState(false);
   const [pendingLeads, setPendingLeads] = useState(pending);
+  // O painel vai direto para o body: o cabeçalho da página prende elementos fixos e cortava o painel.
+  const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- só sabe que está no navegador depois de montar
+  useEffect(() => setMounted(true), []);
 
   const ready = review?.contacts.filter((c) => c.phone && !c.problem && !c.duplicate) ?? [];
   const duplicates = review?.contacts.filter((c) => c.duplicate) ?? [];
@@ -91,79 +96,57 @@ export function TeamListImport({ pending, team }: { pending: TeamListPendingLead
     setStep("conferir");
   }
 
+  const title = step === "distribuir" ? "Distribuir para a equipe" : "Importar contatos";
+  const description = step === "lista" ? `Cole ou envie até ${SUPERVISOR_IMPORT_MAX} contatos. Eles ficam só com a sua equipe.`
+    : step === "conferir" ? "Confira antes de importar. Nada vai para os corretores agora."
+      : "Escolha quem recebe. Só vai para os corretores quando você tocar em Distribuir.";
+
   return (
     <>
       <Button variant="secondary" size="sm" onClick={openSheet}>
         <UploadSimple size={16} aria-hidden="true" />
         {pendingLeads.length ? `Distribuir lista (${pendingLeads.length})` : "Importar contatos"}
       </Button>
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent className="arc-venancor">
-          <SheetHeader>
-            <SheetTitle>{step === "distribuir" ? "Distribuir para a equipe" : "Importar contatos"}</SheetTitle>
-            <SheetDescription>
-              {step === "lista" ? `Cole ou envie até ${SUPERVISOR_IMPORT_MAX} contatos. Eles ficam só com a sua equipe.`
-                : step === "conferir" ? "Confira antes de importar. Nada vai para os corretores agora."
-                  : "Escolha quem recebe. Só vai para os corretores quando você tocar em Distribuir."}
-            </SheetDescription>
-          </SheetHeader>
-
-          {step === "lista" ? (
-            <SheetBody className="flex flex-col gap-3 pt-4">
-              <label className="text-sm font-medium text-(--foreground)" htmlFor="team-list-text">Um contato por linha: nome, celular e e-mail</label>
-              <Textarea
+      {mounted ? createPortal(<div className="arc-venancor"><LiteSidePanel open={open} onOpenChange={setOpen} title={title} description={description}>
+        {step === "lista" ? (
+          <div className={form.form}>
+            <div className={form.field}>
+              <label className={form.label} htmlFor="team-list-text">Um contato por linha</label>
+              <textarea
                 id="team-list-text"
-                rows={10}
+                className={`${form.textarea} ${styles.list}`}
                 value={text}
                 onChange={(event) => { setText(event.target.value); setReview(null); }}
                 placeholder={"Maria Silva (21) 99876-5432 maria@email.com\nJoão Souza 11912345678"}
               />
-              <label className="w-max cursor-pointer text-sm font-medium text-(--chat-action-text)">
-                Ou enviar arquivo (Excel, CSV ou contatos do celular)
-                <input type="file" accept=".xlsx,.xls,.csv,.txt,.vcf,text/csv,text/plain,text/vcard,text/x-vcard" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file); }} />
-              </label>
-              {reviewError ? <p role="alert" className="text-sm text-(--danger)">{reviewError}</p> : null}
-            </SheetBody>
-          ) : null}
-
-          {step === "conferir" && review ? (
-            <SheetBody className="flex flex-col gap-4 pt-4">
-              <p className="text-sm text-(--text-secondary)">
-                <span className="font-medium text-(--foreground)">{plural(ready.length, "pronto", "prontos")}</span>
-                {duplicates.length ? ` · ${plural(duplicates.length, "já está no sistema", "já estão no sistema")}` : ""}
-                {problems.length ? ` · ${plural(problems.length, "com problema", "com problema")}` : ""}
-              </p>
-              {review.overflow ? <p className="text-sm text-(--text-secondary)">{plural(review.overflow, "contato ficou", "contatos ficaram")} para a próxima importação (limite de {SUPERVISOR_IMPORT_MAX}).</p> : null}
-              <ContactList title="Prontos para importar" items={ready.map((c) => ({ key: `${c.line}`, name: c.name, detail: [c.phoneLabel, c.email].filter(Boolean).join(" · ") }))} />
-              <ContactList title="Não serão importados" muted items={[...duplicates.map((c) => ({ key: `d${c.line}`, name: c.name || c.phoneLabel || `Linha ${c.line}`, detail: "Já está no sistema" })), ...problems.map((c) => ({ key: `p${c.line}`, name: c.name || c.phoneLabel || `Linha ${c.line}`, detail: c.problem ?? "" }))]} />
-              <label className="flex items-start gap-3 text-sm text-(--foreground)">
-                <Checkbox checked={consent} onCheckedChange={(value) => setConsent(value === true)} aria-label="Tenho autorização para contatar essas pessoas" />
-                <span>Tenho autorização para contatar essas pessoas.</span>
-              </label>
-            </SheetBody>
-          ) : null}
-
-          {step === "distribuir" ? (
-            <Distribute
-              api={api}
-              leads={pendingLeads}
-              team={team}
-              onDistributed={(left) => {
-                setPendingLeads((current) => current.slice(current.length - left));
-                router.refresh();
-              }}
-              onImportMore={() => { setText(""); setReview(null); setStep("lista"); }}
-            />
-          ) : null}
-
-          {step === "lista" ? (
-            <SheetFooter>
+              <p className={form.hint}>Nome, celular e e-mail, em qualquer ordem. Também serve nome numa linha e telefone na de baixo.</p>
+            </div>
+            <label className={styles.file}>
+              <UploadSimple size={16} aria-hidden="true" />
+              Enviar arquivo (Excel, CSV ou contatos do celular)
+              <input type="file" accept=".xlsx,.xls,.csv,.txt,.vcf,text/csv,text/plain,text/vcard,text/x-vcard" className={styles.srOnly} onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file); event.target.value = ""; }} />
+            </label>
+            {reviewError ? <p role="alert" className={styles.error}>{reviewError}</p> : null}
+            <div className={form.actions}>
               <Button onClick={runReview} disabled={!text.trim() || reviewing}>{reviewing ? "Lendo a lista…" : "Conferir"}</Button>
-            </SheetFooter>
-          ) : null}
+            </div>
+          </div>
+        ) : null}
 
-          {step === "conferir" ? (
-            <SheetFooter className="flex flex-wrap gap-2">
+        {step === "conferir" && review ? (
+          <div className={form.form}>
+            <dl className={form.summary}>
+              <div><dt>Prontos</dt><dd>{ready.length}</dd></div>
+              <div><dt>Ficam de fora</dt><dd>{duplicates.length + problems.length}</dd></div>
+            </dl>
+            {review.overflow ? <p className={form.hint}>{plural(review.overflow, "contato ficou", "contatos ficaram")} para a próxima importação (limite de {SUPERVISOR_IMPORT_MAX}).</p> : null}
+            <ContactList title="Prontos para importar" items={ready.map((c) => ({ key: `${c.line}`, name: c.name, detail: [c.phoneLabel, c.email].filter(Boolean).join(" · ") }))} />
+            <ContactList title="Ficam de fora" muted items={[...duplicates.map((c) => ({ key: `d${c.line}`, name: c.name || c.phoneLabel || `Linha ${c.line}`, detail: "Já está no sistema" })), ...problems.map((c) => ({ key: `p${c.line}`, name: c.name || c.phoneLabel || `Linha ${c.line}`, detail: c.problem ?? "" }))]} />
+            <label className={styles.consent}>
+              <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+              <span>Tenho autorização para contatar essas pessoas.</span>
+            </label>
+            <div className={form.actions}>
               <Button variant="ghost" onClick={() => setStep("lista")}>Voltar</Button>
               <LiteActionButton
                 busyLabel="Importando…"
@@ -183,10 +166,23 @@ export function TeamListImport({ pending, team }: { pending: TeamListPendingLead
               >
                 {`Importar ${plural(ready.length, "contato", "contatos")}`}
               </LiteActionButton>
-            </SheetFooter>
-          ) : null}
-        </SheetContent>
-      </Sheet>
+            </div>
+          </div>
+        ) : null}
+
+        {step === "distribuir" ? (
+          <Distribute
+            api={api}
+            leads={pendingLeads}
+            team={team}
+            onDistributed={(left) => {
+              setPendingLeads((current) => current.slice(current.length - left));
+              router.refresh();
+            }}
+            onImportMore={() => { setText(""); setReview(null); setStep("lista"); }}
+          />
+        ) : null}
+      </LiteSidePanel></div>, document.body) : null}
     </>
   );
 }
@@ -194,13 +190,13 @@ export function TeamListImport({ pending, team }: { pending: TeamListPendingLead
 function ContactList({ title, items, muted = false }: { title: string; items: Array<{ key: string; name: string; detail: string }>; muted?: boolean }) {
   if (!items.length) return null;
   return (
-    <section className="flex flex-col gap-2" aria-label={title}>
-      <h3 className="text-sm font-semibold text-(--foreground)">{title}</h3>
-      <ul className="grid gap-2">
+    <section className={form.field} aria-label={title}>
+      <h3 className={form.label}>{title}</h3>
+      <ul className={styles.rows}>
         {items.map((item) => (
-          <li key={item.key} className="flex flex-col rounded-xl border border-(--border) px-3 py-2">
-            <span className={`text-sm font-medium ${muted ? "text-(--text-secondary)" : "text-(--foreground)"}`}>{item.name}</span>
-            <span className="text-xs text-(--text-secondary)">{item.detail}</span>
+          <li key={item.key} className={styles.row} data-muted={muted || undefined}>
+            <span className={styles.name}>{item.name}</span>
+            <span className={styles.detail}>{item.detail}</span>
           </li>
         ))}
       </ul>
@@ -248,44 +244,45 @@ function Distribute({ api, leads, team, onDistributed, onImportMore }: {
 
   if (!total) {
     return (
-      <SheetBody className="flex flex-col gap-3 pt-4">
-        <p className="text-sm text-(--foreground)">{result ?? "Nenhum lead esperando para distribuir."}</p>
-        <Button variant="secondary" className="w-max" onClick={onImportMore}>Importar outra lista</Button>
-      </SheetBody>
+      <div className={form.form}>
+        <p className={styles.done}>{result ?? "Nenhum lead esperando para distribuir."}</p>
+        <div className={form.actions}>
+          <Button variant="secondary" onClick={onImportMore}>Importar outra lista</Button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <>
-      <SheetBody className="flex flex-col gap-3 pt-4">
-        {result ? <p role="status" className="text-sm font-medium text-(--foreground)">{result}</p> : null}
-        <p className="text-sm text-(--text-secondary)">
-          <span className="font-medium text-(--foreground)">{plural(total, "lead", "leads")}</span> para distribuir
-          {left > 0 ? ` · ${plural(left, "fica", "ficam")} para depois` : ""}
-        </p>
-        {team.length ? (
-          <ul className="grid gap-2" aria-label="Corretores da equipe">
-            {team.map((broker) => {
-              const on = chosen.includes(broker.id);
-              const value = on ? counts[broker.id] ?? 0 : 0;
-              return (
-                <li key={broker.id} className="flex items-center justify-between gap-3 rounded-xl border border-(--border) px-3 py-2">
-                  <label className="flex min-w-0 items-center gap-3 text-sm text-(--foreground)">
-                    <Checkbox checked={on} onCheckedChange={() => toggle(broker.id)} aria-label={`Incluir ${broker.name}`} />
-                    <span className="truncate">{broker.name}</span>
-                  </label>
-                  <span className="flex shrink-0 items-center gap-1">
-                    <Button variant="ghost" size="sm" aria-label={`Menos um para ${broker.name}`} disabled={!on || value === 0} onClick={() => change(broker.id, -1)}><Minus size={14} /></Button>
-                    <span className="w-8 text-center text-sm font-medium tabular-nums text-(--foreground)" aria-label={`${value} leads para ${broker.name}`}>{value}</span>
-                    <Button variant="ghost" size="sm" aria-label={`Mais um para ${broker.name}`} disabled={!on || left <= 0} onClick={() => change(broker.id, 1)}><Plus size={14} /></Button>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        ) : <p className="text-sm text-(--text-secondary)">Sua equipe ainda não tem corretores ativos.</p>}
-      </SheetBody>
-      <SheetFooter>
+    <div className={form.form}>
+      {result ? <p role="status" className={styles.done}>{result}</p> : null}
+      <dl className={form.summary}>
+        <div><dt>Para distribuir</dt><dd>{total}</dd></div>
+        <div><dt>Ficam para depois</dt><dd>{left}</dd></div>
+      </dl>
+      {team.length ? (
+        <ul className={form.checks} aria-label="Corretores da equipe">
+          {team.map((broker) => {
+            const on = chosen.includes(broker.id);
+            const value = on ? counts[broker.id] ?? 0 : 0;
+            return (
+              <li key={broker.id} className={styles.broker}>
+                <label className={form.check}>
+                  <input type="checkbox" checked={on} onChange={() => toggle(broker.id)} />
+                  <span className={styles.name}>{broker.name}</span>
+                  {broker.availability !== "available" ? <span className={styles.detail}>Pausado</span> : null}
+                </label>
+                <span className={styles.stepper}>
+                  <button type="button" aria-label={`Menos um para ${broker.name}`} disabled={!on || value === 0} onClick={() => change(broker.id, -1)}><Minus size={14} /></button>
+                  <span aria-label={`${value} leads para ${broker.name}`}>{value}</span>
+                  <button type="button" aria-label={`Mais um para ${broker.name}`} disabled={!on || left <= 0} onClick={() => change(broker.id, 1)}><Plus size={14} /></button>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : <p className={form.hint}>Sua equipe ainda não tem corretores ativos.</p>}
+      <div className={form.actions}>
         <LiteActionButton
           busyLabel="Distribuindo…"
           doneLabel="Distribuído"
@@ -305,7 +302,7 @@ function Distribute({ api, leads, team, onDistributed, onImportMore }: {
         >
           {`Distribuir ${plural(given, "lead", "leads")}`}
         </LiteActionButton>
-      </SheetFooter>
-    </>
+      </div>
+    </div>
   );
 }
