@@ -61,6 +61,14 @@ const clock = () => Date.now();
 
 /** Pedidos seguidos enquanto a sessão ainda sobe (cada um espera ~1,5 s). */
 const MAX_CODE_ATTEMPTS = 15;
+/** Com um código na tela há menos que isto, versão nova espera para recarregar (o corretor pode estar digitando). */
+const CODE_RELOAD_HOLD_MS = 120_000;
+
+/** A página perdeu a conexão no meio de uma chamada (app em segundo plano, rede caiu): não é erro do servidor. */
+function isNetworkDrop(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /fetch failed|failed to fetch|load failed|networkerror|network request failed|network error/i.test(message);
+}
 const PAIRING_METHOD_OPTIONS = [
   { value: "qr", label: "QR Code" },
   { value: "code", label: "Código" },
@@ -176,6 +184,11 @@ export function WhatsAppConnectDialog({
   const phoneLoaded = useRef(false);
   const pairingCodeRef = useRef<string | null>(null);
   const generatingRef = useRef(false);
+  /** Início/recriação da sessão em andamento: o pedido de código espera por ele em vez de correr junto (16/11/2026). */
+  const startInFlight = useRef<Promise<void> | null>(null);
+  const codeShownAt = useRef(0);
+  const reloadTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (reloadTimer.current) window.clearInterval(reloadTimer.current); }, []);
 
   const ready = connection.status === "ready";
   const secondsLeft = qrShownAt ? Math.min(qrLifetime, Math.ceil(qrLifetime - (now - qrShownAt) / 1_000)) : qrLifetime;
@@ -236,21 +249,37 @@ export function WhatsAppConnectDialog({
   // ── Helpers ─────────────────────────────────────────────────────────
 
   function recoverFromOutdatedAction(error: unknown): boolean {
-    const message = error instanceof Error ? error.message : "";
     const outdated = isOutdatedDeploymentError(error);
-    if (!outdated && !/fetch failed|failed to fetch/i.test(message)) return false;
+    // Queda de rede NÃO é versão nova (16/11/2026): ao copiar o código e ir para o WhatsApp, o celular corta a
+    // conexão da página em segundo plano e a verificação falha com "Failed to fetch". Recarregar ali zerava a tela
+    // e gerava outro código, invalidando o que o corretor tinha acabado de colar. A verificação tenta de novo sozinha.
+    if (!outdated) return isNetworkDrop(error);
     // Um aviso só, mesmo com o polling e o código falhando juntos.
     if (outdatedNoticeShown.current) return true;
     outdatedNoticeShown.current = true;
-    if (reloadForNewDeployment()) {
-      toast.info("O CorreTop foi atualizado. Carregando a versão atual da página...");
-    } else if (outdated) {
-      toast.error("O CorreTop foi atualizado. Feche o app e abra de novo para continuar.", { duration: 12_000 });
-    } else {
-      outdatedNoticeShown.current = false;
-      return false;
-    }
+    reloadWhenSafe();
     return true;
+  }
+
+  /**
+   * Versão nova de verdade: recarrega só com a tela visível e sem um código recém-mostrado (o corretor pode estar
+   * digitando ele no WhatsApp). O pareamento acontece no servidor, então esperar não perde nada.
+   */
+  function reloadWhenSafe() {
+    const tryReload = () => {
+      if (document.visibilityState !== "visible") return false;
+      if (pairingCodeRef.current && clock() - codeShownAt.current < CODE_RELOAD_HOLD_MS) return false;
+      if (reloadForNewDeployment()) toast.info("O CorreTop foi atualizado. Carregando a versão atual da página...");
+      else toast.error("O CorreTop foi atualizado. Feche o app e abra de novo para continuar.", { duration: 12_000 });
+      return true;
+    };
+    if (tryReload()) return;
+    if (reloadTimer.current) window.clearInterval(reloadTimer.current);
+    reloadTimer.current = window.setInterval(() => {
+      if (!tryReload()) return;
+      if (reloadTimer.current) window.clearInterval(reloadTimer.current);
+      reloadTimer.current = null;
+    }, 3_000);
   }
 
   function showUnexpectedActionError(error: unknown) {
@@ -409,6 +438,8 @@ export function WhatsAppConnectDialog({
       const message = error instanceof Error ? error.message : String(error);
       if (/WAHA_(?:UNREACHABLE|TIMEOUT|UNAVAILABLE)\b/i.test(message)) {
         noteFailure(wahaActionCodeFromMessage(message));
+      } else if (isNetworkDrop(error)) {
+        noteFailure("WAHA_UNREACHABLE");
       } else {
         showUnexpectedActionError(error);
       }
@@ -500,6 +531,9 @@ export function WhatsAppConnectDialog({
     lastStartAt.current = clock();
     acting.current = true;
     setConnection((current) => ({ ...current, status: "initializing", qrCode: null, connectedAt: null }));
+    let finishStart: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => { finishStart = resolve; });
+    startInFlight.current = started;
 
     startTransition(async () => {
       try {
@@ -530,6 +564,8 @@ export function WhatsAppConnectDialog({
         showUnexpectedActionError(error);
       } finally {
         acting.current = false;
+        if (startInFlight.current === started) startInFlight.current = null;
+        finishStart();
         // Sem esperar o próximo tick: o QR/estado real aparece já.
         wake.current?.();
       }
@@ -566,6 +602,9 @@ export function WhatsAppConnectDialog({
     setCodeIssue(null);
     try {
       if (!connection.sessionId && !connectingRef.current) runStart({ forceNew: false });
+      // Abrir o roteiro já começa (ou recria) a sessão: pedir o código junto pegava a sessão ainda quebrada e
+      // disparava uma segunda recriação. Espera a primeira terminar.
+      if (startInFlight.current) await startInFlight.current;
       // Sessão quebrada (SESSION_FAILED): recria uma vez, sem o corretor perceber, e pede o código de novo.
       let recreated = false;
       for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt += 1) {
@@ -576,7 +615,9 @@ export function WhatsAppConnectDialog({
             return;
           }
           recreated = true;
-          const restarted = await startWhatsAppConnection({ forceNew: true }).catch(() => null);
+          // Sem o polling no meio: ele leria a sessão ainda em FAILED e dispararia outra recriação por cima.
+          acting.current = true;
+          const restarted = await startWhatsAppConnection({ forceNew: true }).catch(() => null).finally(() => { acting.current = false; });
           if (restarted?.success) {
             setConnection((current) => ({
               ...current,
@@ -592,6 +633,7 @@ export function WhatsAppConnectDialog({
         }
         if (result.success && result.pairingCode) {
           pairingCodeRef.current = result.pairingCode;
+          codeShownAt.current = clock();
           setPairingCode(result.pairingCode);
           connectingRef.current = true;
           // Sair de SCAN_QR_CODE depois disto = o celular aceitou o código.
@@ -625,7 +667,8 @@ export function WhatsAppConnectDialog({
       }
       reportCodeIssue("O WhatsApp demorou para liberar o código. Tente de novo.");
     } catch (error) {
-      showUnexpectedActionError(error);
+      if (isNetworkDrop(error)) reportCodeIssue("A conexão caiu no meio do pedido. Toque em Tentar de novo.");
+      else showUnexpectedActionError(error);
     } finally {
       generatingRef.current = false;
       setGeneratingCode(false);

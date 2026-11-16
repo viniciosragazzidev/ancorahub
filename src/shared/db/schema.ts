@@ -55,7 +55,7 @@ export const leadStatusValues = ["new", "distributed", "in_contact", "quote_sent
 export const leadOriginValues = ["manual", "webhook"] as const;
 export const leadDistributionStatusValues = ["unassigned", "awaiting_unit", "queued", "assigning", "assigned", "distribution_failed", "returned_to_queue"] as const;
 export const leadDistributionOriginValues = ["parent", "unit"] as const;
-export const assignmentSourceValues = ["manual_director", "manual_manager", "automatic", "duty_schedule", "redistribution", "system_recovery"] as const;
+export const assignmentSourceValues = ["manual_director", "manual_manager", "manual_supervisor", "automatic", "duty_schedule", "redistribution", "system_recovery"] as const;
 export const leadInteractionTypeValues = [
   "status_change",
   "note",

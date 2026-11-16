@@ -5,7 +5,7 @@ vi.mock("server-only", () => ({}));
 import { buildTeamLeadLightDetail } from "./team-lead-detail-presentation";
 
 describe("buildTeamLeadLightDetail", () => {
-  it("reuses qualification facts while removing direct contact fields from the management payload", () => {
+  it("gives the team the same client data the broker sees, contact included (16/11/2026)", () => {
     const result = buildTeamLeadLightDetail({
       id: "lead-1",
       name: "Marina Alves",
@@ -38,8 +38,9 @@ describe("buildTeamLeadLightDetail", () => {
     }, [{ id: "beneficiary-1", name: "Marina Alves", birthDate: "1980-01-01", relationship: "titular", isHolder: true }]);
 
     expect(result).toMatchObject({
-      telefone: null,
-      email: null,
+      telefone: "5511999999999",
+      email: "marina@example.com",
+      contactVisible: true,
       qualificationStatus: "hot",
       summary: "Procura cobertura familiar.",
       livesCount: 3,
@@ -48,7 +49,10 @@ describe("buildTeamLeadLightDetail", () => {
       isCurrentBroker: false,
       beneficiaries: [{ name: "Marina Alves", isHolder: true }],
     });
-    expect(result.clientInfo?.some((item) => /e-?mail|telefone|phone|whats/i.test(`${item.key} ${item.label}`))).toBe(false);
-    expect(result.clientInfo?.some((item) => item.value.includes("example.com"))).toBe(false);
+    expect(result.clientInfo).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: "phone", value: "5511999999999" }),
+      expect.objectContaining({ key: "email", value: "marina@example.com" }),
+    ]));
+    expect(result.adContext).toBeNull();
   });
 });

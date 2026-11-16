@@ -16,21 +16,32 @@ import { BrokerDutyHub } from "@/features/broker-workspace/components/broker-dut
 import type { DutyHubCurrent } from "@/features/broker-workspace/duty-hub";
 import { WhatsAppHandoff } from "@/features/broker-workspace/whatsapp-handoff/whatsapp-handoff";
 import { DevLabProvider, type DevLab } from "@/lib/dev-lab";
+import { parseContactList } from "@/features/supervisor-workspace/lead-import/parse-contacts";
+import { TeamListImport } from "@/features/supervisor-workspace/lead-import/team-list-import";
+import { SupervisorLeadsRadar } from "@/features/supervisor-workspace/supervisor-leads-radar";
 
 import styles from "./lab.module.css";
 
-type Flow = "plantao" | "lead" | "conquistas";
+type Flow = "plantao" | "lead" | "lista" | "conquistas";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
   { id: "plantao", label: "Aceitar plantão" },
   { id: "lead", label: "Aceitar lead" },
+  { id: "lista", label: "Lista da equipe (supervisor)" },
   { id: "conquistas", label: "Conquistas" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+/** Telefone que o laboratório trata como "já está no sistema". */
+const LAB_KNOWN_PHONE = "5521999990000";
+const LAB_TEAM = [
+  { id: "b1", name: "Ana Paula", availability: "available" },
+  { id: "b2", name: "Bruno Lima", availability: "available" },
+  { id: "b3", name: "Carla Dias", availability: "paused" },
+];
 const HANDOFF_LEAD = { name: "Carla Mendes", wants: "Plano PME para a empresa dela, 6 vidas.", plan: "SulAmérica · PME", lives: "6 vidas", city: "Niterói" };
 
 function thread(overrides: Partial<ThreadSummary>): ThreadSummary {
@@ -64,6 +75,26 @@ export function FlowLab() {
       return { ok: true, awaitingRelease: outcome === "liberacao" && mode === "presencial" };
     },
     presenceGate: async () => ({ required: false, connected: true }),
+    teamList: {
+      review: async (text) => {
+        await wait(delay);
+        const parsed = parseContactList(text);
+        return { ok: true, data: { overflow: parsed.overflow, contacts: parsed.contacts.map((c) => ({ ...c, duplicate: c.phone === LAB_KNOWN_PHONE })) } };
+      },
+      importContacts: async (input) => {
+        await wait(delay);
+        if (outcome === "falha") return { ok: false, error: "Não consegui importar agora. Nada foi gravado." };
+        const stamp = Date.now();
+        return { ok: true, data: { imported: input.contacts.length, duplicates: 0, importId: `lab-${stamp}`, leads: input.contacts.map((c, index) => ({ id: `lab-${stamp}-${index}`, name: c.name })) } };
+      },
+      distribute: async (input) => {
+        await wait(delay);
+        if (outcome === "falha") return { ok: false, error: "Não consegui distribuir agora. Os leads continuam aqui." };
+        const counts = input.counts ?? {};
+        const distributed = Object.values(counts).reduce((sum, value) => sum + value, 0);
+        return { ok: true, data: { distributed, left: input.leadIds.length - distributed, perBroker: counts } };
+      },
+    },
   }), [delay, outcome, mode]);
 
   const duty: DutyHubCurrent = {
@@ -100,6 +131,12 @@ export function FlowLab() {
               next: { label: "Aceitar Carla", detail: "Oferta de lead esperando você.", href: "/dev/laboratorio", urgent: true, acceptLeadId: "l1" },
               now: { title: "Agora", emptyText: "Você está em dia.", items: [{ id: "offer-l1", title: "Carla Mendes", detail: "Plano PME, 6 vidas. Oferta para você.", actionLabel: "Aceitar e chamar no WhatsApp", href: "/dev/laboratorio", acceptLeadId: "l1", expiresAt: inMinutes(4), tone: "urgent" }] },
             }}
+          />
+        ) : flow === "lista" ? (
+          <SupervisorLeadsRadar
+            data={{ team: [], leads: [], funnel: { new: 0, firstContact: 0, service: 0, quote: 0, closing: 0 }, slaMinutes: 15 }}
+            now={new Date().toISOString()}
+            action={<TeamListImport pending={[]} team={LAB_TEAM} />}
           />
         ) : (
           <main className={`arc-venancor ${styles.buttons}`}>

@@ -331,7 +331,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   let scene$: React.ReactNode;
   let cta$: React.ReactNode;
   if (error) {
-    const e = errorView(error, { phone: formatPhone(connection.phone), message: presence.error ?? null });
+    const e = errorView(error, { phone: formatPhone(connection.phone), message: presence.error ?? null, issue: connection.issue });
     scene$ = (
       <>
         <Say title={e.title} sub={e.sub} state="waiting" />
@@ -589,12 +589,13 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   );
 }
 
-function errorView(error: GuideError, context: { phone: string; message: string | null }): { title: string; sub?: string; cta: string } {
+function errorView(error: GuideError, context: { phone: string; message: string | null; issue?: string | null }): { title: string; sub?: string; cta: string } {
   const e = COPY.errors;
   switch (error) {
     case "expired": return e.expired;
     case "cooldown": return e.cooldown;
-    case "issue": return e.issue;
+    // A causa real (servidor instável, número, demora) no lugar do "Confira a internet" genérico (16/11/2026).
+    case "issue": return context.issue ? { ...e.issue, sub: context.issue } : e.issue;
     case "rejected": return { title: e.rejected.title, sub: e.rejected.sub(context.phone), cta: e.rejected.cta };
     case "stalled": return e.stalled;
     case "notOpened": return e.notOpened;
