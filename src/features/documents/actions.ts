@@ -361,12 +361,14 @@ export async function reviewDocumentAction({
           and(
             eq(schema.leadDocuments.id, documentId),
             eq(schema.leadDocuments.tenantId, context.tenantId),
-            eq(schema.leadDocuments.leadId, leadId)
+            eq(schema.leadDocuments.leadId, leadId),
+            eq(schema.leadDocuments.status, "pending"),
+            isNull(schema.leadDocuments.deletedAt),
           )
         )
         .returning({ filename: schema.leadDocuments.filename, requirementId: schema.leadDocuments.requirementId, beneficiaryId: schema.leadDocuments.beneficiaryId });
 
-      if (!doc) throw new Error("Documento não encontrado.");
+      if (!doc) throw new Error("Documento já revisado ou removido por outra pessoa. Atualize a lista.");
       reviewedFileName = doc.filename;
 
       if (doc.requirementId) {
@@ -433,7 +435,12 @@ export async function deleteDocumentAction(documentId: string): Promise<Document
     if (!allowed) return { error: "Você não pode excluir este documento." };
 
     await db.transaction(async (tx) => {
-      await tx.update(schema.leadDocuments).set({ deletedAt: new Date(), deletedBy: context.userId }).where(and(eq(schema.leadDocuments.id, document.id), eq(schema.leadDocuments.tenantId, context.tenantId)));
+      const [removed] = await tx.update(schema.leadDocuments).set({ deletedAt: new Date(), deletedBy: context.userId }).where(and(
+        eq(schema.leadDocuments.id, document.id),
+        eq(schema.leadDocuments.tenantId, context.tenantId),
+        isNull(schema.leadDocuments.deletedAt),
+      )).returning({ id: schema.leadDocuments.id });
+      if (!removed) throw new Error("Documento já removido por outra pessoa. Atualize a lista.");
       if (document.requirementId) {
         await tx.update(schema.leadDocumentChecklist).set({ documentId: null, status: "pending", updatedAt: new Date() }).where(and(
           eq(schema.leadDocumentChecklist.tenantId, context.tenantId),
@@ -514,6 +521,8 @@ export async function bulkReviewDocumentsAction(
           and(
             inArray(schema.leadDocuments.id, documentIds),
             eq(schema.leadDocuments.tenantId, context.tenantId),
+            eq(schema.leadDocuments.status, "pending"),
+            isNull(schema.leadDocuments.deletedAt),
             leadScope,
           )
         );
@@ -525,16 +534,24 @@ export async function bulkReviewDocumentsAction(
       allowedDocsToNotify = allowedDocs;
       const allowedIds = allowedDocs.map((d) => d.id);
 
-      await tx
+      const changedDocs = await tx
         .update(schema.leadDocuments)
         .set({
           status,
           reviewedBy: context.userId,
           reviewedAt: new Date(),
         })
-        .where(and(inArray(schema.leadDocuments.id, allowedIds), eq(schema.leadDocuments.tenantId, context.tenantId)));
+        .where(and(
+          inArray(schema.leadDocuments.id, allowedIds),
+          eq(schema.leadDocuments.tenantId, context.tenantId),
+          eq(schema.leadDocuments.status, "pending"),
+          isNull(schema.leadDocuments.deletedAt),
+        ))
+        .returning({ id: schema.leadDocuments.id, leadId: schema.leadDocuments.leadId, filename: schema.leadDocuments.filename, requirementId: schema.leadDocuments.requirementId, beneficiaryId: schema.leadDocuments.beneficiaryId });
 
-      for (const doc of allowedDocs) {
+      allowedDocsToNotify = changedDocs;
+
+      for (const doc of changedDocs) {
         if (!doc.requirementId) continue;
         await tx.update(schema.leadDocumentChecklist).set({ documentId: doc.id, status, updatedAt: new Date() }).where(and(
           eq(schema.leadDocumentChecklist.tenantId, context.tenantId),
@@ -545,7 +562,7 @@ export async function bulkReviewDocumentsAction(
       }
 
       // Audit logs and timeline interactions
-      for (const doc of allowedDocs) {
+      for (const doc of changedDocs) {
         await tx.insert(schema.leadInteractions).values({
           id: randomUUID(),
           leadId: doc.leadId,

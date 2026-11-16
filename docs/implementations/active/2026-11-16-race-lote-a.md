@@ -32,4 +32,11 @@ Fechar concorrências de proposta/venda, documentos, atribuição, plantões, co
 
 ## Registro de execução
 
-Em andamento. Arquivos, testes, commits e riscos serão atualizados na conclusão.
+### Item 2 concluído
+
+- Commit `PENDENTE`: trava lead, beneficiários, requisitos e documentos em ordem fixa; a validação transacional exige confirmação aprovada, titular e todos os requisitos ativos aprovados.
+- Revisão individual, revisão em lote e remoção atualizam somente documentos ainda pendentes/ativos e só executam efeitos para linhas retornadas.
+- Testes: lógica unitária aprovada; integração concorrente com PostgreSQL isolado adicionada, mas skip porque `ERP_TEST_DATABASE_URL` não está configurada. `npx tsc --noEmit` passou.
+- Risco residual: inclusão concorrente de novos requisitos/beneficiários não é serializada por locks de linhas já existentes; a gravação desses elementos deve manter o lock do lead para fechar também essa janela.
+
+Item 3 em andamento. Arquivos, testes, commits e riscos serão atualizados na conclusão.
