@@ -105,7 +105,7 @@ vi.mock("@/features/lead-distribution/post-sale-transfer", () => ({
 }));
 vi.mock("@/features/lead-distribution/jobs", () => ({ enqueueAndProcessLeadDistribution: vi.fn(), enqueueLeadDistributionJob: vi.fn() }));
 
-import { removeLeadAssignmentAction, reassignLeadAction } from "./management-actions";
+import { assumeLeadForInvestigationAction, removeLeadAssignmentAction, reassignLeadAction } from "./management-actions";
 import { ensureDefaultQueue } from "@/features/lead-distribution/service";
 
 function formData() {
@@ -157,6 +157,26 @@ describe("removeLeadAssignmentAction", () => {
 
     expect(result).toMatchObject({ error: expect.any(String) });
     expect(state.db.transaction).not.toHaveBeenCalled();
+    expect(state.inserts).toHaveLength(0);
+  });
+});
+
+describe("assumeLeadForInvestigationAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.inserts.length = 0;
+    state.controls.conflict = false;
+    Object.assign(state.lead, { corretorId: "00000000-0000-4000-8000-000000000002", status: "distributed", archivedAt: null, deletedAt: null });
+  });
+
+  it("does not write history or audit when another request wins the conditional claim", async () => {
+    state.controls.conflict = true;
+    const data = formData();
+    data.set("reason", "Assumir para investigar");
+
+    const result = await assumeLeadForInvestigationAction({}, data);
+
+    expect(result).toMatchObject({ error: expect.stringContaining("outra pessoa") });
     expect(state.inserts).toHaveLength(0);
   });
 });
