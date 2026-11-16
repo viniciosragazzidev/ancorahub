@@ -8,6 +8,7 @@ import { getManagerUnitScope } from "@/features/broker-workspace/manager-unit-sc
 import type { RadarFunnel, RadarLead, RadarTeamMember } from "./supervisor-leads-radar";
 import { getLeadTimeline } from "@/features/leads/queries";
 import { buildTeamLeadLightDetail, getTeamLeadPresentationSupplements } from "./team-lead-detail-presentation";
+import { visibleToManagement } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 
 const ACTIVE_STATUSES = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 
@@ -32,13 +33,13 @@ export const getManagerLiteLeads = cache(async function getManagerLiteLeads(cont
       .where(and(eq(schema.tenantMemberships.tenantId, scope.tenantId), eq(schema.tenantMemberships.branchId, scope.branchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))),
     db.select({ id: schema.leads.id, name: schema.leads.nome, phone: schema.leads.telefone, status: schema.leads.status, ownerId: schema.leads.corretorId, ownerName: schema.user.name, ownerImage: schema.user.image, productName: schema.carrierPlans.name, assignedAt: schema.leads.assignedAt, firstContactAt: schema.leads.firstContactAt, stageEnteredAt: schema.leads.stageEnteredAt })
       .from(schema.leads).leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId)).leftJoin(schema.carrierPlans, eq(schema.carrierPlans.id, schema.leads.planId))
-      .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), inArray(schema.leads.status, [...ACTIVE_STATUSES]), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
+      .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), visibleToManagement(), inArray(schema.leads.status, [...ACTIVE_STATUSES]), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
       .orderBy(desc(schema.leads.assignedAt), desc(schema.leads.createdAt)).limit(500),
     // Counted in the database, not from the 500 rows above: the funnel must not undercount a large unit.
     db.select({ total: count() }).from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), inArray(schema.leads.status, ["new", "distributed"]), isNull(schema.leads.firstContactAt), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))),
+      .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), visibleToManagement(), inArray(schema.leads.status, ["new", "distributed"]), isNull(schema.leads.firstContactAt), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))),
     db.select({ status: schema.leads.status, total: count() }).from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), inArray(schema.leads.status, [...ACTIVE_STATUSES]), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))).groupBy(schema.leads.status),
+      .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), visibleToManagement(), inArray(schema.leads.status, [...ACTIVE_STATUSES]), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))).groupBy(schema.leads.status),
   ]);
 
   const slaMinutes = Math.max(1, Number.parseInt(tenant?.sla ?? "15", 10) || 15);
@@ -113,7 +114,7 @@ export async function getManagerLiteLeadDetail(context: TenantContext, leadId: s
       branchName: schema.branches.name,
     })
       .from(schema.leads).leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId)).leftJoin(schema.carrierPlans, eq(schema.carrierPlans.id, schema.leads.planId)).leftJoin(schema.branches, and(eq(schema.branches.id, schema.leads.branchId), eq(schema.branches.tenantId, schema.leads.tenantId)))
-      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))).limit(1),
+      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), visibleToManagement(), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))).limit(1),
     db.select({ id: schema.user.id, name: schema.user.name, image: schema.user.image, availability: schema.tenantMemberships.availabilityStatus }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
       .where(and(eq(schema.tenantMemberships.tenantId, scope.tenantId), eq(schema.tenantMemberships.branchId, scope.branchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))).orderBy(schema.user.name),
   ]);

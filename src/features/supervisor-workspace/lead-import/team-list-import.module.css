@@ -196,3 +196,49 @@
   color: var(--text-muted);
   opacity: 0.5;
 }
+
+.filters {
+  display: grid;
+  gap: 8px;
+}
+
+.filterCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  min-height: 32px;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.filterCheck input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.selectBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rowCheck {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+}
+
+.rowCheck input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--primary);
+}

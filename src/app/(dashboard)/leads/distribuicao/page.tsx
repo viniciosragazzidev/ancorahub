@@ -54,6 +54,7 @@ import { canViewDistributionQueues } from "./_components/director-distribution-t
 import { DirectorDistributionHealth } from "./_components/director-distribution-health";
 import directorDistributionStyles from "./_components/director-distribution-page.module.css";
 import { TtlCache } from "@/shared/cache/ttl-cache";
+import { visibleToManagement } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 
 export const dynamic = "force-dynamic";
 
@@ -272,6 +273,7 @@ export default async function LeadDistributionPage({
           isNull(schema.leads.deletedAt),
           isNull(schema.leads.archivedAt),
           isNull(schema.leads.corretorId),
+          visibleToManagement(),
           isNull(schema.leads.distributionRemovedAt),
           context.role === "manager" && context.branchId
             ? eq(schema.leads.branchId, context.branchId)
@@ -288,6 +290,7 @@ export default async function LeadDistributionPage({
           isNull(schema.leads.deletedAt),
           isNull(schema.leads.archivedAt),
           isNull(schema.leads.corretorId),
+          visibleToManagement(),
         ),
       ),
     db

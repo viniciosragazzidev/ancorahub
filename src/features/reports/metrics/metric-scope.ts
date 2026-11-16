@@ -1,11 +1,12 @@
 import "server-only";
 
-import { eq, inArray, type SQL } from "drizzle-orm";
+import { and, eq, inArray, type SQL } from "drizzle-orm";
 
 import { getSupervisedBrokerIds } from "@/features/team/supervisor-service";
 import { resolveAccessContext } from "@/shared/auth/access-context";
 import type { TenantContext } from "@/shared/auth/types";
 import { schema } from "@/shared/db";
+import { visibleToManagement } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 
 /**
  * Escopo de dados dos relatórios (DEC-090 §6).
@@ -31,6 +32,13 @@ export interface ReportDataScope {
 const NO_LEADS_SENTINEL = "__reporting_no_scope__";
 
 export async function resolveReportDataScope(context: TenantContext): Promise<ReportDataScope> {
+  const scope = await resolveBaseReportDataScope(context);
+  // Lista interna da equipe (16/11): diretor e gestor só contam o lead depois que o cliente respondeu.
+  if (!scope.canSeeUnits) return scope;
+  return { ...scope, leadScope: scope.leadScope ? and(scope.leadScope, visibleToManagement()) : visibleToManagement() };
+}
+
+async function resolveBaseReportDataScope(context: TenantContext): Promise<ReportDataScope> {
   // A custom role replaces legacy grants and may narrow a manager's/supervisor's
   // data boundary. Translate that canonical scope before falling back to the
   // older report-role matrix so a `own` or `none` role can never see a whole unit.

@@ -16,8 +16,7 @@ import { BrokerDutyHub } from "@/features/broker-workspace/components/broker-dut
 import type { DutyHubCurrent } from "@/features/broker-workspace/duty-hub";
 import { WhatsAppHandoff } from "@/features/broker-workspace/whatsapp-handoff/whatsapp-handoff";
 import { DevLabProvider, type DevLab } from "@/lib/dev-lab";
-import { TeamListImport } from "@/features/supervisor-workspace/lead-import/team-list-import";
-import { SupervisorLeadsRadar } from "@/features/supervisor-workspace/supervisor-leads-radar";
+import { TeamListManager } from "@/features/supervisor-workspace/lead-import/team-list-manager";
 
 import styles from "./lab.module.css";
 
@@ -40,7 +39,22 @@ const LAB_TEAM = [
   { id: "b1", name: "Ana Paula", availability: "available" },
   { id: "b2", name: "Bruno Lima", availability: "available" },
   { id: "b3", name: "Carla Dias", availability: "paused" },
+  { id: "b4", name: "Débora Nunes", availability: "available" },
+  { id: "b5", name: "Eduardo Reis", availability: "available" },
+  { id: "b6", name: "Fábio Melo", availability: "paused" },
 ];
+/** "Lista importada" de exemplo: 6 esperando, 4 com corretores (2 já responderam). */
+const LAB_LIST = ["Ana Teste", "Bia Teste", "Caio Teste", "Davi Teste", "Eva Teste", "Fabio Teste", "Gil Teste", "Hana Teste", "Iago Teste", "Júlia Teste"].map((name, index) => ({
+  id: `lab-list-${index}`,
+  name,
+  phone: `55219876500${String(index).padStart(2, "0")}`,
+  status: index < 6 ? "new" : "in_contact",
+  brokerId: index < 6 ? null : LAB_TEAM[index % 2].id,
+  brokerName: index < 6 ? null : LAB_TEAM[index % 2].name,
+  replied: index >= 8,
+  createdAt: new Date().toISOString(),
+  assignedAt: null,
+}));
 const HANDOFF_LEAD = { name: "Carla Mendes", wants: "Plano PME para a empresa dela, 6 vidas.", plan: "SulAmérica · PME", lives: "6 vidas", city: "Niterói" };
 
 function thread(overrides: Partial<ThreadSummary>): ThreadSummary {
@@ -135,11 +149,7 @@ export function FlowLab() {
             }}
           />
         ) : flow === "lista" ? (
-          <SupervisorLeadsRadar
-            data={{ team: [], leads: [], funnel: { new: 0, firstContact: 0, service: 0, quote: 0, closing: 0 }, slaMinutes: 15 }}
-            now={new Date().toISOString()}
-            action={<TeamListImport pending={0} team={LAB_TEAM} />}
-          />
+          <TeamListManager rows={LAB_LIST} totals={{ all: LAB_LIST.length, pending: LAB_LIST.filter((row) => !row.brokerId).length, distributed: LAB_LIST.filter((row) => row.brokerId).length, replied: LAB_LIST.filter((row) => row.replied).length }} team={LAB_TEAM} switcher={null} />
         ) : (
           <main className={`arc-venancor ${styles.buttons}`}>
             <h1>Conquistas</h1>

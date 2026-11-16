@@ -22,6 +22,8 @@ export type LeadRow = {
   isPlantaoAtivo: boolean;
   returnedUnaccepted?: boolean;
   isManagementInvestigation?: boolean;
+  /** Lead da lista interna da equipe (importado pela supervisão). */
+  isTeamList?: boolean;
   branchName: string | null;
   qualificationStatus: string | null;
   queueName: string | null;

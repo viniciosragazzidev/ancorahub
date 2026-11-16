@@ -45,7 +45,8 @@ export async function reviewTeamListAction(phones: string[]) {
 const importSchema = z.object({
   consent: z.boolean(),
   importId: z.string().uuid(),
-  contacts: z.array(z.object({ name: z.string().max(120), phone: z.string().max(30), email: z.string().max(160).nullable(), note: z.string().max(300).nullable() })).min(1).max(SUPERVISOR_IMPORT_CHUNK),
+  // Limites folgados: o servidor relê e descarta o contato estranho; um campo grande não derruba o bloco.
+  contacts: z.array(z.object({ name: z.string().max(400), phone: z.string().max(40), email: z.string().max(254).nullable(), note: z.string().max(400).nullable() })).min(1).max(SUPERVISOR_IMPORT_CHUNK),
 });
 
 export async function importTeamListAction(input: z.infer<typeof importSchema>) {
@@ -56,7 +57,10 @@ export async function importTeamListAction(input: z.infer<typeof importSchema>) 
   });
 }
 
-const distributeSchema = z.object({ counts: z.record(z.string().min(1), z.number().int().min(0).max(SUPERVISOR_IMPORT_MAX)) });
+const distributeSchema = z.object({
+  counts: z.record(z.string().min(1), z.number().int().min(0).max(SUPERVISOR_IMPORT_MAX)),
+  leadIds: z.array(z.string().min(1)).max(SUPERVISOR_IMPORT_MAX).optional(),
+});
 
 export async function distributeTeamListAction(input: z.infer<typeof distributeSchema>) {
   return run(async () => {

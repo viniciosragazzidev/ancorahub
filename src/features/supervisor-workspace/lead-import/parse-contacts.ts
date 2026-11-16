@@ -7,6 +7,8 @@ import { lerTelefone } from "@/shared/input/telefone";
 export const SUPERVISOR_IMPORT_MAX = 5000;
 /** Limite de cada supervisor a cada 7 dias. */
 export const SUPERVISOR_IMPORT_WEEKLY_MAX = 5000;
+/** Quantos leads da lista cada corretor recebe, no máximo, a cada distribuição (16/11). */
+export const SUPERVISOR_DISTRIBUTE_PER_BROKER_MAX = 50;
 /** A tela grava em blocos deste tamanho (o corpo de uma Server Action vai até 1 MB). */
 export const SUPERVISOR_IMPORT_CHUNK = 1000;
 
@@ -52,7 +54,7 @@ export type TeamListApi = {
   /** Um bloco de até SUPERVISOR_IMPORT_CHUNK. `importId` junta os blocos da mesma lista. */
   importContacts: (input: { consent: boolean; importId: string; contacts: Array<Omit<ContactDraft, "line">> }) => Promise<Result<{ imported: number; duplicates: number }>>;
   /** Quantos leads cada corretor recebe. O servidor escolhe os mais antigos da lista. */
-  distribute: (input: { counts: Record<string, number> }) => Promise<Result<{ distributed: number; left: number; perBroker: Record<string, number> }>>;
+  distribute: (input: { counts: Record<string, number>; leadIds?: string[] }) => Promise<Result<{ distributed: number; left: number; perBroker: Record<string, number> }>>;
 };
 
 export type ParsedList = {
@@ -119,7 +121,10 @@ export function buildContact(input: { line: number; name: string; phoneRaw: stri
         ? "Telefone fixo. Só celular com WhatsApp."
         : name.length < 2
           ? "Sem nome."
-          : null;
+          // Mensagem colada no lugar do nome ("Bom dia! Eu já possuo plano..."): fica de fora, não derruba o bloco.
+          : name.length > 80 || name.split(/\s+/).length > 8
+            ? "Parece uma mensagem, não um nome."
+            : null;
   return { line, name, phone, phoneLabel: read?.ok ? read.exibicao : phoneRaw, email, note: input.note?.trim() ? input.note.trim().slice(0, 300) : null, fixed, problem };
 }
 
@@ -205,18 +210,20 @@ export function parseContactList(text: string, max = SUPERVISOR_IMPORT_MAX): Par
  * Quantos leads cada corretor recebe. `requested` vazio = dividir igualmente entre os escolhidos (o resto vai um a mais
  * para os primeiros). Com quantidades, a soma nunca passa do total.
  */
-export function planShares(total: number, brokerIds: string[], requested?: Record<string, number>): { shares: Array<{ brokerId: string; count: number }>; left: number } {
+export function planShares(total: number, brokerIds: string[], requested?: Record<string, number>, cap = SUPERVISOR_DISTRIBUTE_PER_BROKER_MAX): { shares: Array<{ brokerId: string; count: number }>; left: number } {
   if (total <= 0 || !brokerIds.length) return { shares: [], left: Math.max(0, total) };
   if (!requested) {
-    const base = Math.floor(total / brokerIds.length);
-    const extra = total % brokerIds.length;
+    // Dividir igual, sem passar do limite por corretor: o que não couber fica para a próxima distribuição.
+    const room = Math.min(total, cap * brokerIds.length);
+    const base = Math.floor(room / brokerIds.length);
+    const extra = room % brokerIds.length;
     const shares = brokerIds.map((brokerId, index) => ({ brokerId, count: base + (index < extra ? 1 : 0) })).filter((share) => share.count > 0);
-    return { shares, left: 0 };
+    return { shares, left: total - room };
   }
   let left = total;
   const shares: Array<{ brokerId: string; count: number }> = [];
   for (const brokerId of brokerIds) {
-    const wanted = Math.max(0, Math.floor(requested[brokerId] ?? 0));
+    const wanted = Math.min(cap, Math.max(0, Math.floor(requested[brokerId] ?? 0)));
     const count = Math.min(wanted, left);
     if (count > 0) shares.push({ brokerId, count });
     left -= count;

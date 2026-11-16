@@ -1177,6 +1177,13 @@
                         "when":  1794600000000,
                         "tag":  "0231_broker_prior_clients",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  168,
+                        "version":  "7",
+                        "when":  1794700000000,
+                        "tag":  "0232_team_list_never_queued",
+                        "breakpoints":  true
                     }
                 ]
 }

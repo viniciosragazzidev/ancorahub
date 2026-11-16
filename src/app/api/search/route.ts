@@ -13,13 +13,15 @@ import { getDatabase, schema } from "@/shared/db";
 import type { TenantRole } from "@/shared/db/schema";
 
 import { FEATURE_SEARCH_INDEX } from "@/shared/feature-search-index";
+import { visibleToManagement } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 
 function leadScope(tenantId: string, role: TenantRole, branchId: string | null, userId: string, teamScoped = false) {
   const base = and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt));
-  if (role === "director") return base;
+  // Lista interna da equipe (16/11): a gestão só acha o lead depois que o cliente respondeu.
+  if (role === "director") return and(base, visibleToManagement());
   if (teamScoped) return and(base, inSupervisorTeam(schema.leads.corretorId, tenantId, userId));
   if ((role === "manager" || role === "supervisor") && branchId) {
-    return and(base, eq(schema.leads.branchId, branchId));
+    return and(base, eq(schema.leads.branchId, branchId), role === "manager" ? visibleToManagement() : undefined);
   }
   return and(base, eq(schema.leads.corretorId, userId));
 }

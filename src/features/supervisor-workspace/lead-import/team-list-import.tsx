@@ -7,13 +7,15 @@ import { FileXls, Minus, Plus, UploadSimple, X } from "@phosphor-icons/react";
 
 import { Button } from "@/components/arc/button/button";
 import { LiteActionButton } from "@/components/lite/controls/action-button";
+import { SaleCelebration, type SaleCelebrationStat } from "@/components/lite/celebration/sale-celebration";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
 import { useDevLab } from "@/lib/dev-lab";
+import { fireFeedback, fireFeedbackOnce } from "@/lib/feedback/use-feedback";
 
 import { distributeTeamListAction, importTeamListAction, reviewTeamListAction, structureTeamListAction } from "./actions";
 import { applyTableAnswer, applyTextAnswer, organizeTable, organizeText, tableRequest, textRequest, textToTable, type Organized, type SourceTable } from "./organize";
-import { SUPERVISOR_IMPORT_CHUNK, SUPERVISOR_IMPORT_MAX, planShares, vcardToLines, type ParsedContact, type TeamListApi } from "./parse-contacts";
+import { SUPERVISOR_DISTRIBUTE_PER_BROKER_MAX, SUPERVISOR_IMPORT_CHUNK, SUPERVISOR_IMPORT_MAX, planShares, vcardToLines, type ParsedContact, type TeamListApi } from "./parse-contacts";
 import styles from "./team-list-import.module.css";
 
 export type TeamListBroker = { id: string; name: string; availability: string };
@@ -26,6 +28,11 @@ const realApi: TeamListApi = {
 };
 
 type Step = "lista" | "conferir" | "distribuir";
+type Celebration = { key: string; budgetKey: string; title: string; message: string; stats: SaleCelebrationStat[]; art: { src: string; width: number; height: number }; continueLabel: string };
+
+/** Arte do capitão: subindo (lista importada) e com o baú (lista distribuída). */
+const IMPORT_ART = { src: "/mascote/desempenho-subindo.webp", width: 640, height: 557 };
+const DISTRIBUTE_ART = { src: "/mascote/distribuicao-capitao-bau.webp", width: 800, height: 539 };
 type Review = { organized: Organized; known: Set<string>; weekLeft: number; cut: number };
 
 const fmt = (n: number) => n.toLocaleString("pt-BR");
@@ -43,7 +50,13 @@ function joinColumns(labels: string[]) {
  * com ajuda da IA. Uma busca de repetidos no banco, gravação em blocos de 1.000. Nada vai para os corretores antes
  * de tocar em Distribuir.
  */
-export function TeamListImport({ pending, team }: { pending: number; team: TeamListBroker[] }) {
+export function TeamListImport({ pending, team, selectedLeadIds = [], onSelectionDone }: {
+  pending: number;
+  team: TeamListBroker[];
+  /** Contatos marcados na "Lista importada": a distribuição vale só para eles. */
+  selectedLeadIds?: string[];
+  onSelectionDone?: () => void;
+}) {
   const router = useRouter();
   const lab = useDevLab();
   const api = lab?.teamList ?? realApi;
@@ -59,6 +72,18 @@ export function TeamListImport({ pending, team }: { pending: number; team: TeamL
   const [pendingCount, setPendingCount] = useState(pending);
   const [progress, setProgress] = useState("Importando…");
   const [notice, setNotice] = useState<string | null>(null);
+  const [celebration, setCelebration] = useState<Celebration | null>(null);
+  const lastImport = useRef<{ imported: number; duplicates: number } | null>(null);
+
+  /**
+   * Conquista do capitão (FEEDBACK.md nível 3): importar uma lista e distribuí-la são raros e marcam o dia da
+   * supervisão. Respeita o limite diário e o interruptor "Comemorações"; sem eles, fica a confirmação simples.
+   */
+  function celebrate(next: Celebration) {
+    const plan = fireFeedbackOnce(`team-list:${next.key}`, "celebrate", { budgetKey: next.budgetKey });
+    if (plan.celebrate) setCelebration(next);
+    else fireFeedback("confirm");
+  }
   // Blocos já gravados desta lista: "Tentar de novo" continua de onde parou.
   const sent = useRef<{ importId: string; upTo: number; imported: number; duplicates: number } | null>(null);
   // O painel vai direto para o body: o cabeçalho da página prende elementos fixos e cortava o painel.
@@ -186,6 +211,7 @@ export function TeamListImport({ pending, team }: { pending: number; team: TeamL
       state.duplicates += result.data.duplicates;
     }
     setPendingCount((current) => current + state.imported);
+    lastImport.current = { imported: state.imported, duplicates: state.duplicates };
     setNotice(`${plural(state.imported, "contato importado", "contatos importados")}.${state.duplicates ? ` ${plural(state.duplicates, "já estava", "já estavam")} no CRM.` : ""} Agora escolha quem recebe.`);
     return { ok: true as const };
   }
@@ -200,7 +226,7 @@ export function TeamListImport({ pending, team }: { pending: number; team: TeamL
     <>
       <Button variant="secondary" size="sm" onClick={openSheet}>
         <UploadSimple size={16} aria-hidden="true" />
-        {pendingCount ? `Distribuir lista (${fmt(pendingCount)})` : "Importar contatos"}
+        {selectedLeadIds.length ? `Distribuir marcados (${fmt(selectedLeadIds.length)})` : pendingCount ? `Distribuir lista (${fmt(pendingCount)})` : "Importar contatos"}
       </Button>
       {mounted ? createPortal(<div className="arc-venancor"><LiteSidePanel open={open} onOpenChange={setOpen} title={title} description={description}>
         {step === "lista" ? (
@@ -295,9 +321,25 @@ export function TeamListImport({ pending, team }: { pending: number; team: TeamL
                 keeps="A lista continua aqui."
                 onAction={importAll}
                 onDone={() => {
+                  const done = lastImport.current;
+                  const importId = sent.current?.importId ?? String(Date.now());
                   router.refresh();
                   resetList();
                   setStep("distribuir");
+                  if (done?.imported) {
+                    celebrate({
+                      key: `import:${importId}`,
+                      budgetKey: "lista-equipe-importada",
+                      title: "Lista importada!",
+                      message: "Os contatos já são da sua equipe. Agora é só escolher quem recebe.",
+                      stats: [
+                        { label: "Importados", value: fmt(done.imported) },
+                        ...(done.duplicates ? [{ label: "Já estavam no CRM", value: fmt(done.duplicates) }] : []),
+                      ],
+                      art: IMPORT_ART,
+                      continueLabel: "Distribuir agora",
+                    });
+                  }
                 }}
               >
                 {`Importar ${plural(view.toImport.length, "contato", "contatos")}`}
@@ -309,11 +351,26 @@ export function TeamListImport({ pending, team }: { pending: number; team: TeamL
         {step === "distribuir" ? (
           <Distribute
             api={api}
-            total={pendingCount}
+            total={selectedLeadIds.length || pendingCount}
+            leadIds={selectedLeadIds.length ? selectedLeadIds : undefined}
             team={team}
             notice={notice}
-            onDistributed={(left) => {
-              setPendingCount(left);
+            onDistributed={(left, distributed, brokers) => {
+              celebrate({
+                key: `distribute:${Date.now()}`,
+                budgetKey: "lista-equipe-distribuida",
+                title: "Lista distribuída!",
+                message: "Cada corretor recebeu um aviso no CRM. Os leads já chegam aceitos, com o telefone liberado.",
+                stats: [
+                  { label: "Leads", value: fmt(distributed) },
+                  { label: "Corretores", value: fmt(brokers) },
+                  ...(left ? [{ label: "Para depois", value: fmt(left) }] : []),
+                ],
+                art: DISTRIBUTE_ART,
+                continueLabel: "Continuar",
+              });
+              setPendingCount((current) => (selectedLeadIds.length ? Math.max(0, current - distributed) : left));
+              if (selectedLeadIds.length) onSelectionDone?.();
               setNotice(null);
               router.refresh();
             }}
@@ -321,6 +378,21 @@ export function TeamListImport({ pending, team }: { pending: number; team: TeamL
           />
         ) : null}
       </LiteSidePanel></div>, document.body) : null}
+      {celebration ? (
+        <SaleCelebration
+          open
+          onClose={() => setCelebration(null)}
+          celebrationKey={celebration.key}
+          feedback={false}
+          title={celebration.title}
+          message={celebration.message}
+          stats={celebration.stats}
+          art={celebration.art}
+          badge="check"
+          continueLabel={celebration.continueLabel}
+          statsLabel={celebration.title === "Lista importada!" ? "Resumo da importação" : "Resumo da distribuição"}
+        />
+      ) : null}
     </>
   );
 }
@@ -360,12 +432,13 @@ function ContactList({ title, items, muted = false }: { title: string; items: Ar
 }
 
 /** Marcar os corretores e, se quiser, ajustar quantos cada um recebe. Começa dividindo igual entre os disponíveis. */
-function Distribute({ api, total, team, notice, onDistributed, onImportMore }: {
+function Distribute({ api, total, leadIds, team, notice, onDistributed, onImportMore }: {
+  leadIds?: string[];
   api: TeamListApi;
   total: number;
   team: TeamListBroker[];
   notice: string | null;
-  onDistributed: (left: number) => void;
+  onDistributed: (left: number, distributed: number, brokers: number) => void;
   onImportMore: () => void;
 }) {
   const [chosen, setChosen] = useState<string[]>(() => {
@@ -374,6 +447,11 @@ function Distribute({ api, total, team, notice, onDistributed, onImportMore }: {
   });
   const [manual, setManual] = useState<Record<string, number> | null>(null);
   const [result, setResult] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const visible = team.filter((broker) => (!onlyAvailable || broker.availability === "available") && normalize(broker.name).includes(normalize(query.trim())));
+  const allVisibleOn = visible.length > 0 && visible.every((broker) => chosen.includes(broker.id));
 
   const counts = useMemo(() => {
     if (manual) return manual;
@@ -382,6 +460,13 @@ function Distribute({ api, total, team, notice, onDistributed, onImportMore }: {
   }, [manual, chosen, total, team]);
   const given = chosen.reduce((sum, id) => sum + (counts[id] ?? 0), 0);
   const left = total - given;
+
+  /** Marca ou desmarca de uma vez os corretores que aparecem (respeita a busca e o filtro). */
+  function toggleVisible() {
+    setManual(null);
+    const ids = visible.map((broker) => broker.id);
+    setChosen((current) => (allVisibleOn ? current.filter((id) => !ids.includes(id)) : [...new Set([...current, ...ids])]));
+  }
 
   function toggle(id: string) {
     setManual(null);
@@ -392,7 +477,7 @@ function Distribute({ api, total, team, notice, onDistributed, onImportMore }: {
   function set(id: string, wanted: number) {
     const base = Object.fromEntries(chosen.map((brokerId) => [brokerId, counts[brokerId] ?? 0]));
     const others = given - (base[id] ?? 0);
-    base[id] = Math.max(0, Math.min(Math.floor(wanted) || 0, total - others));
+    base[id] = Math.max(0, Math.min(Math.floor(wanted) || 0, total - others, SUPERVISOR_DISTRIBUTE_PER_BROKER_MAX));
     setManual(base);
     if (!chosen.includes(id) && base[id] > 0) setChosen((current) => [...current, id]);
   }
@@ -417,8 +502,31 @@ function Distribute({ api, total, team, notice, onDistributed, onImportMore }: {
       </dl>
       {team.length ? (
         <>
+          {team.length > 4 ? (
+            <div className={styles.filters}>
+              <input
+                type="search"
+                className={form.input}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar corretor pelo nome"
+                aria-label="Buscar corretor pelo nome"
+              />
+              <label className={styles.filterCheck}>
+                <input type="checkbox" checked={onlyAvailable} onChange={(event) => setOnlyAvailable(event.target.checked)} />
+                <span>Só disponíveis</span>
+              </label>
+            </div>
+          ) : null}
+          <div className={styles.selectBar}>
+            <span className={styles.detail}>{`${plural(chosen.length, "corretor escolhido", "corretores escolhidos")} de ${fmt(team.length)}`}</span>
+            <Button variant="ghost" size="sm" onClick={toggleVisible} disabled={!visible.length}>
+              {allVisibleOn ? (query || onlyAvailable ? "Desmarcar estes" : "Desmarcar todos") : (query || onlyAvailable ? "Marcar estes" : "Marcar todos")}
+            </Button>
+          </div>
+          {!visible.length ? <p className={form.hint}>Nenhum corretor com esse nome.</p> : null}
           <ul className={form.checks} aria-label="Corretores da equipe">
-            {team.map((broker) => {
+            {visible.map((broker) => {
               const on = chosen.includes(broker.id);
               const value = on ? counts[broker.id] ?? 0 : 0;
               return (
@@ -434,35 +542,35 @@ function Distribute({ api, total, team, notice, onDistributed, onImportMore }: {
                       type="number"
                       inputMode="numeric"
                       min={0}
-                      max={total}
+                      max={Math.min(total, SUPERVISOR_DISTRIBUTE_PER_BROKER_MAX)}
                       value={value}
                       disabled={!on}
                       aria-label={`Leads para ${broker.name}`}
                       onChange={(event) => set(broker.id, Number(event.target.value))}
                     />
-                    <button type="button" aria-label={`Mais um para ${broker.name}`} disabled={!on || left <= 0} onClick={() => set(broker.id, value + 1)}><Plus size={14} /></button>
+                    <button type="button" aria-label={`Mais um para ${broker.name}`} disabled={!on || left <= 0 || value >= SUPERVISOR_DISTRIBUTE_PER_BROKER_MAX} onClick={() => set(broker.id, value + 1)}><Plus size={14} /></button>
                   </span>
                 </li>
               );
             })}
           </ul>
+          <p className={form.hint}>{`Até ${SUPERVISOR_DISTRIBUTE_PER_BROKER_MAX} leads por corretor a cada distribuição. O lead já chega aceito, com o telefone liberado.`}</p>
           {manual ? <Button variant="ghost" size="sm" onClick={() => setManual(null)}>Dividir igual de novo</Button> : null}
         </>
       ) : <p className={form.hint}>Sua equipe ainda não tem corretores ativos.</p>}
       <div className={form.actions}>
+        <Button variant="ghost" onClick={onImportMore}>Importar mais contatos</Button>
         <LiteActionButton
           busyLabel="Distribuindo…"
           doneLabel="Distribuído"
-          feedback="milestone"
-          budgetKey="lista-equipe-distribuida"
           disabled={!given}
           keeps="Os leads continuam esperando aqui."
           onAction={async () => {
             const picked = Object.fromEntries(chosen.filter((id) => (counts[id] ?? 0) > 0).map((id) => [id, counts[id] ?? 0]));
-            const response = await api.distribute({ counts: picked });
+            const response = await api.distribute({ counts: picked, leadIds });
             if (!response.ok) return { ok: false, message: response.error };
             setResult(`${plural(response.data.distributed, "lead foi", "leads foram")} para a equipe. Cada corretor recebeu um aviso no CRM.`);
-            onDistributed(response.data.left);
+            onDistributed(response.data.left, response.data.distributed, Object.keys(response.data.perBroker).length);
             setManual(null);
             return { ok: true };
           }}

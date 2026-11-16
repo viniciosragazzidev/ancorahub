@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { TEAM_LIST_SOURCE } from "@/features/supervisor-workspace/lead-import/team-list-sql";
 import { redirect } from "next/navigation";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 
@@ -156,6 +157,7 @@ async function MinhaFilaContent() {
       slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes,
       stageEnteredAt: schema.leads.stageEnteredAt,
       dutyName: schema.unitDutySchedules.name,
+      sourceChannel: schema.leads.sourceChannel,
     })
     .from(schema.leads)
     .where(
@@ -416,6 +418,7 @@ async function MinhaFilaContent() {
         arrivedAt: pendingOffer?.offeredAt ?? l.assignedAt ?? null,
         expiresAt: pendingOffer?.expiresAt ?? null,
         dutyName: pendingOffer?.dutyName ?? l.dutyName,
+        isTeamList: l.sourceChannel === TEAM_LIST_SOURCE,
         updatedAt: l.stageEnteredAt,
         dueAt,
         isAwaitingResponse: latestMsgByLead.get(l.id)?.direction === "incoming",

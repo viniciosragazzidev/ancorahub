@@ -219,6 +219,7 @@ function BrokerCell({ lead }: { lead: LeadWorkspaceItem }) {
       <span className={styles.subtle}>{lead.branchName ?? "Sem unidade"}</span>
       {lead.isPlantaoAtivo ? <span className={styles.badge} data-tone="warning">Plantão ativo</span> : null}
       {lead.isManagementInvestigation ? <span className={styles.badge} data-tone="neutral">Investigação da gestão</span> : null}
+      {lead.isTeamList ? <span className={styles.badge} data-tone="neutral" title="Importado pela supervisão na lista interna da equipe">Lead de equipe</span> : null}
       {lead.returnedUnaccepted && !lead.corretorNome ? (
         <span className={styles.badge} data-tone="warning" title="Já passou por um corretor que não aceitou ou não atendeu a tempo; aguardando novo corretor">Devolvido, não aceito</span>
       ) : null}
