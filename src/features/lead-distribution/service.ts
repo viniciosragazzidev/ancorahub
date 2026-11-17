@@ -36,6 +36,7 @@ import { countLeadsReceivedInDuty, type DutyLeadCap } from "./duty-lead-cap";
 import { selectBrokerDutyScheduleIds } from "./shared-duty-roster";
 import { createDutyConfigCache } from "./duty-config-cache";
 import { findBranchDefaultQueueName, findPostSaleExemptionQueueName, getQueueName, isPostSaleQueueName, postSaleTransferAuditAction } from "./post-sale-transfer";
+import { createDistributionStepMemo, type AsyncStepMemo } from "./distribution-step-memo";
 
 const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
 
@@ -60,6 +61,11 @@ type RosterResolution = {
   dutyDateBySchedule?: Map<string, string>;
   /** Intervalo de início (11/11): confirmados e pendentes de cada ocorrência desta unidade. */
   startPresenceBySchedule?: Map<string, DutyStartPresenceCount>;
+};
+
+type DistributionStepMemo = {
+  rosters: AsyncStepMemo<RosterResolution>;
+  fallbackBranches: AsyncStepMemo<string[]>;
 };
 
 async function getRosterBrokerIds(
@@ -764,9 +770,16 @@ async function getAutoDistributionStart(): Promise<Date | null> {
   return Number.isNaN(value.getTime()) ? new Date(DEFAULT_AUTO_DISTRIBUTION_START) : value;
 }
 
-export async function processQueuedLead(context: TenantContext, leadId: string, excludeBrokerId?: string | null, fallbackDepth = 0): Promise<LeadAssignmentResult> {
+export async function processQueuedLead(
+  context: TenantContext,
+  leadId: string,
+  excludeBrokerId?: string | null,
+  fallbackDepth = 0,
+  stepMemoInput?: DistributionStepMemo,
+): Promise<LeadAssignmentResult> {
   if (!canManage(context)) throw new AuthorizationError("Você não pode executar a distribuição automática.");
   if (fallbackDepth > 3) return { status: "queued", leadId, reason: "O encadeamento de filas de contingência excedeu o limite seguro." };
+  const stepMemo = stepMemoInput ?? createDistributionStepMemo<RosterResolution>();
   traceLeadStep(leadId, `start:${fallbackDepth}`);
   const db = getDatabase();
   const [lead] = await db.select({
@@ -1077,7 +1090,20 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
 
   const loadEligibleBrokers = async (branchIds: string[]) => {
     traceLeadStep(leadId, "roster");
-    const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId, exclusiveScheduleIds, (queue?.dutyFallbackPolicy as DutyFallbackPolicy | undefined) ?? (exclusiveScheduleIds?.length ? "wait_next_duty" : "unit_roster"), dutyLeadCaps, lead.createdAt)] as const));
+    const rosterResults = await Promise.all(branchIds.map(async (branchId) => {
+      // One processQueuedLead step uses one roster snapshot; only the no-channel re-entry shares it.
+      const result = await stepMemo.rosters(branchId, () => getRosterBrokerIds(
+        context.tenantId,
+        branchId,
+        new Date(),
+        lead.webhookCredentialId,
+        exclusiveScheduleIds,
+        (queue?.dutyFallbackPolicy as DutyFallbackPolicy | undefined) ?? (exclusiveScheduleIds?.length ? "wait_next_duty" : "unit_roster"),
+        dutyLeadCaps,
+        lead.createdAt,
+      ));
+      return [branchId, result] as const;
+    }));
     // A broker on the plantão receives its leads whatever unit their membership
     // is in (22/10, case Kelven: escalado e confirmado no PRESENCIAL TARDE de
     // outra unidade, never offered a lead). The plantão's unit is theirs here.
@@ -1208,29 +1234,33 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_distribution", entidadeId: leadId, acao: "lead.queue_duty_fallback" });
     });
+    // Queue changed, so the next decision must read a fresh roster snapshot.
     return processQueuedLead(context, leadId, excludeBrokerId, fallbackDepth + 1);
   }
   let fallbackUnitUsed = false;
   if (!brokers.length && context.role === "director") {
     // A unit with no available eligible broker must not strand the lead. Expand
     // only after the primary unit is empty, preserving the configured order.
-    const fallbackBranches = await db
-      .select({ id: schema.branches.id })
-      .from(schema.branches)
-      .where(and(
-        eq(schema.branches.tenantId, context.tenantId),
-        eq(schema.branches.status, "active"),
-        eq(schema.branches.acceptingLeads, true),
-        eq(schema.branches.autoDistribute, true),
-        eq(schema.branches.isDistributionHub, false),
-        ...((intelligentPolicy.value.allowedBranchIds?.length)
-          ? [inArray(schema.branches.id, intelligentPolicy.value.allowedBranchIds)]
-          : []),
-        ...(intelligentPolicy.value.excludedBranchIds.length
-          ? [not(inArray(schema.branches.id, intelligentPolicy.value.excludedBranchIds))]
-          : []),
-      ));
-    const fallbackIds = fallbackBranches.map((branch) => branch.id).filter((id) => !targetBranchIds.includes(id));
+    const fallbackBranchIds = await stepMemo.fallbackBranches("director-fallback-units", async () => {
+      const fallbackBranches = await db
+        .select({ id: schema.branches.id })
+        .from(schema.branches)
+        .where(and(
+          eq(schema.branches.tenantId, context.tenantId),
+          eq(schema.branches.status, "active"),
+          eq(schema.branches.acceptingLeads, true),
+          eq(schema.branches.autoDistribute, true),
+          eq(schema.branches.isDistributionHub, false),
+          ...((intelligentPolicy.value.allowedBranchIds?.length)
+            ? [inArray(schema.branches.id, intelligentPolicy.value.allowedBranchIds)]
+            : []),
+          ...(intelligentPolicy.value.excludedBranchIds.length
+            ? [not(inArray(schema.branches.id, intelligentPolicy.value.excludedBranchIds))]
+            : []),
+        ));
+      return fallbackBranches.map((branch) => branch.id);
+    });
+    const fallbackIds = fallbackBranchIds.filter((id) => !targetBranchIds.includes(id));
     if (fallbackIds.length) {
       const fallback = await loadEligibleBrokers(fallbackIds);
       if (fallback.brokers.length) {
@@ -1450,6 +1480,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     });
 
     if (!restartedCycle) return { status: "conflict", leadId, reason: "O estado do lead mudou durante a redistribuição." };
+    // The offer cycle state changed; start a new step without the prior memo.
     return processQueuedLead(context, leadId, excludeBrokerId ?? lead.corretorId);
   }
 
@@ -1697,7 +1728,8 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     // A broker without a usable corporate channel is recorded as an attempted
     // offer (CANCELLED). Re-evaluate immediately so the lead advances to the
     // next eligible broker instead of consuming a scheduler retry.
-    return processQueuedLead(context, leadId, chosen.id);
+    // The broker has no usable channel: the lead state did not change, so reuse this step's roster snapshot.
+    return processQueuedLead(context, leadId, chosen.id, 0, stepMemo);
   }
 
   return {

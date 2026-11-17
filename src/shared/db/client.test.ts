@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { connectionLimit, usesPostgresJsDriver } from "./client";
+import { connectionLimit, databaseIdleTimeoutSeconds, POSTGRES_FETCH_TYPES_ENABLED, usesPostgresJsDriver } from "./client";
 
 describe("usesPostgresJsDriver", () => {
   it("selects postgres-js for Supabase direct and pooler URLs regardless of env variable name", () => {
@@ -40,6 +40,19 @@ describe("connectionLimit", () => {
     vi.stubEnv("DB_POOL_MAX", "2");
 
     expect(connectionLimit()).toBe(2);
+  });
+});
+
+describe("database idle timeout", () => {
+  it("keeps the page pool at its current timeout and extends only background postgres pools", () => {
+    const transactionPooler = "postgresql://u:p@aws-0-sa-east-1.pooler.supabase.com:6543/postgres";
+    const sessionPooler = "postgresql://u:p@db.example.test:5432/postgres";
+
+    expect(databaseIdleTimeoutSeconds(transactionPooler)).toBe(120);
+    expect(databaseIdleTimeoutSeconds(sessionPooler)).toBe(30);
+    expect(databaseIdleTimeoutSeconds(transactionPooler, true)).toBe(600);
+    expect(databaseIdleTimeoutSeconds(sessionPooler, true)).toBe(600);
+    expect(POSTGRES_FETCH_TYPES_ENABLED).toBe(true);
   });
 });
 
