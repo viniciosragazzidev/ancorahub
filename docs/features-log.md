@@ -2,6 +2,9 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 17/11/2026 - Ajustes da revisão do Lote A
+
+- O lock de criação de lead mantém o advisory lock para telefones com menos de 8 dígitos usando os dígitos recebidos. Conversão por proposta e registro manual compartilham o lock transacional por lead, bloqueiam uma segunda venda ativa e preservam a resposta idempotente da proposta. A foto presencial substitui apenas a autoconfirmação do corretor (`confirmedBy IS NULL`), sem sobrescrever ausência ou validação da direção. Testes concorrentes passaram no PostgreSQL sintético da porta 5442.
 ## 16/11/2026 - Auditoria de concorrência, Lote A
 
 - Claims no PostgreSQL impedem efeitos duplicados ao converter proposta em venda, registrar venda com documentos aprovados, assumir investigação, revisar documentos, mover escala, aceitar convite e consumir retry da qualificação.
