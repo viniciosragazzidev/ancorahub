@@ -99,6 +99,7 @@ export async function getTeamMemberProfile(memberUserId: string) {
     joinedAt: schema.tenantMemberships.createdAt,
     brokerCode: schema.brokerProfiles.internalCode,
     brokerPhone: schema.brokerProfiles.phone,
+    brokerCpf: schema.brokerProfiles.cpf,
     brokerLifecycleStatus: schema.brokerProfiles.lifecycleStatus,
     activatedAt: schema.brokerProfiles.activatedAt,
   })
