@@ -1,51 +1,48 @@
 import { describe, expect, it } from "vitest";
 
-import { claimProposalConversion } from "./proposal-conversion-claim";
+import { completeProposalConversion } from "./proposal-conversion-claim";
 
-function createBarrier(parties: number) {
-  let arrived = 0;
-  let release!: () => void;
-  const open = new Promise<void>((resolve) => { release = resolve; });
-  return async () => {
-    arrived += 1;
-    if (arrived === parties) release();
-    await open;
-  };
-}
-
-describe("claimProposalConversion", () => {
-  it("duas chamadas simultâneas reservam a proposta uma vez e reutilizam a venda vencedora", async () => {
-    let convertedSaleId: string | null = null;
-    let effects = 0;
-    const waitForBoth = createBarrier(2);
+describe("completeProposalConversion", () => {
+  it("links the proposal only after a sale row exists", async () => {
+    const updates: unknown[] = [];
     const tx = {
       update: () => ({
-        set: () => ({
+        set: (values: unknown) => ({
           where: () => ({
             returning: async () => {
-              await waitForBoth();
-              if (convertedSaleId) return [];
-              convertedSaleId = Math.random().toString(36).slice(2);
-              effects += 1;
+              updates.push(values);
               return [{ id: "proposal-1" }];
             },
           }),
         }),
       }),
-      select: () => ({
-        from: () => ({
-          where: () => ({ limit: async () => [{ convertedSaleId }] }),
-        }),
+    };
+
+    const completed = await completeProposalConversion(tx as never, {
+      tenantId: "tenant-1",
+      leadId: "lead-1",
+      proposalId: "proposal-1",
+      saleId: "sale-1",
+      convertedAt: new Date(),
+    });
+
+    expect(completed).toBe(true);
+    expect(updates).toHaveLength(1);
+  });
+
+  it("reports a conflict when the conditional proposal update affects no row", async () => {
+    const tx = {
+      update: () => ({
+        set: () => ({ where: () => ({ returning: async () => [] }) }),
       }),
     };
 
-    const results = await Promise.all([
-      claimProposalConversion(tx as never, { tenantId: "tenant-1", proposalId: "proposal-1", saleId: "sale-a", convertedAt: new Date() }),
-      claimProposalConversion(tx as never, { tenantId: "tenant-1", proposalId: "proposal-1", saleId: "sale-b", convertedAt: new Date() }),
-    ]);
-
-    expect(results.filter((result) => result.kind === "claimed")).toHaveLength(1);
-    expect(results.filter((result) => result.kind === "already_converted")).toHaveLength(1);
-    expect(effects).toBe(1);
+    await expect(completeProposalConversion(tx as never, {
+      tenantId: "tenant-1",
+      leadId: "lead-1",
+      proposalId: "proposal-1",
+      saleId: "sale-1",
+      convertedAt: new Date(),
+    })).resolves.toBe(false);
   });
 });
