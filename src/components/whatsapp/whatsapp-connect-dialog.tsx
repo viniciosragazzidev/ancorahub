@@ -609,9 +609,12 @@ export function WhatsAppConnectDialog({
       let recreated = false;
       for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt += 1) {
         const result = await requestWhatsAppPairingCode({ phone: `55${pairingPhone}` });
-        if (!result.success && result.code === "SESSION_FAILED") {
+        // Sessão quebrada ou código recusado pelo WhatsApp (17/11): recria a sessão uma vez e pede de novo.
+        if (!result.success && (result.code === "SESSION_FAILED" || result.code === "PAIRING_REFUSED")) {
           if (recreated) {
-            reportCodeIssue("O WhatsApp do servidor está instável agora. Tente de novo em 1 minuto.");
+            reportCodeIssue(result.code === "PAIRING_REFUSED"
+              ? "O WhatsApp não liberou o código agora. Espere 1 minuto e toque em Tentar de novo, ou use o QR Code."
+              : "O WhatsApp do servidor está instável agora. Tente de novo em 1 minuto.");
             return;
           }
           recreated = true;
