@@ -187,6 +187,8 @@ export function WhatsAppConnectDialog({
   /** Início/recriação da sessão em andamento: o pedido de código espera por ele em vez de correr junto (16/11/2026). */
   const startInFlight = useRef<Promise<void> | null>(null);
   const codeShownAt = useRef(0);
+  // Quando o código atual chegou: a tela conta os 2 min 40 s que ele vale (17/11).
+  const [codeIssuedAt, setCodeIssuedAt] = useState<number | null>(null);
   const reloadTimer = useRef<number | null>(null);
   useEffect(() => () => { if (reloadTimer.current) window.clearInterval(reloadTimer.current); }, []);
 
@@ -638,6 +640,7 @@ export function WhatsAppConnectDialog({
           pairingCodeRef.current = result.pairingCode;
           codeShownAt.current = clock();
           setPairingCode(result.pairingCode);
+          setCodeIssuedAt(Date.now());
           connectingRef.current = true;
           // Sair de SCAN_QR_CODE depois disto = o celular aceitou o código.
           sawQrRef.current = true;
@@ -851,6 +854,7 @@ export function WhatsAppConnectDialog({
               connectivity,
               issue: codeIssue,
               onGenerate: () => void generatePairingCode(),
+              codeIssuedAt: pairingCode ? codeIssuedAt : null,
             }}
           />
         </DialogPopup>
