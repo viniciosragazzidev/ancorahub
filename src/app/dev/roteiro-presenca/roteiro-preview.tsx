@@ -16,7 +16,7 @@ import styles from "./roteiro.module.css";
  * Parâmetros para prints: ?aparelho=celular|computador&passo=…&erro=…&modo=online|presencial&limpo=1
  */
 type Mode = "online" | "presencial";
-type Screen = "cartao" | "retomar" | "fim" | GuideStep | "codigo-copiado";
+type Screen = "cartao" | "retomar" | "fim" | GuideStep | "codigo-copiado" | "codigo-gerar";
 type Sim = "carregando" | "expirado" | "espera" | "falhou" | "recusado" | "demorando" | "naoabriu" | "copia" | "instavel" | "desconectou" | "atrasado" | "confirmar-erro";
 
 const CODE_A = "K7QM2XPD";
@@ -28,10 +28,11 @@ const SCREENS: { id: Screen; label: string }[] = [
   { id: "cartao", label: "0. Cartão" },
   { id: "boasvindas", label: "1. Boas-vindas" },
   { id: "numero", label: "1b. Número" },
-  { id: "codigo", label: "2. Código" },
-  { id: "codigo-copiado", label: "2. Copiado" },
-  { id: "telainicial", label: "3. Tela inicial" },
-  { id: "caminho", label: "4. Caminho" },
+  { id: "telainicial", label: "2. Tela inicial" },
+  { id: "caminho", label: "3. Caminho" },
+  { id: "codigo-gerar", label: "4. Gerar código" },
+  { id: "codigo", label: "4. Código" },
+  { id: "codigo-copiado", label: "4. Copiado" },
   { id: "esperando", label: "5. Esperando" },
   { id: "conectado", label: "6. Conectado" },
   { id: "confirmar", label: "7. Confirmar" },
@@ -53,8 +54,8 @@ const SIMS: { id: Sim; label: string }[] = [
   { id: "confirmar-erro", label: "Falha ao confirmar" },
 ];
 
-type Facts = Pick<PresenceGuideConnection, "ready" | "phase" | "code" | "generating" | "expired" | "cooldownSeconds" | "stalled" | "connectivity" | "issue" | "phone" | "method" | "started" | "phoneChecked">;
-const BASE_FACTS: Facts = { ready: false, phase: "qr", code: CODE_A, generating: false, expired: false, cooldownSeconds: 0, stalled: false, connectivity: null, issue: null, phone: "21987654321", method: "code", started: true, phoneChecked: true };
+type Facts = Pick<PresenceGuideConnection, "ready" | "phase" | "code" | "generating" | "expired" | "cooldownSeconds" | "stalled" | "connectivity" | "issue" | "phone" | "method" | "started" | "phoneChecked" | "codeIssuedAt">;
+const BASE_FACTS: Facts = { ready: false, phase: "qr", code: CODE_A, generating: false, expired: false, cooldownSeconds: 0, stalled: false, connectivity: null, issue: null, phone: "21987654321", method: "code", started: true, phoneChecked: true, codeIssuedAt: null };
 
 type Setup = { screen: Screen; facts: Facts; stage: ConfirmStage; error: string | null; reconnect: boolean; preview: PresenceGuidePreview };
 
@@ -69,7 +70,8 @@ function setupFor(screen: Screen, sim: Sim | null, device: GuideDevice): Setup {
   switch (screen) {
     case "boasvindas": step("boasvindas"); facts.started = false; facts.code = null; break;
     case "numero": step("numero"); facts.phone = ""; facts.code = null; break;
-    case "codigo": step("codigo"); break;
+    case "codigo": step("codigo"); facts.codeIssuedAt = Date.now(); break;
+    case "codigo-gerar": step("codigo"); facts.code = null; break;
     case "codigo-copiado": step("codigo"); preview.copied = true; break;
     case "telainicial": step("telainicial"); break;
     case "caminho": step("caminho"); break;
@@ -174,7 +176,7 @@ export function RoteiroPresencaPreview() {
 
   const generate = React.useCallback(() => {
     setFacts((f) => ({ ...f, code: null, generating: true, expired: false, issue: null, stalled: false, phase: "qr" }));
-    later(900, () => setFacts((f) => ({ ...f, generating: false, code: f.code === CODE_A ? CODE_B : CODE_A })));
+    later(900, () => setFacts((f) => ({ ...f, generating: false, code: f.code === CODE_A ? CODE_B : CODE_A, codeIssuedAt: Date.now() })));
   }, [later]);
 
   const connection: PresenceGuideConnection = {
@@ -183,9 +185,9 @@ export function RoteiroPresencaPreview() {
     phoneValid: /^\d{10,11}$/.test(facts.phone),
     onMethodChange: (method) => setFacts((f) => ({ ...f, method })),
     onStart: () => {
-      setFacts((f) => ({ ...f, started: true, code: null, generating: f.method === "code" }));
-      if (device === "mobile") later(900, () => setFacts((f) => ({ ...f, generating: false, code: CODE_A })));
-      else later(6_000, connect);
+      // Celular (17/11): começar não gera código; ele sai quando o corretor toca em Gerar código.
+      setFacts((f) => ({ ...f, started: true, code: null, generating: device === "desktop" && f.method === "code" }));
+      if (device !== "mobile") later(6_000, connect);
     },
     onPhoneChange: (phone) => setFacts((f) => ({ ...f, phone })),
     onGenerate: generate,

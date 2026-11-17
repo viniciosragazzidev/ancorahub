@@ -48,14 +48,17 @@ describe("roteiro de presença: erros", () => {
 });
 
 describe("roteiro de presença: progresso e retomada", () => {
-  it("7 marcos no celular, com a tela inicial no 3; 4 no computador", () => {
-    expect(progressOf("telainicial", "mobile")).toMatchObject({ at: 3, total: 7 });
+  it("7 marcos no celular, com o caminho antes do código (17/11); 4 no computador", () => {
+    expect(progressOf("telainicial", "mobile")).toMatchObject({ at: 2, total: 7 });
+    expect(progressOf("caminho", "mobile")).toMatchObject({ at: 3, total: 7 });
+    expect(progressOf("codigo", "mobile")).toMatchObject({ at: 4, total: 7 });
     expect(progressOf("confirmar", "mobile")).toMatchObject({ at: 7, total: 7 });
     expect(progressOf("pronto", "desktop")).toMatchObject({ at: 4, total: 4, fill: 1 });
   });
-  it("retoma no código (com um novo) quem já tinha passado dele; lembrança velha não vale", () => {
+  it("retoma no caminho quem estava nele e no código (com um novo) quem já tinha chegado nele; lembrança velha não vale", () => {
     const now = Date.now();
-    expect(resumeStep({ step: "caminho", platform: "android", at: now - 60_000 }, now)).toBe("codigo");
+    expect(resumeStep({ step: "caminho", platform: "android", at: now - 60_000 }, now)).toBe("telainicial");
+    expect(resumeStep({ step: "esperando", platform: "android", at: now - 60_000 }, now)).toBe("codigo");
     expect(resumeStep({ step: "numero", platform: "android", at: now }, now)).toBe("numero");
     expect(resumeStep({ step: "boasvindas", platform: "android", at: now }, now)).toBeNull();
     expect(resumeStep({ step: "caminho", platform: "android", at: now - 3 * 60 * 60_000 }, now)).toBeNull();
@@ -76,7 +79,8 @@ describe("roteiro de presença: narração de cada etapa (10/11)", () => {
   it("o caminho narra um toque por vez, com o 1º diferente no iPhone", () => {
     expect(narrationKey({ ...base, step: "caminho", scene: 0 })).toBe("toque-1-android");
     expect(narrationKey({ ...base, step: "caminho", scene: 0, platform: "iphone" })).toBe("toque-1-iphone");
-    expect(narrationKey({ ...base, step: "caminho", scene: 3 })).toBe("toque-4");
+    // O áudio do toque 4 é da ordem antiga: fica sem voz até ser regravado (17/11).
+    expect(narrationKey({ ...base, step: "caminho", scene: 3 })).toBeNull();
   });
   it("varia no computador, no presencial e no modo só conectar", () => {
     expect(narrationKey({ ...base, step: "codigo", device: "desktop", method: "qr" })).toBe("codigo-computador-qr");
@@ -88,5 +92,17 @@ describe("roteiro de presença: narração de cada etapa (10/11)", () => {
   it("sem narração com erro na tela ou enquanto confirma", () => {
     expect(narrationKey({ ...base, step: "codigo", error: "expired" })).toBeNull();
     expect(narrationKey({ ...base, step: "confirmar", stage: "sending" })).toBeNull();
+  });
+});
+
+describe("validade do código (17/11)", () => {
+  it("conta 2:35 a partir de quando o código chegou e para em zero", async () => {
+    const { codeSecondsLeft, formatCodeClock, PAIRING_CODE_TTL_SECONDS } = await import("./presence-guide-steps");
+    expect(codeSecondsLeft(null, 1000)).toBeNull();
+    expect(codeSecondsLeft(0 + 1, 1)).toBe(PAIRING_CODE_TTL_SECONDS);
+    expect(codeSecondsLeft(1000, 1000 + 60_000)).toBe(PAIRING_CODE_TTL_SECONDS - 60);
+    expect(codeSecondsLeft(1000, 1000 + 999_000)).toBe(0);
+    expect(formatCodeClock(155)).toBe("2:35");
+    expect(formatCodeClock(9)).toBe("0:09");
   });
 });

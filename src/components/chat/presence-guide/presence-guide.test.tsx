@@ -31,40 +31,58 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe("PresenceGuide (roteiro guiado de presença, 09/11)", () => {
-  it("copiar o código leva ao tutorial (tela inicial e 4 toques) antes de abrir o WhatsApp, que abre uma vez só no fim", async () => {
+  it("celular (17/11): primeiro o caminho e a tela do WhatsApp; o código só sai quando o corretor está pronto para colar", async () => {
     const open = vi.fn();
-    render(<PresenceGuide device="mobile" connection={connection()} duty={duty} presence={presence()} onClose={vi.fn()} openWhatsApp={open} preview={{ step: "codigo" }} />);
+    const onGenerate = vi.fn();
+    const { rerender } = render(<PresenceGuide device="mobile" connection={connection({ code: null, onGenerate })} duty={duty} presence={presence()} onClose={vi.fn()} openWhatsApp={open} voiceBase={null} preview={{ step: "telainicial" }} />);
+    expect(screen.getByText(/Antes de abrir o WhatsApp, veja o que fazer lá/)).toBeTruthy();
     expect(screen.getByText("2 de 7")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Entendi, próximo passo" }));
+    expect(screen.getByText("3 de 7")).toBeTruthy();
+    for (let i = 0; i < 3; i += 1) fireEvent.click(screen.getByRole("button", { name: "Próximo toque" }));
+    expect(screen.getByText(/Pare nessa tela e volte aqui para pegar o código/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Abrir o WhatsApp/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Entendi, abrir o WhatsApp/ }));
+    expect(open).toHaveBeenCalledTimes(1);
+
+    // Voltou do WhatsApp: ainda sem código. Só gera quando ele confirma que está na tela.
+    expect(screen.getByText("Já está na tela Conectar com número de telefone, no WhatsApp?")).toBeTruthy();
+    expect(screen.getByText("4 de 7")).toBeTruthy();
+    expect(onGenerate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Gerar código" }));
+    expect(onGenerate).toHaveBeenCalledTimes(1);
+
+    rerender(<PresenceGuide device="mobile" connection={connection({ onGenerate, codeIssuedAt: Date.now() })} duty={duty} presence={presence()} onClose={vi.fn()} openWhatsApp={open} voiceBase={null} preview={{ step: "telainicial" }} />);
+    expect(screen.getByText("Vale por mais 2:35")).toBeTruthy();
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Copiar código/ })); });
     expect(screen.getByText("Código copiado")).toBeTruthy();
-    await act(async () => { vi.advanceTimersByTime(1_000); });
-
-    expect(screen.getByText(/Antes de abrir o WhatsApp, veja o que fazer lá/)).toBeTruthy();
-    expect(screen.getByText("3 de 7")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Abrir o WhatsApp/ })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Entendi, próximo passo" }));
-    expect(screen.getByText("Depois, na lista de Conversas, toque em 4 lugares, nesta ordem:")).toBeTruthy();
-    expect(screen.getByText("4 de 7")).toBeTruthy();
-    for (let i = 0; i < 3; i += 1) fireEvent.click(screen.getByRole("button", { name: "Próximo toque" }));
-    expect(open).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Abrir o WhatsApp/ }));
-    // Antes de sair do app, o resumo: tela inicial e 3 pontinhos. Só o botão do aviso abre o WhatsApp.
-    expect(open).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog", { name: "Quando o WhatsApp abrir:" })).toBeTruthy();
-    expect(screen.getByText(/toque nos 3 pontinhos/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Abrir o WhatsApp e colar/ }));
     fireEvent.click(screen.getByRole("button", { name: /Entendi, abrir o WhatsApp/ }));
-    expect(open).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledTimes(2);
     expect(screen.getByText("5 de 7")).toBeTruthy();
+    expect(screen.getByText("Digitou o código no WhatsApp? Agora é só esperar uns segundos.")).toBeTruthy();
   });
 
-  it("o caminho tem 4 toques e o último abre o WhatsApp e espera a conexão", () => {
+  it("o código conta 2 min 40 s; perto do fim avisa e, vencido, pede outro", async () => {
+    const onGenerate = vi.fn();
+    render(<PresenceGuide device="mobile" connection={connection({ onGenerate, codeIssuedAt: Date.now() })} duty={duty} presence={presence()} onClose={vi.fn()} voiceBase={null} preview={{ step: "codigo" }} />);
+    expect(screen.getByText("Vale por mais 2:35")).toBeTruthy();
+    await act(async () => { vi.advanceTimersByTime(130_000); });
+    expect(screen.getByText("Está acabando: 0:25. Cole logo ou gere outro.")).toBeTruthy();
+    await act(async () => { vi.advanceTimersByTime(26_000); });
+    expect(screen.getByText("O código venceu antes de entrar no WhatsApp.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Gerar outro código" }));
+    expect(onGenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it("o caminho tem 4 toques e o último abre o WhatsApp; na volta, o código", () => {
     const open = vi.fn();
-    render(<PresenceGuide device="mobile" connection={connection()} duty={duty} presence={presence()} onClose={vi.fn()} openWhatsApp={open} preview={{ step: "caminho" }} />);
+    render(<PresenceGuide device="mobile" connection={connection({ code: null })} duty={duty} presence={presence()} onClose={vi.fn()} openWhatsApp={open} voiceBase={null} preview={{ step: "caminho" }} />);
     for (let i = 0; i < 3; i += 1) fireEvent.click(screen.getByRole("button", { name: "Próximo toque" }));
     fireEvent.click(screen.getByRole("button", { name: /Abrir o WhatsApp/ }));
     fireEvent.click(screen.getByRole("button", { name: /Entendi, abrir o WhatsApp/ }));
     expect(open).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Digitou o código no WhatsApp? Agora é só esperar uns segundos.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Gerar código" })).toBeTruthy();
   });
 
   it("conectado e confirmado: um toque confirma; o fim leva ao plantão", () => {
@@ -82,16 +100,18 @@ describe("PresenceGuide (roteiro guiado de presença, 09/11)", () => {
   it("enquanto o código não chega mostra o carregamento; se não vier, pede de novo e depois oferece Tentar de novo", async () => {
     const onGenerate = vi.fn();
     render(<PresenceGuide device="mobile" connection={connection({ code: null, onGenerate })} duty={duty} presence={presence()} onClose={vi.fn()} voiceBase={null} preview={{ step: "codigo" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Gerar código" }));
+    expect(onGenerate).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Só um instante…")).toBeTruthy();
     expect(screen.getByText(/Pode levar até 30 segundos/)).toBeTruthy();
     await act(async () => { vi.advanceTimersByTime(2_600); });
-    expect(onGenerate).toHaveBeenCalledTimes(1);
-    await act(async () => { vi.advanceTimersByTime(2_600); });
     expect(onGenerate).toHaveBeenCalledTimes(2);
+    await act(async () => { vi.advanceTimersByTime(2_600); });
+    expect(onGenerate).toHaveBeenCalledTimes(3);
     await act(async () => { vi.advanceTimersByTime(2_600); });
     expect(screen.getByText("Não consegui gerar o código agora.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
-    expect(onGenerate).toHaveBeenCalledTimes(3);
+    expect(onGenerate).toHaveBeenCalledTimes(4);
     expect(screen.getByText("Só um instante…")).toBeTruthy();
   });
 

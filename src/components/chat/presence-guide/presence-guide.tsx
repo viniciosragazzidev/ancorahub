@@ -16,7 +16,7 @@ import {
   Tiles, WaIcon, WaitDots, WaitingMock, WelcomeArt,
 } from "./presence-guide-art";
 import {
-  guideError, narrationKey, platformFromUserAgent, progressOf, readGuideMemory, resumeStep, visibleStep, writeGuideMemory,
+  codeSecondsLeft, formatCodeClock, guideError, narrationKey, platformFromUserAgent, progressOf, readGuideMemory, resumeStep, visibleStep, writeGuideMemory,
   type ConfirmStage, type GuideDevice, type GuideError, type GuideMode, type GuidePlatform, type GuideStep, type LocalIssue,
 } from "./presence-guide-steps";
 import styles from "./presence-guide.module.css";
@@ -49,6 +49,8 @@ export type PresenceGuideConnection = {
   connectivity: "unreachable" | "unauthorized" | null;
   issue: string | null;
   onGenerate: () => void;
+  /** Quando o código atual chegou (ms), para a contagem de 2 min 40 s. */
+  codeIssuedAt?: number | null;
 };
 
 export type PresenceGuideDuty = { key: string; scheduleName: string; branchName: string | null; mode: "online" | "presencial"; until: string };
@@ -95,6 +97,8 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   const [localStep, setLocalStep] = React.useState<GuideStep>(preview?.step ?? (connection.started ? "codigo" : "boasvindas"));
   const [scene, setScene] = React.useState(preview?.scene ?? 0);
   const [platform, setPlatform] = React.useState<GuidePlatform>(preview?.platform ?? "android");
+  // Celular: o corretor já tocou em Gerar código (estava na tela do WhatsApp).
+  const [codeArmed, setCodeArmed] = React.useState(false);
   const [copied, setCopied] = React.useState(preview?.copied ?? false);
   const [local, setLocal] = React.useState<LocalIssue | null>(preview?.local ?? null);
   const [sheet, setSheet] = React.useState<"ajuda" | "sair" | "abrir" | null>(preview?.sheet ?? null);
@@ -156,11 +160,12 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   }
 
   const error: GuideError | null = guideError({ step, device, facts: connection, local, stage: presence.stage });
-  const narration = narrationKey({ step, scene, platform, device, mode, method: connection.method, dutyMode: duty.mode, stage: presence.stage, error });
+  const narration = narrationKey({ step, scene, platform, device, mode, method: connection.method, dutyMode: duty.mode, stage: presence.stage, error, hasCode: Boolean(connection.code) });
 
   // Vigia do código (10/11): se o código não chega e nada está sendo pedido, pede de novo sozinho (até 2 vezes);
   // se mesmo assim não vier, ou passar de 45 s esperando, a tela troca o carregamento por "Tentar de novo".
-  const waitingCode = !error && step === "codigo" && connection.started && !connection.code && (!desktop || connection.method === "code");
+  // Celular (17/11): o código só é pedido depois que o corretor toca em Gerar código, já na tela do WhatsApp.
+  const waitingCode = !error && step === "codigo" && connection.started && !connection.code && (desktop ? connection.method === "code" : codeArmed || connection.generating);
   const codeKicks = React.useRef(0);
   React.useEffect(() => {
     if (!waitingCode) {
@@ -226,12 +231,28 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
     setCopied(false);
   }, [connection.code, preview?.copied]);
 
-  // Copiou: segue sozinho para a tela inicial.
+  // Contagem do código (17/11): de segundo em segundo enquanto há código; ao vencer, a tela pede outro.
+  const [clockNow, setClockNow] = React.useState(() => Date.now());
+  const issuedAt = connection.code ? connection.codeIssuedAt ?? null : null;
   React.useEffect(() => {
-    if (!copied || preview?.copied || step !== "codigo" || desktop) return;
-    const timer = window.setTimeout(() => setLocalStep("telainicial"), 900);
-    return () => window.clearTimeout(timer);
-  }, [copied, preview, step, desktop]);
+    if (!issuedAt) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- relógio da contagem (sistema externo: o tempo)
+    setClockNow(Date.now());
+    const timer = window.setInterval(() => setClockNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [issuedAt]);
+  const secondsLeft = codeSecondsLeft(issuedAt, clockNow);
+  React.useEffect(() => {
+    if (secondsLeft !== 0 || connection.ready) return;
+    if (step !== "codigo" && step !== "esperando") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- o código venceu sem entrar no WhatsApp
+    setLocal("codeExpired");
+  }, [secondsLeft, step, connection.ready]);
+  const countdown$ = secondsLeft !== null && secondsLeft > 0 ? (
+    <p className={styles.caption} role="timer" aria-live="off" data-tone={secondsLeft <= 30 ? "warning" : undefined} style={{ fontVariantNumeric: "tabular-nums", fontWeight: secondsLeft <= 30 ? 600 : undefined }}>
+      {secondsLeft <= 30 ? COPY.code.hurry(formatCodeClock(secondsLeft)) : COPY.code.left(formatCodeClock(secondsLeft))}
+    </p>
+  ) : null;
 
   // Saiu para o WhatsApp: o aviso "não abriu" é cancelado.
   React.useEffect(() => {
@@ -289,6 +310,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
   }
 
   function regenerate() {
+    setCodeArmed(true);
     setLocal(null);
     codeKicks.current = 0;
     setCopied(false);
@@ -303,18 +325,20 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
         if (!connection.phoneValid) { setLocal(null); setLocalStep("numero"); return; }
         regenerate();
         return;
-      case "expired": case "cooldown": case "stalled": regenerate(); return;
+      case "expired": case "timedOut": case "cooldown": case "stalled": regenerate(); return;
       case "rejected": setLocal(null); setLocalStep("numero"); return;
       case "notOpened": setLocal(null); setLocalStep("esperando"); return;
-      case "copyBlocked": setLocal(null); setLocalStep("telainicial"); return;
+      // Anotou o código: vai direto colar no WhatsApp (a tela do código já está aberta lá).
+      case "copyBlocked": setLocal(null); askToOpenWhatsApp(() => setLocalStep("esperando")); return;
       case "unstable": case "confirm": presence.onConfirm(); return;
       default:
     }
   }
 
+  /** Celular (17/11): começa a sessão e mostra o caminho; o código só sai quando o corretor estiver na tela de digitar. */
   function start() {
     connection.onStart();
-    setLocalStep("codigo");
+    setLocalStep(desktop ? "codigo" : "telainicial");
   }
 
   function switchDesktopMethod(next: "qr" | "code") {
@@ -386,7 +410,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
                 {qr
                   // eslint-disable-next-line @next/next/no-img-element -- QR dinâmico em base64
                   ? connection.qrCode ? <img className={styles.qrImg} alt="QR Code para conectar o WhatsApp" src={connection.qrCode.startsWith("data:") ? connection.qrCode : `data:image/png;base64,${connection.qrCode}`} /> : <CodeLoading label={COPY.code.loadingQr} compact />
-                  : connection.code ? <Tiles code={connection.code} big /> : <CodeLoading label={COPY.code.loading} compact />}
+                  : connection.code ? <span style={{ display: "grid", gap: 8, justifyItems: "center" }}><Tiles code={connection.code} big />{countdown$}</span> : <CodeLoading label={COPY.code.loading} compact />}
                 <ol className={styles.list}>
                   {COPY.desktop.steps(qr, platform).map((text, index) => <li key={text} className={styles.listItem} data-on={index === 0}><span className={styles.listNum}>{index + 1}</span>{text}</li>)}
                 </ol>
@@ -401,16 +425,33 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
           cta$ = <button type="button" className={styles.link} onClick={() => switchDesktopMethod(qr ? "code" : "qr")}>{qr ? COPY.desktop.useCode : COPY.desktop.useQr}</button>;
           break;
         }
+        // Ainda não pediu: confirma que está na tela de digitar do WhatsApp e só então gera.
+        if (!connection.code && !codeArmed && !connection.generating) {
+          scene$ = (
+            <>
+              <Say title={COPY.code.readyTitle} sub={COPY.code.readySub} />
+              <div className={styles.art}>
+                <PhoneMock platform={platform} scene={3} />
+                <button type="button" className={styles.link} onClick={() => askToOpenWhatsApp()}>{COPY.code.notYet}</button>
+              </div>
+            </>
+          );
+          cta$ = <button type="button" className={styles.cta} disabled={!connection.phoneChecked} onClick={regenerate}>{COPY.code.readyCta}</button>;
+          break;
+        }
         scene$ = (
           <>
-            <Say title={!connection.code ? COPY.code.generating : copied ? COPY.code.copiedTitle : COPY.code.title} sub={connection.code ? COPY.code.sub : undefined} state={connection.code ? "idle" : "working"} />
+            <Say title={!connection.code ? COPY.code.generating : copied ? COPY.code.copiedTitle : COPY.code.title} sub={connection.code ? (copied ? COPY.code.copiedSub : COPY.code.sub) : undefined} state={connection.code ? "idle" : "working"} />
             <div className={styles.art}>
               {connection.code ? <Tiles code={connection.code} ok={copied} /> : <CodeLoading label={COPY.code.loading} hint={COPY.code.loadingHint} />}
+              {countdown$}
               <span className={styles.copied} role="status">{copied ? <><CheckIcon size={16} /> {COPY.code.copied}</> : null}</span>
             </div>
           </>
         );
-        cta$ = <button type="button" className={styles.cta} disabled={!connection.code} onClick={copied ? () => setLocalStep("telainicial") : () => void copy()}>{copied ? COPY.code.next : <><CopyIcon /> {COPY.code.cta}</>}</button>;
+        cta$ = copied
+          ? <button type="button" className={styles.cta} data-tone="whatsapp" onClick={() => askToOpenWhatsApp(() => setLocalStep("esperando"))}><WaIcon light /> {COPY.code.openCta}</button>
+          : <button type="button" className={styles.cta} disabled={!connection.code} onClick={() => void copy()}><CopyIcon /> {COPY.code.cta}</button>;
         break;
       case "telainicial":
         scene$ = (
@@ -441,7 +482,8 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
         );
         cta$ = scene < 3
           ? <button type="button" className={styles.cta} onClick={() => setScene(scene + 1)}>{COPY.path.next}</button>
-          : <button type="button" className={styles.cta} data-tone="whatsapp" onClick={() => askToOpenWhatsApp(() => setLocalStep("esperando"))}><WaIcon light /> {COPY.path.cta}</button>;
+          // Abre o WhatsApp para chegar na tela do código; ao voltar, o código é gerado (17/11).
+          : <button type="button" className={styles.cta} data-tone="whatsapp" onClick={() => askToOpenWhatsApp(() => setLocalStep("codigo"))}><WaIcon light /> {COPY.path.cta}</button>;
         break;
       case "esperando":
         scene$ = (
@@ -449,6 +491,7 @@ export function PresenceGuide({ device, connection, duty, presence, onClose, ope
             <Say title={COPY.waiting.title} sub={COPY.waiting.sub} state="working" />
             <div className={styles.art}>
               <WaitingMock code={connection.code} />
+              {countdown$}
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}><WaitDots /><span className={styles.caption}>{COPY.waiting.label}</span></div>
               <button type="button" className={styles.link} onClick={() => { setScene(0); setLocalStep("caminho"); }}>{COPY.waiting.again}</button>
             </div>
@@ -593,6 +636,7 @@ function errorView(error: GuideError, context: { phone: string; message: string 
   const e = COPY.errors;
   switch (error) {
     case "expired": return e.expired;
+    case "timedOut": return e.timedOut;
     case "cooldown": return e.cooldown;
     // A causa real (servidor instável, número, demora) no lugar do "Confira a internet" genérico (16/11/2026).
     case "issue": return context.issue ? { ...e.issue, sub: context.issue } : e.issue;
