@@ -13,12 +13,14 @@ import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { SearchField } from "@/components/arc/search-field/search-field";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
-import { resendInviteAction, revokeInviteAction } from "@/app/(dashboard)/equipe/actions";
+import { resendInviteAction, revokeInviteAction, updateLiteBrokerContactAction } from "@/app/(dashboard)/equipe/actions";
+import { Input } from "@/components/ui/input";
 import { TeamInviteLiteSheet } from "@/features/team/team-invite-lite-sheet";
 import { ActionNoticeLine, useActionNotice } from "@/components/lite/feedback/action-notice";
 
 import { addBrokerToMyTeamAction } from "./actions";
 import { cancelMyTeamInviteAction, inviteBrokerToMyTeamAction, removeBrokerFromMyTeamAction } from "./my-team-actions";
+import { PendingBrokerEditSheet } from "./pending-broker-edit-sheet";
 import type { SupervisorTeamPageData } from "./my-team-queries";
 import { TeamOnDutyList } from "./team-on-duty-list";
 import { PeopleRow, PeopleSection } from "@/components/light/people-list/people-list";
@@ -49,6 +51,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
   const normalizeName = (value: string) => value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-BR");
   const unitQuery = normalizeName(unitSearch.trim());
   const unitBrokers = data.brokers.filter((broker) => normalizeName(broker.name).includes(unitQuery));
+  const unitPending = data.pendingAccessInvites.filter((invite) => normalizeName(invite.brokerName).includes(unitQuery));
 
   function runAction(key: string, action: () => Promise<{ ok: boolean; message: string }>, options: { keeps: string; fallback: string; retry: () => void; onSuccess?: () => void }) {
     notice.tap();
@@ -135,7 +138,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
       <div aria-live="polite"><ActionNoticeLine notice={notice.notice} /></div>
 
       {activeTab === "members" ? <TeamOnDutyList duty={initialData.onDuty ?? []} /> : null}
-      {activeTab === "members" ? (data.members.length ? <PeopleSection id="team-members-title" title="Membros" count={data.members.length}>
+      {activeTab === "members" ? (data.members.length || data.pendingAccessInvites.length ? <PeopleSection id="team-members-title" title="Membros" count={data.members.length + data.pendingAccessInvites.length}>
         {data.members.map((member, index) => <PeopleRow
           key={member.id}
           index={index}
@@ -148,19 +151,20 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
           dot={member.late ? "alert" : null}
           dotLabel={member.late ? "Tem lead atrasado" : undefined}
           action={<BottomSheet className="arc-venancor" trigger={<button type="button" className={styles.memberMenuTrigger} aria-label={`Ações de ${member.name}`}>•••</button>} title={`Ações de ${member.name}`} description="Escolha uma ação para este membro." closeLabel="Fechar" detents={[0.38, 0.7]}>
-            <MemberSheetActions memberId={member.id} memberName={member.name} pending={pending} removing={busyKey === `remove:${member.id}`} onRemove={() => removeMember(member.id)} />
+            <MemberSheetActions memberId={member.id} memberName={member.name} registration={{ name: member.name, email: member.email ?? "", phone: member.phone ?? "", cpf: member.cpf ?? "", brokerCode: member.brokerCode ?? "" }} pending={pending} removing={busyKey === `remove:${member.id}`} onRemove={() => removeMember(member.id)} />
           </BottomSheet>}
         />)}
+        {data.pendingAccessInvites.map((invite, index) => <PeopleRow key={`pending-${invite.id}`} index={data.members.length + index} name={invite.brokerName} chip={<Badge tone="neutral" size="sm">Aguardando aceite</Badge>} preview={invite.email ?? "sem e-mail"} action={<PendingBrokerEditSheet broker={{ brokerProfileId: invite.brokerProfileId, brokerName: invite.brokerName, email: invite.email, phone: invite.phone, cpf: invite.cpf, brokerCode: invite.brokerCode }} />} />)}
       </PeopleSection> : <EmptyState title="Sua equipe ainda não tem membros" description="Adicione alguém da sua unidade ou envie um convite." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} action={<Button variant="outline" onClick={() => setActiveTab("unit")}>Ver corretores da unidade</Button>} />) : null}
 
       {activeTab === "invites" ? (data.invites.length || data.pendingAccessInvites.length ? <PeopleSection id="team-invites-title" title="Convites pendentes" count={data.invites.length + data.pendingAccessInvites.length}>
-        {data.pendingAccessInvites.map((invite, index) => <PeopleRow key={invite.id} index={index} name={invite.brokerName} chip="Primeiro acesso" preview={`${invite.email ?? "sem e-mail"} · ${shortDate.format(new Date(invite.createdAt))}`} action={<div className={styles.brokerActions}><Button variant="outline" size="sm" disabled={pending} aria-busy={busyKey === `resend:${invite.id}` || undefined} onClick={() => manageAccessInvite(resendInviteAction, invite.id)}>{busyKey === `resend:${invite.id}` ? "Reenviando…" : "Reenviar"}</Button><Button variant="ghost" size="sm" disabled={pending} aria-busy={busyKey === `revoke:${invite.id}` || undefined} onClick={() => manageAccessInvite(revokeInviteAction, invite.id)}>{busyKey === `revoke:${invite.id}` ? "Cancelando…" : "Cancelar"}</Button></div>} />)}
+        {data.pendingAccessInvites.map((invite, index) => <PeopleRow key={invite.id} index={index} name={invite.brokerName} chip="Primeiro acesso" preview={`${invite.email ?? "sem e-mail"} · ${shortDate.format(new Date(invite.createdAt))}`} action={<div className={styles.brokerActions}><PendingBrokerEditSheet broker={{ brokerProfileId: invite.brokerProfileId, brokerName: invite.brokerName, email: invite.email, phone: invite.phone, cpf: invite.cpf, brokerCode: invite.brokerCode }} /><Button variant="outline" size="sm" disabled={pending} aria-busy={busyKey === `resend:${invite.id}` || undefined} onClick={() => manageAccessInvite(resendInviteAction, invite.id)}>{busyKey === `resend:${invite.id}` ? "Reenviando…" : "Reenviar"}</Button><Button variant="ghost" size="sm" disabled={pending} aria-busy={busyKey === `revoke:${invite.id}` || undefined} onClick={() => manageAccessInvite(revokeInviteAction, invite.id)}>{busyKey === `revoke:${invite.id}` ? "Cancelando…" : "Cancelar"}</Button></div>} />)}
         {data.invites.map((invite, index) => <PeopleRow key={invite.id} index={data.pendingAccessInvites.length + index} name={invite.brokerName} chip="Convite para a equipe" preview={shortDate.format(new Date(invite.createdAt))} action={<Button variant="outline" size="sm" disabled={pending} aria-busy={busyKey === `cancel:${invite.id}` || undefined} onClick={() => cancelInvite(invite.id)}>{busyKey === `cancel:${invite.id}` ? "Cancelando…" : "Cancelar convite"}</Button>} />)}
       </PeopleSection> : <EmptyState title="Nenhum convite pendente" description="Os convites enviados para corretores aparecem aqui." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} />) : null}
 
       {activeTab === "unit" ? <>
         <SearchField label="Buscar corretor da sua unidade" placeholder="Digite o nome do corretor" value={unitSearch} onValueChange={setUnitSearch} clearLabel="Limpar busca" />
-        {unitBrokers.length ? <PeopleSection id="team-brokers-title" title="Corretores da sua unidade" count={unitBrokers.length}>
+        {unitBrokers.length || unitPending.length ? <PeopleSection id="team-brokers-title" title="Corretores da sua unidade" count={unitBrokers.length + unitPending.length}>
         {unitBrokers.map((broker, index) => <PeopleRow
           key={broker.id}
           index={index}
@@ -169,6 +173,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
           preview={broker.supervisorName ? `Equipe de ${broker.supervisorName}` : "Livre para entrar na equipe"}
           action={broker.supervisorId ? <Link className={styles.textLink} href="/equipe/transferencia">Pedir transferência</Link> : broker.inviteId ? <Button variant="outline" size="sm" disabled>Convite pendente</Button> : <div className={styles.brokerActions}><Button size="sm" disabled={pending} aria-busy={busyKey === `add:${broker.id}` || undefined} onClick={() => addDirectly(broker.id)}>{busyKey === `add:${broker.id}` ? "Adicionando…" : "Adicionar"}</Button><Button variant="outline" size="sm" disabled={pending || !data.team} aria-busy={busyKey === `invite:${broker.id}` || undefined} onClick={() => invite(broker.id)}>{busyKey === `invite:${broker.id}` ? "Convidando…" : "Convidar"}</Button></div>}
         />)}
+        {unitPending.map((invite, index) => <PeopleRow key={`unit-pending-${invite.id}`} index={unitBrokers.length + index} name={invite.brokerName} chip={<Badge tone="neutral" size="sm">Aguardando aceite</Badge>} preview={invite.email ?? "sem e-mail"} action={<PendingBrokerEditSheet broker={{ brokerProfileId: invite.brokerProfileId, brokerName: invite.brokerName, email: invite.email, phone: invite.phone, cpf: invite.cpf, brokerCode: invite.brokerCode }} />} />)}
       </PeopleSection> : <EmptyState title={unitQuery ? "Nenhum corretor encontrado" : "Não há outros corretores ativos"} description={unitQuery ? "Tente outro nome ou limpe a busca para ver os corretores da sua unidade." : "Quando houver corretores disponíveis na sua unidade, eles aparecerão aqui."} icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} />}
       </> : null}
     </div>
@@ -178,8 +183,53 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
 const firstNameOf = (name: string) => name.trim().split(/\s+/)[0] ?? name;
 
 /** Member actions in the sheet: shortcuts first, removal behind a confirmation step. */
-function MemberSheetActions({ memberId, memberName, pending, removing = false, onRemove }: { memberId: string; memberName: string; pending: boolean; removing?: boolean; onRemove: () => void }) {
+type MemberRegistration = { name: string; email: string; phone: string; cpf: string; brokerCode: string };
+
+/** Cadastro do corretor da equipe: nome, e-mail, telefone, CPF e código, pelo mesmo caminho do perfil. */
+function MemberRegistrationForm({ memberId, registration, onBack }: { memberId: string; registration: MemberRegistration; onBack: () => void }) {
+  const router = useRouter();
+  const [saving, startTransition] = useTransition();
+  const [message, setMessage] = useState("");
+  const [, setFailed] = useState(false);
+
+  function save(formData: FormData) {
+    setMessage("");
+    startTransition(async () => {
+      const result = await updateLiteBrokerContactAction({
+        userId: memberId,
+        name: formData.get("name"),
+        email: formData.get("email"),
+        phone: formData.get("phone"),
+        cpf: formData.get("cpf") ?? "",
+        brokerCode: formData.get("brokerCode") ?? "",
+      });
+      setFailed(!result.success);
+      setMessage(result.success ? "Cadastro atualizado." : result.error ?? "Não consegui salvar agora.");
+      if (result.success) router.refresh();
+    });
+  }
+
+  return (
+    <form action={save} className={styles.sheetActions} aria-label="Editar cadastro">
+      <Input name="name" aria-label="Nome" defaultValue={registration.name} required minLength={2} maxLength={120} />
+      <Input name="email" type="email" aria-label="E-mail" defaultValue={registration.email} required maxLength={254} />
+      <Input name="phone" type="tel" aria-label="Telefone" defaultValue={registration.phone} required minLength={8} maxLength={30} />
+      <Input name="cpf" inputMode="numeric" aria-label="CPF" placeholder="CPF (11 dígitos)" defaultValue={registration.cpf} maxLength={20} />
+      <Input name="brokerCode" aria-label="Código do corretor" placeholder="Código do corretor" defaultValue={registration.brokerCode} maxLength={40} />
+      <div className={styles.sheetDangerActions}>
+        <Button variant="ghost" type="button" onClick={onBack}>Voltar</Button>
+        <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar cadastro"}</Button>
+      </div>
+      {message ? <p role="status" className="text-sm">{message}</p> : null}
+      
+    </form>
+  );
+}
+
+function MemberSheetActions({ memberId, memberName, registration, pending, removing = false, onRemove }: { memberId: string; memberName: string; registration: MemberRegistration; pending: boolean; removing?: boolean; onRemove: () => void }) {
   const [confirming, setConfirming] = useState(false);
+  const [editing, setEditing] = useState(false);
+  if (editing) return <MemberRegistrationForm memberId={memberId} registration={registration} onBack={() => setEditing(false)} />;
   const id = encodeURIComponent(memberId);
   return (
     <div className={styles.sheetActions}>
@@ -187,6 +237,7 @@ function MemberSheetActions({ memberId, memberName, pending, removing = false, o
         <Link href={`/equipe/${id}`} className={styles.sheetRow}><span>Ver perfil</span><small>Números, leads e notas de {firstNameOf(memberName)}</small></Link>
         <Link href={`/relacionamento?brokerId=${id}`} className={styles.sheetRow}><span>Mandar recado</span><small>Pela Central de relacionamento</small></Link>
         <Link href={`/relacionamento?brokerId=${id}&action=recognition`} className={styles.sheetRow}><span>Reconhecer</span><small>Um elogio que ele recebe no app</small></Link>
+        <button type="button" className={styles.sheetRow} onClick={() => setEditing(true)}><span>Editar cadastro</span><small>Nome, e-mail, telefone, CPF e código</small></button>
       </nav>
       {confirming ? (
         <div className={styles.sheetDanger} role="group" aria-label="Confirmar remoção">

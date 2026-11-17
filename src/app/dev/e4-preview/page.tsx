@@ -71,11 +71,11 @@ const supervisorData: SupervisorTeamPageData = {
   team: { name: "Equipe Horizonte", description: "Atendimento da Unidade Centro.", imageUrl: null },
   ranking: { position: 2, positionChange: 1 }, overview: { brokers: 6, inService: 4, late: 1 },
   members: [
-    { id: uuid("11"), name: "Ana Lima", imageUrl: null, availability: "available", receivedToday: 5, inService: 3, late: 0 },
-    { id: uuid("12"), name: "Bruno Costa", imageUrl: null, availability: "on_duty", receivedToday: 4, inService: 1, late: 1 },
+    { id: uuid("11"), name: "Ana Lima", imageUrl: null, email: null, phone: null, cpf: null, brokerCode: null, availability: "available", receivedToday: 5, inService: 3, late: 0 },
+    { id: uuid("12"), name: "Bruno Costa", imageUrl: null, email: null, phone: null, cpf: null, brokerCode: null, availability: "on_duty", receivedToday: 4, inService: 1, late: 1 },
   ],
   invites: [{ id: uuid("60"), brokerId: uuid("21"), brokerName: "Bia Martins", createdAt: instant }],
-  pendingAccessInvites: [{ id: uuid("61"), brokerProfileId: uuid("62"), brokerName: "Caio Alves", email: "caio@example.test", createdAt: instant }],
+  pendingAccessInvites: [{ id: uuid("61"), brokerProfileId: uuid("62"), brokerName: "Caio Alves", email: "caio@example.test", phone: null, cpf: null, brokerCode: null, createdAt: instant }],
   brokers: [
     { id: uuid("21"), name: "Bia Martins", imageUrl: null, supervisorId: null, supervisorName: null, inviteId: null },
     { id: uuid("22"), name: "Caio Alves", imageUrl: null, supervisorId: null, supervisorName: null, inviteId: null },

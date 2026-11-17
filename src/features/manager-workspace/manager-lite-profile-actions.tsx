@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { toggleLiteBrokerStatusAction, updateLiteBrokerContactAction, generateLiteBrokerPasswordResetAction } from "@/app/(dashboard)/equipe/actions";
 
 export function LiteBrokerProfileActions(props: {
-  userId: string; name: string; email: string; phone: string; active: boolean; canResetPassword: boolean;
+  userId: string; name: string; email: string; phone: string; cpf?: string; brokerCode?: string; active: boolean; canResetPassword: boolean; /** Supervisor: só o cadastro, sem ativar/desativar acesso. */ contactOnly?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<"status" | "contact" | "reset" | null>(null);
@@ -52,7 +52,7 @@ export function LiteBrokerProfileActions(props: {
 
   function saveContact(formData: FormData) {
     const failOptions = { fallback: "Não consegui salvar os dados agora", keeps: "Os dados anteriores continuam valendo", retry: () => saveContact(formData) };
-    run("contact", () => updateLiteBrokerContactAction({ userId: props.userId, name: formData.get("name"), email: formData.get("email"), phone: formData.get("phone") }), "Dados atualizados.", failOptions);
+    run("contact", () => updateLiteBrokerContactAction({ userId: props.userId, name: formData.get("name"), email: formData.get("email"), phone: formData.get("phone"), cpf: formData.get("cpf") ?? undefined, brokerCode: formData.get("brokerCode") ?? undefined }), "Dados atualizados.", failOptions);
   }
 
   function resetPassword() {
@@ -65,15 +65,17 @@ export function LiteBrokerProfileActions(props: {
   return <section aria-label="Ações de gestão do corretor" className="grid gap-3 rounded-2xl border border-border bg-card p-4">
     <h2 className="text-base font-medium">Gestão do corretor</h2>
     <div className="flex flex-wrap gap-2">
-      <Button variant="outline" disabled={pending} aria-busy={busy === "status" || undefined} onClick={toggleStatus}>{busy === "status" ? (props.active ? "Desativando…" : "Reativando…") : props.active ? "Desativar acesso" : "Reativar acesso"}</Button>
+      {props.contactOnly ? null : <Button variant="outline" disabled={pending} aria-busy={busy === "status" || undefined} onClick={toggleStatus}>{busy === "status" ? (props.active ? "Desativando…" : "Reativando…") : props.active ? "Desativar acesso" : "Reativar acesso"}</Button>}
       {props.canResetPassword ? <Button variant="outline" disabled={pending} aria-busy={busy === "reset" || undefined} onClick={resetPassword}>{busy === "reset" ? "Gerando…" : "Gerar link de nova senha"}</Button> : null}
     </div>
     <details>
-      <summary className="cursor-pointer text-sm font-medium">Editar nome, e-mail e telefone</summary>
+      <summary className="cursor-pointer text-sm font-medium">Editar cadastro</summary>
       <form action={saveContact} className="mt-3 grid gap-2">
         <Input name="name" aria-label="Nome" defaultValue={props.name} required minLength={2} maxLength={120} />
         <Input name="email" type="email" aria-label="E-mail" defaultValue={props.email} required maxLength={254} />
         <Input name="phone" type="tel" aria-label="Telefone" defaultValue={props.phone} required minLength={8} maxLength={30} />
+        <Input name="cpf" inputMode="numeric" aria-label="CPF" placeholder="CPF (11 dígitos)" defaultValue={props.cpf ?? ""} maxLength={20} />
+        <Input name="brokerCode" aria-label="Código do corretor" placeholder="Código do corretor" defaultValue={props.brokerCode ?? ""} maxLength={40} />
         <Button disabled={pending} aria-busy={busy === "contact" || undefined}>{busy === "contact" ? "Salvando…" : "Salvar dados"}</Button>
       </form>
     </details>

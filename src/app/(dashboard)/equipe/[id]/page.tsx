@@ -135,7 +135,7 @@ export default async function TeamMemberProfilePage({
       recognitions={extras.recognitions}
       managerProfile={{ temperature: profile.metrics.temperature, quotes: profile.metrics.quotes, sales: profile.metrics.sales, interactions: profile.metrics.interactions, tasks: profile.metrics.tasks, dutyDays: profile.dutyDays.map((day) => ({ date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(`${day.date}T12:00:00-03:00`)), scheduleName: day.scheduleName, startsAt: day.startsAt, endsAt: day.endsAt, state: day.state })) }}
       postSaleEvaluation={postSaleEvaluation}
-      managementActions={<div className="flex flex-wrap items-center gap-2"><LiteBrokerProfileActions userId={profile.member.userId} name={profile.member.name} email={profile.member.email} phone={profile.member.brokerPhone ?? ""} active={active} canResetPassword />{canExportLeads ? <BrokerLeadsExportButton brokerId={profile.member.userId} compact /> : null}</div>}
+      managementActions={<div className="flex flex-wrap items-center gap-2"><LiteBrokerProfileActions userId={profile.member.userId} name={profile.member.name} email={profile.member.email} phone={profile.member.brokerPhone ?? ""} cpf={profile.member.brokerCpf ?? ""} brokerCode={profile.member.brokerCode ?? ""} active={active} canResetPassword />{canExportLeads ? <BrokerLeadsExportButton brokerId={profile.member.userId} compact /> : null}</div>}
       showSupervisorActions={false}
       monthGoal={monthGoalRow ? { brokerId: profile.member.userId, period: monthGoalRow.period, goal: monthGoalRow.goal, canEdit: false } : undefined}
     />;
@@ -219,7 +219,7 @@ export default async function TeamMemberProfilePage({
         metricTimeline={timeline.available ? timeline.points : null}
         recognitions={extras.recognitions}
         managerProfile={{ temperature: profile.metrics.temperature, quotes: profile.metrics.quotes, sales: profile.metrics.sales, interactions: profile.metrics.interactions, tasks: profile.metrics.tasks, dutyDays: profile.dutyDays.map((day) => ({ date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(`${day.date}T12:00:00-03:00`)), scheduleName: day.scheduleName, startsAt: day.startsAt, endsAt: day.endsAt, state: day.state })) }}
-        managementActions={<LiteBrokerProfileActions userId={profile.member.userId} name={profile.member.name} email={profile.member.email} phone={profile.member.brokerPhone ?? ""} active={profile.member.membershipStatus === "active" && profile.member.userStatus === "active"} canResetPassword={false} />}
+        managementActions={<LiteBrokerProfileActions userId={profile.member.userId} name={profile.member.name} email={profile.member.email} phone={profile.member.brokerPhone ?? ""} cpf={profile.member.brokerCpf ?? ""} brokerCode={profile.member.brokerCode ?? ""} active={profile.member.membershipStatus === "active" && profile.member.userStatus === "active"} canResetPassword={false} contactOnly />}
         showSupervisorActions
         monthGoal={monthGoalRow ? { brokerId: profile.member.userId, period: monthGoalRow.period, goal: monthGoalRow.goal, canEdit: true } : undefined}
       />

@@ -29,6 +29,7 @@ import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidat
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { canRevokeTeamInvitation } from "@/features/team/invitation-scope";
 import { canManageLiteBroker } from "@/features/team/lite-team-scope";
+import { assertBrokerRegistrationAvailable, brokerRegistrationInput } from "@/features/team/broker-registration";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 
 import { invalidateTenantContextCache } from "@/shared/auth/tenant-context";
@@ -43,6 +44,9 @@ const liteContactInput = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
   phone: z.string().trim().min(8).max(30),
+  // Omitidos não mudam o cadastro: só CPF e código enviados são gravados.
+  cpf: z.string().trim().max(20).optional(),
+  brokerCode: z.string().trim().max(40).optional(),
 });
 
 async function getLiteManagedBroker(userId: string, context: Awaited<ReturnType<typeof getRequiredTenantContext>>) {
@@ -675,10 +679,24 @@ export async function updateLiteBrokerContactAction(input: unknown): Promise<Tea
     const [otherTenantMembership] = await db.select({ id: schema.tenantMemberships.id }).from(schema.tenantMemberships)
       .where(and(eq(schema.tenantMemberships.userId, target.userId), ne(schema.tenantMemberships.tenantId, context.tenantId))).limit(1);
     if (otherTenantMembership) throw new Error("O e-mail deste acesso é compartilhado com outro tenant e não pode ser alterado por esta tela.");
+    // Mesmas regras da criação: CPF só com 11 dígitos (vazio limpa) e código não pode ficar em branco.
+    const cpf = data.cpf === undefined ? undefined : brokerRegistrationInput.shape.cpf.parse(data.cpf);
+    const brokerCode = brokerRegistrationInput.shape.brokerCode.parse(data.brokerCode);
     await db.transaction(async (tx) => {
       await tx.update(schema.user).set({ name: data.name, email: data.email, updatedAt: new Date() }).where(eq(schema.user.id, target.userId));
-      await tx.update(schema.brokerProfiles).set({ professionalName: data.name, invitedEmail: data.email, phone: data.phone, updatedAt: new Date() })
-        .where(and(eq(schema.brokerProfiles.tenantId, context.tenantId), eq(schema.brokerProfiles.userId, target.userId)));
+      const [profile] = await tx.select({ id: schema.brokerProfiles.id }).from(schema.brokerProfiles)
+        .where(and(eq(schema.brokerProfiles.tenantId, context.tenantId), eq(schema.brokerProfiles.userId, target.userId))).limit(1);
+      if (profile && (cpf || brokerCode)) {
+        await assertBrokerRegistrationAvailable(tx, { tenantId: context.tenantId, profileId: profile.id, registration: { cpf, brokerCode } });
+      }
+      await tx.update(schema.brokerProfiles).set({
+        professionalName: data.name,
+        invitedEmail: data.email,
+        phone: data.phone,
+        ...(cpf !== undefined ? { cpf } : {}),
+        ...(brokerCode ? { internalCode: brokerCode } : {}),
+        updatedAt: new Date(),
+      }).where(and(eq(schema.brokerProfiles.tenantId, context.tenantId), eq(schema.brokerProfiles.userId, target.userId)));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "broker_profile", entidadeId: target.userId, acao: "team.broker_contact_updated" });
     });
     return { success: true, message: "Dados do corretor atualizados." };
