@@ -13,7 +13,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 vi.mock("./actions", () => ({ addBrokerToMyTeamAction: mockAddDirectly }));
 vi.mock("./my-team-actions", () => ({ inviteBrokerToMyTeamAction: mockInvite, cancelMyTeamInviteAction: mockCancel, removeBrokerFromMyTeamAction: mockRemove }));
 vi.mock("./pending-broker-actions", () => ({ updatePendingSupervisedBrokerAction: vi.fn() }));
-vi.mock("@/app/(dashboard)/equipe/actions", () => ({ resendInviteAction: mockResendAccessInvite, revokeInviteAction: mockRevokeAccessInvite }));
+vi.mock("@/app/(dashboard)/equipe/actions", () => ({ resendInviteAction: mockResendAccessInvite, revokeInviteAction: mockRevokeAccessInvite, updateLiteBrokerContactAction: vi.fn() }));
 vi.mock("@/features/team/team-invite-lite-sheet", () => ({ TeamInviteLiteSheet: () => <button type="button">Convidar corretor</button> }));
 vi.mock("next/link", () => ({ default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => <a href={href} {...props}>{children}</a> }));
 vi.mock("@/components/chat/assistant-avatar", () => ({ AssistantAvatar: () => <span data-testid="team-mascot" /> }));

@@ -15,7 +15,7 @@ export type SupervisorTeamPageData = {
   team: { name: string; description: string; imageUrl: string | null } | null;
   ranking: { position: number; positionChange: number | null } | null;
   overview: { brokers: number; inService: number; late: number };
-  members: Array<{ id: string; name: string; imageUrl: string | null; availability: string; receivedToday: number; inService: number; late: number }>;
+  members: Array<{ id: string; name: string; imageUrl: string | null; email: string | null; phone: string | null; cpf: string | null; brokerCode: string | null; availability: string; receivedToday: number; inService: number; late: number }>;
   invites: Array<{ id: string; brokerId: string; brokerName: string; createdAt: string }>;
   pendingAccessInvites: Array<{ id: string; brokerProfileId: string; brokerName: string; email: string | null; phone: string | null; cpf: string | null; brokerCode: string | null; createdAt: string }>;
   brokers: Array<{ id: string; name: string; imageUrl: string | null; supervisorId: string | null; supervisorName: string | null; inviteId: string | null }>;
@@ -37,9 +37,13 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
       .from(schema.supervisorTeams)
       .where(and(eq(schema.supervisorTeams.tenantId, context.tenantId), eq(schema.supervisorTeams.supervisorId, context.userId), eq(schema.supervisorTeams.branchId, context.branchId)))
       .limit(1),
-    db.select({ id: schema.tenantMemberships.userId, name: schema.user.name, imageUrl: schema.user.image })
+    db.select({ id: schema.tenantMemberships.userId, name: schema.user.name, imageUrl: schema.user.image, email: schema.user.email, phone: schema.brokerProfiles.phone, cpf: schema.brokerProfiles.cpf, brokerCode: schema.brokerProfiles.internalCode })
       .from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+      .leftJoin(schema.brokerProfiles, and(
+        eq(schema.brokerProfiles.userId, schema.tenantMemberships.userId),
+        eq(schema.brokerProfiles.tenantId, schema.tenantMemberships.tenantId),
+      ))
       .where(and(
         eq(schema.tenantMemberships.tenantId, context.tenantId),
         eq(schema.tenantMemberships.branchId, context.branchId),
