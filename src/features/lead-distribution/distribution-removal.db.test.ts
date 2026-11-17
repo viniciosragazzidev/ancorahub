@@ -2,18 +2,19 @@
  * Removing a lead from distribution against a real database, inside one
  * transaction that is ROLLED BACK at the end: nothing is committed and no
  * message is sent (outbound and notifications are mocked).
- * Opt-in only (never part of the normal suite):
+ * Opt-in only (never part of the normal suite); requires ERP_TEST_DATABASE_URL and ERP_TEST_ROOT:
  *   RUN_DISTRIBUTION_DB_E2E=1 npx vitest run src/features/lead-distribution/distribution-removal.db.test.ts
  */
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { existsSync, readFileSync } from "node:fs";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import * as realSchema from "@/shared/db/schema";
 import type { TenantContext } from "@/shared/auth/types";
+import { assertIsolatedErpTestDataDirectory, getIsolatedErpTestDatabase } from "./isolated-erp-test-db";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -28,15 +29,15 @@ vi.mock("@/features/communication-channels/outbound-service", () => ({ processMe
 vi.mock("./ownership-signal", () => ({ signalLeadOwnershipChange: vi.fn() }));
 
 const enabled = process.env.RUN_DISTRIBUTION_DB_E2E === "1";
-function readLocalEnv(name: string) {
-  if (!existsSync(".env.local")) return "";
-  const line = readFileSync(".env.local", "utf8").split(String.fromCharCode(10)).map((entry) => entry.trim()).find((entry) => entry.startsWith(`${name}=`));
-  return line ? line.slice(name.length + 1).trim().replace(/^["']|["']$/g, "") : "";
-}
-const url = enabled ? (readLocalEnv("SUPABASE_DB_URL") || readLocalEnv("DATABASE_URL")) : "";
-const client = enabled ? postgres(url, { prepare: false, max: 1 }) : null;
+const isolated = enabled ? getIsolatedErpTestDatabase() : null;
+const client = isolated ? postgres(isolated.url, { prepare: false, max: 1 }) : null;
 const db = client ? drizzle(client, { schema: realSchema }) : null;
 afterAll(async () => { await client?.end({ timeout: 5 }); });
+beforeAll(async () => {
+  if (!client || !isolated) return;
+  const [server] = await client`SHOW data_directory`;
+  assertIsolatedErpTestDataDirectory(server.data_directory, isolated.dataDirectory);
+});
 
 class Rollback extends Error {}
 

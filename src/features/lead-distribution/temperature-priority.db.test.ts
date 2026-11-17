@@ -2,22 +2,25 @@
  * Distribution order by temperature against a real database, inside one
  * transaction that is ROLLED BACK at the end: nothing is committed and the
  * engine itself (processQueuedLead) is mocked, so no lead is offered.
- * Opt-in only (never part of the normal suite):
+ * Opt-in only (never part of the normal suite); requires ERP_TEST_DATABASE_URL and ERP_TEST_ROOT:
  *   RUN_DISTRIBUTION_DB_E2E=1 npx vitest run src/features/lead-distribution/temperature-priority.db.test.ts
  */
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull, ne, notInArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { existsSync, readFileSync } from "node:fs";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import * as realSchema from "@/shared/db/schema";
+import { assertIsolatedErpTestDataDirectory, getIsolatedErpTestDatabase } from "./isolated-erp-test-db";
 
 vi.mock("server-only", () => ({}));
 const state: { tx: unknown } = { tx: null };
 vi.mock("@/shared/db", () => ({ schema: realSchema, getDatabase: () => state.tx }));
-vi.mock("@/features/system-settings/queries", () => ({ getSystemSettings: async () => [], getSystemSetting: async () => undefined }));
+vi.mock("@/features/system-settings/queries", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/system-settings/queries")>();
+  return { ...actual, getSystemSettings: async () => [], getSystemSetting: async () => undefined, getFeatureFlag: async () => "false" };
+});
 vi.mock("@/features/communication-channels/outbound-service", () => ({ processMetaOutboundBatch: vi.fn() }));
 vi.mock("./offers", () => ({ expireOutdatedLeadOffers: vi.fn() }));
 const processed: string[] = [];
@@ -30,17 +33,16 @@ vi.mock("./service", () => ({
 }));
 
 const enabled = process.env.RUN_DISTRIBUTION_DB_E2E === "1";
-// @next/env skips .env.local under NODE_ENV=test, so read it directly.
-function readLocalEnv(name: string) {
-  if (!existsSync(".env.local")) return "";
-  const line = readFileSync(".env.local", "utf8").split(String.fromCharCode(10)).map((entry) => entry.trim()).find((entry) => entry.startsWith(`${name}=`));
-  return line ? line.slice(name.length + 1).trim().replace(/^["']|["']$/g, "") : "";
-}
-const url = enabled ? (readLocalEnv("SUPABASE_DB_URL") || readLocalEnv("DATABASE_URL")) : "";
-const client = enabled ? postgres(url, { prepare: false, max: 1 }) : null;
+const isolated = enabled ? getIsolatedErpTestDatabase() : null;
+const client = isolated ? postgres(isolated.url, { prepare: false, max: 1 }) : null;
 const db = client ? drizzle(client, { schema: realSchema }) : null;
 
 afterAll(async () => { await client?.end({ timeout: 5 }); });
+beforeAll(async () => {
+  if (!client || !isolated) return;
+  const [server] = await client`SHOW data_directory`;
+  assertIsolatedErpTestDataDirectory(server.data_directory, isolated.dataDirectory);
+});
 
 class Rollback extends Error {}
 

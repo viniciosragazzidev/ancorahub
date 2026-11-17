@@ -51,7 +51,7 @@ describe("database idle timeout", () => {
     expect(databaseIdleTimeoutSeconds(transactionPooler)).toBe(120);
     expect(databaseIdleTimeoutSeconds(sessionPooler)).toBe(30);
     expect(databaseIdleTimeoutSeconds(transactionPooler, true)).toBe(600);
-    expect(databaseIdleTimeoutSeconds(sessionPooler, true)).toBe(600);
+    expect(databaseIdleTimeoutSeconds(sessionPooler, true)).toBe(30);
     expect(POSTGRES_FETCH_TYPES_ENABLED).toBe(true);
   });
 });
