@@ -17,7 +17,7 @@ export type SupervisorTeamPageData = {
   overview: { brokers: number; inService: number; late: number };
   members: Array<{ id: string; name: string; imageUrl: string | null; availability: string; receivedToday: number; inService: number; late: number }>;
   invites: Array<{ id: string; brokerId: string; brokerName: string; createdAt: string }>;
-  pendingAccessInvites: Array<{ id: string; brokerProfileId: string; brokerName: string; email: string | null; createdAt: string }>;
+  pendingAccessInvites: Array<{ id: string; brokerProfileId: string; brokerName: string; email: string | null; phone: string | null; cpf: string | null; brokerCode: string | null; createdAt: string }>;
   brokers: Array<{ id: string; name: string; imageUrl: string | null; supervisorId: string | null; supervisorName: string | null; inviteId: string | null }>;
   /** Quem da equipe está de plantão agora. */
   onDuty?: TeamDuty[];
@@ -59,6 +59,9 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
       brokerProfileId: schema.brokerProfiles.id,
       brokerName: schema.brokerProfiles.professionalName,
       email: schema.brokerInvitations.email,
+      phone: schema.brokerProfiles.phone,
+      cpf: schema.brokerProfiles.cpf,
+      brokerCode: schema.brokerProfiles.internalCode,
       createdAt: schema.brokerInvitations.createdAt,
     }).from(schema.brokerInvitations)
       .innerJoin(schema.brokerProfiles, and(

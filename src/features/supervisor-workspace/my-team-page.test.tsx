@@ -12,6 +12,7 @@ const refresh = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 vi.mock("./actions", () => ({ addBrokerToMyTeamAction: mockAddDirectly }));
 vi.mock("./my-team-actions", () => ({ inviteBrokerToMyTeamAction: mockInvite, cancelMyTeamInviteAction: mockCancel, removeBrokerFromMyTeamAction: mockRemove }));
+vi.mock("./pending-broker-actions", () => ({ updatePendingSupervisedBrokerAction: vi.fn() }));
 vi.mock("@/app/(dashboard)/equipe/actions", () => ({ resendInviteAction: mockResendAccessInvite, revokeInviteAction: mockRevokeAccessInvite }));
 vi.mock("@/features/team/team-invite-lite-sheet", () => ({ TeamInviteLiteSheet: () => <button type="button">Convidar corretor</button> }));
 vi.mock("next/link", () => ({ default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => <a href={href} {...props}>{children}</a> }));
@@ -93,7 +94,7 @@ describe("MyTeamPage", () => {
 describe("MyTeamPage pending first-access invitations", () => {
   it("keeps resend scoped to the pending invitation id", async () => {
     mockResendAccessInvite.mockResolvedValue({ success: false, error: "Sem WhatsApp disponível." });
-    render(<MyTeamPage initialData={{ ...base, pendingAccessInvites: [{ id: "invite-42", brokerProfileId: "profile-42", brokerName: "Caio Lima", email: "caio@example.com", createdAt: "2026-10-14T12:00:00.000Z" }] }} />);
+    render(<MyTeamPage initialData={{ ...base, pendingAccessInvites: [{ id: "invite-42", brokerProfileId: "profile-42", brokerName: "Caio Lima", email: "caio@example.com", phone: null, cpf: null, brokerCode: null, createdAt: "2026-10-14T12:00:00.000Z" }] }} />);
     fireEvent.click(screen.getByRole("button", { name: /Convites/ }));
     expect(screen.getByText(/caio@example.com/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Reenviar" }));
