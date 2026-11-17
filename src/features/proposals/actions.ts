@@ -9,7 +9,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { recordStageChangeForLead, stageActorType } from "@/features/leads/stage-history";
 import { generateCommissionSchedule } from "@/features/commissions/commission-rules-service";
-import { claimProposalConversion } from "./proposal-conversion-claim";
+import { claimProposalConversion, completeProposalConversion } from "./proposal-conversion-claim";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import type { ProposalStatus } from "@/shared/db/schema";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
@@ -340,8 +340,8 @@ export async function convertProposalToSaleAction(
     const conversion = await db.transaction(async (tx) => {
       const claim = await claimProposalConversion(tx, {
         tenantId: context.tenantId,
+        leadId: lead.id,
         proposalId,
-        saleId,
         convertedAt: now,
       });
       if (claim.kind !== "claimed") return claim;
@@ -391,6 +391,15 @@ export async function convertProposalToSaleAction(
         createdBy: context.userId,
         notes: input.notes ?? null,
       });
+
+      const proposalCompleted = await completeProposalConversion(tx, {
+        tenantId: context.tenantId,
+        leadId: lead.id,
+        proposalId,
+        saleId,
+        convertedAt: now,
+      });
+      if (!proposalCompleted) throw new Error("Esta proposta mudou de estado. Atualize a tela e tente novamente.");
 
       // Create Commission Schedules
       if (schedule.length) {
@@ -477,6 +486,8 @@ export async function convertProposalToSaleAction(
     });
 
     if (conversion.kind === "already_converted") return { success: true, saleId: conversion.saleId };
+    if (conversion.kind === "sale_exists") return { success: false, error: "Este lead já tem uma venda ativa registrada." };
+    if (conversion.kind === "lead_not_found") return { success: false, error: "Proposta não encontrada." };
     if (conversion.kind === "conflict") return { success: false, error: "Esta proposta mudou de estado. Atualize a tela e tente novamente." };
 
     const { triggerInstantAutomation } = await import("@/features/automations/engine");

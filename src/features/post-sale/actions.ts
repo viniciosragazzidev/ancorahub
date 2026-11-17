@@ -25,6 +25,7 @@ import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 import { canEnsureLeadHolder } from "./register-sale-access";
 import { hasEffectiveRouteAccess } from "@/features/custom-roles/service";
 import { lockSaleEvidence, saleEvidenceIssue, saleEvidenceIssueMessage } from "./sale-document-validation";
+import { lockLeadAndFindActiveSale } from "@/features/leads/lead-sale-lock";
 
 const registerSaleInput = z.object({
   leadId: z.string().min(1),
@@ -323,12 +324,11 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
   // Etapa de onde a venda saiu (desfecho do fechamento, 09/11).
   let soldFrom: { status: string; stageEnteredAt: Date | null } | null = null;
   await db.transaction(async (tx) => {
-    // Lock the lead and check again inside the transaction: two concurrent submits register one sale.
-    const [locked] = await tx.select({ status: schema.leads.status, stageEnteredAt: schema.leads.stageEnteredAt, qualificationDetails: schema.leads.qualificationDetails, planId: schema.leads.planId }).from(schema.leads)
-      .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId))).limit(1).for("update");
+    // All sale creation paths lock this same tenant-scoped lead row before checking active sales.
+    const saleSlot = await lockLeadAndFindActiveSale(tx, { tenantId: context.tenantId, leadId: lead.id });
+    const locked = saleSlot.lead;
     const lockedAiSale = Boolean(locked) && aiSaleRegistrationPending(locked!.status, locked!.qualificationDetails);
-    const [activeSale] = await tx.select({ id: schema.sales.id }).from(schema.sales)
-      .where(and(eq(schema.sales.leadId, lead.id), eq(schema.sales.tenantId, context.tenantId), eq(schema.sales.status, "active"))).limit(1);
+    const activeSale = saleSlot.activeSaleId ? { id: saleSlot.activeSaleId } : null;
     if (!locked) throw new SaleAlreadyRegisteredError("A venda deste lead já foi registrada.");
     const block = saleRegistrationBlockedReason({ status: locked.status, aiRegistrationPending: lockedAiSale, hasActiveSale: Boolean(activeSale) });
     if (block === "lost") throw new SaleAlreadyRegisteredError("Este lead está perdido. Reabra o lead antes de registrar a venda.");
