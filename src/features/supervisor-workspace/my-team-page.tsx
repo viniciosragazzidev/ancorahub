@@ -13,7 +13,8 @@ import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { SearchField } from "@/components/arc/search-field/search-field";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
-import { resendInviteAction, revokeInviteAction } from "@/app/(dashboard)/equipe/actions";
+import { resendInviteAction, revokeInviteAction, updateLiteBrokerContactAction } from "@/app/(dashboard)/equipe/actions";
+import { Input } from "@/components/ui/input";
 import { TeamInviteLiteSheet } from "@/features/team/team-invite-lite-sheet";
 import { ActionNoticeLine, useActionNotice } from "@/components/lite/feedback/action-notice";
 
@@ -149,7 +150,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
           dot={member.late ? "alert" : null}
           dotLabel={member.late ? "Tem lead atrasado" : undefined}
           action={<BottomSheet className="arc-venancor" trigger={<button type="button" className={styles.memberMenuTrigger} aria-label={`Ações de ${member.name}`}>•••</button>} title={`Ações de ${member.name}`} description="Escolha uma ação para este membro." closeLabel="Fechar" detents={[0.38, 0.7]}>
-            <MemberSheetActions memberId={member.id} memberName={member.name} pending={pending} removing={busyKey === `remove:${member.id}`} onRemove={() => removeMember(member.id)} />
+            <MemberSheetActions memberId={member.id} memberName={member.name} registration={{ name: member.name, email: member.email ?? "", phone: member.phone ?? "", cpf: member.cpf ?? "", brokerCode: member.brokerCode ?? "" }} pending={pending} removing={busyKey === `remove:${member.id}`} onRemove={() => removeMember(member.id)} />
           </BottomSheet>}
         />)}
       </PeopleSection> : <EmptyState title="Sua equipe ainda não tem membros" description="Adicione alguém da sua unidade ou envie um convite." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} action={<Button variant="outline" onClick={() => setActiveTab("unit")}>Ver corretores da unidade</Button>} />) : null}
@@ -179,8 +180,53 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
 const firstNameOf = (name: string) => name.trim().split(/\s+/)[0] ?? name;
 
 /** Member actions in the sheet: shortcuts first, removal behind a confirmation step. */
-function MemberSheetActions({ memberId, memberName, pending, removing = false, onRemove }: { memberId: string; memberName: string; pending: boolean; removing?: boolean; onRemove: () => void }) {
+type MemberRegistration = { name: string; email: string; phone: string; cpf: string; brokerCode: string };
+
+/** Cadastro do corretor da equipe: nome, e-mail, telefone, CPF e código, pelo mesmo caminho do perfil. */
+function MemberRegistrationForm({ memberId, registration, onBack }: { memberId: string; registration: MemberRegistration; onBack: () => void }) {
+  const router = useRouter();
+  const [saving, startTransition] = useTransition();
+  const [message, setMessage] = useState("");
+  const [, setFailed] = useState(false);
+
+  function save(formData: FormData) {
+    setMessage("");
+    startTransition(async () => {
+      const result = await updateLiteBrokerContactAction({
+        userId: memberId,
+        name: formData.get("name"),
+        email: formData.get("email"),
+        phone: formData.get("phone"),
+        cpf: formData.get("cpf") ?? "",
+        brokerCode: formData.get("brokerCode") ?? "",
+      });
+      setFailed(!result.success);
+      setMessage(result.success ? "Cadastro atualizado." : result.error ?? "Não consegui salvar agora.");
+      if (result.success) router.refresh();
+    });
+  }
+
+  return (
+    <form action={save} className={styles.sheetActions} aria-label="Editar cadastro">
+      <Input name="name" aria-label="Nome" defaultValue={registration.name} required minLength={2} maxLength={120} />
+      <Input name="email" type="email" aria-label="E-mail" defaultValue={registration.email} required maxLength={254} />
+      <Input name="phone" type="tel" aria-label="Telefone" defaultValue={registration.phone} required minLength={8} maxLength={30} />
+      <Input name="cpf" inputMode="numeric" aria-label="CPF" placeholder="CPF (11 dígitos)" defaultValue={registration.cpf} maxLength={20} />
+      <Input name="brokerCode" aria-label="Código do corretor" placeholder="Código do corretor" defaultValue={registration.brokerCode} maxLength={40} />
+      <div className={styles.sheetDangerActions}>
+        <Button variant="ghost" type="button" onClick={onBack}>Voltar</Button>
+        <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar cadastro"}</Button>
+      </div>
+      {message ? <p role="status" className="text-sm">{message}</p> : null}
+      
+    </form>
+  );
+}
+
+function MemberSheetActions({ memberId, memberName, registration, pending, removing = false, onRemove }: { memberId: string; memberName: string; registration: MemberRegistration; pending: boolean; removing?: boolean; onRemove: () => void }) {
   const [confirming, setConfirming] = useState(false);
+  const [editing, setEditing] = useState(false);
+  if (editing) return <MemberRegistrationForm memberId={memberId} registration={registration} onBack={() => setEditing(false)} />;
   const id = encodeURIComponent(memberId);
   return (
     <div className={styles.sheetActions}>
@@ -188,6 +234,7 @@ function MemberSheetActions({ memberId, memberName, pending, removing = false, o
         <Link href={`/equipe/${id}`} className={styles.sheetRow}><span>Ver perfil</span><small>Números, leads e notas de {firstNameOf(memberName)}</small></Link>
         <Link href={`/relacionamento?brokerId=${id}`} className={styles.sheetRow}><span>Mandar recado</span><small>Pela Central de relacionamento</small></Link>
         <Link href={`/relacionamento?brokerId=${id}&action=recognition`} className={styles.sheetRow}><span>Reconhecer</span><small>Um elogio que ele recebe no app</small></Link>
+        <button type="button" className={styles.sheetRow} onClick={() => setEditing(true)}><span>Editar cadastro</span><small>Nome, e-mail, telefone, CPF e código</small></button>
       </nav>
       {confirming ? (
         <div className={styles.sheetDanger} role="group" aria-label="Confirmar remoção">

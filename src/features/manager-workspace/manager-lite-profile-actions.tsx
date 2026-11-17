@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { toggleLiteBrokerStatusAction, updateLiteBrokerContactAction, generateLiteBrokerPasswordResetAction } from "@/app/(dashboard)/equipe/actions";
 
 export function LiteBrokerProfileActions(props: {
-  userId: string; name: string; email: string; phone: string; cpf?: string; brokerCode?: string; active: boolean; canResetPassword: boolean;
+  userId: string; name: string; email: string; phone: string; cpf?: string; brokerCode?: string; active: boolean; canResetPassword: boolean; /** Supervisor: só o cadastro, sem ativar/desativar acesso. */ contactOnly?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<"status" | "contact" | "reset" | null>(null);
@@ -65,7 +65,7 @@ export function LiteBrokerProfileActions(props: {
   return <section aria-label="Ações de gestão do corretor" className="grid gap-3 rounded-2xl border border-border bg-card p-4">
     <h2 className="text-base font-medium">Gestão do corretor</h2>
     <div className="flex flex-wrap gap-2">
-      <Button variant="outline" disabled={pending} aria-busy={busy === "status" || undefined} onClick={toggleStatus}>{busy === "status" ? (props.active ? "Desativando…" : "Reativando…") : props.active ? "Desativar acesso" : "Reativar acesso"}</Button>
+      {props.contactOnly ? null : <Button variant="outline" disabled={pending} aria-busy={busy === "status" || undefined} onClick={toggleStatus}>{busy === "status" ? (props.active ? "Desativando…" : "Reativando…") : props.active ? "Desativar acesso" : "Reativar acesso"}</Button>}
       {props.canResetPassword ? <Button variant="outline" disabled={pending} aria-busy={busy === "reset" || undefined} onClick={resetPassword}>{busy === "reset" ? "Gerando…" : "Gerar link de nova senha"}</Button> : null}
     </div>
     <details>
