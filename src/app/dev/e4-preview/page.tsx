@@ -75,7 +75,7 @@ const supervisorData: SupervisorTeamPageData = {
     { id: uuid("12"), name: "Bruno Costa", imageUrl: null, availability: "on_duty", receivedToday: 4, inService: 1, late: 1 },
   ],
   invites: [{ id: uuid("60"), brokerId: uuid("21"), brokerName: "Bia Martins", createdAt: instant }],
-  pendingAccessInvites: [{ id: uuid("61"), brokerProfileId: uuid("62"), brokerName: "Caio Alves", email: "caio@example.test", createdAt: instant }],
+  pendingAccessInvites: [{ id: uuid("61"), brokerProfileId: uuid("62"), brokerName: "Caio Alves", email: "caio@example.test", phone: null, cpf: null, brokerCode: null, createdAt: instant }],
   brokers: [
     { id: uuid("21"), name: "Bia Martins", imageUrl: null, supervisorId: null, supervisorName: null, inviteId: null },
     { id: uuid("22"), name: "Caio Alves", imageUrl: null, supervisorId: null, supervisorName: null, inviteId: null },
