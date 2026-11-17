@@ -96,16 +96,20 @@ describe("distribution per-step memo", () => {
     expect(withoutMemo.rosterReads).toBe(4);
   });
 
-  it("does not carry snapshots into a new processQueuedLead step", async () => {
-    let reads = 0;
-    const load = async () => ({ brokerIds: [`broker-${++reads}`] });
-    const firstStep = createDistributionStepMemo<TestRoster>();
-    const first = await firstStep.rosters("unit-a", load);
-    const nextStateStep = createDistributionStepMemo<TestRoster>();
-    const second = await nextStateStep.rosters("unit-a", load);
+  it("does not leak snapshots between tenants or processQueuedLead calls", async () => {
+    let tenantAReads = 0;
+    let tenantBReads = 0;
+    const tenantAStep = createDistributionStepMemo<TestRoster>();
+    const tenantBStep = createDistributionStepMemo<TestRoster>();
+    const tenantA = await tenantAStep.rosters("same-unit-id", async () => ({ brokerIds: [`tenant-a-${++tenantAReads}`] }));
+    const tenantB = await tenantBStep.rosters("same-unit-id", async () => ({ brokerIds: [`tenant-b-${++tenantBReads}`] }));
+    const nextTenantACall = createDistributionStepMemo<TestRoster>();
+    const nextTenantA = await nextTenantACall.rosters("same-unit-id", async () => ({ brokerIds: [`tenant-a-${++tenantAReads}`] }));
 
-    expect(first.brokerIds).toEqual(["broker-1"]);
-    expect(second.brokerIds).toEqual(["broker-2"]);
-    expect(reads).toBe(2);
+    expect(tenantA.brokerIds).toEqual(["tenant-a-1"]);
+    expect(tenantB.brokerIds).toEqual(["tenant-b-1"]);
+    expect(nextTenantA.brokerIds).toEqual(["tenant-a-2"]);
+    expect(tenantAReads).toBe(2);
+    expect(tenantBReads).toBe(1);
   });
 });

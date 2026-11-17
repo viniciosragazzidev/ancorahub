@@ -1,17 +1,17 @@
 /**
  * A queue with no destination ("Nenhum (ficam na fila)"), against the real
- * schema inside one transaction that is ROLLED BACK. Opt-in only:
+ * schema inside one transaction that is ROLLED BACK. Opt-in only; requires ERP_TEST_DATABASE_URL and ERP_TEST_ROOT:
  *   RUN_QUEUE_NO_DESTINATION_DB_E2E=1 npx vitest run src/features/lead-distribution/queue-no-destination.db.test.ts
  */
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import * as realSchema from "@/shared/db/schema";
 import type { TenantContext } from "@/shared/auth/types";
+import { assertIsolatedErpTestDataDirectory, getIsolatedErpTestDatabase } from "./isolated-erp-test-db";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -19,15 +19,15 @@ const state: { tx: unknown } = { tx: null };
 vi.mock("@/shared/db", () => ({ schema: realSchema, getDatabase: () => state.tx }));
 
 const enabled = process.env.RUN_QUEUE_NO_DESTINATION_DB_E2E === "1";
-function readLocalEnv(name: string) {
-  if (!existsSync(".env.local")) return "";
-  const line = readFileSync(".env.local", "utf8").split(String.fromCharCode(10)).map((entry) => entry.trim()).find((entry) => entry.startsWith(`${name}=`));
-  return line ? line.slice(name.length + 1).trim().replace(/^["']|["']$/g, "") : "";
-}
-const url = enabled ? (readLocalEnv("SUPABASE_DB_URL") || readLocalEnv("DATABASE_URL")) : "";
-const client = enabled ? postgres(url, { prepare: false, max: 1 }) : null;
+const isolated = enabled ? getIsolatedErpTestDatabase() : null;
+const client = isolated ? postgres(isolated.url, { prepare: false, max: 1 }) : null;
 const db = client ? drizzle(client, { schema: realSchema }) : null;
 afterAll(async () => { await client?.end({ timeout: 5 }); });
+beforeAll(async () => {
+  if (!client || !isolated) return;
+  const [server] = await client`SHOW data_directory`;
+  assertIsolatedErpTestDataDirectory(server.data_directory, isolated.dataDirectory);
+});
 
 describe.skipIf(!enabled)("queue with no destination (rolled back)", () => {
   it("keeps its leads waiting, and switching to distribute wakes them at once", async () => {

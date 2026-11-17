@@ -61,7 +61,7 @@ export const POSTGRES_FETCH_TYPES_ENABLED = true;
 const MAX_LIFETIME_SECONDS = isTransactionPooler() ? 30 * 60 : 60;
 
 export function databaseIdleTimeoutSeconds(databaseUrl: string, backgroundPool = false) {
-  if (backgroundPool) return 600;
+  if (backgroundPool && isTransactionPooler(databaseUrl)) return 600;
   // 24/10: 5 s on the session pooler reconnected (TLS + auth) after every short pause, adding
   // 50-150 ms to the next click. 30 s keeps the few page-pool sockets warm.
   return isTransactionPooler(databaseUrl) ? 120 : 30;

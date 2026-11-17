@@ -3,8 +3,8 @@
 ## 17/11/2026 - Egress da distribuição: consultas memorizadas por passo
 
 - `processQueuedLead` reutiliza o roster e as unidades de fallback dentro do mesmo passo do lead. A reentrada por corretor sem canal compartilha o snapshot; reentradas que mudam fila ou ciclo iniciam um passo novo e consultam o estado atualizado. Testes comparam a sequência de corretores com e sem memo e contam as consultas.
-- O pool PostgreSQL de background mantém conexões ociosas por até 600 s. O pool de páginas conserva os limites atuais e `fetch_types` continua habilitado para arrays `text[]`.
-- Validação: 644 testes focados passaram (10 ignorados), TypeScript, ESLint focado e build Webpack passaram. A suíte global do harness encontrou falhas em testes fora dos arquivos alterados e foi interrompida.
+- O pool PostgreSQL de background usa 600 s somente no transaction pooler (6543); no session pooler (5432), conserva 30 s. O pool de páginas mantém os limites atuais e `fetch_types` continua habilitado para arrays `text[]`.
+- Validação: 644 testes focados passaram (10 ignorados), os quatro testes DB de distribuição passaram no Postgres sintético isolado, TypeScript, ESLint e build Webpack passaram. A suíte global do harness encontrou falhas em testes fora dos arquivos alterados e foi interrompida.
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
