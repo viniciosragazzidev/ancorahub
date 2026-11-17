@@ -102,3 +102,11 @@ describe("MyTeamPage pending first-access invitations", () => {
     expect(mockResendAccessInvite.mock.calls[0][1].get("invitationId")).toBe("invite-42");
   });
 });
+describe("MyTeamPage pending brokers in the members list", () => {
+  it("lists brokers waiting for acceptance in Membros with their label and an edit action", () => {
+    render(<MyTeamPage initialData={{ ...base, pendingAccessInvites: [{ id: "invite-7", brokerProfileId: "profile-7", brokerName: "Duda Pendente", email: "duda@example.com", phone: null, cpf: null, brokerCode: null, createdAt: "2026-11-10T12:00:00.000Z" }] }} />);
+    expect(screen.getByText("Duda Pendente")).toBeTruthy();
+    expect(screen.getByText("Aguardando aceite")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Editar" })).toBeTruthy();
+  });
+});

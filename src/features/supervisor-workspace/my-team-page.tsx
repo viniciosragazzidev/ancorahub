@@ -51,6 +51,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
   const normalizeName = (value: string) => value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-BR");
   const unitQuery = normalizeName(unitSearch.trim());
   const unitBrokers = data.brokers.filter((broker) => normalizeName(broker.name).includes(unitQuery));
+  const unitPending = data.pendingAccessInvites.filter((invite) => normalizeName(invite.brokerName).includes(unitQuery));
 
   function runAction(key: string, action: () => Promise<{ ok: boolean; message: string }>, options: { keeps: string; fallback: string; retry: () => void; onSuccess?: () => void }) {
     notice.tap();
@@ -137,7 +138,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
       <div aria-live="polite"><ActionNoticeLine notice={notice.notice} /></div>
 
       {activeTab === "members" ? <TeamOnDutyList duty={initialData.onDuty ?? []} /> : null}
-      {activeTab === "members" ? (data.members.length ? <PeopleSection id="team-members-title" title="Membros" count={data.members.length}>
+      {activeTab === "members" ? (data.members.length || data.pendingAccessInvites.length ? <PeopleSection id="team-members-title" title="Membros" count={data.members.length + data.pendingAccessInvites.length}>
         {data.members.map((member, index) => <PeopleRow
           key={member.id}
           index={index}
@@ -153,6 +154,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
             <MemberSheetActions memberId={member.id} memberName={member.name} registration={{ name: member.name, email: member.email ?? "", phone: member.phone ?? "", cpf: member.cpf ?? "", brokerCode: member.brokerCode ?? "" }} pending={pending} removing={busyKey === `remove:${member.id}`} onRemove={() => removeMember(member.id)} />
           </BottomSheet>}
         />)}
+        {data.pendingAccessInvites.map((invite, index) => <PeopleRow key={`pending-${invite.id}`} index={data.members.length + index} name={invite.brokerName} chip={<Badge tone="neutral" size="sm">Aguardando aceite</Badge>} preview={invite.email ?? "sem e-mail"} action={<PendingBrokerEditSheet broker={{ brokerProfileId: invite.brokerProfileId, brokerName: invite.brokerName, email: invite.email, phone: invite.phone, cpf: invite.cpf, brokerCode: invite.brokerCode }} />} />)}
       </PeopleSection> : <EmptyState title="Sua equipe ainda não tem membros" description="Adicione alguém da sua unidade ou envie um convite." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} action={<Button variant="outline" onClick={() => setActiveTab("unit")}>Ver corretores da unidade</Button>} />) : null}
 
       {activeTab === "invites" ? (data.invites.length || data.pendingAccessInvites.length ? <PeopleSection id="team-invites-title" title="Convites pendentes" count={data.invites.length + data.pendingAccessInvites.length}>
@@ -162,7 +164,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
 
       {activeTab === "unit" ? <>
         <SearchField label="Buscar corretor da sua unidade" placeholder="Digite o nome do corretor" value={unitSearch} onValueChange={setUnitSearch} clearLabel="Limpar busca" />
-        {unitBrokers.length ? <PeopleSection id="team-brokers-title" title="Corretores da sua unidade" count={unitBrokers.length}>
+        {unitBrokers.length || unitPending.length ? <PeopleSection id="team-brokers-title" title="Corretores da sua unidade" count={unitBrokers.length + unitPending.length}>
         {unitBrokers.map((broker, index) => <PeopleRow
           key={broker.id}
           index={index}
@@ -171,6 +173,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
           preview={broker.supervisorName ? `Equipe de ${broker.supervisorName}` : "Livre para entrar na equipe"}
           action={broker.supervisorId ? <Link className={styles.textLink} href="/equipe/transferencia">Pedir transferência</Link> : broker.inviteId ? <Button variant="outline" size="sm" disabled>Convite pendente</Button> : <div className={styles.brokerActions}><Button size="sm" disabled={pending} aria-busy={busyKey === `add:${broker.id}` || undefined} onClick={() => addDirectly(broker.id)}>{busyKey === `add:${broker.id}` ? "Adicionando…" : "Adicionar"}</Button><Button variant="outline" size="sm" disabled={pending || !data.team} aria-busy={busyKey === `invite:${broker.id}` || undefined} onClick={() => invite(broker.id)}>{busyKey === `invite:${broker.id}` ? "Convidando…" : "Convidar"}</Button></div>}
         />)}
+        {unitPending.map((invite, index) => <PeopleRow key={`unit-pending-${invite.id}`} index={unitBrokers.length + index} name={invite.brokerName} chip={<Badge tone="neutral" size="sm">Aguardando aceite</Badge>} preview={invite.email ?? "sem e-mail"} action={<PendingBrokerEditSheet broker={{ brokerProfileId: invite.brokerProfileId, brokerName: invite.brokerName, email: invite.email, phone: invite.phone, cpf: invite.cpf, brokerCode: invite.brokerCode }} />} />)}
       </PeopleSection> : <EmptyState title={unitQuery ? "Nenhum corretor encontrado" : "Não há outros corretores ativos"} description={unitQuery ? "Tente outro nome ou limpe a busca para ver os corretores da sua unidade." : "Quando houver corretores disponíveis na sua unidade, eles aparecerão aqui."} icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} />}
       </> : null}
     </div>
