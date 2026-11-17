@@ -74,4 +74,38 @@ describe.skipIf(!testUrl)("lead phone advisory lock against isolated PostgreSQL"
       await db.delete(schema.tenants).where(eq(schema.tenants.id, tenantId));
     }
   }, 30_000);
+
+  it("keeps the lock for phone numbers shorter than eight digits", async () => {
+    if (!db) throw new Error("Isolated test database was not initialized.");
+    const tenantId = randomUUID();
+    const phone = "21 123-45";
+    let arrived = 0;
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => { release = resolve; });
+    const attempt = () => (async () => {
+      arrived += 1;
+      if (arrived === 2) release();
+      await barrier;
+      return db!.transaction(async (tx) => {
+        const phoneKey = await lockLeadCreationByPhone(tx, tenantId, phone);
+        const [existing] = await tx.select({ id: schema.leads.id }).from(schema.leads)
+          .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt),
+            sql`right(regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g'), 8) = ${phoneKey}`)).limit(1);
+        if (existing) return false;
+        await tx.insert(schema.leads).values({ id: randomUUID(), tenantId, nome: "Lead curto sintético", telefone: phone });
+        return true;
+      });
+    })();
+
+    try {
+      await db.insert(schema.tenants).values({ id: tenantId, name: "Tenant sintético", slug: `race-${tenantId}` });
+      const results = await Promise.all([attempt(), attempt()]);
+      expect(results.filter(Boolean)).toHaveLength(1);
+      const saved = await db.select({ id: schema.leads.id }).from(schema.leads).where(eq(schema.leads.tenantId, tenantId));
+      expect(saved).toHaveLength(1);
+    } finally {
+      await db.delete(schema.leads).where(eq(schema.leads.tenantId, tenantId));
+      await db.delete(schema.tenants).where(eq(schema.tenants.id, tenantId));
+    }
+  }, 30_000);
 });
