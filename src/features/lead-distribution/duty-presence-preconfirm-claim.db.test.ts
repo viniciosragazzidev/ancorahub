@@ -111,6 +111,24 @@ describe.skipIf(!testUrl)("duty preconfirmation claim against isolated PostgreSQ
       const [final] = await db.select({ status: schema.dutyPresenceConfirmations.status })
         .from(schema.dutyPresenceConfirmations).where(and(eq(schema.dutyPresenceConfirmations.tenantId, tenantId), eq(schema.dutyPresenceConfirmations.assignmentId, assignmentId)));
       expect(final.status).toBe("confirmed");
+
+      await db.update(schema.dutyPresenceConfirmations).set({ status: "confirmed", confirmedBy: null, confirmedAt: now, photoStorageKey: null, photoTakenAt: null })
+        .where(and(eq(schema.dutyPresenceConfirmations.tenantId, tenantId), eq(schema.dutyPresenceConfirmations.assignmentId, assignmentId)));
+      const photoAnswer = { status: "pending" as const, confirmedAt: null, confirmedBy: null, photoStorageKey: "synthetic/photo.jpg", photoTakenAt: now, updatedAt: now };
+      const photoSaved = await db.transaction((tx) => saveOwnDutyPresenceAnswer(tx, {
+        tenantId, scheduleId, assignmentId, brokerId: userId, dutyDate, startsAt, endsAt, now, answer: photoAnswer,
+      }));
+      expect(photoSaved.kind).toBe("saved");
+      const [photoRow] = await db.select({ status: schema.dutyPresenceConfirmations.status, photoStorageKey: schema.dutyPresenceConfirmations.photoStorageKey })
+        .from(schema.dutyPresenceConfirmations).where(and(eq(schema.dutyPresenceConfirmations.tenantId, tenantId), eq(schema.dutyPresenceConfirmations.assignmentId, assignmentId)));
+      expect(photoRow).toMatchObject({ status: "pending", photoStorageKey: "synthetic/photo.jpg" });
+
+      await db.update(schema.dutyPresenceConfirmations).set({ status: "confirmed", confirmedBy: userId, confirmedAt: now })
+        .where(and(eq(schema.dutyPresenceConfirmations.tenantId, tenantId), eq(schema.dutyPresenceConfirmations.assignmentId, assignmentId)));
+      const reviewerConfirmedPhoto = await db.transaction((tx) => saveOwnDutyPresenceAnswer(tx, {
+        tenantId, scheduleId, assignmentId, brokerId: userId, dutyDate, startsAt, endsAt, now, answer: photoAnswer,
+      }));
+      expect(reviewerConfirmedPhoto).toMatchObject({ kind: "already_confirmed", confirmedBy: userId });
     } finally {
       await db.delete(schema.auditLogs).where(eq(schema.auditLogs.userId, userId));
       await db.delete(schema.dutyPresenceConfirmations).where(eq(schema.dutyPresenceConfirmations.tenantId, tenantId));

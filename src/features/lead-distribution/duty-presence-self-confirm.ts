@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, isNull, ne, or } from "drizzle-orm";
 
 import type { DatabaseExecutor } from "@/shared/db";
 import { schema } from "@/shared/db";
@@ -39,8 +39,14 @@ export async function saveOwnDutyPresenceAnswer(tx: DatabaseExecutor, input: {
   }).onConflictDoUpdate({
     target: [schema.dutyPresenceConfirmations.tenantId, schema.dutyPresenceConfirmations.assignmentId, schema.dutyPresenceConfirmations.dutyDate, schema.dutyPresenceConfirmations.shiftStartsAt, schema.dutyPresenceConfirmations.shiftEndsAt],
     set: input.answer,
-    // Do not overwrite an absence or a confirmation another actor already won.
-    setWhere: and(ne(schema.dutyPresenceConfirmations.status, "absent"), ne(schema.dutyPresenceConfirmations.status, "confirmed")),
+    // A presencial photo replaces the broker's app confirmation (confirmedBy IS NULL),
+    // but never an absence or a confirmation already validated by another actor.
+    setWhere: and(
+      ne(schema.dutyPresenceConfirmations.status, "absent"),
+      input.answer.status === "pending"
+        ? or(ne(schema.dutyPresenceConfirmations.status, "confirmed"), isNull(schema.dutyPresenceConfirmations.confirmedBy))
+        : ne(schema.dutyPresenceConfirmations.status, "confirmed"),
+    ),
   }).returning({ id: schema.dutyPresenceConfirmations.id });
   if (row) return { kind: "saved", confirmationId: row.id };
 
