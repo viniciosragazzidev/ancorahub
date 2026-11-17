@@ -135,7 +135,7 @@ export function platformFromUserAgent(userAgent: string): GuidePlatform {
 /** Um áudio curto (até ~10 s) por etapa; os textos estão em PRESENCE_GUIDE_NARRATION (pairing-copy.ts). */
 export type NarrationKey =
   | "boas-vindas" | "numero" | "codigo" | "codigo-computador-qr" | "codigo-computador-numero" | "tela-inicial"
-  | "toque-1-android" | "toque-1-iphone" | "toque-2" | "toque-3" | "toque-4" | "esperando"
+  | "toque-1-android" | "toque-1-iphone" | "toque-2" | "toque-3" | "toque-4" | "codigo-gerar" | "esperando"
   | "conectado" | "conectado-so-conectar" | "confirmar" | "confirmar-presencial" | "pronto" | "pronto-presencial";
 
 /** Qual narração toca agora. Com erro na tela não há narração (o texto do erro já diz o que fazer). */
@@ -151,12 +151,12 @@ export function narrationKey(input: {
     case "numero": return "numero";
     case "codigo":
       if (input.device === "desktop") return input.method === "qr" ? "codigo-computador-qr" : "codigo-computador-numero";
-      return input.hasCode === false ? null : "codigo";
+      // Celular (17/11): antes do código, a narração pede para gerar só quando estiver na tela do WhatsApp.
+      return input.hasCode === false ? "codigo-gerar" : "codigo";
     case "telainicial": return "tela-inicial";
     case "caminho":
       if (input.scene <= 0) return input.platform === "iphone" ? "toque-1-iphone" : "toque-1-android";
-      // O áudio do toque 4 fala da ordem antiga ("digite o seu código"): sem voz até ser regravado (17/11).
-      return input.scene === 1 ? "toque-2" : input.scene === 2 ? "toque-3" : null;
+      return input.scene === 1 ? "toque-2" : input.scene === 2 ? "toque-3" : "toque-4";
     case "esperando": return "esperando";
     case "conectado": return input.mode === "connect" ? "conectado-so-conectar" : "conectado";
     case "confirmar": return input.stage === "sending" ? null : input.dutyMode === "presencial" ? "confirmar-presencial" : "confirmar";
