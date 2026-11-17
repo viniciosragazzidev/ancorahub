@@ -79,8 +79,10 @@ describe("roteiro de presença: narração de cada etapa (10/11)", () => {
   it("o caminho narra um toque por vez, com o 1º diferente no iPhone", () => {
     expect(narrationKey({ ...base, step: "caminho", scene: 0 })).toBe("toque-1-android");
     expect(narrationKey({ ...base, step: "caminho", scene: 0, platform: "iphone" })).toBe("toque-1-iphone");
-    // O áudio do toque 4 é da ordem antiga: fica sem voz até ser regravado (17/11).
-    expect(narrationKey({ ...base, step: "caminho", scene: 3 })).toBeNull();
+    expect(narrationKey({ ...base, step: "caminho", scene: 3 })).toBe("toque-4");
+    // Celular (17/11): antes do código, pede para gerar só na tela do WhatsApp; com o código, a de copiar.
+    expect(narrationKey({ ...base, step: "codigo", hasCode: false })).toBe("codigo-gerar");
+    expect(narrationKey({ ...base, step: "codigo", hasCode: true })).toBe("codigo");
   });
   it("varia no computador, no presencial e no modo só conectar", () => {
     expect(narrationKey({ ...base, step: "codigo", device: "desktop", method: "qr" })).toBe("codigo-computador-qr");
