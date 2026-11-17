@@ -20,6 +20,14 @@ describe("tenant-scoped lead phone lock", () => {
     expect(sameLeadPhone("21998765432", "31998765433")).toBe(false);
   });
 
+  it("locks with the available digits for a short phone instead of skipping the lock", async () => {
+    let lockCalls = 0;
+    const key = await lockLeadCreationByPhone({ execute: async () => { lockCalls += 1; } } as never, "tenant-1", "(21) 123-45");
+
+    expect(key).toBe("2112345");
+    expect(lockCalls).toBe(1);
+  });
+
   it("two simultaneous intake attempts produce one effect under the shared transaction lock", async () => {
     let lockTail = Promise.resolve();
     let created = false;

@@ -4,7 +4,8 @@ import type { DatabaseExecutor } from "@/shared/db";
 
 /** Shared key protocol for every tenant lead intake path, matching Meta's original lock. */
 export function leadPhoneLockKey(phone: string) {
-  return phone.replace(/\D/g, "").slice(-8);
+  const digits = phone.replace(/\D/g, "");
+  return digits.length > 8 ? digits.slice(-8) : digits;
 }
 
 export function sameLeadPhone(left: string, right: string) {
@@ -18,7 +19,7 @@ export function sameLeadPhone(left: string, right: string) {
 
 export async function lockLeadCreationByPhone(tx: DatabaseExecutor, tenantId: string, phone: string) {
   const phoneKey = leadPhoneLockKey(phone);
-  if (phoneKey.length !== 8) throw new Error("Informe um telefone válido para proteger a criação do lead.");
+  if (!phoneKey) throw new Error("Informe um telefone válido para proteger a criação do lead.");
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${tenantId}), hashtext(${phoneKey}))`);
   return phoneKey;
 }
