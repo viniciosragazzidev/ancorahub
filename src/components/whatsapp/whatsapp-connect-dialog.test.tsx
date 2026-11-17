@@ -145,6 +145,20 @@ describe("WhatsAppConnectDialog mobile access", () => {
     expect(mocks.requestCode).toHaveBeenCalledTimes(2);
   });
 
+  it("recreates once when WhatsApp refuses the code, and never says the server is unreachable", async () => {
+    mocks.start.mockResolvedValue({ success: true, status: "initializing", sessionId: "session-synthetic", providerStatus: "SCAN_QR_CODE" });
+    mocks.poll.mockResolvedValue({ ...readySnapshot, status: "initializing", providerStatus: "SCAN_QR_CODE" });
+    mocks.requestCode
+      .mockResolvedValueOnce({ success: false, code: "PAIRING_REFUSED", error: "WhatsApp (WAHA_INTERNAL_ERROR)" })
+      .mockResolvedValue({ success: true, pairingCode: "QRST-9012", retryInMs: null });
+    render(<WhatsAppConnectDialog initial={{ ...readyConnection, status: "disconnected" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Conectar WhatsApp" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Gerar código" }));
+    expect(await screen.findByRole("img", { name: "Código Q R S T 9 0 1 2" }, { timeout: 4_000 })).toBeInTheDocument();
+    expect(mocks.start).toHaveBeenCalledWith({ forceNew: true });
+    expect(mocks.error).not.toHaveBeenCalledWith(expect.stringMatching(/inacess/), expect.anything());
+  });
+
   it("stops after one recreation and says the server is unstable instead of blaming the internet", async () => {
     mocks.start.mockResolvedValue({ success: true, status: "initializing", sessionId: "session-synthetic", providerStatus: "SCAN_QR_CODE" });
     mocks.poll.mockResolvedValue({ ...readySnapshot, status: "initializing", providerStatus: "SCAN_QR_CODE" });

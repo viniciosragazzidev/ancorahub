@@ -86,6 +86,17 @@ async function readConnectionState(sessionName: string): Promise<WahaConnectionR
   }
 }
 
+/**
+ * O servidor do WhatsApp respondeu, com erro (17/11/2026). Antes este erro caía no catch de rede e virava
+ * WAHA_UNREACHABLE: o corretor lia "servidor inacessível" com o servidor no ar e a sessão só recusando o código.
+ */
+class VpsHttpError extends Error {
+  constructor(message: string, readonly status: number, readonly apiCode: string | null) {
+    super(message);
+    this.name = "VpsHttpError";
+  }
+}
+
 async function vpsRequest<T extends WahaConnectionResponse>(
   path: string,
   options: { method?: string; body?: unknown; timeoutMs?: number } = {},
@@ -111,12 +122,12 @@ async function vpsRequest<T extends WahaConnectionResponse>(
         response.status === 404
           ? ` A rota ${options.method ?? "GET"} ${path} não foi encontrada no servidor. Verifique se o Fastify service no VPS foi reiniciado com as rotas mais recentes.`
           : "";
-      throw new Error(`WhatsApp (${detail})${routeHint}`);
+      throw new VpsHttpError(`WhatsApp (${detail})${routeHint}`, response.status, data && "error" in data ? String(data.error) : null);
     }
     return data;
   } catch (error) {
     if (error instanceof Error && /VPS_API_URL não configurada/.test(error.message)) throw error;
-    if (error instanceof Error && /WAHA \(/.test(error.message)) throw error;
+    if (error instanceof VpsHttpError || (error instanceof Error && /WAHA \(/.test(error.message))) throw error;
     // Erro de rede / TLS / DNS / timeout. O código WAHA_UNREACHABLE (ou
     // WAHA_TIMEOUT) é embutido na mensagem para que a classificação
     // preservada no retorno da action não colapse em WAHA_ERROR genérico.
@@ -631,11 +642,14 @@ export async function requestWhatsAppPairingCode(input: { phone: string }) {
       : /ALREADY_CONNECTED/.test(message) ? "ALREADY_CONNECTED"
         : /\b404\b|não foi encontrada/i.test(message) ? "PAIRING_CODE_UNSUPPORTED"
           : wahaActionErrorCode(message);
-    // Falha genérica: confere se a sessão caiu (FAILED/STOPPED). Aí a resposta certa é recriar, não "tente de novo".
+    // Falha genérica: confere se a sessão caiu (FAILED/STOPPED, ou ERROR, que é como a API normaliza o FAILED).
+    // Aí a resposta certa é recriar, não "tente de novo".
     if (!["INVALID_PHONE", "ALREADY_CONNECTED", "PAIRING_CODE_UNSUPPORTED"].includes(code)) {
       const state = await readConnectionState(connection.sessionName).catch(() => null);
       const provider = String(state?.providerStatus ?? state?.status ?? "").toUpperCase();
-      if (/FAILED|STOPPED/.test(provider) || /FAILED|STOPPED/i.test(message)) code = "SESSION_FAILED";
+      if (/FAILED|STOPPED|ERROR/.test(provider) || /FAILED|STOPPED/i.test(message)) code = "SESSION_FAILED";
+      // O servidor respondeu, mas o WhatsApp não liberou o código (17/11, Vitor e Charles): não é "inacessível".
+      else if (error instanceof VpsHttpError) code = "PAIRING_REFUSED";
     }
     return { success: false as const, code, error: message };
   }
