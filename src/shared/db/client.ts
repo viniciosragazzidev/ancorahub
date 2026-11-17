@@ -56,10 +56,16 @@ export function connectionLimit() {
  * pooler each socket holds one of the project's 15 slots, so it is released
  * quickly, as before.
  */
-// 24/10: 5 s on the session pooler reconnected (TLS + auth) after every short pause, adding
-// 50-150 ms to the next click. 30 s keeps the few sockets warm and still frees them quickly.
-const IDLE_TIMEOUT_SECONDS = isTransactionPooler() ? 120 : 30;
+// `fetch_types` stays on: the schema reads text[] columns and postgres.js needs its OID mapping.
+export const POSTGRES_FETCH_TYPES_ENABLED = true;
 const MAX_LIFETIME_SECONDS = isTransactionPooler() ? 30 * 60 : 60;
+
+export function databaseIdleTimeoutSeconds(databaseUrl: string, backgroundPool = false) {
+  if (backgroundPool) return 600;
+  // 24/10: 5 s on the session pooler reconnected (TLS + auth) after every short pause, adding
+  // 50-150 ms to the next click. 30 s keeps the few page-pool sockets warm.
+  return isTransactionPooler(databaseUrl) ? 120 : 30;
+}
 
 function getDatabaseUrl(): string {
   const databaseUrl = process.env.SUPABASE_DB_URL?.trim() || process.env.DATABASE_URL?.trim();
@@ -91,7 +97,7 @@ export function usesPostgresJsDriver(databaseUrl: string): boolean {
 /**
  * Log database configuration for observability (no credentials).
  */
-function logDbConfig(databaseUrl: string): void {
+function logDbConfig(databaseUrl: string, idleTimeoutSeconds: number): void {
   try {
     const url = new URL(databaseUrl);
     const isPooled = url.hostname.includes("pooler") || url.hostname.includes("ep-");
@@ -105,7 +111,7 @@ function logDbConfig(databaseUrl: string): void {
         driver: usesPostgresJsDriver(databaseUrl) ? "postgres.js" : "neon-serverless",
         prepare: false,
         connectTimeoutSeconds: 10,
-        idleTimeoutSeconds: IDLE_TIMEOUT_SECONDS,
+        idleTimeoutSeconds,
         maxLifetimeSeconds: MAX_LIFETIME_SECONDS,
         transactionPooler: isTransactionPooler(databaseUrl),
         statementTimeoutMs: statementTimeoutMs(),
@@ -157,8 +163,12 @@ export function databaseSslOption(env: NodeJS.ProcessEnv = process.env) {
   return undefined;
 }
 
-function createPostgresDatabase(databaseUrl: string, max = connectionLimit()): Database {
-  logDbConfig(databaseUrl);
+function createPostgresDatabase(
+  databaseUrl: string,
+  max = connectionLimit(),
+  idleTimeoutSeconds = databaseIdleTimeoutSeconds(databaseUrl),
+): Database {
+  logDbConfig(databaseUrl, idleTimeoutSeconds);
   const ssl = databaseSslOption();
 
   return drizzlePostgres(
@@ -167,8 +177,9 @@ function createPostgresDatabase(databaseUrl: string, max = connectionLimit()): D
       max,
       ...(ssl ? { ssl } : {}),
       connect_timeout: 10,
-      idle_timeout: IDLE_TIMEOUT_SECONDS,
+      idle_timeout: idleTimeoutSeconds,
       max_lifetime: MAX_LIFETIME_SECONDS,
+      fetch_types: POSTGRES_FETCH_TYPES_ENABLED,
       // postgres.js offers an issue-time debug hook, not a completion hook.
       // It is used only to count/hash query shapes inside an opt-in request
       // trace; raw SQL and parameters are discarded before logging.
@@ -188,7 +199,7 @@ export function getDatabase(): Database {
   const databaseUrl = getDatabaseUrl();
   // Jobs and webhooks (backgroundRoute) get their own pool; pages keep theirs.
   if (isInBackgroundPool() && usesPostgresJsDriver(databaseUrl)) {
-    pools.backgroundDatabase ??= createPostgresDatabase(databaseUrl, backgroundConnectionLimit());
+    pools.backgroundDatabase ??= createPostgresDatabase(databaseUrl, backgroundConnectionLimit(), databaseIdleTimeoutSeconds(databaseUrl, true));
     return pools.backgroundDatabase;
   }
   if (usesPostgresJsDriver(databaseUrl)) {
@@ -198,7 +209,7 @@ export function getDatabase(): Database {
       new Pool({
         connectionString: databaseUrl,
         max: connectionLimit(),
-        idleTimeoutMillis: IDLE_TIMEOUT_SECONDS * 1000,
+        idleTimeoutMillis: databaseIdleTimeoutSeconds(databaseUrl) * 1000,
         connectionTimeoutMillis: 5000,
         options: `-c statement_timeout=${statementTimeoutMs()}`,
       }),
