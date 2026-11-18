@@ -1,7 +1,7 @@
 "use client";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import type { ReactNode } from "react";
-import { useReducedMotion } from "motion/react";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 
@@ -18,7 +18,7 @@ const curve = `cubic-bezier(${motionTokens.ease.standard.join(",")})`;
  * Fechado fica inerte (fora do foco e da leitura). Com movimento reduzido, só opacidade.
  */
 export function LiteCollapse({ open, children, className }: LiteCollapseProps) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   const transition = reduce
     ? `opacity ${motionTokens.duration.instant}s linear`
     : `grid-template-rows ${motionTokens.duration.standard}s ${curve}, opacity ${motionTokens.duration.fast}s ${curve}`;

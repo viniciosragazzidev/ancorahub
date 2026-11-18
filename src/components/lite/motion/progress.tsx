@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 
@@ -15,7 +16,7 @@ export interface LiteProgressProps {
 
 /** Barra que cresce com scaleX a partir da esquerda (origem fixa), em 480 ms. Com movimento reduzido, troca direto. */
 export function LiteProgress({ value, label, className }: LiteProgressProps) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   const clamped = Math.min(100, Math.max(0, value));
   const ratio = clamped / 100;
   return (

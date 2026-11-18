@@ -630,6 +630,8 @@ As rotas do aplicativo usam a integração experimental de View Transitions do N
 
 **Estado de implementação — 02/10/2026:** o wrapper experimental de transições de rota permanece removido (ajuste de 30/07), sem reintroduzir snapshots ou sobreposição. O controle existente governa o movimento local dos componentes reutilizáveis. Sua leitura pública expõe apenas esse booleano, sem dados de tenant, e ocorre após hidratação para não bloquear o layout pelo banco. Falha na leitura mantém a interface estática e utilizável; a preferência de movimento reduzido continua prioritária. A escrita administrativa e sua auditoria não mudaram.
 
+**Emenda — 18/11/2026:** os valores de movimento passam a ter uma fonte só (`src/components/arc/motion-tokens.ts`), com as variáveis CSS e os conjuntos JS antigos como apelidos e um teste de sincronia. O controle passa a juntar três sinais: `prefers-reduced-motion`, a preferência "Menos animação" do app (`html[data-reduce-motion]`) e esta chave; o resultado continua em `html[data-interface-motion]` e é lido por `useMotionAllowed()`. A interface começa com movimento ligado e só desliga quando a leitura da chave responde desligada ou falha. Tabelas: a primeira carga da rota pode entrar em cascata curta; filtro, ordenação, paginação e reordenação seguem sem animação de entrada. Métricas não contam do zero ao abrir; só o valor que muda com a tela aberta rola (nível 2 de `FEEDBACK.md`). A transição de rota volta só por CSS em `template.tsx`, sem View Transition (plano `docs/implementations/active/2026-11-18-refinamento-movimento-areas.md`).
+
 ## DEC-035 — Serviço Fastify isolado para evidência e evolução da Cloud API
 
 **Estado:** Aceita

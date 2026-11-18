@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 
@@ -16,7 +17,7 @@ export interface LiteHighlightProps {
  * Deve ficar dentro de um pai com `position: relative`. Com movimento reduzido, troca sem deslizar.
  */
 export function LiteHighlight({ layoutId, active, className }: LiteHighlightProps) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   if (!active) return null;
   return (
     <motion.span

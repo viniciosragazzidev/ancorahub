@@ -1,5 +1,10 @@
+import { motionTokens as canonical } from "@/components/arc/motion-tokens";
+
 /**
  * Motion Tokens Centralizados do AncoraHub
+ *
+ * Apelidos de `src/components/arc/motion-tokens.ts` (fonte única desde 18/11/2026).
+ * Não coloque número aqui: mude o canônico.
  * 
  * Regra: Nenhuma animação deve ter durações ou easings arbitrários.
  * Todos os componentes devem consumir estes tokens para garantir
@@ -8,11 +13,11 @@
 
 export const motionTokens = {
   duration: {
-    instant: 0.08,
-    fast: 0.15,
-    normal: 0.25,
-    deliberate: 0.35,
-    slow: 0.4,
+    instant: canonical.duration.instant,
+    fast: canonical.duration.fast,
+    normal: canonical.duration.standard,
+    deliberate: canonical.duration.draw,
+    slow: canonical.duration.considered,
   },
   distance: {
     xs: 2,
@@ -29,25 +34,25 @@ export const motionTokens = {
     pop: 1.04,
   },
   easings: {
-    smoothOut: [0.22, 1, 0.36, 1] as const,
-    easeInOut: [0.4, 0, 0.2, 1] as const,
+    smoothOut: canonical.ease.standard,
+    easeInOut: canonical.ease.inOut,
     // Compatibility alias: shared operational controls never overshoot.
-    bounceSubtle: [0.22, 1, 0.36, 1] as const,
+    bounceSubtle: canonical.ease.standard,
   },
   spring: {
     soft: {
       type: "spring" as const,
-      duration: 0.25,
+      duration: canonical.duration.standard,
       bounce: 0,
     },
     responsive: {
       type: "spring" as const,
-      duration: 0.15,
+      duration: canonical.duration.fast,
       bounce: 0,
     },
     bouncy: {
       type: "spring" as const,
-      duration: 0.25,
+      duration: canonical.duration.standard,
       bounce: 0,
     },
   },

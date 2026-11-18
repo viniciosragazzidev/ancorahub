@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 
@@ -24,7 +25,7 @@ export interface LiteAttentionProps {
  * uma vez, e nunca em loop. Com movimento reduzido, só opacidade e sem crescer.
  */
 export function LiteAttention({ pulseKey, duration = motionTokens.attention.duration, children, className }: LiteAttentionProps) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   return (
     <span className={className} style={{ position: "relative", display: "inline-flex" }}>
       {children}

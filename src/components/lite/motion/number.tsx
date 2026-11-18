@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
+import { animate, motion, useMotionValue, useTransform } from "motion/react";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 
@@ -63,7 +64,7 @@ export function LiteNumber({ value, format = "integer", decimals, countFromZero 
 
 /** Uma coluna de 0 a 9. `position` é o dígito atual em unidades de dígito; o motion anima essa posição. */
 function Digit({ digit, countFromZero }: { digit: number; countFromZero: boolean }) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   const position = useMotionValue(digit);
   const opacity = useMotionValue(1);
   const offset = useTransform(position, (current) => `${-current * 10}%`);

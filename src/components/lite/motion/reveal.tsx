@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 
@@ -16,7 +17,7 @@ export interface LiteRevealProps {
 
 /** Entra ao rolar até a vista, uma vez: fade e subida de 12 px. Com movimento reduzido, só opacidade. */
 export function LiteReveal({ children, className, amount = 0.2 }: LiteRevealProps) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   return (
     <motion.div
       className={className}

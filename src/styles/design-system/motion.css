@@ -9,13 +9,13 @@
 
 @theme {
   --ease-ds-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --animate-ds-rise: ds-rise 260ms var(--ease-ds-out) both;
+  --animate-ds-rise: ds-rise 240ms var(--ease-ds-out) both;
   --animate-ds-fade: ds-fade 180ms ease-out both;
   --animate-ds-shimmer: ds-shimmer 1.4s ease-in-out infinite;
 }
 
 /* Item entering a list/section: rises 6px while fading in. Stagger by setting
- * `--ds-i` (index) on the element: each item waits 32ms more, capped at 8. */
+ * `--ds-i` (index) on the element: each item waits --duration-stagger (35ms) more, capped at 8. */
 @keyframes ds-rise {
   from {
     opacity: 0;
@@ -50,7 +50,7 @@
 
 .ds-rise {
   animation: var(--animate-ds-rise);
-  animation-delay: calc(min(var(--ds-i, 0), 8) * 32ms);
+  animation-delay: calc(min(var(--ds-i, 0), 8) * var(--duration-stagger, 35ms));
 }
 
 .ds-fade {

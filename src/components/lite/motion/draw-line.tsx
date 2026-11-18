@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 
@@ -18,7 +19,7 @@ export interface LiteDrawLineProps {
 
 /** Linha de gráfico ou sparkline que se desenha (pathLength) em 480 ms. Com movimento reduzido, já aparece pronta. */
 export function LiteDrawLine({ d, viewBox, label, className, strokeWidth = 2 }: LiteDrawLineProps) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   return (
     <svg role="img" aria-label={label} viewBox={viewBox} className={className} preserveAspectRatio="none">
       <motion.path

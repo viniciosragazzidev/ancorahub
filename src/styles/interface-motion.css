@@ -41,7 +41,7 @@
 
 :where([data-slot="switch-thumb"], [data-slot="ds-switch-thumb"], [data-slot="progress-indicator"]) {
   transition-property: transform, translate;
-  transition-duration: var(--duration-fast);
+  transition-duration: var(--duration-standard);
   transition-timing-function: var(--ease-smooth-out);
 }
 
@@ -68,10 +68,10 @@
 /* Validation does not change the control's dense dimensions. */
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-interface-motion="off"]) :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]):is([aria-invalid="true"], [data-shake="true"]) {
-    animation: ct-field-error-shake var(--duration-fast) var(--ease-smooth-out) both;
+    animation: ct-field-error-shake var(--duration-standard) var(--ease-smooth-out) both;
   }
   html:not([data-interface-motion="off"]) .ct-field-success {
-    animation: ct-field-success var(--duration-fast) var(--ease-smooth-out) both;
+    animation: ct-field-success var(--duration-standard) var(--ease-smooth-out) both;
   }
 }
 @keyframes ct-field-error-shake {
@@ -108,11 +108,11 @@
 }
 
 :where([data-slot="dialog-overlay"], [data-slot="ds-dialog-overlay"], [data-slot="sheet-overlay"], [data-slot="ds-sheet-overlay"]) {
-  transition: opacity var(--duration-fast) var(--ease-smooth-out);
+  transition: opacity var(--duration-standard) var(--ease-smooth-out);
 }
 :where([data-slot="dialog-popup"], [data-slot="ds-dialog-popup"]) {
   transition-property: opacity, scale;
-  transition-duration: var(--duration-fast);
+  transition-duration: var(--duration-standard);
   transition-timing-function: var(--ease-smooth-out);
 }
 :where([data-slot="dialog-popup"], [data-slot="ds-dialog-popup"])[data-starting-style] {
@@ -146,7 +146,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-interface-motion="off"]) [data-slot="animated-toast"]:not([data-status="neutral"]) [data-badge-icon] {
-    animation: ct-toast-status-pulse var(--duration-fast) var(--ease-smooth-out) both;
+    animation: ct-toast-status-pulse var(--duration-standard) var(--ease-smooth-out) both;
   }
 }
 @keyframes ct-toast-status-pulse {
@@ -155,7 +155,7 @@
   100% { scale: 1; opacity: 1; }
 }
 .ct-toaster [data-sonner-toast].ct-toast {
-  transition: transform var(--duration-fast) var(--ease-smooth-out), opacity var(--duration-fast) var(--ease-smooth-out);
+  transition: transform var(--duration-standard) var(--ease-smooth-out), opacity var(--duration-standard) var(--ease-smooth-out);
 }
 .ct-toaster [data-sonner-toast].ct-toast[data-removed="true"] {
   transition-duration: var(--duration-quick);
@@ -170,7 +170,7 @@
 /* Dragging follows the finger without interpolation. */
 [data-slot="drawer-popup"] {
   transition-property: transform, opacity;
-  transition-duration: var(--duration-fast);
+  transition-duration: var(--duration-standard);
   transition-timing-function: var(--ease-smooth-out);
 }
 [data-slot="drawer-popup"][data-ending-style] { transition-duration: var(--duration-quick); }
@@ -233,10 +233,10 @@
 @keyframes ct-spin { to { transform: rotate(360deg); } }
 
 /* Explicit opt-in legacy reveals. Never attached to data rows or badges. */
-.ct-reveal { animation: ct-reveal var(--duration-fast) var(--ease-smooth-out) both; }
+.ct-reveal { animation: ct-reveal var(--duration-standard) var(--ease-smooth-out) both; }
 .ct-reveal-fast { animation: ct-reveal var(--duration-quick) var(--ease-smooth-out) both; }
 .ct-stagger > * {
-  animation: ct-reveal var(--duration-fast) var(--ease-smooth-out) both;
+  animation: ct-reveal var(--duration-standard) var(--ease-smooth-out) both;
   animation-delay: calc(min(var(--stagger, 0), 4) * var(--duration-stagger));
 }
 @keyframes ct-reveal {
