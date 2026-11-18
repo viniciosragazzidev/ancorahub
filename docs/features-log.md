@@ -1,5 +1,9 @@
 # Histórico de Funcionalidades Adicionadas (Features Log)
 
+## 18/11/2026 - Capitão maior no banner mobile de Plantões
+
+- A ilustração do Capitão no banner compacto passa de 116 px para 144 px em telas menores que 640 px. A coluna acompanha a arte para ela não cobrir a mensagem; estados, ação e destino de informar horários não mudam. Registro: `docs/implementations/active/2026-11-18-identidade-capitao-ancora.md`.
+
 ## 18/11/2026 - Identidade do Capitão Âncora e da Sasá
 
 - Artes e referências visuais ativas do mascote atualizadas para o Capitão Âncora; a conversa de avisos passa a usar Sasá, assistente de convés. Copy de distribuição e financeiro adota termos diretos de trabalho; os dez ícones objetuais das rotas, as funções, IDs técnicos, permissões e caminhos permanecem.

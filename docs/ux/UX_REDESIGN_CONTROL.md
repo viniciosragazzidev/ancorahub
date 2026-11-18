@@ -1,3 +1,13 @@
+## 2026-11-18: Capitão maior no banner mobile de Plantões
+
+Papel: corretor Lite em `/plantoes`. Objetivo: dar mais presença ao Capitão na dica
+de escala e manter legível a ação contextual de informar horários. O banner continua
+mostrando os estados sem plantão, plantão atual e próximo plantão; link e destino não
+mudam. No breakpoint mobile, a arte compacta passa de 116 px para 144 px e recebe uma
+coluna própria da mesma largura, sem sobrepor o texto. Nenhum token, primitive, rota,
+regra ou movimento novo; UX-M1.10 permanece pendente. Registro:
+`docs/implementations/active/2026-11-18-identidade-capitao-ancora.md`.
+
 ## 2026-11-15: assets próprios por rota nos assistentes
 
 Revisão pedida por Vinicios. Papel inicial: corretor Lite; mesmas associações visuais
