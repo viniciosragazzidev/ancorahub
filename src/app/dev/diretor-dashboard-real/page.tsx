@@ -4,6 +4,8 @@ import "@/components/arc/director-primitives.css";
 
 import { notFound } from "next/navigation";
 
+import { SidebarProvider } from "@/components/ui/sidebar";
+
 import { DirectorLiteDashboard } from "@/features/dashboard/components/director-lite/director-lite-dashboard";
 import { DirectorLiteQualificationFunnelPage } from "@/features/dashboard/components/director-lite/qualification-funnel-page";
 import { funnelPeriodForOverview } from "@/features/qualification-turbo/funnel";
@@ -63,12 +65,15 @@ export default async function DirectorDashboardRealPage({ searchParams }: { sear
 
   const data = buildEssential("today", "all", now);
   return (
-    <div className="arc-venancor" data-skin="diretor">
-      <div className="app-shell-canvas h-app overflow-y-auto overflow-x-hidden overscroll-contain arc-venancor" data-slot="app-scroll-frame" data-skin="diretor" style={{ background: "var(--background)" }}>
-        <div className={styles.page}>
-          <DirectorLiteDashboard data={data} period="today" branchId={null} branches={BRANCHES} now={now} />
+    // O cabeçalho do painel usa o SidebarTrigger, que exige o provider do layout do app.
+    <SidebarProvider>
+      <div className="arc-venancor w-full" data-skin="diretor">
+        <div className="app-shell-canvas h-app overflow-y-auto overflow-x-hidden overscroll-contain arc-venancor" data-slot="app-scroll-frame" data-skin="diretor" style={{ background: "var(--background)" }}>
+          <div className={styles.page}>
+            <DirectorLiteDashboard data={data} period="today" branchId={null} branches={BRANCHES} now={now} />
+          </div>
         </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }
