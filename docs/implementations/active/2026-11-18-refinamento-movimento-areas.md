@@ -145,7 +145,10 @@ Entregue: o canônico é o `StatCard` de `src/components/dashboard/metric-card.t
 
 **Validação**: laboratório › Movimento › "Cards" lado a lado com o print da referência; preview 3005 em `/dashboard`, `/financeiro`, `/equipe/desempenho`, `/gestao`. Conferir que nenhum card tem `box-shadow` (busca no DOM).
 
-### Etapa 2 · Entrada de rota e entrada em sequência
+### Etapa 2 · Entrada de rota e entrada em sequência · PARCIAL 18/11/2026
+
+Entregue a pedido do usuário ("animação mais dinâmica"): `.ct-enter-seq` e `.ct-enter-seq-tight` em `src/styles/interface-motion.css`, CSS puro (vale em componente de servidor). Cada bloco sobe 8px (`--distance-base`), sai de um desfoque de 2px (`--blur-small`) e aparece em `--duration-considered` (480ms) com `--ease-enter`; blocos a cada 80ms (`--duration-micro`, passo `line` dos tokens), até 6; cards dentro de um bloco a cada 35ms com `--enter-offset` para começar depois do bloco pai. Fill `backwards`, então nada fica preso depois. Desligado por movimento reduzido, "Menos animação" e kill switch. Aplicado no Resumo do diretor (`CommandCenter`, modo normal), em `/equipe` e na vitrine do laboratório. Diferença do plano: 480ms e 80ms em vez de 240ms e 35ms, porque o usuário pediu mais movimento; o teto de 480ms continua dentro do "raro" de `motion-frequencia.md`, e por isso não entra nas rotas de alta frequência. Falta: o `template.tsx` (adiado: um invólucro em volta das páginas mexe no flex do layout; vai precisar de um teste por rota) e as demais rotas.
+
 
 **O que muda**
 - `template.tsx` em `(dashboard)`, `(platform-admin)` e `(auth)` envolvendo o conteúdo num `RouteEnter` (CSS puro, `animation` com `both`, sem JS de medição) que aplica a entrada da tabela do §5. O cabeçalho e a navegação lateral **não** remontam nem animam.

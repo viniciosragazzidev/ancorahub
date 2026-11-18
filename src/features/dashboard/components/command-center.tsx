@@ -71,7 +71,7 @@ function TodayNumbers({ today }: { today: CommandCenterData["today"] }) {
     { label: "Sem 1º contato", value: today.withoutFirstContact, href: "/leads?attention=unworked", action: "Cobrar atendimento", warn: today.withoutFirstContact > 0 },
   ];
   return (
-    <section aria-label="Turno de hoje, desde 19h" className="grid gap-px overflow-hidden rounded-[var(--radius-card)] border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
+    <section aria-label="Turno de hoje, desde 19h" style={{ "--enter-offset": 1 } as React.CSSProperties} className="ct-enter-seq-tight grid gap-px overflow-hidden rounded-[var(--radius-card)] border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
       {items.map((item) => (
         <Link
           key={item.label}
@@ -267,7 +267,7 @@ export function CommandCenter({ data, showQualityTab = false, canManage = true }
   return (
     <>
       <DashboardHeader breadcrumb={dateLabel.charAt(0).toLocaleUpperCase("pt-BR") + dateLabel.slice(1)} title={data.welcome.firstName ? `Olá, ${data.welcome.firstName}` : "Dashboard"} />
-      <main className="mx-auto flex min-h-full w-full max-w-[1200px] flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8">
+      <main className="ct-enter-seq mx-auto flex min-h-full w-full max-w-[1200px] flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8">
         {showQualityTab ? <DashboardSectionTabs active="overview" period={30} showQuality /> : null}
         <section aria-label="Buscar e criar" className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <LeadSearch />

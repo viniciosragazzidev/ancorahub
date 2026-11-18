@@ -203,6 +203,7 @@ export function MetricGrid({
   columns = 4,
   className,
   label,
+  style,
 }: {
   children: React.ReactNode;
   /** Colunas no desktop; no celular são sempre 2 (1 quando `columns` é 1). */
@@ -210,6 +211,8 @@ export function MetricGrid({
   className?: string;
   /** Nome do grupo para leitor de tela. */
   label?: string;
+  /** Ex.: `--enter-offset` quando a grade entra em sequência (`ct-enter-seq-tight`). */
+  style?: React.CSSProperties;
 }) {
   const cols = {
     1: "grid-cols-1",
@@ -221,6 +224,7 @@ export function MetricGrid({
     <section
       data-slot="metric-grid"
       aria-label={label}
+      style={style}
       className={cn(
         "grid overflow-hidden rounded-[var(--radius-card)] border border-border bg-card",
         "[&>*]:-mr-px [&>*]:-mb-px [&>*]:border-t-0! [&>*]:border-l-0! [&>*]:border-r! [&>*]:border-b! [&>*]:border-border",
