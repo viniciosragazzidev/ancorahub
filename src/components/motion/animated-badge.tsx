@@ -1,4 +1,5 @@
 "use client";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import {
   AlertTriangle,
@@ -12,7 +13,6 @@ import {
 import {
   AnimatePresence,
   motion,
-  useReducedMotion,
   type HTMLMotionProps,
   type Variants,
 } from "motion/react";
@@ -105,7 +105,7 @@ export function AnimatedBadge({
   ...rest
 }: AnimatedBadgeProps) {
   const directorLite = useArcScopeEnabled();
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   const motionEnabled = useInterfaceMotionEnabled() && !reduce;
   const Icon = ICONS[status];
   const resolvedContentKey =

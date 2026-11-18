@@ -1,7 +1,8 @@
 "use client";
 
 import { Children, type ReactNode } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 
@@ -18,7 +19,7 @@ export interface LiteListPresenceProps {
  * Com movimento reduzido, só opacidade e sem reordenar.
  */
 export function LiteListPresence({ children, className }: LiteListPresenceProps) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   return (
     <div className={className}>
       <AnimatePresence initial={false}>

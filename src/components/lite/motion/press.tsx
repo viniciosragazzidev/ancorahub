@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 
@@ -21,7 +22,7 @@ export interface LitePressProps {
 
 /** Escala de toque por tipo de elemento, com mola curta. Com movimento reduzido, não escala. */
 export function LitePress({ kind = "button", children, className }: LitePressProps) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   return (
     <motion.div
       className={className}

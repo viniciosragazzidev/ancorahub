@@ -1,29 +1,26 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { motion, useReducedMotion, type Variants } from "motion/react";
+import { motion, type Variants } from "motion/react";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
+import { LitePageEnter, LitePress as KitPress } from "@/components/lite/motion";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 /**
- * Motion shared by the Lite management screens (gestor and supervisor): page entry,
- * staggered lists and a press feedback. With prefers-reduced-motion only opacity moves.
+ * Compatibilidade: entrada de página e pressão vêm do kit `@/components/lite/motion`
+ * (fonte única desde 18/11/2026). Só a lista semântica (`ul`/`li`) fica aqui, porque o kit
+ * cascateia `div`s. Código novo importa direto do kit.
  */
 
-const enter = { duration: motionTokens.duration.standard, ease: [...motionTokens.ease.enter] } as const;
+export { LitePageEnter };
 
-/** Page entry: fade and a short rise (150 to 250 ms). */
-export function LitePageEnter({ children, className }: { children: ReactNode; className?: string }) {
-  const reduce = useReducedMotion();
+/** Pressão de card ou link: escala `pressCard` do kit. */
+export function LitePress({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <motion.div
-      className={className}
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={enter}
-    >
+    <KitPress kind="card" className={className}>
       {children}
-    </motion.div>
+    </KitPress>
   );
 }
 
@@ -31,14 +28,16 @@ const listVariants: Variants = {
   shown: { transition: { staggerChildren: motionTokens.stagger.item } },
 };
 
-function itemVariants(reduce: boolean | null): Variants {
+const enter = { duration: motionTokens.duration.standard, ease: [...motionTokens.ease.enter] } as const;
+
+function itemVariants(reduce: boolean): Variants {
   return {
-    hidden: reduce ? { opacity: 0 } : { opacity: 0, y: 6 },
+    hidden: reduce ? { opacity: 0 } : { opacity: 0, y: motionTokens.distance.sm },
     shown: { opacity: 1, y: 0, transition: enter },
   };
 }
 
-/** List with a short stagger: each child is a LiteListItem. */
+/** Lista com cascata curta: cada filho é um LiteListItem. */
 export function LiteList({ children, className, label }: { children: ReactNode; className?: string; label?: string }) {
   return (
     <motion.ul className={className} aria-label={label} variants={listVariants} initial="hidden" animate="shown">
@@ -47,22 +46,16 @@ export function LiteList({ children, className, label }: { children: ReactNode; 
   );
 }
 
-/** A list row: staggered entry and a press feedback (slight scale, none with reduced motion). */
+/** Linha da lista: entra em cascata e escala `pressRow` ao tocar (nada com movimento reduzido). */
 export function LiteListItem({ children, className }: { children: ReactNode; className?: string }) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   return (
-    <motion.li className={className} variants={itemVariants(reduce)} whileTap={reduce ? undefined : { scale: 0.99 }}>
+    <motion.li
+      className={className}
+      variants={itemVariants(reduce)}
+      whileTap={reduce ? undefined : { scale: motionTokens.scale.pressRow }}
+    >
       {children}
     </motion.li>
-  );
-}
-
-/** Press feedback for a card or a link (slight scale, none with reduced motion). */
-export function LitePress({ children, className }: { children: ReactNode; className?: string }) {
-  const reduce = useReducedMotion();
-  return (
-    <motion.div className={className} whileTap={reduce ? undefined : { scale: 0.985 }} transition={{ duration: motionTokens.duration.fast }}>
-      {children}
-    </motion.div>
   );
 }

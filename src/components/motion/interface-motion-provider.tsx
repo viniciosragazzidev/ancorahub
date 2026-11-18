@@ -1,11 +1,58 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { MotionConfig } from "motion/react";
+import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
+import { MotionConfig, useReducedMotion } from "motion/react";
 import { useReducedMotionPreference } from "@/utils/animation/use-reduced-motion";
 import { transitions } from "@/lib/motion";
 
+/**
+ * Movimento depende de três sinais (plano 2026-11-18, etapa 0):
+ * 1. o sistema (`prefers-reduced-motion`);
+ * 2. "Menos animação" do próprio app (`html[data-reduce-motion="1"]`, ver features/assist/a11y-prefs);
+ * 3. o kill switch do super-admin (`feature_interface_motion_enabled`).
+ * O provider junta os três em `html[data-interface-motion]`, que o CSS lê, e no `MotionConfig`.
+ * Componentes leem com `useMotionAllowed()`.
+ */
+
+/** Valor do contexto: só o kill switch (true fora de provider). */
 const InterfaceMotionContext = createContext(true);
+
+function subscribeUserReduce(onChange: () => void) {
+  if (typeof MutationObserver === "undefined") return () => undefined;
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-reduce-motion"] });
+  return () => observer.disconnect();
+}
+const readUserReduce = () => document.documentElement.dataset.reduceMotion === "1";
+const readServerUserReduce = () => false;
+
+/** "Menos animação" ligado pelo usuário no app. */
+export function useUserReducedMotion() {
+  return useSyncExternalStore(subscribeUserReduce, readUserReduce, readServerUserReduce);
+}
+
+function subscribeSystemReduce(onChange: () => void) {
+  if (typeof window.matchMedia !== "function") return () => undefined;
+  const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+const readSystemReduce = () => typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const readServerSystemReduce = () => false;
+
+/**
+ * Pode animar? Junta sistema, "Menos animação" e kill switch.
+ * No servidor e na hidratação responde "pode", para a marcação inicial de entrada
+ * sair igual nos dois lados; a preferência vale logo depois de montar.
+ */
+export function useMotionAllowed() {
+  const switchOn = useContext(InterfaceMotionContext);
+  // O hook do motion e a leitura direta do matchMedia dizem a mesma coisa; os dois juntos cobrem o cache global do motion.
+  const motionSystem = useReducedMotion() === true;
+  const system = useSyncExternalStore(subscribeSystemReduce, readSystemReduce, readServerSystemReduce);
+  const user = useUserReducedMotion();
+  return switchOn && !motionSystem && !system && !user;
+}
 
 export function InterfaceMotionProvider({
   children,
@@ -14,9 +61,12 @@ export function InterfaceMotionProvider({
   children: React.ReactNode;
   enabled?: boolean;
 }) {
-  const [configuredEnabled, setConfiguredEnabled] = useState(false);
+  // Começa ligado (o padrão da chave é ligado); a API só desliga quando o kill switch está ativo.
+  const [configuredEnabled, setConfiguredEnabled] = useState(true);
+  const switchOn = enabled ?? configuredEnabled;
   const reducedMotion = useReducedMotionPreference();
-  const motionEnabled = (enabled ?? configuredEnabled) && !reducedMotion;
+  const userReduced = useUserReducedMotion();
+  const motionEnabled = switchOn && !reducedMotion && !userReduced;
 
   useEffect(() => {
     if (enabled !== undefined) return;
@@ -64,7 +114,7 @@ export function InterfaceMotionProvider({
   }, [motionEnabled]);
 
   return (
-    <InterfaceMotionContext.Provider value={motionEnabled}>
+    <InterfaceMotionContext.Provider value={switchOn}>
       <MotionConfig
         reducedMotion={motionEnabled ? "user" : "always"}
         transition={motionEnabled ? transitions.normal : { duration: 0 }}
@@ -75,10 +125,12 @@ export function InterfaceMotionProvider({
   );
 }
 
+/** Como `useMotionAllowed`, mas trata o servidor como movimento reduzido (comportamento antigo, mantido para quem já usa). */
 export function useInterfaceMotionEnabled() {
-  const enabled = useContext(InterfaceMotionContext);
+  const switchOn = useContext(InterfaceMotionContext);
   const reducedMotion = useReducedMotionPreference();
-  return enabled && !reducedMotion;
+  const userReduced = useUserReducedMotion();
+  return switchOn && !reducedMotion && !userReduced;
 }
 
 /** Compatibility adapter for components that already model a reduced state. */

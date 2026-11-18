@@ -4,8 +4,9 @@
  * Laboratório de fluxos do corretor (15/11/2026). As telas são as reais (Início, Plantões, conquistas); só a
  * resposta do servidor é simulada pelo DevLabProvider. Mudou o componente real, o laboratório já mostra.
  * Painel no canto: fluxo, resposta do servidor, demora e "Recomeçar".
+ * "Movimento" (18/11/2026): vitrine dos componentes compartilhados com os interruptores "Menos animação" e "Kill switch".
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ChatHome } from "@/components/chat/chat-home";
 import { TOUR_STORAGE_KEY } from "@/components/chat/tour/tour-steps";
@@ -16,11 +17,13 @@ import { BrokerDutyHub } from "@/features/broker-workspace/components/broker-dut
 import type { DutyHubCurrent } from "@/features/broker-workspace/duty-hub";
 import { WhatsAppHandoff } from "@/features/broker-workspace/whatsapp-handoff/whatsapp-handoff";
 import { DevLabProvider, type DevLab } from "@/lib/dev-lab";
+import { InterfaceMotionProvider } from "@/components/motion/interface-motion-provider";
 import { TeamListManager } from "@/features/supervisor-workspace/lead-import/team-list-manager";
 
 import styles from "./lab.module.css";
+import { MotionShowcase } from "./motion-showcase";
 
-type Flow = "plantao" | "lead" | "lista" | "conquistas";
+type Flow = "plantao" | "lead" | "lista" | "conquistas" | "movimento";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -28,6 +31,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "lead", label: "Aceitar lead" },
   { id: "lista", label: "Lista da equipe (supervisor)" },
   { id: "conquistas", label: "Conquistas" },
+  { id: "movimento", label: "Movimento (componentes)" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -73,6 +77,16 @@ export function FlowLab() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [handoff, setHandoff] = useState<string | null>(null);
   const [sale, setSale] = useState(0);
+  const [lessMotion, setLessMotion] = useState(false);
+  const [killSwitch, setKillSwitch] = useState(false);
+  // "Menos animação" é a mesma marca que Configurações › Acessibilidade põe no <html>; volta ao valor anterior ao sair.
+  useEffect(() => {
+    if (!lessMotion) return;
+    const root = document.documentElement;
+    const previous = root.dataset.reduceMotion;
+    root.dataset.reduceMotion = "1";
+    return () => { if (previous === undefined) delete root.dataset.reduceMotion; else root.dataset.reduceMotion = previous; };
+  }, [lessMotion]);
   // As boas-vindas e o tour cobririam o fluxo: no laboratório ficam como já vistos.
   useState(() => { try { window.localStorage.setItem("ancora:lite-welcome:2026-10-chat", "1"); window.localStorage.setItem(TOUR_STORAGE_KEY, "skipped"); } catch { /* ignore */ } return null; });
 
@@ -150,6 +164,10 @@ export function FlowLab() {
           />
         ) : flow === "lista" ? (
           <TeamListManager rows={LAB_LIST} totals={{ all: LAB_LIST.length, pending: LAB_LIST.filter((row) => !row.brokerId).length, distributed: LAB_LIST.filter((row) => row.brokerId).length, replied: LAB_LIST.filter((row) => row.replied).length }} team={LAB_TEAM} switcher={null} />
+        ) : flow === "movimento" ? (
+          <InterfaceMotionProvider enabled={!killSwitch}>
+            <MotionShowcase delay={delay} failing={outcome === "falha"} />
+          </InterfaceMotionProvider>
         ) : (
           <main className={`arc-venancor ${styles.buttons}`}>
             <h1>Conquistas</h1>
@@ -184,8 +202,12 @@ export function FlowLab() {
               <button type="button" aria-pressed={mode === "online"} onClick={() => setMode("online")}>Online</button>
               <button type="button" aria-pressed={mode === "presencial"} onClick={() => setMode("presencial")}>Presencial</button>
             </fieldset>
+            <fieldset><legend>Movimento</legend>
+              <button type="button" aria-pressed={lessMotion} onClick={() => setLessMotion((value) => !value)}>Menos animação</button>
+              <button type="button" aria-pressed={killSwitch} onClick={() => setKillSwitch((value) => !value)}>Kill switch</button>
+            </fieldset>
             <button type="button" className={styles.restart} onClick={restart}>Recomeçar</button>
-            <p className={styles.note}>Telas reais, servidor simulado. As comemorações respeitam o limite do dia: em Configurações › Acessibilidade dá para desligar.</p>
+            <p className={styles.note}>Telas reais, servidor simulado. As comemorações respeitam o limite do dia: em Configurações › Acessibilidade dá para desligar. Movimento reduzido do sistema: DevTools › Rendering › prefers-reduced-motion.</p>
           </div>
         ) : null}
       </aside>

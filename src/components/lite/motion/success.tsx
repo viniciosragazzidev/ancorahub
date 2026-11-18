@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
@@ -20,7 +21,7 @@ const CHECK_FROM_SCALE = 0.6;
 export function LiteSuccess({ label, className }: LiteSuccessProps) {
   // Kill-switch html[data-interface-motion="off"] também entrega o check pronto.
   const motionEnabled = useInterfaceMotionEnabled();
-  const reduce = useReducedMotion() || !motionEnabled;
+  const reduce = !useMotionAllowed() || !motionEnabled;
   return (
     <span role="status" className={className} style={{ display: "inline-flex", alignItems: "center", gap: motionTokens.distance.xs * 2 }}>
       <motion.svg

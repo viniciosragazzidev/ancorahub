@@ -3,7 +3,8 @@
 import React, { ReactNode } from "react";
 import { X } from "lucide-react";
 import { transitions } from "@/lib/motion";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import {
   AnimatedBadge,
@@ -50,7 +51,7 @@ export function AnimatedToast({
   onClose,
   className,
 }: AnimatedToastProps) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   const motionEnabled = useInterfaceMotionEnabled() && !reduce;
   const directorLite = useArcScopeEnabled();
   const directorEnter = directorLite && motionEnabled ? { opacity: 0, y: directorMotionTokens.distance.lg } : { opacity: 0 };

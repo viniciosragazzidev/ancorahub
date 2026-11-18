@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 
@@ -19,7 +20,7 @@ export interface LiteSwapProps {
  * Sai com fade em 120 ms; entra com fade e subida de 4 px.
  */
 export function LiteSwap({ swapKey, children, className }: LiteSwapProps) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   return (
     <AnimatePresence mode="popLayout" initial={false}>
       <motion.div

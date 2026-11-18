@@ -1,25 +1,26 @@
 "use client";
 
 import type { Variants, Transition } from "motion/react";
+import { motionTokens as canonical } from "@/components/arc/motion-tokens";
 
-/* ─── Tokens de movimento (MACRO-MICRO §4) ─── */
+/* ─── Tokens de movimento: apelidos de src/components/arc/motion-tokens.ts (fonte única desde 18/11/2026) ─── */
 
 export const motionTokens = {
   duration: {
-    instant: 0.08,
-    fast: 0.12,
-    base: 0.18,
-    medium: 0.24,
-    slow: 0.32,
-    slower: 0.42,
-    emphasis: 0.56,
+    instant: canonical.duration.instant,
+    fast: canonical.duration.fast,
+    base: canonical.duration.exit,
+    medium: canonical.duration.standard,
+    slow: canonical.duration.draw,
+    slower: canonical.duration.considered,
+    emphasis: canonical.duration.considered,
   },
   delay: {
     none: 0,
-    subtle: 0.04,
-    base: 0.08,
-    contextual: 0.12,
-    stagger: 0.04,
+    subtle: canonical.stagger.item,
+    base: canonical.beat.text,
+    contextual: canonical.duration.instant,
+    stagger: canonical.stagger.item,
   },
   distance: {
     xsmall: 2,
@@ -38,18 +39,13 @@ export const motionTokens = {
 } as const;
 
 export const ease = {
-  standard: [0.2, 0, 0, 1] as const,
-  enter: [0, 0, 0.2, 1] as const,
-  exit: [0.4, 0, 1, 1] as const,
-  emphasized: [0.2, 0.8, 0.2, 1] as const,
+  standard: canonical.ease.standard,
+  enter: canonical.ease.enter,
+  exit: canonical.ease.exit,
+  emphasized: canonical.ease.enter,
 };
 
-export const spring = {
-  type: "spring" as const,
-  stiffness: 420,
-  damping: 32,
-  mass: 0.8,
-};
+export const spring = canonical.spring.responsive;
 
 /* ─── Shared transitions ─── */
 

@@ -1,6 +1,6 @@
 # Refinamento de áreas, movimento e entrada de rotas · plano
 
-Data: 18/11/2026 · Dono: Vinicios · Status: **plano, nada implementado**
+Data: 18/11/2026 · Dono: Vinicios · Status: **§8 decidido em 18/11 (recomendações adotadas); etapa 0 entregue em 18/11** (branch `feat/movimento-e0-fundacao`); etapas 1 a 10 pendentes
 Padrões que mandam: `docs/design-system.md` (tokens, densidade), `docs/design-system/FEEDBACK.md` (níveis 0 a 3; vence qualquer conflito de movimento), `docs/design-system/MOTION_RULES.md` (tokens canônicos em `src/components/arc/motion-tokens.ts`), `docs/ux/motion-frequencia.md` (orçamento por frequência).
 Referências: landing https://salte.app/ (estudada no navegador em 18/11) e os quatro prints enviados pelo usuário. O vídeo do X (`johny_victor_/status/2122792281380139213`) **não pôde ser visto**: o post abre, mas o player fica atrás da parede de login do X. O plano segue sem ele.
 
@@ -105,7 +105,10 @@ Teto total de entrada de uma rota: **240 + 5 × 35 = 415 ms** para o último blo
 
 Cada etapa é uma branch própria (`feat/movimento-eN-...`), com merge em `preview/3005` depois de cada commit, conforme o CLAUDE.md global. Nenhuma etapa muda dado, rota ou texto de tela (regra "reorganizar mantém o design").
 
-### Etapa 0 · Fundação: um token, um sinal de movimento reduzido, uma vitrine
+### Etapa 0 · Fundação: um token, um sinal de movimento reduzido, uma vitrine · ENTREGUE 18/11/2026
+
+Entregue: `globals.css` com os nomes canônicos (`--duration-instant|fast|exit|standard|draw|considered`, `--duration-stagger` 35ms, `--ease-enter|standard|exit`) e os antigos como apelidos (`--duration-quick` → `fast`, `--motion-duration-normal` → `standard`, `--ease-smooth-out` → `standard`…); em `interface-motion.css` o `--duration-fast` que valia 250ms virou `--duration-standard` (240ms), então overlays, campos e toasts quase não mudam de tempo; `director-skin.css` não sobrescreve mais `--duration-fast`; `ds-rise` 240ms e cascata pela variável; `src/lib/motion/motion-tokens.ts` e `src/shared/animations/variants.ts` apontam para o canônico; teste `src/lib/motion/motion-tokens-sync.test.ts`. `useMotionAllowed()` (`src/components/motion/use-motion-allowed.ts`) junta sistema, "Menos animação" e kill switch; o provider começa ligado e marca `html[data-interface-motion="off"]` também com "Menos animação"; o kit Lite inteiro, `animated-badge`, `animated-toast` e o `useReduce` do Diretor Lite passam por ele. `light-motion.tsx` reexporta o kit (só `LiteList`/`LiteListItem` ficam lá, por serem `ul`/`li`). DEC-034 com emenda e `MOTION.md` atualizados. Laboratório: fluxo "Movimento (componentes)" com cards, tabela, drawer, menu, abas, skeleton e vazio, e interruptores "Menos animação" e "Kill switch". Diferença do plano: o hook não ficou num arquivo próprio com a lógica; mora no provider e o arquivo `use-motion-allowed.ts` só reexporta.
+
 
 **O que muda**
 - `globals.css:161-189`, `lib/motion/motion-tokens.ts`, `shared/animations/variants.ts` e `lite/motion/motion-tokens.css` passam a derivar de `arc/motion-tokens.ts` (variáveis CSS geradas a partir dele ou escritas uma vez com o mesmo valor e um teste que compara). `.arc-venancor` deixa de sobrescrever durações.
@@ -262,7 +265,24 @@ Landing (`src/app/page.tsx`), login (`LightAuthShell`), primeiro acesso, onboard
 
 Cada lote fecha com: laboratório › Movimento verde nos três interruptores, preview 3005 nas rotas do lote em desktop e 375px, gravação curta de antes e depois para a revisão do usuário.
 
-## 8. O que o design system não cobre (precisa de decisão do usuário)
+## 8. O que o design system não cobre · DECIDIDO em 18/11/2026
+
+O usuário mandou seguir as recomendações em todos os itens. Resumo do que vale:
+
+| # | Tema | Decisão |
+|---|---|---|
+| 1 | Superfície azul grande | só landing, login e onboarding, com o azul do DS; nunca nas telas internas. Entra como exceção escrita no `design-system.md` na etapa 10 |
+| 2 | Texturas | só o pontilhado (branco 12%, passo 12px), nas superfícies do item 1; sem halftone nem grão |
+| 3 | Fundo do bloco de IA | neutro `#fafafa` com borda; só o rótulo em azul |
+| 4 | Número grande | Inter 30px semibold (`--text-3xl` já existe), `tabular-nums`; Satoshi só em 36px+ |
+| 5 | Retrato/vídeo | só landing, radius 16px, esfumado por máscara; precisa de imagem com direito de uso |
+| 6 | Nome do bloco de IA | "Sugestões • Âncora IA" |
+| 7 | Count-up ao abrir | não usar |
+| 8 | Troca automática de abas | só superfícies de marca |
+| 9 | Scroll-driven | só landing |
+
+Texto original das opções, para referência:
+
 
 1. **Superfície azul grande com textura** (faixa da referência). O DS diz que o azul `#2563eb` nunca é fundo de superfície grande. Recomendação: permitir só na landing, login e onboarding, como exceção documentada no DS, com o azul do DS (não o `#0e7aff` da referência), e nunca nas telas internas.
 2. **Texturas** (pontilhado SVG, grão, halftone) e **brilho interno por `box-shadow inset`**. Não existem tokens para isso. Recomendação: um único token de textura pontilhada (branco 12%, passo 12px) e nenhum halftone; só nas superfícies do item 1.
