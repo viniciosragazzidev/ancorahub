@@ -10,9 +10,19 @@
 .figures div { display: grid; gap: 2px; }
 .figures dt { color: var(--text-secondary); font-size: var(--text-xs); }
 .figures dd { margin: 0; font-size: var(--text-xl); font-weight: 600; font-variant-numeric: tabular-nums; }
-/* Desktop: Taxa ao lado dos Plantões e Funil ao lado das Filas (pedido 14/11). No celular empilha. */
-.pair { display: grid; gap: var(--space-6); }
+/* Organização de 18/11: coluna principal (Funil com o anel, Filas) e coluna "Agora" (Plantões, WhatsApp).
+ * No DOM "Agora" vem primeiro: no celular aparece antes da análise; no desktop vai para a direita. */
+.columns { display: grid; gap: var(--space-6); align-items: start; }
+.side, .main { display: grid; gap: var(--space-6); min-width: 0; }
 .pairItem { display: grid; min-width: 0; }
 .pairItem > section { align-content: start; }
-.pairItem > .centered { align-content: center; }
-@media (min-width: 960px) { .pair { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; } }
+@media (min-width: 960px) {
+  .columns { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  .main { grid-column: 1; grid-row: 1; }
+  .side { grid-column: 2; grid-row: 1; }
+}
+/* Anel ao lado do funil num painel só; empilha em telas estreitas. */
+.qualification { display: grid; gap: var(--space-6); }
+@media (min-width: 640px) { .qualification { grid-template-columns: auto minmax(0, 1fr); align-items: center; } }
+/* "Ver corretores" é botão (abre o painel lateral) com a cara do link do kit. */
+.linkButton { justify-self: start; gap: 4px; padding: 0; border: 0; background: none; cursor: pointer; }

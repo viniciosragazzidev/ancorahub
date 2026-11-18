@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const motionState = vi.hoisted(() => ({ reduce: false }));
@@ -63,17 +63,18 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     expect(container.querySelector("[data-live-status-strip]")).toBeNull();
   });
 
-  it("mostra os blocos no estilo do Desempenho Lite, nesta ordem", () => {
+  it("mostra os blocos no estilo do Desempenho Lite, nesta ordem (organização de 18/11: Agora antes da análise)", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
     const blocks = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
     expect(blocks).toEqual([
       "Leads desde sex 19h",
-      "Taxa de qualificação",
       "Plantões acontecendo agora",
+      "WhatsApp dos corretores",
       "Funil de qualificação",
       "Leads por fila",
-      "WhatsApp dos corretores",
     ]);
+    expect(screen.getByRole("region", { name: "Agora" })).toBeInTheDocument();
+    expect(screen.getByText("Taxa de qualificação")).toBeInTheDocument();
   });
 
   it("mostra os quatro números da janela e nenhum dado de venda", () => {
@@ -176,8 +177,10 @@ describe("bloco 3: WhatsApp dos corretores", () => {
     expect(screen.getByText("Atendimentos ativos")).toBeInTheDocument();
   });
 
-  it("lista só os corretores conectados, ordenados por atendimentos ativos", () => {
+  it("lista só os corretores conectados, ordenados por atendimentos ativos, no painel lateral", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    expect(screen.queryByRole("list", { name: "Corretores conectados, com atendimentos ativos" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Ver corretores \(3\)/ }));
     const list = within(screen.getByRole("list", { name: "Corretores conectados, com atendimentos ativos" }));
     const names = list.getAllByRole("link").map((link) => link.getAttribute("title"));
     expect(names).toEqual(["Ver conversas de Ana Souza", "Ver conversas de Carla Dias", "Ver conversas de Bruno Lima"]);
@@ -239,6 +242,7 @@ describe("movimento", () => {
     const [first] = data.whatsapp.brokers;
     const big = { ...data, whatsapp: { ...data.whatsapp, brokers: [{ ...first!, received: 1234, responding: 1000 }] } };
     render(<DirectorLiteDashboard data={big} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    fireEvent.click(screen.getByRole("button", { name: /Ver corretores/ }));
     expect(screen.getByText(/1\.000 de 1\.234 respondendo/)).toBeInTheDocument();
   });
 });
