@@ -239,6 +239,43 @@
   animation: ct-reveal var(--duration-standard) var(--ease-smooth-out) both;
   animation-delay: calc(min(var(--stagger, 0), 4) * var(--duration-stagger));
 }
+/* Entrada em sequência dos blocos de uma tela (plano de movimento 18/11/2026, etapa 2).
+ * Cada filho direto de .ct-enter-seq sobe 8px, sai de um desfoque leve e aparece; o próximo começa
+ * 80ms depois (passo `line` dos tokens), no máximo 6 passos. `--enter-offset` (em passos) atrasa uma
+ * sequência aninhada para começar depois do bloco que a contém (ex.: os cards de uma grade).
+ * Movimento reduzido, "Menos animação" e kill switch zeram tudo pelas regras do fim deste arquivo. */
+.ct-enter-seq > * {
+  --enter-i: 0;
+  animation: ct-enter var(--duration-considered) var(--ease-enter) backwards;
+  animation-delay: calc((var(--enter-offset, 0) + min(var(--enter-i), 5)) * var(--duration-micro));
+}
+.ct-enter-seq > *:nth-child(2) { --enter-i: 1; }
+.ct-enter-seq > *:nth-child(3) { --enter-i: 2; }
+.ct-enter-seq > *:nth-child(4) { --enter-i: 3; }
+.ct-enter-seq > *:nth-child(5) { --enter-i: 4; }
+.ct-enter-seq > *:nth-child(n + 6) { --enter-i: 5; }
+/* Sequência curta dentro de um bloco (cards de uma grade): passo `item`. */
+.ct-enter-seq-tight > * {
+  --enter-i: 0;
+  animation: ct-enter var(--duration-considered) var(--ease-enter) backwards;
+  animation-delay: calc(var(--enter-offset, 0) * var(--duration-micro) + min(var(--enter-i), 7) * var(--duration-stagger));
+}
+.ct-enter-seq-tight > *:nth-child(2) { --enter-i: 1; }
+.ct-enter-seq-tight > *:nth-child(3) { --enter-i: 2; }
+.ct-enter-seq-tight > *:nth-child(4) { --enter-i: 3; }
+.ct-enter-seq-tight > *:nth-child(5) { --enter-i: 4; }
+.ct-enter-seq-tight > *:nth-child(6) { --enter-i: 5; }
+.ct-enter-seq-tight > *:nth-child(7) { --enter-i: 6; }
+.ct-enter-seq-tight > *:nth-child(n + 8) { --enter-i: 7; }
+@keyframes ct-enter {
+  from { opacity: 0; transform: translateY(var(--distance-base)); filter: blur(var(--blur-small)); }
+  /* Sem "to": o fim é o próprio estilo do elemento, e o fill "backwards" não prende transform depois. */
+}
+/* Com o "Menos animação" do app, só some o deslocamento: a regra global já zera os tempos. */
+html[data-interface-motion="off"] :is(.ct-enter-seq, .ct-enter-seq-tight) > * { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  :is(.ct-enter-seq, .ct-enter-seq-tight) > * { animation: none; }
+}
 @keyframes ct-reveal {
   from { opacity: 0; transform: translateY(var(--distance-micro)); }
   to { opacity: 1; transform: translateY(0); }

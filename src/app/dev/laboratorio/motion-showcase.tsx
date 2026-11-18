@@ -65,7 +65,7 @@ export function MotionShowcase({ delay, failing }: { delay: number; failing: boo
   const table = useReactTable({ data: rows, columns: COLUMNS, getCoreRowModel: getCoreRowModel() });
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <main className="ct-enter-seq mx-auto flex max-w-5xl flex-col gap-6 p-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">Movimento</h1>
         <p className="text-sm text-muted-foreground">
@@ -75,13 +75,13 @@ export function MotionShowcase({ delay, failing }: { delay: number; failing: boo
 
       <SkeletonReveal loading={loading} fallback={<Skeleton className="h-40 w-full" />}>
         <div className="flex flex-col gap-3">
-          <MetricGrid label="Números de hoje">
+          <MetricGrid label="Números de hoje" className="ct-enter-seq-tight" style={{ "--enter-offset": 1 } as React.CSSProperties}>
             <StatCard variant="overview" icon={CalendarCheck} label="Leads hoje" value={47} sublabel="12 em atendimento" info="Leads que entraram desde 00:00." />
             <StatCard variant="overview" icon={UsersThree} label="Corretores no plantão" value={9} sublabel="2 em pausa" />
             <StatCard variant="overview" icon={ChartLineUp} label="Conversão" value="18%" sublabel="+3 pp vs outubro" trend="up" change="+3 pp" />
             <StatCard variant="overview" icon={Clock} tone="warning" label="SLA vencido" value={3} sublabel="sem primeiro contato" />
           </MetricGrid>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="ct-enter-seq-tight grid grid-cols-1 gap-3 sm:grid-cols-2" style={{ "--enter-offset": 2 } as React.CSSProperties}>
             <StatCard icon={CurrencyCircleDollar} label="Vendas no mês" value="R$ 38.450,00" sublabel="14 aguardam implantação" />
             <InsightStrip label={AI_INSIGHT_LABEL}>
               <p>Conversão de <InsightValue>18%</InsightValue> em novembro, <InsightValue>3 pontos</InsightValue> acima de outubro. Hoje são <InsightValue>3</InsightValue> leads com SLA vencido: vale redistribuir antes do almoço.</p>
