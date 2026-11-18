@@ -307,7 +307,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           </p>
         </section>
         */}
-        <div className="ct-enter-seq-tight grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4" style={{ "--enter-offset": 1 } as React.CSSProperties}>
+        <div className="ct-enter-seq-tight grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           <StatCard label="Total de membros" value={members.length} sublabel="últimos 6 meses" sparklineData={membersTrend} sparklineColor="var(--chart-1)" />
           <StatCard label="Acessos ativos" value={activeMembers} sublabel="membros com acesso" sparklineData={membersTrend} sparklineColor="var(--chart-3)" />
           <StatCard label="Leads sem atendimento" value={unassignedCount} sublabel="aguardando corretor" sparklineData={leadsTrend} sparklineColor="var(--chart-4)" />

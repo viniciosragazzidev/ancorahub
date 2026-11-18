@@ -1,24 +1,23 @@
-import { InsightStrip } from "@/components/dashboard/insight-strip";
+import { Badge } from "@/components/arc/badge/badge";
 
 import type { Insight } from "@/features/team-management/insights";
 
-/**
- * Destaques da semana (G4): até três frases do G0, sem número solto. Não aparece sem destaque.
- * Desde 18/11/2026 usa o `InsightStrip` (uma cor só no bloco): o tom vira texto, não selo colorido.
- */
+import styles from "./team-extras.module.css";
+
+/** Destaques da semana (G4): até três frases do G0, sem número solto. Não aparece sem destaque. */
 export function InsightsSection({ insights }: { insights: readonly Insight[] }) {
   if (insights.length === 0) return null;
   return (
-    <InsightStrip label="Destaques">
-      <ul>
+    <section className={`${styles.card} ${styles.insights}`} aria-labelledby="insights-title">
+      <h2 id="insights-title">Destaques</h2>
+      <ul className={styles.insightList}>
         {insights.map((insight) => (
           <li key={insight.id}>
-            <span className="font-medium">{insight.tone === "positive" ? "Bom sinal" : "Atenção"}</span>
-            <span className="text-muted-foreground"> · </span>
-            <span>{insight.message}</span>
+            <Badge tone={insight.tone === "positive" ? "success" : "warning"} size="sm">{insight.tone === "positive" ? "Bom sinal" : "Atenção"}</Badge>
+            <p>{insight.message}</p>
           </li>
         ))}
       </ul>
-    </InsightStrip>
+    </section>
   );
 }

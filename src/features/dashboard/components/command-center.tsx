@@ -71,7 +71,7 @@ function TodayNumbers({ today }: { today: CommandCenterData["today"] }) {
     { label: "Sem 1º contato", value: today.withoutFirstContact, href: "/leads?attention=unworked", action: "Cobrar atendimento", warn: today.withoutFirstContact > 0 },
   ];
   return (
-    <section aria-label="Turno de hoje, desde 19h" style={{ "--enter-offset": 1 } as React.CSSProperties} className="ct-enter-seq-tight grid gap-px overflow-hidden rounded-[var(--radius-card)] border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
+    <section aria-label="Turno de hoje, desde 19h" className="ct-enter-seq-tight grid gap-px overflow-hidden rounded-[var(--radius-card)] border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
       {items.map((item) => (
         <Link
           key={item.label}

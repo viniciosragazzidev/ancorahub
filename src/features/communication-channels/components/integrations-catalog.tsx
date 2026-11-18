@@ -54,7 +54,7 @@ function IntegrationTile({ integration }: { integration: IntegrationCard }) {
       variant="compact"
       className={
         integration.status === "available"
-          ? "h-full cursor-pointer transition-all duration-150 hover:border-primary/50 hover:bg-muted/40 active:scale-[0.99]"
+          ? "h-full cursor-pointer transition-all duration-150 hover:border-primary/50 hover:bg-muted/40 hover:shadow-xs active:scale-[0.99]"
           : "h-full border-dashed opacity-75"
       }
     >

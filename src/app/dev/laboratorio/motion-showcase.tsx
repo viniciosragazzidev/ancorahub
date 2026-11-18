@@ -11,8 +11,7 @@ import { getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-
 import { CalendarCheck, ChartLineUp, Clock, CurrencyCircleDollar, DotsThreeVertical, MagnifyingGlass, UsersThree } from "@phosphor-icons/react";
 
 import { DataTable } from "@/components/data-table/data-table";
-import { AI_INSIGHT_LABEL, InsightStrip, InsightValue } from "@/components/dashboard/insight-strip";
-import { MetricGrid, StatCard } from "@/components/dashboard/metric-card";
+import { StatCard } from "@/components/dashboard/metric-card";
 import { EmptyState } from "@/components/empty-state";
 import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 import { Button } from "@/components/ui/button";
@@ -74,19 +73,12 @@ export function MotionShowcase({ delay, failing }: { delay: number; failing: boo
       </header>
 
       <SkeletonReveal loading={loading} fallback={<Skeleton className="h-40 w-full" />}>
-        <div className="flex flex-col gap-3">
-          <MetricGrid label="Números de hoje" className="ct-enter-seq-tight" style={{ "--enter-offset": 1 } as React.CSSProperties}>
-            <StatCard variant="overview" icon={CalendarCheck} label="Leads hoje" value={47} sublabel="12 em atendimento" info="Leads que entraram desde 00:00." />
-            <StatCard variant="overview" icon={UsersThree} label="Corretores no plantão" value={9} sublabel="2 em pausa" />
-            <StatCard variant="overview" icon={ChartLineUp} label="Conversão" value="18%" sublabel="+3 pp vs outubro" trend="up" change="+3 pp" />
-            <StatCard variant="overview" icon={Clock} tone="warning" label="SLA vencido" value={3} sublabel="sem primeiro contato" />
-          </MetricGrid>
-          <div className="ct-enter-seq-tight grid grid-cols-1 gap-3 sm:grid-cols-2" style={{ "--enter-offset": 2 } as React.CSSProperties}>
-            <StatCard icon={CurrencyCircleDollar} label="Vendas no mês" value="R$ 38.450,00" sublabel="14 aguardam implantação" />
-            <InsightStrip label={AI_INSIGHT_LABEL}>
-              <p>Conversão de <InsightValue>18%</InsightValue> em novembro, <InsightValue>3 pontos</InsightValue> acima de outubro. Hoje são <InsightValue>3</InsightValue> leads com SLA vencido: vale redistribuir antes do almoço.</p>
-            </InsightStrip>
-          </div>
+        <div className="ct-enter-seq-tight grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          <StatCard icon={CalendarCheck} label="Leads hoje" value={47} sublabel="12 em atendimento" />
+          <StatCard icon={UsersThree} label="Corretores no plantão" value={9} sublabel="2 em pausa" />
+          <StatCard icon={ChartLineUp} label="Conversão" value="18%" sublabel="vs outubro" trend="up" change="+3 pp" />
+          <StatCard icon={Clock} label="SLA vencido" value={3} sublabel="sem primeiro contato" />
+          <StatCard icon={CurrencyCircleDollar} label="Vendas no mês" value="R$ 38.450,00" sublabel="14 aguardam implantação" />
         </div>
       </SkeletonReveal>
 

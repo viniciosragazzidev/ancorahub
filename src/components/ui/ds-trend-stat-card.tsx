@@ -32,7 +32,7 @@ export const DsTrendStatCard = React.forwardRef<HTMLDivElement, DsTrendStatCardP
         ref={ref}
         data-slot="ds-trend-stat-card"
         className={cn(
-          "flex flex-col rounded-ds-cards border border-ds-ash bg-ds-canvas-white p-ds-16 font-ds-inter",
+          "flex flex-col rounded-ds-cards border border-ds-ash bg-ds-canvas-white p-ds-16 font-ds-inter transition-colors duration-150 ease-out hover:border-ds-smoke",
           className,
         )}
         {...props}
@@ -58,7 +58,7 @@ export const DsTrendStatCard = React.forwardRef<HTMLDivElement, DsTrendStatCardP
           ) : null}
         </div>
 
-        <p className="mt-ds-12 font-ds-mono text-ds-heading-sm font-semibold tabular-nums text-ds-charcoal">
+        <p className="mt-ds-12 font-ds-mono text-ds-heading font-semibold tabular-nums text-ds-charcoal">
           {value}
         </p>
         {caption ? <p className="mt-ds-4 text-ds-caption text-ds-fog">{caption}</p> : null}

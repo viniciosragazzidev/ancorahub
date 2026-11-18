@@ -121,8 +121,7 @@
 }
 
 :root:has([data-ui-refinement="clean"]) .ui-metric-card-icon {
-  /* Chip do KPI: 8px (docs/design-system.md § Stat / KPI Tile). */
-  border-radius: var(--radius-ds-buttons);
+  border-radius: var(--radius-control);
 }
 
 :root:has([data-ui-refinement="clean"]) .ui-metric-card-source {

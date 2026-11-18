@@ -376,7 +376,7 @@ export function DirectorWizard({
                   <Button
                     onClick={handleComplete}
                     disabled={pending}
-                    className="bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+                    className="bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
                   >
                     {pending ? "Salvando..." : "Comecar a usar"}
                     {!pending && <ArrowRight className="size-4" />}

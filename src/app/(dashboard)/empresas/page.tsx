@@ -66,7 +66,7 @@ export default async function EmpresasPage() {
         </Card>
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Empresas cadastradas">
           {visibleCompanies.map((company) => (
-            <Card key={company.id} className="border-border/70 bg-card shadow-sm transition-[border-color,box-shadow] hover:border-primary/30">
+            <Card key={company.id} className="border-border/70 bg-card shadow-sm transition-[border-color,box-shadow] hover:border-primary/30 hover:shadow-md">
               <CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><CardTitle className="truncate text-base">{company.name}</CardTitle><CardDescription className="mt-1">{company.branchName ?? "Sem unidade"}</CardDescription></div><Badge variant="secondary" className="shrink-0">PJ</Badge></div></CardHeader>
               <CardContent className="space-y-3 text-sm"><div className="flex items-center justify-between gap-3 text-muted-foreground"><span>CNPJ</span><span className="font-medium text-foreground">{company.cnpj ?? "Não informado"}</span></div><div className="flex items-center justify-between gap-3 text-muted-foreground"><span className="flex items-center gap-1.5"><Users className="size-3.5" /> Pessoas</span><span className="font-medium text-foreground tabular-nums">{company.employeeCount ?? "—"}</span></div><div className="border-t border-border/60 pt-3 text-xs text-muted-foreground"><span className="font-semibold tabular-nums text-foreground">{company.leadCount}</span> oportunidade{company.leadCount === 1 ? "" : "s"} vinculada{company.leadCount === 1 ? "" : "s"}</div></CardContent>
             </Card>
