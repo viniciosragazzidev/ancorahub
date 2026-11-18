@@ -216,7 +216,7 @@ export function OperationView({ data, canOpenConversations = true }: { data: Ess
 
         <div className={local.main}>
           <LiteItem index={6} className={local.pairItem}>
-            <section className={kit.panel} aria-labelledby="operation-funnel-title">
+            <section className={`${kit.panel} ${local.qualificationPanel}`} aria-labelledby="operation-funnel-title">
               <h2 id="operation-funnel-title" className={kit.sectionTitle}>Funil de qualificação</h2>
               <div className={local.qualification}>
                 <div className={kit.goal}>
