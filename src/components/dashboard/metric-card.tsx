@@ -211,7 +211,7 @@ export function MetricGrid({
   className?: string;
   /** Nome do grupo para leitor de tela. */
   label?: string;
-  /** Ex.: `--enter-offset` quando a grade entra em sequência (`ct-enter-seq-tight`). */
+  /** Estilo inline opcional do container. */
   style?: React.CSSProperties;
 }) {
   const cols = {
