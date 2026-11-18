@@ -65,7 +65,7 @@ describe("manager desktop chat rail", () => {
     // Desktop has no "Mais" sheet, so Clientes is reachable from the rail.
     expect(rail?.assistants[2]).toMatchObject({ name: "Clientes da unidade", href: "/clientes" });
     expect(rail?.assistants[3]).toMatchObject({ name: "Mensagens da unidade", href: "/mensagens" });
-    expect(rail?.assistants[4]).toMatchObject({ name: "Notificações", href: "/notificacoes", shape: "jack" });
+    expect(rail?.assistants[4]).toMatchObject({ name: "Notificações", href: "/notificacoes", shape: "sasa" });
     expect(rail?.leadsBadgeCount).toBe(2);
     expect(rail?.leads).toHaveLength(3);
     expect(rail?.managerUnitSummary).toMatchObject({ leads: 3, unassigned: 2, activeBrokers: 2, brokersWithoutWhatsApp: 1, late: 1 });

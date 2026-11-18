@@ -64,7 +64,7 @@
 @media (prefers-reduced-motion: reduce) { .root { transition: none; } }
 
 /*
- * A arte da Distribuição é larga (o capitão e três marujos): coluna maior para ela, saindo pelo topo do banner.
+ * A arte oficial do Capitão Âncora é larga: coluna maior para ela, saindo pelo topo do banner.
  * Os seletores repetem tom e pose para pesar mais que as regras do banner compartilhado.
  */
 /* No celular a arte larga vai para cima do texto, centralizada, saindo pelo topo do banner. */

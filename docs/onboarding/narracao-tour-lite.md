@@ -110,15 +110,15 @@ Dica de voz: tom de colega, animado e calmo, 150 a 165 palavras por minuto; cada
 
 > Dicas de Atendimento é o seu analista. A inteligência artificial lê as conversas com os clientes e te diz quem responder primeiro, qual é o próximo passo e dá dicas práticas, como tratar uma objeção ou quando propor o fechamento.
 
-## 09-ancora.mp3 · Jack: avisos e suas perguntas
+## 09-ancora.mp3 · Sasá: avisos e suas perguntas
 
 - Tipo: spotlight · destaque: `thread-ancora` · 10 XP
-- Texto na tela: Os avisos da Âncora chegam aqui, e é aqui que você escreve: pergunte ao Jack o que quiser sobre o seu dia.
+- Texto na tela: Os avisos da Âncora chegam nesta conversa. Você também pode escrever para Sasá e perguntar sobre seu dia.
 - Duração estimada: 12s (36 palavras)
 
 **Narração:**
 
-> Este é o Jack, o assistente verificado da Âncora. Os avisos da empresa chegam aqui, e é aqui que você pode escrever e perguntar o que quiser: quem atender primeiro, seu plantão, seus retornos, sua meta.
+> Sasá é a assistente de convés da Âncora. Os avisos da empresa chegam aqui. Você pode perguntar sobre seus leads, plantão, retornos e meta.
 
 ## 10-desafio.mp3 · Desafio rápido
 

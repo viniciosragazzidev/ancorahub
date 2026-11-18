@@ -4,6 +4,12 @@
 
 - **Experiência do corretor**: interface Lite obrigatória para o corretor; a antiga experiência normal está aposentada para esse papel.
 
+## Identidade visual
+
+- **Capitão Âncora**: mascote principal da Âncora Saúde; marinheiro adulto, acolhedor e experiente, representado com uniforme branco e azul-marinho, âncora dourada e bigode branco.
+- **Assistente de convés**: personagem auxiliar com uniforme branco e azul-marinho simples e pequena âncora, sem as listras de capitão.
+- **Sasá**: assistente de convés que identifica a conversa de avisos e perguntas do corretor. Nome, arte e voz não alteram a rota, permissões, ações ou dados da conversa.
+
 ## Atendimento e pós-venda
 
 - **Lead**: oportunidade comercial e unidade de atendimento; pode representar uma família.

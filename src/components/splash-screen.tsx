@@ -29,7 +29,7 @@ function splashShownAt() {
 }
 
 /**
- * Splash do PWA com o capitão pirata e a marca ÂNCORA (arte original em design/mascote/splash/).
+ * Splash do PWA com o Capitão Âncora e a marca da Âncora Saúde.
  * - Fundo #002B73 (o azul da arte) com o capitão e a marca, já no HTML do servidor (aparece antes do
  *   JavaScript, emendando com a tela do PWA instalado, que usa o mesmo azul em background_color).
  * - Fica até o capitão terminar a animação (cerca de 1,9 s; a splash aparecia e sumia rápido demais) e
@@ -88,13 +88,13 @@ export function SplashScreen() {
 
   if (phase === "gone") return null;
 
-  // Arte da splash aprovada em 14/11/2026 (design/mascote/splash/): o capitão e a marca ÂNCORA, separados
+  // Ilustração oficial do Capitão Âncora e marca ÂNCORA separadas
   // para o capitão entrar e dar um pulinho enquanto a marca aparece logo depois. Fundo do mesmo azul da arte.
   return (
     <div className={styles.splash} data-phase={phase} data-splash-screen="" aria-hidden="true">
       <div className={styles.content}>
         {/* eslint-disable-next-line @next/next/no-img-element -- arte local, precisa estar no HTML antes do JS */}
-        <img ref={hero} className={styles.hero} src="/mascote/splash-capitao.webp" width={645} height={735} alt="" fetchPriority="high" decoding="async" draggable={false} />
+        <img ref={hero} className={styles.hero} src="/mascote/splash-capitao.webp" width={1145} height={1374} alt="" fetchPriority="high" decoding="async" draggable={false} />
         {/* eslint-disable-next-line @next/next/no-img-element -- marca local, precisa estar no HTML antes do JS */}
         <img className={styles.wordmark} src="/mascote/splash-ancora.webp" width={710} height={240} alt="" decoding="async" draggable={false} />
       </div>

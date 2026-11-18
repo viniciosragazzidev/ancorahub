@@ -69,7 +69,7 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
           { id: "assistant:equipe", kind: "assistant", assistant: "equipe", name: "Minha unidade", verified: true, preview: `${inService} ${inService === 1 ? "corretor" : "corretores"} em atendimento na unidade.`, at: now.toISOString(), unread: false, waitingYou: late > 0, href: "/equipe", shape: "mochi", hue: 150, avatarAsset: "equipe" },
           { id: "assistant:clientes", kind: "assistant", name: "Clientes da unidade", verified: true, preview: "Clientes conquistados pela unidade e renovações.", at: now.toISOString(), unread: false, waitingYou: false, href: "/clientes", shape: "cubo", hue: 210, avatarAsset: "carteira" },
           { id: "assistant:mensagens", kind: "assistant", name: "Mensagens da unidade", verified: true, preview: "As conversas de WhatsApp dos corretores da unidade.", at: now.toISOString(), unread: false, waitingYou: false, href: "/mensagens", shape: "onigiri", hue: 30, avatarAsset: "mensagens" },
-          { id: "assistant:ancora", kind: "assistant", assistant: "ancora", name: "Notificações", verified: true, preview: "Avisos e atualizações da unidade.", at: now.toISOString(), unread: false, waitingYou: false, href: "/notificacoes", shape: "jack", hue: 175 },
+          { id: "assistant:ancora", kind: "assistant", assistant: "ancora", name: "Notificações", verified: true, preview: "Avisos e atualizações da unidade.", at: now.toISOString(), unread: false, waitingYou: false, href: "/notificacoes", shape: "sasa", hue: 175 },
         ],
         leads: buildTeamLeadThreads(data.leads, data.slaMinutes, now), nowIso: now.toISOString(), canQuote: false, leadsBadgeCount: waiting,
         managerUnitSummary: {

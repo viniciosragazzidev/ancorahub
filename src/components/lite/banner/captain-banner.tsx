@@ -10,10 +10,10 @@ import styles from "./captain-banner.module.css";
 
 export type CaptainBannerArt = { src: string; width: number; height: number };
 
-/** Arte provisória (o capitão com o baú) até as artes próprias de cada banner chegarem. */
-export const CAPTAIN_TREASURE_ART: CaptainBannerArt = { src: "/mascote/venda-capitao.webp", width: 584, height: 640 };
+/** Ilustração padrão do Capitão Âncora; banners de área podem fornecer uma pose própria. */
+export const CAPTAIN_WELCOME_ART: CaptainBannerArt = { src: "/mascote/splash-capitao.webp", width: 1145, height: 1374 };
 
-export function CaptainBanner({ label, title, subtitle, facts, goal, progress, action, actionSlot, art = CAPTAIN_TREASURE_ART, tone = "navy", pose = "rise", size = "regular", className }: {
+export function CaptainBanner({ label, title, subtitle, facts, goal, progress, action, actionSlot, art = CAPTAIN_WELCOME_ART, tone = "navy", pose = "rise", size = "regular", className }: {
   /** Nome acessível da região. */
   label: string;
   title: ReactNode;

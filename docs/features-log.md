@@ -1,5 +1,11 @@
 # Histórico de Funcionalidades Adicionadas (Features Log)
 
+## 18/11/2026 - Identidade do Capitão Âncora e da Sasá
+
+- Artes e referências visuais ativas do mascote atualizadas para o Capitão Âncora; a conversa de avisos passa a usar Sasá, assistente de convés. Copy de distribuição e financeiro adota termos diretos de trabalho; os dez ícones objetuais das rotas, as funções, IDs técnicos, permissões e caminhos permanecem.
+- As duas versões renderizadas do vídeo de boas-vindas ainda contêm Jack. A fonte editável do projeto não está neste repositório; atualização e render dos vídeos permanecem pendentes até o projeto ser recuperado.
+- Decisão: DEC-188. Contrato visual: `docs/design-system/MASCOTE.md`. Registro: `docs/implementations/active/2026-11-18-identidade-capitao-ancora.md`.
+
 ## 17/11/2026 - Egress da distribuição: consultas memorizadas por passo
 
 - `processQueuedLead` reutiliza o roster e as unidades de fallback dentro do mesmo passo do lead. A reentrada por corretor sem canal compartilha o snapshot; reentradas que mudam fila ou ciclo iniciam um passo novo e consultam o estado atualizado. Testes comparam a sequência de corretores com e sem memo e contam as consultas.

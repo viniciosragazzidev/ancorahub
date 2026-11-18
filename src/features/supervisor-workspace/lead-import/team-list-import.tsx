@@ -30,9 +30,9 @@ const realApi: TeamListApi = {
 type Step = "lista" | "conferir" | "distribuir";
 type Celebration = { key: string; budgetKey: string; title: string; message: string; stats: SaleCelebrationStat[]; art: { src: string; width: number; height: number }; continueLabel: string };
 
-/** Arte do capitão: subindo (lista importada) e com o baú (lista distribuída). */
-const IMPORT_ART = { src: "/mascote/desempenho-subindo.webp", width: 640, height: 557 };
-const DISTRIBUTE_ART = { src: "/mascote/distribuicao-capitao-bau.webp", width: 800, height: 539 };
+/** Arte do Capitão Âncora para a lista importada e para a distribuição concluída. */
+const IMPORT_ART = { src: "/mascote/desempenho-subindo.webp", width: 1145, height: 1374 };
+const DISTRIBUTE_ART = { src: "/mascote/distribuicao-capitao-leads.webp", width: 1312, height: 1199 };
 type Review = { organized: Organized; known: Set<string>; weekLeft: number; cut: number };
 
 const fmt = (n: number) => n.toLocaleString("pt-BR");

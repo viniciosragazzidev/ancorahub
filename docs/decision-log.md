@@ -1,5 +1,13 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-188 - Identidade oficial do Capitão Âncora e da Sasá
+
+**Estado:** aprovada por Vinicios em 2026-11-18. **Escopo:** identidade visual e copy ativa.
+
+O mascote principal do CorreTop passa a ser o Capitão Âncora conforme a prancha oficial recebida nesta sessão: marinheiro adulto, rosto pêssego arredondado, nariz alaranjado, olhos castanhos, bigode branco curvado, boné branco com aba azul-marinho e âncora dourada, camisa branca, lenço e calça azul-marinho, listras douradas nos ombros e âncora dourada no peito. Aplicar a paleta aprovada (#002B73, #0B5ED7, #00B26B, #7ED957, #FFC400, #FF8A65, #FFF6E9 e #1F2937) e conservar rosto, uniforme e proporções entre poses.
+
+Sasá é a assistente de convés da conversa de avisos e perguntas, com uniforme simples e sem insígnias de capitão. Trocar as referências ativas a Jack e ao imaginário pirata por nomes e linguagem direta de trabalho. Os dez ícones objetuais das rotas permanecem como estão. Preservar IDs técnicos, rotas, permissões, ações, conteúdo funcional, controles existentes e preferências de movimento. Vídeos já renderizados não são considerados atualizados: seus arquivos de projeto editáveis precisam ser substituídos e re-renderizados para completar a migração audiovisual. Registro: `docs/implementations/active/2026-11-18-identidade-capitao-ancora.md`.
+
 ## DEC-186 - ERP nas duas peles do design system e endurecimento de cargos
 
 **Estado:** aceita. **Data:** 2026-11-12.

@@ -26,7 +26,7 @@ type AssistantDefinition = {
 };
 
 export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
-  ancora: { name: "Jack", shape: "jack", hue: 175, verified: true, href: "/dashboard/c/ancora" },
+  ancora: { name: "Sasá", shape: "sasa", hue: 175, verified: true, href: "/dashboard/c/ancora" },
   leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/minha-fila", avatarAsset: "leads" },
   // Início reorganizado (BROKER_NAV_REORG): a carteira abre a página, não uma conversa.
   carteira: { name: "Minha carteira", shape: "salte", hue: 190, href: "/clientes", avatarAsset: "carteira" },
@@ -167,7 +167,7 @@ function assistantThread(id: AssistantId, values: Pick<ThreadSummary, "preview" 
     assistant: id,
     name: assistant.name,
     verified: assistant.verified,
-    // Jack is pinned to the top: the one conversation where the broker writes.
+    // Sasá is pinned to the top: the one conversation where the broker writes.
     pinned: id === "ancora",
     href: assistant.href,
     shape: assistant.shape,
@@ -222,7 +222,7 @@ export function buildAssistantThreads(input: {
 }
 
 /**
- * Início reorganizado (plano do modo corretor, etapa 1): o Jack fixo no topo e os acessos numa ordem estável
+ * Início reorganizado (plano do modo corretor, etapa 1): o Sasá fixo no topo e os acessos numa ordem estável
  * (Meus leads, Minha carteira, Plantão, Agenda, Desempenho, Cotação). Dicas de Atendimento e Jornada saem do Início:
  * a Jornada abre pelo Desempenho. O que pede atenção continua marcado em cada linha e no flutuante Agora.
  */
@@ -819,31 +819,31 @@ function dayLabel(date: Date, now: Date) {
  * The Âncora thread: the broker's notifications as messages from the company,
  * oldest first and grouped by day, with a marker before the unread ones.
  */
-/** Questions ready to tap in Jack's conversation: the reply value is sent to the AI as if typed. */
-export const JACK_ASK_PREFIX = "ask:";
-const JACK_ASKS: ChatChoice[] = [
-  { id: "jack-first", label: "Quem eu atendo primeiro?", action: { kind: "local", value: `${JACK_ASK_PREFIX}Quem eu atendo primeiro agora?` } },
-  { id: "jack-day", label: "Como está meu dia?", action: { kind: "local", value: `${JACK_ASK_PREFIX}Como está o meu dia até agora?` } },
+/** Questions ready to tap in Sasá's conversation: the reply value is sent to the AI as if typed. */
+export const SASA_ASK_PREFIX = "ask:";
+const SASA_ASKS: ChatChoice[] = [
+  { id: "sasa-first", label: "Quem eu atendo primeiro?", action: { kind: "local", value: `${SASA_ASK_PREFIX}Quem eu atendo primeiro agora?` } },
+  { id: "sasa-day", label: "Como está meu dia?", action: { kind: "local", value: `${SASA_ASK_PREFIX}Como está o meu dia até agora?` } },
 ];
 
-/** Questions about the operator material, ready to tap (pilot of the Jack with the RAG, 23/10). */
-export type JackMaterialAsk = { id: string; label: string; question: string };
+/** Questions about the operator material, ready to tap (pilot of the Sasá with the RAG, 23/10). */
+export type SasaMaterialAsk = { id: string; label: string; question: string };
 
-function materialChoices(asks: JackMaterialAsk[] | undefined): ChatChoice[] {
-  return (asks ?? []).slice(0, 3).map((ask) => ({ id: ask.id, label: ask.label, hint: "Material das operadoras", reply: ask.question, action: { kind: "local", value: `${JACK_ASK_PREFIX}${ask.question}` } }));
+function materialChoices(asks: SasaMaterialAsk[] | undefined): ChatChoice[] {
+  return (asks ?? []).slice(0, 3).map((ask) => ({ id: ask.id, label: ask.label, hint: "Material das operadoras", reply: ask.question, action: { kind: "local", value: `${SASA_ASK_PREFIX}${ask.question}` } }));
 }
 
-export function buildAncoraScript(input: { notifications: AncoraNotification[]; now: Date; materialAsks?: JackMaterialAsk[] }): ChatScript {
+export function buildAncoraScript(input: { notifications: AncoraNotification[]; now: Date; materialAsks?: SasaMaterialAsk[] }): ChatScript {
   const { now } = input;
   const materials = materialChoices(input.materialAsks);
   const items = [...input.notifications].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   if (!items.length) {
     return {
       blocks: [
-        assistantMessage("ancora-empty", "Oi, eu sou o Jack! Aqui chegam os avisos da Âncora e você pode me perguntar o que quiser sobre o seu dia: quem atender primeiro, seu plantão, seus retornos, sua meta. É só escrever aqui embaixo."),
-        question("ancora-choice", "Quer começar por uma destas?", [...JACK_ASKS, ...materials]),
+        assistantMessage("ancora-empty", "Oi, aqui é Sasá, assistente de convés da Âncora. Os avisos chegam nesta conversa. Você também pode perguntar sobre seus leads, plantão, retornos e meta."),
+        question("ancora-choice", "Quer começar por uma destas?", [...SASA_ASKS, ...materials]),
       ],
-      composerPlaceholder: "Pergunte ao Jack",
+      composerPlaceholder: "Pergunte ao Sasá",
       status: { label: "Sem avisos novos", tone: "idle" },
     };
   }
@@ -872,15 +872,15 @@ export function buildAncoraScript(input: { notifications: AncoraNotification[]; 
     choices.push({ id: "relationship-ack", label: "Ciente", reply: "Ciente", action: { kind: "server", name: "relationship.ack", payload: {} } });
   }
   if (unread.length) choices.push({ id: "mark-all", label: "Marcar tudo como lido", reply: "Já vi, pode marcar como lido", action: { kind: "server", name: "notifications.markRead", payload: {} } });
-  // Jack answers in this same conversation: two questions ready to tap (the AI answers them).
-  blocks.push(assistantMessage("ancora-jack-hint", vary(["Precisa de algo? É só me perguntar aqui embaixo.", "Me pergunte o que quiser sobre o seu dia.", "Quer saber quem atender primeiro? Toque abaixo ou escreva.", "Estou por aqui para o que precisar."], now, 3)));
-  choices.push(...JACK_ASKS, ...materials);
+  // Sasá answers in this same conversation: two questions ready to tap (the AI answers them).
+  blocks.push(assistantMessage("ancora-sasa-hint", vary(["Precisa de algo? É só me perguntar aqui embaixo.", "Me pergunte o que quiser sobre o seu dia.", "Quer saber quem atender primeiro? Toque abaixo ou escreva.", "Estou por aqui para o que precisar."], now, 3)));
+  choices.push(...SASA_ASKS, ...materials);
   choices.push({ id: "settings", label: "Configurar avisos", hint: "Notificações no celular e pop-up de lead", action: { kind: "href", href: "/notificacoes" } });
   blocks.push(question("ancora-choice", unread.length ? "O que você quer fazer?" : "Tudo lido. Quer me perguntar algo?", choices));
 
   return {
     blocks,
-    composerPlaceholder: "Pergunte ao Jack",
+    composerPlaceholder: "Pergunte ao Sasá",
     status: unread.length ? { label: unread.length === 1 ? "1 aviso novo" : `${unread.length} avisos novos`, tone: "waiting" } : { label: "Tudo lido", tone: "idle" },
   };
 }

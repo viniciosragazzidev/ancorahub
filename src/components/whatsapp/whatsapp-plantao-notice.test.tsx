@@ -127,7 +127,7 @@ describe("WhatsAppPlantaoNotice", () => {
     expect(screen.queryByRole("button", { name: "Fechar aviso" })).toBeNull();
   });
 
-  it("omite o aviso diário na conversa com Jack, que tem o aviso fixo", async () => {
+  it("omite o aviso diário na conversa com Sasá, que tem o aviso fixo", async () => {
     pathname.current = "/dashboard/c/ancora";
     render(<WhatsAppPlantaoNotice userId="user-1" mode="daily" />);
 

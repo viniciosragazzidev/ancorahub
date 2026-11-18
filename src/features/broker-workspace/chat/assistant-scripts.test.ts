@@ -15,7 +15,7 @@ function journey(): BrokerJourneyData {
 const dailySummary: JourneyCelebration = { id: "summary-1", userId: "broker-1", kind: "daily_summary", payload: { kind: "daily_summary", date: "2026-10-08", received: 6, onTimeContacts: 5, points: 85 }, priority: 10, createdAt: "2026-10-08T22:00:00Z", seenAt: "2026-10-08T22:10:00Z" };
 
 describe("Início reorganizado (BROKER_NAV_REORG)", () => {
-  it("keeps Jack on top and the plan's order, without Dicas de Atendimento and Jornada, with Minha carteira", () => {
+  it("keeps Sasá on top and the plan's order, without Dicas de Atendimento and Jornada, with Minha carteira", () => {
     const threads = buildAssistantThreads({ data: workspace({ queue: [lead()] }), now, journey: journey(), capabilities: { quoteSimulator: true, dutyCalendar: true, journey: true, homeV2: true } });
     expect(threads.map((t) => t.assistant)).toEqual(["ancora", "leads", "carteira", "plantao", "agenda", "desempenho", "cotacao"]);
     expect(threads.find((t) => t.assistant === "carteira")).toMatchObject({ name: "Minha carteira", href: "/clientes", waitingYou: false });
@@ -192,7 +192,7 @@ function questionBlocks(script: ChatScript) {
 describe("broker chat assistant scripts", () => {
   it("declares assistant identities, mascots, hues and routes from the contract", () => {
     expect(ASSISTANTS).toMatchObject({
-      ancora: { name: "Jack", shape: "jack", hue: 175, verified: true, href: "/dashboard/c/ancora" },
+      ancora: { name: "Sasá", shape: "sasa", hue: 175, verified: true, href: "/dashboard/c/ancora" },
       leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/minha-fila" },
       plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/plantoes/agora" },
       agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/agenda" },
@@ -245,7 +245,7 @@ describe("broker chat assistant scripts", () => {
       today: { ...workspace().today, unreadNotifications: 1, receivedToday: 1 },
     });
     const threads = buildAssistantThreads({ data, capabilities: { quoteSimulator: false, dutyCalendar: true }, now });
-    // Jack is pinned first; then waiting, unread, latest.
+    // Sasá is pinned first; then waiting, unread, latest.
     expect(threads[0]).toMatchObject({ assistant: "ancora", pinned: true, unread: true, waitingYou: false });
     expect(threads[1]?.assistant).toBe("leads");
     expect(threads[2]?.assistant).toBe("plantao");
@@ -456,14 +456,14 @@ describe("buildAncoraScript", () => {
       ],
     });
     const ids = script.blocks.map((block) => block.id);
-    expect(ids).toEqual(["ancora-day-2026-10-08", "ancora-1", "ancora-day-2026-10-09", "ancora-unread", "ancora-2", "ancora-3", "ancora-jack-hint", "ancora-choice"]);
+    expect(ids).toEqual(["ancora-day-2026-10-08", "ancora-1", "ancora-day-2026-10-09", "ancora-unread", "ancora-2", "ancora-3", "ancora-sasa-hint", "ancora-choice"]);
     expect(script.blocks[0]).toMatchObject({ label: "Ontem" });
     expect(script.blocks.find((block) => block.id === "ancora-unread")).toMatchObject({ text: "2 avisos novos" });
     expect(script.blocks.find((block) => block.id === "ancora-3")).toMatchObject({ type: "notice", title: "Aviso 3", message: "Detalhe 3", at: "10:00", unread: true, leadId: "lead-7" });
     expect(script.blocks.find((block) => block.id === "ancora-1")).toMatchObject({ type: "notice", unread: false });
-    expect(questionBlocks(script)[0]?.choices.map(({ id }) => id)).toEqual(["open-lead", "mark-all", "jack-first", "jack-day", "settings"]);
+    expect(questionBlocks(script)[0]?.choices.map(({ id }) => id)).toEqual(["open-lead", "mark-all", "sasa-first", "sasa-day", "settings"]);
     expect(questionBlocks(script)[0]?.choices[2]?.action).toEqual({ kind: "local", value: "ask:Quem eu atendo primeiro agora?" });
-    expect(script.composerPlaceholder).toBe("Pergunte ao Jack");
+    expect(script.composerPlaceholder).toBe("Pergunte ao Sasá");
     expect(questionBlocks(script)[0]?.choices[0]?.action).toEqual({ kind: "href", href: "/leads/lead-7" });
     expect(questionBlocks(script)[0]?.choices[1]?.action).toEqual({ kind: "server", name: "notifications.markRead", payload: {} });
     expect(script.status).toMatchObject({ label: "2 avisos novos", tone: "waiting" });
@@ -473,7 +473,7 @@ describe("buildAncoraScript", () => {
   it("explains the thread when there is nothing yet and stays calm when all is read", () => {
     expect(buildAncoraScript({ now, notifications: [] }).blocks[0]).toMatchObject({ id: "ancora-empty" });
     const read = buildAncoraScript({ now, notifications: [notification("1", "2026-10-09T08:00:00-03:00", true)] });
-    expect(questionBlocks(read)[0]?.choices.map(({ id }) => id)).toEqual(["jack-first", "jack-day", "settings"]);
+    expect(questionBlocks(read)[0]?.choices.map(({ id }) => id)).toEqual(["sasa-first", "sasa-day", "settings"]);
     expect(read.status?.tone).toBe("idle");
   });
 

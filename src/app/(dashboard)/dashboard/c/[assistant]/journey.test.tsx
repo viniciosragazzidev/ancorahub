@@ -52,9 +52,9 @@ it.each([
   mocks.audience.mockResolvedValue("supervisor");
   await expect(request(assistant)).rejects.toThrow(`redirect:${href}`);
 });
-it("keeps Jack in the assistant route and rejects assistants from another audience", async () => {
-  const jack = await request("ancora");
-  expect(jack).toBeTruthy();
+it("keeps Sasá in the assistant route and rejects assistants from another audience", async () => {
+  const ancoraThread = await request("ancora");
+  expect(ancoraThread).toBeTruthy();
 
   mocks.context.mockResolvedValue({ role: "supervisor", tenantId: "tenant-text", userId: "supervisor-text" });
   mocks.audience.mockResolvedValue("supervisor");

@@ -17,6 +17,8 @@ Se o vídeo (ou outro feito com essa voz e esses efeitos) for usado fora da Ânc
 
 Fora do git (`/video/` no `.gitignore`): `video/boas-vindas/hf-v3/` (HyperFrames, versão 3: 14 cenas, Jack, Dicas de Atendimento, pontos; copy aprovada pelo Vinicios em 2026-10-13; trilha Cat Walk estendida com emenda), `video/boas-vindas/hf-v2/` (versão 2), `video/boas-vindas/audio-v2/` (música e efeitos) e `video/boas-vindas/desktop/` (composição 16:9). Plano completo: `docs/implementations/active/2026-10-12-video-boas-vindas.md`.
 
+Status em 18/11/2026: os MP4s ativos ainda contêm Jack. A pasta-fonte `video/boas-vindas/hf-v3/` não estava disponível nos worktrees revisados; reabrir a composição com o Capitão Âncora e Sasá e exportar as versões mobile/desktop quando a fonte for recuperada.
+
 ## Voz da introdução do roteiro de presença (09/11/2026)
 
 `public/onboarding/narracao/presenca/*.mp3` (abertura e uma narração por etapa, 10/11): mesma voz ("Liam", `eleven_multilingual_v2`), mesma conta

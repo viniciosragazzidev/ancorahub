@@ -29,7 +29,7 @@ function moodMotion(mood: MascotMood, reduce: boolean | null): { animate: Target
   };
 }
 
-const SHAPES: Record<Exclude<MascotShape, "logo" | "jack">, string> = {
+const SHAPES: Record<Exclude<MascotShape, "logo" | "sasa">, string> = {
   // 64x64 viewBox; every body leaves room under it for the soft shadow.
   mochi: "M8 40c0-15 10.7-26 24-26s24 11 24 26c0 6-4 9-10 9H18c-6 0-10-3-10-9Z",
   onigiri: "M28.6 13.8c1.6-2.6 5.2-2.6 6.8 0l17.4 28.9c1.6 2.7-.3 6.3-3.4 6.3H14.6c-3.1 0-5-3.6-3.4-6.3l17.4-28.9Z",
@@ -104,8 +104,8 @@ export function AssistantAvatar({
     );
   }
 
-  if (shape === "jack") {
-    // Jack é o capitão pirata do ícone do app (public/mascote/jack-capitao.webp, recorte do ícone de 14/11/2026).
+  if (shape === "sasa") {
+    // Sasá é a assistente de convés; usa uniforme simples e mantém as reações da conversa.
     // Mesmas reações do mascote: respira trabalhando, uma passada por humor e o ponto azul esperando.
     const { animate, transition } = moodMotion(mood, reduce);
     const working = state === "working" && !reduce;
@@ -119,7 +119,7 @@ export function AssistantAvatar({
           style={{ display: "block", width: size, height: size, borderRadius: 999, transformOrigin: "50% 80%" }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- arte local pequena, usada em vários tamanhos */}
-          <img src="/mascote/jack-capitao.webp" width={size} height={size} alt="" draggable={false} style={{ display: "block", width: size, height: size, borderRadius: 999 }} />
+          <img src="/mascote/sasa-assistente-conves.webp" width={size} height={size} alt="" draggable={false} style={{ display: "block", width: size, height: size, borderRadius: 999, objectFit: "contain" }} />
         </motion.span>
         {state === "waiting" ? (
           <span aria-hidden="true" style={{ position: "absolute", right: 0, top: 0, width: Math.max(8, size * 0.2), height: Math.max(8, size * 0.2), borderRadius: 999, background: "oklch(36% 0.14 262)", boxShadow: "0 0 0 2px var(--surface)" }} />
