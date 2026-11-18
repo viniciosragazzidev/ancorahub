@@ -340,7 +340,7 @@ function NegotiationsRadarClassic({
               <Card 
                 key={lead.id} 
                 className={cn(
-                  "relative flex flex-col justify-between overflow-hidden border transition-all",
+                  "relative flex flex-col justify-between overflow-hidden border transition-all hover:shadow-md",
                   lead.isHot && "border-emerald-500/30 bg-gradient-to-br from-emerald-500/[0.02] to-card",
                   lead.hasRisk && "border-destructive/30 bg-gradient-to-br from-destructive/[0.02] to-card",
                   !lead.isHot && !lead.hasRisk && "border-border/80 bg-card"

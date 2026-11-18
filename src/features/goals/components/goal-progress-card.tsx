@@ -103,7 +103,7 @@ export function GoalProgressCard({
   }
 
   return (
-    <Card className="border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25 group/card">
+    <Card className="border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-sm group/card">
       <CardContent className="p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">

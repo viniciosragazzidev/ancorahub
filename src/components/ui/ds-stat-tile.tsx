@@ -34,7 +34,7 @@ const TONE_CHIP: Record<DsStatTileTone, string> = {
 /**
  * Stat / KPI Tile — docs/design-system.md § Stat / KPI Tile.
  * Meant to sit inside a DsDashboardCard (this component is content-only, no
- * border of its own). Number in Geist Mono 24px (`text-ds-heading-sm`) — the doc already reserves
+ * border of its own). Number in Geist Mono 24px — the doc already reserves
  * that face/size for "large code display elements".
  */
 export const DsStatTile = React.forwardRef<HTMLDivElement, DsStatTileProps>(
@@ -56,7 +56,7 @@ export const DsStatTile = React.forwardRef<HTMLDivElement, DsStatTileProps>(
           <p className="font-ds-inter text-ds-caption text-ds-steel">{label}</p>
         </div>
         {value !== undefined ? (
-          <p className={cn("font-ds-mono text-ds-heading-sm font-semibold tabular-nums", TONE_TEXT[tone])}>
+          <p className={cn("font-ds-mono text-ds-body-lg font-semibold tabular-nums", TONE_TEXT[tone])}>
             {value}
           </p>
         ) : (

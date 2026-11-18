@@ -374,11 +374,11 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
             {activeTab === "overview" && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:gap-3 lg:grid-cols-3 2xl:grid-cols-5">
-                  <StatCard label="Leads atendidos" value={initialStats.operation.startedToday} sublabel={`${initialStats.operation.active} ativos | ${initialStats.operation.transferredToHuman} trans. humano`} icon={Activity} />
-                  <StatCard label="Taxa de qualificação" value={initialStats.qualification.totalQualified} sublabel={`${initialStats.qualification.hotLeads} quentes | ${initialStats.qualification.completionRatePct}% conclusão`} icon={Sparkles} tone="warning" />
-                  <StatCard label="Fila de espera" value={initialStats.distribution.waitingQueue} sublabel={`${initialStats.distribution.waitingQueue} em fila`} icon={Clock} />
-                  <StatCard label="Custo de operação" value={`R$ ${(initialStats.costs.aiCostBrl + initialStats.costs.whatsappCostBrl).toFixed(2)}`} sublabel={`R$ ${initialStats.costs.avgCostPerSessionBrl.toFixed(2)} / atendimento`} icon={DollarSign} tone="success" valueClassName="text-emerald-700" />
-                  <StatCard label="Follow-ups ativos" value={`${initialStats.followup.sent} enviados`} sublabel={`${initialStats.followup.conversionsPostFollowup} rec. pós-followup`} icon={RotateCcw} />
+                  <StatCard label="Leads atendidos" value={initialStats.operation.startedToday} sublabel={`${initialStats.operation.active} ativos | ${initialStats.operation.transferredToHuman} trans. humano`} icon={Activity} iconClassName="bg-primary/10 text-primary" />
+                  <StatCard label="Taxa de qualificação" value={initialStats.qualification.totalQualified} sublabel={`${initialStats.qualification.hotLeads} quentes | ${initialStats.qualification.completionRatePct}% conclusão`} icon={Sparkles} iconClassName="bg-amber-500/10 text-amber-600" />
+                  <StatCard label="Fila de espera" value={initialStats.distribution.waitingQueue} sublabel={`${initialStats.distribution.waitingQueue} em fila`} icon={Clock} iconClassName="bg-violet-500/10 text-violet-600" />
+                  <StatCard label="Custo de operação" value={`R$ ${(initialStats.costs.aiCostBrl + initialStats.costs.whatsappCostBrl).toFixed(2)}`} sublabel={`R$ ${initialStats.costs.avgCostPerSessionBrl.toFixed(2)} / atendimento`} icon={DollarSign} iconClassName="bg-emerald-500/10 text-emerald-600" valueClassName="text-emerald-700" />
+                  <StatCard label="Follow-ups ativos" value={`${initialStats.followup.sent} enviados`} sublabel={`${initialStats.followup.conversionsPostFollowup} rec. pós-followup`} icon={RotateCcw} iconClassName="bg-sky-500/10 text-sky-600" />
                 </div>
                 <div className="grid gap-6 md:grid-cols-2">
               <Card className="border-border/70">

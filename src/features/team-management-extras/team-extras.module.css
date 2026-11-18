@@ -28,6 +28,10 @@
 .sectionHeading span { color: var(--text-muted); font-size: var(--text-xs); }
 .muted { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
 
+.insights { gap: 10px; }
+.insightList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.insightList li { display: grid; justify-items: start; gap: 6px; padding: 12px; border-radius: 1rem; background: var(--surface-muted); }
+.insightList p { margin: 0; font-size: var(--text-sm); }
 
 .goals { gap: 16px; }
 .goalBlock { display: grid; gap: 8px; }

@@ -704,7 +704,7 @@ export function CustomRolesWorkspace({
             <Card
               key={role.id}
               className={[
-                "group relative hover:border-primary/30 transition-all cursor-pointer overflow-hidden border border-border/80 bg-card",
+                "group relative hover:border-primary/30 transition-all hover:shadow-md cursor-pointer overflow-hidden border border-border/80 bg-card",
                 role.status === "archived" && "opacity-60",
               ].join(" ")}
               onClick={() => setSelectedId(role.id)}

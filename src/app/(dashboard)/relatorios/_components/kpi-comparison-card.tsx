@@ -2,7 +2,6 @@ import { cn } from "@/lib/utils";
 import type { ComparisonDelta } from "@/features/reports/metrics/metrics-math";
 import { TrendUp, TrendDown } from "@/components/huge-icons";
 import { DashboardCard } from "@/components/dashboard-card";
-import { STAT_TONE_CHIP, type StatCardTone } from "@/components/dashboard/metric-card";
 import type { ComponentType } from "react";
 
 interface IconComponentProps {
@@ -14,8 +13,7 @@ interface KpiComparisonCardProps {
   readonly value: string | number;
   readonly sublabel: string;
   readonly icon: ComponentType<IconComponentProps>;
-  /** Tom do chip (azul por padrão; semântico só para status real). */
-  readonly tone?: StatCardTone;
+  readonly iconClassName?: string;
   readonly delta?: ComparisonDelta;
   readonly isCurrency?: boolean;
 }
@@ -74,7 +72,7 @@ export function KpiComparisonCard({
   value,
   sublabel,
   icon: Icon,
-  tone = "default",
+  iconClassName,
   delta,
   isCurrency,
 }: KpiComparisonCardProps) {
@@ -85,10 +83,9 @@ export function KpiComparisonCard({
     >
       <div className="flex items-center justify-between">
         <div
-          aria-hidden="true"
           className={cn(
-            "ui-metric-card-icon flex size-7 items-center justify-center rounded-ds-buttons",
-            STAT_TONE_CHIP[tone],
+            "ui-metric-card-icon flex size-9 items-center justify-center",
+            iconClassName,
           )}
         >
           <Icon className="size-4" />
@@ -97,7 +94,7 @@ export function KpiComparisonCard({
       </div>
       <div className="mt-3">
         <p
-          className="ui-metric-card-value truncate font-ds-mono text-ds-heading-sm font-semibold tabular-nums"
+          className="ui-metric-card-value truncate text-lg font-semibold sm:text-2xl"
           title={String(value)}
         >
           {value}

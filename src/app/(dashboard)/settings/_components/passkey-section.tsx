@@ -159,7 +159,7 @@ export function PasskeySection() {
               size="lg"
               onClick={() => addBiometricsPasskey(isMobile ? "platform" : undefined)}
               disabled={busy === "add"}
-              className="h-12 w-full sm:w-auto rounded-xl bg-primary text-primary-foreground font-semibold px-6 shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm"
+              className="h-12 w-full sm:w-auto rounded-xl bg-primary text-primary-foreground font-semibold px-6 shadow-md hover:shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm"
             >
               <Fingerprint className={`size-5 ${busy === "add" ? "animate-spin" : ""}`} />
               {busy === "add" ? "Aguardando leitura..." : "Cadastrar Biometria"}
