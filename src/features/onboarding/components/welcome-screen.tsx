@@ -457,7 +457,7 @@ export function WelcomeScreen({
                 {hasPendingEssential && firstPending ? (
                   <Button
                     size="lg"
-                    className={`group relative overflow-hidden bg-gradient-to-r ${config.warning} px-6 text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]`}
+                    className={`group relative overflow-hidden bg-gradient-to-r ${config.warning} px-6 text-white shadow-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]`}
                     onClick={() => handleStepNavigate(firstPending.href!)}
                   >
                     <span className="relative z-10 flex items-center gap-2">
@@ -470,7 +470,7 @@ export function WelcomeScreen({
                   <Link href={config.ctaHref}>
                     <Button
                       size="lg"
-                      className={`group relative overflow-hidden bg-gradient-to-r ${config.warning} px-6 text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]`}
+                      className={`group relative overflow-hidden bg-gradient-to-r ${config.warning} px-6 text-white shadow-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]`}
                     >
                       <span className="relative z-10 flex items-center gap-2">
                         {config.cta}

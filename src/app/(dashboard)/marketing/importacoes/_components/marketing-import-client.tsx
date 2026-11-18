@@ -189,7 +189,7 @@ export function MarketingImportClient({ branches, history, lastImport, role, bra
             <Button
               onClick={handleSubmit}
               disabled={busy || !file || (canChooseBranch && !branchId)}
-              className="w-full h-12 text-base font-medium transition-transform duration-300 active:scale-[0.98] hover:-translate-y-0.5 shadow-sm"
+              className="w-full h-12 text-base font-medium transition-transform duration-300 active:scale-[0.98] shadow-sm"
             >
               {busy ? "Importando..." : "Importar leads"}
             </Button>

@@ -126,7 +126,7 @@ export default async function PlatformOverviewPage() {
             return (
               <Card
                 key={stat.label}
-                className="border-border/70 bg-card shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-sm"
+                className="border-border/70 bg-card shadow-none transition-all duration-200 hover:border-primary/25"
               >
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium">

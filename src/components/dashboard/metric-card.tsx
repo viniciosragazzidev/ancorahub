@@ -1,11 +1,22 @@
-import { ArrowDownRight, ArrowUpRight } from "@/components/huge-icons";
+import { ArrowDownRight, ArrowUpRight, InfoIcon } from "@/components/huge-icons";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { MiniDonut } from "./mini-donut";
 import { MetricSparkline } from "./metric-sparkline";
-import { CountUpText } from "@/components/motion/count-up";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+/** Tom do chip e do número (docs/design-system.md § Stat / KPI Tile). Semântico só quando o número é um status real. */
+export type StatCardTone = "default" | "success" | "warning" | "destructive";
+
+/** Classes do chip por tom; reaproveitadas pelos cards de número que ainda não são `StatCard`. */
+export const STAT_TONE_CHIP: Record<StatCardTone, string> = {
+  default: "bg-ds-powder-blue text-ds-electric-blue",
+  success: "bg-ds-soft-mint text-ds-forest-ink",
+  warning: "bg-ds-amber-wash text-ds-amber-ink",
+  destructive: "bg-ds-rose-wash text-ds-rose-ink",
+};
 
 export type StatCardProps = {
   /** Rótulo exibido no topo do card */
@@ -16,7 +27,14 @@ export type StatCardProps = {
   sublabel?: string;
   /** Ícone opcional mostrado em um box colorido ao lado do label */
   icon?: React.ComponentType<{ className?: string }>;
-  /** Classes para personalizar o fundo/cor do ícone (ex: "bg-primary/10 text-primary") */
+  /**
+   * Tom do chip do ícone. Azul por padrão; success/warning/destructive só quando o número
+   * representa um status real (ex.: "SLA vencido"), nunca para variar a cor de uma grade.
+   */
+  tone?: StatCardTone;
+  /** Explicação curta do número, no `(i)` à direita do rótulo. */
+  info?: string;
+  /** @deprecated Use `tone`. Classes extras no chip do ícone (geometria ou casos já aprovados). */
   iconClassName?: string;
   /** Direção da tendência (up = positivo, down = negativo) */
   trend?: "up" | "down" | "neutral";
@@ -36,32 +54,32 @@ export type StatCardProps = {
   valueClassName?: string;
   /** Classes adicionais no card */
   className?: string;
-  /** Ativa animação de entrada fade-in + slide-up (cardItemVariants) */
+  /** @deprecated A entrada vem da rota (etapa 2 do plano de movimento); mantido só por compatibilidade. */
   animated?: boolean;
-  /** Atraso da animação em segundos (ex: 0.08 para efeito cascata) */
+  /** @deprecated Ver `animated`. */
   animationDelay?: number;
   /** Variante visual para métricas isoladas ou agrupadas em uma visão geral. */
   variant?: "default" | "overview";
 };
 
 /**
- * StatCard — componente único e padronizado para exibir métricas e estatísticas.
+ * StatCard — o card de número canônico (docs/design-system.md § Stat / KPI Tile; plano
+ * docs/implementations/active/2026-11-18-refinamento-movimento-areas.md, etapa 1).
  *
- * Suporta:
- * - Ícone opcional com fundo colorido
- * - Badge de tendência/variação
- * - Gráfico de linha (sparkline) via shadcn Chart
- * - Gráfico MiniDonut opcional
- * - Valor com cor personalizada
- * - Label + sublabel opcional
- * - Animação de entrada fade-in + slide-up (animated + animationDelay)
+ * Anatomia: chip de ícone 28px (radius 8px, azul por padrão) · rótulo · `(i)` opcional ·
+ * número em Geist Mono 24px com `tabular-nums` · linha de contexto · variação opcional.
+ * Borda fina, sem sombra e parado no hover: card informativo não se mexe.
+ * O número aparece pronto (nível 0 de FEEDBACK.md); nada conta do zero.
+ * Vários números juntos: use `MetricGrid`.
  */
 export function StatCard({
   label,
   value,
   sublabel,
   icon: Icon,
-  iconClassName = "bg-primary/10 text-primary",
+  tone = "default",
+  info,
+  iconClassName,
   trend,
   change,
   changeVariant,
@@ -95,7 +113,7 @@ export function StatCard({
       variant={variant === "overview" ? "overview" : "compact"}
       className={cn(
         "ui-metric-card group/card h-full min-w-0",
-        variant === "overview" ? "rounded-none border-0 border-r border-border last:border-r-0" : "hover:bg-card/95",
+        variant === "overview" && "rounded-none shadow-none",
         className,
       )}
     >
@@ -103,17 +121,29 @@ export function StatCard({
         <div className="flex min-w-0 items-center gap-2.5">
           {Icon && (
             <div
+              aria-hidden="true"
               className={cn(
-                "ui-metric-card-icon flex size-8 shrink-0 items-center justify-center bg-muted text-foreground/80 transition-[background-color,color] duration-150 ease-out group-hover/card:bg-foreground/10 group-hover/card:text-foreground motion-reduce:transition-none",
+                "ui-metric-card-icon flex size-7 shrink-0 items-center justify-center rounded-ds-buttons",
+                STAT_TONE_CHIP[tone],
                 iconClassName,
               )}
             >
               <Icon className="size-4" />
             </div>
           )}
-          <span className="ui-metric-card-label truncate transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/card:text-foreground motion-reduce:transition-none">
-            {label}
-          </span>
+          <span className="ui-metric-card-label truncate">{label}</span>
+          {info ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button type="button" aria-label={`Sobre ${label}`} className="flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground">
+                    <InfoIcon className="size-3.5" />
+                  </button>
+                }
+              />
+              <TooltipContent className="max-w-60">{info}</TooltipContent>
+            </Tooltip>
+          ) : null}
         </div>
         {(trend || change) && (
           <Badge
@@ -131,14 +161,14 @@ export function StatCard({
         <div className="min-w-0">
           <p
             className={cn(
-              "ui-metric-card-value text-xl font-semibold text-foreground",
+              "ui-metric-card-value font-ds-mono text-ds-heading-sm font-semibold tabular-nums text-foreground",
               valueClassName,
             )}
           >
-            <CountUpText text={value} />
+            {value}
           </p>
           {sublabel && (
-            <p className="ui-metric-card-label mt-1 text-[12px] leading-tight text-muted-foreground transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/card:text-foreground/70 motion-reduce:transition-none">
+            <p className="ui-metric-card-label mt-1 text-[12px] leading-tight text-muted-foreground">
               {sublabel}
             </p>
           )}
@@ -157,6 +187,50 @@ export function StatCard({
       {card}
     </div>
   ) : card;
+}
+
+// ─── Grade de números ───────────────────────────────────────────────────────
+
+/**
+ * Vários números num container só, com divisórias de 1px entre as células (como a grade
+ * "Consultas hoje / Sala de espera / Comparecimento" da referência). Os filhos são
+ * `StatCard variant="overview"`. Cada célula desenha a borda direita e a de baixo e avança 1px
+ * sobre a vizinha; o container corta as da última coluna e da última linha. Linha incompleta
+ * fica em branco, sem bloco cinza.
+ */
+export function MetricGrid({
+  children,
+  columns = 4,
+  className,
+  label,
+}: {
+  children: React.ReactNode;
+  /** Colunas no desktop; no celular são sempre 2 (1 quando `columns` é 1). */
+  columns?: 1 | 2 | 3 | 4;
+  className?: string;
+  /** Nome do grupo para leitor de tela. */
+  label?: string;
+}) {
+  const cols = {
+    1: "grid-cols-1",
+    2: "grid-cols-2",
+    3: "grid-cols-2 lg:grid-cols-3",
+    4: "grid-cols-2 lg:grid-cols-4",
+  }[columns];
+  return (
+    <section
+      data-slot="metric-grid"
+      aria-label={label}
+      className={cn(
+        "grid overflow-hidden rounded-[var(--radius-card)] border border-border bg-card",
+        "[&>*]:-mr-px [&>*]:-mb-px [&>*]:border-t-0! [&>*]:border-l-0! [&>*]:border-r! [&>*]:border-b! [&>*]:border-border",
+        cols,
+        className,
+      )}
+    >
+      {children}
+    </section>
+  );
 }
 
 // ─── Alias para retrocompatibilidade ─────────────────────────────────────────

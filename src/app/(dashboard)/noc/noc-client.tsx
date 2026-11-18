@@ -641,7 +641,7 @@ export function NocClient({ data }: NocClientProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.05, 0.2) }}
               whileHover={{ y: -2 }}
-              className="group flex flex-col justify-between rounded-xl border border-border/60 bg-card p-4 text-left shadow-none transition-all duration-200 hover:border-border hover:shadow-xs"
+              className="group flex flex-col justify-between rounded-xl border border-border/60 bg-card p-4 text-left shadow-none transition-all duration-200 hover:border-border"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110", stat.bg, stat.color)}>

@@ -346,7 +346,7 @@ function CommissionRuleCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: [0, 0, 0.2, 1] }}
     >
-      <Card className="border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-sm">
+      <Card className="border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25">
         <CardContent className="p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -468,7 +468,7 @@ export function CommissionRulesManager({
             whileHover={{ y: -2, transition: { duration: 0.2, ease: [0, 0, 0.2, 1] } }}
             whileTap={{ scale: 0.995, transition: { duration: 0.1 } }}
           >
-            <Card size="sm" className="group/card border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-sm">
+            <Card size="sm" className="group/card border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25">
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground transition-colors duration-200 group-hover/card:text-foreground">{item.label}</p>
                 <p className="mt-2 font-mono text-2xl font-semibold transition-colors duration-200 group-hover/card:text-primary">{item.value}</p>

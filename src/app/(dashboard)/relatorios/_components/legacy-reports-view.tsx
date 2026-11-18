@@ -321,7 +321,6 @@ export default async function LegacyReportsView({
               value={totalLeads}
               sublabel={`Nos últimos ${period} dias`}
               icon={Users}
-              iconClassName="bg-chart-1/10 text-chart-1"
               sparklineData={leadsTrend}
               sparklineColor="var(--chart-1)"
             />
@@ -330,7 +329,6 @@ export default async function LegacyReportsView({
               value={totalClients}
               sublabel="Leads que viraram clientes"
               icon={Target}
-              iconClassName="bg-chart-5/10 text-chart-5"
               sparklineData={clientsTrend}
               sparklineColor="var(--chart-5)"
             />
@@ -339,7 +337,6 @@ export default async function LegacyReportsView({
               value={totalSales}
               sublabel="Registros do período"
               icon={TrendUp}
-              iconClassName="bg-chart-2/10 text-chart-2"
               sparklineData={salesTrend}
               sparklineColor="var(--chart-2)"
             />
@@ -348,7 +345,6 @@ export default async function LegacyReportsView({
               value={`${conversionRate}%`}
               sublabel="Clientes em relação aos leads"
               icon={ChartBar}
-              iconClassName="bg-chart-4/10 text-chart-4"
               sparklineData={leadsTrend.map((value, index) =>
                 value > 0 ? Math.round((clientsTrend[index] / value) * 100) : 0,
               )}
@@ -359,7 +355,7 @@ export default async function LegacyReportsView({
               value={revenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               sublabel="Vendas ativas no período"
               icon={CurrencyCircleDollar}
-              iconClassName="bg-success/10 text-success"
+              tone="success"
               sparklineData={revenueTrend}
               sparklineColor="var(--success)"
             /> : null}
@@ -404,7 +400,7 @@ export default async function LegacyReportsView({
                       >
                         <Icon className={`size-5 ${report.color}`} />
                       </div>
-                      <ArrowUpRight className="size-4 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none" />
+                      <ArrowUpRight className="size-4 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none" />
                     </div>
                     <h3 className="mt-3 text-sm font-semibold">{report.title}</h3>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">

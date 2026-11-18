@@ -125,7 +125,10 @@ Entregue: `globals.css` com os nomes canônicos (`--duration-instant|fast|exit|s
 - No laboratório: cada interruptor desliga deslocamento e cascata (conferir com `getComputedStyle` e gravação de tela).
 - No preview 3005: abrir `/dashboard` com o SO em movimento reduzido (emulação do navegador) e sem; nada deve mudar de layout, só a presença do movimento.
 
-### Etapa 1 · Blocos de área (cards e containers)
+### Etapa 1 · Blocos de área (cards e containers) · ENTREGUE 18/11/2026
+
+Entregue: o canônico é o `StatCard` de `src/components/dashboard/metric-card.tsx` (48 usos), não o Arc (zero usos), para não migrar 48 telas. Ele segue o § Stat / KPI Tile: número em Geist Mono 24px pronto (sem `CountUpText`), chip 28px `rounded-ds-buttons`, `tone` (azul por padrão; success/warning/destructive só para status), `info` com `(i)` e tooltip, parado no hover. `MetricGrid` no mesmo arquivo (células com divisória de 1px; linha incompleta fica em branco). `InsightStrip` + `InsightValue` em `src/components/dashboard/insight-strip.tsx` (Callout neutro, rótulo `AI_INSIGHT_LABEL` só para texto da IA); aplicado à frase do funil ("Em resumo") e aos Destaques da equipe (o selo verde/âmbar virou texto). O `ai-conversation-insight-card` ficou como está: é análise interativa com ações, não faixa de leitura. `iconClassName` decorativo saiu de 23 cards (relatórios, qualificação, venda); verde e âmbar viraram `tone`. `KpiComparisonCard`, `DsStatTile` e `DsTrendStatCard` alinhados ao mesmo número e chip; `.ui-metric-card-icon` com radius 8px. `hover:shadow-*` e `hover:-translate-y` fora de 16 arquivos (a landing `src/app/page.tsx` fica para a etapa 10; a welcome-screen ainda tem `hover:scale` e `transition-all`, etapa 9). Vitrine do laboratório com `MetricGrid`, `StatCard` e `InsightStrip`. Ficou de fora: o painel do plantão (`duty-operations-workspace`) mantém o chip próprio aprovado em 14/11.
+
 
 **O que muda**
 - Um card de número canônico, `MetricCard` (base: `src/components/arc/metric-card`), com a anatomia da referência: ícone em quadrado com borda, rótulo `text-sm` Inter, `(i)` opcional à direita que abre tooltip, número grande, linha de contexto cinza, delta colorido opcional (verde ou vermelho, **uma** cor cromática por card). Unidade monetária (`R$`) em cinza de texto secundário, menor que o número.
@@ -273,8 +276,8 @@ O usuário mandou seguir as recomendações em todos os itens. Resumo do que val
 |---|---|---|
 | 1 | Superfície azul grande | só landing, login e onboarding, com o azul do DS; nunca nas telas internas. Entra como exceção escrita no `design-system.md` na etapa 10 |
 | 2 | Texturas | só o pontilhado (branco 12%, passo 12px), nas superfícies do item 1; sem halftone nem grão |
-| 3 | Fundo do bloco de IA | neutro `#fafafa` com borda; só o rótulo em azul |
-| 4 | Número grande | Inter 30px semibold (`--text-3xl` já existe), `tabular-nums`; Satoshi só em 36px+ |
+| 3 | Fundo do bloco de IA | Callout neutro do DS: Paper Mist (`bg-ds-paper-mist`) com borda; só o rótulo e os números citados em azul (corrigido em 18/11: `#fafafa` não é token) |
+| 4 | Número grande | **corrigido em 18/11:** o DS já cobre (§ Stat / KPI Tile): Geist Mono 24px (`font-ds-mono text-ds-heading-sm`), `tabular-nums`, chip 28px com radius 8px. A recomendação de Inter 30px foi erro do plano |
 | 5 | Retrato/vídeo | só landing, radius 16px, esfumado por máscara; precisa de imagem com direito de uso |
 | 6 | Nome do bloco de IA | "Sugestões • Âncora IA" |
 | 7 | Count-up ao abrir | não usar |

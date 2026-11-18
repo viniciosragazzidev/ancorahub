@@ -132,7 +132,7 @@ function GoalCard({
         </DrawerContent>
       </Drawer>
 
-      <Card className="border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-sm">
+      <Card className="border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25">
         <CardContent className="p-4 sm:p-5">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">

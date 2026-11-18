@@ -47,7 +47,6 @@ export function SaleStatsCards({
           label="Total em Comissões"
           value={formatCurrency(totalCommissions)}
           icon={CurrencyCircleDollar}
-          iconClassName="bg-blue-500/10 text-blue-600 dark:text-blue-400"
           sparklineData={scheduleTrend}
           sparklineColor="var(--chart-2)"
           animated
@@ -57,7 +56,7 @@ export function SaleStatsCards({
           label="Comissão Paga"
           value={formatCurrency(paidCommissions)}
           icon={CheckCircle}
-          iconClassName="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          tone="success"
           valueClassName="text-emerald-600 dark:text-emerald-400"
           sparklineData={paidTrend}
           sparklineColor="var(--chart-3)"
@@ -68,7 +67,7 @@ export function SaleStatsCards({
           label="Comissão A Pagar"
           value={formatCurrency(pendingCommissions)}
           icon={Clock}
-          iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          tone="warning"
           valueClassName="text-amber-600 dark:text-amber-400"
           sparklineData={pendingTrend}
           sparklineColor="var(--chart-4)"
