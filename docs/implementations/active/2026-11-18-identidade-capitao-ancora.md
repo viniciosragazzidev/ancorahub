@@ -60,6 +60,7 @@ Por pedido de Vinicios em 18/11, o avatar/logo da Sasá é um recorte fechado ap
 - Testes dirigidos do avatar, splash, banner de Plantões e celebração de venda: 4 arquivos, 19 testes aprovados. `git diff --check` passou.
 - `npm run build` padrão falhou porque o Turbopack rejeita o symlink de `node_modules` do worktree; `npm run build -- --webpack` passou, incluindo compilação, TypeScript e geração das 171 páginas. Permanecem avisos de `unpdf` e rotas dinâmicas com `headers`.
 - Verificação full desta revisão: documentação, arquivos alterados, arquitetura, segurança, desempenho e type-check passaram. Lint parou no scanner por 987 ocorrências preexistentes de mojibake em quatro arquivos não alterados; a suíte global falhou em testes legados de navegação/com snapshots (2 falhas; 7 arquivos ignorados com `--test-bail=1`). Evidência: `reports/agent/verification/2026-11-18T18-20-48.853Z.md`.
+- Ajuste solicitado depois: no banner compacto de Plantões, a arte mobile do Capitão passa de 116 px para 144 px com coluna dedicada, preservando espaço para o texto. Rota, ação e estados sem plantão/atual/próximo permanecem iguais. `git diff --check` e `npm run build -- --webpack` passaram; o build gerou as 171 páginas. Testes não executados nesta revisão CSS. Preview 3005 excedeu o tempo limite, então a revisão visual no navegador ficou pendente. Evidência: `reports/agent/verification/2026-11-18T16-06-15.110.md`.
 
 ## Risco e reversão
 
