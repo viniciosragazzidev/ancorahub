@@ -21,8 +21,9 @@
   .main { grid-column: 1; grid-row: 1; }
   .side { grid-column: 2; grid-row: 1; }
 }
-/* Anel ao lado do funil num painel só; empilha em telas estreitas. */
+/* Anel ao lado do funil num painel só; empilha quando o próprio painel é estreito (container query). */
+.qualificationPanel { container-type: inline-size; }
 .qualification { display: grid; gap: var(--space-6); }
-@media (min-width: 640px) { .qualification { grid-template-columns: auto minmax(0, 1fr); align-items: center; } }
+@container (min-width: 600px) { .qualification { grid-template-columns: auto minmax(0, 1fr); align-items: center; } }
 /* "Ver corretores" é botão (abre o painel lateral) com a cara do link do kit. */
 .linkButton { justify-self: start; gap: 4px; padding: 0; border: 0; background: none; cursor: pointer; }
