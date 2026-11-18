@@ -1,5 +1,12 @@
 # Histórico de Funcionalidades Adicionadas (Features Log)
 
+## 18/11/2026 - Capitão Âncora e Sasá
+
+- A identidade principal passa a seguir a prancha oficial do Capitão Âncora: marinheiro experiente com boné branco de âncora dourada, bigode branco curvado, uniforme branco e azul-marinho e detalhes dourados. A biblioteca inclui repouso, boas-vindas, luneta, financeiro, distribuição e conquista; Sasá recebe um avatar de assistente de convés com uniforme simples.
+- Os banners de desempenho, financeiro, distribuição, comemoração e abertura usam as novas artes. A conversa, o agente e a orientação passam a chamar a assistente de Sasá; ações, rota, permissões e funcionamento permanecem os mesmos. Os rótulos de anúncio foram atualizados e novos anúncios começam com a pose de boas-vindas.
+- Termos de fantasia saem das cópias ativas de distribuição, desempenho e financeiro. Os dez ícones objetuais de área continuam iguais. O movimento compartilhado e o respeito a movimento reduzido permanecem; os vídeos antigos do mascote foram removidos.
+- Registro, escopo, arquivos e validações: `docs/implementations/active/2026-11-18-identidade-capitao-ancora.md`.
+
 ## 17/11/2026 - Egress da distribuição: consultas memorizadas por passo
 
 - `processQueuedLead` reutiliza o roster e as unidades de fallback dentro do mesmo passo do lead. A reentrada por corretor sem canal compartilha o snapshot; reentradas que mudam fila ou ciclo iniciam um passo novo e consultam o estado atualizado. Testes comparam a sequência de corretores com e sem memo e contam as consultas.

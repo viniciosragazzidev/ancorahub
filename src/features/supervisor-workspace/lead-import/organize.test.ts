@@ -4,9 +4,9 @@ import { applyTableAnswer, applyTextAnswer, maskForAi, organizeTable, organizeTe
 
 // Mesmo formato da planilha da Valéria (16/11): sem cabeçalho, origem e operadora repetidas, responsável no fim.
 const valeria = [
-  ["Diniz Junior", "(21) 96556-8116", "Google", "Unimed", "Possui CNPJ: NÃO | Contato: WhatsApp", "", "JACK M 05.11"],
-  ["Daniele", "(21) 99070-0856", "Google", "Unimed", "Possui CNPJ: NÃO | Contato: E-mail", "", "JACK M 05.11"],
-  ["Luiz Alberto das Neves Venâncio ", "(24) 98111-5091", "Google", "Amil", "Possui CNPJ: SIM | Contato: WhatsApp", "", "JACK M 05.11"],
+  ["Diniz Junior", "(21) 96556-8116", "Google", "Unimed", "Possui CNPJ: NÃO | Contato: WhatsApp", "", "SASA M 05.11"],
+  ["Daniele", "(21) 99070-0856", "Google", "Unimed", "Possui CNPJ: NÃO | Contato: E-mail", "", "SASA M 05.11"],
+  ["Luiz Alberto das Neves Venâncio ", "(24) 98111-5091", "Google", "Amil", "Possui CNPJ: SIM | Contato: WhatsApp", "", "SASA M 05.11"],
   ["Anderson Lima ", "(22) 9975-2124", "Google", "Unimed", "Possui CNPJ: NÃO | Contato: WhatsApp", "", "GIOVANE 05.11"],
   ["Roberta", "(21) 99070-0856", "Google", "Unimed", "Possui CNPJ: NÃO | Contato: WhatsApp", "", "GIOVANE 05.11"],
   ["Braian", "(21) 2680-7717", "Google", "Unimed", "Possui CNPJ: SIM | Contato: E-mail", "", "MARISA 06.11"],
@@ -17,7 +17,7 @@ describe("organizeTable", () => {
     const organized = organizeTable(valeria);
     expect(organized.confident).toBe(true);
     expect(organized.map).toMatchObject({ header: null, name: 0, phone: 1, email: null, extras: [2, 3, 4, 6] });
-    expect(organized.contacts[0]).toMatchObject({ name: "Diniz Junior", phone: "5521965568116", note: "Google · Unimed · Possui CNPJ: NÃO | Contato: WhatsApp · JACK M 05.11", problem: null });
+    expect(organized.contacts[0]).toMatchObject({ name: "Diniz Junior", phone: "5521965568116", note: "Google · Unimed · Possui CNPJ: NÃO | Contato: WhatsApp · SASA M 05.11", problem: null });
     expect(organized.contacts[2].name).toBe("Luiz Alberto das Neves Venâncio");
   });
 

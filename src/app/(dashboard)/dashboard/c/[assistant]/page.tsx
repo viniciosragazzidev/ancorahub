@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 const ANCORA_HISTORY = 30;
 
-/** Jack remains the only assistant conversation; previous assistant URLs redirect to work pages. */
+/** Sasá remains the only assistant conversation; previous assistant URLs redirect to work pages. */
 export default async function AssistantConversationPage({ params }: { params: Promise<{ assistant: string }> }) {
   const { assistant } = await params;
   const context = await getRequiredTenantContext();

@@ -96,5 +96,5 @@ tela limpa, e mensagem de vantagens com a garantia de que conversa pessoal não 
   é lead nem cliente do corretor; grupos e status são ignorados; a IA só lê conversa ligada a um lead; gestores
   só veem conversas de leads. Por isso o texto diz "não são salvas nem lidas", e não "nem passam pelo sistema".
 - Removido o aviso "WhatsApp para os leads do plantão a partir de 20/10" (banner diário no layout e lembrete fixo na
-  conversa com o Jack). A flag `feature_whatsapp_plantao_notice_enabled` ficou sem uso na tela.
+  conversa com o Sasá). A flag `feature_whatsapp_plantao_notice_enabled` ficou sem uso na tela.
 - Preview só em desenvolvimento: `/dev/presenca-whatsapp`.

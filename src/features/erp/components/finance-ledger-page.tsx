@@ -75,18 +75,17 @@ function BrokerFinanceHero({ data }: { data: Entries }) {
   </section>;
 }
 
-/** O capitão no trono, cercado de moedas, mostrando uma ao corretor (arte de 14/11/2026). */
-const FINANCE_ART: CaptainBannerArt = { src: "/mascote/financeiro-trono.webp", width: 640, height: 585 };
+/** Capitão Âncora confere o livro de comissões e os lançamentos. */
+const FINANCE_ART: CaptainBannerArt = { src: "/mascote/financeiro-controle.webp", width: 1312, height: 1199 };
 
 /**
- * Banner do Meu financeiro: a frase fala do que está a caminho do baú e o atalho leva aos leads, de onde vem a
- * próxima comissão. Fica entre o resumo e a lista, como nas outras telas do corretor.
+ * Banner do Meu financeiro: informa os valores e o atalho leva aos leads. Fica entre o resumo e a lista.
  */
 function BrokerFinanceBanner({ data }: { data: Entries }) {
   const { payableCents, settledCents } = data.summary;
-  const title = payableCents > 0 ? `Tem ${formatCents(payableCents)} a caminho do seu baú. Bora encher mais um pouco?`
-    : settledCents > 0 ? `Seu baú já recebeu ${formatCents(settledCents)}. Bora atrás da próxima comissão?`
-      : "Sua primeira comissão aprovada aparece aqui. Bora pra próxima venda?";
+  const title = payableCents > 0 ? `Você tem ${formatCents(payableCents)} a receber. Confira o status e a previsão abaixo.`
+    : settledCents > 0 ? `Você já recebeu ${formatCents(settledCents)}. Confira o período e os lançamentos abaixo.`
+      : "Sua primeira comissão aprovada aparecerá aqui.";
   return <CaptainBanner className={hero.banner} label="Dica do financeiro" title={title} art={FINANCE_ART} action={{ label: "Ver meus leads", href: "/minha-fila" }} />;
 }
 

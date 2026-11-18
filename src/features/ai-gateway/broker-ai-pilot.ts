@@ -3,7 +3,7 @@ import "server-only";
 import { FEATURE_FLAGS, getFeatureFlag, getSystemSetting } from "@/features/system-settings/queries";
 
 /**
- * Pilot of the Jack with the operator RAG (Vinicios, 23/10): only the brokers listed in
+ * Pilot of the Sasá with the operator RAG (Vinicios, 23/10): only the brokers listed in
  * `broker_ai_pilot_user_ids` (user ids, comma separated) get it for now. Everyone else
  * keeps today's behavior, ruled by the BROKER_AI_ASSISTANTS flag.
  */

@@ -1,5 +1,13 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-189 - Identidade do Capitão Âncora e da assistente Sasá
+
+**Pedido do Vinicios em 2026-11-18; aprovado na conversa.** A prancha oficial fornecida passa a definir o mascote principal do CorreTop/Âncora Saúde: marinheiro adulto, rosto arredondado cor de pêssego, olhos castanhos grandes, nariz alaranjado, bigode branco curvado, boné branco de aba azul-marinho com âncora dourada, uniforme branco e azul-marinho, lenço azul e detalhes dourados. A paleta oficial é #002B73, #0B5ED7, #00B26B, #7ED957, #FFC400, #FF8A65, #FFF6E9 e #1F2937.
+
+Capitão Âncora é o personagem principal. Personagens de apoio são assistentes de convés com uniforme simples; a assistente da conversa de avisos passa a se chamar Sasá. As dez ilustrações objetuais das áreas permanecem como ícones funcionais. A linguagem de pirata e as artes anteriores saem dos pontos ativos da interface. O escopo é visual e de texto: não altera rotas, regras, dados, permissões, ações, integrações ou comportamento de distribuição.
+
+Referência e artes-fonte: design/mascote/capitao-ancora/. Contrato: docs/design-system/MASCOTE.md. Implementação: docs/implementations/active/2026-11-18-identidade-capitao-ancora.md.
+
 ## DEC-188 - Pré-confirmação administrativa de plantão contíguo
 
 **Estado:** aceita para implementação. **Data:** 2026-11-16.
