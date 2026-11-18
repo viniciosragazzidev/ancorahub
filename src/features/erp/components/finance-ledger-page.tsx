@@ -76,7 +76,7 @@ function BrokerFinanceHero({ data }: { data: Entries }) {
 }
 
 /** Capitão Âncora confere o livro de comissões e os lançamentos. */
-const FINANCE_ART: CaptainBannerArt = { src: "/mascote/financeiro-controle.webp", width: 1312, height: 1199 };
+const FINANCE_ART: CaptainBannerArt = { src: "/mascote/2026-11-18/financeiro-controle.webp", width: 1312, height: 1199 };
 
 /**
  * Banner do Meu financeiro: informa os valores e o atalho leva aos leads. Fica entre o resumo e a lista.

@@ -119,7 +119,7 @@ export function AssistantAvatar({
           style={{ display: "block", width: size, height: size, borderRadius: 999, transformOrigin: "50% 80%" }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- arte local pequena, usada em vários tamanhos */}
-          <img src="/mascote/sasa-assistente-conves.webp" width={size} height={size} alt="" draggable={false} style={{ display: "block", width: size, height: size, borderRadius: 999, objectFit: "contain" }} />
+          <img src="/mascote/2026-11-18/sasa-logo-azul.webp" width={size} height={size} alt="" draggable={false} style={{ display: "block", width: size, height: size, borderRadius: 999, objectFit: "cover" }} />
         </motion.span>
         {state === "waiting" ? (
           <span aria-hidden="true" style={{ position: "absolute", right: 0, top: 0, width: Math.max(8, size * 0.2), height: Math.max(8, size * 0.2), borderRadius: 999, background: "oklch(36% 0.14 262)", boxShadow: "0 0 0 2px var(--surface)" }} />

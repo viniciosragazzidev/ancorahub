@@ -6,6 +6,8 @@
 
 Capitão Âncora é o personagem principal. Personagens de apoio são assistentes de convés com uniforme simples; a assistente da conversa de avisos passa a se chamar Sasá. As dez ilustrações objetuais das áreas permanecem como ícones funcionais. A linguagem de pirata e as artes anteriores saem dos pontos ativos da interface. O escopo é visual e de texto: não altera rotas, regras, dados, permissões, ações, integrações ou comportamento de distribuição. Os dois MP4s ativos de boas-vindas ainda exibem Jack; a fonte editável necessária para re-renderizá-los não estava disponível no checkout revisado.
 
+Sasá é a assistente de convés da conversa de avisos e perguntas, com uniforme simples e sem insígnias de capitão. Por pedido de Vinicios em 18/11, seu avatar/logo usa somente o rosto oficial do Capitão Âncora, com bigode branco, boné com âncora dourada e fundo azul #002B73; a orientação de uniforme simples vale para ilustrações de corpo inteiro da assistente. Trocar as referências ativas a Jack e ao imaginário pirata por nomes e linguagem direta de trabalho. Preservar IDs técnicos, rotas, permissões, ações, conteúdo funcional, controles existentes e preferências de movimento.
+
 Referência e artes-fonte: design/mascote/capitao-ancora/. Contrato: docs/design-system/MASCOTE.md. Implementação: docs/implementations/active/2026-11-18-identidade-capitao-ancora.md.
 
 ## DEC-188 - Pré-confirmação administrativa de plantão contíguo

@@ -15,7 +15,7 @@ describe("SaleCelebration", () => {
     const onClose = vi.fn();
     render(<SaleCelebration open celebrationKey="sale-1" onClose={onClose} stats={[{ label: "Valor mensal", value: "R$ 1.240" }, { label: "Vidas", value: "3" }]} />);
     const dialog = screen.getByRole("dialog", { name: "Venda registrada!" });
-    expect(dialog.querySelector("img")!.getAttribute("src")).toBe("/mascote/venda-capitao.webp");
+    expect(dialog.querySelector("img")!.getAttribute("src")).toBe("/mascote/2026-11-18/venda-capitao.webp");
     expect(screen.getByText("R$ 1.240")).toBeTruthy();
     expect(screen.getAllByRole("button")).toHaveLength(1);
     expect(fired).toHaveBeenCalledWith("sale-celebration:sale-1", "celebrate", { budgetKey: "venda" }, false);

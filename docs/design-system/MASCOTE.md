@@ -36,6 +36,7 @@ Capitão Âncora é um marinheiro experiente, sábio e sempre próximo. Represen
 - Capitão Âncora é o mascote principal da marca e pode aparecer na abertura, em banners, comemorações, orientação e ilustrações contextuais.
 - Assistentes de convés são personagens de apoio. Usam uniforme mais simples que o do Capitão: camisa branca, detalhes azul-marinho e uma pequena âncora; sem as listras douradas de capitão.
 - Sasá é a assistente de convés que mantém a conversa de avisos e perguntas do corretor. A troca do nome e da arte não muda sua função, permissões, ações ou rota.
+- O avatar/logo de Sasá é uma exceção de recorte: usa somente o rosto oficial do Capitão, com bigode branco, boné com âncora dourada e fundo azul-marinho #002B73, conforme pedido de Vinicios em 18/11. Ilustrações de corpo inteiro da assistente continuam com uniforme simples.
 - As dez ilustrações objetuais das áreas de Leads, Carteira, Plantão, Agenda, Cotação, Desempenho, Dicas, Jornada, Equipe e Mensagens continuam como ícones funcionais. Elas não são personagens e permanecem inalteradas.
 
 ## Regras de uso
@@ -49,23 +50,32 @@ Capitão Âncora é um marinheiro experiente, sábio e sempre próximo. Represen
 
 ## Biblioteca oficial de artes
 
-As fontes PNG e a prancha de referência ficam em design/mascote/capitao-ancora/. Os arquivos WebP transparentes publicados ficam em public/mascote/.
+As fontes PNG e a prancha de referência ficam em design/mascote/capitao-ancora/. Os arquivos WebP publicados e versionados ficam em public/mascote/2026-11-18/ para evitar que navegadores continuem exibindo imagens antigas em cache.
 
 | Fonte | Arquivo publicado | Uso |
 |---|---|---|
-| capitao-repouso.png | repouso.webp | Repouso, espera e erro |
-| capitao-boas-vindas.png | boas-vindas.webp, splash-capitao.webp | Boas-vindas |
-| capitao-conquista.png | positivo.webp, desempenho-subindo.webp, venda-capitao.webp | Aceite, feedback positivo e celebração |
-| capitao-luneta.png | desempenho-mirando.webp | Desempenho e próximos passos |
-| capitao-financeiro.png | financeiro-controle.webp | Livro de comissões e lançamentos |
-| capitao-distribuicao.png | distribuicao-capitao-leads.webp | Organização e distribuição de leads |
-| sasa-assistente-conves.png | sasa-assistente-conves.webp | Avatar da conversa com Sasá |
+| capitao-repouso.png | 2026-11-18/repouso.webp | Repouso, espera e erro |
+| capitao-boas-vindas.png | 2026-11-18/boas-vindas.webp, 2026-11-18/splash-capitao.webp | Boas-vindas |
+| capitao-conquista.png | 2026-11-18/positivo.webp, 2026-11-18/desempenho-subindo.webp, 2026-11-18/venda-capitao.webp | Aceite, feedback positivo e celebração |
+| capitao-luneta.png | 2026-11-18/desempenho-mirando.webp | Desempenho e próximos passos |
+| capitao-financeiro.png | 2026-11-18/financeiro-controle.webp | Livro de comissões e lançamentos |
+| capitao-distribuicao.png | 2026-11-18/distribuicao-capitao-leads.webp | Organização e distribuição de leads |
+| sasa-logo-azul.png | 2026-11-18/sasa-logo-azul.webp | Avatar/logo de rosto da Sasá |
 
 O arquivo splash-ancora.webp é a marca da empresa, não um personagem. As imagens antigas foram removidas do caminho ativo e preservadas em design/mascote/_archive/identidade-anterior/ somente como histórico; nunca devem voltar à interface.
 
 ## Componente e estados
 
 O componente compartilhado é src/components/mascot/mascot.tsx. O contrato de estados está em src/components/mascot/mascot-config.ts. A ordem da lista de estados permanece estável porque corresponde ao número recebido pela máquina de estados da Rive.
+
+No chat, o avatar da assistente é renderizado por `AssistantAvatar` em
+`src/components/chat/assistant-avatar.tsx`; Sasá usa a forma `sasa` declarada em
+`src/components/chat/types.ts` e o recorte `2026-11-18/sasa-logo-azul.webp`. Estados de
+espera, trabalho e reação continuam usando o movimento existente e respeitam
+`useReducedMotion`. As ilustrações do Capitão Âncora são selecionadas pelas
+superfícies existentes de splash, banners, desempenho, financeiro, distribuição,
+jornada e importação. A atualização não cria componente, token, movimento ou regra
+de negócio.
 
 | Estado | Situação | Arte |
 |---|---|---|
@@ -83,7 +93,7 @@ Comemore somente depois da confirmação do servidor. Não mostre informação d
 
 ## Splash
 
-A abertura usa splash-capitao.webp e splash-ancora.webp sobre o azul oficial #002B73. A animação de entrada, os tempos, a saída quando o app está pronto e o comportamento de sessão permanecem. A imagem chega pelo HTML do servidor, não captura cliques e é decorativa para leitores de tela.
+A abertura usa `2026-11-18/splash-capitao.webp` e `splash-ancora.webp` sobre o azul oficial #002B73. Os banners de Início e Plantões compartilham a arte versionada do mesmo Capitão, evitando a exibição da imagem pirata anterior pelo cache do navegador. A animação de entrada, os tempos, a saída quando o app está pronto e o comportamento de sessão permanecem. A imagem chega pelo HTML do servidor, não captura cliques e é decorativa para leitores de tela.
 
 ## Uso nas áreas e controle
 

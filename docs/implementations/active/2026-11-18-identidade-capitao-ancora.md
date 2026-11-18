@@ -1,6 +1,6 @@
 # Identidade visual do Capitão Âncora e da Sasá
 
-**Status:** interface e artes atualizadas; os vídeos renderizados ainda precisam da fonte editável para concluir a migração audiovisual.
+**Status:** artes de interface e avatar/logo da Sasá atualizados nesta branch com URLs versionadas; os vídeos renderizados ainda precisam da fonte editável para concluir a migração audiovisual.
 **Prioridade:** P1, definida pelo Vinicios em 18/11/2026.
 **Decisão:** DEC-189.
 **UX:** substituição de assets e texto. Não muda rota, papel, ação, estado de negócio, layout, componente-base ou etapa UX-M1.10.
@@ -17,11 +17,13 @@ Paleta: #002B73, #0B5ED7, #00B26B, #7ED957, #FFC400, #FF8A65, #FFF6E9 e #1F2937.
 
 Sasá é a assistente de convés da conversa de notificações. Sua arte usa camisa branca, gola e lenço azul-marinho e pequena âncora dourada, sem as listras de capitão. Sua função, ações, permissões, conversa e rota permanecem.
 
+Por pedido de Vinicios em 18/11, o avatar/logo da Sasá é um recorte fechado apenas do rosto oficial do Capitão Âncora, com bigode branco, boné com âncora dourada e fundo azul #002B73. A forma de assistente com uniforme simples continua valendo para ilustrações de corpo inteiro.
+
 ## Escopo executado
 
-- Fontes e referência oficial em design/mascote/capitao-ancora/.
-- WebP transparentes novos publicados em public/mascote/ para repouso, boas-vindas, luneta, financeiro, distribuição, conquista e Sasá.
-- Splash, banners, celebrações, feedback do mascote, desempenho, financeiro, distribuição e importação usam as novas artes.
+- Fontes e referência oficial em design/mascote/capitao-ancora/; logo da Sasá em `sasa-logo-azul.png` e WebP otimizado em `public/mascote/2026-11-18/sasa-logo-azul.webp`.
+- WebP otimizados publicados em public/mascote/ para repouso, boas-vindas, luneta, financeiro, distribuição, conquista e a logo da Sasá.
+- Splash, banners, celebrações, feedback do mascote, desempenho, financeiro, distribuição e importação usam as novas artes em `public/mascote/2026-11-18/`. Início e Plantões compartilham a mesma URL nova para impedir que a versão pirata antiga permaneça no cache do navegador.
 - Avatar, identificação, tour, cópias da conversa, prompt do agente e documentação ativa usam o nome Sasá.
 - Cópias ativas de distribuição e financeiro descrevem equipe, atendimento, comissões e valores previstos/recebidos.
 - Anúncios existentes continuam aceitando seus identificadores salvos; rótulos mostram poses novas e novos anúncios iniciam com boas-vindas.
@@ -36,7 +38,7 @@ Sasá é a assistente de convés da conversa de notificações. Sua arte usa cam
 - src/features/ai-gateway/agents.ts e referências da conversa de assistente
 - src/components/lite/banner/, src/components/lite/celebration/ e src/features/home-announcement/
 - Banners de desempenho, distribuição, financeiro, jornada e importação de leads
-- public/mascote/ e design/mascote/
+- public/mascote/ e design/mascote/, incluindo `design/mascote/README.md`
 - CONTEXT.md, docs/design-system/MASCOTE.md, docs/design-system.md, docs/decision-log.md, docs/features-log.md, docs/README.md, docs/onboarding/narracao-tour-lite.md, docs/onboarding/creditos-video-boas-vindas.md, docs/ux/phase2/2026-11-13-plano-modo-corretor.md e documentos ativos de UX/assistentes
 
 ## Preservações
@@ -54,6 +56,10 @@ Sasá é a assistente de convés da conversa de notificações. Sua arte usa cam
 - `npm run agent:verify -- --level full`: documentação e type-check passaram; segurança sem achados; diagnóstico de arquitetura encontrou 5 itens e desempenho 9 itens. Lint interrompido pelo scanner antes do ESLint: 987 ocorrências de mojibake em quatro arquivos fora desta mudança (`docs/business-rules.md`, `src/features/lead-distribution/monthly-duty-actions.ts`, `src/features/leads/management-actions.test.ts` e `src/features/reports/metrics/lead-quality-period.test.ts`). Vitest global: 23 arquivos falharam, 929 passaram, 24 ignorados e 2 erros; inclui snapshots/rotas legadas, dependências/mocks do ambiente e falha inicial do teste de sincronização do roteiro, corrigida e revalidada nos testes dirigidos.
 - Evidência do harness: `reports/agent/verification/2026-11-18T16-56-31.098Z.md`.
 - Revisão visual no preview 3005 continua pendente; o servidor não foi reiniciado.
+- Retificação visual desta revisão: a logo da Sasá agora usa o recorte apenas do rosto com bigode, âncora no boné e fundo #002B73. Todas as rotas ativas do Capitão usam arquivos versionados em `public/mascote/2026-11-18/`, incluindo o banner compartilhado de Início e Plantões, para impedir que o navegador continue mostrando a URL pirata antiga.
+- Testes dirigidos do avatar, splash, banner de Plantões e celebração de venda: 4 arquivos, 19 testes aprovados. `git diff --check` passou.
+- `npm run build` padrão falhou porque o Turbopack rejeita o symlink de `node_modules` do worktree; `npm run build -- --webpack` passou, incluindo compilação, TypeScript e geração das 171 páginas. Permanecem avisos de `unpdf` e rotas dinâmicas com `headers`.
+- Verificação full desta revisão: documentação, arquivos alterados, arquitetura, segurança, desempenho e type-check passaram. Lint parou no scanner por 987 ocorrências preexistentes de mojibake em quatro arquivos não alterados; a suíte global falhou em testes legados de navegação/com snapshots (2 falhas; 7 arquivos ignorados com `--test-bail=1`). Evidência: `reports/agent/verification/2026-11-18T18-20-48.853Z.md`.
 
 ## Risco e reversão
 

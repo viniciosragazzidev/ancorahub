@@ -213,8 +213,8 @@ function ServiceSection({ view, insightAsBanner = false, banner = null }: { view
  * Banner do Desempenho (14/11/2026): tom quase branco, o capitão saindo pelo topo. A frase é a dica do período
  * (o que mais pode subir agora) e o atalho leva aos leads, onde a dica vira ação.
  */
-const PERFORMANCE_ART_UP = { src: "/mascote/desempenho-subindo.webp", width: 1145, height: 1374 };
-const PERFORMANCE_ART_AIM = { src: "/mascote/desempenho-mirando.webp", width: 1145, height: 1374 };
+const PERFORMANCE_ART_UP = { src: "/mascote/2026-11-18/desempenho-subindo.webp", width: 1145, height: 1374 };
+const PERFORMANCE_ART_AIM = { src: "/mascote/2026-11-18/desempenho-mirando.webp", width: 1145, height: 1374 };
 
 function PerformanceBanner({ view }: { view: BrokerPerformanceView }) {
   const first = view.service.firstContact;

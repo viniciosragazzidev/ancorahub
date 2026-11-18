@@ -94,7 +94,7 @@ export function SplashScreen() {
     <div className={styles.splash} data-phase={phase} data-splash-screen="" aria-hidden="true">
       <div className={styles.content}>
         {/* eslint-disable-next-line @next/next/no-img-element -- arte local, precisa estar no HTML antes do JS */}
-        <img ref={hero} className={styles.hero} src="/mascote/splash-capitao.webp" width={1145} height={1374} alt="" fetchPriority="high" decoding="async" draggable={false} />
+        <img ref={hero} className={styles.hero} src="/mascote/2026-11-18/splash-capitao.webp" width={1145} height={1374} alt="" fetchPriority="high" decoding="async" draggable={false} />
         {/* eslint-disable-next-line @next/next/no-img-element -- marca local, precisa estar no HTML antes do JS */}
         <img className={styles.wordmark} src="/mascote/splash-ancora.webp" width={710} height={240} alt="" decoding="async" draggable={false} />
       </div>

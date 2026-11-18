@@ -35,7 +35,7 @@ const PERIOD_OPTIONS = [
 ];
 
 /** Capitão Âncora organiza e acompanha a distribuição de leads. */
-const DISTRIBUTION_ART: CaptainBannerArt = { src: "/mascote/distribuicao-capitao-leads.webp", width: 1312, height: 1199 };
+const DISTRIBUTION_ART: CaptainBannerArt = { src: "/mascote/2026-11-18/distribuicao-capitao-leads.webp", width: 1312, height: 1199 };
 
 const STATUS_LABEL: Record<string, string> = { available: "Disponível", busy: "Em atendimento", break: "Pausa", paused: "Pausa" };
 
