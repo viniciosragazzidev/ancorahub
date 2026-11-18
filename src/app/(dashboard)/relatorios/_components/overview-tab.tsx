@@ -51,7 +51,6 @@ export function OverviewTab({ period, commercial, funnel, attention }: OverviewT
             value={`${commercial.conversion.rate.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`}
             sublabel={`${commercial.conversion.received} leads recebidos`}
             icon={Target}
-            iconClassName="bg-chart-4/10 text-chart-4"
             delta={conversionDelta}
           />
           <KpiComparisonCard
@@ -59,7 +58,6 @@ export function OverviewTab({ period, commercial, funnel, attention }: OverviewT
             value={commercial.sales}
             sublabel="Registros do período"
             icon={TrendUp}
-            iconClassName="bg-chart-2/10 text-chart-2"
             delta={salesDelta}
           />
           {commercial.revenue !== null && (
@@ -71,7 +69,7 @@ export function OverviewTab({ period, commercial, funnel, attention }: OverviewT
               })}
               sublabel="Vendas ativas no período"
               icon={CurrencyCircleDollar}
-              iconClassName="bg-success/10 text-success"
+              tone="success"
               delta={revenueDelta}
               isCurrency
             />
@@ -85,7 +83,6 @@ export function OverviewTab({ period, commercial, funnel, attention }: OverviewT
               })}
               sublabel="Receita / vendas"
               icon={Users}
-              iconClassName="bg-chart-1/10 text-chart-1"
               delta={avgTicketDelta}
               isCurrency
             />
@@ -95,7 +92,6 @@ export function OverviewTab({ period, commercial, funnel, attention }: OverviewT
             value={commercial.conversion.received}
             sublabel={`Nos últimos ${period} dias`}
             icon={Users}
-            iconClassName="bg-chart-1/10 text-chart-1"
           />
         </DashboardGrid>
       </section>

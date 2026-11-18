@@ -1,6 +1,7 @@
 import type { CountRow, FunnelStep } from "@/features/funnel-insights/insights-core";
 import { biggestDrop, headline } from "@/features/funnel-insights/insights-core";
 import type { FunnelInsights } from "@/features/funnel-insights/queries";
+import { InsightStrip } from "@/components/dashboard/insight-strip";
 
 const pct = (value: number) => `${Math.round(value * 100)}%`;
 
@@ -45,7 +46,7 @@ export function FunnelInsightsPanel({ insights, steps }: { insights: FunnelInsig
   return (
     <div className="grid gap-4" aria-label="Onde os clientes param">
       {sentence ? (
-        <p role="status" className="rounded-[var(--radius-card)] border border-border bg-card px-4 py-3 text-sm font-medium text-foreground">{sentence}</p>
+        <InsightStrip label="Em resumo" live><p>{sentence}</p></InsightStrip>
       ) : null}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Onde param na qualificação" hint={`${insights.stoppedTotal} ${insights.stoppedTotal === 1 ? "lead parou" : "leads pararam"} antes de terminar; primeira pergunta que ficou sem resposta.`}>
