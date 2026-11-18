@@ -84,7 +84,7 @@ export async function notifyAiBudgetLevel(state: AiBudgetState, now = new Date()
   const exceeded = state.level === "exceeded";
   const title = exceeded ? "Orçamento de IA do mês esgotado" : "Orçamento de IA em 80%";
   const message = exceeded
-    ? `A IA já gastou US$ ${spent} de US$ ${budget} neste mês. A análise das conversas passou ao ritmo econômico (a cada 10 minutos); o robô de qualificação e o Jack continuam.`
+    ? `A IA já gastou US$ ${spent} de US$ ${budget} neste mês. A análise das conversas passou ao ritmo econômico (a cada 10 minutos); o robô de qualificação e o Sasá continuam.`
     : `A IA já gastou US$ ${spent} de US$ ${budget} neste mês. Ao chegar em 100%, a análise das conversas passa ao ritmo econômico.`;
   await Promise.all(directors.map((director) => publishNotification({
     capability: "ai_budget",

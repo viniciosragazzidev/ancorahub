@@ -1,5 +1,5 @@
 /**
- * Questions ready to tap, made from what the operator material actually has (Jack, 23/10):
+ * Questions ready to tap, made from what the operator material actually has (Sasá, 23/10):
  * an operator with a price table suggests its prices, one with a hospital list suggests
  * its hospitals, and so on. Nothing is suggested for a subject with no material, so a tap
  * never lands on "não encontrei". They rotate by day so the broker sees new ones.

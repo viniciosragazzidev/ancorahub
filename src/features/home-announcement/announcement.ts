@@ -8,11 +8,12 @@ import { z } from "zod";
 import type { CaptainBannerArt } from "@/components/lite/banner/captain-banner";
 
 export const ANNOUNCEMENT_ARTS = {
-  tesouro: { label: "Capitão com o baú", art: { src: "/mascote/venda-capitao.webp", width: 584, height: 640 } },
-  trono: { label: "Capitão no trono", art: { src: "/mascote/financeiro-trono.webp", width: 640, height: 585 } },
-  mirando: { label: "Capitão na luneta", art: { src: "/mascote/desempenho-mirando.webp", width: 640, height: 561 } },
-  subindo: { label: "Capitão subindo", art: { src: "/mascote/desempenho-subindo.webp", width: 640, height: 557 } },
-  acenando: { label: "Capitão acenando", art: { src: "/mascote/splash-capitao.webp", width: 645, height: 735 } },
+  // Identificadores legados continuam aceitos porque podem estar salvos nas configurações da empresa.
+  tesouro: { label: "Capitão comemorando", art: { src: "/mascote/venda-capitao.webp", width: 1145, height: 1374 } },
+  trono: { label: "Capitão conferindo os resultados", art: { src: "/mascote/financeiro-controle.webp", width: 1312, height: 1199 } },
+  mirando: { label: "Capitão olhando adiante", art: { src: "/mascote/desempenho-mirando.webp", width: 1145, height: 1374 } },
+  subindo: { label: "Capitão celebrando uma conquista", art: { src: "/mascote/desempenho-subindo.webp", width: 1145, height: 1374 } },
+  acenando: { label: "Capitão dando boas-vindas", art: { src: "/mascote/splash-capitao.webp", width: 1145, height: 1374 } },
 } as const satisfies Record<string, { label: string; art: CaptainBannerArt }>;
 
 export type AnnouncementArtId = keyof typeof ANNOUNCEMENT_ARTS;
@@ -57,13 +58,13 @@ export const EMPTY_ANNOUNCEMENT: HomeAnnouncementInput = {
   title: "",
   body: "",
   button: null,
-  art: "tesouro",
+  art: "acenando",
   tone: "navy",
   endsOn: null,
 };
 
 export function announcementArt(id: AnnouncementArtId): CaptainBannerArt {
-  return (ANNOUNCEMENT_ARTS[id] ?? ANNOUNCEMENT_ARTS.tesouro).art;
+  return (ANNOUNCEMENT_ARTS[id] ?? ANNOUNCEMENT_ARTS.acenando).art;
 }
 
 /** No ar agora: ligado e, se tiver data final, ainda não passou (comparado no dia de São Paulo). */

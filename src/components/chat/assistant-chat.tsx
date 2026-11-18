@@ -8,7 +8,7 @@ import { bestAssistMatch } from "@/features/assist/catalog";
 import { useAssist } from "@/features/assist/components/assist-layer";
 import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
 import type { AgentId } from "@/features/ai-gateway/agents";
-import { ASSISTANTS, JACK_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
+import { ASSISTANTS, SASA_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
 
 import { prepareWhatsAppWindow } from "@/lib/whatsapp-open";
 import { rememberWhatsAppHandoff, useAcceptHandoffEnabled } from "@/features/broker-workspace/whatsapp-handoff/handoff-store";
@@ -18,7 +18,7 @@ import type { Mention } from "./composer";
 import type { AssistantAvatarAsset, ChatBlock, ChatScript, MascotShape } from "./types";
 
 /** An assistant conversation: the script plays, replies run the broker's actions. */
-export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false }: { identity: { name: string; shape: MascotShape; hue: number | null; avatarAsset?: AssistantAvatarAsset }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Jack's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean }) {
+export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false }: { identity: { name: string; shape: MascotShape; hue: number | null; avatarAsset?: AssistantAvatarAsset }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Sasá's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean }) {
   const router = useRouter();
   const assist = useAssist();
   // Aceite com contador (11/11): ligado, o WhatsApp abre na tela do lead depois de 30 s.
@@ -30,8 +30,8 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
   return (
     <ChatScreen
       composerDisabled={!canWrite}
-      placeholder={canWrite ? undefined : "Escolha uma opção acima. Para perguntar, fale com o Jack."}
-      onLocalChoice={async (_choice, value): Promise<ChatBlock[]> => (value.startsWith(JACK_ASK_PREFIX) ? ask(value.slice(JACK_ASK_PREFIX.length)) : [])}
+      placeholder={canWrite ? undefined : "Escolha uma opção acima. Para perguntar, fale com Sasá."}
+      onLocalChoice={async (_choice, value): Promise<ChatBlock[]> => (value.startsWith(SASA_ASK_PREFIX) ? ask(value.slice(SASA_ASK_PREFIX.length)) : [])}
       identity={identity}
       backHref="/dashboard"
       script={script}

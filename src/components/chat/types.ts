@@ -10,7 +10,7 @@ export type AssistantId = "ancora" | "leads" | "carteira" | "plantao" | "agenda"
   | "equipe" | "equipe-leads" | "equipe-plantao" | "equipe-desempenho";
 
 /** Mascot drawn by AssistantAvatar. "logo" is the company mark (verified Âncora thread). */
-export type MascotShape = "mochi" | "onigiri" | "cubo" | "favo" | "nuvem" | "salte" | "logo" | "jack";
+export type MascotShape = "mochi" | "onigiri" | "cubo" | "favo" | "nuvem" | "salte" | "logo" | "sasa";
 
 /** Personagem do universo Âncora que identifica uma área no Lite. */
 export type AssistantAvatarAsset = "leads" | "carteira" | "plantao" | "agenda" | "cotacao" | "desempenho" | "dicas" | "jornada" | "equipe" | "mensagens";
@@ -66,7 +66,7 @@ export type ChatBlock =
   | { type: "system"; id: string; text: string; strong?: string; details?: string; action?: { label: string; choiceAction: ChatAction } }
   /** variant "tip": a tip bubble (lamp + "Dica"), used by Dicas de Atendimento. */
   | { type: "assistant"; id: string; text: string; at?: string; variant?: "tip" }
-  /** An answer from the operator material (Jack, 23/10): sections of rows with their source, copy for the client. */
+  /** An answer from the operator material (Sasá, 23/10): sections of rows with their source, copy for the client. */
   | { type: "operator"; id: string; card: OperatorAnswerView; at?: string }
   /** The client in focus: name in highlight and a few facts as chips. */
   | { type: "client"; id: string; name: string; initials: string; chips: Array<{ label: string; tone?: ChatTone }> }
@@ -147,7 +147,7 @@ export type ThreadSummary = {
   leadId?: string;
   name: string;
   verified?: boolean;
-  /** Always first in the list (Jack), with a pin. */
+  /** Always first in the list (Sasá), with a pin. */
   pinned?: boolean;
   /** Last line of the conversation. */
   preview: string;

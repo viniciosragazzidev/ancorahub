@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({ push: vi.fn(), runServerAction: vi.fn(), invok
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock("./chat-screen", () => ({ ChatScreen: (props: { runAction: (action: unknown) => Promise<unknown> }) => { mocks.invokeAction.mockImplementation(props.runAction); return null; } }));
 vi.mock("@/features/broker-workspace/chat/chat-actions", () => ({ runChatServerAction: mocks.runServerAction }));
-vi.mock("@/features/broker-workspace/chat/assistant-scripts", () => ({ ASSISTANTS: {}, JACK_ASK_PREFIX: "jack:" }));
+vi.mock("@/features/broker-workspace/chat/assistant-scripts", () => ({ ASSISTANTS: {}, SASA_ASK_PREFIX: "ask:" }));
 vi.mock("@/features/assist/catalog", () => ({ bestAssistMatch: vi.fn(() => null) }));
 vi.mock("@/features/assist/components/assist-layer", () => ({ useAssist: () => null }));
 vi.mock("@/features/ai-gateway/ask-assistant", () => ({ askAssistantAction: vi.fn() }));

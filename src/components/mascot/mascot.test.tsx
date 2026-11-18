@@ -28,24 +28,24 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Mascot", () => {
-  it("keeps both local poses loaded in a fixed box and shows the one for each state", () => {
+  it("keeps local poses loaded in a fixed box and shows the one for each state", () => {
     for (const state of MASCOT_STATES) {
       const { container, unmount } = render(<Mascot state={state} size={200} />);
       const box = container.firstElementChild as HTMLElement;
       expect(box.style.height).toBe("200px");
       expect(box.style.width).toBe("128px");
       expect(box.getAttribute("data-mascot-renderer")).toBe("fallback");
-      expect(container.querySelectorAll("img")).toHaveLength(2);
+      expect(container.querySelectorAll("img")).toHaveLength(3);
       const visible = container.querySelector('img[data-visible="true"]')!;
       expect(visible.getAttribute("data-art")).toBe(MASCOT_STATE_ART[state]);
-      expect(visible.getAttribute("src")).toMatch(/^\/mascote\/(repouso|positivo)\.webp$/);
+      expect(visible.getAttribute("src")).toMatch(/^\/mascote\/(repouso|boas-vindas|positivo)\.webp$/);
       unmount();
     }
   });
 
   it("names what the mascot is doing, unless decorative", () => {
     render(<Mascot state="lead_accepted" />);
-    expect(screen.getByRole("img", { name: "Mascote da Âncora Saúde fazendo sinal de positivo" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: "Capitão Âncora fazendo sinal de positivo e segurando um troféu" })).toBeTruthy();
     cleanup();
     const { container } = render(<Mascot state="lead_accepted" decorative />);
     expect(screen.queryByRole("img")).toBeNull();
@@ -73,22 +73,11 @@ describe("Mascot", () => {
     expect(riveRendered).not.toHaveBeenCalled();
   });
 
-  it("plays the local pre-rendered clip only for its states, in light theme, with motion on", () => {
+  it("uses the local illustration and component motion without a pre-rendered video", () => {
     const { container } = render(<Mascot state="lead_accepted" />);
-    const clip = container.querySelector("video")!;
-    expect(clip.getAttribute("src")).toBe("/mascote/lead-accepted.mp4");
-    expect(clip.muted).toBe(true);
-    expect(clip.style.mixBlendMode).toBe("multiply");
-    cleanup();
-    expect(render(<Mascot state="idle" />).container.querySelector("video")).toBeNull();
-    cleanup();
-    motionState.enabled = false;
-    expect(render(<Mascot state="lead_accepted" />).container.querySelector("video")).toBeNull();
-    cleanup();
-    motionState.enabled = true;
-    document.documentElement.classList.add("dark");
-    expect(render(<Mascot state="lead_accepted" />).container.querySelector("video")).toBeNull();
-    document.documentElement.classList.remove("dark");
+    expect(container.querySelector('img[data-visible="true"]')?.getAttribute("src")).toBe("/mascote/positivo.webp");
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.firstElementChild?.getAttribute("data-mascot-renderer")).toBe("fallback");
   });
 
   it("maps states to the Rive number input in a stable order", () => {

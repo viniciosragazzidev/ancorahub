@@ -457,7 +457,7 @@ export async function answerIfOperatorQuestion(input: { tenantId: string; userId
 }
 
 /**
- * What the material of this company covers, for questions ready to tap (Jack, 23/10):
+ * What the material of this company covers, for questions ready to tap (Sasá, 23/10):
  * current facts per operator, plan and area.
  */
 export async function loadMaterialAsks(tenantId: string, options: { seed: number; limit: number; focusCarrier?: string | null; excludeAreas?: string[] }): Promise<MaterialAsk[]> {
@@ -488,12 +488,12 @@ function daySeed(now = new Date()) {
   return Math.floor(now.getTime() / 86_400_000);
 }
 
-/** Questions of the day for the Jack's first screen. */
+/** Questions of the day for the Sasá's first screen. */
 export async function materialAsksOfTheDay(tenantId: string, limit = 3) {
   return loadMaterialAsks(tenantId, { seed: daySeed(), limit }).catch(() => [] as MaterialAsk[]);
 }
 
-/** Same as answerIfOperatorQuestion, with the answer as a card and what to ask next (the Jack draws them). */
+/** Same as answerIfOperatorQuestion, with the answer as a card and what to ask next (the Sasá draws them). */
 export async function operatorQuestionReply(input: { tenantId: string; userId: string; question: string; ragEnabled?: boolean }): Promise<{ text: string; card?: OperatorCard; followUps?: MaterialAsk[]; otherOperators?: boolean } | null> {
   const question = input.question.trim().slice(0, 500);
   if (question.length < 3) return null;

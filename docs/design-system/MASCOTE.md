@@ -1,155 +1,99 @@
-# Mascote da Âncora Saúde · manutenção
+# Capitão Âncora — contrato oficial do mascote
 
-Status: **componente e splash em produção de código desde 14/11/2026, com arte de reserva.** O personagem articulado (rig da Rive) ainda não existe: depende de redesenhar o mascote em camadas vetoriais (§2).
-Dono: Vinicios. Faz parte do padrão de feedback (`FEEDBACK.md` §6). Referências e arte de reserva: `design/mascote/`.
+Status: identidade visual aprovada e aplicada no app em 18/11/2026.
+Decisão: DEC-189.
+Fonte oficial: design/mascote/capitao-ancora/referencia-oficial-capitao-ancora.png.
 
-## 1. O que existe
+## Conceito e personalidade
 
-| Peça | Arquivo | O que faz |
+Capitão Âncora é um marinheiro experiente, sábio e sempre próximo. Representa confiança e cuidado da Âncora Saúde. Sua personalidade é confiável e acolhedora, inteligente e estratégica, inspiradora e positiva.
+
+### Modelo visual obrigatório
+
+- Homem adulto, rosto arredondado cor de pêssego, nariz redondo alaranjado, olhos grandes e castanhos, bochechas rosadas e bigode branco curvado.
+- Boné branco de marinheiro com aba azul-marinho e pequena âncora dourada no centro.
+- Camisa branca de marinheiro, gola e lenço azul-marinho, calça azul-marinho, sapatos pretos simples.
+- Listras douradas nos ombros e emblema dourado de âncora no peito.
+- Silhueta compacta, formas arredondadas e proporção de referência aproximada de 5:7 para o corpo inteiro.
+- Ilustração limpa, expressiva e amigável, com contorno nítido e acabamento 2D arredondado. A identidade do rosto, do bigode, do boné e do uniforme não muda entre poses.
+- As artes não levam texto, números, dados de clientes ou elementos de interface.
+
+### Paleta oficial
+
+| Cor | Código | Uso |
 |---|---|---|
-| Componente | `src/components/mascot/mascot.tsx` (`<Mascot state="…" />`) | Mostra o mascote num estado. Usa a Rive quando há `.riv` e movimento ligado; senão, a arte de reserva |
-| Contrato | `src/components/mascot/mascot-config.ts` | Estados, caminho do `.riv`, nomes da máquina de estados, arte de cada estado, textos acessíveis |
-| Movimento provisório | `src/components/mascot/mascot-motion.ts` | Entrada, salto, balanço e respiração sobre a imagem inteira, com os tempos de `motion-tokens.ts` |
-| Rive | `src/components/mascot/mascot-rive.tsx` | Runtime `@rive-app/react-canvas` (MIT), carregado por import dinâmico só quando precisa |
-| Splash | `src/components/splash-screen.tsx` e `.module.css` | Fundo `#FFFFFF`, mascote no centro, vem no HTML do servidor e some quando o app fica pronto |
-| Arte de reserva | `public/mascote/positivo.webp` (46 KB), `public/mascote/repouso.webp` (25 KB) | Recortes das pranchas aprovadas, fundo transparente. Fontes em `design/mascote/reserva/` |
-| Prévia | `/dev/mascote` (só em desenvolvimento) | Todos os estados, demonstração do lead aceito, splash de novo e preferências |
+| Azul-marinho | #002B73 | Cor principal, boné, calça, lenço e áreas de contraste |
+| Azul de apoio | #0B5ED7 | Acentos e detalhes azuis |
+| Verde | #00B26B | Marca e sinais positivos |
+| Verde-lima | #7ED957 | Destaques positivos |
+| Dourado | #FFC400 | Âncora, listras e pontos de atenção |
+| Pele | #FF8A65 | Tom-base do rosto e das mãos |
+| Branco quente | #FFF6E9 | Camisa, boné e áreas claras |
+| Detalhe | #1F2937 | Contornos e detalhes escuros |
 
-Estados: `idle`, `welcome`, `loading`, `lead_accepted`, `lead_converted`, `success`, `error`.
+## Personagens e funções
 
-| Estado | Quando usar | Arte de reserva | Movimento provisório |
-|---|---|---|---|
-| `idle` | repouso, telas vazias | repouso | parado |
-| `welcome` | splash, primeira entrada | positivo | aparece, salta uma vez, assenta (1,9 s) |
-| `loading` | esperando servidor ou IA | repouso | respira (1,6 s, só enquanto espera) |
-| `lead_accepted` | aceite confirmado pelo servidor | positivo | um salto curto (0,56 s) |
-| `lead_converted` | venda confirmada | positivo | dois saltos, o segundo menor (1,1 s) |
-| `success` | outra confirmação | positivo | um salto curto |
-| `error` | a ação falhou | repouso | balanço de 4 px, 2 ciclos, 250 ms |
+- Capitão Âncora é o mascote principal da marca e pode aparecer na abertura, em banners, comemorações, orientação e ilustrações contextuais.
+- Assistentes de convés são personagens de apoio. Usam uniforme mais simples que o do Capitão: camisa branca, detalhes azul-marinho e uma pequena âncora; sem as listras douradas de capitão.
+- Sasá é a assistente de convés que mantém a conversa de avisos e perguntas do corretor. A troca do nome e da arte não muda sua função, permissões, ações ou rota.
+- As dez ilustrações objetuais das áreas de Leads, Carteira, Plantão, Agenda, Cotação, Desempenho, Dicas, Jornada, Equipe e Mensagens continuam como ícones funcionais. Elas não são personagens e permanecem inalteradas.
 
-Regras (de `FEEDBACK.md`): comemorar só depois da confirmação do servidor; nunca mostrar dados de cliente junto do mascote; nenhum loop fora de `loading`; respeitar `prefers-reduced-motion`, "Menos animação" e o kill-switch (o mascote fica parado e a Rive nem é carregada).
+## Regras de uso
 
-## 1.1 Animações pré-gravadas (Higgsfield)
+- Reutilize o mesmo Capitão Âncora em todas as poses. Não crie uma segunda versão do Capitão com outro rosto, idade, bigode, boné ou uniforme.
+- Use assistentes de convés somente como apoio, com uniforme simples e a mesma linguagem visual.
+- Use poucos elementos auxiliares e apenas quando explicarem o contexto, como luneta, livro de lançamentos, cartões de leads, leme ou troféu.
+- Não use estética ou vocabulário de pirata: espada, sabre, caveira, tapa-olho, gancho, bandeira pirata, roupa de pirata, saque, tesouro, baú, marujo ou tripulação.
+- Use palavras diretas de trabalho: leads, equipe, atendimento, comissão, agenda, plantão, meta, resultado e próximo passo.
+- Preserve o contraste e a legibilidade em recortes pequenos, telas móveis, avatares e temas claro e escuro.
 
-Em 14/11/2026, três animações foram geradas no Higgsfield pelo MCP, com o modelo Wan 2.7 (3 créditos cada, 2 s, 720p). O primeiro e o último quadro foram fixados nas poses aprovadas, para o personagem voltar exatamente à pose:
+## Biblioteca oficial de artes
 
-| Arquivo | Do quadro → ao quadro | Usado em |
+As fontes PNG e a prancha de referência ficam em design/mascote/capitao-ancora/. Os arquivos WebP transparentes publicados ficam em public/mascote/.
+
+| Fonte | Arquivo publicado | Uso |
 |---|---|---|
-| `public/mascote/welcome.mp4` | positivo → positivo (pisca e sorri) | `welcome`, `success` |
-| `public/mascote/lead-accepted.mp4` | repouso → positivo (levanta o polegar) | `lead_accepted` e a splash |
-| `public/mascote/lead-converted.mp4` | positivo → positivo (punho no ar e salto) | `lead_converted` |
+| capitao-repouso.png | repouso.webp | Repouso, espera e erro |
+| capitao-boas-vindas.png | boas-vindas.webp, splash-capitao.webp | Boas-vindas |
+| capitao-conquista.png | positivo.webp, desempenho-subindo.webp, venda-capitao.webp | Aceite, feedback positivo e celebração |
+| capitao-luneta.png | desempenho-mirando.webp | Desempenho e próximos passos |
+| capitao-financeiro.png | financeiro-controle.webp | Livro de comissões e lançamentos |
+| capitao-distribuicao.png | distribuicao-capitao-leads.webp | Organização e distribuição de leads |
+| sasa-assistente-conves.png | sasa-assistente-conves.webp | Avatar da conversa com Sasá |
 
-- Ficaram em H.264, 480 x 640, sem som, de 65 a 185 KB, com fundo branco puro e um pôster (primeiro quadro) em WebP. Originais e as imagens de entrada estão em `design/mascote/higgsfield/`.
-- O `Mascot` toca o vídeo só com movimento ligado e tema claro. O branco some com `mix-blend-mode: multiply` sobre superfícies claras. No tema escuro, com movimento reduzido ou se o vídeo falhar, usa a arte de reserva. A arte fica visível até o vídeo começar a tocar.
-- São vídeos, não um rig: não reagem nem misturam estados. O rig da Rive (§2 e §3) continua sendo o objetivo para um personagem articulado.
-- Para gerar outra: envie a pose em fundo branco 768 x 1024 (como em `design/mascote/higgsfield/`), use `start_image` e `end_image` iguais à pose final, 2 s, 720p, câmera parada e sem cenário. Converta com o comando de ffmpeg da seção 7.
+O arquivo splash-ancora.webp é a marca da empresa, não um personagem. As imagens antigas foram removidas do caminho ativo e preservadas em design/mascote/_archive/identidade-anterior/ somente como histórico; nunca devem voltar à interface.
 
-## 2. Por que ainda não é articulado
+## Componente e estados
 
-As referências (`design/mascote/referencias/`) são imagens achatadas: pranchas de 1536 px e GIFs de cerca de 410 px. Não há camadas, SVG nem `.riv`. Uma imagem inteira se movendo é só a reserva provisória. Para o rig, um designer precisa redesenhar em vetor, cada peça numa camada, com o ponto de giro marcado:
+O componente compartilhado é src/components/mascot/mascot.tsx. O contrato de estados está em src/components/mascot/mascot-config.ts. A ordem da lista de estados permanece estável porque corresponde ao número recebido pela máquina de estados da Rive.
 
-- Cabeça; cabelo (franja separada da nuca); bandana e as duas pontas soltas (balançam).
-- Olhos: branco, íris, brilho; pálpebras superior e inferior (piscar); sobrancelhas.
-- Bocas: neutra, sorriso fechado, sorriso aberto, surpresa, preocupada.
-- Tronco e camisa; casaco (corpo e as duas abas da frente); medalhão; cinto e fivela.
-- Braço e antebraço, esquerdo e direito.
-- Mãos: aberta, punho, polegar para cima, acenando, apontando.
-- Pernas e botas, esquerda e direita.
+| Estado | Situação | Arte |
+|---|---|---|
+| idle | Repouso ou tela vazia | repouso |
+| welcome | Primeira entrada | boas-vindas |
+| loading | Espera pelo servidor ou pela IA | repouso |
+| lead_accepted | Aceite confirmado | positivo |
+| lead_converted | Venda confirmada | positivo |
+| success | Outra confirmação | positivo |
+| error | Ação falhou | repouso |
 
-Formato aceito: arquivo do Rive Editor (`.rev`), SVG com grupos nomeados ou Figma com camadas. Cores de referência do dossiê (ainda não validadas como oficiais): azul `#0B4A8B`, verde `#22C55E`, dourado `#F8BF24`.
+A arte fica imóvel quando o movimento estiver desativado, quando “Menos animação” estiver ativo ou quando o sistema pedir movimento reduzido. O movimento existente continua no componente; não há mais vídeo pré-gravado com a identidade anterior. A Rive permanece opcional e só é carregada quando houver um arquivo local aprovado em public/mascote/mascote.riv.
 
-## 3. Contrato da Rive
+Comemore somente depois da confirmação do servidor. Não mostre informação de cliente junto ao mascote. Nenhum estado repete em loop, exceto loading.
 
-O app espera, no `.riv`:
+## Splash
 
-- Artboard **`Mascote`**.
-- Máquina de estados **`Mascote`**, com uma entrada numérica **`estado`**: 0 `idle`, 1 `welcome`, 2 `loading`, 3 `lead_accepted`, 4 `lead_converted`, 5 `success`, 6 `error` (a ordem de `MASCOT_STATES`).
-- Estados de uma passada (`welcome`, `lead_accepted`, `lead_converted`, `success`, `error`) voltam sozinhos ao `idle` dentro da máquina de estados. `loading` repete até o app mudar a entrada.
-- Pivô do personagem embaixo e no centro (o app alinha com `Alignment.BottomCenter`).
-- `idle` com piscada ocasional (a cada 4 a 6 s) e respiração muito leve; nada chamando atenção.
-- Roteiro do `welcome` (dossiê §3): 0 a 0,4 s aparece; 0,4 a 0,8 s pisca e sorri; 0,8 a 1,4 s flexiona e salta; 1,4 a 1,9 s volta e faz positivo; depois repousa.
+A abertura usa splash-capitao.webp e splash-ancora.webp sobre o azul oficial #002B73. A animação de entrada, os tempos, a saída quando o app está pronto e o comportamento de sessão permanecem. A imagem chega pelo HTML do servidor, não captura cliques e é decorativa para leitores de tela.
 
-Para ligar o rig: salve o arquivo em `public/mascote/mascote.riv`, troque `MASCOT_RIVE.src` para `"/mascote/mascote.riv"` em `mascot-config.ts` e confira em `/dev/mascote`. A arte de reserva continua como fallback (sem WebGL, falha de carga, movimento reduzido). Para a splash usar a Rive também, troque a `<img>` de `splash-screen.tsx` pelo `<Mascot state="welcome" priority />` depois de medir o tempo de carga do runtime no celular.
+## Uso nas áreas e controle
 
-## 4. Ferramentas e licenças
+As vagas do mascote continuam centralizadas em src/components/mascot/mascot-placements.ts. Não ligar vagas nem alterar layout nesta atualização de identidade. Cada área continua decidindo seu estado e conteúdo; o mascote é decorativo e não representa uma regra de negócio.
 
-- **Runtime da Rive** (`@rive-app/react-canvas` 4.38.0): MIT, sem custo nem royalties. O runtime pesa cerca de 2 MB (wasm) e só é baixado quando um `.riv` é mostrado.
-- **Rive CLI:** monta o `.riv` a partir de RML, no computador e sem conta. Instalação no Windows: `irm https://releases.rive.app/cli/install.ps1 | iex`; depois `rive create design/mascote/rive/mascote`. O projeto criado traz `AGENTS.md` e `CLAUDE.md` com a sintaxe.
-- **Licença de exportação:** no plano Free, o `.riv` publicado leva a tela de abertura da Rive. Um `.riv` limpo exige o plano Cadet (US$ 9 por assento por mês, em 14/11/2026).
-- **Motion AI Kit** (opcional, MIT): `npx motion-ai`.
-- Nada de vídeo gerado nem chamada de API durante a splash: tudo é servido pelo próprio app.
+Os objetos por rota continuam sob a flag já existente feature_ui_contextual_illustrations. A troca do personagem principal e do avatar de Sasá não altera essa flag nem expande onde os objetos aparecem.
 
-## 5. Splash
+## Manutenção
 
-- Arte aprovada em 14/11/2026: o capitão pirata com o sabre e a marca ÂNCORA, sobre o azul `#002B73` da própria arte (original em `design/mascote/splash/`). O capitão (`public/mascote/splash-capitao.webp`, 65 KB) e a marca (`splash-ancora.webp`, 24 KB) foram separados, com o azul removido, para o capitão entrar e dar um pulinho (1,9 s) enquanto a marca aparece 160 ms depois. O manifest usa o mesmo azul em `background_color`, para a tela do PWA instalado emendar com a splash. Esta arte é da splash; o `<Mascot>` das outras áreas segue com o personagem anterior até o visual delas ser decidido.
-
-- Vem no HTML do servidor: aparece antes do JavaScript e emenda com a tela branca do PWA instalado (`background_color: #ffffff` no manifest).
-- Some quando o app fica pronto: dois quadros depois da hidratação, respeitando só os 0,4 s de entrada. Nunca espera a animação inteira.
-- Uma vez por sessão (`sessionStorage`, chave `__ancora_splash_shown`). Um script inline marca `html[data-splash="done"]` antes da pintura, então nada pisca nas próximas cargas.
-- "Menos animação" (`ancora:a11y`) ou `prefers-reduced-motion`: mascote parado e saída sem transição.
-- Só `transform` e `opacity`, sem bloquear cliques (`pointer-events: none`) e escondida do leitor de tela.
-
-## 6. Como incluir um estado novo
-
-1. Acrescente o nome no fim de `MASCOT_STATES`. Nunca reordene: o índice é a entrada da Rive.
-2. Preencha `MASCOT_STATE_ART` e `MASCOT_LABELS`, e o movimento provisório em `mascot-motion.ts`.
-3. No arquivo da Rive, crie o estado na máquina `Mascote` para o novo valor de `estado`.
-4. Atualize as tabelas deste documento e rode `npx vitest run src/components/mascot`.
-
-## 7. Como testar
-
-- Conversão de um vídeo novo: `ffmpeg -i entrada.mp4 -an -vf "scale=480:-2:flags=lanczos:out_color_matrix=bt709:out_range=tv,lutrgb=r=if(gt(val,238),255,val):g=if(gt(val,238),255,val):b=if(gt(val,238),255,val),format=yuv420p" -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv -c:v libx264 -profile:v main -crf 22 -preset slow -movflags +faststart public/mascote/nome.mp4`. O `lutrgb` só leva o fundo quase branco a branco puro e não mexe nas cores do personagem. Não use `curves` na imagem toda: ele clareia e desbota o mascote.
-
-- `/dev/mascote` em desenvolvimento: estados, lead aceito com sucesso e falha, splash de novo e interruptores.
-- Celular Android e PWA instalado: abra o app pela rede local ou pelo ambiente de teste e confira a splash, a saída e o desempenho no "Monitor de desempenho" do Chrome remoto (meta 60 fps).
-- Movimento reduzido: ligue "Menos animação" em Configurações > Acessibilidade ou no sistema.
-
-## 8. Vagas do mascote nas áreas
-
-Cada área que pode mostrar o mascote já tem a vaga no código (`src/components/mascot/mascot-placements.ts`). Desligada, a vaga não desenha nada e a área fica como era. Para ligar, mude `enabled` para `true`; o estado e o tamanho também ficam ali.
-
-| Vaga | Onde | Estado padrão | Hoje |
-|---|---|---|---|
-| `splash` | abertura do PWA | `lead_accepted` | ligada |
-| `empty` | `EmptyState`, no lugar do ícone | `idle` | desligada |
-| `error` | `RouteError`, no lugar do ícone | `error` | desligada |
-| `loading` | `LitePageLoading`, acima do esqueleto | `loading` | desligada |
-| `success` | overlay de sucesso; a venda registrada pede `lead_converted` | `success` | desligada |
-| `celebration` | celebração da jornada (missão, conquista, nível), no lugar da arte | `lead_converted` | desligada |
-
-Em `/dev/mascote`, "Mostrar todas as vagas" liga todas só neste aparelho e só em desenvolvimento, para ver cada área com o mascote antes de decidir.
-
-Para trocar o visual de uma vaga: gere a pose (§1.1), salve em `public/mascote/`, aponte o estado em `mascot-config.ts` (`MASCOT_ART`, `MASCOT_STATE_ART` ou `MASCOT_VIDEOS`) e ligue a vaga.
-
-## 9. Assets contextuais dos assistentes por rota
-
-Em 15/11/2026, Vinicios pediu substituir as artes repetitivas com o Capitão/ajudante
-por ilustrações de objetos próprios de cada área. As dez imagens usam a paleta oficial
-(`#002B73`, `#0B5ED7`, `#00B26B`, `#7ED957`, `#FFC400`, `#FFF6E9`, `#1F2937`), fundo
-transparente e nenhum texto, personagem, rosto, pirata ou símbolo de âncora repetido.
-
-| Arquivo | Contexto visual |
-|---|---|
-| `public/assistant-areas/leads.webp` | Cartão de contato com lupa e marcador de novo lead |
-| `public/assistant-areas/carteira.webp` | Pasta com registros e separadores coloridos, sem pictograma de pessoas |
-| `public/assistant-areas/plantao.webp` | Sino de atendimento com relógio |
-| `public/assistant-areas/agenda.webp` | Calendário com data marcada e confirmação |
-| `public/assistant-areas/cotacao.webp` | Planos de saúde comparados com selo de seleção |
-| `public/assistant-areas/desempenho.webp` | Gráfico crescente com medalha |
-| `public/assistant-areas/dicas.webp` | Lâmpada e nota prática |
-| `public/assistant-areas/jornada.webp` | Mapa com rota, origem e destino |
-| `public/assistant-areas/equipe.webp` | Cartões de perfil abstratos conectados em rede |
-| `public/assistant-areas/mensagens.webp` | Balões de conversa e envelope |
-
-Cada arquivo mede 160 × 160 px, WebP com canal alfa e fica abaixo de 8 KB. A prancha
-de revisão está em `design/assistant-areas/visao-geral.png`. O mapa tipado vive em
-`src/components/chat/assistant-avatar.tsx`. A flag já auditada
-`feature_ui_contextual_illustrations` controla sua exibição no Lite de corretor,
-gestor e supervisor; o mesmo controle continua limitando ilustrações de seção/vazio
-ao escopo anterior. Desligada ou em falha de carregamento, o avatar abstrato segue
-visível.
-O desenho é decorativo: estado, ação, nome e permissão continuam no conteúdo existente.
-As ilustrações não substituem Jack/Notificações, a marca verificada, os avatares
-pessoais ou os retratos dos leads. Sem rig, animação nova, dependência ou chamada de
-rede externa. Plano, prompts e evidências:
-`docs/implementations/active/2026-11-15-assets-visuais-por-rota.md`.
+- Para uma pose nova, use o modelo oficial e a paleta acima, salve a fonte em design/mascote/capitao-ancora/ e o WebP otimizado em public/mascote/.
+- Atualize este catálogo e o registro de implementação correspondente.
+- Preserve os nomes de estado, ações, permissões e rotas existentes.
+- Não adicione dependências para substituir arte ou movimento.

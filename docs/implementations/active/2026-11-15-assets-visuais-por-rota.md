@@ -5,7 +5,7 @@
 
 ## Objetivo e contexto
 
-Trocar as artes repetitivas do Capitão/ajudante que hoje aparecem como avatares dos assistentes. Cada rota deve ter um objeto/ilustração que comunique a atividade, sem Jack, personagens, rostos ou símbolo de âncora repetido. Manter a paleta do design system e a linguagem 3D polida da marca, com composição simples para leitura em 32–44 px.
+Trocar as artes repetitivas do Capitão/ajudante que hoje aparecem como avatares dos assistentes. Cada rota deve ter um objeto/ilustração que comunique a atividade, sem Sasá, personagens, rostos ou símbolo de âncora repetido. Manter a paleta do design system e a linguagem 3D polida da marca, com composição simples para leitura em 32–44 px.
 
 ## Mapa visual
 
@@ -27,11 +27,11 @@ Trocar as artes repetitivas do Capitão/ajudante que hoje aparecem como avatares
 - Gerar uma imagem transparente por área, sem texto, watermark, personagem ou marca repetida.
 - Salvar os assets otimizados em diretório semanticamente neutro e atualizar o mapa tipado do avatar contextual existente.
 - Atualizar os contratos de design e o registro de implementação, preservando o controle `feature_ui_contextual_illustrations`, dimensões, alt vazio e fallback abstrato.
-- Não alterar Jack/Notificações, marca verificada, avatares pessoais, estados, links, layout, permissões, tokens, regras de negócio ou dependências.
+- Não alterar Sasá/Notificações, marca verificada, avatares pessoais, estados, links, layout, permissões, tokens, regras de negócio ou dependências.
 
 ## Ajuste de escala da lista lateral
 
-O avatar das áreas com `avatarAsset` é exibido a 35 × 35 px (aprox. 20% menor que os 44 px anteriores), centralizado no slot de 44 × 44 px já reservado pela linha. Assim o ícone fica mais leve sem reduzir o alvo da linha nem alterar Jack/Notificações, iniciais de leads ou avatares pessoais. Com a flag visual desligada, a forma abstrata de fallback também respeita os 35 px.
+O avatar das áreas com `avatarAsset` é exibido a 35 × 35 px (aprox. 20% menor que os 44 px anteriores), centralizado no slot de 44 × 44 px já reservado pela linha. Assim o ícone fica mais leve sem reduzir o alvo da linha nem alterar Sasá/Notificações, iniciais de leads ou avatares pessoais. Com a flag visual desligada, a forma abstrata de fallback também respeita os 35 px.
 
 ## Verificação visual
 
@@ -39,7 +39,7 @@ As pranchas de 44 px foram revisadas em fundo claro e escuro. Cada rota tem obje
 
 ## Geração e prompt set
 
-Ferramenta: `image_gen` integrado, uma geração por asset; a imagem de Leads precisou de uma edição adicional para remover o quadriculado gerado como fundo e preservar o alpha. O prompt comum pediu ilustração 3D suave para interface, formas arredondadas, luz de estúdio discreta, composição central reconhecível a 40 px, fundo realmente transparente e paleta `#002B73`, `#0B5ED7`, `#00B26B`, `#7ED957`, `#FFC400`, `#FFF6E9`, `#1F2937`. Todas as peças proíbem Jack, mascote, personagens, rosto, âncora, pirata, texto, letras, números, marca d'água e cenário.
+Ferramenta: `image_gen` integrado, uma geração por asset; a imagem de Leads precisou de uma edição adicional para remover o quadriculado gerado como fundo e preservar o alpha. O prompt comum pediu ilustração 3D suave para interface, formas arredondadas, luz de estúdio discreta, composição central reconhecível a 40 px, fundo realmente transparente e paleta `#002B73`, `#0B5ED7`, `#00B26B`, `#7ED957`, `#FFC400`, `#FFF6E9`, `#1F2937`. Todas as peças proíbem Sasá, mascote, personagens, rosto, âncora, pirata, texto, letras, números, marca d'água e cenário.
 
 | Asset | Prompt específico |
 |---|---|

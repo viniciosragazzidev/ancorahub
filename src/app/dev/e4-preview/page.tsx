@@ -18,7 +18,7 @@ const managerRail: ChatRailData = {
   assistants: [
     { id: "assistant:equipe-leads", kind: "assistant", assistant: "equipe-leads", name: "Leads da unidade", verified: true, pinned: true, preview: "7 leads aguardando distribuição manual.", at: instant, unread: true, waitingYou: true, href: "/leads", shape: "favo", hue: 252 },
     { id: "assistant:equipe", kind: "assistant", assistant: "equipe", name: "Minha unidade", verified: true, preview: "4 corretores em atendimento na unidade.", at: instant, unread: false, waitingYou: false, href: `/unidades/${uuid("1")}`, shape: "mochi", hue: 150 },
-    { id: "assistant:ancora", kind: "assistant", assistant: "ancora", name: "Notificações", verified: true, preview: "Avisos e atualizações da unidade.", at: instant, unread: false, waitingYou: false, href: "/notificacoes", shape: "jack", hue: 175 },
+    { id: "assistant:ancora", kind: "assistant", assistant: "ancora", name: "Notificações", verified: true, preview: "Avisos e atualizações da unidade.", at: instant, unread: false, waitingYou: false, href: "/notificacoes", shape: "sasa", hue: 175 },
   ],
   leads: [], nowIso: instant, canQuote: false, leadsBadgeCount: 7,
   managerUnitSummary: { leads: 24, unassigned: 7, activeBrokers: 8, brokersWithoutWhatsApp: 2, inService: 11, late: 1 },
@@ -27,7 +27,7 @@ const managerRail: ChatRailData = {
 const brokerRail: ChatRailData = {
   viewerName: "Rafa Corretor",
   assistants: [
-    { id: "assistant:ancora", kind: "assistant", assistant: "ancora", name: "Jack", verified: true, pinned: true, preview: "Tenho um resumo do seu dia.", at: instant, unread: false, waitingYou: false, href: "/dashboard/c/ancora", shape: "jack", hue: 175 },
+    { id: "assistant:ancora", kind: "assistant", assistant: "ancora", name: "Sasá", verified: true, pinned: true, preview: "Tenho um resumo do seu dia.", at: instant, unread: false, waitingYou: false, href: "/dashboard/c/ancora", shape: "sasa", hue: 175 },
     { id: "assistant:leads", kind: "assistant", assistant: "leads", name: "Minha fila", verified: true, preview: "Você tem uma oportunidade para olhar.", at: instant, unread: true, waitingYou: true, href: "/minha-fila", shape: "favo", hue: 252 },
     { id: "assistant:plantao", kind: "assistant", assistant: "plantao", name: "Meu plantão", verified: true, preview: "Sua próxima escala está confirmada.", at: instant, unread: false, waitingYou: false, href: "/plantoes", shape: "onigiri", hue: 28 },
   ],

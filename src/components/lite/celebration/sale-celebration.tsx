@@ -29,7 +29,7 @@ export interface SaleCelebrationProps {
   /** Até três números (ex.: valor mensal, vidas, vendas no mês). Sem dado pessoal do cliente. */
   stats?: SaleCelebrationStat[];
   continueLabel?: string;
-  /** Outra conquista (15/11/2026): presença no plantão, WhatsApp conectado. Padrão: o capitão com o baú. */
+  /** Outra conquista (15/11/2026): presença no plantão, WhatsApp conectado. Padrão: Capitão Âncora com troféu. */
   art?: { src: string; width: number; height: number };
   /** Selo que pula no canto do capitão. */
   badge?: "check" | "whatsapp";
@@ -41,7 +41,7 @@ export interface SaleCelebrationProps {
   statsLabel?: string;
 }
 
-const ART = { src: "/mascote/venda-capitao.webp", width: 584, height: 640 };
+const ART = { src: "/mascote/venda-capitao.webp", width: 1145, height: 1374 };
 
 /** Confete curto (só nível 3 do Lite): cor, deslocamento e giro de cada pedaço. */
 const CONFETTI = [

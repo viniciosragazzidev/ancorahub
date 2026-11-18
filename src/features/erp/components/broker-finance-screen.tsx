@@ -174,19 +174,18 @@ function Payouts({ rows, receiptsHref }: { rows: BrokerFinanceDetail["payouts"];
   );
 }
 
-/** O capitão no trono, cercado de moedas, mostrando uma ao corretor (arte de 14/11/2026). */
-const FINANCE_ART: CaptainBannerArt = { src: "/mascote/financeiro-trono.webp", width: 640, height: 585 };
+/** Capitão Âncora confere o livro de comissões e os lançamentos. */
+const FINANCE_ART: CaptainBannerArt = { src: "/mascote/financeiro-controle.webp", width: 1312, height: 1199 };
 
 /**
- * Banner do Meu financeiro (14/11/2026): a frase fala do que está a caminho do baú (ou do que já caiu no mês) e o
- * atalho leva aos leads, de onde vem a próxima comissão. Fica logo abaixo do Meu mês.
+ * Banner do Meu financeiro: informa valores previstos ou recebidos e leva aos leads. Fica logo abaixo do Meu mês.
  */
 function FinanceBanner({ summary }: { summary: BrokerFinanceDetail["summary"] }) {
   const receivable = summary.receivableCents ?? 0;
   const received = summary.receivedThisMonthCents ?? 0;
-  const title = receivable > 0 ? `Tem ${formatBrokerCents(receivable)} a caminho do seu baú. Bora encher mais um pouco?`
-    : received > 0 ? `Seu baú já recebeu ${formatBrokerCents(received)} em ${summary.periodLabel}. Bora atrás da próxima comissão?`
-      : "Cada venda fechada vira moeda no seu baú. Bora pra próxima?";
+  const title = receivable > 0 ? `Você tem ${formatBrokerCents(receivable)} a receber. Confira os detalhes abaixo.`
+    : received > 0 ? `Você recebeu ${formatBrokerCents(received)} em ${summary.periodLabel}. Confira os próximos valores previstos.`
+      : "Suas comissões aparecem aqui depois que uma venda for aprovada.";
   return <CaptainBanner className={styles.banner} label="Dica do financeiro" title={title} art={FINANCE_ART} action={{ label: "Ver meus leads", href: "/minha-fila" }} />;
 }
 

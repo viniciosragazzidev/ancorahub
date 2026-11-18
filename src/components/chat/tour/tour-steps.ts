@@ -204,12 +204,12 @@ export const TOUR_STEPS: TourStep[] = [
     id: "09-ancora",
     kind: "spotlight",
     target: "thread-ancora",
-    title: "Jack: avisos e suas perguntas",
-    body: "Os avisos da Âncora chegam aqui, e é aqui que você escreve: pergunte ao Jack o que quiser sobre o seu dia.",
+    title: "Sasá: avisos e perguntas",
+    body: "Os avisos da Âncora chegam nesta conversa. Você também pode escrever para Sasá e perguntar sobre seu dia.",
     narration:
-      "Este é o Jack, o assistente verificado da Âncora. Os avisos da empresa chegam aqui, e é aqui que você pode escrever e perguntar o que quiser: quem atender primeiro, seu plantão, seus retornos, sua meta.",
+      "Sasá é a assistente de convés da Âncora. Os avisos da empresa chegam aqui. Você pode perguntar sobre seus leads, plantão, retornos e meta.",
     xp: 10,
-    mascot: { shape: "jack", hue: 175 },
+    mascot: { shape: "sasa", hue: 175 },
   },
   {
     id: "10-desafio",
@@ -361,12 +361,12 @@ export const SUPERVISOR_TOUR_STEPS: TourStep[] = [
     id: "sup-06-ancora",
     kind: "spotlight",
     target: "thread-ancora",
-    title: "Jack",
+    title: "Sasá",
     body: "Os avisos da empresa e os alertas da sua equipe. Às 19h chega aqui o resumo do dia.",
     narration:
-      "No Jack chegam os avisos da empresa e os alertas da sua equipe, como lead sem contato no prazo. E todo dia às sete da noite chega aqui o resumo do dia da equipe.",
+      "Na conversa com Sasá chegam os avisos da empresa e os alertas da sua equipe, como leads sem contato no prazo. O resumo diário da equipe também aparece aqui.",
     xp: 10,
-    mascot: { shape: "jack", hue: 175 },
+    mascot: { shape: "sasa", hue: 175 },
   },
   {
     id: "sup-07-acoes",

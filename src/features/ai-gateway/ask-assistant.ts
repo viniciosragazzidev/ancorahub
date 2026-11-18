@@ -13,7 +13,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
 import { operatorQuestionReply } from "@/features/operator-catalog/answer";
-import { JACK_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
+import { SASA_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
 
 import { brokerAiAccess } from "./broker-ai-pilot";
 
@@ -101,7 +101,7 @@ export async function askAssistantAction(raw: { agentId: AgentId; question: stri
   if (!input.success) return fallback();
   const context = await getRequiredTenantContext();
   if (context.role !== "broker") return fallback();
-  // The company flag, or this broker is in the pilot of the Jack with the operator RAG (23/10).
+  // The company flag, or this broker is in the pilot of the Sasá with the operator RAG (23/10).
   const access = await brokerAiAccess(context.userId);
   if (!access.enabled) return fallback();
   // LGPD: nothing goes to a model before the broker allows it (current terms version).
@@ -119,7 +119,7 @@ export async function askAssistantAction(raw: { agentId: AgentId; question: stri
         type: "question",
         id: `ai-operator-next-${stamp}`,
         prompt: operatorAnswer.otherOperators ? "Do material que já temos, posso responder:" : operatorAnswer.card ? "Quer ver mais?" : "Posso responder estas:",
-        choices: operatorAnswer.followUps.map((ask) => ({ id: ask.id, label: ask.label, reply: ask.question, action: { kind: "local" as const, value: `${JACK_ASK_PREFIX}${ask.question}` } })),
+        choices: operatorAnswer.followUps.map((ask) => ({ id: ask.id, label: ask.label, reply: ask.question, action: { kind: "local" as const, value: `${SASA_ASK_PREFIX}${ask.question}` } })),
       });
     }
     return { ok: true, blocks };

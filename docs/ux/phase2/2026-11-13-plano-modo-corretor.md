@@ -28,7 +28,7 @@ validação no servidor; tenant, identidade e carteira vêm da sessão.
 
 ## 2. Início mais limpo
 
-Ordem: Meus leads, Minha carteira, Plantão, Agenda, Desempenho, Cotação. Jack permanece. Configurações,
+Ordem: Meus leads, Minha carteira, Plantão, Agenda, Desempenho, Cotação. Sasá permanece. Configurações,
 notificações e mural da gestão nos acessos secundários. Saem do Início: Dicas de Atendimento, Jornada (vai para
 Desempenho) e blocos que dupliquem Desempenho. Pendências seguem no flutuante **Agora**; dicas educativas separadas
 de avisos importantes. WhatsApp sem faixa permanente: indicador compacto e Configurações.

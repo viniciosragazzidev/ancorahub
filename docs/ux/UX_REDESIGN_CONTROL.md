@@ -4,12 +4,12 @@ Revisão pedida por Vinicios. Papel inicial: corretor Lite; mesmas associações
 são reutilizadas nas áreas de equipe do gestor e supervisor. A ação continua sendo
 abrir o assistente ou módulo pela linha. Dez objetos 3D decorativos identificam Leads,
 Carteira, Plantão, Agenda, Cotação, Desempenho, Dicas, Jornada, Equipe e Mensagens;
-a arte correspondente acompanha o cabeçalho da conversa quando existe. Não há Jack,
-outros personagens, rostos ou símbolo de âncora repetido. Jack/Notificações, marca
+a arte correspondente acompanha o cabeçalho da conversa quando existe. Não há Sasá,
+outros personagens, rostos ou símbolo de âncora repetido. Sasá/Notificações, marca
 verificada e avatares individuais permanecem como estão; texto e indicadores atuais
 comunicam conteúdo e estado.
 
-Na lista lateral, os objetos das áreas usam 35 × 35 px centralizados no slot de 44 × 44 px, cerca de 20% menores para reduzir o peso visual sem diminuir a área de toque da linha. Jack, marca verificada e avatares de leads permanecem no tamanho atual.
+Na lista lateral, os objetos das áreas usam 35 × 35 px centralizados no slot de 44 × 44 px, cerca de 20% menores para reduzir o peso visual sem diminuir a área de toque da linha. Sasá, marca verificada e avatares de leads permanecem no tamanho atual.
 
 Usa o provider e a flag global auditada existentes. A flag desligada e erro de imagem
 restauram as formas abstratas. Sem mudança de rota, hierarquia, ação, permissão, token,
@@ -198,7 +198,7 @@ The daily WhatsApp modal gives the tilted phone illustration additional vertical
 Papel: corretor sem WhatsApp conectado; ação principal: iniciar a conexão no
 computador. O cartão diário usa um tile à esquerda e uma coluna de conteúdo à
 direita, com a linha do computador e o CTA alinhados na mesma linha. O aviso de
-Jack permanece em uma linha sticky de 60px no fluxo da conversa. Reutiliza o card,
+Sasá permanece em uma linha sticky de 60px no fluxo da conversa. Reutiliza o card,
 tipografia, botão, tokens e entrada animada do tour Lite; ícone do WhatsApp verde,
 foco visível e reduced motion respeitado. No celular, ambos ocultam o CTA e mostram
 a orientação de computador; o daily mantém texto completo e X. Não altera
@@ -210,7 +210,7 @@ elegibilidade, flag, auditoria, armazenamento ou diálogo de conexão. Registro:
 Papel: corretor (`broker`); objetivo: conectar o WhatsApp pessoal antes de 20/10;
 ação principal: abrir o pareamento por QR no computador. Estados: conexão ausente,
 aviso diário, aviso fechado até amanhã, orientação no celular, QR aberto e conectado.
-O lembrete fixo fica no topo da conversa com Jack e não tem fechamento. O aviso diário
+O lembrete fixo fica no topo da conversa com Sasá e não tem fechamento. O aviso diário
 fica no topo do conteúdo do dashboard. A flag global do Super-admin controla ambos;
 desativá-la não muda a distribuição. O refinamento visual T122 reutiliza card e
 tipografia do tour Lite, `Button` e o diálogo de conexão existentes. Gap: o token
@@ -519,7 +519,7 @@ Papel: corretor; objetivo: conectar o WhatsApp para receber leads do plantão.
 O aviso diário usa o `Dialog` compartilhado, com foco e fechamento por Escape;
 o CTA “Agora não” mantém o fechamento diário e a auditoria existentes. Desktop:
 texto e ilustração em duas colunas. Celular: ilustração acima, orientação de
-conexão e “Entendi”. O aviso compacto do Jack, a audiência, a flag, a conexão e
+conexão e “Entendi”. O aviso compacto do Sasá, a audiência, a flag, a conexão e
 o armazenamento local permanecem iguais. Nenhum token, componente-base,
 variante ou movimento novo; sem avanço da etapa global UX-M1.10. Registro:
 `docs/implementations/completed/2026-10-14-whatsapp-plantao-notice-modal.md`.

@@ -71,5 +71,5 @@ export function HomeWelcomeBanner({ greeting, firstName, highlights, subtitle, d
     best ? { label: "Sua semana", value: `${best.position}º ${best.label}` } : null,
     highlights?.acceptTime ? { label: "Aceite médio", value: highlights.acceptTime } : null,
   ].filter((fact): fact is { label: string; value: string } => fact !== null);
-  return <CaptainBanner className={className} label="Boas-vindas" title={`${greeting}, ${firstName}! Bem-vindo a bordo.`} subtitle={subtitle} facts={facts} goal={goal} action={action} actionSlot={nextActionSlot} />;
+  return <CaptainBanner className={className} label="Boas-vindas" title={`${greeting}, ${firstName}! Que bom ter você aqui.`} subtitle={subtitle} facts={facts} goal={goal} action={action} actionSlot={nextActionSlot} />;
 }

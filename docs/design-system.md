@@ -719,8 +719,8 @@ Em 14/11/2026, Vinicios autorizou imagens contextuais nos assistentes por área 
 Lite de corretor, gestor e supervisor e no cabeçalho da conversa correspondente.
 Em 15/11, pediu substituir os retratos repetitivos do Capitão/ajudante por dez objetos
 3D próprios de cada rota, em 32 px na conversa e no tamanho já existente da linha.
-As imagens não incluem Jack, outros personagens, rostos ou âncora repetida; sem
-texto, borda, token, primitive ou movimento novos. Jack/Notificações, marca verificada,
+As imagens não incluem Sasá, outros personagens, rostos ou âncora repetida; sem
+texto, borda, token, primitive ou movimento novos. Sasá/Notificações, marca verificada,
 avatares pessoais e retratos de leads continuam inalterados. O controle Super-admin
 da flag continua incluindo os assets nos três papéis Lite; os objetos 3D de seção/vazio
 preservam o escopo anterior, apenas Diretor e Corretor. Com a flag desligada ou erro

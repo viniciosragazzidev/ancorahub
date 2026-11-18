@@ -34,8 +34,8 @@ const PERIOD_OPTIONS = [
   { value: "custom", label: "Escolher datas" },
 ];
 
-/** O capitão no leme, ao lado do baú de envelopes, lançando um para o marujo (arte de 14/11/2026). */
-const DISTRIBUTION_ART: CaptainBannerArt = { src: "/mascote/distribuicao-capitao-bau.webp", width: 800, height: 539 };
+/** Capitão Âncora organiza os cartões de leads ao lado do leme. */
+const DISTRIBUTION_ART: CaptainBannerArt = { src: "/mascote/distribuicao-capitao-leads.webp", width: 1312, height: 1199 };
 
 const STATUS_LABEL: Record<string, string> = { available: "Disponível", busy: "Em atendimento", break: "Pausa", paused: "Pausa" };
 
@@ -51,9 +51,9 @@ function Metric({ icon, label, value, hint, tone }: { icon: ReactNode; label: st
 
 function SummaryBanner({ data }: { data: BrokerDailySummaryAggregate }) {
   const title = data.totalUnstarted > 0
-    ? `${data.totalUnstarted} ${data.totalUnstarted === 1 ? "lead ainda está" : "leads ainda estão"} sem primeiro contato. Bora acionar a tripulação?`
+    ? `${data.totalUnstarted} ${data.totalUnstarted === 1 ? "lead ainda está" : "leads ainda estão"} sem primeiro contato. Acione a equipe para iniciar o atendimento.`
     : data.totalReceived > 0
-      ? "Todo lead que chegou já teve primeiro contato. A tripulação está no ritmo!"
+      ? "Todos os leads recebidos já tiveram o primeiro contato. A equipe está em dia."
       : "Assim que os leads chegarem, a distribuição aparece aqui. Mar calmo por enquanto.";
   const goal = data.totalReceived > 0 ? { value: `${data.teamConversionRate}%`, hint: "de conversão da equipe" } : undefined;
   return (

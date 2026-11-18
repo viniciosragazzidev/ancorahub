@@ -479,7 +479,7 @@ button.leadCardAction:disabled { opacity: 0.6; cursor: default; }
 .clientName { font-size: 17px; font-weight: 600; color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .clientChips { display: flex; flex-wrap: wrap; gap: 6px; }
 
-/* ---------- operator answer card (Jack, 23/10) ---------- */
+/* ---------- operator answer card (Sasá, 23/10) ---------- */
 .operatorCard { display: grid; }
 .operatorIntro { margin: 0; padding: 14px 16px 6px; font-size: var(--text-base); line-height: 1.5; }
 .operatorSection { border-top: 1px solid var(--border-subtle); }

@@ -56,7 +56,7 @@ Pedido do Vinicios: se a informação não estiver no material importado, o sist
    - Citação de item que não foi enviado é bloqueada.
    - Qualquer número que não exista no material nem na pergunta é bloqueado. Isso pega valor inventado, conta feita pela IA e prazo trocado.
    - No lugar, o corretor recebe "Não consegui confirmar essa resposta no material importado".
-6. **Todos os assistentes:** uma pergunta sobre operadora ou conteúdo de plano (operadora citada, carência, coparticipação, rede credenciada, reajuste, tabela de preço, mensalidade, reembolso, CPT, cobertura) feita ao Jack, aos outros assistentes do corretor, ao chat lateral ou ao chat geral é respondida só por esse fluxo, nunca pelo modelo livre. O chat geral (`/api/chat`) passou a exigir login.
+6. **Todos os assistentes:** uma pergunta sobre operadora ou conteúdo de plano (operadora citada, carência, coparticipação, rede credenciada, reajuste, tabela de preço, mensalidade, reembolso, CPT, cobertura) feita ao Sasá, aos outros assistentes do corretor, ao chat lateral ou ao chat geral é respondida só por esse fluxo, nunca pelo modelo livre. O chat geral (`/api/chat`) passou a exigir login.
 
 Cada bloqueio fica no log como `[cotacao-express] blocked`, com o motivo.
 
