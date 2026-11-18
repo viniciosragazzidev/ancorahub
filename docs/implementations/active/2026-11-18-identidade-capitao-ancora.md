@@ -53,7 +53,7 @@ Sasá é a assistente de convés da conversa de notificações. Sua arte usa cam
 - Build de produção: `npm run build -- --webpack` passou. O build padrão com Turbopack não iniciou porque ele rejeita o junction de `node_modules` do worktree por apontar para fora da raiz; nenhuma dependência foi instalada.
 - `npm run agent:verify -- --level fast`: documentação e type-check passaram; testes reportaram 24 falhas e 2 erros, além de 941 aprovados e 31 ignorados.
 - `npm run agent:verify -- --level full`: documentação, checagem de arquivos, arquitetura, segurança, performance e type-check passaram. Lint falhou antes do ESLint por 987 ocorrências de mojibake em quatro arquivos fora do escopo. Testes: 943 aprovados, 22 falhas, 31 ignorados e 2 erros. As falhas são de snapshots/rotas de legado e mocks ou dependências; os testes direcionados do mascote, do tour e da conversa passaram (22/22).
-- Preview visual mobile e desktop: pendente após sincronizar a branch com o preview 3005.
+- Preview visual mobile e desktop: bloqueado porque a porta 3005 recusou conexão após a sincronização; o servidor não foi iniciado nem reiniciado.
 
 ## Risco e reversão
 
