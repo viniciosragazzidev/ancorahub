@@ -106,6 +106,7 @@ export function AssistantAvatar({
 
   if (shape === "sasa") {
     // Sasá é a assistente de convés; usa uniforme simples e mantém as reações da conversa.
+    // Mesmas reações do mascote: respira trabalhando, uma passada por humor e o ponto azul esperando.
     const { animate, transition } = moodMotion(mood, reduce);
     const working = state === "working" && !reduce;
     return (

@@ -4,12 +4,12 @@ Revisão pedida por Vinicios. Papel inicial: corretor Lite; mesmas associações
 são reutilizadas nas áreas de equipe do gestor e supervisor. A ação continua sendo
 abrir o assistente ou módulo pela linha. Dez objetos 3D decorativos identificam Leads,
 Carteira, Plantão, Agenda, Cotação, Desempenho, Dicas, Jornada, Equipe e Mensagens;
-a arte correspondente acompanha o cabeçalho da conversa quando existe. Não há Sasá,
-outros personagens, rostos ou símbolo de âncora repetido. Sasá/Notificações, marca
-verificada e avatares individuais permanecem como estão; texto e indicadores atuais
-comunicam conteúdo e estado.
+a arte correspondente acompanha o cabeçalho da conversa quando existe. A conversa de
+avisos usa Sasá, assistente de convés; o mascote principal é o Capitão Âncora, conforme
+DEC-189. A marca verificada e avatares individuais permanecem; texto e indicadores
+atuais comunicam conteúdo e estado.
 
-Na lista lateral, os objetos das áreas usam 35 × 35 px centralizados no slot de 44 × 44 px, cerca de 20% menores para reduzir o peso visual sem diminuir a área de toque da linha. Sasá, marca verificada e avatares de leads permanecem no tamanho atual.
+Na lista lateral, os objetos das áreas usam 35 × 35 px centralizados no slot de 44 × 44 px, cerca de 20% menores para reduzir o peso visual sem diminuir a área de toque da linha. A troca de identidade não altera o tamanho da marca verificada nem dos avatares de leads.
 
 Usa o provider e a flag global auditada existentes. A flag desligada e erro de imagem
 restauram as formas abstratas. Sem mudança de rota, hierarquia, ação, permissão, token,
@@ -519,7 +519,7 @@ Papel: corretor; objetivo: conectar o WhatsApp para receber leads do plantão.
 O aviso diário usa o `Dialog` compartilhado, com foco e fechamento por Escape;
 o CTA “Agora não” mantém o fechamento diário e a auditoria existentes. Desktop:
 texto e ilustração em duas colunas. Celular: ilustração acima, orientação de
-conexão e “Entendi”. O aviso compacto do Sasá, a audiência, a flag, a conexão e
+conexão e “Entendi”. O aviso compacto da Sasá, a audiência, a flag, a conexão e
 o armazenamento local permanecem iguais. Nenhum token, componente-base,
 variante ou movimento novo; sem avanço da etapa global UX-M1.10. Registro:
 `docs/implementations/completed/2026-10-14-whatsapp-plantao-notice-modal.md`.

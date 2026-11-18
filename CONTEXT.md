@@ -6,9 +6,9 @@
 
 ## Identidade visual e assistentes
 
-- **Capitão Âncora**: mascote principal da Âncora Saúde; marinheiro adulto, acolhedor e experiente, com boné branco de âncora dourada, bigode branco curvado e uniforme branco e azul com detalhes dourados.
-- **Assistente de convés**: personagem de apoio no mesmo estilo visual, com uniforme mais simples que o do Capitão.
-- **Sasá**: assistente de convés da conversa de avisos e perguntas do corretor; mantém as ações, permissões e rota que já existiam para essa conversa.
+- **Capitão Âncora**: mascote principal da Âncora Saúde; marinheiro adulto, acolhedor e experiente, representado com uniforme branco e azul-marinho, âncora dourada, bigode branco curvado e detalhes dourados.
+- **Assistente de convés**: personagem auxiliar no mesmo estilo visual, com uniforme simples e pequena âncora, sem as listras do Capitão.
+- **Sasá**: assistente de convés da conversa de avisos e perguntas do corretor; nome, arte e voz não alteram a rota, permissões, ações ou dados da conversa.
 - **Ilustração funcional de área**: ícone objetual que identifica uma rota do app, como Leads, Plantão ou Agenda; é independente dos personagens.
 
 ## Atendimento e pós-venda

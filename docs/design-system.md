@@ -717,16 +717,16 @@ Mapa e verificação: docs/implementations/active/2026-10-28-contextual-illustra
 
 Em 14/11/2026, Vinicios autorizou imagens contextuais nos assistentes por área do
 Lite de corretor, gestor e supervisor e no cabeçalho da conversa correspondente.
-Em 15/11, pediu substituir os retratos repetitivos do Capitão/ajudante por dez objetos
-3D próprios de cada rota, em 32 px na conversa e no tamanho já existente da linha.
-As imagens não incluem Sasá, outros personagens, rostos ou âncora repetida; sem
-texto, borda, token, primitive ou movimento novos. Sasá/Notificações, marca verificada,
-avatares pessoais e retratos de leads continuam inalterados. O controle Super-admin
-da flag continua incluindo os assets nos três papéis Lite; os objetos 3D de seção/vazio
-preservam o escopo anterior, apenas Diretor e Corretor. Com a flag desligada ou erro
-de carregamento, a apresentação abstrata existente volta. Mapa e evidências:
-docs/design-system/MASCOTE.md §9 e
-docs/implementations/active/2026-11-15-assets-visuais-por-rota.md.
+Em 15/11, pediu substituir os retratos repetitivos por dez objetos 3D próprios de
+cada rota, em 32 px na conversa e no tamanho já existente da linha. Em 18/11, a
+identidade principal foi atualizada para o Capitão Âncora e a conversa de avisos
+passou a usar Sasá, assistente de convés. Os dez objetos de rota permanecem
+inalterados. A marca verificada, avatares pessoais e retratos de leads também
+permanecem. O controle Super-admin da flag continua incluindo os assets nos três
+papéis Lite; os objetos 3D de seção/vazio preservam o escopo anterior, apenas Diretor
+e Corretor. Com a flag desligada ou erro de carregamento, a apresentação abstrata
+existente volta. Contrato vigente: docs/design-system/MASCOTE.md; decisão DEC-189;
+registro: docs/implementations/active/2026-11-18-identidade-capitao-ancora.md.
 
 ## Feedback e movimento · 14/11/2026
 

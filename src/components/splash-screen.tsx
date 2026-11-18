@@ -88,7 +88,8 @@ export function SplashScreen() {
 
   if (phase === "gone") return null;
 
-  // Ilustração oficial do Capitão Âncora e marca ÂNCORA separadas para a entrada do app.
+  // Ilustração oficial do Capitão Âncora e marca ÂNCORA separadas
+  // para o capitão entrar e dar um pulinho enquanto a marca aparece logo depois. Fundo do mesmo azul da arte.
   return (
     <div className={styles.splash} data-phase={phase} data-splash-screen="" aria-hidden="true">
       <div className={styles.content}>

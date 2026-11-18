@@ -110,10 +110,10 @@ Dica de voz: tom de colega, animado e calmo, 150 a 165 palavras por minuto; cada
 
 > Dicas de Atendimento é o seu analista. A inteligência artificial lê as conversas com os clientes e te diz quem responder primeiro, qual é o próximo passo e dá dicas práticas, como tratar uma objeção ou quando propor o fechamento.
 
-## 09-ancora.mp3 · Sasá: avisos e perguntas
+## 09-ancora.mp3 · Sasá: avisos e suas perguntas
 
 - Tipo: spotlight · destaque: `thread-ancora` · 10 XP
-- Texto na tela: Os avisos da Âncora chegam nesta conversa. Escreva para Sasá e pergunte sobre seu dia.
+- Texto na tela: Os avisos da Âncora chegam nesta conversa. Você também pode escrever para Sasá e perguntar sobre seu dia.
 - Duração estimada: 12s (36 palavras)
 
 **Narração:**

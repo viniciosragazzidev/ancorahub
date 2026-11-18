@@ -1,11 +1,10 @@
 # Histórico de Funcionalidades Adicionadas (Features Log)
 
-## 18/11/2026 - Capitão Âncora e Sasá
+## 18/11/2026 - Identidade do Capitão Âncora e da Sasá
 
-- A identidade principal passa a seguir a prancha oficial do Capitão Âncora: marinheiro experiente com boné branco de âncora dourada, bigode branco curvado, uniforme branco e azul-marinho e detalhes dourados. A biblioteca inclui repouso, boas-vindas, luneta, financeiro, distribuição e conquista; Sasá recebe um avatar de assistente de convés com uniforme simples.
-- Os banners de desempenho, financeiro, distribuição, comemoração e abertura usam as novas artes. A conversa, o agente e a orientação passam a chamar a assistente de Sasá; ações, rota, permissões e funcionamento permanecem os mesmos. Os rótulos de anúncio foram atualizados e novos anúncios começam com a pose de boas-vindas.
-- Termos de fantasia saem das cópias ativas de distribuição, desempenho e financeiro. Os dez ícones objetuais de área continuam iguais. O movimento compartilhado e o respeito a movimento reduzido permanecem; os vídeos antigos do mascote foram removidos.
-- Registro, escopo, arquivos e validações: `docs/implementations/active/2026-11-18-identidade-capitao-ancora.md`.
+- Artes e referências visuais ativas do mascote atualizadas para o Capitão Âncora; a conversa de avisos passa a usar Sasá, assistente de convés. Copy de distribuição e financeiro adota termos diretos de trabalho; os dez ícones objetuais das rotas, as funções, IDs técnicos, permissões e caminhos permanecem.
+- As duas versões renderizadas do vídeo de boas-vindas ainda contêm Jack. A fonte editável do projeto não está neste repositório; atualização e render dos vídeos permanecem pendentes até o projeto ser recuperado.
+- Decisão: DEC-189. Contrato visual: `docs/design-system/MASCOTE.md`. Registro: `docs/implementations/active/2026-11-18-identidade-capitao-ancora.md`.
 
 ## 17/11/2026 - Egress da distribuição: consultas memorizadas por passo
 

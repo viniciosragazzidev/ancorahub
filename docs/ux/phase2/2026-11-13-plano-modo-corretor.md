@@ -4,6 +4,8 @@ Data: 2026-11-13. Origem: pedido do Vinicios nesta data. Substitui a proposta de
 [2026-11-13-corretor-redesign-plan.md](./2026-11-13-corretor-redesign-plan.md) quanto à organização do modo corretor;
 os contratos citados lá continuam valendo (Lite atual preservado, componentes existentes, Super-admin, auditoria).
 
+Atualização de identidade em 18/11/2026: qualquer menção a Jack neste plano é histórica e foi substituída por Sasá, assistente de convés, conforme DEC-188. A mudança de identidade não altera as rotas nem a organização descrita aqui.
+
 Reorganizar o **modo corretor** em torno de três atividades: **atender, cuidar da carteira e acompanhar seus
 resultados**, mantendo o estilo atual do Lite. Critérios de qualidade pedidos: padrão máximo de design, animações
 discretas, telas limpas e utilidade real. Toda capacidade nova fica atrás de chave do Super-admin, com auditoria e

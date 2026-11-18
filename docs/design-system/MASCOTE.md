@@ -1,6 +1,6 @@
 # Capitão Âncora — contrato oficial do mascote
 
-Status: identidade visual aprovada e aplicada no app em 18/11/2026.
+Status: identidade visual aprovada e aplicada às artes e interfaces disponíveis em 18/11/2026; vídeos de boas-vindas pendentes de fonte editável.
 Decisão: DEC-189.
 Fonte oficial: design/mascote/capitao-ancora/referencia-oficial-capitao-ancora.png.
 
@@ -88,6 +88,11 @@ A abertura usa splash-capitao.webp e splash-ancora.webp sobre o azul oficial #00
 ## Uso nas áreas e controle
 
 As vagas do mascote continuam centralizadas em src/components/mascot/mascot-placements.ts. Não ligar vagas nem alterar layout nesta atualização de identidade. Cada área continua decidindo seu estado e conteúdo; o mascote é decorativo e não representa uma regra de negócio.
+
+Os arquivos renderizados `boas-vindas-v3-celular.mp4` e
+`boas-vindas-v3-computador.mp4` ainda mostram a identidade anterior. O projeto
+editável da composição não estava disponível nos worktrees revisados; atualizar e
+re-renderizar os vídeos quando a fonte for recuperada.
 
 Os objetos por rota continuam sob a flag já existente feature_ui_contextual_illustrations. A troca do personagem principal e do avatar de Sasá não altera essa flag nem expande onde os objetos aparecem.
 

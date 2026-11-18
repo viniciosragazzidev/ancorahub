@@ -34,7 +34,7 @@ const PERIOD_OPTIONS = [
   { value: "custom", label: "Escolher datas" },
 ];
 
-/** Capitão Âncora organiza os cartões de leads ao lado do leme. */
+/** Capitão Âncora organiza e acompanha a distribuição de leads. */
 const DISTRIBUTION_ART: CaptainBannerArt = { src: "/mascote/distribuicao-capitao-leads.webp", width: 1312, height: 1199 };
 
 const STATUS_LABEL: Record<string, string> = { available: "Disponível", busy: "Em atendimento", break: "Pausa", paused: "Pausa" };
@@ -54,7 +54,7 @@ function SummaryBanner({ data }: { data: BrokerDailySummaryAggregate }) {
     ? `${data.totalUnstarted} ${data.totalUnstarted === 1 ? "lead ainda está" : "leads ainda estão"} sem primeiro contato. Acione a equipe para iniciar o atendimento.`
     : data.totalReceived > 0
       ? "Todos os leads recebidos já tiveram o primeiro contato. A equipe está em dia."
-      : "Assim que os leads chegarem, a distribuição aparece aqui. Mar calmo por enquanto.";
+      : "Assim que os leads chegarem, a distribuição aparece aqui.";
   const goal = data.totalReceived > 0 ? { value: `${data.teamConversionRate}%`, hint: "de conversão da equipe" } : undefined;
   return (
     <CaptainBanner className={styles.banner} label="Dica da distribuição" tone="white" title={title} goal={goal}

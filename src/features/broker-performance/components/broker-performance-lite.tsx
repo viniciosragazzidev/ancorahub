@@ -220,7 +220,8 @@ function PerformanceBanner({ view }: { view: BrokerPerformanceView }) {
   const first = view.service.firstContact;
   const goal = first ? { value: `${Math.round(first.rate)}% no prazo`, hint: "primeiro contato" } : undefined;
   const title = view.insight ?? (view.empty ? "Assim que os leads chegarem, seus números aparecem aqui. Bora pro próximo?" : "Responder rápido é o que mais vira venda. Bora manter o ritmo?");
-  // O Capitão comemora quando há venda no período; sem venda, a luneta reforça olhar os próximos passos.
+  // Arte de 14/11/2026: com venda no período o capitão aponta a bandeira no topo do gráfico; sem venda ainda,
+  // ele mira de luneta e o próximo objetivo ainda está em andamento.
   const sold = (view.cards.find((card) => card.key === "sales")?.value ?? 0) > 0;
   const art = sold ? PERFORMANCE_ART_UP : PERFORMANCE_ART_AIM;
   return <CaptainBanner className={styles.banner} label="Dica do desempenho" tone="white" title={title} goal={goal} art={art}

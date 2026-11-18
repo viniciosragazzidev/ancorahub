@@ -8,6 +8,7 @@
 | `architecture/CorreTop_Arquitetura_Desenvolvimento.md` | Arquitetura e processo de engenharia | Fonte de referência |
 | `ux/UX_REDESIGN_CONTRACT.md` | Filosofia e regras de UX/redesign | Norma visual vigente |
 | `ux/UX_REDESIGN_CONTROL.md` | Etapa atual e próxima ação permitida | Controle obrigatório de UX |
+| `design-system/MASCOTE.md` | Modelo visual oficial do Capitão Âncora, Sasá, paleta e biblioteca de artes | Contrato vigente; DEC-188 |
 | `../AI_RULES.md` | Instruções operacionais para IA | Norma de execução vigente |
 | `business-rules.md` | Regras de domínio consolidadas e rastreáveis | Norma de comportamento vigente |
 | `product/resume-dashboard-plan.md` | Conteúdo e prioridades da home executiva `/resume` | Plano de produto vigente |
