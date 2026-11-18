@@ -31,8 +31,8 @@ type Step = "lista" | "conferir" | "distribuir";
 type Celebration = { key: string; budgetKey: string; title: string; message: string; stats: SaleCelebrationStat[]; art: { src: string; width: number; height: number }; continueLabel: string };
 
 /** Arte do Capitão Âncora para a lista importada e para a distribuição concluída. */
-const IMPORT_ART = { src: "/mascote/desempenho-subindo.webp", width: 1145, height: 1374 };
-const DISTRIBUTE_ART = { src: "/mascote/distribuicao-capitao-leads.webp", width: 1312, height: 1199 };
+const IMPORT_ART = { src: "/mascote/2026-11-18/desempenho-subindo.webp", width: 1145, height: 1374 };
+const DISTRIBUTE_ART = { src: "/mascote/2026-11-18/distribuicao-capitao-leads.webp", width: 1312, height: 1199 };
 type Review = { organized: Organized; known: Set<string>; weekLeft: number; cut: number };
 
 const fmt = (n: number) => n.toLocaleString("pt-BR");

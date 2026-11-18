@@ -27,7 +27,7 @@ describe("SplashScreen", () => {
     const splash = container.querySelector("[data-splash-screen]") as HTMLElement;
     expect(splash).not.toBeNull();
     expect(splash.getAttribute("aria-hidden")).toBe("true");
-    expect([...container.querySelectorAll("img")].map((img) => img.getAttribute("src"))).toEqual(["/mascote/splash-capitao.webp", "/mascote/splash-ancora.webp"]);
+    expect([...container.querySelectorAll("img")].map((img) => img.getAttribute("src"))).toEqual(["/mascote/2026-11-18/splash-capitao.webp", "/mascote/splash-ancora.webp"]);
     expect(container.querySelector("video")).toBeNull();
     expect(sessionStorage.getItem(SPLASH_KEY)).toBe("1");
 

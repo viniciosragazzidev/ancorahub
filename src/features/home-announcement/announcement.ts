@@ -8,11 +8,11 @@ import { z } from "zod";
 import type { CaptainBannerArt } from "@/components/lite/banner/captain-banner";
 
 export const ANNOUNCEMENT_ARTS = {
-  tesouro: { label: "Capitão comemorando", art: { src: "/mascote/venda-capitao.webp", width: 1145, height: 1374 } },
-  trono: { label: "Capitão conferindo os resultados", art: { src: "/mascote/financeiro-controle.webp", width: 1312, height: 1199 } },
-  mirando: { label: "Capitão olhando adiante", art: { src: "/mascote/desempenho-mirando.webp", width: 1145, height: 1374 } },
-  subindo: { label: "Capitão celebrando uma conquista", art: { src: "/mascote/desempenho-subindo.webp", width: 1145, height: 1374 } },
-  acenando: { label: "Capitão dando boas-vindas", art: { src: "/mascote/splash-capitao.webp", width: 1145, height: 1374 } },
+  tesouro: { label: "Capitão comemorando", art: { src: "/mascote/2026-11-18/venda-capitao.webp", width: 1145, height: 1374 } },
+  trono: { label: "Capitão conferindo os resultados", art: { src: "/mascote/2026-11-18/financeiro-controle.webp", width: 1312, height: 1199 } },
+  mirando: { label: "Capitão olhando adiante", art: { src: "/mascote/2026-11-18/desempenho-mirando.webp", width: 1145, height: 1374 } },
+  subindo: { label: "Capitão celebrando uma conquista", art: { src: "/mascote/2026-11-18/desempenho-subindo.webp", width: 1145, height: 1374 } },
+  acenando: { label: "Capitão dando boas-vindas", art: { src: "/mascote/2026-11-18/splash-capitao.webp", width: 1145, height: 1374 } },
 } as const satisfies Record<string, { label: string; art: CaptainBannerArt }>;
 
 export type AnnouncementArtId = keyof typeof ANNOUNCEMENT_ARTS;

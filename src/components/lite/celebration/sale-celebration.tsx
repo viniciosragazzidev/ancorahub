@@ -41,7 +41,7 @@ export interface SaleCelebrationProps {
   statsLabel?: string;
 }
 
-const ART = { src: "/mascote/venda-capitao.webp", width: 1145, height: 1374 };
+const ART = { src: "/mascote/2026-11-18/venda-capitao.webp", width: 1145, height: 1374 };
 
 /** Confete curto (só nível 3 do Lite): cor, deslocamento e giro de cada pedaço. */
 const CONFETTI = [

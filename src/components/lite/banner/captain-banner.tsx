@@ -11,7 +11,7 @@ import styles from "./captain-banner.module.css";
 export type CaptainBannerArt = { src: string; width: number; height: number };
 
 /** Ilustração padrão do Capitão Âncora; banners de área podem fornecer uma pose própria. */
-export const CAPTAIN_WELCOME_ART: CaptainBannerArt = { src: "/mascote/splash-capitao.webp", width: 1145, height: 1374 };
+export const CAPTAIN_WELCOME_ART: CaptainBannerArt = { src: "/mascote/2026-11-18/splash-capitao.webp", width: 1145, height: 1374 };
 
 export function CaptainBanner({ label, title, subtitle, facts, goal, progress, action, actionSlot, art = CAPTAIN_WELCOME_ART, tone = "navy", pose = "rise", size = "regular", className }: {
   /** Nome acessível da região. */

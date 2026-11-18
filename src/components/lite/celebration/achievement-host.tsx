@@ -30,8 +30,8 @@ export function announceAchievement(achievement: Achievement): boolean {
   return true;
 }
 
-const DUTY_ART = { src: "/mascote/desempenho-mirando.webp", width: 1145, height: 1374 };
-const WHATSAPP_ART = { src: "/mascote/desempenho-subindo.webp", width: 1145, height: 1374 };
+const DUTY_ART = { src: "/mascote/2026-11-18/desempenho-mirando.webp", width: 1145, height: 1374 };
+const WHATSAPP_ART = { src: "/mascote/2026-11-18/desempenho-subindo.webp", width: 1145, height: 1374 };
 
 function screenOf(achievement: Achievement): { title: string; message: string; stats: SaleCelebrationStat[]; art: { src: string; width: number; height: number }; badge: "check" | "whatsapp"; continueLabel: string } {
   if (achievement.kind === "whatsapp") {

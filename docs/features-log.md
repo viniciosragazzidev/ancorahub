@@ -3,6 +3,7 @@
 ## 18/11/2026 - Identidade do Capitão Âncora e da Sasá
 
 - Artes e referências visuais ativas do mascote atualizadas para o Capitão Âncora; a conversa de avisos passa a usar Sasá, assistente de convés. Copy de distribuição e financeiro adota termos diretos de trabalho; os dez ícones objetuais das rotas, as funções, IDs técnicos, permissões e caminhos permanecem.
+- Avatar/logo da Sasá atualizado para somente o rosto oficial do Capitão, com bigode branco, boné com âncora e fundo azul. URLs versionadas nas artes do mascote corrigem o cache antigo; os banners de Início e Plantões exibem a mesma arte marinheira.
 - As duas versões renderizadas do vídeo de boas-vindas ainda contêm Jack. A fonte editável do projeto não está neste repositório; atualização e render dos vídeos permanecem pendentes até o projeto ser recuperado.
 - Decisão: DEC-188. Contrato visual: `docs/design-system/MASCOTE.md`. Registro: `docs/implementations/active/2026-11-18-identidade-capitao-ancora.md`.
 
