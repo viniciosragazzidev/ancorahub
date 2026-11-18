@@ -1,6 +1,7 @@
 import "@/components/arc/venancor-scope.css";
 import "@/components/arc/director-skin.css";
 import "@/components/arc/director-primitives.css";
+import "@/components/arc/director-chrome.css";
 
 import { notFound } from "next/navigation";
 
@@ -10,7 +11,6 @@ import { DirectorLiteDashboard } from "@/features/dashboard/components/director-
 import { DirectorLiteQualificationFunnelPage } from "@/features/dashboard/components/director-lite/qualification-funnel-page";
 import { funnelPeriodForOverview } from "@/features/qualification-turbo/funnel";
 import { parseOverviewPeriod } from "@/features/dashboard/overview-filter";
-import styles from "@/features/dashboard/components/director-lite/director-lite.module.css";
 
 import { buildEssential } from "../diretor-dashboard-preview/_components/essential-example";
 import { buildFunnel, type UnitId } from "../diretor-dashboard-preview/_components/data";
@@ -53,13 +53,15 @@ export default async function DirectorDashboardRealPage({ searchParams }: { sear
     const period = funnelPeriodForOverview(overviewPeriod);
     const data = buildFunnel(period, branch ? FUNNEL_UNIT_IDS[branch.id] : "all", now);
     return (
-      <div className="arc-venancor" data-skin="diretor">
-        <div className="app-shell-canvas h-app overflow-y-auto overflow-x-hidden overscroll-contain arc-venancor" data-slot="app-scroll-frame" data-skin="diretor" style={{ background: "var(--background)" }}>
-          <div className={styles.page}>
-            <DirectorLiteQualificationFunnelPage data={data} branchId={branch?.id ?? null} branches={BRANCHES} firstName="Renata" now={now} />
+      <SidebarProvider>
+        <div className="arc-venancor w-full" data-skin="diretor">
+          <div className="app-shell-canvas h-app overflow-y-auto overflow-x-hidden overscroll-contain arc-venancor" data-slot="app-scroll-frame" data-skin="diretor" style={{ background: "var(--background)" }}>
+            <div data-slot="app-content">
+              <DirectorLiteQualificationFunnelPage data={data} branchId={branch?.id ?? null} branches={BRANCHES} firstName="Renata" now={now} />
+            </div>
           </div>
         </div>
-      </div>
+      </SidebarProvider>
     );
   }
 
@@ -69,7 +71,8 @@ export default async function DirectorDashboardRealPage({ searchParams }: { sear
     <SidebarProvider>
       <div className="arc-venancor w-full" data-skin="diretor">
         <div className="app-shell-canvas h-app overflow-y-auto overflow-x-hidden overscroll-contain arc-venancor" data-slot="app-scroll-frame" data-skin="diretor" style={{ background: "var(--background)" }}>
-          <div className={styles.page}>
+          {/* Mesmo container do app: a moldura (director-chrome.css) dá o respiro do topo e o gutter ao <main>. */}
+          <div data-slot="app-content">
             <DirectorLiteDashboard data={data} period="today" branchId={null} branches={BRANCHES} now={now} />
           </div>
         </div>
