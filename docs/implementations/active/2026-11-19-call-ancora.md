@@ -161,7 +161,7 @@ Status em 19/11/2026: demonstração visual entregue na branch `feat/call-ancora
 
 ### Fora deste MVP
 
-Base de contatos, campanha, reservas concorrentes, logs de chamadas, criação de lead, integração em tempo real com o CRM, app Capacitor/Android, discagem automática, gestão, limites por chip e revisão jurídica continuam nas etapas posteriores do plano. O link `tel:` só abre o discador do aparelho; o MVP não consegue observar chamadas reais.
+Base de contatos, campanha, reservas concorrentes, logs de chamadas, criação de lead, integração em tempo real com o CRM, app Capacitor/Android, discagem automática de chamadas reais, gestão, limites por chip e revisão jurídica continuam nas etapas posteriores do plano. O link `tel:` só abre o discador do aparelho depois de um toque; o MVP não consegue observar chamadas reais. Esta etapa automatiza apenas a contagem e a simulação.
 ### Acesso e ativação
 
 - A flag global `feature_call_ancora_visual_enabled` fica desligada por padrão (`false`).
@@ -175,6 +175,13 @@ Base de contatos, campanha, reservas concorrentes, logs de chamadas, criação d
 - A sessão do CRM usa a identidade autenticada como chave quando o admin está em `Ver como`, mantendo isolada a sessão do corretor visualizado. Tenant e permissões continuam vindo do contexto resolvido no servidor.
 - Leituras do armazenamento em memória executam `prune()` para remover sessões ociosas e tickets antigos mesmo quando outra sessão é consultada.
 - Evidência desta rodada: TypeScript, ESLint focado, quatro arquivos Vitest (20 testes) e build Webpack passaram. Relatório em `reports/agent/verification/call-ancora-mvp.md`; capturas em `reports/agent/call-ancora-mvp/`.
+
+### Rail e discagem da sessão em 19/11/2026
+
+- O rail Assistentes do corretor Lite inclui `Call Âncora` quando `CALL_ANCORA_VISUAL` está ligada, ou para admin ativo em `Ver como` e desenvolvimento, usando o mesmo gate de `visibility.ts`. O item abre `/call-ancora` e usa `public/assistant-areas/call-ancora.webp`; no celular, o caminho continua em Mais.
+- A sessão tem a preferência `Discagem automática`, desligada por padrão e guardada no estado temporário do servidor. Ligada, classificar uma ligação abre a contagem de três segundos, com Pausar; ao terminar, a simulação seguinte começa no celular sem toque. Desligada, a sessão deixa o próximo contato pronto e o celular mostra o botão grande `Ligar para o próximo`.
+- A página web não pode abrir `tel:` sem um gesto do usuário. Por isso a ligação real permanece manual e o celular vibra ao receber um novo contato, respeitando as preferências do dispositivo. Discagem real sem toque exige o app Android e `TelecomManager.placeCall`.
+- Sem migration, escrita no banco ou persistência após reinício do processo. A preferência é compartilhada pelo polling da tela web e do celular pareado.
 
 ## Etapa 1: status
 

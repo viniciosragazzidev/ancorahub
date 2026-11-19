@@ -10,6 +10,9 @@ import { buildSupervisorLeadThreads, buildSupervisorThreads, buildTeamLeadThread
 import { getSupervisorLiteRadar } from "@/features/supervisor-workspace/lite-queries";
 import { getSupervisorWorkspaceData } from "@/features/supervisor-workspace/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { getRequiredSession } from "@/shared/auth/session";
+import { isActivePlatformAdmin } from "@/features/super-admin/view-as";
+import { canUseCallAncora } from "@/features/call-ancora/visibility";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getManagerLiteLeads } from "@/features/supervisor-workspace/manager-lite-queries";
 
@@ -90,18 +93,28 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
       .then(async (flag) => flag === "true"
         ? { enabled: true, data: await getCachedBrokerJourneyData(context.tenantId, context.userId).catch(() => null) }
         : { enabled: false, data: null });
-    const [data, dutyCalendarFlag, journeyResult, homeV2Flag, walletUnified] = await Promise.all([
+    const callAncoraPromise = Promise.all([
+      getFeatureFlag(FEATURE_FLAGS.CALL_ANCORA_VISUAL).catch(() => "false"),
+      getRequiredSession(),
+    ]).then(async ([flag, session]) => canUseCallAncora({
+      role: context.role,
+      featureEnabled: flag === "true",
+      platformAdmin: Boolean(context.viewAs) || (context.role !== "broker" && await isActivePlatformAdmin(session.user.id).catch(() => false)),
+      development: process.env.NODE_ENV === "development",
+    }));
+    const [data, dutyCalendarFlag, journeyResult, homeV2Flag, walletUnified, callAncora] = await Promise.all([
       getCachedBrokerWorkspaceData(),
       getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR).catch(() => "false"),
       journeyPromise,
       getFeatureFlag(FEATURE_FLAGS.BROKER_NAV_REORG).catch(() => FEATURE_FLAGS.BROKER_NAV_REORG.defaultValue),
       isBrokerMyWalletEnabled().catch(() => false),
+      callAncoraPromise,
     ]);
     const dutyCalendar = dutyCalendarFlag === "true";
     const now = new Date();
     const journeyEnabled = journeyResult.enabled;
     const journey = journeyResult.data;
-    const capabilities = { quoteSimulator: true, dutyCalendar, journey: journeyEnabled, homeV2: homeV2Flag === "true", walletUnified };
+    const capabilities = { quoteSimulator: true, dutyCalendar, journey: journeyEnabled, homeV2: homeV2Flag === "true", walletUnified, callAncora };
     return {
       viewerName: data.viewer.name,
       assistants: buildAssistantThreads({ data, capabilities, journey, now }),

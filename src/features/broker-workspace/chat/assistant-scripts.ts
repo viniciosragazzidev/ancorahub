@@ -33,6 +33,7 @@ export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
   plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/plantoes/agora", avatarAsset: "plantao" },
   agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/agenda", avatarAsset: "agenda" },
   cotacao: { name: "Cotação", shape: "favo", hue: 268, href: "/cotacao", avatarAsset: "cotacao" },
+  "call-ancora": { name: "Call Âncora", shape: "cubo", hue: 145, href: "/call-ancora", avatarAsset: "call-ancora" },
   desempenho: { name: "Desempenho", shape: "nuvem", hue: 330, href: "/desempenho", avatarAsset: "desempenho" },
   insights: { name: "Dicas de Atendimento", shape: "salte", hue: 200, href: "/conversas/broker", avatarAsset: "dicas" },
   jornada: { name: "Jornada", shape: "favo", hue: 85, href: "/jornada", avatarAsset: "jornada" },
@@ -46,7 +47,7 @@ export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
 export const SUPERVISOR_ASSISTANTS = ["equipe", "equipe-leads", "equipe-plantao", "equipe-desempenho"] as const;
 
 type LeadQueueItem = BrokerWorkspaceData["queue"][number];
-type ScriptAssistantId = Exclude<AssistantId, "ancora" | "carteira" | "cotacao" | "insights" | "equipe" | "equipe-leads" | "equipe-plantao" | "equipe-desempenho">;
+type ScriptAssistantId = Exclude<AssistantId, "ancora" | "carteira" | "cotacao" | "call-ancora" | "insights" | "equipe" | "equipe-leads" | "equipe-plantao" | "equipe-desempenho">;
 
 function iso(date: Date | null | undefined) {
   return date && Number.isFinite(date.getTime()) ? date.toISOString() : null;
@@ -212,7 +213,7 @@ function threadSort(left: ThreadSummary, right: ThreadSummary) {
 export function buildAssistantThreads(input: {
   data: BrokerWorkspaceData;
   /** walletUnified: com a Minha carteira ligada, Meus leads e Minha carteira viram uma linha só (abas Em atendimento e Clientes). */
-  capabilities: { quoteSimulator: boolean; dutyCalendar: boolean; journey?: boolean; homeV2?: boolean; walletUnified?: boolean };
+  capabilities: { quoteSimulator: boolean; dutyCalendar: boolean; journey?: boolean; homeV2?: boolean; walletUnified?: boolean; callAncora?: boolean };
   journey?: BrokerJourneyData | null;
   now: Date;
 }): ThreadSummary[] {
@@ -226,7 +227,7 @@ export function buildAssistantThreads(input: {
  * (Meus leads, Minha carteira, Plantão, Agenda, Desempenho, Cotação). Dicas de Atendimento e Jornada saem do Início:
  * a Jornada abre pelo Desempenho. O que pede atenção continua marcado em cada linha e no flutuante Agora.
  */
-const HOME_V2_ORDER: readonly AssistantId[] = ["ancora", "leads", "carteira", "plantao", "agenda", "desempenho", "cotacao"];
+const HOME_V2_ORDER: readonly AssistantId[] = ["ancora", "leads", "carteira", "plantao", "agenda", "desempenho", "cotacao", "call-ancora"];
 export const HOME_V2_PLANTAO_HREF = "/plantoes";
 
 function arrangeHomeV2(threads: ThreadSummary[], walletUnified: boolean): ThreadSummary[] {
@@ -253,7 +254,7 @@ function arrangeHomeV2(threads: ThreadSummary[], walletUnified: boolean): Thread
 
 function buildAllAssistantThreads(input: {
   data: BrokerWorkspaceData;
-  capabilities: { quoteSimulator: boolean; dutyCalendar: boolean; journey?: boolean };
+  capabilities: { quoteSimulator: boolean; dutyCalendar: boolean; journey?: boolean; callAncora?: boolean };
   journey?: BrokerJourneyData | null;
   now: Date;
 }): ThreadSummary[] {
@@ -321,6 +322,15 @@ function buildAllAssistantThreads(input: {
   if (capabilities.quoteSimulator) {
     threads.push(assistantThread("cotacao", {
       preview: isQuotePausedFor(data.viewer.userId) ? "Em pausa por enquanto." : "O simulador está pronto para uma nova cotação.",
+      at: null,
+      unread: false,
+      waitingYou: false,
+    }));
+  }
+
+  if (capabilities.callAncora) {
+    threads.push(assistantThread("call-ancora", {
+      preview: "Comece uma sessão de ligações pelo celular.",
       at: null,
       unread: false,
       waitingYou: false,

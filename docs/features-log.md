@@ -2,11 +2,15 @@
 
 ## 19/11/2026 - MVP visual do Call Âncora
 
-- Entrada no Lite e na navegação normal para quem tem acesso, rota `/call-ancora` com pareamento por QR de uso único, ligação simulada, cronômetro, próximo contato, classificação e interessados. `/call-ancora/celular` mostra contato fictício, link `tel:` e simulação; `/dev/laboratorio` demonstra o fluxo sem pareamento. Estado temporário em memória, sem gravar no CRM e sem criar leads. `CALL_ANCORA_VISUAL` começa desligada; corretores só recebem acesso quando o Super-admin liga a flag, enquanto admins ativos da plataforma e desenvolvimento podem abrir a demonstração. Não inclui base de frios nem ligação automática. Registro: `docs/implementations/active/2026-11-19-call-ancora.md`.
+- Entrada no Lite e na navegação normal para quem tem acesso, rota `/call-ancora` com pareamento por QR de uso único, ligação simulada, cronômetro, próximo contato, classificação e interessados. `/call-ancora/celular` mostra contato fictício, link `tel:` e simulação; `/dev/laboratorio` demonstra o fluxo sem pareamento. Estado temporário em memória, sem gravar no CRM e sem criar leads. `CALL_ANCORA_VISUAL` começa desligada; corretores só recebem acesso quando o Super-admin liga a flag, enquanto admins ativos da plataforma e desenvolvimento podem abrir a demonstração. Não inclui base de frios nem discagem real automática. Registro: `docs/implementations/active/2026-11-19-call-ancora.md`.
 
 ## 19/11/2026 - Ajustes das sessões do Call Âncora
 
 - A tela móvel para de consultar quando a API encerra a sessão (401/403) e pede um novo QR. `Ver como` separa o armazenamento do admin da sessão do corretor visualizado; leituras também removem sessões ociosas e tickets antigos. Validação: 20 testes focados, TypeScript, ESLint e build Webpack.
+
+## 19/11/2026 - Rail e discagem automática do Call Âncora
+
+- O rail Assistentes do corretor mostra `Call Âncora` pelo mesmo gate de flag, admin ativo ou desenvolvimento e usa ilustração própria; no celular, a entrada continua em Mais. A preferência `Discagem automática` vale para a sessão e aparece no celular: ligada, a classificação abre contagem de três segundos com pausa e a próxima simulação começa sozinha; desligada, o próximo contato fica parado com `Ligar para o próximo`. A página web não abre `tel:` sem toque; discagem real automática depende do app Android com `TelecomManager.placeCall`. Estado temporário, sem migration nem escrita no CRM.
 
 ## 18/11/2026 - Capitão maior no banner mobile de Plantões
 
