@@ -294,7 +294,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         title="Equipe e unidades"
         rightSlot={<div className="flex items-center gap-1.5 sm:gap-2">{diretorSemCargo ? <Button aria-label="Cargos e permissões" render={<Link href="/equipe/cargos" />} variant="outline" className="max-[559px]:px-2.5"><ShieldCheck className="size-4" /><span className="max-[559px]:hidden">Cargos e permissões</span></Button> : null}{podeGerirEquipe ? <TeamInviteSection branches={branches} canInviteManager={context.role === "director"} canInviteDirector={context.role === "director"} customRoles={customRoles} /> : null}</div>}
       />
-      <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
+      <main className="ct-enter-seq flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <TeamManagementTabs active="membros" />
         {/* Contexto de página legado, preservado para eventual restauração:
         <section>
@@ -307,7 +307,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           </p>
         </section>
         */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <div className="ct-enter-seq-tight grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           <StatCard label="Total de membros" value={members.length} sublabel="últimos 6 meses" sparklineData={membersTrend} sparklineColor="var(--chart-1)" />
           <StatCard label="Acessos ativos" value={activeMembers} sublabel="membros com acesso" sparklineData={membersTrend} sparklineColor="var(--chart-3)" />
           <StatCard label="Leads sem atendimento" value={unassignedCount} sublabel="aguardando corretor" sparklineData={leadsTrend} sparklineColor="var(--chart-4)" />

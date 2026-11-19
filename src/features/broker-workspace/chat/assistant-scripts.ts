@@ -260,7 +260,6 @@ function buildAllAssistantThreads(input: {
   const { data, capabilities, now } = input;
   const leads = buildLeadThreads({ queue: data.queue, now });
   const leadPreview = latestLeadPreview(leads);
-  const notification = data.inbox.find((item) => item.source === "notification");
   const activeDuty = data.duty?.active;
   const nextDuty = capabilities.dutyCalendar ? data.duty?.next : null;
   const overdueReturn = isOverdueReturn(data, now);
@@ -269,14 +268,7 @@ function buildAllAssistantThreads(input: {
   const activeTime = activeDuty ? `${formatTime(activeDuty.startsAt)} às ${formatTime(activeDuty.endsAt)}` : null;
 
   const threads = [
-    assistantThread("ancora", {
-      preview: data.today.unreadNotifications > 0
-        ? notification?.title ?? `Você tem ${data.today.unreadNotifications} avisos novos.`
-        : "Você não tem avisos novos. Quando a escala mudar ou um lead precisar de você, o recado aparece aqui.",
-      at: data.today.unreadNotifications > 0 ? iso(data.updatedAt) : null,
-      unread: data.today.unreadNotifications > 0,
-      waitingYou: false,
-    }),
+    assistantThread("ancora", { preview: SASA_THREAD_PREVIEW, at: null, unread: false, waitingYou: false }),
     assistantThread("leads", {
       preview: leadPreview?.preview ?? "Tudo em dia por aqui.",
       at: latestIso(leads.map((lead) => lead.at ? new Date(lead.at) : null)),
@@ -805,9 +797,6 @@ export function buildJourneyScript(input: { journey: BrokerJourneyData | null; d
   return { blocks, status: { label: "Sua jornada", tone: "waiting" } };
 }
 
-/** One notification of the broker (notifications table). */
-export type AncoraNotification = { id: string; title: string; message: string; type: string; readAt: Date | null; createdAt: Date; leadId: string | null };
-
 function dayLabel(date: Date, now: Date) {
   const key = localDateKey(date);
   if (key === localDateKey(now)) return "Hoje";
@@ -815,10 +804,6 @@ function dayLabel(date: Date, now: Date) {
   return formatDate(date);
 }
 
-/**
- * The Âncora thread: the broker's notifications as messages from the company,
- * oldest first and grouped by day, with a marker before the unread ones.
- */
 /** Questions ready to tap in Sasá's conversation: the reply value is sent to the AI as if typed. */
 export const SASA_ASK_PREFIX = "ask:";
 const SASA_ASKS: ChatChoice[] = [
@@ -833,54 +818,24 @@ function materialChoices(asks: SasaMaterialAsk[] | undefined): ChatChoice[] {
   return (asks ?? []).slice(0, 3).map((ask) => ({ id: ask.id, label: ask.label, hint: "Material das operadoras", reply: ask.question, action: { kind: "local", value: `${SASA_ASK_PREFIX}${ask.question}` } }));
 }
 
-export function buildAncoraScript(input: { notifications: AncoraNotification[]; now: Date; materialAsks?: SasaMaterialAsk[] }): ChatScript {
-  const { now } = input;
+/** Prévia da linha da Sasá no Início: a conversa é só para pedidos (19/11). */
+export const SASA_THREAD_PREVIEW = "Peça o que precisar, por texto ou áudio.";
+
+/**
+ * A conversa da Sasá (19/11/2026): só para pedidos ao assistente. Os avisos e notificações moraram aqui até
+ * 19/11; agora ficam na área de Notificações (/notificacoes, sino do Início). Plano: 2026-11-19-sasa-agentica.md.
+ */
+export function buildAncoraScript(input: { now: Date; materialAsks?: SasaMaterialAsk[] }): ChatScript {
   const materials = materialChoices(input.materialAsks);
-  const items = [...input.notifications].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-  if (!items.length) {
-    return {
-      blocks: [
-        assistantMessage("ancora-empty", "Oi, aqui é Sasá, assistente de convés da Âncora. Os avisos chegam nesta conversa. Você também pode perguntar sobre seus leads, plantão, retornos e meta."),
-        question("ancora-choice", "Quer começar por uma destas?", [...SASA_ASKS, ...materials]),
-      ],
-      composerPlaceholder: "Pergunte ao Sasá",
-      status: { label: "Sem avisos novos", tone: "idle" },
-    };
-  }
-  const blocks: ChatBlock[] = [];
-  const unread = items.filter((item) => !item.readAt);
-  let lastDay = "";
-  let markedUnread = false;
-  for (const item of items) {
-    const day = localDateKey(item.createdAt);
-    if (day !== lastDay) {
-      blocks.push({ type: "date", id: `ancora-day-${day}`, label: dayLabel(item.createdAt, now) });
-      lastDay = day;
-    }
-    if (!item.readAt && !markedUnread) {
-      blocks.push({ type: "system", id: "ancora-unread", text: unread.length === 1 ? "1 aviso novo" : `${unread.length} avisos novos` });
-      markedUnread = true;
-    }
-    blocks.push({ type: "notice", id: `ancora-${item.id}`, noticeType: item.type, leadId: item.leadId, title: item.title, message: item.message || null, at: formatTime(item.createdAt), atIso: item.createdAt.toISOString(), unread: !item.readAt });
-  }
-
-  const latestLead = [...unread].reverse().find((item) => item.leadId);
-  const choices: ChatChoice[] = [];
-  if (latestLead?.leadId) choices.push({ id: "open-lead", label: "Abrir o lead do último aviso", action: { kind: "href", href: `/leads/${latestLead.leadId}` } });
-  // A message of the Central that asks for confirmation (relationship.confirmation).
-  if (unread.some((item) => item.type === "relationship.confirmation")) {
-    choices.push({ id: "relationship-ack", label: "Ciente", reply: "Ciente", action: { kind: "server", name: "relationship.ack", payload: {} } });
-  }
-  if (unread.length) choices.push({ id: "mark-all", label: "Marcar tudo como lido", reply: "Já vi, pode marcar como lido", action: { kind: "server", name: "notifications.markRead", payload: {} } });
-  // Sasá answers in this same conversation: two questions ready to tap (the AI answers them).
-  blocks.push(assistantMessage("ancora-sasa-hint", vary(["Precisa de algo? É só me perguntar aqui embaixo.", "Me pergunte o que quiser sobre o seu dia.", "Quer saber quem atender primeiro? Toque abaixo ou escreva.", "Estou por aqui para o que precisar."], now, 3)));
-  choices.push(...SASA_ASKS, ...materials);
-  choices.push({ id: "settings", label: "Configurar avisos", hint: "Notificações no celular e pop-up de lead", action: { kind: "href", href: "/notificacoes" } });
-  blocks.push(question("ancora-choice", unread.length ? "O que você quer fazer?" : "Tudo lido. Quer me perguntar algo?", choices));
-
   return {
-    blocks,
-    composerPlaceholder: "Pergunte ao Sasá",
-    status: unread.length ? { label: unread.length === 1 ? "1 aviso novo" : `${unread.length} avisos novos`, tone: "waiting" } : { label: "Tudo lido", tone: "idle" },
+    blocks: [
+      assistantMessage("ancora-intro", vary([
+        "Oi, aqui é a Sasá. Me diga o que você precisa, por texto ou áudio, e eu cuido dos seus leads, plantão, retornos e meta.",
+        "Oi, aqui é a Sasá. Peça o que precisar sobre seus leads, plantão, retornos e meta: eu resolvo por aqui.",
+      ], input.now, 3)),
+      question("ancora-choice", "Quer começar por uma destas?", [...SASA_ASKS, ...materials]),
+    ],
+    composerPlaceholder: "Peça algo à Sasá",
+    status: { label: "Pronta para ajudar", tone: "idle" },
   };
 }

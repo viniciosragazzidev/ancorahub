@@ -23,7 +23,7 @@ import styles from "./presence-guide.module.css";
 
 /**
  * Roteiro guiado "conectar o WhatsApp e confirmar presença" (09/11, plano 2026-11-09-roteiro-guiado-presenca-whatsapp.md).
- * Uma ideia e um botão por tela, conduzido pelo Sasá, o capitão do ícone do app. A conexão de verdade continua no
+ * Uma ideia e um botão por tela, com orientação de Sasá, assistente de convés. A conexão de verdade continua no
  * WhatsAppConnectDialog (que passa `connection`); a presença, no cartão de presença (que passa `presence`).
  * Celular: boas-vindas → código → tela inicial → caminho → esperando → conectado → confirmar → pronto.
  * Computador: boas-vindas → QR (ou código) com o caminho ao lado → conectado → confirmar → pronto.

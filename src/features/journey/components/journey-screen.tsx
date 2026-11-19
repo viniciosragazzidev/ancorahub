@@ -189,7 +189,7 @@ function JourneyHero({ data }: { data: JourneyScreenData }) {
 /**
  * Banner da jornada (14/11/2026, no estilo do card promocional do Duolingo): uma frase com a próxima meta,
  * um selo com o número que falta e um botão que leva às missões. O capitão fica à direita, saindo do card.
- * A ilustração usa o Capitão Âncora na pose oficial de conquista.
+ * A arte usa o Capitão Âncora e pode receber uma pose específica quando a jornada tiver ilustração própria.
  */
 function JourneyBanner({ data, pending }: { data: JourneyScreenData; pending: number }) {
   const { level, streak } = data;

@@ -19,6 +19,17 @@ const SUPERVISOR_STORAGE_KEY = "ancora:lite-welcome:2026-10-supervisor";
 /** The welcome video (broker, Super-admin flag): seen once per device, before the card. */
 /** v3 (2026-10-13): Sasá, Dicas de Atendimento, pontos. New key: everyone sees the new video once. */
 const VIDEO_STORAGE_KEY = "ancora:welcome-video:2026-10-v3";
+/**
+ * The video stopped showing on 2026-11-19: the broker enters straight into the
+ * Início. WelcomeVideo and the Super-admin flag stay; turn this on to bring it back.
+ */
+export const WELCOME_VIDEO_ENABLED = false;
+/**
+ * The welcome card ("O app do corretor mudou" / "Seu app de supervisor chegou")
+ * also stopped on 2026-11-19: clean entry. The tour stays reachable from Mais
+ * and /dashboard?tour=1; the notifications ask still comes once per device.
+ */
+export const WELCOME_CARD_ENABLED = false;
 /** "Não perca nenhum lead": asked once per device (also for those who already saw the welcome). */
 const PUSH_STORAGE_KEY = "ancora:push-nudge:2026-10";
 
@@ -72,7 +83,7 @@ export function LiteWelcome({ variant = "broker" }: { variant?: "broker" | "supe
   const [afterPush, setAfterPush] = useState<(() => void) | null>(null);
   const shell = useLightAvailabilityContext();
   const isSupervisor = variant === "supervisor";
-  const withVideo = !isSupervisor && Boolean(shell?.welcomeVideo);
+  const withVideo = WELCOME_VIDEO_ENABLED && !isSupervisor && Boolean(shell?.welcomeVideo);
   const storageKey = isSupervisor ? SUPERVISOR_STORAGE_KEY : STORAGE_KEY;
   const team = isSupervisor ? SUPERVISOR_TEAM : TEAM;
   const points = isSupervisor ? SUPERVISOR_POINTS : POINTS;
@@ -82,7 +93,7 @@ export function LiteWelcome({ variant = "broker" }: { variant?: "broker" | "supe
     const timer = window.setTimeout(() => {
       // First access: the video comes first, then the card (each remembered on its own).
       if (withVideo && !readSeen(VIDEO_STORAGE_KEY)) setVideoOpen(true);
-      else if (!readSeen(storageKey)) setOpen(true);
+      else if (WELCOME_CARD_ENABLED && !readSeen(storageKey)) setOpen(true);
       // Welcome already seen: still ask once to turn on notifications.
       else if (!isSupervisor && !readSeen(PUSH_STORAGE_KEY)) void canAskForPush().then((ask) => { if (ask) setPushOpen(true); });
     }, 350);
@@ -92,7 +103,7 @@ export function LiteWelcome({ variant = "broker" }: { variant?: "broker" | "supe
   function finishVideo() {
     writeSeen(VIDEO_STORAGE_KEY, "1");
     setVideoOpen(false);
-    if (!readSeen(storageKey)) window.setTimeout(() => setOpen(true), 220);
+    if (WELCOME_CARD_ENABLED && !readSeen(storageKey)) window.setTimeout(() => setOpen(true), 220);
   }
 
   function close(next?: () => void) {

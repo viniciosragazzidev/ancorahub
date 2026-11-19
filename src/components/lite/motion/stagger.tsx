@@ -1,7 +1,8 @@
 "use client";
 
 import { Children, type ReactNode } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 
@@ -34,7 +35,7 @@ export interface LiteStaggerItemProps {
 
 /** Item avulso da cascata; `index` define o atraso, limitado a stagger.max - 1. */
 export function LiteStaggerItem({ index, children, className }: LiteStaggerItemProps) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   const step = Math.min(index, motionTokens.stagger.max - 1);
   return (
     <motion.div

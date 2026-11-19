@@ -24,6 +24,8 @@ import { resolveAccessContext } from "@/shared/auth/access-context";
 import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 import { canEnsureLeadHolder } from "./register-sale-access";
 import { hasEffectiveRouteAccess } from "@/features/custom-roles/service";
+import { lockSaleEvidence, saleEvidenceIssue, saleEvidenceIssueMessage } from "./sale-document-validation";
+import { lockLeadAndFindActiveSale } from "@/features/leads/lead-sale-lock";
 
 const registerSaleInput = z.object({
   leadId: z.string().min(1),
@@ -201,24 +203,198 @@ export async function removeLeadBeneficiaryAction(beneficiaryId: string) {
   if (!z.string().uuid().safeParse(beneficiaryId).success) return { error: "Beneficiário inválido." };
   const context = await getRequiredTenantContext();
   const db = getDatabase();
-  const [beneficiary] = await db.select({ id: schema.leadBeneficiaries.id, leadId: schema.leadBeneficiaries.leadId, isHolder: schema.leadBeneficiaries.isHolder }).from(schema.leadBeneficiaries).innerJoin(schema.leads, eq(schema.leadBeneficiaries.leadId, schema.leads.id)).where(and(eq(schema.leadBeneficiaries.id, beneficiaryId), eq(schema.leadBeneficiaries.tenantId, context.tenantId), context.role === "broker" ? eq(schema.leads.corretorId, context.userId) : context.role === "manager" ? eq(schema.leads.branchId, context.branchId ?? "") : undefined)).limit(1);
-  if (!beneficiary) return { error: "Beneficiário não encontrado." };
-  if (beneficiary.isHolder) return { error: "O titular não pode ser removido. Substitua-o antes." };
-  const [quotedLineItem] = await db.select({ id: schema.quoteLineItems.id }).from(schema.quoteLineItems).where(and(eq(schema.quoteLineItems.tenantId, context.tenantId), eq(schema.quoteLineItems.beneficiaryId, beneficiary.id))).limit(1);
-  if (quotedLineItem) return { error: "Este beneficiário já faz parte de uma cotação. Exclua ou substitua a cotação antes de removê-lo." };
-  const [linkedDocument] = await db.select({ id: schema.leadDocuments.id }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.tenantId, context.tenantId), eq(schema.leadDocuments.beneficiaryId, beneficiary.id))).limit(1);
-  if (linkedDocument) return { error: "Este beneficiário possui documentos vinculados. Remova ou substitua os documentos antes de excluí-lo." };
   try {
-    await db.delete(schema.leadBeneficiaries).where(and(eq(schema.leadBeneficiaries.id, beneficiary.id), eq(schema.leadBeneficiaries.tenantId, context.tenantId)));
+    return await db.transaction(async (tx) => {
+      // Use the same aggregate lock as sale registration and beneficiary edits.
+      const [lead] = await tx.select({ id: schema.leads.id, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId })
+        .from(schema.leads)
+        .where(and(eq(schema.leads.id, sql`(select lead_id from lead_beneficiaries where id = ${beneficiaryId} and tenant_id = ${context.tenantId})`), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt)))
+        .limit(1)
+        .for("update");
+      if (!lead) return { error: "Beneficiário não encontrado." };
+      if ((context.role === "broker" && lead.corretorId !== context.userId) || (context.role === "manager" && lead.branchId !== context.branchId)) {
+        return { error: "Beneficiário não encontrado." };
+      }
+      const [beneficiary] = await tx.select({ id: schema.leadBeneficiaries.id, leadId: schema.leadBeneficiaries.leadId, isHolder: schema.leadBeneficiaries.isHolder })
+        .from(schema.leadBeneficiaries)
+        .where(and(eq(schema.leadBeneficiaries.id, beneficiaryId), eq(schema.leadBeneficiaries.tenantId, context.tenantId), eq(schema.leadBeneficiaries.leadId, lead.id)))
+        .limit(1)
+        .for("update");
+      if (!beneficiary) return { error: "Beneficiário não encontrado." };
+      if (beneficiary.isHolder) return { error: "O titular não pode ser removido. Substitua-o antes." };
+      const [quotedLineItem] = await tx.select({ id: schema.quoteLineItems.id }).from(schema.quoteLineItems).where(and(eq(schema.quoteLineItems.tenantId, context.tenantId), eq(schema.quoteLineItems.beneficiaryId, beneficiary.id))).limit(1);
+      if (quotedLineItem) return { error: "Este beneficiário já faz parte de uma cotação. Exclua ou substitua a cotação antes de removê-lo." };
+      const [linkedDocument] = await tx.select({ id: schema.leadDocuments.id }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.tenantId, context.tenantId), eq(schema.leadDocuments.beneficiaryId, beneficiary.id))).limit(1);
+      if (linkedDocument) return { error: "Este beneficiário possui documentos vinculados. Remova ou substitua os documentos antes de excluí-lo." };
+      const [removed] = await tx.delete(schema.leadBeneficiaries).where(and(
+        eq(schema.leadBeneficiaries.id, beneficiary.id),
+        eq(schema.leadBeneficiaries.tenantId, context.tenantId),
+        eq(schema.leadBeneficiaries.leadId, lead.id),
+      )).returning({ id: schema.leadBeneficiaries.id });
+      if (!removed) return { error: "Beneficiário removido por outra pessoa. Atualize a tela." };
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_beneficiary", entidadeId: removed.id, acao: "removeu" });
+      return { success: true };
+    });
   } catch {
     return { error: "Não foi possível excluir este beneficiário porque ele passou a ter vínculos operacionais. Atualize a página e tente novamente." };
   }
-  await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_beneficiary", entidadeId: beneficiary.id, acao: "removeu" });
-  return { success: true };
+}
+
+const conversationPersonInput = z.object({
+  name: z.string().trim().min(2).max(160).nullable(),
+  age: z.number().int().min(0).max(120).nullable(),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  cpf: z.string().regex(/^\d{11}$/).nullable(),
+  relationship: z.enum(schema.beneficiaryRelationshipValues),
+});
+type ConversationPerson = z.output<typeof conversationPersonInput>;
+
+/** O arquivo já guardado por /api/documents/upload (mesmas regras de confirmDocumentUploadAction). */
+const contractFileInput = z.object({
+  filename: z.string().trim().min(1).max(180),
+  fileUrl: z.string().startsWith("/api/documents/download?key=").max(600),
+  storageKey: z.string().max(400).optional(),
+  mimeType: z.string().max(100).optional(),
+  sizeBytes: z.number().int().min(1).max(10 * 1024 * 1024).optional(),
+  checksumSha256: z.string().max(128).optional(),
+});
+
+const conversationSaleInput = z.object({
+  leadId: z.string().min(1),
+  planType: z.enum(schema.planType.enumValues),
+  ages: z.array(z.number().int().min(0, "Idade inválida.").max(120, "Idade inválida.")).min(1, "Informe a idade do titular.").max(30, "Cabem até 30 vidas."),
+  carrierId: z.string().min(1).nullable(),
+  planId: z.string().min(1).nullable(),
+  approvedValue: z.coerce.number().finite().positive("Informe o valor mensal da venda.").max(1_000_000, "Confira o valor mensal."),
+  coverageStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe uma data de vigência válida."),
+  source: z.enum(["conversa", "contrato"]),
+  /** Lido do contrato: titular primeiro, depois os dependentes. */
+  people: z.array(conversationPersonInput).max(30).optional(),
+  policyNumber: z.string().trim().max(60).nullable().optional(),
+  paymentMethod: z.enum(schema.paymentMethodValues).nullable().optional(),
+  contractTermMonths: z.number().int().min(1).max(120).nullable().optional(),
+  contract: contractFileInput.nullable().optional(),
+});
+export type ConversationSaleInput = z.input<typeof conversationSaleInput>;
+
+const PLAN_TYPE_LABEL: Record<(typeof schema.planType.enumValues)[number], string> = { individual: "Individual", familiar: "Familiar", pme: "PME", empresarial: "Empresarial" };
+
+/**
+ * Registrar venda pela conversa (19/11): mesmo registro (cliente, comissões, renovação, avisos), sem exigir
+ * documentos nesta fase. Valor e vidas vêm das respostas ou do contrato lido pela IA.
+ */
+export async function registerConversationSaleAction(rawInput: ConversationSaleInput): Promise<RegisterSaleResult> {
+  const parsed = conversationSaleInput.safeParse(rawInput);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Confira os dados da venda." };
+  const input = parsed.data;
+  const [holderAge, ...dependents] = input.ages;
+  // Pessoas só valem se baterem com as idades confirmadas; CPF que não confere fica de fora.
+  const people = input.people?.length === input.ages.length
+    ? input.people.map((person, index) => ({ ...person, age: input.ages[index] ?? person.age, cpf: person.cpf && isValidCpf(person.cpf) ? person.cpf : null, relationship: index === 0 ? "titular" as const : person.relationship === "titular" ? "outro" as const : person.relationship }))
+    : [];
+  const notes = [
+    `Registrada pela conversa${input.source === "contrato" ? " com o contrato lido pela IA" : ""}.`,
+    `Tipo: ${PLAN_TYPE_LABEL[input.planType]}.`,
+    `Vidas: ${input.ages.length} (titular ${holderAge}${dependents.length ? `; dependentes ${dependents.join(", ")}` : ""}).`,
+  ].join(" ");
+  try {
+    return await registerSale({
+      leadId: input.leadId,
+      policyNumber: input.policyNumber || null,
+      coverageStartDate: input.coverageStartDate,
+      contractTermMonths: input.contractTermMonths ?? 12,
+      paymentMethod: input.paymentMethod ?? "boleto",
+      renewalType: "nova_contratacao",
+      renewalContactPreference: "whatsapp",
+      approvedValue: input.approvedValue,
+      confirmationDocumentId: null,
+      ...(input.carrierId ? { carrierId: input.carrierId } : {}),
+    }, { planId: input.planId, ages: input.ages, notes, people, contract: input.contract ?? null });
+  } catch (error) {
+    if (error instanceof SaleAlreadyRegisteredError) return { error: error.message };
+    console.error("[register-sale-conversation] failed", { leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
+    const message = error instanceof Error ? error.message : "";
+    const forUser = /^(Lead não encontrado|Você só pode|Este lead não pertence|Seu cargo)/.test(message);
+    return { error: forUser ? message : "Não foi possível registrar a venda. Tente de novo; se continuar, avise a direção." };
+  }
+}
+
+type SaleTx = Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0];
+
+function sameName(a: string, b: string) {
+  const norm = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  return norm(a) === norm(b);
+}
+
+/**
+ * Plano, vidas e valor no lead. Titular: nome, nascimento, idade e CPF lidos do contrato (criado se faltar).
+ * Dependentes lidos com nome entram como beneficiários (sem repetir quem já está). O contrato vira documento do
+ * lead, em análise, e a venda aponta para ele. Devolve o id do documento (ou null sem contrato).
+ */
+async function applyConversationSaleToLead(tx: SaleTx, input: {
+  tenantId: string; userId: string; leadId: string; leadName: string; planId: string | null; approvedValue: number; ages: number[];
+  people: ConversationPerson[]; contract: z.output<typeof contractFileInput> | null; coverageStartDate: string; now: Date;
+}): Promise<string | null> {
+  await tx.update(schema.leads).set({
+    ...(input.planId ? { planId: input.planId } : {}),
+    livesCount: input.ages.length,
+    monthlyValue: input.approvedValue.toFixed(2),
+    updatedAt: input.now,
+  }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
+
+  const existing = await tx.select({ id: schema.leadBeneficiaries.id, name: schema.leadBeneficiaries.name, isHolder: schema.leadBeneficiaries.isHolder, age: schema.leadBeneficiaries.age, birthDate: schema.leadBeneficiaries.birthDate, cpf: schema.leadBeneficiaries.cpf })
+    .from(schema.leadBeneficiaries).where(and(eq(schema.leadBeneficiaries.tenantId, input.tenantId), eq(schema.leadBeneficiaries.leadId, input.leadId)));
+  const holder = existing.find((person) => person.isHolder);
+  const read = input.people[0];
+  const holderAge = input.ages[0] ?? null;
+  if (!holder) {
+    await tx.insert(schema.leadBeneficiaries).values({ id: randomUUID(), tenantId: input.tenantId, leadId: input.leadId, name: read?.name ?? input.leadName, age: holderAge, birthDate: read?.birthDate ?? null, cpf: read?.cpf ?? null, relationship: "titular", isHolder: true });
+  } else {
+    const changes = {
+      ...(read?.name ? { name: read.name } : {}),
+      ...(holder.age == null && holderAge != null ? { age: holderAge } : {}),
+      ...(holder.birthDate == null && read?.birthDate ? { birthDate: read.birthDate } : {}),
+      ...(holder.cpf == null && read?.cpf ? { cpf: read.cpf } : {}),
+    };
+    if (Object.keys(changes).length) {
+      await tx.update(schema.leadBeneficiaries).set({ ...changes, updatedAt: input.now }).where(and(eq(schema.leadBeneficiaries.id, holder.id), eq(schema.leadBeneficiaries.tenantId, input.tenantId)));
+    }
+  }
+  const dependents = input.people.slice(1).filter((person) => person.name && !existing.some((current) => !current.isHolder && sameName(current.name, person.name!)));
+  if (dependents.length) {
+    await tx.insert(schema.leadBeneficiaries).values(dependents.map((person) => ({
+      id: randomUUID(), tenantId: input.tenantId, leadId: input.leadId, name: person.name!, age: person.age, birthDate: person.birthDate, cpf: person.cpf, relationship: person.relationship, isHolder: false,
+    })));
+  }
+
+  if (!input.contract) return null;
+  const documentId = randomUUID();
+  await tx.insert(schema.leadDocuments).values({
+    id: documentId,
+    tenantId: input.tenantId,
+    leadId: input.leadId,
+    requirementId: null,
+    beneficiaryId: null,
+    filename: input.contract.filename,
+    fileUrl: input.contract.fileUrl,
+    storageKey: input.contract.storageKey || null,
+    category: "contratacao",
+    description: "Contrato da venda, lido pela IA no registro",
+    coverageStartDate: input.coverageStartDate,
+    mimeType: input.contract.mimeType || null,
+    sizeBytes: input.contract.sizeBytes ?? null,
+    checksumSha256: input.contract.checksumSha256 || null,
+    scanStatus: "clean",
+    status: "pending",
+    uploadedBy: input.userId,
+  });
+  await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.userId, entidade: "lead_document", entidadeId: documentId, acao: "document.uploaded" });
+  return documentId;
 }
 
 /** Already converted, or an active sale exists: a second registration would duplicate client, commissions and reminders. */
 class SaleAlreadyRegisteredError extends Error {}
+class SaleDocumentValidationError extends Error {}
 
 type RegisterSaleResult = { success: true; saleId: string; activeCustomerId: string } | { success?: undefined; error: string };
 
@@ -234,6 +410,7 @@ export async function registerSaleAction(rawInput: z.input<typeof registerSaleIn
     return await registerSale(parsed.data);
   } catch (error) {
     if (error instanceof SaleAlreadyRegisteredError) return { error: error.message };
+    if (error instanceof SaleDocumentValidationError) return { error: error.message };
     console.error("[register-sale] failed", { leadId: parsed.data.leadId, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
     const message = error instanceof Error ? error.message : "";
     // Scope and cargo messages are written for the user; anything else is generic.
@@ -242,7 +419,15 @@ export async function registerSaleAction(rawInput: z.input<typeof registerSaleIn
   }
 }
 
-async function registerSale(input: z.output<typeof registerSaleInput>): Promise<RegisterSaleResult> {
+type SaleCoreInput = Omit<z.output<typeof registerSaleInput>, "policyNumber" | "confirmationDocumentId"> & { policyNumber: string | null; confirmationDocumentId: string | null };
+
+/**
+ * Venda registrada pela conversa (19/11): sem documentos nesta fase. O que o corretor respondeu (ou o que a IA leu
+ * do contrato) vai para o lead: plano, vidas e valor; a idade do titular vai para o titular, criado se faltar.
+ */
+type ConversationSale = { planId: string | null; ages: number[]; notes: string; people: ConversationPerson[]; contract: z.output<typeof contractFileInput> | null };
+
+async function registerSale(input: SaleCoreInput, conversation: ConversationSale | null = null): Promise<RegisterSaleResult> {
   const { context, db, lead } = await assertLeadScope(input.leadId);
   if (!hasPermission(context.role, "alterar_status_lead")) return { error: "Você não pode registrar vendas." };
   if (!lead.corretorId && context.role === "broker") return { error: "O lead precisa ter um corretor responsável." };
@@ -253,18 +438,28 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
   if (initialBlock === "lost") return { error: "Este lead está perdido. Reabra o lead antes de registrar a venda." };
   if (input.expirationDate && input.expirationDate <= input.coverageStartDate) return { error: "O vencimento precisa ser depois do início da vigência." };
 
+  // Pela conversa os documentos ficam para a segunda fase: titular, confirmação e requisitos não travam a venda.
+  if (!conversation) {
   const beneficiaries = await db.select().from(schema.leadBeneficiaries).where(and(eq(schema.leadBeneficiaries.leadId, lead.id), eq(schema.leadBeneficiaries.tenantId, context.tenantId)));
   if (!beneficiaries.some((beneficiary) => beneficiary.isHolder)) return { error: "Cadastre o titular e os beneficiários antes de registrar a venda." };
 
-  const [confirmation] = await db.select({ id: schema.leadDocuments.id, status: schema.leadDocuments.status }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.id, input.confirmationDocumentId), eq(schema.leadDocuments.leadId, lead.id), eq(schema.leadDocuments.tenantId, context.tenantId))).limit(1);
+  const [confirmation] = await db.select({ id: schema.leadDocuments.id, status: schema.leadDocuments.status }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.id, input.confirmationDocumentId ?? ""), eq(schema.leadDocuments.leadId, lead.id), eq(schema.leadDocuments.tenantId, context.tenantId), isNull(schema.leadDocuments.deletedAt))).limit(1);
   if (!confirmation || confirmation.status !== "approved") return { error: "A confirmação da operadora precisa estar anexada e aprovada." };
 
   const requirements = await db.select({ id: schema.documentRequirements.id, required: schema.documentRequirements.required, appliesPerBeneficiary: schema.documentRequirements.appliesPerBeneficiary }).from(schema.documentRequirements).where(and(eq(schema.documentRequirements.tenantId, context.tenantId), or(isNull(schema.documentRequirements.planId), eq(schema.documentRequirements.planId, lead.planId ?? ""))));
-  const documents = await db.select({ requirementId: schema.leadDocuments.requirementId, beneficiaryId: schema.leadDocuments.beneficiaryId, status: schema.leadDocuments.status }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.leadId, lead.id), eq(schema.leadDocuments.tenantId, context.tenantId)));
+  const documents = await db.select({ requirementId: schema.leadDocuments.requirementId, beneficiaryId: schema.leadDocuments.beneficiaryId, status: schema.leadDocuments.status }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.leadId, lead.id), eq(schema.leadDocuments.tenantId, context.tenantId), isNull(schema.leadDocuments.deletedAt)));
   const missing = requirements.filter((requirement) => requirement.required && (requirement.appliesPerBeneficiary ? beneficiaries.some((beneficiary) => !documents.some((document) => document.requirementId === requirement.id && document.beneficiaryId === beneficiary.id && document.status === "approved")) : !documents.some((document) => document.requirementId === requirement.id && document.status === "approved")));
   if (missing.length) return { error: "Ainda existem documentos obrigatórios pendentes ou rejeitados." };
+  }
 
   let resolvedPlanId = lead.planId;
+  if (conversation?.planId) {
+    const [plan] = await db.select({ id: schema.carrierPlans.id }).from(schema.carrierPlans)
+      .where(and(eq(schema.carrierPlans.id, conversation.planId), eq(schema.carrierPlans.tenantId, context.tenantId), ...(input.carrierId ? [eq(schema.carrierPlans.carrierId, input.carrierId)] : [])))
+      .limit(1);
+    if (!plan) return { error: "Esse plano não está no catálogo da corretora. Escolha outro." };
+    resolvedPlanId = plan.id;
+  }
   let carrierName: string | null = null;
   if (input.carrierId) {
     const [carrier] = await db
@@ -274,7 +469,7 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
       .limit(1);
     if (carrier) {
       carrierName = carrier.name;
-      if (lead.planId) {
+      if (lead.planId && !conversation?.planId) {
         const [plan] = await db
           .select({ id: schema.carrierPlans.id })
           .from(schema.carrierPlans)
@@ -298,17 +493,29 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
 
   // Etapa de onde a venda saiu (desfecho do fechamento, 09/11).
   let soldFrom: { status: string; stageEnteredAt: Date | null } | null = null;
+  let conversationDocumentId: string | null = null;
   await db.transaction(async (tx) => {
-    // Lock the lead and check again inside the transaction: two concurrent submits register one sale.
-    const [locked] = await tx.select({ status: schema.leads.status, stageEnteredAt: schema.leads.stageEnteredAt, qualificationDetails: schema.leads.qualificationDetails }).from(schema.leads)
-      .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId))).limit(1).for("update");
+    // All sale creation paths lock this same tenant-scoped lead row before checking active sales.
+    const saleSlot = await lockLeadAndFindActiveSale(tx, { tenantId: context.tenantId, leadId: lead.id });
+    const locked = saleSlot.lead;
     const lockedAiSale = Boolean(locked) && aiSaleRegistrationPending(locked!.status, locked!.qualificationDetails);
-    const [activeSale] = await tx.select({ id: schema.sales.id }).from(schema.sales)
-      .where(and(eq(schema.sales.leadId, lead.id), eq(schema.sales.tenantId, context.tenantId), eq(schema.sales.status, "active"))).limit(1);
+    const activeSale = saleSlot.activeSaleId ? { id: saleSlot.activeSaleId } : null;
     if (!locked) throw new SaleAlreadyRegisteredError("A venda deste lead já foi registrada.");
     const block = saleRegistrationBlockedReason({ status: locked.status, aiRegistrationPending: lockedAiSale, hasActiveSale: Boolean(activeSale) });
     if (block === "lost") throw new SaleAlreadyRegisteredError("Este lead está perdido. Reabra o lead antes de registrar a venda.");
     if (block === "already_registered") throw new SaleAlreadyRegisteredError(activeSale ? "Este lead já tem uma venda ativa registrada." : "A venda deste lead já foi registrada.");
+    if (!conversation) {
+      const lockedEvidence = await lockSaleEvidence(tx, {
+        tenantId: context.tenantId,
+        leadId: lead.id,
+        planId: locked.planId,
+        confirmationDocumentId: input.confirmationDocumentId ?? "",
+      });
+      const evidenceIssue = saleEvidenceIssue(lockedEvidence);
+      if (evidenceIssue) throw new SaleDocumentValidationError(saleEvidenceIssueMessage(evidenceIssue) ?? "Revise os documentos obrigatórios antes de registrar a venda.");
+    } else {
+      conversationDocumentId = await applyConversationSaleToLead(tx, { tenantId: context.tenantId, userId: context.userId, leadId: lead.id, leadName: lead.nome, planId: resolvedPlanId, approvedValue: input.approvedValue, ages: conversation.ages, people: conversation.people, contract: conversation.contract, coverageStartDate: input.coverageStartDate, now });
+    }
     // Já convertido pela IA: a etapa não muda de novo e o desfecho já foi avisado na conversão.
     soldFrom = lockedAiSale ? null : { status: locked.status, stageEnteredAt: locked.stageEnteredAt ?? null };
 
@@ -343,7 +550,8 @@ async function registerSale(input: z.output<typeof registerSaleInput>): Promise<
       renewalType: input.renewalType,
       renewalContactPreference: input.renewalContactPreference,
       postSaleNotes: input.postSaleNotes ?? null,
-      confirmationDocumentId: input.confirmationDocumentId,
+      confirmationDocumentId: conversationDocumentId ?? input.confirmationDocumentId,
+      notes: conversation?.notes ?? null,
       status: "active",
       createdBy: context.userId,
     });

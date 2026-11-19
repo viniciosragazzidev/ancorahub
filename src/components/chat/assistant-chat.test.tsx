@@ -11,6 +11,7 @@ vi.mock("@/features/broker-workspace/chat/assistant-scripts", () => ({ ASSISTANT
 vi.mock("@/features/assist/catalog", () => ({ bestAssistMatch: vi.fn(() => null) }));
 vi.mock("@/features/assist/components/assist-layer", () => ({ useAssist: () => null }));
 vi.mock("@/features/ai-gateway/ask-assistant", () => ({ askAssistantAction: vi.fn() }));
+vi.mock("@/features/sasa/command-action", () => ({ sasaCommandAction: vi.fn(async () => ({ handled: false, blocks: [] })) }));
 
 import { AssistantChat } from "./assistant-chat";
 

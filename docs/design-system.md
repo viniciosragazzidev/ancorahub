@@ -725,7 +725,7 @@ inalterados. A marca verificada, avatares pessoais e retratos de leads também
 permanecem. O controle Super-admin da flag continua incluindo os assets nos três
 papéis Lite; os objetos 3D de seção/vazio preservam o escopo anterior, apenas Diretor
 e Corretor. Com a flag desligada ou erro de carregamento, a apresentação abstrata
-existente volta. Contrato vigente: docs/design-system/MASCOTE.md; decisão DEC-188;
+existente volta. Contrato vigente: docs/design-system/MASCOTE.md; decisão DEC-189;
 registro: docs/implementations/active/2026-11-18-identidade-capitao-ancora.md.
 
 ## Feedback e movimento · 14/11/2026

@@ -245,8 +245,8 @@ describe("broker chat assistant scripts", () => {
       today: { ...workspace().today, unreadNotifications: 1, receivedToday: 1 },
     });
     const threads = buildAssistantThreads({ data, capabilities: { quoteSimulator: false, dutyCalendar: true }, now });
-    // Sasá is pinned first; then waiting, unread, latest.
-    expect(threads[0]).toMatchObject({ assistant: "ancora", pinned: true, unread: true, waitingYou: false });
+    // Sasá is pinned first; the notices live in Notificações now (19/11), so her row only invites a request.
+    expect(threads[0]).toMatchObject({ assistant: "ancora", pinned: true, unread: false, waitingYou: false, preview: "Peça o que precisar, por texto ou áudio." });
     expect(threads[1]?.assistant).toBe("leads");
     expect(threads[2]?.assistant).toBe("plantao");
     expect(threads.findIndex((thread) => thread.assistant === "ancora")).toBeLessThan(threads.findIndex((thread) => thread.assistant === "agenda"));
@@ -442,45 +442,16 @@ describe("broker chat assistant scripts", () => {
 });
 
 describe("buildAncoraScript", () => {
-  const notification = (id: string, at: string, read: boolean, leadId: string | null = null) => ({
-    id, title: `Aviso ${id}`, message: `Detalhe ${id}`, type: "info", readAt: read ? new Date(at) : null, createdAt: new Date(at), leadId,
-  });
-
-  it("shows the notifications by day, marks where the unread start and offers to mark them read", () => {
-    const script = buildAncoraScript({
-      now,
-      notifications: [
-        notification("3", "2026-10-09T10:00:00-03:00", false, "lead-7"),
-        notification("1", "2026-10-08T09:00:00-03:00", true),
-        notification("2", "2026-10-09T08:00:00-03:00", false),
-      ],
-    });
-    const ids = script.blocks.map((block) => block.id);
-    expect(ids).toEqual(["ancora-day-2026-10-08", "ancora-1", "ancora-day-2026-10-09", "ancora-unread", "ancora-2", "ancora-3", "ancora-sasa-hint", "ancora-choice"]);
-    expect(script.blocks[0]).toMatchObject({ label: "Ontem" });
-    expect(script.blocks.find((block) => block.id === "ancora-unread")).toMatchObject({ text: "2 avisos novos" });
-    expect(script.blocks.find((block) => block.id === "ancora-3")).toMatchObject({ type: "notice", title: "Aviso 3", message: "Detalhe 3", at: "10:00", unread: true, leadId: "lead-7" });
-    expect(script.blocks.find((block) => block.id === "ancora-1")).toMatchObject({ type: "notice", unread: false });
-    expect(questionBlocks(script)[0]?.choices.map(({ id }) => id)).toEqual(["open-lead", "mark-all", "sasa-first", "sasa-day", "settings"]);
-    expect(questionBlocks(script)[0]?.choices[2]?.action).toEqual({ kind: "local", value: "ask:Quem eu atendo primeiro agora?" });
-    expect(script.composerPlaceholder).toBe("Pergunte ao Sasá");
-    expect(questionBlocks(script)[0]?.choices[0]?.action).toEqual({ kind: "href", href: "/leads/lead-7" });
-    expect(questionBlocks(script)[0]?.choices[1]?.action).toEqual({ kind: "server", name: "notifications.markRead", payload: {} });
-    expect(script.status).toMatchObject({ label: "2 avisos novos", tone: "waiting" });
+  it("is only for requests to the Sasá: no notices, a hello and questions ready to tap", () => {
+    const script = buildAncoraScript({ now, materialAsks: [{ id: "m1", label: "Carência da Amil", question: "Qual a carência da Amil?" }] });
+    expect(script.blocks.map((block) => block.id)).toEqual(["ancora-intro", "ancora-choice"]);
+    expect(script.blocks.some((block) => block.type === "notice" || block.type === "date")).toBe(false);
+    expect(script.blocks[0]).toMatchObject({ type: "assistant", text: expect.stringContaining("Sasá") });
+    expect(questionBlocks(script)[0]?.choices.map(({ id }) => id)).toEqual(["sasa-first", "sasa-day", "m1"]);
+    expect(questionBlocks(script)[0]?.choices[0]?.action).toEqual({ kind: "local", value: "ask:Quem eu atendo primeiro agora?" });
+    expect(script.composerPlaceholder).toBe("Peça algo à Sasá");
+    expect(script.status?.tone).toBe("idle");
     expectNoEmDash([script]);
-  });
-
-  it("explains the thread when there is nothing yet and stays calm when all is read", () => {
-    expect(buildAncoraScript({ now, notifications: [] }).blocks[0]).toMatchObject({ id: "ancora-empty" });
-    const read = buildAncoraScript({ now, notifications: [notification("1", "2026-10-09T08:00:00-03:00", true)] });
-    expect(questionBlocks(read)[0]?.choices.map(({ id }) => id)).toEqual(["sasa-first", "sasa-day", "settings"]);
-    expect(read.status?.tone).toBe("idle");
-  });
-
-  it("offers \"Ciente\" while a Central message asking for confirmation is unread", () => {
-    const script = buildAncoraScript({ now, notifications: [{ ...notification("9", "2026-10-09T08:00:00-03:00", false), type: "relationship.confirmation" }] });
-    const ack = questionBlocks(script)[0]?.choices.find(({ id }) => id === "relationship-ack");
-    expect(ack?.action).toEqual({ kind: "server", name: "relationship.ack", payload: {} });
   });
 
   it("opens each conversation with a varied line and a smart reading of the moment", () => {

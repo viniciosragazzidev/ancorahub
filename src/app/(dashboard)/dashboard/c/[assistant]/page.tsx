@@ -1,20 +1,15 @@
-import { and, desc, eq } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 
 import { AssistantChat } from "@/components/chat/assistant-chat";
 import type { AssistantId } from "@/components/chat/types";
-import { MarkSeenOnView } from "@/components/chat/mark-seen-on-view";
 import { ASSISTANTS, SUPERVISOR_ASSISTANTS, buildAncoraScript } from "@/features/broker-workspace/chat/assistant-scripts";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { getDatabase, schema } from "@/shared/db";
 import { brokerAiAccess } from "@/features/ai-gateway/broker-ai-pilot";
 import { materialAsksOfTheDay } from "@/features/operator-catalog/answer";
 
 export const dynamic = "force-dynamic";
-
-const ANCORA_HISTORY = 30;
 
 /** Sasá remains the only assistant conversation; previous assistant URLs redirect to work pages. */
 export default async function AssistantConversationPage({ params }: { params: Promise<{ assistant: string }> }) {
@@ -29,34 +24,13 @@ export default async function AssistantConversationPage({ params }: { params: Pr
   if (audience === "supervisor" && assistant !== "ancora" && !supervisorOnly) notFound();
   const definition = ASSISTANTS[assistant as AssistantId];
   if (assistant !== "ancora") redirect(definition.href);
+  // A Sasá é só para pedidos ao assistente (19/11) e só o corretor escreve: o supervisor vê os avisos em Notificações.
+  if (audience === "supervisor") redirect("/notificacoes");
   const identity = { name: definition.name, shape: definition.shape, hue: definition.hue };
 
-  const [notifications, materialAsks] = await Promise.all([
-    getDatabase()
-      .select({
-        id: schema.notifications.id,
-        title: schema.notifications.title,
-        message: schema.notifications.message,
-        type: schema.notifications.type,
-        readAt: schema.notifications.readAt,
-        createdAt: schema.notifications.createdAt,
-        leadId: schema.notifications.leadId,
-      })
-      .from(schema.notifications)
-      .where(and(eq(schema.notifications.tenantId, context.tenantId), eq(schema.notifications.recipientUserId, context.userId)))
-      .orderBy(desc(schema.notifications.createdAt))
-      .limit(ANCORA_HISTORY),
-    // Pilot of the operator RAG: questions made from the material this company has.
-    audience === "broker"
-      ? brokerAiAccess(context.userId).then((access) => (access.operatorRag ? materialAsksOfTheDay(context.tenantId) : [])).catch(() => [])
-      : Promise.resolve([]),
-  ]);
-  const hasUnread = notifications.some((item) => !item.readAt);
+  // Conversa só para pedidos à Sasá (19/11): os avisos ficam em /notificacoes, aberta pelo sino do Início.
+  // Pilot of the operator RAG: questions made from the material this company has.
+  const materialAsks = await brokerAiAccess(context.userId).then((access) => (access.operatorRag ? materialAsksOfTheDay(context.tenantId) : [])).catch(() => []);
   // Lembrete fixo "WhatsApp a partir de 20/10" removido em 05/11: a conexão é pedida ao confirmar presença.
-  return (
-    <>
-      <AssistantChat key="ancora" identity={identity} script={buildAncoraScript({ notifications, now: new Date(), materialAsks })} instant agentId={audience === "broker" ? "ancora" : undefined} canWrite={audience === "broker"} />
-      {hasUnread ? <MarkSeenOnView kind="ancora" /> : null}
-    </>
-  );
+  return <AssistantChat key="ancora" identity={identity} script={buildAncoraScript({ now: new Date(), materialAsks })} instant agentId="ancora" canWrite />;
 }

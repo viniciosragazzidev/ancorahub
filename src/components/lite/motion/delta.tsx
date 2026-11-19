@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 import { motionTokens } from "@/components/arc/motion-tokens";
 
@@ -22,7 +23,7 @@ const TONE_COLOR = {
 
 /** Pílula de variação que entra logo depois do número (80 ms). Com movimento reduzido, só opacidade. */
 export function LiteDelta({ value, decimals = 0, className, locale = "pt-BR" }: LiteDeltaProps) {
-  const reduce = useReducedMotion();
+  const reduce = !useMotionAllowed();
   const tone = value > 0 ? "up" : value < 0 ? "down" : "flat";
   const text = new Intl.NumberFormat(locale, {
     style: "percent",

@@ -53,8 +53,8 @@ it.each([
   await expect(request(assistant)).rejects.toThrow(`redirect:${href}`);
 });
 it("keeps Sasá in the assistant route and rejects assistants from another audience", async () => {
-  const ancoraThread = await request("ancora");
-  expect(ancoraThread).toBeTruthy();
+  const sasa = await request("ancora");
+  expect(sasa).toBeTruthy();
 
   mocks.context.mockResolvedValue({ role: "supervisor", tenantId: "tenant-text", userId: "supervisor-text" });
   mocks.audience.mockResolvedValue("supervisor");

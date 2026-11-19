@@ -5,6 +5,7 @@ import { useEffect } from "react"
 import { LayoutDashboard, RotateCcw } from "lucide-react"
 
 import { useArcScopeEnabled } from "@/components/arc/arc-scope-context"
+import { MascotSlot, useMascotPlacement } from "@/components/mascot/mascot-slot"
 import styles from "./route-state.module.css"
 
 type RouteErrorProps = {
@@ -29,6 +30,8 @@ export function RouteError({
   standalone = false,
 }: RouteErrorProps) {
   const directorSkin = useArcScopeEnabled()
+  // Vaga do mascote (mascot-placements.ts, "error"): ligada, o mascote atento entra no lugar do ícone.
+  const mascot = useMascotPlacement("error")
   useEffect(() => {
     console.error("RouteError details:", {
       message: error.message,
@@ -54,7 +57,7 @@ export function RouteError({
       data-skin={directorSkin ? "diretor" : undefined}
       aria-labelledby="route-error-title"
     >
-      <span className={styles.icon} aria-hidden="true"><RotateCcw size={20} strokeWidth={1.75} /></span>
+      {mascot ? <MascotSlot placement="error" /> : <span className={styles.icon} aria-hidden="true"><RotateCcw size={20} strokeWidth={1.75} /></span>}
       <div className={styles.copy}>
         <h1 id="route-error-title" role="alert" className={styles.title}>{title}</h1>
         <p className={styles.description}>{description}</p>

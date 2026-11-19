@@ -2,7 +2,7 @@
 
 **Status:** artes de interface e avatar/logo da Sasá atualizados nesta branch com URLs versionadas; os vídeos renderizados ainda precisam da fonte editável para concluir a migração audiovisual.
 **Prioridade:** P1, definida pelo Vinicios em 18/11/2026.
-**Decisão:** DEC-188.
+**Decisão:** DEC-189.
 **UX:** substituição de assets e texto. Não muda rota, papel, ação, estado de negócio, layout, componente-base ou etapa UX-M1.10.
 
 ## Objetivo
@@ -33,7 +33,7 @@ Por pedido de Vinicios em 18/11, o avatar/logo da Sasá é um recorte fechado ap
 
 ## Arquivos e áreas afetados
 
-- src/components/chat/assistant-avatar.tsx, src/components/chat/types.ts e src/components/splash-screen*
+- src/components/mascot/, src/components/chat/assistant-avatar.tsx, src/components/chat/types.ts e src/components/splash-screen*
 - src/components/chat/ e src/features/broker-workspace/chat/
 - src/features/ai-gateway/agents.ts e referências da conversa de assistente
 - src/components/lite/banner/, src/components/lite/celebration/ e src/features/home-announcement/

@@ -106,7 +106,7 @@ export function DocumentsWorkspace({
   const pendingIds = useMemo(() => filteredDocs.map((d) => d.id), [filteredDocs]);
   const multiSelect = useMultiSelect(pendingIds);
   const [reqState, reqFormAction, reqPending] = useActionState(createRequirementAction, {});
-  const [, startTransition] = useTransition();
+  const [reviewPending, startTransition] = useTransition();
   const reqFormRef = useRef<HTMLFormElement>(null);
   const [reqKey, setReqKey] = useState(0);
 
@@ -168,11 +168,13 @@ export function DocumentsWorkspace({
         const res = await bulkReviewDocumentsAction(ids, status);
         if (res.error) toast.error(res.error);
         else {
-          toast.success(`Processamento em lote concluído (${ids.length} itens).`);
+          const updatedIds = res.updatedDocumentIds ?? ids;
+          toast.success(res.message ?? `Processamento em lote concluído (${updatedIds.length} itens).`);
           setPendingDocs((current) =>
-            current.map((d) => (ids.includes(d.id) ? { ...d, status } : d))
+            current.map((d) => (updatedIds.includes(d.id) ? { ...d, status } : d))
           );
           multiSelect.clear();
+          if (updatedIds.length !== ids.length) router.refresh();
         }
       } catch (error) {
         if (isVersionSkewError(error)) reloadAfterDeploymentUpdate();
@@ -304,6 +306,7 @@ export function DocumentsWorkspace({
                 size="icon-xs"
                 variant="outline"
                 className="border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10"
+                disabled={reviewPending}
                 onClick={() => handleReviewDoc(row.original.id, row.original.leadId, "approved")}
                 title="Aprovar"
               >
@@ -312,6 +315,7 @@ export function DocumentsWorkspace({
               <Button
                 size="icon-xs"
                 variant="destructive"
+                disabled={reviewPending}
                 onClick={() => handleReviewDoc(row.original.id, row.original.leadId, "rejected")}
                 title="Rejeitar"
               >
@@ -324,6 +328,7 @@ export function DocumentsWorkspace({
                 size="xs"
                 variant="ghost"
                 className="text-[11px] text-muted-foreground hover:text-foreground"
+                disabled={reviewPending}
                 onClick={() =>
                   handleReviewDoc(
                     row.original.id,
@@ -421,7 +426,7 @@ export function DocumentsWorkspace({
                 size="sm"
                 variant="outline"
                 className="text-emerald-500 hover:text-emerald-600 border-emerald-500/20"
-                disabled={multiSelect.count === 0}
+                disabled={multiSelect.count === 0 || reviewPending}
                 onClick={() => handleBulkReview("approved")}
               >
                 <CheckCircle className="size-4" />
@@ -430,7 +435,7 @@ export function DocumentsWorkspace({
               <Button
                 size="sm"
                 variant="destructive"
-                disabled={multiSelect.count === 0}
+                disabled={multiSelect.count === 0 || reviewPending}
                 onClick={() => handleBulkReview("rejected")}
               >
                 <XCircle className="size-4" />

@@ -41,7 +41,7 @@
 
 :where([data-slot="switch-thumb"], [data-slot="ds-switch-thumb"], [data-slot="progress-indicator"]) {
   transition-property: transform, translate;
-  transition-duration: var(--duration-fast);
+  transition-duration: var(--duration-standard);
   transition-timing-function: var(--ease-smooth-out);
 }
 
@@ -68,10 +68,10 @@
 /* Validation does not change the control's dense dimensions. */
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-interface-motion="off"]) :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]):is([aria-invalid="true"], [data-shake="true"]) {
-    animation: ct-field-error-shake var(--duration-fast) var(--ease-smooth-out) both;
+    animation: ct-field-error-shake var(--duration-standard) var(--ease-smooth-out) both;
   }
   html:not([data-interface-motion="off"]) .ct-field-success {
-    animation: ct-field-success var(--duration-fast) var(--ease-smooth-out) both;
+    animation: ct-field-success var(--duration-standard) var(--ease-smooth-out) both;
   }
 }
 @keyframes ct-field-error-shake {
@@ -108,11 +108,11 @@
 }
 
 :where([data-slot="dialog-overlay"], [data-slot="ds-dialog-overlay"], [data-slot="sheet-overlay"], [data-slot="ds-sheet-overlay"]) {
-  transition: opacity var(--duration-fast) var(--ease-smooth-out);
+  transition: opacity var(--duration-standard) var(--ease-smooth-out);
 }
 :where([data-slot="dialog-popup"], [data-slot="ds-dialog-popup"]) {
   transition-property: opacity, scale;
-  transition-duration: var(--duration-fast);
+  transition-duration: var(--duration-standard);
   transition-timing-function: var(--ease-smooth-out);
 }
 :where([data-slot="dialog-popup"], [data-slot="ds-dialog-popup"])[data-starting-style] {
@@ -146,7 +146,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-interface-motion="off"]) [data-slot="animated-toast"]:not([data-status="neutral"]) [data-badge-icon] {
-    animation: ct-toast-status-pulse var(--duration-fast) var(--ease-smooth-out) both;
+    animation: ct-toast-status-pulse var(--duration-standard) var(--ease-smooth-out) both;
   }
 }
 @keyframes ct-toast-status-pulse {
@@ -155,7 +155,7 @@
   100% { scale: 1; opacity: 1; }
 }
 .ct-toaster [data-sonner-toast].ct-toast {
-  transition: transform var(--duration-fast) var(--ease-smooth-out), opacity var(--duration-fast) var(--ease-smooth-out);
+  transition: transform var(--duration-standard) var(--ease-smooth-out), opacity var(--duration-standard) var(--ease-smooth-out);
 }
 .ct-toaster [data-sonner-toast].ct-toast[data-removed="true"] {
   transition-duration: var(--duration-quick);
@@ -170,7 +170,7 @@
 /* Dragging follows the finger without interpolation. */
 [data-slot="drawer-popup"] {
   transition-property: transform, opacity;
-  transition-duration: var(--duration-fast);
+  transition-duration: var(--duration-standard);
   transition-timing-function: var(--ease-smooth-out);
 }
 [data-slot="drawer-popup"][data-ending-style] { transition-duration: var(--duration-quick); }
@@ -233,11 +233,52 @@
 @keyframes ct-spin { to { transform: rotate(360deg); } }
 
 /* Explicit opt-in legacy reveals. Never attached to data rows or badges. */
-.ct-reveal { animation: ct-reveal var(--duration-fast) var(--ease-smooth-out) both; }
+.ct-reveal { animation: ct-reveal var(--duration-standard) var(--ease-smooth-out) both; }
 .ct-reveal-fast { animation: ct-reveal var(--duration-quick) var(--ease-smooth-out) both; }
 .ct-stagger > * {
-  animation: ct-reveal var(--duration-fast) var(--ease-smooth-out) both;
+  animation: ct-reveal var(--duration-standard) var(--ease-smooth-out) both;
   animation-delay: calc(min(var(--stagger, 0), 4) * var(--duration-stagger));
+}
+/* Entrada em sequência dos blocos de uma tela (plano de movimento 18/11/2026, etapa 2).
+ * Cada filho direto de .ct-enter-seq sobe 8px, sai de um desfoque leve e aparece; o próximo começa
+ * 80ms depois (passo `line` dos tokens), no máximo 6 passos. O bloco guarda seu atraso em
+ * `--enter-at`, que os descendentes herdam: uma grade .ct-enter-seq-tight em qualquer profundidade
+ * dentro do bloco faz os cards entrarem 35ms um depois do outro a partir do atraso do bloco.
+ * `--enter-offset` (em passos) empurra a sequência toda, quando ela começa depois de outra coisa.
+ * Movimento reduzido, "Menos animação" e kill switch zeram tudo pelas regras abaixo e do fim do arquivo. */
+.ct-enter-seq > * {
+  --enter-i: 0;
+  --enter-at: calc((var(--enter-offset, 0) + min(var(--enter-i), 5)) * var(--duration-micro));
+  animation: ct-enter var(--duration-considered) var(--ease-enter) backwards;
+  animation-delay: var(--enter-at);
+}
+.ct-enter-seq > *:nth-child(2) { --enter-i: 1; }
+.ct-enter-seq > *:nth-child(3) { --enter-i: 2; }
+.ct-enter-seq > *:nth-child(4) { --enter-i: 3; }
+.ct-enter-seq > *:nth-child(5) { --enter-i: 4; }
+.ct-enter-seq > *:nth-child(n + 6) { --enter-i: 5; }
+/* Grade de cards: quem entra são os cards, não o container (evita subir duas vezes). */
+.ct-enter-seq > .ct-enter-seq-tight { animation: none; }
+.ct-enter-seq-tight > * {
+  --enter-j: 0;
+  animation: ct-enter var(--duration-considered) var(--ease-enter) backwards;
+  animation-delay: calc(var(--enter-at, 0ms) + min(var(--enter-j), 7) * var(--duration-stagger));
+}
+.ct-enter-seq-tight > *:nth-child(2) { --enter-j: 1; }
+.ct-enter-seq-tight > *:nth-child(3) { --enter-j: 2; }
+.ct-enter-seq-tight > *:nth-child(4) { --enter-j: 3; }
+.ct-enter-seq-tight > *:nth-child(5) { --enter-j: 4; }
+.ct-enter-seq-tight > *:nth-child(6) { --enter-j: 5; }
+.ct-enter-seq-tight > *:nth-child(7) { --enter-j: 6; }
+.ct-enter-seq-tight > *:nth-child(n + 8) { --enter-j: 7; }
+@keyframes ct-enter {
+  from { opacity: 0; transform: translateY(var(--distance-base)); filter: blur(var(--blur-small)); }
+  /* Sem "to": o fim é o próprio estilo do elemento, e o fill "backwards" não prende transform depois. */
+}
+/* Com o "Menos animação" do app, só some o deslocamento: a regra global já zera os tempos. */
+html[data-interface-motion="off"] :is(.ct-enter-seq, .ct-enter-seq-tight) > * { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  :is(.ct-enter-seq, .ct-enter-seq-tight) > * { animation: none; }
 }
 @keyframes ct-reveal {
   from { opacity: 0; transform: translateY(var(--distance-micro)); }

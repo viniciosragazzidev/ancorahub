@@ -9,11 +9,16 @@ import { useAssist } from "@/features/assist/components/assist-layer";
 import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
 import type { AgentId } from "@/features/ai-gateway/agents";
 import { ASSISTANTS, SASA_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
+import { readSasaPick, type SasaCommandInput } from "@/features/sasa/command-core";
+import { sasaCommandAction } from "@/features/sasa/command-action";
+import { useDevLab } from "@/lib/dev-lab";
+import { useFeedback } from "@/lib/feedback/use-feedback";
 
 import { prepareWhatsAppWindow } from "@/lib/whatsapp-open";
 import { rememberWhatsAppHandoff, useAcceptHandoffEnabled } from "@/features/broker-workspace/whatsapp-handoff/handoff-store";
 
 import { ChatScreen } from "./chat-screen";
+import { feedbackOnResult } from "./chat-feedback";
 import type { Mention } from "./composer";
 import type { AssistantAvatarAsset, ChatBlock, ChatScript, MascotShape } from "./types";
 
@@ -23,15 +28,40 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
   const assist = useAssist();
   // Aceite com contador (11/11): ligado, o WhatsApp abre na tela do lead depois de 30 s.
   const handoff = useAcceptHandoffEnabled();
-  const ask = async (text: string): Promise<ChatBlock[]> => {
+  const lab = useDevLab();
+  const fire = useFeedback();
+  // Sasá agêntica (fase 1, 19/11): o pedido roda primeiro como comando; o que não for comando segue para a IA.
+  const agentic = agentId === "ancora";
+  const command = async (input: SasaCommandInput) => {
+    const reply = await (lab?.sasa?.command ?? sasaCommandAction)(input);
+    // Nível 1 (FEEDBACK.md): confirmação só depois do servidor; falha com erro. Sem som de celebração.
+    if (reply.executed) feedbackOnResult(reply.executed.action, reply.executed, fire);
+    return reply;
+  };
+  const askAi = async (text: string): Promise<ChatBlock[]> => {
+    if (lab?.sasa) return [{ type: "assistant", id: `lab-free-${Date.now()}`, text: "No laboratório, só os pedidos da fase 1 respondem: plantão, pausa, quem está esperando, agenda, retornos e etapa." }];
     if (agentId) return (await askAssistantAction({ agentId, question: text })).blocks;
     return [{ type: "assistant", id: `free-answer-${Date.now()}`, text: "Não achei isso. Tente com outras palavras ou toque em \"?\" no topo para a ajuda da tela." }];
+  };
+  /** Pergunta pronta ("ask:") ou texto: comando da Sasá primeiro, IA depois. */
+  const ask = async (text: string): Promise<ChatBlock[]> => {
+    if (agentic) {
+      const reply = await command({ text });
+      if (reply.handled) return reply.blocks;
+    }
+    return askAi(text);
   };
   return (
     <ChatScreen
       composerDisabled={!canWrite}
       placeholder={canWrite ? undefined : "Escolha uma opção acima. Para perguntar, fale com Sasá."}
-      onLocalChoice={async (_choice, value): Promise<ChatBlock[]> => (value.startsWith(SASA_ASK_PREFIX) ? ask(value.slice(SASA_ASK_PREFIX.length)) : [])}
+      onLocalChoice={async (_choice, value): Promise<ChatBlock[]> => {
+        if (value.startsWith(SASA_ASK_PREFIX)) return ask(value.slice(SASA_ASK_PREFIX.length));
+        // "Qual Carlos?" e "Tentar de novo": repete o pedido com o lead escolhido.
+        const pick = readSasaPick(value);
+        if (pick) return (await command({ text: pick.text, pickedLeadId: pick.leadId })).blocks;
+        return [];
+      }}
       identity={identity}
       backHref="/dashboard"
       script={script}
@@ -44,7 +74,7 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
         const whatsapp = !handoffAccept && (action.name === "lead.accept" || action.name === "lead.registerContact") ? prepareWhatsAppWindow() : null;
         let result: Awaited<ReturnType<typeof runChatServerAction>>;
         try {
-          result = await runChatServerAction(action.name, action.payload);
+          result = lab?.sasa ? await lab.sasa.run(action.name, action.payload) : await runChatServerAction(action.name, action.payload);
         } catch (error) {
           whatsapp?.cancel();
           throw error;
@@ -77,7 +107,12 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
         router.push(destination ?? `/dashboard/c/${encodeURIComponent(mention.handle)}`);
         return [];
       }}
-      onFreeText={async (text): Promise<ChatBlock[]> => {
+      onFreeText={async (text, meta): Promise<ChatBlock[]> => {
+        if (agentic) {
+          const reply = await command({ text, clientCommandId: meta?.clientMessageId ?? null });
+          if (reply.handled) return reply.blocks;
+          if (lab?.sasa) return askAi(text);
+        }
         // "Onde fica?" answered from the app catalog first: instant, free and always right.
         const where = bestAssistMatch(text, assist?.capabilities ?? {});
         if (where) {
@@ -87,7 +122,7 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
             { type: "button", id: `where-go-${stamp}`, label: where.kind === "action" ? "Me leva lá" : `Abrir ${where.title}`, href: where.href },
           ];
         }
-        return ask(text);
+        return askAi(text);
       }}
     />
   );

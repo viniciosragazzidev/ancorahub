@@ -21,6 +21,7 @@ import { ensureDefaultQueue, offerLeadToBrokerManually, routeLeadToBranch } from
 import { enqueueAndProcessLeadDistribution, enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { DISTRIBUTION_REMOVAL_NOTE_MAX, DISTRIBUTION_REMOVAL_REASONS, type DistributionRemovalReason } from "@/features/lead-distribution/distribution-removal";
+import { claimLeadForInvestigation } from "./investigation-claim";
 
 const inputSchema = z.object({ leadId: z.string().uuid(), brokerId: z.string().uuid().nullable(), branchId: z.string().uuid().optional(), dutyScheduleId: z.string().uuid().optional(), assignmentMode: z.enum(["direct", "offer"]).optional() });
 
@@ -724,21 +725,28 @@ export async function assumeLeadForInvestigationAction(_prev: ManagementActionSt
     const { context, db, lead } = await getManagedLead(leadId);
     if (["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) throw new Error("Este lead já está ativo em atendimento e não pode ser assumido por outro usuário.");
     const now = new Date();
-    await db.transaction(async (tx) => {
-      await tx.update(schema.leads).set({ corretorId: context.userId, status: "under_analysis", distributionStatus: "assigned", assignedAt: now, stageEnteredAt: now, firstContactAt: null, serviceStartedAt: null, serviceStartedBy: null }).where(eq(schema.leads.id, lead.id));
+    const claimed = await db.transaction(async (tx) => {
+      const updated = await claimLeadForInvestigation(tx, {
+        expected: { id: lead.id, tenantId: context.tenantId, status: lead.status, corretorId: lead.corretorId, branchId: lead.branchId },
+        actorId: context.userId,
+        now,
+      });
+      if (!updated) return null;
       await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: `Lead assumido para investigação por ${context.role === "director" ? "Diretor" : "Gestor"}. Motivo: ${reason}` });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: "assumiu_lead_investigacao" });
+      return updated;
     });
+    if (!claimed) throw new Error("Este lead foi atualizado por outra pessoa. Atualize a página antes de assumir.");
     void publishLeadInvalidation({
       tenantId: context.tenantId,
       actorId: context.userId,
-      branchIds: [lead.branchId],
+      branchIds: [claimed.branchId],
       brokerIds: [lead.corretorId, context.userId],
     }).catch(() => undefined);
     return {
       success: true,
       mutationId,
-      entity: { leadId: lead.id, branchId: lead.branchId, corretorId: context.userId, status: "under_analysis" },
+      entity: { leadId: lead.id, branchId: claimed.branchId, corretorId: context.userId, status: "under_analysis" },
     };
   } catch (error) {
     return { mutationId, error: error instanceof Error ? error.message : "Não foi possível assumir o lead para investigação." };

@@ -158,13 +158,20 @@
   --font-logo: "Amil Typeface", var(--font-jakarta-sans), sans-serif;
   --font-inter-sans: var(--font-jakarta-sans);
   --font-mono: var(--font-jetbrains-mono), var(--font-geist-mono), monospace;
-  --duration-stagger: 40ms;
+  /* Movimento: valores de src/components/arc/motion-tokens.ts (fonte única desde 18/11/2026).
+     Nomes canônicos primeiro; os antigos ficam como apelidos. Teste: src/lib/motion/motion-tokens-sync.test.ts */
+  --duration-instant: 120ms;
+  --duration-fast: 160ms;
+  --duration-exit: 180ms;
+  --duration-standard: 240ms;
+  --duration-draw: 320ms;
+  --duration-considered: 480ms;
+  --duration-stagger: 35ms;
   --duration-micro: 80ms;
-  --duration-quick: 150ms;
-  --duration-fast: 250ms;
-  --duration-medium: 350ms;
-  --duration-slow: 400ms;
-  --duration-very-slow: 500ms;
+  --duration-quick: var(--duration-fast);
+  --duration-medium: var(--duration-draw);
+  --duration-slow: var(--duration-considered);
+  --duration-very-slow: var(--duration-considered);
   --distance-micro: 4px;
   --distance-small: 6px;
   --distance-base: 8px;
@@ -177,13 +184,16 @@
   --blur-small: 2px;
   --blur-medium: 3px;
   --blur-large: 8px;
-  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-smooth-out: var(--ease-standard);
   --ease-in-out: ease-in-out;
   --ease-out: ease-out;
   --ease-linear: linear;
-  --motion-duration-extra-fast: 100ms;
-  --motion-duration-fast: 200ms;
-  --motion-duration-normal: 300ms;
+  --motion-duration-extra-fast: var(--duration-instant);
+  --motion-duration-fast: var(--duration-fast);
+  --motion-duration-normal: var(--duration-standard);
   --motion-timing-function-ease-in: cubic-bezier(0.55, 0.055, 0.675, 0.19);
   --motion-timing-function-ease-out: cubic-bezier(0.215, 0.61, 0.355, 1);
   --motion-timing-function-ease-in-out: cubic-bezier(0.645, 0.045, 0.355, 1);

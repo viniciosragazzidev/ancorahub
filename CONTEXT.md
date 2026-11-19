@@ -4,11 +4,12 @@
 
 - **Experiência do corretor**: interface Lite obrigatória para o corretor; a antiga experiência normal está aposentada para esse papel.
 
-## Identidade visual
+## Identidade visual e assistentes
 
-- **Capitão Âncora**: mascote principal da Âncora Saúde; marinheiro adulto, acolhedor e experiente, representado com uniforme branco e azul-marinho, âncora dourada e bigode branco.
-- **Assistente de convés**: personagem auxiliar com uniforme branco e azul-marinho simples e pequena âncora, sem as listras de capitão.
-- **Sasá**: assistente de convés que identifica a conversa de avisos e perguntas do corretor. Nome, arte e voz não alteram a rota, permissões, ações ou dados da conversa.
+- **Capitão Âncora**: mascote principal da Âncora Saúde; marinheiro adulto, acolhedor e experiente, representado com uniforme branco e azul-marinho, âncora dourada, bigode branco curvado e detalhes dourados.
+- **Assistente de convés**: personagem auxiliar no mesmo estilo visual, com uniforme simples e pequena âncora, sem as listras do Capitão.
+- **Sasá**: assistente de convés da conversa de avisos e perguntas do corretor; nome, arte e voz não alteram a rota, permissões, ações ou dados da conversa.
+- **Ilustração funcional de área**: ícone objetual que identifica uma rota do app, como Leads, Plantão ou Agenda; é independente dos personagens.
 
 ## Atendimento e pós-venda
 
@@ -33,6 +34,7 @@
 
 ## Distribuição de leads
 
+- **Pré-confirmação do plantão seguinte**: registro administrativo de presença para a próxima participação do mesmo corretor quando ela começa exatamente ao fim do turno confirmado.
 - **Participação na escala**: compromisso de um corretor com um plantão, distinto da elegibilidade para receber leads. Pode ser planejada para um cadastro desativado sem reativar seu acesso ou torná-lo disponível para distribuição.
 - **Plantão multiunidade/multidia**: criação coordenada de regras de plantão independentes para mais de uma unidade e/ou dia da semana. Não é uma regra compartilhada: cada combinação de unidade, fila e dia conserva escala, cobertura e histórico próprios.
 - **Central de distribuição**: superfície operacional única para configurar filas, acompanhar exceções e explicar decisões. Ela não substitui o motor: toda ação manual, qualificação e automação deve usar o mesmo resolver determinístico.

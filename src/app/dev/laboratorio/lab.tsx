@@ -4,10 +4,13 @@
  * Laboratório de fluxos do corretor (15/11/2026). As telas são as reais (Início, Plantões, conquistas); só a
  * resposta do servidor é simulada pelo DevLabProvider. Mudou o componente real, o laboratório já mostra.
  * Painel no canto: fluxo, resposta do servidor, demora e "Recomeçar".
+ * "Movimento" (18/11/2026): vitrine dos componentes compartilhados com os interruptores "Menos animação" e "Kill switch".
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import { AssistantChat } from "@/components/chat/assistant-chat";
 import { ChatHome } from "@/components/chat/chat-home";
+import { buildAncoraScript } from "@/features/broker-workspace/chat/assistant-scripts";
 import { TOUR_STORAGE_KEY } from "@/components/chat/tour/tour-steps";
 import type { ThreadSummary } from "@/components/chat/types";
 import { AchievementHost, announceAchievement } from "@/components/lite/celebration/achievement-host";
@@ -16,18 +19,26 @@ import { BrokerDutyHub } from "@/features/broker-workspace/components/broker-dut
 import type { DutyHubCurrent } from "@/features/broker-workspace/duty-hub";
 import { WhatsAppHandoff } from "@/features/broker-workspace/whatsapp-handoff/whatsapp-handoff";
 import { DevLabProvider, type DevLab } from "@/lib/dev-lab";
+import { InterfaceMotionProvider } from "@/components/motion/interface-motion-provider";
 import { TeamListManager } from "@/features/supervisor-workspace/lead-import/team-list-manager";
+import { SaleChat, type SaleChatServices } from "@/features/post-sale/components/sale-chat";
+import type { SaleCatalog } from "@/features/post-sale/conversation-sale-core";
 
 import styles from "./lab.module.css";
+import { MotionShowcase } from "./motion-showcase";
+import { createLabSasa, labSasaPhrasesBlock, labSasaWorld } from "./sasa-lab";
 
-type Flow = "plantao" | "lead" | "lista" | "conquistas";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "lista" | "conquistas" | "movimento";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
   { id: "plantao", label: "Aceitar plantão" },
   { id: "lead", label: "Aceitar lead" },
+  { id: "venda", label: "Registrar venda" },
+  { id: "sasa", label: "Sasá: pedidos por texto" },
   { id: "lista", label: "Lista da equipe (supervisor)" },
   { id: "conquistas", label: "Conquistas" },
+  { id: "movimento", label: "Movimento (componentes)" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -55,6 +66,15 @@ const LAB_LIST = ["Ana Teste", "Bia Teste", "Caio Teste", "Davi Teste", "Eva Tes
   createdAt: new Date().toISOString(),
   assignedAt: null,
 }));
+/** Catálogo de exemplo do Registrar venda em conversa. */
+const LAB_SALE_CATALOG: SaleCatalog = {
+  carriers: [
+    { id: "amil", name: "Amil", plans: [{ id: "amil-s380", name: "Amil S380", type: "familiar" }, { id: "amil-s450", name: "Amil S450", type: "familiar" }, { id: "amil-pme", name: "Amil PME One", type: "pme" }] },
+    { id: "bradesco", name: "Bradesco Saúde", plans: [{ id: "bradesco-top", name: "Bradesco Top Nacional", type: "individual" }, { id: "bradesco-efetivo", name: "Bradesco Efetivo", type: "pme" }] },
+    { id: "sulamerica", name: "SulAmérica", plans: [{ id: "sula-exato", name: "SulAmérica Exato", type: "familiar" }, { id: "sula-direto", name: "SulAmérica Direto", type: "pme" }] },
+  ],
+};
+const LAB_SALE_LEAD = { id: "lab-venda", name: "Carlos Teixeira", initials: "CT", stageLabel: "Em negociação", monthlyValue: 1290 };
 const HANDOFF_LEAD = { name: "Carla Mendes", wants: "Plano PME para a empresa dela, 6 vidas.", plan: "SulAmérica · PME", lives: "6 vidas", city: "Niterói" };
 
 function thread(overrides: Partial<ThreadSummary>): ThreadSummary {
@@ -73,10 +93,23 @@ export function FlowLab() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [handoff, setHandoff] = useState<string | null>(null);
   const [sale, setSale] = useState(0);
+  const [lessMotion, setLessMotion] = useState(false);
+  const [killSwitch, setKillSwitch] = useState(false);
+  // "Menos animação" é a mesma marca que Configurações › Acessibilidade põe no <html>; volta ao valor anterior ao sair.
+  useEffect(() => {
+    if (!lessMotion) return;
+    const root = document.documentElement;
+    const previous = root.dataset.reduceMotion;
+    root.dataset.reduceMotion = "1";
+    return () => { if (previous === undefined) delete root.dataset.reduceMotion; else root.dataset.reduceMotion = previous; };
+  }, [lessMotion]);
   // As boas-vindas e o tour cobririam o fluxo: no laboratório ficam como já vistos.
   useState(() => { try { window.localStorage.setItem("ancora:lite-welcome:2026-10-chat", "1"); window.localStorage.setItem(TOUR_STORAGE_KEY, "skipped"); } catch { /* ignore */ } return null; });
 
+  // Sasá agêntica: um corretor de mentira que as ações simuladas mudam; "Recomeçar" volta ao início.
+  const sasaState = useRef({ world: labSasaWorld(), closed: [] as ReturnType<typeof labSasaWorld>["returns"] });
   const lab = useMemo<DevLab>(() => ({
+    sasa: createLabSasa(sasaState.current, { delay, outcome }),
     acceptLead: async () => {
       await wait(delay);
       return outcome === "falha" ? { success: false, error: "Outro corretor aceitou este lead primeiro." } : { success: true, whatsappUrl: "https://exemplo.invalid/" };
@@ -88,6 +121,36 @@ export function FlowLab() {
       return { ok: true, awaitingRelease: outcome === "liberacao" && mode === "presencial" };
     },
     presenceGate: async () => ({ required: false, connected: true }),
+    sale: {
+      // Simula a IA lendo o contrato: familiar da Amil com titular e 2 dependentes, sem a vigência (em "falha", não lê nada).
+      readContract: async () => {
+        await wait(delay + 800);
+        if (outcome === "falha") return { ok: false, error: "Não consegui ler esse contrato. Tente uma foto mais nítida ou responda as perguntas." };
+        return {
+          ok: true,
+          file: { filename: "contrato-carlos.pdf", fileUrl: "/api/documents/download?key=lab" },
+          reading: {
+            planType: "familiar",
+            holder: { name: "Carlos Eduardo Teixeira", birthDate: "1988-03-14", age: null, cpf: null, relationship: "titular" },
+            dependents: [
+              { name: "Juliana Teixeira", birthDate: "1991-07-02", age: null, cpf: null, relationship: "conjuge" },
+              { name: "Pedro Teixeira", birthDate: "2017-05-20", age: null, cpf: null, relationship: "filho" },
+            ],
+            carrierName: "AMIL ASSISTÊNCIA MÉDICA",
+            planName: "Amil S380",
+            monthlyValue: 1890.42,
+            coverageStartDate: null,
+            policyNumber: "PRP-2026-118734",
+            paymentMethod: "boleto",
+            contractTermMonths: 12,
+          },
+        };
+      },
+      register: async () => {
+        await wait(delay);
+        return outcome === "falha" ? { error: "Não foi possível registrar a venda agora." } : { success: true, saleId: "lab-" + Date.now() };
+      },
+    } satisfies SaleChatServices,
     teamList: {
       // Simula a IA: devolve o mapa do jeito que a leitura automática faria (ou nada, em "falha").
       structure: async (request) => {
@@ -126,7 +189,7 @@ export function FlowLab() {
     }],
   };
 
-  const restart = () => { setRun((value) => value + 1); setHandoff(null); };
+  const restart = () => { setRun((value) => value + 1); setHandoff(null); sasaState.current.world = labSasaWorld(); sasaState.current.closed = []; };
 
   return (
     <DevLabProvider value={lab}>
@@ -148,8 +211,24 @@ export function FlowLab() {
               now: { title: "Agora", emptyText: "Você está em dia.", items: [{ id: "offer-l1", title: "Carla Mendes", detail: "Plano PME, 6 vidas. Oferta para você.", actionLabel: "Aceitar e chamar no WhatsApp", href: "/dev/laboratorio", acceptLeadId: "l1", expiresAt: inMinutes(4), tone: "urgent" }] },
             }}
           />
+        ) : flow === "venda" ? (
+          <SaleChat lead={LAB_SALE_LEAD} catalog={LAB_SALE_CATALOG} services={lab.sale!} backHref="/dev/laboratorio" doneHref="/dev/laboratorio" />
+        ) : flow === "sasa" ? (
+          <div className="arc-venancor h-dvh">
+            <AssistantChat
+              identity={{ name: "Sasá", shape: "sasa", hue: 175 }}
+              script={(() => { const script = buildAncoraScript({ now: new Date() }); return { ...script, blocks: [...script.blocks, labSasaPhrasesBlock()] }; })()}
+              instant
+              agentId="ancora"
+              canWrite
+            />
+          </div>
         ) : flow === "lista" ? (
           <TeamListManager rows={LAB_LIST} totals={{ all: LAB_LIST.length, pending: LAB_LIST.filter((row) => !row.brokerId).length, distributed: LAB_LIST.filter((row) => row.brokerId).length, replied: LAB_LIST.filter((row) => row.replied).length }} team={LAB_TEAM} switcher={null} />
+        ) : flow === "movimento" ? (
+          <InterfaceMotionProvider enabled={!killSwitch}>
+            <MotionShowcase delay={delay} failing={outcome === "falha"} />
+          </InterfaceMotionProvider>
         ) : (
           <main className={`arc-venancor ${styles.buttons}`}>
             <h1>Conquistas</h1>
@@ -184,8 +263,12 @@ export function FlowLab() {
               <button type="button" aria-pressed={mode === "online"} onClick={() => setMode("online")}>Online</button>
               <button type="button" aria-pressed={mode === "presencial"} onClick={() => setMode("presencial")}>Presencial</button>
             </fieldset>
+            <fieldset><legend>Movimento</legend>
+              <button type="button" aria-pressed={lessMotion} onClick={() => setLessMotion((value) => !value)}>Menos animação</button>
+              <button type="button" aria-pressed={killSwitch} onClick={() => setKillSwitch((value) => !value)}>Kill switch</button>
+            </fieldset>
             <button type="button" className={styles.restart} onClick={restart}>Recomeçar</button>
-            <p className={styles.note}>Telas reais, servidor simulado. As comemorações respeitam o limite do dia: em Configurações › Acessibilidade dá para desligar.</p>
+            <p className={styles.note}>Telas reais, servidor simulado. As comemorações respeitam o limite do dia: em Configurações › Acessibilidade dá para desligar. Movimento reduzido do sistema: DevTools › Rendering › prefers-reduced-motion.</p>
           </div>
         ) : null}
       </aside>

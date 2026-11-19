@@ -9,7 +9,7 @@
 - Artes e referências visuais ativas do mascote atualizadas para o Capitão Âncora; a conversa de avisos passa a usar Sasá, assistente de convés. Copy de distribuição e financeiro adota termos diretos de trabalho; os dez ícones objetuais das rotas, as funções, IDs técnicos, permissões e caminhos permanecem.
 - Avatar/logo da Sasá atualizado para somente o rosto oficial do Capitão, com bigode branco, boné com âncora e fundo azul. URLs versionadas nas artes do mascote corrigem o cache antigo; os banners de Início e Plantões exibem a mesma arte marinheira.
 - As duas versões renderizadas do vídeo de boas-vindas ainda contêm Jack. A fonte editável do projeto não está neste repositório; atualização e render dos vídeos permanecem pendentes até o projeto ser recuperado.
-- Decisão: DEC-188. Contrato visual: `docs/design-system/MASCOTE.md`. Registro: `docs/implementations/active/2026-11-18-identidade-capitao-ancora.md`.
+- Decisão: DEC-189. Contrato visual: `docs/design-system/MASCOTE.md`. Registro: `docs/implementations/active/2026-11-18-identidade-capitao-ancora.md`.
 
 ## 17/11/2026 - Egress da distribuição: consultas memorizadas por passo
 
@@ -18,6 +18,14 @@
 - Validação: 644 testes focados passaram (10 ignorados), os quatro testes DB de distribuição passaram no Postgres sintético isolado, TypeScript, ESLint e build Webpack passaram. A suíte global do harness encontrou falhas em testes fora dos arquivos alterados e foi interrompida.
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
+
+## 17/11/2026 - Ajustes da revisão do Lote A
+
+- O lock de criação de lead mantém o advisory lock para telefones com menos de 8 dígitos usando os dígitos recebidos. Conversão por proposta e registro manual compartilham o lock transacional por lead, bloqueiam uma segunda venda ativa e preservam a resposta idempotente da proposta. A foto presencial substitui apenas a autoconfirmação do corretor (`confirmedBy IS NULL`), sem sobrescrever ausência ou validação da direção. Testes concorrentes passaram no PostgreSQL sintético da porta 5442.
+## 16/11/2026 - Auditoria de concorrência, Lote A
+
+- Claims no PostgreSQL impedem efeitos duplicados ao converter proposta em venda, registrar venda com documentos aprovados, assumir investigação, revisar documentos, mover escala, aceitar convite e consumir retry da qualificação.
+- Criação de lead por telefone usa um lock transacional por tenant nos caminhos manual, CSV, importação, Meta, OpenWA e WAHA. OpenWA usa o filtro compartilhado de candidatos também durante a releitura protegida, preservando telefones curtos. A pré-confirmação de turno estritamente contíguo usa a ocorrência única e UPDATE condicional auditado.
 
 ## 15/11/2026 - Ícones dos assistentes mais leves
 
@@ -952,7 +960,6 @@ F1 foi rebaseado sobre F0/F5. Em `/conversas`, sinais de conversa chamam só o d
 ## 14/11/2026 - Feedback padrão em todo o modo Lite (fases 2 a 5)
 
 O Lite inteiro (corretor, supervisor, gestor e Diretor Lite) responde no padrão de `docs/design-system/FEEDBACK.md`: estados de envio, sucesso só depois do servidor, erro com a causa, o que continua valendo e "Tentar de novo", e som e vibração por nível. As ações do chat ganham nível e "Não enviada · Tentar de novo". A ficha, a agenda, os clientes, o plantão, a meta do dia (nível 2), as configurações, o supervisor, o gestor e as telas do diretor deixam de usar toast para o que cabe no objeto. A venda registrada comemora em tela cheia com o capitão (nível 3). O que ficou de fora está no plano: `docs/implementations/active/2026-11-14-feedback-padrao.md`.
-
 ## 15/11/2026 - Ilustrações contextuais próprias por rota
 
 Revisão das imagens decorativas dos assistentes do Lite: dez assets WebP transparentes, sem Jack ou outros personagens, passam a usar objetos distintos que identificam Leads, Carteira, Plantão, Agenda, Cotação, Desempenho, Dicas, Jornada, Equipe e Mensagens. Também acompanham o cabeçalho de conversa; no mesmo controle global auditado, desligado ou com erro de carregamento, retornam os avatares abstratos. O controle não amplia as ilustrações de seção/vazio para gestor e supervisor. Jack/Notificações, leads individuais, conteúdo e sinais de estado permanecem inalterados. Plano e evidências: `docs/implementations/active/2026-11-15-assets-visuais-por-rota.md`.

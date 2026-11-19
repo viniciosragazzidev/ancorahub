@@ -9,6 +9,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { recordStageChangeForLead, stageActorType } from "@/features/leads/stage-history";
 import { generateCommissionSchedule } from "@/features/commissions/commission-rules-service";
+import { claimProposalConversion, completeProposalConversion } from "./proposal-conversion-claim";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import type { ProposalStatus } from "@/shared/db/schema";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
@@ -336,7 +337,15 @@ export async function convertProposalToSaleAction(
 
     const schedule = await generateCommissionSchedule(context.tenantId, saleId, resolvedPlanId, approvedValue);
 
-    await db.transaction(async (tx) => {
+    const conversion = await db.transaction(async (tx) => {
+      const claim = await claimProposalConversion(tx, {
+        tenantId: context.tenantId,
+        leadId: lead.id,
+        proposalId,
+        convertedAt: now,
+      });
+      if (claim.kind !== "claimed") return claim;
+
       // Create Client (if not exists)
       await tx
         .insert(schema.clients)
@@ -382,6 +391,15 @@ export async function convertProposalToSaleAction(
         createdBy: context.userId,
         notes: input.notes ?? null,
       });
+
+      const proposalCompleted = await completeProposalConversion(tx, {
+        tenantId: context.tenantId,
+        leadId: lead.id,
+        proposalId,
+        saleId,
+        convertedAt: now,
+      });
+      if (!proposalCompleted) throw new Error("Esta proposta mudou de estado. Atualize a tela e tente novamente.");
 
       // Create Commission Schedules
       if (schedule.length) {
@@ -437,9 +455,6 @@ export async function convertProposalToSaleAction(
       // Histórico de etapas (05/11): proposta aprovada fecha o funil do lead.
       await recordStageChangeForLead(tx, { tenantId: context.tenantId, leadId: lead.id, fromStatus: lead.status, toStatus: "converted", changedAt: now, actorType: stageActorType({ role: context.role }), actorUserId: context.userId, reason: "Proposta convertida em venda", previousStageEnteredAt: lead.stageEnteredAt ?? null });
 
-      const { triggerInstantAutomation } = await import("@/features/automations/engine");
-      void triggerInstantAutomation(context.tenantId, lead.id, "venda_realizada").catch(console.error);
-
       // Add Lead interaction audit log
       await tx.insert(schema.leadInteractions).values({
         id: randomUUID(),
@@ -451,16 +466,6 @@ export async function convertProposalToSaleAction(
           : `Venda registrada via conversao de proposta. Contrato de ${contractTermMonths} meses com vencimento em ${new Date(expirationDateStr + "T12:00:00Z").toLocaleDateString("pt-BR")}.`,
         createdAt: now,
       });
-
-      // Mark proposal as converted
-      await tx
-        .update(schema.proposals)
-        .set({
-          convertedAt: now,
-          convertedSaleId: saleId,
-          updatedAt: now,
-        })
-        .where(eq(schema.proposals.id, proposalId));
 
       // Audit Log
       await tx.insert(schema.platformAuditLogs).values({
@@ -476,7 +481,17 @@ export async function convertProposalToSaleAction(
           policyNumber: input.policyNumber,
         },
       });
+
+      return { kind: "claimed" as const };
     });
+
+    if (conversion.kind === "already_converted") return { success: true, saleId: conversion.saleId };
+    if (conversion.kind === "sale_exists") return { success: false, error: "Este lead já tem uma venda ativa registrada." };
+    if (conversion.kind === "lead_not_found") return { success: false, error: "Proposta não encontrada." };
+    if (conversion.kind === "conflict") return { success: false, error: "Esta proposta mudou de estado. Atualize a tela e tente novamente." };
+
+    const { triggerInstantAutomation } = await import("@/features/automations/engine");
+    void triggerInstantAutomation(context.tenantId, lead.id, "venda_realizada").catch(console.error);
 
     // Desfecho do fechamento (09/11): a venda de um lead em Documentação ou Em análise avisa a direção.
     const { notifyDirectorsClosingOutcome } = await import("@/features/leads/closing-outcome-notice");

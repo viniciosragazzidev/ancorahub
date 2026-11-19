@@ -1,0 +1,67 @@
+/* Registrar venda em conversa (19/11): mesmos tokens do cotador (quote-guide.module.css) e do Lite. */
+.root { display: contents; }
+
+/* ---------- Envio do contrato ---------- */
+.upload {
+  position: relative; display: grid; gap: 12px; padding: 16px; border-radius: var(--radius-panel);
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-resting);
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.upload[data-dragging="true"] { border-color: var(--primary); background: color-mix(in oklch, var(--primary) 5%, var(--surface)); }
+.uploadTop { display: flex; align-items: center; gap: 12px; }
+.uploadIcon { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 12px; background: color-mix(in oklch, var(--primary) 10%, transparent); color: var(--primary); }
+.uploadTitle { margin: 0; font-size: var(--text-sm); font-weight: 500; color: var(--foreground); }
+.uploadText { margin: 2px 0 0; font-size: var(--text-xs); line-height: 1.5; color: var(--text-secondary); }
+.uploadButton { width: 100%; }
+.askLink { justify-self: center; padding: 4px 8px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: var(--text-sm); color: var(--primary); cursor: pointer; transition: opacity var(--duration-fast) var(--ease-standard); }
+.askLink:hover { text-decoration: underline; text-underline-offset: 3px; }
+.askLink:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.askLink:disabled { opacity: 0.5; cursor: default; }
+.file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+/* Prévia do arquivo enquanto a IA lê: a faixa de leitura desce pela página. */
+.sheet { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--background); overflow: hidden; }
+.thumb { position: relative; width: 52px; height: 68px; flex: none; border-radius: 6px; overflow: hidden; background: var(--surface); border: 1px solid var(--border); display: grid; place-items: center; color: var(--text-muted); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.beam { position: absolute; left: 0; right: 0; height: 18px; top: -18px; background: linear-gradient(180deg, transparent, color-mix(in oklch, var(--primary) 32%, transparent) 70%, var(--primary)); pointer-events: none; }
+.sheetBody { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.sheetName { margin: 0; font-size: var(--text-sm); font-weight: 500; color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheetState { margin: 0; display: flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--text-secondary); }
+.sheetState[data-phase="read"] { color: var(--success); }
+.sheetState[data-phase="failed"] { color: var(--warning); }
+.dots { display: inline-flex; gap: 3px; }
+.dots span { width: 4px; height: 4px; border-radius: 9999px; background: currentColor; }
+
+/* ---------- O que a IA achou ---------- */
+.found { display: grid; gap: 4px; padding: 16px; border-radius: var(--radius-panel); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-resting); }
+.foundHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.foundTitle { margin: 0; font-size: var(--text-sm); font-weight: 500; color: var(--foreground); }
+.foundCount { font-size: var(--text-xs); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.foundRow { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; align-items: start; padding: 6px 0; }
+.foundRow + .foundRow { border-top: 1px solid var(--border); }
+.mark { width: 20px; height: 20px; border-radius: 9999px; display: grid; place-items: center; margin-top: 1px; }
+.mark[data-found="true"] { background: color-mix(in oklch, var(--success) 14%, transparent); color: var(--success); }
+.mark[data-found="false"] { background: var(--background); color: var(--text-muted); }
+.foundLabel { margin: 0; font-size: var(--text-xs); color: var(--text-secondary); }
+.foundValue { margin: 1px 0 0; font-size: var(--text-sm); color: var(--foreground); overflow-wrap: anywhere; }
+.foundValue[data-missing="true"] { color: var(--text-muted); }
+
+/* ---------- Resumo para confirmar ---------- */
+.review { display: grid; gap: 14px; padding: 16px; border-radius: var(--radius-panel); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-resting); }
+.reviewHead { display: grid; gap: 2px; }
+.reviewTitle { margin: 0; font-size: var(--text-base); font-weight: 500; letter-spacing: -0.01em; color: var(--foreground); }
+.reviewSub { margin: 0; font-size: var(--text-xs); color: var(--text-secondary); }
+.section { display: grid; gap: 2px; }
+.sectionTitle { margin: 0 0 4px; font-size: var(--text-xs); font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; color: var(--text-muted); }
+.row { display: grid; grid-template-columns: minmax(96px, 38%) minmax(0, 1fr); gap: 12px; padding: 7px 0; align-items: baseline; }
+.row + .row { border-top: 1px solid var(--border); }
+.rowLabel { font-size: var(--text-sm); color: var(--text-secondary); }
+.rowValue { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: var(--text-sm); color: var(--foreground); overflow-wrap: anywhere; }
+.tag { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 9999px; font-size: var(--text-xs); line-height: 18px; color: var(--primary); background: color-mix(in oklch, var(--primary) 9%, transparent); }
+.attach { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--background); font-size: var(--text-xs); color: var(--text-secondary); }
+.attach svg { color: var(--primary); flex: none; }
+
+/* ---------- Venda registrada ---------- */
+.done { display: grid; justify-items: center; gap: 8px; padding: 20px 16px; border-radius: var(--radius-panel); background: var(--surface); border: 1px solid var(--border); text-align: center; }
+.doneTitle { margin: 0; font-size: var(--text-lg); font-weight: 500; letter-spacing: -0.01em; color: var(--success); }
+.doneText { margin: 0; max-width: 320px; font-size: var(--text-sm); line-height: 1.5; color: var(--text-secondary); }

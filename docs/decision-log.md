@@ -1,12 +1,22 @@
 # Registro de Decisões de Produto e Arquitetura
 
-## DEC-188 - Identidade oficial do Capitão Âncora e da Sasá
+## DEC-189 - Identidade do Capitão Âncora e da assistente Sasá
 
-**Estado:** aprovada por Vinicios em 2026-11-18. **Escopo:** identidade visual e copy ativa.
+**Pedido do Vinicios em 2026-11-18; aprovado na conversa.** A prancha oficial fornecida passa a definir o mascote principal do CorreTop/Âncora Saúde: marinheiro adulto, rosto arredondado cor de pêssego, olhos castanhos grandes, nariz alaranjado, bigode branco curvado, boné branco de aba azul-marinho com âncora dourada, uniforme branco e azul-marinho, lenço azul e detalhes dourados. A paleta oficial é #002B73, #0B5ED7, #00B26B, #7ED957, #FFC400, #FF8A65, #FFF6E9 e #1F2937.
 
-O mascote principal do CorreTop passa a ser o Capitão Âncora conforme a prancha oficial recebida nesta sessão: marinheiro adulto, rosto pêssego arredondado, nariz alaranjado, olhos castanhos, bigode branco curvado, boné branco com aba azul-marinho e âncora dourada, camisa branca, lenço e calça azul-marinho, listras douradas nos ombros e âncora dourada no peito. Aplicar a paleta aprovada (#002B73, #0B5ED7, #00B26B, #7ED957, #FFC400, #FF8A65, #FFF6E9 e #1F2937) e conservar rosto, uniforme e proporções entre poses.
+Capitão Âncora é o personagem principal. Personagens de apoio são assistentes de convés com uniforme simples; a assistente da conversa de avisos passa a se chamar Sasá. As dez ilustrações objetuais das áreas permanecem como ícones funcionais. A linguagem de pirata e as artes anteriores saem dos pontos ativos da interface. O escopo é visual e de texto: não altera rotas, regras, dados, permissões, ações, integrações ou comportamento de distribuição. Os dois MP4s ativos de boas-vindas ainda exibem Jack; a fonte editável necessária para re-renderizá-los não estava disponível no checkout revisado.
 
-Sasá é a assistente de convés da conversa de avisos e perguntas, com uniforme simples e sem insígnias de capitão. Por pedido de Vinicios em 18/11, seu avatar/logo usa somente o rosto oficial do Capitão Âncora, com bigode branco, boné com âncora dourada e fundo azul #002B73; a orientação de uniforme simples vale para ilustrações de corpo inteiro da assistente. Trocar as referências ativas a Jack e ao imaginário pirata por nomes e linguagem direta de trabalho. Os dez ícones objetuais das rotas permanecem como estão. Preservar IDs técnicos, rotas, permissões, ações, conteúdo funcional, controles existentes e preferências de movimento. Vídeos já renderizados não são considerados atualizados: seus arquivos de projeto editáveis precisam ser substituídos e re-renderizados para completar a migração audiovisual. Registro: `docs/implementations/active/2026-11-18-identidade-capitao-ancora.md`.
+Sasá é a assistente de convés da conversa de avisos e perguntas, com uniforme simples e sem insígnias de capitão. Por pedido de Vinicios em 18/11, seu avatar/logo usa somente o rosto oficial do Capitão Âncora, com bigode branco, boné com âncora dourada e fundo azul #002B73; a orientação de uniforme simples vale para ilustrações de corpo inteiro da assistente. Trocar as referências ativas a Jack e ao imaginário pirata por nomes e linguagem direta de trabalho. Preservar IDs técnicos, rotas, permissões, ações, conteúdo funcional, controles existentes e preferências de movimento.
+
+Referência e artes-fonte: design/mascote/capitao-ancora/. Contrato: docs/design-system/MASCOTE.md. Implementação: docs/implementations/active/2026-11-18-identidade-capitao-ancora.md.
+
+## DEC-188 - Pré-confirmação administrativa de plantão contíguo
+
+**Estado:** aceita para implementação. **Data:** 2026-11-16.
+
+Quando o mesmo corretor tem uma participação de plantão imediatamente após outra e sua presença no turno atual já foi confirmada, Diretor ou Gestor autorizado pode confirmar antecipadamente a ocorrência seguinte. Contiguidade exige igualdade exata entre o instante final do turno atual e o instante inicial do seguinte; a tolerância é zero minutos. A confirmação atualiza a linha de presença existente de `pending` para `confirmed`, não cria segunda linha para a mesma assignment/turno, registra o usuário que a marcou e compete por compare-and-set com a confirmação do corretor. O Gestor fica no escopo efetivo da unidade. A ação exige a permissão existente `duty_schedules_manage` e a flag atual de presença; não cria uma permissão ou flag nova.
+
+Implementação: `docs/implementations/active/2026-11-16-race-lote-a.md`.
 
 ## DEC-186 - ERP nas duas peles do design system e endurecimento de cargos
 
@@ -621,6 +631,8 @@ O CorreTop migra de OpenWA para a Cloud API oficial da Meta em etapas. `communic
 As rotas do aplicativo usam a integração experimental de View Transitions do Next.js para transições curtas entre snapshots do navegador. A rota anterior e a nova não coexistem no DOM do aplicativo, evitando o efeito de tela dividida. A capacidade é reversível pela chave global `feature_interface_motion_enabled`, administrada exclusivamente pelo Super-admin e auditada em `platform_audit_logs`. A preferência `prefers-reduced-motion` sempre prevalece. Tabelas, filas e métricas não recebem animação de entrada ou reordenação; nelas só são permitidas transições de estado de baixo impacto, como hover e foco.
 
 **Estado de implementação — 02/10/2026:** o wrapper experimental de transições de rota permanece removido (ajuste de 30/07), sem reintroduzir snapshots ou sobreposição. O controle existente governa o movimento local dos componentes reutilizáveis. Sua leitura pública expõe apenas esse booleano, sem dados de tenant, e ocorre após hidratação para não bloquear o layout pelo banco. Falha na leitura mantém a interface estática e utilizável; a preferência de movimento reduzido continua prioritária. A escrita administrativa e sua auditoria não mudaram.
+
+**Emenda — 18/11/2026:** os valores de movimento passam a ter uma fonte só (`src/components/arc/motion-tokens.ts`), com as variáveis CSS e os conjuntos JS antigos como apelidos e um teste de sincronia. O controle passa a juntar três sinais: `prefers-reduced-motion`, a preferência "Menos animação" do app (`html[data-reduce-motion]`) e esta chave; o resultado continua em `html[data-interface-motion]` e é lido por `useMotionAllowed()`. A interface começa com movimento ligado e só desliga quando a leitura da chave responde desligada ou falha. Tabelas: a primeira carga da rota pode entrar em cascata curta; filtro, ordenação, paginação e reordenação seguem sem animação de entrada. Métricas não contam do zero ao abrir; só o valor que muda com a tela aberta rola (nível 2 de `FEEDBACK.md`). A transição de rota volta só por CSS em `template.tsx`, sem View Transition (plano `docs/implementations/active/2026-11-18-refinamento-movimento-areas.md`).
 
 ## DEC-035 — Serviço Fastify isolado para evidência e evolução da Cloud API
 

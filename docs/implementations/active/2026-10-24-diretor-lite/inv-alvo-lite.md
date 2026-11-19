@@ -394,7 +394,7 @@ Legenda de maturidade: **Consolidado** (muitos usos em produção, já ajustado 
 | ThreadRow / ThreadList | `chat/thread-row.tsx:37,75` | `thread`, `now`, `index`, `active`, `timeOnly` / `threads`, `groupByDay`, `activeId` | lista de conversas (rail) | Consolidado |
 | ThreadListScreen | `chat/thread-list-screen.tsx:18` | título, busca, threads | lista em tela cheia | Em uso |
 | ChatHome | `chat/chat-home.tsx:136-143` | `mode` page/rail, `assistants`, `leads`, `summary` | Início do corretor (celular e desktop) | Consolidado |
-| AssistantAvatar | `chat/assistant-avatar.tsx:40-51` | `shape` (mochi, onigiri, cubo, favo, nuvem, salte, logo, jack; `types.ts:13`), `hue`, `size`, estado | mascote SVG | Consolidado |
+| AssistantAvatar | `chat/assistant-avatar.tsx:40-51` | `shape` (mochi, onigiri, cubo, favo, nuvem, salte, logo, sasa; `types.ts:13`), `hue`, `size`, estado | mascote SVG | Consolidado |
 | LiveBlockView | `chat/live-blocks.tsx:73` | `block`, `onLeadOpen` | dados trazidos por `@` (lista, tiles 2 colunas, meta, cartão do lead) | Em uso |
 | OperatorAnswerCard | `chat/operator-answer-card.tsx:58` | `card`, `at` | tabela de preço de operadora em seções recolhíveis | Em uso |
 | ConsentCard | `chat/consent-card.tsx:22` | `block`, `onDecide` | consentimento de IA (LGPD) | Em uso |

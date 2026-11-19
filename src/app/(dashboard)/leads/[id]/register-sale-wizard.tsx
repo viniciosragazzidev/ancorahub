@@ -295,7 +295,7 @@ export function RegisterSaleWizard({
         // (que não bloqueia). Sem vaga no dia ou com celebrações desligadas, vira confirmação simples.
         const plan = fire("celebrate", { budgetKey: "venda" });
         if (celebrationScreen && plan.celebrate) setSaleScreen({ key: `${lead.id}-${Date.now()}`, stats: saleCelebrationStats({ approvedValue, contractTermMonths }) });
-        else if (plan.celebrate || showSuccessOverlay) celebrate("Venda registrada");
+        else if (plan.celebrate || showSuccessOverlay) celebrate("Venda registrada", { mascot: "lead_converted" });
         // "Venda registrada" já aparece na tela; o toast fica só com o que é trabalho do servidor.
         toast.success("O ciclo de renovação já foi agendado.");
         onOpenChange(false);

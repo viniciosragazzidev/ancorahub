@@ -35,12 +35,18 @@ export function buildSupervisorThreads(data: SupervisorWorkspaceData, now: Date)
   const online = data.team.filter((broker) => broker.availability === "available").length;
   const best = [...data.team].sort((a, b) => (b.stats?.accepted ?? 0) - (a.stats?.accepted ?? 0))[0];
   return [
-    thread("ancora", {
-      preview: data.unreadNotifications ? data.latestNotificationTitle ?? `Você tem ${data.unreadNotifications} avisos novos.` : "Sem avisos novos.",
-      at: data.unreadNotifications ? now.toISOString() : null,
-      unread: data.unreadNotifications > 0,
-      waitingYou: false,
-    }),
+    // A conversa da Sasá virou só pedidos ao assistente (19/11), e o supervisor não escreve para ela:
+    // a linha dele vira "Notificações" e abre a área de avisos, como no gestor Lite.
+    {
+      ...thread("ancora", {
+        preview: data.unreadNotifications ? data.latestNotificationTitle ?? `Você tem ${data.unreadNotifications} avisos novos.` : "Sem avisos novos.",
+        at: data.unreadNotifications ? now.toISOString() : null,
+        unread: data.unreadNotifications > 0,
+        waitingYou: false,
+      }),
+      name: "Notificações",
+      href: "/notificacoes",
+    },
     thread("equipe", {
       preview: !data.team.length
         ? data.teamIdentity

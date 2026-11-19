@@ -1,4 +1,5 @@
 "use client";
+import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 
 /**
  * Helpers de movimento do painel do diretor. Sai dos tokens (`motion-tokens.ts`) e reaproveita
@@ -20,29 +21,9 @@ export const fadeT: Transition = { duration: m.duration.instant };
 /** Atraso de cascata: até `stagger.max - 1` passos distintos. */
 export const staggerDelay = (index: number) => Math.min(index, m.stagger.max - 1) * m.stagger.item;
 
-/** Preferência de acessibilidade do próprio site (html[data-reduce-motion="1"], ver features/assist). */
-function subscribeUserReduce(onChange: () => void) {
-  const observer = new MutationObserver(onChange);
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-reduce-motion"] });
-  return () => observer.disconnect();
-}
-const readUserReduce = () => document.documentElement.dataset.reduceMotion === "1";
-
-function subscribeSystemReduce(onChange: () => void) {
-  if (typeof window.matchMedia !== "function") return () => undefined;
-  const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-const readSystemReduce = () => typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-const readServerReduce = () => false;
-
-/** Movimento reduzido vale se o sistema pedir OU se o usuário ligou a preferência no site. */
+/** Movimento reduzido vale se o sistema pedir, se o usuário ligou "Menos animação" ou se o kill switch está ativo (`useMotionAllowed`). */
 export function useReduce() {
-  // Keep the server and hydration snapshots stable; browser preferences apply after mount.
-  const system = useSyncExternalStore(subscribeSystemReduce, readSystemReduce, readServerReduce);
-  const user = useSyncExternalStore(subscribeUserReduce, readUserReduce, readServerReduce);
-  return system || user;
+  return !useMotionAllowed();
 }
 
 /** Texto final de um número, em pt-BR, igual ao que o odômetro mostra no fim. */

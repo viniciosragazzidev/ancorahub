@@ -9,6 +9,8 @@ import { fireFeedbackOnce } from "@/lib/feedback/use-feedback";
 
 import { BadgeArt } from "./badge-art";
 import { Confetti } from "./confetti";
+import { Mascot } from "@/components/mascot/mascot";
+import { useMascotPlacement } from "@/components/mascot/mascot-slot";
 import { LevelRing } from "./level-ring";
 import styles from "./celebration-layer.module.css";
 
@@ -129,6 +131,8 @@ function Sparks() {
 
 function BigMoment({ item, queued, onDone }: { item: JourneyCelebration; queued: number; onDone: () => void }) {
   const reduce = useReducedMotionConfig();
+  // Vaga do mascote (mascot-placements.ts, "celebration"): ligada, o mascote comemora no lugar da arte.
+  const mascot = useMascotPlacement("celebration");
   // Missão é nível 2; conquista e nível são nível 3, os únicos com confete (FEEDBACK.md §3).
   const levelThree = item.kind === "achievement" || item.kind === "level";
   const [plan] = useState(() => fireFeedbackOnce(`jornada:${item.id}`, levelThree ? "celebrate" : "milestone", { budgetKey: "missao" }));
@@ -172,9 +176,10 @@ function BigMoment({ item, queued, onDone }: { item: JourneyCelebration; queued:
       >
         <motion.div className={styles.art} initial={reduce ? false : { scale: 0.4, rotate: -12, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }} transition={reduce ? { duration: 0 } : { ...motionTokens.spring.celebrate, delay: motionTokens.beat.text }}>
           <span className={styles.glow} aria-hidden="true" />
-          {payload.kind === "achievement" ? <BadgeArt badge={payload.badgeKey} earned size={120} /> : null}
-          {payload.kind === "level" ? <LevelRing index={payload.level.index} percentage={100} size={120} /> : null}
-          {payload.kind === "mission" ? (
+          {mascot ? <Mascot state={mascot.state} size={mascot.size} decorative /> : null}
+          {!mascot && payload.kind === "achievement" ? <BadgeArt badge={payload.badgeKey} earned size={120} /> : null}
+          {!mascot && payload.kind === "level" ? <LevelRing index={payload.level.index} percentage={100} size={120} /> : null}
+          {!mascot && payload.kind === "mission" ? (
             <span className={styles.missionArt}>
               <svg viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><motion.path d="M5 12l4 4 10-10" initial={reduce ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.5, delay: 0.35, ease: EASE }} /></svg>
             </span>

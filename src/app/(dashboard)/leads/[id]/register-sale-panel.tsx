@@ -349,7 +349,7 @@ export function RegisterSalePanel({
         toast.success("Ciclo de vida e lembretes de renovação agendados.");
       } else {
         toast.success("Venda registrada com ciclo de vida e lembretes de renovação agendados!");
-        celebrateSuccess("Venda registrada");
+        celebrateSuccess("Venda registrada", { mascot: "lead_converted" });
       }
       onOpenChange(false);
       onRegistered?.();

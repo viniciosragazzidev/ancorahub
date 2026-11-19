@@ -19,32 +19,28 @@ beforeEach(() => { vi.useFakeTimers(); window.localStorage.clear(); push.canAsk.
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe("LiteWelcome", () => {
-  it("welcomes once, then never again on this device", () => {
+  it("Início limpo (19/11/2026): o cartão de boas-vindas não aparece, nem para supervisor", async () => {
     render(<LiteWelcome />);
-    act(() => { vi.advanceTimersByTime(400); });
-    expect(screen.getByRole("dialog", { name: "O app do corretor mudou" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Agora não" }));
-    act(() => { vi.advanceTimersByTime(500); });
-    cleanup();
-    render(<LiteWelcome />);
-    act(() => { vi.advanceTimersByTime(400); });
+    await act(async () => { vi.advanceTimersByTime(400); await Promise.resolve(); });
+    expect(screen.queryByRole("dialog", { name: "O app do corretor mudou" })).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(tour.start).not.toHaveBeenCalled();
+    cleanup();
+    render(<LiteWelcome variant="supervisor" />);
+    await act(async () => { vi.advanceTimersByTime(400); await Promise.resolve(); });
+    expect(screen.queryByRole("dialog", { name: "Seu app de supervisor chegou" })).toBeNull();
   });
 
-  it("after the welcome, asks once to turn on notifications and then starts the tour", async () => {
+  it("sem o cartão, pede os avisos uma vez e não abre o tour sozinho", async () => {
     push.canAsk.mockResolvedValue(true);
     render(<LiteWelcome />);
-    act(() => { vi.advanceTimersByTime(400); });
-    fireEvent.click(screen.getByRole("button", { name: /Fazer o tour/ }));
-    await act(async () => { await Promise.resolve(); vi.advanceTimersByTime(300); });
+    await act(async () => { vi.advanceTimersByTime(400); await Promise.resolve(); });
     expect(screen.getByRole("dialog", { name: "Não perca nenhum lead" })).toBeTruthy();
-    expect(tour.start).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Ativar avisos" }));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(push.enable).toHaveBeenCalled();
-    expect(screen.getByRole("dialog", { name: "Avisos ligados!" })).toBeTruthy();
     await act(async () => { vi.advanceTimersByTime(1700); });
-    expect(tour.start).toHaveBeenCalled();
+    expect(tour.start).not.toHaveBeenCalled();
     cleanup();
     render(<LiteWelcome />);
     await act(async () => { vi.advanceTimersByTime(400); await Promise.resolve(); });

@@ -1,7 +1,7 @@
 # Capitão Âncora — contrato oficial do mascote
 
 Status: identidade visual aprovada e aplicada às artes e interfaces disponíveis em 18/11/2026; vídeos de boas-vindas pendentes de fonte editável.
-Decisão: DEC-188.
+Decisão: DEC-189.
 Fonte oficial: design/mascote/capitao-ancora/referencia-oficial-capitao-ancora.png.
 
 ## Conceito e personalidade
@@ -64,7 +64,9 @@ As fontes PNG e a prancha de referência ficam em design/mascote/capitao-ancora/
 
 O arquivo splash-ancora.webp é a marca da empresa, não um personagem. As imagens antigas foram removidas do caminho ativo e preservadas em design/mascote/_archive/identidade-anterior/ somente como histórico; nunca devem voltar à interface.
 
-## Componentes e estados
+## Componente e estados
+
+O componente compartilhado é src/components/mascot/mascot.tsx. O contrato de estados está em src/components/mascot/mascot-config.ts. A ordem da lista de estados permanece estável porque corresponde ao número recebido pela máquina de estados da Rive.
 
 No chat, o avatar da assistente é renderizado por `AssistantAvatar` em
 `src/components/chat/assistant-avatar.tsx`; Sasá usa a forma `sasa` declarada em
@@ -75,25 +77,32 @@ superfícies existentes de splash, banners, desempenho, financeiro, distribuiç�
 jornada e importação. A atualização não cria componente, token, movimento ou regra
 de negócio.
 
-Celebrações devem ocorrer somente depois da confirmação do servidor. Não mostre
-informação de cliente junto ao mascote. O comportamento do movimento continua sob
-os controles existentes e preferência de movimento reduzido.
+| Estado | Situação | Arte |
+|---|---|---|
+| idle | Repouso ou tela vazia | repouso |
+| welcome | Primeira entrada | boas-vindas |
+| loading | Espera pelo servidor ou pela IA | repouso |
+| lead_accepted | Aceite confirmado | positivo |
+| lead_converted | Venda confirmada | positivo |
+| success | Outra confirmação | positivo |
+| error | Ação falhou | repouso |
+
+A arte fica imóvel quando o movimento estiver desativado, quando “Menos animação” estiver ativo ou quando o sistema pedir movimento reduzido. O movimento existente continua no componente; não há mais vídeo pré-gravado com a identidade anterior. A Rive permanece opcional e só é carregada quando houver um arquivo local aprovado em public/mascote/mascote.riv.
+
+Comemore somente depois da confirmação do servidor. Não mostre informação de cliente junto ao mascote. Nenhum estado repete em loop, exceto loading.
 
 ## Splash
 
 A abertura usa `2026-11-18/splash-capitao.webp` e `splash-ancora.webp` sobre o azul oficial #002B73. Os banners de Início e Plantões compartilham a arte versionada do mesmo Capitão, evitando a exibição da imagem pirata anterior pelo cache do navegador. A animação de entrada, os tempos, a saída quando o app está pronto e o comportamento de sessão permanecem. A imagem chega pelo HTML do servidor, não captura cliques e é decorativa para leitores de tela.
 
-Os arquivos renderizados `boas-vindas-v3-celular.mp4` e
-`boas-vindas-v3-computador.mp4` ainda mostram a identidade anterior. O projeto
-editável da composição não está disponível neste checkout; não substituir os vídeos
-até recuperar a fonte e gerar versões novas.
-
 ## Uso nas áreas e controle
 
-As vagas de ilustração continuam nos componentes existentes de cada área. Não ligar
-novos pontos de exibição nem alterar layout nesta atualização de identidade. Cada
-área continua decidindo seu estado e conteúdo; o mascote é decorativo e não representa
-uma regra de negócio.
+As vagas do mascote continuam centralizadas em src/components/mascot/mascot-placements.ts. Não ligar vagas nem alterar layout nesta atualização de identidade. Cada área continua decidindo seu estado e conteúdo; o mascote é decorativo e não representa uma regra de negócio.
+
+Os arquivos renderizados `boas-vindas-v3-celular.mp4` e
+`boas-vindas-v3-computador.mp4` ainda mostram a identidade anterior. O projeto
+editável da composição não estava disponível nos worktrees revisados; atualizar e
+re-renderizar os vídeos quando a fonte for recuperada.
 
 Os objetos por rota continuam sob a flag já existente feature_ui_contextual_illustrations. A troca do personagem principal e do avatar de Sasá não altera essa flag nem expande onde os objetos aparecem.
 

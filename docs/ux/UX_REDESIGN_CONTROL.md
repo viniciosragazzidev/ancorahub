@@ -16,7 +16,7 @@ abrir o assistente ou módulo pela linha. Dez objetos 3D decorativos identificam
 Carteira, Plantão, Agenda, Cotação, Desempenho, Dicas, Jornada, Equipe e Mensagens;
 a arte correspondente acompanha o cabeçalho da conversa quando existe. A conversa de
 avisos usa Sasá, assistente de convés; o mascote principal é o Capitão Âncora, conforme
-DEC-188. A marca verificada e avatares individuais permanecem; texto e indicadores
+DEC-189. A marca verificada e avatares individuais permanecem; texto e indicadores
 atuais comunicam conteúdo e estado.
 
 Na lista lateral, os objetos das áreas usam 35 × 35 px centralizados no slot de 44 × 44 px, cerca de 20% menores para reduzir o peso visual sem diminuir a área de toque da linha. A troca de identidade não altera o tamanho da marca verificada nem dos avatares de leads.

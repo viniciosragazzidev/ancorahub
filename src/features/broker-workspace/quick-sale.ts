@@ -22,7 +22,8 @@ export const QUICK_SALE_LIMIT = 30;
 export const QUICK_SALE_PARAM = "registrar-venda";
 
 export function quickSaleLeadHref(leadId: string) {
-  return `/leads/${encodeURIComponent(leadId)}?${QUICK_SALE_PARAM}=1`;
+  // Registrar venda em conversa (19/11): o lead escolhido abre direto a conversa do registro.
+  return `/leads/${encodeURIComponent(leadId)}/registrar-venda`;
 }
 
 export const quickSaleInputSchema = z.object({
