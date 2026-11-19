@@ -134,6 +134,7 @@ export async function ChatHomeContent() {
       leads={rail.leads}
       nowIso={rail.nowIso}
       canQuote={rail.canQuote}
+      unreadNotifications={rail.unreadNotifications}
       nowFloatingEnabled={floatingNow === "true"}
       homeActions={homeActionsFlag === "true"}
       financeCard={financeSummary ? <BrokerFinanceSummaryCard summary={financeSummary} /> : null}

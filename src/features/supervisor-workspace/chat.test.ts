@@ -31,7 +31,7 @@ describe("supervisor Lite chat", () => {
     expect(threads.find((thread) => thread.assistant === "equipe")).toMatchObject({ avatarAsset: "equipe" });
     expect(threads.map((thread) => thread.assistant)).toEqual(["ancora", "equipe", "equipe-leads", "equipe-plantao", "equipe-desempenho"]);
     expect(Object.fromEntries(threads.map((thread) => [thread.assistant, thread.href]))).toMatchObject({
-      ancora: "/dashboard/c/ancora",
+      ancora: "/notificacoes",
       equipe: "/equipe/minha",
       "equipe-leads": "/leads",
       "equipe-plantao": "/equipe/plantao",

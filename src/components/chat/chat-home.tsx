@@ -14,7 +14,7 @@ import { Button as ArcButton } from "@/components/arc/button/button";
 import { Badge as ArcBadge } from "@/components/arc/badge/badge";
 import { Avatar } from "@/components/arc/avatar/avatar";
 import { Button } from "@/components/ui/button";
-import { Activity, AlarmClock, ArrowUpRight, CheckCircle2, Headset, House, Inbox, ListTodo } from "lucide-react";
+import { Activity, AlarmClock, ArrowUpRight, Bell, CheckCircle2, Headset, House, Inbox, ListTodo } from "lucide-react";
 import { LightAvailabilityPill } from "@/components/light-top-nav";
 import sharedPage from "@/components/lite/page/lite-page.module.css";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -208,6 +208,7 @@ export function ChatHome({
   financeCard = null,
   quickSaleEnabled = false,
   announcement = null,
+  unreadNotifications,
 }: {
   viewerName: string;
   assistants: ThreadSummary[];
@@ -238,6 +239,8 @@ export function ChatHome({
   quickSaleEnabled?: boolean;
   /** Aviso da diretoria no ar: ocupa o banner do capitão no lugar do padrão. */
   announcement?: HomeAnnouncementView | null;
+  /** Avisos não lidos no sino do topo (corretor e supervisor). Ausente: sem sino (gestor tem a linha Notificações). */
+  unreadNotifications?: number;
 }) {
   const firstSteps = SHOW_FIRST_STEPS ? firstStepsInput : null;
   const now = useMemo(() => new Date(nowIso), [nowIso]);
@@ -338,6 +341,13 @@ export function ChatHome({
         </Link>
         <div className={home.headerTools} data-tour="home-tools">
           {!showWhatsAppStatus || isSupervisor || (isManager && mode !== "rail") ? null : <WhatsAppStatusButton />}
+          {/* Sino (19/11): os avisos saíram da conversa da Sasá e moram em Notificações. */}
+          {unreadNotifications === undefined || isManager ? null : (
+            <Link href="/notificacoes" className={`${redesigned ? sharedPage.iconButton : styles.iconButton} ${home.bell}`} aria-label={unreadNotifications ? `Notificações, ${unreadNotifications} ${unreadNotifications === 1 ? "nova" : "novas"}` : "Notificações"}>
+              <Bell size={18} strokeWidth={1.9} aria-hidden="true" />
+              {unreadNotifications ? <span className={home.bellCount} aria-hidden="true">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span> : null}
+            </Link>
+          )}
           {redesigned ? <ArcButton variant="ghost" className={sharedPage.iconButton} aria-label={searching ? "Fechar busca" : "Buscar"} aria-pressed={searching} onClick={() => { setSearching((value) => !value); setQuery(""); }}><SearchIcon /></ArcButton> : <button type="button" className={styles.iconButton} aria-label={searching ? "Fechar busca" : "Buscar"} aria-pressed={searching} onClick={() => { setSearching((value) => !value); setQuery(""); }}><SearchIcon /></button>}
           {redesigned ? <ArcButton variant="ghost" className={sharedPage.iconButton} aria-label="Nova ação" onClick={() => setNewOpen(true)}><PlusIcon /></ArcButton> : <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>}
         </div>

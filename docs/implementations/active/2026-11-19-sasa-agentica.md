@@ -8,6 +8,17 @@ A personagem se chama **Sasá** em todo texto, prompt, código novo e documenta�
 
 Base desta direção: o registro de venda em conversa (`feat/venda-conversa`, 19/11), em que a IA lê o contrato e só pergunta o que falta. Este plano generaliza esse modelo para o CRM inteiro.
 
+## Feito em 19/11: a conversa da Sasá ficou só agêntica
+
+Pedido do usuário: "o primeiro chat vai ser só para ações agênticas". Branch `feat/sasa-so-agentica`.
+
+- `buildAncoraScript` não recebe mais notificações: só a apresentação da Sasá e as perguntas prontas (dia, quem atender, material das operadoras). Composer: "Peça algo à Sasá".
+- A rota `/dashboard/c/ancora` não consulta avisos e não marca mais tudo como lido ao abrir (o `MarkSeenOnView kind="ancora"` saiu).
+- A linha da Sasá no Início diz "Peça o que precisar, por texto ou áudio." e não fica mais com ponto azul por aviso.
+- Avisos ficam em `/notificacoes` (lista, marcar como lido, push e contagem como antes). Caminho novo: sino no topo do Início do corretor e do supervisor, com a contagem de não lidos (`ChatRailData.unreadNotifications`).
+- Supervisor Lite: não escreve para a Sasá; a linha dele vira "Notificações" e abre `/notificacoes`, como no gestor Lite. A rota da Sasá redireciona o supervisor para lá.
+- O "Ciente" de recado da Central continua no Mural (`/relacionamento`), aberto pelo próprio aviso.
+
 ---
 
 ## 1. O que já existe (levantamento no código)
@@ -17,7 +28,7 @@ Base desta direção: o registro de venda em conversa (`feat/venda-conversa`, 19
 | Peça | Onde | O que faz hoje |
 |---|---|---|
 | Identidade | `ASSISTANTS.ancora` em `src/features/broker-workspace/chat/assistant-scripts.ts` | Nome "Sasá", forma `sasa`, rota `/dashboard/c/ancora`, fixa no topo do Início |
-| Roteiro | `buildAncoraScript` (mesmo arquivo) | Avisos (`notifications`) como blocos `notice`, perguntas prontas (`SASA_ASKS`, prefixo `ask:`), perguntas do material das operadoras |
+| Roteiro | `buildAncoraScript` (mesmo arquivo) | Desde 19/11 só a apresentação e as perguntas prontas (antes trazia os avisos como blocos `notice`); perguntas prontas (`SASA_ASKS`, prefixo `ask:`), perguntas do material das operadoras |
 | Rota | `src/app/(dashboard)/dashboard/c/[assistant]/page.tsx` | Só corretor Lite e supervisor Lite; `canWrite` só para corretor; `agentId="ancora"` |
 | Tela | `src/components/chat/chat-screen.tsx` + `assistant-chat.tsx` | Renderiza `ChatBlock`, roda `ChatAction` (`href`, `server`, `next`, `local`), envio otimista (`user-send-core.ts`, `clientMessageId` como chave de idempotência) |
 | Texto livre | `askAssistantAction` em `src/features/ai-gateway/ask-assistant.ts` | Consentimento LGPD → material da operadora (RAG) → contexto do dia (`workspaceContext`) ou do lead (`leadContext`) → `runGateway` com JSON `{text, suggestions, draftMessage}` → blocos |
