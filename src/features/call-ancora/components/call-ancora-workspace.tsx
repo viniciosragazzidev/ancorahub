@@ -11,6 +11,7 @@ import { useDevLab } from "@/lib/dev-lab";
 import { useFeedback } from "@/lib/feedback/use-feedback";
 
 import { CALL_ANCORA_DEMO_CONTACTS } from "../contacts";
+import { CALL_ANCORA_MOBILE_SESSION_ENDED_MESSAGE, isCallAncoraMobileSessionEndedStatus } from "../mobile-session";
 import type { CallAncoraSnapshot, CallStatus } from "../session-store";
 
 const POLL_MS = 1_200;
@@ -267,9 +268,22 @@ export function CallAncoraMobile({ token }: { token: string }) {
   const [deviceToken, setDeviceToken] = useState<string | null>(null);
   const [session, setSession] = useState<CallAncoraSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sessionEnded, setSessionEnded] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const pairedOnce = useRef(false);
+  const sessionEndedRef = useRef(false);
+  const pollTimer = useRef<number | null>(null);
   const fire = useFeedback();
+
+  const stopForEndedSession = useCallback(() => {
+    sessionEndedRef.current = true;
+    setSessionEnded(true);
+    setError(CALL_ANCORA_MOBILE_SESSION_ENDED_MESSAGE);
+    if (pollTimer.current !== null) {
+      window.clearInterval(pollTimer.current);
+      pollTimer.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (pairedOnce.current) return;
@@ -285,22 +299,35 @@ export function CallAncoraMobile({ token }: { token: string }) {
   }, [token]);
 
   useEffect(() => {
-    if (!deviceToken) return;
+    if (!deviceToken || sessionEndedRef.current) return;
     let cancelled = false;
     const load = async () => {
       try {
         const response = await fetch("/api/call-ancora/mobile", { cache: "no-store", headers: { Authorization: `Bearer ${deviceToken}` } });
+        if (isCallAncoraMobileSessionEndedStatus(response.status)) {
+          if (!cancelled) stopForEndedSession();
+          return;
+        }
         const payload = await response.json() as { session?: CallAncoraSnapshot; error?: string };
         if (!response.ok || !payload.session) throw new Error(payload.error || "A conexão do celular foi encerrada.");
-        if (!cancelled) setSession(payload.session);
+        if (!cancelled && !sessionEndedRef.current) {
+          setSession(payload.session);
+          setError(null);
+        }
       } catch (reason) {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : "O celular perdeu a conexão.");
+        if (!cancelled && !sessionEndedRef.current) setError(reason instanceof Error ? reason.message : "O celular perdeu a conexão.");
       }
     };
     void load();
-    const timer = window.setInterval(() => { void load(); }, POLL_MS);
-    return () => { cancelled = true; window.clearInterval(timer); };
-  }, [deviceToken]);
+    pollTimer.current = window.setInterval(() => { void load(); }, POLL_MS);
+    return () => {
+      cancelled = true;
+      if (pollTimer.current !== null) {
+        window.clearInterval(pollTimer.current);
+        pollTimer.current = null;
+      }
+    };
+  }, [deviceToken, stopForEndedSession]);
 
   const simulate = useCallback(async () => {
     if (!deviceToken || !session || simulating || session.callStatus !== "ready") return;
@@ -315,6 +342,10 @@ export function CallAncoraMobile({ token }: { token: string }) {
     try {
       for (const transition of transitions) {
         const response = await fetch("/api/call-ancora/mobile", { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${deviceToken}` }, body: JSON.stringify({ callStatus: transition.callStatus }) });
+        if (isCallAncoraMobileSessionEndedStatus(response.status)) {
+          stopForEndedSession();
+          return;
+        }
         const payload = await response.json() as { session?: CallAncoraSnapshot; error?: string };
         if (!response.ok || !payload.session) throw new Error(payload.error || "A ligação simulada parou. Tente de novo.");
         setSession(payload.session);
@@ -326,13 +357,13 @@ export function CallAncoraMobile({ token }: { token: string }) {
     } finally {
       setSimulating(false);
     }
-  }, [deviceToken, fire, session, simulating]);
+  }, [deviceToken, fire, session, simulating, stopForEndedSession]);
 
   return (
     <main className="arc-venancor min-h-dvh bg-(--background) px-5 py-8">
       <div className="mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-md flex-col">
         <header className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-2xl bg-(--accent-subtle) text-(--accent-strong)"><PhoneCall className="size-5" aria-hidden="true" /></span><div><p className="text-xs font-semibold uppercase tracking-wide text-(--text-muted)">Call Âncora</p><p className="text-sm font-medium text-(--foreground)">Celular da demonstração</p></div></header>
-        {error ? <section className="mt-8 rounded-3xl border border-(--danger)/25 bg-(--surface) p-6 text-center" role="alert"><p className="font-semibold text-(--foreground)">Não foi possível conectar</p><p className="mt-2 text-sm leading-6 text-(--text-secondary)">{error}</p></section> : !session ? <p className="mt-8 rounded-3xl border border-(--border) bg-(--surface) p-6 text-center text-sm text-(--text-secondary)" role="status">Conectando à sessão…</p> : <>
+        {error ? <section className="mt-8 rounded-3xl border border-(--danger)/25 bg-(--surface) p-6 text-center" role="alert"><p className="font-semibold text-(--foreground)">{sessionEnded ? "Sessão encerrada" : "Não foi possível conectar"}</p><p className="mt-2 text-sm leading-6 text-(--text-secondary)">{error}</p></section> : !session ? <p className="mt-8 rounded-3xl border border-(--border) bg-(--surface) p-6 text-center text-sm text-(--text-secondary)" role="status">Conectando à sessão…</p> : <>
           <section className="mt-8 rounded-[2rem] border border-(--border) bg-(--surface) p-6 text-center shadow-(--shadow-resting)">
             <span className="mx-auto grid size-14 place-items-center rounded-full bg-(--success)/10 text-(--success)"><Check className="size-6" aria-hidden="true" /></span>
             <p className="mt-4 text-lg font-semibold text-(--foreground)">Conectado à conta de {session.brokerFirstName}</p>

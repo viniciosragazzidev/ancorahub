@@ -610,3 +610,7 @@ Papel: corretor dono do lead com flag global ativa. Ação principal: concluir o
 ## 2026-11-19: Call Âncora, MVP visual do corretor
 
 Papel: corretor Lite quando a flag global estiver ativa; admin da plataforma e desenvolvimento local também podem validar a demonstração. Rota `/call-ancora`, acessada pelo menu Mais no Lite ou pela navegação normal quando autorizada. Ação principal: iniciar e parear o celular por QR de uso único. A tela revela sessão, contato fictício, estado/cronômetro, próximo contato e interessados; `/call-ancora/celular` apresenta `Ligar` (`tel:`) e `Simular`. Estados: inicial, QR aguardando/expirado, conectado, ligação em andamento/encerrada, contagem pausada/concluída e erro. O laboratório demonstra o mesmo fluxo com celular simulado. Reutiliza Button Arc, tokens existentes, `LiteListPresence` e `useFeedback`, sem token, primitive ou movimento novo. Sessão em memória, isolada por tenant/corretor, sem lead, chamada real ou escrita no CRM. `CALL_ANCORA_VISUAL` inicia desligada, é reversível e auditada pelo Super-admin. Não avança UX-M1.10. Registro: `docs/implementations/active/2026-11-19-call-ancora.md`.
+
+## 2026-11-19: sessão encerrada do Call Âncora
+
+No celular, HTTP 401/403 encerra a consulta e orienta parear de novo. No modo `Ver como`, o estado temporário pertence ao admin autenticado, preservando a sessão do corretor observado. As leituras limpam sessões e tickets vencidos; sem novo token ou componente visual.

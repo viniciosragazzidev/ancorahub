@@ -115,6 +115,7 @@ export class CallAncoraSessionStore {
   }
 
   pairingCanUseWhenFlagDisabled(pairingToken: string): boolean {
+    this.prune();
     const ticket = this.pairingTickets.get(hashToken(pairingToken));
     if (!ticket || ticket.used || this.now() >= ticket.expiresAt) return false;
     const session = this.liveSession(ticket.sessionKey);
@@ -122,6 +123,7 @@ export class CallAncoraSessionStore {
   }
 
   getForBroker(scope: Scope): CallAncoraSnapshot | null {
+    this.prune();
     const session = this.liveSession(scopeKey(scope));
     if (!session) return null;
     session.lastActivityAt = this.now();
@@ -130,6 +132,7 @@ export class CallAncoraSessionStore {
   }
 
   getForDevice(deviceToken: string): CallAncoraSnapshot | null {
+    this.prune();
     const key = this.deviceSessions.get(hashToken(deviceToken));
     if (!key) return null;
     const session = this.liveSession(key);
@@ -140,6 +143,7 @@ export class CallAncoraSessionStore {
   }
 
   deviceCanUseWhenFlagDisabled(deviceToken: string): boolean {
+    this.prune();
     const key = this.deviceSessions.get(hashToken(deviceToken));
     const session = key ? this.liveSession(key) : null;
     return Boolean(session && session.deviceTokenHash === hashToken(deviceToken) && session.flagBypass);

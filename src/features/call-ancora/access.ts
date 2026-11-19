@@ -7,6 +7,7 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import { getRequiredSession } from "@/shared/auth/session";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { canUseCallAncora } from "./visibility";
+import { callAncoraSessionOwnerId } from "./session-scope";
 
 export async function requireCallAncoraAccess() {
   const [context, session] = await Promise.all([getRequiredTenantContext(), getRequiredSession()]);
@@ -19,5 +20,10 @@ export async function requireCallAncoraAccess() {
     }
     throw new AuthorizationError("O Call Âncora está disponível apenas para corretores e administradores da plataforma.");
   }
-  return { context, brokerName: session.user.name, flagBypass: platformAdmin || development };
+  return {
+    context,
+    sessionOwnerId: callAncoraSessionOwnerId(context, session.user.id),
+    brokerName: session.user.name,
+    flagBypass: platformAdmin || development,
+  };
 }

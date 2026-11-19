@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { CALL_ANCORA_NEXT_DELAY_MS, CALL_ANCORA_PAIR_TTL_MS, CallAncoraSessionStore } from "./session-store";
+import { CALL_ANCORA_NEXT_DELAY_MS, CALL_ANCORA_PAIR_TTL_MS, CALL_ANCORA_SESSION_TTL_MS, CallAncoraSessionStore } from "./session-store";
 
 describe("CallAncoraSessionStore", () => {
   let now: number;
@@ -69,5 +69,21 @@ describe("CallAncoraSessionStore", () => {
     expect(store.getForBroker({ tenantId: "t1", brokerId: "b1" })?.sessionId).toBe(first.snapshot.sessionId);
     expect(store.getForBroker({ tenantId: "t1", brokerId: "b2" })?.brokerFirstName).toBe("Bruno");
     expect(store.getForBroker({ tenantId: "t2", brokerId: "b1" })?.brokerFirstName).toBe("Carla");
+  });
+
+  it.each([
+    ["getForBroker", (instance: CallAncoraSessionStore) => instance.getForBroker({ tenantId: "missing", brokerId: "missing" })],
+    ["getForDevice", (instance: CallAncoraSessionStore) => instance.getForDevice("missing")],
+    ["deviceCanUseWhenFlagDisabled", (instance: CallAncoraSessionStore) => instance.deviceCanUseWhenFlagDisabled("missing")],
+    ["pairingCanUseWhenFlagDisabled", (instance: CallAncoraSessionStore) => instance.pairingCanUseWhenFlagDisabled("missing")],
+  ] as const)("remove sessões vencidas durante a leitura por %s", (_name, read) => {
+    const scope = { tenantId: "t1", brokerId: "b1" };
+    store.create(scope, "Ana", { flagBypass: true });
+    now += CALL_ANCORA_SESSION_TTL_MS + 1;
+
+    read(store);
+
+    now -= CALL_ANCORA_SESSION_TTL_MS + 1;
+    expect(store.getForBroker(scope)).toBeNull();
   });
 });
