@@ -71,6 +71,46 @@ object Labels {
         else -> "Encerrada"
     }
 
+    /**
+     * Motivo do fim da ligação em português simples, para o resumo e a linha do tempo.
+     * Usa o rótulo do Android quando existir; senão o motivo técnico; senão o código.
+     */
+    fun friendlyDisconnect(code: Int?, reason: String?, systemLabel: String?, incoming: Boolean): String {
+        systemLabel?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        reasonLabel(reason)?.let { return it }
+        return when (code) {
+            DisconnectCause.LOCAL -> "Você desligou"
+            DisconnectCause.REMOTE -> "O outro lado desligou"
+            DisconnectCause.BUSY -> "Ocupado"
+            DisconnectCause.MISSED -> if (incoming) "Não atendida" else "Não atendeu"
+            DisconnectCause.REJECTED -> "Chamada recusada"
+            DisconnectCause.CANCELED -> "Chamada cancelada"
+            DisconnectCause.ERROR -> "Falha na ligação"
+            DisconnectCause.RESTRICTED -> "Ligação bloqueada"
+            DisconnectCause.OTHER -> "Outro motivo"
+            DisconnectCause.ANSWERED_ELSEWHERE -> "Atendida em outro aparelho"
+            DisconnectCause.CALL_PULLED -> "Transferida"
+            else -> "Encerrada"
+        }
+    }
+
+    /** Traduz os motivos técnicos mais comuns (DisconnectCause.reason). */
+    private fun reasonLabel(reason: String?): String? {
+        val r = reason?.uppercase(Locale.ROOT) ?: return null
+        return when {
+            "POWER_OFF" in r || "RADIO_OFF" in r -> "Rádio desligado (modo avião?)"
+            "OUT_OF_SERVICE" in r || "NO_SERVICE" in r -> "Sem sinal da operadora"
+            "EMERGENCY_ONLY" in r -> "Só chamadas de emergência"
+            "SIM" in r && ("ABSENT" in r || "ERROR" in r || "NOT_READY" in r) -> "Problema no chip"
+            "BUSY" in r -> "Ocupado"
+            "CONGESTION" in r -> "Rede congestionada"
+            "INVALID_NUMBER" in r || "UNOBTAINABLE" in r || "UNASSIGNED" in r -> "Número inválido"
+            "BARRED" in r || "FDN_BLOCKED" in r || "RESTRICTED" in r -> "Ligação bloqueada"
+            "TIMED_OUT" in r || "NO_ANSWER" in r -> "Não atendeu"
+            else -> null
+        }
+    }
+
     /** "Motivo" no resumo da tela de chamada. */
     fun disconnectReason(code: Int?, incoming: Boolean): String = when (code) {
         DisconnectCause.LOCAL -> "Você desligou"

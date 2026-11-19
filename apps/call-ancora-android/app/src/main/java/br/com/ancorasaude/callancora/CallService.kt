@@ -16,6 +16,7 @@ class CallService : InCallService() {
     override fun onCreate() {
         super.onCreate()
         CallBus.service = this
+        SignalMonitor.start(this)
     }
 
     override fun onDestroy() {

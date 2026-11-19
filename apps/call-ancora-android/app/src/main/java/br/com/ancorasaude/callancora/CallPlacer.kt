@@ -15,6 +15,8 @@ object CallPlacer {
         if (!Readiness.canDial(context)) {
             return "O celular ainda não está pronto: falta o discador padrão ou a permissão de ligação."
         }
+        SignalMonitor.start(context)
+        if (!SignalMonitor.inService) return SignalMonitor.status.value.message + "."
         val telecom = context.getSystemService(TelecomManager::class.java)
             ?: return "Serviço de telefonia indisponível."
         // Marca o início antes de discar: a chamada pode chegar ao serviço em poucos ms.

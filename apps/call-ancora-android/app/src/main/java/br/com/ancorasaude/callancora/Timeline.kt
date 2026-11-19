@@ -97,7 +97,7 @@ object Timeline {
                 val cause = e.causeCode?.let { CallBus.causeName(it) } ?: "sem causa"
                 val talk = e.activeMs?.let { " · ${Math.round(it / 1000.0)} s em ligação" } ?: ""
                 TimelineItem(
-                    title = Labels.disconnectTitle(e.causeCode, e.incoming),
+                    title = Labels.friendlyDisconnect(e.causeCode, e.causeReason, e.causeLabel, e.incoming),
                     subtitle = cause + talk,
                     dotColor = R.color.hangup_red,
                     sinceDial = since,

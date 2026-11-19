@@ -184,7 +184,12 @@ class InCallActivity : AppCompatActivity() {
 
         if (ended) {
             tvSumTalk.text = Labels.clock(snap.talkMs ?: 0L)
-            tvSumReason.text = Labels.disconnectReason(snap.disconnectCode, snap.isIncoming)
+            tvSumReason.text = Labels.friendlyDisconnect(
+                snap.disconnectCode,
+                snap.disconnectReason,
+                snap.disconnectLabel,
+                snap.isIncoming,
+            )
             tvSumAnswer.text = snap.timeToActiveMs?.let { Labels.seconds(it) } ?: "Não atendeu"
         }
         renderTimer()

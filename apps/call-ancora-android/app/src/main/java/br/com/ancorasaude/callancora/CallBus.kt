@@ -29,6 +29,8 @@ data class LogEntry(
     val state: Int? = null,
     val incoming: Boolean = false,
     val causeCode: Int? = null,
+    val causeReason: String? = null,
+    val causeLabel: String? = null,
     val activeMs: Long? = null,
     val scenario: String? = null,
 )
@@ -40,8 +42,11 @@ data class CallSnapshot(
     val isIncoming: Boolean,
     val connectTimeMillis: Long,
     val addedAtElapsed: Long,
+    /** Rótulo do próprio Android para o fim da ligação, quando houver. */
     val disconnectLabel: String?,
     val disconnectCode: Int? = null,
+    /** DisconnectCause.reason (técnico, ex.: "ServiceState.STATE_OUT_OF_SERVICE"). */
+    val disconnectReason: String? = null,
     /** ms entre o pedido de ligação (ou a chegada da recebida) e o primeiro ACTIVE. */
     val timeToActiveMs: Long? = null,
     /** ms em ACTIVE até o DISCONNECTED. */
@@ -137,6 +142,8 @@ object CallBus {
         val now = SystemClock.elapsedRealtime()
         val isCurrent = call == activeCall
         var causeCode: Int? = null
+        var causeReason: String? = null
+        var causeLabel: String? = null
         var activeMs: Long? = null
         val detail = when (state) {
             Call.STATE_ACTIVE -> {
@@ -146,6 +153,8 @@ object CallBus {
             }
             Call.STATE_DISCONNECTED -> {
                 causeCode = call.details.disconnectCause?.code
+                causeReason = call.details.disconnectCause?.reason
+                causeLabel = call.details.disconnectCause?.label?.toString()
                 val connect = call.details.connectTimeMillis
                 activeMs = if (connect > 0) System.currentTimeMillis() - connect else null
                 if (isCurrent) talkMs = activeAtElapsed?.let { now - it }
@@ -160,6 +169,8 @@ object CallBus {
             state = state,
             incoming = isIncoming(call),
             causeCode = causeCode,
+            causeReason = causeReason,
+            causeLabel = causeLabel,
             activeMs = activeMs,
         )
         if (isCurrent) publish(call, _current.value?.addedAtElapsed)
@@ -256,6 +267,8 @@ object CallBus {
         state: Int? = null,
         incoming: Boolean = false,
         causeCode: Int? = null,
+        causeReason: String? = null,
+        causeLabel: String? = null,
         activeMs: Long? = null,
         scenario: String? = null,
     ) {
@@ -270,6 +283,8 @@ object CallBus {
             state = state,
             incoming = incoming,
             causeCode = causeCode,
+            causeReason = causeReason,
+            causeLabel = causeLabel,
             activeMs = activeMs,
             scenario = scenario,
         )
@@ -285,9 +300,9 @@ object CallBus {
             isIncoming = isIncoming(call),
             connectTimeMillis = call.details.connectTimeMillis,
             addedAtElapsed = addedAt ?: SystemClock.elapsedRealtime(),
-            disconnectLabel = cause?.label?.toString()?.takeIf { it.isNotBlank() }
-                ?: cause?.let { causeName(it.code) },
+            disconnectLabel = cause?.label?.toString()?.takeIf { it.isNotBlank() },
             disconnectCode = cause?.code,
+            disconnectReason = cause?.reason,
             timeToActiveMs = timeToActiveMs,
             talkMs = talkMs,
         )
