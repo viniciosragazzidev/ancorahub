@@ -18,8 +18,10 @@ import type { TenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
 import { agentStepSchema, runSasaAgentLoop, type AgentResult } from "./ecosystem-agent";
-import { answerFromFacts, factsToLines, type SasaFacts } from "./ecosystem-answers";
-import { areasOf, wantsAnalysis, type SasaArea } from "./ecosystem-areas";
+import type { ChatBlock } from "@/components/chat/types";
+
+import { answerFromFacts, factsToLines, leadLookupBlocks, type SasaFacts } from "./ecosystem-answers";
+import { areasOf, isLeadLookup, wantsAnalysis, type SasaArea } from "./ecosystem-areas";
 import { nameHintOf } from "./intent-rules";
 import { resolveLead } from "./resolve-entities";
 
@@ -60,7 +62,7 @@ const LOADERS: Record<SasaArea, Loader> = {
   async lead({ context, question, data, leadHint }) {
     const match = resolveLead(question, data.queue.map((lead) => ({ id: lead.id, name: lead.name, status: lead.status })), leadHint);
     if (match.kind === "none") return { lead: { kind: "none", asked: leadHint ?? nameHintOf(question) } };
-    if (match.kind === "many") return { lead: { kind: "many", names: match.leads.map((lead) => lead.name) } };
+    if (match.kind === "many") return { lead: { kind: "many", names: match.leads.map((lead) => lead.name), leads: match.leads.map((lead) => ({ id: lead.id, name: lead.name })) } };
     const db = getDatabase();
     // Só um lead da fila do próprio corretor, conferido de novo no banco (tenant e corretor da sessão).
     const [lead] = await db.select({ status: schema.leads.status, tipo: schema.leads.tipo, createdAt: schema.leads.createdAt, qualificationDetails: schema.leads.qualificationDetails, corretorId: schema.leads.corretorId })
@@ -80,7 +82,8 @@ const LOADERS: Record<SasaArea, Loader> = {
     const outbound = last && (last.direction === "outgoing" || last.direction === "outbound");
     return {
       lead: {
-        kind: "one", name: match.lead.name, status: lead.status, tipo: lead.tipo ?? null, arrivedAt: lead.createdAt,
+        kind: "one", id: match.lead.id, name: match.lead.name, status: lead.status, tipo: lead.tipo ?? null, arrivedAt: lead.createdAt,
+        since: data.queue.find((item) => item.id === match.lead.id)?.arrivedAt ?? lead.createdAt,
         summary: ai.summary ? maskPersonalData(ai.summary) : null, nextStep: ai.nextBestAction ? maskPersonalData(nextStepText(ai.nextBestAction) ?? "") || null : null, objections: ai.objections ?? [],
         lastMessage: last?.body && last.at ? { from: outbound ? (last.senderRole === "assistant" ? "qualificação" : "corretor") : "cliente", text: maskPersonalData(last.body).slice(0, 200), at: last.at } : null,
         notes: notes.map((note) => ({ at: note.at, text: maskPersonalData(note.text).slice(0, 200) })),
@@ -210,16 +213,19 @@ async function loadFacts(context: TenantContext, areas: SasaArea[], question: st
   return Object.assign({}, ...parts) as SasaFacts;
 }
 
-/** Áreas da pergunta pelas palavras; um nome de lead conhecido puxa "lead" na frente. */
-export function sasaQuestionAreas(question: string, data: Workspace): SasaArea[] {
+/**
+ * Áreas da pergunta pelas palavras. Um lead nomeado (ou uma consulta "tem algum lead chamado X?") vira a área "lead"
+ * na frente e tira o resumo genérico da fila: quem pergunta por alguém quer esse alguém.
+ */
+export function sasaQuestionAreas(question: string, data: Pick<Workspace, "queue">): SasaArea[] {
   const areas = areasOf(question);
   const named = resolveLead(question, data.queue.map((lead) => ({ id: lead.id, name: lead.name, status: lead.status })));
-  if (named.kind !== "none" && !areas.includes("lead")) areas.unshift("lead");
+  if (named.kind !== "none" || isLeadLookup(question)) return (["lead"] as SasaArea[]).concat(areas.filter((area) => area !== "lead" && area !== "leads")).slice(0, 3);
   return areas.slice(0, 3);
 }
 
 
-export type SasaAnswer = { text: string; areas: SasaArea[]; via: "direct" | "agent"; truncated?: boolean; reason?: AgentResult["reason"] };
+export type SasaAnswer = { text: string; blocks?: ChatBlock[]; areas: SasaArea[]; via: "direct" | "agent"; truncated?: boolean; reason?: AgentResult["reason"] };
 
 /**
  * Responde uma pergunta do corretor. Primeiro direto, pelos fatos das áreas (sem IA). Sem resposta direta e com a
@@ -230,6 +236,12 @@ export async function answerSasaQuestion(context: TenantContext, question: strin
   const now = options.now ?? new Date();
   const data = await getCachedBrokerWorkspaceData();
   const areas = sasaQuestionAreas(question, data);
+  if (areas[0] === "lead" && !wantsAnalysis(question)) {
+    // Consulta de um lead: só ele, com "Abrir"; nada de resumo da carteira junto.
+    const facts = await loadFacts(context, ["lead"], question, data, now, null);
+    const blocks = leadLookupBlocks(facts, now, String(now.getTime()));
+    if (blocks) return { text: blocks.map((block) => (block.type === "assistant" ? block.text : "")).join(" ").trim(), blocks, areas: ["lead"], via: "direct" };
+  }
   if (areas.length && !wantsAnalysis(question)) {
     const facts = await loadFacts(context, areas.slice(0, 2), question, data, now, null);
     const answers = areas.slice(0, 2).map((area) => answerFromFacts(question, area, facts, now)).filter((text): text is string => Boolean(text));
