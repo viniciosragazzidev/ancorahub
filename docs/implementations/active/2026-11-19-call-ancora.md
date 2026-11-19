@@ -239,3 +239,7 @@ No topo de `/call-ancora`, o diretor (ou admin da plataforma/dev) vê "Configura
 - O pool exclui leads com pedido de parar ou número errado registrados na conversa da IA (`ai_conversations.opt_out_at` / `wrong_number_at`).
 - Limite que continua: a reserva vive na memória do processo (uma instância). Reinício limpa as reservas, mas também derruba as sessões, então o celular para de discar.
 
+### Painel do diretor (19/11/2026)
+
+Em `/call-ancora`, acima das configurações, o diretor (ou admin/dev) vê o "Painel do Call Âncora": totais do período (hoje, 7 ou 30 dias: ligações, atenderam, com interesse, sem interesse, não atendeu, caixa postal, número errado e tempo em ligação) e os corretores que ligaram, do mais recente para o mais antigo, com "Em sessão agora". Ao abrir um corretor, o histórico de ligações dele com o lead, telefone mascarado, horário, duração, resultado (automático ou correção) e se o lead foi para a carteira. Somente leitura sobre as notas `call_ancora` de `lead_interactions`; "atendeu" = teve tempo em ligação ou foi classificada com ou sem interesse. API: `GET /api/call-ancora/report?period=&brokerId=`, só diretor ou admin.
+

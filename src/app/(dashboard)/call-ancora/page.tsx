@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { AuthorizationError } from "@/shared/auth/errors";
 import { requireCallAncoraAccess } from "@/features/call-ancora/access";
+import { CallAncoraReportPanel } from "@/features/call-ancora/components/call-ancora-report";
 import { CallAncoraSettingsPanel } from "@/features/call-ancora/components/call-ancora-settings";
 import { CallAncoraWorkspace } from "@/features/call-ancora/components/call-ancora-workspace";
 
@@ -20,7 +21,7 @@ export default async function CallAncoraPage() {
     <CallAncoraWorkspace
       brokerFirstName={brokerName.trim().split(/\s+/)[0] || "Corretor"}
       canUseTestList={flagBypass}
-      settingsSlot={canConfigure ? <CallAncoraSettingsPanel /> : null}
+      settingsSlot={canConfigure ? <><CallAncoraReportPanel /><CallAncoraSettingsPanel /></> : null}
     />
   );
 }

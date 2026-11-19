@@ -483,6 +483,17 @@ export class CallAncoraSessionStore {
     return this.snapshot(session);
   }
 
+  /** Donos (corretores) com sessão aberta agora no tenant: pareada e não encerrada. */
+  activeOwnerIds(tenantId: string): string[] {
+    const ids: string[] = [];
+    for (const [key, session] of this.sessions) {
+      if (session.tenantId !== tenantId) continue;
+      if (!this.liveSession(key)) continue;
+      if (session.pairedAt !== null && session.runState !== "ended") ids.push(session.brokerId);
+    }
+    return ids;
+  }
+
   /** Escopo (tenant + dono) da sessão de um token de dispositivo. */
   scopeForDevice(deviceToken: string): Scope | null {
     const session = this.deviceSession(deviceToken);
