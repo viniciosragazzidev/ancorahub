@@ -11,6 +11,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.annotation.ColorRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -43,6 +44,13 @@ class InCallActivity : AppCompatActivity() {
     private lateinit var btnHangup: View
     private lateinit var incomingRow: View
     private lateinit var btnBack: View
+    private lateinit var autoPanel: View
+    private lateinit var tvAutoTitle: TextView
+    private lateinit var tvAutoDetail: TextView
+    private lateinit var autoButtons: View
+    private lateinit var btnAutoPause: TextView
+    private lateinit var btnAutoSkip: View
+    private lateinit var btnEndSession: View
 
     private var pulse: ValueAnimator? = null
     private var timerBig: Boolean? = null
@@ -74,6 +82,13 @@ class InCallActivity : AppCompatActivity() {
         btnHangup = findViewById(R.id.btnHangup)
         incomingRow = findViewById(R.id.incomingRow)
         btnBack = findViewById(R.id.btnBack)
+        autoPanel = findViewById(R.id.autoPanel)
+        tvAutoTitle = findViewById(R.id.tvAutoTitle)
+        tvAutoDetail = findViewById(R.id.tvAutoDetail)
+        autoButtons = findViewById(R.id.autoButtons)
+        btnAutoPause = findViewById(R.id.btnAutoPause)
+        btnAutoSkip = findViewById(R.id.btnAutoSkip)
+        btnEndSession = findViewById(R.id.btnEndSession)
 
         AppFonts.applyTree(findViewById(android.R.id.content))
 
@@ -83,10 +98,22 @@ class InCallActivity : AppCompatActivity() {
         btnMute.setOnClickListener { CallBus.toggleMute() }
         btnSpeaker.setOnClickListener { CallBus.toggleSpeaker() }
         btnBack.setOnClickListener { backToTest() }
+        btnAutoPause.setOnClickListener {
+            if (AutoDialer.state.value is AutoDialer.State.Paused) AutoDialer.resume() else AutoDialer.pauseByUser()
+        }
+        btnAutoSkip.setOnClickListener { AutoDialer.skip() }
+        btnEndSession.setOnClickListener {
+            Toast.makeText(this, "Segure para encerrar a sessão.", Toast.LENGTH_SHORT).show()
+        }
+        btnEndSession.setOnLongClickListener {
+            AutoDialer.endSession()
+            true
+        }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { CallBus.current.collect { render(it) } }
+                launch { AutoDialer.state.collect { renderAuto() } }
                 launch {
                     CallBus.audio.collect { audio ->
                         styleToggle(btnMute, audio.muted, if (audio.muted) R.drawable.ic_mic_off else R.drawable.ic_mic)
@@ -161,6 +188,45 @@ class InCallActivity : AppCompatActivity() {
             tvSumAnswer.text = snap.timeToActiveMs?.let { Labels.seconds(it) } ?: "Não atendeu"
         }
         renderTimer()
+        renderAuto()
+    }
+
+    /** Painel da discagem automática (só com a ligação encerrada) e o "encerrar sessão". */
+    private fun renderAuto() {
+        val snap = CallBus.current.value
+        val ended = snap == null || snap.state == Call.STATE_DISCONNECTED
+        val state = AutoDialer.state.value
+        btnEndSession.visibility = if (AutoDialer.isSessionActive) View.VISIBLE else View.GONE
+
+        if (!ended || state is AutoDialer.State.Idle || state is AutoDialer.State.Calling) {
+            autoPanel.visibility = View.GONE
+            return
+        }
+        autoPanel.visibility = View.VISIBLE
+        val remaining = AutoDialer.source.remaining()
+        val queueText = remaining?.let { if (it == 1) "mais 1 na fila" else "mais $it na fila" }
+        when (state) {
+            is AutoDialer.State.Countdown -> {
+                tvAutoTitle.text = "Próxima ligação em ${state.secondsLeft}…"
+                tvAutoDetail.text = listOfNotNull(Phone.display(state.next.number), queueText).joinToString(" · ")
+                autoButtons.visibility = View.VISIBLE
+                btnAutoPause.text = "Pausar"
+                btnAutoSkip.visibility = View.VISIBLE
+            }
+            is AutoDialer.State.Paused -> {
+                tvAutoTitle.text = "Fila pausada"
+                tvAutoDetail.text = state.reason
+                autoButtons.visibility = View.VISIBLE
+                btnAutoPause.text = "Continuar"
+                btnAutoSkip.visibility = if (state.next != null) View.VISIBLE else View.GONE
+            }
+            is AutoDialer.State.Finished -> {
+                tvAutoTitle.text = if (state.endedByUser) "Sessão encerrada" else "Fila concluída"
+                tvAutoDetail.text = MainActivity.statsText(state.stats)
+                autoButtons.visibility = View.GONE
+            }
+            else -> autoPanel.visibility = View.GONE
+        }
     }
 
     /** "00:03" apagado enquanto espera; grande quando a ligação está ativa. */

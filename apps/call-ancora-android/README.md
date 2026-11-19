@@ -59,6 +59,27 @@ Para voltar ao discador normal depois: *Configurações > Apps > Apps padrão > 
 
 Enquanto for o padrão, **todas** as ligações do aparelho (inclusive recebidas) passam pela tela simples do Call Âncora: atender, desligar, mudo e viva-voz.
 
+## 4.1 Preparar o celular (obrigatório)
+
+Ao abrir, o app confere tudo o que precisa e mostra o cartão **Preparar o celular**. Toque em cada item (ou em "Liberar o próximo") até todos ficarem com ✓:
+
+1. discador padrão do aparelho;
+2. fazer ligações;
+3. ler o estado do telefone;
+4. mostrar a notificação da ligação (Android 13 ou mais novo);
+5. abrir a chamada com o celular bloqueado (Android 14 ou mais novo, abre os ajustes);
+6. serviço de chamadas do app.
+
+Se uma permissão foi negada de vez, o botão vira "Abrir ajustes". **Ligar e a fila ficam travados até tudo estar liberado.**
+
+Durante a ligação aparece uma notificação fixa (com Desligar). Ligação recebida com a tela apagada abre a tela de chamada direto.
+
+## 4.2 Fila de teste e discagem automática
+
+Cole vários números no cartão **Fila de teste** (um por linha) e toque em "Adicionar à fila". Com **Discagem automática** ligada, "Iniciar fila" liga para o primeiro; quando a ligação cai, a tela mostra "Próxima ligação em 3…" com **Pausar** e **Pular**, e o próximo número é discado sozinho. No fim aparece "Fila concluída" com o total, as atendidas e o tempo em ligação. Para parar tudo, **segure** "Encerrar sessão".
+
+Proteções do chip: pelo menos 3 s entre ligações e no máximo 60 por hora (ao bater o limite, a fila pausa). A fila não disca se houver outra ligação em andamento ou chegando. Cada passo automático entra no registro (`AUTO_PROXIMA`, `PAUSADA`, `PULADA`, `RETOMADA`, `LIMITE_ATINGIDO`, `FILA_CONCLUIDA`, `SESSAO_ENCERRADA`), com o intervalo desde o fim da ligação anterior.
+
 ## 5. O que testar e mandar de volta
 
 Faça **5 ligações**, uma de cada tipo. Antes de cada uma, toque no cenário em "O que você espera que aconteça?" (Atendida, Não atende, Caixa postal, Ocupado, Desliga na hora):
@@ -87,6 +108,11 @@ O que queremos descobrir: em cada caso, **quando o `ACTIVE` aparece** (na hora d
 - `CallBus.kt`: barramento em memória entre o serviço e as telas, e o formato do registro.
 - `InCallActivity.kt`: tela de chamada mínima, aparece por cima da tela de bloqueio.
 - `Timeline.kt` e `Labels.kt`: transformam o registro técnico na linha do tempo em português da tela. O texto de Copiar/Enviar continua o registro técnico.
+- `Readiness.kt`: checklist do que o celular precisa liberar.
+- `AutoDialer.kt`: sessão de ligações, contagem, pausa, limites do chip.
+- `NumberSource.kt`: de onde vêm os números. Hoje `LocalQueueSource` (fila do celular); na etapa 2, `CrmQueueSource` pega o próximo número no CRM.
+- `CallPlacer.kt`: único ponto que disca; recusa sem o papel de discador padrão.
+- `CallNotifier.kt`: notificação fixa da ligação e tela cheia para ligação recebida.
 - `AppFonts.kt`: baixa Plus Jakarta Sans e JetBrains Mono pelo Google Play Services (sem arquivo de fonte no APK). Sem Play Services, fica a fonte do sistema.
 
 ## Visual

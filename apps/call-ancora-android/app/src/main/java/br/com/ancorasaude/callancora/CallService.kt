@@ -19,6 +19,7 @@ class CallService : InCallService() {
     }
 
     override fun onDestroy() {
+        CallNotifier.hide(this)
         if (CallBus.service === this) CallBus.service = null
         super.onDestroy()
     }
@@ -28,6 +29,7 @@ class CallService : InCallService() {
         val callback = object : Call.Callback() {
             override fun onStateChanged(call: Call, state: Int) {
                 CallBus.onStateChanged(call, state)
+                refreshNotification()
             }
 
             override fun onDetailsChanged(call: Call, details: Call.Details) {
@@ -37,6 +39,7 @@ class CallService : InCallService() {
         call.registerCallback(callback)
         callbacks[call] = callback
         CallBus.onCallAdded(call)
+        refreshNotification()
 
         // InCallService pode abrir a tela mesmo com o app em segundo plano.
         startActivity(
@@ -49,6 +52,17 @@ class CallService : InCallService() {
         callbacks.remove(call)?.let { call.unregisterCallback(it) }
         CallBus.onCallRemoved(call)
         super.onCallRemoved(call)
+        refreshNotification()
+    }
+
+    /** Notificação fixa enquanto houver ligação viva; some quando todas acabam. */
+    private fun refreshNotification() {
+        val snap = CallBus.current.value
+        if (CallBus.hasLiveCall() && snap != null && snap.state != Call.STATE_DISCONNECTED) {
+            CallNotifier.show(this, snap)
+        } else {
+            CallNotifier.hide(this)
+        }
     }
 
     @Deprecated("Mantido para Android 10 a 13; ainda é chamado nas versões novas.")
