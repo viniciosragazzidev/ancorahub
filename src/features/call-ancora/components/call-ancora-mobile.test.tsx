@@ -29,6 +29,11 @@ const session: CallAncoraSnapshot = {
   lastCall: null,
   lastOutcome: null,
   hangupRequested: false,
+  hangupRequest: null,
+  runState: "running",
+  pausedBy: null,
+  version: 1,
+  phone: null,
   countdown: null,
   updatedAt: "2026-11-19T12:00:00.000Z",
 };

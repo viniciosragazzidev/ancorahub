@@ -20,8 +20,9 @@ import org.json.JSONObject
  * valem as proteções locais (sinal, celular pronto, sem ligação por cima, 3 s, 60/h).
  */
 object CrmSession {
-    private const val POLL_ACTIVE_MS = 2_000L
-    private const val POLL_IDLE_MS = 10_000L
+    /** 1 s com ligação ou contagem em andamento; 2 s parado. */
+    private const val POLL_ACTIVE_MS = 1_000L
+    private const val POLL_IDLE_MS = 2_000L
     private const val START_TIMEOUT_MS = 15_000L
     private const val HOUR_MS = 3_600_000L
 
@@ -52,8 +53,10 @@ object CrmSession {
     private var manualContactId: String? = null
     private var awaitingContactId: String? = null
     private var callStarted = false
-    /** O pedido "Caixa postal" da web já foi atendido nesta ligação. */
+    /** O pedido de desligar da web já foi atendido nesta ligação. */
     private var hangupRequestHandled = false
+    /** Versão do estado conferida logo antes de discar (vai no evento "dialing"). */
+    private var dialVersion: Long? = null
     private var dialAt: Long? = null
     private var activeAt: Long? = null
     private var lastDialAt: Long? = null
@@ -115,13 +118,23 @@ object CrmSession {
 
     fun skip() = control("skip")
 
-    /** Encerrar sessão no celular: desliga a ligação atual, para de discar e pausa no servidor. */
+    /**
+     * Encerrar sessão no celular: desliga a ligação atual e encerra a sessão no servidor
+     * (a web também encerra). O token cai e o app volta para "Conectar".
+     */
     fun endSession() {
         manualContactId = null
-        _ui.value = _ui.value.copy(started = false, message = "Sessão encerrada neste celular.")
         if (awaitingContactId != null && CallBus.hasLiveCall()) CallBus.hangup()
-        CallBus.logEvent("CRM_SESSAO_ENCERRADA", "-", null)
-        if (_ui.value.state?.paused != true) control("pause")
+        CallBus.logEvent("CRM_SESSAO_ENCERRADA", "-", "pelo celular")
+        val client = api
+        scope.launch {
+            try {
+                client?.control("end")
+            } catch (e: CrmException) {
+                // Sessão já encerrada ou sem rede: encerra aqui de qualquer jeito.
+            }
+            sessionEnded("Sessão encerrada.")
+        }
     }
 
     // ---------- Ganchos do CallBus ----------
@@ -131,7 +144,10 @@ object CrmSession {
         callStarted = true
         watchdog?.cancel()
         _ui.value = _ui.value.copy(calling = true)
-        report(JSONObject().put("contactId", contactId).put("event", "dialing").put("at", System.currentTimeMillis()))
+        report(
+            JSONObject().put("contactId", contactId).put("event", "dialing").put("at", System.currentTimeMillis())
+                .put("version", dialVersion ?: JSONObject.NULL),
+        )
     }
 
     internal fun onOutgoingActive() {
@@ -173,7 +189,9 @@ object CrmSession {
         pollJob = scope.launch {
             while (true) {
                 tick()
-                val fast = foreground || _ui.value.started || awaitingContactId != null
+                val state = _ui.value.state
+                val fast = awaitingContactId != null || state?.countdownSeconds != null ||
+                    state?.callStatus == "dialing" || state?.callStatus == "active"
                 delay(if (fast) POLL_ACTIVE_MS else POLL_IDLE_MS)
             }
         }
@@ -193,10 +211,16 @@ object CrmSession {
         }
         val state = src.latest
         _ui.value = _ui.value.copy(state = state, message = if (_ui.value.message?.startsWith("Sem conexão") == true) null else _ui.value.message)
-        // Botão "Caixa postal (desligar)" da web: desliga a ligação atual.
-        if (state?.hangupRequest == "voicemail" && awaitingContactId != null && !hangupRequestHandled && CallBus.hasLiveCall()) {
+        // Botões da web: "Caixa postal (desligar)" ou "Desligar ligação".
+        val request = state?.hangupRequest
+        if (request != null && awaitingContactId != null && !hangupRequestHandled && CallBus.hasLiveCall()) {
             hangupRequestHandled = true
-            AutoHangup.manualVoicemail("manual_web")
+            if (request == "voicemail") {
+                AutoHangup.manualVoicemail("manual_web")
+            } else {
+                CallBus.logEvent("CRM_DESLIGAR_PELA_TELA", "-", null)
+                CallBus.hangup()
+            }
         }
         if (state == null || item == null) {
             explainIdle(state)
@@ -219,7 +243,7 @@ object CrmSession {
         if (text != null) _ui.value = _ui.value.copy(message = text)
     }
 
-    private fun maybeDial(state: CrmState, item: QueueNumber) {
+    private suspend fun maybeDial(state: CrmState, item: QueueNumber) {
         val context = appContext ?: return
         if (awaitingContactId != null || !_ui.value.started) return
         val contactId = item.externalId ?: return
@@ -238,6 +262,32 @@ object CrmSession {
             _ui.value = _ui.value.copy(message = block)
             return
         }
+
+        // Conferência na hora: estado novo do servidor (não o da última leitura).
+        val fresh = try {
+            api?.state() ?: return
+        } catch (e: CrmException) {
+            if (e.sessionEnded) {
+                sessionEnded(e.message)
+            } else {
+                _ui.value = _ui.value.copy(message = e.message)
+            }
+            return
+        }
+        _ui.value = _ui.value.copy(state = fresh)
+        val abort = when {
+            fresh.runState == "ended" -> "Sessão encerrada."
+            fresh.runState != "running" -> if (fresh.pausedBy == "phone") "Sessão pausada no celular." else "Pausado pela tela."
+            fresh.version != state.version -> "A sessão mudou na tela. Conferindo de novo…"
+            fresh.current?.id != contactId || fresh.current.dialable != true || fresh.callStatus != "ready" -> "A fila mudou na tela."
+            else -> null
+        }
+        if (abort != null) {
+            CallBus.logEvent("CRM_DISCAGEM_CANCELADA", item.number, "$abort | versão=${state.version}->${fresh.version}")
+            _ui.value = _ui.value.copy(message = abort)
+            return
+        }
+        dialVersion = fresh.version
 
         val error = CallPlacer.place(context, item.number, "CRM")
         if (error != null) {
@@ -310,6 +360,11 @@ object CrmSession {
                         }
                         if (e.status != 0) {
                             CallBus.logEvent("CRM_EVENTO_RECUSADO", "-", "${body.optString("event")} | ${e.status} | ${e.message}")
+                            // Discagem recusada (pausada, versão diferente): desliga já.
+                            if (e.status == 409 && body.optString("event") == "dialing") {
+                                if (CallBus.hasLiveCall()) CallBus.hangup()
+                                _ui.value = _ui.value.copy(message = e.message)
+                            }
                             return@withLock
                         }
                         if (attempt == 0) delay(1_000)
@@ -320,6 +375,8 @@ object CrmSession {
     }
 
     private fun sessionEnded(message: String?) {
+        // Encerrada na web: não deixa ligação da sessão aberta.
+        if (awaitingContactId != null && CallBus.hasLiveCall()) CallBus.hangup()
         val context = appContext
         pollJob?.cancel()
         watchdog?.cancel()

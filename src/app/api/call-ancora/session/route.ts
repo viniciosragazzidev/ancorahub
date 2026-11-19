@@ -12,6 +12,10 @@ const patchSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("classify"), outcome: z.enum(["interested", "not_interested", "no_answer", "voicemail"]) }),
   z.object({ action: z.literal("reclassify"), outcome: z.enum(["interested", "not_interested", "no_answer", "voicemail"]) }),
   z.object({ action: z.literal("hangup-voicemail") }),
+  z.object({ action: z.literal("hangup-call") }),
+  z.object({ action: z.literal("run-pause") }),
+  z.object({ action: z.literal("run-resume") }),
+  z.object({ action: z.literal("end") }),
   z.object({ action: z.literal("pause") }),
   z.object({ action: z.literal("resume") }),
   z.object({ action: z.literal("auto-dial"), enabled: z.boolean() }),
@@ -71,7 +75,15 @@ export async function PATCH(request: Request) {
       : parsed.data.action === "reclassify"
         ? callAncoraSessionStore.reclassify(scope, parsed.data.outcome)
       : parsed.data.action === "hangup-voicemail"
-        ? callAncoraSessionStore.requestVoicemailHangup(scope)
+        ? callAncoraSessionStore.requestHangup(scope, "voicemail")
+      : parsed.data.action === "hangup-call"
+        ? callAncoraSessionStore.requestHangup(scope, "hangup")
+      : parsed.data.action === "run-pause"
+        ? callAncoraSessionStore.pauseRunForBroker(scope)
+      : parsed.data.action === "run-resume"
+        ? callAncoraSessionStore.resumeRunForBroker(scope)
+      : parsed.data.action === "end"
+        ? callAncoraSessionStore.endRunForBroker(scope)
       : parsed.data.action === "auto-dial"
         ? callAncoraSessionStore.setAutoDialEnabled(scope, parsed.data.enabled)
       : parsed.data.action === "pause"

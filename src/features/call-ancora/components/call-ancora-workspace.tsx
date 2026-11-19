@@ -46,6 +46,11 @@ function labSnapshot(firstName: string): CallAncoraSnapshot {
     lastCall: null,
     lastOutcome: null,
     hangupRequested: false,
+    hangupRequest: null,
+    runState: "running",
+    pausedBy: null,
+    version: 1,
+    phone: null,
     countdown: null,
     updatedAt: new Date().toISOString(),
   };
@@ -369,7 +374,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={reduceMotion ? reducedFade : motionTokens.spring.snappy}
             >
-              <Radio className="size-4" aria-hidden="true" /> Celular conectado
+              <Radio className="size-4" aria-hidden="true" /> {session.phone && !session.phone.reachable ? `Celular sem sinal com o AncoraHub há ${session.phone.staleSeconds} s` : "Celular conectado"}
             </motion.span>
           ) : null}
         </header>
@@ -435,7 +440,14 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
               </div>
             </EnterInOrder>
 
-            {session.devicePaused ? <p className="mb-5 rounded-xl border border-(--warning)/25 bg-(--warning)/5 px-4 py-3 text-sm text-(--foreground)" role="status">O celular pausou a sessão. Nenhuma ligação começa até retomar no celular.</p> : null}
+            {!isLab && session.status !== "ended" ? (
+              <div className="mb-5 flex flex-wrap items-center gap-3">
+                <Button size="sm" variant="secondary" className="min-h-10 rounded-full" disabled={busy} onClick={() => void sendAction({ action: session.runState === "paused" ? "run-resume" : "run-pause" }, "Não consegui atualizar a sessão.")}>{session.runState === "paused" ? <Play className="size-4" aria-hidden="true" /> : <Pause className="size-4" aria-hidden="true" />}{session.runState === "paused" ? "Retomar sessão" : "Pausar sessão"}</Button>
+                <Button size="sm" variant="secondary" className="min-h-10 rounded-full" disabled={busy} onClick={() => { if (window.confirm("Encerrar a sessão? O celular é desconectado.")) void sendAction({ action: "end" }, "Não consegui encerrar a sessão."); }}>Encerrar sessão</Button>
+                {session.phone && !session.phone.reachable ? <span className="text-xs text-(--danger)">Sem notícia do celular há {session.phone.staleSeconds} s: a fila espera ele voltar.</span> : null}
+              </div>
+            ) : null}
+            {session.runState === "paused" ? <p className="mb-5 rounded-xl border border-(--warning)/25 bg-(--warning)/5 px-4 py-3 text-sm text-(--foreground)" role="status">{session.pausedBy === "phone" ? "O celular pausou a sessão." : "Sessão pausada pela tela."} A ligação em andamento continua; nenhuma nova começa até retomar.</p> : null}
 
             {canUseTestList && !isLab ? (
               <EnterInOrder index={1} className="mb-6">
@@ -497,7 +509,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
               <section className="order-1 grid gap-5 lg:order-2">
                 <EnterInOrder index={1}>
                   <article className="relative overflow-hidden rounded-2xl border border-(--border) bg-(--surface) p-6 shadow-(--shadow-resting) md:p-8">
-                    {session.current ? <>
+                    {session.current && session.status !== "ended" ? <>
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <span className="inline-flex min-h-9 items-center gap-2 rounded-full bg-(--surface-muted) px-3 text-xs font-medium text-(--text-secondary)">
                           <span className={`size-2 rounded-full transition-colors duration-300 ${session.callStatus === "active" ? "bg-(--success)" : calling ? "bg-(--primary)" : "bg-(--text-muted)"}`} aria-hidden="true" />
@@ -516,7 +528,8 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
                       <SlideSwap swapKey={`${session.current.id}-${session.callStatus}-${session.countdown ? "countdown" : "idle"}`} axis="y" className="mx-auto flex max-w-lg flex-col items-center pb-2 text-center">
                         {session.callStatus === "active" ? <p className="mt-6 flex items-center gap-2 font-mono text-2xl tabular-nums text-(--foreground)" aria-live="off"><Clock3 className="size-5 text-(--success)" aria-hidden="true" /> {clock(Math.floor(Math.max(0, now - Date.parse(session.callStartedAt ?? new Date().toISOString())) / 1000))}</p> : null}
                         {calling ? <p className="mt-6 text-sm text-(--text-secondary)">{session.callStatus === "dialing" ? "Discando pelo celular pareado…" : "Chamando. Aguardando atender…"}</p> : null}
-                        {realCallInProgress && !isLab ? <Button size="sm" variant="secondary" className="mt-4 min-h-10 rounded-full" disabled={busy || session.hangupRequested} onClick={() => void sendAction({ action: "hangup-voicemail" }, "Não consegui pedir para desligar.")}>{session.hangupRequested ? "Pedindo para o celular desligar…" : "Caixa postal (desligar)"}</Button> : null}
+                        {realCallInProgress && !isLab ? <Button size="sm" variant="secondary" className="mt-4 min-h-10 rounded-full" disabled={busy || session.hangupRequested} onClick={() => void sendAction({ action: "hangup-voicemail" }, "Não consegui pedir para desligar.")}>{session.hangupRequest === "voicemail" ? "Pedindo para o celular desligar…" : "Caixa postal (desligar)"}</Button> : null}
+                        {realCallInProgress && !isLab ? <Button size="sm" variant="secondary" className="mt-2 min-h-10 rounded-full" disabled={busy || session.hangupRequested} onClick={() => void sendAction({ action: "hangup-call" }, "Não consegui pedir para desligar.")}>{session.hangupRequest === "hangup" ? "Pedindo para o celular desligar…" : "Desligar ligação"}</Button> : null}
                         {session.callStatus === "ready" ? <p className="mt-5 max-w-sm text-sm leading-6 text-(--text-secondary)">{session.autoDialEnabled ? "Discagem automática ligada. A próxima simulação começa após a contagem; para uma chamada real, o navegador exige um toque em Ligar no celular." : "Discagem automática desligada. O próximo contato está pronto. Toque em Ligar para o próximo no celular."}</p> : null}
                         {lastCallText && (session.callStatus === "ended" || session.countdown) ? <p className="mt-5 text-sm font-medium text-(--foreground)" role="status">{lastCallText}</p> : null}
                         {session.callStatus === "ended" && !session.countdown ? <p className="mt-5 text-sm text-(--text-secondary)">Como foi esta conversa?</p> : null}
@@ -527,7 +540,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
                     </> : (
                       <div className="flex flex-col items-center py-16 text-center">
                         <Beat><span className="grid size-16 place-items-center rounded-full bg-(--success)/10 text-(--success)"><Check className="size-8" aria-hidden="true" /></span></Beat>
-                        <Beat at="text"><h2 className="mt-4 text-2xl font-semibold text-(--foreground)">Demonstração concluída</h2></Beat>
+                        <Beat at="text"><h2 className="mt-4 text-2xl font-semibold text-(--foreground)">{session.runState === "ended" ? "Sessão encerrada" : "Demonstração concluída"}</h2></Beat>
                         <Beat at="number"><p className="mt-2 text-sm text-(--text-secondary)">Os contatos continuam fictícios e não foram salvos.</p></Beat>
                         <Beat at="after"><Button className="mt-6 min-h-11 rounded-full" variant="secondary" onClick={() => void start()}>Recomeçar</Button></Beat>
                       </div>
