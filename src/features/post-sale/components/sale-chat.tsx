@@ -465,7 +465,7 @@ function ReviewCard({ data }: { data: SaleReviewData }) {
       animate={{ opacity: 1, y: 0, scale: 1 }} transition={motionTokens.spring.smooth}>
       <div className={styles.reviewHead}>
         <p className={styles.reviewTitle}>Confira a venda</p>
-        <p className={styles.reviewSub}>{data.fromContract ? "Li do contrato. Corrija o que não bater." : "Se algo não bater, toque em Corrigir algo."}</p>
+        <p className={styles.reviewSub}>{data.fromContract ? "Tudo veio do contrato, menos o que está marcado. Corrija o que não bater." : "Se algo não bater, toque em Corrigir algo."}</p>
       </div>
       {data.sections.map((section) => (
         <div key={section.title} className={styles.section}>
@@ -477,7 +477,7 @@ function ReviewCard({ data }: { data: SaleReviewData }) {
                 initial={motionOn ? { opacity: 0, y: motionTokens.distance.xs } : false} animate={{ opacity: 1, y: 0 }}
                 transition={{ ...enter, delay: 0.08 + delay }}>
                 <span className={styles.rowLabel}>{row.label}</span>
-                <span className={styles.rowValue}>{row.value}{row.sourced ? <span className={styles.tag}>Do contrato</span> : null}</span>
+                <span className={styles.rowValue}>{row.value}{data.fromContract && !row.sourced && row.value !== "A informar" ? <span className={styles.tag}>Você informou</span> : null}</span>
               </motion.div>
             );
           })}
