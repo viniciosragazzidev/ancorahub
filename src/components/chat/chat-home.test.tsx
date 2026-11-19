@@ -116,6 +116,17 @@ describe("ChatHome", () => {
     expect(screen.getByText("De plantão: PME")).toBeTruthy();
   });
 
+  it("Início limpo (19/11/2026): Primeiros passos não aparece, mesmo com missões pendentes", () => {
+    navigation.pathname = "/dashboard";
+    const steps = [
+      { key: "photo" as const, title: "Coloque sua foto", detail: "Os clientes reconhecem você.", href: "/settings?tab=conta", done: false },
+      { key: "whatsapp" as const, title: "Conecte seu WhatsApp", detail: "Para mandar a primeira mensagem.", href: "/settings?tab=whatsapp", done: false },
+    ];
+    const { container } = render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={leads} nowIso="2026-10-10T12:00:00.000Z" canQuote firstSteps={steps} />);
+    expect(screen.queryByRole("heading", { name: "Primeiros passos" })).toBeNull();
+    expect(container.querySelector('[aria-labelledby="first-steps-title"]')).toBeNull();
+    expect(screen.queryByText("Coloque sua foto")).toBeNull();
+  });
   it("page: não inclui a faixa de status vivos, que fica na Distribuição", () => {
     navigation.pathname = "/dashboard";
     const { container } = render(
