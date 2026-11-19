@@ -9,6 +9,7 @@ import {
   deviceStateBody,
 } from "@/features/call-ancora/device-api";
 import { persistClassification, syncColdQueue } from "@/features/call-ancora/cold-session";
+import { ensureDeviceLoaded } from "@/features/call-ancora/session-persistence";
 import { callAncoraSessionStore } from "@/features/call-ancora/session-store";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,8 @@ const eventSchema = z.object({
 export async function POST(request: Request) {
   const token = bearerToken(request);
   if (!token) return deviceJson({ error: DEVICE_UNAUTHORIZED }, 401);
+  // Depois de um deploy/reinício, traz a sessão guardada de volta antes de responder.
+  await ensureDeviceLoaded(token);
   if (!(await deviceAllowed(token))) return deviceJson({ error: DEVICE_DISABLED }, 403);
   const parsed = eventSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return deviceJson({ error: "O evento da ligação não é válido." }, 400);

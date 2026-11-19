@@ -55,6 +55,8 @@ object CrmSession {
     private var callStarted = false
     /** O pedido de desligar da web já foi atendido nesta ligação. */
     private var hangupRequestHandled = false
+    /** 401/403 seguidos: só desconecta depois de alguns (um deploy pode responder errado por instantes). */
+    private var unauthorizedStreak = 0
     /** Versão do estado conferida logo antes de discar (vai no evento "dialing"). */
     private var dialVersion: Long? = null
     private var dialAt: Long? = null
@@ -203,12 +205,19 @@ object CrmSession {
             src.next()
         } catch (e: CrmException) {
             if (e.sessionEnded) {
-                sessionEnded(e.message)
+                unauthorizedStreak += 1
+                if (unauthorizedStreak >= 3) {
+                    sessionEnded(e.message)
+                } else {
+                    _ui.value = _ui.value.copy(message = "Reconectando ao AncoraHub…")
+                }
                 return
             }
-            _ui.value = _ui.value.copy(message = e.message)
+            // Servidor reiniciando (deploy) ou sem internet: mantém a sessão e tenta de novo.
+            _ui.value = _ui.value.copy(message = if (e.status >= 500) "Reconectando ao AncoraHub…" else e.message)
             return
         }
+        unauthorizedStreak = 0
         val state = src.latest
         _ui.value = _ui.value.copy(state = state, message = if (_ui.value.message?.startsWith("Sem conexão") == true) null else _ui.value.message)
         // Botões da web: "Caixa postal (desligar)" ou "Desligar ligação".

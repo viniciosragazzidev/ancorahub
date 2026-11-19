@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AuthenticationError, AuthorizationError } from "@/shared/auth/errors";
 import { requireCallAncoraAccess } from "@/features/call-ancora/access";
 import { persistClassification, syncColdQueue } from "@/features/call-ancora/cold-session";
+import { ensureSessionLoaded } from "@/features/call-ancora/session-persistence";
 import { readCallAncoraSettings } from "@/features/call-ancora/settings";
 import { CALL_ANCORA_PAIR_TTL_MS, callAncoraSessionStore, toBrokerView } from "@/features/call-ancora/session-store";
 import { CALL_ANCORA_TEST_LIST_MAX, parseCallAncoraTestList } from "@/features/call-ancora/test-list";
@@ -37,6 +38,8 @@ export async function GET() {
   try {
     const { context, sessionOwnerId } = await requireCallAncoraAccess();
     const scope = { tenantId: context.tenantId, brokerId: sessionOwnerId };
+    // Depois de um deploy/reinício, traz a sessão guardada de volta.
+    await ensureSessionLoaded(scope);
     await syncColdQueue(scope);
     const snapshot = callAncoraSessionStore.getForBroker(scope);
     return Response.json({ session: toBrokerView(snapshot) }, { headers: noStore });
@@ -68,6 +71,7 @@ export async function PATCH(request: Request) {
     const parsed = patchSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return Response.json({ error: "Essa ação não é válida para a sessão." }, { status: 400, headers: noStore });
     const scope = { tenantId: context.tenantId, brokerId: sessionOwnerId };
+    await ensureSessionLoaded(scope);
     if (parsed.data.action === "test-list") {
       // Ligação real: só admin da plataforma ou desenvolvimento local.
       if (!flagBypass) return Response.json({ error: "A lista de teste é só para administradores da plataforma." }, { status: 403, headers: noStore });

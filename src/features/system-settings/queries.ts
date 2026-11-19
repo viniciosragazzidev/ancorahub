@@ -28,7 +28,8 @@ async function loadAllSettings() {
     .select({ key: schema.systemSettings.key, value: schema.systemSettings.value })
     .from(schema.systemSettings)
     // Job leases, heartbeats and per-occurrence manual queues are runtime state, not settings.
-    .where(sql`${schema.systemSettings.key} not like 'lease:%' and ${schema.systemSettings.key} not like 'heartbeat:%' and ${schema.systemSettings.key} not like 'manual-queue:%'`));
+    // Call Âncora: estado das sessões de ligação (sobrevive a deploy), também não é configuração.
+    .where(sql`${schema.systemSettings.key} not like 'lease:%' and ${schema.systemSettings.key} not like 'heartbeat:%' and ${schema.systemSettings.key} not like 'manual-queue:%' and ${schema.systemSettings.key} not like 'call-ancora-runtime:%'`));
 }
 
 export function invalidateSystemSettingsCache() {

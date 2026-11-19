@@ -116,6 +116,8 @@ export type CallAncoraDeviceState = {
 };
 
 type Scope = { tenantId: string; brokerId: string };
+/** Estado completo de uma sessão (serializável, para sobreviver a reinício/deploy). */
+export type CallAncoraPersistedSession = Session;
 type Session = Scope & {
   id: string;
   brokerFirstName: string;
@@ -204,6 +206,12 @@ export class CallAncoraSessionStore {
   private readonly pairingTickets = new Map<string, PairingTicket>();
   private readonly deviceSessions = new Map<string, string>();
 
+  /**
+   * Chamado a cada mudança de uma sessão (ou com `null` quando ela some), para guardar o
+   * estado fora da memória. A sessão volta com [restoreSession] depois de reinício/deploy.
+   */
+  onPersist: ((sessionKey: string, session: CallAncoraPersistedSession | null) => void) | null = null;
+
   constructor(
     private readonly now: () => number = () => Date.now(),
     /** Fila inicial de cada sessão: a base de frios (vazia até ser ligada). */
@@ -247,6 +255,7 @@ export class CallAncoraSessionStore {
       countdownRemainingMs: null,
     };
     this.sessions.set(key, session);
+    this.onPersist?.(key, session);
 
     const pairingToken = randomBytes(32).toString("base64url");
     this.pairingTickets.set(hashToken(pairingToken), {
@@ -671,6 +680,35 @@ export class CallAncoraSessionStore {
   private bump(session: Session) {
     session.version += 1;
     session.lastActivityAt = this.now();
+    this.onPersist?.(scopeKey(session), session);
+  }
+
+  /** Há sessão em memória para este dono? */
+  hasSession(scope: Scope): boolean {
+    return this.sessions.has(scopeKey(scope));
+  }
+
+  /** Há sessão em memória para este token de dispositivo? */
+  hasDevice(deviceToken: string): boolean {
+    return Boolean(deviceToken) && this.deviceSessions.has(hashToken(deviceToken));
+  }
+
+  /** Chave da sessão (tenant + dono) e hash do token, usados para guardar o estado. */
+  static sessionKeyFor(scope: Scope) {
+    return scopeKey(scope);
+  }
+
+  static deviceHashFor(deviceToken: string) {
+    return hashToken(deviceToken);
+  }
+
+  /** Recoloca na memória uma sessão guardada (depois de reinício/deploy). */
+  restoreSession(saved: CallAncoraPersistedSession) {
+    const key = scopeKey(saved);
+    if (this.sessions.has(key)) return;
+    if (this.now() - saved.lastActivityAt >= CALL_ANCORA_SESSION_TTL_MS) return;
+    this.sessions.set(key, { ...saved, queue: saved.queue.map((contact) => ({ ...contact })) });
+    if (saved.deviceTokenHash) this.deviceSessions.set(saved.deviceTokenHash, key);
   }
 
   private appStale(session: Session) {
@@ -798,6 +836,7 @@ export class CallAncoraSessionStore {
 
   private removeSession(key: string) {
     const existing = this.sessions.get(key);
+    if (existing) this.onPersist?.(key, null);
     if (existing?.deviceTokenHash) this.deviceSessions.delete(existing.deviceTokenHash);
     this.sessions.delete(key);
     for (const [tokenHash, ticket] of this.pairingTickets) {

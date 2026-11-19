@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
+// Liga a gravação da sessão fora da memória (sobrevive a deploy).
+import "@/features/call-ancora/session-persistence";
 import { callAncoraSessionStore } from "@/features/call-ancora/session-store";
 
 export const dynamic = "force-dynamic";
