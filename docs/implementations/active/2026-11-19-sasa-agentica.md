@@ -331,9 +331,22 @@ Critério de pronto de cada fase: testes puros verdes, fluxo no laboratório cob
 
 ---
 
-## 7. Decisões que ficam com o usuário
+## 7. Decisões (aprovadas em 19/11)
 
-Opção recomendada marcada; o plano segue com ela se não houver resposta.
+O usuário aprovou as 10 opções recomendadas ("pode seguir com as decisões recomendadas do plano da Sasá"). Valem como decididas:
+
+1. D1: interpretação por JSON + zod no `runGateway`.
+2. D2: ações reversíveis executam direto, com Desfazer.
+3. D3: mensagem ao cliente, sempre o corretor envia.
+4. D4: áudio do corretor descartado depois de transcrito.
+5. D5: transcrição guardada por 90 dias.
+6. D6: nova versão do termo de IA citando voz.
+7. D7: botão no canto inferior direito, secundário, sem base sólida.
+8. D8: piloto por corretor antes da empresa inteira.
+9. D9: teto de 150 comandos e 20 min de áudio por dia.
+10. D10: supervisor Lite numa fase separada.
+
+Tabela original, para referência:
 
 | # | Decisão | Opções | Recomendado |
 |---|---|---|---|
