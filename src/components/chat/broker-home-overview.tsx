@@ -127,7 +127,9 @@ export function BrokerHomeOverview({
         : null);
   const expiresAt = focus && "expiresAt" in focus ? focus.expiresAt : undefined;
   const expired = Boolean(expiresAt && Date.parse(expiresAt) <= clock);
-  const paused = shell?.availability === "paused";
+  // "offline" (botão antigo de ficar offline) também não recebe: aparece igual à pausa, com rótulo próprio.
+  const offline = shell?.availability === "offline";
+  const paused = shell?.availability === "paused" || offline;
   // "Ficar disponível" daqui: a confirmação e o erro aparecem no próprio aviso (nível 1, sem toast).
   const [resumeAsked, setResumeAsked] = useState(false);
   const resumeFailed = resumeAsked && paused && !shell?.isPending && Boolean(shell?.error);
@@ -159,7 +161,7 @@ export function BrokerHomeOverview({
             </div>
             <div className={layout.headerActions}>
               <Badge variant={paused ? "warning" : "success"}>
-                {paused ? "Recebimento pausado" : "Disponível"}
+                {offline ? "Fora do ar" : paused ? "Recebimento pausado" : "Disponível"}
               </Badge>
               <Button variant="ghost" className={`${page.iconButton} ${layout.mobileAction}`} aria-label="Buscar minhas conversas" onClick={onSearch}><Search size={18} aria-hidden="true" /></Button>
               <Button variant="ghost" className={`${page.iconButton} ${layout.mobileAction}`} aria-label="Nova ação" onClick={onNew}><Plus size={18} aria-hidden="true" /></Button>
@@ -172,7 +174,7 @@ export function BrokerHomeOverview({
 
           {paused ? (
             <div className={layout.availability} role="status">
-              <span>Você continua atendendo sua carteira. Novas ofertas ficam pausadas.</span>
+              <span>{offline ? "Você está fora do ar: novas ofertas e avisos não chegam até você." : "Você continua atendendo sua carteira. Novas ofertas ficam pausadas."}</span>
               <Button
                 variant="secondary"
                 loading={shell?.isPending}
