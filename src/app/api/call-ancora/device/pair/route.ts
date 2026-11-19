@@ -9,6 +9,8 @@ import {
   deviceStateBody,
   pairingAllowed,
 } from "@/features/call-ancora/device-api";
+// Liga a gravação da sessão fora da memória (sobrevive a deploy).
+import "@/features/call-ancora/session-persistence";
 import { callAncoraSessionStore } from "@/features/call-ancora/session-store";
 
 export const dynamic = "force-dynamic";

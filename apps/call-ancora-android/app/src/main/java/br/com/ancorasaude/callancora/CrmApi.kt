@@ -140,20 +140,31 @@ class CrmApi(private val origin: String, private val token: String?) {
 
     suspend fun pair(ticket: String): PairResult {
         val json = request("POST", "/api/call-ancora/device/pair", JSONObject().put("token", ticket), auth = false)
-        return PairResult(
-            deviceToken = json.getString("deviceToken"),
-            brokerFirstName = json.optString("brokerFirstName"),
-            sessionId = json.optString("sessionId"),
-            state = parseState(json),
-        )
+        return try {
+            PairResult(
+                deviceToken = json.getString("deviceToken"),
+                brokerFirstName = json.optString("brokerFirstName"),
+                sessionId = json.optString("sessionId"),
+                state = parseState(json),
+            )
+        } catch (e: org.json.JSONException) {
+            throw CrmException("Resposta inesperada do servidor. Leia o QR de novo.", 503)
+        }
     }
 
-    suspend fun state(): CrmState = parseState(request("GET", "/api/call-ancora/device/state", null))
+    suspend fun state(): CrmState = safeParse(request("GET", "/api/call-ancora/device/state", null))
 
-    suspend fun event(body: JSONObject): CrmState = parseState(request("POST", "/api/call-ancora/device/events", body))
+    suspend fun event(body: JSONObject): CrmState = safeParse(request("POST", "/api/call-ancora/device/events", body))
 
     suspend fun control(action: String): CrmState =
-        parseState(request("POST", "/api/call-ancora/device/control", JSONObject().put("action", action)))
+        safeParse(request("POST", "/api/call-ancora/device/control", JSONObject().put("action", action)))
+
+    /** Resposta fora do formato esperado vira falha temporária, nunca derruba o app. */
+    private fun safeParse(json: JSONObject): CrmState = try {
+        parseState(json)
+    } catch (e: org.json.JSONException) {
+        throw CrmException("Resposta inesperada do servidor.", 503)
+    }
 
     private suspend fun request(method: String, path: String, body: JSONObject?, auth: Boolean = true): JSONObject =
         withContext(Dispatchers.IO) {
@@ -174,11 +185,12 @@ class CrmApi(private val origin: String, private val token: String?) {
                 val status = connection.responseCode
                 val stream = if (status in 200..299) connection.inputStream else connection.errorStream
                 val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-                val json = runCatching { JSONObject(text) }.getOrElse { JSONObject() }
+                val parsed = runCatching { JSONObject(text) }.getOrNull()
                 if (status !in 200..299) {
-                    throw CrmException(json.optString("error").ifBlank { "O servidor respondeu $status." }, status)
+                    throw CrmException(parsed?.optString("error")?.ifBlank { null } ?: "O servidor respondeu $status.", status)
                 }
-                json
+                // Página HTML (servidor reiniciando num deploy): trata como falha temporária.
+                parsed ?: throw CrmException("O servidor está reiniciando.", 503)
             } catch (e: IOException) {
                 throw CrmException("Sem conexão com o AncoraHub. Confira a internet do celular.")
             } finally {

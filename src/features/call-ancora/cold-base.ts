@@ -154,12 +154,13 @@ export class ColdReservations {
     return this.tenant(tenantId).has(leadId);
   }
 
-  /** Renova as reservas que a sessão ainda segura (atual + próximo). */
+  /** Renova as reservas que a sessão segura (atual + próximo); recria se sumiram (reinício). */
   renew(tenantId: string, sessionKey: string, leadIds: string[]) {
     const map = this.tenant(tenantId);
     for (const leadId of leadIds) {
       const existing = map.get(leadId);
       if (existing?.sessionKey === sessionKey) existing.expiresAt = this.now() + COLD_RESERVATION_TTL_MS;
+      else if (!existing) map.set(leadId, { sessionKey, expiresAt: this.now() + COLD_RESERVATION_TTL_MS, phone: null });
     }
   }
 

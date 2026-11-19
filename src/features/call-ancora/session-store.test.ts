@@ -33,6 +33,25 @@ describe("CallAncoraSessionStore", () => {
     expect(paired.snapshot).toMatchObject({ status: "active", total: 0, current: null, next: null, queueSource: "cold_base" });
   });
 
+  it("a sessão guardada volta depois de um reinício (deploy) com o mesmo token do celular", () => {
+    const saved = new Map<string, unknown>();
+    store.onPersist = (key, session) => { saved.set(key, session ? JSON.parse(JSON.stringify(session)) : null); };
+    const scope = { tenantId: "t1", brokerId: "b1" };
+    const started = store.create(scope, "Ana");
+    const paired = store.pair(started.pairingToken);
+    if (!paired.ok) throw new Error("O pareamento deveria funcionar.");
+    store.updateCallStatus(paired.deviceToken, "dialing");
+    const before = store.getForBroker(scope);
+
+    const restarted = new CallAncoraSessionStore(() => now, fixtureSource);
+    expect(restarted.getForDevice(paired.deviceToken)).toBeNull();
+    const persisted = [...saved.values()].at(-1) as Parameters<CallAncoraSessionStore["restoreSession"]>[0];
+    restarted.restoreSession(persisted);
+    const after = restarted.getForDevice(paired.deviceToken);
+    expect(after).toMatchObject({ sessionId: before?.sessionId, callStatus: "dialing", version: before?.version });
+    expect(restarted.getForBroker(scope)?.current?.id).toBe("c-01");
+  });
+
   it("pareia um dispositivo com token de uso único", () => {
     const started = store.create({ tenantId: "t1", brokerId: "b1" }, "Ana Souza");
     expect(started.snapshot.brokerFirstName).toBe("Ana");

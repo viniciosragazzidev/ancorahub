@@ -141,7 +141,9 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, s
       pollInFlight.current = true;
       try {
         const response = await fetch("/api/call-ancora/session", { cache: "no-store" });
-        const payload = await response.json() as { session?: CallAncoraSnapshot | null; error?: string };
+        // Durante um deploy o servidor devolve uma página HTML: mantém a sessão na tela e tenta de novo.
+        const payload = await response.json().catch(() => null) as { session?: CallAncoraSnapshot | null; error?: string } | null;
+        if (!payload) throw new Error("Reconectando ao servidor…");
         if (!response.ok) throw new Error(payload.error || "Não foi possível atualizar a sessão.");
         if (!cancelled) {
           setSession(payload.session ?? null);
