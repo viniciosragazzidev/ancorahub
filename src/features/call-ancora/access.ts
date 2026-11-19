@@ -18,12 +18,14 @@ export async function requireCallAncoraAccess() {
     if (context.role === "broker") {
       throw new AuthorizationError("O Call Âncora está desativado pela plataforma.");
     }
-    throw new AuthorizationError("O Call Âncora está disponível apenas para corretores e administradores da plataforma.");
+    throw new AuthorizationError("O Call Âncora está disponível apenas para corretores, diretores e administradores da plataforma.");
   }
   return {
     context,
     sessionOwnerId: callAncoraSessionOwnerId(context, session.user.id),
     brokerName: session.user.name,
     flagBypass: platformAdmin || development,
+    /** Diretor (ou admin/dev) vê as configurações do Call Âncora da empresa. */
+    canConfigure: context.role === "director" || platformAdmin || development,
   };
 }

@@ -53,9 +53,16 @@ export async function fetchColdCandidates(input: {
   excludeLeadIds: string[];
   limit?: number;
   now?: Date;
+  /** Regras da tela do diretor (período dos leads, tentativas, intervalo). Sem elas, o padrão. */
+  rules?: { maxAgeDays: number; minAgeDays: number; maxAttempts: number; cooldownMs: number };
 }): Promise<CallAncoraContact[]> {
   const now = input.now ?? new Date();
-  const cooldownSince = new Date(now.getTime() - COLD_ATTEMPT_COOLDOWN_MS);
+  const rules = input.rules;
+  const cooldownSince = new Date(now.getTime() - (rules?.cooldownMs ?? COLD_ATTEMPT_COOLDOWN_MS));
+  const maxAttempts = rules?.maxAttempts ?? COLD_MAX_ATTEMPTS;
+  const day = 24 * 60 * 60_000;
+  const createdAfter = rules ? new Date(now.getTime() - rules.maxAgeDays * day) : null;
+  const createdBefore = rules && rules.minAgeDays > 0 ? new Date(now.getTime() - rules.minAgeDays * day) : null;
   const limit = input.limit ?? COLD_PAGE_SIZE;
   const rows = await getDatabase()
     .select({ id: schema.leads.id, nome: schema.leads.nome, telefone: schema.leads.telefone })
@@ -75,7 +82,9 @@ export async function fetchColdCandidates(input: {
           and i.metadata->>'source' = ${CALL_ANCORA_SOURCE}
           and (i.metadata->>'outcome' = 'wrong_number' or i.created_at > ${cooldownSince.toISOString()}::timestamptz)
       )`,
-      sql`${callAncoraAttempts(schema.leads.id)} < ${COLD_MAX_ATTEMPTS}`,
+      sql`${callAncoraAttempts(schema.leads.id)} < ${maxAttempts}`,
+      createdAfter ? sql`${schema.leads.createdAt} >= ${createdAfter.toISOString()}::timestamptz` : undefined,
+      createdBefore ? sql`${schema.leads.createdAt} <= ${createdBefore.toISOString()}::timestamptz` : undefined,
     ))
     .orderBy(asc(schema.leads.createdAt), asc(schema.leads.id))
     // Busca um pouco mais para compensar telefones inválidos.

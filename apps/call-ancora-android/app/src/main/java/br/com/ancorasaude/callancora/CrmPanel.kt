@@ -116,7 +116,7 @@ class CrmPanel(private val activity: MainActivity) {
         tvNumber.text = when {
             empty || ended -> ""
             current?.dialable == true && current.phone != null -> Phone.display(current.phone)
-            !state.callingWindowOpen -> "Fora do horário de ligações (segunda a sábado, 8h às 20h)."
+            !state.callingWindowOpen -> "Fora do horário de ligações definido pela empresa."
             else -> "Contato bloqueado para ligação (o app não disca)"
         }
 

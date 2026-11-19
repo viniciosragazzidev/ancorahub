@@ -8,6 +8,10 @@ vi.mock("@/features/call-ancora/cold-base", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/call-ancora/cold-base")>()),
   fetchColdCandidates: vi.fn(async () => []),
 }));
+vi.mock("@/features/call-ancora/settings", async () => {
+  const rules = await import("@/features/call-ancora/settings-rules");
+  return { readCallAncoraSettings: vi.fn(async () => rules.CALL_ANCORA_DEFAULT_SETTINGS), countCallAncoraContactsToday: vi.fn(async () => 0) };
+});
 vi.mock("@/features/call-ancora/cold-outcome", () => ({
   CALL_ANCORA_LEAD_TAKEN_MESSAGE: "Este lead já foi para outro corretor.",
   recordColdOutcome: vi.fn(async () => ({ assigned: false, conflict: null })),

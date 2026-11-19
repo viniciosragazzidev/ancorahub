@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AuthenticationError, AuthorizationError } from "@/shared/auth/errors";
 import { requireCallAncoraAccess } from "@/features/call-ancora/access";
 import { persistClassification, syncColdQueue } from "@/features/call-ancora/cold-session";
+import { readCallAncoraSettings } from "@/features/call-ancora/settings";
 import { CALL_ANCORA_PAIR_TTL_MS, callAncoraSessionStore, toBrokerView } from "@/features/call-ancora/session-store";
 import { CALL_ANCORA_TEST_LIST_MAX, parseCallAncoraTestList } from "@/features/call-ancora/test-list";
 
@@ -49,7 +50,12 @@ export async function POST(request: Request) {
     const { context, sessionOwnerId, brokerName, flagBypass } = await requireCallAncoraAccess();
     const parsed = z.object({ action: z.literal("start") }).safeParse(await request.json().catch(() => null));
     if (!parsed.success) return Response.json({ error: "Não reconheci o início da sessão." }, { status: 400, headers: noStore });
-    const started = callAncoraSessionStore.create({ tenantId: context.tenantId, brokerId: sessionOwnerId }, brokerName, { flagBypass });
+    const scope = { tenantId: context.tenantId, brokerId: sessionOwnerId };
+    const created = callAncoraSessionStore.create(scope, brokerName, { flagBypass });
+    const settings = await readCallAncoraSettings(context.tenantId).catch(() => null);
+    const started = settings?.autoDialByDefault
+      ? { ...created, snapshot: callAncoraSessionStore.setAutoDialEnabled(scope, true) ?? created.snapshot }
+      : created;
     return Response.json({ ...started, snapshot: toBrokerView(started.snapshot), pairExpiresAt: Date.now() + CALL_ANCORA_PAIR_TTL_MS }, { headers: noStore });
   } catch (error) {
     return authError(error);

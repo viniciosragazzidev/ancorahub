@@ -533,6 +533,14 @@ export class CallAncoraSessionStore {
     this.bump(session);
   }
 
+  /** Aviso de limite diário (só muda se o texto mudar, para não mexer na versão a cada leitura). */
+  setLimitNotice(scope: Scope, notice: string) {
+    const session = this.liveSession(scopeKey(scope));
+    if (!session || session.notice === notice) return;
+    session.notice = notice;
+    this.bump(session);
+  }
+
   setNotice(scope: Scope, notice: string | null) {
     const session = this.liveSession(scopeKey(scope));
     if (!session) return;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { ArrowRight, Check, Clock3, Headphones, Heart, Pause, Phone, PhoneCall, Play, Radio, ScanLine, Smartphone, Sparkles, Users, X } from "lucide-react";
 
@@ -109,7 +109,7 @@ function lastCallSummary(lastCall: CallAncoraSnapshot["lastCall"]) {
   return `Encerrada${cause} · ${clock(lastCall.talkSeconds)} em ligação`;
 }
 
-export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }: { brokerFirstName: string; canUseTestList?: boolean }) {
+export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false, settingsSlot = null }: { brokerFirstName: string; canUseTestList?: boolean; settingsSlot?: ReactNode }) {
   const lab = useDevLab();
   const isLab = Boolean(lab);
   const fire = useFeedback();
@@ -370,6 +370,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
   return (
     <main className="arc-venancor lite-page flex min-h-full flex-col gap-5 bg-(--surface) text-(--foreground)">
       <div className="w-full">
+        {settingsSlot}
         {error ? <p className="mb-5 rounded-xl border border-(--danger)/25 bg-(--danger)/5 px-4 py-3 text-sm text-(--danger)" role="alert">{error}</p> : null}
 
         {!session ? (
@@ -515,7 +516,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
                       <div className="flex flex-col items-center py-14 text-center">
                         <span className="grid size-16 place-items-center rounded-full bg-(--surface-muted) text-(--text-muted)"><Clock3 className="size-8" aria-hidden="true" /></span>
                         <h2 className="mt-4 text-xl font-semibold text-(--foreground)">Fora do horário de ligações</h2>
-                        <p className="mt-2 max-w-sm text-sm leading-6 text-(--text-secondary)">As ligações para os frios acontecem de segunda a sábado, das 8h às 20h.</p>
+                        <p className="mt-2 max-w-sm text-sm leading-6 text-(--text-secondary)">As ligações para os frios seguem o horário definido pelo diretor nas configurações do Call Âncora.</p>
                       </div>
                     ) : (session.total === 0 || (session.queueSource === "cold_base" && !session.current)) && session.status !== "ended" ? (
                       <div className="flex flex-col items-center py-14 text-center">
