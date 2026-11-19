@@ -36,6 +36,8 @@ export type DevLab = {
     simulateMic?: boolean;
     /** Chave "Sem internet" do laboratório (fase 3): o envio falha como sem rede e o áudio vai para a fila. */
     offline?: boolean;
+    /** Fase 4: no lugar de navegar para a venda ou a cotação (o laboratório troca de fluxo). */
+    open?: (open: import("@/features/sasa/drafts").SasaOpen) => void;
   };
 };
 

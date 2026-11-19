@@ -344,6 +344,15 @@ No painel do laboratório: resposta do servidor (ok, falha, ambíguo, sem rede),
 - Intenções 7, 9, 10 (nota + sugestão de etapa e retorno; "fechou a venda do Carlos" abrindo a conversa da venda já pré-preenchida; cotação com idades).
 - Laboratório: "Fechou a venda" começa no botão e cai no fluxo "Registrar venda" já existente, com respostas pré-preenchidas.
 
+**Entregue em 19/11 (branch `feat/sasa-fase-4`).**
+
+- "O cliente disse" (`lead.note`): verbo na 3ª pessoa ("a Ana disse que…", "o Pedro pediu…") vira nota no histórico pela ação de sempre (`lead.addNote`, nível 0, sem Desfazer: é registro, como digitar uma nota). Depois, um toque cada: etapa que a fala sugere (só para a frente: gostou/aceitou → Em negociação; documentos → Documentação pendente), retorno na hora dita ("me liga sexta às 10") ou amanhã às 9h quando a fala pede retorno, e concluir o retorno de hoje quando ele já ligou.
+- "Fechou a venda do Carlos, Amil S380, 3 vidas, 35, 32 e 8, R$ 1.290" (`sale.start`): o servidor extrai tipo, idades, valor e início da vigência (`drafts.ts`); a tela guarda o rascunho no aparelho (sessionStorage, 10 min, nunca na URL) e abre `/leads/[id]/registrar-venda`. A conversa da venda (`SaleChat`) lê o rascunho e, pelo mesmo `mergeContractReading` da leitura do contrato, entra com as respostas, procura operadora e plano do catálogo por palavra inteira e pergunta só o que falta. Conta como informado pelo corretor, não "do contrato".
+- Cotação (`quote.start`): "cotação para 3 vidas, 35, 32 e 8, pessoa física" abre `/cotacao` (cotação guiada do catálogo real) já com idades, público, saúde ou odonto e cidade, quando dita.
+- O interpretador por IA conhece as três intenções novas. Nenhuma ação de servidor nova.
+- Laboratório: no "Botão da Sasá", o painel "Próxima fala" escolhe "Fechou a venda", "O cliente disse" ou "Cotação"; "Fechou a venda" cai no fluxo "Registrar venda" com as respostas preenchidas. As três falas também estão na lista de pedidos do fluxo da conversa.
+- **Pendente**: no laboratório a cotação não abre (a cotação guiada precisa do catálogo real do servidor); desfazer nota não existe (a ação de nota não devolve o id).
+
 ### Fase 5 · Sensíveis e vários passos
 
 - Intenções 11 a 13 (aceitar/recusar, perder, rascunho de mensagem), 22 (vários passos numa frase, lista confirmada em um toque), e avaliação de tool calling nativo para leituras encadeadas.

@@ -9,6 +9,7 @@
  * Plano: docs/implementations/active/2026-11-19-sasa-agentica.md §4.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import BottomSheet from "@/components/arc/bottom-sheet/bottom-sheet";
@@ -16,6 +17,7 @@ import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
 import { runChatServerAction } from "@/features/broker-workspace/chat/chat-actions";
 import { sasaCommandAction } from "@/features/sasa/command-action";
 import { isOfflineError, sasaQueue, type SasaQueued } from "@/features/sasa/offline-queue";
+import { keepSasaOpen } from "@/features/sasa/drafts";
 import { sasaReplyFitsToast, transcribeSasaVoice, undoOf } from "@/features/sasa/voice-client";
 import { sasaVoiceRouteHidden, useSasaVoiceSurface } from "@/features/sasa/voice-visibility";
 import { useDevLab } from "@/lib/dev-lab";
@@ -38,6 +40,7 @@ const SASA = { name: "Sasá", shape: "sasa" as const, hue: 175 };
 
 export function SasaVoiceButton({ pathname, chat }: { pathname: string; chat: boolean }) {
   const lab = useDevLab();
+  const router = useRouter();
   const fire = useFeedback();
   const reduce = useReducedMotion();
   const surface = useSasaVoiceSurface();
@@ -81,6 +84,15 @@ export function SasaVoiceButton({ pathname, chat }: { pathname: string; chat: bo
       const reply = await command({ text: heard.text, clientCommandId: item.id, origin: "voice", recordedAt: item.recordedAt });
       if (fromQueue) await sasaQueue.remove(item.id);
       if (reply.executed) feedbackOnResult(reply.executed.action, reply.executed, fire);
+      if (reply.open) {
+        // Fase 4: abre a venda ou a cotação já preenchidas; o aviso diz o que foi anotado.
+        keepSasaOpen(reply.open);
+        const text = reply.blocks.find((block): block is Extract<ChatBlock, { type: "assistant" }> => block.type === "assistant")?.text ?? "Abrindo…";
+        say(text, "info", heard.text);
+        if (lab?.sasa?.open) lab.sasa.open(reply.open);
+        else router.push(reply.open.href);
+        return;
+      }
       const blocks = reply.handled
         ? reply.blocks
         : lab?.sasa
@@ -106,7 +118,7 @@ export function SasaVoiceButton({ pathname, chat }: { pathname: string; chat: bo
     }
     // `recorder` é estável o bastante: done só volta o estado para o repouso.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [command, fire, lab, present, refreshQueued, say, transcribe]);
+  }, [command, fire, lab, present, refreshQueued, router, say, transcribe]);
 
   const recorder = useVoiceRecorder({
     simulate: Boolean(lab?.sasa?.simulateMic),
