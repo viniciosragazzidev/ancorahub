@@ -16,6 +16,9 @@ import { operatorQuestionReply } from "@/features/operator-catalog/answer";
 import { SASA_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
 
 import { brokerAiAccess } from "./broker-ai-pilot";
+import { sasaEcosystemContext } from "@/features/sasa/ecosystem";
+import { sasaLimitMessage } from "@/features/sasa/limits";
+import { markSasaAnswered, sasaUsageToday } from "@/features/sasa/store";
 
 import { AGENT_IDS, AGENT_REGISTRY, assistantReplySchema, buildMessages, replyToBlocks, type ActionTargets, type AgentId } from "./agents";
 import { runGateway } from "./gateway";
@@ -30,6 +33,8 @@ const inputSchema = z.object({
   agentId: z.enum(AGENT_IDS),
   question: z.string().trim().min(1).max(500),
   leadId: z.string().min(1).max(80).optional(),
+  /** Pedido da Sasá que não era comando (fase 1+): a linha de `sasa_commands` ganha as áreas lidas. */
+  clientCommandId: z.string().min(8).max(80).optional(),
 });
 
 /** The broker's day as plain text for the model (short names, no contact data). */
@@ -94,7 +99,7 @@ const FALLBACK_TEXT = "Ainda não entendo texto livre aqui. Escolha uma das opç
  * gateway (free models first) and a structured reply turned into chat blocks.
  * Off unless the BROKER_AI_ASSISTANTS flag is on; any failure keeps today's answer.
  */
-export async function askAssistantAction(raw: { agentId: AgentId; question: string; leadId?: string }): Promise<{ ok: boolean; blocks: ChatBlock[] }> {
+export async function askAssistantAction(raw: { agentId: AgentId; question: string; leadId?: string; clientCommandId?: string }): Promise<{ ok: boolean; blocks: ChatBlock[] }> {
   const stamp = String(Date.now());
   const fallback = (text = FALLBACK_TEXT) => ({ ok: false, blocks: [{ type: "assistant" as const, id: `ai-fallback-${stamp}`, text }] });
   const input = inputSchema.safeParse(raw);
@@ -125,9 +130,21 @@ export async function askAssistantAction(raw: { agentId: AgentId; question: stri
     return { ok: true, blocks };
   }
   const agent = AGENT_REGISTRY[input.data.agentId];
-  const built = input.data.agentId === "lead" && input.data.leadId
-    ? await leadContext(input.data.leadId).catch(() => null)
-    : await workspaceContext().catch(() => null);
+  // Sasá (19/11): responde sobre todo o ecossistema do corretor, lendo só as áreas que a pergunta pede.
+  if (input.data.agentId === "ancora") {
+    // Teto de 150 por dia (D9); o pedido com id já foi contado pela Sasá.
+    if (!input.data.clientCommandId) {
+      const limit = sasaLimitMessage(await sasaUsageToday(context.tenantId, context.userId));
+      if (limit) return fallback(limit);
+    }
+  }
+  const ecosystem = input.data.agentId === "ancora" ? await sasaEcosystemContext(context, input.data.question).catch((error) => { console.error("[sasa] ecosystem failed", error); return null; }) : null;
+  if (ecosystem && input.data.clientCommandId) await markSasaAnswered(context.tenantId, context.userId, input.data.clientCommandId, ecosystem.areas, ecosystem.via);
+  const built = ecosystem
+    ? { text: ecosystem.text, targets: { leadId: ecosystem.leadId } satisfies ActionTargets }
+    : input.data.agentId === "lead" && input.data.leadId
+      ? await leadContext(input.data.leadId).catch(() => null)
+      : await workspaceContext().catch(() => null);
   if (!built) return fallback();
 
   const result = await runGateway({
@@ -137,7 +154,7 @@ export async function askAssistantAction(raw: { agentId: AgentId; question: stri
     userId: context.userId,
     messages: buildMessages(agent, built.text, input.data.question),
     schema: assistantReplySchema,
-    maxTokens: 450,
+    maxTokens: input.data.agentId === "ancora" ? 600 : 450,
     temperature: 0.3,
     leadId: built.targets.leadId ?? null,
     sensitive: agent.sensitive,

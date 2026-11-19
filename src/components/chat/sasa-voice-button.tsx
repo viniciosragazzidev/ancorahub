@@ -95,9 +95,11 @@ export function SasaVoiceButton({ pathname, chat }: { pathname: string; chat: bo
       }
       const blocks = reply.handled
         ? reply.blocks
-        : lab?.sasa
+        : lab?.sasa?.ask
+          ? await lab.sasa.ask(heard.text)
+          : lab?.sasa
           ? [{ type: "assistant" as const, id: `lab-free-${Date.now()}`, text: "No laboratório, só os pedidos da Sasá respondem: plantão, pausa, quem está esperando, agenda, retornos e etapa." }]
-          : (await askAssistantAction({ agentId: "ancora", question: heard.text })).blocks;
+          : (await askAssistantAction({ agentId: "ancora", question: heard.text, clientCommandId: item.id })).blocks;
       present(heard.text, blocks);
     } catch (error) {
       if (isOfflineError(error, !isOffline())) {
@@ -174,7 +176,8 @@ export function SasaVoiceButton({ pathname, chat }: { pathname: string; chat: bo
 
   return (
     <>
-      <div className={styles.dock} data-lifted={surface.lifted || undefined} data-sasa-own="">
+      {/* arc-venancor: o botão vive fora das telas, e os tokens do Lite (superfície, borda) só existem dentro dessa classe. */}
+      <div className={`${styles.dock} arc-venancor`} data-lifted={surface.lifted || undefined} data-sasa-own="">
         <AnimatePresence>
           {toast && !routeHidden ? (
             <motion.div
@@ -205,6 +208,10 @@ export function SasaVoiceButton({ pathname, chat }: { pathname: string; chat: bo
             <span className={styles.dot} data-still={reduce || undefined} aria-hidden="true" />
             <span className={styles.time}>{voiceClock(clock - recorder.state.startedAt)}</span>
             <span>{recorder.state.cancelling ? "Solte para cancelar" : "Deslize para a esquerda para cancelar"}</span>
+          </div>
+        ) : sending ? (
+          <div className={styles.recording} role="status" aria-live="polite">
+            <span className={styles.sendingText}>Entendendo o áudio…</span>
           </div>
         ) : null}
 

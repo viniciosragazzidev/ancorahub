@@ -3,6 +3,7 @@
  * a IA (custo zero, funciona com a IA fora). O que não casar aqui vai para o interpretador por IA.
  * Plano: docs/implementations/active/2026-11-19-sasa-agentica.md §2 e §3.1.
  */
+import { looksLikeQuestion } from "./ecosystem-areas";
 import { normalizePtBr } from "./parse-when";
 
 export const SASA_STAGES = ["quote_sent", "negotiation", "documentation_pending"] as const;
@@ -29,17 +30,29 @@ export type SasaIntent =
 export type SasaTool = SasaIntent["tool"];
 export const SASA_TOOLS: readonly SasaTool[] = ["duty.next", "duty.pause", "duty.resume", "leads.waiting", "agenda.list", "returns.schedule", "returns.complete", "returns.cancel", "lead.stage", "lead.note", "sale.start", "quote.start"];
 
-/** A ordem importa: a primeira regra que casar vence (cancelar antes de marcar, pausar antes de plantão). */
+/** Pedidos que escrevem a partir de uma descrição: em forma de pergunta, viram leitura (resposta pelo ecossistema). */
+const WRITES_FROM_DESCRIPTION = new Set<SasaTool>(["lead.note", "sale.start", "lead.stage", "quote.start"]);
+
+/** Pedido tipado da frase, ou null (pergunta geral, que a Sasá responde lendo os dados do corretor). */
 export function classifySasaText(input: string): SasaIntent | null {
+  const intent = classifyRaw(input);
+  if (intent && WRITES_FROM_DESCRIPTION.has(intent.tool) && looksLikeQuestion(input)) return null;
+  return intent;
+}
+
+/** A ordem importa: a primeira regra que casar vence (cancelar antes de marcar, pausar antes de plantão). */
+function classifyRaw(input: string): SasaIntent | null {
   const text = normalizePtBr(input).replace(/\s+/g, " ").trim();
   if (!text) return null;
   const aboutReturn = /\b(retorno|retornos|lembrete|lembra|ligar|liga|ligacao)\b/.test(text);
 
   if (/\b(cancela|cancelar|desmarca|desmarcar|tira|tirar|apaga)\b/.test(text) && aboutReturn) return { tool: "returns.cancel" };
+  // Pergunta nunca escreve: "o que a Ana disse?" e "quantas vendas eu fiz?" são leituras (ecossistema), não nota nem venda.
+  const asking = looksLikeQuestion(input);
   // Venda fechada vem antes de tudo que fala de cliente: "fechou a venda do Carlos, Amil, 3 vidas".
-  if (/\b(fechou|fechei|fechamos|vendi|assinou|assinaram)\b|\bvenda fechada\b|\bfechar a venda\b/.test(text) && !/\b(vai|quer|pode|deve)\s+fechar\b/.test(text)) return { tool: "sale.start" };
+  if (!asking && /\b(fechou|fechei|fechamos|vendi|assinou|assinaram)\b|\bvenda fechada\b|\bfechar a venda\b/.test(text) && !/\b(vai|quer|pode|deve)\s+fechar\b/.test(text)) return { tool: "sale.start" };
   // O que o cliente disse (3ª pessoa): vira nota. "Já falei com a Ana" (1ª pessoa) continua sendo concluir retorno.
-  if (/\b(disse|falou|pediu|respondeu|contou|avisou|comentou|perguntou|reclamou|mandou dizer|achou)\b/.test(text)) return { tool: "lead.note" };
+  if (!asking && /\b(disse|falou|pediu|respondeu|contou|avisou|comentou|perguntou|reclamou|mandou dizer|achou)\b/.test(text)) return { tool: "lead.note" };
   if (/\b(ja )?(liguei|falei|retornei|conversei)\b/.test(text) || /\b(conclui|concluir|finaliza|finalizar|feito)\b.*\bretorno\b/.test(text) || /\bretorno\b.*\b(feito|concluido)\b/.test(text)) {
     return { tool: "returns.complete" };
   }
@@ -56,7 +69,7 @@ export function classifySasaText(input: string): SasaIntent | null {
   if (/\b(pausa|pausar|pause|me pausa)\b|\b(para|parar) de receber\b|\bnao quero (mais )?receber\b/.test(text)) return { tool: "duty.pause" };
 
   if (/\b(esperando|aguardando|sem resposta)\b/.test(text) || /\bquem (eu )?(atendo|respondo|devo|tenho que)\b/.test(text)) return { tool: "leads.waiting" };
-  if (/\bagenda\b|\bo que (eu )?tenho\b|\bmeus retornos\b|\bretornos (de )?(hoje|amanha|atrasados?)\b|\bcomo (esta|ta) (o )?meu dia\b/.test(text)) return { tool: "agenda.list" };
+  if (/\bagenda\b|\bo que (eu )?tenho\b|\bmeus retornos\b|\bretornos? (de )?(hoje|amanha|atrasados?)\b|\bcomo (esta|ta) (o )?meu dia\b/.test(text)) return { tool: "agenda.list" };
   if (/\bplantao\b|\bplantoes\b|\bescala\b/.test(text)) return { tool: "duty.next" };
   return null;
 }

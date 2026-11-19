@@ -6,6 +6,8 @@ import type { ChatBlock, ChatServerActionName } from "@/components/chat/types";
 import { SASA_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
 import { runSasaCommand, type SasaActionResult, type SasaWorld } from "@/features/sasa/command-core";
 import { parseWhenPtBr } from "@/features/sasa/parse-when";
+import { areasOf, SASA_AREA_LABEL, type SasaArea } from "@/features/sasa/ecosystem-areas";
+import { resolveLead } from "@/features/sasa/resolve-entities";
 import type { DevLab } from "@/lib/dev-lab";
 
 /** O que o "microfone" do laboratório ouve, em ordem: o segundo vem com a hora errada, para testar o Corrigir. */
@@ -72,6 +74,37 @@ export const LAB_SASA_PHRASES = [
   "Marca retorno com o Roberto amanhã",
 ];
 
+/** Perguntas prontas, uma por área do ecossistema do corretor (19/11). */
+export const LAB_SASA_QUESTIONS: Array<[SasaArea, string]> = [
+  ["leads", "Quantos leads eu tenho em negociação?"],
+  ["lead", "O que a Ana Souza já falou comigo?"],
+  ["wallet", "Quantos clientes da minha carteira renovam este mês?"],
+  ["duty", "Quando é meu próximo plantão?"],
+  ["agenda", "Tenho retorno atrasado?"],
+  ["performance", "Como estou no ranking da semana?"],
+  ["finance", "Quanto tenho de comissão a receber?"],
+  ["sales", "Quantas vendas eu fiz este mês?"],
+  ["quotes", "Quais cotações eu fiz?"],
+  ["notifications", "Tenho aviso novo?"],
+];
+
+export function labSasaQuestionsBlock(): ChatBlock {
+  return {
+    type: "question",
+    id: "lab-sasa-questions",
+    prompt: "Laboratório: pergunte sobre cada área.",
+    choices: LAB_SASA_QUESTIONS.map(([area, text]) => ({ id: `lab-q-${area}`, label: text, hint: SASA_AREA_LABEL[area], action: { kind: "local", value: `${SASA_ASK_PREFIX}${text}` } })),
+  };
+}
+
+/** No laboratório a IA não roda: a resposta mostra quais leituras a Sasá faria para responder. */
+export function labSasaAnswer(question: string, world: SasaWorld): ChatBlock[] {
+  const areas = areasOf(question);
+  if (resolveLead(question, world.leads).kind !== "none" && !areas.includes("lead")) areas.unshift("lead");
+  const list = (areas.length ? areas : (["leads", "agenda", "performance"] as SasaArea[])).slice(0, 3).map((area) => SASA_AREA_LABEL[area]);
+  return [{ type: "assistant", id: `lab-ask-${Date.now()}`, text: `No laboratório eu não chamo a IA. Para responder, eu leria só os seus dados de: ${list.join(", ")}${areas.length ? "" : " (a IA escolheria as fontes)"}.` }];
+}
+
 export function labSasaPhrasesBlock(): ChatBlock {
   return {
     type: "question",
@@ -129,6 +162,7 @@ export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["retu
   };
   return {
     run,
+    ask: async (question: string) => { await wait(Math.min(options.delay, 600)); return labSasaAnswer(question, state.world); },
     simulateMic: true,
     get offline() { return Boolean(state.offline); },
     transcribe: async () => {
