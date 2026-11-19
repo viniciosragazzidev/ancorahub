@@ -133,7 +133,8 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       ))
       .where(and(
         eq(schema.brokerProfiles.tenantId, context.tenantId),
-        context.role === "manager" && context.branchId ? eq(schema.brokerProfiles.branchId, context.branchId) : undefined,
+        // Gestor só vê a própria unidade; sem unidade, ninguém (fail closed, como o resto da página).
+        context.role === "manager" ? (context.branchId ? eq(schema.brokerProfiles.branchId, context.branchId) : sql`false`) : undefined,
         team ? inSupervisorTeam(schema.brokerProfiles.userId, team.tenantId, team.userId) : undefined,
       )),
     getDatabase()

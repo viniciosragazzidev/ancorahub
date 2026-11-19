@@ -28,6 +28,7 @@ import type { CommandCenterData } from "../today";
 import { WhatsAppActivityCard } from "./whatsapp-activity-card";
 import { AttentionGrid, RecentLeadsCard } from "./dashboard-widgets";
 import { DashboardSectionTabs } from "./dashboard-section-tabs";
+import { AllowedLink, UnitManagerLinks, useHrefAllowed } from "./allowed-link";
 
 type Shortcut = { href: string; label: string; icon: ReactNode };
 
@@ -64,6 +65,7 @@ function LeadSearch() {
  * number and its shortcut are the same click.
  */
 function TodayNumbers({ today }: { today: CommandCenterData["today"] }) {
+  const allowed = useHrefAllowed();
   const items = [
     { label: "Chegaram desde as 19h", value: today.received, href: "/leads", action: "Ver leads" },
     { label: "Distribuídos desde as 19h", value: today.distributed, href: "/leads/distribuicao", action: "Ver distribuição" },
@@ -73,7 +75,7 @@ function TodayNumbers({ today }: { today: CommandCenterData["today"] }) {
   return (
     <section aria-label="Turno de hoje, desde 19h" className="ct-enter-seq-tight grid gap-px overflow-hidden rounded-[var(--radius-card)] border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
       {items.map((item) => (
-        <Link
+        <AllowedLink
           key={item.label}
           href={item.href}
           className="group flex min-w-0 flex-col gap-2 bg-card px-5 py-4 transition-colors hover:bg-ds-paper-mist focus-visible:outline-none"
@@ -83,20 +85,23 @@ function TodayNumbers({ today }: { today: CommandCenterData["today"] }) {
             {item.warn ? <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-medium text-ds-amber-ink">Pede ação</span> : null}
           </span>
           <span className={cn("font-mono text-3xl font-medium tabular-nums tracking-tight", item.warn ? "text-ds-amber-ink" : "text-foreground")}>{item.value}</span>
-          <span className="flex items-center gap-1 text-xs font-medium text-ds-electric-blue">
-            {item.action}
-            <ArrowRight aria-hidden="true" className="size-3 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
-          </span>
-        </Link>
+          {allowed(item.href) ? (
+            <span className="flex items-center gap-1 text-xs font-medium text-ds-electric-blue">
+              {item.action}
+              <ArrowRight aria-hidden="true" className="size-3 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
+            </span>
+          ) : null}
+        </AllowedLink>
       ))}
     </section>
   );
 }
 
 function Shortcuts({ items }: { items: Shortcut[] }) {
+  const allowed = useHrefAllowed();
   return (
     <nav aria-label="Atalhos" className="flex flex-wrap gap-2">
-      {items.map((item) => (
+      {items.filter((item) => allowed(item.href)).map((item) => (
         <Link
           key={item.href + item.label}
           href={item.href}
@@ -119,7 +124,7 @@ function QueuesToday({ queues, received }: { queues: CommandCenterData["today"][
         <ul className="divide-y divide-border">
           {queues.map((queue) => (
             <li key={queue.id ?? "none"}>
-              <Link
+              <AllowedLink
                 href={queue.id ? `/leads?fila=${queue.id}` : "/leads?fila=__none"}
                 className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 px-5 py-3.5 transition-colors hover:bg-ds-paper-mist focus-visible:outline-none"
               >
@@ -137,13 +142,13 @@ function QueuesToday({ queues, received }: { queues: CommandCenterData["today"][
                   <span className="block font-mono text-xl font-medium tabular-nums">{queue.today}</span>
                   <span className="block text-[11px] text-muted-foreground">no turno</span>
                 </span>
-              </Link>
+              </AllowedLink>
             </li>
           ))}
         </ul>
       ) : (
         <div className="px-5 pb-6 pt-1">
-          <Link href="/leads/distribuicao" className="inline-flex items-center gap-1 text-sm font-medium text-ds-electric-blue">Ver as filas <ArrowRight aria-hidden="true" className="size-3.5" /></Link>
+          <AllowedLink hideWhenBlocked href="/leads/distribuicao" className="inline-flex items-center gap-1 text-sm font-medium text-ds-electric-blue">Ver as filas <ArrowRight aria-hidden="true" className="size-3.5" /></AllowedLink>
         </div>
       )}
     </Card>
@@ -204,6 +209,7 @@ function BrokersWhatsAppReadiness({ whatsapp }: { whatsapp: CommandCenterData["w
 }
 
 function DutiesNow({ welcome }: { welcome: CommandCenterData["welcome"] }) {
+  const allowed = useHrefAllowed();
   const running = welcome.runningDuties ?? [];
   const list = running.length ? running : welcome.nextDuty ? [welcome.nextDuty] : [];
   return (
@@ -218,7 +224,7 @@ function DutiesNow({ welcome }: { welcome: CommandCenterData["welcome"] }) {
             const short = duty.brokerCount < duty.minimumBrokers;
             return (
               <li key={duty.scheduleId}>
-                <Link href={`/leads/distribuicao/plantao/${duty.scheduleId}`} className="flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-ds-paper-mist focus-visible:outline-none">
+                <AllowedLink href={`/leads/distribuicao/plantao/${duty.scheduleId}`} className="flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-ds-paper-mist focus-visible:outline-none">
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium" title={duty.name}>{duty.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">
@@ -229,14 +235,18 @@ function DutiesNow({ welcome }: { welcome: CommandCenterData["welcome"] }) {
                     <UsersThree aria-hidden="true" className="size-3.5" />
                     {duty.brokerCount}/{duty.minimumBrokers}
                   </span>
-                </Link>
+                </AllowedLink>
               </li>
             );
           })}
         </ul>
       ) : (
         <div className="px-5 pb-5 pt-1">
-          <Link href="/leads/distribuicao?view=plantao" className="inline-flex items-center gap-1 text-sm font-medium text-ds-electric-blue">Ver plantões <ArrowRight aria-hidden="true" className="size-3.5" /></Link>
+          {allowed("/leads/distribuicao") ? (
+            <Link href="/leads/distribuicao?view=plantao" className="inline-flex items-center gap-1 text-sm font-medium text-ds-electric-blue">Ver plantões <ArrowRight aria-hidden="true" className="size-3.5" /></Link>
+          ) : (
+            <Link href="/equipe/plantoes" className="inline-flex items-center gap-1 text-sm font-medium text-ds-electric-blue">Ver plantões da unidade <ArrowRight aria-hidden="true" className="size-3.5" /></Link>
+          )}
         </div>
       )}
     </Card>
@@ -248,11 +258,27 @@ function DutiesNow({ welcome }: { welcome: CommandCenterData["welcome"] }) {
  * and the shortcuts people use the most. Period reports (funnel, trends,
  * rankings) live in Relatórios.
  */
-export function CommandCenter({ data, showQualityTab = false, canManage = true }: { data: CommandCenterData; showQualityTab?: boolean; canManage?: boolean }) {
+/**
+ * Gestor de unidade (19/11): mesmo Painel, sem os atalhos para áreas que ele não abre e com os dele (plantões da
+ * unidade e equipe). Busca e "Novo lead" levam à lista de leads, que é do diretor, e saem.
+ */
+export function CommandCenter({ data, showQualityTab = false, canManage = true, unitManager = false }: { data: CommandCenterData; showQualityTab?: boolean; canManage?: boolean; unitManager?: boolean }) {
+  return (
+    <UnitManagerLinks active={unitManager}>
+      <CommandCenterBody data={data} showQualityTab={showQualityTab} canManage={canManage} unitManager={unitManager} />
+    </UnitManagerLinks>
+  );
+}
+
+function CommandCenterBody({ data, showQualityTab, canManage, unitManager }: { data: CommandCenterData; showQualityTab: boolean; canManage: boolean; unitManager: boolean }) {
   const now = new Date(data.generatedAt);
   const dateLabel = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "numeric", month: "long" }).format(now);
   const firstRunning = data.welcome.runningDuties?.[0] ?? null;
   const shortcuts: Shortcut[] = [
+    ...(unitManager ? [
+      { href: "/equipe/plantoes", label: "Plantões da unidade", icon: <CalendarCheck /> },
+      { href: "/equipe", label: "Minha equipe", icon: <UsersThree /> },
+    ] : []),
     firstRunning
       ? { href: `/leads/distribuicao/plantao/${firstRunning.scheduleId}`, label: "Plantão agora", icon: <CalendarCheck /> }
       : { href: "/leads/distribuicao?view=plantao", label: "Plantões", icon: <CalendarCheck /> },
@@ -269,12 +295,14 @@ export function CommandCenter({ data, showQualityTab = false, canManage = true }
       <DashboardHeader breadcrumb={dateLabel.charAt(0).toLocaleUpperCase("pt-BR") + dateLabel.slice(1)} title={data.welcome.firstName ? `Olá, ${data.welcome.firstName}` : "Dashboard"} />
       <main className="ct-enter-seq mx-auto flex min-h-full w-full max-w-[1200px] flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8">
         {showQualityTab ? <DashboardSectionTabs active="overview" period={30} showQuality /> : null}
-        <section aria-label="Buscar e criar" className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <LeadSearch />
-          <Link href="/leads?new=1" className={cn(dsButtonVariants({ dsVariant: "filled-dark" }), "h-11 shrink-0 justify-center gap-1.5 px-4 text-sm")}>
-            <Plus aria-hidden="true" className="size-4" /> Novo lead
-          </Link>
-        </section>
+        {unitManager ? null : (
+          <section aria-label="Buscar e criar" className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <LeadSearch />
+            <Link href="/leads?new=1" className={cn(dsButtonVariants({ dsVariant: "filled-dark" }), "h-11 shrink-0 justify-center gap-1.5 px-4 text-sm")}>
+              <Plus aria-hidden="true" className="size-4" /> Novo lead
+            </Link>
+          </section>
+        )}
 
         <TodayNumbers today={data.today} />
         <Shortcuts items={shortcuts} />
