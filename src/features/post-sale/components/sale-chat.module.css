@@ -13,6 +13,10 @@
 .uploadTitle { margin: 0; font-size: var(--text-sm); font-weight: 500; color: var(--foreground); }
 .uploadText { margin: 2px 0 0; font-size: var(--text-xs); line-height: 1.5; color: var(--text-secondary); }
 .uploadButton { width: 100%; }
+.askLink { justify-self: center; padding: 4px 8px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: var(--text-sm); color: var(--primary); cursor: pointer; transition: opacity var(--duration-fast) var(--ease-standard); }
+.askLink:hover { text-decoration: underline; text-underline-offset: 3px; }
+.askLink:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.askLink:disabled { opacity: 0.5; cursor: default; }
 .file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
 /* Prévia do arquivo enquanto a IA lê: a faixa de leitura desce pela página. */

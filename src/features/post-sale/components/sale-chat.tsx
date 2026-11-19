@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FileText, Paperclip } from "lucide-react";
@@ -67,6 +67,8 @@ const ACCEPTED = new Set(["application/pdf", "image/jpeg", "image/png"]);
 const MAX_BYTES = 10 * 1024 * 1024;
 
 type ContractPhase = { blockId: string; name: string; preview: string | null; phase: "reading" | "read" | "failed" };
+/** A conversa guarda os blocos já desenhados: o estado da leitura chega ao cartão por contexto, não por props. */
+const ContractPhaseContext = createContext<{ phase: ContractPhase | null; registered: boolean }>({ phase: null, registered: false });
 
 /**
  * Registrar venda em conversa (19/11). Três etapas no total: escolher o cliente (antes desta tela), mandar o
@@ -104,7 +106,6 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
       { type: "client", id: "c-lead", name: lead.name, initials: lead.initials, chips: [{ label: lead.stageLabel, tone: "info" }] },
       { type: "assistant", id: "a-intro", text: `Vamos registrar a venda de ${firstName}! Manda o contrato ou a proposta, em foto ou PDF, que eu leio e preencho tudo: pessoas, plano, valor e vigência.` },
       { type: "custom", id: "upload-0", kind: "upload", data: null },
-      { type: "question", id: "q-mode", prompt: "Sem o contrato à mão?", choices: [{ id: "mode-ask", label: "Responder as perguntas", hint: "São 6, rapidinho", action: { kind: "local", value: "ask:1" } }] },
     ],
   }), [firstName, lead.initials, lead.name, lead.stageLabel]);
 
@@ -173,7 +174,6 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
       return [
         { type: "assistant", id: `a-read-error-${turn}`, text: result.error },
         { type: "custom", id: `upload-${turn}`, kind: "upload", data: null },
-        { type: "question", id: `q-mode-${turn}`, prompt: "Ou, se preferir", choices: [{ id: "mode-ask", label: "Responder as perguntas", action: { kind: "local", value: "ask:1" } }] },
       ];
     }
     const merged = mergeContractReading({ ...answersRef.current, contract: result.file }, result.reading, catalog, today);
@@ -257,7 +257,7 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
 
   const renderCustom = useCallback((block: Extract<ChatBlock, { type: "custom" }>, api: CustomBlockApi) => {
     if (block.kind === "upload") {
-      return <ContractUpload disabled={registered} phase={contractPhase?.blockId === block.id ? contractPhase : null} onFile={(file) => pickFile(file, api, block.id)} />;
+      return <ContractUpload blockId={block.id} onFile={(file) => pickFile(file, api, block.id)} onAsk={() => api.local("Prefiro responder as perguntas", "ask:1")} />;
     }
     if (block.kind === "found") {
       const data = block.data as { rows: ExtractedRow[]; file: string };
@@ -274,7 +274,8 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
       );
     }
     return null;
-  }, [contractPhase, pickFile, registered]);
+  }, [pickFile]);
+  const phaseContext = useMemo(() => ({ phase: contractPhase, registered }), [contractPhase, registered]);
 
   const waiting = saleAwaiting(answers, catalog);
   const flowDone = waiting === "done" || registered;
@@ -289,6 +290,7 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
 
   return (
     <div className={`arc-venancor ${styles.root}`}>
+      <ContractPhaseContext.Provider value={phaseContext}>
       <ChatScreen
         identity={identity}
         backHref={backHref}
@@ -302,6 +304,7 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
         placeholder={placeholder}
         composerInput={composerInput}
       />
+      </ContractPhaseContext.Provider>
       {celebration ? (
         <SaleCelebration open celebrationKey={celebration.key} stats={celebration.stats} feedback={false} onClose={() => { setCelebration(null); router.refresh(); }} />
       ) : null}
@@ -319,7 +322,10 @@ function useMotionOn() {
 const enter = { duration: motionTokens.duration.standard, ease: motionTokens.ease.enter };
 
 /** Toque ou arraste o contrato. Depois do envio, o cartão vira a prévia do arquivo com a faixa de leitura. */
-function ContractUpload({ onFile, disabled, phase }: { onFile: (file: File) => string | null; disabled: boolean; phase: ContractPhase | null }) {
+function ContractUpload({ blockId, onFile, onAsk }: { blockId: string; onFile: (file: File) => string | null; onAsk: () => void }) {
+  const { phase: current, registered: disabled } = useContext(ContractPhaseContext);
+  const phase = current?.blockId === blockId ? current : null;
+  const [asked, setAsked] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -328,7 +334,7 @@ function ContractUpload({ onFile, disabled, phase }: { onFile: (file: File) => s
   const shown = phase;
 
   const take = (file: File | undefined) => {
-    if (!file || disabled || shown) return;
+    if (!file || disabled || shown || asked) return;
     const problem = onFile(file);
     setError(problem);
   };
@@ -386,9 +392,14 @@ function ContractUpload({ onFile, disabled, phase }: { onFile: (file: File) => s
                 take(file);
               }}
             />
-            <Button variant="secondary" className={styles.uploadButton} disabled={disabled} onClick={() => input.current?.click()}>
+            <Button variant="secondary" className={styles.uploadButton} disabled={disabled || asked} onClick={() => input.current?.click()}>
               Enviar foto ou PDF
             </Button>
+            {asked ? null : (
+              <button type="button" className={styles.askLink} disabled={disabled} onClick={() => { setAsked(true); onAsk(); }}>
+                Sem o contrato? Responder 6 perguntas
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
