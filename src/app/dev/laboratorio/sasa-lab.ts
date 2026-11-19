@@ -50,7 +50,17 @@ export function labSasaWorld(now = new Date()): SasaWorld {
 }
 
 /** Pedidos prontos para tocar (o mesmo que digitar). */
+/** Fase 4: falas prontas para o botão (painel "Próxima fala"). */
+export const LAB_SASA_SPEECH = {
+  venda: "Fechou a venda do Carlos Teixeira, Amil S380 familiar, 3 vidas, 35, 32 e 8 anos, R$ 1.290 por mês",
+  disse: "A Ana disse que gostou da proposta e vai ver com o marido, me liga sexta às 10",
+  cotacao: "Cotação para 3 vidas, 35, 32 e 8 anos, pessoa física",
+} as const;
+
 export const LAB_SASA_PHRASES = [
+  LAB_SASA_SPEECH.disse,
+  LAB_SASA_SPEECH.venda,
+  LAB_SASA_SPEECH.cotacao,
   "Qual é meu próximo plantão?",
   "Pausa meu plantão",
   "Quem está esperando resposta?",
@@ -73,7 +83,7 @@ export function labSasaPhrasesBlock(): ChatBlock {
 
 const PRESET_MINUTES: Record<string, number> = { today: 60, tomorrow: 60 * 24, in_2_days: 60 * 48, in_3_days: 60 * 72 };
 
-export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["returns"]; heard?: number; offline?: boolean }, options: { delay: number; outcome: LabOutcome }): NonNullable<DevLab["sasa"]> {
+export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["returns"]; heard?: number; offline?: boolean; nextSpeech?: string | null }, options: { delay: number; outcome: LabOutcome }): NonNullable<DevLab["sasa"]> {
   const run = async (name: ChatServerActionName, raw: Record<string, string | number | boolean | null>): Promise<SasaActionResult> => {
     await wait(options.delay);
     if (options.outcome === "falha") return { ok: false, message: "O servidor recusou (simulado). Nada foi alterado." };
@@ -125,6 +135,7 @@ export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["retu
       if (state.offline) throw new TypeError("Failed to fetch");
       await wait(options.delay);
       if (options.outcome === "falha") return { ok: false, error: "Não consegui entender o áudio. Tente de novo ou escreva." };
+      if (state.nextSpeech) { const text = state.nextSpeech; state.nextSpeech = null; return { ok: true, text }; }
       const index = state.heard ?? 0;
       state.heard = index + 1;
       return { ok: true, text: LAB_SASA_VOICE[index % LAB_SASA_VOICE.length]! };

@@ -18,10 +18,16 @@ export type SasaIntent =
   | { tool: "returns.schedule"; reschedule: boolean }
   | { tool: "returns.complete" }
   | { tool: "returns.cancel" }
-  | { tool: "lead.stage"; status: SasaStage };
+  | { tool: "lead.stage"; status: SasaStage }
+  /** Fase 4: "a Ana disse que vai ver com o marido" vira nota, com etapa e retorno sugeridos. */
+  | { tool: "lead.note" }
+  /** Fase 4: "fechou a venda do Carlos" abre o registro da venda já preenchido. */
+  | { tool: "sale.start" }
+  /** Fase 4: "cotação para 3 vidas, 35, 32 e 8" abre a cotação com as idades. */
+  | { tool: "quote.start" };
 
 export type SasaTool = SasaIntent["tool"];
-export const SASA_TOOLS: readonly SasaTool[] = ["duty.next", "duty.pause", "duty.resume", "leads.waiting", "agenda.list", "returns.schedule", "returns.complete", "returns.cancel", "lead.stage"];
+export const SASA_TOOLS: readonly SasaTool[] = ["duty.next", "duty.pause", "duty.resume", "leads.waiting", "agenda.list", "returns.schedule", "returns.complete", "returns.cancel", "lead.stage", "lead.note", "sale.start", "quote.start"];
 
 /** A ordem importa: a primeira regra que casar vence (cancelar antes de marcar, pausar antes de plantão). */
 export function classifySasaText(input: string): SasaIntent | null {
@@ -30,6 +36,10 @@ export function classifySasaText(input: string): SasaIntent | null {
   const aboutReturn = /\b(retorno|retornos|lembrete|lembra|ligar|liga|ligacao)\b/.test(text);
 
   if (/\b(cancela|cancelar|desmarca|desmarcar|tira|tirar|apaga)\b/.test(text) && aboutReturn) return { tool: "returns.cancel" };
+  // Venda fechada vem antes de tudo que fala de cliente: "fechou a venda do Carlos, Amil, 3 vidas".
+  if (/\b(fechou|fechei|fechamos|vendi|assinou|assinaram)\b|\bvenda fechada\b|\bfechar a venda\b/.test(text) && !/\b(vai|quer|pode|deve)\s+fechar\b/.test(text)) return { tool: "sale.start" };
+  // O que o cliente disse (3ª pessoa): vira nota. "Já falei com a Ana" (1ª pessoa) continua sendo concluir retorno.
+  if (/\b(disse|falou|pediu|respondeu|contou|avisou|comentou|perguntou|reclamou|mandou dizer|achou)\b/.test(text)) return { tool: "lead.note" };
   if (/\b(ja )?(liguei|falei|retornei|conversei)\b/.test(text) || /\b(conclui|concluir|finaliza|finalizar|feito)\b.*\bretorno\b/.test(text) || /\bretorno\b.*\b(feito|concluido)\b/.test(text)) {
     return { tool: "returns.complete" };
   }
@@ -41,6 +51,7 @@ export function classifySasaText(input: string): SasaIntent | null {
   if (/\b(negociacao|negociando|negociar)\b/.test(text) && !/\?$/.test(text)) return { tool: "lead.stage", status: "negotiation" };
   if (/\b(documentacao|documentos|docs)\b.*\b(pendente|faltando|mandar|enviar)\b|\bpendente de documento/.test(text)) return { tool: "lead.stage", status: "documentation_pending" };
 
+  if (/\b(cotacao|cotar|simula|simular|simulacao)\b/.test(text) && !/\b(mandei|enviei|passei)\b/.test(text)) return { tool: "quote.start" };
   if (/\b(volta|voltar|volte) a receber\b|\b(despausa|despausar|retoma|retomar)\b|\bquero receber\b|\bme (ativa|libera|despausa)\b/.test(text)) return { tool: "duty.resume" };
   if (/\b(pausa|pausar|pause|me pausa)\b|\b(para|parar) de receber\b|\bnao quero (mais )?receber\b/.test(text)) return { tool: "duty.pause" };
 

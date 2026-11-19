@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { takeQuoteDraft, type QuoteSpokenDraft } from "@/features/sasa/drafts";
+import { mergeSpokenQuote } from "@/features/sasa/draft-merge";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 
 import { ChatScreen, type CustomBlockApi } from "@/components/chat/chat-screen";
@@ -41,14 +43,19 @@ const mascot = { shape: definition.shape, hue: definition.hue ?? 268 };
  * por vez com progresso, o mascote procura, os mais em conta chegam como cartões animados e o que
  * é denso (condições, rede, comparação) abre num painel. "Refazer" começa outra conversa.
  */
-export function CatalogQuoteGuide(props: { facets: GuideFacets; services: QuoteGuideServices; canExport?: boolean }) {
+export function CatalogQuoteGuide(props: { facets: GuideFacets; services: QuoteGuideServices; canExport?: boolean; /** O que o corretor disse à Sasá ("cotação para 3 vidas, 35, 32 e 8"); sem ele, procura o rascunho no aparelho. */ spokenDraft?: QuoteSpokenDraft | null }) {
   const [run, setRun] = useState(0);
-  return <QuoteGuideConversation key={run} {...props} onRestart={() => setRun((value) => value + 1)} />;
+  // Sasá (fase 4): o rascunho é lido uma vez, no aparelho, antes da primeira pergunta.
+  const [draft, setDraft] = useState<QuoteSpokenDraft | null | undefined>(props.spokenDraft === undefined ? undefined : props.spokenDraft);
+  useEffect(() => { if (draft === undefined) setDraft(takeQuoteDraft()); }, [draft]);
+  if (draft === undefined) return null;
+  return <QuoteGuideConversation key={run} {...props} draft={run === 0 ? draft : null} onRestart={() => setRun((value) => value + 1)} />;
 }
 
-function QuoteGuideConversation({ facets, services, canExport = true, onRestart }: { facets: GuideFacets; services: QuoteGuideServices; canExport?: boolean; onRestart: () => void }) {
-  const [answers, setAnswers] = useState<GuideAnswers>({});
-  const answersRef = useRef<GuideAnswers>({});
+function QuoteGuideConversation({ facets, services, canExport = true, onRestart, draft }: { facets: GuideFacets; services: QuoteGuideServices; canExport?: boolean; onRestart: () => void; draft?: QuoteSpokenDraft | null }) {
+  const spoken = useMemo(() => (draft ? mergeSpokenQuote(draft, facets) : null), [draft, facets]);
+  const [answers, setAnswers] = useState<GuideAnswers>(() => spoken?.answers ?? {});
+  const answersRef = useRef<GuideAnswers>(spoken?.answers ?? {});
   const round = useRef(0);
   const budgetMode = useRef(false);
   const lastInput = useRef<QuoteInput | null>(null);
@@ -65,10 +72,12 @@ function QuoteGuideConversation({ facets, services, canExport = true, onRestart 
   const script = useMemo<ChatScript>(() => ({
     status: { label: "Esperando você", tone: "waiting" },
     blocks: [
-      { type: "assistant", id: "a-intro", text: "Vamos montar uma cotação? São poucas perguntas e no fim eu te mostro os planos mais em conta do catálogo." },
+      { type: "assistant", id: "a-intro", text: spoken?.found.length ? `Vamos montar a cotação! Já anotei o que você me disse: ${spoken.found.join(", ")}. Faltam poucas perguntas.` : "Vamos montar uma cotação? São poucas perguntas e no fim eu te mostro os planos mais em conta do catálogo." },
       { type: "system", id: "s-catalog", strong: `${count(facets.totalPlans)} planos`, text: `no catálogo de ${facets.sourceDate.split("-").reverse().join("/")}` },
-      ...nextGuideBlocks({}, facets, 0),
+      ...nextGuideBlocks(spoken?.answers ?? {}, facets, 0),
     ],
+    // Montado uma vez, na entrada.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [facets]);
 
   const commit = useCallback((next: GuideAnswers) => {

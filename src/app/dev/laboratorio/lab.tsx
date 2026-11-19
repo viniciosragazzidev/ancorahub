@@ -29,7 +29,8 @@ import type { SaleCatalog } from "@/features/post-sale/conversation-sale-core";
 
 import styles from "./lab.module.css";
 import { MotionShowcase } from "./motion-showcase";
-import { createLabSasa, labSasaPhrasesBlock, labSasaWorld } from "./sasa-lab";
+import { createLabSasa, LAB_SASA_SPEECH, labSasaPhrasesBlock, labSasaWorld } from "./sasa-lab";
+import type { SaleSpokenDraft } from "@/features/sasa/drafts";
 
 type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento";
 type Outcome = "ok" | "falha" | "liberacao";
@@ -111,7 +112,11 @@ export function FlowLab() {
   useState(() => { try { window.localStorage.setItem("ancora:lite-welcome:2026-10-chat", "1"); window.localStorage.setItem(TOUR_STORAGE_KEY, "skipped"); } catch { /* ignore */ } return null; });
 
   // Sasá agêntica: um corretor de mentira que as ações simuladas mudam; "Recomeçar" volta ao início.
-  const sasaState = useRef({ world: labSasaWorld(), closed: [] as ReturnType<typeof labSasaWorld>["returns"], heard: 0, offline: false });
+  const sasaState = useRef({ world: labSasaWorld(), closed: [] as ReturnType<typeof labSasaWorld>["returns"], heard: 0, offline: false, nextSpeech: null as string | null });
+  // Fase 4: "Fechou a venda" no botão cai no fluxo Registrar venda já preenchido.
+  const [saleDraft, setSaleDraft] = useState<SaleSpokenDraft | null>(null);
+  const [nextSpeech, setNextSpeech] = useState<keyof typeof LAB_SASA_SPEECH | null>(null);
+  const chooseSpeech = (key: keyof typeof LAB_SASA_SPEECH | null) => { setNextSpeech(key); sasaState.current.nextSpeech = key ? LAB_SASA_SPEECH[key] : null; };
   // Botão da Sasá (fase 3): "Sem internet" faz o envio falhar como sem rede; voltar a internet manda a fila.
   const [offline, setOffline] = useState(false);
   const setInternet = (value: boolean) => {
@@ -124,7 +129,13 @@ export function FlowLab() {
     if (!sasaState.current.offline) window.dispatchEvent(new Event("online"));
   };
   const lab = useMemo<DevLab>(() => ({
-    sasa: createLabSasa(sasaState.current, { delay, outcome }),
+    sasa: {
+      ...createLabSasa(sasaState.current, { delay, outcome }),
+      open: (open) => {
+        setNextSpeech(null);
+        if (open.kind === "sale") { setSaleDraft(open.draft); setFlow("venda"); }
+      },
+    },
     acceptLead: async () => {
       await wait(delay);
       return outcome === "falha" ? { success: false, error: "Outro corretor aceitou este lead primeiro." } : { success: true, whatsappUrl: "https://exemplo.invalid/" };
@@ -204,7 +215,7 @@ export function FlowLab() {
     }],
   };
 
-  const restart = () => { setRun((value) => value + 1); setHandoff(null); sasaState.current.world = labSasaWorld(); sasaState.current.closed = []; sasaState.current.heard = 0; };
+  const restart = () => { setRun((value) => value + 1); setHandoff(null); sasaState.current.world = labSasaWorld(); sasaState.current.closed = []; sasaState.current.heard = 0; setSaleDraft(null); chooseSpeech(null); };
 
   return (
     <DevLabProvider value={lab}>
@@ -227,7 +238,7 @@ export function FlowLab() {
             }}
           />
         ) : flow === "venda" ? (
-          <SaleChat lead={LAB_SALE_LEAD} catalog={LAB_SALE_CATALOG} services={lab.sale!} backHref="/dev/laboratorio" doneHref="/dev/laboratorio" />
+          <SaleChat lead={LAB_SALE_LEAD} catalog={LAB_SALE_CATALOG} services={lab.sale!} backHref="/dev/laboratorio" doneHref="/dev/laboratorio" spokenDraft={saleDraft} />
         ) : flow === "sasa" ? (
           <div className="arc-venancor h-dvh">
             <AssistantChat
@@ -295,11 +306,19 @@ export function FlowLab() {
               {DELAYS.map((item) => <button key={item.ms} type="button" aria-pressed={delay === item.ms} onClick={() => setDelay(item.ms)}>{item.label}</button>)}
             </fieldset>
             {flow === "botao" ? (
+              <>
+              <fieldset><legend>Próxima fala</legend>
+                <button type="button" aria-pressed={nextSpeech === null} onClick={() => chooseSpeech(null)}>Sequência</button>
+                <button type="button" aria-pressed={nextSpeech === "venda"} onClick={() => chooseSpeech("venda")}>Fechou a venda</button>
+                <button type="button" aria-pressed={nextSpeech === "disse"} onClick={() => chooseSpeech("disse")}>O cliente disse</button>
+                <button type="button" aria-pressed={nextSpeech === "cotacao"} onClick={() => chooseSpeech("cotacao")}>Cotação</button>
+              </fieldset>
               <fieldset><legend>Internet</legend>
                 <button type="button" aria-pressed={!offline} onClick={() => setInternet(true)}>Com internet</button>
                 <button type="button" aria-pressed={offline} onClick={() => setInternet(false)}>Sem internet</button>
                 <button type="button" onClick={() => void queueOldAudio()} title="Um áudio gravado há 40 min, sem internet: pede confirmação">Áudio de 40 min na fila</button>
               </fieldset>
+              </>
             ) : null}
             <fieldset><legend>Plantão</legend>
               <button type="button" aria-pressed={mode === "online"} onClick={() => setMode("online")}>Online</button>

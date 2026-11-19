@@ -12,6 +12,7 @@ import { ASSISTANTS, SASA_ASK_PREFIX } from "@/features/broker-workspace/chat/as
 import { readSasaPick, SASA_DROP_VALUE, type SasaClientCommand } from "@/features/sasa/command-core";
 import { sasaCommandAction } from "@/features/sasa/command-action";
 import { readSasaFix, sasaFixBlock, transcribeSasaVoice } from "@/features/sasa/voice-client";
+import { keepSasaOpen } from "@/features/sasa/drafts";
 import { useDevLab } from "@/lib/dev-lab";
 import { useFeedback } from "@/lib/feedback/use-feedback";
 
@@ -42,6 +43,12 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
     const reply = await (lab?.sasa?.command ?? sasaCommandAction)(input);
     // Nível 1 (FEEDBACK.md): confirmação só depois do servidor; falha com erro. Sem som de celebração.
     if (reply.executed) feedbackOnResult(reply.executed.action, reply.executed, fire);
+    // Fase 4: venda ou cotação já preenchidas com o que foi dito.
+    if (reply.open) {
+      keepSasaOpen(reply.open);
+      if (lab?.sasa?.open) lab.sasa.open(reply.open);
+      else router.push(reply.open.href);
+    }
     return reply;
   };
   const askAi = async (text: string): Promise<ChatBlock[]> => {
