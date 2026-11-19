@@ -54,6 +54,7 @@ export async function SupervisorHomeContent() {
       leads={rail.leads}
       nowIso={rail.nowIso}
       canQuote={false}
+      unreadNotifications={rail.unreadNotifications}
       whatsappActivity={whatsapp?.activity}
       summary={withNeeds(summaryOf(data), needs)}
     />

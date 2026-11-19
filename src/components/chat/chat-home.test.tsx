@@ -82,6 +82,16 @@ describe("ChatHome", () => {
     expect(screen.queryByRole("heading", { level: 2, name: "2 plantões agora" })).toBeNull();
   });
 
+  it("sino (19/11): leva aos avisos, que saíram da conversa da Sasá, com a contagem de não lidos", () => {
+    const { rerender } = render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote showWhatsAppStatus={false} unreadNotifications={3} />);
+    const bell = screen.getByRole("link", { name: "Notificações, 3 novas" });
+    expect(bell).toHaveAttribute("href", "/notificacoes");
+    expect(within(bell).getByText("3")).toBeTruthy();
+    rerender(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote showWhatsAppStatus={false} unreadNotifications={0} />);
+    expect(screen.getByRole("link", { name: "Notificações" })).toHaveAttribute("href", "/notificacoes");
+    rerender(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote showWhatsAppStatus={false} />);
+    expect(screen.queryByRole("link", { name: /^Notificações/ })).toBeNull();
+  });
   it("rail: keeps the list and marks the conversation open at the center", () => {
     render(<ChatHome mode="rail" viewerName="Ana Lima" assistants={assistants} leads={leads} nowIso="2026-10-10T12:00:00.000Z" canQuote />);
     expect(screen.getByRole("link", { name: /Plantão/ }).getAttribute("aria-current")).toBe("page");

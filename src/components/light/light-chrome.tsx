@@ -149,7 +149,7 @@ export function LightChrome({
             </nav>
           ) : null}
           {chatRail ? (
-            <ChatHome mode="rail" viewerName={chatRail.viewerName} assistants={chatRail.assistants} leads={chatRail.leads} nowIso={chatRail.nowIso} canQuote={chatRail.canQuote} leadsBadgeCount={chatRail.leadsBadgeCount} />
+            <ChatHome mode="rail" viewerName={chatRail.viewerName} assistants={chatRail.assistants} leads={chatRail.leads} nowIso={chatRail.nowIso} canQuote={chatRail.canQuote} leadsBadgeCount={chatRail.leadsBadgeCount} unreadNotifications={chatRail.unreadNotifications} />
           ) : (
             <div className="lite-rail-skeleton" aria-hidden="true">
               {Array.from({ length: 7 }, (_, index) => <span key={index} />)}

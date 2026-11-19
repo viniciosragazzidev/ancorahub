@@ -28,6 +28,8 @@ export type ChatRailData = {
   canQuote: boolean;
   /** Waiting unit leads shown in the manager's Leads tab badge. */
   leadsBadgeCount?: number;
+  /** Avisos não lidos: contagem do sino do Início (a conversa da Sasá não mostra mais avisos desde 19/11). */
+  unreadNotifications?: number;
   managerUnitSummary?: { leads: number; unassigned: number; activeBrokers: number; brokersWithoutWhatsApp: number; inService: number; late: number };
 };
 
@@ -54,6 +56,7 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
           .catch(() => buildSupervisorLeadThreads(data, now)),
         nowIso: now.toISOString(),
         canQuote: false,
+        unreadNotifications: data.unreadNotifications,
       };
     }
     if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
@@ -105,6 +108,7 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
       leads: buildLeadThreads({ queue: data.queue, now }),
       nowIso: now.toISOString(),
       canQuote: capabilities.quoteSimulator,
+      unreadNotifications: data.today.unreadNotifications,
     };
   } catch (error) {
     console.error("[chat-rail] Could not load the broker workspace", error);
