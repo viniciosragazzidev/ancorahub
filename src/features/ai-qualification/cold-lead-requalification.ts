@@ -33,6 +33,7 @@ import {
 } from "./cold-lead-requalification-policy";
 import { readDistributionPolicy } from "@/features/lead-distribution/domain";
 import { runInBackgroundPool } from "@/shared/db/background-pool";
+import { isLeadHeldByCallAncora } from "@/features/call-ancora/cold-base";
 
 const REQUALIFICATION_PREFIX = COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX;
 const LEGACY_PREFIX = "cold-lead-reactivation:";
@@ -352,6 +353,10 @@ export async function requalifyColdLeadsManually(context: TenantContext, input: 
         if (lead) await recordAudit({ tenantId: context.tenantId, actorUserId: context.userId, leadId, action: "cold_lead_requalification.manual.skipped", metadata: { reason: "not_eligible" } });
         continue;
       }
+      if (isLeadHeldByCallAncora(context.tenantId, leadId)) {
+        skipped.push({ leadId, name: lead.nome, reason: "O lead esta numa ligacao do Call Ancora agora." });
+        continue;
+      }
       if (!featureEnabled || !tenantRuleEnabled) {
         skipped.push({ leadId, name: lead.nome, reason: "A requalificacao esta desligada pelo administrador." });
         await recordAudit({ tenantId: context.tenantId, actorUserId: context.userId, leadId, action: "cold_lead_requalification.manual.skipped", metadata: { reason: "disabled" } });
@@ -506,6 +511,8 @@ export async function runColdLeadRequalificationSweep(tenantIdFilter?: string, n
       let sentCount = 0;
       let skippedCount = 0;
       for (const lead of eligible) {
+        // Lead numa ligação do Call Âncora agora: não manda mensagem por cima.
+        if (isLeadHeldByCallAncora(tenantId, lead.id)) { skippedCount += 1; continue; }
         const convo = conversationByLead.get(lead.id);
         const history = historyByLead.get(lead.id) ?? [];
         const attempts = countRequalificationAttempts(history);

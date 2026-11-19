@@ -809,6 +809,13 @@ export async function processQueuedLead(
     createdAt: schema.leads.createdAt,
   }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
+  // Call Âncora: o lead reservado para uma ligação não é entregue a ninguém até a reserva acabar.
+  {
+    const { isLeadHeldByCallAncora, CALL_ANCORA_HOLD_REASON } = await import("@/features/call-ancora/cold-base");
+    if (isLeadHeldByCallAncora(context.tenantId, leadId)) {
+      return { status: "queued", leadId, reason: CALL_ANCORA_HOLD_REASON, retryAt: new Date(Date.now() + 10 * 60_000) };
+    }
+  }
   // Leads older than the cut-off stay for manual assignment; everything from
   // it on is handed out automatically (setting distribution_auto_min_created_at).
   traceLeadStep(leadId, "load_lead");

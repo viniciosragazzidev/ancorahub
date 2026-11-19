@@ -61,7 +61,7 @@ export async function syncColdQueue(scope: Scope, now = new Date()) {
   const picked = [];
   for (const contact of candidates) {
     if (picked.length >= allowed) break;
-    if (coldReservations.tryReserve(scope.tenantId, need.sessionKey, contact.id)) picked.push(contact);
+    if (coldReservations.tryReserve(scope.tenantId, need.sessionKey, contact.id, contact.phone)) picked.push(contact);
   }
   if (picked.length) callAncoraSessionStore.appendColdContacts(scope, picked);
 }

@@ -83,6 +83,11 @@ export async function fetchColdCandidates(input: {
           and (i.metadata->>'outcome' = 'wrong_number' or i.created_at > ${cooldownSince.toISOString()}::timestamptz)
       )`,
       sql`${callAncoraAttempts(schema.leads.id)} < ${maxAttempts}`,
+      // Pedido de parar ou número errado já registrados na conversa da IA.
+      sql`not exists (
+        select 1 from ${schema.aiConversations} c
+        where c.lead_id = ${schema.leads.id} and (c.opt_out_at is not null or c.wrong_number_at is not null)
+      )`,
       createdAfter ? sql`${schema.leads.createdAt} >= ${createdAfter.toISOString()}::timestamptz` : undefined,
       createdBefore ? sql`${schema.leads.createdAt} <= ${createdBefore.toISOString()}::timestamptz` : undefined,
     ))
@@ -104,7 +109,7 @@ export async function fetchColdCandidates(input: {
  * Reservas em memória por tenant (uma instância no Coolify): duas sessões ativas nunca
  * recebem o mesmo lead ao mesmo tempo. Expira em 10 min ou quando a sessão solta.
  */
-type Reservation = { sessionKey: string; expiresAt: number };
+type Reservation = { sessionKey: string; expiresAt: number; phone: string | null };
 
 export class ColdReservations {
   private readonly byTenant = new Map<string, Map<string, Reservation>>();
@@ -127,13 +132,26 @@ export class ColdReservations {
     return [...this.tenant(tenantId)].filter(([, r]) => r.sessionKey !== sessionKey).map(([leadId]) => leadId);
   }
 
-  /** Reserva se estiver livre (ou já for desta sessão). */
-  tryReserve(tenantId: string, sessionKey: string, leadId: string): boolean {
+  /**
+   * Reserva se estiver livre (ou já for desta sessão). Com `phone`, também recusa quando o
+   * mesmo número (outro lead do tenant) já está reservado: nunca duas ligações ao mesmo número.
+   */
+  tryReserve(tenantId: string, sessionKey: string, leadId: string, phone: string | null = null): boolean {
     const map = this.tenant(tenantId);
     const existing = map.get(leadId);
     if (existing && existing.sessionKey !== sessionKey) return false;
-    map.set(leadId, { sessionKey, expiresAt: this.now() + COLD_RESERVATION_TTL_MS });
+    if (phone) {
+      for (const [otherId, reservation] of map) {
+        if (otherId !== leadId && reservation.phone === phone) return false;
+      }
+    }
+    map.set(leadId, { sessionKey, expiresAt: this.now() + COLD_RESERVATION_TTL_MS, phone });
     return true;
+  }
+
+  /** O lead está reservado por alguma sessão do Call Âncora agora? */
+  isHeld(tenantId: string, leadId: string): boolean {
+    return this.tenant(tenantId).has(leadId);
   }
 
   /** Renova as reservas que a sessão ainda segura (atual + próximo). */
@@ -160,3 +178,14 @@ export class ColdReservations {
 
 const globalReservations = globalThis as typeof globalThis & { __callAncoraColdReservations?: ColdReservations };
 export const coldReservations = globalReservations.__callAncoraColdReservations ??= new ColdReservations();
+
+/**
+ * Para a distribuição (liberação das 9h e fila automática) e a requalificação de frios:
+ * true quando o lead está reservado para uma ligação do Call Âncora neste momento.
+ * Uma instância só (Coolify): a reserva vive no mesmo processo que os jobs.
+ */
+export function isLeadHeldByCallAncora(tenantId: string, leadId: string): boolean {
+  return coldReservations.isHeld(tenantId, leadId);
+}
+
+export const CALL_ANCORA_HOLD_REASON = "O lead está numa ligação do Call Âncora agora; a distribuição tenta de novo depois.";
