@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Cenário do teste (pílula selecionável). Selecionado = view.isSelected. -->
-    <style name="CallAncora.ScenarioChip">
+    <style name="CallAncora.ScenarioChip" parent="">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:background">@drawable/bg_scenario_chip</item>
@@ -18,7 +18,7 @@
     </style>
 
     <!-- Botão redondo de controle na tela de chamada (Mudo, Viva-voz). -->
-    <style name="CallAncora.RoundControl">
+    <style name="CallAncora.RoundControl" parent="">
         <item name="android:layout_width">62dp</item>
         <item name="android:layout_height">62dp</item>
         <item name="android:background">@drawable/bg_dot</item>
@@ -31,7 +31,7 @@
     </style>
 
     <!-- Rótulo embaixo dos botões redondos. -->
-    <style name="CallAncora.RoundLabel">
+    <style name="CallAncora.RoundLabel" parent="">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:layout_marginTop">8dp</item>
