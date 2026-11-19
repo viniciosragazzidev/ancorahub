@@ -24,8 +24,8 @@ const noStore = { "Cache-Control": "no-store, max-age=0" };
 
 export async function GET() {
   try {
-    const { context } = await requireCallAncoraAccess();
-    const snapshot = callAncoraSessionStore.getForBroker({ tenantId: context.tenantId, brokerId: context.userId });
+    const { context, sessionOwnerId } = await requireCallAncoraAccess();
+    const snapshot = callAncoraSessionStore.getForBroker({ tenantId: context.tenantId, brokerId: sessionOwnerId });
     return Response.json({ session: snapshot }, { headers: noStore });
   } catch (error) {
     return authError(error);
@@ -34,10 +34,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { context, brokerName, flagBypass } = await requireCallAncoraAccess();
+    const { context, sessionOwnerId, brokerName, flagBypass } = await requireCallAncoraAccess();
     const parsed = z.object({ action: z.literal("start") }).safeParse(await request.json().catch(() => null));
     if (!parsed.success) return Response.json({ error: "Não reconheci o início da demonstração." }, { status: 400, headers: noStore });
-    const started = callAncoraSessionStore.create({ tenantId: context.tenantId, brokerId: context.userId }, brokerName, { flagBypass });
+    const started = callAncoraSessionStore.create({ tenantId: context.tenantId, brokerId: sessionOwnerId }, brokerName, { flagBypass });
     return Response.json({ ...started, pairExpiresAt: Date.now() + CALL_ANCORA_PAIR_TTL_MS }, { headers: noStore });
   } catch (error) {
     return authError(error);
@@ -46,10 +46,10 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const { context } = await requireCallAncoraAccess();
+    const { context, sessionOwnerId } = await requireCallAncoraAccess();
     const parsed = patchSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return Response.json({ error: "Essa ação não é válida para a demonstração." }, { status: 400, headers: noStore });
-    const scope = { tenantId: context.tenantId, brokerId: context.userId };
+    const scope = { tenantId: context.tenantId, brokerId: sessionOwnerId };
     const snapshot = parsed.data.action === "classify"
       ? callAncoraSessionStore.classify(scope, parsed.data.outcome)
       : parsed.data.action === "pause"

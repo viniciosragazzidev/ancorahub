@@ -168,3 +168,10 @@ Base de contatos, campanha, reservas concorrentes, logs de chamadas, criação d
 - Corretores só veem e usam a demonstração quando o Super-admin ativa a flag.
 - Admins ativos da plataforma e o ambiente local de desenvolvimento podem abrir a demonstração com a flag desligada; no modo "Ver como", o bypass é validado pela sessão real do admin.
 - Sessões móveis de admin/desenvolvimento guardam o bypass apenas em memória, preso ao token temporário do aparelho. Para corretores, desligar a flag também bloqueia a API móvel.
+
+### Ajustes de sessão em 19/11/2026
+
+- A tela do celular encerra o polling ao receber HTTP 401 ou 403 e orienta gerar um novo QR. O mesmo tratamento vale para a simulação que receber esses status.
+- A sessão do CRM usa a identidade autenticada como chave quando o admin está em `Ver como`, mantendo isolada a sessão do corretor visualizado. Tenant e permissões continuam vindo do contexto resolvido no servidor.
+- Leituras do armazenamento em memória executam `prune()` para remover sessões ociosas e tickets antigos mesmo quando outra sessão é consultada.
+- Evidência desta rodada: TypeScript, ESLint focado, quatro arquivos Vitest (20 testes) e build Webpack passaram. Relatório em `reports/agent/verification/call-ancora-mvp.md`; capturas em `reports/agent/call-ancora-mvp/`.
