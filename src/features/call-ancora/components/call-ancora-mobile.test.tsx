@@ -42,6 +42,8 @@ const session: CallAncoraSnapshot = {
   pausedBy: null,
   version: 1,
   phone: null,
+  callingWindowOpen: true,
+  notice: null,
   countdown: null,
   updatedAt: "2026-11-19T12:00:00.000Z",
 };

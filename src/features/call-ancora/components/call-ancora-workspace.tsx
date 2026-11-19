@@ -58,6 +58,8 @@ function labSnapshot(firstName: string): CallAncoraSnapshot {
     pausedBy: null,
     version: 1,
     phone: null,
+    callingWindowOpen: true,
+    notice: null,
     countdown: null,
     updatedAt: new Date().toISOString(),
   };
@@ -91,6 +93,7 @@ const OUTCOME_LABEL: Record<CallOutcome, string> = {
   not_interested: "Sem interesse",
   no_answer: "Não atendeu",
   voicemail: "Caixa postal",
+  wrong_number: "Número errado",
 };
 
 /** Como a última ligação real terminou, em português, a partir do relato do app Android. */
@@ -500,14 +503,21 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
                   ) : (
                     <div className="rounded-xl border border-dashed border-(--border) px-4 py-7 text-center"><Users className="mx-auto size-6 text-(--text-muted)" aria-hidden="true" /><p className="mt-2 text-sm font-medium text-(--foreground)">A lista começa vazia</p><p className="mt-1 text-xs leading-5 text-(--text-muted)">Quando alguém demonstrar interesse, aparece aqui.</p></div>
                   )}
-                  <p className="mt-4 text-xs leading-5 text-(--text-muted)">Nesta etapa, interesse não cria lead nem movimenta a carteira.</p>
+                  <p className="mt-4 text-xs leading-5 text-(--text-muted)">Com interesse: o lead vai para a sua carteira.</p>
                 </section>
               </EnterInOrder>
 
               <section className="order-1 grid gap-5 lg:order-2">
                 <EnterInOrder index={1}>
                   <article className="relative overflow-hidden rounded-2xl border border-(--border) bg-(--surface) p-6 shadow-(--shadow-resting) md:p-8">
-                    {session.total === 0 && session.status !== "ended" ? (
+                    {session.notice ? <p className="mb-4 rounded-xl bg-(--surface-muted) px-4 py-3 text-sm text-(--foreground)" role="status">{session.notice}</p> : null}
+                    {!session.callingWindowOpen && session.queueSource === "cold_base" && session.status !== "ended" && !session.current?.dialable ? (
+                      <div className="flex flex-col items-center py-14 text-center">
+                        <span className="grid size-16 place-items-center rounded-full bg-(--surface-muted) text-(--text-muted)"><Clock3 className="size-8" aria-hidden="true" /></span>
+                        <h2 className="mt-4 text-xl font-semibold text-(--foreground)">Fora do horário de ligações</h2>
+                        <p className="mt-2 max-w-sm text-sm leading-6 text-(--text-secondary)">As ligações para os frios acontecem de segunda a sábado, das 8h às 20h.</p>
+                      </div>
+                    ) : (session.total === 0 || (session.queueSource === "cold_base" && !session.current)) && session.status !== "ended" ? (
                       <div className="flex flex-col items-center py-14 text-center">
                         <span className="grid size-16 place-items-center rounded-full bg-(--surface-muted) text-(--text-muted)"><Users className="size-8" aria-hidden="true" /></span>
                         <h2 className="mt-4 text-xl font-semibold text-(--foreground)">Sua fila está vazia</h2>
@@ -526,7 +536,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
                         <div className="mx-auto flex max-w-lg flex-col items-center pt-8 text-center md:pt-10">
                           <CallAvatar name={session.current.name} status={session.callStatus} />
                           <h2 className="mt-5 text-3xl font-semibold tracking-tight text-(--foreground)">{session.current.name}</h2>
-                          <p className="mt-2 text-sm tabular-nums text-(--text-secondary)">{session.current.phone} <span className="text-(--text-muted)">{session.current.source === "test_list" ? "· lista de teste" : "· base de frios"}</span></p>
+                          <p className="mt-2 text-sm tabular-nums text-(--text-secondary)">{session.current.phone} <span className="text-(--text-muted)">{session.current.source === "test_list" ? "· lista de teste" : "· base de frios, o número completo fica só no celular"}</span></p>
                         </div>
                       </SlideSwap>
                       <SlideSwap swapKey={`${session.current.id}-${session.callStatus}-${session.countdown ? "countdown" : "idle"}`} axis="y" className="mx-auto flex max-w-lg flex-col items-center pb-2 text-center">
@@ -539,7 +549,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
                         {session.callStatus === "ended" && !session.countdown ? <p className="mt-5 text-sm text-(--text-secondary)">Como foi esta conversa?</p> : null}
                         {session.countdown && currentOutcome && !isLab ? <div className="mt-5 w-full max-w-md text-center"><p className="text-sm text-(--text-secondary)">Classificada como <span className="font-semibold text-(--foreground)">{OUTCOME_LABEL[currentOutcome.outcome]}</span>{currentOutcome.auto ? " (automático, estimativa)" : ""}.</p><div className="mt-2 flex flex-wrap justify-center gap-2"><span className="self-center text-xs text-(--text-muted)">Corrigir:</span>{(Object.keys(OUTCOME_LABEL) as CallOutcome[]).filter((outcome) => outcome !== currentOutcome.outcome).map((outcome) => <Button key={outcome} size="sm" variant="secondary" className="min-h-9 rounded-full" disabled={busy} onClick={() => void sendAction({ action: "reclassify", outcome }, "Não consegui corrigir a classificação.")}>{OUTCOME_LABEL[outcome]}</Button>)}</div></div> : null}
                         {session.countdown ? <div className="mt-6 flex w-full max-w-md flex-wrap items-center justify-center gap-3 rounded-xl bg-(--surface-muted) px-4 py-3"><span className="inline-flex items-center gap-1 text-sm text-(--text-secondary)">{countdownExpired ? "Próximo contato" : session.countdown.paused ? "Próximo em pausado" : <>Próximo em <LiteNumber value={session.countdown.remainingSeconds} /> s</>}</span><Button size="sm" variant="secondary" className="min-h-10 rounded-full" onClick={() => void setCountdownPaused(!session.countdown?.paused)}>{session.countdown.paused ? <Play className="size-4" aria-hidden="true" /> : <Pause className="size-4" aria-hidden="true" />}{session.countdown.paused ? "Retomar" : "Pausar"}</Button></div> : null}
-                        {session.callStatus === "ended" && !session.countdown ? <div className="mt-6 grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2"><Button variant="primary" size="lg" className="min-h-12 rounded-full" disabled={busy} loading={busy} onClick={() => void classify("interested")}><Heart className="size-4" aria-hidden="true" /> Com interesse</Button><Button variant="secondary" size="lg" className="min-h-12 rounded-full" disabled={busy} onClick={() => void classify("not_interested")}><X className="size-4" aria-hidden="true" /> Sem interesse</Button><Button variant="secondary" size="md" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("voicemail")}>Caixa postal</Button><Button variant="secondary" size="md" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("no_answer")}>Não atendeu</Button></div> : null}
+                        {session.callStatus === "ended" && !session.countdown ? <div className="mt-6 grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2"><Button variant="primary" size="lg" className="min-h-12 rounded-full" disabled={busy} loading={busy} onClick={() => void classify("interested")}><Heart className="size-4" aria-hidden="true" /> Com interesse</Button><Button variant="secondary" size="lg" className="min-h-12 rounded-full" disabled={busy} onClick={() => void classify("not_interested")}><X className="size-4" aria-hidden="true" /> Sem interesse</Button><Button variant="secondary" size="md" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("voicemail")}>Caixa postal</Button><Button variant="secondary" size="md" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("no_answer")}>Não atendeu</Button><Button variant="secondary" size="md" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("wrong_number")}>Número errado</Button></div> : null}
                       </SlideSwap>
                     </> : (
                       <div className="flex flex-col items-center py-16 text-center">

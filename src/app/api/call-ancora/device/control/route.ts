@@ -8,6 +8,7 @@ import {
   deviceJson,
   deviceStateBody,
 } from "@/features/call-ancora/device-api";
+import { syncColdQueue } from "@/features/call-ancora/cold-session";
 import { callAncoraSessionStore } from "@/features/call-ancora/session-store";
 
 export const dynamic = "force-dynamic";
@@ -23,5 +24,7 @@ export async function POST(request: Request) {
   if (!callAncoraSessionStore.deviceHeartbeat(token)) return deviceJson({ error: DEVICE_UNAUTHORIZED }, 401);
   const snapshot = callAncoraSessionStore.deviceControl(token, parsed.data.action);
   if (!snapshot) return deviceJson({ error: "Agora não dá para fazer isso. Atualize o estado da sessão." }, 409);
-  return deviceJson(deviceStateBody(snapshot));
+  const scope = callAncoraSessionStore.scopeForDevice(token);
+  if (scope) await syncColdQueue(scope);
+  return deviceJson(deviceStateBody(callAncoraSessionStore.getForDevice(token) ?? snapshot));
 }

@@ -3,6 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const flag = vi.hoisted(() => ({ value: "true" }));
 vi.mock("@/features/system-settings/queries", () => ({ getFeatureFlag: vi.fn(async () => flag.value) }));
+// Sem banco nos testes de rota: a base de frios vem vazia e o resultado não é gravado.
+vi.mock("@/features/call-ancora/cold-base", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/call-ancora/cold-base")>()),
+  fetchColdCandidates: vi.fn(async () => []),
+}));
+vi.mock("@/features/call-ancora/cold-outcome", () => ({
+  CALL_ANCORA_LEAD_TAKEN_MESSAGE: "Este lead já foi para outro corretor.",
+  recordColdOutcome: vi.fn(async () => ({ assigned: false, conflict: null })),
+}));
 
 import { CALL_ANCORA_PAIR_TTL_MS, CallAncoraSessionStore, callAncoraSessionStore, toDeviceState } from "@/features/call-ancora/session-store";
 import { POST as pairPost } from "./pair/route";

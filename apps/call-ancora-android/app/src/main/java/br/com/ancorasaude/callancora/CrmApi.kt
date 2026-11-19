@@ -40,6 +40,8 @@ data class CrmState(
     val lastCall: CrmLastCall?,
     /** "voicemail": a web pediu para desligar a ligação atual como caixa postal. */
     val hangupRequest: String?,
+    /** Janela de ligações aberta (seg a sáb, 8h às 20h). */
+    val callingWindowOpen: Boolean,
 )
 
 /** Resultado do QR: de onde veio (origem) e o ticket de uso único. */
@@ -129,6 +131,7 @@ class CrmApi(private val origin: String, private val token: String?) {
                 next = next,
                 lastCall = last,
                 hangupRequest = if (s.isNull("hangupRequest")) null else s.optString("hangupRequest").ifBlank { null },
+                callingWindowOpen = s.optBoolean("callingWindowOpen", true),
             )
         }
     }
