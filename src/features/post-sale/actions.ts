@@ -240,6 +240,25 @@ export async function removeLeadBeneficiaryAction(beneficiaryId: string) {
   }
 }
 
+const conversationPersonInput = z.object({
+  name: z.string().trim().min(2).max(160).nullable(),
+  age: z.number().int().min(0).max(120).nullable(),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  cpf: z.string().regex(/^\d{11}$/).nullable(),
+  relationship: z.enum(schema.beneficiaryRelationshipValues),
+});
+type ConversationPerson = z.output<typeof conversationPersonInput>;
+
+/** O arquivo já guardado por /api/documents/upload (mesmas regras de confirmDocumentUploadAction). */
+const contractFileInput = z.object({
+  filename: z.string().trim().min(1).max(180),
+  fileUrl: z.string().startsWith("/api/documents/download?key=").max(600),
+  storageKey: z.string().max(400).optional(),
+  mimeType: z.string().max(100).optional(),
+  sizeBytes: z.number().int().min(1).max(10 * 1024 * 1024).optional(),
+  checksumSha256: z.string().max(128).optional(),
+});
+
 const conversationSaleInput = z.object({
   leadId: z.string().min(1),
   planType: z.enum(schema.planType.enumValues),
@@ -249,6 +268,12 @@ const conversationSaleInput = z.object({
   approvedValue: z.coerce.number().finite().positive("Informe o valor mensal da venda.").max(1_000_000, "Confira o valor mensal."),
   coverageStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe uma data de vigência válida."),
   source: z.enum(["conversa", "contrato"]),
+  /** Lido do contrato: titular primeiro, depois os dependentes. */
+  people: z.array(conversationPersonInput).max(30).optional(),
+  policyNumber: z.string().trim().max(60).nullable().optional(),
+  paymentMethod: z.enum(schema.paymentMethodValues).nullable().optional(),
+  contractTermMonths: z.number().int().min(1).max(120).nullable().optional(),
+  contract: contractFileInput.nullable().optional(),
 });
 export type ConversationSaleInput = z.input<typeof conversationSaleInput>;
 
@@ -263,6 +288,10 @@ export async function registerConversationSaleAction(rawInput: ConversationSaleI
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Confira os dados da venda." };
   const input = parsed.data;
   const [holderAge, ...dependents] = input.ages;
+  // Pessoas só valem se baterem com as idades confirmadas; CPF que não confere fica de fora.
+  const people = input.people?.length === input.ages.length
+    ? input.people.map((person, index) => ({ ...person, age: input.ages[index] ?? person.age, cpf: person.cpf && isValidCpf(person.cpf) ? person.cpf : null, relationship: index === 0 ? "titular" as const : person.relationship === "titular" ? "outro" as const : person.relationship }))
+    : [];
   const notes = [
     `Registrada pela conversa${input.source === "contrato" ? " com o contrato lido pela IA" : ""}.`,
     `Tipo: ${PLAN_TYPE_LABEL[input.planType]}.`,
@@ -271,16 +300,16 @@ export async function registerConversationSaleAction(rawInput: ConversationSaleI
   try {
     return await registerSale({
       leadId: input.leadId,
-      policyNumber: null,
+      policyNumber: input.policyNumber || null,
       coverageStartDate: input.coverageStartDate,
-      contractTermMonths: 12,
-      paymentMethod: "boleto",
+      contractTermMonths: input.contractTermMonths ?? 12,
+      paymentMethod: input.paymentMethod ?? "boleto",
       renewalType: "nova_contratacao",
       renewalContactPreference: "whatsapp",
       approvedValue: input.approvedValue,
       confirmationDocumentId: null,
       ...(input.carrierId ? { carrierId: input.carrierId } : {}),
-    }, { planId: input.planId, ages: input.ages, notes });
+    }, { planId: input.planId, ages: input.ages, notes, people, contract: input.contract ?? null });
   } catch (error) {
     if (error instanceof SaleAlreadyRegisteredError) return { error: error.message };
     console.error("[register-sale-conversation] failed", { leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
@@ -292,21 +321,75 @@ export async function registerConversationSaleAction(rawInput: ConversationSaleI
 
 type SaleTx = Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0];
 
-/** Plano, vidas e valor no lead; a idade do titular no titular (criado com o nome do lead se ainda não existe). */
-async function applyConversationSaleToLead(tx: SaleTx, input: { tenantId: string; leadId: string; leadName: string; planId: string | null; approvedValue: number; ages: number[]; now: Date }) {
+function sameName(a: string, b: string) {
+  const norm = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  return norm(a) === norm(b);
+}
+
+/**
+ * Plano, vidas e valor no lead. Titular: nome, nascimento, idade e CPF lidos do contrato (criado se faltar).
+ * Dependentes lidos com nome entram como beneficiários (sem repetir quem já está). O contrato vira documento do
+ * lead, em análise, e a venda aponta para ele. Devolve o id do documento (ou null sem contrato).
+ */
+async function applyConversationSaleToLead(tx: SaleTx, input: {
+  tenantId: string; userId: string; leadId: string; leadName: string; planId: string | null; approvedValue: number; ages: number[];
+  people: ConversationPerson[]; contract: z.output<typeof contractFileInput> | null; coverageStartDate: string; now: Date;
+}): Promise<string | null> {
   await tx.update(schema.leads).set({
     ...(input.planId ? { planId: input.planId } : {}),
     livesCount: input.ages.length,
     monthlyValue: input.approvedValue.toFixed(2),
     updatedAt: input.now,
   }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
-  const [holder] = await tx.select({ id: schema.leadBeneficiaries.id, age: schema.leadBeneficiaries.age }).from(schema.leadBeneficiaries)
-    .where(and(eq(schema.leadBeneficiaries.tenantId, input.tenantId), eq(schema.leadBeneficiaries.leadId, input.leadId), eq(schema.leadBeneficiaries.isHolder, true))).limit(1);
+
+  const existing = await tx.select({ id: schema.leadBeneficiaries.id, name: schema.leadBeneficiaries.name, isHolder: schema.leadBeneficiaries.isHolder, age: schema.leadBeneficiaries.age, birthDate: schema.leadBeneficiaries.birthDate, cpf: schema.leadBeneficiaries.cpf })
+    .from(schema.leadBeneficiaries).where(and(eq(schema.leadBeneficiaries.tenantId, input.tenantId), eq(schema.leadBeneficiaries.leadId, input.leadId)));
+  const holder = existing.find((person) => person.isHolder);
+  const read = input.people[0];
+  const holderAge = input.ages[0] ?? null;
   if (!holder) {
-    await tx.insert(schema.leadBeneficiaries).values({ id: randomUUID(), tenantId: input.tenantId, leadId: input.leadId, name: input.leadName, age: input.ages[0] ?? null, relationship: "titular", isHolder: true });
-  } else if (holder.age == null && input.ages[0] != null) {
-    await tx.update(schema.leadBeneficiaries).set({ age: input.ages[0], updatedAt: input.now }).where(and(eq(schema.leadBeneficiaries.id, holder.id), eq(schema.leadBeneficiaries.tenantId, input.tenantId)));
+    await tx.insert(schema.leadBeneficiaries).values({ id: randomUUID(), tenantId: input.tenantId, leadId: input.leadId, name: read?.name ?? input.leadName, age: holderAge, birthDate: read?.birthDate ?? null, cpf: read?.cpf ?? null, relationship: "titular", isHolder: true });
+  } else {
+    const changes = {
+      ...(read?.name ? { name: read.name } : {}),
+      ...(holder.age == null && holderAge != null ? { age: holderAge } : {}),
+      ...(holder.birthDate == null && read?.birthDate ? { birthDate: read.birthDate } : {}),
+      ...(holder.cpf == null && read?.cpf ? { cpf: read.cpf } : {}),
+    };
+    if (Object.keys(changes).length) {
+      await tx.update(schema.leadBeneficiaries).set({ ...changes, updatedAt: input.now }).where(and(eq(schema.leadBeneficiaries.id, holder.id), eq(schema.leadBeneficiaries.tenantId, input.tenantId)));
+    }
   }
+  const dependents = input.people.slice(1).filter((person) => person.name && !existing.some((current) => !current.isHolder && sameName(current.name, person.name!)));
+  if (dependents.length) {
+    await tx.insert(schema.leadBeneficiaries).values(dependents.map((person) => ({
+      id: randomUUID(), tenantId: input.tenantId, leadId: input.leadId, name: person.name!, age: person.age, birthDate: person.birthDate, cpf: person.cpf, relationship: person.relationship, isHolder: false,
+    })));
+  }
+
+  if (!input.contract) return null;
+  const documentId = randomUUID();
+  await tx.insert(schema.leadDocuments).values({
+    id: documentId,
+    tenantId: input.tenantId,
+    leadId: input.leadId,
+    requirementId: null,
+    beneficiaryId: null,
+    filename: input.contract.filename,
+    fileUrl: input.contract.fileUrl,
+    storageKey: input.contract.storageKey || null,
+    category: "contratacao",
+    description: "Contrato da venda, lido pela IA no registro",
+    coverageStartDate: input.coverageStartDate,
+    mimeType: input.contract.mimeType || null,
+    sizeBytes: input.contract.sizeBytes ?? null,
+    checksumSha256: input.contract.checksumSha256 || null,
+    scanStatus: "clean",
+    status: "pending",
+    uploadedBy: input.userId,
+  });
+  await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.userId, entidade: "lead_document", entidadeId: documentId, acao: "document.uploaded" });
+  return documentId;
 }
 
 /** Already converted, or an active sale exists: a second registration would duplicate client, commissions and reminders. */
@@ -342,7 +425,7 @@ type SaleCoreInput = Omit<z.output<typeof registerSaleInput>, "policyNumber" | "
  * Venda registrada pela conversa (19/11): sem documentos nesta fase. O que o corretor respondeu (ou o que a IA leu
  * do contrato) vai para o lead: plano, vidas e valor; a idade do titular vai para o titular, criado se faltar.
  */
-type ConversationSale = { planId: string | null; ages: number[]; notes: string };
+type ConversationSale = { planId: string | null; ages: number[]; notes: string; people: ConversationPerson[]; contract: z.output<typeof contractFileInput> | null };
 
 async function registerSale(input: SaleCoreInput, conversation: ConversationSale | null = null): Promise<RegisterSaleResult> {
   const { context, db, lead } = await assertLeadScope(input.leadId);
@@ -410,6 +493,7 @@ async function registerSale(input: SaleCoreInput, conversation: ConversationSale
 
   // Etapa de onde a venda saiu (desfecho do fechamento, 09/11).
   let soldFrom: { status: string; stageEnteredAt: Date | null } | null = null;
+  let conversationDocumentId: string | null = null;
   await db.transaction(async (tx) => {
     // All sale creation paths lock this same tenant-scoped lead row before checking active sales.
     const saleSlot = await lockLeadAndFindActiveSale(tx, { tenantId: context.tenantId, leadId: lead.id });
@@ -430,7 +514,7 @@ async function registerSale(input: SaleCoreInput, conversation: ConversationSale
       const evidenceIssue = saleEvidenceIssue(lockedEvidence);
       if (evidenceIssue) throw new SaleDocumentValidationError(saleEvidenceIssueMessage(evidenceIssue) ?? "Revise os documentos obrigatórios antes de registrar a venda.");
     } else {
-      await applyConversationSaleToLead(tx, { tenantId: context.tenantId, leadId: lead.id, leadName: lead.nome, planId: resolvedPlanId, approvedValue: input.approvedValue, ages: conversation.ages, now });
+      conversationDocumentId = await applyConversationSaleToLead(tx, { tenantId: context.tenantId, userId: context.userId, leadId: lead.id, leadName: lead.nome, planId: resolvedPlanId, approvedValue: input.approvedValue, ages: conversation.ages, people: conversation.people, contract: conversation.contract, coverageStartDate: input.coverageStartDate, now });
     }
     // Já convertido pela IA: a etapa não muda de novo e o desfecho já foi avisado na conversão.
     soldFrom = lockedAiSale ? null : { status: locked.status, stageEnteredAt: locked.stageEnteredAt ?? null };
@@ -466,7 +550,7 @@ async function registerSale(input: SaleCoreInput, conversation: ConversationSale
       renewalType: input.renewalType,
       renewalContactPreference: input.renewalContactPreference,
       postSaleNotes: input.postSaleNotes ?? null,
-      confirmationDocumentId: input.confirmationDocumentId,
+      confirmationDocumentId: conversationDocumentId ?? input.confirmationDocumentId,
       notes: conversation?.notes ?? null,
       status: "active",
       createdBy: context.userId,
