@@ -311,6 +311,17 @@ No painel do laboratório: resposta do servidor (ok, falha, ambíguo, sem rede),
 - Microfone no composer da conversa da Sasá (segurar para falar ali dentro), `POST /api/sasa/voz`, transcrição exibida com "Corrigir".
 - Laboratório: fluxo "Sasá por voz" com `transcribe` simulado (texto fixo por cenário) e opção de usar o microfone de verdade só no navegador.
 
+**Entregue em 19/11 (branch `feat/sasa-fase-2`).**
+
+- Microfone no composer da conversa da Sasá (`composer.tsx` + `voice-recorder.ts`): com o campo vazio, o botão de enviar vira microfone. Segurar grava (até 60 s), soltar envia, arrastar 64 px para a esquerda cancela, toque rápido explica "Segure o microfone enquanto fala". Teclado: Espaço ou Enter seguram, Esc cancela. Estados gravando (ponto, tempo, dica), "Entendendo o áudio…" e erro com a causa; vibração de toque e de erro via `useFeedback`, sem som; ponto e giro parados com `prefers-reduced-motion`.
+- `POST /api/sasa/voz`: sessão, só corretor do piloto (D8), consentimento de IA, até 2 MB; transcreve com o transcritor existente (Groq ou OpenAI) e um vocabulário da Sasá, em memória, e descarta o áudio (D4). Só o texto vai para `sasa_commands`, ligado ao pedido pelo mesmo `clientCommandId`; reenvio devolve o texto sem cobrar de novo.
+- "Corrigir o que eu ouvi": toda resposta a um pedido por voz traz essa opção. Ela desfaz o que foi feito com o texto errado (pelo mesmo Desfazer) e devolve o texto ao campo para corrigir e enviar.
+- Tabela própria `sasa_commands` (migration `drizzle/0233_sasa_commands.sql`): um registro por pedido, único por corretor e `client_command_id`; substitui a auditoria em `audit_logs` da fase 1. Sem a tabela, a Sasá continua funcionando, só sem histórico e teto.
+- Teto (D9): 150 pedidos e 20 minutos de áudio por dia de São Paulo (`limits.ts`), conferidos antes de transcrever e antes de executar.
+- Limpeza (D5): `/api/internal/jobs/sasa-cleanup`, `30 6 * * *` (03:30 em SP), apaga transcrição e resposta com mais de 90 dias; documentada no runbook do Coolify e no espelho `job-schedule.ts`.
+- Laboratório: o fluxo "Sasá: pedidos por texto e voz" grava de mentira (o painel não tem microfone), com o mesmo gesto e estados; a transcrição simulada traz, em ordem, um pedido certo, um com a hora errada (para testar o Corrigir), pausar e quem está esperando.
+- **Antes do deploy**: aplicar `drizzle/0233_sasa_commands.sql` e criar a Scheduled Task `sasa-cleanup` no Coolify. A voz usa as chaves de transcrição que a qualificação por áudio já usa (Groq ou OpenAI).
+
 ### Fase 3 · Botão flutuante em todo o Lite
 
 - `SasaVoiceButton` no shell, contexto de visibilidade, toast com ação e folha curta.

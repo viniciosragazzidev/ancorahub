@@ -31,6 +31,8 @@ export const JOB_SCHEDULE = {
   // Auto-reparo WhatsApp (flags desligadas por padrão). Horário em UTC; o aviso de véspera confere a hora de São Paulo.
   "whatsapp-autorreparo": { path: "/api/internal/jobs/whatsapp-autorreparo", cron: "0 * * * *", label: "Auto-reparo do WhatsApp" },
   "negotiation-snapshot": { path: "/api/internal/jobs/negotiation-snapshot", cron: "55 2 * * *", label: "Foto diária do fechamento" },
+  // 06:30 UTC = 03:30 em São Paulo: apaga o que foi dito à Sasá há mais de 90 dias (D5).
+  "sasa-cleanup": { path: "/api/internal/jobs/sasa-cleanup", cron: "30 6 * * *", label: "Limpeza da Sasá" },
 } as const;
 
 export type JobKey = keyof typeof JOB_SCHEDULE;

@@ -26,7 +26,7 @@ export async function resolveTranscriptionTarget(): Promise<TranscriptionTarget 
 const DOMAIN_PROMPT = "Conversa de WhatsApp com corretora de plano de saúde: nome, idade, cidade, bairro, operadora, plano individual, familiar ou empresarial, CNPJ, MEI, coparticipação, carência.";
 
 /** Fala → texto em português. Temperatura 0: transcreve, não interpreta. */
-export async function transcribeAudio(input: { target: TranscriptionTarget; audio: Uint8Array; mimeType: string; timeoutMs?: number }) {
+export async function transcribeAudio(input: { target: TranscriptionTarget; audio: Uint8Array; mimeType: string; timeoutMs?: number; /** Vocabulário do contexto (padrão: conversa com o cliente). */ prompt?: string }) {
   const provider = createOpenAI({
     apiKey: input.target.apiKey,
     ...(input.target.provider === "groq" ? { baseURL: "https://api.groq.com/openai/v1" } : {}),
@@ -34,7 +34,7 @@ export async function transcribeAudio(input: { target: TranscriptionTarget; audi
   const result = await transcribe({
     model: provider.transcription(input.target.model),
     audio: input.audio,
-    providerOptions: { openai: { language: "pt", prompt: DOMAIN_PROMPT, temperature: 0 } },
+    providerOptions: { openai: { language: "pt", prompt: input.prompt ?? DOMAIN_PROMPT, temperature: 0 } },
     maxRetries: 1,
     abortSignal: AbortSignal.timeout(input.timeoutMs ?? 30_000),
   });
