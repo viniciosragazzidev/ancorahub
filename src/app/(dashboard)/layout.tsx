@@ -5,6 +5,7 @@ import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import { AuthorizationError, AuthenticationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AppShell } from "@/components/app-shell";
+import { brokerAiAccess } from "@/features/ai-gateway/broker-ai-pilot";
 import { canEnterErpRoute } from "@/features/erp/route-access";
 import { getErpNavigation } from "@/features/erp/navigation";
 import { ContextualIllustrationsProvider } from "@/components/illustrations/contextual-illustration";
@@ -72,6 +73,10 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   // Minha carteira (etapa 4a): mesma regra da página /clientes, para o título do header não divergir dela.
   const brokerMyWalletPromise = context.role === "broker"
     ? isBrokerMyWalletEnabled().catch(() => false)
+    : Promise.resolve(false);
+  // Botão flutuante da Sasá (fase 3): mesma liberação da Sasá com IA (piloto ou flag da empresa).
+  const sasaVoicePromise = context.role === "broker"
+    ? brokerAiAccess(context.userId).then((access) => access.enabled).catch(() => false)
     : Promise.resolve(false);
   const relationshipFlagPromise = context.role === "broker" || context.role === "supervisor"
     ? getFeatureFlag(FEATURE_FLAGS.RELATIONSHIP_CENTER).catch(() => "false")
@@ -195,6 +200,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     illustrationsSetting,
     autoSaleFlag,
     brokerMyWalletFlag,
+    sasaVoiceEnabled,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -215,6 +221,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     illustrationsPromise,
     autoSaleFlagPromise,
     brokerMyWalletPromise,
+    sasaVoicePromise,
   ]);
 
   // Flag criada no G0 (feature_team_management_enabled): só libera o item Gestão do gestor Lite.
@@ -308,6 +315,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         teamManagementEnabled={isLightManager && teamManagementFlag}
         showDutyCalendar={isLightBroker && brokerDutyCalendarFlag === "true"}
         showRelationship={(isLightBroker || isLightSupervisor) && relationshipFlag === "true"}
+        sasaVoiceEnabled={isLightBroker && sasaVoiceEnabled}
         branding={{
           tenantName: tenant?.name ?? null,
           brandColor: tenant?.brandColor ?? null,

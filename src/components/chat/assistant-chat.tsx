@@ -9,7 +9,7 @@ import { useAssist } from "@/features/assist/components/assist-layer";
 import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
 import type { AgentId } from "@/features/ai-gateway/agents";
 import { ASSISTANTS, SASA_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
-import { readSasaPick, type SasaCommandInput } from "@/features/sasa/command-core";
+import { readSasaPick, SASA_DROP_VALUE, type SasaClientCommand } from "@/features/sasa/command-core";
 import { sasaCommandAction } from "@/features/sasa/command-action";
 import { readSasaFix, sasaFixBlock, transcribeSasaVoice } from "@/features/sasa/voice-client";
 import { useDevLab } from "@/lib/dev-lab";
@@ -24,7 +24,7 @@ import type { Mention } from "./composer";
 import type { AssistantAvatarAsset, ChatBlock, ChatScript, MascotShape } from "./types";
 
 /** An assistant conversation: the script plays, replies run the broker's actions. */
-export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false, voice = false }: { identity: { name: string; shape: MascotShape; hue: number | null; avatarAsset?: AssistantAvatarAsset }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Sasá's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean; /** Segurar para falar com a Sasá (fase 2): só para quem tem a Sasá com IA liberada. */ voice?: boolean }) {
+export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false, voice = false, embedded = false }: { identity: { name: string; shape: MascotShape; hue: number | null; avatarAsset?: AssistantAvatarAsset }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Sasá's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean; /** Segurar para falar com a Sasá (fase 2): só para quem tem a Sasá com IA liberada. */ voice?: boolean; /** Só os blocos, sem cabeçalho nem campo (folha do botão da Sasá, fase 3). */ embedded?: boolean }) {
   const router = useRouter();
   const assist = useAssist();
   // Aceite com contador (11/11): ligado, o WhatsApp abre na tela do lead depois de 30 s.
@@ -38,7 +38,7 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
   const transcribe = agentic && canWrite && (voice || Boolean(lab?.sasa?.transcribe)) ? (lab?.sasa?.transcribe ?? transcribeSasaVoice) : undefined;
   const runServer = (name: Parameters<typeof runChatServerAction>[0], payload: Record<string, string | number | boolean | null>) =>
     lab?.sasa ? lab.sasa.run(name, payload) : runChatServerAction(name, payload);
-  const command = async (input: SasaCommandInput) => {
+  const command = async (input: SasaClientCommand) => {
     const reply = await (lab?.sasa?.command ?? sasaCommandAction)(input);
     // Nível 1 (FEEDBACK.md): confirmação só depois do servidor; falha com erro. Sem som de celebração.
     if (reply.executed) feedbackOnResult(reply.executed.action, reply.executed, fire);
@@ -59,10 +59,12 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
   };
   return (
     <ChatScreen
+      embedded={embedded}
       composerDisabled={!canWrite}
       placeholder={canWrite ? undefined : "Escolha uma opção acima. Para perguntar, fale com Sasá."}
       onLocalChoice={async (_choice, value): Promise<ChatBlock[]> => {
         if (value.startsWith(SASA_ASK_PREFIX)) return ask(value.slice(SASA_ASK_PREFIX.length));
+        if (value === SASA_DROP_VALUE) return [{ type: "assistant", id: `sasa-drop-${Date.now()}`, text: "Tudo bem, não fiz nada." }];
         // "Qual Carlos?" e "Tentar de novo": repete o pedido com o lead escolhido.
         const pick = readSasaPick(value);
         if (pick) return (await command({ text: pick.text, pickedLeadId: pick.leadId })).blocks;

@@ -21,6 +21,8 @@ const inputSchema = z.object({
   clientCommandId: z.string().min(8).max(80).nullish(),
   pickedLeadId: z.string().min(1).max(80).nullish(),
   origin: z.enum(["text", "voice"]).nullish(),
+  /** Hora da gravação (fila sem internet); até 24 h, nunca no futuro. */
+  recordedAt: z.string().datetime({ offset: true }).nullish(),
 });
 
 const NOT_HANDLED: SasaReply = { handled: false, blocks: [] };
@@ -32,7 +34,7 @@ const NOT_HANDLED: SasaReply = { handled: false, blocks: [] };
  * Cada pedido vira uma linha em `sasa_commands` (fase 2), que dá o histórico, o teto de 150 por dia (D9)
  * e garante que um reenvio (resposta perdida na internet ruim) não executa duas vezes.
  */
-export async function sasaCommandAction(raw: { text: string; clientCommandId?: string | null; pickedLeadId?: string | null; origin?: "text" | "voice" | null }): Promise<SasaReply> {
+export async function sasaCommandAction(raw: { text: string; clientCommandId?: string | null; pickedLeadId?: string | null; origin?: "text" | "voice" | null; recordedAt?: string | null }): Promise<SasaReply> {
   const parsed = inputSchema.safeParse(raw);
   if (!parsed.success) return NOT_HANDLED;
   const input = parsed.data;
@@ -63,6 +65,8 @@ export async function sasaCommandAction(raw: { text: string; clientCommandId?: s
 
     const now = new Date();
     const world = sasaWorldOf(await getCachedBrokerWorkspaceData(), now);
+    const recorded = input.recordedAt ? new Date(input.recordedAt) : null;
+    const recordedAt = recorded && recorded.getTime() <= now.getTime() && now.getTime() - recorded.getTime() <= 86_400_000 ? recorded : null;
 
     let interpreted: Awaited<ReturnType<typeof interpretSasaText>> = null;
     let via: "rules" | "ai" = "rules";
@@ -88,6 +92,7 @@ export async function sasaCommandAction(raw: { text: string; clientCommandId?: s
     const reply = await runSasaCommand({
       text: input.text,
       pickedLeadId: input.pickedLeadId ?? null,
+      recordedAt,
       world,
       intent: interpreted?.intent,
       leadHint: interpreted?.leadHint,

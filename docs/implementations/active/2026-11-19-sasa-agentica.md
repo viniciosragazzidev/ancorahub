@@ -328,6 +328,17 @@ No painel do laboratório: resposta do servidor (ok, falha, ambíguo, sem rede),
 - Fila offline em IndexedDB e regra dos 30 minutos.
 - Laboratório: fluxo "Botão da Sasá" sobre o Início real e sobre a lista de leads, com chave "Sem internet" no painel; verifica onde ele some (oferta de lead, folha aberta, celebração).
 
+**Entregue em 19/11 (branch `feat/sasa-fase-3`).**
+
+- `SasaVoiceButton` (`src/components/chat/sasa-voice-button.tsx`) montado uma vez no shell do Lite (`light-chrome.tsx`), só para corretor com a Sasá liberada (`brokerAiAccess`, D8) e nunca em "Ver como". Canto inferior direito, 56 px, borda 1px, a Sasá com um selo de microfone; secundário, sem base sólida (D7). Segurar grava, soltar envia, arrastar 64 px para a esquerda cancela; Espaço/Enter seguram e Esc cancela. Gravando: botão vermelho e uma faixa com o tempo e "Deslize para a esquerda para cancelar".
+- Visibilidade (`voice-visibility.ts`): some nas conversas (que têm o próprio microfone), no registro de venda, na cotação, com `data-lead-offer` (oferta de lead), `data-lite-moment` (celebração), com qualquer diálogo ou folha aberta e com o teclado aberto. As pílulas do pé (`data-sasa-lift`: Agora, aceitar lead, `FloatingPill`) o empurram para cima em vez de cobrir. Usa os mesmos sinais que o anfitrião de conquistas e o tour já usavam, sem estado novo nas telas.
+- Resposta: texto curto (com ou sem Desfazer) vira toast com "Ouvi: …", o resultado e uma ação (Desfazer), por 6 s; escolha ("Qual Carlos?"), lista ou cartão abre uma folha curta (`BottomSheet`) com os mesmos blocos da conversa (`AssistantChat embedded`). Pedido que não é comando recebe a resposta da IA na folha.
+- Sem internet (`offline-queue.ts`): o áudio fica no IndexedDB (até 5, 24 h) e sai quando a conexão volta, um por vez, com a hora da gravação. O selo do botão mostra quantos esperam.
+- Regra dos 30 minutos (`sasaArrivedLate` no núcleo): pedido de escrita gravado há mais de 30 min não executa sozinho, vira "Você gravou às 13:20, sem internet. Pausar o recebimento de leads?" com Confirmar e "Deixar pra lá". "Daqui a 1 hora" conta da hora da gravação. Leituras respondem normalmente.
+- Laboratório: fluxo "Botão da Sasá" sobre o Início real (lista de assistentes e leads, pílula do pé), com "Com internet / Sem internet" e "Áudio de 40 min na fila".
+- Sem migration nova nem ação de servidor nova (`sasaCommandAction` só ganhou `recordedAt`).
+- **Pendente**: o histórico do que foi feito pelo botão ainda não aparece na conversa da Sasá (a linha fica em `sasa_commands`, mas a conversa não lê de lá).
+
 ### Fase 4 · Venda, cotação e registrar o que o cliente disse
 
 - Intenções 7, 9, 10 (nota + sugestão de etapa e retorno; "fechou a venda do Carlos" abrindo a conversa da venda já pré-preenchida; cotação com idades).
