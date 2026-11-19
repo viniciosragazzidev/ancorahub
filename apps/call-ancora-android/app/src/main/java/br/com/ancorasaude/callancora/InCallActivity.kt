@@ -51,6 +51,7 @@ class InCallActivity : AppCompatActivity() {
     private lateinit var btnAutoPause: TextView
     private lateinit var btnAutoSkip: View
     private lateinit var btnEndSession: View
+    private lateinit var btnVoicemail: View
 
     private var pulse: ValueAnimator? = null
     private var timerBig: Boolean? = null
@@ -89,6 +90,7 @@ class InCallActivity : AppCompatActivity() {
         btnAutoPause = findViewById(R.id.btnAutoPause)
         btnAutoSkip = findViewById(R.id.btnAutoSkip)
         btnEndSession = findViewById(R.id.btnEndSession)
+        btnVoicemail = findViewById(R.id.btnVoicemail)
 
         AppFonts.applyTree(findViewById(android.R.id.content))
 
@@ -102,6 +104,7 @@ class InCallActivity : AppCompatActivity() {
             if (AutoDialer.state.value is AutoDialer.State.Paused) AutoDialer.resume() else AutoDialer.pauseByUser()
         }
         btnAutoSkip.setOnClickListener { AutoDialer.skip() }
+        btnVoicemail.setOnClickListener { AutoHangup.manualVoicemail("manual") }
         btnEndSession.setOnClickListener {
             Toast.makeText(this, "Segure para encerrar a sessão.", Toast.LENGTH_SHORT).show()
         }
@@ -179,12 +182,14 @@ class InCallActivity : AppCompatActivity() {
         controlsRow.visibility = if (ended || ringingIncoming) View.GONE else View.VISIBLE
         btnHangup.visibility = if (ended || ringingIncoming) View.GONE else View.VISIBLE
         incomingRow.visibility = if (ringingIncoming) View.VISIBLE else View.GONE
+        btnVoicemail.visibility =
+            if (!ended && !snap.isIncoming && AutoHangup.isTracking) View.VISIBLE else View.GONE
         summaryCard.visibility = if (ended) View.VISIBLE else View.GONE
         btnBack.visibility = if (ended) View.VISIBLE else View.GONE
 
         if (ended) {
             tvSumTalk.text = Labels.clock(snap.talkMs ?: 0L)
-            tvSumReason.text = Labels.friendlyDisconnect(
+            tvSumReason.text = snap.autoDecisionLabel ?: Labels.friendlyDisconnect(
                 snap.disconnectCode,
                 snap.disconnectReason,
                 snap.disconnectLabel,

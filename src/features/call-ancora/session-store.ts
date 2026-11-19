@@ -10,7 +10,9 @@ export const CALL_ANCORA_SESSION_TTL_MS = 4 * 60 * 60_000;
 export const CALL_ANCORA_NEXT_DELAY_MS = 3_000;
 
 export type CallStatus = "ready" | "dialing" | "ringing" | "active" | "ended";
-export type CallOutcome = "interested" | "not_interested";
+export type CallOutcome = "interested" | "not_interested" | "no_answer" | "voicemail";
+/** Resultados que o app (ou o servidor) pode decidir sozinho, por tempo. */
+export type CallAutoOutcome = "no_answer" | "voicemail";
 export type DeviceCallEvent = "dialing" | "active" | "disconnected";
 export type DeviceControlAction = "pause" | "resume" | "skip";
 export type PairingResult =
@@ -26,8 +28,12 @@ export type CallAncoraLastCall = {
   causeLabel: string | null;
   reachedActive: boolean;
   talkSeconds: number;
-  /** "no_answer" quando o servidor classificou sozinho (nunca chegou a ACTIVE). */
-  autoOutcome: "no_answer" | null;
+  /** Classificação automática: "no_answer" (não chegou a ACTIVE ou tempo de toque esgotado) ou "voicemail" (provável caixa postal). */
+  autoOutcome: CallAutoOutcome | null;
+  /** Regra que decidiu (ex.: ring_timeout, quick_active, late_active, manual, server_no_active). */
+  rule: string | null;
+  /** ms entre DISCANDO e ACTIVE no celular, para calibrar as regras. */
+  dialToActiveMs: number | null;
 };
 
 export type CallAncoraSnapshot = {
@@ -50,6 +56,10 @@ export type CallAncoraSnapshot = {
   /** O celular pausou a sessão (não disca até retomar). */
   devicePaused: boolean;
   lastCall: CallAncoraLastCall | null;
+  /** Como o contato atual foi classificado (pode ser corrigido durante a contagem). */
+  lastOutcome: { contactId: string; outcome: CallOutcome; auto: boolean } | null;
+  /** A web pediu para o celular desligar a ligação atual como caixa postal. */
+  hangupRequested: boolean;
   countdown: { remainingSeconds: number; paused: boolean } | null;
   updatedAt: string;
 };
@@ -69,6 +79,8 @@ export type CallAncoraDeviceState = {
   current: { id: string; name: string; dialable: boolean; phone: string | null } | null;
   next: { id: string; name: string; phoneMasked: string | null } | null;
   lastCall: CallAncoraLastCall | null;
+  /** "voicemail": a web pediu para desligar a ligação atual como caixa postal. */
+  hangupRequest: "voicemail" | null;
 };
 
 type Scope = { tenantId: string; brokerId: string };
@@ -86,6 +98,8 @@ type Session = Scope & {
   callStartedAt: number | null;
   classified: boolean;
   lastCall: CallAncoraLastCall | null;
+  lastOutcome: CallAncoraSnapshot["lastOutcome"];
+  hangupRequested: boolean;
   interests: CallAncoraContact[];
   completed: number;
   autoDialEnabled: boolean;
@@ -124,6 +138,7 @@ export function toDeviceState(snapshot: CallAncoraSnapshot): CallAncoraDeviceSta
       ? { id: next.id, name: next.name, phoneMasked: next.dialable === true ? maskPhone(next.phone) : null }
       : null,
     lastCall: snapshot.lastCall,
+    hangupRequest: snapshot.hangupRequested ? "voicemail" : null,
   };
 }
 
@@ -154,6 +169,8 @@ export class CallAncoraSessionStore {
       callStartedAt: null,
       classified: false,
       lastCall: null,
+      lastOutcome: null,
+      hangupRequested: false,
       interests: [],
       completed: 0,
       autoDialEnabled: false,
@@ -252,7 +269,16 @@ export class CallAncoraSessionStore {
    */
   reportDeviceEvent(
     deviceToken: string,
-    input: { contactId: string; event: DeviceCallEvent; causeCode?: number | null; causeLabel?: string | null },
+    input: {
+      contactId: string;
+      event: DeviceCallEvent;
+      causeCode?: number | null;
+      causeLabel?: string | null;
+      /** Decisão do app por tempo (ou manual): desligou sozinho como não atendida ou caixa postal. */
+      autoOutcome?: CallAutoOutcome | null;
+      rule?: string | null;
+      dialToActiveMs?: number | null;
+    },
   ): DeviceEventResult {
     this.prune();
     const session = this.deviceSession(deviceToken);
@@ -279,16 +305,22 @@ export class CallAncoraSessionStore {
       if (status === "ended") return { ok: true, snapshot: this.snapshot(session) };
       if (status !== "dialing" && status !== "ringing" && status !== "active") return { ok: false, reason: "conflict" };
       const reachedActive = session.callStartedAt !== null;
+      // Decisão do app (caixa postal / tempo de toque) ou, sem ACTIVE, "Não atendeu".
+      const autoOutcome: CallAutoOutcome | null = input.autoOutcome ?? (reachedActive ? null : "no_answer");
+      const rule = input.autoOutcome ? input.rule?.slice(0, 40) ?? "app" : reachedActive ? null : "server_no_active";
       session.callStatus = "ended";
+      session.hangupRequested = false;
       session.lastCall = {
         causeCode: typeof input.causeCode === "number" ? input.causeCode : null,
         causeLabel: input.causeLabel?.slice(0, 80) ?? null,
         reachedActive,
         talkSeconds: reachedActive ? Math.max(0, Math.floor((now - (session.callStartedAt ?? now)) / 1000)) : 0,
-        autoOutcome: reachedActive ? null : "no_answer",
+        autoOutcome,
+        rule,
+        dialToActiveMs: typeof input.dialToActiveMs === "number" ? input.dialToActiveMs : null,
       };
-      // Nunca chegou a ACTIVE: "Não atendeu" sem esperar a web.
-      if (!reachedActive) this.finishContact(session, null);
+      // Classificação automática sem esperar a web (pode ser corrigida durante a contagem).
+      if (autoOutcome) this.finishContact(session, autoOutcome, true);
     }
     session.lastActivityAt = now;
     return { ok: true, snapshot: this.snapshot(session) };
@@ -326,7 +358,36 @@ export class CallAncoraSessionStore {
     if (!session || session.pairedAt === null || session.callStatus !== "ended" || session.classified) return null;
     const contact = session.queue[session.contactIndex];
     if (!contact) return null;
-    this.finishContact(session, outcome);
+    this.finishContact(session, outcome, false);
+    session.lastActivityAt = this.now();
+    return this.snapshot(session);
+  }
+
+  /**
+   * Corrige a classificação do contato que acabou de terminar, enquanto a contagem para o
+   * próximo ainda não acabou (ex.: o app marcou "Caixa postal" e era "Sem interesse").
+   */
+  reclassify(scope: Scope, outcome: CallOutcome): CallAncoraSnapshot | null {
+    const session = this.liveSession(scopeKey(scope));
+    if (!session || !session.classified) return null;
+    const inCountdown = session.countdownEndsAt !== null || session.countdownPaused;
+    const contact = session.queue[session.contactIndex];
+    if (!inCountdown || !contact || session.lastOutcome?.contactId !== contact.id) return null;
+    session.interests = session.interests.filter((item) => item.id !== contact.id);
+    if (outcome === "interested") session.interests.push(contact);
+    session.lastOutcome = { contactId: contact.id, outcome, auto: false };
+    session.lastActivityAt = this.now();
+    return this.snapshot(session);
+  }
+
+  /** Web: pede ao celular para desligar a ligação atual como caixa postal. */
+  requestVoicemailHangup(scope: Scope): CallAncoraSnapshot | null {
+    const session = this.liveSession(scopeKey(scope));
+    if (!session || session.pairedAt === null) return null;
+    const contact = session.queue[session.contactIndex];
+    if (!contact?.dialable) return null;
+    if (session.callStatus !== "dialing" && session.callStatus !== "ringing" && session.callStatus !== "active") return null;
+    session.hangupRequested = true;
     session.lastActivityAt = this.now();
     return this.snapshot(session);
   }
@@ -353,6 +414,8 @@ export class CallAncoraSessionStore {
     session.callStartedAt = null;
     session.classified = false;
     session.lastCall = null;
+    session.lastOutcome = null;
+    session.hangupRequested = false;
     session.interests = [];
     session.completed = 0;
     session.countdownEndsAt = null;
@@ -404,11 +467,13 @@ export class CallAncoraSessionStore {
   }
 
   /** Fecha o contato atual (classificado na web ou "Não atendeu" automático) e segue a fila. */
-  private finishContact(session: Session, outcome: CallOutcome | null) {
+  private finishContact(session: Session, outcome: CallOutcome, auto: boolean) {
     const contact = session.queue[session.contactIndex];
     if (contact && outcome === "interested" && !session.interests.some((item) => item.id === contact.id)) {
       session.interests.push(contact);
     }
+    session.lastOutcome = contact ? { contactId: contact.id, outcome, auto } : null;
+    session.hangupRequested = false;
     session.classified = true;
     session.completed += 1;
     if (session.autoDialEnabled) {
@@ -459,6 +524,7 @@ export class CallAncoraSessionStore {
     session.callStatus = session.contactIndex < session.queue.length ? "ready" : "ended";
     session.callStartedAt = null;
     session.classified = false;
+    session.hangupRequested = false;
     session.lastActivityAt = this.now();
   }
 
@@ -484,6 +550,8 @@ export class CallAncoraSessionStore {
       awaitingClassification: Boolean(current) && session.callStatus === "ended" && !session.classified,
       devicePaused: session.devicePaused,
       lastCall: session.lastCall ? { ...session.lastCall } : null,
+      lastOutcome: session.lastOutcome ? { ...session.lastOutcome } : null,
+      hangupRequested: session.hangupRequested,
       countdown: session.countdownEndsAt !== null || session.countdownPaused
         ? { remainingSeconds: Math.ceil((session.countdownPaused ? session.countdownRemainingMs ?? 0 : (session.countdownEndsAt ?? now) - now) / 1000), paused: session.countdownPaused }
         : null,

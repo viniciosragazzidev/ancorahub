@@ -52,6 +52,8 @@ object CrmSession {
     private var manualContactId: String? = null
     private var awaitingContactId: String? = null
     private var callStarted = false
+    /** O pedido "Caixa postal" da web já foi atendido nesta ligação. */
+    private var hangupRequestHandled = false
     private var dialAt: Long? = null
     private var activeAt: Long? = null
     private var lastDialAt: Long? = null
@@ -138,7 +140,7 @@ object CrmSession {
         report(JSONObject().put("contactId", contactId).put("event", "active").put("at", System.currentTimeMillis()))
     }
 
-    internal fun onOutgoingEnded(causeCode: Int?, causeLabel: String) {
+    internal fun onOutgoingEnded(causeCode: Int?, causeLabel: String, auto: AutoHangup.Result?) {
         val contactId = awaitingContactId ?: return
         val now = SystemClock.elapsedRealtime()
         val body = JSONObject()
@@ -149,6 +151,10 @@ object CrmSession {
             .put("causeLabel", causeLabel)
             .put("timeToActiveMs", activeAt?.let { a -> dialAt?.let { a - it } } ?: JSONObject.NULL)
             .put("talkMs", activeAt?.let { now - it } ?: JSONObject.NULL)
+            .put("autoOutcome", auto?.decision?.outcome?.api ?: JSONObject.NULL)
+            .put("rule", auto?.decision?.rule ?: JSONObject.NULL)
+            .put("dialToActiveMs", auto?.dialToActiveMs ?: JSONObject.NULL)
+        hangupRequestHandled = false
         resetCallTracking()
         _ui.value = _ui.value.copy(calling = false)
         report(body)
@@ -187,6 +193,11 @@ object CrmSession {
         }
         val state = src.latest
         _ui.value = _ui.value.copy(state = state, message = if (_ui.value.message?.startsWith("Sem conexão") == true) null else _ui.value.message)
+        // Botão "Caixa postal (desligar)" da web: desliga a ligação atual.
+        if (state?.hangupRequest == "voicemail" && awaitingContactId != null && !hangupRequestHandled && CallBus.hasLiveCall()) {
+            hangupRequestHandled = true
+            AutoHangup.manualVoicemail("manual_web")
+        }
         if (state == null || item == null) {
             explainIdle(state)
             return

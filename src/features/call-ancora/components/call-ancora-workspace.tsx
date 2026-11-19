@@ -15,7 +15,7 @@ import { useFeedback } from "@/lib/feedback/use-feedback";
 
 import { CALL_ANCORA_DEMO_CONTACTS } from "../contacts";
 import { CALL_ANCORA_MOBILE_SESSION_ENDED_MESSAGE, isCallAncoraMobileSessionEndedStatus } from "../mobile-session";
-import type { CallAncoraSnapshot, CallStatus } from "../session-store";
+import type { CallAncoraSnapshot, CallOutcome, CallStatus } from "../session-store";
 import { Beat, CallAvatar, ConnectedMoment, contactInitials, EnterInOrder, ExpiryBar, PairingQr, QueueTrack, SlideSwap, SwapText } from "./call-ancora-motion";
 
 const POLL_MS = 1_200;
@@ -44,6 +44,8 @@ function labSnapshot(firstName: string): CallAncoraSnapshot {
     awaitingClassification: false,
     devicePaused: false,
     lastCall: null,
+    lastOutcome: null,
+    hangupRequested: false,
     countdown: null,
     updatedAt: new Date().toISOString(),
   };
@@ -72,11 +74,23 @@ function statusLabel(status: CallStatus) {
   return ({ ready: "Pronta para ligar", dialing: "Discando", ringing: "Chamando", active: "Em ligação", ended: "Ligação encerrada" })[status];
 }
 
+const OUTCOME_LABEL: Record<CallOutcome, string> = {
+  interested: "Com interesse",
+  not_interested: "Sem interesse",
+  no_answer: "Não atendeu",
+  voicemail: "Caixa postal",
+};
+
 /** Como a última ligação real terminou, em português, a partir do relato do app Android. */
 function lastCallSummary(lastCall: CallAncoraSnapshot["lastCall"]) {
   if (!lastCall) return null;
   const cause = lastCall.causeLabel ? ` · ${lastCall.causeLabel}` : "";
-  if (lastCall.autoOutcome === "no_answer") return `Não atendeu${cause}`;
+  if (lastCall.autoOutcome === "voicemail") {
+    return lastCall.rule === "manual" || lastCall.rule === "manual_web" ? "Caixa postal · desligada" : "Provável caixa postal · o celular desligou sozinho";
+  }
+  if (lastCall.autoOutcome === "no_answer") {
+    return lastCall.rule === "ring_timeout" ? "Não atendeu · tempo de toque esgotado, o celular desligou" : `Não atendeu${cause}`;
+  }
   return `Encerrada${cause} · ${clock(lastCall.talkSeconds)} em ligação`;
 }
 
@@ -181,7 +195,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
     }
   }, [brokerFirstName, isLab]);
 
-  const classify = useCallback(async (outcome: "interested" | "not_interested") => {
+  const classify = useCallback(async (outcome: CallOutcome) => {
     if (!session || session.callStatus !== "ended") return;
     setBusy(true);
     setError(null);
@@ -239,6 +253,23 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
       setBusy(false);
     }
   }, [isLab, session]);
+
+  /** Ações simples da sessão (corrigir classificação, pedir para o celular desligar). */
+  const sendAction = useCallback(async (body: Record<string, unknown>, failure: string) => {
+    if (isLab) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/call-ancora/session", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const payload = await response.json() as { session?: CallAncoraSnapshot; error?: string };
+      if (!response.ok || !payload.session) throw new Error(payload.error || failure);
+      setSession(payload.session);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : failure);
+    } finally {
+      setBusy(false);
+    }
+  }, [isLab]);
 
   const applyTestList = useCallback(async () => {
     if (!session || isLab) return;
@@ -316,6 +347,8 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
   const totalContacts = session?.total ?? CALL_ANCORA_DEMO_CONTACTS.length;
   const realQueue = session?.queueSource === "test_list";
   const lastCallText = lastCallSummary(session?.lastCall ?? null);
+  const currentOutcome = session?.lastOutcome && session.current && session.lastOutcome.contactId === session.current.id ? session.lastOutcome : null;
+  const realCallInProgress = Boolean(session?.current?.dialable) && (session?.callStatus === "dialing" || session?.callStatus === "ringing" || session?.callStatus === "active");
   const calling = session?.callStatus === "dialing" || session?.callStatus === "ringing";
   const inSession = Boolean(session && session.status !== "waiting_pairing" && !connectedMoment);
   const newestInterests = session ? [...session.interests].reverse() : [];
@@ -483,11 +516,13 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
                       <SlideSwap swapKey={`${session.current.id}-${session.callStatus}-${session.countdown ? "countdown" : "idle"}`} axis="y" className="mx-auto flex max-w-lg flex-col items-center pb-2 text-center">
                         {session.callStatus === "active" ? <p className="mt-6 flex items-center gap-2 font-mono text-2xl tabular-nums text-(--foreground)" aria-live="off"><Clock3 className="size-5 text-(--success)" aria-hidden="true" /> {clock(Math.floor(Math.max(0, now - Date.parse(session.callStartedAt ?? new Date().toISOString())) / 1000))}</p> : null}
                         {calling ? <p className="mt-6 text-sm text-(--text-secondary)">{session.callStatus === "dialing" ? "Discando pelo celular pareado…" : "Chamando. Aguardando atender…"}</p> : null}
+                        {realCallInProgress && !isLab ? <Button size="sm" variant="secondary" className="mt-4 min-h-10 rounded-full" disabled={busy || session.hangupRequested} onClick={() => void sendAction({ action: "hangup-voicemail" }, "Não consegui pedir para desligar.")}>{session.hangupRequested ? "Pedindo para o celular desligar…" : "Caixa postal (desligar)"}</Button> : null}
                         {session.callStatus === "ready" ? <p className="mt-5 max-w-sm text-sm leading-6 text-(--text-secondary)">{session.autoDialEnabled ? "Discagem automática ligada. A próxima simulação começa após a contagem; para uma chamada real, o navegador exige um toque em Ligar no celular." : "Discagem automática desligada. O próximo contato está pronto. Toque em Ligar para o próximo no celular."}</p> : null}
                         {lastCallText && (session.callStatus === "ended" || session.countdown) ? <p className="mt-5 text-sm font-medium text-(--foreground)" role="status">{lastCallText}</p> : null}
                         {session.callStatus === "ended" && !session.countdown ? <p className="mt-5 text-sm text-(--text-secondary)">Como foi esta conversa?</p> : null}
+                        {session.countdown && currentOutcome && !isLab ? <div className="mt-5 w-full max-w-md text-center"><p className="text-sm text-(--text-secondary)">Classificada como <span className="font-semibold text-(--foreground)">{OUTCOME_LABEL[currentOutcome.outcome]}</span>{currentOutcome.auto ? " (automático, estimativa)" : ""}.</p><div className="mt-2 flex flex-wrap justify-center gap-2"><span className="self-center text-xs text-(--text-muted)">Corrigir:</span>{(Object.keys(OUTCOME_LABEL) as CallOutcome[]).filter((outcome) => outcome !== currentOutcome.outcome).map((outcome) => <Button key={outcome} size="sm" variant="secondary" className="min-h-9 rounded-full" disabled={busy} onClick={() => void sendAction({ action: "reclassify", outcome }, "Não consegui corrigir a classificação.")}>{OUTCOME_LABEL[outcome]}</Button>)}</div></div> : null}
                         {session.countdown ? <div className="mt-6 flex w-full max-w-md flex-wrap items-center justify-center gap-3 rounded-xl bg-(--surface-muted) px-4 py-3"><span className="inline-flex items-center gap-1 text-sm text-(--text-secondary)">{countdownExpired ? "Próximo contato" : session.countdown.paused ? "Próximo em pausado" : <>Próximo em <LiteNumber value={session.countdown.remainingSeconds} /> s</>}</span><Button size="sm" variant="secondary" className="min-h-10 rounded-full" onClick={() => void setCountdownPaused(!session.countdown?.paused)}>{session.countdown.paused ? <Play className="size-4" aria-hidden="true" /> : <Pause className="size-4" aria-hidden="true" />}{session.countdown.paused ? "Retomar" : "Pausar"}</Button></div> : null}
-                        {session.callStatus === "ended" && !session.countdown ? <div className="mt-6 grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2"><Button variant="primary" size="lg" className="min-h-12 rounded-full" disabled={busy} loading={busy} onClick={() => void classify("interested")}><Heart className="size-4" aria-hidden="true" /> Com interesse</Button><Button variant="secondary" size="lg" className="min-h-12 rounded-full" disabled={busy} onClick={() => void classify("not_interested")}><X className="size-4" aria-hidden="true" /> Sem interesse</Button></div> : null}
+                        {session.callStatus === "ended" && !session.countdown ? <div className="mt-6 grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2"><Button variant="primary" size="lg" className="min-h-12 rounded-full" disabled={busy} loading={busy} onClick={() => void classify("interested")}><Heart className="size-4" aria-hidden="true" /> Com interesse</Button><Button variant="secondary" size="lg" className="min-h-12 rounded-full" disabled={busy} onClick={() => void classify("not_interested")}><X className="size-4" aria-hidden="true" /> Sem interesse</Button><Button variant="secondary" size="md" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("voicemail")}>Caixa postal</Button><Button variant="secondary" size="md" className="min-h-11 rounded-full" disabled={busy} onClick={() => void classify("no_answer")}>Não atendeu</Button></div> : null}
                       </SlideSwap>
                     </> : (
                       <div className="flex flex-col items-center py-16 text-center">

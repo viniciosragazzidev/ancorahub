@@ -159,6 +159,7 @@ class CrmPanel(private val activity: MainActivity) {
                 val cause = last?.causeLabel?.let { " · $it" }.orEmpty()
                 val text = when {
                     last == null -> "Ligação encerrada"
+                    last.voicemail -> "Provável caixa postal$cause"
                     last.noAnswer -> "Não atendeu$cause"
                     else -> "Encerrada$cause · ${Labels.clock(last.talkSeconds * 1000L)}"
                 }

@@ -22,6 +22,9 @@ const eventSchema = z.object({
   timeToActiveMs: z.number().int().nonnegative().nullable().optional(),
   talkMs: z.number().int().nonnegative().nullable().optional(),
   sim: z.string().max(80).nullable().optional(),
+  autoOutcome: z.enum(["no_answer", "voicemail"]).nullable().optional(),
+  rule: z.string().max(40).nullable().optional(),
+  dialToActiveMs: z.number().int().nonnegative().max(600_000).nullable().optional(),
 });
 
 /** App Android: evento de ligação real (discando, em ligação, encerrada com a causa). */

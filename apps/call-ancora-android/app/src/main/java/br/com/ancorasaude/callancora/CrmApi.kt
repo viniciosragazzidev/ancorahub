@@ -11,7 +11,13 @@ import java.net.URL
 /** Estado da sessão como o servidor manda para o app (número só quando discável). */
 data class CrmContact(val id: String, val name: String, val dialable: Boolean, val phone: String?)
 data class CrmNext(val id: String, val name: String, val phoneMasked: String?)
-data class CrmLastCall(val causeLabel: String?, val reachedActive: Boolean, val talkSeconds: Int, val noAnswer: Boolean)
+data class CrmLastCall(
+    val causeLabel: String?,
+    val reachedActive: Boolean,
+    val talkSeconds: Int,
+    val noAnswer: Boolean,
+    val voicemail: Boolean,
+)
 
 data class CrmState(
     val sessionId: String,
@@ -28,6 +34,8 @@ data class CrmState(
     val current: CrmContact?,
     val next: CrmNext?,
     val lastCall: CrmLastCall?,
+    /** "voicemail": a web pediu para desligar a ligação atual como caixa postal. */
+    val hangupRequest: String?,
 )
 
 /** Resultado do QR: de onde veio (origem) e o ticket de uso único. */
@@ -95,6 +103,7 @@ class CrmApi(private val origin: String, private val token: String?) {
                     reachedActive = it.optBoolean("reachedActive"),
                     talkSeconds = it.optInt("talkSeconds"),
                     noAnswer = it.optString("autoOutcome") == "no_answer",
+                    voicemail = it.optString("autoOutcome") == "voicemail",
                 )
             }
             return CrmState(
@@ -112,6 +121,7 @@ class CrmApi(private val origin: String, private val token: String?) {
                 current = current,
                 next = next,
                 lastCall = last,
+                hangupRequest = if (s.isNull("hangupRequest")) null else s.optString("hangupRequest").ifBlank { null },
             )
         }
     }

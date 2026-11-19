@@ -45,4 +45,5 @@ dependencies {
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     // Token do dispositivo guardado criptografado.
     implementation("androidx.security:security-crypto:1.0.0")
+    testImplementation("junit:junit:4.13.2")
 }

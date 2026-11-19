@@ -360,6 +360,25 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- Caixa postal: desliga agora e marca como caixa postal -->
+    <TextView
+        android:id="@+id/btnVoicemail"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:layout_marginBottom="18dp"
+        android:background="@drawable/bg_pill_outline_white"
+        android:clickable="true"
+        android:focusable="true"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:tag="font600"
+        android:text="Caixa postal · desligar"
+        android:textColor="@color/white"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
     <!-- Desligar (chamada feita ou já atendida) -->
     <ImageView
         android:id="@+id/btnHangup"

@@ -27,6 +27,8 @@ const session: CallAncoraSnapshot = {
   awaitingClassification: false,
   devicePaused: false,
   lastCall: null,
+  lastOutcome: null,
+  hangupRequested: false,
   countdown: null,
   updatedAt: "2026-11-19T12:00:00.000Z",
 };

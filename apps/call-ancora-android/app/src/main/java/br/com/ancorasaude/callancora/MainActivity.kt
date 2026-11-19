@@ -31,6 +31,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.slider.Slider
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.launch
@@ -155,6 +156,8 @@ class MainActivity : AppCompatActivity() {
         AppFonts.applyTree(findViewById(android.R.id.content))
         SignalMonitor.start(this)
         CrmSession.restore(this)
+        HangupSettings.load(this)
+        bindHangupSettings()
         etNumber.addTextChangedListener(BrPhoneWatcher(etNumber))
 
         btnNextItem.setOnClickListener {
@@ -211,6 +214,45 @@ class MainActivity : AppCompatActivity() {
     override fun onStop() {
         CrmSession.foreground = false
         super.onStop()
+    }
+
+    /** Cartão "Regras de desligamento": chave geral e os três tempos. */
+    private fun bindHangupSettings() {
+        val sw = findViewById<MaterialSwitch>(R.id.swAutoHangup)
+        val sliders = findViewById<View>(R.id.hangupSliders)
+        val ring = findViewById<Slider>(R.id.sliderRingTimeout)
+        val quick = findViewById<Slider>(R.id.sliderQuickActive)
+        val late = findViewById<Slider>(R.id.sliderLateActive)
+        val tvRing = findViewById<TextView>(R.id.tvRingTimeoutValue)
+        val tvQuick = findViewById<TextView>(R.id.tvQuickActiveValue)
+        val tvLate = findViewById<TextView>(R.id.tvLateActiveValue)
+
+        fun show(config: HangupConfig) {
+            sw.isChecked = config.enabled
+            sliders.alpha = if (config.enabled) 1f else 0.45f
+            ring.value = config.ringTimeoutSec.toFloat()
+            quick.value = config.quickActiveSec.toFloat()
+            late.value = config.voicemailAfterSec.toFloat()
+            tvRing.text = "${config.ringTimeoutSec} s"
+            tvQuick.text = "${config.quickActiveSec} s"
+            tvLate.text = "${config.voicemailAfterSec} s"
+        }
+        show(HangupSettings.config.value)
+
+        fun save() {
+            val config = HangupConfig(
+                enabled = sw.isChecked,
+                ringTimeoutSec = ring.value.toInt(),
+                quickActiveSec = quick.value.toInt(),
+                voicemailAfterSec = late.value.toInt(),
+            )
+            HangupSettings.update(this, config)
+            show(HangupSettings.config.value)
+        }
+        sw.setOnCheckedChangeListener { _, _ -> save() }
+        listOf(ring, quick, late).forEach { slider ->
+            slider.addOnChangeListener { _, _, fromUser -> if (fromUser) save() }
+        }
     }
 
     /** "Ler QR code": pede a câmera (só agora) e abre o leitor. */
