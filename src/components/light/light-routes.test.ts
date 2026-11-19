@@ -29,8 +29,19 @@ describe("Light routes", () => {
     expect(getLightMoreDestinations({ dutyCalendar: false }).some((item) => item.href === "/plantoes")).toBe(false);
     expect(resolveLightRoute("/plantoes/agora")).toMatchObject({ parentHref: "/plantoes" });
   });
+  it("mostra Call Âncora só com a flag liberada e resolve a rota Lite", () => {
+    expect(getLightMoreDestinations({ callAncora: false }).some((item) => item.href === "/call-ancora")).toBe(false);
+    expect(getLightMoreDestinations({ callAncora: true })).toContainEqual({ href: "/call-ancora", label: "Call Âncora", requires: "callAncora" });
+    expect(getLightMoreDestinations({ callAncora: true }, "supervisor").some((item) => item.href === "/call-ancora")).toBe(true);
+    expect(getLightMoreDestinations({ callAncora: true }, "manager").some((item) => item.href === "/call-ancora")).toBe(true);
+    expect(getLightMoreDestinations({ callAncora: false }, "manager").some((item) => item.href === "/call-ancora")).toBe(false);
+    expect(isLightRouteAllowed("/call-ancora")).toBe(true);
+    expect(isLightRouteAllowed("/call-ancora", "supervisor")).toBe(true);
+    expect(isLightRouteAllowed("/call-ancora", "manager")).toBe(true);
+    expect(resolveLightRoute("/call-ancora")).toMatchObject({ title: "Call Âncora", tab: "mais", parentHref: "/dashboard" });
+  });
   it("keeps the allowed route list used by the dashboard layout", () => {
-    for (const path of ["/dashboard", "/minha-fila", "/agenda", "/desempenho", "/leads/abc", "/conversas/broker", "/clientes/1", "/l/token", "/settings", "/notificacoes"]) {
+    for (const path of ["/dashboard", "/minha-fila", "/agenda", "/desempenho", "/leads/abc", "/conversas/broker", "/clientes/1", "/l/token", "/settings", "/notificacoes", "/call-ancora"]) {
       expect(isLightRouteAllowed(path)).toBe(true);
     }
     expect(isLightRouteAllowed("/agenda", "supervisor")).toBe(false);

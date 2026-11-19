@@ -58,6 +58,7 @@ export function AppShell({
   showRelationship = false,
   journeyEnabled = false,
   homeV2Enabled = false,
+  callAncoraEnabled = false,
   brokerMyWalletEnabled = false,
   welcomeVideoEnabled = false,
   brokerHomeRedesign = false,
@@ -89,6 +90,7 @@ export function AppShell({
   journeyEnabled?: boolean;
   /** Início do corretor reorganizado (BROKER_NAV_REORG): menu Mais novo. */
   homeV2Enabled?: boolean;
+  callAncoraEnabled?: boolean;
   /** Minha carteira do corretor (etapa 4a): título de `/clientes` no Lite. */
   brokerMyWalletEnabled?: boolean;
   /** Welcome video on the broker's first access (Super-admin flag). */
@@ -231,6 +233,7 @@ export function AppShell({
           showRelationship={showRelationship}
           journeyEnabled={journeyEnabled}
           homeV2Enabled={homeV2Enabled}
+          callAncoraEnabled={callAncoraEnabled}
           brokerMyWalletEnabled={brokerMyWalletEnabled}
           welcomeVideoEnabled={welcomeVideoEnabled}
           brokerHomeRedesign={brokerHomeRedesign}
@@ -289,10 +292,10 @@ export function AppShell({
         {directorLiteEnabled ? <div className="arc-venancor director-view-as-banner" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}><ViewAsBanner viewingAs={viewAs.viewingAs} /></div> : <ViewAsBanner viewingAs={viewAs.viewingAs} />}
         {directorLiteEnabled ? (
           <div className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}>
-            <CorreTopSidebar erpPaths={erpLinks.map((link) => link.href)} logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} />
+            <CorreTopSidebar erpPaths={erpLinks.map((link) => link.href)} logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} callAncoraEnabled={callAncoraEnabled} />
           </div>
         ) : (
-          <CorreTopSidebar erpPaths={erpLinks.map((link) => link.href)} logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} />
+          <CorreTopSidebar erpPaths={erpLinks.map((link) => link.href)} logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} negotiationsEnabled={negotiationsEnabled} postSaleAuditEnabled={postSaleAuditEnabled} callAncoraEnabled={callAncoraEnabled} />
         )}
         {directorLiteEnabled ? <div id={DIRECTOR_LITE_PORTAL_ROOT_ID} className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }} /> : null}
         <SidebarInset

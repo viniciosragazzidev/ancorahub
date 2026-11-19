@@ -2,6 +2,7 @@
   "/agenda",
   "/conversas/broker",
   "/cotacao",
+  "/call-ancora",
   "/dashboard/c/[assistant]",
   "/desempenho",
   "/equipe/desempenho",

@@ -48,6 +48,7 @@ export function LightChrome({
   showNegotiations = false,
   journeyEnabled = false,
   homeV2Enabled = false,
+  callAncoraEnabled = false,
   brokerMyWalletEnabled = false,
   welcomeVideoEnabled = false,
   brokerHomeRedesign = false,
@@ -70,6 +71,7 @@ export function LightChrome({
   showNegotiations?: boolean;
   journeyEnabled?: boolean;
   homeV2Enabled?: boolean;
+  callAncoraEnabled?: boolean;
   /** Minha carteira (etapa 4a): só muda o título de `/clientes` para o corretor. */
   brokerMyWalletEnabled?: boolean;
   welcomeVideoEnabled?: boolean;
@@ -105,6 +107,7 @@ export function LightChrome({
       showNegotiations={showNegotiations}
       journeyEnabled={journeyEnabled}
       homeV2Enabled={homeV2Enabled}
+      callAncoraEnabled={callAncoraEnabled}
       viewAs={viewAs}
       teamRankingEnabled={teamRankingEnabled}
       teamManagementEnabled={teamManagementEnabled}
@@ -125,7 +128,7 @@ export function LightChrome({
   const shell = {
     availability, isPending, setStatus, error: availabilityError, openMore: (opener?: HTMLElement) => { moreReturnTo.current = opener ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null); setMoreOpen(true); }, audience, welcomeVideo: welcomeVideoEnabled,
     homeRedesign: audience === "broker" && brokerHomeRedesign, showHomeLearning,
-    homeTools: getLightMoreDestinations({ quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship, journey: journeyEnabled }, audience),
+    homeTools: getLightMoreDestinations({ quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship, journey: journeyEnabled, callAncora: callAncoraEnabled }, audience),
   };
   // Computers: the conversation list stays on the left and the screen opens at the center
   // (CSS .lite-split, venancor-scope.css); phones keep one screen at a time.

@@ -23,12 +23,13 @@ import { InterfaceMotionProvider } from "@/components/motion/interface-motion-pr
 import { TeamListManager } from "@/features/supervisor-workspace/lead-import/team-list-manager";
 import { SaleChat, type SaleChatServices } from "@/features/post-sale/components/sale-chat";
 import type { SaleCatalog } from "@/features/post-sale/conversation-sale-core";
+import { CallAncoraWorkspace } from "@/features/call-ancora/components/call-ancora-workspace";
 
 import styles from "./lab.module.css";
 import { MotionShowcase } from "./motion-showcase";
 import { createLabSasa, labSasaPhrasesBlock, labSasaWorld } from "./sasa-lab";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "lista" | "conquistas" | "movimento";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "lista" | "conquistas" | "movimento" | "callAncora";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -39,6 +40,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "lista", label: "Lista da equipe (supervisor)" },
   { id: "conquistas", label: "Conquistas" },
   { id: "movimento", label: "Movimento (componentes)" },
+  { id: "callAncora", label: "Call Âncora (celular simulado)" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -229,6 +231,8 @@ export function FlowLab() {
           <InterfaceMotionProvider enabled={!killSwitch}>
             <MotionShowcase delay={delay} failing={outcome === "falha"} />
           </InterfaceMotionProvider>
+        ) : flow === "callAncora" ? (
+          <CallAncoraWorkspace brokerFirstName="Vinicios" />
         ) : (
           <main className={`arc-venancor ${styles.buttons}`}>
             <h1>Conquistas</h1>

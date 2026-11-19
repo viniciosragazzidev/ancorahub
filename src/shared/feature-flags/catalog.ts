@@ -227,6 +227,11 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Modo corretor reorganizado (plano do modo corretor): Início sem Dicas de Atendimento e Jornada, com Minha carteira entre os acessos (etapa 1); Desempenho em período, resultados, atendimento e conversão, metas e Minha jornada (etapa 2); Plantões em uma entrada única (etapa 3); Minha carteira com visões e Novo interessado, junto com a carteira Lite (etapa 4a); Perfil do cliente com histórico (etapa 5); Agenda agrupada por dia ligada a leads e perfis (etapa 6). Desligada, volta tudo ao anterior.",
   },
+  CALL_ANCORA_VISUAL: {
+    key: "feature_call_ancora_visual_enabled", scope: "global", defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Demonstração visual do Call Âncora com contatos fictícios e sessão temporária em memória. Desligada por padrão; libera corretores quando ativada pelo Super-admin. Admins ativos da plataforma e desenvolvimento local podem validar sem a flag.",
+  },
   BROKER_JOURNEY: {
     key: "feature_broker_journey_enabled", scope: "global", defaultValue: "false",
     allowedValues: ["true", "false"] as const,

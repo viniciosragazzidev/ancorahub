@@ -1236,6 +1236,7 @@ const BROKER_NEWS_FLAGS = [
   { field: "relationshipCenterEnabled", flag: FEATURE_FLAGS.RELATIONSHIP_CENTER },
   { field: "brokerEngagementEnabled", flag: FEATURE_FLAGS.BROKER_ENGAGEMENT },
   { field: "brokerAiAssistantsEnabled", flag: FEATURE_FLAGS.BROKER_AI_ASSISTANTS },
+  { field: "callAncoraVisualEnabled", flag: FEATURE_FLAGS.CALL_ANCORA_VISUAL },
   { field: "supervisorTeamScopeEnabled", flag: FEATURE_FLAGS.SUPERVISOR_TEAM_SCOPE },
   { field: "supervisorLiteEnabled", flag: FEATURE_FLAGS.SUPERVISOR_LITE },
   { field: "teamManagementEnabled", flag: FEATURE_FLAGS.TEAM_MANAGEMENT },

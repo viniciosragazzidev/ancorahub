@@ -42,6 +42,7 @@ import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag"
 import { resolveNegotiationsRouteAccess } from "@/features/negotiations/route-access";
 import { BrokerProfileViewerProvider } from "@/components/broker-profile-link";
 import { getBrokerProfileTeamIds } from "@/features/team/broker-profile-team";
+import { canUseCallAncora } from "@/features/call-ancora/visibility";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   let context;
@@ -68,6 +69,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     : Promise.resolve("false");
   const brokerNavReorgFlagPromise = context.role === "broker"
     ? getFeatureFlag(FEATURE_FLAGS.BROKER_NAV_REORG).catch(() => FEATURE_FLAGS.BROKER_NAV_REORG.defaultValue)
+    : Promise.resolve("false");
+  const callAncoraFlagPromise = context.role === "broker"
+    ? getFeatureFlag(FEATURE_FLAGS.CALL_ANCORA_VISUAL).catch(() => "false")
     : Promise.resolve("false");
   // Minha carteira (etapa 4a): mesma regra da página /clientes, para o título do header não divergir dela.
   const brokerMyWalletPromise = context.role === "broker"
@@ -135,7 +139,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   });
   const routeAccessPromise = pathnamePromise.then(async (pathname) => {
     const path = pathname.split("?")[0];
-    if (path === "" || isAlwaysAllowedPath(path)) return true;
+    if (path === "" || path === "/call-ancora" || isAlwaysAllowedPath(path)) return true;
     return canAccessRoute(await effectiveAccessPromise, getRouteDefinition(path));
   });
   const negotiationsRouteAccessPromise = resolveNegotiationsRouteAccess({
@@ -195,6 +199,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     illustrationsSetting,
     autoSaleFlag,
     brokerMyWalletFlag,
+    callAncoraSetting,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -215,6 +220,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     illustrationsPromise,
     autoSaleFlagPromise,
     brokerMyWalletPromise,
+    callAncoraFlagPromise,
   ]);
 
   // Flag criada no G0 (feature_team_management_enabled): só libera o item Gestão do gestor Lite.
@@ -238,7 +244,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   }
 
   // Gestor na versão antiga (10/11): só as rotas da gestão da unidade; o resto volta para a equipe.
-  if (isOutsideManagerScope(context.role, context.jobTitle) && pathname !== "" && !isManagerRouteAllowed(pathname) && !erpRouteAllowed) {
+  if (isOutsideManagerScope(context.role, context.jobTitle) && pathname !== "" && !isManagerRouteAllowed(pathname) && !erpRouteAllowed
+    && !(pathname.split("?")[0] === "/call-ancora" && (context.viewAs || process.env.NODE_ENV === "development"))) {
     redirect(MANAGER_HOME_PATH);
   }
 
@@ -269,6 +276,12 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const [shell] = shellRows;
   const tenant = shell ? { name: shell.tenantName, brandColor: shell.brandColor, logoUrl: shell.logoUrl } : undefined;
   const currentUser = shell && shell.userName !== null ? { name: shell.userName, email: shell.userEmail, isPlatformAdmin: shell.isPlatformAdmin } : undefined;
+  const callAncoraVisible = canUseCallAncora({
+    role: context.role,
+    featureEnabled: callAncoraSetting === "true",
+    platformAdmin: Boolean(context.viewAs || currentUser?.isPlatformAdmin),
+    development: process.env.NODE_ENV === "development",
+  });
   // "Ver como": the real signed-in user is a platform admin (while viewing, context.viewAs says so).
   const viewAsState = {
     canViewAs: Boolean(context.viewAs) || Boolean(currentUser?.isPlatformAdmin),
@@ -302,6 +315,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         showQuoteSimulator={isLightBroker}
         journeyEnabled={isLightBroker && brokerJourneyFlag === "true"}
         homeV2Enabled={isLightBroker && brokerNavReorgFlag === "true"}
+        callAncoraEnabled={callAncoraVisible}
         brokerMyWalletEnabled={isLightBroker && brokerMyWalletFlag}
         welcomeVideoEnabled={isLightBroker && welcomeVideoFlag === "true" && (process.env.WELCOME_VIDEO_TENANT_ID ?? "").split(",").map((id) => id.trim()).filter(Boolean).includes(context.tenantId)}
         teamRankingEnabled={isLightSupervisor && teamRankingFlag === "true"}
