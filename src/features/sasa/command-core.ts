@@ -48,6 +48,20 @@ export type SasaCommandInput = {
   origin?: "text" | "voice" | null;
 };
 
+/** O pedido como sai do aparelho: a hora da gravação viaja como texto ISO. */
+export type SasaClientCommand = SasaCommandInput & { recordedAt?: string | null };
+/** No servidor: quando foi gravado (fila sem internet). "daqui a 1 hora" conta daqui; mais de 30 min pede confirmação. */
+type SasaTimedInput = SasaCommandInput & { recordedAt?: Date | null };
+
+/** Regra dos 30 minutos (plano §3.6): pedido de escrita que chega atrasado não executa sozinho. */
+export const SASA_LATE_MINUTES = 30;
+export function sasaArrivedLate(recordedAt: Date | null | undefined, now: Date) {
+  return Boolean(recordedAt && now.getTime() - recordedAt.getTime() > SASA_LATE_MINUTES * 60_000);
+}
+
+/** "Deixar pra lá" na confirmação de um pedido atrasado. */
+export const SASA_DROP_VALUE = "sasa-drop";
+
 /** Valor de uma escolha local que repete o pedido com o lead escolhido. */
 export const SASA_PICK_PREFIX = "sasa:";
 export function sasaPickValue(text: string, leadId: string) {
@@ -97,7 +111,7 @@ export function sasaWorldOf(data: BrokerWorkspaceData, now: Date): SasaWorld {
 
 type Plan =
   | { kind: "answer"; blocks: ChatBlock[] }
-  | { kind: "run"; name: ChatServerActionName; payload: Record<string, string>; done: string; failed: string };
+  | { kind: "run"; name: ChatServerActionName; payload: Record<string, string>; done: string; failed: string; /** O pedido como pergunta ("Marcar retorno com Ana amanhã às 10:00"). */ ask: string };
 
 function dayDate(date: Date) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "2-digit" }).format(date);
@@ -162,7 +176,7 @@ function agendaAnswer(world: SasaWorld, stamp: string): Plan {
 }
 
 /** Resolve o lead do pedido; em dúvida ou sem achar, devolve a pergunta a fazer. */
-function leadOf(input: SasaCommandInput, world: SasaWorld, stamp: string, hint: string | null): { lead: SasaLead } | { plan: Plan } {
+function leadOf(input: SasaTimedInput, world: SasaWorld, stamp: string, hint: string | null): { lead: SasaLead } | { plan: Plan } {
   if (input.pickedLeadId) {
     const lead = world.leads.find((item) => item.id === input.pickedLeadId);
     if (lead) return { lead };
@@ -190,24 +204,25 @@ function openReturnsOf(world: SasaWorld, leadId: string) {
   return world.returns.filter((item) => item.leadId === leadId).sort((a, b) => (a.dueAt?.getTime() ?? Infinity) - (b.dueAt?.getTime() ?? Infinity));
 }
 
-function plan(intent: SasaIntent, input: SasaCommandInput, world: SasaWorld, stamp: string, hint: string | null, whenText: string | null): Plan {
+function plan(intent: SasaIntent, input: SasaTimedInput, world: SasaWorld, stamp: string, hint: string | null, whenText: string | null): Plan {
   switch (intent.tool) {
     case "duty.next": return dutyAnswer(world, stamp);
     case "leads.waiting": return waitingAnswer(world, stamp);
     case "agenda.list": return agendaAnswer(world, stamp);
     case "duty.pause":
       if (world.availability === "paused") return { kind: "answer", blocks: [sasaSay(`sasa-paused-${stamp}`, "Você já está pausado. Para voltar, diga \"volta a receber\".")] };
-      return { kind: "run", name: "duty.pause", payload: {}, done: "Pausei. Você não recebe leads novos até voltar.", failed: "Não consegui pausar. Você continua recebendo." };
+      return { kind: "run", name: "duty.pause", payload: {}, done: "Pausei. Você não recebe leads novos até voltar.", failed: "Não consegui pausar. Você continua recebendo.", ask: "Pausar o recebimento de leads" };
     case "duty.resume":
       if (world.availability === "available") return { kind: "answer", blocks: [sasaSay(`sasa-available-${stamp}`, "Você já está recebendo leads.")] };
-      return { kind: "run", name: "duty.resume", payload: {}, done: "Pronto, você voltou a receber leads.", failed: "Não consegui voltar você. Seu recebimento continua pausado." };
+      return { kind: "run", name: "duty.resume", payload: {}, done: "Pronto, você voltou a receber leads.", failed: "Não consegui voltar você. Seu recebimento continua pausado.", ask: "Voltar a receber leads" };
     case "returns.schedule": {
       const found = leadOf(input, world, stamp, hint);
       if ("plan" in found) return found.plan;
       const lead = found.lead;
       const name = firstNameOf(lead.name);
       const replace = intent.reschedule ? openReturnsOf(world, lead.id)[0] : undefined;
-      const when = parseWhenPtBr(whenText ?? input.text, world.now);
+      // Fila sem internet: "daqui a 1 hora" conta da hora em que foi gravado.
+      const when = parseWhenPtBr(whenText ?? input.text, input.recordedAt ?? world.now);
       if (!when) {
         const presets: Array<[string, string]> = [["today", "Hoje às 18h"], ["tomorrow", "Amanhã às 9h"], ["in_2_days", "Daqui a 2 dias"]];
         return {
@@ -224,6 +239,7 @@ function plan(intent: SasaIntent, input: SasaCommandInput, world: SasaWorld, sta
         payload: { leadId: lead.id, at: when.at.toISOString(), ...(replace ? { taskId: replace.taskId } : {}) },
         done: `${replace ? "Remarquei" : "Combinado"}: retorno com ${name} ${label}. Está na sua Agenda.`,
         failed: `Não consegui marcar o retorno com ${name}. Nada foi alterado.`,
+        ask: `${replace ? "Remarcar" : "Marcar"} retorno com ${name} ${label}`,
       };
     }
     case "returns.complete":
@@ -234,8 +250,8 @@ function plan(intent: SasaIntent, input: SasaCommandInput, world: SasaWorld, sta
       const open = openReturnsOf(world, found.lead.id)[0];
       if (!open) return { kind: "answer", blocks: [sasaSay(`sasa-no-return-${stamp}`, `${name} não tem retorno aberto na sua Agenda.`)] };
       return intent.tool === "returns.complete"
-        ? { kind: "run", name: "lead.completeReturn", payload: { taskId: open.taskId, leadName: name }, done: `Boa. Tirei o retorno com ${name} da sua Agenda.`, failed: `Não consegui concluir o retorno com ${name}. Ele continua na Agenda.` }
-        : { kind: "run", name: "lead.cancelReturn", payload: { taskId: open.taskId, leadName: name }, done: `Cancelei o retorno com ${name}.`, failed: `Não consegui cancelar o retorno com ${name}. Ele continua na Agenda.` };
+        ? { kind: "run", name: "lead.completeReturn", payload: { taskId: open.taskId, leadName: name }, done: `Boa. Tirei o retorno com ${name} da sua Agenda.`, failed: `Não consegui concluir o retorno com ${name}. Ele continua na Agenda.`, ask: `Concluir o retorno com ${name}` }
+        : { kind: "run", name: "lead.cancelReturn", payload: { taskId: open.taskId, leadName: name }, done: `Cancelei o retorno com ${name}.`, failed: `Não consegui cancelar o retorno com ${name}. Ele continua na Agenda.`, ask: `Cancelar o retorno com ${name}` };
     }
     case "lead.stage": {
       const found = leadOf(input, world, stamp, hint);
@@ -243,7 +259,7 @@ function plan(intent: SasaIntent, input: SasaCommandInput, world: SasaWorld, sta
       const name = firstNameOf(found.lead.name);
       const stage = SASA_STAGE_LABEL[intent.status];
       if (found.lead.status === intent.status) return { kind: "answer", blocks: [sasaSay(`sasa-same-stage-${stamp}`, `${name} já está em ${stage}.`)] };
-      return { kind: "run", name: "lead.changeStep", payload: { leadId: found.lead.id, status: intent.status, previous: found.lead.status }, done: `Pronto: ${name} agora está em ${stage}.`, failed: `Não consegui mudar a etapa de ${name}. Ela continua como estava.` };
+      return { kind: "run", name: "lead.changeStep", payload: { leadId: found.lead.id, status: intent.status, previous: found.lead.status }, done: `Pronto: ${name} agora está em ${stage}.`, failed: `Não consegui mudar a etapa de ${name}. Ela continua como estava.`, ask: `Mudar ${name} para ${stage}` };
     }
   }
 }
@@ -252,7 +268,7 @@ function plan(intent: SasaIntent, input: SasaCommandInput, world: SasaWorld, sta
  * Roda um pedido. `intent` vem da IA quando as regras não casaram; sem ela, só as regras.
  * Sucesso só depois da confirmação do servidor; erro diz o que continua valendo e oferece "Tentar de novo".
  */
-export async function runSasaCommand(input: SasaCommandInput & {
+export async function runSasaCommand(input: SasaTimedInput & {
   world: SasaWorld;
   run: SasaRun;
   intent?: SasaIntent | null;
@@ -265,6 +281,21 @@ export async function runSasaCommand(input: SasaCommandInput & {
   const stamp = input.stamp ?? String(input.world.now.getTime());
   const next = plan(intent, input, input.world, stamp, input.leadHint ?? null, input.whenText ?? null);
   if (next.kind === "answer") return { handled: true, tool: intent.tool, blocks: next.blocks };
+  if (sasaArrivedLate(input.recordedAt, input.world.now)) {
+    // Gravado sem internet há mais de 30 min: o corretor confirma num toque (a ação roda pelo mesmo caminho do chat).
+    const at = clockLabel(input.recordedAt!);
+    return {
+      handled: true,
+      tool: intent.tool,
+      blocks: [{
+        type: "question", id: `sasa-late-${stamp}`, prompt: `Você gravou às ${at}, sem internet. ${next.ask}?`,
+        choices: [
+          { id: "confirm", label: "Confirmar", reply: "Confirmar", action: { kind: "server", name: next.name, payload: next.payload } },
+          { id: "drop", label: "Deixar pra lá", reply: "Deixar pra lá", action: { kind: "local", value: SASA_DROP_VALUE } },
+        ],
+      }],
+    };
+  }
 
   let result: SasaActionResult;
   try {

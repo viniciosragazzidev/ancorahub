@@ -1,0 +1,147 @@
+/*
+ * Botão flutuante da Sasá (fase 3). Tokens do Lite (Arc): superfície, borda 1px, raio total no botão, 12px no aviso.
+ * Secundário (D7): não é a CTA da tela, então sem a base sólida do botão primário.
+ */
+.dock {
+  position: fixed;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  z-index: 21;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+  transition: bottom 200ms ease;
+}
+/* Uma pílula no pé (Agora, aceitar lead): sobe acima dela. */
+.dock[data-lifted] { bottom: calc(env(safe-area-inset-bottom, 0px) + 82px); }
+
+.button {
+  pointer-events: auto;
+  position: relative;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: var(--shadow-floating);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition: background-color 160ms ease, transform 100ms ease;
+}
+.button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.button:active { transform: scale(0.97); }
+.button[data-recording] { background: var(--danger); border-color: var(--danger); color: #fff; transform: scale(1.08); }
+.button[data-still] { transition: none; }
+.button[data-still]:active, .button[data-still][data-recording] { transform: none; }
+.button:disabled { cursor: default; }
+
+.micBadge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 2px solid var(--surface);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.micBadge svg { width: 12px; height: 12px; }
+.micBig { width: 24px; height: 24px; }
+.spin { width: 22px; height: 22px; animation: sasaSpin 0.9s linear infinite; }
+.queued {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--foreground);
+  color: var(--surface);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.recording {
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-floating);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.recording[data-cancelling] { color: var(--danger); }
+.dot { width: 10px; height: 10px; border-radius: 999px; background: var(--danger); animation: sasaPulse 1.2s ease-in-out infinite; }
+.dot[data-still] { animation: none; }
+.time { font-variant-numeric: tabular-nums; font-weight: 500; color: var(--foreground); }
+
+.toast {
+  pointer-events: auto;
+  width: min(420px, calc(100vw - 32px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-floating);
+  font-size: var(--text-sm);
+  color: var(--foreground);
+}
+.toast[data-tone="error"] { border-color: color-mix(in oklch, var(--danger) 40%, var(--border)); }
+.toastText { flex: 1; min-width: 0; display: grid; gap: 2px; line-height: 1.35; }
+.heard { color: var(--text-secondary); font-size: 12px; overflow-wrap: anywhere; }
+.toastAction {
+  flex: none;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toastClose {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.toastClose svg { width: 16px; height: 16px; }
+
+.sheetBody { min-height: 0; }
+
+@keyframes sasaPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes sasaSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .dot, .spin { animation: none; }
+  .dock, .button { transition: none; }
+  .button[data-recording], .button:active { transform: none; }
+}

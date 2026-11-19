@@ -10,6 +10,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AssistantChat } from "@/components/chat/assistant-chat";
 import { ChatHome } from "@/components/chat/chat-home";
+import { SasaVoiceButton } from "@/components/chat/sasa-voice-button";
+import { newClientMessageId } from "@/components/chat/user-send-core";
+import { sasaQueue } from "@/features/sasa/offline-queue";
 import { buildAncoraScript } from "@/features/broker-workspace/chat/assistant-scripts";
 import { TOUR_STORAGE_KEY } from "@/components/chat/tour/tour-steps";
 import type { ThreadSummary } from "@/components/chat/types";
@@ -28,7 +31,7 @@ import styles from "./lab.module.css";
 import { MotionShowcase } from "./motion-showcase";
 import { createLabSasa, labSasaPhrasesBlock, labSasaWorld } from "./sasa-lab";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "lista" | "conquistas" | "movimento";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -36,6 +39,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "lead", label: "Aceitar lead" },
   { id: "venda", label: "Registrar venda" },
   { id: "sasa", label: "Sasá: pedidos por texto e voz" },
+  { id: "botao", label: "Botão da Sasá" },
   { id: "lista", label: "Lista da equipe (supervisor)" },
   { id: "conquistas", label: "Conquistas" },
   { id: "movimento", label: "Movimento (componentes)" },
@@ -107,7 +111,18 @@ export function FlowLab() {
   useState(() => { try { window.localStorage.setItem("ancora:lite-welcome:2026-10-chat", "1"); window.localStorage.setItem(TOUR_STORAGE_KEY, "skipped"); } catch { /* ignore */ } return null; });
 
   // Sasá agêntica: um corretor de mentira que as ações simuladas mudam; "Recomeçar" volta ao início.
-  const sasaState = useRef({ world: labSasaWorld(), closed: [] as ReturnType<typeof labSasaWorld>["returns"], heard: 0 });
+  const sasaState = useRef({ world: labSasaWorld(), closed: [] as ReturnType<typeof labSasaWorld>["returns"], heard: 0, offline: false });
+  // Botão da Sasá (fase 3): "Sem internet" faz o envio falhar como sem rede; voltar a internet manda a fila.
+  const [offline, setOffline] = useState(false);
+  const setInternet = (value: boolean) => {
+    sasaState.current.offline = !value;
+    setOffline(!value);
+    if (value) window.setTimeout(() => window.dispatchEvent(new Event("online")), 50);
+  };
+  const queueOldAudio = async () => {
+    await sasaQueue.add({ id: newClientMessageId(), audio: new Blob(["lab"], { type: "audio/webm" }), seconds: 3, recordedAt: new Date(Date.now() - 40 * 60_000).toISOString() });
+    if (!sasaState.current.offline) window.dispatchEvent(new Event("online"));
+  };
   const lab = useMemo<DevLab>(() => ({
     sasa: createLabSasa(sasaState.current, { delay, outcome }),
     acceptLead: async () => {
@@ -223,6 +238,26 @@ export function FlowLab() {
               canWrite
             />
           </div>
+        ) : flow === "botao" ? (
+          <>
+            <ChatHome
+              viewerName="Vinicios Ragazzi"
+              nowIso={new Date().toISOString()}
+              canQuote
+              showWhatsAppStatus={false}
+              assistants={[thread({ id: "a-sasa", assistant: "ancora" as never, name: "Sasá", preview: "Peça o que precisar, por texto ou áudio.", shape: "sasa", hue: 175, href: "/dev/laboratorio" })]}
+              leads={[
+                thread({ id: "l-ana", kind: "lead", leadId: "lab-ana", name: "Ana Souza", preview: "Cotação enviada.", href: "/dev/laboratorio", initials: "AS", shape: "logo", hue: null } as Partial<ThreadSummary>),
+                thread({ id: "l-carlos-m", kind: "lead", leadId: "lab-carlos-m", name: "Carlos Mendes", preview: "Respondeu e espera você.", waitingYou: true, href: "/dev/laboratorio", initials: "CM", shape: "logo", hue: null } as Partial<ThreadSummary>),
+                thread({ id: "l-pedro", kind: "lead", leadId: "lab-pedro", name: "Pedro Lima", preview: "Retorno hoje.", href: "/dev/laboratorio", initials: "PL", shape: "logo", hue: null } as Partial<ThreadSummary>),
+              ]}
+              summary={{
+                receivedToday: 3, acceptedToday: 2, inServiceNow: 4, slaAtRiskNow: 1, duty: { title: "De plantão: TESTE", detail: "09:00 às 19:00", href: "/dev/laboratorio" }, goal: null,
+                next: { label: "Responder Carlos", detail: "Ele respondeu e espera você.", href: "/dev/laboratorio", urgent: false },
+              }}
+            />
+            <SasaVoiceButton pathname="/dashboard" chat={false} />
+          </>
         ) : flow === "lista" ? (
           <TeamListManager rows={LAB_LIST} totals={{ all: LAB_LIST.length, pending: LAB_LIST.filter((row) => !row.brokerId).length, distributed: LAB_LIST.filter((row) => row.brokerId).length, replied: LAB_LIST.filter((row) => row.replied).length }} team={LAB_TEAM} switcher={null} />
         ) : flow === "movimento" ? (
@@ -259,6 +294,13 @@ export function FlowLab() {
             <fieldset><legend>Demora</legend>
               {DELAYS.map((item) => <button key={item.ms} type="button" aria-pressed={delay === item.ms} onClick={() => setDelay(item.ms)}>{item.label}</button>)}
             </fieldset>
+            {flow === "botao" ? (
+              <fieldset><legend>Internet</legend>
+                <button type="button" aria-pressed={!offline} onClick={() => setInternet(true)}>Com internet</button>
+                <button type="button" aria-pressed={offline} onClick={() => setInternet(false)}>Sem internet</button>
+                <button type="button" onClick={() => void queueOldAudio()} title="Um áudio gravado há 40 min, sem internet: pede confirmação">Áudio de 40 min na fila</button>
+              </fieldset>
+            ) : null}
             <fieldset><legend>Plantão</legend>
               <button type="button" aria-pressed={mode === "online"} onClick={() => setMode("online")}>Online</button>
               <button type="button" aria-pressed={mode === "presencial"} onClick={() => setMode("presencial")}>Presencial</button>
