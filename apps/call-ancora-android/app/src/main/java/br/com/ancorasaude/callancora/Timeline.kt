@@ -21,6 +21,17 @@ data class TimelineItem(
 object Timeline {
     private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale("pt", "BR"))
 
+    /** Passos da discagem automática, em português. */
+    private val autoTitles = mapOf(
+        AutoDialer.EVENT_AUTO_NEXT to "Próxima automática",
+        AutoDialer.EVENT_PAUSED to "Fila pausada",
+        AutoDialer.EVENT_SKIPPED to "Número pulado",
+        AutoDialer.EVENT_RESUMED to "Fila retomada",
+        AutoDialer.EVENT_LIMIT to "Limite por hora atingido",
+        AutoDialer.EVENT_FINISHED to "Fila concluída",
+        AutoDialer.EVENT_SESSION_ENDED to "Sessão encerrada",
+    )
+
     /** Quantas ligações há no registro (pedidas pelo app ou recebidas). */
     fun callCount(entries: List<LogEntry>): Int = entries.count {
         it.event == CallBus.EVENT_DIAL_REQUEST ||
@@ -71,6 +82,15 @@ object Timeline {
                 title = "Aviso",
                 subtitle = e.detail.orEmpty(),
                 dotColor = R.color.ancora_gold,
+                sinceDial = "",
+            )
+            e.event in autoTitles -> TimelineItem(
+                title = autoTitles.getValue(e.event),
+                subtitle = listOfNotNull(
+                    e.number.takeIf { it != "-" }?.let { Phone.display(it) },
+                    e.detail,
+                ).joinToString(" · "),
+                dotColor = if (e.event == AutoDialer.EVENT_AUTO_NEXT) R.color.ancora_blue else R.color.ancora_gold,
                 sinceDial = "",
             )
             state == Call.STATE_DISCONNECTED -> {

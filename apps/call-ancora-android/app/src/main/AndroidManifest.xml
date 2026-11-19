@@ -5,6 +5,13 @@
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <!-- Ler o estado do telefone (usado pelo papel de discador padrão). -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- Notificação fixa da ligação (Android 13+ pede ao usuário). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Abrir a tela de chamada recebida com o celular bloqueado (Android 14+ confere). -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Serviço de chamada em primeiro plano, tipo ligação telefônica. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
 
     <uses-feature
         android:name="android.hardware.telephony"
@@ -64,6 +71,7 @@
         <service
             android:name=".CallService"
             android:exported="true"
+            android:foregroundServiceType="phoneCall"
             android:permission="android.permission.BIND_INCALL_SERVICE">
             <meta-data
                 android:name="android.telecom.IN_CALL_SERVICE_UI"
@@ -72,5 +80,10 @@
                 <action android:name="android.telecom.InCallService" />
             </intent-filter>
         </service>
+
+        <!-- Botões da notificação da ligação (Atender, Recusar, Desligar). -->
+        <receiver
+            android:name=".CallActionReceiver"
+            android:exported="false" />
     </application>
 </manifest>

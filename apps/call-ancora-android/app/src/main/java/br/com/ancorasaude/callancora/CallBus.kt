@@ -93,6 +93,15 @@ object CallBus {
 
     fun note(message: String) = append("-", EVENT_NOTE, message)
 
+    /** Evento livre no registro técnico (passos da discagem automática). */
+    fun logEvent(event: String, number: String, detail: String?) = append(number, event, detail)
+
+    /** Há alguma ligação deste app ainda não encerrada? */
+    fun hasLiveCall(): Boolean {
+        val calls = service?.calls ?: return false
+        return calls.any { stateOf(it) != Call.STATE_DISCONNECTED }
+    }
+
     fun clearLog() {
         _log.value = emptyList()
     }
@@ -121,6 +130,7 @@ object CallBus {
         )
         if (state == Call.STATE_ACTIVE) markActive(now)
         publish(call, now)
+        if (incoming) AutoDialer.onIncomingCall() else AutoDialer.onOutgoingAdded()
     }
 
     internal fun onStateChanged(call: Call, state: Int) {
@@ -153,6 +163,10 @@ object CallBus {
             activeMs = activeMs,
         )
         if (isCurrent) publish(call, _current.value?.addedAtElapsed)
+        if (state == Call.STATE_DISCONNECTED && !isIncoming(call)) {
+            val answered = call.details.connectTimeMillis > 0 || (isCurrent && timeToActiveMs != null)
+            AutoDialer.onOutgoingEnded(answered, if (isCurrent) talkMs else activeMs)
+        }
     }
 
     internal fun onDetailsChanged(call: Call) {
