@@ -61,6 +61,9 @@ describe.skipIf(!testUrl)("Call Âncora: base de frios no PostgreSQL isolado", (
       // Segurado (manual_hold) entra na base geral de frios.
       lead("lead11", { distributionStatus: "manual_hold" }),
     ]);
+    // lead12: pediu para parar na conversa da IA; fica fora do pool.
+    await db.insert(schema.leads).values(lead("lead12"));
+    await db.insert(schema.aiConversations).values({ id: id("conv12"), tenantId, leadId: id("lead12"), optOutAt: new Date() } as typeof schema.aiConversations.$inferInsert);
     // lead8: "Número errado" antigo; lead9: tentativa há 1 h (dentro das 4 h).
     await db.insert(schema.leadInteractions).values([
       { id: id("i8"), leadId: id("lead8"), userId: id("broker1"), tipo: "note", conteudo: "Call Âncora: Número errado", metadata: { source: "call_ancora", outcome: "wrong_number" }, createdAt: new Date(Date.now() - 48 * 3_600_000) },

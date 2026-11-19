@@ -231,3 +231,11 @@ Status em 19/11/2026, branch `feat/call-ancora-android`.
 
 No topo de `/call-ancora`, o diretor (ou admin da plataforma/dev) vê "Configurações do Call Âncora", guardadas em `system_settings` com a chave `call_ancora_settings:<tenant>` (sem tabela nova): contatos por corretor por dia (120), créditos diários da empresa (0 = sem limite), período dos leads (criados há no máximo 365 e no mínimo 0 dias), tentativas por lead (3), intervalo entre tentativas (4 h), horário de início e fim (8h às 20h), ligar aos sábados (sim) e discagem automática ligada ao iniciar (não). A fila de frios aplica tudo; ao bater o limite do corretor ou os créditos da empresa, a fila para de receber frios e avisa. Com a flag ligada, o diretor passa a abrir `/call-ancora`. API: `GET/PUT /api/call-ancora/settings`, só diretor ou admin.
 
+### Reserva respeitada pela distribuição e pela requalificação (19/11/2026)
+
+- A distribuição automática (inclusive a liberação das 9h) não entrega lead reservado para uma ligação do Call Âncora: devolve "em fila" com nova tentativa em 10 min (`processQueuedLead`).
+- A requalificação de frios (manual e automática) pula o lead reservado.
+- A reserva também bloqueia o mesmo telefone em outro lead do tenant (nunca duas ligações ao mesmo número).
+- O pool exclui leads com pedido de parar ou número errado registrados na conversa da IA (`ai_conversations.opt_out_at` / `wrong_number_at`).
+- Limite que continua: a reserva vive na memória do processo (uma instância). Reinício limpa as reservas, mas também derruba as sessões, então o celular para de discar.
+
