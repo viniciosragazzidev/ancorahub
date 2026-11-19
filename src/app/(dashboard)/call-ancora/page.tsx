@@ -14,6 +14,6 @@ async function getCallAncoraPageAccess() {
 }
 
 export default async function CallAncoraPage() {
-  const { brokerName } = await getCallAncoraPageAccess();
-  return <CallAncoraWorkspace brokerFirstName={brokerName.trim().split(/\s+/)[0] || "Corretor"} />;
+  const { brokerName, flagBypass } = await getCallAncoraPageAccess();
+  return <CallAncoraWorkspace brokerFirstName={brokerName.trim().split(/\s+/)[0] || "Corretor"} canUseTestList={flagBypass} />;
 }

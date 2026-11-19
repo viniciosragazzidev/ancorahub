@@ -1,27 +1,44 @@
+export type CallAncoraContactSource = "demo" | "test_list";
+
 export type CallAncoraContact = {
   id: string;
   name: string;
   phone: string;
+  /** De onde veio o contato. Só a lista de teste tem número real. */
+  source: CallAncoraContactSource;
+  /**
+   * O app Android só disca quando isto é true. Só o servidor define, e só para a
+   * "Lista de teste" de admin/dev. Contatos de demonstração nunca são discáveis.
+   */
+  dialable: boolean;
 };
 
-/** Contatos de demonstração, sem relação com a base real da Âncora. */
-export const CALL_ANCORA_DEMO_CONTACTS: readonly CallAncoraContact[] = [
-  { id: "demo-01", name: "Marina Duarte", phone: "+55 00 0000-0001" },
-  { id: "demo-02", name: "Rafael Nogueira", phone: "+55 00 0000-0002" },
-  { id: "demo-03", name: "Camila Freitas", phone: "+55 00 0000-0003" },
-  { id: "demo-04", name: "Eduardo Martins", phone: "+55 00 0000-0004" },
-  { id: "demo-05", name: "Patrícia Azevedo", phone: "+55 00 0000-0005" },
-  { id: "demo-06", name: "Lucas Moreira", phone: "+55 00 0000-0006" },
-  { id: "demo-07", name: "Fernanda Barros", phone: "+55 00 0000-0007" },
-  { id: "demo-08", name: "André Ribeiro", phone: "+55 00 0000-0008" },
-  { id: "demo-09", name: "Juliana Campos", phone: "+55 00 0000-0009" },
-  { id: "demo-10", name: "Thiago Costa", phone: "+55 00 0000-0010" },
-  { id: "demo-11", name: "Aline Monteiro", phone: "+55 00 0000-0011" },
-  { id: "demo-12", name: "Bruno Cardoso", phone: "+55 00 0000-0012" },
-  { id: "demo-13", name: "Renata Lopes", phone: "+55 00 0000-0013" },
-  { id: "demo-14", name: "Daniel Ferreira", phone: "+55 00 0000-0014" },
-  { id: "demo-15", name: "Sofia Almeida", phone: "+55 00 0000-0015" },
-  { id: "demo-16", name: "Pedro Henrique", phone: "+55 00 0000-0016" },
-  { id: "demo-17", name: "Isabela Rocha", phone: "+55 00 0000-0017" },
-  { id: "demo-18", name: "Gustavo Mendes", phone: "+55 00 0000-0018" },
-];
+const DEMO = [
+  ["demo-01", "Marina Duarte", "+55 00 0000-0001"],
+  ["demo-02", "Rafael Nogueira", "+55 00 0000-0002"],
+  ["demo-03", "Camila Freitas", "+55 00 0000-0003"],
+  ["demo-04", "Eduardo Martins", "+55 00 0000-0004"],
+  ["demo-05", "Patrícia Azevedo", "+55 00 0000-0005"],
+  ["demo-06", "Lucas Moreira", "+55 00 0000-0006"],
+  ["demo-07", "Fernanda Barros", "+55 00 0000-0007"],
+  ["demo-08", "André Ribeiro", "+55 00 0000-0008"],
+  ["demo-09", "Juliana Campos", "+55 00 0000-0009"],
+  ["demo-10", "Thiago Costa", "+55 00 0000-0010"],
+  ["demo-11", "Aline Monteiro", "+55 00 0000-0011"],
+  ["demo-12", "Bruno Cardoso", "+55 00 0000-0012"],
+  ["demo-13", "Renata Lopes", "+55 00 0000-0013"],
+  ["demo-14", "Daniel Ferreira", "+55 00 0000-0014"],
+  ["demo-15", "Sofia Almeida", "+55 00 0000-0015"],
+  ["demo-16", "Pedro Henrique", "+55 00 0000-0016"],
+  ["demo-17", "Isabela Rocha", "+55 00 0000-0017"],
+  ["demo-18", "Gustavo Mendes", "+55 00 0000-0018"],
+] as const;
+
+/** Contatos de demonstração, sem relação com a base real da Âncora. Nunca discáveis. */
+export const CALL_ANCORA_DEMO_CONTACTS: readonly CallAncoraContact[] = DEMO.map(([id, name, phone]) => ({
+  id,
+  name,
+  phone,
+  source: "demo",
+  dialable: false,
+}));

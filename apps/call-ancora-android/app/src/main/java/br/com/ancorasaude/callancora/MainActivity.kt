@@ -31,6 +31,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.launch
 
 /**
@@ -64,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var timelineCard: LinearLayout
     private lateinit var emptyCard: View
     private lateinit var logActions: View
+    private lateinit var crmPanel: CrmPanel
 
     /** Cenário escolhido nas pílulas; vai para o registro junto do pedido de ligação. */
     private var selectedScenario: String = ""
@@ -80,6 +83,28 @@ class MainActivity : AppCompatActivity() {
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { refreshAll() }
+
+    /** Câmera só para ler o QR de pareamento. */
+    private val cameraLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                launchScanner()
+            } else {
+                crmPanel.pairError = "Sem a câmera não dá para ler o QR. Toque de novo para permitir."
+                crmPanel.render()
+            }
+        }
+
+    private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
+        val text = result.contents ?: return@registerForActivityResult
+        lifecycleScope.launch {
+            crmPanel.pairError = null
+            val error = CrmSession.pairFromQr(this@MainActivity, text)
+            crmPanel.pairError = error
+            if (error == null) toast("Celular conectado ao AncoraHub.")
+            crmPanel.render()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -117,8 +142,19 @@ class MainActivity : AppCompatActivity() {
             R.id.scDesliga,
         ).map { findViewById<TextView>(it) }
 
+        crmPanel = CrmPanel(this)
+        crmPanel.bind()
+        val localContent = findViewById<View>(R.id.localModeContent)
+        val localToggle = findViewById<TextView>(R.id.tvLocalModeToggle)
+        findViewById<View>(R.id.localModeHeader).setOnClickListener {
+            val show = localContent.visibility != View.VISIBLE
+            localContent.visibility = if (show) View.VISIBLE else View.GONE
+            localToggle.text = if (show) "Ocultar" else "Mostrar"
+        }
+
         AppFonts.applyTree(findViewById(android.R.id.content))
         SignalMonitor.start(this)
+        CrmSession.restore(this)
         etNumber.addTextChangedListener(BrPhoneWatcher(etNumber))
 
         btnNextItem.setOnClickListener {
@@ -151,6 +187,8 @@ class MainActivity : AppCompatActivity() {
                 launch { AutoDialer.state.collect { renderSession() } }
                 launch { AutoDialer.stats.collect { renderSession() } }
                 launch { SignalMonitor.status.collect { refreshAll() } }
+                launch { CrmSession.ui.collect { crmPanel.render() } }
+                launch { CallBus.current.collect { crmPanel.render() } }
             }
         }
     }
@@ -165,6 +203,39 @@ class MainActivity : AppCompatActivity() {
         refreshAll()
     }
 
+    override fun onStart() {
+        super.onStart()
+        CrmSession.foreground = true
+    }
+
+    override fun onStop() {
+        CrmSession.foreground = false
+        super.onStop()
+    }
+
+    /** "Ler QR code": pede a câmera (só agora) e abre o leitor. */
+    fun startQrScan() {
+        val permission = android.Manifest.permission.CAMERA
+        when {
+            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> launchScanner()
+            isPermanentlyDenied(permission) -> openAppSettings()
+            else -> {
+                prefs.edit().putBoolean("asked_$permission", true).apply()
+                cameraLauncher.launch(permission)
+            }
+        }
+    }
+
+    private fun launchScanner() {
+        scanLauncher.launch(
+            ScanOptions()
+                .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                .setPrompt("Aponte para o QR do Call Âncora na tela do computador")
+                .setBeepEnabled(false)
+                .setOrientationLocked(false),
+        )
+    }
+
     /** Outro app pediu para discar (ACTION_DIAL / VIEW tel:): só preenche o número. */
     private fun handleDialIntent(intent: Intent?) {
         val data = intent?.data ?: return
@@ -177,6 +248,7 @@ class MainActivity : AppCompatActivity() {
         renderReadiness()
         renderCallButton()
         renderSession()
+        if (::crmPanel.isInitialized) crmPanel.render()
     }
 
     // ---------- Preparar o celular ----------

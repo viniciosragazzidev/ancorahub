@@ -21,7 +21,12 @@ const session: CallAncoraSnapshot = {
   callElapsedSeconds: 0,
   interests: [],
   completed: 0,
+  total: CALL_ANCORA_DEMO_CONTACTS.length,
+  queueSource: "demo",
   autoDialEnabled: false,
+  awaitingClassification: false,
+  devicePaused: false,
+  lastCall: null,
   countdown: null,
   updatedAt: "2026-11-19T12:00:00.000Z",
 };

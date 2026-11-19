@@ -135,7 +135,12 @@ object CallBus {
         )
         if (state == Call.STATE_ACTIVE) markActive(now)
         publish(call, now)
-        if (incoming) AutoDialer.onIncomingCall() else AutoDialer.onOutgoingAdded()
+        if (incoming) {
+            AutoDialer.onIncomingCall()
+        } else {
+            AutoDialer.onOutgoingAdded()
+            CrmSession.onOutgoingAdded()
+        }
     }
 
     internal fun onStateChanged(call: Call, state: Int) {
@@ -174,9 +179,16 @@ object CallBus {
             activeMs = activeMs,
         )
         if (isCurrent) publish(call, _current.value?.addedAtElapsed)
+        if (state == Call.STATE_ACTIVE && isCurrent && !isIncoming(call)) {
+            CrmSession.onOutgoingActive()
+        }
         if (state == Call.STATE_DISCONNECTED && !isIncoming(call)) {
             val answered = call.details.connectTimeMillis > 0 || (isCurrent && timeToActiveMs != null)
             AutoDialer.onOutgoingEnded(answered, if (isCurrent) talkMs else activeMs)
+            CrmSession.onOutgoingEnded(
+                causeCode,
+                Labels.friendlyDisconnect(causeCode, causeReason, causeLabel, false),
+            )
         }
     }
 

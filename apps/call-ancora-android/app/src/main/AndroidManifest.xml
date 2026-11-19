@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Discar sem o corretor tocar em "ligar" no discador do sistema. -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
+    <!-- Conversa com o AncoraHub (pareamento e fila do CRM). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Ler o QR de pareamento. Pedida só na hora de ler. -->
+    <uses-permission android:name="android.permission.CAMERA" />
     <!-- Ler o estado do telefone (usado pelo papel de discador padrão). -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <!-- Notificação fixa da ligação (Android 13+ pede ao usuário). -->
@@ -16,12 +21,16 @@
     <uses-feature
         android:name="android.hardware.telephony"
         android:required="true" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
 
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.CallAncora">
 
@@ -80,6 +89,12 @@
                 <action android:name="android.telecom.InCallService" />
             </intent-filter>
         </service>
+
+        <!-- Leitor de QR do ZXing: segue a orientação do celular (retrato). -->
+        <activity
+            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+            android:screenOrientation="fullSensor"
+            tools:replace="screenOrientation" />
 
         <!-- Botões da notificação da ligação (Atender, Recusar, Desligar). -->
         <receiver

@@ -183,6 +183,328 @@
             android:textColor="@color/amber_ink"
             android:textSize="12sp" />
 
+        <!-- AncoraHub: pareamento por QR e sessão do CRM -->
+        <LinearLayout
+            android:id="@+id/crmCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <!-- Não conectado -->
+            <LinearLayout
+                android:id="@+id/crmConnectView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:tag="font600"
+                    android:text="Conectar ao AncoraHub"
+                    android:textColor="@color/ink"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:fontFamily="sans-serif"
+                    android:lineSpacingMultiplier="1.15"
+                    android:tag="font400"
+                    android:text="No computador, abra o Call Âncora, toque em Iniciar e leia o QR com este celular."
+                    android:textColor="@color/fog"
+                    android:textSize="12.5sp" />
+
+                <TextView
+                    android:id="@+id/tvCameraStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_chip_warn"
+                    android:fontFamily="sans-serif-medium"
+                    android:paddingStart="10dp"
+                    android:paddingTop="5dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="5dp"
+                    android:tag="font600"
+                    android:textColor="@color/amber_ink"
+                    android:textSize="12sp" />
+
+                <LinearLayout
+                    android:id="@+id/btnScan"
+                    android:layout_width="match_parent"
+                    android:layout_height="59dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_call_button"
+                    android:clickable="true"
+                    android:contentDescription="Ler QR code"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingBottom="3dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:importantForAccessibility="no"
+                        android:tag="font600"
+                        android:text="Ler QR code"
+                        android:textColor="@color/white"
+                        android:textSize="16sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Conectado -->
+            <LinearLayout
+                android:id="@+id/crmSessionView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvCrmAccount"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_chip_ok"
+                        android:ellipsize="end"
+                        android:fontFamily="sans-serif-medium"
+                        android:maxLines="1"
+                        android:paddingStart="10dp"
+                        android:paddingTop="5dp"
+                        android:paddingEnd="10dp"
+                        android:paddingBottom="5dp"
+                        android:tag="font600"
+                        android:textColor="@color/forest"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/btnCrmDisconnect"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:fontFamily="sans-serif-medium"
+                        android:padding="4dp"
+                        android:tag="font600"
+                        android:text="Desconectar"
+                        android:textColor="@color/ancora_blue"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvCrmProgress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:tag="font500"
+                    android:textColor="@color/fog"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tvCrmName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:tag="font600"
+                    android:textColor="@color/ink"
+                    android:textSize="20sp" />
+
+                <TextView
+                    android:id="@+id/tvCrmNumber"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:tag="font500"
+                    android:textColor="@color/steel"
+                    android:textSize="15sp" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:id="@+id/crmStateDot"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:background="@drawable/bg_dot"
+                        android:backgroundTint="@color/dot_neutral" />
+
+                    <TextView
+                        android:id="@+id/tvCrmState"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:fontFamily="sans-serif-medium"
+                        android:tag="font600"
+                        android:textColor="@color/ink"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvCrmInfo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:fontFamily="sans-serif"
+                    android:tag="font400"
+                    android:textColor="@color/fog"
+                    android:textSize="12.5sp" />
+
+                <TextView
+                    android:id="@+id/tvCrmNext"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:tag="font500"
+                    android:textColor="@color/steel"
+                    android:textSize="12.5sp" />
+
+                <LinearLayout
+                    android:id="@+id/btnCrmCall"
+                    android:layout_width="match_parent"
+                    android:layout_height="59dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_call_button"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingBottom="3dp">
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_phone" />
+
+                    <TextView
+                        android:id="@+id/tvCrmCallLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:fontFamily="sans-serif-medium"
+                        android:tag="font600"
+                        android:text="Começar ligações"
+                        android:textColor="@color/white"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnCrmPause"
+                        android:layout_width="0dp"
+                        android:layout_height="42dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_pill_outline"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:fontFamily="sans-serif-medium"
+                        android:gravity="center"
+                        android:tag="font600"
+                        android:text="Pausar"
+                        android:textColor="@color/ink"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/btnCrmEnd"
+                        android:layout_width="0dp"
+                        android:layout_height="42dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_pill_outline"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:fontFamily="sans-serif-medium"
+                        android:gravity="center"
+                        android:tag="font600"
+                        android:text="Segure para encerrar"
+                        android:textColor="@color/hangup_red"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvCrmError"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:fontFamily="sans-serif-medium"
+                android:tag="font500"
+                android:textColor="@color/hangup_red"
+                android:textSize="12.5sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Modo teste local (fila no próprio celular), recolhido -->
+        <LinearLayout
+            android:id="@+id/localModeHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif-medium"
+                android:tag="font600"
+                android:text="Modo teste local"
+                android:textColor="@color/ink"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/tvLocalModeToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:tag="font600"
+                android:text="Mostrar"
+                android:textColor="@color/ancora_blue"
+                android:textSize="12.5sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/localModeContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
         <!-- Número e cenário -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -686,6 +1008,7 @@
                 android:text="Enviar registro"
                 android:textColor="@color/white"
                 android:textSize="13sp" />
+        </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 </ScrollView>
