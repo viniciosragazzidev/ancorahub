@@ -4,6 +4,9 @@
  * (grátis, instantâneo, sem inventar). O que não reconhecer devolve null e vai para a camada de IA limitada.
  * Sem acesso a uma área (ex.: Meu financeiro desligado), diz isso em vez de inventar.
  */
+import type { ChatBlock } from "@/components/chat/types";
+import { SASA_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
+
 import type { SasaArea } from "./ecosystem-areas";
 import { spDayStart } from "./limits";
 import { normalizePtBr } from "./parse-when";
@@ -32,9 +35,9 @@ export type SasaFacts = {
   };
   lead?:
     | { kind: "none"; asked: string | null }
-    | { kind: "many"; names: string[] }
+    | { kind: "many"; names: string[]; leads?: Array<{ id: string; name: string }> }
     | {
-      kind: "one"; name: string; status: string; tipo: string | null; arrivedAt: Date; summary: string | null; nextStep: string | null; objections: string[];
+      kind: "one"; id?: string; name: string; status: string; /** Desde quando está com o corretor (chegada na fila dele). */ since?: Date | null; tipo: string | null; arrivedAt: Date; summary: string | null; nextStep: string | null; objections: string[];
       lastMessage: { from: "cliente" | "corretor" | "qualificação"; text: string; at: Date } | null; notes: Array<{ at: Date; text: string }>;
     };
   wallet?: { total: number; attention: number; renewalCount: number; hasRenewalData: boolean; renewals: Array<{ name: string; from: string }>; anniversaries: Array<{ name: string; on: Date; years: number }> };
@@ -214,6 +217,38 @@ export function answerFromFacts(question: string, area: SasaArea, facts: SasaFac
       return c.availability === "available" ? "Você está disponível, recebendo leads." : c.availability === "paused" ? "Você está pausado: não recebe leads novos. Para voltar, diga \"volta a receber\"." : "Você está fora do ar para receber leads.";
     }
   }
+}
+
+const since = (date: Date, now: Date) => {
+  const days = Math.floor((now.getTime() - date.getTime()) / 86_400_000);
+  if (days >= 1) return `${days} ${days === 1 ? "dia" : "dias"}`;
+  const hours = Math.floor((now.getTime() - date.getTime()) / 3_600_000);
+  return hours >= 1 ? `${hours} h` : "menos de 1 h";
+};
+
+/**
+ * Consulta de um lead ("tem algum lead chamado Antônia?"): um achado responde na hora, com etapa, há quanto tempo
+ * está com o corretor, último contato, próximo passo e "Abrir"; vários de verdade viram escolha por toque.
+ * Nunca pede sobrenome em texto nem anexa o resumo da carteira.
+ */
+export function leadLookupBlocks(facts: SasaFacts, now: Date, stamp: string): ChatBlock[] | null {
+  const d = facts.lead;
+  if (!d) return null;
+  if (d.kind === "none") return [{ type: "assistant", id: `sasa-lead-none-${stamp}`, text: d.asked ? `Não achei ${d.asked} entre os seus leads ativos.` : "Não achei esse lead entre os seus leads ativos." }];
+  if (d.kind === "many") {
+    const options = d.leads?.length ? d.leads : d.names.map((name) => ({ id: name, name }));
+    return [{
+      type: "question", id: `sasa-lead-pick-${stamp}`, prompt: `Achei ${options.length}. Qual deles?`,
+      choices: options.map((lead, index) => ({ id: `lead-${index}`, label: lead.name, reply: lead.name, action: { kind: "local", value: `${SASA_ASK_PREFIX}Quem é ${lead.name}?` } })),
+    }];
+  }
+  const name = first(d.name);
+  const parts = [`${d.name} está ${STAGE_LABEL[d.status] ?? d.status}${d.since ? `, com você há ${since(d.since, now)}` : ""}.`];
+  parts.push(d.lastMessage ? `Último contato: ${d.lastMessage.from === "cliente" ? `${name} escreveu` : d.lastMessage.from === "corretor" ? "você escreveu" : "a qualificação escreveu"} em ${sasaDdmm(d.lastMessage.at)}: "${d.lastMessage.text}".` : "Ainda não há conversa registrada.");
+  if (d.nextStep) parts.push(`Próximo passo: ${d.nextStep}`);
+  const blocks: ChatBlock[] = [{ type: "assistant", id: `sasa-lead-${stamp}`, text: parts.join(" ") }];
+  if (d.id) blocks.push({ type: "button", id: `sasa-lead-open-${stamp}`, label: `Abrir ${name}`, href: `/leads/${encodeURIComponent(d.id)}`, tone: "action" });
+  return blocks;
 }
 
 /** Os mesmos fatos em linhas curtas, para a IA limitada (primeiros nomes e números, sem contato). */

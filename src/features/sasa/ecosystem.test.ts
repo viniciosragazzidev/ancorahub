@@ -47,7 +47,7 @@ describe("uma pergunta pronta de cada área do corretor", () => {
   const expected: Record<string, string | RegExp> = {
     "Quantos leads novos eu tenho?": "Você tem 1 lead novo esperando atendimento. Hoje chegaram 3 e você aceitou 2.",
     "Quem está esperando resposta e há quanto tempo?": "2 pessoas estão esperando você: Júlia (lead novo há 6 min); Carlos (respondeu há 25 min).",
-    "Me fala da Ana Souza": /^Ana está cotação enviada \(familiar\), chegou em 16\/11\. Família de 3.*Última conversa \(cliente, 19\/11\): "Vou ver com meu marido e te falo"\. Notas: 18\/11 Pediu a cotação da Amil S380\. Próximo passo: Ligar/,
+    "Me fala da Ana Souza": 'Ana Souza está cotação enviada, com você há 2 dias. Último contato: Ana escreveu em 19/11: "Vou ver com meu marido e te falo". Próximo passo: Ligar para tirar a dúvida da carência do filho.',
     "Quais clientes renovam nos próximos 90 dias?": "2 clientes renovam nos próximos 90 dias: Marcos (a partir de 02/12); Paula (a partir de 15/12).",
     "Tem aniversário de contrato chegando?": "Aniversários de contrato nos próximos 30 dias: Rita em 28/11 (1 ano).",
     "Qual é minha escala da semana?": "Seus plantões nos próximos 7 dias: sex., 20/11 14:00 às 18:00 (PME Manhã); dom., 22/11 14:00 às 22:00 (Presencial Centro).",

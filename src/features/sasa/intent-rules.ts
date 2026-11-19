@@ -79,6 +79,6 @@ function classifyRaw(input: string): SasaIntent | null {
 
 /** O nome dito, para responder "Não achei Carlos" quando ele não está entre os leads. */
 export function nameHintOf(input: string): string | null {
-  const match = input.match(/\b(?:com|do|da|de|pro|pra|para|o|a)\s+([A-ZÀ-Ý][\p{L}'-]+(?:\s+[A-ZÀ-Ý][\p{L}'-]+)?)/u);
+  const match = input.match(/\b(?:com|do|da|de|pro|pra|para|o|a|chamad[oa]|é|sobre)\s+([A-ZÀ-Ý][\p{L}'-]+(?:\s+[A-ZÀ-Ý][\p{L}'-]+)?)/u);
   return match?.[1] ?? null;
 }
