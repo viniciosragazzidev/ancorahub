@@ -128,6 +128,13 @@ describe("Home operacional do corretor", () => {
     expect(shell.setStatus).toHaveBeenCalledWith("available", { inlineError: true });
     expect(screen.queryByText("Aprendizagem existente")).toBeNull();
   });
+  it("offline também aparece como fora do ar e volta com Ficar disponível", () => {
+    show(summary, { availability: "offline" });
+    expect(screen.getByText("Fora do ar")).toBeTruthy();
+    expect(screen.getByText(/novas ofertas e avisos não chegam/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Ficar disponível" }));
+    expect(shell.setStatus).toHaveBeenCalledWith("available", { inlineError: true });
+  });
   it("confirma no próprio lugar quando o servidor tira a pausa", () => {
     const view = show(summary, { availability: "paused" });
     fireEvent.click(screen.getByRole("button", { name: "Ficar disponível" }));

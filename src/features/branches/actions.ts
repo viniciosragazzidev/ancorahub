@@ -404,7 +404,8 @@ export async function setBrokersAvailabilityAction(
         const shouldUpdate =
           target.data === "paused"
             ? membership.availabilityStatus === "available"
-            : membership.availabilityStatus === "paused";
+            // Reativar vale para pausado e para "offline" (que o próprio corretor marca): os dois ficam fora da distribuição.
+            : membership.availabilityStatus === "paused" || membership.availabilityStatus === "offline";
         if (!shouldUpdate) continue;
         updated += 1;
         await tx
