@@ -5892,3 +5892,39 @@ export const erpIncentiveResults = pgTable("erp_incentive_results", {
   snapshot: jsonb("snapshot").$type<unknown>().notNull(), digest: text("digest").notNull(),
   createdBy: text("created_by").notNull().references(() => user.id), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [index("erp_incentive_results_campaign_idx").on(table.tenantId, table.campaignId, table.createdAt)]);
+
+/**
+ * Pedidos à Sasá agêntica (fase 2, 19/11/2026; migration 0233). Um por pedido (texto ou voz), único por
+ * corretor e `client_command_id`: o reenvio com internet ruim devolve a resposta guardada em vez de executar
+ * de novo. Áudio nunca é guardado (D4); a transcrição e a resposta são apagadas depois de 90 dias (D5) pelo
+ * job `/api/internal/jobs/sasa-cleanup`. Plano: docs/implementations/active/2026-11-19-sasa-agentica.md.
+ */
+export const sasaCommands = pgTable(
+  "sasa_commands",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    clientCommandId: text("client_command_id").notNull(),
+    /** text | voice */
+    origin: text("origin").notNull(),
+    /** O que o corretor disse ou escreveu; null depois da limpeza de 90 dias. */
+    transcript: text("transcript"),
+    audioSeconds: numeric("audio_seconds", { precision: 8, scale: 2 }),
+    tool: text("tool"),
+    /** rules | ai */
+    via: text("via"),
+    /** transcribed | answered | done | failed | not_command | limited */
+    status: text("status").notNull(),
+    pickedLeadId: text("picked_lead_id"),
+    reply: jsonb("reply").$type<Record<string, unknown>>(),
+    purgedAt: timestamp("purged_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("sasa_commands_user_client_unique").on(table.userId, table.clientCommandId),
+    index("sasa_commands_tenant_user_created_idx").on(table.tenantId, table.userId, table.createdAt),
+    index("sasa_commands_purge_idx").on(table.createdAt).where(sql`${table.purgedAt} IS NULL`),
+  ],
+);

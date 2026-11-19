@@ -35,7 +35,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "plantao", label: "Aceitar plantão" },
   { id: "lead", label: "Aceitar lead" },
   { id: "venda", label: "Registrar venda" },
-  { id: "sasa", label: "Sasá: pedidos por texto" },
+  { id: "sasa", label: "Sasá: pedidos por texto e voz" },
   { id: "lista", label: "Lista da equipe (supervisor)" },
   { id: "conquistas", label: "Conquistas" },
   { id: "movimento", label: "Movimento (componentes)" },
@@ -107,7 +107,7 @@ export function FlowLab() {
   useState(() => { try { window.localStorage.setItem("ancora:lite-welcome:2026-10-chat", "1"); window.localStorage.setItem(TOUR_STORAGE_KEY, "skipped"); } catch { /* ignore */ } return null; });
 
   // Sasá agêntica: um corretor de mentira que as ações simuladas mudam; "Recomeçar" volta ao início.
-  const sasaState = useRef({ world: labSasaWorld(), closed: [] as ReturnType<typeof labSasaWorld>["returns"] });
+  const sasaState = useRef({ world: labSasaWorld(), closed: [] as ReturnType<typeof labSasaWorld>["returns"], heard: 0 });
   const lab = useMemo<DevLab>(() => ({
     sasa: createLabSasa(sasaState.current, { delay, outcome }),
     acceptLead: async () => {
@@ -189,7 +189,7 @@ export function FlowLab() {
     }],
   };
 
-  const restart = () => { setRun((value) => value + 1); setHandoff(null); sasaState.current.world = labSasaWorld(); sasaState.current.closed = []; };
+  const restart = () => { setRun((value) => value + 1); setHandoff(null); sasaState.current.world = labSasaWorld(); sasaState.current.closed = []; sasaState.current.heard = 0; };
 
   return (
     <DevLabProvider value={lab}>

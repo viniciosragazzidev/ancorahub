@@ -2,26 +2,33 @@ import "server-only";
 
 import { and, asc, eq, isNull } from "drizzle-orm";
 
+import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
+import type { AvailableCatalogPlan } from "@/features/global-catalog/types";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 
-import type { SaleCatalog, SalePlanType } from "./conversation-sale-core";
+import type { SaleCatalog } from "./conversation-sale-core";
+import { mergeSaleCatalog } from "./sale-catalog-merge";
 
-/** Operadoras ativas da corretora com os planos ativos de cada uma (as perguntas Operadora e Plano). */
-export async function loadSaleCatalog(tenantId: string): Promise<SaleCatalog> {
+/**
+ * Operadoras e planos da conversa da venda: catálogo antigo (`carriers` + `carrier_plans` ativos) e catálogo novo
+ * (global liberado para a corretora e privado), os mesmos que a tela do lead oferece. Falha do catálogo novo não
+ * derruba a conversa: segue com o antigo.
+ */
+export async function loadSaleCatalog(context: TenantContext): Promise<SaleCatalog> {
   const db = getDatabase();
-  const [carriers, plans] = await Promise.all([
-    db.select({ id: schema.carriers.id, name: schema.carriers.name }).from(schema.carriers)
-      .where(and(eq(schema.carriers.tenantId, tenantId), eq(schema.carriers.status, "active"))).orderBy(asc(schema.carriers.name)),
-    db.select({ id: schema.carrierPlans.id, carrierId: schema.carrierPlans.carrierId, name: schema.carrierPlans.name, type: schema.carrierPlans.type }).from(schema.carrierPlans)
-      .where(and(eq(schema.carrierPlans.tenantId, tenantId), eq(schema.carrierPlans.active, true))).orderBy(asc(schema.carrierPlans.name)),
+  const [legacy, available] = await Promise.all([
+    db.select({ carrierId: schema.carriers.id, carrierName: schema.carriers.name, planId: schema.carrierPlans.id, planName: schema.carrierPlans.name, planType: schema.carrierPlans.type })
+      .from(schema.carriers)
+      .leftJoin(schema.carrierPlans, and(eq(schema.carrierPlans.carrierId, schema.carriers.id), eq(schema.carrierPlans.tenantId, context.tenantId), eq(schema.carrierPlans.active, true)))
+      .where(and(eq(schema.carriers.tenantId, context.tenantId), eq(schema.carriers.status, "active")))
+      .orderBy(asc(schema.carriers.name)),
+    listAvailableCatalogPlans(context).catch((error) => {
+      console.error("[registrar-venda] catálogo novo indisponível", error instanceof Error ? error.name : "unknown");
+      return [] as AvailableCatalogPlan[];
+    }),
   ]);
-  return {
-    carriers: carriers.map((carrier) => ({
-      ...carrier,
-      plans: plans.filter((plan) => plan.carrierId === carrier.id).map((plan) => ({ id: plan.id, name: plan.name, type: plan.type as SalePlanType })),
-    })),
-  };
+  return mergeSaleCatalog(legacy, available);
 }
 
 export type SaleChatLeadRow = { id: string; nome: string; status: string; monthlyValue: string | null; corretorId: string | null; qualificationDetails: unknown };

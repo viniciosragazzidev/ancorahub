@@ -66,6 +66,24 @@ export async function resolveBrokerFinanceAccess(context: TenantContext): Promis
   return { auth, receiptLinks: canAccessRoute(access, getRouteDefinition("/financeiro/recibos")) };
 }
 
+/**
+ * Parcelas do cronograma das próprias vendas que a direção marcou como pagas fora do ERP (Comissões, modo
+ * diretor): só as que não têm lançamento aprovado no ERP, que já entram pela liquidação confirmada. Assim nada
+ * conta em dobro.
+ */
+function ownSchedulePaidOutsideErp(auth: ErpAccess) {
+  const tenantId = auth.context.tenantId;
+  const schedule = schema.commissionSchedule;
+  const entries = schema.erpFinancialEntries;
+  return and(
+    eq(schedule.tenantId, tenantId),
+    eq(schema.sales.brokerId, auth.context.userId),
+    erpScopeSql(auth.scope, schema.leads.branchId, schema.sales.brokerId),
+    eq(schedule.status, "paid"),
+    sql`not exists (select 1 from ${entries} where ${entries.tenantId} = ${tenantId} and ${entries.originCommissionId} = ${schedule.id} and ${entries.status} = 'approved')`,
+  );
+}
+
 /** Lançamentos aprovados do próprio corretor, dentro do escopo do ERP. */
 export function ownApprovedEntriesWhere(auth: ErpAccess) {
   const entries = schema.erpFinancialEntries;
@@ -85,7 +103,10 @@ async function computeSummary(db: ErpDatabase, auth: ErpAccess, now: Date): Prom
   const own = ownApprovedEntriesWhere(auth);
   const isCommission = sql`${entries.kind} = 'broker_commission'`;
   const isAdvance = sql`${entries.kind} = 'advance'`;
-  const [[totals], [received]] = await Promise.all([
+  const schedule = schema.commissionSchedule;
+  const scheduleSales = and(eq(schema.sales.id, schedule.saleId), eq(schema.sales.tenantId, tenantId));
+  const scheduleLeads = and(eq(schema.leads.id, schema.sales.leadId), eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt));
+  const [[totals], [received], [paidOutside]] = await Promise.all([
     // O join faz o Drizzle qualificar as colunas de fora, como em getFinancialEntries.
     db.select({
       commissions: sql<number>`count(*) FILTER (WHERE ${isCommission})::int`.mapWith(Number),
@@ -100,12 +121,19 @@ async function computeSummary(db: ErpDatabase, auth: ErpAccess, now: Date): Prom
       .innerJoin(entries, and(eq(entries.tenantId, tenantId), eq(entries.id, schema.erpSettlements.entryId)))
       .where(and(eq(schema.erpSettlements.tenantId, tenantId), eq(schema.erpSettlements.status, "confirmed"),
         gte(schema.erpSettlements.occurredOn, start), lt(schema.erpSettlements.occurredOn, end), own, isCommission)),
+    // Pagas pela direção no cronograma (fora do ERP): contam como recebidas no mês em que foram marcadas.
+    db.select({
+      count: sql<number>`count(*)::int`.mapWith(Number),
+      value: sql<string>`coalesce(sum(CASE WHEN (${schedule.paidAt} at time zone 'America/Sao_Paulo')::date >= ${start}::date AND (${schedule.paidAt} at time zone 'America/Sao_Paulo')::date < ${end}::date THEN ${schedule.amount} ELSE 0 END), 0)::numeric(14,2)::text`,
+    }).from(schedule).innerJoin(schema.sales, scheduleSales).innerJoin(schema.leads, scheduleLeads)
+      .where(ownSchedulePaidOutsideErp(auth)),
   ]);
   const commissions = totals?.commissions ?? 0;
+  const paidOutsideCents = numericToCents(paidOutside?.value ?? "0");
   return {
     period, periodLabel: periodLabel(period),
     receivableCents: amountOrNoData(commissions, checkedCents(totals?.receivable ?? 0)),
-    receivedThisMonthCents: amountOrNoData(commissions, checkedCents(received?.value ?? 0)),
+    receivedThisMonthCents: amountOrNoData(commissions + (paidOutside?.count ?? 0), checkedCents((received?.value ?? 0) + paidOutsideCents)),
     openAdvancesCents: amountOrNoData(totals?.advances ?? 0, checkedCents(totals?.openAdvances ?? 0)),
   };
 }
@@ -207,7 +235,8 @@ async function computeInsights(db: ErpDatabase, auth: ErpAccess, now: Date): Pro
   );
   const salesJoin = and(eq(schema.sales.id, schedule.saleId), eq(schema.sales.tenantId, tenantId));
   const leadsJoin = and(eq(schema.leads.id, schema.sales.leadId), eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt));
-  const [receivedRows, forecastRows, [sales], [next]] = await Promise.all([
+  const paidMonth = sql<string>`to_char(${schedule.paidAt} at time zone 'America/Sao_Paulo', 'YYYY-MM')`;
+  const [receivedRows, forecastRows, [sales], [next], paidOutsideRows] = await Promise.all([
     db.select({
       period: month,
       value: sql<number>`coalesce(sum(CASE WHEN ${settlements.kind} = 'reversal' THEN -${settlements.amountCents} ELSE ${settlements.amountCents} END), 0)::bigint`.mapWith(Number),
@@ -229,8 +258,15 @@ async function computeInsights(db: ErpDatabase, auth: ErpAccess, now: Date): Pro
       .where(and(ownSchedule, eq(schedule.status, "pending"), gte(schedule.referenceMonth, current)))
       .orderBy(asc(schedule.referenceMonth), asc(schedule.dueDate), asc(schedule.id))
       .limit(1),
+    // Pagas pela direção no cronograma, fora do ERP: entram no "recebido" do mês em que foram marcadas.
+    db.select({ period: paidMonth, value: sql<string>`coalesce(sum(${schedule.amount}), 0)::numeric(14,2)::text` })
+      .from(schedule).innerJoin(schema.sales, salesJoin).innerJoin(schema.leads, leadsJoin)
+      .where(and(ownSchedulePaidOutsideErp(auth), sql`(${schedule.paidAt} at time zone 'America/Sao_Paulo')::date >= ${periodBounds(firstReceived).start}::date`, sql`(${schedule.paidAt} at time zone 'America/Sao_Paulo')::date < ${periodBounds(current).end}::date`))
+      .groupBy(paidMonth),
   ]);
-  const received = monthSeries(firstReceived, INSIGHT_MONTHS, new Map(receivedRows.map((row) => [row.period, checkedCents(row.value)])));
+  const receivedByMonth = new Map(receivedRows.map((row) => [row.period, checkedCents(row.value)]));
+  for (const row of paidOutsideRows) receivedByMonth.set(row.period, checkedCents((receivedByMonth.get(row.period) ?? 0) + numericToCents(row.value)));
+  const received = monthSeries(firstReceived, INSIGHT_MONTHS, receivedByMonth);
   const forecast = monthSeries(current, INSIGHT_MONTHS, new Map(forecastRows.map((row) => [row.period, numericToCents(row.value)])));
   return {
     received,

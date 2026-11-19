@@ -228,6 +228,21 @@
 .send { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; border: 0; background: var(--chat-action); color: white; cursor: pointer; }
 .send:disabled { background: var(--chat-action-soft); color: var(--chat-action); cursor: default; }
 .send svg { width: 16px; height: 16px; }
+/* Segurar para falar (Sasá, fase 2): o botão de enviar vira microfone com o campo vazio. */
+.mic { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: transform 100ms ease, background-color 160ms ease; }
+.mic[data-recording] { background: var(--danger); transform: scale(1.08); }
+.mic[data-still] { transition: none; transform: none; }
+.voiceBar { display: flex; align-items: center; gap: 10px; min-height: 24px; padding: 0 4px; font-size: var(--text-sm); color: var(--text-secondary); }
+.voiceBar[data-cancelling] { color: var(--danger); }
+.voiceDot { width: 10px; height: 10px; flex: none; border-radius: 999px; background: var(--danger); animation: voicePulse 1.2s ease-in-out infinite; }
+.voiceDot[data-still] { animation: none; }
+.voiceTime { font-variant-numeric: tabular-nums; color: var(--foreground); font-weight: 500; }
+.voiceHint { margin-left: auto; text-align: right; }
+.voiceNote { margin: 8px 4px 0; font-size: var(--text-sm); color: var(--text-secondary); }
+.voiceSpin { animation: voiceSpin 0.9s linear infinite; }
+@keyframes voicePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes voiceSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .voiceDot, .voiceSpin { animation: none; } .mic, .mic[data-recording] { transition: none; transform: none; } }
 /* Lite no celular: alvos do composer com 44px (o visual do modo normal não muda). */
 @media (pointer: coarse) {
   :global([data-skin="diretor"]) .tool,
