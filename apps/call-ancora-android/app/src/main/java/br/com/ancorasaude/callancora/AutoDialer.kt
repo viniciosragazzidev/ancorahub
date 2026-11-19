@@ -74,6 +74,8 @@ object AutoDialer {
     /** Uma ligação da sessão foi discada e ainda não caiu. */
     private var awaitingCallEnd = false
     private var currentItem: QueueNumber? = null
+    /** A fila pausou sozinha por falta de sinal: retoma sozinha quando o sinal voltar. */
+    private var pausedForSignal = false
     private val dialTimes = ArrayDeque<Long>()
 
     val isSessionActive: Boolean
@@ -137,6 +139,21 @@ object AutoDialer {
         }
     }
 
+    /** O sinal da operadora mudou (vem do SignalMonitor). */
+    internal fun onSignalChanged(inService: Boolean) {
+        val st = _state.value
+        if (!inService) {
+            if (st is State.Countdown) pauseForSignal(st.next)
+        } else if (st is State.Paused && pausedForSignal) {
+            resume()
+        }
+    }
+
+    private fun pauseForSignal(next: QueueNumber?) {
+        pause(SignalMonitor.status.value.message + ". A fila volta sozinha quando o sinal voltar.", next)
+        pausedForSignal = true
+    }
+
     /** Chegou uma ligação: não disca por cima dela. */
     internal fun onIncomingCall() {
         if (_state.value is State.Countdown) {
@@ -157,6 +174,7 @@ object AutoDialer {
 
     fun resume() {
         val st = _state.value as? State.Paused ?: return
+        pausedForSignal = false
         CallBus.logEvent(EVENT_RESUMED, st.next?.number ?: "-", null)
         val ongoing = currentItem
         if (awaitingCallEnd && ongoing != null) {
@@ -220,6 +238,9 @@ object AutoDialer {
     private suspend fun dial(item: QueueNumber, auto: Boolean) {
         val context = appContext ?: return pause("Sessão perdida. Toque em Continuar.", item)
 
+        if (!SignalMonitor.inService) {
+            return pauseForSignal(item)
+        }
         if (CallPlacer.phoneBusy(context)) {
             return pause("Há outra ligação em andamento.", item)
         }
@@ -277,6 +298,7 @@ object AutoDialer {
      */
     private fun pause(reason: String, next: QueueNumber?) {
         job?.cancel()
+        pausedForSignal = false
         CallBus.logEvent(EVENT_PAUSED, next?.number ?: "-", reason)
         _state.value = State.Paused(reason, next)
     }

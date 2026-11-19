@@ -24,12 +24,16 @@ object Readiness {
         NOTIFICATIONS("Mostrar a notificação da ligação"),
         FULL_SCREEN("Abrir a chamada com o celular bloqueado"),
         IN_CALL_SERVICE("Serviço de chamadas do app"),
+        SIGNAL("Sinal da operadora"),
     }
 
     data class Status(val item: Item, val ok: Boolean)
 
     /** Itens que valem para este Android, com a situação de cada um. */
-    fun check(context: Context): List<Status> = applicableItems().map { Status(it, isOk(context, it)) }
+    fun check(context: Context): List<Status> {
+        SignalMonitor.start(context)
+        return applicableItems().map { Status(it, isOk(context, it)) }
+    }
 
     fun allReady(context: Context): Boolean = check(context).all { it.ok }
 
@@ -65,6 +69,7 @@ object Readiness {
         }
         Item.FULL_SCREEN -> canUseFullScreenIntent(context)
         Item.IN_CALL_SERVICE -> isInCallServiceEnabled(context)
+        Item.SIGNAL -> SignalMonitor.inService
     }
 
     fun isDefaultDialer(context: Context): Boolean {

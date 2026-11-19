@@ -68,7 +68,8 @@ Ao abrir, o app confere tudo o que precisa e mostra o cartão **Preparar o celul
 3. ler o estado do telefone;
 4. mostrar a notificação da ligação (Android 13 ou mais novo);
 5. abrir a chamada com o celular bloqueado (Android 14 ou mais novo, abre os ajustes);
-6. serviço de chamadas do app.
+6. serviço de chamadas do app;
+7. sinal da operadora (o app avisa: "Desligue o modo avião", "Coloque um chip" ou "Sem sinal da operadora"). Se o sinal cair no meio da fila, ela pausa e volta sozinha quando o sinal voltar.
 
 Se uma permissão foi negada de vez, o botão vira "Abrir ajustes". **Ligar e a fila ficam travados até tudo estar liberado.**
 

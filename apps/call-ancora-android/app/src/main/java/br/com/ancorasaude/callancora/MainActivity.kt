@@ -118,6 +118,7 @@ class MainActivity : AppCompatActivity() {
         ).map { findViewById<TextView>(it) }
 
         AppFonts.applyTree(findViewById(android.R.id.content))
+        SignalMonitor.start(this)
         etNumber.addTextChangedListener(BrPhoneWatcher(etNumber))
 
         btnNextItem.setOnClickListener {
@@ -149,6 +150,7 @@ class MainActivity : AppCompatActivity() {
                 launch { LocalQueueSource.items.collect { renderQueue(it) } }
                 launch { AutoDialer.state.collect { renderSession() } }
                 launch { AutoDialer.stats.collect { renderSession() } }
+                launch { SignalMonitor.status.collect { refreshAll() } }
             }
         }
     }
@@ -226,7 +228,11 @@ class MainActivity : AppCompatActivity() {
         row.addView(mark, LinearLayout.LayoutParams(dp(22), dp(22)))
 
         val label = TextView(this).apply {
-            text = status.item.label
+            text = if (status.item == Readiness.Item.SIGNAL && !status.ok) {
+                SignalMonitor.status.value.message
+            } else {
+                status.item.label
+            }
             setTextColor(color(R.color.white))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             alpha = if (status.ok) 0.75f else 1f
@@ -238,7 +244,7 @@ class MainActivity : AppCompatActivity() {
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(10) },
         )
 
-        if (!status.ok) {
+        if (!status.ok && actionLabel(status.item) != null) {
             val button = TextView(this).apply {
                 text = actionLabel(status.item)
                 gravity = Gravity.CENTER
@@ -260,7 +266,10 @@ class MainActivity : AppCompatActivity() {
         return row
     }
 
-    private fun actionLabel(item: Readiness.Item): String = when (item) {
+    /** Texto do botão do item; null quando não há o que o app possa abrir. */
+    private fun actionLabel(item: Readiness.Item): String? = when (item) {
+        Readiness.Item.SIGNAL ->
+            if (SignalMonitor.status.value == SignalMonitor.Status.AIRPLANE) "Abrir ajustes" else null
         Readiness.Item.DIALER_ROLE -> "Tornar padrão"
         Readiness.Item.FULL_SCREEN -> "Abrir ajustes"
         Readiness.Item.IN_CALL_SERVICE -> "Ativar"
@@ -287,6 +296,17 @@ class MainActivity : AppCompatActivity() {
             Readiness.Item.IN_CALL_SERVICE -> {
                 Readiness.enableInCallService(this)
                 refreshAll()
+            }
+            Readiness.Item.SIGNAL -> {
+                if (SignalMonitor.status.value == SignalMonitor.Status.AIRPLANE) {
+                    try {
+                        startActivity(Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS))
+                    } catch (e: ActivityNotFoundException) {
+                        toast(SignalMonitor.status.value.message)
+                    }
+                } else {
+                    toast(SignalMonitor.status.value.message + ". Procure um lugar com sinal.")
+                }
             }
         }
     }
