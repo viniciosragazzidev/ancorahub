@@ -18,7 +18,7 @@ export function FloatingPill({ children, onClick, tone = "action", pulse = false
   mobileOnly?: boolean;
 }) {
   return (
-    <div className={styles.pillWrap} data-mobile-only={mobileOnly ? "" : undefined}>
+    <div className={styles.pillWrap} data-mobile-only={mobileOnly ? "" : undefined} data-sasa-lift="">
       <button
         type="button"
         className={[styles.pill, tone === "whatsapp" ? styles.pillWhatsapp : "", pulse ? (tone === "whatsapp" ? styles.pillPulseWhatsapp : styles.pillPulse) : ""].filter(Boolean).join(" ")}
