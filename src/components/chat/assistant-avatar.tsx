@@ -45,6 +45,7 @@ const AREA_ASSETS: Record<AssistantAvatarAsset, string> = {
   plantao: "/assistant-areas/plantao.webp",
   agenda: "/assistant-areas/agenda.webp",
   cotacao: "/assistant-areas/cotacao.webp",
+  "call-ancora": "/assistant-areas/call-ancora.webp",
   desempenho: "/assistant-areas/desempenho.webp",
   dicas: "/assistant-areas/dicas.webp",
   jornada: "/assistant-areas/jornada.webp",

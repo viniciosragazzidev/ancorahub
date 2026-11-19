@@ -30,6 +30,7 @@ const brokerRail: ChatRailData = {
     { id: "assistant:ancora", kind: "assistant", assistant: "ancora", name: "Sasá", verified: true, pinned: true, preview: "Tenho um resumo do seu dia.", at: instant, unread: false, waitingYou: false, href: "/dashboard/c/ancora", shape: "sasa", hue: 175 },
     { id: "assistant:leads", kind: "assistant", assistant: "leads", name: "Minha fila", verified: true, preview: "Você tem uma oportunidade para olhar.", at: instant, unread: true, waitingYou: true, href: "/minha-fila", shape: "favo", hue: 252 },
     { id: "assistant:plantao", kind: "assistant", assistant: "plantao", name: "Meu plantão", verified: true, preview: "Sua próxima escala está confirmada.", at: instant, unread: false, waitingYou: false, href: "/plantoes", shape: "onigiri", hue: 28 },
+    { id: "assistant:call-ancora", kind: "assistant", assistant: "call-ancora", name: "Call Âncora", verified: true, preview: "Comece uma sessão de ligações pelo celular.", at: instant, unread: false, waitingYou: false, href: "/call-ancora", shape: "cubo", hue: 145, avatarAsset: "call-ancora" },
   ],
   leads: [], nowIso: instant, canQuote: true,
 };
@@ -97,11 +98,11 @@ export default async function E4PreviewPage({ searchParams }: { searchParams: Pr
   const primaryScreen = preview === "supervisor-team" ? supervisorScreen : managerScreen;
 
   if (screen === "supervisor-team") return supervisorScreen;
-  if (screen === "broker-reference") return <LightChrome audience="broker" user={{ name: brokerRail.viewerName, email: "rafa@example.test" }} initialChatRail={brokerRail}><ReferenceHome /></LightChrome>;
+  if (screen === "broker-reference") return <LightChrome audience="broker" user={{ name: brokerRail.viewerName, email: "rafa@example.test" }} initialChatRail={brokerRail} callAncoraEnabled><ReferenceHome /></LightChrome>;
   if (screen === "comparison") {
     return <main className="grid h-screen w-full grid-cols-2 gap-0 bg-[var(--surface-muted)]">
       <section className="h-screen min-w-0 overflow-hidden border border-border" aria-label={preview === "supervisor-team" ? "Supervisor Lite" : "Gestor Lite"}><div className="h-screen">{primaryScreen}</div></section>
-      <section className="h-screen min-w-0 overflow-hidden border border-border" aria-label="Referência do Corretor Lite"><div className="h-screen"><LightChrome audience="broker" user={{ name: brokerRail.viewerName, email: "rafa@example.test" }} initialChatRail={brokerRail}><ReferenceHome /></LightChrome></div></section>
+      <section className="h-screen min-w-0 overflow-hidden border border-border" aria-label="Referência do Corretor Lite"><div className="h-screen"><LightChrome audience="broker" user={{ name: brokerRail.viewerName, email: "rafa@example.test" }} initialChatRail={brokerRail} callAncoraEnabled><ReferenceHome /></LightChrome></div></section>
     </main>;
   }
   return primaryScreen;

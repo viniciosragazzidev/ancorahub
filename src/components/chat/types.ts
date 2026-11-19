@@ -5,7 +5,7 @@
  * or opens the next question.
  */
 
-export type AssistantId = "ancora" | "leads" | "carteira" | "plantao" | "agenda" | "cotacao" | "desempenho" | "insights" | "jornada"
+export type AssistantId = "ancora" | "leads" | "carteira" | "plantao" | "agenda" | "cotacao" | "call-ancora" | "desempenho" | "insights" | "jornada"
   /** Supervisor Lite (2026-10-10): the team instead of the broker's own work. */
   | "equipe" | "equipe-leads" | "equipe-plantao" | "equipe-desempenho";
 
@@ -13,7 +13,7 @@ export type AssistantId = "ancora" | "leads" | "carteira" | "plantao" | "agenda"
 export type MascotShape = "mochi" | "onigiri" | "cubo" | "favo" | "nuvem" | "salte" | "logo" | "sasa";
 
 /** Personagem do universo Âncora que identifica uma área no Lite. */
-export type AssistantAvatarAsset = "leads" | "carteira" | "plantao" | "agenda" | "cotacao" | "desempenho" | "dicas" | "jornada" | "equipe" | "mensagens";
+export type AssistantAvatarAsset = "leads" | "carteira" | "plantao" | "agenda" | "cotacao" | "call-ancora" | "desempenho" | "dicas" | "jornada" | "equipe" | "mensagens";
 
 /** What a chosen reply does. Server actions are run by the screen through a registry, never by the script. */
 export type ChatAction =

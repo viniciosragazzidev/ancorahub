@@ -11,6 +11,7 @@ const patchSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("classify"), outcome: z.enum(["interested", "not_interested"]) }),
   z.object({ action: z.literal("pause") }),
   z.object({ action: z.literal("resume") }),
+  z.object({ action: z.literal("auto-dial"), enabled: z.boolean() }),
 ]);
 
 function authError(error: unknown) {
@@ -52,6 +53,8 @@ export async function PATCH(request: Request) {
     const scope = { tenantId: context.tenantId, brokerId: sessionOwnerId };
     const snapshot = parsed.data.action === "classify"
       ? callAncoraSessionStore.classify(scope, parsed.data.outcome)
+      : parsed.data.action === "auto-dial"
+        ? callAncoraSessionStore.setAutoDialEnabled(scope, parsed.data.enabled)
       : parsed.data.action === "pause"
         ? callAncoraSessionStore.pauseCountdown(scope)
         : callAncoraSessionStore.resumeCountdown(scope);

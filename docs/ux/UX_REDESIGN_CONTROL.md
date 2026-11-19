@@ -614,3 +614,7 @@ Papel: corretor Lite quando a flag global estiver ativa; admin da plataforma e d
 ## 2026-11-19: sessão encerrada do Call Âncora
 
 No celular, HTTP 401/403 encerra a consulta e orienta parear de novo. No modo `Ver como`, o estado temporário pertence ao admin autenticado, preservando a sessão do corretor observado. As leituras limpam sessões e tickets vencidos; sem novo token ou componente visual.
+
+## 2026-11-19: rail e discagem automática do Call Âncora
+
+Papel: corretor Lite. O rail Assistentes usa o mesmo gate já aplicado à rota e abre `/call-ancora`; o celular mantém a entrada em Mais. A nova chave usa o `Switch` Arc compartilhado, e o celular mostra o estado da preferência, o número destacado, o botão `Ligar para o próximo` e o feedback háptico. Com a chave ligada, classificar a ligação inicia contagem de três segundos com Pausar e a simulação avança sozinha; desligada, o próximo contato espera um toque. Reutiliza tokens e feedback existentes, sem nova primitive, token ou movimento. A limitação do navegador para abrir `tel:` sem gesto fica explícita; discagem real sem toque requer Android. Sem migration e sem escrita no banco. UX-M1.10 continua pendente.

@@ -26,6 +26,7 @@ export type CallAncoraSnapshot = {
   callElapsedSeconds: number;
   interests: CallAncoraContact[];
   completed: number;
+  autoDialEnabled: boolean;
   countdown: { remainingSeconds: number; paused: boolean } | null;
   updatedAt: string;
 };
@@ -43,6 +44,7 @@ type Session = Scope & {
   callStartedAt: number | null;
   interests: CallAncoraContact[];
   completed: number;
+  autoDialEnabled: boolean;
   flagBypass: boolean;
   countdownEndsAt: number | null;
   countdownPaused: boolean;
@@ -80,6 +82,7 @@ export class CallAncoraSessionStore {
       callStartedAt: null,
       interests: [],
       completed: 0,
+      autoDialEnabled: false,
       flagBypass: options.flagBypass ?? false,
       countdownEndsAt: null,
       countdownPaused: false,
@@ -176,9 +179,24 @@ export class CallAncoraSessionStore {
     if (!contact) return null;
     if (outcome === "interested" && !session.interests.some((item) => item.id === contact.id)) session.interests.push(contact);
     session.completed += 1;
-    session.countdownEndsAt = this.now() + CALL_ANCORA_NEXT_DELAY_MS;
-    session.countdownPaused = false;
-    session.countdownRemainingMs = null;
+    if (session.autoDialEnabled) {
+      session.countdownEndsAt = this.now() + CALL_ANCORA_NEXT_DELAY_MS;
+      session.countdownPaused = false;
+      session.countdownRemainingMs = null;
+    } else {
+      this.advanceToNextContact(session);
+    }
+    session.lastActivityAt = this.now();
+    return this.snapshot(session);
+  }
+
+  setAutoDialEnabled(scope: Scope, enabled: boolean): CallAncoraSnapshot | null {
+    const session = this.liveSession(scopeKey(scope));
+    if (!session) return null;
+    session.autoDialEnabled = enabled;
+    if (!enabled && (session.countdownEndsAt !== null || session.countdownPaused)) {
+      this.advanceToNextContact(session);
+    }
     session.lastActivityAt = this.now();
     return this.snapshot(session);
   }
@@ -227,6 +245,10 @@ export class CallAncoraSessionStore {
 
   private advanceIfCountdownEnded(session: Session) {
     if (session.countdownEndsAt === null || this.now() < session.countdownEndsAt) return;
+    this.advanceToNextContact(session);
+  }
+
+  private advanceToNextContact(session: Session) {
     session.countdownEndsAt = null;
     session.countdownPaused = false;
     session.countdownRemainingMs = null;
@@ -252,6 +274,7 @@ export class CallAncoraSessionStore {
       callElapsedSeconds: session.callStartedAt === null ? 0 : Math.max(0, Math.floor((now - session.callStartedAt) / 1000)),
       interests: session.interests.map((item) => ({ ...item })),
       completed: session.completed,
+      autoDialEnabled: session.autoDialEnabled,
       countdown: session.countdownEndsAt !== null || session.countdownPaused
         ? { remainingSeconds: Math.ceil((session.countdownPaused ? session.countdownRemainingMs ?? 0 : (session.countdownEndsAt ?? now) - now) / 1000), paused: session.countdownPaused }
         : null,

@@ -36,6 +36,18 @@ describe("Início reorganizado (BROKER_NAV_REORG)", () => {
     expect(old).toEqual(expect.arrayContaining(["insights", "jornada"]));
     expect(old).not.toContain("carteira");
   });
+  it("shows Call Âncora only when its visibility capability is enabled", () => {
+    const base = { data: workspace(), now, capabilities: { quoteSimulator: true, dutyCalendar: true, homeV2: true } };
+    expect(buildAssistantThreads(base).some((thread) => thread.assistant === "call-ancora")).toBe(false);
+    const enabled = buildAssistantThreads({ ...base, capabilities: { ...base.capabilities, callAncora: true } });
+    expect(enabled.map((thread) => thread.assistant)).toEqual(["ancora", "leads", "carteira", "plantao", "agenda", "desempenho", "cotacao", "call-ancora"]);
+    expect(enabled.at(-1)).toMatchObject({
+      name: "Call Âncora",
+      href: "/call-ancora",
+      avatarAsset: "call-ancora",
+      preview: "Comece uma sessão de ligações pelo celular.",
+    });
+  });
   it("opens Plantão on the single entry /plantoes with the flag on and keeps /plantoes/agora with it off (etapa 3)", () => {
     const base = { data: workspace(), now, journey: journey() };
     const on = buildAssistantThreads({ ...base, capabilities: { quoteSimulator: false, dutyCalendar: false, homeV2: true } });
@@ -54,6 +66,7 @@ describe("assistant avatar art direction", () => {
       plantao: "plantao",
       agenda: "agenda",
       cotacao: "cotacao",
+      "call-ancora": "call-ancora",
       desempenho: "desempenho",
       insights: "dicas",
       jornada: "jornada",
