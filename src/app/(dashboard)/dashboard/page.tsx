@@ -11,6 +11,7 @@ import { getCommandCenterData } from "@/features/dashboard/today";
 import { CommandCenter } from "@/features/dashboard/components/command-center";
 import { canAccessLeadQualityCenter, getLeadQualityReport, getSimpleLeadQualityReport, parseLeadQualityFocus } from "@/features/reports/metrics/lead-quality-service";
 import { parseLeadQualityPeriod } from "@/features/reports/metrics/lead-quality-period";
+import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 import { listLeadQualityQueues } from "@/features/reports/metrics/lead-quality-export";
 import { LeadQualityCenter } from "@/features/reports/components/lead-quality-center";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
@@ -119,7 +120,8 @@ export default async function DashboardPage({
         singleParam(resolvedSearchParams.key),
       );
       const qualityPeriod = parseLeadQualityPeriod(singleParam(resolvedSearchParams.period));
-      const queues = await listLeadQualityQueues(context.tenantId);
+      // Gestor de unidade: o filtro por fila listava as filas da empresa toda; ele vê o relatório da unidade sem esse filtro.
+      const queues = isOutsideManagerScope(context.role, context.jobTitle) ? [] : await listLeadQualityQueues(context.tenantId);
       const rawQueue = singleParam(resolvedSearchParams.queue);
       const queueId = rawQueue && queues.some((queue) => queue.id === rawQueue) ? rawQueue : null;
       const report = await getLeadQualityReport(context, qualityPeriod, focus, { queueId, origin: null });
@@ -152,7 +154,7 @@ export default async function DashboardPage({
     ]);
     const showQualityTab = canReadQuality && reportingEnabled !== "false";
     // The dashboard is the command center of the day; the period reports live in Relatórios.
-    return <CommandCenter data={data} showQualityTab={showQualityTab} canManage={context.role === "director" || context.role === "manager"} />;
+    return <CommandCenter data={data} showQualityTab={showQualityTab} canManage={context.role === "director" || context.role === "manager"} unitManager={isOutsideManagerScope(context.role, context.jobTitle)} />;
   });
 
   return result;
