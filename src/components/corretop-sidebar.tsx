@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   Wallet,
   Megaphone,
+  PhoneCall,
 } from "@phosphor-icons/react";
 import {
   DropdownMenu,
@@ -92,7 +93,7 @@ const areaPresentation: Record<NavAreaId, Pick<NavItemConfig, "icon" | "iconTone
   erp: { icon: ShieldCheck, iconTone: "text-primary" },
 };
 
-export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initialOnDuty, negotiationsEnabled = false, postSaleAuditEnabled = false, erpPaths = [] }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string; initialOnDuty?: boolean; negotiationsEnabled?: boolean; postSaleAuditEnabled?: boolean; erpPaths?: readonly string[] }) {
+export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initialOnDuty, negotiationsEnabled = false, postSaleAuditEnabled = false, callAncoraEnabled = false, erpPaths = [] }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string; initialOnDuty?: boolean; negotiationsEnabled?: boolean; postSaleAuditEnabled?: boolean; callAncoraEnabled?: boolean; erpPaths?: readonly string[] }) {
   const currentPathname = usePathname();
   const pathname = initialPathname ?? currentPathname;
   const { isMobile, setOpenMobile } = useSidebar();
@@ -318,6 +319,34 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
                 </div>
               );
             })}
+            {callAncoraEnabled ? (
+              <div className="mt-3 flex flex-col">
+                <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/45 transition-[margin,opacity,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:mb-0 group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0 motion-reduce:transition-none">Demonstração</p>
+                <Tooltip>
+                  <TooltipTrigger render={
+                    <Link
+                      data-slot="sidebar-nav-link"
+                      href="/call-ancora"
+                      aria-current={pathname === "/call-ancora" ? "page" : undefined}
+                      onClick={() => isMobile && setOpenMobile(false)}
+                      className={cn(
+                        "group/navitem relative flex min-h-10 w-full items-center gap-3 rounded-full px-3 py-2 outline-none select-none transition-[background-color,color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-primary/8 focus-visible:ring-2 focus-visible:ring-sidebar-ring/50 active:scale-[0.98] motion-reduce:transition-none",
+                        isMobile && "min-h-(--mobile-touch-target)",
+                        pathname === "/call-ancora" && "text-primary shadow-none",
+                        !isMobile && "group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0",
+                      )}
+                    />
+                  }>
+                    <NavPending className="text-primary" />
+                    <div data-slot="sidebar-nav-icon" className={cn("relative flex size-8 shrink-0 items-center justify-center rounded-full", directorLite ? "director-nav-icon" : "bg-sidebar-accent/55 text-sky-600 dark:text-sky-300", pathname === "/call-ancora" && "bg-primary/8 text-primary")}>
+                      <PhoneCall weight={pathname === "/call-ancora" ? "fill" : "regular"} className="size-[1.15rem] shrink-0" />
+                    </div>
+                    <span data-slot="sidebar-nav-label" className={cn("min-w-0 flex-1 truncate text-sm leading-tight tracking-tight", pathname === "/call-ancora" ? "font-semibold text-primary" : "font-medium text-sidebar-foreground/72", !isMobile && "group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0")}>Call Âncora</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="border-sidebar-border bg-popover text-xs font-medium text-popover-foreground shadow-none">Call Âncora</TooltipContent>
+                </Tooltip>
+              </div>
+            ) : null}
           </nav>
         </TooltipProvider>
       </SidebarContent>

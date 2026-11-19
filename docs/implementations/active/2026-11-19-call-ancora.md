@@ -1,6 +1,6 @@
 # Call Âncora: discador automático próprio pelo celular
 
-Briefing para o agente que vai dar início ao plano. Ideia do dono do AncoraHub, conversada em 19/11/2026. Nada foi implementado. Este documento junta o que foi decidido, o que foi descartado e por quê, o que já existe no repositório e o que precisa ser levantado antes de codificar.
+Briefing e registro de implementação do plano iniciado em 19/11/2026. O MVP visual está implementado; o discador Android, a base e a operação de contatos permanecem nas etapas seguintes. Este documento junta o que foi decidido, o que foi descartado e por quê, o que já existe no repositório e o que precisa ser levantado antes de avançar.
 
 ## 1. O problema e a ideia
 
@@ -147,3 +147,24 @@ O **PWA atual dentro de uma casca nativa Android (Capacitor)**, com um **plugin 
 - Migrations: usar o número mais alto existente em qualquer branch do origin; cada entrada do journal precisa do seu `.sql`.
 - Nunca imprimir segredos nem a URL do banco. Dados de teste fictícios.
 - O app Android é um projeto novo: definir onde ele mora (sugestão: `apps/call-ancora-android/` no mesmo repositório, ou um repositório próprio) antes de começar a etapa 1.
+
+## Registro de implementação: MVP visual
+
+Status em 19/11/2026: demonstração visual entregue na branch `feat/call-ancora-mvp`.
+
+- O corretor abre `/call-ancora` pelo menu Mais do Lite, inicia uma sessão e pareia o navegador do celular por QR de uso único, válido por dois minutos. O celular mostra a conta do corretor, o contato fictício, `Ligar` com `tel:` e `Simular` para avançar pelos estados. A tela do computador acompanha a ligação, o cronômetro, o próximo contato e a lista de interessados.
+- O laboratório em `/dev/laboratorio` executa o mesmo fluxo com celular e estado simulados no navegador. Os 18 contatos têm números fictícios, inclusive o prefixo `00`; interesse não cria lead, não altera carteira e nenhuma chamada é iniciada pelo botão `Simular`.
+- `src/features/call-ancora/session-store.ts` mantém estado apenas em memória do processo, por tenant e corretor, com sessão de quatro horas ociosas e pareamento de uso único. Não grava no banco e não persiste após reinício ou troca de processo. A interface consulta a sessão por polling a cada 1,2 segundo; não usa SSE.
+- A rota exige sessão autenticada. A chave global `CALL_ANCORA_VISUAL` começa desligada; só libera corretores quando o Super-admin a ativa. Admins ativos da plataforma e desenvolvimento local podem validar a demonstração sem a flag, inclusive em "Ver como" com validação da sessão real do admin. A configuração é auditada pelo fluxo já existente. Sem migration e sem alteração de dados do CRM.
+- Reutiliza Button Arc, tokens atuais, `LiteListPresence` e `useFeedback`; não cria token visual ou primitive. `prefers-reduced-motion` é respeitado pelo componente de presença compartilhado.
+- Tsc, testes focados, build e eventuais limitações do harness serão registrados em `reports/agent/verification/call-ancora-mvp.md`.
+
+### Fora deste MVP
+
+Base de contatos, campanha, reservas concorrentes, logs de chamadas, criação de lead, integração em tempo real com o CRM, app Capacitor/Android, discagem automática, gestão, limites por chip e revisão jurídica continuam nas etapas posteriores do plano. O link `tel:` só abre o discador do aparelho; o MVP não consegue observar chamadas reais.
+### Acesso e ativação
+
+- A flag global `feature_call_ancora_visual_enabled` fica desligada por padrão (`false`).
+- Corretores só veem e usam a demonstração quando o Super-admin ativa a flag.
+- Admins ativos da plataforma e o ambiente local de desenvolvimento podem abrir a demonstração com a flag desligada; no modo "Ver como", o bypass é validado pela sessão real do admin.
+- Sessões móveis de admin/desenvolvimento guardam o bypass apenas em memória, preso ao token temporário do aparelho. Para corretores, desligar a flag também bloqueia a API móvel.

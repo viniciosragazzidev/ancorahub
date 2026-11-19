@@ -22,6 +22,7 @@ export const LIGHT_ALLOWED_PREFIXES = [
   "/relacionamento",
   "/primeiro-acesso",
   "/extensao",
+  "/call-ancora",
   // Meu financeiro (somente leitura): a página ainda confere a chave, o módulo financeiro do ERP e a permissão.
   "/meu-financeiro",
 ] as const;
@@ -33,6 +34,7 @@ export const LIGHT_ALLOWED_PREFIXES = [
 const ID = "[^/]+";
 export const LIGHT_SUPERVISOR_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/dashboard$/,
+  /^\/call-ancora$/,
   /^\/negociacoes$/,
   new RegExp(`^/dashboard/c/${ID}$`),
   /^\/leads$/,
@@ -60,6 +62,7 @@ export const LIGHT_SUPERVISOR_ALLOWED_ROUTES: readonly RegExp[] = [
 /** The manager Lite starts with the unit dashboard and lead work only. */
 export const LIGHT_MANAGER_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/dashboard$/,
+  /^\/call-ancora$/,
   /^\/negociacoes$/,
   /^\/leads$/,
   new RegExp(`^/leads/(?!dashboard$|arquivados$|distribuicao$)${ID}$`),
@@ -98,6 +101,7 @@ export function isLightRouteAllowed(pathname: string, audience: "broker" | "supe
 
 /** "Mais" of the supervisor. */
 export const LIGHT_SUPERVISOR_DESTINATIONS: readonly LightMoreDestination[] = [
+  { href: "/call-ancora", label: "Call Âncora", requires: "callAncora" },
   { href: "/equipe/minha", label: "Minha equipe" },
   { href: "/negociacoes", label: "Negociações da equipe", requires: "negotiations" },
   { href: "/equipe/desempenho", label: "Placar da equipe", requires: "teamRanking" },
@@ -110,6 +114,7 @@ export const LIGHT_SUPERVISOR_DESTINATIONS: readonly LightMoreDestination[] = [
 ];
 
 export const LIGHT_MANAGER_DESTINATIONS: readonly LightMoreDestination[] = [
+  { href: "/call-ancora", label: "Call Âncora", requires: "callAncora" },
   { href: "/leads", label: "Leads da unidade" },
   { href: "/negociacoes", label: "Negociações", requires: "negotiations" },
   { href: "/equipe", label: "Equipe" },
@@ -138,7 +143,7 @@ export type LightMoreDestination = {
   href: string;
   label: string;
   /** Hidden unless the matching capability is on. */
-  requires?: "quoteSimulator" | "dutyCalendar" | "relationshipCenter" | "journey" | "teamRanking" | "teamManagement" | "negotiations";
+  requires?: "quoteSimulator" | "dutyCalendar" | "relationshipCenter" | "journey" | "teamRanking" | "teamManagement" | "negotiations" | "callAncora";
 };
 
 export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
@@ -148,6 +153,7 @@ export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/clientes", label: "Clientes" },
   { href: "/relacionamento", label: "Mural da gestão", requires: "relationshipCenter" },
   { href: "/notificacoes", label: "Notificações" },
+  { href: "/call-ancora", label: "Call Âncora", requires: "callAncora" },
   { href: "/settings", label: "Configurações" },
 ];
 
@@ -164,10 +170,11 @@ export const LIGHT_MORE_DESTINATIONS_V2: readonly LightMoreDestination[] = [
   { href: "/cotacao", label: "Cotação", requires: "quoteSimulator" },
   { href: "/relacionamento", label: "Mural da gestão", requires: "relationshipCenter" },
   { href: "/notificacoes", label: "Notificações" },
+  { href: "/call-ancora", label: "Call Âncora", requires: "callAncora" },
   { href: "/settings", label: "Configurações" },
 ];
 
-export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean; journey?: boolean; teamRanking?: boolean; teamManagement?: boolean; negotiations?: boolean; homeV2?: boolean }, audience: "broker" | "supervisor" | "manager" = "broker") {
+export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean; journey?: boolean; teamRanking?: boolean; teamManagement?: boolean; negotiations?: boolean; callAncora?: boolean; homeV2?: boolean }, audience: "broker" | "supervisor" | "manager" = "broker") {
   const list = audience === "manager" ? LIGHT_MANAGER_DESTINATIONS : audience === "supervisor" ? LIGHT_SUPERVISOR_DESTINATIONS : capabilities.homeV2 ? LIGHT_MORE_DESTINATIONS_V2 : LIGHT_MORE_DESTINATIONS;
   return list.filter((item) => !item.requires || capabilities[item.requires]);
 }
@@ -215,6 +222,7 @@ const RULES: readonly RouteRule[] = [
   // Aberta pelo Desempenho (Início reorganizado), a seta volta para lá.
   { test: exact("/jornada"), route: (_path, search) => ({ title: "Minha jornada", tab: "mais", isRoot: false, parentHref: search?.get("de") === "desempenho" ? "/desempenho" : "/dashboard", hidesTabBar: true }) },
   { test: exact("/meu-financeiro"), route: { title: "Meu financeiro", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  { test: exact("/call-ancora"), route: { title: "Call Âncora", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/agenda"), route: { title: "Agenda", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/desempenho"), route: { title: "Desempenho", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/dashboard"), route: { title: "Início", tab: "inicio", isRoot: true, parentHref: null, chat: true, hidesTabBar: true } },
