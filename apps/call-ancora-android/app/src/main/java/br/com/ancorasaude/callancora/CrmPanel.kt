@@ -117,7 +117,7 @@ class CrmPanel(private val activity: MainActivity) {
         stateDot.backgroundTintList = ColorStateList.valueOf(color(dot))
 
         tvInfo.text = ui.message ?: when {
-            state.paused -> "Sessão pausada no celular."
+            state.paused -> if (state.pausedBy == "phone") "Sessão pausada no celular." else "Pausado pela tela."
             state.countdownSeconds != null ->
                 if (state.countdownPaused) "Contagem pausada." else "Próxima ligação em ${state.countdownSeconds} s."
             state.awaitingClassification -> "Classifique a ligação na tela do computador."
@@ -159,6 +159,7 @@ class CrmPanel(private val activity: MainActivity) {
                 val cause = last?.causeLabel?.let { " · $it" }.orEmpty()
                 val text = when {
                     last == null -> "Ligação encerrada"
+                    last.voicemail -> "Provável caixa postal$cause"
                     last.noAnswer -> "Não atendeu$cause"
                     else -> "Encerrada$cause · ${Labels.clock(last.talkSeconds * 1000L)}"
                 }

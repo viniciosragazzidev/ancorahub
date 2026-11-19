@@ -22,6 +22,10 @@ const eventSchema = z.object({
   timeToActiveMs: z.number().int().nonnegative().nullable().optional(),
   talkMs: z.number().int().nonnegative().nullable().optional(),
   sim: z.string().max(80).nullable().optional(),
+  autoOutcome: z.enum(["no_answer", "voicemail"]).nullable().optional(),
+  rule: z.string().max(40).nullable().optional(),
+  dialToActiveMs: z.number().int().nonnegative().max(600_000).nullable().optional(),
+  version: z.number().int().nonnegative().nullable().optional(),
 });
 
 /** App Android: evento de ligação real (discando, em ligação, encerrada com a causa). */
@@ -36,6 +40,8 @@ export async function POST(request: Request) {
   if (!result.ok) {
     if (result.reason === "unauthorized") return deviceJson({ error: DEVICE_UNAUTHORIZED }, 401);
     if (result.reason === "not_dialable") return deviceJson({ error: "Este contato não pode ser discado." }, 422);
+    if (result.reason === "paused") return deviceJson({ error: "Pausado pela tela. Nenhuma ligação nova começa.", code: "paused" }, 409);
+    if (result.reason === "version_mismatch") return deviceJson({ error: "A sessão mudou na tela. Atualize antes de discar.", code: "version_mismatch" }, 409);
     return deviceJson({ error: "A fila mudou. Atualize o estado da sessão." }, 409);
   }
   return deviceJson(deviceStateBody(result.snapshot));

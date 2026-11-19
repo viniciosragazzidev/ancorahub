@@ -51,6 +51,8 @@ data class CallSnapshot(
     val timeToActiveMs: Long? = null,
     /** ms em ACTIVE até o DISCONNECTED. */
     val talkMs: Long? = null,
+    /** O app desligou sozinho (ou pelo botão Caixa postal): motivo em português. */
+    val autoDecisionLabel: String? = null,
 )
 
 data class AudioSnapshot(val muted: Boolean = false, val speaker: Boolean = false)
@@ -86,6 +88,8 @@ object CallBus {
     @Volatile private var activeAtElapsed: Long? = null
     @Volatile private var timeToActiveMs: Long? = null
     @Volatile private var talkMs: Long? = null
+    /** Decisão de desligamento automático da ligação atual (ver AutoHangup). */
+    @Volatile private var lastAuto: AutoHangup.Result? = null
 
     // ---------- Eventos vindos da tela principal ----------
 
@@ -117,6 +121,9 @@ object CallBus {
         val now = SystemClock.elapsedRealtime()
         val incoming = isIncoming(call)
         val ref = dialStartedAtElapsed
+        // Ligação feita pelo próprio app (pedido de ligação recente): as regras de desligamento valem.
+        val appPlaced = !incoming && ref != null && now - ref <= DIAL_REFERENCE_WINDOW_MS
+        lastAuto = null
         if (incoming || ref == null || now - ref > DIAL_REFERENCE_WINDOW_MS) {
             // Ligação recebida ou iniciada fora do app: o relógio começa agora.
             dialStartedAtElapsed = now
@@ -140,6 +147,10 @@ object CallBus {
         } else {
             AutoDialer.onOutgoingAdded()
             CrmSession.onOutgoingAdded()
+            if (appPlaced) {
+                AutoHangup.onOutgoingStarted(numberOf(call))
+                if (state == Call.STATE_ACTIVE) AutoHangup.onActive()
+            }
         }
     }
 
@@ -157,6 +168,7 @@ object CallBus {
                 if (connect > 0) "connectTimeMillis=$connect" else null
             }
             Call.STATE_DISCONNECTED -> {
+                if (isCurrent && !isIncoming(call)) lastAuto = AutoHangup.take()
                 causeCode = call.details.disconnectCause?.code
                 causeReason = call.details.disconnectCause?.reason
                 causeLabel = call.details.disconnectCause?.label?.toString()
@@ -181,13 +193,18 @@ object CallBus {
         if (isCurrent) publish(call, _current.value?.addedAtElapsed)
         if (state == Call.STATE_ACTIVE && isCurrent && !isIncoming(call)) {
             CrmSession.onOutgoingActive()
+            AutoHangup.onActive()
         }
         if (state == Call.STATE_DISCONNECTED && !isIncoming(call)) {
-            val answered = call.details.connectTimeMillis > 0 || (isCurrent && timeToActiveMs != null)
+            val auto = if (isCurrent) lastAuto else null
+            val reachedActive = call.details.connectTimeMillis > 0 || (isCurrent && timeToActiveMs != null)
+            // Caixa postal / não atendida decidida pelo app não conta como atendida.
+            val answered = reachedActive && auto?.decision == null
             AutoDialer.onOutgoingEnded(answered, if (isCurrent) talkMs else activeMs)
             CrmSession.onOutgoingEnded(
                 causeCode,
-                Labels.friendlyDisconnect(causeCode, causeReason, causeLabel, false),
+                auto?.decision?.humanLabel() ?: Labels.friendlyDisconnect(causeCode, causeReason, causeLabel, false),
+                auto,
             )
         }
     }
@@ -317,6 +334,7 @@ object CallBus {
             disconnectReason = cause?.reason,
             timeToActiveMs = timeToActiveMs,
             talkMs = talkMs,
+            autoDecisionLabel = if (state == Call.STATE_DISCONNECTED) lastAuto?.decision?.humanLabel() else null,
         )
     }
 

@@ -987,4 +987,7 @@ O app confere, ao abrir e ao voltar, tudo o que precisa do sistema de ligações
 ## 19/11/2026 - Call Âncora: celular pareado com a sessão do CRM (etapa 2)
 
 O app Android lê o QR da tela Call Âncora, conecta à conta do corretor e disca a fila da sessão sozinho, mandando cada etapa da ligação para a web em tempo real (discando, em ligação, encerrada com o motivo). A web classifica (Com interesse / Sem interesse) e, com a discagem automática ligada, a próxima ligação começa sem toque. Ligação não atendida é marcada sozinha. Por segurança, os contatos de demonstração continuam fictícios e nunca são discados; ligação real só com a "Lista de teste" que administradores da plataforma montam na web. Detalhes: `docs/implementations/active/2026-11-19-call-ancora.md`.
+## 19/11/2026 - Call Âncora: caixa postal automática e sincronia estrita com a tela
+
+O celular desliga sozinho quando ninguém atende (22 s) e quando a ligação provavelmente caiu na caixa postal (atendeu rápido demais ou tarde demais), sempre como estimativa e com os tempos ajustáveis. A web ganha Não atendeu e Caixa postal, correção da classificação durante a contagem e os botões Pausar sessão, Encerrar sessão, Caixa postal (desligar) e Desligar ligação. Pausar na tela impede o celular de começar outra ligação (ele confere o estado na hora de discar), encerrar em qualquer lado desconecta o celular, e a web mostra quando o celular está sem sinal com o AncoraHub.
 

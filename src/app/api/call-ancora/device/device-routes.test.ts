@@ -165,6 +165,130 @@ describe("API do app Android do Call Âncora", () => {
     expect((await stateGet(authed("state", paired.deviceToken))).status).toBe(401);
   });
 
+  async function testListSession(autoDial = false) {
+    const paired = await pairNew({ flagBypass: true });
+    callAncoraSessionStore.setTestList(paired.scope, [
+      { name: "Ana", phone: "+5521999990000" },
+      { name: "Bia", phone: "+5521977776666" },
+    ]);
+    if (autoDial) callAncoraSessionStore.setAutoDialEnabled(paired.scope, true);
+    const contactId = callAncoraSessionStore.getForBroker(paired.scope)?.current?.id ?? "";
+    const send = (body: Record<string, unknown>) => eventsPost(authed("events", paired.deviceToken, { contactId, ...body }));
+    return { ...paired, contactId, send };
+  }
+
+  it("provável caixa postal (ACTIVE rápido): o app desliga e o servidor classifica sozinho", async () => {
+    const s = await testListSession();
+    await s.send({ event: "dialing" });
+    await s.send({ event: "active" });
+    const ended = await s.send({ event: "disconnected", causeCode: 2, autoOutcome: "voicemail", rule: "quick_active", dialToActiveMs: 1200 });
+    const body = await ended.json() as { state: { completed: number; awaitingClassification: boolean; lastCall: { autoOutcome: string; rule: string; dialToActiveMs: number } } };
+    expect(body.state.completed).toBe(1);
+    expect(body.state.awaitingClassification).toBe(false);
+    expect(body.state.lastCall).toMatchObject({ autoOutcome: "voicemail", rule: "quick_active", dialToActiveMs: 1200 });
+  });
+
+  it("tempo de toque esgotado: Não atendeu automático com a regra registrada", async () => {
+    const s = await testListSession(true);
+    await s.send({ event: "dialing" });
+    await s.send({ event: "disconnected", causeCode: 2, autoOutcome: "no_answer", rule: "ring_timeout" });
+    const snapshot = callAncoraSessionStore.getForBroker(s.scope);
+    expect(snapshot?.lastOutcome).toEqual({ contactId: s.contactId, outcome: "no_answer", auto: true });
+    expect(snapshot?.lastCall?.rule).toBe("ring_timeout");
+    expect(snapshot?.countdown?.remainingSeconds).toBe(3);
+  });
+
+  it("corrige a classificação automática só durante a contagem", async () => {
+    const s = await testListSession(true);
+    await s.send({ event: "dialing" });
+    await s.send({ event: "active" });
+    await s.send({ event: "disconnected", autoOutcome: "voicemail", rule: "late_active" });
+    const corrected = callAncoraSessionStore.reclassify(s.scope, "interested");
+    expect(corrected?.lastOutcome).toEqual({ contactId: s.contactId, outcome: "interested", auto: false });
+    expect(corrected?.interests.map((item) => item.id)).toEqual([s.contactId]);
+    expect(callAncoraSessionStore.reclassify(s.scope, "not_interested")?.interests).toEqual([]);
+
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 5_000);
+    expect(callAncoraSessionStore.reclassify(s.scope, "voicemail")).toBeNull();
+  });
+
+  it("web pede para o celular desligar como caixa postal", async () => {
+    const s = await testListSession();
+    expect(callAncoraSessionStore.requestVoicemailHangup(s.scope)).toBeNull();
+    await s.send({ event: "dialing" });
+    expect(callAncoraSessionStore.requestVoicemailHangup(s.scope)?.hangupRequested).toBe(true);
+    const state = await (await stateGet(authed("state", s.deviceToken))).json() as { state: { hangupRequest: string | null } };
+    expect(state.state.hangupRequest).toBe("voicemail");
+    await s.send({ event: "disconnected", autoOutcome: "voicemail", rule: "manual_web" });
+    expect(callAncoraSessionStore.getForBroker(s.scope)?.hangupRequested).toBe(false);
+  });
+
+  it("sessão pausada pela tela recusa o evento de discagem", async () => {
+    const s = await testListSession();
+    callAncoraSessionStore.pauseRunForBroker(s.scope);
+    const response = await s.send({ event: "dialing" });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "paused" });
+    callAncoraSessionStore.resumeRunForBroker(s.scope);
+    expect((await s.send({ event: "dialing" })).status).toBe(200);
+  });
+
+  it("recusa discagem com versão diferente da do servidor", async () => {
+    const s = await testListSession();
+    const state = await (await stateGet(authed("state", s.deviceToken))).json() as { state: { version: number; runState: string } };
+    expect(state.state.runState).toBe("running");
+    const stale = await s.send({ event: "dialing", version: state.state.version - 1 });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ code: "version_mismatch" });
+    expect((await s.send({ event: "dialing", version: state.state.version })).status).toBe(200);
+  });
+
+  it("encerrar na web encerra a sessão e derruba o token do celular", async () => {
+    const s = await testListSession();
+    const ended = callAncoraSessionStore.endRunForBroker(s.scope);
+    expect(ended).toMatchObject({ runState: "ended", status: "ended", current: null });
+    expect((await stateGet(authed("state", s.deviceToken))).status).toBe(401);
+  });
+
+  it("encerrar no celular também derruba o token", async () => {
+    const s = await testListSession();
+    const response = await controlPost(authed("control", s.deviceToken, { action: "end" }));
+    expect(response.status).toBe(200);
+    expect(callAncoraSessionStore.getForBroker(s.scope)?.runState).toBe("ended");
+    expect((await stateGet(authed("state", s.deviceToken))).status).toBe(401);
+  });
+
+  it("heartbeat: celular sem sinal há mais de 6 s aparece na web e segura a fila", async () => {
+    const s = await testListSession(true);
+    await stateGet(authed("state", s.deviceToken));
+    expect(callAncoraSessionStore.getForBroker(s.scope)?.phone?.reachable).toBe(true);
+    await s.send({ event: "dialing" });
+    await s.send({ event: "disconnected", autoOutcome: "no_answer", rule: "ring_timeout" });
+
+    const base = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(base + 7_000);
+    const stale = callAncoraSessionStore.getForBroker(s.scope);
+    expect(stale?.phone).toMatchObject({ reachable: false });
+    expect(stale?.phone?.staleSeconds).toBeGreaterThanOrEqual(6);
+    expect(stale?.current?.id).toBe(s.contactId);
+
+    await stateGet(authed("state", s.deviceToken));
+    const back = callAncoraSessionStore.getForBroker(s.scope);
+    expect(back?.phone?.reachable).toBe(true);
+    expect(back?.current?.id).not.toBe(s.contactId);
+  });
+
+  it("a versão só cresce", async () => {
+    const s = await testListSession();
+    const v1 = callAncoraSessionStore.getForBroker(s.scope)?.version ?? 0;
+    callAncoraSessionStore.pauseRunForBroker(s.scope);
+    const v2 = callAncoraSessionStore.getForBroker(s.scope)?.version ?? 0;
+    callAncoraSessionStore.resumeRunForBroker(s.scope);
+    const v3 = callAncoraSessionStore.getForBroker(s.scope)?.version ?? 0;
+    expect(v2).toBeGreaterThan(v1);
+    expect(v3).toBeGreaterThan(v2);
+  });
+
   it("lista de teste só vale para sessão de admin/dev", () => {
     const broker = newSession();
     expect(callAncoraSessionStore.setTestList(broker.scope, [{ name: "X", phone: "+5521999990000" }])).toBeNull();

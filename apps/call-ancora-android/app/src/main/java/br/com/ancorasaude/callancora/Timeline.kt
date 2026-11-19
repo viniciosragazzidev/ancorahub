@@ -30,6 +30,7 @@ object Timeline {
         AutoDialer.EVENT_LIMIT to "Limite por hora atingido",
         AutoDialer.EVENT_FINISHED to "Fila concluída",
         AutoDialer.EVENT_SESSION_ENDED to "Sessão encerrada",
+        "AUTO_DESLIGAR" to "Desligada pelo app (estimativa)",
     )
 
     /** Quantas ligações há no registro (pedidas pelo app ou recebidas). */
