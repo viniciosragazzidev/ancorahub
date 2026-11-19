@@ -2,7 +2,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
+import type { CallAncoraContact } from "./contacts";
+import type { CallAncoraQueueSource } from "./queue-source";
 import { CALL_ANCORA_NEXT_DELAY_MS, CALL_ANCORA_PAIR_TTL_MS, CALL_ANCORA_SESSION_TTL_MS, CallAncoraSessionStore } from "./session-store";
+
+/** Fonte de fila só para os testes (no produto a base de frios ainda está vazia). */
+const FIXTURE: CallAncoraContact[] = Array.from({ length: 3 }, (_, index) => ({
+  id: `c-0${index + 1}`,
+  name: `Contato ${index + 1}`,
+  phone: `+552199999000${index + 1}`,
+  source: "cold_base",
+  dialable: true,
+}));
+const fixtureSource: CallAncoraQueueSource = { kind: "cold_base", initialQueue: () => FIXTURE };
 
 describe("CallAncoraSessionStore", () => {
   let now: number;
@@ -10,7 +22,15 @@ describe("CallAncoraSessionStore", () => {
 
   beforeEach(() => {
     now = Date.parse("2026-11-19T12:00:00.000Z");
-    store = new CallAncoraSessionStore(() => now);
+    store = new CallAncoraSessionStore(() => now, fixtureSource);
+  });
+
+  it("sem a base de frios, a fila começa vazia (sem contatos fictícios)", () => {
+    const empty = new CallAncoraSessionStore(() => now);
+    const started = empty.create({ tenantId: "t1", brokerId: "b1" }, "Ana");
+    const paired = empty.pair(started.pairingToken);
+    if (!paired.ok) throw new Error("O pareamento deveria funcionar.");
+    expect(paired.snapshot).toMatchObject({ status: "active", total: 0, current: null, next: null, queueSource: "cold_base" });
   });
 
   it("pareia um dispositivo com token de uso único", () => {
@@ -54,13 +74,13 @@ describe("CallAncoraSessionStore", () => {
     store.setAutoDialEnabled({ tenantId: "t1", brokerId: "b1" }, true);
     const classified = store.classify({ tenantId: "t1", brokerId: "b1" }, "interested");
     expect(classified?.interests).toHaveLength(1);
-    expect(classified?.current?.id).toBe("demo-01");
+    expect(classified?.current?.id).toBe("c-01");
     expect(store.pauseCountdown({ tenantId: "t1", brokerId: "b1" })?.countdown?.paused).toBe(true);
     now += CALL_ANCORA_NEXT_DELAY_MS + 10_000;
-    expect(store.getForBroker({ tenantId: "t1", brokerId: "b1" })?.current?.id).toBe("demo-01");
-    expect(store.resumeCountdown({ tenantId: "t1", brokerId: "b1" })?.current?.id).toBe("demo-01");
+    expect(store.getForBroker({ tenantId: "t1", brokerId: "b1" })?.current?.id).toBe("c-01");
+    expect(store.resumeCountdown({ tenantId: "t1", brokerId: "b1" })?.current?.id).toBe("c-01");
     now += CALL_ANCORA_NEXT_DELAY_MS;
-    expect(store.getForBroker({ tenantId: "t1", brokerId: "b1" })?.current?.id).toBe("demo-02");
+    expect(store.getForBroker({ tenantId: "t1", brokerId: "b1" })?.current?.id).toBe("c-02");
   });
 
   it("avança automaticamente após três segundos e mantém a pausa até retomar", () => {
@@ -76,17 +96,17 @@ describe("CallAncoraSessionStore", () => {
     store.updateCallStatus(paired.deviceToken, "ended");
     const classified = store.classify(scope, "not_interested");
 
-    expect(classified?.current?.id).toBe("demo-01");
+    expect(classified?.current?.id).toBe("c-01");
     expect(classified?.countdown).toEqual({ remainingSeconds: 3, paused: false });
     now += 1_000;
     expect(store.pauseCountdown(scope)?.countdown).toEqual({ remainingSeconds: 2, paused: true });
     now += CALL_ANCORA_NEXT_DELAY_MS + 1_000;
-    expect(store.getForDevice(paired.deviceToken)?.current?.id).toBe("demo-01");
-    expect(store.resumeCountdown(scope)?.current?.id).toBe("demo-01");
+    expect(store.getForDevice(paired.deviceToken)?.current?.id).toBe("c-01");
+    expect(store.resumeCountdown(scope)?.current?.id).toBe("c-01");
     now += 1_999;
-    expect(store.getForBroker(scope)?.current?.id).toBe("demo-01");
+    expect(store.getForBroker(scope)?.current?.id).toBe("c-01");
     now += 1;
-    expect(store.getForDevice(paired.deviceToken)?.current?.id).toBe("demo-02");
+    expect(store.getForDevice(paired.deviceToken)?.current?.id).toBe("c-02");
   });
 
   it("com discagem automática desligada deixa o próximo contato pronto sem contagem", () => {
@@ -104,7 +124,7 @@ describe("CallAncoraSessionStore", () => {
     expect(classified).toMatchObject({
       autoDialEnabled: false,
       callStatus: "ready",
-      current: { id: "demo-02" },
+      current: { id: "c-02" },
       countdown: null,
       completed: 1,
     });
@@ -125,7 +145,7 @@ describe("CallAncoraSessionStore", () => {
     expect(store.setAutoDialEnabled(scope, false)).toMatchObject({
       autoDialEnabled: false,
       callStatus: "ready",
-      current: { id: "demo-02" },
+      current: { id: "c-02" },
       countdown: null,
     });
   });

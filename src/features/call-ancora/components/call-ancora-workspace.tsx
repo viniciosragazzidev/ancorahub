@@ -13,12 +13,19 @@ import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 import { useDevLab } from "@/lib/dev-lab";
 import { useFeedback } from "@/lib/feedback/use-feedback";
 
-import { CALL_ANCORA_DEMO_CONTACTS } from "../contacts";
+import type { CallAncoraContact } from "../contacts";
 import { CALL_ANCORA_MOBILE_SESSION_ENDED_MESSAGE, isCallAncoraMobileSessionEndedStatus } from "../mobile-session";
 import type { CallAncoraSnapshot, CallOutcome, CallStatus } from "../session-store";
 import { Beat, CallAvatar, ConnectedMoment, contactInitials, EnterInOrder, ExpiryBar, PairingQr, QueueTrack, SlideSwap, SwapText } from "./call-ancora-motion";
 
 const POLL_MS = 1_200;
+
+/** Só para o laboratório (/dev/laboratorio): contatos do roteiro simulado, nunca discáveis. */
+const LAB_CONTACTS: readonly CallAncoraContact[] = [
+  { id: "lab-01", name: "Marina Duarte", phone: "(00) 0000-0001", source: "cold_base", dialable: false },
+  { id: "lab-02", name: "Rafael Nogueira", phone: "(00) 0000-0002", source: "cold_base", dialable: false },
+  { id: "lab-03", name: "Camila Freitas", phone: "(00) 0000-0003", source: "cold_base", dialable: false },
+];
 const PAIR_TTL_SECONDS = 120;
 /** Quanto o momento "Celular conectado" fica na tela antes da sessão abrir. */
 const CONNECTED_MOMENT_MS = motionTokens.duration.celebrate * 1_000;
@@ -31,15 +38,15 @@ function labSnapshot(firstName: string): CallAncoraSnapshot {
     brokerFirstName: firstName,
     status: "active",
     pairedAt: new Date().toISOString(),
-    current: CALL_ANCORA_DEMO_CONTACTS[0],
-    next: CALL_ANCORA_DEMO_CONTACTS[1],
+    current: LAB_CONTACTS[0],
+    next: LAB_CONTACTS[1],
     callStatus: "ready",
     callStartedAt: null,
     callElapsedSeconds: 0,
     interests: [],
     completed: 0,
-    total: CALL_ANCORA_DEMO_CONTACTS.length,
-    queueSource: "demo",
+    total: LAB_CONTACTS.length,
+    queueSource: "cold_base",
     autoDialEnabled: false,
     awaitingClassification: false,
     devicePaused: false,
@@ -64,10 +71,10 @@ function advanceLabSession(session: CallAncoraSnapshot): CallAncoraSnapshot {
   const index = session.completed;
   return {
     ...session,
-    current: CALL_ANCORA_DEMO_CONTACTS[index] ?? null,
-    next: CALL_ANCORA_DEMO_CONTACTS[index + 1] ?? null,
-    status: index < CALL_ANCORA_DEMO_CONTACTS.length ? "active" : "ended",
-    callStatus: index < CALL_ANCORA_DEMO_CONTACTS.length ? "ready" : "ended",
+    current: LAB_CONTACTS[index] ?? null,
+    next: LAB_CONTACTS[index + 1] ?? null,
+    status: index < LAB_CONTACTS.length ? "active" : "ended",
+    callStatus: index < LAB_CONTACTS.length ? "ready" : "ended",
     callStartedAt: null,
     callElapsedSeconds: 0,
     countdown: null,
@@ -132,7 +139,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
       try {
         const response = await fetch("/api/call-ancora/session", { cache: "no-store" });
         const payload = await response.json() as { session?: CallAncoraSnapshot | null; error?: string };
-        if (!response.ok) throw new Error(payload.error || "Não foi possível atualizar a demonstração.");
+        if (!response.ok) throw new Error(payload.error || "Não foi possível atualizar a sessão.");
         if (!cancelled) {
           setSession(payload.session ?? null);
           setError(null);
@@ -186,7 +193,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
         body: JSON.stringify({ action: "start" }),
       });
       const payload = await response.json() as { pairingToken?: string; pairExpiresAt?: number; snapshot?: CallAncoraSnapshot; error?: string };
-      if (!response.ok || !payload.pairingToken || !payload.snapshot) throw new Error(payload.error || "Não foi possível iniciar a demonstração.");
+      if (!response.ok || !payload.pairingToken || !payload.snapshot) throw new Error(payload.error || "Não foi possível iniciar a sessão.");
       const url = new URL("/call-ancora/celular", window.location.origin);
       url.searchParams.set("t", payload.pairingToken);
       setQrValue(url.toString());
@@ -349,36 +356,17 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
   const countdownExpired = Boolean(session?.countdown && !session.countdown.paused && session.countdown.remainingSeconds <= 0);
   const pairExpired = pairingExpiresAt !== null && now >= pairingExpiresAt;
   const pairSecondsLeft = Math.max(0, Math.ceil(((pairingExpiresAt ?? now) - now) / 1000));
-  const totalContacts = session?.total ?? CALL_ANCORA_DEMO_CONTACTS.length;
+  const totalContacts = session?.total ?? LAB_CONTACTS.length;
   const realQueue = session?.queueSource === "test_list";
   const lastCallText = lastCallSummary(session?.lastCall ?? null);
   const currentOutcome = session?.lastOutcome && session.current && session.lastOutcome.contactId === session.current.id ? session.lastOutcome : null;
   const realCallInProgress = Boolean(session?.current?.dialable) && (session?.callStatus === "dialing" || session?.callStatus === "ringing" || session?.callStatus === "active");
   const calling = session?.callStatus === "dialing" || session?.callStatus === "ringing";
-  const inSession = Boolean(session && session.status !== "waiting_pairing" && !connectedMoment);
   const newestInterests = session ? [...session.interests].reverse() : [];
 
   return (
-    <main className="arc-venancor min-h-full bg-(--background) px-4 py-6 pb-28 md:px-8 md:py-8 md:pb-10">
-      <div className="mx-auto w-full max-w-6xl">
-        <header className="mb-7 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="mb-2 flex items-center gap-2 text-sm font-medium text-(--accent-strong)"><PhoneCall className="size-4" aria-hidden="true" /> CALL ÂNCORA · DEMONSTRAÇÃO</p>
-            <h1 className="text-2xl font-semibold tracking-tight text-(--foreground) md:text-3xl">Sua sessão de ligações</h1>
-            <p className="mt-2 max-w-2xl text-sm text-(--text-secondary)">Veja o fluxo de ponta a ponta com contatos fictícios. Nada é salvo e nenhum lead é criado.</p>
-          </div>
-          {inSession && session?.status === "active" ? (
-            <motion.span
-              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-(--success)/20 bg-(--success)/10 px-4 text-sm font-medium text-(--success)"
-              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: motionTokens.scale.popIn, y: -motionTokens.distance.xs }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={reduceMotion ? reducedFade : motionTokens.spring.snappy}
-            >
-              <Radio className="size-4" aria-hidden="true" /> {session.phone && !session.phone.reachable ? `Celular sem sinal com o AncoraHub há ${session.phone.staleSeconds} s` : "Celular conectado"}
-            </motion.span>
-          ) : null}
-        </header>
-
+    <main className="arc-venancor lite-page flex min-h-full flex-col gap-5 bg-(--surface) text-(--foreground)">
+      <div className="w-full">
         {error ? <p className="mb-5 rounded-xl border border-(--danger)/25 bg-(--danger)/5 px-4 py-3 text-sm text-(--danger)" role="alert">{error}</p> : null}
 
         {!session ? (
@@ -389,18 +377,18 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
               </LiteAttention>
             </Beat>
             <Beat at="text">
-              <p className="text-xs font-semibold uppercase tracking-[.16em] text-(--text-muted)">Call Âncora</p>
+              <p className="text-xs font-semibold text-(--text-muted)">Call Âncora</p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-(--foreground) md:text-4xl">Uma conversa de cada vez.</h2>
             </Beat>
             <Beat at="number">
-              <p className="mx-auto mt-4 max-w-md text-base leading-7 text-(--text-secondary)">Conecte o celular da demonstração e acompanhe a ligação, o próximo contato e os interessados nesta tela.</p>
+              <p className="mx-auto mt-4 max-w-md text-base leading-7 text-(--text-secondary)">Conecte o celular com o app Call Âncora e acompanhe a ligação, o próximo contato e os interessados nesta tela.</p>
             </Beat>
             <Beat at="after" className="flex flex-col items-center">
               <Button className="mt-8 min-h-14 min-w-52 rounded-full px-10 text-base" size="lg" loading={busy} onClick={() => void start()}>
                 <PhoneCall className="size-5" aria-hidden="true" /> Iniciar
               </Button>
-              <ul className="mt-5 flex flex-wrap justify-center gap-2 text-xs text-(--text-muted)" aria-label="Sobre a demonstração">
-                {["Somente simulação", `${totalContacts} contatos fictícios`, "Sem acesso à base real"].map((item) => <li key={item} className="rounded-full border border-(--border) px-3 py-1">{item}</li>)}
+              <ul className="mt-5 flex flex-wrap justify-center gap-2 text-xs text-(--text-muted)" aria-label="Sobre o Call Âncora">
+                {["Discagem pelo app no celular", "Fila de frios da Âncora", "Classificação nesta tela"].map((item) => <li key={item} className="rounded-full border border-(--border) px-3 py-1">{item}</li>)}
               </ul>
             </Beat>
           </section>
@@ -430,11 +418,21 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
           <ConnectedMoment brokerFirstName={session.brokerFirstName} />
         ) : (
           <>
+              {session.status === "active" ? (
+              <motion.span
+                className="mb-4 inline-flex min-h-9 items-center gap-2 rounded-full border border-(--success)/20 bg-(--success)/10 px-3 text-xs font-medium text-(--success)"
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: motionTokens.scale.popIn, y: -motionTokens.distance.xs }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={reduceMotion ? reducedFade : motionTokens.spring.snappy}
+              >
+                <Radio className="size-4" aria-hidden="true" /> {session.phone && !session.phone.reachable ? `Celular sem sinal com o AncoraHub há ${session.phone.staleSeconds} s` : "Celular conectado"}
+              </motion.span>
+            ) : null}
             <EnterInOrder index={0} className="mb-6">
               <div className="flex items-center justify-between gap-4 rounded-2xl border border-(--border) bg-(--surface) px-4 py-3 md:px-5">
                 <div className="min-w-0">
                   <p id="call-ancora-auto-dial-label" className="text-sm font-semibold text-(--foreground)">Discagem automática</p>
-                  <p className="mt-1 text-xs leading-5 text-(--text-secondary)"><SwapText value={session.autoDialEnabled ? "Após classificar, a próxima simulação começa sozinha em 3 segundos." : "Desligada. O próximo contato fica pronto para você iniciar no celular."} /></p>
+                  <p className="mt-1 text-xs leading-5 text-(--text-secondary)"><SwapText value={session.autoDialEnabled ? "Após classificar, o celular liga para o próximo em 3 segundos." : "Desligada. O próximo contato fica pronto e você toca em Ligar no celular."} /></p>
                 </div>
                 <Switch aria-labelledby="call-ancora-auto-dial-label" checked={session.autoDialEnabled} disabled={busy} onCheckedChange={(enabled) => void setAutoDialEnabled(enabled)} />
               </div>
@@ -463,7 +461,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
                   />
                   <div className="mt-3 flex flex-wrap items-center gap-3">
                     <Button size="sm" variant="secondary" className="min-h-10 rounded-full" disabled={busy || !testListText.trim()} loading={busy} onClick={() => void applyTestList()}>Usar como fila</Button>
-                    <span className="text-xs text-(--text-muted)">{realQueue ? `Fila atual: lista de teste, ${totalContacts} números` : "Fila atual: contatos fictícios (não discáveis)"}</span>
+                    <span className="text-xs text-(--text-muted)">{realQueue ? `Fila atual: lista de teste, ${totalContacts} números` : totalContacts === 0 ? "Fila atual: vazia" : "Fila atual: base de frios"}</span>
                   </div>
                 </section>
               </EnterInOrder>
@@ -483,7 +481,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
                       >
                         <Heart className="size-5" fill={session.interests.length ? "currentColor" : "none"} aria-hidden="true" />
                       </motion.span>
-                      <div><h2 id="call-ancora-interesses" className="font-semibold text-(--foreground)">Com interesse</h2><p className="text-xs text-(--text-muted)">Ficam nesta lista de demonstração</p></div>
+                      <div><h2 id="call-ancora-interesses" className="font-semibold text-(--foreground)">Com interesse</h2><p className="text-xs text-(--text-muted)">Desta sessão</p></div>
                     </div>
                     <LiteAttention pulseKey={session.interests.length || undefined} className="rounded-full">
                       <span className="grid min-h-8 min-w-8 place-items-center rounded-full bg-(--surface-muted) px-2 text-sm font-semibold text-(--foreground)"><LiteNumber value={session.interests.length} live /></span>
@@ -509,7 +507,13 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
               <section className="order-1 grid gap-5 lg:order-2">
                 <EnterInOrder index={1}>
                   <article className="relative overflow-hidden rounded-2xl border border-(--border) bg-(--surface) p-6 shadow-(--shadow-resting) md:p-8">
-                    {session.current && session.status !== "ended" ? <>
+                    {session.total === 0 && session.status !== "ended" ? (
+                      <div className="flex flex-col items-center py-14 text-center">
+                        <span className="grid size-16 place-items-center rounded-full bg-(--surface-muted) text-(--text-muted)"><Users className="size-8" aria-hidden="true" /></span>
+                        <h2 className="mt-4 text-xl font-semibold text-(--foreground)">Sua fila está vazia</h2>
+                        <p className="mt-2 max-w-sm text-sm leading-6 text-(--text-secondary)">Ainda não há frios na sua fila. Assim que a base de frios estiver ligada, eles aparecem aqui.</p>
+                      </div>
+                    ) : session.current && session.status !== "ended" ? <>
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <span className="inline-flex min-h-9 items-center gap-2 rounded-full bg-(--surface-muted) px-3 text-xs font-medium text-(--text-secondary)">
                           <span className={`size-2 rounded-full transition-colors duration-300 ${session.callStatus === "active" ? "bg-(--success)" : calling ? "bg-(--primary)" : "bg-(--text-muted)"}`} aria-hidden="true" />
@@ -522,7 +526,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
                         <div className="mx-auto flex max-w-lg flex-col items-center pt-8 text-center md:pt-10">
                           <CallAvatar name={session.current.name} status={session.callStatus} />
                           <h2 className="mt-5 text-3xl font-semibold tracking-tight text-(--foreground)">{session.current.name}</h2>
-                          <p className="mt-2 text-sm tabular-nums text-(--text-secondary)">{session.current.phone} <span className="text-(--text-muted)">{session.current.dialable ? "· lista de teste (ligação real)" : "· número fictício"}</span></p>
+                          <p className="mt-2 text-sm tabular-nums text-(--text-secondary)">{session.current.phone} <span className="text-(--text-muted)">{session.current.source === "test_list" ? "· lista de teste" : "· base de frios"}</span></p>
                         </div>
                       </SlideSwap>
                       <SlideSwap swapKey={`${session.current.id}-${session.callStatus}-${session.countdown ? "countdown" : "idle"}`} axis="y" className="mx-auto flex max-w-lg flex-col items-center pb-2 text-center">
@@ -530,7 +534,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
                         {calling ? <p className="mt-6 text-sm text-(--text-secondary)">{session.callStatus === "dialing" ? "Discando pelo celular pareado…" : "Chamando. Aguardando atender…"}</p> : null}
                         {realCallInProgress && !isLab ? <Button size="sm" variant="secondary" className="mt-4 min-h-10 rounded-full" disabled={busy || session.hangupRequested} onClick={() => void sendAction({ action: "hangup-voicemail" }, "Não consegui pedir para desligar.")}>{session.hangupRequest === "voicemail" ? "Pedindo para o celular desligar…" : "Caixa postal (desligar)"}</Button> : null}
                         {realCallInProgress && !isLab ? <Button size="sm" variant="secondary" className="mt-2 min-h-10 rounded-full" disabled={busy || session.hangupRequested} onClick={() => void sendAction({ action: "hangup-call" }, "Não consegui pedir para desligar.")}>{session.hangupRequest === "hangup" ? "Pedindo para o celular desligar…" : "Desligar ligação"}</Button> : null}
-                        {session.callStatus === "ready" ? <p className="mt-5 max-w-sm text-sm leading-6 text-(--text-secondary)">{session.autoDialEnabled ? "Discagem automática ligada. A próxima simulação começa após a contagem; para uma chamada real, o navegador exige um toque em Ligar no celular." : "Discagem automática desligada. O próximo contato está pronto. Toque em Ligar para o próximo no celular."}</p> : null}
+                        {session.callStatus === "ready" ? <p className="mt-5 max-w-sm text-sm leading-6 text-(--text-secondary)">{session.autoDialEnabled ? "Discagem automática ligada. O celular liga para o próximo depois da contagem." : "Discagem automática desligada. O próximo contato está pronto. Toque em Ligar para o próximo no celular."}</p> : null}
                         {lastCallText && (session.callStatus === "ended" || session.countdown) ? <p className="mt-5 text-sm font-medium text-(--foreground)" role="status">{lastCallText}</p> : null}
                         {session.callStatus === "ended" && !session.countdown ? <p className="mt-5 text-sm text-(--text-secondary)">Como foi esta conversa?</p> : null}
                         {session.countdown && currentOutcome && !isLab ? <div className="mt-5 w-full max-w-md text-center"><p className="text-sm text-(--text-secondary)">Classificada como <span className="font-semibold text-(--foreground)">{OUTCOME_LABEL[currentOutcome.outcome]}</span>{currentOutcome.auto ? " (automático, estimativa)" : ""}.</p><div className="mt-2 flex flex-wrap justify-center gap-2"><span className="self-center text-xs text-(--text-muted)">Corrigir:</span>{(Object.keys(OUTCOME_LABEL) as CallOutcome[]).filter((outcome) => outcome !== currentOutcome.outcome).map((outcome) => <Button key={outcome} size="sm" variant="secondary" className="min-h-9 rounded-full" disabled={busy} onClick={() => void sendAction({ action: "reclassify", outcome }, "Não consegui corrigir a classificação.")}>{OUTCOME_LABEL[outcome]}</Button>)}</div></div> : null}
@@ -540,8 +544,8 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
                     </> : (
                       <div className="flex flex-col items-center py-16 text-center">
                         <Beat><span className="grid size-16 place-items-center rounded-full bg-(--success)/10 text-(--success)"><Check className="size-8" aria-hidden="true" /></span></Beat>
-                        <Beat at="text"><h2 className="mt-4 text-2xl font-semibold text-(--foreground)">{session.runState === "ended" ? "Sessão encerrada" : "Demonstração concluída"}</h2></Beat>
-                        <Beat at="number"><p className="mt-2 text-sm text-(--text-secondary)">Os contatos continuam fictícios e não foram salvos.</p></Beat>
+                        <Beat at="text"><h2 className="mt-4 text-2xl font-semibold text-(--foreground)">{session.runState === "ended" ? "Sessão encerrada" : "Fila concluída"}</h2></Beat>
+                        <Beat at="number"><p className="mt-2 text-sm text-(--text-secondary)">Inicie outra sessão quando quiser.</p></Beat>
                         <Beat at="after"><Button className="mt-6 min-h-11 rounded-full" variant="secondary" onClick={() => void start()}>Recomeçar</Button></Beat>
                       </div>
                     )}
@@ -552,7 +556,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
                   <EnterInOrder index={2}>
                     <article className="relative overflow-hidden rounded-2xl border border-(--border) bg-(--surface)">
                       <SlideSwap swapKey={session.next.id} axis="y" className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-                        <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-(--surface-muted) text-(--text-secondary)"><ArrowRight className="size-5" aria-hidden="true" /></span><div><p className="text-xs font-medium uppercase tracking-wide text-(--text-muted)">Próximo contato</p><p className="mt-1 text-sm font-semibold text-(--foreground)">{session.next.name}</p></div></div>
+                        <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-(--surface-muted) text-(--text-secondary)"><ArrowRight className="size-5" aria-hidden="true" /></span><div><p className="text-xs font-medium text-(--text-muted)">Próximo contato</p><p className="mt-1 text-sm font-semibold text-(--foreground)">{session.next.name}</p></div></div>
                         <span className="text-sm tabular-nums text-(--text-secondary)">{session.next.phone}</span>
                       </SlideSwap>
                     </article>
@@ -561,7 +565,7 @@ export function CallAncoraWorkspace({ brokerFirstName, canUseTestList = false }:
 
                 {isLab ? (
                   <EnterInOrder index={4}>
-                    <article className="rounded-2xl border border-(--border) bg-(--surface) p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-xl bg-(--accent-subtle) text-(--accent-strong)"><Smartphone className="size-5" aria-hidden="true" /></span><div><h3 className="font-semibold text-(--foreground)">Celular da demonstração</h3><p className="text-xs text-(--text-secondary)">Conectado à conta de {brokerFirstName}</p></div></div><Button size="md" variant="secondary" className="min-h-11 rounded-full" disabled={simulating || session.callStatus !== "ready" || (session.autoDialEnabled && session.completed > 0)} loading={simulating} onClick={() => void simulateLabCall()}><PhoneCall className="size-4" aria-hidden="true" />{simulating ? "Simulando…" : session.autoDialEnabled && session.completed > 0 ? "Começando automaticamente" : "Ligar para o próximo"}</Button></div><div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-(--text-muted)"><span className="rounded-full bg-(--surface-muted) px-3 py-1.5">{statusLabel(session.callStatus)}</span><span>Número fictício, sem discagem real</span></div></article>
+                    <article className="rounded-2xl border border-(--border) bg-(--surface) p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-xl bg-(--accent-subtle) text-(--accent-strong)"><Smartphone className="size-5" aria-hidden="true" /></span><div><h3 className="font-semibold text-(--foreground)">Celular do laboratório</h3><p className="text-xs text-(--text-secondary)">Conectado à conta de {brokerFirstName}</p></div></div><Button size="md" variant="secondary" className="min-h-11 rounded-full" disabled={simulating || session.callStatus !== "ready" || (session.autoDialEnabled && session.completed > 0)} loading={simulating} onClick={() => void simulateLabCall()}><PhoneCall className="size-4" aria-hidden="true" />{simulating ? "Simulando…" : session.autoDialEnabled && session.completed > 0 ? "Começando automaticamente" : "Ligar para o próximo"}</Button></div><div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-(--text-muted)"><span className="rounded-full bg-(--surface-muted) px-3 py-1.5">{statusLabel(session.callStatus)}</span><span>Laboratório: sem discagem real</span></div></article>
                   </EnterInOrder>
                 ) : null}
               </section>
@@ -580,11 +584,9 @@ export function CallAncoraMobile({ token }: { token: string }) {
   const [session, setSession] = useState<CallAncoraSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sessionEnded, setSessionEnded] = useState(false);
-  const [simulating, setSimulating] = useState(false);
   const pairedOnce = useRef(false);
   const sessionEndedRef = useRef(false);
   const pollTimer = useRef<number | null>(null);
-  const autoStartedContact = useRef<string | null>(null);
   const notifiedContact = useRef<string | null>(null);
   const fire = useFeedback();
 
@@ -642,45 +644,6 @@ export function CallAncoraMobile({ token }: { token: string }) {
     };
   }, [deviceToken, stopForEndedSession]);
 
-  const simulate = useCallback(async () => {
-    if (!deviceToken || !session || simulating || session.callStatus !== "ready") return;
-    setSimulating(true);
-    setError(null);
-    const transitions: Array<{ callStatus: CallStatus; waitMs: number }> = [
-      { callStatus: "dialing", waitMs: 700 },
-      { callStatus: "ringing", waitMs: 900 },
-      { callStatus: "active", waitMs: 4_500 },
-      { callStatus: "ended", waitMs: 0 },
-    ];
-    try {
-      for (const transition of transitions) {
-        const response = await fetch("/api/call-ancora/mobile", { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${deviceToken}` }, body: JSON.stringify({ callStatus: transition.callStatus }) });
-        if (isCallAncoraMobileSessionEndedStatus(response.status)) {
-          stopForEndedSession();
-          return;
-        }
-        const payload = await response.json() as { session?: CallAncoraSnapshot; error?: string };
-        if (!response.ok || !payload.session) throw new Error(payload.error || "A ligação simulada parou. Tente de novo.");
-        setSession(payload.session);
-        if (transition.waitMs) await delay(transition.waitMs);
-      }
-      fire("confirm");
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "A ligação simulada parou. Tente de novo.");
-    } finally {
-      setSimulating(false);
-    }
-  }, [deviceToken, fire, session, simulating, stopForEndedSession]);
-
-  useEffect(() => {
-    if (!deviceToken || !session?.autoDialEnabled || session.completed === 0 || session.callStatus !== "ready" || !session.current || simulating) return;
-    const contactKey = `${session.sessionId}:${session.current.id}`;
-    if (autoStartedContact.current === contactKey) return;
-    autoStartedContact.current = contactKey;
-    // Simulation can advance automatically; the real tel: path below always needs a fresh tap in a browser.
-    void simulate();
-  }, [deviceToken, session, simulating, simulate]);
-
   useEffect(() => {
     if (!session?.current || session.callStatus !== "ready") return;
     const contactKey = `${session.sessionId}:${session.current.id}`;
@@ -692,25 +655,24 @@ export function CallAncoraMobile({ token }: { token: string }) {
   return (
     <main className="arc-venancor min-h-dvh bg-(--background) px-5 py-8">
       <div className="mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-md flex-col">
-        <header className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-2xl bg-(--accent-subtle) text-(--accent-strong)"><PhoneCall className="size-5" aria-hidden="true" /></span><div><p className="text-xs font-semibold uppercase tracking-wide text-(--text-muted)">Call Âncora</p><p className="text-sm font-medium text-(--foreground)">Celular da demonstração</p></div></header>
+        <header className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-2xl bg-(--accent-subtle) text-(--accent-strong)"><PhoneCall className="size-5" aria-hidden="true" /></span><div><p className="text-xs font-semibold text-(--text-muted)">Call Âncora</p><p className="text-sm font-medium text-(--foreground)">Celular pelo navegador</p></div></header>
         {error ? <section className="mt-8 rounded-3xl border border-(--danger)/25 bg-(--surface) p-6 text-center" role="alert"><p className="font-semibold text-(--foreground)">{sessionEnded ? "Sessão encerrada" : "Não foi possível conectar"}</p><p className="mt-2 text-sm leading-6 text-(--text-secondary)">{error}</p></section> : !session ? <p className="mt-8 rounded-3xl border border-(--border) bg-(--surface) p-6 text-center text-sm text-(--text-secondary)" role="status">Conectando à sessão…</p> : <>
           <section className="mt-8 rounded-[2rem] border border-(--border) bg-(--surface) p-6 text-center shadow-(--shadow-resting)">
             <span className="mx-auto grid size-14 place-items-center rounded-full bg-(--success)/10 text-(--success)"><Check className="size-6" aria-hidden="true" /></span>
             <p className="mt-4 text-lg font-semibold text-(--foreground)">Conectado à conta de {session.brokerFirstName}</p>
-            <p className="mt-2 text-sm leading-6 text-(--text-secondary)">Este celular está pareado à demonstração do Call Âncora.</p>
+            <p className="mt-2 text-sm leading-6 text-(--text-secondary)">Este celular está pareado à sua sessão do Call Âncora.</p>
           </section>
           {session.current ? <section className="mt-5 rounded-[2rem] border border-(--border) bg-(--surface) p-6">
-            <p className="text-xs font-semibold uppercase tracking-wide text-(--text-muted)">Contato atual · fictício</p>
+            <p className="text-xs font-semibold text-(--text-muted)">Contato atual</p>
             <h1 className="mt-3 text-2xl font-semibold text-(--foreground)">{session.current.name}</h1>
             <p className="mt-3 rounded-2xl bg-(--accent-subtle) px-4 py-3 text-center text-2xl font-semibold tabular-nums tracking-wide text-(--accent-strong)">{session.current.phone}</p>
             {session.autoDialEnabled ? <p className="mt-3 flex min-h-10 items-center justify-center rounded-full bg-(--success)/10 px-3 text-sm font-medium text-(--success)">Discagem automática ligada</p> : <p className="mt-3 flex min-h-10 items-center justify-center rounded-full bg-(--surface-muted) px-3 text-sm text-(--text-secondary)">Discagem automática desligada</p>}
             {session.countdown ? <p role="status" className="mt-3 rounded-2xl bg-(--surface-muted) px-4 py-3 text-center text-sm text-(--text-secondary)">{session.countdown.paused ? "Próximo contato pausado" : `Próximo contato em ${session.countdown.remainingSeconds} s`}</p> : null}
             {/* Browsers block opening tel: without a fresh user gesture. Fully automatic real calls require the Android app and TelecomManager.placeCall. */}
             {session.callStatus === "ready" ? <a href={`tel:${session.current.phone.replace(/[^+\d]/g, "")}`} className="mt-4 flex min-h-16 items-center justify-center gap-3 rounded-full bg-(--success) px-5 text-lg font-semibold text-white shadow-(--shadow-resting)"><Phone className="size-5" aria-hidden="true" /> Ligar para o próximo</a> : null}
-            {session.callStatus === "ready" ? <Button variant="secondary" size="lg" className="mt-3 min-h-12 w-full rounded-full" disabled={!deviceToken || simulating || (session.autoDialEnabled && session.completed > 0)} loading={simulating} onClick={() => void simulate()}><PhoneCall className="size-4" aria-hidden="true" />{simulating ? statusLabel(session.callStatus) : session.autoDialEnabled && session.completed > 0 ? "Começando automaticamente" : "Simular"}</Button> : null}
-            <p className="mt-3 text-center text-xs leading-5 text-(--text-muted)">{session.callStatus === "ready" ? session.autoDialEnabled && session.completed > 0 ? "A próxima simulação começa sozinha. Toque em Ligar para uma chamada real." : "Toque em Ligar para abrir o discador; chamadas reais exigem toque nesta página." : statusLabel(session.callStatus)}{session.callStatus === "active" ? ` · ${clock(session.callElapsedSeconds)}` : ""}</p>
-          </section> : <section className="mt-5 rounded-[2rem] border border-(--border) bg-(--surface) p-6 text-center"><Check className="mx-auto size-8 text-(--success)" aria-hidden="true" /><p className="mt-3 font-semibold text-(--foreground)">Fila de demonstração concluída</p></section>}
-          <p className="mt-auto pt-6 text-center text-xs leading-5 text-(--text-muted)">Nenhuma ligação real começa sozinha no navegador. A discagem automática real virá com o app Android usando TelecomManager.placeCall.</p>
+            <p className="mt-3 text-center text-xs leading-5 text-(--text-muted)">{session.callStatus === "ready" ? "Toque em Ligar para abrir o discador do celular." : statusLabel(session.callStatus)}{session.callStatus === "active" ? ` · ${clock(session.callElapsedSeconds)}` : ""}</p>
+          </section> : <section className="mt-5 rounded-[2rem] border border-(--border) bg-(--surface) p-6 text-center"><Check className="mx-auto size-8 text-(--success)" aria-hidden="true" /><p className="mt-3 font-semibold text-(--foreground)">{session.total === 0 ? "Ainda não há frios na sua fila. Assim que a base de frios estiver ligada, eles aparecem aqui." : "Fila concluída"}</p></section>}
+          <p className="mt-auto pt-6 text-center text-xs leading-5 text-(--text-muted)">No navegador, cada ligação precisa de um toque. Para discar sozinho, use o app Call Âncora no celular.</p>
         </>}
       </div>
     </main>

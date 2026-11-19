@@ -234,8 +234,9 @@ object CrmSession {
         if (state == null || awaitingContactId != null || !_ui.value.started) return
         val current = state.current
         val text = when {
+            state.total == 0 -> "Ainda não há frios na sua fila. Assim que a base de frios estiver ligada, eles aparecem aqui."
             state.status == "ended" || current == null -> "Fila concluída."
-            !current.dialable -> "Contato fictício: o app não disca números de demonstração. Use a lista de teste na web."
+            !current.dialable -> "Este contato está bloqueado para ligação. Avance a fila na tela do computador."
             state.awaitingClassification -> "Classifique a ligação na tela do computador."
             state.countdownSeconds != null -> if (state.countdownPaused) "Contagem pausada." else "Próxima ligação em ${state.countdownSeconds} s."
             else -> null

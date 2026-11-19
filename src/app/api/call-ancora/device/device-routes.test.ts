@@ -4,7 +4,7 @@ vi.mock("server-only", () => ({}));
 const flag = vi.hoisted(() => ({ value: "true" }));
 vi.mock("@/features/system-settings/queries", () => ({ getFeatureFlag: vi.fn(async () => flag.value) }));
 
-import { CALL_ANCORA_PAIR_TTL_MS, callAncoraSessionStore } from "@/features/call-ancora/session-store";
+import { CALL_ANCORA_PAIR_TTL_MS, CallAncoraSessionStore, callAncoraSessionStore, toDeviceState } from "@/features/call-ancora/session-store";
 import { POST as pairPost } from "./pair/route";
 import { GET as stateGet } from "./state/route";
 import { POST as eventsPost } from "./events/route";
@@ -87,20 +87,24 @@ describe("API do app Android do Call Âncora", () => {
     expect((await stateGet(authed("state", paired.deviceToken))).status).toBe(403);
   });
 
-  it("nunca expõe o número de contato de demonstração (não discável)", async () => {
+  it("sem base de frios a fila do celular vem vazia", async () => {
     const paired = await pairNew();
-    const response = await stateGet(authed("state", paired.deviceToken));
-    const text = await response.text();
-    const body = JSON.parse(text) as { state: { current: { dialable: boolean; phone: string | null }; next: { phoneMasked: string | null } } };
-    expect(body.state.current).toMatchObject({ dialable: false, phone: null });
-    expect(body.state.next.phoneMasked).toBeNull();
-    expect(text).not.toMatch(/0000-00\d\d/);
+    const body = await (await stateGet(authed("state", paired.deviceToken))).json() as { state: { status: string; total: number; current: unknown } };
+    expect(body.state).toMatchObject({ status: "active", total: 0, current: null });
   });
 
-  it("recusa evento de ligação para contato não discável", async () => {
-    const paired = await pairNew();
-    const response = await eventsPost(authed("events", paired.deviceToken, { contactId: paired.pairBody.state.current.id, event: "dialing" }));
-    expect(response.status).toBe(422);
+  it("nunca expõe o número de contato não discável e recusa discar para ele", () => {
+    const blocked = { id: "frio-1", name: "Não ligar", phone: "+5521999990000", source: "cold_base" as const, dialable: false };
+    const following = { id: "frio-2", name: "Outro", phone: "+5521988887777", source: "cold_base" as const, dialable: false };
+    const store = new CallAncoraSessionStore(undefined, { kind: "cold_base", initialQueue: () => [blocked, following] });
+    const started = store.create({ tenantId: "t-nd", brokerId: "b-nd" }, "Ana");
+    const paired = store.pair(started.pairingToken);
+    if (!paired.ok) throw new Error("O pareamento deveria funcionar.");
+    const state = toDeviceState(paired.snapshot);
+    expect(state.current).toMatchObject({ dialable: false, phone: null });
+    expect(state.next?.phoneMasked).toBeNull();
+    expect(JSON.stringify(state)).not.toContain("99999");
+    expect(store.reportDeviceEvent(paired.deviceToken, { contactId: "frio-1", event: "dialing" })).toEqual({ ok: false, reason: "not_dialable" });
   });
 
   it("isola o token por sessão: outro tenant não lê nem altera esta sessão", async () => {

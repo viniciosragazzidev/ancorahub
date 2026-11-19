@@ -990,4 +990,7 @@ O app Android lê o QR da tela Call Âncora, conecta à conta do corretor e disc
 ## 19/11/2026 - Call Âncora: caixa postal automática e sincronia estrita com a tela
 
 O celular desliga sozinho quando ninguém atende (22 s) e quando a ligação provavelmente caiu na caixa postal (atendeu rápido demais ou tarde demais), sempre como estimativa e com os tempos ajustáveis. A web ganha Não atendeu e Caixa postal, correção da classificação durante a contagem e os botões Pausar sessão, Encerrar sessão, Caixa postal (desligar) e Desligar ligação. Pausar na tela impede o celular de começar outra ligação (ele confere o estado na hora de discar), encerrar em qualquer lado desconecta o celular, e a web mostra quando o celular está sem sinal com o AncoraHub.
+## 19/11/2026 - Call Âncora deixa de ser demonstração
+
+O Call Âncora não usa mais contatos fictícios. A fila de cada sessão virá da base geral de frios da Âncora; enquanto ela não está ligada, a tela mostra "Ainda não há frios na sua fila" e só administradores da plataforma carregam números pela Lista de teste. O app e a página do celular perderam os textos de demonstração, e o celular continua discando só números que o servidor libera.
 

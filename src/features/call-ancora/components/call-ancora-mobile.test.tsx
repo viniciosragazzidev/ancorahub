@@ -4,7 +4,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/feedback/use-feedback", () => ({ useFeedback: () => vi.fn() }));
 
-import { CALL_ANCORA_DEMO_CONTACTS } from "../contacts";
+import type { CallAncoraContact } from "../contacts";
+
+const CONTACTS: CallAncoraContact[] = [1, 2, 3].map((n) => ({
+  id: `teste-${n}`,
+  name: `Contato ${n}`,
+  phone: `+552199999000${n}`,
+  source: "test_list",
+  dialable: true,
+}));
 import { CALL_ANCORA_MOBILE_SESSION_ENDED_MESSAGE } from "../mobile-session";
 import type { CallAncoraSnapshot } from "../session-store";
 import { CallAncoraMobile } from "./call-ancora-workspace";
@@ -14,15 +22,15 @@ const session: CallAncoraSnapshot = {
   brokerFirstName: "Ana",
   status: "active",
   pairedAt: "2026-11-19T12:00:00.000Z",
-  current: CALL_ANCORA_DEMO_CONTACTS[0] ?? null,
-  next: CALL_ANCORA_DEMO_CONTACTS[1] ?? null,
+  current: CONTACTS[0] ?? null,
+  next: CONTACTS[1] ?? null,
   callStatus: "ready",
   callStartedAt: null,
   callElapsedSeconds: 0,
   interests: [],
   completed: 0,
-  total: CALL_ANCORA_DEMO_CONTACTS.length,
-  queueSource: "demo",
+  total: CONTACTS.length,
+  queueSource: "test_list",
   autoDialEnabled: false,
   awaitingClassification: false,
   devicePaused: false,
@@ -54,33 +62,26 @@ afterEach(() => {
 });
 
 describe("CallAncoraMobile", () => {
-  it("inicia a próxima simulação sem toque quando a discagem automática está ligada", async () => {
+  it("no navegador não simula nem disca sozinho, mesmo com a discagem automática ligada", async () => {
     const nextContactSession: CallAncoraSnapshot = {
       ...session,
-      current: CALL_ANCORA_DEMO_CONTACTS[1] ?? null,
-      next: CALL_ANCORA_DEMO_CONTACTS[2] ?? null,
+      current: CONTACTS[1] ?? null,
+      next: CONTACTS[2] ?? null,
       completed: 1,
       autoDialEnabled: true,
     };
-    const transitions: string[] = [];
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === "POST") return apiResponse(200, { deviceToken: "device-token", session: nextContactSession });
-      if (init?.method === "PATCH") {
-        const body = JSON.parse(String(init.body)) as { callStatus: string };
-        transitions.push(body.callStatus);
-        return apiResponse(200, { session: { ...nextContactSession, callStatus: body.callStatus } });
-      }
       return apiResponse(200, { session: nextContactSession });
     });
     vi.stubGlobal("fetch", fetchMock);
 
     render(<CallAncoraMobile token="pairing-token" />);
-    await waitFor(() => expect(transitions).toEqual(["dialing", "ringing", "active", "ended"]), { timeout: 9_000, interval: 20 });
-
-    expect(transitions).toEqual(["dialing", "ringing", "active", "ended"]);
-    expect(screen.getByText("Discagem automática ligada")).toBeInTheDocument();
-    expect(screen.getByText(/Nenhuma ligação real começa sozinha no navegador/)).toBeInTheDocument();
-  }, 10_000);
+    expect(await screen.findByText("Discagem automática ligada")).toBeInTheDocument();
+    expect(screen.getByText(/No navegador, cada ligação precisa de um toque/)).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2));
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(false);
+  });
 
   it("deixa o telefone destacado e abre tel: somente pelo toque explícito", async () => {
     vi.stubGlobal("fetch", vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => init?.method === "POST"

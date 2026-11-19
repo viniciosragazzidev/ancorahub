@@ -5,7 +5,7 @@ package br.com.ancorasaude.callancora
  * o corretor classifica na web e o próximo contato aparece aqui.
  *
  * SEGURANÇA: só devolve número quando o servidor marcou o contato como discável
- * (lista de teste de admin/dev). Contatos de demonstração nunca viram ligação.
+ * (base de frios ou lista de teste de admin/dev). Contato não discável nunca vira ligação.
  */
 class CrmQueueSource(private val api: CrmApi) : NumberSource {
 
