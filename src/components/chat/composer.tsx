@@ -2,6 +2,10 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useDevLab } from "@/lib/dev-lab";
+import { useFeedback } from "@/lib/feedback/use-feedback";
+import { newClientMessageId } from "./user-send-core";
+import { useVoiceRecorder, voiceClock, VOICE_CANCEL_PX, type VoiceTranscribe } from "./voice-recorder";
 
 import styles from "./chat.module.css";
 import { fetchMentionMenu } from "./mention-client";
@@ -72,6 +76,8 @@ export function Composer({
   inputMode,
   inputLabel,
   dataTour,
+  voice,
+  draft,
 }: {
   placeholder?: string;
   progress?: ChatProgress | null;
@@ -79,7 +85,7 @@ export function Composer({
   working?: boolean;
   disabled?: boolean;
   mentions?: Mention[];
-  onSend: (text: string) => void | Promise<void>;
+  onSend: (text: string, meta?: { clientMessageId?: string; voice?: boolean }) => void | Promise<void>;
   onMention?: (mention: Mention) => void;
   onStop?: () => void;
   /** Keyboard for the current answer (e.g. "numeric" for ages). */
@@ -87,9 +93,58 @@ export function Composer({
   /** Accessible name when the field answers a question ("Idades de quem vai entrar no plano"). */
   inputLabel?: string;
   dataTour?: string;
+  /** Segurar para falar (Sasá, fase 2): transcreve no servidor e envia o texto como mensagem. */
+  voice?: VoiceTranscribe;
+  /** Texto posto no campo para o corretor corrigir ("Corrigir o que eu ouvi"); muda a cada `key`. */
+  draft?: { text: string; key: number } | null;
 }) {
   const reduce = useReducedMotion();
+  const fire = useFeedback();
   const [text, setText] = useState("");
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
+  const [clock, setClock] = useState(0);
+  const pointerStart = useRef<number | null>(null);
+  const lab = useDevLab();
+  const recorder = useVoiceRecorder({
+    simulate: Boolean(lab?.sasa?.simulateMic),
+    onAudio: (audio, seconds) => {
+      void (async () => {
+        // O mesmo id vai para a transcrição e para o pedido: o servidor liga os dois e não cobra duas vezes.
+        const id = newClientMessageId();
+        try {
+          const result = await voice!({ audio, seconds, clientCommandId: id });
+          recorder.done();
+          if (!result.ok) { setVoiceNote(result.error); fire("error"); return; }
+          void onSend(result.text, { clientMessageId: id, voice: true });
+        } catch {
+          recorder.done();
+          setVoiceNote("Não consegui enviar o áudio. Confira a internet e tente de novo.");
+          fire("error");
+        }
+      })();
+    },
+    onError: (message) => setVoiceNote(message),
+  });
+  const recording = recorder.state.kind === "recording";
+  const sendingVoice = recorder.state.kind === "sending";
+  useEffect(() => {
+    if (!recording) return;
+    setClock(Date.now());
+    const tick = window.setInterval(() => setClock(Date.now()), 250);
+    return () => window.clearInterval(tick);
+  }, [recording]);
+  useEffect(() => {
+    if (!draft) return;
+    setText(draft.text);
+    setVoiceNote(null);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [draft]);
+  useEffect(() => {
+    if (!voiceNote) return;
+    const timeout = window.setTimeout(() => setVoiceNote(null), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [voiceNote]);
+  const showMic = Boolean(voice) && !text.trim() && !disabled;
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const menuId = useId();
@@ -191,7 +246,15 @@ export function Composer({
           </div>
         ) : null}
         <form className={styles.composer} onSubmit={(event) => { event.preventDefault(); if (menuOpen) pick(matches[active]); else submit(); }}>
-          <textarea
+          {recorder.state.kind === "recording" ? (
+            <div className={styles.voiceBar} data-cancelling={recorder.state.cancelling || undefined} role="status" aria-live="polite">
+              <span className={styles.voiceDot} data-still={reduce || undefined} aria-hidden="true" />
+              <span className={styles.voiceTime}>{voiceClock(clock - recorder.state.startedAt)}</span>
+              <span className={styles.voiceHint}>{recorder.state.cancelling ? "Solte para cancelar" : "Deslize para a esquerda para cancelar"}</span>
+            </div>
+          ) : sendingVoice ? (
+            <div className={styles.voiceBar} role="status" aria-live="polite"><span className={styles.shimmerText}>Entendendo o áudio…</span></div>
+          ) : <textarea
             ref={inputRef}
             className={styles.composerInput}
             rows={1}
@@ -207,6 +270,7 @@ export function Composer({
             disabled={disabled}
             onChange={(event) => {
               setText(event.target.value);
+              if (voiceNote) setVoiceNote(null);
               setActive(0);
               event.target.style.height = "auto";
               event.target.style.height = `${Math.min(140, event.target.scrollHeight)}px`;
@@ -223,14 +287,63 @@ export function Composer({
                 setText((current) => current.replace(/@[\p{L}\w]*$/u, ""));
               }
             }}
-          />
+          />}
           <div className={styles.composerTools}>
             <div className={styles.toolGroup}>
               <button type="button" className={styles.tool} aria-label="Comandos com @" onClick={() => { setText((current) => `${current}${current && !current.endsWith(" ") ? " " : ""}@`); inputRef.current?.focus(); }}>
                 <Icon d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Zm0 0v1a1.75 1.75 0 0 0 3.5 0V8a6 6 0 1 0-2.4 4.8" />
               </button>
             </div>
-            {working ? (
+            {showMic && (!working || recording || sendingVoice) ? (
+              <button
+                type="button"
+                className={`${styles.send} ${styles.mic}`}
+                data-recording={recording || undefined}
+                data-still={reduce || undefined}
+                aria-label={recording ? "Gravando. Solte para enviar ou deslize para a esquerda para cancelar" : sendingVoice ? "Enviando o áudio" : "Segure para falar com a Sasá"}
+                aria-busy={sendingVoice || undefined}
+                disabled={sendingVoice}
+                onPointerDown={(event) => {
+                  if (event.button !== 0 || recorder.state.kind !== "idle") return;
+                  event.preventDefault();
+                  event.currentTarget.setPointerCapture?.(event.pointerId);
+                  pointerStart.current = event.clientX;
+                  setVoiceNote(null);
+                  fire("tap");
+                  void recorder.start();
+                }}
+                onPointerMove={(event) => {
+                  if (pointerStart.current === null) return;
+                  recorder.setCancelling(pointerStart.current - event.clientX > VOICE_CANCEL_PX);
+                }}
+                onPointerUp={(event) => {
+                  if (pointerStart.current === null) return;
+                  const cancel = pointerStart.current - event.clientX > VOICE_CANCEL_PX;
+                  pointerStart.current = null;
+                  recorder.stop(cancel);
+                }}
+                onPointerCancel={() => { if (pointerStart.current === null) return; pointerStart.current = null; recorder.stop(true); }}
+                onKeyDown={(event) => {
+                  if ((event.key === " " || event.key === "Enter") && !event.repeat && recorder.state.kind === "idle") {
+                    event.preventDefault();
+                    setVoiceNote(null);
+                    fire("tap");
+                    void recorder.start();
+                  } else if (event.key === "Escape" && recording) {
+                    event.preventDefault();
+                    recorder.stop(true);
+                  }
+                }}
+                onKeyUp={(event) => {
+                  if ((event.key === " " || event.key === "Enter") && recording) { event.preventDefault(); recorder.stop(false); }
+                }}
+                onContextMenu={(event) => event.preventDefault()}
+              >
+                {sendingVoice
+                  ? <svg viewBox="0 0 16 16" aria-hidden="true" className={styles.voiceSpin}><path d="M8 2.5a5.5 5.5 0 1 0 5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+                  : <Icon d="M8 10.5a2.5 2.5 0 0 0 2.5-2.5V4.5a2.5 2.5 0 0 0-5 0V8A2.5 2.5 0 0 0 8 10.5Zm-4.5-3a4.5 4.5 0 0 0 9 0M8 12v2" />}
+              </button>
+            ) : working ? (
               <button type="button" className={styles.send} aria-label="Parar" onClick={onStop}>
                 <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4.5" y="4.5" width="7" height="7" rx="1.5" fill="currentColor" /></svg>
               </button>
@@ -241,6 +354,7 @@ export function Composer({
             )}
           </div>
         </form>
+        {voiceNote ? <p className={styles.voiceNote} role="status">{voiceNote}</p> : null}
       </div>
     </div>
   );

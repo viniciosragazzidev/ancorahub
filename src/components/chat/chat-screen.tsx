@@ -9,6 +9,7 @@ import { AssistantAvatar } from "./assistant-avatar";
 import { ChatBlockView, ChoiceList, MessageEnter, TypingIndicator } from "./chat-blocks";
 import { Composer, type Mention } from "./composer";
 import styles from "./chat.module.css";
+import type { VoiceTranscribe } from "./voice-recorder";
 import type { AssistantAvatarAsset, ChatAction, ChatBlock, ChatChoice, ChatLeadRow, ChatProgress, ChatScript, MascotShape, ChatListItem } from "./types";
 import { fetchMentionBlocks, isDataMention } from "./mention-client";
 import { appendSending, newClientMessageId, settleSend, startRetry } from "./user-send-core";
@@ -52,6 +53,8 @@ export function ChatScreen({
   script,
   runAction,
   onFreeText,
+  composerVoice,
+  composerDraft,
   onMention,
   headerAction,
   topNotice,
@@ -88,7 +91,11 @@ export function ChatScreen({
    * clientMessageId is the optimistic message id, the same on every retry: pass it on to
    * the server as an idempotency key so a retry after a timeout never saves twice.
    */
-  onFreeText?: (text: string, meta?: { clientMessageId: string }) => Promise<ChatBlock[]>;
+  onFreeText?: (text: string, meta?: { clientMessageId: string; voice?: boolean }) => Promise<ChatBlock[]>;
+  /** Segurar para falar no composer (Sasá, fase 2). */
+  composerVoice?: VoiceTranscribe;
+  /** Texto para o corretor corrigir no campo ("Corrigir o que eu ouvi"). */
+  composerDraft?: { text: string; key: number } | null;
   onMention?: (mention: Mention) => Promise<ChatBlock[]> | ChatBlock[];
   headerAction?: ReactNode;
   /** Fixed context notice displayed between the conversation header and thread. */
@@ -345,14 +352,14 @@ export function ChatScreen({
 
   // Free text is optimistic: the message shows at once as "sending" and the server settles it.
   // A failure keeps the text on screen as "Não enviada" with "Tentar de novo".
-  const sendFree = useCallback(async (id: string, text: string) => {
+  const sendFree = useCallback(async (id: string, text: string, voice?: boolean) => {
     if (!onFreeText) return;
     setWorking(true);
     // Guided flows may name the wait ("Procurando entre 2.681 planos…") when the typed answer starts a search.
     setWorkingLabel(localWorkingLabel?.(`text:${text}`) ?? null);
     try {
       // The same id goes on every retry: the server uses it to never save the message twice.
-      const blocks = await onFreeText(text, { clientMessageId: id });
+      const blocks = await onFreeText(text, { clientMessageId: id, ...(voice ? { voice: true } : {}) });
       setShown((current) => settleSend(current, id, true));
       enqueue(blocks);
     } catch {
@@ -466,11 +473,14 @@ export function ChatScreen({
         inputMode={composerInput?.inputMode}
         inputLabel={composerInput?.label}
         dataTour={tourTargets?.composer}
-        onSend={async (text) => {
-          const message = { type: "user" as const, id: newClientMessageId(), text, at: nowLabel() };
+        voice={composerVoice}
+        draft={composerDraft}
+        onSend={async (text, meta) => {
+          // Voz: o id já foi usado na transcrição, o pedido segue com ele (o servidor liga os dois).
+          const message = { type: "user" as const, id: meta?.clientMessageId ?? newClientMessageId(), text, at: nowLabel() };
           if (!onFreeText) { setShown((current) => [...current, message]); return; }
           setShown((current) => appendSending(current, message));
-          await sendFree(message.id, text);
+          await sendFree(message.id, text, meta?.voice);
         }}
         onMention={mention}
       />}

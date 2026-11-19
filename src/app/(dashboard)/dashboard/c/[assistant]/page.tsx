@@ -30,7 +30,8 @@ export default async function AssistantConversationPage({ params }: { params: Pr
 
   // Conversa só para pedidos à Sasá (19/11): os avisos ficam em /notificacoes, aberta pelo sino do Início.
   // Pilot of the operator RAG: questions made from the material this company has.
-  const materialAsks = await brokerAiAccess(context.userId).then((access) => (access.operatorRag ? materialAsksOfTheDay(context.tenantId) : [])).catch(() => []);
+  const access = await brokerAiAccess(context.userId).catch(() => ({ enabled: false, operatorRag: false }));
+  const materialAsks = access.operatorRag ? await materialAsksOfTheDay(context.tenantId).catch(() => []) : [];
   // Lembrete fixo "WhatsApp a partir de 20/10" removido em 05/11: a conexão é pedida ao confirmar presença.
-  return <AssistantChat key="ancora" identity={identity} script={buildAncoraScript({ now: new Date(), materialAsks })} instant agentId="ancora" canWrite />;
+  return <AssistantChat key="ancora" identity={identity} script={buildAncoraScript({ now: new Date(), materialAsks })} instant agentId="ancora" canWrite voice={access.enabled} />;
 }

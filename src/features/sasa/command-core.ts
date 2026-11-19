@@ -44,6 +44,8 @@ export type SasaCommandInput = {
   /** Escolhido por toque depois de "Qual Carlos?". O servidor só aceita um id que esteja em `world.leads`. */
   pickedLeadId?: string | null;
   clientCommandId?: string | null;
+  /** Escrito ou falado (a voz já chegou transcrita). */
+  origin?: "text" | "voice" | null;
 };
 
 /** Valor de uma escolha local que repete o pedido com o lead escolhido. */
