@@ -65,6 +65,8 @@ const REGRAS: readonly Regra[] = [
   ["src/features/manager-workspace/", rota("leads")],
   ["src/features/post-sale/", rota("leads")],
   ["src/features/broker-workspace/", rota("minha-fila")],
+  // Sasá agêntica (19/11): os pedidos do corretor executam as mesmas ações do chat da fila.
+  ["src/features/sasa/", rota("minha-fila")],
   ["src/features/lead-distribution/", rota("distribuicao")],
   ["src/features/whatsapp-plantao-notice/", rota("distribuicao")],
   ["src/features/conversations/", rota("conversas")],
