@@ -6,6 +6,7 @@ import Image from "next/image";
 import { ArrowRight, Check, Clock3, Headphones, Heart, Pause, Phone, PhoneCall, Play, Radio, Smartphone, Sparkles, Users, X } from "lucide-react";
 
 import { Button } from "@/components/arc/button/button";
+import { Switch } from "@/components/arc/switch/switch";
 import { LiteListPresence } from "@/components/lite/motion";
 import { useDevLab } from "@/lib/dev-lab";
 import { useFeedback } from "@/lib/feedback/use-feedback";
@@ -31,6 +32,22 @@ function labSnapshot(firstName: string): CallAncoraSnapshot {
     callElapsedSeconds: 0,
     interests: [],
     completed: 0,
+    autoDialEnabled: false,
+    countdown: null,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function advanceLabSession(session: CallAncoraSnapshot): CallAncoraSnapshot {
+  const index = session.completed;
+  return {
+    ...session,
+    current: CALL_ANCORA_DEMO_CONTACTS[index] ?? null,
+    next: CALL_ANCORA_DEMO_CONTACTS[index + 1] ?? null,
+    status: index < CALL_ANCORA_DEMO_CONTACTS.length ? "active" : "ended",
+    callStatus: index < CALL_ANCORA_DEMO_CONTACTS.length ? "ready" : "ended",
+    callStartedAt: null,
+    callElapsedSeconds: 0,
     countdown: null,
     updatedAt: new Date().toISOString(),
   };
@@ -53,6 +70,7 @@ export function CallAncoraWorkspace({ brokerFirstName }: { brokerFirstName: stri
   const [simulating, setSimulating] = useState(false);
   const pollInFlight = useRef(false);
   const previousInterestCount = useRef(0);
+  const autoStartedLabContact = useRef<string | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
@@ -127,7 +145,16 @@ export function CallAncoraWorkspace({ brokerFirstName }: { brokerFirstName: stri
     setBusy(true);
     setError(null);
     if (isLab) {
-      setSession((current) => current ? { ...current, completed: current.completed + 1, interests: outcome === "interested" && current.current && !current.interests.some((item) => item.id === current.current?.id) ? [...current.interests, current.current] : current.interests, countdown: { remainingSeconds: 3, paused: false } } : current);
+      setSession((current) => {
+        if (!current) return current;
+        const classified = {
+          ...current,
+          completed: current.completed + 1,
+          interests: outcome === "interested" && current.current && !current.interests.some((item) => item.id === current.current?.id) ? [...current.interests, current.current] : current.interests,
+          countdown: current.autoDialEnabled ? { remainingSeconds: 3, paused: false } : null,
+        };
+        return current.autoDialEnabled ? classified : advanceLabSession(classified);
+      });
       setBusy(false);
       return;
     }
@@ -138,6 +165,35 @@ export function CallAncoraWorkspace({ brokerFirstName }: { brokerFirstName: stri
       setSession(payload.session);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "A classificação não foi registrada. Tente de novo.");
+    } finally {
+      setBusy(false);
+    }
+  }, [isLab, session]);
+
+  const setAutoDialEnabled = useCallback(async (enabled: boolean) => {
+    if (!session) return;
+    setBusy(true);
+    setError(null);
+    if (isLab) {
+      setSession((current) => {
+        if (!current) return current;
+        const updated = { ...current, autoDialEnabled: enabled };
+        return !enabled && current.countdown ? advanceLabSession(updated) : updated;
+      });
+      setBusy(false);
+      return;
+    }
+    try {
+      const response = await fetch("/api/call-ancora/session", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "auto-dial", enabled }),
+      });
+      const payload = await response.json() as { session?: CallAncoraSnapshot; error?: string };
+      if (!response.ok || !payload.session) throw new Error(payload.error || "Não consegui atualizar a discagem automática.");
+      setSession(payload.session);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Não consegui atualizar a discagem automática.");
     } finally {
       setBusy(false);
     }
@@ -161,15 +217,14 @@ export function CallAncoraWorkspace({ brokerFirstName }: { brokerFirstName: stri
       setSession((current) => {
         if (!current?.countdown || current.countdown.paused) return current;
         if (current.countdown.remainingSeconds > 1) return { ...current, countdown: { ...current.countdown, remainingSeconds: current.countdown.remainingSeconds - 1 } };
-        const index = current.completed;
-        return { ...current, current: CALL_ANCORA_DEMO_CONTACTS[index] ?? null, next: CALL_ANCORA_DEMO_CONTACTS[index + 1] ?? null, status: index < CALL_ANCORA_DEMO_CONTACTS.length ? "active" : "ended", callStatus: index < CALL_ANCORA_DEMO_CONTACTS.length ? "ready" : "ended", callStartedAt: null, callElapsedSeconds: 0, countdown: null, updatedAt: new Date().toISOString() };
+        return advanceLabSession(current);
       });
     }, 1_000);
     return () => window.clearTimeout(timer);
   }, [isLab, session?.countdown, session?.countdown?.paused, session?.countdown?.remainingSeconds, session?.completed]);
 
   const simulateLabCall = useCallback(async () => {
-    if (!session || simulating) return;
+    if (!session || session.callStatus !== "ready" || simulating) return;
     setSimulating(true);
     const move = (callStatus: CallStatus) => setSession((current) => current ? { ...current, callStatus, callStartedAt: callStatus === "active" ? new Date().toISOString() : current.callStartedAt, callElapsedSeconds: 0, updatedAt: new Date().toISOString() } : current);
     move("dialing"); await delay(700);
@@ -178,6 +233,14 @@ export function CallAncoraWorkspace({ brokerFirstName }: { brokerFirstName: stri
     move("ended");
     setSimulating(false);
   }, [session, simulating]);
+
+  useEffect(() => {
+    if (!isLab || !session?.autoDialEnabled || session.completed === 0 || session.callStatus !== "ready" || !session.current || simulating) return;
+    const contactKey = `${session.sessionId}:${session.current.id}`;
+    if (autoStartedLabContact.current === contactKey) return;
+    autoStartedLabContact.current = contactKey;
+    void simulateLabCall();
+  }, [isLab, session, simulating, simulateLabCall]);
 
   const countdownExpired = Boolean(session?.countdown && !session.countdown.paused && session.countdown.remainingSeconds <= 0);
   const pairExpired = pairingExpiresAt !== null && now >= pairingExpiresAt;
@@ -193,6 +256,14 @@ export function CallAncoraWorkspace({ brokerFirstName }: { brokerFirstName: stri
           </div>
           {session?.status === "active" ? <span className="inline-flex min-h-10 items-center gap-2 rounded-full bg-(--success)/10 px-4 text-sm font-medium text-(--success)"><Radio className="size-4" aria-hidden="true" /> Celular conectado</span> : null}
         </header>
+
+        {session ? <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-(--border) bg-(--surface) px-4 py-3 md:px-5">
+          <div className="min-w-0">
+            <p id="call-ancora-auto-dial-label" className="text-sm font-semibold text-(--foreground)">Discagem automática</p>
+            <p className="mt-1 text-xs leading-5 text-(--text-secondary)">{session.autoDialEnabled ? "Após classificar, a próxima simulação começa sozinha em 3 segundos." : "Desligada. O próximo contato fica pronto para você iniciar no celular."}</p>
+          </div>
+          <Switch aria-labelledby="call-ancora-auto-dial-label" checked={session.autoDialEnabled} disabled={busy} onCheckedChange={(enabled) => void setAutoDialEnabled(enabled)} />
+        </div> : null}
 
         {error ? <p className="mb-5 rounded-2xl border border-(--danger)/25 bg-(--danger)/5 px-4 py-3 text-sm text-(--danger)" role="alert">{error}</p> : null}
 
@@ -243,7 +314,7 @@ export function CallAncoraWorkspace({ brokerFirstName }: { brokerFirstName: stri
                     <h2 className="mt-5 text-3xl font-semibold tracking-tight text-(--foreground)">{session.current.name}</h2>
                     <p className="mt-2 text-sm text-(--text-secondary)">{session.current.phone} <span className="text-(--text-muted)">· número fictício</span></p>
                     {session.callStatus === "active" ? <p className="mt-6 flex items-center gap-2 font-mono text-2xl tabular-nums text-(--foreground)" aria-live="off"><Clock3 className="size-5 text-(--success)" aria-hidden="true" /> {clock(Math.floor(Math.max(0, now - Date.parse(session.callStartedAt ?? new Date().toISOString())) / 1000))}</p> : null}
-                    {session.callStatus === "ready" ? <p className="mt-5 max-w-sm text-sm leading-6 text-(--text-secondary)">{isLab ? "Use o celular simulado ao lado para avançar a ligação." : "A ligação é controlada pelo celular pareado. Quando terminar, classifique o resultado aqui."}</p> : null}
+                    {session.callStatus === "ready" ? <p className="mt-5 max-w-sm text-sm leading-6 text-(--text-secondary)">{session.autoDialEnabled ? "Discagem automática ligada. A próxima simulação começa após a contagem; para uma chamada real, o navegador exige um toque em Ligar no celular." : "Discagem automática desligada. O próximo contato está pronto. Toque em Ligar para o próximo no celular."}</p> : null}
                     {session.callStatus === "ended" && !session.countdown ? <p className="mt-5 text-sm text-(--text-secondary)">Como foi esta conversa?</p> : null}
                     {session.countdown ? <div className="mt-6 flex w-full max-w-md flex-wrap items-center justify-center gap-3 rounded-2xl bg-(--surface-muted) px-4 py-3"><span className="text-sm text-(--text-secondary)">{countdownExpired ? "Próximo contato" : `Próximo em ${session.countdown.paused ? "pausado" : `${session.countdown.remainingSeconds} s`}`}</span><Button size="sm" variant="secondary" className="min-h-10 rounded-full" onClick={() => void setCountdownPaused(!session.countdown?.paused)}>{session.countdown.paused ? <Play className="size-4" aria-hidden="true" /> : <Pause className="size-4" aria-hidden="true" />}{session.countdown.paused ? "Retomar" : "Pausar"}</Button></div> : null}
                   </div>
@@ -253,7 +324,7 @@ export function CallAncoraWorkspace({ brokerFirstName }: { brokerFirstName: stri
 
               {session.next ? <article className="flex flex-wrap items-center justify-between gap-4 rounded-[1.5rem] border border-(--border) bg-(--surface) px-5 py-4"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-2xl bg-(--surface-muted) text-(--text-secondary)"><ArrowRight className="size-5" aria-hidden="true" /></span><div><p className="text-xs font-medium uppercase tracking-wide text-(--text-muted)">Próximo contato</p><p className="mt-1 text-sm font-semibold text-(--foreground)">{session.next.name}</p></div></div><span className="text-sm tabular-nums text-(--text-secondary)">{session.next.phone}</span></article> : null}
 
-              {isLab ? <article className="rounded-[1.5rem] border border-(--border) bg-(--surface) p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-2xl bg-(--accent-subtle) text-(--accent-strong)"><Smartphone className="size-5" aria-hidden="true" /></span><div><h3 className="font-semibold text-(--foreground)">Celular da demonstração</h3><p className="text-xs text-(--text-secondary)">Conectado à conta de {brokerFirstName}</p></div></div><Button size="md" variant="secondary" className="min-h-11 rounded-full" disabled={simulating || session.callStatus !== "ready"} loading={simulating} onClick={() => void simulateLabCall()}><PhoneCall className="size-4" aria-hidden="true" />{simulating ? "Simulando…" : "Simular ligação"}</Button></div><div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-(--text-muted)"><span className="rounded-full bg-(--surface-muted) px-3 py-1.5">{statusLabel(session.callStatus)}</span><span>Número fictício, sem discagem real</span></div></article> : null}
+              {isLab ? <article className="rounded-[1.5rem] border border-(--border) bg-(--surface) p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-2xl bg-(--accent-subtle) text-(--accent-strong)"><Smartphone className="size-5" aria-hidden="true" /></span><div><h3 className="font-semibold text-(--foreground)">Celular da demonstração</h3><p className="text-xs text-(--text-secondary)">Conectado à conta de {brokerFirstName}</p></div></div><Button size="md" variant="secondary" className="min-h-11 rounded-full" disabled={simulating || session.callStatus !== "ready" || (session.autoDialEnabled && session.completed > 0)} loading={simulating} onClick={() => void simulateLabCall()}><PhoneCall className="size-4" aria-hidden="true" />{simulating ? "Simulando…" : session.autoDialEnabled && session.completed > 0 ? "Começando automaticamente" : "Ligar para o próximo"}</Button></div><div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-(--text-muted)"><span className="rounded-full bg-(--surface-muted) px-3 py-1.5">{statusLabel(session.callStatus)}</span><span>Número fictício, sem discagem real</span></div></article> : null}
             </section>
           </div>
         )}
@@ -273,6 +344,8 @@ export function CallAncoraMobile({ token }: { token: string }) {
   const pairedOnce = useRef(false);
   const sessionEndedRef = useRef(false);
   const pollTimer = useRef<number | null>(null);
+  const autoStartedContact = useRef<string | null>(null);
+  const notifiedContact = useRef<string | null>(null);
   const fire = useFeedback();
 
   const stopForEndedSession = useCallback(() => {
@@ -359,6 +432,23 @@ export function CallAncoraMobile({ token }: { token: string }) {
     }
   }, [deviceToken, fire, session, simulating, stopForEndedSession]);
 
+  useEffect(() => {
+    if (!deviceToken || !session?.autoDialEnabled || session.completed === 0 || session.callStatus !== "ready" || !session.current || simulating) return;
+    const contactKey = `${session.sessionId}:${session.current.id}`;
+    if (autoStartedContact.current === contactKey) return;
+    autoStartedContact.current = contactKey;
+    // Simulation can advance automatically; the real tel: path below always needs a fresh tap in a browser.
+    void simulate();
+  }, [deviceToken, session, simulating, simulate]);
+
+  useEffect(() => {
+    if (!session?.current || session.callStatus !== "ready") return;
+    const contactKey = `${session.sessionId}:${session.current.id}`;
+    if (notifiedContact.current === contactKey) return;
+    notifiedContact.current = contactKey;
+    fire("notify");
+  }, [fire, session]);
+
   return (
     <main className="arc-venancor min-h-dvh bg-(--background) px-5 py-8">
       <div className="mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-md flex-col">
@@ -372,12 +462,15 @@ export function CallAncoraMobile({ token }: { token: string }) {
           {session.current ? <section className="mt-5 rounded-[2rem] border border-(--border) bg-(--surface) p-6">
             <p className="text-xs font-semibold uppercase tracking-wide text-(--text-muted)">Contato atual · fictício</p>
             <h1 className="mt-3 text-2xl font-semibold text-(--foreground)">{session.current.name}</h1>
-            <p className="mt-2 text-sm tabular-nums text-(--text-secondary)">{session.current.phone}</p>
-            <a href={`tel:${session.current.phone.replace(/[^+\d]/g, "")}`} className="mt-6 flex min-h-12 items-center justify-center gap-2 rounded-full border border-(--border-strong) px-5 text-sm font-semibold text-(--foreground)"><Phone className="size-4" aria-hidden="true" /> Ligar</a>
-            <Button variant="primary" size="lg" className="mt-3 min-h-12 w-full rounded-full" disabled={!deviceToken || simulating || session.callStatus !== "ready"} loading={simulating} onClick={() => void simulate()}><PhoneCall className="size-4" aria-hidden="true" />{simulating ? statusLabel(session.callStatus) : session.callStatus === "ended" ? "Ligação encerrada" : "Simular"}</Button>
-            <p className="mt-3 text-center text-xs text-(--text-muted)">{session.callStatus === "ready" ? "A simulação mostra os estados no computador." : statusLabel(session.callStatus)}{session.callStatus === "active" ? ` · ${clock(session.callElapsedSeconds)}` : ""}</p>
+            <p className="mt-3 rounded-2xl bg-(--accent-subtle) px-4 py-3 text-center text-2xl font-semibold tabular-nums tracking-wide text-(--accent-strong)">{session.current.phone}</p>
+            {session.autoDialEnabled ? <p className="mt-3 flex min-h-10 items-center justify-center rounded-full bg-(--success)/10 px-3 text-sm font-medium text-(--success)">Discagem automática ligada</p> : <p className="mt-3 flex min-h-10 items-center justify-center rounded-full bg-(--surface-muted) px-3 text-sm text-(--text-secondary)">Discagem automática desligada</p>}
+            {session.countdown ? <p role="status" className="mt-3 rounded-2xl bg-(--surface-muted) px-4 py-3 text-center text-sm text-(--text-secondary)">{session.countdown.paused ? "Próximo contato pausado" : `Próximo contato em ${session.countdown.remainingSeconds} s`}</p> : null}
+            {/* Browsers block opening tel: without a fresh user gesture. Fully automatic real calls require the Android app and TelecomManager.placeCall. */}
+            {session.callStatus === "ready" ? <a href={`tel:${session.current.phone.replace(/[^+\d]/g, "")}`} className="mt-4 flex min-h-16 items-center justify-center gap-3 rounded-full bg-(--success) px-5 text-lg font-semibold text-white shadow-(--shadow-resting)"><Phone className="size-5" aria-hidden="true" /> Ligar para o próximo</a> : null}
+            {session.callStatus === "ready" ? <Button variant="secondary" size="lg" className="mt-3 min-h-12 w-full rounded-full" disabled={!deviceToken || simulating || (session.autoDialEnabled && session.completed > 0)} loading={simulating} onClick={() => void simulate()}><PhoneCall className="size-4" aria-hidden="true" />{simulating ? statusLabel(session.callStatus) : session.autoDialEnabled && session.completed > 0 ? "Começando automaticamente" : "Simular"}</Button> : null}
+            <p className="mt-3 text-center text-xs leading-5 text-(--text-muted)">{session.callStatus === "ready" ? session.autoDialEnabled && session.completed > 0 ? "A próxima simulação começa sozinha. Toque em Ligar para uma chamada real." : "Toque em Ligar para abrir o discador; chamadas reais exigem toque nesta página." : statusLabel(session.callStatus)}{session.callStatus === "active" ? ` · ${clock(session.callElapsedSeconds)}` : ""}</p>
           </section> : <section className="mt-5 rounded-[2rem] border border-(--border) bg-(--surface) p-6 text-center"><Check className="mx-auto size-8 text-(--success)" aria-hidden="true" /><p className="mt-3 font-semibold text-(--foreground)">Fila de demonstração concluída</p></section>}
-          <p className="mt-auto pt-6 text-center text-xs leading-5 text-(--text-muted)">Nenhuma ligação real é iniciada por este botão. O link Ligar abre o discador do celular com um número fictício.</p>
+          <p className="mt-auto pt-6 text-center text-xs leading-5 text-(--text-muted)">Nenhuma ligação real começa sozinha no navegador. A discagem automática real virá com o app Android usando TelecomManager.placeCall.</p>
         </>}
       </div>
     </main>
