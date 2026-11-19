@@ -265,7 +265,8 @@ export function saleReviewData(answers: SaleAnswers, catalog: SaleCatalog): Sale
     ...(answers.policyNumber ? [{ label: "Apólice ou proposta", value: answers.policyNumber, sourced: sourced.has("policy") }] : []),
     ...(answers.paymentMethod ? [{ label: "Pagamento", value: PAYMENT_LABEL[answers.paymentMethod], sourced: sourced.has("payment") }] : []),
     { label: "Início da vigência", value: answers.coverageStartDate ? dateLabel(answers.coverageStartDate) : "A informar", sourced: sourced.has("start") },
-    { label: "Prazo", value: `${answers.contractTermMonths ?? 12} meses`, sourced: sourced.has("term") },
+    // Sem prazo no contrato vale o padrão de 12 meses: não é algo que o corretor informou.
+    { label: "Prazo", value: answers.contractTermMonths ? `${answers.contractTermMonths} meses` : "12 meses (padrão)", sourced: sourced.has("term") || !answers.contractTermMonths },
   ];
   return {
     fromContract: Boolean(answers.fromContract),
