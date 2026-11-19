@@ -5,7 +5,7 @@ export type CallAncoraViewer = {
   development: boolean;
 };
 
-/** Platform admins and local development can use Call Âncora before it is released to brokers. */
+/** Platform admins and local development can use Call Âncora before it is released; with the flag on, brokers use it and directors configure it. */
 export function canUseCallAncora({ role, featureEnabled, platformAdmin, development }: CallAncoraViewer) {
-  return development || platformAdmin || (role === "broker" && featureEnabled);
+  return development || platformAdmin || ((role === "broker" || role === "director") && featureEnabled);
 }

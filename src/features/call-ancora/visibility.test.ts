@@ -19,6 +19,11 @@ describe("acesso visual do Call Âncora", () => {
     expect(canUseCallAncora({ role: "manager", featureEnabled: false, platformAdmin: false, development: true })).toBe(true);
   });
 
+  it("com a flag ligada, o diretor abre a tela para configurar", () => {
+    expect(canUseCallAncora({ role: "director", featureEnabled: true, platformAdmin: false, development: false })).toBe(true);
+    expect(canUseCallAncora({ role: "director", featureEnabled: false, platformAdmin: false, development: false })).toBe(false);
+  });
+
   it("não libera outros papéis em produção só porque a flag foi ligada", () => {
     expect(canUseCallAncora({ role: "manager", featureEnabled: true, platformAdmin: false, development: false })).toBe(false);
   });
