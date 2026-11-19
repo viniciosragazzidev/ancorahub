@@ -182,3 +182,14 @@ Base de contatos, campanha, reservas concorrentes, logs de chamadas, criação d
 - A sessão tem a preferência `Discagem automática`, desligada por padrão e guardada no estado temporário do servidor. Ligada, classificar uma ligação abre a contagem de três segundos, com Pausar; ao terminar, a simulação seguinte começa no celular sem toque. Desligada, a sessão deixa o próximo contato pronto e o celular mostra o botão grande `Ligar para o próximo`.
 - A página web não pode abrir `tel:` sem um gesto do usuário. Por isso a ligação real permanece manual e o celular vibra ao receber um novo contato, respeitando as preferências do dispositivo. Discagem real sem toque exige o app Android e `TelecomManager.placeCall`.
 - Sem migration, escrita no banco ou persistência após reinício do processo. A preferência é compartilhada pelo polling da tela web e do celular pareado.
+
+## Etapa 1: status
+
+Status em 19/11/2026: código da prova do discador entregue na branch `feat/call-ancora-android`, em `apps/call-ancora-android/` (Kotlin nativo, Views com Material 3, sem Capacitor). Ainda não foi compilado nesta máquina, que não tem o Android SDK.
+
+- Vira discador padrão (`RoleManager.ROLE_DIALER`), disca com `TelecomManager.placeCall` e recebe os estados no `CallService` (`InCallService`), com horário, ms desde o pedido de ligação, `connectTimeMillis` no `ACTIVE` e `DisconnectCause` (código, rótulo, motivo) no `DISCONNECTED`.
+- Tela de chamada mínima (`InCallActivity`): atender, recusar/desligar, mudo e viva-voz; aparece sobre a tela de bloqueio.
+- O registro pode ser copiado ou enviado. Não há rede, banco nem gravação em disco.
+- Como compilar, instalar e o roteiro dos 5 testes (atendida, não atendida, caixa postal, ocupado, desligada pelo outro lado): `apps/call-ancora-android/README.md`.
+- O Next.js ignora a pasta (`tsconfig.json` e `eslint.config.mjs`); o Vitest já só lê `src/`.
+- Próximo passo: o dono instala no aparelho, faz os 5 testes e devolve o registro. Com isso se decide a regra de "Não atendeu" automático e o limite de ritmo por chip.
