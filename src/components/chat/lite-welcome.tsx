@@ -19,6 +19,11 @@ const SUPERVISOR_STORAGE_KEY = "ancora:lite-welcome:2026-10-supervisor";
 /** The welcome video (broker, Super-admin flag): seen once per device, before the card. */
 /** v3 (2026-10-13): Sasá, Dicas de Atendimento, pontos. New key: everyone sees the new video once. */
 const VIDEO_STORAGE_KEY = "ancora:welcome-video:2026-10-v3";
+/**
+ * The video stopped showing on 2026-11-19: the broker enters straight into the
+ * Início. WelcomeVideo and the Super-admin flag stay; turn this on to bring it back.
+ */
+export const WELCOME_VIDEO_ENABLED = false;
 /** "Não perca nenhum lead": asked once per device (also for those who already saw the welcome). */
 const PUSH_STORAGE_KEY = "ancora:push-nudge:2026-10";
 
@@ -72,7 +77,7 @@ export function LiteWelcome({ variant = "broker" }: { variant?: "broker" | "supe
   const [afterPush, setAfterPush] = useState<(() => void) | null>(null);
   const shell = useLightAvailabilityContext();
   const isSupervisor = variant === "supervisor";
-  const withVideo = !isSupervisor && Boolean(shell?.welcomeVideo);
+  const withVideo = WELCOME_VIDEO_ENABLED && !isSupervisor && Boolean(shell?.welcomeVideo);
   const storageKey = isSupervisor ? SUPERVISOR_STORAGE_KEY : STORAGE_KEY;
   const team = isSupervisor ? SUPERVISOR_TEAM : TEAM;
   const points = isSupervisor ? SUPERVISOR_POINTS : POINTS;

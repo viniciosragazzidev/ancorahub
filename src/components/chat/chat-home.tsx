@@ -181,6 +181,13 @@ function isActive(thread: ThreadSummary, pathname: string) {
  * - mode "rail": the same list, fixed on the left of every Lite screen on
  *   computers, with the open conversation highlighted.
  */
+/**
+ * "Primeiros passos" (missões do corretor novo) saiu do Início em 19/11/2026:
+ * a entrada fica limpa e as missões vão ganhar outro lugar. Os dados continuam
+ * chegando por `firstSteps`; basta ligar aqui para voltar a mostrar o cartão.
+ */
+const SHOW_FIRST_STEPS = false;
+
 export function ChatHome({
   viewerName,
   assistants,
@@ -191,7 +198,7 @@ export function ChatHome({
   mode = "page",
   summary = null,
   highlights = null,
-  firstSteps = null,
+  firstSteps: firstStepsInput = null,
   presence = null,
   presenceAsks = null,
   whatsappActivity = null,
@@ -232,6 +239,7 @@ export function ChatHome({
   /** Aviso da diretoria no ar: ocupa o banner do capitão no lugar do padrão. */
   announcement?: HomeAnnouncementView | null;
 }) {
+  const firstSteps = SHOW_FIRST_STEPS ? firstStepsInput : null;
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const reduce = useReducedMotion();
   const shell = useLightAvailabilityContext();
