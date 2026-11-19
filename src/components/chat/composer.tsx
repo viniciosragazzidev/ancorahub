@@ -306,7 +306,7 @@ export function Composer({
                 onPointerDown={(event) => {
                   if (event.button !== 0 || recorder.state.kind !== "idle") return;
                   event.preventDefault();
-                  event.currentTarget.setPointerCapture?.(event.pointerId);
+                  try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* ponteiro já solto: segue sem captura */ }
                   pointerStart.current = event.clientX;
                   setVoiceNote(null);
                   fire("tap");
