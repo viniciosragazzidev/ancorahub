@@ -13,7 +13,7 @@ export const CALL_ANCORA_NEXT_DELAY_MS = 3_000;
 export const CALL_ANCORA_PHONE_STALE_MS = 6_000;
 
 export type CallStatus = "ready" | "dialing" | "ringing" | "active" | "ended";
-export type CallOutcome = "interested" | "not_interested" | "no_answer" | "voicemail";
+export type CallOutcome = "interested" | "not_interested" | "no_answer" | "voicemail" | "wrong_number";
 /** Resultados que o app (ou o servidor) pode decidir sozinho, por tempo. */
 export type CallAutoOutcome = "no_answer" | "voicemail";
 export type DeviceCallEvent = "dialing" | "active" | "disconnected";
@@ -27,7 +27,7 @@ export type PairingResult =
   | { ok: false; reason: "invalid" | "expired" | "reused" };
 export type DeviceEventResult =
   | { ok: true; snapshot: CallAncoraSnapshot }
-  | { ok: false; reason: "unauthorized" | "conflict" | "not_dialable" | "paused" | "version_mismatch" };
+  | { ok: false; reason: "unauthorized" | "conflict" | "not_dialable" | "paused" | "version_mismatch" | "outside_window" };
 
 /** Como a última ligação real terminou (relatado pelo app Android). */
 export type CallAncoraLastCall = {
@@ -41,6 +41,8 @@ export type CallAncoraLastCall = {
   rule: string | null;
   /** ms entre DISCANDO e ACTIVE no celular, para calibrar as regras. */
   dialToActiveMs: number | null;
+  /** Chip usado (slot e operadora), quando o app informa. */
+  sim: string | null;
 };
 
 export type CallAncoraPhoneStatus = {
@@ -81,6 +83,10 @@ export type CallAncoraSnapshot = {
   /** A web pediu para o celular desligar a ligação atual. */
   hangupRequested: boolean;
   hangupRequest: CallAncoraHangupRequest | null;
+  /** Janela de ligações (seg a sáb, 8h às 20h); fora dela a base de frios não disca. */
+  callingWindowOpen: boolean;
+  /** Aviso curto para a tela (ex.: "Este lead já foi para outro corretor."). */
+  notice: string | null;
   countdown: { remainingSeconds: number; paused: boolean } | null;
   updatedAt: string;
 };
@@ -105,6 +111,8 @@ export type CallAncoraDeviceState = {
   lastCall: CallAncoraLastCall | null;
   /** Pedido da web: "voicemail" (desligar como caixa postal) ou "hangup" (só desligar). */
   hangupRequest: CallAncoraHangupRequest | null;
+  /** Janela de ligações aberta (seg a sáb, 8h às 20h). */
+  callingWindowOpen: boolean;
 };
 
 type Scope = { tenantId: string; brokerId: string };
@@ -131,6 +139,8 @@ type Session = Scope & {
   pausedBy: "web" | "phone" | null;
   version: number;
   appLastSeenAt: number | null;
+  callingWindowOpen: boolean;
+  notice: string | null;
   flagBypass: boolean;
   countdownEndsAt: number | null;
   countdownPaused: boolean;
@@ -162,13 +172,30 @@ export function toDeviceState(snapshot: CallAncoraSnapshot): CallAncoraDeviceSta
     completed: snapshot.completed,
     total: snapshot.total,
     current: current
-      ? { id: current.id, name: current.name, dialable: current.dialable === true, phone: current.dialable === true ? current.phone : null }
+      ? (() => {
+        const dialable = current.dialable === true && (current.source !== "cold_base" || snapshot.callingWindowOpen);
+        return { id: current.id, name: current.name, dialable, phone: dialable ? current.phone : null };
+      })()
       : null,
     next: next
       ? { id: next.id, name: next.name, phoneMasked: next.dialable === true ? maskPhone(next.phone) : null }
       : null,
     lastCall: snapshot.lastCall,
     hangupRequest: snapshot.hangupRequest,
+    callingWindowOpen: snapshot.callingWindowOpen,
+  };
+}
+
+/** O que a tela web recebe: telefone de frio mascarado; o completo só vai para o celular pareado. */
+export function toBrokerView(snapshot: CallAncoraSnapshot | null): CallAncoraSnapshot | null {
+  if (!snapshot) return null;
+  const mask = (contact: CallAncoraContact | null) =>
+    contact && contact.source === "cold_base" ? { ...contact, phone: maskPhone(contact.phone) } : contact;
+  return {
+    ...snapshot,
+    current: mask(snapshot.current),
+    next: mask(snapshot.next),
+    interests: snapshot.interests.map((contact) => mask(contact) ?? contact),
   };
 }
 
@@ -212,6 +239,8 @@ export class CallAncoraSessionStore {
       pausedBy: null,
       version: 1,
       appLastSeenAt: null,
+      callingWindowOpen: true,
+      notice: null,
       flagBypass: options.flagBypass ?? false,
       countdownEndsAt: null,
       countdownPaused: false,
@@ -325,6 +354,7 @@ export class CallAncoraSessionStore {
       dialToActiveMs?: number | null;
       /** Versão do estado que o app conferiu antes de discar. */
       version?: number | null;
+      sim?: string | null;
     },
   ): DeviceEventResult {
     this.prune();
@@ -341,6 +371,7 @@ export class CallAncoraSessionStore {
     if (input.event === "dialing") {
       if (status === "dialing") return { ok: true, snapshot: this.snapshot(session) };
       if (session.runState !== "running") return { ok: false, reason: "paused" };
+      if (contact.source === "cold_base" && !session.callingWindowOpen) return { ok: false, reason: "outside_window" };
       if (typeof input.version === "number" && input.version !== session.version) return { ok: false, reason: "version_mismatch" };
       if (status !== "ready" || session.countdownEndsAt !== null || session.countdownPaused) return { ok: false, reason: "conflict" };
       session.callStatus = "dialing";
@@ -368,6 +399,7 @@ export class CallAncoraSessionStore {
         autoOutcome,
         rule,
         dialToActiveMs: typeof input.dialToActiveMs === "number" ? input.dialToActiveMs : null,
+        sim: input.sim?.slice(0, 80) ?? null,
       };
       // Classificação automática sem esperar a web (pode ser corrigida durante a contagem).
       if (autoOutcome) this.finishContact(session, autoOutcome, true);
@@ -449,6 +481,63 @@ export class CallAncoraSessionStore {
     session.lastOutcome = { contactId: contact.id, outcome, auto: false };
     this.bump(session);
     return this.snapshot(session);
+  }
+
+  /** Escopo (tenant + dono) da sessão de um token de dispositivo. */
+  scopeForDevice(deviceToken: string): Scope | null {
+    const session = this.deviceSession(deviceToken);
+    return session ? { tenantId: session.tenantId, brokerId: session.brokerId } : null;
+  }
+
+  /**
+   * Base de frios: o que a sessão já tem e quantos contatos faltam para ter atual + próximo.
+   * Null quando a sessão não usa a base de frios.
+   */
+  coldQueueNeeds(scope: Scope): { sessionKey: string; allIds: string[]; heldIds: string[]; want: number } | null {
+    const session = this.liveSession(scopeKey(scope));
+    if (!session || session.queueSource !== "cold_base" || session.runState === "ended" || session.pairedAt === null) return null;
+    const pending = session.queue.slice(session.contactIndex).filter((contact, index) => !(index === 0 && session.classified));
+    const heldIds = session.queue.slice(session.contactIndex, session.contactIndex + 2).map((contact) => contact.id);
+    return { sessionKey: scopeKey(scope), allIds: session.queue.map((contact) => contact.id), heldIds, want: Math.max(0, 2 - pending.length) };
+  }
+
+  /** Acrescenta frios reservados à fila da sessão (a fila andou ou estava vazia). */
+  appendColdContacts(scope: Scope, contacts: CallAncoraContact[]): CallAncoraSnapshot | null {
+    const session = this.liveSession(scopeKey(scope));
+    if (!session || session.queueSource !== "cold_base" || contacts.length === 0) return null;
+    const exhausted = session.contactIndex >= session.queue.length;
+    session.queue.push(...contacts.map((contact) => ({ ...contact })));
+    if (exhausted) {
+      session.callStatus = "ready";
+      session.callStartedAt = null;
+      session.classified = false;
+    }
+    this.bump(session);
+    return this.snapshot(session);
+  }
+
+  /** Tira da fila o frio atual que deixou de estar livre (já foi para outro corretor). */
+  dropCurrentCold(scope: Scope, contactId: string, notice: string): boolean {
+    const session = this.liveSession(scopeKey(scope));
+    const contact = session?.queue[session.contactIndex];
+    if (!session || !contact || contact.id !== contactId || contact.source !== "cold_base" || session.callStatus !== "ready") return false;
+    this.advanceToNextContact(session);
+    session.notice = notice;
+    return true;
+  }
+
+  setCallingWindow(scope: Scope, open: boolean) {
+    const session = this.liveSession(scopeKey(scope));
+    if (!session || session.callingWindowOpen === open) return;
+    session.callingWindowOpen = open;
+    this.bump(session);
+  }
+
+  setNotice(scope: Scope, notice: string | null) {
+    const session = this.liveSession(scopeKey(scope));
+    if (!session) return;
+    session.notice = notice;
+    this.bump(session);
   }
 
   /** Web: pede ao celular para desligar a ligação atual ("voicemail" também classifica). */
@@ -641,6 +730,7 @@ export class CallAncoraSessionStore {
     session.callStartedAt = null;
     session.classified = false;
     session.hangupRequest = null;
+    session.notice = null;
     this.bump(session);
   }
 
@@ -654,7 +744,7 @@ export class CallAncoraSessionStore {
       sessionId: session.id,
       brokerFirstName: session.brokerFirstName,
       // Fila vazia continua "active" (esperando frios); "ended" quando encerrada ou quando a fila acabou.
-      status: ended ? "ended" : session.pairedAt === null ? "waiting_pairing" : current || session.queue.length === 0 ? "active" : "ended",
+      status: ended ? "ended" : session.pairedAt === null ? "waiting_pairing" : current || session.queue.length === 0 || session.queueSource === "cold_base" ? "active" : "ended",
       pairedAt: session.pairedAt === null ? null : new Date(session.pairedAt).toISOString(),
       current: current ? { ...current } : null,
       next: next ? { ...next } : null,
@@ -678,6 +768,8 @@ export class CallAncoraSessionStore {
       lastOutcome: session.lastOutcome ? { ...session.lastOutcome } : null,
       hangupRequested: session.hangupRequest !== null,
       hangupRequest: session.hangupRequest,
+      callingWindowOpen: session.callingWindowOpen,
+      notice: session.notice,
       countdown: session.countdownEndsAt !== null || session.countdownPaused
         ? { remainingSeconds: Math.ceil((session.countdownPaused ? session.countdownRemainingMs ?? 0 : (session.countdownEndsAt ?? now) - now) / 1000), paused: session.countdownPaused }
         : null,

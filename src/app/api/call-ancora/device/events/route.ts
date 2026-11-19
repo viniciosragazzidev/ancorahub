@@ -8,6 +8,7 @@ import {
   deviceJson,
   deviceStateBody,
 } from "@/features/call-ancora/device-api";
+import { persistClassification, syncColdQueue } from "@/features/call-ancora/cold-session";
 import { callAncoraSessionStore } from "@/features/call-ancora/session-store";
 
 export const dynamic = "force-dynamic";
@@ -36,13 +37,22 @@ export async function POST(request: Request) {
   const parsed = eventSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return deviceJson({ error: "O evento da ligação não é válido." }, 400);
 
+  const scope = callAncoraSessionStore.scopeForDevice(token);
+  const before = scope ? callAncoraSessionStore.getForBroker(scope) : null;
   const result = callAncoraSessionStore.reportDeviceEvent(token, parsed.data);
   if (!result.ok) {
     if (result.reason === "unauthorized") return deviceJson({ error: DEVICE_UNAUTHORIZED }, 401);
     if (result.reason === "not_dialable") return deviceJson({ error: "Este contato não pode ser discado." }, 422);
     if (result.reason === "paused") return deviceJson({ error: "Pausado pela tela. Nenhuma ligação nova começa.", code: "paused" }, 409);
+    if (result.reason === "outside_window") return deviceJson({ error: "Fora do horário de ligações.", code: "outside_window" }, 409);
     if (result.reason === "version_mismatch") return deviceJson({ error: "A sessão mudou na tela. Atualize antes de discar.", code: "version_mismatch" }, 409);
     return deviceJson({ error: "A fila mudou. Atualize o estado da sessão." }, 409);
   }
-  return deviceJson(deviceStateBody(result.snapshot));
+  if (scope && parsed.data.event === "disconnected") {
+    // "Não atendeu"/caixa postal automáticos: grava no lead quando é da base de frios.
+    await persistClassification(scope, before, result.snapshot);
+    await syncColdQueue(scope);
+  }
+  const fresh = callAncoraSessionStore.getForDevice(token);
+  return deviceJson(deviceStateBody(fresh ?? result.snapshot));
 }

@@ -219,3 +219,11 @@ Status em 19/11/2026, branch `feat/call-ancora-android`.
 - Até lá, a "Lista de teste" de admin/dev é a única forma de carregar números. A regra de segurança continua: o app só disca contato que o servidor marcou como discável.
 - A página do celular no navegador não simula mais ligações; só abre o discador com um toque. O laboratório (`/dev/laboratorio`) mantém um roteiro simulado próprio.
 
+### Base geral de frios na fila (19/11/2026, sem migration)
+
+- **Pool** (`src/features/call-ancora/cold-base.ts`, só leitura): leads do tenant com `qualification_status = 'cold'`, sem `corretor_id`, `status` fora de `lost`/`converted`, sem `archived_at`, `deleted_at` e `distribution_removed_at`, inclusive `distribution_status = 'manual_hold'`. Sem a espera de 2 dias. Fora: telefone brasileiro inválido, "Número errado" do Call Âncora, tentativa do Call Âncora há menos de 4 h e 3 tentativas. Do mais antigo para o mais novo, página de 20.
+- **Reserva** em memória por tenant (`ColdReservations`): atual + próximo por sessão, 10 min ou até classificar. Antes de entregar o número ao celular o servidor confere no banco se o lead ainda está sem corretor; se não estiver, pula com "Este lead já foi para outro corretor".
+- **Janela:** segunda a sábado, 8h às 20h (São Paulo). Fora dela o frio não é discável e a tela mostra "Fora do horário de ligações".
+- **Gravações por classificação** (`cold-outcome.ts`): toda classificação insere uma nota em `lead_interactions` (`tipo = 'note'`, `metadata.source = 'call_ancora'`, resultado, duração, causa, regra, chip). "Com interesse" usa `assignLeadToBroker` (transferência manual para a unidade do corretor, `assignment_source = 'call_ancora'`), que só vale com o lead ainda sem corretor e escreve `leads`, `lead_assignment_attempts`, `lead_distribution_events`, `audit_logs` e a notificação de lead atribuído. A web mostra telefone mascarado; o completo só vai para o celular pareado.
+- Teste no PostgreSQL isolado: `src/features/call-ancora/cold-base-db.test.ts` (pool, 3 tentativas, dois "Com interesse" simultâneos com um vencedor, manual_hold atribuído, Número errado).
+

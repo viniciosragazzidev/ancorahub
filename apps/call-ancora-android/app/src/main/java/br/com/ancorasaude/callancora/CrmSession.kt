@@ -234,6 +234,7 @@ object CrmSession {
         if (state == null || awaitingContactId != null || !_ui.value.started) return
         val current = state.current
         val text = when {
+            !state.callingWindowOpen -> "Fora do horário de ligações (segunda a sábado, 8h às 20h)."
             state.total == 0 -> "Ainda não há frios na sua fila. Assim que a base de frios estiver ligada, eles aparecem aqui."
             state.status == "ended" || current == null -> "Fila concluída."
             !current.dialable -> "Este contato está bloqueado para ligação. Avance a fila na tela do computador."
