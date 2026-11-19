@@ -25,7 +25,10 @@ export async function requireCallAncoraAccess() {
     sessionOwnerId: callAncoraSessionOwnerId(context, session.user.id),
     brokerName: session.user.name,
     flagBypass: platformAdmin || development,
-    /** Diretor (ou admin/dev) vê as configurações do Call Âncora da empresa. */
-    canConfigure: context.role === "director" || platformAdmin || development,
+    /**
+     * Configurações e painel ficam só na área do diretor: na tela do corretor (inclusive admin
+     * em "Ver como" corretor) eles não aparecem.
+     */
+    canConfigure: context.role === "director" || (context.role !== "broker" && (platformAdmin || development)),
   };
 }
