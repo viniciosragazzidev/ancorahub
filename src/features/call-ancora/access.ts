@@ -16,7 +16,7 @@ export async function requireCallAncoraAccess() {
   const featureEnabled = (await getFeatureFlag(FEATURE_FLAGS.CALL_ANCORA_VISUAL).catch(() => "false")) === "true";
   if (!canUseCallAncora({ role: context.role, featureEnabled, platformAdmin, development })) {
     if (context.role === "broker") {
-      throw new AuthorizationError("A demonstração do Call Âncora está desativada pela plataforma.");
+      throw new AuthorizationError("O Call Âncora está desativado pela plataforma.");
     }
     throw new AuthorizationError("O Call Âncora está disponível apenas para corretores e administradores da plataforma.");
   }

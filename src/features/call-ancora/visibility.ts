@@ -5,7 +5,7 @@ export type CallAncoraViewer = {
   development: boolean;
 };
 
-/** Platform admins and local development can inspect the demo without exposing it to brokers in production. */
+/** Platform admins and local development can use Call Âncora before it is released to brokers. */
 export function canUseCallAncora({ role, featureEnabled, platformAdmin, development }: CallAncoraViewer) {
   return development || platformAdmin || (role === "broker" && featureEnabled);
 }

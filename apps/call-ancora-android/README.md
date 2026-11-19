@@ -67,7 +67,9 @@ Enquanto for o padrão, **todas** as ligações do aparelho (inclusive recebidas
 
 O app só aceita QR do CRM de produção (`https://crm.ancorasaude.cloud`) ou de endereços de desenvolvimento (localhost, emulador, IP da rede local).
 
-**Segurança:** a fila de demonstração tem números fictícios e **nunca é discada**. O app só disca contatos que o servidor marcou como discáveis, e isso só acontece com a **Lista de teste (ligação real)**, que só administradores da plataforma veem na tela web. Para testar de verdade: na web, cole os números na Lista de teste e toque em "Usar como fila".
+**Fila:** vem da base geral de frios da Âncora, que ainda está sendo ligada. Até lá a fila começa vazia ("Ainda não há frios na sua fila") e a única forma de carregar números é a **Lista de teste**, que só administradores da plataforma veem na tela web: cole os números e toque em "Usar como fila".
+
+**Segurança:** o app só disca contatos que o servidor marcou como discáveis; qualquer outro número é recusado no celular e no servidor.
 
 Com o celular conectado e a lista de teste ativa: toque em **Começar ligações**. Cada evento da ligação (discando, em ligação, encerrada com o motivo) aparece ao vivo na web. Ligação atendida: classifique na web (Com interesse / Sem interesse). Ligação que não chegou a ser atendida vira "Não atendeu" sozinha. Com **Discagem automática** ligada na web, a próxima ligação começa sozinha depois da contagem; desligada, toque em **Ligar para o próximo**. Pausar e "Segure para encerrar" ficam no celular.
 

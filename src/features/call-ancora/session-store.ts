@@ -2,7 +2,8 @@ import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
 
-import { CALL_ANCORA_DEMO_CONTACTS, type CallAncoraContact } from "./contacts";
+import type { CallAncoraContact } from "./contacts";
+import { emptyColdBaseQueueSource, type CallAncoraQueueSource } from "./queue-source";
 import { maskPhone, type CallAncoraTestEntry } from "./test-list";
 
 export const CALL_ANCORA_PAIR_TTL_MS = 2 * 60_000;
@@ -62,7 +63,7 @@ export type CallAncoraSnapshot = {
   interests: CallAncoraContact[];
   completed: number;
   total: number;
-  queueSource: "demo" | "test_list";
+  queueSource: "cold_base" | "test_list";
   autoDialEnabled: boolean;
   /** A ligação terminou e espera Com interesse / Sem interesse na web. */
   awaitingClassification: boolean;
@@ -115,7 +116,7 @@ type Session = Scope & {
   pairedAt: number | null;
   deviceTokenHash: string | null;
   queue: CallAncoraContact[];
-  queueSource: "demo" | "test_list";
+  queueSource: "cold_base" | "test_list";
   contactIndex: number;
   callStatus: CallStatus;
   callStartedAt: number | null;
@@ -176,7 +177,11 @@ export class CallAncoraSessionStore {
   private readonly pairingTickets = new Map<string, PairingTicket>();
   private readonly deviceSessions = new Map<string, string>();
 
-  constructor(private readonly now: () => number = () => Date.now()) {}
+  constructor(
+    private readonly now: () => number = () => Date.now(),
+    /** Fila inicial de cada sessão: a base de frios (vazia até ser ligada). */
+    private readonly queueSource: CallAncoraQueueSource = emptyColdBaseQueueSource,
+  ) {}
 
   create(scope: Scope, brokerName: string, options: { flagBypass?: boolean } = {}) {
     this.prune();
@@ -191,8 +196,8 @@ export class CallAncoraSessionStore {
       lastActivityAt: now,
       pairedAt: null,
       deviceTokenHash: null,
-      queue: CALL_ANCORA_DEMO_CONTACTS.map((contact) => ({ ...contact })),
-      queueSource: "demo",
+      queue: this.queueSource.initialQueue(scope).map((contact) => ({ ...contact })),
+      queueSource: "cold_base",
       contactIndex: 0,
       callStatus: "ready",
       callStartedAt: null,
@@ -283,7 +288,7 @@ export class CallAncoraSessionStore {
     return Boolean(session?.flagBypass);
   }
 
-  /** Simulação da página web do celular (sem ligação real). */
+  /** Estados informados pela página do celular no navegador. */
   updateCallStatus(deviceToken: string, nextStatus: CallStatus): CallAncoraSnapshot | null {
     const session = this.deviceSession(deviceToken);
     if (!session || session.pairedAt === null || session.runState === "ended") return null;
@@ -648,7 +653,8 @@ export class CallAncoraSessionStore {
     return {
       sessionId: session.id,
       brokerFirstName: session.brokerFirstName,
-      status: ended ? "ended" : session.pairedAt === null ? "waiting_pairing" : current ? "active" : "ended",
+      // Fila vazia continua "active" (esperando frios); "ended" quando encerrada ou quando a fila acabou.
+      status: ended ? "ended" : session.pairedAt === null ? "waiting_pairing" : current || session.queue.length === 0 ? "active" : "ended",
       pairedAt: session.pairedAt === null ? null : new Date(session.pairedAt).toISOString(),
       current: current ? { ...current } : null,
       next: next ? { ...next } : null,

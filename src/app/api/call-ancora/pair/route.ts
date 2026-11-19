@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return Response.json({ error: "O código de pareamento está incompleto." }, { status: 400, headers: { "Cache-Control": "no-store" } });
   const featureEnabled = (await getFeatureFlag(FEATURE_FLAGS.CALL_ANCORA_VISUAL).catch(() => "false")) === "true";
   if (!featureEnabled && !callAncoraSessionStore.pairingCanUseWhenFlagDisabled(parsed.data.token)) {
-    return Response.json({ error: "A demonstração do Call Âncora está desativada." }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    return Response.json({ error: "O Call Âncora está desativado." }, { status: 403, headers: { "Cache-Control": "no-store" } });
   }
   const result = callAncoraSessionStore.pair(parsed.data.token);
   if (!result.ok) {

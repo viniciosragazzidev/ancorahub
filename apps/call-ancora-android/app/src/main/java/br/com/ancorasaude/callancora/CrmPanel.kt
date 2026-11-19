@@ -99,24 +99,31 @@ class CrmPanel(private val activity: MainActivity) {
         }
 
         val current = state.current
-        val ended = state.status == "ended" || current == null
-        tvProgress.text = if (ended) {
+        val empty = state.total == 0 && state.status != "ended"
+        val ended = !empty && (state.status == "ended" || current == null)
+        tvProgress.text = if (empty) {
+            "Fila vazia"
+        } else if (ended) {
             "${state.completed} de ${state.total} contatos"
         } else {
             "Contato ${minOf(state.completed + 1, state.total)} de ${state.total}"
         }
-        tvName.text = if (ended) "Fila concluída" else current?.name.orEmpty()
+        tvName.text = when {
+            empty -> "Sua fila está vazia"
+            ended -> if (state.runState == "ended") "Sessão encerrada" else "Fila concluída"
+            else -> current?.name.orEmpty()
+        }
         tvNumber.text = when {
-            ended -> ""
+            empty || ended -> ""
             current?.dialable == true && current.phone != null -> Phone.display(current.phone)
-            else -> "Número fictício (o app não disca)"
+            else -> "Contato bloqueado para ligação (o app não disca)"
         }
 
         val (label, dot) = stateLabel(ui, state)
         tvState.text = label
         stateDot.backgroundTintList = ColorStateList.valueOf(color(dot))
 
-        tvInfo.text = ui.message ?: when {
+        tvInfo.text = ui.message ?: if (empty) "Ainda não há frios na sua fila. Assim que a base de frios estiver ligada, eles aparecem aqui." else when {
             state.paused -> if (state.pausedBy == "phone") "Sessão pausada no celular." else "Pausado pela tela."
             state.countdownSeconds != null ->
                 if (state.countdownPaused) "Contagem pausada." else "Próxima ligação em ${state.countdownSeconds} s."

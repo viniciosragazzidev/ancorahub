@@ -15,7 +15,7 @@ afterEach(() => {
   fire.mockClear();
 });
 
-describe("Call Âncora: demonstração no laboratório", () => {
+describe("Call Âncora no laboratório", () => {
   it("passa pelo QR, mostra Celular conectado e abre a sessão no primeiro contato", async () => {
     render(<DevLabProvider value={{}}><CallAncoraWorkspace brokerFirstName="Ana" /></DevLabProvider>);
 

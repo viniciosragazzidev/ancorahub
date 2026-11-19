@@ -12,7 +12,7 @@ import { useMotionAllowed } from "@/components/motion/use-motion-allowed";
 import type { CallStatus } from "../session-store";
 
 /**
- * Peças animadas da demonstração do Call Âncora. Toda curva e duração sai de motion-tokens.ts;
+ * Peças animadas do Call Âncora. Toda curva e duração sai de motion-tokens.ts;
  * com movimento reduzido (sistema, "Menos animação" ou kill-switch) cada peça aparece pronta,
  * só com fade curto, sem deslocamento, mola ou repetição.
  */
@@ -194,7 +194,7 @@ export function ConnectedMoment({ brokerFirstName }: { brokerFirstName: string }
         </motion.span>
       </span>
       <Beat at="text"><h2 className="mt-8 text-3xl font-semibold tracking-tight text-(--foreground)">Celular conectado</h2></Beat>
-      <Beat at="number"><p className="mt-3 max-w-sm text-sm leading-6 text-(--text-secondary)">Conectado à conta de {brokerFirstName}. Preparando os contatos da demonstração…</p></Beat>
+      <Beat at="number"><p className="mt-3 max-w-sm text-sm leading-6 text-(--text-secondary)">Conectado à conta de {brokerFirstName}. Preparando a sua fila…</p></Beat>
     </section>
   );
 }

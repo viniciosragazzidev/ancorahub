@@ -230,7 +230,7 @@ export const FEATURE_FLAGS = {
   CALL_ANCORA_VISUAL: {
     key: "feature_call_ancora_visual_enabled", scope: "global", defaultValue: "false",
     allowedValues: ["true", "false"] as const,
-    description: "Demonstração visual do Call Âncora com contatos fictícios e sessão temporária em memória. Desligada por padrão; libera corretores quando ativada pelo Super-admin. Admins ativos da plataforma e desenvolvimento local podem validar sem a flag.",
+    description: "Call Âncora: discador pelo celular",
   },
   BROKER_JOURNEY: {
     key: "feature_broker_journey_enabled", scope: "global", defaultValue: "false",
