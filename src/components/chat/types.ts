@@ -34,6 +34,10 @@ export type ChatServerActionName =
   | "lead.completeReturn"
   | "lead.cancelReturn"
   | "lead.reopenReturn"
+  /** Desfaz um retorno marcado pela Sasá (cancela o novo e reabre o que ele substituiu). */
+  | "lead.undoReturn"
+  /** Desfaz uma mudança de etapa: volta à etapa anterior. */
+  | "lead.restoreStep"
   | "lead.markLost"
   | "lead.addNote"
   | "duty.pause"

@@ -6,9 +6,11 @@
  * Painel no canto: fluxo, resposta do servidor, demora e "Recomeçar".
  * "Movimento" (18/11/2026): vitrine dos componentes compartilhados com os interruptores "Menos animação" e "Kill switch".
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import { AssistantChat } from "@/components/chat/assistant-chat";
 import { ChatHome } from "@/components/chat/chat-home";
+import { buildAncoraScript } from "@/features/broker-workspace/chat/assistant-scripts";
 import { TOUR_STORAGE_KEY } from "@/components/chat/tour/tour-steps";
 import type { ThreadSummary } from "@/components/chat/types";
 import { AchievementHost, announceAchievement } from "@/components/lite/celebration/achievement-host";
@@ -24,14 +26,16 @@ import type { SaleCatalog } from "@/features/post-sale/conversation-sale-core";
 
 import styles from "./lab.module.css";
 import { MotionShowcase } from "./motion-showcase";
+import { createLabSasa, labSasaPhrasesBlock, labSasaWorld } from "./sasa-lab";
 
-type Flow = "plantao" | "lead" | "venda" | "lista" | "conquistas" | "movimento";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "lista" | "conquistas" | "movimento";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
   { id: "plantao", label: "Aceitar plantão" },
   { id: "lead", label: "Aceitar lead" },
   { id: "venda", label: "Registrar venda" },
+  { id: "sasa", label: "Sasá: pedidos por texto" },
   { id: "lista", label: "Lista da equipe (supervisor)" },
   { id: "conquistas", label: "Conquistas" },
   { id: "movimento", label: "Movimento (componentes)" },
@@ -102,7 +106,10 @@ export function FlowLab() {
   // As boas-vindas e o tour cobririam o fluxo: no laboratório ficam como já vistos.
   useState(() => { try { window.localStorage.setItem("ancora:lite-welcome:2026-10-chat", "1"); window.localStorage.setItem(TOUR_STORAGE_KEY, "skipped"); } catch { /* ignore */ } return null; });
 
+  // Sasá agêntica: um corretor de mentira que as ações simuladas mudam; "Recomeçar" volta ao início.
+  const sasaState = useRef({ world: labSasaWorld(), closed: [] as ReturnType<typeof labSasaWorld>["returns"] });
   const lab = useMemo<DevLab>(() => ({
+    sasa: createLabSasa(sasaState.current, { delay, outcome }),
     acceptLead: async () => {
       await wait(delay);
       return outcome === "falha" ? { success: false, error: "Outro corretor aceitou este lead primeiro." } : { success: true, whatsappUrl: "https://exemplo.invalid/" };
@@ -182,7 +189,7 @@ export function FlowLab() {
     }],
   };
 
-  const restart = () => { setRun((value) => value + 1); setHandoff(null); };
+  const restart = () => { setRun((value) => value + 1); setHandoff(null); sasaState.current.world = labSasaWorld(); sasaState.current.closed = []; };
 
   return (
     <DevLabProvider value={lab}>
@@ -206,6 +213,16 @@ export function FlowLab() {
           />
         ) : flow === "venda" ? (
           <SaleChat lead={LAB_SALE_LEAD} catalog={LAB_SALE_CATALOG} services={lab.sale!} backHref="/dev/laboratorio" doneHref="/dev/laboratorio" />
+        ) : flow === "sasa" ? (
+          <div className="arc-venancor h-dvh">
+            <AssistantChat
+              identity={{ name: "Sasá", shape: "sasa", hue: 175 }}
+              script={(() => { const script = buildAncoraScript({ now: new Date() }); return { ...script, blocks: [...script.blocks, labSasaPhrasesBlock()] }; })()}
+              instant
+              agentId="ancora"
+              canWrite
+            />
+          </div>
         ) : flow === "lista" ? (
           <TeamListManager rows={LAB_LIST} totals={{ all: LAB_LIST.length, pending: LAB_LIST.filter((row) => !row.brokerId).length, distributed: LAB_LIST.filter((row) => row.brokerId).length, replied: LAB_LIST.filter((row) => row.replied).length }} team={LAB_TEAM} switcher={null} />
         ) : flow === "movimento" ? (

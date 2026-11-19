@@ -7,7 +7,7 @@ import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { criarLembreteDoLead } from "./lembrete-servico";
 
-export type ReminderState = { success?: boolean; error?: string };
+export type ReminderState = { success?: boolean; error?: string; /** O retorno criado (o chat usa para o "Desfazer"). */ taskId?: string };
 
 const reminderInput = z.object({
   leadId: z.string().min(1),
@@ -29,8 +29,8 @@ export async function quickReminderAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dados invalidos." };
 
   try {
-    await criarLembreteDoLead(await getRequiredTenantContext(), parsed.data);
-    return { success: true };
+    const created = await criarLembreteDoLead(await getRequiredTenantContext(), parsed.data);
+    return { success: true, taskId: created.taskId };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Nao foi possivel criar o lembrete.",

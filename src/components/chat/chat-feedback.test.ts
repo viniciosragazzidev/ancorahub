@@ -38,6 +38,6 @@ describe("feedback das ações do chat", () => {
   });
 
   it("toda ação do chat tem um nível", () => {
-    expect(Object.keys(CHAT_ACTION_FEEDBACK)).toHaveLength(15);
+    expect(Object.keys(CHAT_ACTION_FEEDBACK)).toHaveLength(17);
   });
 });

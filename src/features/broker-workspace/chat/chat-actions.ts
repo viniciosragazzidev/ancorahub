@@ -23,7 +23,7 @@ export type ChatServerActionResult = { ok: boolean; message: string; href?: stri
 
 const leadPayload = z.object({ leadId: z.string().min(1) });
 const taskPayload = z.object({ taskId: z.string().uuid(), leadName: z.string().max(120).optional() });
-const actionName = z.enum(["lead.accept", "lead.decline", "lead.registerContact", "lead.changeStep", "lead.scheduleReturn", "lead.completeReturn", "lead.cancelReturn", "lead.reopenReturn", "lead.markLost", "lead.addNote", "duty.pause", "duty.resume", "notifications.markRead", "relationship.ack", "team.addBroker"]);
+const actionName = z.enum(["lead.accept", "lead.decline", "lead.registerContact", "lead.changeStep", "lead.scheduleReturn", "lead.completeReturn", "lead.cancelReturn", "lead.reopenReturn", "lead.undoReturn", "lead.restoreStep", "lead.markLost", "lead.addNote", "duty.pause", "duty.resume", "notifications.markRead", "relationship.ack", "team.addBroker"]);
 
 const whenPreset = z.enum(["today", "tomorrow", "in_2_days", "in_3_days"]);
 const RETURN_TEXT: Record<z.infer<typeof whenPreset>, string> = {
@@ -39,7 +39,11 @@ function form(values: Record<string, string>) {
   return data;
 }
 
-async function scheduleReturn(leadId: string, when: z.infer<typeof whenPreset>, replaceTaskId?: string) {
+/** Etapas para as quais um "Desfazer" pode voltar (nunca convertido nem perdido). */
+const RESTORABLE_STEPS = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply"] as const;
+const isoInstant = z.string().datetime({ offset: true });
+
+async function scheduleReturn(leadId: string, when: string, replaceTaskId?: string) {
   return quickReminderAction({}, form({ leadId, when, ...(replaceTaskId ? { replaceTaskId } : {}) }));
 }
 
@@ -73,27 +77,34 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
           : { ok: false, message: "O contato não foi registrado. Toque de novo em alguns segundos." };
       }
       case "lead.changeStep": {
-        const { leadId, status, when } = leadPayload.extend({ status: z.enum(["quote_sent", "negotiation"]), when: whenPreset.optional() }).parse(payload);
+        const { leadId, status, when, previous } = leadPayload.extend({ status: z.enum(["quote_sent", "negotiation", "documentation_pending"]), when: whenPreset.optional(), previous: z.string().max(40).optional() }).parse(payload);
         const result = await changeLeadStatusAction({}, form({ leadId, newStatus: status }));
         if (!result.success) return { ok: false, message: "A etapa não foi alterada. Toque de novo em alguns segundos." };
-        const stage = status === "quote_sent" ? "Cotação enviada" : "Em negociação";
-        if (!when) return { ok: true, message: `Pronto, etapa: ${stage}.` };
+        const stage = status === "quote_sent" ? "Cotação enviada" : status === "negotiation" ? "Em negociação" : "Documentação pendente";
+        // A Sasá manda a etapa anterior: o "Desfazer" volta para ela.
+        const restorable = Boolean(previous && (RESTORABLE_STEPS as readonly string[]).includes(previous) && previous !== status);
+        const undo = restorable ? { label: "Desfazer", action: { kind: "server" as const, name: "lead.restoreStep" as const, payload: { leadId, status: previous! } } } : undefined;
+        if (!when) return { ok: true, message: `Pronto, etapa: ${stage}.`, undo };
         const reminder = await scheduleReturn(leadId, when);
         return reminder.success
           ? { ok: true, message: `Pronto, etapa: ${stage}. Te lembro de acompanhar ${RETURN_TEXT[when]}.` }
           : { ok: true, warning: true, message: `Etapa: ${stage}. Não consegui criar o lembrete. Tente de novo pela ficha.` };
       }
       case "lead.scheduleReturn": {
-        const { leadId, when, taskId } = leadPayload.extend({ when: whenPreset, taskId: z.string().uuid().optional() }).parse(payload);
-        const result = await scheduleReturn(leadId, when, taskId);
-        return result.success
-          ? { ok: true, message: `Combinado. Te lembro ${RETURN_TEXT[when]} e ele aparece na sua Agenda.` }
-          : { ok: false, message: "O retorno não foi agendado. Toque de novo em alguns segundos." };
+        // `at` (hora exata, da Sasá) ou um atalho `when`; o servidor confere que o lead é do corretor.
+        const { leadId, when, at, taskId } = leadPayload.extend({ when: whenPreset.optional(), at: isoInstant.optional(), taskId: z.string().uuid().optional() })
+          .refine((value) => Boolean(value.when || value.at)).parse(payload);
+        const result = await scheduleReturn(leadId, at ?? when!, taskId);
+        if (!result.success) return { ok: false, message: "O retorno não foi agendado. Toque de novo em alguns segundos." };
+        const undo = result.taskId ? { label: "Desfazer", action: { kind: "server" as const, name: "lead.undoReturn" as const, payload: { taskId: result.taskId, ...(taskId ? { reopenTaskId: taskId } : {}) } } } : undefined;
+        return { ok: true, message: when ? `Combinado. Te lembro ${RETURN_TEXT[when]} e ele aparece na sua Agenda.` : "Combinado. O retorno está na sua Agenda.", undo };
       }
       case "lead.completeReturn": {
         const { taskId } = taskPayload.parse(payload);
         const result = await setLeadTaskDoneAction(taskId, "done");
-        return result.success ? { ok: true, message: "Boa. Tirei esse retorno da sua Agenda." } : { ok: false, message: "O retorno não foi concluído. Toque de novo em alguns segundos." };
+        return result.success
+          ? { ok: true, message: "Boa. Tirei esse retorno da sua Agenda.", undo: { label: "Desfazer", action: { kind: "server", name: "lead.reopenReturn", payload: { taskId } } } }
+          : { ok: false, message: "O retorno não foi concluído. Toque de novo em alguns segundos." };
       }
       case "lead.cancelReturn": {
         const { taskId, leadName } = taskPayload.parse(payload);
@@ -106,6 +117,21 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
         const { taskId } = taskPayload.parse(payload);
         const result = await setLeadTaskDoneAction(taskId, "reopen");
         return result.success ? { ok: true, message: "Pronto, o retorno voltou para a sua Agenda." } : { ok: false, message: "Não consegui desfazer. Toque de novo em alguns segundos." };
+      }
+      case "lead.undoReturn": {
+        const { taskId, reopenTaskId } = z.object({ taskId: z.string().uuid(), reopenTaskId: z.string().uuid().optional() }).parse(payload);
+        const removed = await setLeadTaskDoneAction(taskId, "cancel");
+        if (!removed.success) return { ok: false, message: "Não consegui desfazer. Toque de novo em alguns segundos." };
+        if (reopenTaskId) {
+          const reopened = await setLeadTaskDoneAction(reopenTaskId, "reopen");
+          if (!reopened.success) return { ok: true, warning: true, message: "Tirei o retorno novo, mas o anterior não voltou. Confira na Agenda." };
+        }
+        return { ok: true, message: reopenTaskId ? "Desfeito. O retorno voltou para o horário de antes." : "Desfeito. Tirei esse retorno da Agenda." };
+      }
+      case "lead.restoreStep": {
+        const { leadId, status } = leadPayload.extend({ status: z.enum(RESTORABLE_STEPS) }).parse(payload);
+        const result = await changeLeadStatusAction({}, form({ leadId, newStatus: status }));
+        return result.success ? { ok: true, message: "Desfeito. A etapa voltou a ser a de antes." } : { ok: false, message: "Não consegui desfazer. Toque de novo em alguns segundos." };
       }
       case "lead.markLost": {
         const { leadId, reason } = leadPayload.extend({ reason: z.enum(MOTIVOS_PERDA) }).parse(payload);
@@ -121,11 +147,11 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
       }
       case "duty.pause": {
         await updateBrokerAvailabilityAction("paused");
-        return { ok: true, message: "Pausei você. Para voltar a receber, abra Plantão agora e toque em \"Voltar a receber\"." };
+        return { ok: true, message: "Pausei você. Para voltar a receber, abra Plantão agora e toque em \"Voltar a receber\".", undo: { label: "Desfazer", action: { kind: "server", name: "duty.resume", payload: {} } } };
       }
       case "duty.resume": {
         await updateBrokerAvailabilityAction("available");
-        return { ok: true, message: "Pronto, você voltou a receber leads." };
+        return { ok: true, message: "Pronto, você voltou a receber leads.", undo: { label: "Desfazer", action: { kind: "server", name: "duty.pause", payload: {} } } };
       }
       case "notifications.markRead": {
         await markAllNotificationsReadAction();

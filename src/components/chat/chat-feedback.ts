@@ -20,6 +20,8 @@ export const CHAT_ACTION_FEEDBACK: Record<ChatServerActionName, ChatActionFeedba
   "lead.completeReturn": { level: 1, success: "confirm" },
   "lead.cancelReturn": { level: 1, success: "tap" },
   "lead.reopenReturn": { level: 1, success: "tap" },
+  "lead.undoReturn": { level: 1, success: "tap" },
+  "lead.restoreStep": { level: 1, success: "tap" },
   "lead.decline": { level: 1, success: "tap" },
   "lead.markLost": { level: 1, success: "tap" },
   "duty.pause": { level: 1, success: "confirm", sound: true },
