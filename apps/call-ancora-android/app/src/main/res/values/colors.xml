@@ -1,11 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Marca Âncora -->
     <color name="ancora_navy">#002B73</color>
+    <color name="ancora_navy_light">#0B3D93</color>
+    <color name="ancora_navy_deep">#001D4F</color>
     <color name="ancora_blue">#0B5ED7</color>
     <color name="ancora_green">#00B26B</color>
+    <color name="ancora_green_shadow">#008A53</color>
+    <color name="ancora_lime">#7ED957</color>
+    <color name="ancora_gold">#FFC400</color>
     <color name="hangup_red">#D93025</color>
-    <color name="surface">#F5F7FB</color>
-    <color name="text_primary">#0F1A2E</color>
-    <color name="text_secondary">#4A5568</color>
+
+    <!-- Neutros do Lite -->
     <color name="white">#FFFFFF</color>
+    <color name="ink">#171717</color>
+    <color name="steel">#525252</color>
+    <color name="fog">#737373</color>
+    <color name="ash">#E5E5E5</color>
+    <color name="mist">#F5F5F5</color>
+    <color name="placeholder">#C8C8C8</color>
+    <color name="dot_neutral">#A3A3A3</color>
+
+    <!-- Estados -->
+    <color name="mint">#DCFCE7</color>
+    <color name="forest">#166534</color>
+    <color name="amber_bg">#FEF3C7</color>
+    <color name="amber_ink">#92400E</color>
+    <color name="chip_on_bg">#E8EEFB</color>
+    <color name="ended_dot">#F4A3A9</color>
+
+    <!-- Tela de chamada -->
+    <color name="white_08">#14FFFFFF</color>
+    <color name="white_12">#1FFFFFFF</color>
+    <color name="white_70">#B3FFFFFF</color>
+    <color name="ring_lime_55">#8C7ED957</color>
+    <color name="ring_lime_22">#387ED957</color>
+    <color name="ring_green_90">#E600B26B</color>
+    <color name="pill_shadow">#2E000000</color>
 </resources>

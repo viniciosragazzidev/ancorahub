@@ -978,3 +978,6 @@ Revisão das imagens decorativas dos assistentes do Lite: dez assets WebP transp
 ## 19/11/2026 - Call Âncora: prova do discador Android (etapa 1)
 
 Novo app Android nativo em `apps/call-ancora-android/`, separado do Next.js: vira discador padrão do aparelho, liga para um número digitado sem toque extra e registra ao vivo cada estado da ligação (discando, chamando, ativa, encerrada com a causa), com horário e milissegundos desde o pedido. O registro pode ser copiado ou enviado para medir como a operadora real informa o atendimento. Tem tela de chamada mínima (atender, desligar, mudo, viva-voz). Ainda sem integração com o CRM. Plano e roteiro de teste: `docs/implementations/active/2026-11-19-call-ancora.md` e `apps/call-ancora-android/README.md`.
+## 19/11/2026 - Call Âncora Android: visual do Lite
+
+O app da prova do discador ganha o visual do AncoraHub Lite: mascote e ícone do Call Âncora, selo de discador padrão, número formatado, cenário do teste em pílulas, linha do tempo da última ligação em português (Discando, Em ligação, Encerrada por você...) e tela de chamada azul com anéis, cronômetro, mudo e viva-voz redondos, resumo ao encerrar e Recusar/Atender. O registro técnico enviado continua igual. Detalhes: `apps/call-ancora-android/README.md`.

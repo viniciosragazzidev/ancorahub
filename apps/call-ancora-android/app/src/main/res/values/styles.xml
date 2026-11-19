@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Cenário do teste (pílula selecionável). Selecionado = view.isSelected. -->
+    <style name="CallAncora.ScenarioChip">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/bg_scenario_chip</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingTop">7dp</item>
+        <item name="android:paddingBottom">7dp</item>
+        <item name="android:tag">font500</item>
+        <item name="android:textColor">@color/scenario_chip_text</item>
+        <item name="android:textSize">12.5sp</item>
+    </style>
+
+    <!-- Botão redondo de controle na tela de chamada (Mudo, Viva-voz). -->
+    <style name="CallAncora.RoundControl">
+        <item name="android:layout_width">62dp</item>
+        <item name="android:layout_height">62dp</item>
+        <item name="android:background">@drawable/bg_dot</item>
+        <item name="android:backgroundTint">@color/white_12</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:padding">18dp</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:tint">@color/white</item>
+    </style>
+
+    <!-- Rótulo embaixo dos botões redondos. -->
+    <style name="CallAncora.RoundLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">8dp</item>
+        <item name="android:alpha">0.9</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:tag">font500</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+</resources>

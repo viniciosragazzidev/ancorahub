@@ -1,95 +1,376 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Tela de chamada mínima no visual do Lite. android:tag = fonte (ver AppFonts). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/ancora_navy"
+    android:background="@drawable/bg_incall"
     android:gravity="center_horizontal"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:paddingStart="22dp"
+    android:paddingTop="18dp"
+    android:paddingEnd="22dp"
+    android:paddingBottom="30dp">
 
-    <TextView
-        android:id="@+id/tvDirection"
+    <!-- Selo Call Âncora -->
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="48dp"
-        android:textColor="#B3FFFFFF"
-        android:textSize="16sp" />
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_badge"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="6dp">
+
+        <ImageView
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_phone" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:fontFamily="sans-serif-medium"
+            android:tag="font600"
+            android:text="Call Âncora"
+            android:textColor="@color/white"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- Ícone com os anéis (168dp = 116dp + 2 x 26dp do anel externo) -->
+    <FrameLayout
+        android:id="@+id/avatarBox"
+        android:layout_width="168dp"
+        android:layout_height="168dp"
+        android:layout_marginTop="0dp">
+
+        <View
+            android:id="@+id/ringOuter"
+            android:layout_width="168dp"
+            android:layout_height="168dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_ring"
+            android:backgroundTint="@color/ring_lime_22" />
+
+        <View
+            android:id="@+id/ringInner"
+            android:layout_width="140dp"
+            android:layout_height="140dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_ring"
+            android:backgroundTint="@color/ring_lime_55" />
+
+        <FrameLayout
+            android:id="@+id/avatar"
+            android:layout_width="116dp"
+            android:layout_height="116dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_avatar">
+
+            <ImageView
+                android:layout_width="82dp"
+                android:layout_height="82dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:src="@drawable/call_ancora" />
+        </FrameLayout>
+    </FrameLayout>
 
     <TextView
         android:id="@+id/tvNumber"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:fontFamily="sans-serif-medium"
+        android:letterSpacing="0.01"
+        android:tag="font600"
         android:textColor="@color/white"
-        android:textSize="32sp"
-        android:textStyle="bold" />
+        android:textSize="28sp" />
 
     <TextView
-        android:id="@+id/tvState"
+        android:id="@+id/tvDirection"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="2dp"
+        android:alpha="0.7"
+        android:fontFamily="sans-serif"
+        android:tag="font400"
         android:textColor="@color/white"
-        android:textSize="20sp" />
+        android:textSize="13sp" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <View
+            android:id="@+id/stateDot"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:background="@drawable/bg_dot"
+            android:backgroundTint="@color/ancora_lime" />
+
+        <TextView
+            android:id="@+id/tvState"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:fontFamily="sans-serif-medium"
+            android:tag="font600"
+            android:textColor="@color/white"
+            android:textSize="15sp" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/tvTimer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="6dp"
         android:fontFamily="monospace"
+        android:letterSpacing="0.04"
+        android:tag="mono"
         android:textColor="@color/white"
-        android:textSize="28sp" />
+        android:textSize="34sp" />
+
+    <!-- Resumo ao encerrar -->
+    <LinearLayout
+        android:id="@+id/summaryCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:background="@drawable/bg_summary"
+        android:orientation="vertical"
+        android:padding="14dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:alpha="0.7"
+                android:fontFamily="sans-serif"
+                android:tag="font400"
+                android:text="Tempo em ligação"
+                android:textColor="@color/white"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvSumTalk"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:tag="font600"
+                android:textColor="@color/white"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:alpha="0.7"
+                android:fontFamily="sans-serif"
+                android:tag="font400"
+                android:text="Motivo"
+                android:textColor="@color/white"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvSumReason"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:tag="font600"
+                android:textColor="@color/white"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:alpha="0.7"
+                android:fontFamily="sans-serif"
+                android:tag="font400"
+                android:text="Tempo até atender"
+                android:textColor="@color/white"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvSumAnswer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:tag="font600"
+                android:textColor="@color/white"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </LinearLayout>
 
     <View
         android:layout_width="1dp"
         android:layout_height="0dp"
         android:layout_weight="1" />
 
+    <!-- Mudo e viva-voz -->
     <LinearLayout
-        android:layout_width="match_parent"
+        android:id="@+id/controlsRow"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="26dp"
         android:orientation="horizontal">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnMute"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:text="Mudo"
-            android:textColor="@color/white"
-            app:strokeColor="@color/white" />
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:minWidth="76dp"
+            android:orientation="vertical">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnSpeaker"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
-            android:layout_weight="1"
-            android:text="Viva-voz"
-            android:textColor="@color/white"
-            app:strokeColor="@color/white" />
+            <ImageView
+                android:id="@+id/btnMute"
+                style="@style/CallAncora.RoundControl"
+                android:contentDescription="Mudo"
+                android:src="@drawable/ic_mic" />
+
+            <TextView
+                android:id="@+id/tvMute"
+                style="@style/CallAncora.RoundLabel"
+                android:text="Mudo" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="30dp"
+            android:gravity="center_horizontal"
+            android:minWidth="76dp"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/btnSpeaker"
+                style="@style/CallAncora.RoundControl"
+                android:contentDescription="Viva-voz"
+                android:src="@drawable/ic_speaker" />
+
+            <TextView
+                android:id="@+id/tvSpeaker"
+                style="@style/CallAncora.RoundLabel"
+                android:text="Viva-voz" />
+        </LinearLayout>
     </LinearLayout>
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnAnswer"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_marginTop="16dp"
-        android:backgroundTint="@color/ancora_green"
-        android:text="Atender"
-        android:textSize="18sp" />
-
-    <com.google.android.material.button.MaterialButton
+    <!-- Desligar (chamada feita ou já atendida) -->
+    <ImageView
         android:id="@+id/btnHangup"
+        android:layout_width="74dp"
+        android:layout_height="74dp"
+        android:background="@drawable/bg_round_red"
+        android:clickable="true"
+        android:contentDescription="Desligar"
+        android:elevation="6dp"
+        android:focusable="true"
+        android:padding="21dp"
+        android:src="@drawable/ic_hangup" />
+
+    <!-- Ligação recebida: Recusar e Atender lado a lado -->
+    <LinearLayout
+        android:id="@+id/incomingRow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/btnReject"
+                android:layout_width="74dp"
+                android:layout_height="74dp"
+                android:background="@drawable/bg_round_red"
+                android:clickable="true"
+                android:contentDescription="Recusar"
+                android:elevation="6dp"
+                android:focusable="true"
+                android:padding="21dp"
+                android:src="@drawable/ic_hangup" />
+
+            <TextView
+                style="@style/CallAncora.RoundLabel"
+                android:alpha="1"
+                android:text="Recusar" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="56dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/btnAnswer"
+                android:layout_width="74dp"
+                android:layout_height="74dp"
+                android:background="@drawable/bg_round_green"
+                android:clickable="true"
+                android:contentDescription="Atender"
+                android:elevation="6dp"
+                android:focusable="true"
+                android:padding="21dp"
+                android:src="@drawable/ic_phone" />
+
+            <TextView
+                style="@style/CallAncora.RoundLabel"
+                android:alpha="1"
+                android:text="Atender" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Encerrada -->
+    <TextView
+        android:id="@+id/btnBack"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="24dp"
-        android:backgroundTint="@color/hangup_red"
-        android:text="Desligar"
-        android:textSize="18sp" />
+        android:layout_height="54dp"
+        android:background="@drawable/bg_pill_white"
+        android:clickable="true"
+        android:focusable="true"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:paddingBottom="2dp"
+        android:tag="font600"
+        android:text="Voltar ao teste"
+        android:textColor="@color/ancora_navy"
+        android:textSize="14sp"
+        android:visibility="gone" />
 </LinearLayout>
