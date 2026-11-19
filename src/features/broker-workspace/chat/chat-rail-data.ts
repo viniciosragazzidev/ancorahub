@@ -99,7 +99,7 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
     ]).then(async ([flag, session]) => canUseCallAncora({
       role: context.role,
       featureEnabled: flag === "true",
-      platformAdmin: Boolean(context.viewAs) || await isActivePlatformAdmin(session.user.id).catch(() => false),
+      platformAdmin: Boolean(context.viewAs) || (context.role !== "broker" && await isActivePlatformAdmin(session.user.id).catch(() => false)),
       development: process.env.NODE_ENV === "development",
     }));
     const [data, dutyCalendarFlag, journeyResult, homeV2Flag, walletUnified, callAncora] = await Promise.all([
