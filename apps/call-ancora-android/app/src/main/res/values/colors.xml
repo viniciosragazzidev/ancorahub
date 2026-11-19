@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ancora_navy">#002B73</color>
+    <color name="ancora_blue">#0B5ED7</color>
+    <color name="ancora_green">#00B26B</color>
+    <color name="hangup_red">#D93025</color>
+    <color name="surface">#F5F7FB</color>
+    <color name="text_primary">#0F1A2E</color>
+    <color name="text_secondary">#4A5568</color>
+    <color name="white">#FFFFFF</color>
+</resources>

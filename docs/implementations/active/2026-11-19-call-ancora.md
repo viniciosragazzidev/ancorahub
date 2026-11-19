@@ -175,3 +175,14 @@ Base de contatos, campanha, reservas concorrentes, logs de chamadas, criação d
 - A sessão do CRM usa a identidade autenticada como chave quando o admin está em `Ver como`, mantendo isolada a sessão do corretor visualizado. Tenant e permissões continuam vindo do contexto resolvido no servidor.
 - Leituras do armazenamento em memória executam `prune()` para remover sessões ociosas e tickets antigos mesmo quando outra sessão é consultada.
 - Evidência desta rodada: TypeScript, ESLint focado, quatro arquivos Vitest (20 testes) e build Webpack passaram. Relatório em `reports/agent/verification/call-ancora-mvp.md`; capturas em `reports/agent/call-ancora-mvp/`.
+
+## Etapa 1: status
+
+Status em 19/11/2026: código da prova do discador entregue na branch `feat/call-ancora-android`, em `apps/call-ancora-android/` (Kotlin nativo, Views com Material 3, sem Capacitor). Ainda não foi compilado nesta máquina, que não tem o Android SDK.
+
+- Vira discador padrão (`RoleManager.ROLE_DIALER`), disca com `TelecomManager.placeCall` e recebe os estados no `CallService` (`InCallService`), com horário, ms desde o pedido de ligação, `connectTimeMillis` no `ACTIVE` e `DisconnectCause` (código, rótulo, motivo) no `DISCONNECTED`.
+- Tela de chamada mínima (`InCallActivity`): atender, recusar/desligar, mudo e viva-voz; aparece sobre a tela de bloqueio.
+- O registro pode ser copiado ou enviado. Não há rede, banco nem gravação em disco.
+- Como compilar, instalar e o roteiro dos 5 testes (atendida, não atendida, caixa postal, ocupado, desligada pelo outro lado): `apps/call-ancora-android/README.md`.
+- O Next.js ignora a pasta (`tsconfig.json` e `eslint.config.mjs`); o Vitest já só lê `src/`.
+- Próximo passo: o dono instala no aparelho, faz os 5 testes e devolve o registro. Com isso se decide a regra de "Não atendeu" automático e o limite de ritmo por chip.

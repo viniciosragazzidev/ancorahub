@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.CallAncora" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/ancora_navy</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/ancora_blue</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorTertiary">@color/ancora_green</item>
+        <item name="colorOnTertiary">@color/white</item>
+        <item name="android:colorBackground">@color/surface</item>
+        <item name="android:statusBarColor">@color/ancora_navy</item>
+    </style>
+</resources>

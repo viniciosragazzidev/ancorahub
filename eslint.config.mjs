@@ -38,6 +38,8 @@ const eslintConfig = defineConfig([
     // Artefatos locais de ferramentas de agente (fora do produto).
     ".ua/**",
     ".dbprobe.cjs",
+    // App Android nativo (Kotlin/Gradle), fora do Next.js.
+    "apps/call-ancora-android/**",
   ]),
 ]);
 
