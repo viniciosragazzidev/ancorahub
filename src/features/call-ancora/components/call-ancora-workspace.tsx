@@ -337,7 +337,7 @@ export function CallAncoraWorkspace({ brokerFirstName }: { brokerFirstName: stri
                 <p className="mt-2 max-w-lg text-sm leading-6 text-(--text-secondary)">Abra a câmera do celular e leia este QR. O código vale por dois minutos e só pode ser usado uma vez.</p>
               </Beat>
               <Beat at="number" className="mt-6 max-w-xs">
-                <p className="mb-2 flex items-center gap-2 text-sm text-(--text-secondary)" aria-live="off"><Clock3 className="size-4" aria-hidden="true" /> {pairExpired ? "QR vencido" : <>Expira em <span className="tabular-nums">{pairSecondsLeft}</span> s</>}</p>
+                <p className="mb-2 flex items-center gap-2 text-sm text-(--text-secondary)" aria-live="off"><Clock3 className="size-4" aria-hidden="true" /> <span className="tabular-nums">{pairExpired ? "QR vencido" : `Expira em ${pairSecondsLeft} s`}</span></p>
                 <ExpiryBar ratio={pairExpired ? 0 : pairSecondsLeft / PAIR_TTL_SECONDS} />
               </Beat>
               <Beat at="after" className="mt-6 flex flex-wrap gap-3">
