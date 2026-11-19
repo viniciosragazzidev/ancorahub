@@ -10,7 +10,8 @@ export type BrokerCommissionState = "prevista" | "conferida" | "paga" | "cancela
 export const BROKER_COMMISSION_STATE_LABELS: Record<BrokerCommissionState, string> = {
   prevista: "Prevista",
   conferida: "Conferida",
-  paga: "Paga",
+  // Para o corretor, a parcela paga pela corretora é dinheiro que ele recebeu (19/11).
+  paga: "Recebida",
   cancelada: "Cancelada",
   estorno: "Em revisão de estorno",
 };

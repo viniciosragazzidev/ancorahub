@@ -137,6 +137,21 @@ describe("getBrokerFinanceSummary: números do próprio corretor", () => {
     expect(summary?.openAdvancesCents).toBe(30_000);
   });
 
+  it("parcela marcada como paga pela direção fora do ERP entra no recebido do mês, sem contar o que o ERP já liquidou", async () => {
+    mocks.results = {
+      erp_financial_entries: [[{ commissions: 0, receivable: 0, advances: 0, openAdvances: 0 }]],
+      erp_settlements: [[{ value: 0 }]],
+      commission_schedule: [[{ count: 1, value: "450.00" }]],
+      erp_events: [[]],
+    };
+    const summary = await getBrokerFinanceSummary(broker, now);
+    expect(summary?.receivedThisMonthCents).toBe(45_000);
+    const paid = render(mocks.wheres.commission_schedule[0]);
+    expect(paid.sql).toContain("not exists");
+    expect(paid.sql).toMatch(/"sales"\."broker_id" = \$\d+/);
+    expect(paid.params).toEqual(expect.arrayContaining(["broker-1", "paid"]));
+  });
+
   it("audita o resumo no máximo uma vez por hora", async () => {
     mocks.results = { erp_financial_entries: [[{ commissions: 1, receivable: 0, advances: 0, openAdvances: 0 }]], erp_settlements: [[{ value: 0 }]], erp_events: [[]] };
     await getBrokerFinanceSummary(broker, now);
@@ -160,7 +175,8 @@ describe("getBrokerFinanceDetail", () => {
         ],
       ],
       erp_settlements: [[{ value: 50_000 }]],
-      commission_schedule: [[
+      // A primeira leitura do cronograma é a do resumo: parcelas pagas pela direção fora do ERP.
+      commission_schedule: [[{ count: 0, value: "0.00" }], [
         { id: "c-1", monthNumber: 1, referenceMonth: "2026-10", amount: "500.00", scheduleStatus: "pending", clientName: "Cliente Sintético A", planName: "Plano X", carrierName: "Operadora Y" },
         { id: "c-2", monthNumber: 2, referenceMonth: "2026-11", amount: "300.00", scheduleStatus: "pending", clientName: "Cliente Sintético A", planName: null, carrierName: null },
         { id: "c-3", monthNumber: 3, referenceMonth: "2026-12", amount: "300.00", scheduleStatus: "pending", clientName: "Cliente Sintético B", planName: null, carrierName: null },
@@ -201,7 +217,7 @@ describe("getBrokerFinanceDetail", () => {
 
   it("indica a próxima página quando há mais parcelas", async () => {
     const many = Array.from({ length: 21 }, (_, index) => ({ id: `c-${index}`, monthNumber: 1, referenceMonth: "2026-11", amount: "10.00", scheduleStatus: "pending", clientName: "Cliente", planName: null, carrierName: null }));
-    seed({ commission_schedule: [many], erp_financial_entries: [[{ commissions: 0, receivable: 0, advances: 0, openAdvances: 0 }], []] });
+    seed({ commission_schedule: [[{ count: 0, value: "0.00" }], many], erp_financial_entries: [[{ commissions: 0, receivable: 0, advances: 0, openAdvances: 0 }], []] });
     const detail = await getBrokerFinanceDetail(broker, { page: 2 }, now);
     expect(detail?.commissions.rows).toHaveLength(20);
     expect(detail?.commissions.hasNext).toBe(true);
