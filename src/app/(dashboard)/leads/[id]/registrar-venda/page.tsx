@@ -38,7 +38,7 @@ export default async function RegisterSaleConversationPage({ params }: { params:
   if (block === "lost") return <SaleChatBlocked leadId={lead.id} title="Este lead está como perdido." text="Reabra o lead para registrar a venda." />;
   if (block === "already_registered") return <SaleChatBlocked leadId={lead.id} title="A venda deste lead já foi registrada." text="Acompanhe pela tela do lead." />;
 
-  const catalog = await loadSaleCatalog(context.tenantId);
+  const catalog = await loadSaleCatalog(context);
   const value = lead.monthlyValue ? Number(lead.monthlyValue) : null;
   return (
     <SaleChatPage
