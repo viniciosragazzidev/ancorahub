@@ -7,6 +7,7 @@
  */
 import { createContext, useContext } from "react";
 
+import type { SaleChatServices } from "@/features/post-sale/components/sale-chat";
 import type { TeamListApi } from "@/features/supervisor-workspace/lead-import/parse-contacts";
 
 export type DevLab = {
@@ -20,6 +21,8 @@ export type DevLab = {
   presenceGate?: () => Promise<{ required: boolean; connected: boolean } | null>;
   /** Lista interna da equipe do supervisor: no lugar das Server Actions de conferir, importar e distribuir. */
   teamList?: TeamListApi;
+  /** Registrar venda em conversa: no lugar de ler o contrato e de registrar a venda. */
+  sale?: SaleChatServices;
 };
 
 const DevLabContext = createContext<DevLab | null>(null);

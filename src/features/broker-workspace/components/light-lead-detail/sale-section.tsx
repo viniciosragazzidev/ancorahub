@@ -9,7 +9,7 @@ import { stageLabel } from "./format";
 import type { LeadDetailController } from "./use-lead-detail";
 
 /** Current stage and the sale documentation flow (register, in review, approved, rejected). */
-export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrationV2Enabled = false, hasActiveSale = false, justRegistered = false }: { c: LeadDetailController; mode?: "broker" | "management"; aiSalePrompt?: AiSalePrompt | null; registrationV2Enabled?: boolean; hasActiveSale?: boolean; /** Venda acabou de ser registrada nesta tela: confirma aqui mesmo (o toast é só apoio). */ justRegistered?: boolean }) {
+export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrationV2Enabled = false, hasActiveSale = false, justRegistered = false, conversation = false }: { c: LeadDetailController; /** Registrar venda em conversa (19/11): um botão só, sem documentos nesta fase. */ conversation?: boolean; mode?: "broker" | "management"; aiSalePrompt?: AiSalePrompt | null; registrationV2Enabled?: boolean; hasActiveSale?: boolean; /** Venda acabou de ser registrada nesta tela: confirma aqui mesmo (o toast é só apoio). */ justRegistered?: boolean }) {
   const {
     isDistributed,
     leadStatus,
@@ -56,7 +56,17 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrat
         ) : null}
       </div>
 
-      {registrationV2Enabled && mode === "broker" && !isDistributed && canStartV2Registration ? (
+      {conversation && mode === "broker" && !isDistributed && canStartV2Registration ? (
+        <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
+          {salePromptCopy ? <p className="text-sm font-medium text-(--success)">{salePromptCopy.title}</p> : null}
+          <p className="text-sm text-(--text-secondary)">Fechou? Responda umas perguntas rápidas ou mande o contrato que eu preencho.</p>
+          <Button variant="secondary" onClick={() => setShowSaleConfirm(true)}>
+            Registrar venda
+          </Button>
+        </div>
+      ) : null}
+
+      {!conversation && registrationV2Enabled && mode === "broker" && !isDistributed && canStartV2Registration ? (
         <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
           {aiSalePrompt === "register" ? <p className="text-sm font-medium text-(--foreground)">Venda detectada pela IA</p> : null}
           <p className="text-sm text-(--text-secondary)">Pessoas, plano e documentos em quatro passos. Conclui com a confirmação da operadora aprovada.</p>
@@ -66,7 +76,7 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrat
         </div>
       ) : null}
 
-      {!registrationV2Enabled && mode === "broker" && approvedDocument && leadStatus !== "converted" ? (
+      {!conversation && !registrationV2Enabled && mode === "broker" && approvedDocument && leadStatus !== "converted" ? (
         <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
           <p className="text-sm font-medium text-(--success)">Documentação aprovada pelo supervisor</p>
           <p className="text-sm text-(--text-secondary)">
@@ -78,7 +88,7 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrat
         </div>
       ) : null}
 
-      {!registrationV2Enabled && mode === "broker" && !approvedDocument && rejectedDocument && leadStatus !== "converted" ? (
+      {!conversation && !registrationV2Enabled && mode === "broker" && !approvedDocument && rejectedDocument && leadStatus !== "converted" ? (
         <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
           <p className="text-sm font-medium text-(--warning)">Documentação rejeitada pelo supervisor</p>
           <p className="text-sm text-(--text-secondary)">
@@ -90,14 +100,14 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrat
         </div>
       ) : null}
 
-      {!registrationV2Enabled && mode === "broker" && !approvedDocument && !rejectedDocument && leadStatus === "documentation_pending" ? (
+      {!conversation && !registrationV2Enabled && mode === "broker" && !approvedDocument && !rejectedDocument && leadStatus === "documentation_pending" ? (
         <div className="border-t border-(--border) pt-4">
           <p className="text-sm font-medium text-(--foreground)">Documentação em análise</p>
           <p className="mt-1 text-sm text-(--text-secondary)">Aguardando aprovação do supervisor.</p>
         </div>
       ) : null}
 
-      {!registrationV2Enabled && mode === "broker" && salePromptCopy ? (
+      {!conversation && !registrationV2Enabled && mode === "broker" && salePromptCopy ? (
         <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
           <p className="text-sm font-medium text-(--success)">{salePromptCopy.title}</p>
           <p className="text-sm text-(--text-secondary)">{salePromptCopy.body}</p>
@@ -107,7 +117,7 @@ export function SaleSection({ c, mode = "broker", aiSalePrompt = null, registrat
         </div>
       ) : null}
 
-      {!registrationV2Enabled && mode === "broker" && canRegisterSale ? (
+      {!conversation && !registrationV2Enabled && mode === "broker" && canRegisterSale ? (
         <div className="border-t border-(--border) pt-4">
           <Button variant="secondary" onClick={handleRequestSale} loading={requestingSale} disabled={requestingSale}>
             Registrar venda

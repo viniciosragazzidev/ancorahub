@@ -51,7 +51,7 @@ describe("Registrar venda em dois toques", () => {
     await flush();
     expect(listAction).toHaveBeenCalledWith({ query: "" });
     const ana = screen.getByRole("link", { name: /Ana Souza/ });
-    expect(ana.getAttribute("href")).toBe("/leads/lead-1?registrar-venda=1");
+    expect(ana.getAttribute("href")).toBe("/leads/lead-1/registrar-venda");
     expect(ana.textContent).toContain("Em análise");
     expect(ana.textContent).toContain("AS");
     expect(screen.getByRole("link", { name: /Bruno Lima/ }).textContent).toContain("Cotação enviada");

@@ -1,0 +1,14 @@
+/* Registrar venda em conversa (19/11): mesmos tokens do cotador (quote-guide.module.css). */
+.root { display: contents; }
+
+.upload { display: grid; gap: 12px; padding: 16px; border-radius: var(--radius-panel); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-resting); }
+.uploadTop { display: flex; align-items: center; gap: 12px; }
+.uploadIcon { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 12px; background: color-mix(in oklch, var(--primary) 10%, transparent); color: var(--primary); }
+.uploadTitle { margin: 0; font-size: var(--text-sm); font-weight: 500; color: var(--foreground); }
+.uploadText { margin: 2px 0 0; font-size: var(--text-xs); line-height: 1.5; color: var(--text-secondary); }
+.uploadButton { width: 100%; }
+.file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+.done { display: grid; justify-items: center; gap: 8px; padding: 20px 16px; border-radius: var(--radius-panel); background: var(--surface); border: 1px solid var(--border); text-align: center; }
+.doneTitle { margin: 0; font-size: var(--text-lg); font-weight: 500; letter-spacing: -0.01em; color: var(--success); }
+.doneText { margin: 0; max-width: 320px; font-size: var(--text-sm); line-height: 1.5; color: var(--text-secondary); }

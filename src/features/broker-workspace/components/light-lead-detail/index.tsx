@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
 import { LeadHeaderBar, NextStepCard } from "@/features/broker-workspace/chat/lead-screen-parts";
@@ -81,6 +82,15 @@ export function LightLeadDetail({
     c.markConverted();
     setSaleRegistered(true);
   };
+  // Registrar venda em conversa (19/11): o corretor responsável registra pela conversa, sem formulário nem documentos.
+  const router = useRouter();
+  const conversationSale = !isManagement && variant !== "details" && lead.isCurrentBroker;
+  const { showSaleConfirm, setShowSaleConfirm } = c;
+  useEffect(() => {
+    if (!conversationSale || !showSaleConfirm) return;
+    setShowSaleConfirm(false);
+    router.push(`/leads/${encodeURIComponent(lead.id)}/registrar-venda`);
+  }, [conversationSale, showSaleConfirm, setShowSaleConfirm, router, lead.id]);
 
   // Lead already taken by someone else (or finished): nothing to act on. The panel keeps the history visible.
   if (variant === "page" && !isManagement && !lead.isCurrentBroker && c.isDistributed === false) {
@@ -133,14 +143,14 @@ export function LightLeadDetail({
               <AdOriginCard ad={lead.adContext} />
               <ClientInfoCard lead={lead} c={c} withSummary />
               <PeopleDataSection lead={lead} c={c} showRecordDetails={false} />
-              <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} registrationV2Enabled={saleRegistrationV2Enabled} hasActiveSale={lead.hasActiveSale} justRegistered={saleRegistered} />
+              <SaleSection c={c} conversation={conversationSale} aiSalePrompt={lead.aiSalePrompt ?? null} registrationV2Enabled={saleRegistrationV2Enabled} hasActiveSale={lead.hasActiveSale} justRegistered={saleRegistered} />
             </div>
           }
           conversation={conversation}
         />
         <DeclineSheet lead={lead} c={c} />
         <StepSheet c={c} />
-        {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} celebrationScreen /> : <>
+        {conversationSale ? null : saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} celebrationScreen /> : <>
           <SaleDocSheet lead={lead} c={c} requirements={requirements} />
           <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} celebration />
         </>}
@@ -175,7 +185,7 @@ export function LightLeadDetail({
         <ClosingOutcomeCard lead={lead} c={c} />
         <AdOriginCard ad={lead.adContext} />
         <ClientInfoCard lead={lead} c={c} />
-        <SaleSection c={c} aiSalePrompt={lead.aiSalePrompt ?? null} registrationV2Enabled={saleRegistrationV2Enabled} hasActiveSale={lead.hasActiveSale} justRegistered={saleRegistered} />
+        <SaleSection c={c} conversation={conversationSale} aiSalePrompt={lead.aiSalePrompt ?? null} registrationV2Enabled={saleRegistrationV2Enabled} hasActiveSale={lead.hasActiveSale} justRegistered={saleRegistered} />
         <DetailsZone lead={lead} c={c} />
         <PeopleDataSection lead={lead} c={c} />
       </div>
@@ -183,7 +193,7 @@ export function LightLeadDetail({
       <LeadActionBar lead={lead} c={c} />
       <DeclineSheet lead={lead} c={c} />
       <StepSheet c={c} />
-      {saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} celebrationScreen /> : <>
+      {conversationSale ? null : saleRegistrationV2Enabled ? <RegisterSaleWizard key={lead.id} lead={lead} documents={documents} requirements={requirements} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} successOverlay={false} celebrationScreen /> : <>
         <SaleDocSheet lead={lead} c={c} requirements={requirements} />
         <RegisterSalePanel leadId={lead.id} documents={documents} carriers={carriers} open={c.showSaleConfirm} onOpenChange={c.setShowSaleConfirm} onRegistered={onSaleRegistered} celebration />
       </>}

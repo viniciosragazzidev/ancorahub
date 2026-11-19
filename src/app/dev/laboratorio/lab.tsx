@@ -19,16 +19,19 @@ import { WhatsAppHandoff } from "@/features/broker-workspace/whatsapp-handoff/wh
 import { DevLabProvider, type DevLab } from "@/lib/dev-lab";
 import { InterfaceMotionProvider } from "@/components/motion/interface-motion-provider";
 import { TeamListManager } from "@/features/supervisor-workspace/lead-import/team-list-manager";
+import { SaleChat, type SaleChatServices } from "@/features/post-sale/components/sale-chat";
+import type { SaleCatalog } from "@/features/post-sale/conversation-sale-core";
 
 import styles from "./lab.module.css";
 import { MotionShowcase } from "./motion-showcase";
 
-type Flow = "plantao" | "lead" | "lista" | "conquistas" | "movimento";
+type Flow = "plantao" | "lead" | "venda" | "lista" | "conquistas" | "movimento";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
   { id: "plantao", label: "Aceitar plantão" },
   { id: "lead", label: "Aceitar lead" },
+  { id: "venda", label: "Registrar venda" },
   { id: "lista", label: "Lista da equipe (supervisor)" },
   { id: "conquistas", label: "Conquistas" },
   { id: "movimento", label: "Movimento (componentes)" },
@@ -59,6 +62,15 @@ const LAB_LIST = ["Ana Teste", "Bia Teste", "Caio Teste", "Davi Teste", "Eva Tes
   createdAt: new Date().toISOString(),
   assignedAt: null,
 }));
+/** Catálogo de exemplo do Registrar venda em conversa. */
+const LAB_SALE_CATALOG: SaleCatalog = {
+  carriers: [
+    { id: "amil", name: "Amil", plans: [{ id: "amil-s380", name: "Amil S380", type: "familiar" }, { id: "amil-s450", name: "Amil S450", type: "familiar" }, { id: "amil-pme", name: "Amil PME One", type: "pme" }] },
+    { id: "bradesco", name: "Bradesco Saúde", plans: [{ id: "bradesco-top", name: "Bradesco Top Nacional", type: "individual" }, { id: "bradesco-efetivo", name: "Bradesco Efetivo", type: "pme" }] },
+    { id: "sulamerica", name: "SulAmérica", plans: [{ id: "sula-exato", name: "SulAmérica Exato", type: "familiar" }, { id: "sula-direto", name: "SulAmérica Direto", type: "pme" }] },
+  ],
+};
+const LAB_SALE_LEAD = { id: "lab-venda", name: "Carlos Teixeira", initials: "CT", stageLabel: "Em negociação", monthlyValue: 1290 };
 const HANDOFF_LEAD = { name: "Carla Mendes", wants: "Plano PME para a empresa dela, 6 vidas.", plan: "SulAmérica · PME", lives: "6 vidas", city: "Niterói" };
 
 function thread(overrides: Partial<ThreadSummary>): ThreadSummary {
@@ -102,6 +114,18 @@ export function FlowLab() {
       return { ok: true, awaitingRelease: outcome === "liberacao" && mode === "presencial" };
     },
     presenceGate: async () => ({ required: false, connected: true }),
+    sale: {
+      // Simula a IA lendo o contrato: um familiar da Amil com 3 vidas, sem o valor (em "falha", não lê nada).
+      readContract: async () => {
+        await wait(delay + 800);
+        if (outcome === "falha") return { ok: false, error: "Não consegui ler esse contrato. Tente uma foto mais nítida ou responda as perguntas." };
+        return { ok: true, reading: { planType: "familiar", ages: [38, 35, 9], carrierName: "AMIL", planName: "Amil S380", monthlyValue: null, coverageStartDate: null } };
+      },
+      register: async () => {
+        await wait(delay);
+        return outcome === "falha" ? { error: "Não foi possível registrar a venda agora." } : { success: true, saleId: "lab-" + Date.now() };
+      },
+    } satisfies SaleChatServices,
     teamList: {
       // Simula a IA: devolve o mapa do jeito que a leitura automática faria (ou nada, em "falha").
       structure: async (request) => {
@@ -162,6 +186,8 @@ export function FlowLab() {
               now: { title: "Agora", emptyText: "Você está em dia.", items: [{ id: "offer-l1", title: "Carla Mendes", detail: "Plano PME, 6 vidas. Oferta para você.", actionLabel: "Aceitar e chamar no WhatsApp", href: "/dev/laboratorio", acceptLeadId: "l1", expiresAt: inMinutes(4), tone: "urgent" }] },
             }}
           />
+        ) : flow === "venda" ? (
+          <SaleChat lead={LAB_SALE_LEAD} catalog={LAB_SALE_CATALOG} services={lab.sale!} backHref="/dev/laboratorio" doneHref="/dev/laboratorio" />
         ) : flow === "lista" ? (
           <TeamListManager rows={LAB_LIST} totals={{ all: LAB_LIST.length, pending: LAB_LIST.filter((row) => !row.brokerId).length, distributed: LAB_LIST.filter((row) => row.brokerId).length, replied: LAB_LIST.filter((row) => row.replied).length }} team={LAB_TEAM} switcher={null} />
         ) : flow === "movimento" ? (

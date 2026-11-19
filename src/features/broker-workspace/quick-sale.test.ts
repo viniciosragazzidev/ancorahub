@@ -75,7 +75,7 @@ describe("Registrar venda: ordenação", () => {
   });
 
   it("monta o link da tela do lead com o atalho", () => {
-    expect(quickSaleLeadHref("lead 1")).toBe("/leads/lead%201?registrar-venda=1");
+    expect(quickSaleLeadHref("lead 1")).toBe("/leads/lead%201/registrar-venda");
   });
 });
 

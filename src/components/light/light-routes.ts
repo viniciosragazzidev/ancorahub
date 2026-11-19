@@ -229,6 +229,11 @@ const RULES: readonly RouteRule[] = [
     test: (path) => /^\/leads\/[^/]+\/feedback$/.test(path),
     route: (path) => ({ title: "Atualização", tab: "fila", isRoot: false, parentHref: path.replace(/\/feedback$/, "") }),
   },
+  // Registrar venda em conversa (19/11): chat em tela cheia com cabeçalho próprio, sem barra de abas.
+  {
+    test: (path) => /^\/leads\/[^/]+\/registrar-venda$/.test(path),
+    route: (path) => ({ title: "Registrar venda", tab: "fila", isRoot: false, parentHref: path.replace(/\/registrar-venda$/, ""), hidesTabBar: true, chat: true }),
+  },
   // The lead is a chat (2026-10-09); ?ficha=1 is the full record with its own header.
   {
     test: under("/leads"),
