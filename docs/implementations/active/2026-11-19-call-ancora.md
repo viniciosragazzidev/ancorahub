@@ -185,4 +185,5 @@ Status em 19/11/2026: código da prova do discador entregue na branch `feat/call
 - O registro pode ser copiado ou enviado. Não há rede, banco nem gravação em disco.
 - Como compilar, instalar e o roteiro dos 5 testes (atendida, não atendida, caixa postal, ocupado, desligada pelo outro lado): `apps/call-ancora-android/README.md`.
 - O Next.js ignora a pasta (`tsconfig.json` e `eslint.config.mjs`); o Vitest já só lê `src/`.
+- Visual alinhado ao Lite (19/11/2026): cabeçalho com o ícone do Call Âncora, cartão azul com o mascote enquanto não é o discador padrão, selo de situação, número formatado, cenário em pílulas, botão Ligar verde, linha do tempo "Última ligação" em português e tela de chamada em azul com anéis, resumo ao encerrar e Recusar/Atender lado a lado. Fontes Plus Jakarta Sans e JetBrains Mono vêm do Google Play Services; sem ele fica a fonte do sistema. O registro técnico de Copiar/Enviar não mudou.
 - Próximo passo: o dono instala no aparelho, faz os 5 testes e devolve o registro. Com isso se decide a regra de "Não atendeu" automático e o limite de ritmo por chip.

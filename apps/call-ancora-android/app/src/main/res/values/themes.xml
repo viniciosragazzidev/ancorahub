@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Só tema claro por enquanto. -->
     <style name="Theme.CallAncora" parent="Theme.Material3.Light.NoActionBar">
         <item name="colorPrimary">@color/ancora_navy</item>
         <item name="colorOnPrimary">@color/white</item>
@@ -7,7 +8,22 @@
         <item name="colorOnSecondary">@color/white</item>
         <item name="colorTertiary">@color/ancora_green</item>
         <item name="colorOnTertiary">@color/white</item>
-        <item name="android:colorBackground">@color/surface</item>
-        <item name="android:statusBarColor">@color/ancora_navy</item>
+        <item name="android:colorBackground">@color/white</item>
+        <item name="android:windowBackground">@color/white</item>
+        <item name="android:statusBarColor">@color/white</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/white</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <!-- Android 15: mantém as barras do sistema com as cores acima, sem edge-to-edge. -->
+        <item name="android:windowOptOutEdgeToEdgeEnforcement" tools:targetApi="35">true</item>
+    </style>
+
+    <!-- Tela de chamada: barras escuras com ícones claros. -->
+    <style name="Theme.CallAncora.InCall">
+        <item name="android:windowBackground">@color/ancora_navy</item>
+        <item name="android:statusBarColor">@color/ancora_navy_light</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/ancora_navy_deep</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 </resources>

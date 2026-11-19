@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gradiente radial azul-marinho, mais claro no topo. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:centerColor="@color/ancora_navy"
+        android:centerX="0.5"
+        android:centerY="0"
+        android:endColor="@color/ancora_navy_deep"
+        android:gradientRadius="100%p"
+        android:startColor="@color/ancora_navy_light"
+        android:type="radial" />
+</shape>

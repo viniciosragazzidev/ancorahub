@@ -15,13 +15,22 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Uma linha do registro: quando aconteceu, quanto tempo depois do pedido de ligação e o que foi. */
+/**
+ * Uma linha do registro: quando aconteceu, quanto tempo depois do pedido de ligação e o que foi.
+ * [event] e [detail] formam o registro técnico (Copiar/Enviar). Os demais campos só alimentam a
+ * linha do tempo amigável da tela e não mudam o texto exportado.
+ */
 data class LogEntry(
     val wallClockMs: Long,
     val sinceDialMs: Long?,
     val number: String,
     val event: String,
     val detail: String? = null,
+    val state: Int? = null,
+    val incoming: Boolean = false,
+    val causeCode: Int? = null,
+    val activeMs: Long? = null,
+    val scenario: String? = null,
 )
 
 /** Foto da ligação atual, usada pela tela de chamada. */
@@ -32,6 +41,11 @@ data class CallSnapshot(
     val connectTimeMillis: Long,
     val addedAtElapsed: Long,
     val disconnectLabel: String?,
+    val disconnectCode: Int? = null,
+    /** ms entre o pedido de ligação (ou a chegada da recebida) e o primeiro ACTIVE. */
+    val timeToActiveMs: Long? = null,
+    /** ms em ACTIVE até o DISCONNECTED. */
+    val talkMs: Long? = null,
 )
 
 data class AudioSnapshot(val muted: Boolean = false, val speaker: Boolean = false)
@@ -41,6 +55,11 @@ data class AudioSnapshot(val muted: Boolean = false, val speaker: Boolean = fals
  * Nada é gravado em disco nem enviado para fora.
  */
 object CallBus {
+    const val EVENT_DIAL_REQUEST = "PEDIDO_DE_LIGACAO"
+    const val EVENT_ADDED_PREFIX = "ADICIONADA:"
+    const val EVENT_REMOVED = "REMOVIDA"
+    const val EVENT_NOTE = "AVISO"
+
     private const val MAX_LOG = 500
     /** Um pedido de ligação feito há mais que isso não serve de referência para a próxima chamada. */
     private const val DIAL_REFERENCE_WINDOW_MS = 30_000L
@@ -58,15 +77,21 @@ object CallBus {
     @Volatile internal var service: CallService? = null
     @Volatile private var activeCall: Call? = null
 
+    // Medidas da ligação atual, para o resumo da tela de chamada.
+    @Volatile private var activeAtElapsed: Long? = null
+    @Volatile private var timeToActiveMs: Long? = null
+    @Volatile private var talkMs: Long? = null
+
     // ---------- Eventos vindos da tela principal ----------
 
     fun markDialRequested(number: String, scenario: String) {
         dialStartedAtElapsed = SystemClock.elapsedRealtime()
-        val detail = scenario.takeIf { it.isNotBlank() }?.let { "cenário: $it" }
-        append(number, "PEDIDO_DE_LIGACAO", detail)
+        val clean = scenario.trim().takeIf { it.isNotEmpty() }
+        val detail = clean?.let { "cenário: $it" }
+        append(number, EVENT_DIAL_REQUEST, detail, scenario = clean)
     }
 
-    fun note(message: String) = append("-", "AVISO", message)
+    fun note(message: String) = append("-", EVENT_NOTE, message)
 
     fun clearLog() {
         _log.value = emptyList()
@@ -83,22 +108,51 @@ object CallBus {
             dialStartedAtElapsed = now
         }
         activeCall = call
+        activeAtElapsed = null
+        timeToActiveMs = null
+        talkMs = null
         val state = stateOf(call)
-        append(numberOf(call), "ADICIONADA:" + stateName(state), if (incoming) "recebida" else "feita")
+        append(
+            numberOf(call),
+            EVENT_ADDED_PREFIX + stateName(state),
+            if (incoming) "recebida" else "feita",
+            state = state,
+            incoming = incoming,
+        )
+        if (state == Call.STATE_ACTIVE) markActive(now)
         publish(call, now)
     }
 
     internal fun onStateChanged(call: Call, state: Int) {
+        val now = SystemClock.elapsedRealtime()
+        val isCurrent = call == activeCall
+        var causeCode: Int? = null
+        var activeMs: Long? = null
         val detail = when (state) {
             Call.STATE_ACTIVE -> {
+                if (isCurrent) markActive(now)
                 val connect = call.details.connectTimeMillis
                 if (connect > 0) "connectTimeMillis=$connect" else null
             }
-            Call.STATE_DISCONNECTED -> describeDisconnect(call)
+            Call.STATE_DISCONNECTED -> {
+                causeCode = call.details.disconnectCause?.code
+                val connect = call.details.connectTimeMillis
+                activeMs = if (connect > 0) System.currentTimeMillis() - connect else null
+                if (isCurrent) talkMs = activeAtElapsed?.let { now - it }
+                describeDisconnect(call)
+            }
             else -> null
         }
-        append(numberOf(call), stateName(state), detail)
-        if (call == activeCall) publish(call, _current.value?.addedAtElapsed)
+        append(
+            numberOf(call),
+            stateName(state),
+            detail,
+            state = state,
+            incoming = isIncoming(call),
+            causeCode = causeCode,
+            activeMs = activeMs,
+        )
+        if (isCurrent) publish(call, _current.value?.addedAtElapsed)
     }
 
     internal fun onDetailsChanged(call: Call) {
@@ -106,7 +160,7 @@ object CallBus {
     }
 
     internal fun onCallRemoved(call: Call) {
-        append(numberOf(call), "REMOVIDA", null)
+        append(numberOf(call), EVENT_REMOVED, null)
         if (call == activeCall) {
             activeCall = null
             _current.value = _current.value?.copy(state = Call.STATE_DISCONNECTED)
@@ -149,7 +203,7 @@ object CallBus {
         service?.setAudioRoute(route)
     }
 
-    // ---------- Exportação ----------
+    // ---------- Exportação (registro técnico, formato fixo) ----------
 
     fun formatLog(context: Context): String {
         val fmt = SimpleDateFormat("dd/MM/yyyy HH:mm:ss.SSS", Locale("pt", "BR"))
@@ -175,27 +229,53 @@ object CallBus {
 
     // ---------- Apoio ----------
 
-    private fun append(number: String, event: String, detail: String?) {
+    private fun markActive(now: Long) {
+        if (activeAtElapsed != null) return
+        activeAtElapsed = now
+        timeToActiveMs = dialStartedAtElapsed?.let { now - it }
+    }
+
+    private fun append(
+        number: String,
+        event: String,
+        detail: String?,
+        state: Int? = null,
+        incoming: Boolean = false,
+        causeCode: Int? = null,
+        activeMs: Long? = null,
+        scenario: String? = null,
+    ) {
         val ref = dialStartedAtElapsed
         val since = ref?.let { SystemClock.elapsedRealtime() - it }
-        val entry = LogEntry(System.currentTimeMillis(), since, number, event, detail)
+        val entry = LogEntry(
+            wallClockMs = System.currentTimeMillis(),
+            sinceDialMs = since,
+            number = number,
+            event = event,
+            detail = detail,
+            state = state,
+            incoming = incoming,
+            causeCode = causeCode,
+            activeMs = activeMs,
+            scenario = scenario,
+        )
         _log.value = (_log.value + entry).takeLast(MAX_LOG)
     }
 
     private fun publish(call: Call, addedAt: Long?) {
         val state = stateOf(call)
+        val cause = if (state == Call.STATE_DISCONNECTED) call.details.disconnectCause else null
         _current.value = CallSnapshot(
             number = numberOf(call),
             state = state,
             isIncoming = isIncoming(call),
             connectTimeMillis = call.details.connectTimeMillis,
             addedAtElapsed = addedAt ?: SystemClock.elapsedRealtime(),
-            disconnectLabel = if (state == Call.STATE_DISCONNECTED) {
-                call.details.disconnectCause?.label?.toString()?.takeIf { it.isNotBlank() }
-                    ?: call.details.disconnectCause?.let { causeName(it.code) }
-            } else {
-                null
-            },
+            disconnectLabel = cause?.label?.toString()?.takeIf { it.isNotBlank() }
+                ?: cause?.let { causeName(it.code) },
+            disconnectCode = cause?.code,
+            timeToActiveMs = timeToActiveMs,
+            talkMs = talkMs,
         )
     }
 
@@ -233,19 +313,6 @@ object CallBus {
         12 -> "AUDIO_PROCESSING"
         13 -> "SIMULATED_RINGING"
         else -> "ESTADO_$state"
-    }
-
-    /** Nome em português simples, para a tela de chamada. */
-    fun stateLabel(state: Int): String = when (state) {
-        Call.STATE_NEW, Call.STATE_CONNECTING -> "Conectando…"
-        Call.STATE_DIALING -> "Discando…"
-        Call.STATE_RINGING -> "Chamando você"
-        Call.STATE_HOLDING -> "Em espera"
-        Call.STATE_ACTIVE -> "Em ligação"
-        Call.STATE_DISCONNECTING -> "Encerrando…"
-        Call.STATE_DISCONNECTED -> "Encerrada"
-        Call.STATE_SELECT_PHONE_ACCOUNT -> "Escolha o chip"
-        else -> stateName(state)
     }
 
     fun causeName(code: Int): String = when (code) {

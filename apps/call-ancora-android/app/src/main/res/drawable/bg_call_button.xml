@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Botão Ligar: verde com a base de 3dp em verde escuro. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:top="3dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/ancora_green_shadow" />
+            <corners android:radius="100dp" />
+        </shape>
+    </item>
+    <item android:bottom="3dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/ancora_green" />
+            <corners android:radius="100dp" />
+        </shape>
+    </item>
+</layer-list>

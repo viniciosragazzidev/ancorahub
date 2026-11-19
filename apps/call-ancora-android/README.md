@@ -61,7 +61,7 @@ Enquanto for o padrão, **todas** as ligações do aparelho (inclusive recebidas
 
 ## 5. O que testar e mandar de volta
 
-Faça **5 ligações**, uma de cada tipo. Antes de cada uma, escreva o tipo no campo "Cenário do teste":
+Faça **5 ligações**, uma de cada tipo. Antes de cada uma, toque no cenário em "O que você espera que aconteça?" (Atendida, Não atende, Caixa postal, Ocupado, Desliga na hora):
 
 1. **atendida**: alguém atende, conversa uns segundos e você desliga;
 2. **não atendida**: deixa tocar até cair sozinha, sem caixa postal;
@@ -86,3 +86,9 @@ O que queremos descobrir: em cada caso, **quando o `ACTIVE` aparece** (na hora d
 - `CallService.kt`: `InCallService` que recebe as ligações e os estados.
 - `CallBus.kt`: barramento em memória entre o serviço e as telas, e o formato do registro.
 - `InCallActivity.kt`: tela de chamada mínima, aparece por cima da tela de bloqueio.
+- `Timeline.kt` e `Labels.kt`: transformam o registro técnico na linha do tempo em português da tela. O texto de Copiar/Enviar continua o registro técnico.
+- `AppFonts.kt`: baixa Plus Jakarta Sans e JetBrains Mono pelo Google Play Services (sem arquivo de fonte no APK). Sem Play Services, fica a fonte do sistema.
+
+## Visual
+
+Segue o AncoraHub Lite: azul-marinho `#002B73`, azul `#0B5ED7`, verde `#00B26B`, mascote e ícone do Call Âncora (`res/drawable-nodpi`, também usado no ícone do app). Só tema claro por enquanto.
