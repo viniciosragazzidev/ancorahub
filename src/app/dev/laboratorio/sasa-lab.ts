@@ -6,9 +6,9 @@ import type { ChatBlock, ChatServerActionName } from "@/components/chat/types";
 import { SASA_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
 import { runSasaCommand, type SasaActionResult, type SasaWorld } from "@/features/sasa/command-core";
 import { parseWhenPtBr } from "@/features/sasa/parse-when";
-import { areasOf, SASA_AREA_LABEL, wantsAnalysis, type SasaArea } from "@/features/sasa/ecosystem-areas";
+import { areasOf, isLeadLookup, SASA_AREA_LABEL, wantsAnalysis, type SasaArea } from "@/features/sasa/ecosystem-areas";
 import { runSasaAgentLoop } from "@/features/sasa/ecosystem-agent";
-import { answerFromFacts, factsToLines, type SasaFacts } from "@/features/sasa/ecosystem-answers";
+import { answerFromFacts, factsToLines, leadLookupBlocks, type SasaFacts } from "@/features/sasa/ecosystem-answers";
 import { resolveLead } from "@/features/sasa/resolve-entities";
 import type { DevLab } from "@/lib/dev-lab";
 
@@ -89,7 +89,7 @@ export function labSasaFacts(now = new Date()): SasaFacts {
       active: 5, byStatus: { negotiation: 1, in_contact: 2, quote_sent: 1, new: 1 }, newCount: 1, receivedToday: 3, acceptedToday: 2,
       waiting: [{ name: "Carlos Mendes", reason: "respondeu", minutes: 25, urgent: false }, { name: "Júlia Prado", reason: "lead novo", minutes: 6, urgent: true }],
     },
-    lead: { kind: "one", name: "Ana Souza", status: "quote_sent", tipo: "familiar", arrivedAt: day(-3), summary: "Família de 3, quer Amil ou SulAmérica até R$ 1.500.", nextStep: "Ligar para tirar a dúvida da carência do filho.", objections: ["preço"], lastMessage: { from: "cliente", text: "Vou ver com meu marido e te falo", at: at(-120) }, notes: [{ at: day(-1), text: "Pediu a cotação da Amil S380" }] },
+    lead: { kind: "one", id: "lab-ana", since: day(-2), name: "Ana Souza", status: "quote_sent", tipo: "familiar", arrivedAt: day(-3), summary: "Família de 3, quer Amil ou SulAmérica até R$ 1.500.", nextStep: "Ligar para tirar a dúvida da carência do filho.", objections: ["preço"], lastMessage: { from: "cliente", text: "Vou ver com meu marido e te falo", at: at(-120) }, notes: [{ at: day(-1), text: "Pediu a cotação da Amil S380" }] },
     wallet: { total: 42, attention: 3, renewalCount: 2, hasRenewalData: true, renewals: [{ name: "Marcos Lima", from: "02/12" }, { name: "Paula Reis", from: "15/12" }], anniversaries: [{ name: "Rita Alves", on: day(9), years: 1 }] },
     duty: {
       active: [{ name: "TESTE", startsAt: at(-60), endsAt: at(300), paused: false, presence: "confirmed" }],
@@ -177,8 +177,17 @@ const LAB_AGENT_SCRIPTS: Record<string, { reads: Array<{ area: SasaArea; lead?: 
 /** No laboratório: resposta direta pelos fatos de exemplo; aberta pela camada limitada com o modelo de mentira. */
 export async function labSasaAsk(question: string, world: SasaWorld, now = new Date()): Promise<ChatBlock[]> {
   const facts = labSasaFacts(now);
-  const areas = areasOf(question);
-  if (resolveLead(question, world.leads).kind !== "none" && !areas.includes("lead")) areas.unshift("lead");
+  let areas = areasOf(question);
+  const named = resolveLead(question, world.leads);
+  if (named.kind !== "none" || isLeadLookup(question)) areas = ["lead", ...areas.filter((area) => area !== "lead" && area !== "leads")];
+  if (areas[0] === "lead" && !wantsAnalysis(question)) {
+    // Consulta de lead no laboratório: o achado (ou a falta dele) vem do corretor de mentira.
+    const lead = named.kind === "one" ? { ...(facts.lead as Extract<NonNullable<SasaFacts["lead"]>, { kind: "one" }>), id: named.lead.id, name: named.lead.name, status: named.lead.status }
+      : named.kind === "many" ? { kind: "many" as const, names: named.leads.map((item) => item.name), leads: named.leads.map((item) => ({ id: item.id, name: item.name })) }
+        : { kind: "none" as const, asked: null };
+    const blocks = leadLookupBlocks({ lead }, now, String(Date.now()));
+    if (blocks) return blocks;
+  }
   const direct = wantsAnalysis(question) ? [] : areas.slice(0, 2).map((area) => answerFromFacts(question, area, facts, now)).filter((text): text is string => Boolean(text));
   const say = (text: string): ChatBlock[] => [{ type: "assistant", id: `lab-ask-${Date.now()}`, text }];
   if (direct.length) return say(direct.join(" "));

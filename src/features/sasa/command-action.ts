@@ -92,7 +92,7 @@ export async function sasaCommandAction(raw: { text: string; clientCommandId?: s
         const dynamic = consent.granted && await isSasaDynamicAiEnabled(context.tenantId);
         const answer = await answerSasaQuestion(context, input.text, { dynamic, now }).catch((error) => { console.error("[sasa] answer failed", error); return null; });
         if (answer) {
-          const reply: SasaReply = { handled: true, blocks: [{ type: "assistant", id: `sasa-answer-${now.getTime()}`, text: answer.text }] };
+          const reply: SasaReply = { handled: true, blocks: answer.blocks ?? [{ type: "assistant", id: `sasa-answer-${now.getTime()}`, text: answer.text }] };
           await save("answered", { tool: `${answer.via === "direct" ? "read" : "agent"}:${answer.areas.join(",")}${answer.truncated ? ":limite" : ""}`.slice(0, 120), via: answer.via === "direct" ? "rules" : "ai", reply });
           return reply;
         }

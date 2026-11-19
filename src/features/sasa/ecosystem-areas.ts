@@ -65,6 +65,11 @@ export function wantsAnalysis(question: string) {
   return /\b(prioriz\w*|devo|deveria|compar\w*|resum\w*|analis\w*|por que|porque|sugest\w*|dica|estrategia|melhor|pior|tendencia|evolu\w*)\b/.test(normalizePtBr(question));
 }
 
+/** Consulta de um lead pelo nome: "tem algum lead chamado Antônia?", "quem é a Ana?", "como está o Carlos?". */
+export function isLeadLookup(question: string) {
+  return /\b(chamad[oa]s?|quem e|como (esta|ta|anda)|me fala (d[ao]|sobre)|tem (algum|alguma|um|uma) (lead|cliente))\b/.test(normalizePtBr(question));
+}
+
 /** Pergunta ou pedido? Uma pergunta não executa nada: só lê. */
 export function looksLikeQuestion(question: string) {
   const text = normalizePtBr(question).trim();
