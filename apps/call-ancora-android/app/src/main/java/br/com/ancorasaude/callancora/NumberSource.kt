@@ -9,6 +9,8 @@ data class QueueNumber(
     val id: Long,
     val number: String,
     val scenario: String? = null,
+    /** Id do contato na fonte externa (CRM). */
+    val externalId: String? = null,
 )
 
 /**

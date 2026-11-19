@@ -984,3 +984,7 @@ O app da prova do discador ganha o visual do AncoraHub Lite: mascote e ícone do
 ## 19/11/2026 - Call Âncora Android: acesso garantido e fila automática
 
 O app confere, ao abrir e ao voltar, tudo o que precisa do sistema de ligações (discador padrão, permissões, notificação, tela cheia e serviço de chamadas) e só libera Ligar com tudo marcado. Durante a ligação há notificação fixa, e a ligação recebida abre com o celular bloqueado. Nova fila de teste com discagem automática: quando a ligação cai, conta 3 s (com Pausar e Pular) e liga para o próximo sozinho, com limites para proteger o chip e resumo de fila concluída. Cada passo vai para o registro técnico. Detalhes: `apps/call-ancora-android/README.md`.
+## 19/11/2026 - Call Âncora: celular pareado com a sessão do CRM (etapa 2)
+
+O app Android lê o QR da tela Call Âncora, conecta à conta do corretor e disca a fila da sessão sozinho, mandando cada etapa da ligação para a web em tempo real (discando, em ligação, encerrada com o motivo). A web classifica (Com interesse / Sem interesse) e, com a discagem automática ligada, a próxima ligação começa sem toque. Ligação não atendida é marcada sozinha. Por segurança, os contatos de demonstração continuam fictícios e nunca são discados; ligação real só com a "Lista de teste" que administradores da plataforma montam na web. Detalhes: `docs/implementations/active/2026-11-19-call-ancora.md`.
+

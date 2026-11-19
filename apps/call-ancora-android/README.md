@@ -59,6 +59,20 @@ Para voltar ao discador normal depois: *Configurações > Apps > Apps padrão > 
 
 Enquanto for o padrão, **todas** as ligações do aparelho (inclusive recebidas) passam pela tela simples do Call Âncora: atender, desligar, mudo e viva-voz.
 
+## 4.0 Conectar ao AncoraHub (etapa 2)
+
+1. No computador, entre no AncoraHub e abra **Call Âncora**. Toque em **Iniciar**: aparece um QR (vale 2 minutos, uso único).
+2. No celular, no cartão **Conectar ao AncoraHub**, toque em **Ler QR code** (o app pede a câmera só agora) e aponte para o QR.
+3. Aparece "Conectado à conta de <nome>". O token do celular fica guardado criptografado; **Desconectar** apaga.
+
+O app só aceita QR do CRM de produção (`https://crm.ancorasaude.cloud`) ou de endereços de desenvolvimento (localhost, emulador, IP da rede local).
+
+**Segurança:** a fila de demonstração tem números fictícios e **nunca é discada**. O app só disca contatos que o servidor marcou como discáveis, e isso só acontece com a **Lista de teste (ligação real)**, que só administradores da plataforma veem na tela web. Para testar de verdade: na web, cole os números na Lista de teste e toque em "Usar como fila".
+
+Com o celular conectado e a lista de teste ativa: toque em **Começar ligações**. Cada evento da ligação (discando, em ligação, encerrada com o motivo) aparece ao vivo na web. Ligação atendida: classifique na web (Com interesse / Sem interesse). Ligação que não chegou a ser atendida vira "Não atendeu" sozinha. Com **Discagem automática** ligada na web, a próxima ligação começa sozinha depois da contagem; desligada, toque em **Ligar para o próximo**. Pausar e "Segure para encerrar" ficam no celular.
+
+A fila local (abaixo) continua em **Modo teste local**, recolhido.
+
 ## 4.1 Preparar o celular (obrigatório)
 
 Ao abrir, o app confere tudo o que precisa e mostra o cartão **Preparar o celular**. Toque em cada item (ou em "Liberar o próximo") até todos ficarem com ✓:
@@ -114,6 +128,7 @@ O que queremos descobrir: em cada caso, **quando o `ACTIVE` aparece** (na hora d
 - `NumberSource.kt`: de onde vêm os números. Hoje `LocalQueueSource` (fila do celular); na etapa 2, `CrmQueueSource` pega o próximo número no CRM.
 - `CallPlacer.kt`: único ponto que disca; recusa sem o papel de discador padrão.
 - `CallNotifier.kt`: notificação fixa da ligação e tela cheia para ligação recebida.
+- `CrmApi.kt`, `CrmSession.kt`, `CrmQueueSource.kt`, `CrmPanel.kt`, `DeviceStore.kt`: pareamento por QR, sessão do CRM e token criptografado.
 - `AppFonts.kt`: baixa Plus Jakarta Sans e JetBrains Mono pelo Google Play Services (sem arquivo de fonte no APK). Sem Play Services, fica a fonte do sistema.
 
 ## Visual

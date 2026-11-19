@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AuthenticationError, AuthorizationError } from "@/shared/auth/errors";
 import { requireCallAncoraAccess } from "@/features/call-ancora/access";
 import { CALL_ANCORA_PAIR_TTL_MS, callAncoraSessionStore } from "@/features/call-ancora/session-store";
+import { CALL_ANCORA_TEST_LIST_MAX, parseCallAncoraTestList } from "@/features/call-ancora/test-list";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,6 +13,7 @@ const patchSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("pause") }),
   z.object({ action: z.literal("resume") }),
   z.object({ action: z.literal("auto-dial"), enabled: z.boolean() }),
+  z.object({ action: z.literal("test-list"), text: z.string().max(10_000) }),
 ]);
 
 function authError(error: unknown) {
@@ -47,10 +49,21 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const { context, sessionOwnerId } = await requireCallAncoraAccess();
+    const { context, sessionOwnerId, flagBypass } = await requireCallAncoraAccess();
     const parsed = patchSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return Response.json({ error: "Essa ação não é válida para a demonstração." }, { status: 400, headers: noStore });
     const scope = { tenantId: context.tenantId, brokerId: sessionOwnerId };
+    if (parsed.data.action === "test-list") {
+      // Ligação real: só admin da plataforma ou desenvolvimento local.
+      if (!flagBypass) return Response.json({ error: "A lista de teste é só para administradores da plataforma." }, { status: 403, headers: noStore });
+      const { entries, errors } = parseCallAncoraTestList(parsed.data.text);
+      if (errors.length || entries.length === 0) {
+        return Response.json({ error: errors[0] ?? "Digite pelo menos um número.", errors }, { status: 400, headers: noStore });
+      }
+      const updated = callAncoraSessionStore.setTestList(scope, entries.slice(0, CALL_ANCORA_TEST_LIST_MAX));
+      if (!updated) return Response.json({ error: "Inicie a sessão e espere a ligação atual terminar para trocar a fila." }, { status: 409, headers: noStore });
+      return Response.json({ session: updated }, { headers: noStore });
+    }
     const snapshot = parsed.data.action === "classify"
       ? callAncoraSessionStore.classify(scope, parsed.data.outcome)
       : parsed.data.action === "auto-dial"

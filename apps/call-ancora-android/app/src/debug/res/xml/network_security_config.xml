@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- APK de teste: permite HTTP para o CRM local na rede (localhost, emulador, IP da rede).
+     O app só aceita esses endereços e o CRM de produção (CrmApi.parseQr). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
