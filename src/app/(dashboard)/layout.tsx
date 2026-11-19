@@ -204,8 +204,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     illustrationsSetting,
     autoSaleFlag,
     brokerMyWalletFlag,
-    sasaVoiceEnabled,
     callAncoraSetting,
+    sasaVoiceEnabled,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -226,8 +226,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     illustrationsPromise,
     autoSaleFlagPromise,
     brokerMyWalletPromise,
-    sasaVoicePromise,
     callAncoraFlagPromise,
+    sasaVoicePromise,
   ]);
 
   // Flag criada no G0 (feature_team_management_enabled): só libera o item Gestão do gestor Lite.
