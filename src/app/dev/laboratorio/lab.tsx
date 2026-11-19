@@ -115,11 +115,29 @@ export function FlowLab() {
     },
     presenceGate: async () => ({ required: false, connected: true }),
     sale: {
-      // Simula a IA lendo o contrato: um familiar da Amil com 3 vidas, sem o valor (em "falha", não lê nada).
+      // Simula a IA lendo o contrato: familiar da Amil com titular e 2 dependentes, sem a vigência (em "falha", não lê nada).
       readContract: async () => {
         await wait(delay + 800);
         if (outcome === "falha") return { ok: false, error: "Não consegui ler esse contrato. Tente uma foto mais nítida ou responda as perguntas." };
-        return { ok: true, reading: { planType: "familiar", ages: [38, 35, 9], carrierName: "AMIL", planName: "Amil S380", monthlyValue: null, coverageStartDate: null } };
+        return {
+          ok: true,
+          file: { filename: "contrato-carlos.pdf", fileUrl: "/api/documents/download?key=lab" },
+          reading: {
+            planType: "familiar",
+            holder: { name: "Carlos Eduardo Teixeira", birthDate: "1988-03-14", age: null, cpf: null, relationship: "titular" },
+            dependents: [
+              { name: "Juliana Teixeira", birthDate: "1991-07-02", age: null, cpf: null, relationship: "conjuge" },
+              { name: "Pedro Teixeira", birthDate: "2017-05-20", age: null, cpf: null, relationship: "filho" },
+            ],
+            carrierName: "AMIL ASSISTÊNCIA MÉDICA",
+            planName: "Amil S380",
+            monthlyValue: 1890.42,
+            coverageStartDate: null,
+            policyNumber: "PRP-2026-118734",
+            paymentMethod: "boleto",
+            contractTermMonths: 12,
+          },
+        };
       },
       register: async () => {
         await wait(delay);

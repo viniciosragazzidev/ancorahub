@@ -7,16 +7,30 @@ import type { ChatScript } from "@/components/chat/types";
 import { ASSISTANTS } from "@/features/broker-workspace/chat/assistant-scripts";
 
 import { registerConversationSaleAction } from "../actions";
-import type { SaleCatalog } from "../conversation-sale-core";
+import type { SaleCatalog, SaleContractFile } from "../conversation-sale-core";
 import { readSaleContractAction } from "../sale-contract-actions";
 import { SaleChat, type SaleChatLead, type SaleChatServices } from "./sale-chat";
 
 const services: SaleChatServices = {
+  // A IA lê e o arquivo é guardado ao mesmo tempo; se guardar falhar, a leitura continua valendo (venda sem anexo).
   readContract: async ({ leadId, file }) => {
     const form = new FormData();
     form.set("leadId", leadId);
     form.set("file", file);
-    return readSaleContractAction(form);
+    const upload = new FormData();
+    upload.set("leadId", leadId);
+    upload.set("file", file);
+    const [read, stored] = await Promise.all([
+      readSaleContractAction(form),
+      fetch("/api/documents/upload", { method: "POST", body: upload })
+        .then(async (response): Promise<SaleContractFile | null> => {
+          const payload = await response.json().catch(() => null) as (Partial<SaleContractFile> & { error?: string }) | null;
+          if (!response.ok || !payload?.fileUrl || !payload.filename) return null;
+          return { filename: payload.filename, fileUrl: payload.fileUrl, storageKey: payload.storageKey, mimeType: payload.mimeType, sizeBytes: payload.sizeBytes, checksumSha256: payload.checksumSha256 };
+        })
+        .catch(() => null),
+    ]);
+    return read.ok ? { ...read, file: stored } : read;
   },
   register: (input) => registerConversationSaleAction(input),
 };

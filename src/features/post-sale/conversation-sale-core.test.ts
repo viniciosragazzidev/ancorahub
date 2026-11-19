@@ -11,6 +11,7 @@ import {
   parseSaleMoney,
   resetSaleAnswers,
   saleAwaiting,
+  saleReviewData,
   type SaleCatalog,
 } from "./conversation-sale-core";
 import { parseContractReading } from "./sale-contract-reading";
@@ -42,7 +43,7 @@ describe("registrar venda em conversa", () => {
     expect(saleAwaiting(answers, catalog)).toBe("start");
     answers = applySaleChoice(answers, "start:2026-12-01", catalog)!;
     expect(saleAwaiting(answers, catalog)).toBe("done");
-    expect(nextSaleBlocks(answers, catalog, { turn: 1, today, leadValue: null }).map((block) => block.type)).toEqual(["facts", "question"]);
+    expect(nextSaleBlocks(answers, catalog, { turn: 1, today, leadValue: null }).map((block) => block.type)).toEqual(["custom", "question"]);
   });
 
   it("operadora fora do catálogo ou sem planos pula a pergunta do plano", () => {
@@ -91,5 +92,32 @@ describe("registrar venda em conversa", () => {
 
   it("resposta da IA sem JSON não vira leitura", () => {
     expect(parseContractReading("não consegui ler")).toBeNull();
+  });
+
+  it("o contrato completo traz titular, dependentes, apólice, pagamento e prazo", () => {
+    const reading = parseContractReading(JSON.stringify({
+      planType: "familiar",
+      holder: { name: "CARLOS EDUARDO DA SILVA", birthDate: "1988-03-14", cpf: "529.982.247-25" },
+      dependents: [{ name: "juliana silva", birthDate: "1991-12-30", relationship: "conjuge" }, { name: "Pedro", age: 8, relationship: "filho" }],
+      carrierName: "Amil", planName: "Amil S380", monthlyValue: 1890.42, coverageStartDate: "2026-12-01",
+      policyNumber: "PRP-118734", paymentMethod: "boleto", contractTermMonths: 24,
+    }))!;
+    expect(reading.holder).toMatchObject({ name: "Carlos Eduardo da Silva", cpf: "52998224725", relationship: "titular" });
+    const merged = mergeContractReading({}, reading, catalog, today);
+    expect(merged.answers.ages).toEqual([38, 34, 8]);
+    expect(merged.answers.people?.map((person) => person.relationship)).toEqual(["titular", "conjuge", "filho"]);
+    expect(merged.answers).toMatchObject({ policyNumber: "PRP-118734", paymentMethod: "boleto", contractTermMonths: 24 });
+    expect(saleAwaiting(merged.answers, catalog)).toBe("done");
+    expect(merged.rows.find((row) => row.key === "dependents")?.value).toBe("2: Juliana e Pedro");
+    const review = saleReviewData(merged.answers, catalog);
+    expect(review.sections[0].rows.map((row) => row.value)).toEqual(["Carlos Eduardo da Silva, 38 anos", "Juliana Silva, 34 anos", "Pedro, 8 anos"]);
+    expect(review.sections[2].rows.find((row) => row.label === "Prazo")).toMatchObject({ value: "24 meses", sourced: true });
+  });
+
+  it("idades escritas à mão descartam as pessoas do contrato", () => {
+    const merged = mergeContractReading({}, { holder: { name: "Ana", age: 40, birthDate: null, cpf: null, relationship: "titular" } }, catalog, today);
+    const reset = resetSaleAnswers(merged.answers, "type");
+    expect(reset.people).toBeUndefined();
+    expect(reset.sourced).not.toContain("people");
   });
 });

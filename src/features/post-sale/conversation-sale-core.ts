@@ -13,6 +13,20 @@ export type SaleCatalogPlan = { id: string; name: string; type: SalePlanType };
 export type SaleCatalogCarrier = { id: string; name: string; plans: SaleCatalogPlan[] };
 export type SaleCatalog = { carriers: SaleCatalogCarrier[] };
 
+export type SaleRelationship = "titular" | "conjuge" | "filho" | "outro";
+export const RELATIONSHIP_LABEL: Record<SaleRelationship, string> = { titular: "Titular", conjuge: "Cônjuge", filho: "Filho(a)", outro: "Dependente" };
+/** Uma pessoa do contrato: o titular primeiro, depois os dependentes. */
+export type SalePerson = { name: string | null; age: number | null; birthDate: string | null; cpf: string | null; relationship: SaleRelationship };
+
+export type SalePaymentMethod = "boleto" | "debito_automatico" | "cartao_credito" | "desconto_folha" | "outro";
+export const PAYMENT_LABEL: Record<SalePaymentMethod, string> = { boleto: "Boleto", debito_automatico: "Débito automático", cartao_credito: "Cartão de crédito", desconto_folha: "Desconto em folha", outro: "Outro" };
+
+/** O arquivo do contrato já guardado (POST /api/documents/upload); vira documento do lead quando a venda é registrada. */
+export type SaleContractFile = { filename: string; fileUrl: string; storageKey?: string; mimeType?: string; sizeBytes?: number; checksumSha256?: string };
+
+/** Campos que podem vir do contrato (marcados "Do contrato" no resumo). */
+export type SaleField = "planType" | "people" | "carrier" | "plan" | "value" | "start" | "policy" | "payment" | "term";
+
 export type SaleAnswers = {
   planType?: SalePlanType;
   ages?: number[];
@@ -23,6 +37,14 @@ export type SaleAnswers = {
   coverageStartDate?: string;
   /** O que veio do contrato lido pela IA. */
   fromContract?: boolean;
+  /** Pessoas com nome, nascimento e CPF (só pelo contrato). */
+  people?: SalePerson[];
+  policyNumber?: string;
+  paymentMethod?: SalePaymentMethod;
+  contractTermMonths?: number;
+  contract?: SaleContractFile | null;
+  /** Quais respostas vieram do contrato. */
+  sourced?: SaleField[];
 };
 
 export type SaleAwaiting = "planType" | "ages" | "carrier" | "plan" | "value" | "start" | "done";
@@ -220,9 +242,53 @@ export function saleReviewRows(answers: SaleAnswers, catalog: SaleCatalog) {
   ];
 }
 
+export type SaleReviewData = {
+  fromContract: boolean;
+  contractName: string | null;
+  sections: Array<{ title: string; rows: Array<{ label: string; value: string; sourced: boolean }> }>;
+};
+
+/** O resumo para confirmar, em três grupos (pessoas, plano, contrato), com a marca do que veio do contrato. */
+export function saleReviewData(answers: SaleAnswers, catalog: SaleCatalog): SaleReviewData {
+  const sourced = new Set(answers.sourced ?? []);
+  const carrier = catalog.carriers.find((item) => item.id === answers.carrierId);
+  const plan = carrier?.plans.find((item) => item.id === answers.planId);
+  const people = answers.people?.length === answers.ages?.length ? answers.people ?? [] : [];
+  const peopleRows = people.length
+    ? people.map((person, index) => ({
+      label: index === 0 ? "Titular" : RELATIONSHIP_LABEL[person.relationship],
+      value: [person.name ?? (index === 0 ? "Titular" : `Dependente ${index}`), person.age != null ? `${person.age} anos` : null].filter(Boolean).join(", "),
+      sourced: sourced.has("people"),
+    }))
+    : [{ label: "Vidas", value: answers.ages?.length ? livesLine(answers.ages) : "A informar", sourced: sourced.has("people") }];
+  const contractRows = [
+    ...(answers.policyNumber ? [{ label: "Apólice ou proposta", value: answers.policyNumber, sourced: sourced.has("policy") }] : []),
+    ...(answers.paymentMethod ? [{ label: "Pagamento", value: PAYMENT_LABEL[answers.paymentMethod], sourced: sourced.has("payment") }] : []),
+    { label: "Início da vigência", value: answers.coverageStartDate ? dateLabel(answers.coverageStartDate) : "A informar", sourced: sourced.has("start") },
+    { label: "Prazo", value: `${answers.contractTermMonths ?? 12} meses`, sourced: sourced.has("term") },
+  ];
+  return {
+    fromContract: Boolean(answers.fromContract),
+    contractName: answers.contract?.filename ?? null,
+    sections: [
+      { title: "Pessoas", rows: peopleRows },
+      {
+        title: "Plano",
+        rows: [
+          { label: "Tipo", value: answers.planType ? PLAN_TYPE_LABEL[answers.planType] : "A informar", sourced: sourced.has("planType") },
+          { label: "Operadora", value: carrier?.name ?? "Fora do catálogo", sourced: sourced.has("carrier") },
+          { label: "Plano", value: plan?.name ?? "Fora do catálogo", sourced: sourced.has("plan") },
+          { label: "Valor mensal", value: answers.monthlyValue ? money(answers.monthlyValue) : "A informar", sourced: sourced.has("value") },
+        ],
+      },
+      { title: "Contrato", rows: contractRows },
+    ],
+  };
+}
+
 export function reviewBlocks(answers: SaleAnswers, catalog: SaleCatalog, turn: number): ChatBlock[] {
   return [
-    { type: "facts", id: `f-review-${turn}`, title: "Confira a venda", subtitle: answers.fromContract ? "Li do contrato. Corrija o que não bater." : undefined, rows: saleReviewRows(answers, catalog) },
+    { type: "custom", id: `review-${turn}`, kind: "review", data: saleReviewData(answers, catalog) },
     {
       type: "question",
       id: `q-confirm-${turn}`,
@@ -252,10 +318,11 @@ export function fixBlocks(turn: number): ChatBlock[] {
 /** Apaga o trecho a corrigir: a conversa pergunta só aquilo de novo. */
 export function resetSaleAnswers(answers: SaleAnswers, part: string): SaleAnswers {
   const next = { ...answers };
-  if (part === "type") { delete next.planType; delete next.ages; }
-  if (part === "carrier") { delete next.carrierId; delete next.planId; }
-  if (part === "value") delete next.monthlyValue;
-  if (part === "start") delete next.coverageStartDate;
+  const drop = (...fields: SaleField[]) => { next.sourced = (next.sourced ?? []).filter((field) => !fields.includes(field)); };
+  if (part === "type") { delete next.planType; delete next.ages; delete next.people; drop("planType", "people"); }
+  if (part === "carrier") { delete next.carrierId; delete next.planId; drop("carrier", "plan"); }
+  if (part === "value") { delete next.monthlyValue; drop("value"); }
+  if (part === "start") { delete next.coverageStartDate; drop("start"); }
   return next;
 }
 
@@ -310,35 +377,92 @@ export type SaleContractReading = {
   planName?: string | null;
   monthlyValue?: number | null;
   coverageStartDate?: string | null;
+  holder?: SalePerson | null;
+  dependents?: SalePerson[] | null;
+  policyNumber?: string | null;
+  paymentMethod?: SalePaymentMethod | null;
+  contractTermMonths?: number | null;
 };
 
+/** Uma linha do cartão "Li do contrato": o que foi achado (ou não) em cada campo. */
+export type ExtractedRow = { key: string; label: string; value: string | null };
+
+/** Idade em anos completos numa data. */
+export function ageOn(birthDate: string, today: Date): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthDate);
+  if (!match) return null;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  let age = today.getFullYear() - year;
+  if (today.getMonth() + 1 < month || (today.getMonth() + 1 === month && today.getDate() < day)) age -= 1;
+  return age >= 0 && age <= 120 ? age : null;
+}
+
+function firstNames(names: string[]) {
+  const short = names.map((name) => name.split(" ")[0]);
+  return short.length <= 1 ? short.join("") : `${short.slice(0, -1).join(", ")} e ${short[short.length - 1]}`;
+}
+
 /** Junta o que foi lido do contrato às respostas: o que não foi achado continua para perguntar. */
-export function mergeContractReading(answers: SaleAnswers, reading: SaleContractReading, catalog: SaleCatalog): { answers: SaleAnswers; found: string[] } {
+export function mergeContractReading(answers: SaleAnswers, reading: SaleContractReading, catalog: SaleCatalog, today = new Date()): { answers: SaleAnswers; found: string[]; rows: ExtractedRow[] } {
   const next: SaleAnswers = { ...answers, fromContract: true };
+  const sourced = new Set<SaleField>(answers.sourced ?? []);
   const found: string[] = [];
-  if (reading.planType && reading.planType in PLAN_TYPE_LABEL) { next.planType = reading.planType; found.push(`tipo ${PLAN_TYPE_LABEL[reading.planType]}`); }
-  const ages = (reading.ages ?? []).filter((age) => Number.isInteger(age) && age >= 0 && age <= 120).slice(0, 30);
-  if (ages.length) {
-    next.ages = ages;
-    if (!next.planType) next.planType = ages.length > 1 ? "familiar" : "individual";
-    found.push(ages.length === 1 ? "a idade do titular" : `${ages.length} vidas`);
+
+  const people = [reading.holder ? { ...reading.holder, relationship: "titular" as const } : null, ...(reading.dependents ?? [])]
+    .filter((person): person is SalePerson => Boolean(person))
+    .map((person) => ({ ...person, age: person.age ?? (person.birthDate ? ageOn(person.birthDate, today) : null) }))
+    .slice(0, 30);
+  if (people.length && people.every((person) => person.age != null)) {
+    next.people = people;
+    next.ages = people.map((person) => person.age!);
+  } else {
+    const ages = (reading.ages ?? []).filter((age) => Number.isInteger(age) && age >= 0 && age <= 120).slice(0, 30);
+    if (ages.length) next.ages = ages;
+    if (people.length) next.people = people;
   }
+  if (next.ages?.length) { sourced.add("people"); found.push(next.ages.length === 1 ? "a idade do titular" : `${next.ages.length} vidas`); }
+
+  if (reading.planType && reading.planType in PLAN_TYPE_LABEL) { next.planType = reading.planType; sourced.add("planType"); found.unshift(`tipo ${PLAN_TYPE_LABEL[reading.planType]}`); }
+  else if (next.ages?.length && !next.planType) next.planType = next.ages.length > 1 ? "familiar" : "individual";
+
   const carrier = matchByName(catalog.carriers, reading.carrierName);
   if (carrier) {
     next.carrierId = carrier.id;
+    sourced.add("carrier");
     found.push(carrier.name);
     const plan = matchByName(carrier.plans, reading.planName);
-    if (plan) { next.planId = plan.id; found.push(`plano ${plan.name}`); } else delete next.planId;
+    if (plan) { next.planId = plan.id; sourced.add("plan"); found.push(`plano ${plan.name}`); } else delete next.planId;
   }
   if (reading.monthlyValue && reading.monthlyValue > 0 && reading.monthlyValue <= 1_000_000) {
     next.monthlyValue = Math.round(reading.monthlyValue * 100) / 100;
+    sourced.add("value");
     found.push(`valor ${money(next.monthlyValue)}`);
   }
   if (reading.coverageStartDate && /^\d{4}-\d{2}-\d{2}$/.test(reading.coverageStartDate)) {
     next.coverageStartDate = reading.coverageStartDate;
+    sourced.add("start");
     found.push(`vigência em ${dateLabel(reading.coverageStartDate)}`);
   }
-  return { answers: next, found };
+  if (reading.policyNumber) { next.policyNumber = reading.policyNumber; sourced.add("policy"); }
+  if (reading.paymentMethod && reading.paymentMethod in PAYMENT_LABEL) { next.paymentMethod = reading.paymentMethod; sourced.add("payment"); }
+  if (reading.contractTermMonths && reading.contractTermMonths >= 1 && reading.contractTermMonths <= 120) { next.contractTermMonths = reading.contractTermMonths; sourced.add("term"); }
+  next.sourced = [...sourced];
+
+  const holder = next.people?.find((person) => person.relationship === "titular");
+  const dependents = next.people?.filter((person) => person.relationship !== "titular") ?? [];
+  const namedDependents = dependents.map((person) => person.name).filter((name): name is string => Boolean(name));
+  const plan = carrier?.plans.find((item) => item.id === next.planId);
+  const rows: ExtractedRow[] = [
+    { key: "holder", label: "Titular", value: holder?.name ? `${holder.name}${holder.age != null ? `, ${holder.age} anos` : ""}` : next.ages?.length ? `${next.ages[0]} anos` : null },
+    { key: "dependents", label: "Dependentes", value: namedDependents.length ? `${dependents.length}: ${firstNames(namedDependents)}` : next.ages && next.ages.length > 1 ? `${next.ages.length - 1} (${next.ages.slice(1).join(", ")} anos)` : next.ages?.length === 1 ? "Nenhum" : null },
+    { key: "carrier", label: "Operadora", value: carrier?.name ?? reading.carrierName ?? null },
+    { key: "plan", label: "Plano", value: plan?.name ?? reading.planName ?? null },
+    { key: "value", label: "Valor mensal", value: next.monthlyValue && sourced.has("value") ? money(next.monthlyValue) : null },
+    { key: "start", label: "Vigência", value: sourced.has("start") && next.coverageStartDate ? dateLabel(next.coverageStartDate) : null },
+    { key: "policy", label: "Apólice ou proposta", value: next.policyNumber ?? null },
+    { key: "payment", label: "Pagamento", value: next.paymentMethod ? PAYMENT_LABEL[next.paymentMethod] : null },
+  ];
+  return { answers: next, found, rows };
 }
 
 /** Escreveu em vez de tocar: tenta casar o texto com a pergunta em aberto. */
@@ -346,7 +470,7 @@ export function applySaleText(answers: SaleAnswers, text: string, catalog: SaleC
   const awaiting = saleAwaiting(answers, catalog);
   if (awaiting === "ages") {
     const parsed = parseSaleAges(text, answers.planType);
-    return "error" in parsed ? parsed : { answers: { ...answers, ages: parsed.ages } };
+    return "error" in parsed ? parsed : { answers: { ...answers, ages: parsed.ages, people: undefined } };
   }
   if (awaiting === "value") {
     const parsed = parseSaleMoney(text);
