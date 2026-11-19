@@ -8,6 +8,8 @@
 import { createContext, useContext } from "react";
 
 import type { SaleChatServices } from "@/features/post-sale/components/sale-chat";
+import type { SasaActionResult, SasaCommandInput, SasaReply } from "@/features/sasa/command-core";
+import type { ChatServerActionName } from "@/components/chat/types";
 import type { TeamListApi } from "@/features/supervisor-workspace/lead-import/parse-contacts";
 
 export type DevLab = {
@@ -23,6 +25,11 @@ export type DevLab = {
   teamList?: TeamListApi;
   /** Registrar venda em conversa: no lugar de ler o contrato e de registrar a venda. */
   sale?: SaleChatServices;
+  /** Sasá agêntica: no lugar de sasaCommandAction e das ações do chat (Desfazer, atalhos de data). */
+  sasa?: {
+    command: (input: SasaCommandInput) => Promise<SasaReply>;
+    run: (name: ChatServerActionName, payload: Record<string, string | number | boolean | null>) => Promise<SasaActionResult>;
+  };
 };
 
 const DevLabContext = createContext<DevLab | null>(null);

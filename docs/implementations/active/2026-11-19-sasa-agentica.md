@@ -296,6 +296,16 @@ No painel do laboratório: resposta do servidor (ok, falha, ambíguo, sem rede),
 - Entra na conversa da Sasá: o texto livre passa primeiro pelo roteador.
 - Laboratório: fluxo "Sasá por texto" com a conversa real da Sasá e o servidor simulado; casos ok, ambíguo ("Carlos" com 2 leads), falha e Desfazer.
 
+**Entregue em 19/11 (branch `feat/sasa-fase-1`).** Fases 0 e 1 juntas:
+
+- Núcleo puro em `src/features/sasa/`: `parse-when.ts` (datas em pt-BR, fuso de São Paulo), `intent-rules.ts` (atalho por regras), `resolve-entities.ts` (nome → lead, só entre os leads do corretor), `command-core.ts` (`runSasaCommand`: planeja, executa pela ação existente, devolve Desfazer ou Tentar de novo). Testes em `sasa.test.ts`.
+- `sasaCommandAction` (`command-action.ts`): só corretor, liberação do piloto (`brokerAiAccess`), regras primeiro; a IA (`interpret.ts`, JSON + zod no `runGateway`, `sensitive`, só primeiros nomes) só entra com consentimento e quando as regras não casam. O que não é pedido volta para `askAssistantAction`.
+- Ações do chat: `lead.scheduleReturn` aceita `at` (hora exata) e devolve Desfazer (`lead.undoReturn`, que reabre o retorno substituído); `lead.changeStep` aceita `documentation_pending` e a etapa anterior (Desfazer por `lead.restoreStep`); `lead.completeReturn`, `duty.pause` e `duty.resume` ganharam Desfazer.
+- Feedback de nível 1 via `feedbackOnResult` (toque, confirmação depois do servidor, erro), sem som de celebração.
+- Laboratório: fluxo "Sasá: pedidos por texto" com o núcleo real sobre um corretor de mentira (dois Carlos, retorno atrasado, gente esperando) e pedidos prontos para tocar.
+- **Desvio do plano**: a auditoria usa `audit_logs` (`entidade = "sasa_command"`, `entidadeId = clientCommandId`, metadados com tenant, texto, ferramenta e resposta) em vez da tabela nova `sasa_commands`. Dá a mesma trilha e a idempotência sem migration; a tabela própria entra quando houver transcrição (fase 2).
+- **Pendente**: limpeza das transcrições após 90 dias (D5) e teto diário de 150 comandos (D9) entram com a voz (fase 2), que é quando passam a existir transcrição e custo por comando; hoje as regras não custam e a IA já tem o limite por minuto do gateway.
+
 ### Fase 2 · Voz na conversa da Sasá
 
 - Microfone no composer da conversa da Sasá (segurar para falar ali dentro), `POST /api/sasa/voz`, transcrição exibida com "Corrigir".
