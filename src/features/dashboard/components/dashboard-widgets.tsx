@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { AllowedLink } from "./allowed-link";
 import {
   ArrowRight,
   Buildings,
@@ -235,13 +237,14 @@ export function KpiStrip({ metrics }: { metrics: DashboardViewData["metrics"] })
 
 function MoreLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link
+    <AllowedLink
+      hideWhenBlocked
       href={href}
       className="inline-flex items-center gap-1 rounded-md text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {children}
       <ArrowRight className="size-3.5" />
-    </Link>
+    </AllowedLink>
   );
 }
 
@@ -302,7 +305,7 @@ export function AttentionGrid({ items }: { items: DashboardViewData["attention"]
       {cells.length ? (
         <div className="grid flex-1 auto-rows-fr grid-cols-2 gap-px bg-border">
           {cells.map((item, index) => (
-            <Link
+            <AllowedLink
               key={item.id}
               href={item.href}
               className={cn(
@@ -315,7 +318,7 @@ export function AttentionGrid({ items }: { items: DashboardViewData["attention"]
                 <span className="font-ds-mono text-2xl font-medium tabular-nums text-foreground">{item.count}</span>
                 <span className={cn("truncate text-xs", item.tone === "danger" ? "text-ds-rose-ink" : "text-ds-amber-ink")}>{item.description}</span>
               </span>
-            </Link>
+            </AllowedLink>
           ))}
         </div>
       ) : (
