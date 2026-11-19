@@ -36,6 +36,10 @@ export type DevLab = {
     simulateMic?: boolean;
     /** Chave "Sem internet" do laboratório (fase 3): o envio falha como sem rede e o áudio vai para a fila. */
     offline?: boolean;
+    /** Perguntas sobre o ecossistema (19/11): no lugar de askAssistantAction. */
+    ask?: (question: string) => Promise<import("@/components/chat/types").ChatBlock[]>;
+    /** Fase 4: no lugar de navegar para a venda ou a cotação (o laboratório troca de fluxo). */
+    open?: (open: import("@/features/sasa/drafts").SasaOpen) => void;
   };
 };
 
