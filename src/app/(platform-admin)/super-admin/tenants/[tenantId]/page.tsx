@@ -14,6 +14,7 @@ import {
   updateAcceptHandoffPilotAction,
   updateDutyShiftReminderPilotAction,
   updateAiAudioTranscriptionAction,
+  updateSasaDynamicAiAction,
   updateCustomerWaitingModeAction,
   updateQualificationContextAnalysisTenantAction,
   updateQualificationContextAnalysisQueueAction,
@@ -37,6 +38,7 @@ import { acceptHandoffSettingKey } from "@/features/broker-workspace/whatsapp-ha
 import { customerWaitingSettingKey, parseCustomerWaitingMode } from "@/features/customer-waiting/flag";
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import { aiAudioTranscriptionSettingKey } from "@/features/ai-agent/audio-transcription/flag";
+import { sasaDynamicAiSettingKey } from "@/features/sasa/dynamic-ai-flag";
 import { AutoSaleSuperAdminCard } from "@/features/auto-sale/components/super-admin-card";
 import { qualificationContextAnalysisSettingKeys } from "@/features/ai-agent/qualification-context-analysis-settings";
 import { CLEAN_UI_FEATURE, getCleanUiOperationalLegacyTenantIds } from "@/features/clean-ui/feature";
@@ -98,6 +100,7 @@ export default async function SuperAdminTenantDetailPage({
       acceptHandoffSettingKey(tenantId.data),
       dutyShiftReminderSettingKey(tenantId.data),
       aiAudioTranscriptionSettingKey(tenantId.data),
+      sasaDynamicAiSettingKey(tenantId.data),
       customerWaitingSettingKey(tenantId.data),
       qualificationContextAnalysisSettingKeys(tenantId.data).tenant,
     ]),
@@ -122,6 +125,7 @@ export default async function SuperAdminTenantDetailPage({
   const acceptHandoffEnabled = settingMap.get(acceptHandoffSettingKey(tenant.id)) === "true";
   const dutyShiftReminderEnabled = settingMap.get(dutyShiftReminderSettingKey(tenant.id)) === "true";
   const aiAudioEnabled = settingMap.get(aiAudioTranscriptionSettingKey(tenant.id)) === "true";
+  const sasaDynamicAiEnabled = settingMap.get(sasaDynamicAiSettingKey(tenant.id)) !== "false";
   const customerWaitingObserving = parseCustomerWaitingMode(settingMap.get(customerWaitingSettingKey(tenant.id))) === "observe";
   const contextAnalysisTenantKey = qualificationContextAnalysisSettingKeys(tenant.id).tenant;
   const contextAnalysisTenantEnabled = settingMap.get(contextAnalysisTenantKey) !== "false";
@@ -138,6 +142,7 @@ export default async function SuperAdminTenantDetailPage({
   const acceptHandoffAction = updateAcceptHandoffPilotAction.bind(null, tenant.id);
   const dutyShiftReminderAction = updateDutyShiftReminderPilotAction.bind(null, tenant.id);
   const aiAudioAction = updateAiAudioTranscriptionAction.bind(null, tenant.id);
+  const sasaDynamicAiAction = updateSasaDynamicAiAction.bind(null, tenant.id);
   const customerWaitingAction = updateCustomerWaitingModeAction.bind(null, tenant.id);
   const contextAnalysisTenantAction = updateQualificationContextAnalysisTenantAction.bind(null, tenant.id);
 
@@ -272,6 +277,21 @@ export default async function SuperAdminTenantDetailPage({
                   <input name="enabled" type="hidden" value={dutyShiftReminderEnabled ? "false" : "true"} />
                   <Button type="submit" variant={dutyShiftReminderEnabled ? "outline" : "default"}>
                     {dutyShiftReminderEnabled ? "Desligar" : "Ligar"}
+                  </Button>
+                </form>
+              </div>
+              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="max-w-2xl">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-medium">IA dinâmica da Sasá</h3>
+                    <Badge variant={sasaDynamicAiEnabled ? "success" : "outline"}>{sasaDynamicAiEnabled ? "Ligado" : "Desligado"}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">Responde perguntas abertas do corretor ("qual lead priorizar?", "como foi minha semana?") combinando até 4 leituras dos dados dele, em até 15 s. Desligada, a Sasá continua com as respostas diretas (comissões, vendas, plantões, agenda), sem custo de IA.</p>
+                </div>
+                <form action={sasaDynamicAiAction}>
+                  <input name="enabled" type="hidden" value={sasaDynamicAiEnabled ? "false" : "true"} />
+                  <Button type="submit" variant={sasaDynamicAiEnabled ? "outline" : "default"}>
+                    {sasaDynamicAiEnabled ? "Desligar" : "Ligar"}
                   </Button>
                 </form>
               </div>

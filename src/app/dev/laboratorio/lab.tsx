@@ -29,7 +29,7 @@ import type { SaleCatalog } from "@/features/post-sale/conversation-sale-core";
 
 import styles from "./lab.module.css";
 import { MotionShowcase } from "./motion-showcase";
-import { createLabSasa, LAB_SASA_SPEECH, labSasaPhrasesBlock, labSasaQuestionsBlock, labSasaWorld } from "./sasa-lab";
+import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, labSasaQuestionsBlock, labSasaWorld } from "./sasa-lab";
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
 
 type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento";
@@ -243,7 +243,7 @@ export function FlowLab() {
           <div className="arc-venancor h-dvh">
             <AssistantChat
               identity={{ name: "Sasá", shape: "sasa", hue: 175 }}
-              script={(() => { const script = buildAncoraScript({ now: new Date() }); return { ...script, blocks: [...script.blocks, labSasaPhrasesBlock(), labSasaQuestionsBlock()] }; })()}
+              script={(() => { const script = buildAncoraScript({ now: new Date() }); return { ...script, blocks: [...script.blocks, labSasaPhrasesBlock(), labSasaQuestionsBlock(), labSasaOpenBlock()] }; })()}
               instant
               agentId="ancora"
               canWrite

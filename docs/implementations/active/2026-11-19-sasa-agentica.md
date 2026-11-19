@@ -360,6 +360,17 @@ No painel do laboratório: resposta do servidor (ok, falha, ambíguo, sem rede),
 - **Pergunta nunca escreve**: "o que a Ana disse?", "quantas vendas eu fechei?", "quantos leads em negociação?" e "quais cotações eu fiz?" viram leitura, não nota, venda, etapa ou cotação.
 - Laboratório: perguntas prontas de cada área no fluxo da conversa; lá a IA não roda e a resposta diz quais dados seriam lidos.
 
+### Respostas diretas em todas as áreas e IA dinâmica limitada (19/11)
+
+Pedido do usuário: "Hoje não responde quanto tenho a receber, sobre vendas etc", "Faz isso pra todos os contextos do corretor" e "coloque junto uma camada de ia dinâmica e limitada".
+
+- **Fatos por área** (`ecosystem.ts`): onze leituras com a consulta da própria tela e a identidade da sessão. Leads e fila (painel do dia), um lead (lead da própria fila, notas em `lead_interactions`, última mensagem só se o contato pode ser revelado, próximo passo da IA), carteira (`getBrokerClientWallet`, visão Renovações; aniversários de contrato em 30 dias), plantões (painel + `getBrokerDutyCalendarData` para a escala da semana; desligada = "não liberada"), agenda, desempenho (`getBrokerHighlights`, meta), comissões (`getBrokerFinanceDetail`: a receber, recebido no mês com o pago fora do ERP, previsto pelo cronograma; sem acesso = "você não tem acesso ao Meu financeiro"), vendas (`getSales`, só as do corretor e ativas, mês de São Paulo), cotações e propostas (`quotes`/`proposals` criadas por ele), avisos e conta (status do WhatsApp do ícone do Início, disponibilidade).
+- **Respostas diretas** (`ecosystem-answers.ts`, puro): perguntas reconhecíveis respondem sem IA, grátis e sem inventar ("quanto tenho a receber?", "quanto vou receber no mês que vem?", "quantas vendas fiz este mês?", "quanto vendi em valor?", "escala da semana", "estou confirmado?", "renovações em 90 dias", "meu WhatsApp está conectado?"...). Valor sem base no ERP aparece como "sem dado ainda", nunca zero.
+- **IA dinâmica limitada** (`ecosystem-agent.ts`): o que não tem resposta direta, ou pede análise ("qual lead devo priorizar?", "resume o Carlos", "compara com a semana passada"), vai para um laço de até 4 leituras e 1 resposta, ~15 s, só com as ferramentas de leitura do próprio corretor (JSON + zod no gateway, provedores pagos, dados mascarados). Ao estourar, responde com o que viu e diz o que faltou. Só afirma o que veio das leituras; fora do CRM, recusa com educação. Precisa do consentimento de IA e conta no teto de 150 por dia; a linha de `sasa_commands` guarda `read:<áreas>` ou `agent:<áreas>[:limite]`.
+- **Chave por empresa** no Super-admin ("IA dinâmica da Sasá", `sasa_dynamic_ai_<tenantId>`), ligada por padrão; desligada, ficam só as respostas diretas.
+- **Comandos não roubam perguntas**: "escala da semana", "estou confirmado no plantão?", "o que tenho de novo nos avisos?" e "há quanto tempo estão esperando?" vão para as respostas do ecossistema.
+- Laboratório: 20 perguntas prontas (as de comissões e vendas do usuário e as de cada área) com fatos de exemplo e o código real; 3 perguntas abertas com a IA limitada (modelo de mentira com roteiro) e uma que estoura o teto de 4 consultas. Cada pergunta tem teste em `ecosystem.test.ts`.
+
 ### Fase 5 · Sensíveis e vários passos
 
 - Intenções 11 a 13 (aceitar/recusar, perder, rascunho de mensagem), 22 (vários passos numa frase, lista confirmada em um toque), e avaliação de tool calling nativo para leituras encadeadas.
