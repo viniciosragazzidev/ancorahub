@@ -68,9 +68,12 @@ function classifyRaw(input: string): SasaIntent | null {
   if (/\b(volta|voltar|volte) a receber\b|\b(despausa|despausar|retoma|retomar)\b|\bquero receber\b|\bme (ativa|libera|despausa)\b/.test(text)) return { tool: "duty.resume" };
   if (/\b(pausa|pausar|pause|me pausa)\b|\b(para|parar) de receber\b|\bnao quero (mais )?receber\b/.test(text)) return { tool: "duty.pause" };
 
-  if (/\b(esperando|aguardando|sem resposta)\b/.test(text) || /\bquem (eu )?(atendo|respondo|devo|tenho que)\b/.test(text)) return { tool: "leads.waiting" };
-  if (/\bagenda\b|\bo que (eu )?tenho\b|\bmeus retornos\b|\bretornos? (de )?(hoje|amanha|atrasados?)\b|\bcomo (esta|ta) (o )?meu dia\b/.test(text)) return { tool: "agenda.list" };
-  if (/\bplantao\b|\bplantoes\b|\bescala\b/.test(text)) return { tool: "duty.next" };
+  // Leituras rápidas com lista na conversa. Perguntas mais finas (tempo de espera, escala da semana, confirmação,
+  // avisos, dinheiro) seguem para as respostas do ecossistema, que trazem esses números.
+  const finer = /\b(quanto tempo|ha quanto|semana|escala|confirmad\w*|presenca|avisos?|notificac\w*|novidades?|de novo|whatsapp|vendas?|comiss\w*|receber|recebi)\b/.test(text);
+  if (!finer && (/\b(esperando|aguardando|sem resposta)\b/.test(text) || /\bquem (eu )?(atendo|respondo|devo|tenho que)\b/.test(text))) return { tool: "leads.waiting" };
+  if (!finer && /\bagenda\b|\bo que (eu )?tenho\b|\bmeus retornos\b|\bretornos? (de )?(hoje|amanha|atrasados?)\b|\bcomo (esta|ta) (o )?meu dia\b/.test(text)) return { tool: "agenda.list" };
+  if (!finer && /\bplantao\b|\bplantoes\b/.test(text)) return { tool: "duty.next" };
   return null;
 }
 

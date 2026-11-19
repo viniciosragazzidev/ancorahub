@@ -9,6 +9,9 @@ import { runChatServerAction } from "@/features/broker-workspace/chat/chat-actio
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
 import { runSasaCommand, sasaWorldOf, type SasaReply } from "./command-core";
+import { isSasaDynamicAiEnabled } from "./dynamic-ai-flag";
+import { answerSasaQuestion } from "./ecosystem";
+import { looksLikeQuestion } from "./ecosystem-areas";
 import { classifySasaText } from "./intent-rules";
 import { interpretSasaText } from "./interpret";
 import { sasaLimitMessage } from "./limits";
@@ -73,7 +76,9 @@ export async function sasaCommandAction(raw: { text: string; clientCommandId?: s
     if (!classifySasaText(input.text)) {
       // LGPD: nada vai a um modelo sem o consentimento atual.
       const consent = await readAiConsent(context.tenantId, context.userId).catch(() => ({ granted: false }));
-      if (consent.granted) {
+      // Pergunta não vira comando: vai direto para a leitura do ecossistema.
+      const asking = looksLikeQuestion(input.text);
+      if (consent.granted && !asking) {
         interpreted = await interpretSasaText({
           tenantId: context.tenantId,
           userId: context.userId,
@@ -83,6 +88,14 @@ export async function sasaCommandAction(raw: { text: string; clientCommandId?: s
         }).catch(() => null);
       }
       if (!interpreted) {
+        // Ecossistema (19/11): resposta direta pelos dados das telas; sem ela, a IA limitada (chave da empresa + consentimento).
+        const dynamic = consent.granted && await isSasaDynamicAiEnabled(context.tenantId);
+        const answer = await answerSasaQuestion(context, input.text, { dynamic, now }).catch((error) => { console.error("[sasa] answer failed", error); return null; });
+        if (answer) {
+          const reply: SasaReply = { handled: true, blocks: [{ type: "assistant", id: `sasa-answer-${now.getTime()}`, text: answer.text }] };
+          await save("answered", { tool: `${answer.via === "direct" ? "read" : "agent"}:${answer.areas.join(",")}${answer.truncated ? ":limite" : ""}`.slice(0, 120), via: answer.via === "direct" ? "rules" : "ai", reply });
+          return reply;
+        }
         await save("not_command");
         return NOT_HANDLED;
       }
