@@ -353,6 +353,13 @@ No painel do laboratório: resposta do servidor (ok, falha, ambíguo, sem rede),
 - Laboratório: no "Botão da Sasá", o painel "Próxima fala" escolhe "Fechou a venda", "O cliente disse" ou "Cotação"; "Fechou a venda" cai no fluxo "Registrar venda" com as respostas preenchidas. As três falas também estão na lista de pedidos do fluxo da conversa.
 - **Pendente**: no laboratório a cotação não abre (a cotação guiada precisa do catálogo real do servidor); desfazer nota não existe (a ação de nota não devolve o id).
 
+### Ajustes de 19/11 (antes da fase 5)
+
+- **Fundo do flutuante**: o botão, a faixa de gravação, o "Entendendo o áudio…" e o toast ficavam transparentes porque o dock vive fora das telas e os tokens do Lite só existem dentro de `.arc-venancor`. O dock agora leva a classe, cada peça repete a superfície com valor de reserva, borda de 1px e sombra leve (`--shadow-raised`, não mais `--shadow-floating`). A folha curta já usava `arc-venancor`.
+- **Sasá responde sobre todo o ecossistema do corretor** (`ecosystem.ts`, `ecosystem-areas.ts`): dez ferramentas de leitura, uma por área (leads e espera, um lead com histórico e notas, carteira e renovações, plantões, agenda, desempenho e ranking, comissões, vendas, cotações e propostas, avisos), cada uma com a consulta que a própria tela usa (`getCachedBrokerWorkspaceData`, `getBrokerClientWallet`, `getBrokerFinanceSummary`, `getSaleSummary`/`getSales`, `getBrokerHighlights`, `quotes`/`proposals` do próprio corretor, `notifications`, `leadInteractions` de um lead da própria fila). Tenant, corretor e papel só da sessão; nada de SQL livre. Escolha das ferramentas: palavras da pergunta e nome de lead conhecido; sem isso, a IA escolhe numa lista fechada (JSON + zod no gateway, D1). O resumo continua pelo `askAssistantAction` (consentimento, material das operadoras, provedores pagos). Teto de 150 por dia e auditoria em `sasa_commands` (`tool = ask:<áreas>`).
+- **Pergunta nunca escreve**: "o que a Ana disse?", "quantas vendas eu fechei?", "quantos leads em negociação?" e "quais cotações eu fiz?" viram leitura, não nota, venda, etapa ou cotação.
+- Laboratório: perguntas prontas de cada área no fluxo da conversa; lá a IA não roda e a resposta diz quais dados seriam lidos.
+
 ### Fase 5 · Sensíveis e vários passos
 
 - Intenções 11 a 13 (aceitar/recusar, perder, rascunho de mensagem), 22 (vários passos numa frase, lista confirmada em um toque), e avaliação de tool calling nativo para leituras encadeadas.

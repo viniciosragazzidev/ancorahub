@@ -88,6 +88,17 @@ export async function saveSasaCommand(input: {
   }
 }
 
+/** Pergunta respondida lendo o ecossistema: guarda quais áreas foram lidas (auditoria). */
+export async function markSasaAnswered(tenantId: string, userId: string, clientCommandId: string, areas: string[], via: string) {
+  try {
+    await getDatabase().update(schema.sasaCommands)
+      .set({ status: "answered", tool: `ask:${areas.join(",")}`.slice(0, 120), via, updatedAt: new Date() })
+      .where(and(eq(schema.sasaCommands.tenantId, tenantId), eq(schema.sasaCommands.userId, userId), eq(schema.sasaCommands.clientCommandId, clientCommandId)));
+  } catch (error) {
+    warn(error);
+  }
+}
+
 /** D5: apaga o texto dito e a resposta dos pedidos com mais de 90 dias (a linha fica como trilha). */
 export async function purgeOldSasaCommands(now = new Date(), batch = 5_000) {
   const db = getDatabase();
