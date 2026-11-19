@@ -8,6 +8,14 @@ import { runSasaCommand, type SasaActionResult, type SasaWorld } from "@/feature
 import { parseWhenPtBr } from "@/features/sasa/parse-when";
 import type { DevLab } from "@/lib/dev-lab";
 
+/** O que o "microfone" do laboratório ouve, em ordem: o segundo vem com a hora errada, para testar o Corrigir. */
+export const LAB_SASA_VOICE = [
+  "marca retorno com a Ana amanhã às 10",
+  "marca retorno com o Pedro amanhã às 11",
+  "pausa meu plantão",
+  "quem está esperando resposta",
+];
+
 export type LabOutcome = "ok" | "falha" | "liberacao";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -65,7 +73,7 @@ export function labSasaPhrasesBlock(): ChatBlock {
 
 const PRESET_MINUTES: Record<string, number> = { today: 60, tomorrow: 60 * 24, in_2_days: 60 * 48, in_3_days: 60 * 72 };
 
-export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["returns"] }, options: { delay: number; outcome: LabOutcome }): NonNullable<DevLab["sasa"]> {
+export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["returns"]; heard?: number; offline?: boolean }, options: { delay: number; outcome: LabOutcome }): NonNullable<DevLab["sasa"]> {
   const run = async (name: ChatServerActionName, raw: Record<string, string | number | boolean | null>): Promise<SasaActionResult> => {
     await wait(options.delay);
     if (options.outcome === "falha") return { ok: false, message: "O servidor recusou (simulado). Nada foi alterado." };
@@ -111,10 +119,21 @@ export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["retu
   };
   return {
     run,
+    simulateMic: true,
+    get offline() { return Boolean(state.offline); },
+    transcribe: async () => {
+      if (state.offline) throw new TypeError("Failed to fetch");
+      await wait(options.delay);
+      if (options.outcome === "falha") return { ok: false, error: "Não consegui entender o áudio. Tente de novo ou escreva." };
+      const index = state.heard ?? 0;
+      state.heard = index + 1;
+      return { ok: true, text: LAB_SASA_VOICE[index % LAB_SASA_VOICE.length]! };
+    },
     command: async (input) => {
+      if (state.offline) throw new TypeError("Failed to fetch");
       await wait(Math.min(options.delay, 600));
       state.world.now = new Date();
-      return runSasaCommand({ ...input, world: state.world, run: (name, payload) => run(name, payload) });
+      return runSasaCommand({ ...input, recordedAt: input.recordedAt ? new Date(input.recordedAt) : null, world: state.world, run: (name, payload) => run(name, payload) });
     },
   };
 }

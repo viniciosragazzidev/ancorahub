@@ -8,8 +8,9 @@
 import { createContext, useContext } from "react";
 
 import type { SaleChatServices } from "@/features/post-sale/components/sale-chat";
-import type { SasaActionResult, SasaCommandInput, SasaReply } from "@/features/sasa/command-core";
+import type { SasaActionResult, SasaClientCommand, SasaReply } from "@/features/sasa/command-core";
 import type { ChatServerActionName } from "@/components/chat/types";
+import type { VoiceTranscribe } from "@/components/chat/voice-recorder";
 import type { TeamListApi } from "@/features/supervisor-workspace/lead-import/parse-contacts";
 
 export type DevLab = {
@@ -27,8 +28,14 @@ export type DevLab = {
   sale?: SaleChatServices;
   /** Sasá agêntica: no lugar de sasaCommandAction e das ações do chat (Desfazer, atalhos de data). */
   sasa?: {
-    command: (input: SasaCommandInput) => Promise<SasaReply>;
+    command: (input: SasaClientCommand) => Promise<SasaReply>;
     run: (name: ChatServerActionName, payload: Record<string, string | number | boolean | null>) => Promise<SasaActionResult>;
+    /** No lugar do POST /api/sasa/voz (fase 2): devolve um texto simulado. */
+    transcribe?: VoiceTranscribe;
+    /** Sem microfone (painel de testes): o botão grava de mentira, com o mesmo gesto. */
+    simulateMic?: boolean;
+    /** Chave "Sem internet" do laboratório (fase 3): o envio falha como sem rede e o áudio vai para a fila. */
+    offline?: boolean;
   };
 };
 

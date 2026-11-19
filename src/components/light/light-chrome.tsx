@@ -1,6 +1,7 @@
 "use client";
 
 import { AchievementHost } from "@/components/lite/celebration/achievement-host";
+import { SasaVoiceButton } from "@/components/chat/sasa-voice-button";
 import { CHAT_RAIL_REFRESH_EVENT } from "@/components/chat/chat-events";
 import { TipHost } from "@/components/chat/tip-host";
 import Link from "next/link";
@@ -45,6 +46,7 @@ export function LightChrome({
   showQuoteSimulator = false,
   showDutyCalendar = false,
   showRelationship = false,
+  sasaVoiceEnabled = false,
   showNegotiations = false,
   journeyEnabled = false,
   homeV2Enabled = false,
@@ -68,6 +70,7 @@ export function LightChrome({
   showQuoteSimulator?: boolean;
   showDutyCalendar?: boolean;
   showRelationship?: boolean;
+  sasaVoiceEnabled?: boolean;
   showNegotiations?: boolean;
   journeyEnabled?: boolean;
   homeV2Enabled?: boolean;
@@ -168,6 +171,8 @@ export function LightChrome({
       {audience === "broker" ? <TipHost /> : null}
       {/* Conquistas do corretor (15/11/2026): presença confirmada e WhatsApp conectado, na tela do capitão. */}
       {audience === "broker" && !viewAs.viewingAs ? <AchievementHost /> : null}
+      {/* Botão da Sasá (fase 3): segurar e falar de qualquer tela; some em conversas, folhas, oferta e celebração. */}
+      {audience === "broker" && sasaVoiceEnabled && !viewAs.viewingAs ? <SasaVoiceButton pathname={pathname} chat={Boolean(chat)} /> : null}
       {audience === "broker" ? <Suspense fallback={null}><LiteMicroTour pathname={pathname} /></Suspense> : null}
     </LightAvailabilityProvider>
   );

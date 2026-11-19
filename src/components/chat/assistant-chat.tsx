@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { runChatServerAction } from "@/features/broker-workspace/chat/chat-actions";
@@ -9,8 +9,9 @@ import { useAssist } from "@/features/assist/components/assist-layer";
 import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
 import type { AgentId } from "@/features/ai-gateway/agents";
 import { ASSISTANTS, SASA_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
-import { readSasaPick, type SasaCommandInput } from "@/features/sasa/command-core";
+import { readSasaPick, SASA_DROP_VALUE, type SasaClientCommand } from "@/features/sasa/command-core";
 import { sasaCommandAction } from "@/features/sasa/command-action";
+import { readSasaFix, sasaFixBlock, transcribeSasaVoice } from "@/features/sasa/voice-client";
 import { useDevLab } from "@/lib/dev-lab";
 import { useFeedback } from "@/lib/feedback/use-feedback";
 
@@ -23,7 +24,7 @@ import type { Mention } from "./composer";
 import type { AssistantAvatarAsset, ChatBlock, ChatScript, MascotShape } from "./types";
 
 /** An assistant conversation: the script plays, replies run the broker's actions. */
-export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false }: { identity: { name: string; shape: MascotShape; hue: number | null; avatarAsset?: AssistantAvatarAsset }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Sasá's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean }) {
+export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false, voice = false, embedded = false }: { identity: { name: string; shape: MascotShape; hue: number | null; avatarAsset?: AssistantAvatarAsset }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Sasá's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean; /** Segurar para falar com a Sasá (fase 2): só para quem tem a Sasá com IA liberada. */ voice?: boolean; /** Só os blocos, sem cabeçalho nem campo (folha do botão da Sasá, fase 3). */ embedded?: boolean }) {
   const router = useRouter();
   const assist = useAssist();
   // Aceite com contador (11/11): ligado, o WhatsApp abre na tela do lead depois de 30 s.
@@ -32,14 +33,19 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
   const fire = useFeedback();
   // Sasá agêntica (fase 1, 19/11): o pedido roda primeiro como comando; o que não for comando segue para a IA.
   const agentic = agentId === "ancora";
-  const command = async (input: SasaCommandInput) => {
+  // "Corrigir o que eu ouvi": o texto transcrito volta para o campo.
+  const [draft, setDraft] = useState<{ text: string; key: number } | null>(null);
+  const transcribe = agentic && canWrite && (voice || Boolean(lab?.sasa?.transcribe)) ? (lab?.sasa?.transcribe ?? transcribeSasaVoice) : undefined;
+  const runServer = (name: Parameters<typeof runChatServerAction>[0], payload: Record<string, string | number | boolean | null>) =>
+    lab?.sasa ? lab.sasa.run(name, payload) : runChatServerAction(name, payload);
+  const command = async (input: SasaClientCommand) => {
     const reply = await (lab?.sasa?.command ?? sasaCommandAction)(input);
     // Nível 1 (FEEDBACK.md): confirmação só depois do servidor; falha com erro. Sem som de celebração.
     if (reply.executed) feedbackOnResult(reply.executed.action, reply.executed, fire);
     return reply;
   };
   const askAi = async (text: string): Promise<ChatBlock[]> => {
-    if (lab?.sasa) return [{ type: "assistant", id: `lab-free-${Date.now()}`, text: "No laboratório, só os pedidos da fase 1 respondem: plantão, pausa, quem está esperando, agenda, retornos e etapa." }];
+    if (lab?.sasa) return [{ type: "assistant", id: `lab-free-${Date.now()}`, text: "No laboratório, só os pedidos da Sasá respondem: plantão, pausa, quem está esperando, agenda, retornos e etapa." }];
     if (agentId) return (await askAssistantAction({ agentId, question: text })).blocks;
     return [{ type: "assistant", id: `free-answer-${Date.now()}`, text: "Não achei isso. Tente com outras palavras ou toque em \"?\" no topo para a ajuda da tela." }];
   };
@@ -53,13 +59,28 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
   };
   return (
     <ChatScreen
+      embedded={embedded}
       composerDisabled={!canWrite}
       placeholder={canWrite ? undefined : "Escolha uma opção acima. Para perguntar, fale com Sasá."}
       onLocalChoice={async (_choice, value): Promise<ChatBlock[]> => {
         if (value.startsWith(SASA_ASK_PREFIX)) return ask(value.slice(SASA_ASK_PREFIX.length));
+        if (value === SASA_DROP_VALUE) return [{ type: "assistant", id: `sasa-drop-${Date.now()}`, text: "Tudo bem, não fiz nada." }];
         // "Qual Carlos?" e "Tentar de novo": repete o pedido com o lead escolhido.
         const pick = readSasaPick(value);
         if (pick) return (await command({ text: pick.text, pickedLeadId: pick.leadId })).blocks;
+        const fix = readSasaFix(value);
+        if (fix) {
+          // Ouviu errado: desfaz o que foi feito com o texto errado e devolve o texto para corrigir.
+          let undone = false;
+          if (fix.undo) {
+            const result = await runServer(fix.undo.name, fix.undo.payload).catch(() => ({ ok: false, message: "" }));
+            feedbackOnResult(fix.undo.name, result, fire);
+            undone = result.ok;
+            if (!result.ok) return [{ type: "assistant", id: `sasa-fix-failed-${Date.now()}`, text: "Não consegui desfazer o que fiz. Use o Desfazer acima e tente de novo." }];
+          }
+          setDraft({ text: fix.text, key: Date.now() });
+          return [{ type: "assistant", id: `sasa-fix-${Date.now()}`, text: undone ? "Desfiz o que eu tinha feito. Corrija o texto abaixo e envie." : "Corrija o texto abaixo e envie." }];
+        }
         return [];
       }}
       identity={identity}
@@ -74,7 +95,7 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
         const whatsapp = !handoffAccept && (action.name === "lead.accept" || action.name === "lead.registerContact") ? prepareWhatsAppWindow() : null;
         let result: Awaited<ReturnType<typeof runChatServerAction>>;
         try {
-          result = lab?.sasa ? await lab.sasa.run(action.name, action.payload) : await runChatServerAction(action.name, action.payload);
+          result = await runServer(action.name, action.payload);
         } catch (error) {
           whatsapp?.cancel();
           throw error;
@@ -107,11 +128,15 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
         router.push(destination ?? `/dashboard/c/${encodeURIComponent(mention.handle)}`);
         return [];
       }}
+      composerVoice={transcribe}
+      composerDraft={draft}
       onFreeText={async (text, meta): Promise<ChatBlock[]> => {
         if (agentic) {
-          const reply = await command({ text, clientCommandId: meta?.clientMessageId ?? null });
-          if (reply.handled) return reply.blocks;
-          if (lab?.sasa) return askAi(text);
+          const reply = await command({ text, clientCommandId: meta?.clientMessageId ?? null, origin: meta?.voice ? "voice" : "text" });
+          // Voz: o que foi entendido sempre pode ser corrigido (desfazendo o que foi feito).
+          const withFix = (blocks: ChatBlock[]) => (meta?.voice ? [...blocks, sasaFixBlock(text, blocks, String(Date.now()))] : blocks);
+          if (reply.handled) return withFix(reply.blocks);
+          if (lab?.sasa || meta?.voice) return withFix(await askAi(text));
         }
         // "Onde fica?" answered from the app catalog first: instant, free and always right.
         const where = bestAssistMatch(text, assist?.capabilities ?? {});

@@ -56,6 +56,7 @@ export function AppShell({
   isLightBroker = false,
   showDutyCalendar = false,
   showRelationship = false,
+  sasaVoiceEnabled = false,
   journeyEnabled = false,
   homeV2Enabled = false,
   callAncoraEnabled = false,
@@ -87,6 +88,8 @@ export function AppShell({
   isLightBroker?: boolean;
   showDutyCalendar?: boolean;
   showRelationship?: boolean;
+  /** Botão flutuante da Sasá (fase 3): corretor Lite com a Sasá liberada. */
+  sasaVoiceEnabled?: boolean;
   journeyEnabled?: boolean;
   /** Início do corretor reorganizado (BROKER_NAV_REORG): menu Mais novo. */
   homeV2Enabled?: boolean;
@@ -231,6 +234,7 @@ export function AppShell({
           user={user}
           showDutyCalendar={showDutyCalendar}
           showRelationship={showRelationship}
+          sasaVoiceEnabled={sasaVoiceEnabled}
           journeyEnabled={journeyEnabled}
           homeV2Enabled={homeV2Enabled}
           callAncoraEnabled={callAncoraEnabled}

@@ -265,6 +265,10 @@ const conversationSaleInput = z.object({
   ages: z.array(z.number().int().min(0, "Idade inválida.").max(120, "Idade inválida.")).min(1, "Informe a idade do titular.").max(30, "Cabem até 30 vidas."),
   carrierId: z.string().min(1).nullable(),
   planId: z.string().min(1).nullable(),
+  /** Plano escolhido em qualquer catálogo (vai para o lead); `planId` só existe quando é do catálogo antigo. */
+  leadPlanId: z.string().min(1).max(200).nullable().optional(),
+  carrierName: z.string().trim().max(160).nullable().optional(),
+  planName: z.string().trim().max(200).nullable().optional(),
   approvedValue: z.coerce.number().finite().positive("Informe o valor mensal da venda.").max(1_000_000, "Confira o valor mensal."),
   coverageStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe uma data de vigência válida."),
   source: z.enum(["conversa", "contrato"]),
@@ -295,6 +299,7 @@ export async function registerConversationSaleAction(rawInput: ConversationSaleI
   const notes = [
     `Registrada pela conversa${input.source === "contrato" ? " com o contrato lido pela IA" : ""}.`,
     `Tipo: ${PLAN_TYPE_LABEL[input.planType]}.`,
+    ...(input.carrierName ? [`Operadora: ${input.carrierName}${input.planName ? `, plano ${input.planName}` : ""}.`] : []),
     `Vidas: ${input.ages.length} (titular ${holderAge}${dependents.length ? `; dependentes ${dependents.join(", ")}` : ""}).`,
   ].join(" ");
   try {
@@ -309,7 +314,7 @@ export async function registerConversationSaleAction(rawInput: ConversationSaleI
       approvedValue: input.approvedValue,
       confirmationDocumentId: null,
       ...(input.carrierId ? { carrierId: input.carrierId } : {}),
-    }, { planId: input.planId, ages: input.ages, notes, people, contract: input.contract ?? null });
+    }, { planId: input.planId, leadPlanId: input.leadPlanId ?? input.planId, ages: input.ages, notes, people, contract: input.contract ?? null });
   } catch (error) {
     if (error instanceof SaleAlreadyRegisteredError) return { error: error.message };
     console.error("[register-sale-conversation] failed", { leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 200) : "unknown" });
@@ -425,7 +430,7 @@ type SaleCoreInput = Omit<z.output<typeof registerSaleInput>, "policyNumber" | "
  * Venda registrada pela conversa (19/11): sem documentos nesta fase. O que o corretor respondeu (ou o que a IA leu
  * do contrato) vai para o lead: plano, vidas e valor; a idade do titular vai para o titular, criado se faltar.
  */
-type ConversationSale = { planId: string | null; ages: number[]; notes: string; people: ConversationPerson[]; contract: z.output<typeof contractFileInput> | null };
+type ConversationSale = { planId: string | null; leadPlanId: string | null; ages: number[]; notes: string; people: ConversationPerson[]; contract: z.output<typeof contractFileInput> | null };
 
 async function registerSale(input: SaleCoreInput, conversation: ConversationSale | null = null): Promise<RegisterSaleResult> {
   const { context, db, lead } = await assertLeadScope(input.leadId);
@@ -452,7 +457,8 @@ async function registerSale(input: SaleCoreInput, conversation: ConversationSale
   if (missing.length) return { error: "Ainda existem documentos obrigatórios pendentes ou rejeitados." };
   }
 
-  let resolvedPlanId = lead.planId;
+  // Pela conversa só um plano do catálogo antigo liga a venda (o do lead pode ser do catálogo novo e não serve à FK).
+  let resolvedPlanId = conversation ? null : lead.planId;
   if (conversation?.planId) {
     const [plan] = await db.select({ id: schema.carrierPlans.id }).from(schema.carrierPlans)
       .where(and(eq(schema.carrierPlans.id, conversation.planId), eq(schema.carrierPlans.tenantId, context.tenantId), ...(input.carrierId ? [eq(schema.carrierPlans.carrierId, input.carrierId)] : [])))
@@ -514,7 +520,7 @@ async function registerSale(input: SaleCoreInput, conversation: ConversationSale
       const evidenceIssue = saleEvidenceIssue(lockedEvidence);
       if (evidenceIssue) throw new SaleDocumentValidationError(saleEvidenceIssueMessage(evidenceIssue) ?? "Revise os documentos obrigatórios antes de registrar a venda.");
     } else {
-      conversationDocumentId = await applyConversationSaleToLead(tx, { tenantId: context.tenantId, userId: context.userId, leadId: lead.id, leadName: lead.nome, planId: resolvedPlanId, approvedValue: input.approvedValue, ages: conversation.ages, people: conversation.people, contract: conversation.contract, coverageStartDate: input.coverageStartDate, now });
+      conversationDocumentId = await applyConversationSaleToLead(tx, { tenantId: context.tenantId, userId: context.userId, leadId: lead.id, leadName: lead.nome, planId: conversation.leadPlanId ?? resolvedPlanId, approvedValue: input.approvedValue, ages: conversation.ages, people: conversation.people, contract: conversation.contract, coverageStartDate: input.coverageStartDate, now });
     }
     // Já convertido pela IA: a etapa não muda de novo e o desfecho já foi avisado na conversão.
     soldFrom = lockedAiSale ? null : { status: locked.status, stageEnteredAt: locked.stageEnteredAt ?? null };

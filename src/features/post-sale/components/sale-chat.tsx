@@ -25,6 +25,7 @@ import {
   PLAN_TYPE_LABEL,
   resetSaleAnswers,
   saleAwaiting,
+  saleCatalogSelection,
   saleProgress,
   splitSaleChoice,
   type ExtractedRow,
@@ -48,8 +49,13 @@ export type SaleChatServices = {
     leadId: string;
     planType: NonNullable<SaleAnswers["planType"]>;
     ages: number[];
+    /** Operadora e plano do catálogo antigo (ligados à venda e às comissões); null quando o plano é do catálogo novo. */
     carrierId: string | null;
     planId: string | null;
+    /** O plano escolhido, de qualquer catálogo: vai para o lead. */
+    leadPlanId?: string | null;
+    carrierName?: string | null;
+    planName?: string | null;
     approvedValue: number;
     coverageStartDate: string;
     source: "conversa" | "contrato";
@@ -126,8 +132,7 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
         leadId: lead.id,
         planType: current.planType,
         ages: current.ages,
-        carrierId: current.carrierId ?? null,
-        planId: current.planId ?? null,
+        ...saleCatalogSelection(catalog, current.carrierId, current.planId),
         approvedValue: current.monthlyValue,
         coverageStartDate: current.coverageStartDate,
         source: current.fromContract ? "contrato" : "conversa",

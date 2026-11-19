@@ -9,8 +9,26 @@ export type SalePlanType = "individual" | "familiar" | "pme" | "empresarial";
 export const PLAN_TYPE_LABEL: Record<SalePlanType, string> = { individual: "Individual", familiar: "Familiar", pme: "PME", empresarial: "Empresarial" };
 const PLAN_TYPE_ORDER: SalePlanType[] = ["individual", "familiar", "pme", "empresarial"];
 
-export type SaleCatalogPlan = { id: string; name: string; type: SalePlanType };
-export type SaleCatalogCarrier = { id: string; name: string; plans: SaleCatalogPlan[] };
+/**
+ * Planos da corretora: o catálogo (global liberado e privado) e o catálogo antigo (`carrier_plans`), que é o único
+ * que a venda liga por id (`sales.carrier_plan_id`, comissões). `source` diz de onde veio cada um.
+ */
+export type SaleCatalogPlan = { id: string; name: string; type: SalePlanType; source?: "legacy" | "catalog" };
+/** `legacyId`: a operadora no catálogo antigo (`carriers`), quando existe com o mesmo nome. */
+export type SaleCatalogCarrier = { id: string; name: string; legacyId?: string | null; plans: SaleCatalogPlan[] };
+
+/** O que a venda grava a partir da operadora e do plano escolhidos. */
+export function saleCatalogSelection(catalog: SaleCatalog, carrierId: string | null | undefined, planId: string | null | undefined) {
+  const carrier = catalog.carriers.find((item) => item.id === carrierId) ?? null;
+  const plan = carrier?.plans.find((item) => item.id === planId) ?? null;
+  return {
+    carrierId: carrier?.legacyId ?? null,
+    planId: plan && (plan.source ?? "legacy") === "legacy" ? plan.id : null,
+    leadPlanId: plan?.id ?? null,
+    carrierName: carrier?.name ?? null,
+    planName: plan?.name ?? null,
+  };
+}
 export type SaleCatalog = { carriers: SaleCatalogCarrier[] };
 
 export type SaleRelationship = "titular" | "conjuge" | "filho" | "outro";
@@ -185,7 +203,9 @@ export function nextSaleBlocks(answers: SaleAnswers, catalog: SaleCatalog, conte
       }];
     case "carrier": {
       const carriers = carriersFor(catalog, answers.planType);
-      return [{
+      return [
+        ...(carriers.length ? [] : [{ type: "assistant" as const, id: `a-no-carriers-${turn}`, text: "A corretora ainda não tem operadoras cadastradas no catálogo. Toque em Outra operadora para seguir; a direção completa depois." }]),
+        {
         type: "question",
         id: `q-carrier-${turn}`,
         prompt: "Qual a operadora?",

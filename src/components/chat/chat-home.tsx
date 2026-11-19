@@ -507,13 +507,13 @@ export function ChatHome({
       </section>
 
       {floatingNow && summary?.now ? (
-        <div className={`${styles.pillWrap} ${home.nowLauncher}`}>
+        <div className={`${styles.pillWrap} ${home.nowLauncher}`} data-sasa-lift="">
           <BottomSheet open={nowOpen} onOpenChange={setNowOpen} title="Agora" description={summary.now.items.length ? `${summary.now.items.length} ${summary.now.items.length === 1 ? "pendência na sua fila" : "pendências na sua fila"}.` : "Você está em dia."} detents={[summary.now.items.length <= 1 ? (compactNow ? 0.44 : 0.36) : summary.now.items.length === 2 ? (compactNow ? 0.66 : 0.5) : 0.8]} closeLabel="Fechar Agora" icon={<ListTodo strokeWidth={1.9} />} className="arc-venancor"
             trigger={<ArcButton type="button" variant="secondary" data-tour="home-pill" className={offerWaiting ? offerHaloClass : undefined} {...offerAttributes} aria-label={`${offerWaiting ? "Oferta pendente. " : ""}Abrir Agora: ${summary.now.items.length} ${summary.now.items.length === 1 ? "pendência" : "pendências"}`}><ListTodo size={18} aria-hidden="true" /><span>{offerWaiting ? "Oferta pendente" : "Agora"}</span><ArcBadge size="sm" tone="neutral">{summary.now.items.length || "Em dia"}</ArcBadge></ArcButton>}>
             <NowSection data={summary.now} floating onNavigate={() => setNowOpen(false)} />
           </BottomSheet>
         </div>
-      ) : <div className={styles.pillWrap} data-mobile-only>
+      ) : <div className={styles.pillWrap} data-mobile-only data-sasa-lift="">
         {next?.acceptLeadId ? (
           <AcceptLeadButton leadId={next.acceptLeadId} className={styles.pill} data-tour="home-pill" offerPending>{next.label}</AcceptLeadButton>
         ) : next ? (
