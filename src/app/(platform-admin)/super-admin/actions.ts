@@ -43,6 +43,7 @@ import { acceptHandoffSettingKey } from "@/features/broker-workspace/whatsapp-ha
 import { customerWaitingSettingKey, customerWaitingSinceKey } from "@/features/customer-waiting/flag";
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import { aiAudioTranscriptionSettingKey } from "@/features/ai-agent/audio-transcription/flag";
+import { sasaDynamicAiSettingKey } from "@/features/sasa/dynamic-ai-flag";
 import { qualificationContextAnalysisSettingKeys } from "@/features/ai-agent/qualification-context-analysis-settings";
 import { EXTENSION_PILOT_USERS_SETTING } from "@/features/browser-extension/pilot";
 
@@ -547,6 +548,20 @@ export async function updateAiAudioTranscriptionAction(tenantId: string, formDat
   await setSystemSetting(aiAudioTranscriptionSettingKey(targetTenantId), input.enabled, now);
   await getDatabase().insert(schema.platformAuditLogs).values({
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "ai_audio_transcription.tenant_updated",
+    targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now,
+  });
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
+}
+
+/** Liga ou desliga, por empresa, a IA dinâmica da Sasá (respostas abertas que combinam leituras). Ligada por padrão. */
+export async function updateSasaDynamicAiAction(tenantId: string, formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
+  const now = new Date();
+  await setSystemSetting(sasaDynamicAiSettingKey(targetTenantId), input.enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "sasa_dynamic_ai.tenant_updated",
     targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now,
   });
   revalidatePath(`/super-admin/tenants/${targetTenantId}`);

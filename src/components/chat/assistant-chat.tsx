@@ -12,6 +12,7 @@ import { ASSISTANTS, SASA_ASK_PREFIX } from "@/features/broker-workspace/chat/as
 import { readSasaPick, SASA_DROP_VALUE, type SasaClientCommand } from "@/features/sasa/command-core";
 import { sasaCommandAction } from "@/features/sasa/command-action";
 import { readSasaFix, sasaFixBlock, transcribeSasaVoice } from "@/features/sasa/voice-client";
+import { keepSasaOpen } from "@/features/sasa/drafts";
 import { useDevLab } from "@/lib/dev-lab";
 import { useFeedback } from "@/lib/feedback/use-feedback";
 
@@ -42,11 +43,18 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
     const reply = await (lab?.sasa?.command ?? sasaCommandAction)(input);
     // Nível 1 (FEEDBACK.md): confirmação só depois do servidor; falha com erro. Sem som de celebração.
     if (reply.executed) feedbackOnResult(reply.executed.action, reply.executed, fire);
+    // Fase 4: venda ou cotação já preenchidas com o que foi dito.
+    if (reply.open) {
+      keepSasaOpen(reply.open);
+      if (lab?.sasa?.open) lab.sasa.open(reply.open);
+      else router.push(reply.open.href);
+    }
     return reply;
   };
-  const askAi = async (text: string): Promise<ChatBlock[]> => {
+  const askAi = async (text: string, clientCommandId?: string): Promise<ChatBlock[]> => {
+    if (lab?.sasa?.ask) return lab.sasa.ask(text);
     if (lab?.sasa) return [{ type: "assistant", id: `lab-free-${Date.now()}`, text: "No laboratório, só os pedidos da Sasá respondem: plantão, pausa, quem está esperando, agenda, retornos e etapa." }];
-    if (agentId) return (await askAssistantAction({ agentId, question: text })).blocks;
+    if (agentId) return (await askAssistantAction({ agentId, question: text, ...(clientCommandId ? { clientCommandId } : {}) })).blocks;
     return [{ type: "assistant", id: `free-answer-${Date.now()}`, text: "Não achei isso. Tente com outras palavras ou toque em \"?\" no topo para a ajuda da tela." }];
   };
   /** Pergunta pronta ("ask:") ou texto: comando da Sasá primeiro, IA depois. */
@@ -136,7 +144,7 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
           // Voz: o que foi entendido sempre pode ser corrigido (desfazendo o que foi feito).
           const withFix = (blocks: ChatBlock[]) => (meta?.voice ? [...blocks, sasaFixBlock(text, blocks, String(Date.now()))] : blocks);
           if (reply.handled) return withFix(reply.blocks);
-          if (lab?.sasa || meta?.voice) return withFix(await askAi(text));
+          if (lab?.sasa || meta?.voice) return withFix(await askAi(text, meta?.clientMessageId));
         }
         // "Onde fica?" answered from the app catalog first: instant, free and always right.
         const where = bestAssistMatch(text, assist?.capabilities ?? {});
@@ -147,7 +155,7 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
             { type: "button", id: `where-go-${stamp}`, label: where.kind === "action" ? "Me leva lá" : `Abrir ${where.title}`, href: where.href },
           ];
         }
-        return askAi(text);
+        return askAi(text, meta?.clientMessageId);
       }}
     />
   );

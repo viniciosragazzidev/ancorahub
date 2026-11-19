@@ -6,6 +6,10 @@ import type { ChatBlock, ChatServerActionName } from "@/components/chat/types";
 import { SASA_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
 import { runSasaCommand, type SasaActionResult, type SasaWorld } from "@/features/sasa/command-core";
 import { parseWhenPtBr } from "@/features/sasa/parse-when";
+import { areasOf, SASA_AREA_LABEL, wantsAnalysis, type SasaArea } from "@/features/sasa/ecosystem-areas";
+import { runSasaAgentLoop } from "@/features/sasa/ecosystem-agent";
+import { answerFromFacts, factsToLines, type SasaFacts } from "@/features/sasa/ecosystem-answers";
+import { resolveLead } from "@/features/sasa/resolve-entities";
 import type { DevLab } from "@/lib/dev-lab";
 
 /** O que o "microfone" do laboratório ouve, em ordem: o segundo vem com a hora errada, para testar o Corrigir. */
@@ -50,7 +54,17 @@ export function labSasaWorld(now = new Date()): SasaWorld {
 }
 
 /** Pedidos prontos para tocar (o mesmo que digitar). */
+/** Fase 4: falas prontas para o botão (painel "Próxima fala"). */
+export const LAB_SASA_SPEECH = {
+  venda: "Fechou a venda do Carlos Teixeira, Amil S380 familiar, 3 vidas, 35, 32 e 8 anos, R$ 1.290 por mês",
+  disse: "A Ana disse que gostou da proposta e vai ver com o marido, me liga sexta às 10",
+  cotacao: "Cotação para 3 vidas, 35, 32 e 8 anos, pessoa física",
+} as const;
+
 export const LAB_SASA_PHRASES = [
+  LAB_SASA_SPEECH.disse,
+  LAB_SASA_SPEECH.venda,
+  LAB_SASA_SPEECH.cotacao,
   "Qual é meu próximo plantão?",
   "Pausa meu plantão",
   "Quem está esperando resposta?",
@@ -61,6 +75,128 @@ export const LAB_SASA_PHRASES = [
   "Mandei a cotação pro Carlos Mendes",
   "Marca retorno com o Roberto amanhã",
 ];
+
+/**
+ * Ecossistema do corretor no laboratório (19/11): os mesmos fatos que as telas mostrariam, para as respostas diretas
+ * rodarem com o código real (`answerFromFacts`). As perguntas abertas usam a camada limitada real
+ * (`runSasaAgentLoop`) com um modelo de mentira que segue um roteiro.
+ */
+export function labSasaFacts(now = new Date()): SasaFacts {
+  const at = (minutes: number) => new Date(now.getTime() + minutes * 60_000);
+  const day = (days: number) => at(days * 1440);
+  return {
+    leads: {
+      active: 5, byStatus: { negotiation: 1, in_contact: 2, quote_sent: 1, new: 1 }, newCount: 1, receivedToday: 3, acceptedToday: 2,
+      waiting: [{ name: "Carlos Mendes", reason: "respondeu", minutes: 25, urgent: false }, { name: "Júlia Prado", reason: "lead novo", minutes: 6, urgent: true }],
+    },
+    lead: { kind: "one", name: "Ana Souza", status: "quote_sent", tipo: "familiar", arrivedAt: day(-3), summary: "Família de 3, quer Amil ou SulAmérica até R$ 1.500.", nextStep: "Ligar para tirar a dúvida da carência do filho.", objections: ["preço"], lastMessage: { from: "cliente", text: "Vou ver com meu marido e te falo", at: at(-120) }, notes: [{ at: day(-1), text: "Pediu a cotação da Amil S380" }] },
+    wallet: { total: 42, attention: 3, renewalCount: 2, hasRenewalData: true, renewals: [{ name: "Marcos Lima", from: "02/12" }, { name: "Paula Reis", from: "15/12" }], anniversaries: [{ name: "Rita Alves", on: day(9), years: 1 }] },
+    duty: {
+      active: [{ name: "TESTE", startsAt: at(-60), endsAt: at(300), paused: false, presence: "confirmed" }],
+      next: { name: "PME Manhã", startsAt: day(1), endsAt: at(1440 + 240) },
+      week: [{ name: "PME Manhã", startsAt: day(1), endsAt: at(1440 + 240) }, { name: "Presencial Centro", startsAt: day(3), endsAt: at(3 * 1440 + 480) }],
+      presenceAsk: null,
+    },
+    agenda: { items: [{ lead: "Ana Souza", title: "Retornar contato", dueAt: at(-60) }, { lead: "Pedro Lima", title: "Retornar contato hoje", dueAt: at(120) }, { lead: "Carlos Teixeira", title: "Retornar contato", dueAt: day(2) }] },
+    performance: {
+      today: { received: 3, accepted: 2, returnsDue: 2, awaiting: 2 },
+      goal: { name: "Vendas de novembro", current: "6", target: "10", percentage: 60 },
+      week: { offered: 20, accepted: 17, started: 15, medianAcceptSeconds: 48, medianStartSeconds: 420 },
+      ranks: [{ position: 2, total: 12, label: "nos que mais aceitam" }],
+    },
+    finance: {
+      access: true, periodLabel: "novembro de 2026", receivableCents: 345_000, receivedThisMonthCents: 128_050, openAdvancesCents: 0,
+      forecast: [{ label: "nov/26", cents: 98_000 }, { label: "dez/26", cents: 112_500 }, { label: "jan/27", cents: 87_000 }],
+      nextInstallment: { label: "12/2026", cents: 45_000, client: "Marcos Lima" },
+    },
+    sales: { monthLabel: "novembro", monthCount: 4, monthValue: 5_960, totalCount: 31, totalValue: 41_870, last: [{ on: day(-2), client: "Marcos Lima", plan: "Amil S380", value: 1_290 }, { on: day(-6), client: "Paula Reis", plan: "SulAmérica Exato", value: 1_870 }] },
+    quotes: { quotes: [{ lead: "Ana Souza", status: "sent", total: 1_290, at: day(-1) }, { lead: "Pedro Lima", status: "draft", total: null, at: at(-90) }], proposals: [{ lead: "Carlos Teixeira", title: "Familiar Amil", status: "negociacao", total: 1_890, at: day(-2) }] },
+    notifications: { unread: 2, items: [{ title: "Escala de dezembro publicada", at: at(-30), unread: true }, { title: "Recado da gestão", at: at(-200), unread: true }, { title: "Meta atualizada", at: day(-1), unread: false }] },
+    account: { whatsapp: "connected", connectedAt: day(-12), availability: "available" },
+  };
+}
+
+/** Perguntas prontas: as do usuário (comissões e vendas) e uma de cada área. */
+export const LAB_SASA_QUESTIONS: Array<[SasaArea, string]> = [
+  ["finance", "Quanto tenho a receber?"],
+  ["finance", "Quanto recebi este mês?"],
+  ["finance", "Quanto vou receber no mês que vem?"],
+  ["sales", "Quantas vendas fiz este mês?"],
+  ["sales", "Quais foram minhas últimas vendas?"],
+  ["sales", "Quanto vendi em valor?"],
+  ["leads", "Quantos leads novos eu tenho?"],
+  ["leads", "Quem está esperando resposta e há quanto tempo?"],
+  ["lead", "Me fala da Ana Souza"],
+  ["wallet", "Quais clientes renovam nos próximos 90 dias?"],
+  ["wallet", "Tem aniversário de contrato chegando?"],
+  ["duty", "Qual é minha escala da semana?"],
+  ["duty", "Estou confirmado no plantão?"],
+  ["agenda", "Quais retornos tenho na semana?"],
+  ["performance", "Quanto falta para a meta?"],
+  ["performance", "Qual meu tempo de primeira resposta?"],
+  ["quotes", "Quais propostas estão pendentes?"],
+  ["notifications", "O que tenho de novo nos avisos?"],
+  ["account", "Meu WhatsApp está conectado?"],
+  ["account", "Estou disponível ou pausado?"],
+];
+
+/** Perguntas abertas (IA limitada) e o caso que estoura o teto de consultas. */
+export const LAB_SASA_OPEN = [
+  "Como foi minha semana comparada à anterior?",
+  "Qual lead devo priorizar agora?",
+  "Resume o Carlos Mendes pra mim",
+  "Analisa tudo: leads, carteira, agenda, comissões e vendas",
+];
+
+export function labSasaQuestionsBlock(): ChatBlock {
+  return {
+    type: "question",
+    id: "lab-sasa-questions",
+    prompt: "Laboratório: pergunte sobre cada área.",
+    choices: LAB_SASA_QUESTIONS.map(([area, text], index) => ({ id: `lab-q-${index}`, label: text, hint: SASA_AREA_LABEL[area], action: { kind: "local", value: `${SASA_ASK_PREFIX}${text}` } })),
+  };
+}
+
+export function labSasaOpenBlock(): ChatBlock {
+  return {
+    type: "question",
+    id: "lab-sasa-open",
+    prompt: "Laboratório: perguntas abertas (IA limitada, simulada).",
+    choices: LAB_SASA_OPEN.map((text, index) => ({ id: `lab-open-${index}`, label: text, hint: index === LAB_SASA_OPEN.length - 1 ? "Estoura o teto de 4 consultas" : "Até 4 consultas", action: { kind: "local", value: `${SASA_ASK_PREFIX}${text}` } })),
+  };
+}
+
+/** Roteiro do modelo de mentira: as leituras que ele pediria e a resposta no fim (null = nunca responde). */
+const LAB_AGENT_SCRIPTS: Record<string, { reads: Array<{ area: SasaArea; lead?: string }>; answer: string | null }> = {
+  [LAB_SASA_OPEN[0]!]: { reads: [{ area: "performance" }, { area: "sales" }], answer: "Nos últimos 7 dias você aceitou 17 de 20 ofertas e registrou 4 vendas no mês. Não tenho a semana anterior separada, então não consigo comparar com precisão." },
+  [LAB_SASA_OPEN[1]!]: { reads: [{ area: "leads" }, { area: "agenda" }], answer: "Comece pela Júlia: lead novo esperando há 6 min e o 1º contato está atrasando. Depois o Carlos, que respondeu há 25 min, e o retorno atrasado da Ana." },
+  [LAB_SASA_OPEN[2]!]: { reads: [{ area: "lead", lead: "Carlos Mendes" }], answer: "O Carlos está em atendimento e respondeu há 25 min esperando você. Não tenho notas dele ainda." },
+  [LAB_SASA_OPEN[3]!]: { reads: [{ area: "leads" }, { area: "wallet" }, { area: "agenda" }, { area: "finance" }, { area: "sales" }], answer: null },
+};
+
+/** No laboratório: resposta direta pelos fatos de exemplo; aberta pela camada limitada com o modelo de mentira. */
+export async function labSasaAsk(question: string, world: SasaWorld, now = new Date()): Promise<ChatBlock[]> {
+  const facts = labSasaFacts(now);
+  const areas = areasOf(question);
+  if (resolveLead(question, world.leads).kind !== "none" && !areas.includes("lead")) areas.unshift("lead");
+  const direct = wantsAnalysis(question) ? [] : areas.slice(0, 2).map((area) => answerFromFacts(question, area, facts, now)).filter((text): text is string => Boolean(text));
+  const say = (text: string): ChatBlock[] => [{ type: "assistant", id: `lab-ask-${Date.now()}`, text }];
+  if (direct.length) return say(direct.join(" "));
+  const script = LAB_AGENT_SCRIPTS[question] ?? { reads: [{ area: "leads" as SasaArea }], answer: "No laboratório, esta pergunta aberta usaria a IA limitada; aqui só mostro o caminho: li seus leads." };
+  let step = 0;
+  const result = await runSasaAgentLoop({
+    question,
+    hint: areas,
+    read: async (area) => factsToLines(area, facts, now),
+    ask: async () => {
+      const next = script.reads[step];
+      step += 1;
+      if (next) return { action: "read", area: next.area, lead: next.lead ?? null, text: null };
+      return script.answer ? { action: "answer", area: null, lead: null, text: script.answer } : { action: "read", area: "notifications", lead: null, text: null };
+    },
+  });
+  return say(result.truncated ? `${result.text} (IA limitada: ${result.reads.length} consultas, teto atingido)` : result.text);
+}
 
 export function labSasaPhrasesBlock(): ChatBlock {
   return {
@@ -73,7 +209,7 @@ export function labSasaPhrasesBlock(): ChatBlock {
 
 const PRESET_MINUTES: Record<string, number> = { today: 60, tomorrow: 60 * 24, in_2_days: 60 * 48, in_3_days: 60 * 72 };
 
-export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["returns"]; heard?: number; offline?: boolean }, options: { delay: number; outcome: LabOutcome }): NonNullable<DevLab["sasa"]> {
+export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["returns"]; heard?: number; offline?: boolean; nextSpeech?: string | null }, options: { delay: number; outcome: LabOutcome }): NonNullable<DevLab["sasa"]> {
   const run = async (name: ChatServerActionName, raw: Record<string, string | number | boolean | null>): Promise<SasaActionResult> => {
     await wait(options.delay);
     if (options.outcome === "falha") return { ok: false, message: "O servidor recusou (simulado). Nada foi alterado." };
@@ -119,12 +255,14 @@ export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["retu
   };
   return {
     run,
+    ask: async (question: string) => { await wait(Math.min(options.delay, 600)); return labSasaAsk(question, state.world); },
     simulateMic: true,
     get offline() { return Boolean(state.offline); },
     transcribe: async () => {
       if (state.offline) throw new TypeError("Failed to fetch");
       await wait(options.delay);
       if (options.outcome === "falha") return { ok: false, error: "Não consegui entender o áudio. Tente de novo ou escreva." };
+      if (state.nextSpeech) { const text = state.nextSpeech; state.nextSpeech = null; return { ok: true, text }; }
       const index = state.heard ?? 0;
       state.heard = index + 1;
       return { ok: true, text: LAB_SASA_VOICE[index % LAB_SASA_VOICE.length]! };

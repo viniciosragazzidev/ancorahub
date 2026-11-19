@@ -14,6 +14,8 @@ import { LiteSuccess } from "@/components/lite/motion";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { ASSISTANTS } from "@/features/broker-workspace/chat/assistant-scripts";
 import { useFeedback } from "@/lib/feedback/use-feedback";
+import { takeSaleDraft, type SaleSpokenDraft } from "@/features/sasa/drafts";
+import { mergeSpokenSale } from "@/features/sasa/draft-merge";
 
 import {
   applySaleChoice,
@@ -80,19 +82,26 @@ const ContractPhaseContext = createContext<{ phase: ContractPhase | null; regist
  * Registrar venda em conversa (19/11). Três etapas no total: escolher o cliente (antes desta tela), mandar o
  * contrato (a IA lê tudo) ou responder, e confirmar. Sem formulário.
  */
-export function SaleChat(props: { lead: SaleChatLead; catalog: SaleCatalog; services: SaleChatServices; today?: Date; backHref?: string; doneHref?: string }) {
+export function SaleChat(props: { lead: SaleChatLead; catalog: SaleCatalog; services: SaleChatServices; today?: Date; backHref?: string; doneHref?: string; /** O que o corretor disse à Sasá ("fechou a venda do Carlos…"); sem ele, a tela procura o rascunho guardado no aparelho. */ spokenDraft?: SaleSpokenDraft | null }) {
   const [run, setRun] = useState(0);
-  return <SaleConversation key={run} {...props} onRestart={() => setRun((value) => value + 1)} />;
+  // Sasá (fase 4): o rascunho é lido uma vez, no aparelho, antes da primeira pergunta.
+  const [draft, setDraft] = useState<SaleSpokenDraft | null | undefined>(props.spokenDraft === undefined ? undefined : props.spokenDraft);
+  const leadId = props.lead.id;
+  useEffect(() => { if (draft === undefined) setDraft(takeSaleDraft(leadId)); }, [draft, leadId]);
+  if (draft === undefined) return null;
+  return <SaleConversation key={run} {...props} draft={run === 0 ? draft : null} onRestart={() => setRun((value) => value + 1)} />;
 }
 
-function SaleConversation({ lead, catalog, services, today: fixedToday, backHref = "/dashboard", doneHref, onRestart }: {
-  lead: SaleChatLead; catalog: SaleCatalog; services: SaleChatServices; today?: Date; backHref?: string; doneHref?: string; onRestart: () => void;
+function SaleConversation({ lead, catalog, services, today: fixedToday, backHref = "/dashboard", doneHref, onRestart, draft }: {
+  lead: SaleChatLead; catalog: SaleCatalog; services: SaleChatServices; today?: Date; backHref?: string; doneHref?: string; onRestart: () => void; draft?: SaleSpokenDraft | null;
 }) {
   const router = useRouter();
   const fire = useFeedback();
   const today = useMemo(() => fixedToday ?? new Date(), [fixedToday]);
-  const [answers, setAnswers] = useState<SaleAnswers>({});
-  const answersRef = useRef<SaleAnswers>({});
+  // O que veio da Sasá entra como resposta do corretor; a conversa só pergunta o que faltar.
+  const spoken = useMemo(() => (draft ? mergeSpokenSale(draft, catalog, fixedToday ?? new Date()) : null), [catalog, draft, fixedToday]);
+  const [answers, setAnswers] = useState<SaleAnswers>(() => spoken?.answers ?? {});
+  const answersRef = useRef<SaleAnswers>(spoken?.answers ?? {});
   const files = useRef(new Map<string, File>());
   const round = useRef(0);
   const otherDate = useRef(false);
@@ -108,11 +117,19 @@ function SaleConversation({ lead, catalog, services, today: fixedToday, backHref
 
   const script = useMemo<ChatScript>(() => ({
     status: { label: "Esperando você", tone: "waiting" },
-    blocks: [
-      { type: "client", id: "c-lead", name: lead.name, initials: lead.initials, chips: [{ label: lead.stageLabel, tone: "info" }] },
-      { type: "assistant", id: "a-intro", text: `Vamos registrar a venda de ${firstName}! Manda o contrato ou a proposta, em foto ou PDF, que eu leio e preencho tudo: pessoas, plano, valor e vigência.` },
-      { type: "custom", id: "upload-0", kind: "upload", data: null },
-    ],
+    blocks: spoken?.found.length
+      ? [
+        { type: "client", id: "c-lead", name: lead.name, initials: lead.initials, chips: [{ label: lead.stageLabel, tone: "info" }] },
+        { type: "assistant", id: "a-intro", text: `Vamos registrar a venda de ${firstName}! Já anotei o que você me disse: ${spoken.found.join(", ")}.` },
+        ...nextSaleBlocks(spoken.answers, catalog, { today, leadValue: lead.monthlyValue, turn: 0 }),
+      ]
+      : [
+        { type: "client", id: "c-lead", name: lead.name, initials: lead.initials, chips: [{ label: lead.stageLabel, tone: "info" }] },
+        { type: "assistant", id: "a-intro", text: `Vamos registrar a venda de ${firstName}! Manda o contrato ou a proposta, em foto ou PDF, que eu leio e preencho tudo: pessoas, plano, valor e vigência.` },
+        { type: "custom", id: "upload-0", kind: "upload", data: null },
+      ],
+    // Montado uma vez, na entrada: as respostas seguintes chegam pela própria conversa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [firstName, lead.initials, lead.name, lead.stageLabel]);
 
   const commit = useCallback((next: SaleAnswers) => {

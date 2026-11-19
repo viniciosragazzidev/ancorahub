@@ -9,7 +9,8 @@
 import type { ChatBlock, ChatChoice, ChatLeadRow, ChatServerActionName } from "@/components/chat/types";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 
-import { classifySasaText, nameHintOf, SASA_STAGE_LABEL, type SasaIntent } from "./intent-rules";
+import { parseSpokenQuote, parseSpokenSale, type SasaOpen } from "./drafts";
+import { classifySasaText, nameHintOf, SASA_STAGE_LABEL, type SasaIntent, type SasaStage } from "./intent-rules";
 import { clockLabel, parseWhenPtBr, whenLabel } from "./parse-when";
 import { firstNameOf, resolveLead, type SasaLead } from "./resolve-entities";
 
@@ -37,6 +38,8 @@ export type SasaReply = {
   tool?: SasaIntent["tool"];
   /** Rodou uma ação de escrita: o nome dela e se o servidor confirmou (para o feedback de nível 1). */
   executed?: { action: ChatServerActionName; ok: boolean; warning?: boolean };
+  /** Fase 4: a tela guarda o rascunho no aparelho e abre a venda ou a cotação já preenchida. */
+  open?: SasaOpen;
 };
 
 export type SasaCommandInput = {
@@ -110,8 +113,39 @@ export function sasaWorldOf(data: BrokerWorkspaceData, now: Date): SasaWorld {
 }
 
 type Plan =
-  | { kind: "answer"; blocks: ChatBlock[] }
-  | { kind: "run"; name: ChatServerActionName; payload: Record<string, string>; done: string; failed: string; /** O pedido como pergunta ("Marcar retorno com Ana amanhã às 10:00"). */ ask: string };
+  | { kind: "answer"; blocks: ChatBlock[]; open?: SasaOpen }
+  | { kind: "run"; name: ChatServerActionName; payload: Record<string, string>; done: string; failed: string; /** O pedido como pergunta ("Marcar retorno com Ana amanhã às 10:00"). */ ask: string; /** Depois de feito: próximos passos sugeridos, um toque cada. */ then?: ChatBlock | null };
+
+/** Etapa que a fala sugere, só quando é para a frente e diferente da atual. */
+function stageFromSpeech(text: string, current: string): SasaStage | null {
+  const said = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const order = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending"];
+  const pick: SasaStage | null = /\b(document|rg|cpf|comprovante|carteirinha)/.test(said) ? "documentation_pending"
+    : /\b(fechar|aceitou|topou|gostou|quer seguir|vai assinar|desconto|negociar|proposta)\b/.test(said) ? "negotiation"
+      : /\b(recebeu a cotacao|viu a cotacao|olhou a cotacao)\b/.test(said) ? "quote_sent"
+        : null;
+  if (!pick || pick === current) return null;
+  const from = order.indexOf(current);
+  return from === -1 || order.indexOf(pick) > from ? pick : null;
+}
+
+/** Depois da nota: etapa e retorno sugeridos pela fala, um toque cada (D2: sugestão, nunca sozinho). */
+function noteSuggestions(text: string, lead: SasaLead, world: SasaWorld, base: Date, stamp: string): ChatBlock | null {
+  const choices: ChatChoice[] = [];
+  const name = firstNameOf(lead.name);
+  const stage = stageFromSpeech(text, lead.status);
+  if (stage) choices.push({ id: "stage", label: `Mudar para ${SASA_STAGE_LABEL[stage]}`, action: { kind: "server", name: "lead.changeStep", payload: { leadId: lead.id, status: stage, previous: lead.status } } });
+  const when = parseWhenPtBr(text, base);
+  const said = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const open = openReturnsOf(world, lead.id)[0];
+  if (when) {
+    choices.push({ id: "return", label: `Retorno ${whenLabel(when.at, world.now)}`, action: { kind: "server", name: "lead.scheduleReturn", payload: { leadId: lead.id, at: when.at.toISOString(), ...(open ? { taskId: open.taskId } : {}) } } });
+  } else if (/\b(vai pensar|vai ver|depois|retorn|me liga|ligar|semana que vem|amanha)\b/.test(said)) {
+    choices.push({ id: "return", label: "Retorno amanhã às 9h", action: { kind: "server", name: "lead.scheduleReturn", payload: { leadId: lead.id, when: "tomorrow", ...(open ? { taskId: open.taskId } : {}) } } });
+  }
+  if (open && !when && /\b(liguei|falei|conversei|retornei)\b/.test(said)) choices.push({ id: "complete", label: "Concluir o retorno de hoje", action: { kind: "server", name: "lead.completeReturn", payload: { taskId: open.taskId, leadName: name } } });
+  return choices.length ? { type: "question", id: `sasa-note-next-${stamp}`, prompt: `E com ${name}, quer também:`, choices } : null;
+}
 
 function dayDate(date: Date) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "2-digit" }).format(date);
@@ -253,6 +287,46 @@ function plan(intent: SasaIntent, input: SasaTimedInput, world: SasaWorld, stamp
         ? { kind: "run", name: "lead.completeReturn", payload: { taskId: open.taskId, leadName: name }, done: `Boa. Tirei o retorno com ${name} da sua Agenda.`, failed: `Não consegui concluir o retorno com ${name}. Ele continua na Agenda.`, ask: `Concluir o retorno com ${name}` }
         : { kind: "run", name: "lead.cancelReturn", payload: { taskId: open.taskId, leadName: name }, done: `Cancelei o retorno com ${name}.`, failed: `Não consegui cancelar o retorno com ${name}. Ele continua na Agenda.`, ask: `Cancelar o retorno com ${name}` };
     }
+    case "sale.start": {
+      const found = leadOf(input, world, stamp, hint);
+      if ("plan" in found) return found.plan;
+      const name = firstNameOf(found.lead.name);
+      const draft = parseSpokenSale(whenText ? `${input.text} ${whenText}` : input.text, input.recordedAt ?? world.now);
+      const href = `/leads/${encodeURIComponent(found.lead.id)}/registrar-venda`;
+      const heard = [draft.planType ? `tipo ${draft.planType === "pme" ? "PME" : draft.planType}` : null, draft.ages ? (draft.ages.length === 1 ? `${draft.ages[0]} anos` : `${draft.ages.length} vidas`) : null, draft.monthlyValue ? `R$ ${draft.monthlyValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : null].filter(Boolean);
+      return {
+        kind: "answer",
+        open: { kind: "sale", leadId: found.lead.id, href, draft },
+        blocks: [
+          sasaSay(`sasa-sale-${stamp}`, `Boa! Abrindo o registro da venda de ${name}${heard.length ? ` com o que você disse: ${heard.join(", ")}` : ""}. Lá eu pergunto só o que faltar.`),
+          { type: "question", id: `sasa-sale-open-${stamp}`, prompt: "Se não abrir sozinho:", choices: [{ id: "open-sale", label: "Registrar a venda", action: { kind: "href", href } }] },
+        ],
+      };
+    }
+    case "quote.start": {
+      const draft = parseSpokenQuote(input.text);
+      const lives = draft.ages?.length;
+      return {
+        kind: "answer",
+        open: { kind: "quote", href: "/cotacao", draft },
+        blocks: [
+          sasaSay(`sasa-quote-${stamp}`, lives ? `Abrindo a cotação com ${lives === 1 ? `1 vida (${draft.ages![0]} anos)` : `${lives} vidas (${draft.ages!.join(", ")} anos)`}. Lá eu pergunto o resto.` : "Abrindo a cotação. Lá eu pergunto quem vai entrar no plano."),
+          { type: "question", id: `sasa-quote-open-${stamp}`, prompt: "Se não abrir sozinho:", choices: [{ id: "open-quote", label: "Fazer a cotação", action: { kind: "href", href: "/cotacao" } }] },
+        ],
+      };
+    }
+    case "lead.note": {
+      const found = leadOf(input, world, stamp, hint);
+      if ("plan" in found) return found.plan;
+      const lead = found.lead;
+      const name = firstNameOf(lead.name);
+      const content = input.text.trim().slice(0, 2000);
+      return {
+        kind: "run", name: "lead.addNote", payload: { leadId: lead.id, content },
+        done: `Anotei no histórico de ${name}.`, failed: `Não consegui anotar no histórico de ${name}. Nada foi salvo.`, ask: `Anotar no histórico de ${name}: "${content}"`,
+        then: noteSuggestions(content, lead, world, input.recordedAt ?? world.now, stamp),
+      };
+    }
     case "lead.stage": {
       const found = leadOf(input, world, stamp, hint);
       if ("plan" in found) return found.plan;
@@ -280,7 +354,7 @@ export async function runSasaCommand(input: SasaTimedInput & {
   if (!intent) return { handled: false, blocks: [] };
   const stamp = input.stamp ?? String(input.world.now.getTime());
   const next = plan(intent, input, input.world, stamp, input.leadHint ?? null, input.whenText ?? null);
-  if (next.kind === "answer") return { handled: true, tool: intent.tool, blocks: next.blocks };
+  if (next.kind === "answer") return { handled: true, tool: intent.tool, blocks: next.blocks, ...(next.open ? { open: next.open } : {}) };
   if (sasaArrivedLate(input.recordedAt, input.world.now)) {
     // Gravado sem internet há mais de 30 min: o corretor confirma num toque (a ação roda pelo mesmo caminho do chat).
     const at = clockLabel(input.recordedAt!);
@@ -310,5 +384,6 @@ export async function runSasaCommand(input: SasaTimedInput & {
   if (!result.ok) return { handled: true, tool: intent.tool, executed: { action: next.name, ok: false }, blocks: [sasaSay(`sasa-failed-${stamp}`, next.failed), retry] };
   const blocks: ChatBlock[] = [sasaSay(`sasa-done-${stamp}`, result.warning ? result.message : next.done)];
   if (result.undo) blocks.push({ type: "question", id: `sasa-undo-${stamp}`, prompt: "Foi sem querer?", choices: [{ id: "undo", label: result.undo.label, action: result.undo.action }] });
+  if (next.then) blocks.push(next.then);
   return { handled: true, tool: intent.tool, executed: { action: next.name, ok: true, warning: result.warning }, blocks };
 }
