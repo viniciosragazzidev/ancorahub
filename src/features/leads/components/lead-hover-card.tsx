@@ -264,6 +264,7 @@ export function LeadHoverCardContent({ lead, onOpen, href }: LeadHoverCardConten
           <Button
             type="button"
             size="sm"
+            variant="secondary"
             className="ml-auto min-w-28"
             onClick={(event) => {
               event.stopPropagation();
@@ -275,6 +276,7 @@ export function LeadHoverCardContent({ lead, onOpen, href }: LeadHoverCardConten
         ) : href ? (
           <Button
             size="sm"
+            variant="secondary"
             className="ml-auto min-w-28"
             render={<Link href={href} onClick={(event) => event.stopPropagation()} />}
           >
