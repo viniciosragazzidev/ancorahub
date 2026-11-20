@@ -4,6 +4,7 @@
 import Link from "next/link";
 
 import styles from "./director-lite.module.css";
+import { customRangeLabel, type CustomRange } from "./custom-range";
 import { dateTitle } from "./format";
 
 function PeriodHelp() {
@@ -15,6 +16,39 @@ function PeriodHelp() {
         <li>O período altera apenas os leads por fila.</li>
         <li>Plantões e WhatsApp mostram o momento atual.</li>
       </ul>
+    </details>
+  );
+}
+
+
+/**
+ * Intervalo personalizado com data e hora (como na tela antiga, 20/11/2026). Sem hora, "de" começa às 19h do dia
+ * anterior e "até" termina às 19h, a mesma regra de `leadQualityRange`.
+ */
+function CustomRangePicker({ active, onApply }: { active: CustomRange | null; onApply: (range: CustomRange) => void }) {
+  return (
+    <details className={styles.help}>
+      <summary className={styles.pill} data-active={active ? "true" : undefined} aria-label="Intervalo personalizado">
+        {active ? customRangeLabel(active) : "Personalizado"}
+      </summary>
+      <form
+        className={`${styles.helpPanel} ${styles.rangeForm}`}
+        onSubmit={(event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          const read = (name: string) => String(data.get(name) ?? "").trim();
+          if (!read("from") || !read("to")) return;
+          onApply({ from: read("from"), fromTime: read("fromTime") || null, to: read("to"), toTime: read("toTime") || null });
+        }}
+      >
+        <p className={styles.rangeTitle}>Intervalo personalizado</p>
+        <label className={styles.rangeField}>De<input type="date" name="from" required defaultValue={active?.from} /></label>
+        <label className={styles.rangeField}>Hora<input type="time" name="fromTime" defaultValue={active?.fromTime ?? ""} /></label>
+        <label className={styles.rangeField}>Até<input type="date" name="to" required defaultValue={active?.to} /></label>
+        <label className={styles.rangeField}>Hora<input type="time" name="toTime" defaultValue={active?.toTime ?? ""} /></label>
+        <p className={styles.rangeHint}>Sem hora, o dia começa às 19h do dia anterior e termina às 19h.</p>
+        <button type="submit" className={styles.rangeApply}>Aplicar</button>
+      </form>
     </details>
   );
 }
@@ -59,7 +93,7 @@ function Segmented({ label, items, active, onSelect, kind }: { label: string; it
   );
 }
 
-export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, periods, activePeriod, onPeriod, units, activeUnit, onUnit, unitLabel = "Unidade" }: {
+export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, periods, activePeriod, onPeriod, units, activeUnit, onUnit, unitLabel = "Unidade", customRange, onCustomRange }: {
   firstName: string | null;
   now: Date;
   tabs: HeaderOption[];
@@ -75,6 +109,9 @@ export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, per
   onUnit?: (value: string) => void;
   /** Nome acessível do seletor ("Unidade" ou "Fila"). */
   unitLabel?: string;
+  /** Intervalo personalizado ativo (nenhum atalho fica marcado) e a ação de aplicar um novo. Sem `onCustomRange`, some. */
+  customRange?: CustomRange | null;
+  onCustomRange?: (range: CustomRange) => void;
 }) {
   // 20/11/2026 (skill interface-enxuta): uma faixa só. Abas à esquerda, unidade e período à direita; a saudação saiu
   // (o topo já diz "Painel · Hoje · unidade") e o início do dia fica no texto de ajuda do período.
@@ -98,6 +135,7 @@ export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, per
           ) : null}
           <div className={styles.periodGroup}>
             <Segmented label="Período" items={periods} active={activePeriod} onSelect={onPeriod} kind="period" />
+            {onCustomRange ? <CustomRangePicker active={customRange ?? null} onApply={onCustomRange} /> : null}
             <PeriodHelp />
           </div>
         </div>
