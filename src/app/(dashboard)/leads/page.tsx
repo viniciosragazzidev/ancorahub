@@ -856,22 +856,13 @@ async function LeadsPageContent({
 
         {/* Paused Branch Alert */}
         {isDirector && pausedBranchCount > 0 ? (
-          <div className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-warning/20 bg-accent/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <WifiHigh className="size-5 shrink-0 text-warning" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">
-                  {pausedBranchCount} {pausedBranchCount === 1 ? "filial está com" : "filiais estão com"} recebimento de leads pausado
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground font-medium">
-                  Os leads de webhooks não serão roteados para {pausedBranchCount === 1 ? "ela" : "elas"} até que o recebimento seja reativado.
-                </p>
-              </div>
-            </div>
-            <Button render={<Link href="/leads/distribuicao" />} size="sm" variant="outline" className="shrink-0 self-start sm:self-auto">
-              Revisar distribuição
-            </Button>
-          </div>
+          // Faixa de uma linha (skill interface-enxuta): o problema contado e a ação ao lado.
+          <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[var(--radius-card)] border border-warning/25 bg-warning/5 px-3 py-2 text-sm text-foreground">
+            <WifiHigh aria-hidden="true" className="size-4 shrink-0 text-warning" />
+            <span className="font-medium">{pausedBranchCount} {pausedBranchCount === 1 ? "filial está com" : "filiais estão com"} recebimento de leads pausado</span>
+            <span className="text-muted-foreground">· os leads de webhooks não serão roteados para {pausedBranchCount === 1 ? "ela" : "elas"} até reativar</span>
+            <Link href="/leads/distribuicao" className="ml-auto font-medium text-primary underline-offset-4 hover:underline">Revisar distribuição</Link>
+          </p>
         ) : null}
 
         {/* Regra de chat parado em simulação (05/11): o diretor vê o que mudaria e liga com um toque. */}
