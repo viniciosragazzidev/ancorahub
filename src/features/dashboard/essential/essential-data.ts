@@ -45,7 +45,7 @@ export type EssentialDashboard = {
  * Painel essencial do diretor. Blocos 1 e 3 são "agora" (o período não muda nada); o bloco 2 segue o período.
  * A unidade vale para os três. Consultas agregadas, uma por conta, sem N+1.
  */
-export async function getEssentialDashboard(context: TenantContext, filter: { period: OverviewPeriod; branchId?: string | null }, now = new Date()): Promise<EssentialDashboard> {
+export async function getEssentialDashboard(context: TenantContext, filter: { period: OverviewPeriod; branchId?: string | null; queueId?: string | null }, now = new Date()): Promise<EssentialDashboard> {
   const db = getDatabase();
   const scope = await resolveReportDataScope(context);
   const overview = await resolveOverviewFilter(context, scope, { period: filter.period, branchId: filter.branchId }, now);
@@ -59,6 +59,8 @@ export async function getEssentialDashboard(context: TenantContext, filter: { pe
     isNull(schema.leads.archivedAt),
     scope.leadScope,
     unit ? eq(schema.leads.branchId, unit) : undefined,
+    // Fila escolhida no topo do Painel (20/11/2026): intervalo e fila, como nas outras abas.
+    filter.queueId ? eq(schema.leads.queueId, filter.queueId) : undefined,
   );
   const today = getSaoPauloDateKey(now);
 
