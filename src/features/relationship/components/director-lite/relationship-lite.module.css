@@ -694,3 +694,6 @@ button.row:hover {
     flex-wrap: wrap;
   }
 }
+
+/* Usar de novo / reenviar para quem não leu (20/11). */
+.reuseRow { display: flex; flex-wrap: wrap; gap: 8px; }
