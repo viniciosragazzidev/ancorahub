@@ -30,6 +30,7 @@ export function LightAppHeader({
   showMoreButton = true,
   titleAsHeading = false,
   brokerMyWallet = false,
+  summary,
 }: {
   /** Supervisor Lite: no availability (they do not receive leads). */
   hideAvailability?: boolean;
@@ -49,6 +50,8 @@ export function LightAppHeader({
   titleAsHeading?: boolean;
   /** Corretor com a Minha carteira ligada: `/clientes` se chama "Minha carteira". */
   brokerMyWallet?: boolean;
+  /** Resumo em uma linha ao lado do título ("9.078 leads · 3.309 sem corretor"), skill `interface-enxuta`. */
+  summary?: string;
 }) {
   const lightRoute = useLightRoute({ brokerMyWallet });
   const title = routeOverride?.title ?? lightRoute.title;
@@ -71,12 +74,18 @@ export function LightAppHeader({
         {!isRoot && parentHref ? <LightBackButton fallbackHref={parentHref} alwaysParent={backToParent} className={routeOverride ? "size-11 border border-(--border)" : "size-10 border border-(--border)"} /> : null}
         <Title
           className={cn(
-            "min-w-0 flex-1 truncate tracking-tight text-(--foreground)",
+            "min-w-0 truncate tracking-tight text-(--foreground)",
+            summary ? "shrink-0" : "flex-1",
             isRoot ? "text-xl font-medium" : "text-base font-medium",
           )}
         >
           {title}
         </Title>
+        {summary ? (
+          <span data-slot="page-summary" className="hidden min-w-0 flex-1 truncate text-sm tabular-nums text-(--text-secondary) md:inline">
+            {summary}
+          </span>
+        ) : null}
         {actions}
         {isRoot && !hideAvailability ? (
           <LightAvailabilityPill

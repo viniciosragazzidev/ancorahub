@@ -842,10 +842,12 @@ export default async function LeadDistributionPage({
   );
 
   const directorLite = await isDirectorLitePageOnServer(context, "/leads/distribuicao");
+  // Resumo da barra do topo no Lite (anatomia de página): os mesmos dois números que o modo normal mostra no topo.
+  const liteSummary = `${totalAvailable.toLocaleString("pt-BR")} ${totalAvailable === 1 ? "disponível" : "disponíveis"} · ${totalNewLeads.toLocaleString("pt-BR")} aguardando`;
   if (directorLite && ["resumo_dia", "roteamento", "filas", "plantao", "saude_historico"].includes(view)) {
     return (
       <>
-        <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" />
+        <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" summary={liteSummary} />
         <main className={directorDistributionStyles.page}>
           {/* Agora na operação só em mini cards (14/11/2026): os cartões grandes saíram; frios ao lado do plantão. */}
           {view === "resumo_dia" && await shouldShowLiveStatusStrip(context) ? <LiveStatusBoundary context={context} enabled compact /> : null}

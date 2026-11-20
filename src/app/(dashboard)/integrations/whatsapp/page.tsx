@@ -85,15 +85,16 @@ export default async function WhatsAppIntegrationPage({ searchParams }: { search
   const channelsWithIntake = channels.map((channel) => ({ ...channel, leadIntake: parseChannelLeadIntake(intakeByKey.get(channelLeadIntakeKey(channel.id))) }));
 
   const official = { ...getMetaCloudConfigurationState(), enabled: metaEnabled, canConfigure: context.role === "director", branches, channels: channelsWithIntake, companyAccount, queues, adAccountNames: adAccounts.map((account) => account.name) };
+  const summary = `${channels.length.toLocaleString("pt-BR")} ${channels.length === 1 ? "número oficial" : "números oficiais"}`;
   if (lite) {
     return <>
-      <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
+      <DashboardHeader breadcrumb="Integrações" title="WhatsApp" summary={summary} />
       <WhatsAppPageLite official={official} />
     </>;
   }
 
   return <>
-    <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
+    <DashboardHeader breadcrumb="Integrações" title="WhatsApp" summary={summary} />
     <WhatsAppPage
       official={{ ...getMetaCloudConfigurationState(), enabled: metaEnabled, canConfigure: context.role === "director", branches, channels: channelsWithIntake, companyAccount, queues, adAccountNames: adAccounts.map((account) => account.name) }}
       waha={null}

@@ -208,6 +208,13 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
   const brokerOffer = await readCampaignBrokerOffer(context.tenantId, campaign.campaignId).catch(() => null);
   const canEditBrokerOffer = canEditCampaignBrokerOffer(context);
 
+  // Resumo do topo (anatomia de página), só com o que a página já carrega.
+  const summary = [
+    `${(campaign.leadsCount ?? 0).toLocaleString("pt-BR")} ${campaign.leadsCount === 1 ? "lead" : "leads"}`,
+    `${campaignAds.length.toLocaleString("pt-BR")} ${campaignAds.length === 1 ? "anúncio" : "anúncios"}`,
+    `${campaignForms.length.toLocaleString("pt-BR")} ${campaignForms.length === 1 ? "formulário" : "formulários"}`,
+  ].join(" · ");
+
   const detailProps = {
     campaign,
     ads: campaignAds,
@@ -224,7 +231,7 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
   if (await isDirectorLitePageOnServer(context, "/marketing/campanhas/[id]")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Marketing / Campanhas" title={campaign.name} />
+        <DashboardHeader breadcrumb="Marketing / Campanhas" title={campaign.name} summary={summary} />
         <main className={litePage.stack}>
           <CampaignDetailLite {...detailProps} />
         </main>
@@ -234,7 +241,7 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
 
   return (
     <>
-      <DashboardHeader breadcrumb="Marketing / Campanhas" title={`Campanha: ${campaign.name}`} />
+      <DashboardHeader breadcrumb="Marketing / Campanhas" title={`Campanha: ${campaign.name}`} summary={summary} />
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6 max-w-7xl mx-auto w-full">
         <CampaignDetailView
           campaign={campaign}

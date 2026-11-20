@@ -124,10 +124,13 @@ export default async function SubscriptionPage() {
       features: [],
     };
 
+  const activeUsers = userCount[0]?.count ?? 0;
+  const summary = `Plano ${planInfo.label} · ${activeUsers.toLocaleString("pt-BR")} ${activeUsers === 1 ? "usuário ativo" : "usuários ativos"}`;
+
   if (await isDirectorLitePageOnServer(context, "/assinatura")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Administração" title="Assinatura" />
+        <DashboardHeader breadcrumb="Administração" title="Assinatura" summary={summary} />
         <main className={litePage.stack}>
           <SubscriptionLite
             tenant={{ name: tenant.name, legalName: tenant.legalName, cnpj: tenant.cnpj, status: tenant.status, createdAt: tenant.createdAt }}
@@ -146,7 +149,7 @@ export default async function SubscriptionPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Administração" title="Assinatura" />
+      <DashboardHeader breadcrumb="Administração" title="Assinatura" summary={summary} />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>

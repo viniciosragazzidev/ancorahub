@@ -8,6 +8,8 @@ import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { SituationsWorkspaceLite } from "./_components/situations-workspace-lite";
 
+const count = (value: number, one: string, many: string) => `${value.toLocaleString("pt-BR")} ${value === 1 ? one : many}`;
+
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Situações - Atendimento" };
@@ -29,12 +31,19 @@ export default async function AtendimentoSituacoesPage({ searchParams }: { searc
     autoActivatedKeys(context.tenantId),
     searchParams ?? Promise.resolve({} as { view?: string }),
   ]);
+  // Resumo do topo (anatomia de página), só com o que a página já carrega.
+  const active = situations.filter((situation) => situation.enabled).length;
+  const summary = [
+    count(situations.length, "situação", "situações"),
+    count(active, "ativa", "ativas"),
+    learning.suggestions.length > 0 ? count(learning.suggestions.length, "sugestão da IA", "sugestões da IA") : null,
+  ].filter(Boolean).join(" · ");
 
   // Chave do visual Lite: os mesmos dados, filtros e ações, com a lista Lite.
   if (await isDirectorLitePageOnServer(context, "/atendimento/situacoes")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Atendimento" title="Situações" />
+        <DashboardHeader breadcrumb="Atendimento" title="Situações" summary={summary} />
         <main className={litePage.stack}>
           <SituationsWorkspaceLite situations={situations} learning={learning} autoActivatedKeys={aiKeys} initialView={params.view} canConfigure={context.role === "director"} />
         </main>
@@ -44,7 +53,7 @@ export default async function AtendimentoSituacoesPage({ searchParams }: { searc
 
   return (
     <>
-      <DashboardHeader breadcrumb="Atendimento" title="Situações" />
+      <DashboardHeader breadcrumb="Atendimento" title="Situações" summary={summary} />
       <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <SituationsWorkspace situations={situations} learning={learning} autoActivatedKeys={aiKeys} initialView={params.view} canConfigure={context.role === "director"} />
       </main>

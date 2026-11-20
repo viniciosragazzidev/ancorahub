@@ -19,12 +19,13 @@ export default async function ExtensionSettingsPage() {
   if (!await isExtensionPilotUser(context.userId)) notFound();
   const [settings] = await getDatabase().select({ enabled: schema.extensionSettings.enabled, minimumVersion: schema.extensionSettings.minimumVersion }).from(schema.extensionSettings).where(eq(schema.extensionSettings.tenantId, context.tenantId)).limit(1);
   const canConfigure = context.role === "director";
+  const summary = `${settings?.enabled ? "Ativa para a empresa" : "Desativada pela empresa"} · v${BROWSER_EXTENSION_MANIFEST_VERSION}`;
   // Chave do visual Lite: os mesmos dados e a mesma regra de quem configura, no padrão Lite.
   if (await isDirectorLitePageOnServer(context, "/settings/extension")) {
-    return <><DashboardHeader breadcrumb="Configurações / Integrações" title="AncoraHub Assistant" /><main className={litePage.stack}><ExtensionLiteView data={{ conectada: await sessaoExtensaoAtiva(context.userId, context.tenantId), enabled: Boolean(settings?.enabled), minimumVersion: settings?.minimumVersion ?? "0.1.0", extensionVersion: BROWSER_EXTENSION_MANIFEST_VERSION, canConfigure }} /></main></>;
+    return <><DashboardHeader breadcrumb="Configurações / Integrações" title="AncoraHub Assistant" summary={summary} /><main className={litePage.stack}><ExtensionLiteView data={{ conectada: await sessaoExtensaoAtiva(context.userId, context.tenantId), enabled: Boolean(settings?.enabled), minimumVersion: settings?.minimumVersion ?? "0.1.0", extensionVersion: BROWSER_EXTENSION_MANIFEST_VERSION, canConfigure }} /></main></>;
   }
   return <>
-    <DashboardHeader breadcrumb="Configurações / Integrações" title="AncoraHub Assistant" />
+    <DashboardHeader breadcrumb="Configurações / Integrações" title="AncoraHub Assistant" summary={summary} />
     <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
       <Card className="max-w-2xl">
         <CardHeader>

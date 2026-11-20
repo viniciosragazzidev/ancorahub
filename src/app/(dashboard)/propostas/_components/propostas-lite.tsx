@@ -202,7 +202,7 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
             <LiteSelect label={`Status de ${proposal.title}`} hideLabel value={proposal.status} onChange={(value) => changeStatus(proposal.id, value as ProposalStatus)} options={Object.entries(STATUS).map(([value, item]) => ({ value, label: item.label }))} />
           </span>
           {proposal.status === "aprovada" && !proposal.convertedSaleId ? (
-            <button type="button" className={page.primaryButton} onClick={() => { clear("convert"); setSelected(proposal); setConvertOpen(true); }}>
+            <button type="button" className={page.button} onClick={() => { clear("convert"); setSelected(proposal); setConvertOpen(true); }}>
               <CheckCircle2 aria-hidden="true" size={16} /> Fechar venda
             </button>
           ) : null}
@@ -241,6 +241,7 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
         {views.map((view) => (
           <TabsContent key={view.value} value={view.value} className={styles.panel}>
             <LiteResponsiveData caption={`Propostas: ${view.label}`} columns={columns} rows={view.rows} rowKey={(proposal) => proposal.id} empty={<p>Nenhuma proposta encontrada.</p>} />
+            {view.rows.length ? <p className={`${page.muted} ${page.numeric}`}>{view.rows.length.toLocaleString("pt-BR")} {view.rows.length === 1 ? "proposta" : "propostas"}</p> : null}
           </TabsContent>
         ))}
       </Tabs>

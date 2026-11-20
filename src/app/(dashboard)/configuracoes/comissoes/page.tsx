@@ -20,11 +20,14 @@ export default async function CommissionRulesPage() {
     getPostSaleSettings(),
   ]);
 
+  const activeRules = rules.filter((rule) => rule.active).length;
+  const summary = `${rules.length.toLocaleString("pt-BR")} ${rules.length === 1 ? "regra" : "regras"} · ${activeRules.toLocaleString("pt-BR")} ${activeRules === 1 ? "ativa" : "ativas"}`;
+
   // Chave do visual Lite: as mesmas regras, operadoras e pós-venda, com as mesmas ações.
   if (await isDirectorLitePageOnServer(context, "/configuracoes/comissoes")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Configurações / Financeiro" title="Regras de comissão" />
+        <DashboardHeader breadcrumb="Configurações / Financeiro" title="Regras de comissão" summary={summary} />
         <main className={litePage.stack}>
           <CommissionRulesLite rules={rules} carriers={carriers} />
           <PostSaleSettingsLite {...postSaleSettings} />
@@ -35,7 +38,7 @@ export default async function CommissionRulesPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Configurações / Financeiro" title="Regras de Comissão" />
+      <DashboardHeader breadcrumb="Configurações / Financeiro" title="Regras de Comissão" summary={summary} />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         {/* Contexto de página legado, preservado para eventual restauração:
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">

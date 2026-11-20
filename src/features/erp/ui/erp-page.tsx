@@ -13,7 +13,7 @@ import kit from "./erp-kit.module.css";
  * - Lite audiences (broker, supervisor, manager): the Lite frame already draws the header with back + title, so the
  *   screen's actions open the page body instead of a second header.
  */
-export async function ErpPage({ pathname, breadcrumb, title, actions, children }: { pathname: string; breadcrumb: string; title: string; actions?: ReactNode; children: ReactNode }) {
+export async function ErpPage({ pathname, breadcrumb, title, summary, actions, children }: { pathname: string; breadcrumb: string; title: string; /** Resumo de uma linha ao lado do título (skill `interface-enxuta`). */ summary?: string; actions?: ReactNode; children: ReactNode }) {
   const [skin, audience] = await Promise.all([
     getErpSkin(pathname),
     getRequiredTenantContext().then((context) => getLiteAudience(context)).catch(() => null),
@@ -25,7 +25,7 @@ export async function ErpPage({ pathname, breadcrumb, title, actions, children }
     </main>
   </ErpSkinProvider>;
   return <ErpSkinProvider skin={skin}>
-    <DashboardHeader breadcrumb={breadcrumb} title={title} rightSlot={actions} />
+    <DashboardHeader breadcrumb={breadcrumb} title={title} summary={summary} rightSlot={actions} />
     <main className={skin === "lite" ? litePage.stack : "flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6"}>{children}</main>
   </ErpSkinProvider>;
 }

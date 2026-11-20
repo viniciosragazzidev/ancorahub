@@ -24,9 +24,13 @@ export default async function AutoSalePage() {
   if (!flags.enabled) notFound();
   const overview = await getAutoSaleOverview(context);
   const lite = await isDirectorLitePageOnServer(context, "/vendas/automatizada");
+  // Resumo da barra do topo (anatomia de página), com o resumo que a visão geral já trouxe.
+  const pageSummary = overview.state === "ready"
+    ? `${overview.summary.total.toLocaleString("pt-BR")} ${overview.summary.total === 1 ? "venda acompanhada" : "vendas acompanhadas"} · ${overview.summary.documentsRequested.toLocaleString("pt-BR")} com documentos pedidos`
+    : undefined;
   return (
     <>
-      <DashboardHeader breadcrumb="Comercial" title="Venda Automatizada" />
+      <DashboardHeader breadcrumb="Comercial" title="Venda Automatizada" summary={pageSummary} />
       <main className={lite ? litePage.stack : "flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6"}>
         <AutoSaleWorkspace overview={overview} lite={lite} isDirector={context.role === "director"} />
       </main>

@@ -131,10 +131,14 @@ export default async function IntegrityPage() {
   const leadsTrend = fillDaySeries(dailyLeads);
   const auditsTrend = fillDaySeries(dailyAudits);
 
+  const stalledTotal = Number(stalledLeads[0]?.count ?? 0);
+  const unworkedTotal = Number(unworkedLeads[0]?.count ?? 0);
+  const summary = `${stalledTotal.toLocaleString("pt-BR")} ${stalledTotal === 1 ? "lead parado" : "leads parados"} · ${unworkedTotal.toLocaleString("pt-BR")} sem atendimento`;
+
   if (await isDirectorLitePageOnServer(context, "/integridade")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Governança" title="Integridade" />
+        <DashboardHeader breadcrumb="Governança" title="Integridade" summary={summary} />
         <main className={litePage.stack}>
           <IntegrityLite
             data={{
@@ -204,7 +208,7 @@ export default async function IntegrityPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Governança" title="Integridade" />
+      <DashboardHeader breadcrumb="Governança" title="Integridade" summary={summary} />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>

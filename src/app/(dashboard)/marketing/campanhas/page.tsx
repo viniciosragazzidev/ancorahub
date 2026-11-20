@@ -37,12 +37,18 @@ export default async function CampaignsPage() {
   const canConfigure = context.role === "director" || context.jobTitle === "marketing" || context.role === "manager";
   const connection = marketing?.connection ?? null;
   const connected = connection?.status === "connected";
+  // Resumo do topo (anatomia de página), só com o que a página já carrega.
+  const summary = [
+    `${data.campaigns.length.toLocaleString("pt-BR")} ${data.campaigns.length === 1 ? "campanha" : "campanhas"}`,
+    `${data.totals.leads.toLocaleString("pt-BR")} ${data.totals.leads === 1 ? "lead" : "leads"}`,
+    `${data.totals.sales.toLocaleString("pt-BR")} ${data.totals.sales === 1 ? "venda" : "vendas"}`,
+  ].join(" · ");
 
   if (await isDirectorLitePageOnServer(context, "/marketing/campanhas")) {
     const sync = connected && connection ? buildMetaSyncInfo(marketing?.logs ?? [], connection.lastSyncedAt, canConfigure, new Date()) : null;
     return (
       <>
-        <DashboardHeader breadcrumb="Marketing" title="Campanhas Meta Ads e ROI" />
+        <DashboardHeader breadcrumb="Marketing" title="Campanhas Meta Ads e ROI" summary={summary} />
         <main className={litePage.stack}>
           <MetaStatusLite connected={Boolean(connected && connection)} sync={sync} captureModeLabel={connection ? CAPTURE_MODE_LABEL[connection.globalCaptureMode ?? "selective"] : null} />
           <CampaignsLite campaigns={data.campaigns} totals={data.totals} />
@@ -64,7 +70,7 @@ export default async function CampaignsPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Marketing" title="Campanhas Meta Ads & ROI" />
+      <DashboardHeader breadcrumb="Marketing" title="Campanhas Meta Ads & ROI" summary={summary} />
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6 max-w-[1600px] mx-auto w-full">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-4 py-3">
           {connected && connection ? (

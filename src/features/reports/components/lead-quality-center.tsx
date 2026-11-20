@@ -406,6 +406,7 @@ export function LeadQualityCenter({ report, showQualityTab = true, queues = [], 
       <DashboardHeader
         breadcrumb="Operação comercial"
         title="Qualidade dos leads"
+        summary={report.enabled ? `${numberLabel(report.summary.total)} ${report.summary.total === 1 ? "lead" : "leads"} · ${windowLabel}` : undefined}
         rightSlot={
           <div className="flex min-w-0 items-center gap-2">
             <div className="w-28 shrink-0">

@@ -69,12 +69,14 @@ export default async function SalesPage({
 
   const [branches, sales] = await Promise.all([branchesPromise, salesPromise]);
   const totalRevenue = sales.reduce((sum, row) => sum + Number(row.saleValue), 0);
+  // Resumo da barra do topo (anatomia de página), só com as vendas já carregadas acima.
+  const pageSummary = `${sales.length.toLocaleString("pt-BR")} ${sales.length === 1 ? "venda" : "vendas"} · ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalRevenue)} em ${period} dias`;
 
   // Chave do diretor: a mesma página no visual Lite (unidade e período vão para a barra da lista).
   if (await isDirectorLitePageOnServer(context, "/vendas")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Operação comercial" title="Vendas" />
+        <DashboardHeader breadcrumb="Operação comercial" title="Vendas" summary={pageSummary} />
         <main className={litePage.stack}>
           <SalesWorkspaceLite
             sales={sales.map((s) => ({ ...s, saleValue: Number(s.saleValue), saleDate: s.saleDate.toISOString(), createdAt: s.createdAt.toISOString() }))}
@@ -94,6 +96,7 @@ export default async function SalesPage({
       <DashboardHeader
         breadcrumb="Operação comercial"
         title="Vendas & Fechamentos"
+        summary={pageSummary}
         rightSlot={
           <div className="flex items-center gap-2">
             {canFilterBranch ? <BranchSelect branches={branches} value={effectiveBranchId} /> : null}

@@ -49,12 +49,14 @@ export default async function EmpresasPage() {
   // Gestor Lite: the unit's PJ portfolio in the Lite shell (same scoped query above).
   if ((await getLiteAudience(context)) === "manager") return <LightCompaniesList companies={companies} />;
   const visibleCompanies = companies;
+  const linkedLeads = visibleCompanies.reduce((total, company) => total + company.leadCount, 0);
 
   return (
     <>
       <DashboardHeader
         breadcrumb="CRM comercial"
         title="Empresas"
+        summary={`${visibleCompanies.length.toLocaleString("pt-BR")} ${visibleCompanies.length === 1 ? "empresa" : "empresas"} · ${linkedLeads.toLocaleString("pt-BR")} ${linkedLeads === 1 ? "oportunidade vinculada" : "oportunidades vinculadas"}`}
         rightSlot={<Button render={<Link href="/leads?tipo=PJ" />} size="sm"><Plus /> Novo lead PJ</Button>}
       />
       <main className="flex min-w-0 flex-1 flex-col gap-6 p-4 lg:p-6">

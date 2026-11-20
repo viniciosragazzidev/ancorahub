@@ -13,6 +13,14 @@ import { requireCapability } from "@/shared/auth/authorization";
 
 export const dynamic = "force-dynamic";
 
+/** Resumo de uma linha do topo, só com o que a página já carregou (skill `interface-enxuta`). */
+function buildMetaSummary(connected: boolean, assets: { pages: unknown[]; adAccounts: unknown[] } | null) {
+  if (!connected) return "Não conectada";
+  const pages = assets?.pages.length ?? 0;
+  const accounts = assets?.adAccounts.length ?? 0;
+  return `Conectada · ${pages.toLocaleString("pt-BR")} ${pages === 1 ? "página" : "páginas"} · ${accounts.toLocaleString("pt-BR")} ${accounts === 1 ? "conta de anúncio" : "contas de anúncio"}`;
+}
+
 export default async function MetaIntegrationPage() {
   const context = await getRequiredTenantContext();
   await requireCapability(context, "acessar_integracao_meta");
@@ -28,13 +36,14 @@ export default async function MetaIntegrationPage() {
   const canConfigure = context.role === "director" || context.jobTitle === "marketing" || context.role === "manager";
   // Sending lead stages to Meta is a director decision; it never blocks the page.
   const conversions = context.role === "director" ? await getMetaConversionsPanel(context.tenantId) : null;
+  const summary = buildMetaSummary(marketing.connection?.status === "connected", marketing.assets);
 
   if (await isDirectorLitePageOnServer(context, "/integrations/meta")) {
     const connection = marketing.connection;
     const connected = connection?.status === "connected";
     return (
       <>
-        <DashboardHeader breadcrumb="Integrações" title="Marketing Meta" />
+        <DashboardHeader breadcrumb="Integrações" title="Marketing Meta" summary={summary} />
         <main className={litePage.stack}>
           <MetaIntegrationLite
             connection={connection}
@@ -53,7 +62,7 @@ export default async function MetaIntegrationPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Integrações" title="Marketing Meta" />
+      <DashboardHeader breadcrumb="Integrações" title="Marketing Meta" summary={summary} />
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <MetaIntegrationHub
           marketing={{ connection: marketing.connection, assets: marketing.assets, logs: marketing.logs }}
