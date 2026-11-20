@@ -30,8 +30,16 @@ export type OverviewFields = {
   customInstructions: string;
 };
 
-function brl(value: number) {
-  return `R$ ${value.toFixed(2)}`;
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const COUNT = new Intl.NumberFormat("pt-BR");
+
+/** Valores no formato brasileiro (20/11): "R$ 6.057,70" e "8.921", nunca "R$ 6057.70". */
+export function brl(value: number) {
+  return BRL.format(value);
+}
+
+export function n(value: number) {
+  return COUNT.format(value);
 }
 
 export function OverviewTabLite({ stats, fields, onChange, onToggleEnabled, enabledStatus }: {
@@ -42,11 +50,11 @@ export function OverviewTabLite({ stats, fields, onChange, onToggleEnabled, enab
   enabledStatus?: ActionStatus;
 }) {
   const numbers = [
-    { label: "Leads atendidos", value: stats.operation.startedToday, hint: `${stats.operation.active} ativos · ${stats.operation.transferredToHuman} passados a humano` },
-    { label: "Qualificados", value: stats.qualification.totalQualified, hint: `${stats.qualification.hotLeads} quentes · ${stats.qualification.completionRatePct}% de conclusão` },
-    { label: "Fila de espera", value: stats.distribution.waitingQueue, hint: `${stats.distribution.waitingQueue} em fila` },
+    { label: "Leads atendidos", value: n(stats.operation.startedToday), hint: `${n(stats.operation.active)} ativos · ${n(stats.operation.transferredToHuman)} passados a humano` },
+    { label: "Qualificados", value: n(stats.qualification.totalQualified), hint: `${n(stats.qualification.hotLeads)} quentes · ${stats.qualification.completionRatePct}% de conclusão` },
+    { label: "Fila de espera", value: n(stats.distribution.waitingQueue), hint: "aguardando corretor" },
     { label: "Custo de operação", value: brl(stats.costs.aiCostBrl + stats.costs.whatsappCostBrl), hint: `${brl(stats.costs.avgCostPerSessionBrl)} por atendimento` },
-    { label: "Follow-ups", value: `${stats.followup.sent} enviados`, hint: `${stats.followup.conversionsPostFollowup} recuperados depois do follow-up` },
+    { label: "Follow-ups", value: `${n(stats.followup.sent)} enviados`, hint: `${n(stats.followup.conversionsPostFollowup)} recuperados depois do follow-up` },
   ];
   return (
     <>
