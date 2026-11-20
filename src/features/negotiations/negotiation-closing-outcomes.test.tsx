@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 import { NegotiationClosingOutcomes } from "./negotiation-closing-outcomes";
 
@@ -17,5 +17,14 @@ describe("desfechos do fechamento na tela da direção", () => {
     expect(screen.getByText("Desfecho pendente agora").parentElement).toHaveTextContent("58");
     expect(screen.getAllByText("Tainá Pinto").length).toBeGreaterThan(0);
     expect(document.body.textContent).not.toContain(String.fromCharCode(0x2014));
+  });
+
+  it("mostra 8 corretores e o resto no Ver todos", () => {
+    const brokers = Array.from({ length: 11 }, (_, index) => ({ brokerId: `b${index}`, brokerName: `Corretor ${index}`, inClosing: 1, pending: 0, converted: 0, lost: 0, returned: 0 }));
+    render(<NegotiationClosingOutcomes summary={{ periodDays: 30, entered: 0, converted: 0, lost: 0, returned: 0, pendingNow: 0, inClosingNow: 11, brokers }} />);
+    expect(screen.queryAllByText("Corretor 10")).toHaveLength(0);
+    expect(screen.getByText(/8 de 11 corretores/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Ver todos (+3)" }));
+    expect(screen.getAllByText("Corretor 10").length).toBeGreaterThan(0);
   });
 });
