@@ -1,3 +1,4 @@
+import PropostasPage from "../propostas/page";
 import { and, desc, eq, gte } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -16,8 +17,10 @@ import { SalesWorkspaceLite } from "./sales-workspace-lite";
 export default async function SalesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string; branch?: string }>;
+  searchParams: Promise<{ period?: string; branch?: string; tab?: string }>;
 }) {
+  // /propostas redireciona para cá com ?tab=propostas (next.config.ts): mostra a tela de propostas, não a de vendas.
+  if ((await searchParams).tab === "propostas") return PropostasPage();
   const context = await getRequiredTenantContext();
   const db = getDatabase();
   const resolvedSearchParams = await searchParams;
