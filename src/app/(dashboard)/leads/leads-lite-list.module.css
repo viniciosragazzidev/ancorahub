@@ -109,3 +109,13 @@
   color: var(--text-secondary);
   font-size: var(--text-xs);
 }
+
+/* Resultado da busca (20/11/2026): "N leads para “x” · Limpar busca". */
+.resultLine { margin: 0 0 var(--space-3); color: var(--text-secondary); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+.resultClear { padding: 0; border: 0; background: none; color: var(--primary); font: inherit; font-weight: 500; cursor: pointer; }
+.resultClear:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Telefone copiável embaixo do nome (20/11/2026). */
+.copyPhone { padding: 0; border: 0; background: none; color: var(--text-secondary); font: inherit; font-size: var(--text-xs); font-variant-numeric: tabular-nums; white-space: nowrap; cursor: copy; }
+.copyPhone:hover { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+.copyPhone:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: var(--radius-sm); }

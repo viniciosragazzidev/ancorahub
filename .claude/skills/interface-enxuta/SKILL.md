@@ -10,6 +10,8 @@ Hierarquia em conflito: `docs/design-system.md` > `docs/design-system/FEEDBACK.m
 
 ## Antes de codar
 
+0. **Pergunta obrigatória:** "o que eu adiciono para facilitar o dia de quem usa esta tela o tempo todo?" Liste as 1 a 3 tarefas mais frequentes da tela e corte passos delas: atalho de teclado ("/" para buscar), copiar telefone num clique, filtros lembrados, "próximo item" num toque, ação frequente na própria linha, contagem que diz o que fazer. Só com dado já carregado; ação frequente é nível 0 do `FEEDBACK.md` (sem som). Diga no relatório o que entrou.
+
 1. Leia a tela inteira e liste o que está fixo nela. Para cada item, pergunte: "o usuário precisa disso para agir agora?" Se não precisa, o item sai da tela fixa.
 2. Apresente o plano por componente (exigência do `CLAUDE.md`). Siga a opção recomendada sem esperar resposta, a menos que exija **token novo**: aí pare e pergunte.
 3. Nunca invente cor, raio, espaçamento, sombra ou tamanho de fonte. Se o padrão pedir algo fora dos tokens, anote em "Decisões pendentes" no relatório de referência e pergunte.

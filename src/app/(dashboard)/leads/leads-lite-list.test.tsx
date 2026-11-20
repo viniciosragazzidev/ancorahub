@@ -38,7 +38,7 @@ describe("cabeçalho e ações da lista Lite", () => {
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Kanban" })).not.toBeInTheDocument();
-    expect(screen.getByText("1 a 20 de 134")).toBeInTheDocument();
+    expect(screen.getByText("1 a 20 de 134 leads")).toBeInTheDocument();
   });
 
   it("mostra no máximo 2 etiquetas e o resto em +N", () => {
@@ -61,7 +61,7 @@ describe("cabeçalho e ações da lista Lite", () => {
         <LeadsListSwitch {...props} onRowClick={() => {}} pagination={{ currentPage: 1, pageSize: 20, totalItems: 134, totalPages: 7 }} />
       </ArcScopeProvider>,
     );
-    expect(screen.getByText("1 a 20 de 134")).toBeInTheDocument();
+    expect(screen.getByText("1 a 20 de 134 leads")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
     expect(replace).toHaveBeenCalledWith("/leads?search=Maria&branch=b1&page=2", { scroll: false });
   });
@@ -231,11 +231,11 @@ describe("nome, telefone e a visão Qualificação IA", () => {
       </ArcScopeProvider>,
     );
     expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(20);
-    expect(screen.getByText("1 a 20 de 45")).toBeInTheDocument();
+    expect(screen.getByText("1 a 20 de 45 leads")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
     expect(container.querySelectorAll('[data-lite="table"] tbody tr')).toHaveLength(5);
-    expect(screen.getByText("41 a 45 de 45")).toBeInTheDocument();
+    expect(screen.getByText("41 a 45 de 45 leads")).toBeInTheDocument();
   });
 });
 

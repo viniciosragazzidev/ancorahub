@@ -327,3 +327,6 @@
     width: auto;
   }
 }
+
+/* Dica do atalho "/" dentro da busca (20/11/2026). */
+.searchKbd { flex: none; margin-right: var(--space-2); color: var(--text-muted); }
