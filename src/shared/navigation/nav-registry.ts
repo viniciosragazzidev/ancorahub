@@ -288,6 +288,29 @@ export function visibleNavAreas(user: NavAccessUser | null) {
   });
 }
 
+/**
+ * Menu lateral em 6 entradas (20/11/2026, skill `interface-enxuta`): agrupa áreas sem mudar nomes, abas nem rotas.
+ * A primeira área visível do grupo é o destino da entrada; as demais aparecem como subitens.
+ */
+export type NavGroup = { id: string; label: string; areas: readonly NavAreaId[] };
+
+export const NAV_GROUPS: readonly NavGroup[] = [
+  { id: "inicio", label: "Início", areas: ["inicio"] },
+  { id: "conversas", label: "Conversas", areas: ["conversas"] },
+  { id: "leads", label: "Leads", areas: ["leads", "distribuicao", "marketing"] },
+  { id: "comercial", label: "Comercial", areas: ["comercial"] },
+  { id: "equipe", label: "Equipe", areas: ["equipe"] },
+  { id: "configuracoes", label: "Configurações", areas: ["configuracoes", "atendimento-ia", "financeiro", "erp"] },
+];
+
+/** Agrupa itens já filtrados por área; área fora dos grupos vira um grupo próprio no fim. Grupos vazios somem. */
+export function groupNavItems<T extends { id: NavAreaId }>(items: readonly T[]): { group: NavGroup; items: T[] }[] {
+  const grouped = NAV_GROUPS.map((group) => ({ group, items: group.areas.flatMap((areaId) => items.filter((item) => item.id === areaId)) }));
+  const known = new Set(NAV_GROUPS.flatMap((group) => group.areas));
+  const loose = items.filter((item) => !known.has(item.id)).map((item) => ({ group: { id: item.id, label: "", areas: [item.id] } as NavGroup, items: [item] }));
+  return [...grouped, ...loose].filter((entry) => entry.items.length > 0);
+}
+
 /** Caminhos que são raiz de uma aba: no chrome do diretor não mostram "voltar". */
 export function isNavTabRoot(pathname: string) {
   const path = pathOf(pathname).replace(/(.)\/+$/, "$1");

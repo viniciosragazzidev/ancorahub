@@ -44,6 +44,8 @@ interface DataTableProps<TData, TValue> {
   pageSize?: number;
   getRowClassName?: (row: TData) => string | undefined;
   onRowClick?: (row: TData) => void;
+  /** Plural do item para o rodapé ("pessoas"). */
+  itemNoun?: string;
 }
 
 export function DataTable<TData, TValue>({
@@ -58,6 +60,7 @@ export function DataTable<TData, TValue>({
   pageSize = 10,
   getRowClassName,
   onRowClick,
+  itemNoun,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -191,7 +194,7 @@ export function DataTable<TData, TValue>({
           </Table>
         </DragScrollTable>
 
-        {showPagination && <DataTablePagination table={table} />}
+        {showPagination && <DataTablePagination table={table} itemNoun={itemNoun} />}
       </DataTableFrame>
     </div>
   );

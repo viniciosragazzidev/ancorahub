@@ -87,6 +87,7 @@ import { canDirectorMarkLeadInService } from "@/features/leads/director-service-
 import { buildPostSaleAudienceHref } from "@/features/post-sale-audit/bulk-navigation";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { LeadDetailsDrawer } from "@/features/leads/components/lead-details-drawer";
+import { PageToolbar } from "@/components/ui/page-toolbar";
 import { formatLeadCommercialTotals, sumLeadCommercialValues } from "@/features/leads/commercial-values";
 export type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 
@@ -223,6 +224,7 @@ export function LeadsWorkspace({
   unassignedPagination,
   queueTabs,
   liteFilters,
+  classicFilters,
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
@@ -263,6 +265,8 @@ export function LeadsWorkspace({
    * undefined (React #130 em produção).
    */
   liteFilters?: Omit<LeadsFiltersProps, "trailing">;
+  /** Filtros do modo normal, renderizados embaixo das abas (anatomia de página). */
+  classicFilters?: React.ReactNode;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -708,13 +712,11 @@ export function LeadsWorkspace({
             {queueTabs}
           </div>
         ) : (
-        <div className="grid gap-2 border-b border-border/60 pb-2">
-        <div className="flex items-center gap-2">
-          {viewTabs}
-          {columnsMenu}
-        </div>
-        {queueTabs}
-        </div>
+        // Anatomia de página (skill interface-enxuta): abas com contagem primeiro, depois filas e filtros.
+        <PageToolbar
+          tabs={<div className="flex items-center gap-2">{viewTabs}{columnsMenu}</div>}
+          below={queueTabs || classicFilters ? <>{queueTabs}{classicFilters}</> : undefined}
+        />
         )}
 
         {/* ─── TAB 1: LISTA PRINCIPAL (TABELA) ─── */}

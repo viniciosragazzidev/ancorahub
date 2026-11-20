@@ -8,6 +8,7 @@ const TABS = [
 ] as const;
 
 /** Same underline tab bar as /leads/distribuicao, with links (each view is its own request). */
-export function TeamManagementTabs({ active }: { active: "membros" | "unidades" | "equipes" }) {
-  return <RouteSectionTabs label="Gestão de equipe e unidades" tabs={TABS} active={active} />;
+export function TeamManagementTabs({ active, counts }: { active: "membros" | "unidades" | "equipes"; counts?: Partial<Record<"membros" | "unidades" | "equipes", number>> }) {
+  const tabs = counts ? TABS.map((tab) => ({ ...tab, count: counts[tab.id] })) : TABS;
+  return <RouteSectionTabs label="Gestão de equipe e unidades" tabs={tabs} active={active} />;
 }

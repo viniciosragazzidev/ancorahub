@@ -20,6 +20,8 @@ import { AreaTabs } from "@/components/navigation/area-tabs";
 type DashboardHeaderProps = {
   breadcrumb: string;
   title: string;
+  /** Resumo em uma linha ao lado do título ("1.240 leads · mais recentes primeiro"), skill `interface-enxuta`. */
+  summary?: string;
   rightSlot?: React.ReactNode;
   showModeToggle?: boolean;
   showSidebarTrigger?: boolean;
@@ -28,6 +30,7 @@ type DashboardHeaderProps = {
 export function DashboardHeader({
   breadcrumb,
   title,
+  summary,
   rightSlot,
   showModeToggle = false,
   showSidebarTrigger = true,
@@ -54,8 +57,13 @@ export function DashboardHeader({
           <div className="h-4 w-px bg-border/50 shrink-0 max-[559px]:hidden" />
         </>
       ) : null}
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 items-end gap-3">
         <AnimatedPageTitle breadcrumb={breadcrumb} title={title} />
+        {summary ? (
+          <span data-slot="page-summary" className="hidden min-w-0 truncate pb-px text-xs tabular-nums text-muted-foreground md:inline">
+            {summary}
+          </span>
+        ) : null}
       </div>
       <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5 max-[559px]:contents">
         {rightSlot ? (
