@@ -11,7 +11,7 @@ import { startTransition, useActionState, useEffect, useMemo, useState } from "r
 import { ArrowRight, ChevronRight, Download, Search } from "lucide-react";
 
 import { StatCard } from "@/components/dashboard/metric-card";
-import { LiteBulkBar, LiteSelect, LiteUrlSelect } from "@/components/lite/controls";
+import { LiteBulkBar, LiteUrlSelect } from "@/components/lite/controls";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import page from "@/components/lite/page/lite-page.module.css";
@@ -42,6 +42,12 @@ export type SaleLiteRow = {
 type StatusFilter = "all" | "active" | "cancelled";
 
 const PAGE_SIZE = 10;
+
+/** Ticket médio das vendas ativas (canceladas não entram); 0 sem venda ativa. */
+export function averageSaleTicket(sales: Pick<SaleLiteRow, "status" | "saleValue">[]) {
+  const active = sales.filter((sale) => sale.status === "active");
+  return active.length ? Math.round((active.reduce((sum, sale) => sum + sale.saleValue, 0) / active.length) * 100) / 100 : 0;
+}
 
 function exportMonthCommissions() {
   const now = new Date();
@@ -99,6 +105,13 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
   };
 
   const activeSales = sales.filter((sale) => sale.status === "active").length;
+  const cancelledSales = sales.length - activeSales;
+  const averageTicket = averageSaleTicket(sales);
+  const statusTabs: { value: StatusFilter; label: string; count: number }[] = [
+    { value: "all", label: "Todas", count: sales.length },
+    { value: "active", label: "Ativas", count: activeSales },
+    { value: "cancelled", label: "Canceladas", count: cancelledSales },
+  ];
   const trend = useMemo(() => ({
     total: dailyCounts(sales.map((sale) => new Date(sale.saleDate)), period),
     active: dailyCounts(sales.filter((sale) => sale.status === "active").map((sale) => new Date(sale.saleDate)), period),
@@ -162,7 +175,7 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
         <StatCard label="Total de vendas" value={sales.length} sublabel={`últimos ${period} dias`} sparklineData={trend.total} sparklineColor="var(--chart-1)" animated />
         <StatCard label="Vendas ativas" value={activeSales} sublabel="em andamento" sparklineData={trend.active} sparklineColor="var(--chart-3)" animated animationDelay={0.06} />
         <StatCard label="Receita total" value={formatCurrency(totalRevenue)} sublabel="acumulado no período" sparklineData={trend.revenue} sparklineColor="var(--chart-2)" animated animationDelay={0.12} />
-        <StatCard label="Comissão a repassar" value={formatCurrency(totalRevenue)} sublabel="gerada nas vendas" sparklineData={trend.revenue} sparklineColor="var(--chart-4)" animated animationDelay={0.18} />
+        <StatCard label="Ticket médio" value={formatCurrency(averageTicket)} sublabel="por venda ativa" animated animationDelay={0.18} />
       </div>
 
       <div className={page.group}>
@@ -171,17 +184,29 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
             <Search aria-hidden="true" size={18} className={page.searchIcon} />
             <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por lead, corretor ou plano" aria-label="Buscar vendas" className={page.searchInput} />
           </label>
-          <div className={page.select}>
-            <LiteSelect label="Status" hideLabel value={status} onChange={(value) => setStatus(value as StatusFilter)} options={[{ value: "all", label: "Todas as vendas" }, { value: "active", label: "Ativas" }, { value: "cancelled", label: "Canceladas" }]} />
-          </div>
           {branches.length > 1 ? (
             <LiteUrlSelect className={page.select} label="Unidade" param="branch" value={branchId ?? ""} resetPage options={[{ value: "", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))]} />
           ) : null}
           <LiteUrlSelect className={page.selectNarrow} label="Período" param="period" value={String(period)} defaultValue={String(DEFAULT_PERIOD)} method="replace" options={PERIOD_OPTIONS.map((days) => ({ value: String(days), label: `${days} dias` }))} />
-          <button type="button" className={`${page.button} ${page.toolbarEnd}`} onClick={exportMonthCommissions}>
-            <Download aria-hidden="true" size={16} /> Exportar CSV
+          <button type="button" className={`${page.button} ${page.toolbarEnd}`} onClick={exportMonthCommissions} title="Baixa as comissões do mês atual em CSV">
+            <Download aria-hidden="true" size={16} /> Comissões do mês
           </button>
         </div>
+
+        {sales.length > 0 ? (
+          <nav className={page.countTabs} aria-label="Filtrar vendas por status">
+            {statusTabs.map((tab) => (
+              <button key={tab.value} type="button" className={page.countTab} data-active={status === tab.value ? "true" : undefined} aria-pressed={status === tab.value} onClick={() => setStatus(tab.value)}>
+                {tab.label}<span className={page.countPill}>{tab.count}</span>
+              </button>
+            ))}
+          </nav>
+        ) : null}
+        {query.trim() ? (
+          <p className={page.resultLine} role="status">
+            {filtered.length} {filtered.length === 1 ? "venda" : "vendas"} para “{query.trim()}” · <button type="button" onClick={() => setQuery("")}>Limpar busca</button>
+          </p>
+        ) : null}
 
         {sales.length === 0 ? (
           <div className={page.empty}>
@@ -200,7 +225,7 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
               onRowOpen={(sale) => router.push(`/vendas/${sale.id}`)}
               empty={<p>Nenhuma venda encontrada. Ajuste a busca ou o filtro de status.</p>}
             />
-            <LitePagination label="Páginas de vendas" {...pagination} />
+            <LitePagination label="Páginas de vendas" {...pagination} itemNoun="vendas" />
           </>
         )}
       </div>
