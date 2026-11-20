@@ -6,10 +6,12 @@ import type { OverviewPeriod } from "@/features/dashboard/overview-filter";
 
 import { DirectorLiteChrome, type DashboardBranch, type DirectorLiteTab } from "./director-lite-chrome";
 import { OperationView } from "./operation-view";
+import { EntriesView } from "./entries-view";
+import type { EntriesByTurn } from "@/features/dashboard/entries/entries-by-turn-core";
 
 export type { DashboardBranch };
 
-export function DirectorLiteDashboard({ data, period, branchId, branches, now, availableTabs, canOpenConversations = true }: {
+export function DirectorLiteDashboard({ data, period, branchId, branches, now, availableTabs, canOpenConversations = true, queues, queueId = null, entries = null }: {
   data: EssentialDashboard;
   period: OverviewPeriod;
   /** Unidade escolhida já validada contra as unidades do tenant; null = todas. */
@@ -20,10 +22,18 @@ export function DirectorLiteDashboard({ data, period, branchId, branches, now, a
   availableTabs?: readonly DirectorLiteTab[];
   /** Sem acesso às Conversas, os nomes dos corretores ficam sem link (a tela levaria a acesso negado). */
   canOpenConversations?: boolean;
+  /** Filtro por fila (20/11/2026): intervalo e fila no topo em todas as abas do Painel. */
+  queues?: DashboardBranch[];
+  queueId?: string | null;
+  /** Entradas por turno, WhatsApp x formulário. */
+  entries?: EntriesByTurn | null;
 }) {
+  const queueName = queues?.find((queue) => queue.id === queueId)?.name ?? null;
+  const periodText = period === "today" ? "Hoje" : period === "7d" ? "Últimos 7 dias" : "Últimos 30 dias";
   return (
-    <DirectorLiteChrome now={now} tab="overview" period={period} branchId={branchId} branches={branches} firstName={data.firstName} availableTabs={availableTabs}>
+    <DirectorLiteChrome now={now} tab="overview" period={period} branchId={branchId} branches={branches} firstName={data.firstName} availableTabs={availableTabs} queues={queues} queueId={queueId}>
       <OperationView data={data} canOpenConversations={canOpenConversations} />
+      {entries ? <div className="mt-6"><EntriesView data={entries} queueName={queueName} periodText={periodText} /></div> : null}
     </DirectorLiteChrome>
   );
 }

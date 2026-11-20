@@ -124,7 +124,7 @@ function time(value: string | Date | null) {
  * first-contact sends (outbound read by its tenant + created_at index, there is no index by
  * recipient) and their inbound messages (by the tenant + lead index). Counts are made here.
  */
-async function loadCohort(tenantId: string, since: Date, branchId: string | null) {
+async function loadCohort(tenantId: string, since: Date, branchId: string | null, queueId: string | null = null) {
   // Raw SQL with postgres.js: a Date parameter is sent as Date.toString(), which Postgres
   // rejects ("Wed Oct 14 2026 ... GMT+0000"); send ISO text with an explicit cast.
   const sinceIso = since.toISOString();
@@ -136,6 +136,7 @@ async function loadCohort(tenantId: string, since: Date, branchId: string | null
       from leads l
       where l.tenant_id = ${tenantId} and l.created_at >= ${sinceIso}::timestamptz and l.deleted_at is null
         ${branchId ? sql`and l.branch_id = ${branchId}` : sql``}
+        ${queueId ? sql`and l.queue_id = ${queueId}` : sql``}
     ),
     fc as (
       select o.recipient_id as lead_id, min(o.sent_at) as first_out,
@@ -170,15 +171,17 @@ export async function getQualificationFunnel(
   context: TenantContext,
   period: FunnelPeriod,
   requestedBranchId?: string | null,
+  /** Fila escolhida no topo do Funil (20/11/2026); sem fila, todas. O custo da empresa só entra sem recorte. */
+  queueId: string | null = null,
 ): Promise<QualificationFunnel> {
   const db = getDatabase();
   const since = funnelPeriodStart(period);
   const isDirector = context.role === "director";
   const branchId = resolveFunnelBranchScope(context, requestedBranchId);
-  const includeCompanyCost = isDirector && branchId === null;
+  const includeCompanyCost = isDirector && branchId === null && queueId === null;
 
   const [rows, costRows, real] = await Promise.all([
-    loadCohort(context.tenantId, since, branchId),
+    loadCohort(context.tenantId, since, branchId, queueId),
     includeCompanyCost
       ? db.select({
         templateName: schema.whatsappOutboundMessages.templateName,

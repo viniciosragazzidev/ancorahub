@@ -19,13 +19,12 @@ import { getFeatureFlag } from "@/features/system-settings/queries";
 import { funnelPeriodForOverview, funnelPeriodStart, getQualificationFunnel, parseFunnelPeriod } from "@/features/qualification-turbo/funnel";
 import { QualificationFunnelView } from "@/features/qualification-turbo/components/qualification-funnel-view";
 import { parseOverviewPeriod } from "@/features/dashboard/overview-filter";
-import { parseBranchIdParam } from "@/features/reports/metrics/narrow-scope";
 import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
-import { getDashboardUnitFilter, resolveRequestedUnit } from "@/features/dashboard/director-lite-branches";
 import { DirectorLiteDashboard } from "@/features/dashboard/components/director-lite/director-lite-dashboard";
 import { DirectorLiteQualificationFunnelPage } from "@/features/dashboard/components/director-lite/qualification-funnel-page";
 import { getEssentialDashboard } from "@/features/dashboard/essential/essential-data";
 import { renderDirectorLiteQuality } from "@/features/dashboard/director-lite-quality-page";
+import { getEntriesByTurn } from "@/features/dashboard/entries/entries-by-turn";
 import { getDirectorLiteViewerFirstName } from "@/features/dashboard/director-lite-viewer";
 import { liteDashboardTabs } from "@/features/dashboard/director-lite-tabs";
 import { hasPermission } from "@/shared/auth/permissions";
@@ -87,14 +86,17 @@ export default async function DashboardPage({
       if (await shouldUseDirectorLiteStyle(context)) {
         const overviewPeriod = parseOverviewPeriod(singleParam(resolvedSearchParams.periodo) ?? singleParam(resolvedSearchParams.period));
         const funnelPeriod = funnelPeriodForOverview(overviewPeriod);
-        const { canCompare, units } = await getDashboardUnitFilter(context);
-        const branchId = canCompare ? resolveRequestedUnit(parseBranchIdParam(singleParam(resolvedSearchParams.unidade)), units) : null;
-        const [funnel, firstName, insights] = await Promise.all([
-          getQualificationFunnel(context, funnelPeriod, branchId),
+        // 20/11/2026: intervalo e fila no topo (nada de unidade) e entradas por turno, WhatsApp x formulário.
+        const queues = await listLeadQualityQueues(context.tenantId);
+        const rawQueue = singleParam(resolvedSearchParams.fila);
+        const queueId = rawQueue && queues.some((queue) => queue.id === rawQueue) ? rawQueue : null;
+        const [funnel, firstName, insights, entries] = await Promise.all([
+          getQualificationFunnel(context, funnelPeriod, null, queueId),
           getDirectorLiteViewerFirstName(context.userId),
-          getFunnelInsights(context, funnelPeriodStart(funnelPeriod), branchId).catch(() => null),
+          queueId ? Promise.resolve(null) : getFunnelInsights(context, funnelPeriodStart(funnelPeriod), null).catch(() => null),
+          getEntriesByTurn(context, { period: overviewPeriod, queueId }).catch(() => null),
         ]);
-        return <DirectorLiteQualificationFunnelPage data={funnel} branchId={branchId} branches={canCompare ? units : []} firstName={firstName} now={new Date()} insights={insights ? <FunnelInsightsPanel insights={insights} steps={funnel.stages} /> : null} />;
+        return <DirectorLiteQualificationFunnelPage data={funnel} branchId={null} branches={[]} queues={queues} queueId={queueId} entries={entries} firstName={firstName} now={new Date()} insights={insights ? <FunnelInsightsPanel insights={insights} steps={funnel.stages} /> : null} />;
       }
       const funnelPeriod = parseFunnelPeriod(singleParam(resolvedSearchParams.period));
       const [funnel, insights] = await Promise.all([
@@ -105,14 +107,11 @@ export default async function DashboardPage({
     }
     if (activeTab === "quality" && canReadQuality) {
       // Qualidade no visual Lite (chave ligada), vista Simples. Detalhada e recortes seguem na tela antiga.
-      const liteQuality = !singleParam(resolvedSearchParams.dimension)
-        && singleParam(resolvedSearchParams.vista) !== "detalhada"
-        && singleParam(resolvedSearchParams.legado) !== "1"
-        && (await shouldUseDirectorLiteStyle(context));
-      if (liteQuality) {
+      // 20/11/2026: só intervalo e fila; entradas por turno (WhatsApp x formulário). Vistas antigas saíram no Lite.
+      if (await shouldUseDirectorLiteStyle(context)) {
         return renderDirectorLiteQuality(context, {
           periodo: singleParam(resolvedSearchParams.periodo),
-          unidade: singleParam(resolvedSearchParams.unidade),
+          fila: singleParam(resolvedSearchParams.fila),
         });
       }
       const focus = parseLeadQualityFocus(
@@ -135,17 +134,20 @@ export default async function DashboardPage({
     if (activeTab !== "quality" && activeTab !== "funnel" && (await shouldUseDirectorLiteStyle(context))) {
       const period = parseOverviewPeriod(singleParam(resolvedSearchParams.periodo));
       // Só as unidades autorizadas aparecem; sem permissão de comparar, o filtro some. Unidade fora do escopo cai em "Todas".
-      const { canCompare, units } = await getDashboardUnitFilter(context);
-      const branchId = canCompare ? resolveRequestedUnit(parseBranchIdParam(singleParam(resolvedSearchParams.unidade)), units) : null;
-      const [data, liteReporting] = await Promise.all([
-        getEssentialDashboard(context, { period, branchId }),
+      // 20/11/2026: intervalo e fila no topo (no lugar da unidade) e entradas por turno, WhatsApp x formulário.
+      const queues = await listLeadQualityQueues(context.tenantId);
+      const rawQueue = singleParam(resolvedSearchParams.fila);
+      const queueId = rawQueue && queues.some((queue) => queue.id === rawQueue) ? rawQueue : null;
+      const [data, liteReporting, entries] = await Promise.all([
+        getEssentialDashboard(context, { period, branchId: null, queueId }),
         canReadQuality ? getFeatureFlag(FEATURE_FLAGS.REPORTING_CENTER) : Promise.resolve("false"),
+        getEntriesByTurn(context, { period, queueId }).catch(() => null),
       ]);
       // Abas como no legado: Qualidade e Funil só com a central de qualidade E a central de relatórios ligada.
       const showQualityTabs = canReadQuality && liteReporting !== "false";
       // Só as abas e os links que a tela de hoje já libera para o papel (o visual Lite vale para todo o modo normal).
       const canOpenConversations = hasPermission(context.role, "acessar_conversas") && context.jobTitle !== "marketing";
-      return <DirectorLiteDashboard data={data} period={period} branchId={branchId} branches={canCompare ? units : []} now={new Date()} availableTabs={liteDashboardTabs(context, showQualityTabs)} canOpenConversations={canOpenConversations} />;
+      return <DirectorLiteDashboard data={data} period={period} branchId={null} branches={[]} queues={queues} queueId={queueId} entries={entries} now={new Date()} availableTabs={liteDashboardTabs(context, showQualityTabs)} canOpenConversations={canOpenConversations} />;
     }
 
     const [data, reportingEnabled] = await Promise.all([
