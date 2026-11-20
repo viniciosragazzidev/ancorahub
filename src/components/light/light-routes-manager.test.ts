@@ -9,7 +9,9 @@ describe("manager Lite routes", () => {
     for (const path of ["/dashboard/c/ancora", "/leads/dashboard", "/leads/arquivados", "/distribuicao/dashboard", "/leads/a/b", "/leads/distribuicao/plantao", "/leads/distribuicao/plantao/a/b", "/equipe/cargos", "/equipe/convidar", "/equipe/dashboard", "/equipe/recuperacoes", "/equipe/minha", "/equipe/plantao", "/equipe/repassar", "/equipe/transferencia", "/equipe/a/b", "/clientes/a/b", "/empresas/abc", "/empresas/abc/leads", "/unidades", "/unidades/branch-1/subpage", "/relatorios", "/cotacao", "/primeiro-acesso/etapa"]) {
       expect(isLightRouteAllowed(path, "manager"), path).toBe(false);
     }
-    expect(LIGHT_MANAGER_ALLOWED_ROUTES).toHaveLength(22);
+    // 23 com o Call Âncora (b6c5041f), que tem acesso controlado pela própria chave.
+    expect(LIGHT_MANAGER_ALLOWED_ROUTES).toHaveLength(23);
+    expect(isLightRouteAllowed("/call-ancora", "manager")).toBe(true);
     expect(isLightRouteAllowed("/gestao", "manager")).toBe(true);
     expect(isLightRouteAllowed("/gestao/a/b", "manager")).toBe(false);
     expect(isLightRouteAllowed("/mensagens", "manager")).toBe(true);

@@ -14,9 +14,11 @@ describe("DEC-187: migration 0231 e schema", () => {
   it("o journal tem a 0231 logo depois da 0230, com o .sql correspondente", () => {
     const journal = JSON.parse(readFileSync(path.join(root, "drizzle", "meta", "_journal.json"), "utf8")) as { entries: { idx: number; tag: string }[] };
     const tags = journal.entries.map((entry) => entry.tag);
-    expect(tags.at(-1)).toBe("0231_broker_prior_clients");
-    expect(tags.at(-2)).toBe("0230_erp_operational");
-    expect(journal.entries.at(-1)!.idx).toBe(journal.entries.at(-2)!.idx + 1);
+    // Migrações novas entram depois; o que importa é a 0231 vir logo após a 0230 (20/11).
+    const index = tags.indexOf("0231_broker_prior_clients");
+    expect(index).toBeGreaterThan(0);
+    expect(tags[index - 1]).toBe("0230_erp_operational");
+    expect(journal.entries[index]!.idx).toBe(journal.entries[index - 1]!.idx + 1);
     expect(existsSync(sqlPath)).toBe(true);
   });
 

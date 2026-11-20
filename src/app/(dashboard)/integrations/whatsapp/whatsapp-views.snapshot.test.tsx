@@ -11,10 +11,14 @@ vi.mock("@/shared/db", () => {
 });
 vi.mock("drizzle-orm", () => ({ and: () => ({}), asc: () => ({}), desc: () => ({}), eq: () => ({}) }));
 vi.mock("@/features/communication-channels/outbound-service", () => ({ resolveNoticeTextVariants: () => ["texto"] }));
-vi.mock("@/features/team-notices/catalog", () => ({ TEAM_NOTICES: [{ key: "k1", label: "Aviso", description: "Desc", purpose: "taskReminder", class: "critical" }] }));
+vi.mock("@/features/team-notices/catalog", () => {
+  const TEAM_NOTICES = [{ key: "k1", label: "Aviso", description: "Desc", purpose: "taskReminder", class: "critical" }];
+  // A tela agora pede a lista por teamNoticesFor (o lembrete 24 h depende de uma chave da empresa).
+  return { TEAM_NOTICES, teamNoticesFor: () => TEAM_NOTICES };
+});
 vi.mock("@/features/team-notices/service", () => ({ getTeamNoticeSettings: async () => new Map([["k1", { enabled: true, channel: "waha", freeMessageIds: [] }]]) }));
 vi.mock("@/features/waha-cadence/tenant-channel", () => ({ getTenantChannel: async () => ({ id: "c1", status: "ready" }), getMaterialsChannel: async () => ({ id: "c2", status: "ready" }) }));
-vi.mock("@/features/system-settings/queries", () => ({ getFeatureFlag: async () => "true" }));
+vi.mock("@/features/system-settings/queries", () => ({ getFeatureFlag: async () => "true", getSystemSetting: async () => null }));
 vi.mock("@/features/waha-group-capture/channel-actions", () => ({ disconnectMaterialsChannelAction: vi.fn(), pollMaterialsChannelAction: vi.fn(), refreshMaterialGroupsAction: vi.fn(), setMaterialGroupActiveAction: vi.fn(), startMaterialsChannelAction: vi.fn() }));
 vi.mock("@/features/waha-group-capture/groups-service", () => ({ getCaptureStats: vi.fn() }));
 vi.mock("@/features/waha-group-capture/safe-load", () => ({

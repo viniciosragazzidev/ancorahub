@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => {
-  const schema = { webhookDeliveries: Symbol("deliveries"), leads: Symbol("leads"), leadInteractions: Symbol("interactions"), auditLogs: Symbol("audit"), leadDistributionEvents: Symbol("events") };
+  const schema = { webhookDeliveries: Symbol("deliveries"), leads: Symbol("leads"), leadInteractions: Symbol("interactions"), auditLogs: Symbol("audit"), leadDistributionEvents: Symbol("events"), leadStatusValues: ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"] };
   const inserts: Array<{ table: symbol; values: Record<string, unknown> }> = [];
   const updates: Array<{ table: symbol; values: Record<string, unknown> }> = [];
   let existingLeadRows: Array<Record<string, unknown>> = [];
