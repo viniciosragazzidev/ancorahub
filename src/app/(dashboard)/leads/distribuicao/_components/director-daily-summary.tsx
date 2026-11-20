@@ -8,13 +8,13 @@
  */
 import "@/components/arc/venancor-scope.css";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
-import { BadgeCheck, CircleSlash, Clock, Headset, Inbox, Search, TrendingUp, Users } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { ArrowRight, BadgeCheck, CircleSlash, Headset, Inbox, Search, TrendingUp, Users } from "lucide-react";
 
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { AvailabilityToggle } from "@/components/availability-toggle";
-import { CaptainBanner, type CaptainBannerArt } from "@/components/lite/banner/captain-banner";
 import { LiteMenu } from "@/components/lite/controls/menu";
 import { LiteSelect } from "@/components/lite/controls/select";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
@@ -34,8 +34,19 @@ const PERIOD_OPTIONS = [
   { value: "custom", label: "Escolher datas" },
 ];
 
-/** Capitão Âncora organiza e acompanha a distribuição de leads. */
-const DISTRIBUTION_ART: CaptainBannerArt = { src: "/mascote/2026-11-18/distribuicao-capitao-leads.webp", width: 1312, height: 1199 };
+type StatusTab = "all" | "available" | "paused" | "offline" | "pending";
+
+/** Grupo de disponibilidade para as abas: pausa junta "paused" e "break"; o resto que não é disponível conta como offline. */
+export function availabilityGroup(status: string): "available" | "paused" | "offline" {
+  if (status === "available" || status === "busy") return "available";
+  if (status === "paused" || status === "break") return "paused";
+  return "offline";
+}
+
+/** Quem tem lead sem 1º contato vem primeiro (é quem o gestor cobra); empate por mais recebidos. */
+export function sortBrokersForFollowUp(items: BrokerDailySummaryItem[]) {
+  return [...items].sort((a, b) => b.unstartedLeads - a.unstartedLeads || b.leadsReceived - a.leadsReceived);
+}
 
 const STATUS_LABEL: Record<string, string> = { available: "Disponível", busy: "Em atendimento", break: "Pausa", paused: "Pausa" };
 
@@ -49,17 +60,15 @@ function Metric({ icon, label, value, hint, tone }: { icon: ReactNode; label: st
   );
 }
 
-function SummaryBanner({ data }: { data: BrokerDailySummaryAggregate }) {
-  const title = data.totalUnstarted > 0
-    ? `${data.totalUnstarted} ${data.totalUnstarted === 1 ? "lead ainda está" : "leads ainda estão"} sem primeiro contato. Acione a equipe para iniciar o atendimento.`
-    : data.totalReceived > 0
-      ? "Todos os leads recebidos já tiveram o primeiro contato. A equipe está em dia."
-      : "Assim que os leads chegarem, a distribuição aparece aqui.";
-  const goal = data.totalReceived > 0 ? { value: `${data.teamConversionRate}%`, hint: "de conversão da equipe" } : undefined;
+/** Aviso compacto (20/11, skill interface-enxuta): só aparece quando há o que fazer, com um verbo. */
+function PendingNotice({ data }: { data: BrokerDailySummaryAggregate }) {
+  if (data.totalUnstarted <= 0) return null;
   return (
-    <CaptainBanner className={styles.banner} label="Dica da distribuição" tone="white" title={title} goal={goal}
-      progress={data.totalReceived > 0 ? data.teamConversionRate : null} art={DISTRIBUTION_ART}
-      action={{ label: "Ver os leads", href: "/leads" }} />
+    <p className={styles.notice} role="status">
+      <span className={styles.noticeDot} aria-hidden="true" />
+      <span><strong>{data.totalUnstarted}</strong> {data.totalUnstarted === 1 ? "lead sem 1º contato" : "leads sem 1º contato"} no período</span>
+      <Link href="/leads" className={styles.noticeVerb}>Ver os leads <ArrowRight aria-hidden="true" size={14} /></Link>
+    </p>
   );
 }
 
@@ -71,7 +80,25 @@ export function DirectorDailySummary({ initialData, branches, canFilterBranch = 
   const router = useRouter();
   const summary = useBrokerDailySummary(initialData);
   const { data, period, filteredItems, isLoading } = summary;
-  const { pageRows, pagination, reset } = useLitePages(filteredItems, PAGE_SIZE);
+  const [statusTab, setStatusTab] = useState<StatusTab>("all");
+  const counts = useMemo(() => {
+    const next = { all: filteredItems.length, available: 0, paused: 0, offline: 0, pending: 0 };
+    for (const item of filteredItems) {
+      next[availabilityGroup(item.availabilityStatus)] += 1;
+      if (item.unstartedLeads > 0) next.pending += 1;
+    }
+    return next;
+  }, [filteredItems]);
+  const rows = useMemo(() => sortBrokersForFollowUp(filteredItems.filter((item) => statusTab === "all"
+    || (statusTab === "pending" ? item.unstartedLeads > 0 : availabilityGroup(item.availabilityStatus) === statusTab))), [filteredItems, statusTab]);
+  const { pageRows, pagination, reset } = useLitePages(rows, PAGE_SIZE);
+  const statusTabs: { value: StatusTab; label: string }[] = [
+    { value: "all", label: "Todos" },
+    { value: "pending", label: "Com lead sem contato" },
+    { value: "available", label: "Disponíveis" },
+    { value: "paused", label: "Em pausa" },
+    { value: "offline", label: "Offline" },
+  ];
 
   const columns: LiteColumn<BrokerDailySummaryItem>[] = [
     { id: "broker", label: "Corretor", primary: true, render: (item) => <span className={styles.who}><span className={styles.whoName}>{item.brokerName}</span><span className={styles.whoSub}>{item.branchName || "Matriz"}</span></span> },
@@ -124,7 +151,7 @@ export function DirectorDailySummary({ initialData, branches, canFilterBranch = 
         <Metric icon={<TrendingUp size={16} />} label="Conversão" value={`${data.teamConversionRate}%`} hint={response} />
       </dl>
 
-      <SummaryBanner data={data} />
+      <PendingNotice data={data} />
 
       <section className={styles.list} aria-label="Corretores">
         <div className={styles.toolbar}>
@@ -141,13 +168,18 @@ export function DirectorDailySummary({ initialData, branches, canFilterBranch = 
             </div>
           ) : null}
         </div>
-        <p className={styles.count}>
-          <Clock size={14} aria-hidden="true" /> {filteredItems.length} {filteredItems.length === 1 ? "corretor" : "corretores"} · toque na linha para ver os leads
-        </p>
+        <nav className={styles.statusTabs} aria-label="Filtrar corretores por status">
+          {statusTabs.map((tab) => (
+            <button key={tab.value} type="button" className={styles.statusTab} data-active={statusTab === tab.value ? "true" : undefined}
+              aria-pressed={statusTab === tab.value} onClick={() => { reset(); setStatusTab(tab.value); }}>
+              {tab.label}<span className={styles.statusCount}>{counts[tab.value]}</span>
+            </button>
+          ))}
+        </nav>
         <LiteResponsiveData caption="Resumo dos corretores" columns={columns} rows={pageRows} rowKey={(item) => item.brokerId}
           onRowOpen={(item) => router.push(`/leads?corretor=${item.brokerId}`)}
           empty={<p className={styles.empty}>Nenhum corretor encontrado com esses filtros.</p>} />
-        <LitePagination {...pagination} label="Páginas dos corretores" pending={isLoading} />
+        <LitePagination {...pagination} label="Páginas dos corretores" pending={isLoading} itemNoun="corretores" />
       </section>
     </div>
   );
