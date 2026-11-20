@@ -22,6 +22,11 @@ export type NavTab = {
   roles?: readonly TenantRole[];
   /** Escondida enquanto a chave correspondente estiver desligada. */
   requires?: "negotiations" | "relationshipCenter" | "postSaleAudit" | "autoSale" | "erp";
+  /**
+   * Rota cuja permissão vale para a aba quando o href é outro endereço (ex.: Comissões abre em /settings?tab=comissoes,
+   * mas quem pode ver é quem pode abrir /configuracoes/comissoes). Sem isto, a permissão segue o href.
+   */
+  accessPath?: string;
   /** Outros valores de query que abrem a mesma aba (links antigos), ex.: { tab: ["alerts"] }. */
   aliases?: Readonly<Record<string, readonly string[]>>;
   /**
@@ -99,13 +104,13 @@ export const NAV_AREAS: readonly NavArea[] = [
     tabs: [
       { id: "vendas", label: "Vendas", href: "/vendas", permission: "acessar_vendas" },
       // /propostas redireciona para /vendas?tab=propostas (next.config.ts): a aba aponta para o destino final (20/11).
-      { id: "propostas", label: "Propostas", href: "/vendas?tab=propostas", permission: "acessar_vendas", paths: ["/propostas"] },
+      { id: "propostas", label: "Propostas", href: "/vendas?tab=propostas", permission: "acessar_vendas", paths: ["/propostas"], accessPath: "/propostas" },
       { id: "negociacoes", label: "Negociações", href: "/negociacoes", permission: "ver_dashboard_equipe", requires: "negotiations" },
       // Venda Automatizada (piloto, DEC-182): só com feature_auto_sale_<tenantId> ligada.
       { id: "venda-automatizada", label: "Venda Automatizada", href: "/vendas/automatizada", permission: "acessar_vendas", roles: ["director", "manager"], requires: "autoSale" },
       { id: "clientes", label: "Clientes", href: "/clientes", permission: "acessar_clientes" },
       { id: "documentos", label: "Documentos", href: "/documentos", permission: "acessar_documentos" },
-      { id: "comissoes", label: "Comissões", href: "/settings?tab=comissoes", permission: "ver_comissionamento", roles: ["director", "manager"], paths: ["/configuracoes/comissoes"] },
+      { id: "comissoes", label: "Comissões", href: "/settings?tab=comissoes", permission: "ver_comissionamento", roles: ["director", "manager"], paths: ["/configuracoes/comissoes"], accessPath: "/configuracoes/comissoes" },
       { id: "ferramentas", label: "Ferramentas", href: "/ferramentas", permission: "acessar_ferramentas", paths: ["/ferramentas/validador-comprovante"] },
     ],
   },
@@ -274,7 +279,7 @@ export function canShowNavTab(tab: NavTab, user: NavAccessUser | null) {
   const hasCargo = permissions.some((permission) => permission.startsWith("route:"));
   if (tab.noCargo && hasCargo) return false;
   if (tab.cargoCapability && hasCargo && !permissions.includes(tab.cargoCapability)) return false;
-  return canShowNavigationItem({ url: tab.href, permission: tab.permission, requires: tab.requires === "relationshipCenter" ? "relationshipCenter" : undefined }, user);
+  return canShowNavigationItem({ url: tab.accessPath ?? tab.href, permission: tab.permission, requires: tab.requires === "relationshipCenter" ? "relationshipCenter" : undefined }, user);
 }
 
 export function visibleNavTabs(area: NavArea, user: NavAccessUser | null) {
