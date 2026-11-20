@@ -190,10 +190,10 @@ export function UnitsLite({ branches, canManage }: { branches: UnitLite[]; canMa
   ];
   // Tabela no lugar da grade de cartões (20/11, regra de densidade do CLAUDE.md): uma linha por unidade.
   const columns: LiteColumn<UnitLite>[] = [
-    { id: "name", label: "Unidade", primary: true, render: (branch) => (
+    { id: "name", label: "Unidade", primary: true, nowrap: true, render: (branch) => (
       <span>
-        <Link href={`/unidades/${branch.id}`} className={`${page.cellLink} ${page.cellTitle}`} onClick={(event) => event.stopPropagation()}>{branch.name}</Link>
-        <span className={page.cellSub}>{branch.externalId ? `Identificador ${branch.externalId}` : "Sem identificador"}</span>
+        <span className={page.cellTitle}><Link href={`/unidades/${branch.id}`} className={page.cellLink} title={branch.name} onClick={(event) => event.stopPropagation()}>{branch.name}</Link></span>
+        {branch.externalId ? <span className={page.cellSub}>Identificador {branch.externalId}</span> : null}
       </span>
     ) },
     { id: "status", label: "Status", nowrap: true, render: (branch) => <span className={page.badge} data-tone={branch.status === "active" ? "success" : undefined}>{branch.status === "active" ? "Ativa" : "Inativa"}</span> },
