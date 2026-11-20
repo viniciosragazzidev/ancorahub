@@ -10,13 +10,15 @@ import { Button } from "@/components/ui/button";
 import { DsStatusBadge, type DsStatusBadgeStatus } from "@/components/ui/ds-status-badge";
 import { HoverPreview } from "@/components/ui/hover-preview";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { Kbd } from "@/components/ui/kbd";
+import { PersonChip } from "@/components/ui/person-chip";
+import { SegmentBar } from "@/components/ui/segment-bar";
 import { WhatsappLogo } from "@/components/huge-icons";
 import { formatLeadPhone } from "@/features/leads/format-lead-phone";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { formatCurrencyDisplay } from "@/shared/utils/format";
 import { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";
 import { openWhatsApp } from "@/lib/whatsapp-open";
-import { cn } from "@/lib/utils";
 
 /**
  * Hover card do lead (skill `interface-enxuta`, relatório `docs/design-system/referencias/jubayer6910.md` §6).
@@ -91,15 +93,6 @@ function phoneDigits(phone: string | null | undefined) {
   return phone ? phone.replace(/\D/g, "") : "";
 }
 
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]!.toUpperCase())
-    .join("");
-}
-
 function livesLabel(lives: number) {
   return lives === 1 ? "1 vida" : `${lives} vidas`;
 }
@@ -168,14 +161,7 @@ export function LeadHoverCardContent({ lead, onOpen, href }: LeadHoverCardConten
 
         {step ? (
           <div className="flex items-center gap-ds-12">
-            <div className="flex flex-1 gap-ds-4" role="img" aria-label={`Etapa ${step.step} de ${step.total} do funil`}>
-              {Array.from({ length: step.total }, (_, index) => (
-                <span
-                  key={index}
-                  className={cn("h-1 flex-1 rounded-ds-tags", index < step.step ? "bg-ds-electric-blue" : "bg-ds-ash")}
-                />
-              ))}
-            </div>
+            <SegmentBar value={step.step} total={step.total} label={`Etapa ${step.step} de ${step.total} do funil`} />
             <span className="shrink-0 text-ds-caption text-ds-fog" aria-hidden>
               Etapa {step.step} de {step.total}
             </span>
@@ -196,17 +182,7 @@ export function LeadHoverCardContent({ lead, onOpen, href }: LeadHoverCardConten
           {lead.brokerName !== undefined ? (
             <Stat label="Corretor">
               {lead.brokerName ? (
-                <>
-                  <span
-                    aria-hidden
-                    className="inline-flex size-5 shrink-0 items-center justify-center rounded-ds-tags bg-ds-powder-blue text-[10px] font-semibold text-ds-electric-blue"
-                  >
-                    {initials(lead.brokerName)}
-                  </span>
-                  <span className="truncate" title={lead.brokerName}>
-                    {lead.brokerName.split(/\s+/)[0]}
-                  </span>
-                </>
+                <PersonChip name={lead.brokerName} />
               ) : (
                 <span className="truncate text-ds-fog">Sem corretor</span>
               )}
@@ -272,6 +248,7 @@ export function LeadHoverCardContent({ lead, onOpen, href }: LeadHoverCardConten
             }}
           >
             Abrir ficha
+            <Kbd aria-hidden>↵</Kbd>
           </Button>
         ) : href ? (
           <Button

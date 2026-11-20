@@ -31,15 +31,33 @@ Regra de bolso: **olhar = hover card, mexer = drawer, raro = menu**.
 - Só em dispositivo com mouse: `(hover: hover) and (pointer: fine)`. No toque, o gatilho mantém o comportamento antigo (abre o drawer ou navega).
 - Gatilho é o **nome da entidade**, não a linha inteira. O clique no nome continua fazendo o que fazia.
 - Abre com 350ms de atraso e fecha com 150ms, para não piscar ao atravessar a tabela. Abre também no **foco do teclado**; `Esc` fecha e devolve o foco.
-- Conteúdo, de cima para baixo, separado por hairline Ash:
-  1. Cabeçalho: nome (Inter 600, 14px), status em pílula, uma linha de contexto em caption Fog.
-  2. Faixa de até 3 dados em grade (rótulo caption Fog em cima, valor body 14px Charcoal embaixo).
-  3. Lista curta de fatos (ícone 14px Fog + texto): telefone, corretor, próxima ação.
-  4. Rodapé com até 3 atalhos frequentes em botão ghost pequeno, e "Abrir ficha" como link no fim. **Nenhum CTA Deep Sapphire no hover card.**
-- Superfície: `bg-popover`, 1px Ash, raio 12px, `--shadow-md`, largura 320px, padding 12px.
+- Abre **ao lado do nome** (`side="right"`, alinhado ao topo), cobrindo as colunas vizinhas, não a linha de baixo.
+- Conteúdo, de cima para baixo (modelo aprovado pelo Vinicios em 20/11, referência `LeadHoverCardContent`):
+  1. Cabeçalho: avatar 36px, nome (Inter 600, 16px), contexto em caption Fog, status em pílula à direita.
+  2. Chips de contexto (pílula com borda Ash, ícone 12px): plano, vidas, unidade.
+  3. Progresso: `SegmentBar` + "Etapa 5 de 8" em caption.
+  4. Número principal num bloco Paper Mist com raio 12: rótulo em caixa alta, valor em 24px semibold, legenda em caption.
+  5. Grade de 3 dados: rótulo caption Fog, valor body 500. Pessoa sempre com `PersonChip`, telefone em mono.
+  6. Seção "Próximo passo" (rótulo em caixa alta) só quando a lista sabe.
+  7. Rodapé: atalhos ghost (WhatsApp, Ligar) à esquerda; "Abrir ficha" secundário à direita, com `Kbd ↵` quando Enter no nome abre. **Nenhum CTA primário (Deep Sapphire ou preenchido) no hover card.**
+- Superfície: `bg-popover`, 1px Ash, raio 12px, `--shadow-md`, largura 384px, padding 16px.
+- O nome que dispara sublinha no hover (`underline-offset-4 hover:underline`).
 - Movimento: fade + 4px de translação em 120 a 160ms. Com `prefers-reduced-motion`, só fade de até 120ms.
 - Feedback: abrir é nível 0 (sem som, sem vibração). Atalho que muda dado segue o nível dele no `FEEDBACK.md`.
 - Dados ausentes viram "—", nunca "undefined" ou linha vazia. Não busque dados novos no servidor só para o hover: use o que a linha já tem.
+
+## Detalhes mínimos (componentes prontos, use em toda tela)
+
+| Detalhe | Componente | Como |
+|---|---|---|
+| Ícone em cada cabeçalho de coluna | `DataTableColumnHeader` | `icon={<Flag />}` (14px, Fog) |
+| Contagem e resumo ao lado do título do card | `SectionCardHeader` | `count="6 novos"`, `summary="12 leads · por entrada"` |
+| Pessoa (corretor, responsável, autor) | `PersonChip` / `PersonInitials` | iniciais Powder Blue + "Nome S."; nome completo no `title` |
+| Progresso em passos (etapa, checklist) | `SegmentBar` | `value`, `total` e `label` acessível |
+| Tecla que funciona | `Kbd` | "↵", "Esc", "⌘K", só onde a tecla age de verdade |
+| Prévia no hover | `HoverPreview` | gatilho focável; nada muda no toque |
+| Status | `DsStatusBadge` | pílula lavada com ponto; nunca texto solto |
+| Número | `tabular-nums` | valores, contagens e horários alinham |
 
 ## Tabela
 
