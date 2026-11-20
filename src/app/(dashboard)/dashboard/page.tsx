@@ -23,7 +23,9 @@ import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag"
 import { DirectorLiteDashboard } from "@/features/dashboard/components/director-lite/director-lite-dashboard";
 import { DirectorLiteQualificationFunnelPage } from "@/features/dashboard/components/director-lite/qualification-funnel-page";
 import { getEssentialDashboard } from "@/features/dashboard/essential/essential-data";
-import { renderDirectorLiteQuality } from "@/features/dashboard/director-lite-quality-page";
+import { parseCustomRange, renderDirectorLiteQuality } from "@/features/dashboard/director-lite-quality-page";
+import { customRangeLabel } from "@/features/dashboard/components/director-lite/custom-range";
+import { leadQualityWindow } from "@/features/reports/metrics/lead-quality-period";
 import { getEntriesByTurn } from "@/features/dashboard/entries/entries-by-turn";
 import { getDirectorLiteViewerFirstName } from "@/features/dashboard/director-lite-viewer";
 import { liteDashboardTabs } from "@/features/dashboard/director-lite-tabs";
@@ -90,13 +92,17 @@ export default async function DashboardPage({
         const queues = await listLeadQualityQueues(context.tenantId);
         const rawQueue = singleParam(resolvedSearchParams.fila);
         const queueId = rawQueue && queues.some((queue) => queue.id === rawQueue) ? rawQueue : null;
+        const customRange = parseCustomRange(singleParam(resolvedSearchParams.periodo));
+        const range = customRange ? parseLeadQualityPeriod(singleParam(resolvedSearchParams.periodo)) : null;
+        const bounds = range ? leadQualityWindow(range) : null;
+        const window = bounds ? { since: bounds.since, until: bounds.until ?? new Date() } : null;
         const [funnel, firstName, insights, entries] = await Promise.all([
-          getQualificationFunnel(context, funnelPeriod, null, queueId),
+          getQualificationFunnel(context, funnelPeriod, null, queueId, window),
           getDirectorLiteViewerFirstName(context.userId),
-          queueId ? Promise.resolve(null) : getFunnelInsights(context, funnelPeriodStart(funnelPeriod), null).catch(() => null),
-          getEntriesByTurn(context, { period: overviewPeriod, queueId }).catch(() => null),
+          queueId || window ? Promise.resolve(null) : getFunnelInsights(context, funnelPeriodStart(funnelPeriod), null).catch(() => null),
+          getEntriesByTurn(context, range ? { range, queueId } : { period: overviewPeriod, queueId }).catch(() => null),
         ]);
-        return <DirectorLiteQualificationFunnelPage data={funnel} branchId={null} branches={[]} queues={queues} queueId={queueId} entries={entries} firstName={firstName} now={new Date()} insights={insights ? <FunnelInsightsPanel insights={insights} steps={funnel.stages} /> : null} />;
+        return <DirectorLiteQualificationFunnelPage data={funnel} branchId={null} branches={[]} queues={queues} queueId={queueId} entries={entries} customRange={customRange} firstName={firstName} now={new Date()} insights={insights ? <FunnelInsightsPanel insights={insights} steps={funnel.stages} /> : null} />;
       }
       const funnelPeriod = parseFunnelPeriod(singleParam(resolvedSearchParams.period));
       const [funnel, insights] = await Promise.all([
@@ -138,16 +144,20 @@ export default async function DashboardPage({
       const queues = await listLeadQualityQueues(context.tenantId);
       const rawQueue = singleParam(resolvedSearchParams.fila);
       const queueId = rawQueue && queues.some((queue) => queue.id === rawQueue) ? rawQueue : null;
+      const customRange = parseCustomRange(singleParam(resolvedSearchParams.periodo));
+      const range = customRange ? parseLeadQualityPeriod(singleParam(resolvedSearchParams.periodo)) : null;
+      const bounds = range ? leadQualityWindow(range) : null;
+      const window = bounds && customRange ? { since: bounds.since, until: bounds.until ?? new Date(), label: `entre ${customRangeLabel(customRange)}` } : null;
       const [data, liteReporting, entries] = await Promise.all([
-        getEssentialDashboard(context, { period, branchId: null, queueId }),
+        getEssentialDashboard(context, { period, branchId: null, queueId, window }),
         canReadQuality ? getFeatureFlag(FEATURE_FLAGS.REPORTING_CENTER) : Promise.resolve("false"),
-        getEntriesByTurn(context, { period, queueId }).catch(() => null),
+        getEntriesByTurn(context, range ? { range, queueId } : { period, queueId }).catch(() => null),
       ]);
       // Abas como no legado: Qualidade e Funil só com a central de qualidade E a central de relatórios ligada.
       const showQualityTabs = canReadQuality && liteReporting !== "false";
       // Só as abas e os links que a tela de hoje já libera para o papel (o visual Lite vale para todo o modo normal).
       const canOpenConversations = hasPermission(context.role, "acessar_conversas") && context.jobTitle !== "marketing";
-      return <DirectorLiteDashboard data={data} period={period} branchId={null} branches={[]} queues={queues} queueId={queueId} entries={entries} now={new Date()} availableTabs={liteDashboardTabs(context, showQualityTabs)} canOpenConversations={canOpenConversations} />;
+      return <DirectorLiteDashboard data={data} period={period} branchId={null} branches={[]} queues={queues} queueId={queueId} entries={entries} customRange={customRange} now={new Date()} availableTabs={liteDashboardTabs(context, showQualityTabs)} canOpenConversations={canOpenConversations} />;
     }
 
     const [data, reportingEnabled] = await Promise.all([

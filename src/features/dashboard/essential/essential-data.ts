@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, count, eq, gte, inArray, isNull, like, lte, notInArray, or, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, like, lt, lte, notInArray, or, sql } from "drizzle-orm";
 
 import { COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX } from "@/features/ai-qualification/cold-lead-requalification-policy";
 import { getSaoPauloDateKey } from "@/features/lead-distribution/dated-duty-roster";
@@ -45,12 +45,18 @@ export type EssentialDashboard = {
  * Painel essencial do diretor. Blocos 1 e 3 são "agora" (o período não muda nada); o bloco 2 segue o período.
  * A unidade vale para os três. Consultas agregadas, uma por conta, sem N+1.
  */
-export async function getEssentialDashboard(context: TenantContext, filter: { period: OverviewPeriod; branchId?: string | null; queueId?: string | null }, now = new Date()): Promise<EssentialDashboard> {
+export async function getEssentialDashboard(
+  context: TenantContext,
+  filter: { period: OverviewPeriod; branchId?: string | null; queueId?: string | null; window?: { since: Date; until: Date; label: string } | null },
+  now = new Date(),
+): Promise<EssentialDashboard> {
   const db = getDatabase();
   const scope = await resolveReportDataScope(context);
   const overview = await resolveOverviewFilter(context, scope, { period: filter.period, branchId: filter.branchId }, now);
   const unit = overview.narrowBranchId;
-  const queueSince = businessTurnStart(now, businessDaysBack(PERIOD_DAYS[filter.period]));
+  // Intervalo personalizado (20/11/2026): só os leads por fila seguem a janela; plantões e WhatsApp são "agora".
+  const queueSince = filter.window?.since ?? businessTurnStart(now, businessDaysBack(PERIOD_DAYS[filter.period]));
+  const queueUntil = filter.window ? lt(schema.leads.createdAt, filter.window.until) : undefined;
   const todayTurn = businessTurnStart(now, 0);
   const dayAgo = new Date(now.getTime() - DAY_MS);
   const alive = and(
@@ -132,7 +138,7 @@ export async function getEssentialDashboard(context: TenantContext, filter: { pe
   const [leadGroups, queueNames, coldLeads] = await Promise.all([
     db.select({ queueId: schema.leads.queueId, status: schema.leads.qualificationStatus, leads: count() })
       .from(schema.leads)
-      .where(and(alive, gte(schema.leads.createdAt, queueSince)))
+      .where(and(alive, gte(schema.leads.createdAt, queueSince), queueUntil))
       .groupBy(schema.leads.queueId, schema.leads.qualificationStatus),
     db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, hue: schema.leadQueues.colorHue })
       .from(schema.leadQueues)
@@ -149,7 +155,7 @@ export async function getEssentialDashboard(context: TenantContext, filter: { pe
         ),
         notInArray(schema.whatsappOutboundMessages.status, NOT_AN_ATTEMPT),
       ))
-      .where(and(alive, gte(schema.leads.createdAt, queueSince), eq(schema.leads.qualificationStatus, "cold")))
+      .where(and(alive, gte(schema.leads.createdAt, queueSince), queueUntil, eq(schema.leads.qualificationStatus, "cold")))
       .groupBy(schema.leads.id, schema.leads.queueId),
   ]);
   const names = new Map(queueNames.map((row) => [row.id, row]));
@@ -191,7 +197,7 @@ export async function getEssentialDashboard(context: TenantContext, filter: { pe
     generatedAt: now.toISOString(),
     firstName: welcome.firstName,
     duties: { running: duties, next: welcome.nextDuty },
-    queues: { since: queueSince.toISOString(), label: windowLabel(queueSince), rows: queues.queues, totals: queues.totals },
+    queues: { since: queueSince.toISOString(), label: filter.window?.label ?? windowLabel(queueSince), rows: queues.queues, totals: queues.totals },
     whatsapp: { ...whatsapp, since: todayTurn.toISOString(), label: windowLabel(todayTurn) },
   };
 }
