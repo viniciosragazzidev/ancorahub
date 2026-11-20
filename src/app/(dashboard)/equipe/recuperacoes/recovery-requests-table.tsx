@@ -9,7 +9,7 @@ import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 
 import { Button } from "@/components/ui/button";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
-import { PersonChip } from "@/components/ui/person-chip";
+import { PersonChip, PersonInitials } from "@/components/ui/person-chip";
 import {
   Dialog,
   DialogClose,
@@ -269,7 +269,7 @@ export function RecoveryRequestsTable({ requests }: { requests: ResetRequest[] }
             <DialogHeader>
               <DialogTitle>Detalhes da rejeição</DialogTitle>
               <DialogDescription>
-                Solicitação de <strong>{detailsDialog?.userName}</strong> ({detailsDialog?.userEmail})
+                Solicitação de {detailsDialog?.userName ? <PersonInitials name={detailsDialog.userName} className="mr-1 align-middle" /> : null}<strong>{detailsDialog?.userName}</strong> ({detailsDialog?.userEmail})
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">

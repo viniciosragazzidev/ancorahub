@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetSection, SheetSectionHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetSection, SheetSectionHeader, SheetSectionLabel, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,7 +29,7 @@ export function Section({ title, description, action, children }: { title: strin
     <SheetSection>
       <SheetSectionHeader>
         <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground">{title}</p>
+          <SheetSectionLabel>{title}</SheetSectionLabel>
           {description ? <p className="text-xs leading-5 text-muted-foreground">{description}</p> : null}
         </div>
         {action}

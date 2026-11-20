@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ContextNote } from "@/components/ui/context-note";
 import { Dialog, DialogClose, DialogDescription, DialogPopup, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -534,32 +534,16 @@ export function TeamMemberActions({
             }
           />
           <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuLabel className="truncate">{member.name ?? member.email}</DropdownMenuLabel>
             {member.status === "pending" && canManageInvite ? (
-              <>
-                <DropdownMenuItem onClick={() => {
-                  const fd = new FormData();
-                  fd.set("memberId", member.id);
-                  startTransition(() => resendAction(fd));
-                }} disabled={resendPending}>
-                  <UserSwitch size={15} />
-                  Reenviar convite
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={async () => {
-                  const fd = new FormData();
-                  fd.set("invitationId", member.id);
-                  const result = await revokeInviteAction({ success: false }, fd);
-                  if (result.success) {
-                    toast.success("Convite revogado.");
-                    router.refresh();
-                  } else {
-                    toast.error(result.error ?? "Erro ao revogar convite.");
-                  }
-                }} variant="destructive">
-                  <Trash size={15} />
-                  Revogar convite
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
+              <DropdownMenuItem onClick={() => {
+                const fd = new FormData();
+                fd.set("memberId", member.id);
+                startTransition(() => resendAction(fd));
+              }} disabled={resendPending}>
+                <UserSwitch size={15} />
+                Reenviar convite
+              </DropdownMenuItem>
             ) : null}
             {canResetPassword ? (
               <DropdownMenuItem onClick={() => setResetPasswordOpen(true)}>
@@ -576,6 +560,22 @@ export function TeamMemberActions({
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuSeparator />
+            {member.status === "pending" && canManageInvite ? (
+              <DropdownMenuItem onClick={async () => {
+                const fd = new FormData();
+                fd.set("invitationId", member.id);
+                const result = await revokeInviteAction({ success: false }, fd);
+                if (result.success) {
+                  toast.success("Convite revogado.");
+                  router.refresh();
+                } else {
+                  toast.error(result.error ?? "Erro ao revogar convite.");
+                }
+              }} variant="destructive">
+                <Trash size={15} />
+                Revogar convite
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem
               disabled={!canDelete}
               onClick={() => setDeleteOpen(true)}

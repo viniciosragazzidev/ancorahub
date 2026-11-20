@@ -380,7 +380,7 @@ export function ReferralsWorkspace({ workspace, toolbar }: { workspace: Workspac
     { id: "status", label: "Etapa", render: (row) => <ReferralStatus row={row} /> },
     { id: "owner", label: "Responsável", nowrap: true, render: (row) => row.ownerName ?? "Não informado" },
     { id: "created", label: "Registro", nowrap: true, render: (row) => formatDate(row.createdAt) },
-    { id: "menu", label: "", render: (row) => <ErpRowMenu label={`Ações de ${row.referredName}`} items={menu(row)} /> },
+    { id: "menu", label: "", render: (row) => <ErpRowMenu label={`Ações de ${row.referredName}`} entityName={row.referredName} items={menu(row)} /> },
   ];
   const { summary } = workspace;
   return <>

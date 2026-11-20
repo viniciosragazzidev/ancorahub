@@ -7,6 +7,7 @@ import { CheckCircle, Clock, ListChecks, Plus, Users } from "@/components/huge-i
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PersonInitials } from "@/components/ui/person-chip";
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPopup, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -117,6 +118,7 @@ export function LeadTasks({ leadId, tasks, assignees }: { leadId: string; tasks:
                         checked={selectedAssignees.includes(assignee.id)}
                         onCheckedChange={(checked) => toggleAssignee(assignee.id, Boolean(checked))}
                       />
+                      <PersonInitials name={assignee.name} />
                       <span>{assignee.name}</span>
                     </label>
                   ))}

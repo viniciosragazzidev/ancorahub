@@ -94,6 +94,17 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Contexto à esquerda do rodapé do modal ("Rascunho salvo automaticamente"); ações à direita. */
+function DialogFooterNote({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="dialog-footer-note"
+      className={cn("mt-2 min-w-0 truncate text-xs text-muted-foreground sm:mt-0 sm:mr-auto sm:self-center", className)}
+      {...props}
+    />
+  );
+}
+
 function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
   return (
     <DialogPrimitive.Title
@@ -124,6 +135,7 @@ export {
   DialogPanel,
   DialogHeader,
   DialogFooter,
+  DialogFooterNote,
   DialogTitle,
   DialogDescription,
 }

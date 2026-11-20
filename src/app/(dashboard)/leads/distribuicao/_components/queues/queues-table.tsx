@@ -12,6 +12,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -122,6 +123,7 @@ export function QueuesTable({
               <DotsThreeVertical size={15} />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuLabel className="truncate">{row.original.name}</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => onEdit(row.original)}>
                 <PencilSimple className="size-3.5" /> Editar configuração
               </DropdownMenuItem>
