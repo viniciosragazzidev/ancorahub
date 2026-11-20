@@ -6,9 +6,11 @@ import { describe, expect, it } from "vitest";
 describe("sales navigation performance contract", () => {
   const root = process.cwd();
 
-  it("prefetches the sales route from the primary sidebar", () => {
+  // Desde abe08f49 (perf nav) todo link do menu usa o prefetch padrão do Next (inclusive /vendas), em vez de
+  // uma lista fixa de rotas; o contrato agora é nenhum link do menu desligar o prefetch.
+  it("keeps the default prefetch on the sidebar links (sales included)", () => {
     const sidebar = readFileSync(join(root, "src/components/corretop-sidebar.tsx"), "utf8");
-    expect(sidebar).toMatch(/priorityNavigationPaths[^\n]+["']\/vendas["']/);
+    expect(sidebar).not.toMatch(/prefetch=\{false\}/);
   });
 
   it("shows immediate route feedback while dynamic sales data loads", () => {

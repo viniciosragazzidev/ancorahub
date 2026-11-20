@@ -32,6 +32,8 @@ function dashboardPages(dir = DASHBOARD_DIR, prefix = ""): string[] {
  */
 const OUTSIDE_AREAS: Record<string, string> = {
   "/minha-fila": "redirect para /leads (next.config)",
+  "/call-ancora": "Demonstração: item próprio no rodapé da barra lateral, fora das áreas",
+  "/meu-financeiro": "Light do corretor (as próprias comissões)",
   "/agenda": "Light do corretor",
   "/desempenho": "Light do corretor",
   "/jornada": "Light do corretor",
@@ -192,7 +194,9 @@ describe("nav-registry", () => {
   });
 
   it("tab roots have no parent in the director chrome", () => {
-    expect(isNavTabRoot("/propostas")).toBe(true);
+    // Propostas e Comissões abrem por ?tab= (o next.config redireciona as rotas antigas para lá).
+    expect(isNavTabRoot("/vendas?tab=propostas")).toBe(true);
+    expect(isNavTabRoot("/settings?tab=comissoes")).toBe(true);
     expect(isNavTabRoot("/equipe/cargos")).toBe(true);
     expect(isNavTabRoot("/leads/abc")).toBe(false);
   });

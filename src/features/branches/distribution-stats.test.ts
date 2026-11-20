@@ -39,7 +39,7 @@ describe("aggregateBranchDistributionStats", () => {
 
   it("keeps the active status list used by the distribution screen", () => {
     expect(ACTIVE_LEAD_STATUSES).toEqual([
-      "new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis",
+      "new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply",
     ]);
   });
 });

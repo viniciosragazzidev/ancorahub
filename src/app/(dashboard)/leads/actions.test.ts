@@ -5,6 +5,8 @@ const state = vi.hoisted(() => {
     leads: Symbol("leads"),
     aiConversations: Symbol("aiConversations"),
     auditLogs: Symbol("auditLogs"),
+    // change-lead-status monta o z.enum com esta lista ao carregar o módulo.
+    leadStatusValues: ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "awaiting_reply", "converted", "lost"],
   };
   const updates: Array<{ table: symbol; values: Record<string, unknown> }> = [];
   const inserts: Array<{ table: symbol; values: Record<string, unknown> }> = [];

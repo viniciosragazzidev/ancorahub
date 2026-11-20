@@ -74,6 +74,9 @@ const fixtures = vi.hoisted(() => {
   return { lead, db, interactions, context, liteStyle: { current: false } };
 });
 
+// A página busca os planos legados com unstable_cache (precisa do cache do Next, que o teste não tem).
+vi.mock("@/features/leads/reference-data", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/features/leads/reference-data")>()), getCachedLegacyPlans: async () => [] }));
+vi.mock("@/features/global-catalog/queries", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/features/global-catalog/queries")>()), listAvailableCatalogPlans: async () => [] }));
 vi.mock("@/shared/db", async () => ({ schema: await import("@/shared/db/schema"), getDatabase: () => fixtures.db }));
 vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: async () => fixtures.context }));
 vi.mock("@/features/leads/queries", () => ({ getLeadTimeline: async () => fixtures.interactions }));
@@ -83,6 +86,9 @@ vi.mock("@/features/documents/actions", () => ({
   getLeadDocumentChecklist: async () => [],
 }));
 vi.mock("@/features/post-sale/queries", () => ({ getLeadBeneficiaries: async () => [] }));
+// Cartões de servidor assíncronos (buscam dados próprios): o RTL não renderiza componente async, a página sumia.
+vi.mock("@/features/post-sale-audit/components/post-sale-lead-card", () => ({ PostSaleLeadCard: () => null }));
+vi.mock("@/features/leads/components/sale-details-card", () => ({ SaleDetailsCard: () => null }));
 vi.mock("@/features/conversation-intelligence", async () => ({
   AiConversationInsightCard: (await import("@/features/conversation-intelligence/components/ai-conversation-insight-card")).AiConversationInsightCard,
 }));
@@ -99,7 +105,7 @@ vi.mock("@/features/supervisor-workspace/supervisor-lead-detail", () => ({ Super
 vi.mock("@/features/broker-workspace/components/light-lead-detail", () => ({ LightLeadDetail: () => null }));
 vi.mock("@/features/broker-workspace/chat/lead-conversation", () => ({ LeadConversation: () => null }));
 vi.mock("@/features/broker-workspace/chat/lead-script", () => ({ buildLeadConversationScript: vi.fn() }));
-vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: async () => null }));
+vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: async () => null, getFeatureFlag: async () => false }));
 vi.mock("@/features/broker-workspace/experience-mode", () => ({ getExperienceMode: async () => "FULL" }));
 vi.mock("@/features/broker-workspace/lite-audience", () => ({ getLiteAudience: async () => null }));
 vi.mock("@/features/director-lite/style-flag", () => ({ isDirectorLitePageOnServer: async () => fixtures.liteStyle.current }));
@@ -214,7 +220,8 @@ vi.mock("@/features/promotional-materials/actions", serverModule);
 vi.mock("@/features/proposals/actions", serverModule);
 vi.mock("@/features/qualification-flow/actions", serverModule);
 vi.mock("@/features/qualification-turbo/actions", serverModule);
-vi.mock("@/features/quotes/actions", serverModule);
+// A seção de cotações carrega a lista por conta própria (useEffect): devolve uma lista vazia.
+vi.mock("@/features/quotes/actions", () => new Proxy({}, { has: (_target, key) => key !== "then", get: (_target, key) => (key === "then" || key === "__esModule" ? undefined : key === "listLeadQuotesAction" ? async () => ({ quotes: [] }) : async () => undefined) }));
 vi.mock("@/features/quotes/external-quote-actions", serverModule);
 vi.mock("@/features/relationship/actions", serverModule);
 vi.mock("@/features/sales-tools/actions", serverModule);
