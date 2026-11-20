@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { SalesWorkspaceLite, type SaleLiteRow } from "./sales-workspace-lite";
+import { averageSaleTicket, SalesWorkspaceLite, type SaleLiteRow } from "./sales-workspace-lite";
 import { SaleDetailLite } from "./[id]/sale-detail-lite";
 
 const push = vi.fn();
@@ -41,11 +41,10 @@ describe("vendas Lite", () => {
     expect(screen.getAllByTestId("stat")[0]).toHaveTextContent("Total de vendas: 3");
     const table = () => document.querySelector('[data-lite="table"]') as HTMLElement;
     expect(within(table()).getAllByRole("row")).toHaveLength(4);
-    fireEvent.click(screen.getByRole("button", { name: /^Status/ }));
-    fireEvent.click(screen.getByRole("option", { name: "Canceladas" }));
+    expect(screen.getAllByTestId("stat")[3]).toHaveTextContent("Ticket médio");
+    fireEvent.click(screen.getByRole("button", { name: /^Canceladas/ }));
     expect(within(table()).getAllByRole("row")).toHaveLength(2);
-    fireEvent.click(screen.getByRole("button", { name: /^Status/ }));
-    fireEvent.click(screen.getByRole("option", { name: "Todas as vendas" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Todas/ }));
     fireEvent.change(screen.getByRole("searchbox", { name: "Buscar vendas" }), { target: { value: "nazareth" } });
     expect(within(table()).getAllByRole("row")).toHaveLength(2);
     expect(within(table()).getByRole("link", { name: "Ver detalhes da venda" })).toHaveAttribute("href", "/vendas/s3");
@@ -104,5 +103,12 @@ describe("vendas Lite", () => {
     expect(table().getByRole("status")).toHaveTextContent("Paga");
     expect(fire).toHaveBeenCalledWith("confirm");
     expect(toast.success).not.toHaveBeenCalled();
+  });
+});
+
+describe("ticket médio", () => {
+  it("considera só as vendas ativas", () => {
+    expect(averageSaleTicket(SALES)).toBe(1075);
+    expect(averageSaleTicket([])).toBe(0);
   });
 });
