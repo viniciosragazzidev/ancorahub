@@ -30,10 +30,11 @@ import { CallAncoraWorkspace } from "@/features/call-ancora/components/call-anco
 
 import styles from "./lab.module.css";
 import { MotionShowcase } from "./motion-showcase";
+import { LeadHoverLab } from "./lead-hover-lab";
 import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, labSasaQuestionsBlock, labSasaWorld } from "./sasa-lab";
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -46,6 +47,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "conquistas", label: "Conquistas" },
   { id: "movimento", label: "Movimento (componentes)" },
   { id: "callAncora", label: "Call Âncora (celular simulado)" },
+  { id: "leadHover", label: "Hover card do lead (desktop)" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -277,6 +279,8 @@ export function FlowLab() {
           <InterfaceMotionProvider enabled={!killSwitch}>
             <MotionShowcase delay={delay} failing={outcome === "falha"} />
           </InterfaceMotionProvider>
+        ) : flow === "leadHover" ? (
+          <LeadHoverLab />
         ) : flow === "callAncora" ? (
           <CallAncoraWorkspace brokerFirstName="Vinicios" />
         ) : (

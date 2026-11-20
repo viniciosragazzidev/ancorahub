@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { LeadStatusBadge } from "@/components/status-badges";
+import { LeadNameHoverCard } from "@/features/leads/components/lead-hover-card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { getTeamMemberProfile } from "@/features/team/member-profile";
@@ -117,7 +118,19 @@ export function MemberLeadsTabs({ leads, limit }: { leads: Lead[]; limit: number
                 return (
                 <TableRow key={lead.id}>
                   <TableCell className="max-w-[16rem]">
-                    <Link href={`/leads/${lead.id}`} className="block truncate font-medium underline-offset-4 hover:underline">{lead.name}</Link>
+                    <LeadNameHoverCard
+                      lead={{
+                        id: lead.id,
+                        name: lead.name,
+                        status: lead.status,
+                        phone: lead.phone,
+                        lastActivityAt: lead.firstContactAt ?? lead.assignedAt ?? lead.createdAt,
+                        context: lead.queueName,
+                      }}
+                      href={`/leads/${lead.id}`}
+                    >
+                      <Link href={`/leads/${lead.id}`} className="block truncate font-medium underline-offset-4 hover:underline">{lead.name}</Link>
+                    </LeadNameHoverCard>
                     {lead.queueName ? <span className="block truncate text-xs text-muted-foreground">{lead.queueName}</span> : null}
                   </TableCell>
                   <TableCell>

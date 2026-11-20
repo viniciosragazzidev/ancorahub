@@ -1,5 +1,6 @@
 import { and, asc, count, eq, ilike, isNotNull, isNull, or } from "drizzle-orm";
 import Link from "next/link";
+import { LeadNameHoverCard } from "@/features/leads/components/lead-hover-card";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 
@@ -171,7 +172,12 @@ export default async function ArchivedLeadsPage({
                     {rows.map((lead) => (
                       <TableRow key={lead.id}>
                         <TableCell className="pl-5">
-                          <p className="font-medium">{lead.name}</p>
+                          <LeadNameHoverCard
+                            lead={{ id: lead.id, name: lead.name, status: lead.status, phone: lead.phone, lastActivityAt: lead.archivedAt, context: "Arquivado" }}
+                            href={`/leads/${lead.id}`}
+                          >
+                            <p tabIndex={0} className="w-fit rounded-ds-buttons font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{lead.name}</p>
+                          </LeadNameHoverCard>
                           <p className="text-xs text-muted-foreground">{lead.phone}{lead.email ? ` · ${lead.email}` : ""}</p>
                         </TableCell>
                         <TableCell><Badge variant="outline">{lead.status ?? "—"}</Badge></TableCell>

@@ -30,6 +30,18 @@ export interface LeadsDataTableProps {
   onRowClick?: (lead: LeadWorkspaceItem) => void;
 }
 
+/** Data mais recente entre as informadas (último movimento do lead no hover card). */
+function latestDate(...values: Array<string | null | undefined>): Date | null {
+  let latest: Date | null = null;
+  for (const value of values) {
+    if (!value) continue;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) continue;
+    if (!latest || date > latest) latest = date;
+  }
+  return latest;
+}
+
 function readWhatsappEntry(item: { sourceChannel?: string | null; sourceMetadata?: unknown }) {
   const details = readMetaLeadDisplayDetails(item.sourceChannel, item.sourceMetadata);
   return details.entry === "whatsapp" ? { label: details.adsLabel } : null;
@@ -67,6 +79,9 @@ export function LeadsDataTable({
       queueColorHue: item.queueColorHue ?? null,
       createdAt: new Date(item.createdAt),
       updatedAt: new Date(item.createdAt),
+      monthlyValue: item.monthlyValue ?? null,
+      livesCount: item.livesCount ?? null,
+      lastActivityAt: latestDate(item.stageEnteredAt, item.firstContactAt, item.assignedAt),
     }));
   }, [leads]);
 
