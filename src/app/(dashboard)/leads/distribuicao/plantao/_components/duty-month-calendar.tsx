@@ -32,6 +32,24 @@ function dayOrder(date: string, today: string, clock: string, item: { schedule: 
   return running ? 0 : 1;
 }
 
+export type ShiftState = "running" | "upcoming" | "done";
+
+/**
+ * Estado do plantão no quadro (20/11, pedido do Vinicios: o dia lotado confundia): "running" acontece agora,
+ * "upcoming" ainda não começou (hoje mais tarde ou dia futuro) e "done" já encerrou.
+ */
+export function shiftState(date: string, today: string, clock: string, startsAt: string, endsAt: string, done: boolean): ShiftState {
+  if (done || date < today) return "done";
+  if (date > today) return "upcoming";
+  const start = startsAt.slice(0, 5);
+  const end = endsAt.slice(0, 5);
+  if (clock >= end && end > start) return "done";
+  return start <= clock ? "running" : "upcoming";
+}
+
+/** Quantos "por começar" aparecem antes do "+N" quando o dia está cheio. */
+export const UPCOMING_VISIBLE = 3;
+
 function lastDayOfMonth(month: string) {
   const [year, monthNumber] = month.split("-").map(Number);
   const day = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
@@ -69,7 +87,15 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
   onCreateOnDate: (date: string) => void;
 }) {
   const today = todayKey();
+  const clock = nowClock();
   const directorLite = useDirectorLitePage();
+  const [openFullDays, setOpenFullDays] = useState<ReadonlySet<string>>(new Set());
+  const toggleFullDay = (date: string) => setOpenFullDays((current) => {
+    const next = new Set(current);
+    if (next.has(date)) next.delete(date);
+    else next.add(date);
+    return next;
+  });
   const desktopViewRef = useRef<HTMLDivElement>(null);
   const mobileViewRef = useRef<HTMLElement>(null);
   const [newDutyDate, setNewDutyDate] = useState(today);
@@ -163,7 +189,7 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
           const items = byDate.get(date) ?? [];
           const past = date < today;
           const isToday = date === today;
-          const hasItems = items.length > 0;
+          
           return (
             <div
               key={date}
@@ -173,9 +199,7 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
                 "group/day flex min-h-24 flex-col gap-1 p-1.5",
                 past
                   ? "bg-[color-mix(in_oklab,var(--card)_65%,var(--muted))]"
-                  : hasItems
-                    ? "bg-[color-mix(in_oklab,var(--primary)_16%,var(--card))] shadow-[inset_3px_0_0_var(--primary)] dark:bg-[color-mix(in_oklab,var(--primary)_26%,var(--card))]"
-                    : "bg-card",
+                  : "bg-card", // o destaque fica no plantão que acontece agora, não no dia inteiro (20/11)
                 isToday && "ring-2 ring-inset ring-primary/60",
               )}
             >
@@ -195,49 +219,104 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
                   </button>
                 ) : null}
               </div>
-              {past && hasItems ? (
-                <button
-                  type="button"
-                  aria-expanded={openPastDays.has(date)}
-                  onClick={() => togglePastDay(date)}
-                  className="w-full rounded-md border border-dashed border-border px-1.5 py-0.5 text-left text-[10px] text-muted-foreground hover:bg-muted/60"
-                >
-                  {openPastDays.has(date) ? "Recolher" : `${items.length} ${items.length === 1 ? "encerrado" : "encerrados"}`}
-                </button>
-              ) : null}
-              {(past && !openPastDays.has(date) ? [] : items).map(({ schedule, done }) => {
-                const published = publishedScheduleIds.has(schedule.id);
-                const inDraft = !published && Boolean(draftScheduleIds?.has(schedule.id));
-                const gap = !done && !published && !inDraft && gapScheduleIds.has(schedule.id);
+              {(() => {
+                // Três camadas por dia: o que acontece agora em destaque, o que ainda vai começar compacto e
+                // apagado, e o que já encerrou recolhido em "N encerrados" (também no dia de hoje).
+                const states = items.map((item) => ({ ...item, state: shiftState(date, today, clock, item.schedule.startsAt, item.schedule.endsAt, item.done) }));
+                const running = states.filter((item) => item.state === "running");
+                const upcoming = states.filter((item) => item.state === "upcoming");
+                const closed = states.filter((item) => item.state === "done");
+                const showAllUpcoming = openFullDays.has(date) || upcoming.length <= UPCOMING_VISIBLE + 1;
+                const visibleUpcoming = showAllUpcoming ? upcoming : upcoming.slice(0, UPCOMING_VISIBLE);
+                const closedOpen = openPastDays.has(date);
+                const status = (scheduleId: string) => {
+                  const published = publishedScheduleIds.has(scheduleId);
+                  const inDraft = !published && Boolean(draftScheduleIds?.has(scheduleId));
+                  const gap = !published && !inDraft && gapScheduleIds.has(scheduleId);
+                  return { published, inDraft, gap };
+                };
+                const title = (schedule: T, label: string) => `${schedule.typeName ? `${schedule.typeName} · ` : ""}${schedule.name} · ${schedule.startsAt.slice(0, 5)}–${schedule.endsAt.slice(0, 5)}${repeatingScheduleIds.has(schedule.id) ? " · repete toda semana" : ""} · ${label}`;
                 return (
-                  <button
-                    key={schedule.id}
-                    type="button"
-                    onClick={() => onOpen(schedule)}
-                    title={`${schedule.typeName ? `${schedule.typeName} · ` : ""}${schedule.name} · ${schedule.startsAt.slice(0, 5)}–${schedule.endsAt.slice(0, 5)}${repeatingScheduleIds.has(schedule.id) ? " · repete toda semana" : ""}${done ? " · encerrado" : ""}`}
-                    style={schedule.typeName ? typeStripe(schedule.typeHue) : undefined}
-                    className={cn(
-                      directorLite
-                        ? "w-full min-w-0 border px-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        : "w-full min-w-0 rounded-md border px-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      directorLite && styles.calendarItem,
-                      done
-                        ? "border-dashed border-border bg-transparent py-0.5 text-muted-foreground hover:bg-muted/60"
-                        : cn("bg-card py-1 hover:border-foreground/30", gap ? "border-warning/50" : "border-border", published && "border-success/50"),
-                    )}
-                  >
-                    <span className={cn("flex items-center gap-1 truncate font-medium", done ? "text-[10px]" : "text-[11px] text-foreground")}>
-                      {repeatingScheduleIds.has(schedule.id) ? <span aria-label="repete toda semana" className="shrink-0 text-muted-foreground">↻</span> : null}
-                      <span className="truncate">{schedule.name}</span>
-                    </span>
-                    {done ? null : (
-                      <span className="block truncate text-[10px] text-muted-foreground">
-                        {schedule.startsAt.slice(0, 5)}–{schedule.endsAt.slice(0, 5)}{published ? " · escala publicada" : inDraft ? " · na escala (rascunho)" : gap ? " · falta corretor" : ""}
-                      </span>
-                    )}
-                  </button>
+                  <>
+                    {running.map(({ schedule }) => {
+                      const { published, inDraft, gap } = status(schedule.id);
+                      return (
+                        <button
+                          key={schedule.id}
+                          type="button"
+                          onClick={() => onOpen(schedule)}
+                          title={title(schedule, "acontecendo agora")}
+                          data-shift-state="running"
+                          style={schedule.typeName ? typeStripe(schedule.typeHue) : undefined}
+                          className={cn(
+                            "w-full min-w-0 rounded-md border border-primary/50 bg-card px-1.5 py-1 text-left shadow-[inset_3px_0_0_var(--primary)] transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            directorLite && styles.calendarItem,
+                          )}
+                        >
+                          <span className="flex items-center gap-1">
+                            <span className="shrink-0 rounded-full bg-primary/10 px-1.5 text-[10px] font-semibold text-primary">Agora</span>
+                            <span className="truncate text-[11px] font-semibold text-foreground">{schedule.name}</span>
+                          </span>
+                          <span className="block truncate text-[10px] text-muted-foreground">
+                            {schedule.startsAt.slice(0, 5)}–{schedule.endsAt.slice(0, 5)}{published ? " · escala publicada" : inDraft ? " · na escala (rascunho)" : gap ? " · falta corretor" : ""}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {visibleUpcoming.map(({ schedule }) => {
+                      const { gap } = status(schedule.id);
+                      return (
+                        <button
+                          key={schedule.id}
+                          type="button"
+                          onClick={() => onOpen(schedule)}
+                          title={title(schedule, gap ? "ainda não começou · falta corretor" : "ainda não começou")}
+                          data-shift-state="upcoming"
+                          className="flex w-full min-w-0 items-center gap-1 rounded px-1 py-px text-left text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <span className="shrink-0 tabular-nums">{schedule.startsAt.slice(0, 5)}</span>
+                          {repeatingScheduleIds.has(schedule.id) ? <span aria-label="repete toda semana" className="shrink-0">↻</span> : null}
+                          <span className="truncate">{schedule.name}</span>
+                          {gap ? <span aria-label="falta corretor" className="ml-auto size-1.5 shrink-0 rounded-full bg-warning" /> : null}
+                        </button>
+                      );
+                    })}
+                    {!showAllUpcoming ? (
+                      <button type="button" onClick={() => toggleFullDay(date)} aria-expanded={false}
+                        className="w-full rounded px-1 py-px text-left text-[10px] font-medium text-primary hover:underline">
+                        +{upcoming.length - UPCOMING_VISIBLE} por começar
+                      </button>
+                    ) : openFullDays.has(date) ? (
+                      <button type="button" onClick={() => toggleFullDay(date)} aria-expanded
+                        className="w-full rounded px-1 py-px text-left text-[10px] text-muted-foreground hover:underline">
+                        Mostrar menos
+                      </button>
+                    ) : null}
+                    {closed.length ? (
+                      <button
+                        type="button"
+                        aria-expanded={closedOpen}
+                        onClick={() => togglePastDay(date)}
+                        className="mt-auto w-full rounded-md border border-dashed border-border px-1.5 py-0.5 text-left text-[10px] text-muted-foreground hover:bg-muted/60"
+                      >
+                        {closedOpen ? "Recolher encerrados" : `${closed.length} ${closed.length === 1 ? "encerrado" : "encerrados"}`}
+                      </button>
+                    ) : null}
+                    {closedOpen ? closed.map(({ schedule }) => (
+                      <button
+                        key={schedule.id}
+                        type="button"
+                        onClick={() => onOpen(schedule)}
+                        title={title(schedule, "encerrado")}
+                        data-shift-state="done"
+                        className="w-full min-w-0 truncate rounded px-1 py-px text-left text-[10px] text-muted-foreground/80 line-through decoration-muted-foreground/40 hover:bg-muted/60"
+                      >
+                        {schedule.startsAt.slice(0, 5)} {schedule.name}
+                      </button>
+                    )) : null}
+                  </>
                 );
-              })}
+              })()}
             </div>
           );
         })}
