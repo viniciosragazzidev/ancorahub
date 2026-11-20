@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -19,6 +19,9 @@ vi.mock("@/features/branches/actions", () => actions);
 
 import { UnitsLite, type UnitLite } from "./units-lite";
 
+// A lista Lite desenha tabela (desktop) e cartões (celular); os testes olham a tabela.
+const table = () => within(document.querySelector('[data-lite="table"]') as HTMLElement);
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -29,13 +32,13 @@ const branch: UnitLite = { id: "b1", name: "Centro", externalId: "FIL-01", statu
 describe("UnitsLite", () => {
   it("a chave de recebimento chama a mesma ação; ver unidade leva ao perfil", async () => {
     render(<UnitsLite branches={[branch]} canManage />);
-    await act(async () => { fireEvent.click(screen.getByRole("switch", { name: "Recebe leads: ligado" })); });
+    await act(async () => { fireEvent.click(table().getByRole("switch", { name: "Recebe leads: ligado" })); });
     const data = (actions.toggleAcceptingLeadsAction.mock.calls[0] as unknown as [unknown, FormData])[1];
     expect(data.get("branchId")).toBe("b1");
-    expect(screen.getByRole("status")).toHaveTextContent("Configuração atualizada");
+    expect(table().getByRole("status")).toHaveTextContent("Configuração atualizada");
     expect(fire).toHaveBeenCalledWith("confirm");
     expect(toast.success).not.toHaveBeenCalled();
-    expect(screen.getByRole("link", { name: "Ver unidade Centro" })).toHaveAttribute("href", "/unidades/b1");
+    expect(table().getByRole("link", { name: "Ver unidade Centro" })).toHaveAttribute("href", "/unidades/b1");
   });
 
   it("sem gestão: chaves só leitura, sem editar nem nova filial", () => {
@@ -48,10 +51,10 @@ describe("UnitsLite", () => {
   it("chave que falha mostra a causa ao lado e Tentar de novo", async () => {
     actions.toggleAutoDistributeAction.mockResolvedValueOnce({ error: "A unidade não tem corretores disponíveis." } as never);
     render(<UnitsLite branches={[branch]} canManage />);
-    await act(async () => { fireEvent.click(screen.getByRole("switch", { name: "Distribuição automática: desligado" })); });
-    expect(screen.getByRole("alert")).toHaveTextContent("A unidade não tem corretores disponíveis. A unidade continua como estava.");
+    await act(async () => { fireEvent.click(table().getByRole("switch", { name: "Distribuição automática: desligado" })); });
+    expect(table().getByRole("alert")).toHaveTextContent("A unidade não tem corretores disponíveis. A unidade continua como estava.");
     expect(fire).toHaveBeenCalledWith("error");
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" })); });
+    await act(async () => { fireEvent.click(table().getByRole("button", { name: "Tentar de novo" })); });
     expect(actions.toggleAutoDistributeAction).toHaveBeenCalledTimes(2);
     expect(toast.error).not.toHaveBeenCalled();
   });

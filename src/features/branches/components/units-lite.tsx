@@ -15,6 +15,7 @@ import { ChevronRight, Pencil, Plus, Power, Search } from "lucide-react";
 
 import { Switch } from "@/components/arc/switch/switch";
 import { StatCard } from "@/components/dashboard/metric-card";
+import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
@@ -108,19 +109,19 @@ function BranchForm({ branch, onDone }: { branch?: UnitLite; onDone: () => void 
   );
 }
 
-function UnitSwitch({ branchId, label, enabled, action, readOnly, readOnlyText }: { branchId: string; label: string; enabled: boolean; action: BranchAction; readOnly: boolean; readOnlyText: string }) {
+function UnitSwitch({ branchId, label, enabled, action, readOnly, readOnlyText, compact = false }: { branchId: string; label: string; enabled: boolean; action: BranchAction; readOnly: boolean; readOnlyText: string; compact?: boolean }) {
   const { pending, run, note } = useBranchAction();
   if (readOnly) {
     return (
       <span className={styles.switchRow}>
-        <span>{label}</span>
+        {compact ? null : <span>{label}</span>}
         <span className={page.muted}>{readOnlyText}</span>
       </span>
     );
   }
   return (
-    <span className={styles.switchRow}>
-      <span>{label}</span>
+    <span className={styles.switchRow} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+      {compact ? null : <span>{label}</span>}
       <Switch
         checked={enabled}
         disabled={pending}
@@ -162,12 +163,58 @@ function StatusButton({ branch }: { branch: UnitLite }) {
   );
 }
 
+type UnitTab = "all" | "receiving" | "paused" | "inactive";
+
+/** Aba de cada unidade: inativa primeiro; ativa que recebe leads ou ativa com recebimento pausado. */
+export function unitTab(branch: Pick<UnitLite, "status" | "acceptingLeads">): Exclude<UnitTab, "all"> {
+  if (branch.status !== "active") return "inactive";
+  return branch.acceptingLeads ? "receiving" : "paused";
+}
+
 export function UnitsLite({ branches, canManage }: { branches: UnitLite[]; canManage: boolean }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<UnitTab>("all");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<UnitLite | null>(null);
   const needle = query.trim().toLocaleLowerCase("pt-BR");
-  const visible = branches.filter((branch) => !needle || branch.name.toLocaleLowerCase("pt-BR").includes(needle) || (branch.externalId ?? "").toLocaleLowerCase("pt-BR").includes(needle));
+  const visible = branches.filter((branch) => (tab === "all" || unitTab(branch) === tab)
+    && (!needle || branch.name.toLocaleLowerCase("pt-BR").includes(needle) || (branch.externalId ?? "").toLocaleLowerCase("pt-BR").includes(needle)));
+  const tabCounts = { all: branches.length, receiving: 0, paused: 0, inactive: 0 };
+  for (const branch of branches) tabCounts[unitTab(branch)] += 1;
+  const tabs: { value: UnitTab; label: string }[] = [
+    { value: "all", label: "Todas" },
+    { value: "receiving", label: "Recebendo leads" },
+    { value: "paused", label: "Recebimento pausado" },
+    { value: "inactive", label: "Inativas" },
+  ];
+  // Tabela no lugar da grade de cartões (20/11, regra de densidade do CLAUDE.md): uma linha por unidade.
+  const columns: LiteColumn<UnitLite>[] = [
+    { id: "name", label: "Unidade", primary: true, render: (branch) => (
+      <span>
+        <Link href={`/unidades/${branch.id}`} className={`${page.cellLink} ${page.cellTitle}`} onClick={(event) => event.stopPropagation()}>{branch.name}</Link>
+        <span className={page.cellSub}>{branch.externalId ? `Identificador ${branch.externalId}` : "Sem identificador"}</span>
+      </span>
+    ) },
+    { id: "status", label: "Status", nowrap: true, render: (branch) => <span className={page.badge} data-tone={branch.status === "active" ? "success" : undefined}>{branch.status === "active" ? "Ativa" : "Inativa"}</span> },
+    { id: "members", label: "Equipe", numeric: true, render: (branch) => branch.memberCount },
+    { id: "available", label: "Disponíveis", numeric: true, render: (branch) => <span data-tone={branch.availableBrokers === 0 ? "warning" : undefined}>{branch.availableBrokers}</span> },
+    { id: "active", label: "Em atendimento", numeric: true, phonePriority: "low", render: (branch) => branch.activeLeads.toLocaleString("pt-BR") },
+    { id: "accepting", label: "Recebe leads", render: (branch) => <UnitSwitch compact branchId={branch.id} label="Recebe leads" enabled={branch.acceptingLeads} action={toggleAcceptingLeadsAction} readOnly={!canManage} readOnlyText={branch.acceptingLeads ? "Sim" : "Pausado"} /> },
+    { id: "auto", label: "Distribuição automática", phonePriority: "low", render: (branch) => <UnitSwitch compact branchId={branch.id} label="Distribuição automática" enabled={branch.autoDistribute} action={toggleAutoDistributeAction} readOnly={!canManage} readOnlyText={branch.autoDistribute ? "Sim" : "Não"} /> },
+    { id: "hub", label: "Central", phonePriority: "low", render: (branch) => <UnitSwitch compact branchId={branch.id} label="Central de redistribuição" enabled={branch.isDistributionHub} action={toggleDistributionHubAction} readOnly={!canManage} readOnlyText={branch.isDistributionHub ? "Sim" : "Não"} /> },
+    { id: "actions", label: "Ações", numeric: true, render: (branch) => (
+      <span className={styles.icons} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+        {canManage ? (
+          <>
+            <button type="button" className={page.iconButton} aria-label={`Editar ${branch.name}`} title={`Editar ${branch.name}`} onClick={() => setEditing(branch)}><Pencil aria-hidden="true" size={18} /></button>
+            <StatusButton branch={branch} />
+          </>
+        ) : null}
+        <Link href={`/unidades/${branch.id}`} className={page.iconButton} aria-label={`Ver unidade ${branch.name}`} title="Ver unidade"><ChevronRight aria-hidden="true" size={18} /></Link>
+      </span>
+    ) },
+  ];
   const active = branches.filter((branch) => branch.status === "active").length;
   const accepting = branches.filter((branch) => branch.acceptingLeads).length;
   const members = branches.reduce((total, branch) => total + branch.memberCount, 0);
@@ -197,43 +244,22 @@ export function UnitsLite({ branches, canManage }: { branches: UnitLite[]; canMa
           </span>
         </div>
 
+        {branches.length > 0 ? (
+          <nav className={page.countTabs} aria-label="Filtrar unidades">
+            {tabs.map((item) => (
+              <button key={item.value} type="button" className={page.countTab} data-active={tab === item.value ? "true" : undefined} aria-pressed={tab === item.value} onClick={() => setTab(item.value)}>
+                {item.label}<span className={page.countPill}>{tabCounts[item.value]}</span>
+              </button>
+            ))}
+          </nav>
+        ) : null}
         {branches.length === 0 ? (
           <div className={page.empty}><p className={page.emptyTitle}>Nenhuma filial cadastrada</p><p className={page.emptyText}>Crie a primeira unidade para organizar a equipe e o recebimento de leads.</p></div>
         ) : visible.length === 0 ? (
-          <div className={page.empty}><p className={page.emptyTitle}>Nenhuma unidade encontrada</p><p className={page.emptyText}>Ajuste a busca ou cadastre uma nova unidade.</p></div>
+          <div className={page.empty}><p className={page.emptyTitle}>Nenhuma unidade encontrada</p><p className={page.emptyText}>Ajuste a busca, troque de aba ou cadastre uma nova unidade.</p></div>
         ) : (
-          <ul className={styles.grid}>
-            {visible.map((branch) => (
-              <li key={branch.id} className={styles.card} data-status={branch.status}>
-                <div className={styles.cardHead}>
-                  <span className={styles.name}>
-                    <span className={page.cellTitle}>{branch.name}</span>
-                    <span className={page.cellSub}>{branch.externalId ? `Identificador ${branch.externalId}` : "Sem identificador"}</span>
-                  </span>
-                  <span className={page.badge} data-tone={branch.status === "active" ? "success" : undefined}>{branch.status === "active" ? "Ativa" : "Inativa"}</span>
-                </div>
-                <dl className={styles.metrics}>
-                  <div><dt>Equipe</dt><dd>{branch.memberCount}</dd></div>
-                  <div><dt>Disponíveis</dt><dd>{branch.availableBrokers}</dd></div>
-                  <div><dt>Em atendimento</dt><dd>{branch.activeLeads}</dd></div>
-                </dl>
-                <div className={styles.switches}>
-                  <UnitSwitch branchId={branch.id} label="Recebe leads" enabled={branch.acceptingLeads} action={toggleAcceptingLeadsAction} readOnly={!canManage} readOnlyText={branch.acceptingLeads ? "Sim" : "Pausado"} />
-                  <UnitSwitch branchId={branch.id} label="Distribuição automática" enabled={branch.autoDistribute} action={toggleAutoDistributeAction} readOnly={!canManage} readOnlyText={branch.autoDistribute ? "Sim" : "Não"} />
-                  <UnitSwitch branchId={branch.id} label="Central de redistribuição" enabled={branch.isDistributionHub} action={toggleDistributionHubAction} readOnly={!canManage} readOnlyText={branch.isDistributionHub ? "Sim" : "Não"} />
-                </div>
-                <div className={styles.cardFoot}>
-                  {canManage ? (
-                    <span className={styles.icons}>
-                      <button type="button" className={page.iconButton} aria-label={`Editar ${branch.name}`} title={`Editar ${branch.name}`} onClick={() => setEditing(branch)}><Pencil aria-hidden="true" size={18} /></button>
-                      <StatusButton branch={branch} />
-                    </span>
-                  ) : <span />}
-                  <Link href={`/unidades/${branch.id}`} className={page.button} aria-label={`Ver unidade ${branch.name}`}>Ver unidade <ChevronRight aria-hidden="true" size={16} /></Link>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <LiteResponsiveData caption="Unidades" columns={columns} rows={visible} rowKey={(branch) => branch.id}
+            onRowOpen={(branch) => router.push(`/unidades/${branch.id}`)} />
         )}
         {branches.length > 0 ? (
           <ul className={styles.legend}>
