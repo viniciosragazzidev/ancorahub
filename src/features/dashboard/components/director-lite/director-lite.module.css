@@ -896,3 +896,11 @@ button.heatCell:hover { transform: scale(1.12); }
   align-items: center;
   min-height: 44px;
 }
+
+/* Intervalo personalizado (20/11/2026). */
+.rangeForm { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; width: min(360px, 90vw); }
+.rangeTitle { grid-column: 1 / -1; margin: 0; color: var(--foreground); font-weight: 600; }
+.rangeField { display: grid; gap: 4px; color: var(--text-secondary); font-size: var(--text-xs); }
+.rangeField input { min-height: 40px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-sm); }
+.rangeHint { grid-column: 1 / -1; margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
+.rangeApply { grid-column: 1 / -1; min-height: 40px; border: 0; border-radius: 999px; background: var(--foreground); color: var(--surface); font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
