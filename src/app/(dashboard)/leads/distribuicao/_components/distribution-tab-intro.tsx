@@ -49,7 +49,7 @@ export function DistributionTabIntro({ title, lead, stats, actions, children }: 
           const body = (
             <>
               <dt className={styles.cardTop}><span className={styles.cardIcon} aria-hidden="true">{stat.icon}</span><span className={styles.cardLabel}>{stat.label}</span></dt>
-              <dd className={stat.text ? styles.cardText : styles.cardValue}>{stat.value}</dd>
+              <dd className={stat.text ? styles.cardText : styles.cardValue}>{typeof stat.value === "number" ? stat.value.toLocaleString("pt-BR") : stat.value}</dd>
               {stat.hint ? <dd className={styles.cardHint}>{stat.hint}</dd> : null}
             </>
           );
