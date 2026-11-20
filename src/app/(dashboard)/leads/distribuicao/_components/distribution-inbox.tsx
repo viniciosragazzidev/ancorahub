@@ -64,6 +64,7 @@ import { LiteBulkBar } from "@/components/lite/controls";
 import { formatLiteDate } from "@/components/lite/format/date";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import liteStyles from "./director-distribution-inbox.module.css";
+import { LeadNameHoverCard, type LeadPreviewData } from "@/features/leads/components/lead-hover-card";
 
 type Lead = {
   id: string;
@@ -80,6 +81,20 @@ type Lead = {
   metaAdId?: string | null;
 };
 type Branch = { id: string; name: string };
+
+/** Hover card do nome (desktop): só o que a distribuição já sabe do lead. */
+function distributionLeadPreview(lead: Lead, branches: Branch[]): LeadPreviewData {
+  const branchName = branches.find((branch) => branch.id === lead.branchId)?.name ?? "Inbox geral";
+  return {
+    id: lead.id,
+    name: lead.name,
+    status: lead.status ?? null,
+    phone: lead.phone,
+    lastActivityAt: lead.createdAt,
+    brokerName: null,
+    context: [branchName, lead.sourceCampaign].filter(Boolean).join(" · "),
+  };
+}
 type Broker = {
   id: string;
   name: string;
@@ -1137,7 +1152,17 @@ export function DistributionInbox({
                             />
                           </TableCell>
                           <TableCell>
-                            <p className="font-medium">{lead.name}</p>
+                            <LeadNameHoverCard
+                          lead={distributionLeadPreview(lead, branches)}
+                          href={`/leads/${lead.id}`}
+                        >
+                          <p
+                            tabIndex={0}
+                            className="w-fit rounded-ds-buttons font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                          >
+                            {lead.name}
+                          </p>
+                        </LeadNameHoverCard>
                             <p className="text-xs text-muted-foreground">{lead.phone}</p>
                             {(lead.sourceCampaign || lead.metaCampaignId) && (
                               <div className="mt-1 flex flex-wrap items-center gap-1">
@@ -1333,7 +1358,17 @@ export function DistributionInbox({
                   {inboxLeads.map((lead) => (
                     <TableRow key={lead.id}>
                       <TableCell className="pl-5">
-                        <p className="font-medium">{lead.name}</p>
+                        <LeadNameHoverCard
+                          lead={distributionLeadPreview(lead, branches)}
+                          href={`/leads/${lead.id}`}
+                        >
+                          <p
+                            tabIndex={0}
+                            className="w-fit rounded-ds-buttons font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                          >
+                            {lead.name}
+                          </p>
+                        </LeadNameHoverCard>
                         <p className="text-xs text-muted-foreground">{lead.phone}</p>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
