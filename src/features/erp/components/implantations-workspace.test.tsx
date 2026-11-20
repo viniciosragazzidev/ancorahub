@@ -20,7 +20,7 @@ afterEach(cleanup);
 type Workspace = Parameters<typeof ImplantationsWorkspace>[0]["workspace"];
 const row: Workspace["rows"][number] = {
   leadId: "lead-1", name: "Negócio Alfa", branchId: "b1", brokerId: "u1", brokerName: "Ana Souza", implantationId: "imp-1", stage: "submitted",
-  reference: "PROT-1", policyNumber: "", coverageStartsOn: null, evidenceId: null, reason: "", version: 2, updatedAt: new Date("2026-11-10T12:00:00Z"),
+  reference: "PROT-1", policyNumber: "", coverageStartsOn: null, evidenceId: null, reason: "", version: 2, updatedAt: new Date("2026-11-10T12:00:00Z"), queuedSince: new Date("2026-11-08T12:00:00Z"),
   history: [{ id: "ev-1", createdAt: new Date("2026-11-10T12:00:00Z"), actor: "Bruno Lima", status: "submitted", reviewedImport: true }],
   canOpenLead: true,
 };
