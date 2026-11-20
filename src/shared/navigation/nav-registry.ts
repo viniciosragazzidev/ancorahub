@@ -98,7 +98,8 @@ export const NAV_AREAS: readonly NavArea[] = [
     section: "Operação",
     tabs: [
       { id: "vendas", label: "Vendas", href: "/vendas", permission: "acessar_vendas" },
-      { id: "propostas", label: "Propostas", href: "/propostas", permission: "acessar_vendas" },
+      // /propostas redireciona para /vendas?tab=propostas (next.config.ts): a aba aponta para o destino final (20/11).
+      { id: "propostas", label: "Propostas", href: "/vendas?tab=propostas", permission: "acessar_vendas", paths: ["/propostas"] },
       { id: "negociacoes", label: "Negociações", href: "/negociacoes", permission: "ver_dashboard_equipe", requires: "negotiations" },
       // Venda Automatizada (piloto, DEC-182): só com feature_auto_sale_<tenantId> ligada.
       { id: "venda-automatizada", label: "Venda Automatizada", href: "/vendas/automatizada", permission: "acessar_vendas", roles: ["director", "manager"], requires: "autoSale" },
