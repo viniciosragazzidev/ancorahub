@@ -149,7 +149,8 @@ export function RelationshipMessagesLite({ options, history }: { options: Audien
     }
     setOpenId(null);
     setFeedback(null);
-    document.getElementById("composer-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Depois do painel fechar (ele devolve o foco ao item da lista), sobe até a nova mensagem.
+    window.setTimeout(() => document.getElementById("composer-title")?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
   }
 
   function send() {
