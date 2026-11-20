@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, countDistinct } from "drizzle-orm";
+import { and, count, desc, eq, gte, lte, countDistinct, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { PeriodSelect } from "@/components/period-select";
@@ -202,6 +202,12 @@ export default async function CustomersPage({
         convertedAt: schema.clients.convertedAt,
         brokerName: schema.user.name,
         branchName: schema.branches.name,
+        // Próxima renovação (20/11): o menor aniversário de contrato ativo a partir de hoje, sem duplicar a linha.
+        renewalOn: sql<string | null>`(select min(${schema.activeCustomers.contractAnniversary}) from ${schema.activeCustomers}
+          where ${schema.activeCustomers.clientId} = ${schema.clients.id}
+            and ${schema.activeCustomers.tenantId} = ${schema.clients.tenantId}
+            and ${schema.activeCustomers.status} = 'active'
+            and ${schema.activeCustomers.contractAnniversary} >= current_date)`,
       })
       .from(schema.clients)
       .leftJoin(schema.user, eq(schema.clients.corretorId, schema.user.id))
@@ -237,6 +243,8 @@ export default async function CustomersPage({
           eq(schema.activeCustomers.tenantId, context.tenantId),
           eq(schema.activeCustomers.status, "active"),
           gte(schema.activeCustomers.contractAnniversary, new Date().toISOString().slice(0, 10)),
+          // O cartão diz "próximos 30 dias": antes contava qualquer data futura (20/11).
+          lte(schema.activeCustomers.contractAnniversary, new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)),
           clientScope,
         ),
       ),
@@ -289,6 +297,7 @@ export default async function CustomersPage({
               convertedAt: new Date(client.convertedAt).toISOString(),
               brokerName: client.brokerName,
               branchName: client.branchName,
+              renewalOn: client.renewalOn ? String(client.renewalOn).slice(0, 10) : null,
             }))}
             metrics={metrics}
             period={period}
