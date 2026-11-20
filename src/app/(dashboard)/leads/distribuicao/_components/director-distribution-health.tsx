@@ -28,6 +28,9 @@ function effectTypeLabel(type: string) {
   return labels[type] ?? "Ação de integração";
 }
 
+/** Contagens com separador de milhar (20/11): "2.319", não "2319". */
+const fmtCount = (value: number) => value.toLocaleString("pt-BR");
+
 export function DirectorDistributionHealth({ events, jobs, jobsAvailable, jobsEnabled, effects, failedEffects }: {
   events: EventRow[];
   jobs: Health;
@@ -55,9 +58,9 @@ export function DirectorDistributionHealth({ events, jobs, jobsAvailable, jobsEn
             <Badge tone={!jobsAvailable || !jobsEnabled ? "neutral" : jobs.failed ? "warning" : "success"}>{jobLabel}</Badge>
           </div>
           <dl className={styles.metrics}>
-            <div><dt>Aguardando</dt><dd>{jobs.pending + jobs.retrying}</dd></div>
-            <div><dt>Em processamento</dt><dd>{jobs.processing}</dd></div>
-            <div><dt>Exceções</dt><dd>{jobs.failed}</dd></div>
+            <div><dt>Aguardando</dt><dd>{fmtCount(jobs.pending + jobs.retrying)}</dd></div>
+            <div><dt>Em processamento</dt><dd>{fmtCount(jobs.processing)}</dd></div>
+            <div><dt>Exceções</dt><dd>{fmtCount(jobs.failed)}</dd></div>
           </dl>
           <p className={styles.note}>{jobs.failed ? "Exceções para revisão da gestão." : jobs.pending + jobs.retrying ? "O motor tentará distribuir as pendências." : "Nenhuma pendência automática."}</p>
         </section>
@@ -68,10 +71,10 @@ export function DirectorDistributionHealth({ events, jobs, jobsAvailable, jobsEn
             <Badge tone={effects.failed ? "warning" : "success"}>{effectLabel}</Badge>
           </div>
           <dl className={styles.metrics}>
-            <div><dt>Aguardando</dt><dd>{effects.pending + effects.retrying}</dd></div>
-            <div><dt>Processando</dt><dd>{effects.processing}</dd></div>
-            <div><dt>Exceções</dt><dd>{effects.failed}</dd></div>
-            <div><dt>Concluídos</dt><dd>{effects.completed}</dd></div>
+            <div><dt>Aguardando</dt><dd>{fmtCount(effects.pending + effects.retrying)}</dd></div>
+            <div><dt>Processando</dt><dd>{fmtCount(effects.processing)}</dd></div>
+            <div><dt>Exceções</dt><dd>{fmtCount(effects.failed)}</dd></div>
+            <div><dt>Concluídos</dt><dd>{fmtCount(effects.completed)}</dd></div>
           </dl>
           {failedEffects.length ? (
             <ul className={styles.failures} aria-label="Efeitos que falharam">
