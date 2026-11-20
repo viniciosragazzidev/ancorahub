@@ -1158,7 +1158,7 @@ export function DistributionInbox({
                         >
                           <p
                             tabIndex={0}
-                            className="w-fit rounded-ds-buttons font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                            className="w-fit cursor-default rounded-ds-buttons font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/40"
                           >
                             {lead.name}
                           </p>
@@ -1364,7 +1364,7 @@ export function DistributionInbox({
                         >
                           <p
                             tabIndex={0}
-                            className="w-fit rounded-ds-buttons font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                            className="w-fit cursor-default rounded-ds-buttons font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/40"
                           >
                             {lead.name}
                           </p>
