@@ -22,20 +22,36 @@ export type CampaignsTotals = { leads: number; conversations: number; sales: num
 
 const count = new Intl.NumberFormat("pt-BR");
 
+type CampaignTab = "all" | "running" | "paused" | "noCapture";
+
+/** Aba da campanha (20/11): sem captura primeiro (leads que o CRM ignora); depois veiculando ou pausada na Meta. */
+export function campaignTab(campaign: Pick<MetaCampaignItem, "status" | "isEligibleForCapture">): Exclude<CampaignTab, "all"> {
+  if (!campaign.isEligibleForCapture) return "noCapture";
+  return campaign.status.trim().toUpperCase() === "ACTIVE" ? "running" : "paused";
+}
+
 export function CampaignsLite({ campaigns, totals }: { campaigns: MetaCampaignItem[]; totals: CampaignsTotals }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [adsOf, setAdsOf] = useState<MetaCampaignItem | null>(null);
+  const [tab, setTab] = useState<CampaignTab>("all");
 
-  const filtered = useMemo(() => campaigns
-    .filter((campaign) => campaign.status.trim().toUpperCase() === "ACTIVE" || (campaign.conversationsCount || 0) > 0)
+  const relevant = useMemo(() => campaigns
+    .filter((campaign) => campaign.status.trim().toUpperCase() === "ACTIVE" || (campaign.conversationsCount || 0) > 0), [campaigns]);
+  const tabCounts = useMemo(() => {
+    const next = { all: relevant.length, running: 0, paused: 0, noCapture: 0 };
+    for (const campaign of relevant) next[campaignTab(campaign)] += 1;
+    return next;
+  }, [relevant]);
+  const filtered = useMemo(() => relevant
+    .filter((campaign) => tab === "all" || campaignTab(campaign) === tab)
     .filter((campaign) => campaign.name.toLowerCase().includes(search.toLowerCase().trim()))
     .sort((a, b) => {
       const aEligible = a.isEligibleForCapture ? 1 : 0;
       const bEligible = b.isEligibleForCapture ? 1 : 0;
       if (bEligible !== aEligible) return bEligible - aEligible;
       return (b.leadsCount || 0) - (a.leadsCount || 0);
-    }), [campaigns, search]);
+    }), [relevant, search, tab]);
 
   const groups = useMemo(() => {
     const map = new Map<string, { accountId: string; accountName: string; campaigns: MetaCampaignItem[] }>();
@@ -137,10 +153,23 @@ export function CampaignsLite({ campaigns, totals }: { campaigns: MetaCampaignIt
           </label>
         </div>
 
+        <nav className={page.countTabs} aria-label="Filtrar campanhas">
+          {([
+            { value: "all", label: "Todas" },
+            { value: "running", label: "Veiculando" },
+            { value: "paused", label: "Pausadas na Meta" },
+            { value: "noCapture", label: "Sem captura" },
+          ] as const).map((item) => (
+            <button key={item.value} type="button" className={page.countTab} data-active={tab === item.value ? "true" : undefined} aria-pressed={tab === item.value} onClick={() => setTab(item.value)}>
+              {item.label}<span className={page.countPill}>{tabCounts[item.value]}</span>
+            </button>
+          ))}
+        </nav>
+
         {groups.length === 0 ? (
           <div className={page.empty}>
-            <h3 className={page.emptyTitle}>Nenhuma campanha ativa encontrada</h3>
-            <p className={page.emptyText}>Sincronize a Meta ou ajuste o termo pesquisado.</p>
+            <h3 className={page.emptyTitle}>Nenhuma campanha encontrada</h3>
+            <p className={page.emptyText}>Troque de aba, ajuste o termo pesquisado ou sincronize a Meta.</p>
           </div>
         ) : groups.map((group) => {
           const leads = group.campaigns.reduce((sum, campaign) => sum + (campaign.leadsCount || 0), 0);
