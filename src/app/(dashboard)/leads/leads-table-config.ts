@@ -30,6 +30,12 @@ export type LeadRow = {
   queueColorHue: number | null;
   createdAt: Date;
   updatedAt: Date;
+  /** Valor mensal da proposta (hover card do nome). */
+  monthlyValue?: string | number | null;
+  /** Vidas da proposta atual (hover card do nome). */
+  livesCount?: number | null;
+  /** Último movimento conhecido: troca de etapa, primeiro contato ou atribuição (hover card do nome). */
+  lastActivityAt?: Date | null;
 };
 
 export const leadsColumnMap: ColumnMap<LeadRow> = {

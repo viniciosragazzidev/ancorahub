@@ -207,7 +207,7 @@ export async function getTeamMemberProfile(memberUserId: string) {
       ))
       .where(offerScope)
       .groupBy(schema.leadOffers.status, sql`${schema.leadOffers.expiresAt} <= now()`),
-    db.select({ id: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, assignedAt: schema.leads.assignedAt, firstContactAt: schema.leads.firstContactAt, createdAt: schema.leads.createdAt, temperature: schema.leads.qualificationStatus, queueName: schema.leadQueues.name })
+    db.select({ id: schema.leads.id, name: schema.leads.nome, phone: schema.leads.telefone, status: schema.leads.status, assignedAt: schema.leads.assignedAt, firstContactAt: schema.leads.firstContactAt, createdAt: schema.leads.createdAt, temperature: schema.leads.qualificationStatus, queueName: schema.leadQueues.name })
       // The whole portfolio, newest handed-out first (it used to stop at the 6 last updated).
       .from(schema.leads).leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, context.tenantId))).where(leadScope).orderBy(sql`${schema.leads.assignedAt} desc nulls last`, desc(schema.leads.createdAt)).limit(MEMBER_PROFILE_LEADS_LIMIT),
     db.select({ id: schema.leadDistributionEvents.id, leadName: schema.leads.nome, action: schema.leadDistributionEvents.action, reason: schema.leadDistributionEvents.reason, createdAt: schema.leadDistributionEvents.createdAt })

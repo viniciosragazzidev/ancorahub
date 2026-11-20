@@ -27,6 +27,7 @@ import {
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { QueueColorTag } from "@/features/lead-distribution/queue-color-tag";
 import type { LeadRow } from "./leads-table-config";
+import { LeadNameHoverCard } from "@/features/leads/components/lead-hover-card";
 import { LeadTagChips } from "@/features/lead-tags/components/lead-tag-chip";
 import { LEAD_QUALIFICATION_LABELS, type LeadQualificationStatus } from "@/features/leads/qualification-status";
 
@@ -258,17 +259,33 @@ export const getLeadsColumns = (
           />
           <div className="min-w-0 flex flex-col gap-0.5">
             <div className="flex min-w-0 items-center gap-1.5">
-              <Button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenDrawer(lead);
+              <LeadNameHoverCard
+                lead={{
+                  id: lead.id,
+                  name: lead.name,
+                  status: lead.status,
+                  phone: lead.phone,
+                  product: lead.planType,
+                  monthlyValue: lead.monthlyValue,
+                  lives: lead.livesCount,
+                  lastActivityAt: lead.lastActivityAt,
+                  brokerName: lead.assignedBrokerName,
+                  context: [lead.queueName, lead.branchName].filter(Boolean).join(" · ") || null,
                 }}
-                className="h-auto min-w-0 justify-start truncate p-0 text-left text-xs font-semibold text-foreground"
-                variant="link"
+                onOpen={() => onOpenDrawer(lead)}
               >
-                {lead.name}
-              </Button>
+                <Button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenDrawer(lead);
+                  }}
+                  className="h-auto min-w-0 justify-start truncate p-0 text-left text-xs font-semibold text-foreground"
+                  variant="link"
+                >
+                  {lead.name}
+                </Button>
+              </LeadNameHoverCard>
               {lead.whatsappEntry ? (
                 <span
                   title={lead.whatsappEntry.label ? `Entrou pelo WhatsApp · ${lead.whatsappEntry.label}` : "Entrou pelo WhatsApp"}
