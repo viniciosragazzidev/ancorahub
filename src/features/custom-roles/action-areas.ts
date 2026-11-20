@@ -31,6 +31,10 @@ const REGRAS: readonly Regra[] = [
   ["src/features/notifications/", livre],
   ["src/features/onboarding/", livre],
   ["src/features/broker-availability/", livre],
+  // A própria pessoa troca a unidade dela no perfil (Configurações > Unidade).
+  ["src/features/broker-unit-change/", livre],
+  // Tela de teste só em desenvolvimento: a ação recusa fora de NODE_ENV=development.
+  ["src/app/dev/", livre],
   ["src/app/(dashboard)/notificacoes/", livre],
   ["src/app/(dashboard)/settings/security-actions", livre],
   // Plataforma: têm a própria guarda de super-admin, fora do tenant.
@@ -65,6 +69,10 @@ const REGRAS: readonly Regra[] = [
   ["src/features/manager-workspace/", rota("leads")],
   ["src/features/post-sale/", rota("leads")],
   ["src/features/broker-workspace/", rota("minha-fila")],
+  // Retorno agendado do cliente da carteira, a partir da fila do corretor.
+  ["src/features/carteira/", rota("minha-fila")],
+  // Carteira de clientes: contato do corretor e clientes anteriores ficam na área Clientes.
+  ["src/features/customers/", rota("clientes")],
   // Sasá agêntica (19/11): os pedidos do corretor executam as mesmas ações do chat da fila.
   ["src/features/sasa/", rota("minha-fila")],
   ["src/features/lead-distribution/", rota("distribuicao")],
@@ -87,6 +95,10 @@ const REGRAS: readonly Regra[] = [
   ["src/features/sales-tools/", rota("ferramentas")],
   ["src/features/promotional-materials/", rota("ferramentas")],
   ["src/features/relationship/", rota("relacionamento")],
+  // "Aviso do Início" é uma aba da Central de relacionamento.
+  ["src/features/home-announcement/", rota("relacionamento")],
+  // Resultado do plantão (Configurações); a ação ainda exige diretor.
+  ["src/features/reports/plantao-report-actions", rota("settings")],
   ["src/features/post-sale-audit/", rota("equipe")],
   ["src/features/journey/", rota("jornada")],
   ["src/features/performance/", rota("desempenho")],

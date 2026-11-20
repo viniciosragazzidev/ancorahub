@@ -1,3 +1,4 @@
+import { requireRouteAccess } from "@/features/custom-roles/require-route-access";
 import CommissionRulesPage from "../configuracoes/comissoes/page";
 import { AccessibilityPreferences } from "@/features/assist/components/accessibility-preferences";
 import { and, count, eq, inArray } from "drizzle-orm";
@@ -55,7 +56,10 @@ import { isExtensionPilotUser } from "@/features/browser-extension/pilot";
 
 export default async function SettingsPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> }) {
   // /configuracoes/comissoes redireciona para cá com ?tab=comissoes (next.config.ts): mostra as regras de comissão (20/11).
-  if ((await searchParams)?.tab === "comissoes") return CommissionRulesPage();
+  if ((await searchParams)?.tab === "comissoes") {
+    await requireRouteAccess("/configuracoes/comissoes");
+    return CommissionRulesPage();
+  }
   const context = await getRequiredTenantContext();
   if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
     const [user] = await getDatabase().select({ name: schema.user.name, image: schema.user.image }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1);
