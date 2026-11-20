@@ -259,7 +259,7 @@ export function UnitsLite({ branches, canManage }: { branches: UnitLite[]; canMa
           <div className={page.empty}><p className={page.emptyTitle}>Nenhuma unidade encontrada</p><p className={page.emptyText}>Ajuste a busca, troque de aba ou cadastre uma nova unidade.</p></div>
         ) : (
           <LiteResponsiveData caption="Unidades" columns={columns} rows={visible} rowKey={(branch) => branch.id}
-            onRowOpen={(branch) => router.push(`/unidades/${branch.id}`)} />
+            onRowOpen={(branch) => router.push(`/unidades/${branch.id}`)} empty={<p>Nenhuma unidade nesta aba ou busca.</p>} />
         )}
         {branches.length > 0 ? (
           <ul className={styles.legend}>
