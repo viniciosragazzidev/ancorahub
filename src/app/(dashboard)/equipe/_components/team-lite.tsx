@@ -56,11 +56,12 @@ export function TeamHeaderActionsLite({ isDirector, branches, customRoles }: { i
   const [open, setOpen] = useState(false);
   return (
     <span className={styles.headerActions}>
-      {isDirector ? <Link href="/equipe/cargos" className={page.button} aria-label="Cargos e permissões"><ShieldCheck aria-hidden="true" size={16} /><span className={styles.longLabel}>Cargos e permissões</span></Link> : null}
       <button type="button" className={page.primaryButton} aria-label="Novo funcionário" onClick={() => setOpen(true)}><UserPlus aria-hidden="true" size={16} /><span className={styles.longLabel}>Novo funcionário</span></button>
       <LiteSidePanel open={open} onOpenChange={setOpen} title="Novo funcionário" description={isDirector ? "Você pode criar diretores, gestores e corretores." : "Você pode criar apenas corretores."}>
         <TeamInviteLite branches={branches} canInviteManager={isDirector} canInviteDirector={isDirector} customRoles={customRoles} onDone={() => setOpen(false)} />
       </LiteSidePanel>
+      {/* Anatomia de página: um CTA primário; o resto no "Mais ações". */}
+      {isDirector ? <LiteMenu label="Mais ações" items={[{ id: "cargos", label: "Cargos e permissões", href: "/equipe/cargos" }]} /> : null}
     </span>
   );
 }

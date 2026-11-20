@@ -266,6 +266,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         <DashboardHeader
           breadcrumb={tenant[0]?.name ?? "Gestão"}
           title="Equipe e unidades"
+          summary={`${members.length.toLocaleString("pt-BR")} ${members.length === 1 ? "pessoa" : "pessoas"} · ${activeMembers.toLocaleString("pt-BR")} com acesso ativo`}
           rightSlot={podeGerirEquipe ? <TeamHeaderActionsLite isDirector={diretorSemCargo} branches={branches} customRoles={customRoles} /> : undefined}
         />
         <main className={litePage.stack}>
