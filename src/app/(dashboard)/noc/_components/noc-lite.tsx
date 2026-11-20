@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ChevronRight, CircleAlert, CircleCheck, Search, TriangleAlert, Users, Zap } from "lucide-react";
+import { ArrowRight, ChevronRight, CircleCheck, Info, Search, Zap } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { StatCard } from "@/components/dashboard/metric-card";
@@ -91,86 +91,53 @@ function Legend({ items }: { items: Array<{ label: string; color: string }> }) {
   );
 }
 
-function AnomalyAlerts({ branches }: { branches: BranchHealth[] }) {
-  const [dismissed, setDismissed] = useState<string[]>([]);
-  const visible = branches.filter((branch) => branch.health !== "healthy" && !dismissed.includes(branch.id));
-  if (!visible.length) return null;
-  return (
-    <section className={styles.alerts} aria-label="Anomalias na operação">
-      {visible.map((branch) => {
-        const critical = branch.health === "critical";
-        const Icon = critical ? CircleAlert : TriangleAlert;
-        return (
-          <div key={branch.id} className={styles.alert} data-tone={critical ? "danger" : "warning"} role="status">
-            <Icon aria-hidden="true" size={20} className={styles.alertIcon} />
-            <div className={styles.alertText}>
-              <span className={page.cellTitle}>Anomalia na operação: {branch.name}</span>
-              <span className={page.cellSub}>{branch.healthReason}</span>
-            </div>
-            <div className={styles.alertActions}>
-              <Link href="/leads/distribuicao" className={critical ? page.primaryButton : page.button}>Resolver fila <ArrowRight aria-hidden="true" size={16} /></Link>
-              <button type="button" className={page.button} onClick={() => setDismissed((previous) => [...previous, branch.id])}>Ignorar</button>
-            </div>
-          </div>
-        );
-      })}
-    </section>
-  );
+/** Peso para ordenar: crítica primeiro, depois atenção, depois saudável; empate pelo risco de SLA e fila sem corretor. */
+export function branchSeverity(branch: BranchHealth) {
+  return (branch.health === "critical" ? 2_000_000 : branch.health === "attention" ? 1_000_000 : 0) + branch.slaRiskLeads * 1000 + branch.unassignedLeads;
 }
 
-function BranchMap({ branches }: { branches: BranchHealth[] }) {
-  if (!branches.length) return null;
-  const counts = { healthy: 0, attention: 0, critical: 0 };
-  for (const branch of branches) counts[branch.health] += 1;
+const ATTENTION_VISIBLE = 4;
+
+/**
+ * "Precisa de atenção" (20/11/2026, skill interface-enxuta): no lugar de uma faixa colorida grande por anomalia,
+ * uma lista compacta com as críticas primeiro, um verbo por item e "Ignorar" discreto. Mostra 4 e "Ver todas".
+ */
+function AnomalyAlerts({ branches }: { branches: BranchHealth[] }) {
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const [expanded, setExpanded] = useState(false);
+  const visible = branches
+    .filter((branch) => branch.health !== "healthy" && !dismissed.includes(branch.id))
+    .sort((a, b) => branchSeverity(b) - branchSeverity(a));
+  if (!visible.length) return null;
+  const shown = expanded ? visible : visible.slice(0, ATTENTION_VISIBLE);
   return (
-    <section className={page.card} aria-labelledby="noc-mapa">
+    <section className={page.card} aria-labelledby="noc-atencao">
       <div className={styles.cardHeadRow}>
-        <div className={page.cardHead}>
-          <h2 id="noc-mapa" className={page.sectionTitle}>Mapa de operação por unidade</h2>
-          <p className={page.muted}>Estado operacional e gargalos de cada filial agora.</p>
-        </div>
-        <span className={styles.badges}>
-          <span className={page.badge} data-tone="success">{counts.healthy} {counts.healthy === 1 ? "saudável" : "saudáveis"}</span>
-          <span className={page.badge} data-tone="warning">{counts.attention} em atenção</span>
-          {counts.critical > 0 ? <span className={page.badge} data-tone="danger">{counts.critical} {counts.critical === 1 ? "crítica" : "críticas"}</span> : null}
-        </span>
+        <h2 id="noc-atencao" className={page.sectionTitle}>
+          Precisa de atenção <span className={page.badge} data-tone={visible.some((branch) => branch.health === "critical") ? "danger" : "warning"}>{visible.length}</span>
+        </h2>
       </div>
-      <ul className={styles.map}>
-        {branches.map((branch) => {
-          const capacity = branch.totalBrokers > 0 ? Math.round((branch.availableBrokers / branch.totalBrokers) * 100) : 0;
-          const health = HEALTH[branch.health];
+      <ul className={styles.attentionList}>
+        {shown.map((branch) => {
+          const critical = branch.health === "critical";
           return (
-            <li key={branch.id} className={styles.tile} data-tone={health.tone}>
-              <div className={styles.tileHead}>
-                <span className={styles.tileName}>
-                  <span className={page.cellTitle}>{branch.name}</span>
-                  <span className={page.cellSub}>{branch.healthReason}</span>
-                </span>
-                <span className={page.badge} data-tone={health.tone}>{health.label}</span>
-              </div>
-              <dl className={styles.tileMetrics}>
-                <div><dt>Leads hoje</dt><dd>{branch.leadsToday.toLocaleString("pt-BR")}</dd></div>
-                <div><dt>Atendimentos</dt><dd>{branch.activeAttendances.toLocaleString("pt-BR")}</dd></div>
-                <div><dt>Sem corretor</dt><dd data-tone={branch.unassignedLeads > 0 ? "warning" : undefined}>{branch.unassignedLeads.toLocaleString("pt-BR")}</dd></div>
-                <div><dt>Risco de SLA</dt><dd data-tone={branch.slaRiskLeads > 0 ? "danger" : undefined}>{branch.slaRiskLeads.toLocaleString("pt-BR")}</dd></div>
-              </dl>
-              <div className={styles.capacity}>
-                <span className={styles.capacityLabel}>
-                  <span><Users aria-hidden="true" size={14} /> Corretores disponíveis</span>
-                  <span className={page.numeric}>{branch.availableBrokers} de {branch.totalBrokers}</span>
-                </span>
-                <span className={styles.track} role="img" aria-label={`${capacity}% dos corretores disponíveis`}>
-                  <span className={styles.fill} style={{ width: `${capacity}%` }} />
-                </span>
-              </div>
-              <div className={styles.tileFoot}>
-                <span className={page.cellSub}>{branch.acceptingLeads ? "Recepção ativa" : "Recepção pausada"}</span>
-                <Link href={`/unidades/${branch.id}`} className={page.button} aria-label={`Detalhes da unidade ${branch.name}`}>Detalhes <ChevronRight aria-hidden="true" size={16} /></Link>
-              </div>
+            <li key={branch.id} className={styles.attentionRow} data-tone={critical ? "danger" : "warning"}>
+              <span className={styles.attentionDot} aria-hidden="true" />
+              <span className={styles.attentionText}>
+                <span className={page.cellTitle}>{branch.name}</span>
+                <span className={page.cellSub}>{branch.healthReason}</span>
+              </span>
+              <Link href="/leads/distribuicao" className={styles.attentionVerb}>Resolver fila <ArrowRight aria-hidden="true" size={14} /></Link>
+              <button type="button" className={styles.attentionDismiss} onClick={() => setDismissed((previous) => [...previous, branch.id])} aria-label={`Ignorar o aviso de ${branch.name}`}>Ignorar</button>
             </li>
           );
         })}
       </ul>
+      {visible.length > ATTENTION_VISIBLE ? (
+        <button type="button" className={styles.attentionMore} onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>
+          {expanded ? "Mostrar menos" : `Ver todas (${visible.length})`}
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -178,8 +145,20 @@ function BranchMap({ branches }: { branches: BranchHealth[] }) {
 function BranchTable({ branches }: { branches: BranchHealth[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [health, setHealth] = useState<"all" | BranchHealth["health"]>("all");
   const needle = query.trim().toLocaleLowerCase("pt-BR");
-  const rows = needle ? branches.filter((branch) => branch.name.toLocaleLowerCase("pt-BR").includes(needle)) : branches;
+  // Pior primeiro: quem vigia a operação o dia todo vê a unidade com problema no topo (skill interface-enxuta).
+  const rows = branches
+    .filter((branch) => (health === "all" || branch.health === health) && (!needle || branch.name.toLocaleLowerCase("pt-BR").includes(needle)))
+    .sort((a, b) => branchSeverity(b) - branchSeverity(a));
+  const counts = { all: branches.length, critical: 0, attention: 0, healthy: 0 };
+  for (const branch of branches) counts[branch.health] += 1;
+  const healthTabs = [
+    { value: "all" as const, label: "Todas" },
+    { value: "critical" as const, label: "Críticas" },
+    { value: "attention" as const, label: "Atenção" },
+    { value: "healthy" as const, label: "Saudáveis" },
+  ];
   const columns: LiteColumn<BranchHealth>[] = [
     {
       id: "name",
@@ -207,15 +186,33 @@ function BranchTable({ branches }: { branches: BranchHealth[] }) {
     { id: "active", label: "Em atendimento", numeric: true, render: (branch) => branch.activeAttendances.toLocaleString("pt-BR") },
     { id: "unassigned", label: "Fila sem corretor", numeric: true, render: (branch) => <span className={styles.value} data-tone={branch.unassignedLeads > 0 ? "warning" : undefined}>{branch.unassignedLeads.toLocaleString("pt-BR")}</span> },
     { id: "sla", label: "Risco de SLA", numeric: true, render: (branch) => <span className={styles.value} data-tone={branch.slaRiskLeads > 0 ? "danger" : undefined}>{branch.slaRiskLeads.toLocaleString("pt-BR")}</span> },
-    { id: "capacity", label: "Capacidade", numeric: true, render: (branch) => <span className={styles.value} data-tone={branch.availableBrokers === 0 ? "warning" : undefined}>{branch.availableBrokers}/{branch.totalBrokers} disponíveis</span> },
+    {
+      id: "capacity",
+      label: "Corretores disponíveis",
+      numeric: true,
+      render: (branch) => {
+        const capacity = branch.totalBrokers > 0 ? Math.round((branch.availableBrokers / branch.totalBrokers) * 100) : 0;
+        return (
+          <span className={styles.capacityCell}>
+            <span className={styles.value} data-tone={branch.availableBrokers === 0 ? "warning" : undefined}>{branch.availableBrokers}/{branch.totalBrokers}</span>
+            <span className={styles.track} role="img" aria-label={`${capacity}% dos corretores disponíveis`}><span className={styles.fill} style={{ width: `${capacity}%` }} /></span>
+          </span>
+        );
+      },
+    },
     {
       id: "action",
       label: "Ações",
       numeric: true,
       render: (branch) => (
-        <Link href={`/leads?branch=${branch.id}`} className={page.iconButton} aria-label={`Ver leads da unidade ${branch.name}`} title="Ver leads">
-          <ChevronRight aria-hidden="true" size={18} />
-        </Link>
+        <span className={styles.rowActions}>
+          <Link href={`/unidades/${branch.id}`} className={page.iconButton} aria-label={`Detalhes da unidade ${branch.name}`} title="Detalhes da unidade" onClick={(event) => event.stopPropagation()}>
+            <Info aria-hidden="true" size={18} />
+          </Link>
+          <Link href={`/leads?branch=${branch.id}`} className={page.iconButton} aria-label={`Ver leads da unidade ${branch.name}`} title="Ver leads">
+            <ChevronRight aria-hidden="true" size={18} />
+          </Link>
+        </span>
       ),
     },
   ];
@@ -225,8 +222,15 @@ function BranchTable({ branches }: { branches: BranchHealth[] }) {
       <div className={page.toolbar}>
         <div className={page.cardHead}>
           <h2 id="noc-unidades" className={page.sectionTitle}>Saúde das unidades</h2>
-          <p className={page.muted}>Risco de SLA, fila sem corretor e capacidade disponível por filial.</p>
+          <p className={page.muted}>As piores primeiro: risco de SLA, fila sem corretor e corretores disponíveis.</p>
         </div>
+        <nav aria-label="Filtrar unidades por saúde" className={styles.healthTabs}>
+          {healthTabs.map((tab) => (
+            <button key={tab.value} type="button" className={styles.healthTab} data-active={health === tab.value ? "true" : undefined} aria-pressed={health === tab.value} onClick={() => setHealth(tab.value)}>
+              {tab.label}<span className={styles.healthCount}>{counts[tab.value]}</span>
+            </button>
+          ))}
+        </nav>
         {branches.length > 1 ? (
           <label className={`${page.search} ${styles.branchSearch}`}>
             <Search aria-hidden="true" size={16} className={page.searchIcon} />
@@ -240,7 +244,7 @@ function BranchTable({ branches }: { branches: BranchHealth[] }) {
         rows={rows}
         rowKey={(branch) => branch.id}
         onRowOpen={(branch) => router.push(`/leads?branch=${branch.id}`)}
-        empty={<p>Nenhuma unidade corresponde à busca.</p>}
+        empty={<p>Nenhuma unidade nesta aba ou busca.</p>}
       />
     </section>
   );
@@ -292,7 +296,6 @@ export function NocLite({ data, period, now, urgentLead = null }: { data: NocDat
       </div>
 
       <AnomalyAlerts branches={branchHealth} />
-      <BranchMap branches={branchHealth} />
       <BranchTable branches={branchHealth} />
 
       <div className={styles.charts}>
