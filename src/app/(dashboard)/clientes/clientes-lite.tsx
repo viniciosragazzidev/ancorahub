@@ -9,13 +9,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, Copy, MessageCircle, Search } from "lucide-react";
 
 import { StatCard } from "@/components/dashboard/metric-card";
 import { LiteUrlSelect } from "@/components/lite/controls";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import { formatLiteDate } from "@/components/lite/format/date";
+import { toast } from "@/components/ui/sonner";
 import page from "@/components/lite/page/lite-page.module.css";
 import styles from "./clientes-lite.module.css";
 import { DEFAULT_PERIOD, PERIOD_OPTIONS, type PeriodValue } from "@/shared/period";
@@ -33,6 +34,30 @@ export type ClientLiteRow = {
 };
 
 const PAGE_SIZE = 10;
+
+/** Link do WhatsApp com o número só em dígitos; sem DDI, assume Brasil (55). Vazio sem número. */
+export function whatsappHref(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 10) return null;
+  return `https://wa.me/${digits.length <= 11 ? `55${digits}` : digits}`;
+}
+
+/** Atalhos de quem atende a carteira o dia todo (20/11): abrir o WhatsApp e copiar o telefone sem sair da lista. */
+function ContactShortcuts({ client }: { client: ClientLiteRow }) {
+  const href = whatsappHref(client.phone);
+  if (!href) return null;
+  return (
+    <span className={styles.shortcuts} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+      <a href={href} target="_blank" rel="noreferrer" className={page.iconButton} aria-label={`Abrir WhatsApp de ${client.name}`} title="Abrir no WhatsApp">
+        <MessageCircle aria-hidden="true" size={16} />
+      </a>
+      <button type="button" className={page.iconButton} aria-label={`Copiar telefone de ${client.name}`} title="Copiar telefone"
+        onClick={() => { void navigator.clipboard?.writeText(client.phone.replace(/\D/g, "")).then(() => toast.success("Telefone copiado")); }}>
+        <Copy aria-hidden="true" size={16} />
+      </button>
+    </span>
+  );
+}
 
 export function ClientesLite({ clients, metrics, period, branches, branchId }: {
   clients: ClientLiteRow[];
@@ -75,9 +100,12 @@ export function ClientesLite({ clients, metrics, period, branches, branchId }: {
       label: "Contato",
       secondary: true,
       render: (client) => (
-        <span>
-          <span className={page.numeric}>{client.phone}</span>
-          {client.email ? <span className={page.cellSub}>{client.email}</span> : null}
+        <span className={styles.contact}>
+          <span>
+            <span className={page.numeric}>{client.phone}</span>
+            {client.email ? <span className={page.cellSub}>{client.email}</span> : null}
+          </span>
+          <ContactShortcuts client={client} />
         </span>
       ),
     },
@@ -125,7 +153,11 @@ export function ClientesLite({ clients, metrics, period, branches, branchId }: {
           </div>
         ) : (
           <>
-            <p className={page.cardDescription}>{clients.length} cliente(s) ativo(s), da conversão mais recente para a mais antiga.</p>
+            {query.trim() ? (
+              <p className={page.resultLine} role="status">
+                {filtered.length} {filtered.length === 1 ? "cliente" : "clientes"} para “{query.trim()}” · <button type="button" onClick={() => { setQuery(""); reset(); }}>Limpar busca</button>
+              </p>
+            ) : null}
             <LiteResponsiveData
               caption="Carteira de clientes ativos"
               columns={columns}
@@ -139,7 +171,7 @@ export function ClientesLite({ clients, metrics, period, branches, branchId }: {
                 </div>
               )}
             />
-            <LitePagination {...pagination} label="Páginas de clientes" />
+            <LitePagination {...pagination} label="Páginas de clientes" itemNoun="clientes" />
           </>
         )}
       </div>
