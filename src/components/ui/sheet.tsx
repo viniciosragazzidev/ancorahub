@@ -181,6 +181,28 @@ function SheetSectionHeader({ className, ...props }: React.ComponentProps<"div">
   );
 }
 
+/** Rótulo de seção em caixa alta (skill `interface-enxuta`): agrupa sem cartão aninhado. */
+function SheetSectionLabel({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="sheet-section-label"
+      className={cn("text-[11px] font-medium uppercase tracking-wide text-muted-foreground", className)}
+      {...props}
+    />
+  );
+}
+
+/** Contexto à esquerda do rodapé ("Responsável: Ana · salvo há 2 min"); as ações ficam à direita. */
+function SheetFooterNote({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="sheet-footer-note"
+      className={cn("min-w-0 truncate text-xs text-muted-foreground sm:mr-auto", className)}
+      {...props}
+    />
+  );
+}
+
 export {
   Sheet,
   SheetTrigger,
@@ -193,4 +215,6 @@ export {
   SheetBody,
   SheetSection,
   SheetSectionHeader,
+  SheetSectionLabel,
+  SheetFooterNote,
 };

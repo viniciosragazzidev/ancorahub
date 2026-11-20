@@ -41,8 +41,10 @@ import {
   SheetHeader,
   SheetSection,
   SheetSectionHeader,
+  SheetSectionLabel,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { PersonInitials } from "@/components/ui/person-chip";
 import type { DutyRosterSnapshot } from "@/features/lead-distribution/roster-queries";
 import {
   archiveDutyScheduleAction,
@@ -951,7 +953,7 @@ function DutyInspector({
                 <SheetSection>
                   <SheetSectionHeader>
                     <div>
-                      <p className="text-sm font-semibold">Cobertura</p>
+                      <SheetSectionLabel>Cobertura</SheetSectionLabel>
                       <p className="text-xs text-muted-foreground">
                         A escala não bloqueia a distribuição enquanto estiver incompleta.
                       </p>
@@ -974,7 +976,7 @@ function DutyInspector({
                 <SheetSection>
                   <SheetSectionHeader>
                     <div>
-                      <p className="text-sm font-semibold">Regra</p>
+                      <SheetSectionLabel>Regra</SheetSectionLabel>
                       <p className="text-xs text-muted-foreground">
                         Detalhes que definem a entrada do plantão.
                       </p>
@@ -1008,7 +1010,7 @@ function DutyInspector({
                 <SheetSection>
                   <SheetSectionHeader>
                     <div>
-                      <p className="text-sm font-semibold">Escala de corretores</p>
+                      <SheetSectionLabel>Escala de corretores</SheetSectionLabel>
                       <p className="text-xs text-muted-foreground">
                         Adicione ou remova pessoas do plantão.
                       </p>
@@ -1198,7 +1200,7 @@ function DutyInspector({
                 <SheetSection>
                   <SheetSectionHeader>
                     <div>
-                      <p className="text-sm font-semibold">Histórico</p>
+                      <SheetSectionLabel>Histórico</SheetSectionLabel>
                       <p className="text-xs text-muted-foreground">
                         Alterações auditadas deste plantão.
                       </p>
@@ -1211,7 +1213,7 @@ function DutyInspector({
                         className="flex justify-between gap-3 text-xs"
                       >
                         <span>
-                          {actionLabel(event.action)} · {event.actorName}
+                          {actionLabel(event.action)} · {event.actorName ? <PersonInitials name={event.actorName} className="mr-1 align-middle" /> : null}{event.actorName}
                         </span>
                         <time className="shrink-0 text-muted-foreground">
                           {new Intl.DateTimeFormat("pt-BR", {

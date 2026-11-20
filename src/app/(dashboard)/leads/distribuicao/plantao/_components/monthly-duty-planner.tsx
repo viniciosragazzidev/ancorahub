@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchAddList } from "@/components/ui/search-add-list";
 import { AppSelect } from "@/components/ui/select";
-import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetSectionLabel, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { plantaoDone, plantaoFailed, plantaoTap } from "./plantao-feedback";
 import {
@@ -499,7 +499,7 @@ export function MonthlyDutyPlanner({
                 {step === "types" ? (
                   <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
                     <section className="grid gap-2 rounded-[var(--radius-card)] border border-border p-3">
-                      <p className="text-sm font-medium">Período da escala</p>
+                      <SheetSectionLabel>Período da escala</SheetSectionLabel>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="grid gap-1.5">
                           <Label htmlFor="plan-range-from">De</Label>
@@ -516,7 +516,7 @@ export function MonthlyDutyPlanner({
                     </section>
                     <section className="grid gap-2">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium">Tipos de plantão que entram nesta escala</p>
+                        <SheetSectionLabel>Tipos de plantão que entram nesta escala</SheetSectionLabel>
                         <Button type="button" size="sm" variant="outline" onClick={onCreateSchedule}><Plus className="size-3.5" /> Novo plantão</Button>
                       </div>
                       {typeList.length ? (

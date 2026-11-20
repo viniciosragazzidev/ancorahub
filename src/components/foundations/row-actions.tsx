@@ -32,6 +32,8 @@ export interface RowActionItem {
 export interface RowActionsProps {
   actions: RowActionItem[];
   label?: string;
+  /** Nome da entidade da linha; quando informado, abre o menu como legenda. */
+  entityName?: string;
   align?: "start" | "center" | "end";
   className?: string;
 }
@@ -39,6 +41,7 @@ export interface RowActionsProps {
 export function RowActions({
   actions,
   label = "Ações",
+  entityName,
   align = "end",
   className,
 }: RowActionsProps) {
@@ -63,6 +66,7 @@ export function RowActions({
       </DropdownMenuTrigger>
 
         <DropdownMenuContent align={align} className="w-48">
+          {entityName ? <DropdownMenuLabel className="truncate">{entityName}</DropdownMenuLabel> : null}
           {primaryGroup.length > 0 && (
             <DropdownMenuGroup>
               {primaryGroup.map((action, idx) => (
@@ -136,6 +140,7 @@ function ActionItem({ action, isDestructive }: { action: RowActionItem; isDestru
     <DropdownMenuItem
       disabled={action.disabled}
       onClick={action.onClick}
+      variant={isDestructive ? "destructive" : "default"}
       className={cn(
         "gap-2 text-xs font-medium cursor-pointer",
         isDestructive && "text-destructive focus:bg-destructive/10 focus:text-destructive",

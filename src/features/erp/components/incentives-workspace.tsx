@@ -371,7 +371,7 @@ export function IncentivesWorkspace({ data }: { data: ListData }) {
     { id: "period", label: "Período", nowrap: true, render: (row) => `${day(row.startsOn)} a ${day(row.endsOn)}` },
     { id: "status", label: "Situação", render: (row) => <StatusBadge status={row.status} startsOn={row.startsOn} endsOn={row.endsOn} today={data.today} /> },
     { id: "last", label: "Última apuração", nowrap: true, secondary: true, render: (row) => row.lastCalculatedAt ? dateTime(row.lastCalculatedAt) : "Sem apuração" },
-    { id: "menu", label: "", render: (row) => <ErpRowMenu label={`Ações de ${row.name}`} items={menu(row)} /> },
+    { id: "menu", label: "", render: (row) => <ErpRowMenu label={`Ações de ${row.name}`} entityName={row.name} items={menu(row)} /> },
   ];
   const emptyText = data.canManage
     ? "Crie um rascunho com regulamento, período e métrica. Outra pessoa autorizada aprova antes da apuração."

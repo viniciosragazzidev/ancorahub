@@ -36,6 +36,7 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { PersonInitials } from "@/components/ui/person-chip";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { Input } from "@/components/ui/input";
 import { AppSelect } from "@/components/ui/select";
@@ -1328,7 +1329,7 @@ export function QueueControlCenter({
                   </p>
                   {simulation.selected ? (
                     <p className="mt-3 text-sm">
-                      Destino provável: <strong>{simulation.selected.name}</strong> ·{" "}
+                      Destino provável: <PersonInitials name={simulation.selected.name} className="mr-1 align-middle" /><strong>{simulation.selected.name}</strong> ·{" "}
                       {simulation.selected.activeLeads} leads ativos
                       {simulation.selected.capacity ? ` de ${simulation.selected.capacity}` : ""}
                     </p>

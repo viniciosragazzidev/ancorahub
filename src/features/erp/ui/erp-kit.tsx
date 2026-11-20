@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { DataTable } from "@/components/ui/data-table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AppSelect, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -154,16 +154,20 @@ export function ErpCell({ title, sub }: { title: ReactNode; sub?: ReactNode }) {
 // ─── Menus ──────────────────────────────────────────────────────────────────
 
 /** Row actions `⋯`. */
-export function ErpRowMenu({ label, items }: { label: string; items: ErpMenuItem[] }) {
+export function ErpRowMenu({ label, entityName, items }: { label: string; /** Nome da entidade da linha, mostrado como legenda no topo do menu. */ entityName?: string; items: ErpMenuItem[] }) {
   const skin = useErpSkin();
   const router = useRouter();
   if (!items.length) return null;
   // The row itself opens the drawer: clicks on the menu (and on its portal items, which bubble through React) must not.
   const stop = (event: { stopPropagation: () => void }) => event.stopPropagation();
   if (skin === "lite") return <span onClick={stop} onKeyDown={stop}><LiteMenu label={label} items={items} /></span>;
+  // Destructive items always close the menu, after a separator.
+  const regular = items.filter((item) => item.tone !== "danger");
+  const danger = items.filter((item) => item.tone === "danger");
+  const renderItem = (item: ErpMenuItem) => <DropdownMenuItem key={item.id} variant={item.tone === "danger" ? "destructive" : "default"} disabled={"disabled" in item ? item.disabled : undefined}
+    onClick={() => { if (item.href) router.push(item.href); else item.onSelect?.(); }}>{item.label}</DropdownMenuItem>;
   return <span onClick={stop} onKeyDown={stop}><DropdownMenu><DropdownMenuTrigger render={<Button type="button" aria-label={label} size="icon-sm" variant="ghost"><DotsThreeVertical size={15} /></Button>} />
-    <DropdownMenuContent align="end" className="w-52">{items.map((item) => <DropdownMenuItem key={item.id} variant={item.tone === "danger" ? "destructive" : "default"} disabled={"disabled" in item ? item.disabled : undefined}
-      onClick={() => { if (item.href) router.push(item.href); else item.onSelect?.(); }}>{item.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu></span>;
+    <DropdownMenuContent align="end" className="w-52">{entityName ? <DropdownMenuLabel className="truncate">{entityName}</DropdownMenuLabel> : null}{regular.map(renderItem)}{regular.length && danger.length ? <DropdownMenuSeparator /> : null}{danger.map(renderItem)}</DropdownMenuContent></DropdownMenu></span>;
 }
 
 /** Page-level extras ("Configurações ▾"): auxiliary settings and explainers, never the primary action. */

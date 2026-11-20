@@ -5,8 +5,9 @@ import { useCallback, useEffect, useState, useTransition, type ReactNode } from 
 import { FileArrowDown, MoreHorizontalIcon } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { PersonInitials } from "@/components/ui/person-chip";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetSection, SheetSectionHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "@/components/ui/sonner";
 import { Textarea } from "@/components/ui/textarea";
@@ -107,7 +108,7 @@ function HandOff({ dealId, onDone }: { dealId: string; onDone: () => void }) {
       <ul className="grid gap-1.5">
         {brokers.map((broker) => (
           <li key={broker.id} className="flex min-h-11 items-center justify-between gap-2 rounded-[var(--radius-card)] border border-border px-3">
-            <span className="truncate text-sm">{broker.name}</span>
+            <span className="flex min-w-0 items-center gap-2"><PersonInitials name={broker.name} /><span className="truncate text-sm">{broker.name}</span></span>
             <Button type="button" size="sm" disabled={pending} onClick={() => handOff(broker.id, broker.name)}>Entregar</Button>
           </li>
         ))}
@@ -187,10 +188,12 @@ export function DealSheet({ dealId, onClose, autopilotAllowed, previewDetail }: 
                       <MoreHorizontalIcon className="size-4" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuLabel className="truncate">{detail.lead.name}</DropdownMenuLabel>
                       <DropdownMenuItem onClick={() => setHandOff(true)}>Entregar a um corretor</DropdownMenuItem>
                       {otherModes.map((mode) => <DropdownMenuItem key={mode} onClick={() => run({ op: "mode", dealId: deal.id, mode }, `Modo: ${MODE_LABEL[mode]}.`)}>Mudar para {MODE_LABEL[mode]}</DropdownMenuItem>)}
                       <DropdownMenuItem onClick={() => run({ op: "end", dealId: deal.id, outcome: "return_to_distribution" }, "Negociação encerrada. O lead voltou para a distribuição.")}>Encerrar e devolver à distribuição</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => run({ op: "end", dealId: deal.id, outcome: "lost" }, "Negociação encerrada como perdida.")}>Encerrar como perdida</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem variant="destructive" onClick={() => run({ op: "end", dealId: deal.id, outcome: "lost" }, "Negociação encerrada como perdida.")}>Encerrar como perdida</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : null}

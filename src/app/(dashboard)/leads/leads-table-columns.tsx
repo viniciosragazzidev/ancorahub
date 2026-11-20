@@ -553,7 +553,7 @@ export const getLeadsColumns = (
               }
             />
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel className="text-xs">Opções do Lead</DropdownMenuLabel>
+              <DropdownMenuLabel className="truncate" title={lead.name}>{lead.name}</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => onOpenDrawer(lead)} className="text-xs font-medium">
                 Abrir Drawer de Gestão
               </DropdownMenuItem>

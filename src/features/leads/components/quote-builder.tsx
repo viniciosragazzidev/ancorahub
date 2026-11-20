@@ -16,6 +16,7 @@ import {
   SheetDescription,
   SheetFooter,
   SheetHeader,
+  SheetSectionLabel,
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
@@ -192,9 +193,7 @@ export function QuoteBuilder({
             {/* Plan Items */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold text-muted-foreground">
-                  Planos
-                </Label>
+                <SheetSectionLabel>Planos</SheetSectionLabel>
                 <Button type="button" variant="ghost" className="min-h-11 px-3 text-xs" onClick={addItem}>
                   <Plus className="size-4" /> Adicionar
                 </Button>
@@ -256,9 +255,7 @@ export function QuoteBuilder({
             {beneficiaries.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold text-muted-foreground">
-                    Por beneficiário
-                  </Label>
+                  <SheetSectionLabel>Por beneficiário</SheetSectionLabel>
                   <Button type="button" variant="ghost" className="min-h-11 px-3 text-xs" onClick={addLineItem}>
                     <Plus className="size-4" /> Adicionar
                   </Button>

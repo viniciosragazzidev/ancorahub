@@ -73,7 +73,7 @@ function DropdownMenuLabel({
       data-slot="dropdown-menu-label"
       data-inset={inset}
       className={cn(
-        "px-2 py-1.5 font-mono text-[11px] font-medium uppercase tracking-wider text-muted-foreground data-inset:pl-7",
+        "px-2 py-1.5 font-sans text-[11px] font-medium uppercase tracking-wide text-muted-foreground data-inset:pl-7",
         className
       )}
       {...props}
@@ -102,7 +102,7 @@ function DropdownMenuItem({
         data-variant={variant}
         render={React.cloneElement(renderElement, {
           className: cn(
-            `group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-medium outline-hidden select-none ${focusBackground} focus:text-accent-foreground not-data-[variant=destructive]:focus:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive`,
+            `group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-medium outline-hidden select-none ${focusBackground} focus:text-accent-foreground not-data-[variant=destructive]:focus:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 not-data-[variant=destructive]:[&_svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:*:[svg]:text-destructive`,
             className,
             renderElement.props.className
           ),
@@ -118,7 +118,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        `group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-medium outline-hidden select-none ${focusBackground} focus:text-accent-foreground not-data-[variant=destructive]:focus:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive`,
+        `group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-medium outline-hidden select-none ${focusBackground} focus:text-accent-foreground not-data-[variant=destructive]:focus:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 not-data-[variant=destructive]:[&_svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:*:[svg]:text-destructive`,
         className
       )}
       {...props}
@@ -279,7 +279,7 @@ function DropdownMenuShortcut({
     <span
       data-slot="dropdown-menu-shortcut"
       className={cn(
-        "ml-auto text-xs tracking-widest text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground",
+        "ml-auto inline-flex h-4 min-w-4 items-center justify-center rounded-ds-inputs border border-border px-1 font-ds-mono text-[10px] leading-none font-medium text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground",
         className
       )}
       {...props}
