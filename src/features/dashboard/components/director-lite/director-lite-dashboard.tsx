@@ -7,11 +7,12 @@ import type { OverviewPeriod } from "@/features/dashboard/overview-filter";
 import { DirectorLiteChrome, type DashboardBranch, type DirectorLiteTab } from "./director-lite-chrome";
 import { OperationView } from "./operation-view";
 import { EntriesView } from "./entries-view";
+import { customRangeLabel, type CustomRange } from "./custom-range";
 import type { EntriesByTurn } from "@/features/dashboard/entries/entries-by-turn-core";
 
 export type { DashboardBranch };
 
-export function DirectorLiteDashboard({ data, period, branchId, branches, now, availableTabs, canOpenConversations = true, queues, queueId = null, entries = null }: {
+export function DirectorLiteDashboard({ data, period, branchId, branches, now, availableTabs, canOpenConversations = true, queues, queueId = null, entries = null, customRange = null }: {
   data: EssentialDashboard;
   period: OverviewPeriod;
   /** Unidade escolhida já validada contra as unidades do tenant; null = todas. */
@@ -27,13 +28,15 @@ export function DirectorLiteDashboard({ data, period, branchId, branches, now, a
   queueId?: string | null;
   /** Entradas por turno, WhatsApp x formulário. */
   entries?: EntriesByTurn | null;
+  /** Intervalo personalizado ativo (data e hora). */
+  customRange?: CustomRange | null;
 }) {
   const queueName = queues?.find((queue) => queue.id === queueId)?.name ?? null;
-  const periodText = period === "today" ? "Hoje" : period === "7d" ? "Últimos 7 dias" : "Últimos 30 dias";
+  const periodText = customRange ? customRangeLabel(customRange) : period === "today" ? "Hoje" : period === "7d" ? "Últimos 7 dias" : "Últimos 30 dias";
   return (
-    <DirectorLiteChrome now={now} tab="overview" period={period} branchId={branchId} branches={branches} firstName={data.firstName} availableTabs={availableTabs} queues={queues} queueId={queueId}>
+    <DirectorLiteChrome now={now} tab="overview" period={period} branchId={branchId} branches={branches} firstName={data.firstName} availableTabs={availableTabs} queues={queues} queueId={queueId} customRange={customRange} allowCustomRange>
       <OperationView data={data} canOpenConversations={canOpenConversations} />
-      {entries ? <div className="mt-6"><EntriesView data={entries} queueName={queueName} periodText={periodText} /></div> : null}
+      {entries ? <div className="mt-6"><EntriesView data={entries} queueName={queueName} periodText={periodText} current={!customRange} /></div> : null}
     </DirectorLiteChrome>
   );
 }
