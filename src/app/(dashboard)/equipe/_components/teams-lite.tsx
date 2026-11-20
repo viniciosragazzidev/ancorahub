@@ -48,25 +48,31 @@ function SearchBox({ value, onChange, label, placeholder }: { value: string; onC
   );
 }
 
+/** Equipes com leads para distribuir primeiro (é o que o gestor resolve no dia); empate por leads em aberto. */
+export function sortTeamsForDistribution<T extends Pick<TeamSummary, "listPending" | "companyOpen">>(teams: T[]) {
+  return [...teams].sort((a, b) => b.listPending - a.listPending || b.companyOpen - a.companyOpen);
+}
+
 export function TeamsListLite({ teams }: { teams: TeamSummary[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const rows = useMemo(() => {
     const q = normalize(query.trim());
-    return q ? teams.filter((team) => normalize(team.teamName).includes(q) || normalize(team.supervisorName).includes(q) || normalize(team.branchName ?? "").includes(q)) : teams;
+    const found = q ? teams.filter((team) => normalize(team.teamName).includes(q) || normalize(team.supervisorName).includes(q) || normalize(team.branchName ?? "").includes(q)) : teams;
+    return sortTeamsForDistribution(found);
   }, [teams, query]);
   const columns: LiteColumn<TeamSummary>[] = [
     {
-      id: "team", label: "Equipe", primary: true,
+      id: "team", label: "Equipe", primary: true, nowrap: true,
       render: (team) => (
         <span className={styles.teamCell}>
           <TeamLogo name={team.teamName} image={team.teamImage} size="sm" />
-          <Link href={`/equipe/equipes/${encodeURIComponent(team.supervisorId)}`} className={`${page.cellTitle} ${page.cellLink}`}>{team.teamName}</Link>
+          <Link href={`/equipe/equipes/${encodeURIComponent(team.supervisorId)}`} className={`${page.cellTitle} ${page.cellLink}`} title={team.teamName}>{team.teamName}</Link>
         </span>
       ),
     },
     { id: "supervisor", label: "Supervisora", secondary: true, nowrap: true, render: (team) => team.supervisorName },
-    { id: "branch", label: "Unidade", render: (team) => team.branchName ?? "Sem unidade" },
+    { id: "branch", label: "Unidade", nowrap: true, render: (team) => team.branchName ?? "Sem unidade" },
     { id: "brokers", label: "Corretores", numeric: true, render: (team) => fmt(team.brokers) },
     { id: "company", label: "Leads da empresa em aberto", numeric: true, render: (team) => fmt(team.companyOpen) },
     { id: "list", label: "Lista importada", numeric: true, render: (team) => fmt(team.listTotal) },
