@@ -233,7 +233,7 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
   const cancelDelete = useCallback(() => setDeleting(null), []);
 
   const columns: LiteColumn<PendingDocLite>[] = [
-    { id: "lead", label: "Lead", primary: true, render: (doc) => <Link href={`/leads/${doc.leadId}`} className={styles.link}>{doc.leadNome}</Link> },
+    { id: "lead", label: "Lead", primary: true, nowrap: true, render: (doc) => <Link href={`/leads/${doc.leadId}`} className={styles.link} title={doc.leadNome}>{doc.leadNome}</Link> },
     {
       id: "file",
       label: "Documento e tipo",
