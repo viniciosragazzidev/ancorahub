@@ -6,6 +6,8 @@ import { useEffect, useId, useLayoutEffect, useMemo, useState, useRef, type Reac
 import { toast } from "@/components/ui/sonner";
 import { motion, useReducedMotion } from "motion/react";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import { Kbd } from "@/components/ui/kbd";
+import styles from "./conversas-lite.module.css";
 import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
 
 import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
@@ -207,7 +209,13 @@ export type ConversationItem = {
   tags?: LeadTag[];
 };
 
-type ViewFilter = "all" | "qualified" | "closing" | "converted" | "ai_active" | "human_active" | "with_messages" | "without_messages";
+type ViewFilter = "all" | "awaiting" | "qualified" | "closing" | "converted" | "ai_active" | "human_active" | "with_messages" | "without_messages";
+
+/** Esperando resposta: a última mensagem foi do cliente (inbox de CRM, 20/11). */
+export function isAwaitingReply(conversation: Pick<ConversationItem, "latestMessage">) {
+  const direction = conversation.latestMessage?.direction;
+  return direction === "incoming" || direction === "inbound";
+}
 
 // Signals are coalesced before asking the incremental endpoint; no signal refreshes the full page.
 const CONVERSATIONS_REFRESH_TIMING: VisibleRefreshTiming = { coalesceMs: 3_000, maxWaitMs: 10_000, minGapMs: 20_000 };
@@ -435,10 +443,13 @@ export function ConversationsWorkspace({
   const [filter, setFilter] = useState<ViewFilter>("all");
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [profileOpen, setProfileOpen] = useState(true);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
   const reduceMotion = useReducedMotion();
 
   const selected = conversations.find((conversation) => conversation.id === selectedId) ?? null;
+  // Sem conversa aberta, a coluna do perfil ficaria vazia: ela só aparece com uma conversa selecionada (20/11).
+  const profileVisible = profileOpen && Boolean(selected);
   const messagesWithHistory = useMemo(
     () => conversations.filter((conversation) => (conversation.messageCount ?? conversation.messages.length) > 0).length,
     [conversations],
@@ -454,7 +465,7 @@ export function ConversationsWorkspace({
         );
       const matchesFilter =
         filter === "all" ||
-        (filter === "closing" ? conversation.inClosing === true : filter === "converted" ? conversation.status === "converted" : filter === "qualified"
+        (filter === "awaiting" ? isAwaitingReply(conversation) : filter === "closing" ? conversation.inClosing === true : filter === "converted" ? conversation.status === "converted" : filter === "qualified"
           ? conversation.status === "distributed" ||
             conversation.aiConversation?.status === "CLOSED" ||
             ["hot", "warm", "cold", "qualified", "disqualified"].includes(conversation.status)
@@ -486,6 +497,36 @@ export function ConversationsWorkspace({
     updateSelectedLeadInUrl(id);
   }
 
+  // Atalhos de quem atende o dia todo (20/11, skill interface-enxuta): "/" busca, ↑/↓ troca de conversa.
+  const filteredRef = useRef<ConversationItem[]>([]);
+  filteredRef.current = filtered;
+  useEffect(() => {
+    if (!directorSkinEnabled) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      const typing = Boolean(target?.closest("input, textarea, select, [contenteditable='true'], [role='dialog'], [role='listbox'], [role='menu']"));
+      if (event.key === "/" && !typing) {
+        event.preventDefault();
+        searchRef.current?.focus();
+        return;
+      }
+      if ((event.key === "ArrowDown" || event.key === "ArrowUp") && !typing) {
+        const list = filteredRef.current;
+        if (!list.length) return;
+        event.preventDefault();
+        const index = list.findIndex((item) => item.id === selectedIdRef.current);
+        const next = event.key === "ArrowDown" ? Math.min(list.length - 1, index + 1) : Math.max(0, index < 0 ? 0 : index - 1);
+        const nextId = list[next]?.id;
+        if (nextId && nextId !== selectedIdRef.current) selectConversation(nextId);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // selectConversation lê só refs e setters estáveis.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [directorSkinEnabled]);
+
   function returnToList() {
     setSelectedId(null);
     setMobileView("list");
@@ -506,8 +547,10 @@ export function ConversationsWorkspace({
     );
   }
 
+  const awaitingCount = useMemo(() => conversations.filter(isAwaitingReply).length, [conversations]);
   const statusFilters: { value: ViewFilter; label: string; count: number }[] = [
     { value: "all", label: "Todos", count: conversations.length },
+    { value: "awaiting", label: "Esperando resposta", count: awaitingCount },
     { value: "qualified", label: "Qualificados", count: conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length },
     { value: "closing", label: "Fechamento", count: conversations.filter((c) => c.inClosing === true).length },
     { value: "converted", label: "Convertidos", count: conversations.filter((c) => c.status === "converted").length },
@@ -696,10 +739,10 @@ export function ConversationsWorkspace({
       <div
         data-lite={directorSkinEnabled ? undefined : "panes"}
         data-conversations-part={directorSkinEnabled ? "panes" : undefined}
-        data-profile-open={directorSkinEnabled ? String(profileOpen) : undefined}
+        data-profile-open={directorSkinEnabled ? String(profileVisible) : undefined}
         className={cn(
           "grid min-h-0 flex-1 grid-cols-1 grid-rows-1 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)]",
-          profileOpen && "lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]",
+          profileVisible && "lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]",
         )}
       >
         <section
@@ -715,6 +758,8 @@ export function ConversationsWorkspace({
             <div className={cn("relative", directorSkinEnabled && "min-w-0 flex-1")} data-lite={directorSkinEnabled ? undefined : "search"} data-conversations-part={directorSkinEnabled ? "search" : undefined}>
               <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
+                ref={searchRef}
+                aria-keyshortcuts={directorSkinEnabled ? "/" : undefined}
                 aria-label="Buscar atendimento por nome, telefone ou e-mail"
                 className="h-10 pl-8 text-xs"
                 onChange={(event) => setQuery(event.target.value)}
@@ -726,6 +771,25 @@ export function ConversationsWorkspace({
             {directorSkinEnabled && canSeeBrokerTab ? <ConversationsBulkQualificationAction compact /> : null}
           </div>
 
+          {directorSkinEnabled ? (
+            <div data-conversations-part="quick-tabs" role="group" aria-label="Ver conversas" className={styles.quickTabs}>
+              {(["all", "awaiting"] as const).map((value) => {
+                const option = statusFilters.find((item) => item.value === value)!;
+                return (
+                  <button key={value} type="button" className={styles.quickTab} data-active={filter === value ? "true" : undefined} aria-pressed={filter === value} onClick={() => setFilter(value)}>
+                    {option.label}<span className={styles.quickCount}>{option.count}</span>
+                  </button>
+                );
+              })}
+              <span className={styles.quickHint} aria-hidden="true"><Kbd>/</Kbd> buscar · <Kbd>↑</Kbd><Kbd>↓</Kbd> trocar</span>
+            </div>
+          ) : null}
+          {directorSkinEnabled && query.trim() ? (
+            <p className={styles.searchResult} role="status">
+              {filtered.length} {filtered.length === 1 ? "conversa" : "conversas"} para “{query.trim()}” ·{" "}
+              <button type="button" className={styles.clearSearch} onClick={() => setQuery("")}>Limpar busca</button>
+            </p>
+          ) : null}
           <ScrollArea className="min-h-0 flex-1">
             <div className="p-2">
               {filtered.map((conversation, index) => (
@@ -828,7 +892,7 @@ export function ConversationsWorkspace({
           className={cn(
             "hidden min-h-0 overflow-y-auto border-l border-border bg-card",
             directorSkinEnabled ? "min-[1280px]:flex min-[1280px]:flex-col" : "lg:flex lg:flex-col",
-            !profileOpen && (directorSkinEnabled ? "min-[1280px]:hidden" : "lg:hidden"),
+            !profileVisible && (directorSkinEnabled ? "min-[1280px]:hidden" : "lg:hidden"),
           )}
         >
           {selected && profileOpen ? (
