@@ -49,7 +49,11 @@ Regra de bolso: **olhar = hover card, mexer = drawer, raro = menu**.
 - Acima da tabela: abas de filtro **com contagem** ("Todos 240 · Sem resposta 12"). Ao lado: busca curta e filtros em chips "Rótulo: Valor ▾".
 - Com busca ativa, embaixo: "3 de 12 leads contêm 'silva' · Limpar busca".
 - Rodapé: "10 de 1.240 leads" em caption Fog.
-- Última coluna: `⋯` com as ações raras.
+- Última coluna: `⋯` com as ações raras. No menu: o nome da entidade no cabeçalho (caption Fog), grupos separados por hairline, atalho à direita quando existir e o destrutivo sempre por último, em Rose Ink.
+- Filtros num popover, com a contagem de cada opção e o resumo "3 filtros · 221 leads · Aplicar" no rodapé.
+- Seleção em massa: barra flutuante no rodapé (`DsSelectionBar`), linha selecionada em Powder Blue, "Selecionar todos os 284".
+- Alerta da linha é uma segunda linha em Rose Ink, só quando há problema ("há 3 dias sem resposta"). Nunca um banner fixo por linha.
+- Problema agregado vai para o rodapé da tabela, com a ação que resolve ao lado ("4 leads sem resposta · Ver").
 
 ## Tipografia, cor e forma (resumo dos tokens)
 
