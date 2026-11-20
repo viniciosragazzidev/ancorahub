@@ -30,6 +30,8 @@ interface DataTableProps<TData> extends React.HTMLAttributes<HTMLDivElement> {
   isPending?: boolean;
   getRowClassName?: (row: TData) => string | undefined;
   onRowClick?: (row: TData) => void;
+  /** Resumo do rodapé quando nada está selecionado (ver `DataTablePagination`). */
+  footerSummary?: React.ReactNode;
 }
 
 export function DataTable<TData>({
@@ -42,6 +44,7 @@ export function DataTable<TData>({
   isPending = false,
   getRowClassName,
   onRowClick,
+  footerSummary,
   ...props
 }: DataTableProps<TData>) {
   const rowEnterRef = useRowEnter();
@@ -129,7 +132,7 @@ export function DataTable<TData>({
             </TableBody>
           </Table>
         </DragScrollTable>
-        <DataTablePagination table={table} isPending={isPending} />
+        <DataTablePagination table={table} isPending={isPending} summary={footerSummary} />
       </DataTableFrame>
       {actionBar}
     </div>

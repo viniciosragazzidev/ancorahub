@@ -436,6 +436,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
 
         <div className="p-4 max-sm:hidden">
           <DataTable
+            itemNoun="pessoas"
             columns={columns}
             data={visibleMembers}
             searchKey="name"

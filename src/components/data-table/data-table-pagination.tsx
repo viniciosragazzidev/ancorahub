@@ -21,19 +21,25 @@ interface DataTablePaginationProps<TData> {
   table: Table<TData>;
   pageSizeOptions?: number[];
   isPending?: boolean;
+  /** Mostrado quando nada está selecionado ("Mostrando 1–20 de 1.240 leads"), skill `interface-enxuta`. */
+  summary?: React.ReactNode;
 }
 
 export function DataTablePagination<TData>({
   table,
   pageSizeOptions = [10, 20, 50, 100],
   isPending = false,
+  summary,
 }: DataTablePaginationProps<TData>) {
+  const selectedCount = table.getFilteredSelectedRowModel().rows.length;
   return (
     <div className="flex flex-col-reverse items-center justify-between gap-4 px-2 py-3 sm:flex-row border-t border-border/50">
       <div className="flex-1 text-xs text-muted-foreground" aria-live="polite">
         {isPending
           ? "Atualizando resultados..."
-          : `${table.getFilteredSelectedRowModel().rows.length} de ${table.getFilteredRowModel().rows.length} linha(s) selecionada(s).`}
+          : summary && selectedCount === 0
+            ? <span className="tabular-nums">{summary}</span>
+            : `${selectedCount} de ${table.getFilteredRowModel().rows.length} linha(s) selecionada(s).`}
       </div>
       <div className="flex items-center space-x-6 sm:space-x-8">
         <div className="flex items-center space-x-2">

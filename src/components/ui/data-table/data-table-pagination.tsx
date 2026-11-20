@@ -11,22 +11,35 @@ import {
 import { Button } from "@/components/ui/button";
 
 import { AppSelect } from "@/components/ui/select";
+import { formatShowingRange } from "@/components/ui/page-footer-summary";
 
 interface DataTablePaginationProps<TData> {
   table: Table<TData>;
   showSelectionCount?: boolean;
+  /** Plural do item ("pessoas"): sem seleção, o rodapé diz "Mostrando 1–10 de 12 pessoas" (skill `interface-enxuta`). */
+  itemNoun?: string;
 }
 
 export function DataTablePagination<TData>({
   table,
   showSelectionCount = true,
+  itemNoun,
 }: DataTablePaginationProps<TData>) {
+  const selectedCount = table.getFilteredSelectedRowModel().rows.length;
+  const { pageIndex, pageSize } = table.getState().pagination;
+  if (itemNoun && selectedCount === 0) {
+    showSelectionCount = false;
+  }
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 border-t border-border/60 text-xs">
       {showSelectionCount ? (
         <div className="flex-1 text-muted-foreground font-mono text-[11px]">
           {table.getFilteredSelectedRowModel().rows.length} de{" "}
           {table.getFilteredRowModel().rows.length} linha(s) selecionada(s).
+        </div>
+      ) : itemNoun ? (
+        <div className="flex-1 text-xs tabular-nums text-muted-foreground">
+          {formatShowingRange({ page: pageIndex + 1, pageSize, total: table.getFilteredRowModel().rows.length, noun: itemNoun })}
         </div>
       ) : (
         <div className="flex-1 text-muted-foreground font-mono text-[11px]">
