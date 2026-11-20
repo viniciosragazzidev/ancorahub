@@ -55,12 +55,15 @@ describe("DutyMonthCalendar", () => {
     expect(screen.queryByRole("gridcell", { name: /27\/09/ })).toBeNull();
   });
 
-  it("gives days with plantões a stronger highlight than empty days", () => {
+  it("destaca o plantão que acontece agora e deixa compacto o que ainda não começou (20/11)", () => {
+    // 25/09 às 10:00 em São Paulo (relógio do beforeEach).
+    const running = { ...pme23, id: "manha", name: "MANHA", startsAt: "09:00", endsAt: "12:00" };
+    const later = { ...pme23, id: "tarde", name: "TARDE", startsAt: "15:00", endsAt: "18:00" };
     render(
       <DutyMonthCalendar
         month="2026-09"
-        schedules={[{ ...pme23, id: "pme30", name: "PME 30/09" }]}
-        progressById={new Map([["pme30", { dates: [{ date: "2026-09-30", done: false }] }]])}
+        schedules={[running, later]}
+        progressById={new Map([["manha", { dates: [{ date: "2026-09-25", done: false }] }], ["tarde", { dates: [{ date: "2026-09-25", done: false }] }]])}
         publishedScheduleIds={new Set()}
         gapScheduleIds={new Set()}
         repeatingScheduleIds={new Set()}
@@ -69,8 +72,14 @@ describe("DutyMonthCalendar", () => {
         onCreateOnDate={vi.fn()}
       />,
     );
-    expect(screen.getByRole("gridcell", { name: /30\/09/ }).className).toContain("color-mix(in_oklab,var(--primary)");
-    expect(screen.getByRole("gridcell", { name: /29\/09/ }).className).not.toContain("color-mix(in_oklab,var(--primary)");
+    const now = screen.getByRole("button", { name: /MANHA/ });
+    expect(now).toHaveAttribute("data-shift-state", "running");
+    expect(now).toHaveTextContent("Agora");
+    const soon = screen.getByRole("button", { name: /TARDE/ });
+    expect(soon).toHaveAttribute("data-shift-state", "upcoming");
+    expect(soon).not.toHaveTextContent("Agora");
+    // O dia em si não ganha fundo colorido: o destaque é do plantão em andamento.
+    expect(screen.getByRole("gridcell", { name: /25\/09/ }).className).not.toContain("color-mix(in_oklab,var(--primary)");
   });
 });
 

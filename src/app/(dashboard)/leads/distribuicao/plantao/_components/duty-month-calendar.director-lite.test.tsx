@@ -7,6 +7,9 @@ import { DutyMonthCalendar } from "./duty-month-calendar";
 
 describe("calendário de plantões no Lite do diretor", () => {
   it("oferece a lista móvel com data e horário em português", () => {
+    // O formulário de novo plantão só aparece em mês que ainda não acabou: o relógio fica em outubro de 2026.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-20T13:00:00Z"));
     const schedule = {
       id: "duty-1",
       name: "Plantão presencial da unidade Centro",
@@ -37,5 +40,6 @@ describe("calendário de plantões no Lite do diretor", () => {
     expect(html).toContain("25 de outubro");
     expect(html).toContain('type="date"');
     expect(html).toContain("Novo plantão");
+    vi.useRealTimers();
   });
 });
