@@ -248,9 +248,11 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
                           title={title(schedule, "acontecendo agora")}
                           data-shift-state="running"
                           style={schedule.typeName ? typeStripe(schedule.typeHue) : undefined}
+                          // Raio de cartão (não a pílula do controle Lite, que cortava o horário) e uma faixa só:
+                          // a cor do tipo quando há tipo; senão a cor de destaque (20/11).
                           className={cn(
-                            "w-full min-w-0 rounded-md border border-primary/50 bg-card px-1.5 py-1 text-left shadow-[inset_3px_0_0_var(--primary)] transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                            directorLite && styles.calendarItem,
+                            "w-full min-w-0 rounded-lg border border-primary/50 bg-card py-1 pl-2 pr-1.5 text-left transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            !schedule.typeName && "border-l-[3px] border-l-primary",
                           )}
                         >
                           <span className="flex items-center gap-1">
