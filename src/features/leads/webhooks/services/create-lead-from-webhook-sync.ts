@@ -261,7 +261,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: createdByUserId, entidade: "lead", entidadeId: leadId, acao: "lead.webhook.received" });
     await tx.insert(schema.leadDistributionEvents).values({
       id: randomUUID(), tenantId, leadId, toBranchId: branchId, toQueueId: queueId, action: distStatus, source: "webhook", strategy: "outbox",
-      reason: bypassPlantao ? "Lead direcionado diretamente para a lista geral de leads." : "Lead recebido e aguardando distribuição idempotente.", actorId: createdByUserId, createdAt: now,
+      reason: bypassPlantao ? "Lead direcionado diretamente para a lista geral de leads." : "Lead recebido e aguardando distribuição.", actorId: createdByUserId, createdAt: now,
     });
     await tx.update(schema.webhookDeliveries).set({ status: "processed", leadId, processedAt: now }).where(eq(schema.webhookDeliveries.id, deliveryId));
     await enqueueLeadEffectTx(tx, { tenantId, leadId, webhookDeliveryId: deliveryId, type: "NOTIFY_LEAD_ARRIVED", idempotencyKey: `lead-intake:${deliveryId}:arrival`, payload: { branchId, leadName: normalizedName } });
