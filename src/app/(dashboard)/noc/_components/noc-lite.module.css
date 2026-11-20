@@ -467,3 +467,26 @@
     grid-column: span 3;
   }
 }
+
+/* Precisa de atenção (20/11/2026): lista compacta, críticas primeiro. */
+.attentionList { display: grid; margin: 0; padding: 0; list-style: none; }
+.attentionRow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border-subtle); }
+.attentionRow:first-child { border-top: 0; }
+.attentionDot { width: 8px; height: 8px; border-radius: 999px; background: var(--warning); }
+.attentionRow[data-tone="danger"] .attentionDot { background: var(--danger); }
+.attentionText { display: grid; gap: 2px; min-width: 0; }
+.attentionVerb { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; color: var(--primary); font-size: var(--text-sm); font-weight: 500; text-decoration: none; white-space: nowrap; }
+.attentionVerb:hover { text-decoration: underline; text-underline-offset: 3px; }
+.attentionDismiss, .attentionMore { min-height: 36px; padding: 0 8px; border: 0; background: none; color: var(--text-muted); font: inherit; font-size: var(--text-xs); cursor: pointer; }
+.attentionDismiss:hover, .attentionMore:hover { color: var(--foreground); }
+.attentionMore { justify-self: start; padding: 0; color: var(--primary); font-size: var(--text-sm); font-weight: 500; }
+/* Abas por saúde com contagem e capacidade com barra na linha. */
+.healthTabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--surface-muted); }
+.healthTab { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--text-sm); font-weight: 500; cursor: pointer; }
+.healthTab:hover { color: var(--foreground); }
+.healthTab[data-active="true"] { background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-resting); }
+.healthCount { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--surface-muted); color: var(--text-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; text-align: center; }
+.capacityCell { display: inline-grid; gap: 4px; min-width: 96px; justify-items: end; }
+.capacityCell .track { width: 96px; }
+@media (max-width: 639px) { .attentionRow { grid-template-columns: auto minmax(0, 1fr); } .attentionVerb, .attentionDismiss { grid-column: 2; justify-self: start; } }
+.rowActions { display: inline-flex; gap: 4px; justify-content: flex-end; }
