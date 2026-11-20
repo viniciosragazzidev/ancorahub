@@ -26,7 +26,7 @@ vi.mock("@/shared/db", () => {
   };
   return { getDatabase: () => ({ select: () => make() }), schema: new Proxy({}, { get: () => new Proxy({}, { get: () => ({}) }) }) };
 });
-vi.mock("drizzle-orm", () => ({ and: () => ({}), count: () => ({}), desc: () => ({}), eq: () => ({}), gte: () => ({}), countDistinct: () => ({}) }));
+vi.mock("drizzle-orm", () => ({ and: () => ({}), count: () => ({}), desc: () => ({}), eq: () => ({}), gte: () => ({}), lte: () => ({}), countDistinct: () => ({}), sql: () => ({}) }));
 vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: async () => state.context }));
 // Carteira anterior (DEC-187): só o filtro de clientes de venda importa aqui.
 vi.mock("@/features/customers/prior-portfolio-schema", () => ({ saleClientsOnly: () => ({}) }));
