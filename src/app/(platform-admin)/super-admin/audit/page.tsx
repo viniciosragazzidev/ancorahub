@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Activity, Calendar, UserRound } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MagnifyingGlass, Trash } from "@/components/huge-icons";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
+import { PersonInitials } from "@/components/ui/person-chip";
 import {
   purgeUserLGPDAction,
   getLeadEvidenceReportAction,
@@ -44,7 +46,7 @@ const platformColumns: ColumnDef<PlatformLog>[] = [
   {
     accessorKey: "createdAt",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Data" />
+      <DataTableColumnHeader column={column} title="Data" icon={<Calendar />} />
     ),
     cell: ({ row }) => (
       <span className="font-mono text-xs text-muted-foreground pl-2">
@@ -55,19 +57,22 @@ const platformColumns: ColumnDef<PlatformLog>[] = [
   {
     accessorKey: "actorName",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Administrador" />
+      <DataTableColumnHeader column={column} title="Administrador" icon={<UserRound />} />
     ),
     cell: ({ row }) => (
-      <div className="text-xs">
-        <span className="font-semibold block text-foreground">{row.original.actorName || "Sistema"}</span>
-        <span className="text-xs text-muted-foreground font-mono mt-0.5">{row.original.actorEmail || "auto"}</span>
+      <div className="flex items-center gap-ds-8 text-xs">
+        {row.original.actorName ? <PersonInitials name={row.original.actorName} /> : null}
+        <div>
+          <span className="font-semibold block text-foreground">{row.original.actorName || "Sistema"}</span>
+          <span className="text-xs text-muted-foreground font-mono mt-0.5">{row.original.actorEmail || "auto"}</span>
+        </div>
       </div>
     ),
   },
   {
     accessorKey: "action",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Ação" />
+      <DataTableColumnHeader column={column} title="Ação" icon={<Activity />} />
     ),
     cell: ({ row }) => (
       <span className="font-semibold text-xs text-primary">{row.original.action}</span>
@@ -91,7 +96,7 @@ const tenantColumns: ColumnDef<TenantLog>[] = [
   {
     accessorKey: "createdAt",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Data" />
+      <DataTableColumnHeader column={column} title="Data" icon={<Calendar />} />
     ),
     cell: ({ row }) => (
       <span className="font-mono text-xs text-muted-foreground pl-2">
@@ -102,19 +107,22 @@ const tenantColumns: ColumnDef<TenantLog>[] = [
   {
     accessorKey: "userName",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Usuário" />
+      <DataTableColumnHeader column={column} title="Usuário" icon={<UserRound />} />
     ),
     cell: ({ row }) => (
-      <div className="text-xs">
-        <span className="font-semibold block text-foreground">{row.original.userName || "Usuário"}</span>
-        <span className="text-[10px] text-muted-foreground font-mono">{row.original.userEmail || "—"}</span>
+      <div className="flex items-center gap-ds-8 text-xs">
+        {row.original.userName ? <PersonInitials name={row.original.userName} /> : null}
+        <div>
+          <span className="font-semibold block text-foreground">{row.original.userName || "Usuário"}</span>
+          <span className="text-[10px] text-muted-foreground font-mono">{row.original.userEmail || "—"}</span>
+        </div>
       </div>
     ),
   },
   {
     accessorKey: "acao",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Ação Efetuada" />
+      <DataTableColumnHeader column={column} title="Ação Efetuada" icon={<Activity />} />
     ),
     cell: ({ row }) => (
       <span className="font-semibold text-xs text-primary">{row.original.acao}</span>

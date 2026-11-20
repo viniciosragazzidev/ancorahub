@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
+import { Calendar, Phone, User, UserRound } from "lucide-react";
 import { ArrowRight, MagnifyingGlass, UserList } from "@/components/huge-icons";
 
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OwnershipContext } from "@/components/ownership-context";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
+import { PersonInitials } from "@/components/ui/person-chip";
 import { Input } from "@/components/ui/input";
 import { MobileDataList, MobileDataListItem, MobileDataRow, ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import { StatCard } from "@/components/dashboard/metric-card";
@@ -43,7 +45,7 @@ export const columns: ColumnDef<ClientItem>[] = [
   {
     accessorKey: "name",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Cliente" />
+      <DataTableColumnHeader column={column} title="Cliente" icon={<User />} />
     ),
     cell: ({ row }) => {
       const client = row.original;
@@ -63,7 +65,7 @@ export const columns: ColumnDef<ClientItem>[] = [
   {
     accessorKey: "contact",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Contato" />
+      <DataTableColumnHeader column={column} title="Contato" icon={<Phone />} />
     ),
     cell: ({ row }) => {
       const client = row.original;
@@ -78,23 +80,26 @@ export const columns: ColumnDef<ClientItem>[] = [
   {
     accessorKey: "brokerName",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Responsável / Filial" />
+      <DataTableColumnHeader column={column} title="Responsável / Filial" icon={<UserRound />} />
     ),
     cell: ({ row }) => {
       const client = row.original;
       return (
-        <OwnershipContext
-          brokerName={client.brokerName}
-          branchName={client.branchName}
-          className="text-xs text-muted-foreground"
-        />
+        <span className="inline-flex min-w-0 items-center gap-ds-8">
+          {client.brokerName ? <PersonInitials name={client.brokerName} /> : null}
+          <OwnershipContext
+            brokerName={client.brokerName}
+            branchName={client.branchName}
+            className="text-xs text-muted-foreground"
+          />
+        </span>
       );
     },
   },
   {
     accessorKey: "convertedAt",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Data Conversão" />
+      <DataTableColumnHeader column={column} title="Data Conversão" icon={<Calendar />} />
     ),
     cell: ({ row }) => {
       const client = row.original;

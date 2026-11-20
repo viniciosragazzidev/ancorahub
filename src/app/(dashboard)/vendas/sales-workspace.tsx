@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, Building2, Calendar, Flag, Search, ShieldCheck, User, UserRound, Wallet } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { FileArrowDown } from "@/components/huge-icons";
 
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppSelect } from "@/components/ui/select";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
+import { PersonChip } from "@/components/ui/person-chip";
 import { Input } from "@/components/ui/input";
 import { MobileDataList, MobileDataListItem, MobileDataRow, ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import { SelectionToolbar } from "@/components/ui/selection-toolbar";
@@ -134,7 +135,7 @@ export function SalesWorkspace({
     {
       accessorKey: "leadName",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Lead" />
+        <DataTableColumnHeader column={column} title="Lead" icon={<User />} />
       ),
       cell: ({ row }) => {
         const sale = row.original;
@@ -151,16 +152,18 @@ export function SalesWorkspace({
     {
       accessorKey: "brokerName",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Corretor" />
+        <DataTableColumnHeader column={column} title="Corretor" icon={<UserRound />} />
       ),
       cell: ({ row }) => (
-        <span className="text-xs text-muted-foreground">{row.original.brokerName ?? "—"}</span>
+        row.original.brokerName
+          ? <PersonChip name={row.original.brokerName} />
+          : <span className="text-xs text-muted-foreground">—</span>
       ),
     },
     {
       accessorKey: "branchName",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Filial" />
+        <DataTableColumnHeader column={column} title="Filial" icon={<Building2 />} />
       ),
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground">{row.original.branchName ?? "—"}</span>
@@ -169,7 +172,7 @@ export function SalesWorkspace({
     {
       accessorKey: "planName",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Plano" />
+        <DataTableColumnHeader column={column} title="Plano" icon={<ShieldCheck />} />
       ),
       cell: ({ row }) => {
         const sale = row.original;
@@ -186,7 +189,7 @@ export function SalesWorkspace({
     {
       accessorKey: "saleDate",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Data da venda" />
+        <DataTableColumnHeader column={column} title="Data da venda" icon={<Calendar />} />
       ),
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground font-mono">{formatDate(row.original.saleDate)}</span>
@@ -195,7 +198,7 @@ export function SalesWorkspace({
     {
       accessorKey: "saleValue",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Valor" className="justify-end" />
+        <DataTableColumnHeader column={column} title="Valor" icon={<Wallet />} className="justify-end" />
       ),
       cell: ({ row }) => (
         <div className="text-right font-mono text-xs font-semibold text-foreground">
@@ -206,7 +209,7 @@ export function SalesWorkspace({
     {
       accessorKey: "status",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Status" />
+        <DataTableColumnHeader column={column} title="Status" icon={<Flag />} />
       ),
       cell: ({ row }) => <SaleStatusBadge status={row.original.status} />,
     },

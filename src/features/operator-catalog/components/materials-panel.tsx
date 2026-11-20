@@ -3,6 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
+import { Calendar, FileText, Flag, Info, ShieldCheck, Tag } from "lucide-react";
 import { ArrowSquareOut, ArrowsClockwise } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import { areaLabel, documentTypeLabel, fieldLabel, formatDate, materialStatus, q
 const columns: ColumnDef<MaterialRow>[] = [
   {
     accessorKey: "fileName",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Arquivo" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Arquivo" icon={<FileText />} />,
     cell: ({ row }) => (
       <span className="grid min-w-0 max-w-sm gap-0.5">
         <span className="truncate text-sm font-medium">{row.original.summary.title || row.original.fileName}</span>
@@ -29,30 +30,30 @@ const columns: ColumnDef<MaterialRow>[] = [
   {
     id: "carrier",
     accessorFn: (row) => row.carrierName ?? row.summary.carrierName ?? "",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Operadora" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Operadora" icon={<ShieldCheck />} />,
     cell: ({ row }) => <span className="text-sm">{row.original.carrierName ?? row.original.summary.carrierName ?? <span className="text-muted-foreground">Não identificada</span>}</span>,
   },
   {
     id: "type",
     accessorFn: (row) => documentTypeLabel(row.documentType),
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Tipo" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Tipo" icon={<Tag />} />,
     cell: ({ row }) => <span className="text-xs">{documentTypeLabel(row.original.documentType)}</span>,
   },
   {
     id: "status",
     accessorFn: (row) => materialStatus(row.status).label,
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" icon={<Flag />} />,
     cell: ({ row }) => <Badge variant={materialStatus(row.original.status).variant}>{materialStatus(row.original.status).label}</Badge>,
   },
   {
     id: "facts",
     accessorFn: (row) => row.summary.facts ?? 0,
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Informações" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Informações" icon={<Info />} />,
     cell: ({ row }) => <span className="font-mono text-xs tabular-nums">{row.original.summary.facts ?? "-"}</span>,
   },
   {
     accessorKey: "createdAt",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Recebido" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Recebido" icon={<Calendar />} />,
     cell: ({ row }) => (
       <span className="grid gap-0.5 text-xs">
         <span>{formatDate(row.original.createdAt)}</span>
