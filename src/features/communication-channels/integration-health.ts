@@ -9,10 +9,11 @@ import { classifyIntegrationHealth, type IntegrationHealth, type IntegrationKey 
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Canal da integração pelo canal de origem do lead: Meta (anúncios e formulários Meta), WhatsApp, formulários do site. */
+/** Canal pelo jeito que o lead entrou: WhatsApp (número próprio ou anúncio que abre o WhatsApp), formulários Meta, formulários do site. */
 const keySql = sql<IntegrationKey | null>`case
+  when ${schema.leads.sourceChannel} in ('whatsapp', 'whatsapp_ctwa')
+    or (${schema.leads.sourceChannel} = 'meta_lead_ads' and ${schema.leads.sourceMetadata}->>'entry' = 'whatsapp') then 'whatsapp'
   when ${schema.leads.sourceChannel} in ('meta_lead_ads', 'meta_ads') then 'meta'
-  when ${schema.leads.sourceChannel} in ('whatsapp', 'whatsapp_ctwa') then 'whatsapp'
   when ${schema.leads.sourceChannel} = 'landing_page' and ${schema.leads.origem} <> 'manual' then 'forms'
   else null end`;
 
