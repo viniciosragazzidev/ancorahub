@@ -15,6 +15,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { formatShowingRange } from "@/components/ui/page-footer-summary";
 
 import { ArchivedLeadsLite } from "./archived-leads-lite";
 
@@ -77,6 +78,8 @@ export default async function ArchivedLeadsPage({
   ]);
   const total = Number(totalRows[0]?.total ?? 0);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // Resumo da barra do topo (anatomia de página), com o total já contado acima.
+  const pageSummary = `${total.toLocaleString("pt-BR")} ${total === 1 ? "lead arquivado" : "leads arquivados"}${search ? ` com "${search}"` : ""}`;
 
   // Chave do diretor: a mesma lista no visual Lite, com o "Voltar para leads" no topo da moldura.
   if (await isDirectorLitePageOnServer(context, "/leads/arquivados")) {
@@ -85,6 +88,7 @@ export default async function ArchivedLeadsPage({
         <DashboardHeader
           breadcrumb="Operação comercial"
           title="Leads arquivados"
+          summary={pageSummary}
           rightSlot={<Link href="/leads" className={litePage.button}><ArrowLeft className="size-4" aria-hidden="true" />Voltar para leads</Link>}
         />
         <main className={litePage.stack}>
@@ -112,7 +116,7 @@ export default async function ArchivedLeadsPage({
 
   return (
     <>
-      <DashboardHeader breadcrumb="Operação comercial" title="Leads arquivados" />
+      <DashboardHeader breadcrumb="Operação comercial" title="Leads arquivados" summary={pageSummary} />
       <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-5 bg-background p-4 pb-28 sm:p-6 lg:gap-6 lg:p-8 lg:pb-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -190,13 +194,18 @@ export default async function ArchivedLeadsPage({
                 </Table>
               </div>
             )}
-            {totalPages > 1 ? (
+            {rows.length ? (
               <div className="flex items-center justify-between border-t border-border px-5 py-3 text-xs text-muted-foreground">
-                <span>Página {page} de {totalPages}</span>
-                <div className="flex gap-2">
-                  <Button size="xs" variant="outline" disabled={page <= 1} render={<Link href={`/leads/arquivados?page=${page - 1}${search ? `&search=${encodeURIComponent(search)}` : ""}`} />}>Anterior</Button>
-                  <Button size="xs" variant="outline" disabled={page >= totalPages} render={<Link href={`/leads/arquivados?page=${page + 1}${search ? `&search=${encodeURIComponent(search)}` : ""}`} />}>Próxima</Button>
-                </div>
+                <span className="tabular-nums">
+                  {formatShowingRange({ page, pageSize: PAGE_SIZE, total, noun: "leads arquivados" })}
+                  {totalPages > 1 ? ` · Página ${page} de ${totalPages}` : null}
+                </span>
+                {totalPages > 1 ? (
+                  <div className="flex gap-2">
+                    <Button size="xs" variant="outline" disabled={page <= 1} render={<Link href={`/leads/arquivados?page=${page - 1}${search ? `&search=${encodeURIComponent(search)}` : ""}`} />}>Anterior</Button>
+                    <Button size="xs" variant="outline" disabled={page >= totalPages} render={<Link href={`/leads/arquivados?page=${page + 1}${search ? `&search=${encodeURIComponent(search)}` : ""}`} />}>Próxima</Button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </CardContent>

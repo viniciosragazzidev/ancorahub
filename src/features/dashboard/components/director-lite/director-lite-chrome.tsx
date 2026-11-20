@@ -49,11 +49,14 @@ export function DirectorLiteChrome({ now, tab, period, branchId, branches, first
     { value: "funnel", label: "Funil de qualificação", short: "Funil", href: dashboardHref("funnel", periodValue, branchId) },
   ].filter((item) => !availableTabs || availableTabs.includes(item.value as DirectorLiteTab));
   const periods = PERIOD_OPTIONS.map((option) => ({ value: option.value, label: option.label, href: dashboardHref(tab, option.value, branchId) }));
+  // Resumo de uma linha (skill `interface-enxuta`): o recorte já escolhido, período e unidade.
+  const periodText = periodValue === "hoje" ? "Hoje" : `Últimos ${periodValue} dias`;
+  const summary = branches.length ? `${periodText} · ${branches.find((branch) => branch.id === branchId)?.name ?? "Todas as unidades"}` : periodText;
   const units = branches.length ? [{ value: "", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))] : undefined;
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <DashboardHeader breadcrumb="Início" title="Painel" />
+      <DashboardHeader breadcrumb="Início" title="Painel" summary={summary} />
       <main className={styles.pageContainer} aria-label="Painel">
         <div className={styles.dashboard}>
           <DirectorLiteHeader

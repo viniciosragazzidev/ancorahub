@@ -45,9 +45,10 @@ export default async function RelationshipPage({ searchParams }: { searchParams:
     const announcement = context.role === "director" ? { initial: await getHomeAnnouncement(context.tenantId), today: todayInSaoPaulo() } : null;
     // Diretor com a chave ligada e a rota fora do opt-out: mesmos dados e mesmas Server Actions, visual Lite.
     if (await isDirectorLitePageOnServer(context, "/relacionamento")) {
+      const summary = enabled ? `${historyItems.length.toLocaleString("pt-BR")} ${historyItems.length === 1 ? "mensagem enviada" : "mensagens enviadas"}` : undefined;
       return (
         <>
-          <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" />
+          <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" summary={summary} />
           <main className={litePage.stack}>
             <RelationshipJourneyLite
               relationshipEnabled={enabled}

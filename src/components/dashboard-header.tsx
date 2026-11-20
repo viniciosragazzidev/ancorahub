@@ -39,6 +39,7 @@ export function DashboardHeader({
     return <DirectorDashboardHeader
       breadcrumb={breadcrumb}
       title={title}
+      summary={summary}
       rightSlot={rightSlot}
       showSidebarTrigger={showSidebarTrigger}
     />;
@@ -97,7 +98,8 @@ function DirectorDashboardHeader({
   title,
   rightSlot,
   showSidebarTrigger,
-}: Pick<DashboardHeaderProps, "breadcrumb" | "title" | "rightSlot" | "showSidebarTrigger">) {
+  summary,
+}: Pick<DashboardHeaderProps, "breadcrumb" | "title" | "rightSlot" | "showSidebarTrigger" | "summary">) {
   const route = useDirectorRoute();
   const chrome = useDirectorChrome();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -113,6 +115,7 @@ function DirectorDashboardHeader({
         onOpenMore={() => setMoreOpen(true)}
         hideAvailability
         titleAsHeading={title === "Painel"}
+        summary={summary}
         routeOverride={{ title, isRoot: root, parentHref: route.parentHref, backToParent: true }}
         leading={root && showSidebarTrigger ? <SidebarTrigger aria-label="Abrir menu principal" className="size-11" /> : null}
         actions={(

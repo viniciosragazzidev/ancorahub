@@ -9,8 +9,17 @@ export function directorLiteStyleSettingKey(tenantId: string) {
   return `${FEATURE_FLAGS.DIRECTOR_LITE_STYLE.key}_${tenantId}`;
 }
 
-/** Tenant IDs must come from the authenticated context or a validated admin target. */
-export async function isDirectorLiteStyleEnabled(tenantId: string) {
+/**
+ * 20/11/2026: o Lite é a versão oficial e única das telas internas (pedido do Vinicios: "a oficial e única é a
+ * que é mostrada no print"). A chave por empresa deixou de valer: sempre ligado. A leitura antiga fica em
+ * `readDirectorLiteStyleSetting` só para histórico e diagnóstico.
+ */
+export async function isDirectorLiteStyleEnabled(_tenantId: string) {
+  return true;
+}
+
+/** Valor gravado da antiga chave por empresa (sem efeito desde 20/11/2026). */
+export async function readDirectorLiteStyleSetting(tenantId: string) {
   const value = await getSystemSetting(directorLiteStyleSettingKey(tenantId)).catch(() => null);
   return value === "true";
 }

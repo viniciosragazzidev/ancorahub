@@ -221,7 +221,16 @@ export function QualificationHubLite({ settings, whatsappDiagnostic, followUpRul
 
   return (
     <>
-      <DashboardHeader breadcrumb="Qualificação IA" title="Qualificação IA" />
+      <DashboardHeader
+        breadcrumb="Qualificação IA"
+        title="Qualificação IA"
+        /* Resumo do topo (anatomia de página), só com o que a tela já carrega. */
+        summary={[
+          `${stats.operation.startedToday.toLocaleString("pt-BR")} ${stats.operation.startedToday === 1 ? "lead atendido" : "leads atendidos"} hoje`,
+          `${stats.operation.active.toLocaleString("pt-BR")} em atendimento`,
+          activeAlerts > 0 ? `${activeAlerts.toLocaleString("pt-BR")} ${activeAlerts === 1 ? "alerta ativo" : "alertas ativos"}` : null,
+        ].filter(Boolean).join(" · ")}
+      />
       <main className={page.stack}>
         <div className={styles.actions}>
           <span className={page.badge} data-tone={fields.enabled ? "success" : undefined}>{fields.enabled ? "IA operando" : "IA pausada"}</span>

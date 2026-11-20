@@ -26,12 +26,17 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
   ]);
 
   if (!sale) notFound();
+  // Resumo da barra do topo (anatomia de página), com a venda já carregada acima.
+  const pageSummary = [
+    sale.clientName ?? sale.leadName,
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(sale.saleValue)),
+  ].filter(Boolean).join(" · ");
 
   // Chave do diretor: o mesmo detalhe no visual Lite, com as mesmas ações.
   if (await isDirectorLitePageOnServer(context, `/vendas/${id}`)) {
     return (
       <>
-        <DashboardHeader breadcrumb="Operação comercial / Vendas" title="Detalhes da venda" />
+        <DashboardHeader breadcrumb="Operação comercial / Vendas" title="Detalhes da venda" summary={pageSummary} />
         <main className={litePage.stack}>
           <SaleDetailLite
             sale={{
@@ -91,7 +96,7 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <>
-      <DashboardHeader breadcrumb="Operação comercial / Vendas" title="Detalhes da Venda" />
+      <DashboardHeader breadcrumb="Operação comercial / Vendas" title="Detalhes da Venda" summary={pageSummary} />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         {/* Hero Header Card */}
         <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-sm transition-all sm:flex-row sm:items-center sm:justify-between">

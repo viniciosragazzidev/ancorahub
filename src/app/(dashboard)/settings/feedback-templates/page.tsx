@@ -11,12 +11,13 @@ export default async function FeedbackTemplatesPage() {
   if (context.role === "broker") throw new Error("Acesso restrito a Gestores e Diretores.");
 
   const templates = await listChecklistTemplatesAction();
+  const summary = `${templates.length.toLocaleString("pt-BR")} ${templates.length === 1 ? "checklist" : "checklists"}`;
 
   // Chave do visual Lite: os mesmos modelos e as mesmas ações, com a lista Lite e o novo modelo no painel lateral.
   if (await isDirectorLitePageOnServer(context, "/settings/feedback-templates")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Configurações" title="Checklists de atendimento" />
+        <DashboardHeader breadcrumb="Configurações" title="Checklists de atendimento" summary={summary} />
         <main className={litePage.stack}>
           <FeedbackTemplatesLite initialTemplates={templates} />
         </main>
@@ -26,7 +27,7 @@ export default async function FeedbackTemplatesPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Checklists de feedback" title="Checklists de atendimento" />
+      <DashboardHeader breadcrumb="Checklists de feedback" title="Checklists de atendimento" summary={summary} />
       <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         <div>
           <p className="text-xs font-medium text-primary">CONFIGURAÇÕES</p>

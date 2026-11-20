@@ -45,7 +45,7 @@ export default async function GestaoEquipePage({ params }: { params: Promise<{ s
     if (page.access !== "render" || !page.view) notFound();
     return (
       <>
-        <DashboardHeader breadcrumb="Gestão de equipe" title={page.view.teamName} />
+        <DashboardHeader breadcrumb="Gestão de equipe" title={page.view.teamName} summary={`${page.view.supervisorName} · ${page.view.brokersCount.toLocaleString("pt-BR")} ${page.view.brokersCount === 1 ? "corretor" : "corretores"}`} />
         <main className={litePage.stack}>
           <TeamPageViewComponent view={page.view} embedded />
           <TeamExtrasSection context={unitContext} supervisorId={supervisorId} canEditBrokers={false} />

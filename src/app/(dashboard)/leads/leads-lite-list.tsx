@@ -7,6 +7,8 @@
  * qualificação, corretor com plantão, investigação e devolução sem aceite (com destaque da linha), unidade e chegada.
  * Ações da linha num menu; seleção em massa com a barra de lote. A busca fica nos filtros Lite.
  */
+import { LeadNameHoverCard } from "@/features/leads/components/lead-hover-card";
+import { getLeadProductLabel } from "@/features/leads/meta-lead-display";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
@@ -97,7 +99,7 @@ export function LeadsLiteList({
   const isBroker = contextRole === "broker";
   const columns = useMemo<LiteColumn<LeadWorkspaceItem>[]>(() => {
     const base: LiteColumn<LeadWorkspaceItem>[] = [
-      { id: "lead", label: "Lead", render: (lead) => <LeadName lead={lead} hideEntry={isBroker} />, primary: true },
+      { id: "lead", label: "Lead", render: (lead) => <LeadName lead={lead} hideEntry={isBroker} onOpen={onRowClick} />, primary: true },
       { id: "phone", label: "Telefone", render: (lead) => <span className={styles.nowrap}>{formatLeadPhone(lead.telefone)}</span>, secondary: true },
       {
         id: "stage",
@@ -162,6 +164,7 @@ export function LeadsLiteList({
       {pagination && onPageChange ? (
         <LitePagination
           label="Páginas de leads"
+          itemNoun="leads"
           page={pagination.currentPage ?? 1}
           totalPages={pagination.totalPages ?? 1}
           totalItems={pagination.totalItems ?? leads.length}
@@ -184,13 +187,36 @@ const MAX_TAGS = 2;
  * Nome (até 2 linhas, quebra só nos espaços, reticências e nome inteiro no title), e embaixo a entrada pelo WhatsApp e
  * as etiquetas, como na tabela atual.
  */
-function LeadName({ lead, hideEntry }: { lead: LeadWorkspaceItem; hideEntry: boolean }) {
+/** Último movimento conhecido do lead (troca de etapa, primeiro contato ou atribuição), para o hover card. */
+function lastActivity(lead: LeadWorkspaceItem): string | null {
+  const dates = [lead.stageEnteredAt, lead.firstContactAt, lead.assignedAt].filter((value): value is string => Boolean(value));
+  return dates.sort().at(-1) ?? null;
+}
+
+function LeadName({ lead, hideEntry, onOpen }: { lead: LeadWorkspaceItem; hideEntry: boolean; onOpen?: (lead: LeadWorkspaceItem) => void }) {
   const entry = hideEntry ? null : readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata);
   const tags = lead.tags ?? [];
   const whatsapp = entry?.entry === "whatsapp";
   return (
     <span className={styles.leadCell}>
-      <span className={styles.leadName} title={lead.nome}>{lead.nome}</span>
+      <LeadNameHoverCard
+        lead={{
+          id: lead.id,
+          name: lead.nome,
+          status: lead.status,
+          phone: lead.telefone,
+          product: getLeadProductLabel({ tipo: lead.tipo, sourceChannel: lead.sourceChannel, sourceMetadata: lead.sourceMetadata }),
+          monthlyValue: lead.monthlyValue ?? null,
+          lives: lead.livesCount ?? null,
+          lastActivityAt: lastActivity(lead),
+          brokerName: lead.corretorNome ?? null,
+          context: [lead.queueName, lead.branchName].filter(Boolean).join(" · ") || null,
+        }}
+        onOpen={onOpen ? () => onOpen(lead) : undefined}
+        href={onOpen ? undefined : `/leads/${lead.id}`}
+      >
+        <span tabIndex={0} title={lead.nome} className={`${styles.leadName} underline-offset-4 outline-none hover:underline focus-visible:underline`}>{lead.nome}</span>
+      </LeadNameHoverCard>
       {whatsapp || tags.length ? (
         <span className={styles.tags}>
           {whatsapp ? (

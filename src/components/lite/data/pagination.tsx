@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import styles from "./pagination.module.css";
 
-export function LitePagination({ page, totalPages, totalItems, pageSize, onPageChange, pending = false, label = "Paginação" }: {
+export function LitePagination({ page, totalPages, totalItems, pageSize, onPageChange, pending = false, label = "Paginação", itemNoun }: {
   page: number;
   totalPages: number;
   totalItems: number;
@@ -17,8 +17,18 @@ export function LitePagination({ page, totalPages, totalItems, pageSize, onPageC
   onPageChange: (page: number) => void;
   pending?: boolean;
   label?: string;
+  /** Plural do item ("leads"): o total aparece com separador de milhar e também quando há uma página só. */
+  itemNoun?: string;
 }) {
-  if (totalPages <= 1) return null;
+  const fmt = (value: number) => value.toLocaleString("pt-BR");
+  if (totalPages <= 1) {
+    if (!itemNoun || totalItems <= 0) return null;
+    return (
+      <nav aria-label={label} className={styles.root}>
+        <p className={styles.range} aria-live="polite">{fmt(totalItems)} {itemNoun}</p>
+      </nav>
+    );
+  }
   const start = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, totalItems);
   const go = (target: number) => {
@@ -28,7 +38,7 @@ export function LitePagination({ page, totalPages, totalItems, pageSize, onPageC
   return (
     <nav aria-label={label} className={styles.root} data-pending={pending ? "true" : undefined}>
       <p className={styles.range} aria-live="polite">
-        <span className={styles.long}>{start} a {end} de {totalItems}</span>
+        <span className={styles.long}>{itemNoun ? `${fmt(start)} a ${fmt(end)} de ${fmt(totalItems)} ${itemNoun}` : `${start} a ${end} de ${totalItems}`}</span>
         <span className={styles.short}>Página {page} de {totalPages}</span>
       </p>
       <div className={styles.buttons}>

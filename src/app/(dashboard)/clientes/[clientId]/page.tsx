@@ -301,13 +301,15 @@ export default async function ClientDetailPage({ params, searchParams }: {
     : null;
 
   const anniversaryIsUpcoming = anniversarySoon !== null && anniversarySoon >= 0 && anniversarySoon <= 45;
+  // Resumo da barra do topo (anatomia de página), só com as vendas já carregadas acima.
+  const pageSummary = `${sales.length.toLocaleString("pt-BR")} ${sales.length === 1 ? "venda" : "vendas"} · ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalSalesValue)}`;
 
   // Diretor com a chave ligada e a rota fora do opt-out: mesma ficha, mesmas ações e mesmas peças de documentos e
   // linha do tempo, no visual Lite.
   if (await isDirectorLitePageOnServer(context, "/clientes/[clientId]")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Pós-venda" title={client.name} />
+        <DashboardHeader breadcrumb="Pós-venda" title={client.name} summary={pageSummary} />
         <main className={litePage.stack}>
           <ClientDetailLite
             client={client}
@@ -343,6 +345,7 @@ export default async function ClientDetailPage({ params, searchParams }: {
       <DashboardHeader
         breadcrumb="Pós-venda"
         title={client.name}
+        summary={pageSummary}
       />
       <main className="flex min-h-full flex-col gap-5 bg-background p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         {/* Profile Cover & Header Card */}

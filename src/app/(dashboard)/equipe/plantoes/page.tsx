@@ -29,10 +29,14 @@ export default async function UnitDutiesPage() {
     return null;
   }) ?? { days: [] as string[], occurrences: null };
   const today = days[0] ?? "";
+  const dutyBrokerCount = occurrences ? new Set(occurrences.flatMap((occurrence) => occurrence.brokers.map((broker) => broker.id))).size : 0;
+  const summary = occurrences && context.branchId
+    ? `${occurrences.length.toLocaleString("pt-BR")} ${occurrences.length === 1 ? "plantão" : "plantões"} · ${dutyBrokerCount.toLocaleString("pt-BR")} ${dutyBrokerCount === 1 ? "corretor" : "corretores"} da unidade`
+    : undefined;
 
   return (
     <>
-      <DashboardHeader breadcrumb="Equipe" title="Plantões da unidade" />
+      <DashboardHeader breadcrumb="Equipe" title="Plantões da unidade" summary={summary} />
       <main className="flex flex-col gap-4 p-4 sm:p-6">
         <p className="max-w-3xl text-sm text-muted-foreground">
           Plantões de hoje e dos próximos 7 dias em que há corretor da sua unidade. Aparecem só os corretores da sua

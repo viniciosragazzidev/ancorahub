@@ -48,6 +48,10 @@ export function OperationalDashboard({
       <DashboardHeader
         breadcrumb="Operação comercial"
         title="Dashboard"
+        summary={[
+          `Últimos ${period} dias`,
+          pending ? `${pending.toLocaleString("pt-BR")} ${pending === 1 ? "pendência" : "pendências"}` : null,
+        ].filter(Boolean).join(" · ")}
         rightSlot={
           <PeriodSelect
             value={period as 7 | 14 | 30 | 90}

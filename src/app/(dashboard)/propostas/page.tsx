@@ -19,12 +19,15 @@ export default async function PropostasPage() {
     getLeadsForProposals(),
   ]);
 
+  // Resumo da barra do topo (anatomia de página), só com as listas já carregadas acima.
+  const pageSummary = `${proposals.length.toLocaleString("pt-BR")} ${proposals.length === 1 ? "proposta" : "propostas"} · ${expiringProposals.length.toLocaleString("pt-BR")} vencendo em 7 dias`;
+
   // Chave do diretor: a mesma tela no visual Lite, com o título no topo da moldura.
   const context = await getRequiredTenantContext();
   if (await isDirectorLitePageOnServer(context, "/propostas")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Operação comercial" title="Propostas" />
+        <DashboardHeader breadcrumb="Operação comercial" title="Propostas" summary={pageSummary} />
         <main className={litePage.stack}>
           <PropostasLite initialProposals={proposals} expiringProposals={expiringProposals} leads={leads} />
         </main>

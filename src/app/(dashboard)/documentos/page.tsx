@@ -53,11 +53,15 @@ export default async function DocumentsPage() {
     getPendingDocuments(),
   ]);
 
+  // Resumo da barra do topo (anatomia de página), só com a fila já carregada acima.
+  const pendingCount = pendingDocs.filter((doc) => doc.status === "pending").length;
+  const pageSummary = `${pendingCount.toLocaleString("pt-BR")} ${pendingCount === 1 ? "pendente" : "pendentes"} · ${pendingDocs.length.toLocaleString("pt-BR")} ${pendingDocs.length === 1 ? "documento" : "documentos"} na fila`;
+
   // Chave do diretor: a mesma tela (fila e requisitos) no visual Lite.
   if (await isDirectorLitePageOnServer(context, "/documentos")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Operação comercial" title="Documentos" />
+        <DashboardHeader breadcrumb="Operação comercial" title="Documentos" summary={pageSummary} />
         <main className={litePage.stack}>
           <DocumentsLite
             carriers={carriers}
@@ -74,7 +78,7 @@ export default async function DocumentsPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Operação comercial" title="Documentos" />
+      <DashboardHeader breadcrumb="Operação comercial" title="Documentos" summary={pageSummary} />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         <DocumentsWorkspace
           role={context.role}

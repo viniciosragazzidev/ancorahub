@@ -49,10 +49,13 @@ export async function UnitsView({ context }: { context: TenantContext }) {
     };
   });
 
+  const memberTotal = units.reduce((total, unit) => total + unit.memberCount, 0);
+  const summary = `${units.length.toLocaleString("pt-BR")} ${units.length === 1 ? "unidade" : "unidades"} · ${memberTotal.toLocaleString("pt-BR")} ${memberTotal === 1 ? "membro" : "membros"}`;
+
   if (await isDirectorLitePageOnServer(context, "/equipe")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Gestão" title="Equipe e unidades" />
+        <DashboardHeader breadcrumb="Gestão" title="Equipe e unidades" summary={summary} />
         <main className={litePage.stack}>
           <div className={`arc-venancor ${litePage.stack}`} data-skin="diretor">
             <TeamTabsLite active="unidades" />
@@ -65,9 +68,9 @@ export async function UnitsView({ context }: { context: TenantContext }) {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Gestão" title="Equipe e unidades" />
+      <DashboardHeader breadcrumb="Gestão" title="Equipe e unidades" summary={summary} />
       <main className="flex min-h-full flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
-        <TeamManagementTabs active="unidades" />
+        <TeamManagementTabs active="unidades" counts={{ unidades: units.length }} />
         <BranchesManager
           branches={branches.map((branch) => {
             const stats = distributionStats.get(branch.id);

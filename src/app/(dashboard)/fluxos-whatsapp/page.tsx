@@ -24,12 +24,15 @@ export default async function FluxosWhatsappPage() {
 
   // Fetch flows
   const flows = await getWhatsappFlows(context.tenantId);
+  // Resumo do topo (anatomia de página), só com o que a página já carrega.
+  const activeFlows = flows.filter((flow) => flow.status === "active").length;
+  const summary = `${flows.length.toLocaleString("pt-BR")} ${flows.length === 1 ? "fluxo" : "fluxos"} · ${activeFlows.toLocaleString("pt-BR")} ${activeFlows === 1 ? "ativo" : "ativos"}`;
 
   // Chave do visual Lite: os mesmos modelos, fluxos e ações, com o cabeçalho da moldura.
   if (await isDirectorLitePageOnServer(context, "/fluxos-whatsapp")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Atendimento" title="Fluxos de WhatsApp" />
+        <DashboardHeader breadcrumb="Atendimento" title="Fluxos de WhatsApp" summary={summary} />
         <main className={litePage.stack}>
           <p className={litePage.cardDescription}>Recepção, qualificação e roteamento de contatos do WhatsApp usando a frota ativa do WAHA.</p>
           <WhatsappFlowsLite initialFlows={flows} />

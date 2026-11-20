@@ -20,7 +20,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { hasCapability } from "@/shared/auth/permissions";
 import { getSupervisedBrokerIds } from "@/features/team/supervisor-service";
 import { reportRegistry } from "@/features/reports/report-registry";
-import { parsePeriod, periodStart } from "@/shared/period";
+import { parsePeriod, periodLabel, periodStart } from "@/shared/period";
 import { ReportCenter } from "./report-center";
 import { SpreadsheetSection } from "./spreadsheet-section";
 import { InternalReportDocuments } from "./internal-report-documents";
@@ -301,6 +301,11 @@ export default async function LegacyReportsView({
       <DashboardHeader
         breadcrumb="Gestão comercial"
         title="Relatórios"
+        summary={[
+          periodLabel(period),
+          `${totalLeads.toLocaleString("pt-BR")} ${totalLeads === 1 ? "lead" : "leads"}`,
+          `${totalSales.toLocaleString("pt-BR")} ${totalSales === 1 ? "venda" : "vendas"}`,
+        ].join(" · ")}
         rightSlot={<PeriodSelect value={period} />}
       />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">

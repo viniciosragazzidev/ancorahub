@@ -54,10 +54,14 @@ export function ConversationsFrame({
       <ConversasHeaderNav currentTab={currentTab} leadsCount={leadsCount} distributedCount={distributedCount} coexLabel={coexLabel} />
     </nav>
   ) : null;
+  // Resumo do topo (anatomia de página): as conversas que a aba aberta já carregou.
+  const listed = officialBrokerTab ? officialBrokerConversations.length : conversations.length;
+  const summary = `${listed.toLocaleString("pt-BR")} ${listed === 1 ? "conversa" : "conversas"}`;
   const header = (
     <DashboardHeader
       breadcrumb="Atendimento"
       title="Conversas"
+      summary={summary}
       rightSlot={directorSkinEnabled ? undefined : pageActions}
     />
   );

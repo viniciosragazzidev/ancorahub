@@ -244,7 +244,7 @@ export default async function TeamMemberProfilePage({
   if (await isDirectorLitePageOnServer(context, "/equipe/[id]")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Equipe" title="Perfil do membro" />
+        <DashboardHeader breadcrumb="Equipe" title="Perfil do membro" summary={`${profile.member.name} · ${roleName}`} />
         <main className={litePage.stack}>
           <MemberProfileLite
             profile={profile}

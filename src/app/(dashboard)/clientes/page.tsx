@@ -271,11 +271,14 @@ export default async function CustomersPage({
     totalBrokers,
   };
 
+  // Resumo da barra do topo (anatomia de página), só com números já carregados acima.
+  const pageSummary = `${totalClients.toLocaleString("pt-BR")} ${totalClients === 1 ? "cliente" : "clientes"} em ${period} dias · ${conversionRate.replace(".", ",")}% de conversão`;
+
   // Chave do diretor: a mesma carteira no visual Lite (unidade e período vão para a barra da lista).
   if (await isDirectorLitePageOnServer(context, "/clientes")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Pós-venda" title="Clientes" />
+        <DashboardHeader breadcrumb="Pós-venda" title="Clientes" summary={pageSummary} />
         <main className={litePage.stack}>
           <ClientesLite
             clients={clients.map((client) => ({
@@ -302,6 +305,7 @@ export default async function CustomersPage({
       <DashboardHeader
         breadcrumb="Pós-venda"
         title="Clientes"
+        summary={pageSummary}
         rightSlot={
           <div className="flex items-center gap-2">
             <BranchSelect branches={branches} value={branchParam} />

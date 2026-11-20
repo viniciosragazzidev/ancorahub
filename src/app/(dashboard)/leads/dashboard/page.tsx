@@ -19,10 +19,12 @@ export default async function LeadsDashboardPage() {
     getAttentionSnapshot(context, period),
   ]);
   const attentionCount = attention.items.reduce((total, item) => total + item.count, 0);
+  // Resumo da barra do topo (anatomia de página), com os números já carregados acima.
+  const pageSummary = `${commercial.conversion.rate.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de conversão · ${attentionCount.toLocaleString("pt-BR")} em risco · ${period} dias`;
   // Chave do diretor: só a pele Lite (container da moldura, números e grupos do contrato), mesmos dados.
   if (await isDirectorLitePageOnServer(context, "/leads/dashboard")) {
     return <>
-      <DashboardHeader breadcrumb="Leads" title="Visão geral de leads" rightSlot={<Link href="/leads" className={litePage.button}>Abrir lista <ArrowUpRight className="size-4" aria-hidden="true" /></Link>} />
+      <DashboardHeader breadcrumb="Leads" title="Visão geral de leads" summary={pageSummary} rightSlot={<Link href="/leads" className={litePage.button}>Abrir lista <ArrowUpRight className="size-4" aria-hidden="true" /></Link>} />
       <main className={litePage.stack}>
         <LeadsOverviewLite
           period={period}
@@ -40,7 +42,7 @@ export default async function LeadsDashboardPage() {
     </>;
   }
   return <>
-    <DashboardHeader breadcrumb="Leads" title="Visão geral de leads" rightSlot={<Link href="/leads" className="text-sm font-medium text-primary hover:underline">Abrir lista <ArrowUpRight className="ml-1 inline size-3.5" /></Link>} />
+    <DashboardHeader breadcrumb="Leads" title="Visão geral de leads" summary={pageSummary} rightSlot={<Link href="/leads" className="text-sm font-medium text-primary hover:underline">Abrir lista <ArrowUpRight className="ml-1 inline size-3.5" /></Link>} />
     <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) lg:p-6">
       <p className="text-sm text-muted-foreground">Saúde da carteira nos últimos {period} dias, dentro do seu escopo.</p>
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Indicadores de leads">

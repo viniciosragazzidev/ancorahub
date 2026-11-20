@@ -3,7 +3,7 @@ import { PeriodSelect } from "@/components/period-select";
 import { ViewScopeContext } from "@/components/ownership-context";
 import type { TenantContext } from "@/shared/auth/types";
 import { hasCapability } from "@/shared/auth/permissions";
-import { parsePeriod } from "@/shared/period";
+import { parsePeriod, periodLabel } from "@/shared/period";
 import type { ReportTabId } from "@/features/reports/metrics/metric-catalog";
 import { reportTabsForRole } from "@/features/reports/metrics/metric-catalog";
 import {
@@ -81,11 +81,21 @@ export default async function ReportingCenterView({
     currentTab === "units" ? getUnitPerformance(context, period) : Promise.resolve(null),
   ]);
 
+  // Resumo de uma linha (skill `interface-enxuta`): período e, quando a aba já carregou, leads e vendas do período.
+  const received = commercialOverview?.conversion.received ?? null;
+  const sales = commercialOverview?.sales ?? null;
+  const summary = [
+    periodLabel(period),
+    received === null ? null : `${received.toLocaleString("pt-BR")} ${received === 1 ? "lead" : "leads"}`,
+    sales === null ? null : `${sales.toLocaleString("pt-BR")} ${sales === 1 ? "venda" : "vendas"}`,
+  ].filter(Boolean).join(" · ");
+
   return (
     <>
       <DashboardHeader
         breadcrumb="Gestão comercial"
         title="Painel"
+        summary={summary}
         rightSlot={<PeriodSelect value={period} />}
       />
       <main className="flex min-h-full flex-col gap-5 bg-background p-(--mobile-page-padding) sm:gap-6 lg:p-6">

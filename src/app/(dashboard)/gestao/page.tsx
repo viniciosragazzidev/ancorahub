@@ -115,9 +115,14 @@ async function renderDirectorUnit(directorUnit: NonNullable<Awaited<ReturnType<t
       unassignedTeam: teamMetrics.teams.find((team) => team.supervisorId === null) ?? null,
     },
   });
+  // Resumo do topo (anatomia de página) com o que a carga da unidade já trouxe.
+  const unitName = directorUnit.branches.find((branch) => branch.id === directorUnit.branchId)?.name;
+  const teamCount = teamMetrics.teams.filter((team) => team.supervisorId !== null).length;
+  const brokerCount = teamMetrics.brokers.length;
+  const summary = [unitName, `${teamCount.toLocaleString("pt-BR")} ${teamCount === 1 ? "equipe" : "equipes"}`, `${brokerCount.toLocaleString("pt-BR")} ${brokerCount === 1 ? "corretor" : "corretores"}`].filter(Boolean).join(" · ");
   return (
       <>
-        <DashboardHeader breadcrumb="Gestão de equipe" title="Gestão da unidade" />
+        <DashboardHeader breadcrumb="Gestão de equipe" title="Gestão da unidade" summary={summary} />
         <main className={litePage.stack}>
           {directorUnit.branches.length > 1 ? (
             <div className={litePage.toolbar}>

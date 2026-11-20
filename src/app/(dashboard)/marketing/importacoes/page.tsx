@@ -28,11 +28,15 @@ export default async function MarketingImportacoesPage() {
     getImportHistoryAction(),
     getLastImportAction(),
   ]);
+  // Resumo do topo (anatomia de página): o histórico já carregado (até as 50 mais recentes).
+  const summary = history.length >= 50
+    ? "50 importações mais recentes"
+    : `${history.length.toLocaleString("pt-BR")} ${history.length === 1 ? "importação" : "importações"} no histórico`;
 
   if (await isDirectorLitePageOnServer(context, "/marketing/importacoes")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Marketing / Importações" title="Importar leads Meta" />
+        <DashboardHeader breadcrumb="Marketing / Importações" title="Importar leads Meta" summary={summary} />
         <main className={litePage.stack}>
           <MarketingImportLite
             branches={branches}
@@ -48,7 +52,7 @@ export default async function MarketingImportacoesPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Marketing / Importações" title="Importar Leads Meta" />
+      <DashboardHeader breadcrumb="Marketing / Importações" title="Importar Leads Meta" summary={summary} />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         <div>
           <p className="text-xs font-medium text-primary">MARKETING</p>
