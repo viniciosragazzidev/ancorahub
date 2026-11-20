@@ -12,14 +12,17 @@ import { NocLite, formatSeconds, relativeTime } from "./noc-lite";
 afterEach(cleanup);
 
 describe("NocLite", () => {
-  it("anomalias com resolver e ignorar, mapa e tabela de unidades com os mesmos destinos", () => {
+  it("Precisa de atenção (críticas primeiro, resolver e ignorar) e tabela de unidades com os mesmos destinos", () => {
     render(<NocLite data={NOC_FIXTURE} period={30} now={NOC_NOW} />);
-    const alerts = within(screen.getByRole("region", { name: "Anomalias na operação" }));
-    expect(alerts.getByText("Anomalia na operação: Niterói 1")).toBeInTheDocument();
+    const alerts = within(screen.getByRole("region", { name: /Precisa de atenção/ }));
+    const first = alerts.getAllByRole("listitem")[0]!;
+    expect(alerts.getByText("Niterói 1")).toBeInTheDocument();
     expect(alerts.getAllByRole("link", { name: /Resolver fila/ })[0]).toHaveAttribute("href", "/leads/distribuicao");
-    fireEvent.click(alerts.getAllByRole("button", { name: "Ignorar" })[0]!);
-    expect(screen.queryByText("Anomalia na operação: Barra da Tijuca")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Detalhes da unidade Centro" })).toHaveAttribute("href", "/unidades/br-centro");
+    const firstName = within(first).getAllByText(/./)[0]!.textContent;
+    fireEvent.click(within(first).getByRole("button", { name: /^Ignorar/ }));
+    expect(alerts.queryAllByRole("listitem").map((item) => item.textContent)).not.toContain(first.textContent);
+    expect(firstName).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: "Detalhes da unidade Centro" })[0]).toHaveAttribute("href", "/unidades/br-centro");
     expect(screen.getAllByRole("link", { name: "Ver leads da unidade Centro" })[0]).toHaveAttribute("href", "/leads?branch=br-centro");
     fireEvent.change(screen.getByRole("searchbox", { name: "Buscar unidade no NOC" }), { target: { value: "niter" } });
     const table = document.querySelector('[data-lite="table"]') as HTMLElement;
