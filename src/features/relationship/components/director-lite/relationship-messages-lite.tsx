@@ -138,6 +138,20 @@ export function RelationshipMessagesLite({ options, history }: { options: Audien
 
   const ready = Boolean(audience && preview && preview.count > 0 && title.trim().length >= 3 && body.trim().length >= 3);
 
+  // Usar de novo / reenviar para quem não leu (20/11): preenche a nova mensagem; o envio passa pela mesma confirmação.
+  function reuse(item: HistoryItem, onlyIds?: string[]) {
+    setKind(item.kind);
+    setTitle(item.title);
+    setBody(item.body);
+    if (onlyIds?.length) {
+      setAudienceKind("people");
+      setPeople(new Set(onlyIds));
+    }
+    setOpenId(null);
+    setFeedback(null);
+    document.getElementById("composer-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function send() {
     if (!audience || !preview) return;
     if (!confirming) { setConfirming(true); return; }
@@ -281,12 +295,12 @@ export function RelationshipMessagesLite({ options, history }: { options: Audien
         )}
       </section>
 
-      <RecipientsPanel key={openId ?? "closed"} item={openItem} onClose={() => setOpenId(null)} />
+      <RecipientsPanel key={openId ?? "closed"} item={openItem} onClose={() => setOpenId(null)} onReuse={reuse} />
     </div>
   );
 }
 
-function RecipientsPanel({ item, onClose }: { item: HistoryItem | null; onClose: () => void }) {
+function RecipientsPanel({ item, onClose, onReuse }: { item: HistoryItem | null; onClose: () => void; onReuse: (item: HistoryItem, onlyIds?: string[]) => void }) {
   const [rows, setRows] = useState<Recipient[] | null>(null);
   const [onlyPending, setOnlyPending] = useState(false);
   const itemId = item?.id ?? null;
@@ -314,6 +328,14 @@ function RecipientsPanel({ item, onClose }: { item: HistoryItem | null; onClose:
       {item ? (
         <div className={styles.panelStack}>
           <p className={styles.message}>{item.body}</p>
+          <div className={styles.reuseRow}>
+            {rows && rows.some(pendingOf) ? (
+              <button type="button" className={page.button} onClick={() => onReuse(item, rows.filter(pendingOf).map((row) => row.brokerId))}>
+                {item.requireAck ? "Reenviar para quem não confirmou" : "Reenviar para quem não leu"} ({rows.filter(pendingOf).length})
+              </button>
+            ) : null}
+            <button type="button" className={page.button} onClick={() => onReuse(item)}>Usar de novo</button>
+          </div>
           <div className={styles.panelHead}>
             <h3 className={styles.blockTitle}>{item.requireAck ? "Confirmações" : "Leitura"}</h3>
             <button type="button" className={`${page.button} ${styles.toggle}`} aria-pressed={onlyPending} onClick={() => setOnlyPending((value) => !value)}>
