@@ -6,7 +6,6 @@ import { useEffect, useId, useLayoutEffect, useMemo, useState, useRef, type Reac
 import { toast } from "@/components/ui/sonner";
 import { motion, useReducedMotion } from "motion/react";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
-import { Kbd } from "@/components/ui/kbd";
 import styles from "./conversas-lite.module.css";
 import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
 
@@ -763,7 +762,7 @@ export function ConversationsWorkspace({
                 aria-label="Buscar atendimento por nome, telefone ou e-mail"
                 className="h-10 pl-8 text-xs"
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder={directorSkinEnabled ? "Buscar conversa" : "Buscar por nome, telefone ou e-mail"}
+                placeholder={directorSkinEnabled ? "Buscar conversa  ( / )" : "Buscar por nome, telefone ou e-mail"}
                 value={query}
               />
             </div>
@@ -781,7 +780,6 @@ export function ConversationsWorkspace({
                   </button>
                 );
               })}
-              <span className={styles.quickHint} aria-hidden="true"><Kbd>/</Kbd> buscar · <Kbd>↑</Kbd><Kbd>↓</Kbd> trocar</span>
             </div>
           ) : null}
           {directorSkinEnabled && query.trim() ? (
