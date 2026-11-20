@@ -80,3 +80,14 @@ a.card:focus-visible {
     padding: 16px;
   }
 }
+
+/* Cabeçalho com abas e contagem; rodapé do cartão com a saúde do canal (20/11/2026, ref P17). */
+.head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.tabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--surface-muted); }
+.tab { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--text-sm); font-weight: 500; cursor: pointer; }
+.tab:hover { color: var(--foreground); }
+.tab[data-active="true"] { background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-resting); }
+.tabCount { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--surface-muted); color: var(--text-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; text-align: center; }
+.tab[data-active="true"] .tabCount { background: var(--surface-muted); color: var(--text-secondary); }
+.foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.footText { min-width: 0; color: var(--text-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
