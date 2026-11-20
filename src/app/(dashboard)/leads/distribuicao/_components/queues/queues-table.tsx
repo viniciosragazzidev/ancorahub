@@ -32,6 +32,11 @@ function entriesLabel({ campaigns, ads }: Row["entries"]) {
 const numberCell = (value: number) => <span className="tabular-nums">{value}</span>;
 
 /** Every queue in one table (the /equipe table); a row opens the queue drawer. */
+/** Mais leads aguardando primeiro (20/11): o gestor vê na hora a fila que está acumulando. Empate pelo nome. */
+export function sortQueuesByBacklog<T extends { waiting: number; name: string }>(queues: T[]) {
+  return [...queues].sort((a, b) => b.waiting - a.waiting || a.name.localeCompare(b.name, "pt-BR"));
+}
+
 export function QueuesTable({
   queues,
   dutySchedules,
@@ -50,7 +55,7 @@ export function QueuesTable({
   onDelete: (queue: Queue) => void;
 }) {
   const rows = useMemo<Row[]>(
-    () => queues.map((queue) => ({ ...queue, entries: entriesByQueue.get(queue.id) ?? { campaigns: 0, ads: 0 } })),
+    () => sortQueuesByBacklog(queues).map((queue) => ({ ...queue, entries: entriesByQueue.get(queue.id) ?? { campaigns: 0, ads: 0 } })),
     [queues, entriesByQueue],
   );
   const dutyName = useMemo(() => new Map(dutySchedules.map((duty) => [duty.id, duty.name])), [dutySchedules]);
