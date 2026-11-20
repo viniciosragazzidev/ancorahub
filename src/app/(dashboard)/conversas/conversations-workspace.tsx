@@ -503,7 +503,7 @@ export function ConversationsWorkspace({
     if (!directorSkinEnabled) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
-      const target = event.target as HTMLElement | null;
+      const target = event.target instanceof Element ? event.target : null;
       const typing = Boolean(target?.closest("input, textarea, select, [contenteditable='true'], [role='dialog'], [role='listbox'], [role='menu']"));
       if (event.key === "/" && !typing) {
         event.preventDefault();
