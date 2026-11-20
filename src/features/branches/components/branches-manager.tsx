@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
+import { Building2, Flag, Hash, Users } from "lucide-react";
 import { ArrowSquareOut, Buildings, PencilSimple, Plus, Power } from "@/components/huge-icons";
 import { toast } from "@/components/ui/sonner";
 
@@ -164,10 +165,10 @@ export function BranchesManager({
   const acceptingCount = branches.filter((branch) => branch.acceptingLeads).length;
   const memberCount = branches.reduce((total, branch) => total + branch.memberCount, 0);
   const columns = useMemo<ColumnDef<Branch>[]>(() => [
-    { accessorKey: "name", header: ({ column }) => <DataTableColumnHeader column={column} title="Unidade" />, cell: ({ row }) => <span className="font-medium text-foreground">{row.original.name}</span> },
-    { accessorKey: "externalId", header: ({ column }) => <DataTableColumnHeader column={column} title="Identificador" />, cell: ({ row }) => <span className="font-mono text-muted-foreground">{row.original.externalId || "—"}</span> },
-    { accessorKey: "memberCount", header: ({ column }) => <DataTableColumnHeader column={column} title="Equipe" />, cell: ({ row }) => <span className="tabular-nums">{row.original.memberCount}</span> },
-    { accessorKey: "status", header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />, cell: ({ row }) => <StatusBadge label={row.original.status === "active" ? "Ativa" : "Inativa"} tone={row.original.status === "active" ? "success" : "neutral"} dot /> },
+    { accessorKey: "name", header: ({ column }) => <DataTableColumnHeader column={column} title="Unidade" icon={<Building2 />} />, cell: ({ row }) => <span className="font-medium text-foreground">{row.original.name}</span> },
+    { accessorKey: "externalId", header: ({ column }) => <DataTableColumnHeader column={column} title="Identificador" icon={<Hash />} />, cell: ({ row }) => <span className="font-mono text-muted-foreground">{row.original.externalId || "—"}</span> },
+    { accessorKey: "memberCount", header: ({ column }) => <DataTableColumnHeader column={column} title="Equipe" icon={<Users />} />, cell: ({ row }) => <span className="tabular-nums">{row.original.memberCount}</span> },
+    { accessorKey: "status", header: ({ column }) => <DataTableColumnHeader column={column} title="Status" icon={<Flag />} />, cell: ({ row }) => <StatusBadge label={row.original.status === "active" ? "Ativa" : "Inativa"} tone={row.original.status === "active" ? "success" : "neutral"} dot /> },
     { id: "accepting", header: "Recebe leads", cell: ({ row }) => canManage
       ? <BranchAcceptingToggle branchId={row.original.id} enabled={row.original.acceptingLeads} />
       : <span className="text-muted-foreground">{row.original.acceptingLeads ? "Sim" : "Pausado"}</span> },
@@ -177,7 +178,7 @@ export function BranchesManager({
     { id: "hub", header: "Central", cell: ({ row }) => canManage
       ? <BranchHubToggle branchId={row.original.id} enabled={row.original.isDistributionHub} />
       : <span className="text-muted-foreground">{row.original.isDistributionHub ? "Sim" : "—"}</span> },
-    { accessorKey: "activeLeads", header: ({ column }) => <DataTableColumnHeader column={column} title="Em atendimento" />, cell: ({ row }) => <span className="tabular-nums">{row.original.activeLeads}</span> },
+    { accessorKey: "activeLeads", header: ({ column }) => <DataTableColumnHeader column={column} title="Em atendimento" icon={<Users />} />, cell: ({ row }) => <span className="tabular-nums">{row.original.activeLeads}</span> },
     { id: "actions", header: () => <span className="sr-only">Ações</span>, enableHiding: false, cell: ({ row }) => <div className="flex items-center justify-end gap-2">
       {canManage ? <><EditBranchSheet branch={row.original} /><BranchStatusAction branch={row.original} /></> : null}
       <Button render={<Link href={`/unidades/${row.original.id}`} />} size="icon-sm" variant="ghost" aria-label={`Abrir ${row.original.name}`} title={`Abrir ${row.original.name}`}>

@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { toast } from "@/components/ui/sonner";
 import type { ColumnDef } from "@tanstack/react-table";
-import { CheckCircle, XCircle } from "lucide-react";
+import { Calendar, CheckCircle, Hash, Wallet, XCircle } from "lucide-react";
 import { CalendarBlank } from "@/components/huge-icons";
 
 import { ScheduleStatusBadge } from "@/components/status-badges";
@@ -99,7 +99,7 @@ export function CommissionScheduleTable({
     {
       accessorKey: "monthNumber",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Parcela" />
+        <DataTableColumnHeader column={column} title="Parcela" icon={<Hash />} />
       ),
       cell: ({ row }) => (
         <div className="flex items-center gap-2 pl-2">
@@ -120,7 +120,7 @@ export function CommissionScheduleTable({
     {
       accessorKey: "dueDate",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Vencimento" />
+        <DataTableColumnHeader column={column} title="Vencimento" icon={<Calendar />} />
       ),
       cell: ({ row }) => (
         <span className="text-muted-foreground text-xs">{formatDate(row.original.dueDate)}</span>
@@ -136,7 +136,7 @@ export function CommissionScheduleTable({
     {
       accessorKey: "amount",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Valor" className="justify-end" />
+        <DataTableColumnHeader column={column} title="Valor" icon={<Wallet />} className="justify-end" />
       ),
       cell: ({ row }) => (
         <div className="text-right font-mono text-xs font-semibold tracking-tight text-foreground">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Calendar, FileText, Flag, Tag, User, UserRound } from "lucide-react";
 import { isOutdatedDeploymentError } from "@/shared/http/outdated-deployment";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
@@ -22,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppSelect } from "@/components/ui/select";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
+import { PersonInitials } from "@/components/ui/person-chip";
 import { OwnershipContext } from "@/components/ownership-context";
 import { VoxelIllustration } from "@/components/illustrations/voxel-illustration";
 import { ContextualIllustration } from "@/components/illustrations/contextual-illustration";
@@ -211,7 +213,7 @@ export function DocumentsWorkspace({
       : []),
     {
       accessorKey: "leadNome",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Lead" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Lead" icon={<User />} />,
       cell: ({ row }) => (
         <a
           href={`/leads/${row.original.leadId}`}
@@ -223,7 +225,7 @@ export function DocumentsWorkspace({
     },
     {
       accessorKey: "filename",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Documento" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Documento" icon={<FileText />} />,
       cell: ({ row }) => (
         <a
           href={row.original.fileUrl}
@@ -237,14 +239,14 @@ export function DocumentsWorkspace({
     },
     {
       accessorKey: "requirementName",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Tipo Requisitado" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Tipo Requisitado" icon={<Tag />} />,
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground">{row.original.requirementName ?? "Avulso"}</span>
       ),
     },
     {
       accessorKey: "status",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" icon={<Flag />} />,
       cell: ({ row }) => {
         const s = row.original.status;
         if (s === "approved") {
@@ -270,19 +272,22 @@ export function DocumentsWorkspace({
     },
     {
       id: "ownership",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Responsável / unidade" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Responsável / unidade" icon={<UserRound />} />,
       cell: ({ row }) => (
-        <OwnershipContext
-          brokerName={row.original.corretorNome}
-          branchName={row.original.branchName}
-          emptyLabel="Não informado"
-          className="text-xs"
-        />
+        <span className="flex items-center gap-ds-8">
+          {row.original.corretorNome ? <PersonInitials name={row.original.corretorNome} /> : null}
+          <OwnershipContext
+            brokerName={row.original.corretorNome}
+            branchName={row.original.branchName}
+            emptyLabel="Não informado"
+            className="text-xs"
+          />
+        </span>
       ),
     },
     {
       accessorKey: "createdAt",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Data de Envio" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Data de Envio" icon={<Calendar />} />,
       cell: ({ row }) => (
         <span className="font-mono text-xs text-muted-foreground">
           {new Intl.DateTimeFormat("pt-BR", {

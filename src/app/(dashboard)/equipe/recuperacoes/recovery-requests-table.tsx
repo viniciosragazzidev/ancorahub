@@ -2,13 +2,14 @@
 
 import { useActionState, useCallback, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Check, X, Loader2, Eye, Ban } from "lucide-react";
+import { Check, X, Loader2, Eye, Ban, Calendar, Mail, User } from "lucide-react";
 import { RecoveryStatusBadge } from "@/components/status-badges";
 import { toast } from "@/components/ui/sonner";
 import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 
 import { Button } from "@/components/ui/button";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
+import { PersonChip } from "@/components/ui/person-chip";
 import {
   Dialog,
   DialogClose,
@@ -91,16 +92,16 @@ export function RecoveryRequestsTable({ requests }: { requests: ResetRequest[] }
     {
       accessorKey: "userName",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Nome" />
+        <DataTableColumnHeader column={column} title="Nome" icon={<User />} />
       ),
       cell: ({ row }) => (
-        <span className="font-semibold text-xs text-foreground pl-2">{row.original.userName}</span>
+        row.original.userName ? <PersonChip name={row.original.userName} className="pl-2" /> : <span className="font-semibold text-xs text-foreground pl-2">{row.original.userName}</span>
       ),
     },
     {
       accessorKey: "userEmail",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="E-mail" />
+        <DataTableColumnHeader column={column} title="E-mail" icon={<Mail />} />
       ),
       cell: ({ row }) => (
         <span className="font-mono text-xs text-muted-foreground">{row.original.userEmail}</span>
@@ -114,7 +115,7 @@ export function RecoveryRequestsTable({ requests }: { requests: ResetRequest[] }
     {
       accessorKey: "createdAt",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Solicitada em" />
+        <DataTableColumnHeader column={column} title="Solicitada em" icon={<Calendar />} />
       ),
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground font-mono">{formatDate(row.original.createdAt)}</span>

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
+import { Flag, Headset, Hourglass, Layers, Users } from "lucide-react";
 
 import { DotsThreeVertical, PencilSimple, Trash } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +57,7 @@ export function QueuesTable({
   const columns = useMemo<ColumnDef<Row>[]>(() => [
     {
       accessorKey: "name",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Fila" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Fila" icon={<Layers />} />,
       cell: ({ row }) => (
         <button
           type="button"
@@ -76,7 +77,7 @@ export function QueuesTable({
     },
     {
       accessorKey: "status",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" icon={<Flag />} />,
       cell: ({ row }) => (
         <Badge variant={row.original.status === "active" ? "success" : "outline"}>
           {row.original.status === "active" ? "Ativa" : "Pausada"}
@@ -88,9 +89,9 @@ export function QueuesTable({
       header: "Distribuição",
       cell: ({ row }) => <span className="whitespace-nowrap text-muted-foreground">{assignmentLabel(row.original)}</span>,
     },
-    { accessorKey: "waiting", header: ({ column }) => <DataTableColumnHeader column={column} title="Aguardando" />, cell: ({ row }) => numberCell(row.original.waiting) },
-    { accessorKey: "members", header: ({ column }) => <DataTableColumnHeader column={column} title="Elegíveis" />, cell: ({ row }) => numberCell(row.original.members) },
-    { accessorKey: "activeLeads", header: ({ column }) => <DataTableColumnHeader column={column} title="Em atendimento" />, cell: ({ row }) => numberCell(row.original.activeLeads) },
+    { accessorKey: "waiting", header: ({ column }) => <DataTableColumnHeader column={column} title="Aguardando" icon={<Hourglass />} />, cell: ({ row }) => numberCell(row.original.waiting) },
+    { accessorKey: "members", header: ({ column }) => <DataTableColumnHeader column={column} title="Elegíveis" icon={<Users />} />, cell: ({ row }) => numberCell(row.original.members) },
+    { accessorKey: "activeLeads", header: ({ column }) => <DataTableColumnHeader column={column} title="Em atendimento" icon={<Headset />} />, cell: ({ row }) => numberCell(row.original.activeLeads) },
     {
       id: "entries",
       header: "Entradas",
