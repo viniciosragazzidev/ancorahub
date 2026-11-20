@@ -98,7 +98,11 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
 
   const summary = useMemo(() => summarizePostSaleReport(data.report, data.alerts.length), [data.alerts.length, data.report]);
   const sortedReport = useMemo(() => [...data.report].sort((a, b) => b.responded - a.responded || b.sent - a.sent || a.brokerName.localeCompare(b.brokerName)), [data.report]);
-  const reportView = paginate(sortedReport, reportPage);
+  // Só quem teve envio por padrão (20/11): as outras dezenas de linhas zeradas ficam atrás de "Mostrar todos".
+  const [showAllBrokers, setShowAllBrokers] = useState(false);
+  const activeReport = useMemo(() => sortedReport.filter((row) => row.sent > 0), [sortedReport]);
+  const hiddenBrokers = sortedReport.length - activeReport.length;
+  const reportView = paginate(showAllBrokers || activeReport.length === 0 ? sortedReport : activeReport, reportPage);
   const enabledAutomations = data.autoRules.rules.filter((rule) => rule.enabled).length + (data.r0.enabled ? 1 : 0);
 
   /** Troca a aba sem recarregar a página e deixa a URL em `?aba=` (dá para voltar ou mandar o link). */
@@ -246,6 +250,14 @@ export function PostSaleWorkspace({ initialData, initialAudience, initialPreview
                   empty={<p className="rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-muted-foreground">Nenhum corretor disponível no escopo atual.</p>}
                 />
                 <Pager page={reportView.page} pages={reportView.pages} onChange={setReportPage} label="corretores" />
+                {hiddenBrokers > 0 && activeReport.length > 0 ? (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {showAllBrokers ? `${sortedReport.length} corretores` : `${activeReport.length} com envio no período · ${hiddenBrokers} sem envio`} ·{" "}
+                    <button type="button" className="text-[var(--primary)] hover:underline" aria-expanded={showAllBrokers} onClick={() => { setShowAllBrokers((value) => !value); setReportPage(1); }}>
+                      {showAllBrokers ? "Só quem teve envio" : "Mostrar todos"}
+                    </button>
+                  </p>
+                ) : null}
               </CardContent>
             </Card>
           </TabsContent>
