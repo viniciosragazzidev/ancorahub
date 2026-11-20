@@ -165,7 +165,7 @@ describe("pele da central de conversas", () => {
 
   it("mantém rótulos e controles do Diretor em português e sem linha de tags vazia", () => {
     const html = renderSelectedConversation();
-    expect(html).toContain('placeholder="Buscar conversa"');
+    expect(html).toContain('placeholder="Buscar conversa  ( / )"');
     expect(html).toContain('placeholder="Mensagem"');
     expect(html).toContain('data-conversations-part="message-history"');
     expect(html).toContain('data-conversations-part="composer-input"');
