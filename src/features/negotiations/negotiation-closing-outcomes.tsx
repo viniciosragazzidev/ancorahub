@@ -1,11 +1,17 @@
 "use client";
 
+import { useState } from "react";
+
 import { BrokerProfileLink } from "@/components/broker-profile-link";
 import { LiteDataTable, type LiteColumn } from "@/components/lite/data/data";
+import page from "@/components/lite/page/lite-page.module.css";
 import type { ClosingOutcomeBrokerRow, ClosingOutcomesSummary } from "@/features/leads/closing-outcome-core";
 
 import { formatNegotiationMetric } from "./negotiations-data-views";
 import styles from "./negotiations.module.css";
+
+/** Corretores visíveis antes do "Ver todos" (20/11, skill interface-enxuta: a lista já vem com os pendentes no topo). */
+export const OUTCOME_BROKERS_VISIBLE = 8;
 
 const BROKER_COLUMNS: LiteColumn<ClosingOutcomeBrokerRow>[] = [
   { id: "broker", label: "Corretor", primary: true, nowrap: true, render: (row) => <span title={row.brokerName}><BrokerProfileLink brokerId={row.brokerId} name={row.brokerName} /></span> },
@@ -20,6 +26,9 @@ const BROKER_COLUMNS: LiteColumn<ClosingOutcomeBrokerRow>[] = [
  * e quantos estão parados sem resposta agora ("desfecho pendente", mais de 10 dias sem mudar de etapa).
  */
 export function NegotiationClosingOutcomes({ summary }: { summary: ClosingOutcomesSummary }) {
+  const [showAll, setShowAll] = useState(false);
+  const rows = showAll ? summary.brokers : summary.brokers.slice(0, OUTCOME_BROKERS_VISIBLE);
+  const hidden = summary.brokers.length - rows.length;
   const stats = [
     { id: "entered", label: "Entraram no fechamento", value: summary.entered },
     { id: "converted", label: "Fechou", value: summary.converted },
@@ -47,11 +56,19 @@ export function NegotiationClosingOutcomes({ summary }: { summary: ClosingOutcom
       <LiteDataTable
         caption="Desfechos do fechamento por corretor"
         columns={BROKER_COLUMNS}
-        rows={summary.brokers}
+        rows={rows}
         rowKey={(row) => row.brokerId ?? "sem-corretor"}
         rowTone={(row) => (row.pending > 0 ? "warning" : undefined)}
         empty={<p>Nenhum lead entrou ou saiu do fechamento no período.</p>}
       />
+      {summary.brokers.length > OUTCOME_BROKERS_VISIBLE ? (
+        <p className={page.resultLine}>
+          {showAll ? `${summary.brokers.length} corretores` : `${rows.length} de ${summary.brokers.length} corretores`} ·{" "}
+          <button type="button" onClick={() => setShowAll((value) => !value)} aria-expanded={showAll}>
+            {showAll ? "Mostrar menos" : `Ver todos (+${hidden})`}
+          </button>
+        </p>
+      ) : null}
     </section>
   );
 }
