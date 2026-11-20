@@ -48,6 +48,14 @@ Regra de bolso: **olhar = hover card, mexer = drawer, raro = menu**.
 - Feedback: abrir é nível 0 (sem som, sem vibração). Atalho que muda dado segue o nível dele no `FEEDBACK.md`.
 - Dados ausentes viram "—", nunca "undefined" ou linha vazia. Não busque dados novos no servidor só para o hover: use o que a linha já tem.
 
+## Capricho em abas, botões e cartões (ref P17, pedido do Vinicios em 20/11)
+
+- **Aba**: rótulo + contagem numa pílula pequena dentro da própria aba; a ativa ganha fundo da superfície e sombra de repouso; as outras ficam em texto secundário.
+- **Botão**: ícone de 16px + verbo ("Exportar CSV", "Conectar", "Abrir"); o primário é um só; o destrutivo vai por último no menu.
+- **Status**: pílula com o estado real e curto ("Recebendo leads", "Sem leads há 3 dias", "Conectado"), nunca um rótulo fixo que não diz nada ("Disponível").
+- **Cartão de catálogo**: ícone + nome + categoria em cima, uma frase, e um rodapé separado por hairline com o dado que importa ("Último lead há 2 h · 34 nas últimas 24 h") e a ação à direita.
+- **Modal de conexão**: lista "o que vai poder fazer", uma escolha, um interruptor, rodapé com a garantia à esquerda ("Seguro via OAuth") e as ações à direita.
+
 ## Detalhes mínimos (componentes prontos, use em toda tela)
 
 | Detalhe | Componente | Como |
