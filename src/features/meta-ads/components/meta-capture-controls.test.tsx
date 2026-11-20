@@ -11,6 +11,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }) 
 vi.mock("@/components/ui/sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("../actions", () => ({ setMetaGlobalCaptureModeAction: setGlobalModeMock }));
 
+import { toast } from "@/components/ui/sonner";
+
 import { MetaMasterCaptureControl } from "./meta-capture-controls";
 
 afterEach(() => {
@@ -28,7 +30,8 @@ describe("MetaMasterCaptureControl", () => {
     fireEvent.click(screen.getByRole("option", { name: /Liberar campanhas configuradas/i }));
 
     await waitFor(() => expect(setGlobalModeMock).toHaveBeenCalledWith({ mode: "selective" }));
-    expect(await screen.findByText(/Controle global atualizado/i)).toBeInTheDocument();
+    // A confirmação saiu do texto na tela e virou toast (padrão de feedback, nível 1).
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Controle global atualizado.", expect.anything()));
     expect(refreshMock).toHaveBeenCalled();
   });
 });
