@@ -49,7 +49,8 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
     expect(screen.getByRole("heading", { level: 1, name: "Painel" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 1, name: /Ol\u00e1, Renata/ })).not.toBeInTheDocument();
-    expect(screen.getByText(/Ol\u00e1, Renata/)).toBeInTheDocument();
+    // 20/11/2026: a saudação saiu; abas, unidade e período numa faixa só.
+    expect(screen.queryByText(/Ol\u00e1, Renata/)).not.toBeInTheDocument();
     expect(screen.getByRole("main", { name: "Painel" })).toHaveClass(styles.pageContainer);
     const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
     expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("aria-current", "page");
@@ -63,18 +64,32 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     expect(container.querySelector("[data-live-status-strip]")).toBeNull();
   });
 
-  it("mostra os blocos no estilo do Desempenho Lite, nesta ordem (organização de 18/11: Agora antes da análise)", () => {
+  it("organização de 20/11: números, Precisa de atenção e Agora antes da análise (funil e tabela de filas)", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    const blocks = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
-    expect(blocks).toEqual([
+    const blocks = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent ?? "");
+    expect(blocks.map((text) => text.replace(/\d+$/, ""))).toEqual([
       "Leads desde sex 19h",
-      "Plantões acontecendo agora",
-      "WhatsApp dos corretores",
+      "Precisa de atenção",
+      "Agora",
       "Funil de qualificação",
       "Leads por fila",
     ]);
-    expect(screen.getByRole("region", { name: "Agora" })).toBeInTheDocument();
-    expect(screen.getByText("Taxa de qualificação")).toBeInTheDocument();
+  });
+
+  it("Precisa de atenção mostra até 3 itens, cada um com um verbo só", () => {
+    render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    const attention = within(screen.getByRole("heading", { name: /Precisa de atenção/ }).closest("section") as HTMLElement);
+    const items = attention.getAllByRole("listitem");
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.length).toBeLessThanOrEqual(3);
+    for (const item of items) expect(within(item).getAllByRole("link")).toHaveLength(1);
+    expect(attention.getByText("Plantão PME abaixo do mínimo")).toBeInTheDocument();
+    expect(attention.getByRole("link", { name: /Ver plantão/ })).toHaveAttribute("href", "/leads/distribuicao/plantao/pme");
+  });
+
+  it("sem pendência, Precisa de atenção diz que está tudo em dia", () => {
+    render(<DirectorLiteDashboard data={emptyEssential(NOW)} period="today" branchId={null} branches={[]} now={NOW} />);
+    expect(screen.getByText("Tudo em dia. Nada pedindo decisão agora.")).toBeInTheDocument();
   });
 
   it("mostra os quatro números da janela e nenhum dado de venda", () => {
@@ -82,7 +97,7 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     const cards = within(screen.getByRole("heading", { name: "Leads desde sex 19h" }).closest("section") as HTMLElement);
     for (const label of ["Entraram", "Qualificados", "Em qualificação", "Frios"]) expect(cards.getByText(label)).toBeInTheDocument();
     expect(cards.getByText("56% do que entrou")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "56% qualificados" })).toBeInTheDocument();
+    expect(screen.getByText("56% qualificados", { exact: false })).toBeInTheDocument();
     expect(container).not.toHaveTextContent(/R\$|venda/i);
   });
 
@@ -120,20 +135,17 @@ describe("bloco 1: plantões acontecendo agora", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
     const pme = screen.getByRole("link", { name: /Plantão PME/ });
     expect(pme).toHaveAttribute("href", "/leads/distribuicao/plantao/pme");
-    expect(screen.getByText("2 plantões ativos neste momento.", { exact: false })).toBeInTheDocument();
     const row = pme.closest("li") as HTMLElement;
     expect(row).toHaveTextContent("6 disponíveis · 9 distribuídos");
-    // PME tem 2 corretores confirmados de 3 escalados: em alerta por estar abaixo do mínimo.
-    const warn = row.querySelector('[data-warn="true"]');
-    expect(warn).toHaveTextContent("2/3 corretores, abaixo do mínimo");
+    // PME tem 2 corretores confirmados de 3 escalados: em alerta (e no "Precisa de atenção") por estar abaixo do mínimo.
+    expect(within(row).getByText("2/3 corretores")).toBeInTheDocument();
     expect(within(pme).getByText("08:00 às 19:00")).toBeInTheDocument();
   });
 
   it("sem plantão ativo, mostra o estado vazio com o próximo plantão", () => {
     const data = { ...emptyEssential(NOW), duties: { running: [], next: { scheduleId: "x", name: "Plantão Noturno", dutyDate: "2026-10-26", startsAt: "19:00", endsAt: "23:00", running: false, queueName: null, brokerCount: 0, minimumBrokers: 1 } } };
     render(<DirectorLiteDashboard data={data} period="today" branchId={null} branches={[]} now={NOW} />);
-    expect(screen.getByText("Nenhum plantão ativo neste momento.")).toBeInTheDocument();
-    expect(screen.getByText("Próximo: Plantão Noturno, 26/10 às 19:00.")).toBeInTheDocument();
+    expect(screen.getByText(/Nenhum plantão ativo\. Próximo: Plantão Noturno, 26\/10 às 19:00\./)).toBeInTheDocument();
   });
 });
 
@@ -145,11 +157,10 @@ describe("bloco 2: leads por fila", () => {
 
   it("tem uma linha por fila com entraram, qualificados e frios", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    const queues = within(screen.getByRole("heading", { name: "Leads por fila" }).closest("section") as HTMLElement);
-    expect(queues.getByText("Fila Tatiana")).toBeInTheDocument();
-    expect(queues.getByText("26 entraram · 15 qualificados · 7 frios")).toBeInTheDocument();
-    expect(queues.getByText("PF Renan")).toBeInTheDocument();
-    expect(queues.getByText("10 entraram · 5 qualificados · 5 frios")).toBeInTheDocument();
+    const queues = within(screen.getByRole("heading", { name: /Leads por fila/ }).closest("section") as HTMLElement);
+    const cells = (name: string) => within(queues.getByRole("row", { name: new RegExp(name) })).getAllByRole("cell").slice(0, 3).map((cell) => cell.textContent);
+    expect(cells("Fila Tatiana")).toEqual(["26", "15", "7"]);
+    expect(cells("PF Renan")).toEqual(["10", "5", "5"]);
     expect(screen.getByText("12 quentes · 8 mornos", { exact: false })).toBeInTheDocument();
   });
 
@@ -162,8 +173,8 @@ describe("bloco 2: leads por fila", () => {
 
   it("sem leads na janela, o estado vazio aparece no lugar da tabela", () => {
     render(<DirectorLiteDashboard data={emptyEssential(NOW)} period="today" branchId={null} branches={[]} now={NOW} />);
-    expect(screen.getByText("Nenhum lead entrou desde sex 19h. Quando um lead entrar, ele aparece aqui, separado por fila.")).toBeInTheDocument();
-    expect(screen.getByText("Quando um lead entrar, o funil aparece aqui.")).toBeInTheDocument();
+    expect(screen.getByText("Nenhum lead entrou desde sex 19h. Quando entrar, aparece aqui separado por fila.")).toBeInTheDocument();
+    expect(screen.getByText("Nenhum lead entrou desde sex 19h. Quando entrar, o funil aparece aqui.")).toBeInTheDocument();
     expect(screen.queryByText(/entraram ·/)).not.toBeInTheDocument();
   });
 });
@@ -174,7 +185,7 @@ describe("bloco 3: WhatsApp dos corretores", () => {
     expect(screen.getByText("3 de 5 corretores conectaram o WhatsApp pessoal", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("Recebidos")).toBeInTheDocument();
     expect(screen.getByText("Respondendo · 37%")).toBeInTheDocument();
-    expect(screen.getByText("Atendimentos ativos")).toBeInTheDocument();
+    expect(screen.getByText("Ativos")).toBeInTheDocument();
   });
 
   it("lista só os corretores conectados, ordenados por atendimentos ativos, no painel lateral", () => {
