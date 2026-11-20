@@ -176,7 +176,7 @@ export default async function ArchivedLeadsPage({
                             lead={{ id: lead.id, name: lead.name, status: lead.status, phone: lead.phone, lastActivityAt: lead.archivedAt, context: "Arquivado" }}
                             href={`/leads/${lead.id}`}
                           >
-                            <p tabIndex={0} className="w-fit rounded-ds-buttons font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{lead.name}</p>
+                            <p tabIndex={0} className="w-fit cursor-default rounded-ds-buttons font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/40">{lead.name}</p>
                           </LeadNameHoverCard>
                           <p className="text-xs text-muted-foreground">{lead.phone}{lead.email ? ` · ${lead.email}` : ""}</p>
                         </TableCell>

@@ -12,6 +12,8 @@ export function SectionCardHeader({
   icon,
   title,
   badge,
+  count,
+  summary,
   description,
   actions,
   className,
@@ -19,6 +21,10 @@ export function SectionCardHeader({
   icon?: ReactNode;
   title: ReactNode;
   badge?: ReactNode;
+  /** Pílula ao lado do título ("6 novos"), skill `interface-enxuta`. */
+  count?: ReactNode;
+  /** Resumo em uma linha depois do título ("12 leads · por entrada"). */
+  summary?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
   className?: string;
@@ -34,7 +40,13 @@ export function SectionCardHeader({
               </span>
             ) : null}
             {title}
+            {count !== undefined && count !== null ? (
+              <span className="inline-flex items-center rounded-ds-tags bg-ds-paper-mist px-ds-8 py-0.5 text-ds-caption font-medium tabular-nums text-ds-steel">
+                {count}
+              </span>
+            ) : null}
             {badge}
+            {summary ? <span className="text-xs font-normal text-muted-foreground">{summary}</span> : null}
           </CardTitle>
           {description ? (
             <CardDescription className="mt-1 max-w-3xl text-xs leading-5">{description}</CardDescription>

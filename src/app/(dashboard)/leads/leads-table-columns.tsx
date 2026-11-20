@@ -5,10 +5,14 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Calendar,
+  Flag,
+  Layers,
   MoreHorizontal,
   Phone,
+  ShieldCheck,
   Sparkles,
   User,
+  UserRound,
   Users,
 } from "lucide-react";
 
@@ -32,6 +36,7 @@ import { LeadTagChips } from "@/features/lead-tags/components/lead-tag-chip";
 import { LEAD_QUALIFICATION_LABELS, type LeadQualificationStatus } from "@/features/leads/qualification-status";
 
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { PersonInitials } from "@/components/ui/person-chip";
 import { WhatsappLogo } from "@/components/huge-icons";
 import Link from "next/link";
 import { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";
@@ -246,7 +251,7 @@ export const getLeadsColumns = (
   {
     accessorKey: "name",
     id: "name",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Lead / Contato" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Lead / Contato" icon={<User />} />,
     cell: ({ row }) => {
       const lead = row.original;
       const phoneDigits = lead.phone ? lead.phone.replace(/\D/g, "") : "";
@@ -328,7 +333,7 @@ export const getLeadsColumns = (
   {
     accessorKey: "status",
     id: "status",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Etapa Comercial" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Etapa Comercial" icon={<Flag />} />,
     cell: ({ row }) => {
       const statusKey = (row.getValue("status") as string || "").toLowerCase();
       const config = STATUS_CONFIG[statusKey] ?? {
@@ -369,7 +374,7 @@ export const getLeadsColumns = (
   {
     accessorKey: "queueName",
     id: "queueName",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Fila" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Fila" icon={<Layers />} />,
     cell: ({ row }) => (
       <QueueColorTag name={row.original.queueName} hue={row.original.queueColorHue} />
     ),
@@ -382,7 +387,7 @@ export const getLeadsColumns = (
   {
     accessorKey: "qualificationStatus",
     id: "qualificationStatus",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Qualificação IA" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Qualificação IA" icon={<Sparkles />} />,
     cell: ({ row }) => {
       const qual = row.getValue("qualificationStatus") as string | null;
       if (!qual) return <span className="text-muted-foreground text-[11px] font-mono">—</span>;
@@ -417,7 +422,7 @@ export const getLeadsColumns = (
   {
     accessorKey: "planType",
     id: "planType",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Plano / Produto" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Plano / Produto" icon={<ShieldCheck />} />,
     cell: ({ row }) => {
       const plan = row.getValue("planType") as string;
       return (
@@ -441,7 +446,7 @@ export const getLeadsColumns = (
   {
     accessorKey: "lives",
     id: "lives",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Vidas" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Vidas" icon={<Users />} />,
     cell: ({ row }) => {
       const lives = row.getValue("lives") as number;
       return (
@@ -462,7 +467,7 @@ export const getLeadsColumns = (
   {
     accessorKey: "assignedBrokerName",
     id: "assignedBrokerName",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Corretor Responsável" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Corretor Responsável" icon={<UserRound />} />,
     cell: ({ row }) => {
       const broker = row.original.assignedBrokerName;
       const isPlantaoAtivo = row.original.isPlantaoAtivo;
@@ -471,7 +476,7 @@ export const getLeadsColumns = (
       return (
         <span className="flex flex-col items-start gap-1">
           <span className={`text-xs font-medium flex items-center gap-1.5 ${isPlantaoAtivo ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>
-            <User className={`size-3 shrink-0 ${isPlantaoAtivo ? "text-amber-500" : "text-muted-foreground"}`} />
+            {broker ? <PersonInitials name={broker} /> : <User className={`size-3 shrink-0 ${isPlantaoAtivo ? "text-amber-500" : "text-muted-foreground"}`} />}
             {broker ? <BrokerProfileLink brokerId={row.original.assignedBrokerId} name={broker} /> : <span className="text-muted-foreground/70 italic font-normal">Sem atribuição</span>}
           </span>
           {isPlantaoAtivo ? <Badge variant="warning" size="sm">Plantão ativo</Badge> : null}
@@ -495,7 +500,7 @@ export const getLeadsColumns = (
   {
     accessorKey: "createdAt",
     id: "createdAt",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Recebido em" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Recebido em" icon={<Calendar />} />,
     cell: ({ row }) => {
       const date = row.getValue("createdAt") as Date;
       if (!date) return <span className="text-muted-foreground font-mono text-[11px]">—</span>;
