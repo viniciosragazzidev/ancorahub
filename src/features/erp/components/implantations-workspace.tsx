@@ -193,6 +193,16 @@ function ImplantationDetails({ row, workspace, onSaved }: { row: Row; workspace:
   </>;
 }
 
+/** Dias inteiros desde a entrada na fila; null sem data. */
+export function daysInQueue(since: Date | string | null | undefined, now: Date = new Date()) {
+  if (!since) return null;
+  const start = new Date(since).getTime();
+  if (Number.isNaN(start)) return null;
+  return Math.max(0, Math.floor((now.getTime() - start) / 86_400_000));
+}
+
+const QUEUE_WARNING_DAYS = 7;
+
 export function ImplantationsWorkspace({ workspace }: { workspace: Workspace }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -203,6 +213,18 @@ export function ImplantationsWorkspace({ workspace }: { workspace: Workspace }) 
     { id: "stage", label: "Etapa", render: (row) => <StageBadge stage={row.stage} /> },
     { id: "reference", label: "Protocolo e apólice", secondary: true, render: (row) => <ErpCell title={row.policyNumber || "Apólice a informar"} sub={row.reference ? `Protocolo ${row.reference}` : undefined} /> },
     { id: "coverage", label: "Início da cobertura", nowrap: true, render: (row) => formatDay(row.coverageStartsOn) ?? "A confirmar" },
+    {
+      id: "queued", label: "Na fila há", nowrap: true,
+      render: (row) => {
+        const days = daysInQueue(row.queuedSince);
+        if (days === null) return "—";
+        const label = days === 0 ? "hoje" : days === 1 ? "1 dia" : `${days} dias`;
+        // Quem conferem o dia todo vê de relance o que está parado há uma semana ou mais.
+        return days >= QUEUE_WARNING_DAYS && (row.stage === "review" || row.stage === "awaiting_documents")
+          ? <ErpStatus tone="warning">{label}</ErpStatus>
+          : label;
+      },
+    },
     { id: "updated", label: "Atualização", nowrap: true, render: (row) => row.updatedAt ? formatMoment(row.updatedAt) : "Sem conferência" },
   ];
   function openRow(row: Row) {
