@@ -31,7 +31,25 @@ export type ClientLiteRow = {
   convertedAt: string;
   brokerName: string | null;
   branchName: string | null;
+  /** Próxima renovação do contrato ativo ("AAAA-MM-DD"), quando há. */
+  renewalOn?: string | null;
 };
+
+const RENEWAL_WINDOW_DAYS = 30;
+
+/** Dias até a renovação (0 = hoje); null sem data. Conta em dias de calendário, sem fuso. */
+export function daysUntilRenewal(renewalOn: string | null | undefined, today: Date = new Date()) {
+  if (!renewalOn) return null;
+  const [year, month, day] = renewalOn.split("-").map(Number);
+  const target = Date.UTC(year, month - 1, day);
+  const base = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((target - base) / 86_400_000);
+}
+
+export function renewsSoon(client: Pick<ClientLiteRow, "renewalOn">, today?: Date) {
+  const days = daysUntilRenewal(client.renewalOn, today);
+  return days !== null && days >= 0 && days <= RENEWAL_WINDOW_DAYS;
+}
 
 const PAGE_SIZE = 10;
 
@@ -69,13 +87,19 @@ export function ClientesLite({ clients, metrics, period, branches, branchId }: {
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<"all" | "renewal">("all");
+  const renewalCount = useMemo(() => clients.filter((client) => renewsSoon(client)).length, [clients]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("pt-BR");
-    if (!needle) return clients;
-    return clients.filter((client) => [client.name, client.phone, client.email ?? "", client.brokerName ?? "", client.branchName ?? ""]
+    // Renovação: a mais próxima primeiro, para o corretor ligar antes de vencer (20/11).
+    const base = tab === "renewal"
+      ? clients.filter((client) => renewsSoon(client)).sort((a, b) => (a.renewalOn ?? "").localeCompare(b.renewalOn ?? ""))
+      : clients;
+    if (!needle) return base;
+    return base.filter((client) => [client.name, client.phone, client.email ?? "", client.brokerName ?? "", client.branchName ?? ""]
       .some((value) => value.toLocaleLowerCase("pt-BR").includes(needle)));
-  }, [clients, query]);
+  }, [clients, query, tab]);
   const { pageRows, pagination, reset } = useLitePages(filtered, PAGE_SIZE);
 
   const trend = useMemo(() => clientConversionTrend(clients, period), [clients, period]);
@@ -112,6 +136,19 @@ export function ClientesLite({ clients, metrics, period, branches, branchId }: {
     { id: "broker", label: "Responsável", nowrap: true, render: (client) => client.brokerName ? <span title={client.brokerName}>{client.brokerName}</span> : <span className={page.muted}>Sem responsável</span> },
     { id: "branch", label: "Unidade", nowrap: true, render: (client) => client.branchName ? <span title={client.branchName}>{client.branchName}</span> : <span className={page.muted}>Geral da empresa</span> },
     { id: "converted", label: "Conversão", render: (client) => <span className={page.numeric}>{formatLiteDate(client.convertedAt)}</span> },
+    {
+      id: "renewal",
+      label: "Renovação",
+      phonePriority: "low",
+      render: (client) => {
+        const days = daysUntilRenewal(client.renewalOn);
+        if (days === null || days < 0) return <span className={page.muted}>—</span>;
+        const label = days === 0 ? "hoje" : days === 1 ? "amanhã" : `em ${days} dias`;
+        return days <= RENEWAL_WINDOW_DAYS
+          ? <span className={page.badge} data-tone="warning" title={client.renewalOn ?? undefined}>{label}</span>
+          : <span className={page.numeric} title={client.renewalOn ?? undefined}>{formatLiteDate(`${client.renewalOn}T12:00:00`)}</span>;
+      },
+    },
   ], []);
 
   return (
@@ -153,6 +190,16 @@ export function ClientesLite({ clients, metrics, period, branches, branchId }: {
           </div>
         ) : (
           <>
+            <nav className={page.countTabs} aria-label="Filtrar clientes">
+              {([
+                { value: "all", label: "Todos", count: clients.length },
+                { value: "renewal", label: "Renovam em 30 dias", count: renewalCount },
+              ] as const).map((item) => (
+                <button key={item.value} type="button" className={page.countTab} data-active={tab === item.value ? "true" : undefined} aria-pressed={tab === item.value} onClick={() => { setTab(item.value); reset(); }}>
+                  {item.label}<span className={page.countPill}>{item.count}</span>
+                </button>
+              ))}
+            </nav>
             {query.trim() ? (
               <p className={page.resultLine} role="status">
                 {filtered.length} {filtered.length === 1 ? "cliente" : "clientes"} para “{query.trim()}” · <button type="button" onClick={() => { setQuery(""); reset(); }}>Limpar busca</button>
