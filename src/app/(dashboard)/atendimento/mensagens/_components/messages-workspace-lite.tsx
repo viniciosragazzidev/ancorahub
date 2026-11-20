@@ -74,7 +74,7 @@ export function MessagesWorkspaceLite({ messages, dutyReminderEnabled = false }:
   });
 
   const columns: LiteColumn<LibraryMessage>[] = [
-    { id: "name", label: "Mensagem", primary: true, render: (message) => <span><span className={page.cellTitle}>{message.name}</span><span className={page.cellSub}>{message.text || "Sem texto sincronizado"}</span></span> },
+    { id: "name", label: "Mensagem", primary: true, render: (message) => <span><span className={page.cellTitle}>{message.name}</span><span className={`${page.cellSub} ${page.clamp2}`} title={message.text || undefined}>{message.text || "Sem texto sincronizado"}</span></span> },
     { id: "kind", label: "Tipo", nowrap: true, render: (message) => <span className={page.badge} data-tone={message.kind === "meta_template" ? "info" : undefined}>{message.kindLabel}</span> },
     { id: "channel", label: "Canal", secondary: true, render: (message) => channelLabels(message).join(" · ") },
     { id: "usages", label: "Em uso", render: (message) => (message.usages.length ? (message.usages.length === 1 ? message.usages[0]!.label : `${message.usages.length} lugares`) : <span className={page.muted}>Não usada</span>) },
