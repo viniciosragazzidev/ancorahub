@@ -128,7 +128,8 @@ describe("filtros do topo na aba Qualidade", () => {
     );
     // O título "Painel" mora no topo da moldura; a saudação virou subtítulo de uma linha (contrato de espaçamento).
     expect(screen.getByRole("heading", { level: 1, name: "Painel" })).toBeInTheDocument();
-    expect(screen.getByText(/^Olá, Renata/)).toBeInTheDocument();
+    // 20/11/2026: a saudação saiu (o topo já diz "Painel · período · unidade").
+    expect(screen.queryByText(/^Olá, Renata/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("aria-current", "page");
     const periods = within(screen.getByRole("navigation", { name: "Período" }));
     expect(periods.getByRole("link", { name: "7 dias" })).toHaveAttribute("aria-current", "true");

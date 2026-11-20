@@ -50,7 +50,8 @@ describe("filtros da aba Funil Lite", () => {
     render(<DirectorLiteQualificationFunnelPage data={data} branchId="branch-autorizada" branches={branches} firstName="Renata" now={now} />);
     expect(screen.getByRole("heading", { level: 1, name: "Painel" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 1, name: /Ol\u00e1, Renata/ })).not.toBeInTheDocument();
-    expect(screen.getByText(/Ol\u00e1, Renata/)).toBeInTheDocument();
+    // 20/11/2026: a saudação saiu (o topo já diz "Painel · período · unidade").
+    expect(screen.queryByText(/Ol\u00e1, Renata/)).not.toBeInTheDocument();
     expect(screen.getByRole("main", { name: "Painel" })).toHaveClass(styles.pageContainer);
     const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
     expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("href", "/dashboard?periodo=30&unidade=branch-autorizada");

@@ -11,6 +11,7 @@ function PeriodHelp() {
     <details className={styles.help}>
       <summary className={styles.helpButton} aria-label="Sobre o período" title="Sobre o período">?</summary>
       <ul className={styles.helpPanel}>
+        <li>O dia da operação começa às 19h.</li>
         <li>O período altera apenas os leads por fila.</li>
         <li>Plantões e WhatsApp mostram o momento atual.</li>
       </ul>
@@ -73,13 +74,14 @@ export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, per
   activeUnit: string;
   onUnit?: (value: string) => void;
 }) {
-  const shortDate = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "numeric", month: "short" }).format(now);
-
+  // 20/11/2026 (skill interface-enxuta): uma faixa só. Abas à esquerda, unidade e período à direita; a saudação saiu
+  // (o topo já diz "Painel · Hoje · unidade") e o início do dia fica no texto de ajuda do período.
+  void firstName;
   return (
     <header className={styles.headerBlock}>
       <div className={styles.pageHead}>
-        <div className={styles.titleBlock}>
-          <p className={styles.pageSubtitle} title={`${dateTitle(now)}. O dia da operação começa às 19h.`}>Olá, {firstName ?? "diretor"} · {shortDate} · dia começa às 19h</p>
+        <div className={styles.titleBlock} title={`${dateTitle(now)}. O dia da operação começa às 19h.`}>
+          {tabs.length ? <Segmented label="Abas do painel" items={tabs} active={activeTab} onSelect={onTab} kind="tab" /> : null}
         </div>
         <div className={styles.filters}>
           {units && units.length > 0 ? (
@@ -98,11 +100,6 @@ export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, per
           </div>
         </div>
       </div>
-      {tabs.length ? (
-        <div className={styles.tabsRow}>
-          <Segmented label="Abas do painel" items={tabs} active={activeTab} onSelect={onTab} kind="tab" />
-        </div>
-      ) : null}
     </header>
   );
 }
