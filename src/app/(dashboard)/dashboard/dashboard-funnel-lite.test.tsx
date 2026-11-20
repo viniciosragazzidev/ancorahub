@@ -17,7 +17,7 @@ vi.mock("@/shared/observability/request-timing", () => ({
 vi.mock("@/features/broker-workspace/experience-mode", () => ({ getExperienceMode: async () => "NORMAL" }));
 vi.mock("@/features/broker-workspace/lite-audience", () => ({ getLiteAudience: async () => null }));
 vi.mock("@/features/reports/metrics/lead-quality-service", () => ({ canAccessLeadQualityCenter: async () => true }));
-vi.mock("@/features/reports/metrics/lead-quality-period", () => ({ parseLeadQualityPeriod: () => 30 }));
+vi.mock("@/features/reports/metrics/lead-quality-period", () => ({ parseLeadQualityPeriod: () => 30, leadQualityWindow: () => ({ since: new Date(), until: null }), isLeadQualityRange: () => false, rangeDays: () => null }));
 const queueA = "fila-a";
 vi.mock("@/features/reports/metrics/lead-quality-export", () => ({ listLeadQualityQueues: async () => [{ id: "fila-a", name: "Fila A" }] }));
 vi.mock("@/features/dashboard/entries/entries-by-turn", () => ({ getEntriesByTurn: async () => ({ turns: [], totals: { whatsapp: 0, form: 0, other: 0, total: 0 } }) }));
@@ -65,20 +65,20 @@ describe("aba Funil de qualificação do Diretor Lite", () => {
     expect(element.type).toBe(DirectorLiteQualificationFunnelPage);
     expect(element.props).toMatchObject({ queueId: queueA, branchId: null, data: fixture, firstName: "Renata", now: expect.any(Date) });
     expect(element.props.entries).toMatchObject({ totals: { total: 0 } });
-    expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-funil", role: "director" }), 30, null, queueA);
+    expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-funil", role: "director" }), 30, null, queueA, null);
   });
 
   it("mapeia Hoje para o período operacional", async () => {
     const element = await DashboardPage({ searchParams: Promise.resolve({ tab: "funnel", periodo: "hoje" }) });
     expect(element.type).toBe(DirectorLiteQualificationFunnelPage);
-    expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-funil", role: "director" }), "today", null, null);
+    expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-funil", role: "director" }), "today", null, null, null);
   });
 
   it("ignora fila desconhecida e consulta todas as filas", async () => {
     const element = await DashboardPage({ searchParams: Promise.resolve({ tab: "funnel", periodo: "7", fila: "outra" }) });
     expect(element.type).toBe(DirectorLiteQualificationFunnelPage);
     expect(element.props.queueId).toBeNull();
-    expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-funil" }), 7, null, null);
+    expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-funil" }), 7, null, null, null);
   });
 
   it("com a chave desligada mantém a tela antiga e sua chamada sem filtro adicional", async () => {
@@ -93,7 +93,7 @@ describe("aba Funil de qualificação do Diretor Lite", () => {
     state.role = "manager";
     const element = await DashboardPage({ searchParams: Promise.resolve({ tab: "funnel", periodo: "7" }) });
     expect(element.type).toBe(DirectorLiteQualificationFunnelPage);
-    expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ role: "manager", branchId: "unidade-gestor" }), 7, null, null);
+    expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ role: "manager", branchId: "unidade-gestor" }), 7, null, null, null);
   });
 
   it("gestor com a chave desligada continua na aba antiga e sua unidade vem da sessão", async () => {
