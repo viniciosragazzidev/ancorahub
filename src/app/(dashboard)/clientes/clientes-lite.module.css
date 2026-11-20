@@ -16,3 +16,7 @@
     display: inline-flex;
   }
 }
+
+/* Atalhos de contato na linha (20/11). */
+.contact { display: inline-flex; align-items: center; gap: 8px; }
+.shortcuts { display: inline-flex; gap: 2px; }
