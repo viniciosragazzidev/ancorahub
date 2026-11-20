@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { parsePeriod } from "@/shared/period";
+import { parsePeriod, periodLabel } from "@/shared/period";
 import { isDrilldownId, getDrilldown } from "@/features/reports/metrics/metrics-service";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import { parseBranchIdParam } from "@/features/reports/metrics/narrow-scope";
@@ -11,6 +11,7 @@ import { OverviewBranchNotFoundError, resolveOverviewFilter } from "@/features/d
 import { ArrowLeft } from "@/components/huge-icons";
 import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PageFooterSummary } from "@/components/ui/page-footer-summary";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { DrilldownLite } from "../_components/drilldown-lite";
@@ -39,6 +40,8 @@ export default async function DrilldownPage({
   });
   const branchId = overview.narrowBranchId;
   const drilldown = await getDrilldown(context, drillId, period, { scope, branchId });
+  // Resumo de uma linha ao lado do título (skill `interface-enxuta`): só com o que a página já carregou.
+  const summary = `${drilldown.total.toLocaleString("pt-BR")} ${drilldown.total === 1 ? "registro" : "registros"} · ${periodLabel(period)}`;
 
   // Esta página também responde em /dashboard/drill/[drillId] (reexportada). As duas rotas saem do opt-out juntas
   // (teste em director-lite-routes.test.ts), então checar o padrão de /relatorios vale para as duas URLs.
@@ -49,6 +52,7 @@ export default async function DrilldownPage({
         <DashboardHeader
           breadcrumb={`Relatórios / ${drilldown.title}`}
           title={drilldown.title}
+          summary={summary}
           rightSlot={<Link href={backHref} className={litePage.button}><ArrowLeft className="size-4" aria-hidden="true" />Voltar</Link>}
         />
         <main className={litePage.stack}>
@@ -68,6 +72,7 @@ export default async function DrilldownPage({
       <DashboardHeader
         breadcrumb={`Relatórios / ${drilldown.title}`}
         title={drilldown.title}
+        summary={summary}
         rightSlot={
           <Link
             href={`/dashboard?period=${period}&tab=overview${branchId ? `&branchId=${encodeURIComponent(branchId)}` : ""}`}
@@ -150,11 +155,11 @@ export default async function DrilldownPage({
                 </TableBody>
               </Table>
             </DataTableFrame>
-            {drilldown.total > drilldown.rows.length && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Exibindo {drilldown.rows.length} de {drilldown.total} registros.
-              </p>
-            )}
+            <PageFooterSummary className="mt-2">
+              {drilldown.total > drilldown.rows.length
+                ? `Exibindo ${drilldown.rows.length} de ${drilldown.total} registros.`
+                : `${drilldown.rows.length.toLocaleString("pt-BR")} ${drilldown.rows.length === 1 ? "lead" : "leads"}`}
+            </PageFooterSummary>
           </section>
         )}
       </main>

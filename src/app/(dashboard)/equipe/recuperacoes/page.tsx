@@ -35,9 +35,11 @@ export default async function PasswordRecoveryPage() {
     .orderBy(schema.passwordResetRequests.createdAt);
 
   if (await isDirectorLitePageOnServer(context, "/equipe/recuperacoes")) {
+    const pending = requests.filter((r) => r.status === "requested").length;
+    const summary = `${requests.length.toLocaleString("pt-BR")} ${requests.length === 1 ? "pedido" : "pedidos"} · ${pending.toLocaleString("pt-BR")} ${pending === 1 ? "pendente" : "pendentes"}`;
     return (
       <>
-        <DashboardHeader breadcrumb="Equipe" title="Recuperação de senha" />
+        <DashboardHeader breadcrumb="Equipe" title="Recuperação de senha" summary={summary} />
         <main className={litePage.stack}>
           <RecoveryLite requests={requests.map((request) => ({ ...request, createdAt: new Date(request.createdAt).toISOString(), reviewedAt: request.reviewedAt ? new Date(request.reviewedAt).toISOString() : null }))} />
         </main>

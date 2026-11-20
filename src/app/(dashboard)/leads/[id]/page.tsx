@@ -701,7 +701,7 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
     }, context.role, context.jobTitle);
     return (
       <>
-        <DashboardHeader breadcrumb="Operação comercial" title="Perfil do lead" />
+        <DashboardHeader breadcrumb="Operação comercial" title="Perfil do lead" summary={lead.nome} />
         <main className={litePageStyles.page}>
           <DirectorLiteLeadDetail
             lead={{

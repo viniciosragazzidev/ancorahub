@@ -292,7 +292,14 @@ function CommandCenterBody({ data, showQualityTab, canManage, unitManager }: { d
 
   return (
     <>
-      <DashboardHeader breadcrumb={dateLabel.charAt(0).toLocaleUpperCase("pt-BR") + dateLabel.slice(1)} title={data.welcome.firstName ? `Olá, ${data.welcome.firstName}` : "Dashboard"} />
+      <DashboardHeader
+        breadcrumb={dateLabel.charAt(0).toLocaleUpperCase("pt-BR") + dateLabel.slice(1)}
+        title={data.welcome.firstName ? `Olá, ${data.welcome.firstName}` : "Dashboard"}
+        summary={[
+          `${data.today.received.toLocaleString("pt-BR")} ${data.today.received === 1 ? "lead chegou" : "leads chegaram"} desde as 19h`,
+          data.today.waiting > 0 ? `${data.today.waiting.toLocaleString("pt-BR")} aguardando corretor` : null,
+        ].filter(Boolean).join(" · ")}
+      />
       <main className="ct-enter-seq mx-auto flex min-h-full w-full max-w-[1200px] flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8">
         {showQualityTab ? <DashboardSectionTabs active="overview" period={30} showQuality /> : null}
         {unitManager ? null : (

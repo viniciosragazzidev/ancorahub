@@ -19,11 +19,14 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
   const [detail, canViewProfile] = await Promise.all([getTeamDetail(context, decodeURIComponent(supervisorId)), isTeamMemberProfileEnabled()]);
   if (!detail) notFound();
   const tab = TABS.find((value) => value === aba) ?? "corretores";
+  const brokerCount = detail.brokers.length;
+  const summary = `${brokerCount.toLocaleString("pt-BR")} ${brokerCount === 1 ? "corretor" : "corretores"} · ${detail.totals.company.toLocaleString("pt-BR")} da empresa · ${detail.totals.list.toLocaleString("pt-BR")} da lista importada`;
   return (
     <>
       <DashboardHeader
         breadcrumb="Equipes"
         title={detail.team.name}
+        summary={summary}
       />
       <main className={litePage.stack}>
         <div className={`arc-venancor ${litePage.stack}`} data-skin="diretor">

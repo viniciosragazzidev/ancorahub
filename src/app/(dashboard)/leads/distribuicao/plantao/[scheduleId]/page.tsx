@@ -115,6 +115,8 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   }
 
   const { schedule, roster, linkedQueues, leads: allLeads, leadsSince, leadsUntil, leadsUpcomingStartsAt, presenceEnabled, liveStatusEnabled, coldQueueWithoutWindow, startInterval } = profile;
+  // Resumo da barra do topo (anatomia de página), com o perfil já carregado acima.
+  const pageSummary = `${roster.length.toLocaleString("pt-BR")} ${roster.length === 1 ? "corretor" : "corretores"} · ${allLeads.length.toLocaleString("pt-BR")} ${allLeads.length === 1 ? "lead" : "leads"}`;
   // Invited brokers without an account yet: on the plantão as "Convite pendente".
   const [pendingRoster, invitedBrokers] = await Promise.all([
     listPendingRosterEntries(context.tenantId, schedule.id),
@@ -139,7 +141,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   if (historicalWindow && occurrenceHistory) {
     const canExportHistory = hasCapability(context.role, "exportar_relatorios_operacionais", context.jobTitle);
     return <>
-      <DashboardHeader breadcrumb="Distribuição · Plantões" title={schedule.name} rightSlot={directorLite ? undefined : <Button render={<Link href="/distribuicao?view=plantao" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar aos plantões</Button>} />
+      <DashboardHeader breadcrumb="Distribuição · Plantões" title={schedule.name} summary={pageSummary} rightSlot={directorLite ? undefined : <Button render={<Link href="/distribuicao?view=plantao" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar aos plantões</Button>} />
       <main className={cn(directorLite ? "flex min-h-full w-full flex-col bg-background" : "mx-auto flex w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6", directorLite && directorDutyStyles.page)}>
         {directorLite ? <DirectorDutyHeaderActions scheduleId={schedule.id} canExport={canExportHistory} reportDate={historicalWindow.dutyDate} /> : null}
         <DutyProfileHeader
@@ -430,6 +432,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     <DashboardHeader
       breadcrumb="Distribuição · Plantões"
       title={schedule.name}
+      summary={pageSummary}
       rightSlot={directorLite ? undefined : <div className="flex flex-wrap items-center gap-2">
         {canExportReport ? (
           <Button render={<a href={`/api/reports/duty-schedule/${schedule.id}`} download />} size="sm" variant="outline" className="gap-1.5">

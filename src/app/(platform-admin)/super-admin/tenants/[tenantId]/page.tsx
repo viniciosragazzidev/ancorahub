@@ -8,7 +8,6 @@ import {
   getPurgeJobStatusAction,
   setTenantStatusAction,
   updateCleanUiOperationalLegacyTenantAction,
-  updateDirectorLiteStylePilotAction,
   updateLiveStatusPilotAction,
   updateBrokerAdContextPilotAction,
   updateAcceptHandoffPilotAction,
@@ -119,7 +118,6 @@ export default async function SuperAdminTenantDetailPage({
   const metaLeadAdsGlobalEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
   const cleanUiGlobalEnabled = settingMap.get(CLEAN_UI_FEATURE) !== "false";
   const customRolesGlobalEnabled = settingMap.get("feature_custom_roles_enabled") === "true";
-  const directorLiteEnabled = settingMap.get(directorLiteStyleSettingKey(tenant.id)) === "true";
   const liveStatusEnabled = settingMap.get(liveStatusSettingKey(tenant.id)) === "true";
   const brokerAdContextEnabled = settingMap.get(brokerAdContextSettingKey(tenant.id)) === "true";
   const acceptHandoffEnabled = settingMap.get(acceptHandoffSettingKey(tenant.id)) === "true";
@@ -136,7 +134,6 @@ export default async function SuperAdminTenantDetailPage({
   const metaLeadAdsAction = updateMetaLeadAdsPilotAction.bind(null, tenant.id);
   const cleanUiAction = updateCleanUiOperationalLegacyTenantAction.bind(null, tenant.id);
   const customRolesAction = updateTenantCustomRolesPilotAction.bind(null, tenant.id);
-  const directorLiteAction = updateDirectorLiteStylePilotAction.bind(null, tenant.id);
   const liveStatusAction = updateLiveStatusPilotAction.bind(null, tenant.id);
   const brokerAdContextAction = updateBrokerAdContextPilotAction.bind(null, tenant.id);
   const acceptHandoffAction = updateAcceptHandoffPilotAction.bind(null, tenant.id);
@@ -209,16 +206,10 @@ export default async function SuperAdminTenantDetailPage({
                 <div className="max-w-2xl">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-medium">Visual Lite das telas internas</h3>
-                    <Badge variant={directorLiteEnabled ? "success" : "outline"}>{directorLiteEnabled ? "Disponível no modo normal" : "Não liberado"}</Badge>
+                    <Badge variant="success">Sempre ligado</Badge>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">Ativa o piloto visual para todos os papéis do modo normal desta empresa (diretor, marketing, financeiro, cargos personalizados e gestor fora do Lite de gestor). Corretor e supervisor continuam iguais em qualquer modo, e o gestor no Lite próprio também.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Desde 20/11/2026 o Lite é a versão oficial e única das telas internas, em todas as empresas. Não há mais interruptor.</p>
                 </div>
-                <form action={directorLiteAction}>
-                  <input name="enabled" type="hidden" value={directorLiteEnabled ? "false" : "true"} />
-                  <Button type="submit" variant={directorLiteEnabled ? "outline" : "default"}>
-                    {directorLiteEnabled ? "Desativar piloto" : "Ativar piloto"}
-                  </Button>
-                </form>
               </div>
               <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-2xl">

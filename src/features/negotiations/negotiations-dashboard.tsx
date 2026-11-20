@@ -138,7 +138,7 @@ export function NegotiationsDashboard({ data, activeTab, generatedAt, conversati
   return (
     <ArcScopeProvider enabled>
       <div className="arc-venancor" data-skin="diretor">
-        <DashboardHeader breadcrumb="Equipe" title="Negociações" />
+        <DashboardHeader breadcrumb="Equipe" title="Negociações" summary={`${formatNegotiationMetric(data.leads.length)} ${data.leads.length === 1 ? "atendimento acompanhado" : "atendimentos acompanhados"}`} />
         <main className={`${litePage.stack} ${styles.root}`} aria-label="Negociações da equipe">
           <div className={styles.summaryLine}>
             <p className={styles.summary}>{formatNegotiationMetric(data.leads.length)} atendimentos acompanhados · atualizado às {formatLiteDate(generatedAt, { hour: "2-digit", minute: "2-digit" })}</p>

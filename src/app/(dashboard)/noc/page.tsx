@@ -29,9 +29,12 @@ export default async function NocPage({
 
   if (await isDirectorLitePageOnServer(context, "/noc")) {
     const urgentLead = await getUrgentLeadForUser().catch(() => null);
+    // Resumo do topo (anatomia de página) com os números que o NOC já carregou.
+    const { leadsToday, activeAttendances } = data.kpis;
+    const summary = `${leadsToday.toLocaleString("pt-BR")} ${leadsToday === 1 ? "lead" : "leads"} hoje · ${activeAttendances.toLocaleString("pt-BR")} em atendimento`;
     return (
       <>
-        <DashboardHeader breadcrumb="Operações" title="Centro de operações" />
+        <DashboardHeader breadcrumb="Operações" title="Centro de operações" summary={summary} />
         <main className={litePage.stack}>
           <NocLite data={data} period={period} now={new Date().toISOString()} urgentLead={urgentLead ? { id: urgentLead.id, nome: urgentLead.nome, reason: urgentLead.urgentReason } : null} />
         </main>

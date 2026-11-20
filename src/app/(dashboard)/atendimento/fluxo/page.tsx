@@ -18,12 +18,14 @@ export default async function AtendimentoFluxoPage() {
     throw new AuthorizationError("Apenas Diretores e Gestores podem ver o fluxo de atendimento.");
   }
   const flow = await getQualificationFlow(context.tenantId);
+  // Resumo do topo (anatomia de página), só com o que a página já carrega.
+  const summary = `${flow.enabledOrder.length.toLocaleString("pt-BR")} ${flow.enabledOrder.length === 1 ? "pergunta" : "perguntas"} no fluxo`;
 
   // Chave do visual Lite: as mesmas perguntas e a mesma regra de edição, com a barra de alterações Lite.
   if (await isDirectorLitePageOnServer(context, "/atendimento/fluxo")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Atendimento" title="Fluxo de atendimento" />
+        <DashboardHeader breadcrumb="Atendimento" title="Fluxo de atendimento" summary={summary} />
         <main className={litePage.stack}>
           <FlowEditorLite enabledOrder={flow.enabledOrder} texts={flow.texts} canEdit={context.role === "director"} />
         </main>
@@ -33,7 +35,7 @@ export default async function AtendimentoFluxoPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Atendimento" title="Fluxo de atendimento" />
+      <DashboardHeader breadcrumb="Atendimento" title="Fluxo de atendimento" summary={summary} />
       <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <FlowEditor enabledOrder={flow.enabledOrder} texts={flow.texts} canEdit={context.role === "director"} />
       </main>

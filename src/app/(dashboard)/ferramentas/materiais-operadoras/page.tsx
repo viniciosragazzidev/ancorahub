@@ -6,6 +6,8 @@ import { getCatalogOverview, getReviewQueue, listCarriersForSelect, listOperator
 import { requireCapability } from "@/shared/auth/authorization";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
+const count = (value: number, one: string, many: string) => `${value.toLocaleString("pt-BR")} ${value === 1 ? one : many}`;
+
 export const dynamic = "force-dynamic";
 
 /** Operator material catalog: director only (it changes what the quote assistant answers). */
@@ -20,10 +22,17 @@ export default async function MateriaisOperadorasPage() {
     getCatalogOverview(context.tenantId),
     listCarriersForSelect(context.tenantId),
   ]);
+  // Resumo do topo (anatomia de página), só com o que a página já carrega.
+  const toReview = queue.pendingFacts.length;
+  const summary = [
+    count(overview.carriers.length, "operadora", "operadoras"),
+    count(materials.length, "material", "materiais"),
+    toReview > 0 ? `${toReview.toLocaleString("pt-BR")} para revisar` : null,
+  ].filter(Boolean).join(" · ");
 
   return (
     <>
-      <DashboardHeader breadcrumb="Ferramentas" title="Materiais das operadoras" />
+      <DashboardHeader breadcrumb="Ferramentas" title="Materiais das operadoras" summary={summary} />
       <main className="flex flex-1 flex-col p-(--mobile-page-padding) lg:p-6">
         <MaterialsWorkspace
           materials={materials}

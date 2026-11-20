@@ -16,11 +16,14 @@ export default async function QualificacaoTurboPage() {
     throw new AuthorizationError("Apenas diretores, gestores e equipe de marketing têm permissão para acessar a qualificação por IA.");
   }
   const data = await getTurboAdminData();
+  // Resumo do topo (anatomia de página), só com o que a página já carrega.
+  const approved = data.templates.filter((template) => template.status === "APPROVED").length;
+  const summary = `${data.templates.length.toLocaleString("pt-BR")} ${data.templates.length === 1 ? "modelo" : "modelos"} · ${approved.toLocaleString("pt-BR")} ${approved === 1 ? "aprovado" : "aprovados"} · turbo ${data.settings.enabled ? "ligado" : "desligado"}`;
   // Chave do visual Lite: os mesmos templates, configurações e ações.
   if (await isDirectorLitePageOnServer(context, "/qualificacao/turbo")) {
     return (
       <>
-        <DashboardHeader breadcrumb="Qualificação" title="Qualificação turbo" />
+        <DashboardHeader breadcrumb="Qualificação" title="Qualificação turbo" summary={summary} />
         <main className={litePage.stack}>
           <TurboAdminLite data={data} />
         </main>
@@ -29,7 +32,7 @@ export default async function QualificacaoTurboPage() {
   }
   return (
     <>
-      <DashboardHeader breadcrumb="Qualificação" title="Qualificação turbo" />
+      <DashboardHeader breadcrumb="Qualificação" title="Qualificação turbo" summary={summary} />
       <main className="flex flex-1 flex-col p-(--mobile-page-padding) lg:p-6">
         <TurboAdmin data={data} />
       </main>
