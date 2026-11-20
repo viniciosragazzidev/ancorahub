@@ -32,6 +32,13 @@ import { PromotionsSheet } from "./promotions-sheet";
 
 type Ready = Extract<AutoSaleOverview, { state: "ready" }>;
 
+type DealTab = "open" | "closed" | "all";
+
+/** Em andamento: ativa, pausada ou esperando você. O resto (entregue, ganha, perdida, encerrada) é histórico. */
+export function isOpenDeal(row: Pick<DealListRow, "status">) {
+  return row.status === "active" || row.status === "paused" || row.status === "waiting_manager";
+}
+
 
 const columns: ColumnDef<DealListRow>[] = [
   {
@@ -79,6 +86,7 @@ export function AutoSaleWorkspace({ overview, lite, isDirector, preview }: { ove
   const router = useRouter();
   const [picking, setPicking] = useState(preview?.picking ?? false);
   const [dealId, setDealId] = useState<string | null>(preview?.openDeal ?? null);
+  const [dealTab, setDealTab] = useState<DealTab | null>(null);
   const [promotions, setPromotions] = useState(false);
   const [nextPending, startingNext] = useTransition();
 
@@ -159,6 +167,16 @@ export function AutoSaleWorkspace({ overview, lite, isDirector, preview }: { ove
     </>
   );
 
+  // Abas com contagem (20/11, ref P17): abre em "Em andamento" quando há alguma; o histórico fica a um clique.
+  const openCount = data.deals.filter(isOpenDeal).length;
+  const activeTab: DealTab = dealTab ?? (openCount > 0 ? "open" : "all");
+  const dealTabs: { value: DealTab; label: string; count: number }[] = [
+    { value: "open", label: "Em andamento", count: openCount },
+    { value: "closed", label: "Encerradas", count: data.deals.length - openCount },
+    { value: "all", label: "Todas", count: data.deals.length },
+  ];
+  const tabRows = activeTab === "all" ? data.deals : data.deals.filter((row) => isOpenDeal(row) === (activeTab === "open"));
+
   if (lite) {
     return (
       <>
@@ -177,7 +195,16 @@ export function AutoSaleWorkspace({ overview, lite, isDirector, preview }: { ove
                 : <button type="button" className={page.primaryButton} onClick={pickNext} disabled={Boolean(platformBlock) || nextPending}>{nextPending ? "Pegando…" : "Pegar o próximo quente"}</button>}
             </div>
           </div>
-          <LiteResponsiveData caption="Negociações da Venda Automatizada" columns={liteColumns} rows={data.deals} rowKey={(row) => row.id} onRowOpen={(row) => setDealId(row.id)} empty={empty} rowTone={(row) => (row.status === "waiting_manager" ? "warning" : undefined)} />
+          {data.deals.length > 0 ? (
+            <nav className={page.countTabs} aria-label="Filtrar negociações">
+              {dealTabs.map((tab) => (
+                <button key={tab.value} type="button" className={page.countTab} data-active={activeTab === tab.value ? "true" : undefined} aria-pressed={activeTab === tab.value} onClick={() => setDealTab(tab.value)}>
+                  {tab.label}<span className={page.countPill}>{tab.count}</span>
+                </button>
+              ))}
+            </nav>
+          ) : null}
+          <LiteResponsiveData caption="Negociações da Venda Automatizada" columns={liteColumns} rows={tabRows} rowKey={(row) => row.id} onRowOpen={(row) => setDealId(row.id)} empty={empty} rowTone={(row) => (row.status === "waiting_manager" ? "warning" : undefined)} />
         </section>
         {sheets}
       </>
