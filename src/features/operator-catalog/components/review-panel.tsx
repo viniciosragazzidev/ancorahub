@@ -7,7 +7,7 @@ import { Info, Lightbulb, ShieldCheck, TextQuote } from "lucide-react";
 import { Check, MoreHorizontalIcon, X } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DsSegmentedControl } from "@/components/ui/ds-segmented-control";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
@@ -19,16 +19,23 @@ import { areaLabel, fieldLabel, qualifiersText, validityText, type AreaInfo } fr
 type View = "facts" | "plans" | "missing" | "suggestions" | "divergences";
 type Run = (task: () => Promise<{ success: true; message: string } | { success: false; error: string }>) => void;
 
-function RowMenu({ items }: { items: Array<{ label: string; onClick: () => void; destructive?: boolean }> }) {
+function RowMenu({ title, items }: { title?: string; items: Array<{ label: string; onClick: () => void; destructive?: boolean }> }) {
+  // Destructive choices always close the menu, after a separator.
+  const regular = items.filter((item) => !item.destructive);
+  const danger = items.filter((item) => item.destructive);
+  const renderItem = (item: (typeof items)[number]) => (
+    <DropdownMenuItem key={item.label} variant={item.destructive ? "destructive" : undefined} onClick={item.onClick}>{item.label}</DropdownMenuItem>
+  );
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button size="icon-sm" variant="ghost" aria-label="Ações" onClick={(event) => event.stopPropagation()} />}>
         <MoreHorizontalIcon className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        {items.map((item) => (
-          <DropdownMenuItem key={item.label} variant={item.destructive ? "destructive" : undefined} onClick={item.onClick}>{item.label}</DropdownMenuItem>
-        ))}
+        {title ? <DropdownMenuLabel className="truncate">{title}</DropdownMenuLabel> : null}
+        {regular.map(renderItem)}
+        {regular.length && danger.length ? <DropdownMenuSeparator /> : null}
+        {danger.map(renderItem)}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -70,7 +77,7 @@ function factColumns(areas: AreaInfo[], extra: { previousTitle: string; actions:
         </span>
       ),
     },
-    { id: "actions", header: "", cell: ({ row }) => <RowMenu items={extra.actions(row.original)} /> },
+    { id: "actions", header: "", cell: ({ row }) => <RowMenu title={fieldLabel(areas, row.original.areaSlug, row.original.fieldKey)} items={extra.actions(row.original)} /> },
   ];
 }
 
@@ -125,7 +132,7 @@ export function ReviewPanel({ queue, areas }: { queue: ReviewQueue; areas: AreaI
       id: "actions",
       header: "",
       cell: ({ row }) => (
-        <RowMenu items={[
+        <RowMenu title={row.original.name} items={[
           { label: "Aprovar plano e informações", onClick: () => run(() => approvePlanAction(row.original.id)) },
           { label: "Descartar plano", destructive: true, onClick: () => run(() => rejectPlanAction(row.original.id)) },
         ]} />
@@ -150,7 +157,7 @@ export function ReviewPanel({ queue, areas }: { queue: ReviewQueue; areas: AreaI
       id: "actions",
       header: "",
       cell: ({ row }) => (
-        <RowMenu items={[
+        <RowMenu title={row.original.label} items={[
           { label: "Incluir no catálogo", onClick: () => run(() => reviewSuggestionAction(row.original.id, "approve")) },
           { label: "Descartar", destructive: true, onClick: () => run(() => reviewSuggestionAction(row.original.id, "reject")) },
         ]} />

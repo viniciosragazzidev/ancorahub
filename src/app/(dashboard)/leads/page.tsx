@@ -829,6 +829,10 @@ async function LeadsPageContent({
       <DashboardHeader
         breadcrumb="Operação comercial"
         title="Leads"
+        summary={[
+          `${totalItems.toLocaleString("pt-BR")} ${totalItems === 1 ? "lead" : "leads"}`,
+          context.role === "director" && unassignedTotalItems > 0 ? `${unassignedTotalItems.toLocaleString("pt-BR")} sem corretor` : null,
+        ].filter(Boolean).join(" · ")}
         rightSlot={
           <LeadsHeaderActions
             period={period}
@@ -874,7 +878,7 @@ async function LeadsPageContent({
         {staleStage && staleStage.mode === "simulate" ? <StaleStageSimulationCard simulation={staleStage.simulation} /> : null}
 
         {/* Filters */}
-        {directorLitePage && hasWorkspace ? null : leadsFilters}
+        {hasWorkspace ? null : leadsFilters}
 
         {/* Workspace or RCD Directional Empty State */}
         {hasWorkspace ? (
@@ -958,6 +962,7 @@ async function LeadsPageContent({
               }}
               queueTabs={directorLitePage ? undefined : queueTabs}
               liteFilters={directorLitePage ? leadsFiltersProps : undefined}
+              classicFilters={directorLitePage ? undefined : leadsFilters}
             />
           </div>
         ) : (

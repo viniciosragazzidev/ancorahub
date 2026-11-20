@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { SearchAddList } from "@/components/ui/search-add-list";
 import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetSection, SheetSectionHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetSection, SheetSectionHeader, SheetSectionLabel, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
 import type { NoticeChannel } from "@/features/team-notices/catalog";
@@ -233,7 +233,7 @@ function NoticeTextsSheet({
               <SheetSection>
                 <SheetSectionHeader>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">Textos próprios</p>
+                    <SheetSectionLabel>Textos próprios</SheetSectionLabel>
                     <p className="text-xs leading-5 text-muted-foreground">Mensagens da biblioteca, até {MAX_NOTICE_FREE_MESSAGES}. Sem nenhuma, valem as versões padrão.</p>
                   </div>
                   <Badge variant="secondary">{chosen.length}/{MAX_NOTICE_FREE_MESSAGES}</Badge>
@@ -286,7 +286,7 @@ function NoticeTextsSheet({
               <SheetSection>
                 <SheetSectionHeader>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">Versões padrão</p>
+                    <SheetSectionLabel>Versões padrão</SheetSectionLabel>
                     <p className="text-xs leading-5 text-muted-foreground">
                       {chosen.length ? "Não usadas enquanto houver textos próprios." : "Em rotação agora. Exemplo com valores fictícios."}
                     </p>

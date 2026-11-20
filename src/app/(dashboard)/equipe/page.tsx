@@ -3,10 +3,7 @@ import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/superv
 import { and, asc, eq, or, sql } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
-import { ShieldCheck } from "@/components/huge-icons";
 import { StatCard } from "@/components/dashboard/metric-card";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isTeamMemberProfileEnabled } from "@/features/team/member-profile";
@@ -14,6 +11,7 @@ import { canEditMemberAuthority, canManageMember } from "@/shared/auth/team-perm
 import { TeamInviteSection } from "./team-invite-section";
 import { TeamMembersTable } from "./team-members-table";
 import { hasEffectiveCapability, isCustomRolesEnabled } from "@/features/custom-roles/service";
+import { TeamMoreActions } from "./team-more-actions";
 import { TeamManagementTabs } from "./team-management-tabs";
 import { UnitsView } from "./units-view";
 import { TeamsView } from "./teams-view";
@@ -293,10 +291,11 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       <DashboardHeader
         breadcrumb={tenant[0]?.name ?? "Gestao"}
         title="Equipe e unidades"
-        rightSlot={<div className="flex items-center gap-1.5 sm:gap-2">{diretorSemCargo ? <Button aria-label="Cargos e permissões" render={<Link href="/equipe/cargos" />} variant="outline" className="max-[559px]:px-2.5"><ShieldCheck className="size-4" /><span className="max-[559px]:hidden">Cargos e permissões</span></Button> : null}{podeGerirEquipe ? <TeamInviteSection branches={branches} canInviteManager={context.role === "director"} canInviteDirector={context.role === "director"} customRoles={customRoles} /> : null}</div>}
+        summary={`${members.length.toLocaleString("pt-BR")} ${members.length === 1 ? "pessoa" : "pessoas"} · ${activeMembers.toLocaleString("pt-BR")} com acesso ativo`}
+        rightSlot={<div className="flex items-center gap-1.5 sm:gap-2"><TeamMoreActions showRoles={diretorSemCargo} />{podeGerirEquipe ? <TeamInviteSection branches={branches} canInviteManager={context.role === "director"} canInviteDirector={context.role === "director"} customRoles={customRoles} /> : null}</div>}
       />
       <main className="ct-enter-seq flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
-        <TeamManagementTabs active="membros" />
+        <TeamManagementTabs active="membros" counts={{ membros: members.length }} />
         {/* Contexto de página legado, preservado para eventual restauração:
         <section>
           <p className="text-xs font-medium text-primary">GESTAO DE EQUIPE</p>

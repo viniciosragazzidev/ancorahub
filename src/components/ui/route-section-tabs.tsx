@@ -8,6 +8,8 @@ type RouteSectionTab = {
   label: string;
   href: string;
   icon?: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  /** Contagem ao lado do rótulo (skill `interface-enxuta`). */
+  count?: number;
 };
 
 /** URL-backed section navigation shared by management pages. */
@@ -28,6 +30,9 @@ export function RouteSectionTabs({ label, tabs, active }: { label: string; tabs:
       >
         {Icon ? <Icon aria-hidden={true} className="size-3.5" /> : null}
         {tab.label}
+        {tab.count != null ? (
+          <span className="rounded-full bg-muted px-1.5 py-px text-[10px] font-medium tabular-nums text-muted-foreground">{tab.count.toLocaleString("pt-BR")}</span>
+        ) : null}
         {current ? <span aria-hidden="true" className="absolute -bottom-px left-3 right-3 h-0.5 rounded-full bg-primary" /> : null}
       </Link>;
     })}

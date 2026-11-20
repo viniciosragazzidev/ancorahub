@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { FileText, Lightning, MoreHorizontalIcon, Plus } from "@/components/huge-icons";
-import { Archive } from "lucide-react";
+import { Archive, ChevronDown as CaretDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -34,7 +34,7 @@ type UrgentLead = { id: string; nome: string; status: string; urgentReason: stri
 
 /**
  * Ações do cabeçalho de /leads com layout responsivo:
- * - ≥ lg: todas as ações em linha (Período, próximo lead, importar, novo lead).
+ * - ≥ lg: Período, próximo lead e "Novo lead" em linha; arquivados e importar no "Mais ▾" (um CTA por tela).
  * - < lg: botão primário "Novo lead" + menu "Mais ações" com Período, Importar e
  *   Próximo lead — evita overflow horizontal do header em telas estreitas.
  */
@@ -132,15 +132,27 @@ export function LeadsHeaderActions({
       <div className="hidden items-center gap-2 lg:flex">
         <PeriodSelect value={period} />
         {children}
-        {role === "director" ? (
-          <Button variant="outline" render={<Link href="/leads/arquivados" />}>
-            <Archive className="size-4" /> Arquivados
-          </Button>
-        ) : null}
-        {canImport ? (
-          <Button variant="outline" onClick={() => setImportOpen(true)}>
-            <FileText /> Importar leads
-          </Button>
+        {role === "director" || canImport ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button size="sm" variant="outline" aria-label="Mais ações" />}>
+              Mais
+              <CaretDownIcon className="size-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              {role === "director" ? (
+                <DropdownMenuItem render={<Link href="/leads/arquivados" />}>
+                  <Archive className="size-4" />
+                  Leads arquivados
+                </DropdownMenuItem>
+              ) : null}
+              {canImport ? (
+                <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                  <FileText className="size-4" />
+                  Importar leads
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : null}
         <Button size="sm" onClick={() => setLeadSheetOpen(true)}>
           <Plus weight="bold" /> Novo lead

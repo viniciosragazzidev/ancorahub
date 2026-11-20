@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { formatShowingRange } from "@/components/ui/page-footer-summary";
 import { DataTable } from "@/components/data-table/data-table";
 import { useDataTable } from "@/hooks/use-data-table";
 import { getLeadsColumns } from "./leads-table-columns";
@@ -129,6 +130,7 @@ export function LeadsDataTable({
     <DataTable
       table={table}
       onRowClick={onRowClick ? handleRowClick : undefined}
+      footerSummary={pagination?.totalItems != null ? formatShowingRange({ page: pagination.currentPage ?? 1, pageSize: pagination.pageSize ?? table.getState().pagination.pageSize, total: pagination.totalItems, noun: "leads" }) : undefined}
       getRowClassName={(row) => row.isManagementInvestigation
         ? "bg-violet-500/[0.07] hover:bg-violet-500/[0.12]"
         : row.returnedUnaccepted

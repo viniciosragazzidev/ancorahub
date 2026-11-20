@@ -62,7 +62,7 @@ import { isCurrentUserOnDuty } from "@/features/lead-distribution/on-duty-check"
 import { SuperAdminRoleSwitcher } from "@/components/super-admin-role-switcher";
 import { ViewAsButton } from "@/features/super-admin/components/view-as";
 import { cn } from "@/lib/utils";
-import { resolveNavLocation, visibleNavAreas, type NavAreaId } from "@/shared/navigation/nav-registry";
+import { groupNavItems, resolveNavLocation, visibleNavAreas, type NavAreaId } from "@/shared/navigation/nav-registry";
 import { useNavUser } from "@/components/navigation/nav-access";
 
 type NavItemConfig = {
@@ -101,6 +101,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
   const chrome = useDirectorChrome();
   const user = useNavUser(initialUser);
   const [onDuty, setOnDuty] = useState(initialOnDuty ?? false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!initialUser) isCurrentUserOnDuty().then(setOnDuty);
@@ -126,6 +127,95 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
     section: area.section,
     ...areaPresentation[area.id],
   }));
+
+  const renderNavLink = (item: NavItemConfig, isActive: boolean, hideMarker = false) => {
+    const Icon = item.icon;
+    const itemTargetUrl = item.url;
+    return (
+                  <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Link
+                        data-slot="sidebar-nav-link"
+                        href={itemTargetUrl}
+                        aria-current={isActive ? "page" : undefined}
+                        onClick={() => isMobile && setOpenMobile(false)}
+                        className={cn(
+                          "group/navitem relative flex min-h-10 w-full items-center gap-3 rounded-full px-3 py-2 outline-none select-none transition-[background-color,color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-primary/8 focus-visible:ring-2 focus-visible:ring-sidebar-ring/50 active:scale-[0.98] motion-reduce:transition-none",
+                          isMobile && "min-h-(--mobile-touch-target)",
+                          isActive && "text-primary shadow-none",
+                          !isMobile && "group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0"
+                        )}
+                      />
+                    }
+                  >
+                    <NavPending className="text-primary" />
+                    {isActive && !directorLite ? (
+                      <motion.span
+                        layoutId="corretop-sidebar-active"
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 rounded-full border border-primary/20 bg-primary/8"
+                        transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
+                      />
+                    ) : null}
+                    {/* Contextual icon */}
+                    <div
+                      data-slot="sidebar-nav-icon"
+                      className={cn(
+                        "relative flex size-8 shrink-0 items-center justify-center rounded-full transition-[background-color,color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/navitem:scale-[1.04] motion-reduce:transition-none",
+                        directorLite ? "director-nav-icon" : !isActive && !item.isWhatsApp && `${item.iconTone} bg-sidebar-accent/55`,
+                        isActive && "bg-primary/8 text-primary",
+                        item.isWhatsApp && "bg-emerald-500/12 text-emerald-600 dark:text-emerald-300",
+                      )}
+                    >
+                      <Icon
+                        weight={isActive ? "fill" : "regular"}
+                        className={cn(
+                          // PROTOTYPE: Director Lite glyph at 80%; keep the icon circle and menu hit target unchanged.
+                          directorLite ? "size-[0.92rem] text-(--text-secondary)" : "size-[1.15rem]",
+                          "shrink-0 transition-[color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
+                          directorLite ? undefined : isActive ? "text-sidebar-primary" : item.isWhatsApp ? "text-emerald-600 dark:text-emerald-300" : item.iconTone,
+                        )}
+                      />
+
+                      {/* Green Status Dot (like WhatsApp) */}
+                      {item.statusDot && (
+                        <span className="absolute top-0.5 right-0.5 flex size-2.5">
+                          <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500 ring-2 ring-sidebar" />
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Label */}
+                    <span
+                      data-slot="sidebar-nav-label"
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-sm leading-tight tracking-tight transition-[max-width,opacity,transform,color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
+                        isActive ? "font-semibold text-primary" : "font-medium text-sidebar-foreground/72 group-hover/navitem:text-primary",
+                        !isMobile && "group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0",
+                      )}
+                    >
+                      {item.label}
+                    </span>
+
+                    {item.beta && directorLite ? <ArcBadge data-slot="director-nav-beta" tone="info" size="sm">Beta</ArcBadge> : null}
+                    {item.beta && !directorLite ? (
+                      <span className="rounded-full bg-primary/12 px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.08em] text-primary uppercase group-data-[collapsible=icon]:hidden">
+                        Beta
+                      </span>
+                    ) : null}
+
+                    {/* Active marker */}
+                    {isActive && !isMobile && !hideMarker && (
+                      <CaretDown className="size-3 shrink-0 -rotate-90 text-sidebar-primary transition-transform duration-[var(--duration-quick)] group-data-[collapsible=icon]:hidden motion-reduce:transition-none" />
+                    )}
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="border-sidebar-border bg-popover text-xs font-medium text-popover-foreground shadow-none">
+                    {item.fullLabel || item.label}
+                  </TooltipContent>
+                  </Tooltip>
+    );
+  };
 
   async function handleLogout() {
     toast.info("Encerrando sua sessão...");
@@ -218,104 +308,52 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initial
       <SidebarContent className="min-h-0 min-w-0 flex-1 overflow-x-hidden px-2 py-2">
         <TooltipProvider delay={150}>
           <nav aria-label="Menu principal" className="flex w-full flex-col gap-1 pb-4">
-            {visibleItems.map((item, index) => {
-              const Icon = item.icon;
-              const isActive = item.id === activeAreaId;
-
-              const itemTargetUrl = item.url;
-
-              const previousItem = visibleItems[index - 1];
-              const showSection = !previousItem || previousItem.section !== item.section;
-
+            {groupNavItems(visibleItems).map(({ group, items }) => {
+              const groupActive = items.some((entry) => entry.id === activeAreaId);
+              const hasChildren = items.length > 1;
+              const open = hasChildren && (openGroups[group.id] ?? groupActive);
+              const head = { ...items[0]!, label: hasChildren && group.label ? group.label : items[0]!.label };
               return (
-                <div key={item.id} className="flex flex-col">
-                  {showSection ? (
-                    <p className="mt-3 mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/45 transition-[margin,opacity,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] first:mt-1 group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:mb-0 group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0 motion-reduce:transition-none">
-                      {item.section}
-                    </p>
+                <div key={group.id} className="flex flex-col">
+                  <div className="relative">
+                    {renderNavLink(head, groupActive, hasChildren)}
+                    {hasChildren ? (
+                      <button
+                        type="button"
+                        data-slot="sidebar-nav-group-toggle"
+                        aria-expanded={open}
+                        aria-label={open ? `Recolher ${group.label}` : `Mostrar ${group.label}`}
+                        onClick={() => setOpenGroups((current) => ({ ...current, [group.id]: !open }))}
+                        className="absolute top-1/2 right-1.5 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-sidebar-foreground/55 transition-colors hover:bg-primary/8 hover:text-primary focus-visible:ring-2 focus-visible:ring-sidebar-ring/50 focus-visible:outline-none group-data-[collapsible=icon]:hidden"
+                      >
+                        <CaretDown className={cn("size-3 transition-transform duration-[var(--duration-quick)] motion-reduce:transition-none", !open && "-rotate-90")} />
+                      </button>
+                    ) : null}
+                  </div>
+                  {open ? (
+                    <ul data-slot="sidebar-nav-sub" className="mt-0.5 mb-1 flex flex-col gap-0.5 group-data-[collapsible=icon]:hidden">
+                      {items.map((child) => {
+                        const childActive = child.id === activeAreaId;
+                        return (
+                          <li key={child.id}>
+                            <Link
+                              data-slot="sidebar-nav-sublink"
+                              href={child.url}
+                              aria-current={childActive ? "page" : undefined}
+                              onClick={() => isMobile && setOpenMobile(false)}
+                              className={cn(
+                                "flex min-h-8 items-center rounded-full py-1.5 pr-3 pl-14 text-[13px] leading-tight outline-none transition-colors hover:bg-primary/8 hover:text-primary focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
+                                isMobile && "min-h-(--mobile-touch-target)",
+                                childActive ? "bg-primary/8 font-semibold text-primary" : "font-medium text-sidebar-foreground/65",
+                              )}
+                            >
+                              <span className="truncate">{child.label}</span>
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
                   ) : null}
-                  <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Link
-                        data-slot="sidebar-nav-link"
-                        href={itemTargetUrl}
-                        aria-current={isActive ? "page" : undefined}
-                        onClick={() => isMobile && setOpenMobile(false)}
-                        className={cn(
-                          "group/navitem relative flex min-h-10 w-full items-center gap-3 rounded-full px-3 py-2 outline-none select-none transition-[background-color,color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-primary/8 focus-visible:ring-2 focus-visible:ring-sidebar-ring/50 active:scale-[0.98] motion-reduce:transition-none",
-                          isMobile && "min-h-(--mobile-touch-target)",
-                          isActive && "text-primary shadow-none",
-                          !isMobile && "group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0"
-                        )}
-                      />
-                    }
-                  >
-                    <NavPending className="text-primary" />
-                    {isActive && !directorLite ? (
-                      <motion.span
-                        layoutId="corretop-sidebar-active"
-                        aria-hidden="true"
-                        className="pointer-events-none absolute inset-0 rounded-full border border-primary/20 bg-primary/8"
-                        transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
-                      />
-                    ) : null}
-                    {/* Contextual icon */}
-                    <div
-                      data-slot="sidebar-nav-icon"
-                      className={cn(
-                        "relative flex size-8 shrink-0 items-center justify-center rounded-full transition-[background-color,color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/navitem:scale-[1.04] motion-reduce:transition-none",
-                        directorLite ? "director-nav-icon" : !isActive && !item.isWhatsApp && `${item.iconTone} bg-sidebar-accent/55`,
-                        isActive && "bg-primary/8 text-primary",
-                        item.isWhatsApp && "bg-emerald-500/12 text-emerald-600 dark:text-emerald-300",
-                      )}
-                    >
-                      <Icon
-                        weight={isActive ? "fill" : "regular"}
-                        className={cn(
-                          // PROTOTYPE: Director Lite glyph at 80%; keep the icon circle and menu hit target unchanged.
-                          directorLite ? "size-[0.92rem] text-(--text-secondary)" : "size-[1.15rem]",
-                          "shrink-0 transition-[color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
-                          directorLite ? undefined : isActive ? "text-sidebar-primary" : item.isWhatsApp ? "text-emerald-600 dark:text-emerald-300" : item.iconTone,
-                        )}
-                      />
-
-                      {/* Green Status Dot (like WhatsApp) */}
-                      {item.statusDot && (
-                        <span className="absolute top-0.5 right-0.5 flex size-2.5">
-                          <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500 ring-2 ring-sidebar" />
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Label */}
-                    <span
-                      data-slot="sidebar-nav-label"
-                      className={cn(
-                        "min-w-0 flex-1 truncate text-sm leading-tight tracking-tight transition-[max-width,opacity,transform,color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
-                        isActive ? "font-semibold text-primary" : "font-medium text-sidebar-foreground/72 group-hover/navitem:text-primary",
-                        !isMobile && "group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0",
-                      )}
-                    >
-                      {item.label}
-                    </span>
-
-                    {item.beta && directorLite ? <ArcBadge data-slot="director-nav-beta" tone="info" size="sm">Beta</ArcBadge> : null}
-                    {item.beta && !directorLite ? (
-                      <span className="rounded-full bg-primary/12 px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.08em] text-primary uppercase group-data-[collapsible=icon]:hidden">
-                        Beta
-                      </span>
-                    ) : null}
-
-                    {/* Active marker */}
-                    {isActive && !isMobile && (
-                      <CaretDown className="size-3 shrink-0 -rotate-90 text-sidebar-primary transition-transform duration-[var(--duration-quick)] group-data-[collapsible=icon]:hidden motion-reduce:transition-none" />
-                    )}
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="border-sidebar-border bg-popover text-xs font-medium text-popover-foreground shadow-none">
-                    {item.fullLabel || item.label}
-                  </TooltipContent>
-                  </Tooltip>
                 </div>
               );
             })}
