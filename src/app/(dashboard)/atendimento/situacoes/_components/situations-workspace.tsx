@@ -1,6 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import { Clock, Flag, Hash, MessageCircleQuestionMark, Signpost, Tag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
@@ -40,7 +41,7 @@ function actionLabel(row: SituationRow) {
 const columns: ColumnDef<Row>[] = [
   {
     accessorKey: "title",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Situação" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Situação" icon={<Signpost />} />,
     cell: ({ row }) => (
       <span className="grid min-w-0 max-w-md gap-0.5">
         <span className="truncate text-sm font-medium">{row.original.title}</span>
@@ -51,7 +52,7 @@ const columns: ColumnDef<Row>[] = [
   {
     id: "kind",
     accessorFn: (row) => KIND_BADGE[row.kind].label,
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Tipo" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Tipo" icon={<Tag />} />,
     cell: ({ row }) => (
       <span className="flex flex-wrap gap-1">
         <Badge variant={KIND_BADGE[row.original.kind].variant}>{KIND_BADGE[row.original.kind].label}</Badge>
@@ -81,7 +82,7 @@ const columns: ColumnDef<Row>[] = [
   {
     id: "enabled",
     accessorFn: (row) => (row.enabled ? 1 : 0),
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" icon={<Flag />} />,
     cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.critical ? "Sempre ligada" : row.original.enabled ? "Ligada" : "Desligada"}</span>,
   },
 ];
@@ -128,7 +129,7 @@ function PhraseTester() {
 const suggestionColumns: ColumnDef<SuggestionRow>[] = [
   {
     accessorKey: "title",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Dúvida dos clientes" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Dúvida dos clientes" icon={<MessageCircleQuestionMark />} />,
     cell: ({ row }) => (
       <span className="grid min-w-0 max-w-md gap-0.5">
         <span className="truncate text-sm font-medium">{row.original.kind === "merge" ? `Parece "${row.original.targetTitle ?? row.original.title}"` : row.original.title}</span>
@@ -143,13 +144,13 @@ const suggestionColumns: ColumnDef<SuggestionRow>[] = [
   },
   {
     accessorKey: "occurrences",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Vezes" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Vezes" icon={<Hash />} />,
     cell: ({ row }) => <span className="text-sm tabular-nums">{row.original.occurrences}</span>,
   },
   {
     id: "lastAskedAt",
     accessorFn: (row) => row.lastAskedAt ?? "",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Última vez" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Última vez" icon={<Clock />} />,
     cell: ({ row }) => <span className="text-xs text-muted-foreground">{formatAskedAt(row.original.lastAskedAt)}</span>,
   },
   {

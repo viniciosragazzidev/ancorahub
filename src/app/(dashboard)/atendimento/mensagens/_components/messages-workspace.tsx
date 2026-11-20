@@ -1,6 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import { Flag, Link2, MessageSquare, Tag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
@@ -51,7 +52,7 @@ function ChannelChips({ message }: { message: LibraryMessage }) {
 const columns: ColumnDef<LibraryMessage>[] = [
   {
     accessorKey: "name",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Mensagem" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Mensagem" icon={<MessageSquare />} />,
     cell: ({ row }) => (
       <span className="grid min-w-0 max-w-md gap-0.5">
         <span className="truncate text-sm font-medium">{row.original.name}</span>
@@ -61,7 +62,7 @@ const columns: ColumnDef<LibraryMessage>[] = [
   },
   {
     accessorKey: "kindLabel",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Tipo" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Tipo" icon={<Tag />} />,
     cell: ({ row }) => <Badge variant={kindVariant[row.original.kind]}>{row.original.kindLabel}</Badge>,
   },
   {
@@ -72,14 +73,14 @@ const columns: ColumnDef<LibraryMessage>[] = [
   {
     id: "usages",
     accessorFn: (message) => message.usages.length,
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Em uso" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Em uso" icon={<Link2 />} />,
     cell: ({ row }) => row.original.usages.length
       ? <span className="text-xs">{row.original.usages.length === 1 ? row.original.usages[0]!.label : `${row.original.usages.length} lugares`}</span>
       : <span className="text-xs text-muted-foreground">Não usada</span>,
   },
   {
     accessorKey: "status",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" icon={<Flag />} />,
     cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.status}</span>,
   },
 ];

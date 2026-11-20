@@ -3,6 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo, useState, useTransition } from "react";
 
+import { Info, Lightbulb, ShieldCheck, TextQuote } from "lucide-react";
 import { Check, MoreHorizontalIcon, X } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
@@ -38,7 +39,7 @@ function factColumns(areas: AreaInfo[], extra: { previousTitle: string; actions:
     {
       id: "what",
       accessorFn: (fact) => `${fact.carrierName} ${fact.planName ?? ""} ${fieldLabel(areas, fact.areaSlug, fact.fieldKey)}`,
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Informação" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Informação" icon={<Info />} />,
       cell: ({ row }) => (
         <span className="grid min-w-0 max-w-sm gap-0.5">
           <span className="truncate text-sm font-medium">{areaLabel(areas, row.original.areaSlug)} · {fieldLabel(areas, row.original.areaSlug, row.original.fieldKey)}</span>
@@ -49,7 +50,7 @@ function factColumns(areas: AreaInfo[], extra: { previousTitle: string; actions:
     },
     {
       accessorKey: "valueText",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Valor" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Valor" icon={<TextQuote />} />,
       cell: ({ row }) => <span className="block max-w-xs whitespace-pre-wrap break-words text-sm">{row.original.valueText}</span>,
     },
     {
@@ -110,7 +111,7 @@ export function ReviewPanel({ queue, areas }: { queue: ReviewQueue; areas: AreaI
   const planColumns: ColumnDef<ReviewQueue["draftPlans"][number]>[] = [
     {
       accessorKey: "name",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Plano" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Plano" icon={<ShieldCheck />} />,
       cell: ({ row }) => (
         <span className="grid gap-0.5">
           <span className="text-sm font-medium">{row.original.name}</span>
@@ -135,7 +136,7 @@ export function ReviewPanel({ queue, areas }: { queue: ReviewQueue; areas: AreaI
   const suggestionColumns: ColumnDef<ReviewQueue["suggestions"][number]>[] = [
     {
       accessorKey: "label",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Sugestão" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Sugestão" icon={<Lightbulb />} />,
       cell: ({ row }) => (
         <span className="grid max-w-md gap-0.5">
           <span className="text-sm font-medium">{row.original.kind === "area" ? "Área nova" : `Campo novo em ${areaLabel(areas, row.original.areaSlug)}`}: {row.original.label}</span>

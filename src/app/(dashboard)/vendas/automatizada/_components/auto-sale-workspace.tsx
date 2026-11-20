@@ -5,6 +5,7 @@
  * Um CTA primário: "Escolher lead quente". Os mesmos dados nos dois visuais (normal e Lite do diretor).
  */
 import type { ColumnDef } from "@tanstack/react-table";
+import { Clock, Flag, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -35,7 +36,7 @@ type Ready = Extract<AutoSaleOverview, { state: "ready" }>;
 const columns: ColumnDef<DealListRow>[] = [
   {
     accessorKey: "leadName",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Cliente" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Cliente" icon={<User />} />,
     cell: ({ row }) => (
       <span className="grid min-w-0 max-w-64 gap-0.5">
         <span className="truncate text-sm font-medium">{row.original.leadName}</span>
@@ -46,7 +47,7 @@ const columns: ColumnDef<DealListRow>[] = [
   {
     id: "status",
     accessorFn: (row) => STATUS_LABEL[row.status],
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Situação" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Situação" icon={<Flag />} />,
     cell: ({ row }) => (
       <span className="flex flex-wrap gap-1">
         <Badge variant={STATUS_TONE[row.original.status]}>{STATUS_LABEL[row.original.status]}</Badge>
@@ -58,7 +59,7 @@ const columns: ColumnDef<DealListRow>[] = [
   { id: "channel", header: "Canal", cell: ({ row }) => <span className="text-xs text-muted-foreground">{CHANNEL_LABEL[row.original.channel]}</span> },
   {
     accessorKey: "updatedAt",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Última atividade" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Última atividade" icon={<Clock />} />,
     cell: ({ row }) => <span className="text-xs tabular-nums text-muted-foreground">{formatWhen(row.original.updatedAt)}</span>,
   },
   { id: "cost", header: "Custo de IA", cell: ({ row }) => <span className="text-xs tabular-nums">{formatUsd(row.original.costUsd)}</span> },

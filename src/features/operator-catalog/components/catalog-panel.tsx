@@ -3,6 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useEffect, useState } from "react";
 
+import { Calendar, Info, ShieldCheck } from "lucide-react";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { DsSegmentedControl } from "@/components/ui/ds-segmented-control";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -15,12 +16,12 @@ function carrierColumns(areas: AreaInfo[]): ColumnDef<CarrierOverview>[] {
   return [
     {
       accessorKey: "name",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Operadora" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Operadora" icon={<ShieldCheck />} />,
       cell: ({ row }) => <span className="text-sm font-medium">{row.original.name}</span>,
     },
     {
       accessorKey: "activePlans",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Planos" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Planos" icon={<ShieldCheck />} />,
       cell: ({ row }) => (
         <span className="text-xs">
           <span className="font-mono tabular-nums">{row.original.activePlans}</span>
@@ -30,7 +31,7 @@ function carrierColumns(areas: AreaInfo[]): ColumnDef<CarrierOverview>[] {
     },
     {
       accessorKey: "facts",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Informações" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Informações" icon={<Info />} />,
       cell: ({ row }) => <span className="font-mono text-xs tabular-nums">{row.original.facts}</span>,
     },
     {
@@ -46,7 +47,7 @@ function carrierColumns(areas: AreaInfo[]): ColumnDef<CarrierOverview>[] {
     },
     {
       accessorKey: "updatedAt",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Última confirmação" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Última confirmação" icon={<Calendar />} />,
       cell: ({ row }) => <span className="text-xs">{row.original.updatedAt ? formatDate(row.original.updatedAt) : "-"}</span>,
     },
   ];
@@ -57,7 +58,7 @@ function factColumns(areas: AreaInfo[]): ColumnDef<FactRow>[] {
     {
       id: "field",
       accessorFn: (fact) => `${fact.planName ?? ""} ${fieldLabel(areas, fact.areaSlug, fact.fieldKey)} ${fact.valueText}`,
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Informação" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Informação" icon={<Info />} />,
       cell: ({ row }) => (
         <span className="grid min-w-0 max-w-xs gap-0.5">
           <span className="truncate text-sm font-medium">{fieldLabel(areas, row.original.areaSlug, row.original.fieldKey)}</span>

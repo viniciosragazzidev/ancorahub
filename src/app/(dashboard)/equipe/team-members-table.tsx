@@ -4,7 +4,7 @@ import { useActionState, useCallback, useEffect, useMemo, useState } from "react
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "@/components/ui/sonner";
-import { Search } from "lucide-react";
+import { Search, Building2, Mail, Phone, User } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CheckCircle, MagnifyingGlass, Pause, Play, UsersThree, XCircle } from "@/components/huge-icons";
 
@@ -192,7 +192,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
     {
       accessorKey: "name",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Membro" />
+        <DataTableColumnHeader column={column} title="Membro" icon={<User />} />
       ),
       cell: ({ row }) => {
         const member = row.original;
@@ -210,7 +210,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
     {
       accessorKey: "email",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="E-mail" />
+        <DataTableColumnHeader column={column} title="E-mail" icon={<Mail />} />
       ),
       cell: ({ row }) => (
         <span className="font-mono text-xs text-muted-foreground">{row.original.email || "E-mail será definido no cadastro"}</span>
@@ -219,7 +219,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
     {
       accessorKey: "phone",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="WhatsApp" />
+        <DataTableColumnHeader column={column} title="WhatsApp" icon={<Phone />} />
       ),
       cell: ({ row }) => (
         <span className="font-mono text-xs text-muted-foreground">{row.original.phone ?? "Não informado"}</span>
@@ -233,7 +233,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
     {
       accessorKey: "branchName",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Filial" />
+        <DataTableColumnHeader column={column} title="Filial" icon={<Building2 />} />
       ),
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground">{row.original.branchId ? row.original.branchName ?? "Unidade vinculada" : "Geral da empresa"}</span>

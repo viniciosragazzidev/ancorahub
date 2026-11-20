@@ -17,15 +17,32 @@ interface DataTableColumnHeaderProps<TData, TValue>
   extends React.HTMLAttributes<HTMLDivElement> {
   column: Column<TData, TValue>;
   title: string;
+  /** Ícone de 14px antes do título (skill `interface-enxuta`). */
+  icon?: React.ReactNode;
+}
+
+function HeaderIcon({ icon }: { icon?: React.ReactNode }) {
+  if (!icon) return null;
+  return (
+    <span aria-hidden className="mr-1.5 inline-flex shrink-0 text-ds-fog [&_svg]:size-3.5">
+      {icon}
+    </span>
+  );
 }
 
 export function DataTableColumnHeader<TData, TValue>({
   column,
   title,
+  icon,
   className,
 }: DataTableColumnHeaderProps<TData, TValue>) {
   if (!column.getCanSort()) {
-    return <div className={cn("text-[11px] font-medium text-muted-foreground", className)}>{title}</div>;
+    return (
+      <div className={cn("flex items-center text-[11px] font-medium text-muted-foreground", className)}>
+        <HeaderIcon icon={icon} />
+        {title}
+      </div>
+    );
   }
 
   return (
@@ -41,6 +58,7 @@ export function DataTableColumnHeader<TData, TValue>({
             />
           }
         >
+          <HeaderIcon icon={icon} />
           <span>{title}</span>
           {column.getIsSorted() === "desc" ? (
             <ArrowDown className="ml-1.5 size-3" />
