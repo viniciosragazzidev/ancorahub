@@ -1,5 +1,7 @@
 "use client";
 
+import { EntriesView } from "./entries-view";
+import type { EntriesByTurn } from "@/features/dashboard/entries/entries-by-turn-core";
 import type { FunnelPeriod, QualificationFunnel } from "@/features/qualification-turbo/funnel";
 import type { OverviewPeriod } from "@/features/dashboard/overview-filter";
 
@@ -19,7 +21,15 @@ export function DirectorLiteQualificationFunnelPage({
   firstName,
   now,
   insights,
+  queues,
+  queueId = null,
+  entries,
 }: {
+  /** Filtro por fila (20/11/2026): intervalo e fila no topo, como na Qualidade. */
+  queues?: DashboardBranch[];
+  queueId?: string | null;
+  /** Entradas por turno (WhatsApp x formulário) acima do funil. */
+  entries?: EntriesByTurn | null;
   /** Funil profissional (05/11): onde param, onde perdemos e qualidade por campanha. */
   insights?: React.ReactNode;
   data: QualificationFunnel;
@@ -31,9 +41,12 @@ export function DirectorLiteQualificationFunnelPage({
 }) {
   const selectedBranch = branches.find((branch) => branch.id === branchId) ?? null;
   const period = overviewPeriod(data.period);
+  const queueName = queues?.find((queue) => queue.id === queueId)?.name ?? null;
+  const periodText = period === "today" ? "Hoje" : period === "7d" ? "Últimos 7 dias" : "Últimos 30 dias";
 
   return (
-    <DirectorLiteChrome now={now} tab="funnel" period={period} branchId={branchId} branches={branches} firstName={firstName}>
+    <DirectorLiteChrome now={now} tab="funnel" period={period} branchId={branchId} branches={branches} firstName={firstName} queues={queues} queueId={queueId}>
+      {entries ? <div className="mb-6"><EntriesView data={entries} queueName={queueName} periodText={periodText} /></div> : null}
       <QualificationFunnelView data={data} unitName={selectedBranch?.name ?? null} widerHref={dashboardHref("funnel", "7", branchId)} now={now} />
       {insights ? <div className="mt-4">{insights}</div> : null}
     </DirectorLiteChrome>

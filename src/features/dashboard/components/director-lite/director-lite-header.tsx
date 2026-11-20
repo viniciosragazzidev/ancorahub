@@ -59,7 +59,7 @@ function Segmented({ label, items, active, onSelect, kind }: { label: string; it
   );
 }
 
-export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, periods, activePeriod, onPeriod, units, activeUnit, onUnit }: {
+export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, periods, activePeriod, onPeriod, units, activeUnit, onUnit, unitLabel = "Unidade" }: {
   firstName: string | null;
   now: Date;
   tabs: HeaderOption[];
@@ -73,6 +73,8 @@ export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, per
   units?: HeaderUnit[];
   activeUnit: string;
   onUnit?: (value: string) => void;
+  /** Nome acessível do seletor ("Unidade" ou "Fila"). */
+  unitLabel?: string;
 }) {
   // 20/11/2026 (skill interface-enxuta): uma faixa só. Abas à esquerda, unidade e período à direita; a saudação saiu
   // (o topo já diz "Painel · Hoje · unidade") e o início do dia fica no texto de ajuda do período.
@@ -86,7 +88,7 @@ export function DirectorLiteHeader({ firstName, now, tabs, activeTab, onTab, per
         <div className={styles.filters}>
           {units && units.length > 0 ? (
             <label className={styles.unitPick}>
-              <span className={styles.srOnly}>Unidade</span>
+              <span className={styles.srOnly}>{unitLabel}</span>
               <select className={styles.unitSelect} value={activeUnit} onChange={(event) => onUnit?.(event.target.value)} disabled={!onUnit}>
                 {units.map((unit) => (
                   <option key={unit.value} value={unit.value}>{unit.label}</option>
