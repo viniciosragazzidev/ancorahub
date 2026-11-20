@@ -15,7 +15,6 @@
   "/internal/design-system/motion",
   "/jornada",
   "/leads/[id]/feedback",
-  "/leads/distribuicao/plantao",
   "/mensagens",
   "/mensagens/[leadId]",
   "/plantoes",
