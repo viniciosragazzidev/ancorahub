@@ -54,7 +54,7 @@ function Metric({ icon, label, value, hint, tone }: { icon: ReactNode; label: st
   return (
     <div className={styles.card} data-tone={tone}>
       <dt className={styles.cardTop}><span className={styles.cardIcon} aria-hidden="true">{icon}</span><span className={styles.cardLabel}>{label}</span></dt>
-      <dd className={styles.cardValue}>{value}</dd>
+      <dd className={styles.cardValue}>{typeof value === "number" ? value.toLocaleString("pt-BR") : value}</dd>
       <dd className={styles.cardHint}>{hint}</dd>
     </div>
   );
