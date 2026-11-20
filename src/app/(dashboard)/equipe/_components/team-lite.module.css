@@ -230,3 +230,6 @@ button.tab {
   color: var(--text-secondary);
   font-size: var(--text-sm);
 }
+
+/* Na célula nowrap da tabela Lite, "td.nowrap > span > span" vira block; o logo continua centralizado (20/11). */
+.teamCell.teamCell > .teamLogo { display: inline-grid; }
