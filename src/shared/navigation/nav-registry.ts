@@ -105,7 +105,7 @@ export const NAV_AREAS: readonly NavArea[] = [
       { id: "venda-automatizada", label: "Venda Automatizada", href: "/vendas/automatizada", permission: "acessar_vendas", roles: ["director", "manager"], requires: "autoSale" },
       { id: "clientes", label: "Clientes", href: "/clientes", permission: "acessar_clientes" },
       { id: "documentos", label: "Documentos", href: "/documentos", permission: "acessar_documentos" },
-      { id: "comissoes", label: "Comissões", href: "/configuracoes/comissoes", permission: "ver_comissionamento", roles: ["director", "manager"] },
+      { id: "comissoes", label: "Comissões", href: "/settings?tab=comissoes", permission: "ver_comissionamento", roles: ["director", "manager"], paths: ["/configuracoes/comissoes"] },
       { id: "ferramentas", label: "Ferramentas", href: "/ferramentas", permission: "acessar_ferramentas", paths: ["/ferramentas/validador-comprovante"] },
     ],
   },
