@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import type { OverviewPeriod } from "@/features/dashboard/overview-filter";
 
 import { DirectorLiteHeader } from "./director-lite-header";
+import { customRangeLabel, rangeParam, type CustomRange } from "./custom-range";
 import styles from "./director-lite.module.css";
 
 export type DashboardBranch = { id: string; name: string };
@@ -30,7 +31,7 @@ export function dashboardHref(tab: DirectorLiteTab, periodValue: string, branchI
   return `${TAB_BASE[tab]}${TAB_BASE[tab].includes("?") ? "&" : "?"}${params.toString()}`;
 }
 
-export function DirectorLiteChrome({ now, tab, period, branchId, branches, firstName, availableTabs, queues, queueId = null, children }: {
+export function DirectorLiteChrome({ now, tab, period, branchId, branches, firstName, availableTabs, queues, queueId = null, customRange = null, allowCustomRange = false, children }: {
   now: Date;
   tab: DirectorLiteTab;
   period: OverviewPeriod;
@@ -46,10 +47,14 @@ export function DirectorLiteChrome({ now, tab, period, branchId, branches, first
    */
   queues?: DashboardBranch[];
   queueId?: string | null;
+  /** Intervalo personalizado ativo (`?periodo=AAAA-MM-DDTHH:MM_AAAA-MM-DDTHH:MM`). Com `allowCustomRange`, aparece "Personalizado". */
+  customRange?: CustomRange | null;
+  allowCustomRange?: boolean;
   children: ReactNode;
 }) {
   const router = useRouter();
-  const periodValue = PERIOD_OPTIONS.find((option) => option.period === period)?.value ?? "hoje";
+  const rangeValue = customRange ? rangeParam(customRange) : null;
+  const periodValue = rangeValue ?? PERIOD_OPTIONS.find((option) => option.period === period)?.value ?? "hoje";
   const tabs = [
     { value: "overview", label: "Visão da operação", short: "Operação", href: dashboardHref("overview", periodValue, branchId) },
     { value: "quality", label: "Qualidade dos leads", short: "Qualidade", href: dashboardHref("quality", periodValue, branchId) },
@@ -58,7 +63,7 @@ export function DirectorLiteChrome({ now, tab, period, branchId, branches, first
   const byQueue = Boolean(queues);
   const periods = PERIOD_OPTIONS.map((option) => ({ value: option.value, label: option.label, href: dashboardHref(tab, option.value, branchId, queueId) }));
   // Resumo de uma linha (skill `interface-enxuta`): o recorte já escolhido, período e unidade.
-  const periodText = periodValue === "hoje" ? "Hoje" : `Últimos ${periodValue} dias`;
+  const periodText = customRange ? customRangeLabel(customRange) : periodValue === "hoje" ? "Hoje" : `Últimos ${periodValue} dias`;
   const summary = byQueue
     ? `${periodText} · ${queues?.find((queue) => queue.id === queueId)?.name ?? "Todas as filas"}`
     : branches.length ? `${periodText} · ${branches.find((branch) => branch.id === branchId)?.name ?? "Todas as unidades"}` : periodText;
@@ -82,6 +87,8 @@ export function DirectorLiteChrome({ now, tab, period, branchId, branches, first
             unitLabel={byQueue ? "Fila" : "Unidade"}
             activeUnit={(byQueue ? queueId : branchId) ?? ""}
             onUnit={(value) => router.push(byQueue ? dashboardHref(tab, periodValue, branchId, value || null) : dashboardHref(tab, periodValue, value || null))}
+            customRange={customRange}
+            onCustomRange={allowCustomRange ? (range) => router.push(dashboardHref(tab, rangeParam(range), branchId, queueId)) : undefined}
           />
           {children}
         </div>
