@@ -17,6 +17,7 @@ import { LiteFilterChips, LiteSelect, useLitePhone } from "@/components/lite/con
 
 import { DEFAULT_PERIOD, PERIOD_OPTIONS } from "@/shared/period";
 
+import { Kbd } from "@/components/ui/kbd";
 import styles from "./leads-lite-filters.module.css";
 import { useLeadFilters, type LeadsFiltersProps } from "./use-lead-filters";
 
@@ -104,7 +105,22 @@ export function LeadsLiteFilters(props: LeadsFiltersProps) {
   const showQueues = Boolean(queueTabs && queueTabs.tabs.length > 2);
   const panelWrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const panelTitleId = useId();
+
+  // Atalho do dia a dia (skill interface-enxuta): "/" foca a busca de qualquer ponto da tela, fora de campos de texto.
+  useEffect(() => {
+    const onSlash = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      event.preventDefault();
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    };
+    window.addEventListener("keydown", onSlash);
+    return () => window.removeEventListener("keydown", onSlash);
+  }, []);
 
   // Popover do desktop: Esc e clique fora fecham, como o popover de hoje; o foco volta ao botão "Filtros".
   useEffect(() => {
@@ -197,11 +213,14 @@ export function LeadsLiteFilters(props: LeadsFiltersProps) {
             type="search"
             enterKeyHint="search"
             value={search}
+            ref={searchRef}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={phone ? "Buscar lead" : "Buscar por nome ou telefone"}
             aria-label="Buscar"
+            aria-keyshortcuts="/"
             className={styles.searchInput}
           />
+          {phone ? null : <Kbd className={styles.searchKbd} aria-hidden title="Atalho: / foca a busca">/</Kbd>}
           <button type="submit" className={styles.searchSubmit}>Buscar</button>
         </form>
         <div ref={panelWrapRef} className={styles.panelWrap}>

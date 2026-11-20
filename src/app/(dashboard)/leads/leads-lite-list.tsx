@@ -7,7 +7,9 @@
  * qualificação, corretor com plantão, investigação e devolução sem aceite (com destaque da linha), unidade e chegada.
  * Ações da linha num menu; seleção em massa com a barra de lote. A busca fica nos filtros Lite.
  */
-import { LeadNameHoverCard } from "@/features/leads/components/lead-hover-card";
+import { formatLastActivity, LeadNameHoverCard } from "@/features/leads/components/lead-hover-card";
+import { PersonInitials } from "@/components/ui/person-chip";
+import { toast } from "@/components/ui/sonner";
 import { getLeadProductLabel } from "@/features/leads/meta-lead-display";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -97,10 +99,20 @@ export function LeadsLiteList({
   bulk?: LeadsLiteBulkConfig;
 }) {
   const isBroker = contextRole === "broker";
+  // Resultado da busca em uma linha, com a saída ao lado (skill interface-enxuta, ref P3).
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchTerm = searchParams.get("search")?.trim() ?? "";
+  const clearSearch = () => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("search");
+    next.delete("page");
+    router.push(next.size ? `${pathname}?${next}` : (pathname ?? "/leads"), { scroll: false });
+  };
   const columns = useMemo<LiteColumn<LeadWorkspaceItem>[]>(() => {
     const base: LiteColumn<LeadWorkspaceItem>[] = [
       { id: "lead", label: "Lead", render: (lead) => <LeadName lead={lead} hideEntry={isBroker} onOpen={onRowClick} />, primary: true },
-      { id: "phone", label: "Telefone", render: (lead) => <span className={styles.nowrap}>{formatLeadPhone(lead.telefone)}</span>, secondary: true },
       {
         id: "stage",
         label: "Etapa",
@@ -124,12 +136,16 @@ export function LeadsLiteList({
         },
       },
     ];
-    if (!isBroker) base.push({ id: "origin", label: "Origem", render: (lead) => lead.origem });
     base.push(
       { id: "broker", label: "Corretor e unidade", render: (lead) => <BrokerCell lead={lead} /> },
     );
     // Como na tabela atual, o corretor não vê a chegada do lead.
-    if (!isBroker) base.push({ id: "arrival", label: "Chegada", render: (lead) => chegada.format(new Date(lead.createdAt)), numeric: true });
+    if (!isBroker) base.push({
+      id: "arrival",
+      label: "Chegada",
+      numeric: true,
+      render: (lead) => <time dateTime={lead.createdAt} title={chegada.format(new Date(lead.createdAt))} className={styles.nowrap}>{formatLastActivity(lead.createdAt)}</time>,
+    });
     base.push({
       id: "actions",
       label: "Ações",
@@ -151,6 +167,12 @@ export function LeadsLiteList({
     : undefined;
   return (
     <div className={`arc-venancor ${styles.root}`} data-skin="diretor">
+      {searchTerm ? (
+        <p className={styles.resultLine} role="status">
+          {(pagination?.totalItems ?? leads.length).toLocaleString("pt-BR")} {(pagination?.totalItems ?? leads.length) === 1 ? "lead" : "leads"} para “{searchTerm}” ·{" "}
+          <button type="button" className={styles.resultClear} onClick={clearSearch}>Limpar busca</button>
+        </p>
+      ) : null}
       <LiteResponsiveData
         caption="Leads"
         columns={columns}
@@ -187,6 +209,29 @@ const MAX_TAGS = 2;
  * Nome (até 2 linhas, quebra só nos espaços, reticências e nome inteiro no title), e embaixo a entrada pelo WhatsApp e
  * as etiquetas, como na tabela atual.
  */
+/** Telefone embaixo do nome: um clique copia (tarefa de todo dia), sem abrir a ficha. Nível 0 do FEEDBACK: só texto. */
+function CopyPhone({ phone }: { phone: string }) {
+  if (!phone) return null;
+  const formatted = formatLeadPhone(phone);
+  return (
+    <button
+      type="button"
+      className={styles.copyPhone}
+      title="Copiar telefone"
+      aria-label={`Copiar telefone ${formatted}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        void navigator.clipboard?.writeText(phone.replace(/\D/g, "")).then(
+          () => toast.success("Telefone copiado", { description: formatted, duration: 1600 }),
+          () => toast.error("Não deu para copiar o telefone", { description: "Selecione o número e copie manualmente." }),
+        );
+      }}
+    >
+      {formatted}
+    </button>
+  );
+}
+
 /** Último movimento conhecido do lead (troca de etapa, primeiro contato ou atribuição), para o hover card. */
 function lastActivity(lead: LeadWorkspaceItem): string | null {
   const dates = [lead.stageEnteredAt, lead.firstContactAt, lead.assignedAt].filter((value): value is string => Boolean(value));
@@ -210,13 +255,14 @@ function LeadName({ lead, hideEntry, onOpen }: { lead: LeadWorkspaceItem; hideEn
           lives: lead.livesCount ?? null,
           lastActivityAt: lastActivity(lead),
           brokerName: lead.corretorNome ?? null,
-          context: [lead.queueName, lead.branchName].filter(Boolean).join(" · ") || null,
+          context: [lead.queueName, lead.branchName, hideEntry ? null : lead.origem].filter(Boolean).join(" · ") || null,
         }}
         onOpen={onOpen ? () => onOpen(lead) : undefined}
         href={onOpen ? undefined : `/leads/${lead.id}`}
       >
         <span tabIndex={0} title={lead.nome} className={`${styles.leadName} underline-offset-4 outline-none hover:underline focus-visible:underline`}>{lead.nome}</span>
       </LeadNameHoverCard>
+      <CopyPhone phone={lead.telefone} />
       {whatsapp || tags.length ? (
         <span className={styles.tags}>
           {whatsapp ? (
@@ -241,7 +287,7 @@ function LeadName({ lead, hideEntry, onOpen }: { lead: LeadWorkspaceItem; hideEn
 function BrokerCell({ lead }: { lead: LeadWorkspaceItem }) {
   return (
     <span className={styles.brokerCell}>
-      <span className={lead.corretorNome ? undefined : styles.muted}>{lead.corretorNome ? <BrokerProfileLink brokerId={lead.corretorId} name={lead.corretorNome} /> : "Sem atribuição"}</span>
+      <span className={lead.corretorNome ? "inline-flex items-center gap-1.5" : styles.muted}>{lead.corretorNome ? <><PersonInitials name={lead.corretorNome} /><BrokerProfileLink brokerId={lead.corretorId} name={lead.corretorNome} /></> : "Sem atribuição"}</span>
       <span className={styles.subtle}>{lead.branchName ?? "Sem unidade"}</span>
       {lead.isPlantaoAtivo ? <span className={styles.badge} data-tone="warning">Plantão ativo</span> : null}
       {lead.isManagementInvestigation ? <span className={styles.badge} data-tone="neutral">Investigação da gestão</span> : null}

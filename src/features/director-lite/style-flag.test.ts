@@ -44,20 +44,22 @@ function setup({ key, mode = "NORMAL", managerLite = false, supervisorLite = fal
 describe("visual Lite das telas internas (chave por empresa + modo normal)", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("uses the per-company settings key and stays off when unset", async () => {
+  it("20/11/2026: o Lite é a versão única; a chave por empresa não é mais lida", async () => {
     getSystemSetting.mockResolvedValue(undefined);
 
-    await expect(isDirectorLiteStyleEnabled("tenant-1")).resolves.toBe(false);
+    await expect(isDirectorLiteStyleEnabled("tenant-1")).resolves.toBe(true);
     expect(directorLiteStyleSettingKey("tenant-1")).toBe("feature_director_lite_style_tenant-1");
-    expect(getSystemSetting).toHaveBeenCalledWith("feature_director_lite_style_tenant-1");
+    expect(getSystemSetting).not.toHaveBeenCalled();
   });
 
-  it("chave desligada: falso para todos, sem consultar o modo de uso", async () => {
-    setup({ key: false });
-    for (const context of [director, marketing, finance, customRole, normalManager, broker, supervisor]) {
+  it("chave antiga desligada não desliga mais o Lite (versão única desde 20/11/2026)", async () => {
+    setup({ key: false, mode: "NORMAL" });
+    for (const context of [director, marketing, finance]) {
+      await expect(shouldUseDirectorLiteStyle(context)).resolves.toBe(true);
+    }
+    for (const context of [broker, supervisor]) {
       await expect(shouldUseDirectorLiteStyle(context)).resolves.toBe(false);
     }
-    expect(getExperienceMode).not.toHaveBeenCalled();
   });
 
   it("chave ligada: verdadeiro para diretor, marketing e financeiro no modo normal", async () => {
@@ -120,11 +122,8 @@ describe("visual Lite das telas internas (chave por empresa + modo normal)", () 
     await expect(isDirectorLitePageOnServer(marketing, "/agenda")).resolves.toBe(false);
   });
 
-  it("fails closed when the setting or the experience mode cannot be read", async () => {
+  it("fails closed when the experience mode cannot be read", async () => {
     getSystemSetting.mockRejectedValue(new Error("settings unavailable"));
-    await expect(shouldUseDirectorLiteStyle(director)).resolves.toBe(false);
-
-    getSystemSetting.mockResolvedValue("true");
     getExperienceMode.mockRejectedValue(new Error("db down"));
     await expect(shouldUseDirectorLiteStyle(director)).resolves.toBe(false);
   });
