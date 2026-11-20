@@ -45,6 +45,8 @@ export async function getImplantations(rawFilters: unknown) {
       policyNumber: schema.erpImplantations.policyNumber, coverageStartsOn: schema.erpImplantations.coverageStartsOn,
       evidenceId: schema.erpImplantations.evidenceDocumentId, reason: schema.erpImplantations.reason,
       version: schema.erpImplantations.version, updatedAt: schema.erpImplantations.updatedAt,
+      // Desde quando o negócio está na etapa (documentação, análise ou convertido): base do "na fila há N dias" (20/11).
+      queuedSince: schema.leads.stageEnteredAt,
     })
       .from(schema.leads).leftJoin(schema.erpImplantations, join).leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId))
       .where(conditions).orderBy(desc(schema.leads.updatedAt), schema.leads.id).limit(PAGE_SIZE).offset((filters.page - 1) * PAGE_SIZE),
