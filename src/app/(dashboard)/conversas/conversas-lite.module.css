@@ -654,4 +654,3 @@
 .quickTab[data-active="true"] .quickCount { background: var(--surface); }
 .searchResult { margin: 0; padding: 6px 16px; border-bottom: 1px solid var(--border-subtle); color: var(--text-muted); font-size: var(--text-xs); }
 .clearSearch { border: 0; background: none; padding: 0; color: var(--primary); font: inherit; cursor: pointer; }
-@media (max-width: 1023px) { 
