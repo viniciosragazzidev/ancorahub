@@ -47,6 +47,7 @@
   --accent: #262626;
   --accent-foreground: #f3f3f3;
   --accent-strong: #c0d4f2; /* Electric Blue no escuro */
+  --series-1-text: #c0d4f2; /* texto azul (links) legível no escuro */
   --accent-subtle: #1e2a3f; /* Powder Blue no escuro */
   --hover: #252525;
   --input: #2a2a2a;
@@ -205,3 +206,35 @@
 .arc-venancor[data-skin="diretor"] :is([data-slot="button"], [data-slot$="-trigger"][data-variant]) { border-radius: 6px; }
 /* Campos de várias linhas com o raio de input (6px) do design system. */
 .arc-venancor[data-skin="diretor"] textarea { border-radius: 6px; }
+
+/* Sidebar, ações do topo (21/11/2026): Visão, Ver como e Área de Plantão no mesmo desenho dos itens do menu (linha de
+   28px, ícone de 16px, texto de 13px, sem caixa com borda nem pílula colorida). O logo da empresa cabe inteiro. */
+.arc-venancor[data-skin="diretor"] .director-sidebar .director-super-admin-actions { gap: 2px; padding: 0; }
+.arc-venancor[data-skin="diretor"] .director-sidebar .director-role-switcher [data-slot="dropdown-menu-trigger"],
+.arc-venancor[data-skin="diretor"] .director-sidebar button[data-variant="sidebar"] {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+.arc-venancor[data-skin="diretor"] .director-sidebar .director-role-switcher [data-slot="dropdown-menu-trigger"]:hover,
+.arc-venancor[data-skin="diretor"] .director-sidebar button[data-variant="sidebar"]:hover { background: var(--ac-sidebar-active); color: var(--foreground); }
+.arc-venancor[data-skin="diretor"] .director-sidebar button[data-variant="sidebar"] small { display: none; }
+.arc-venancor[data-skin="diretor"] .director-sidebar button[data-variant="sidebar"] strong { font-weight: 400; }
+.arc-venancor[data-skin="diretor"] .director-sidebar button[data-variant="sidebar"] > span:first-child { width: 16px; height: 16px; background: transparent; box-shadow: none; color: currentColor; }
+.arc-venancor[data-skin="diretor"] .director-sidebar .director-duty-link { margin: 0; width: 100%; gap: 8px; }
+.arc-venancor[data-skin="diretor"] .director-sidebar .director-duty-link > span:first-child { width: 16px; justify-content: center; }
+.arc-venancor[data-skin="diretor"] .director-sidebar .director-duty-link > span:last-child { font-size: 13px; font-weight: 400; }
+/* Logo da empresa (imagem larga): cabe inteiro, sem a caixa quadrada. */
+.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child:has(img:not([src="/icon.png"])) { width: auto; max-width: 96px; padding: 0; border: 0; background: transparent; }
+.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child img:not([src="/icon.png"]) { width: auto; max-width: 96px; height: 24px; object-fit: contain; }
+@media (hover: hover) and (pointer: fine) {
+  .arc-venancor[data-skin="diretor"] .director-sidebar .director-role-switcher [data-slot="dropdown-menu-trigger"],
+  .arc-venancor[data-skin="diretor"] .director-sidebar button[data-variant="sidebar"] { height: 28px; min-height: 28px; padding: 0 8px 0 6px; font-size: 13px; }
+  .arc-venancor[data-skin="diretor"] .director-sidebar .director-role-switcher [data-slot="dropdown-menu-trigger"] > span:first-child { width: 16px; height: 16px; }
+}
