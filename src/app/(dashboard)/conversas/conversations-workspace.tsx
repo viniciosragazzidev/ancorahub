@@ -66,6 +66,7 @@ import {
   ArrowSquareOut,
   ChatCircleText,
   Check,
+  Copy,
   CheckCircle,
   Clock,
   FileArrowDown,
@@ -89,7 +90,7 @@ import {
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
-import { Sparkles, RefreshCw, PanelRightClose, PanelRightOpen, ChevronDown, UserCheck, Bot } from "lucide-react";
+import { Sparkles, RefreshCw, PanelRightClose, PanelRightOpen, ChevronDown, UserCheck, Bot, MoreHorizontal } from "lucide-react";
 import { startAutoSaleFromConversationAction } from "@/features/auto-sale/actions";
 import { isAutoSaleTemperature } from "@/features/auto-sale/eligibility";
 import {
@@ -1515,7 +1516,12 @@ function ConversationHistory({ client, directorSkinEnabled }: { client: Conversa
                 </div>
               ) : (
                 // Diretor (sem balão): o grupo diz quem falou, para o CSS separar cliente de equipe/IA.
-                <MessageGroup key={gi} data-sender-group={directorSkinEnabled ? group.type : undefined}>
+                <MessageGroup
+                  key={gi}
+                  data-sender-group={directorSkinEnabled ? group.type : undefined}
+                  // Fala da equipe: IA ou pessoa. Com o lead já com corretor, a fala da pessoa ganha o tom do corretor.
+                  data-sender-kind={directorSkinEnabled && group.type === "system" ? (group.messages[0].senderRole === "assistant" || group.messages[0].direction === "outbound" ? "ai" : client.corretorId ? "broker" : "team") : undefined}
+                >
                   {group.messages.map((message, mi) => (
                     <motion.div
                       key={message.id}
@@ -2237,6 +2243,8 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled, v
       data-active={active ? "true" : undefined}
       data-lite={directorSkinEnabled ? undefined : "row"}
       data-conversations-part={directorSkinEnabled ? "row" : undefined}
+      // Lead já com corretor (21/11/2026): a linha ganha o tom do corretor, o mesmo do bloco dele no chat.
+      data-has-broker={directorSkinEnabled && conversation.corretorId ? "true" : undefined}
       className={cn(
         "group relative flex w-full cursor-pointer items-start gap-3 rounded-full px-3 py-3 text-left",
         active ? "bg-muted/80" : "hover:bg-muted/65",
@@ -2266,6 +2274,7 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled, v
           <span data-conversations-part={directorSkinEnabled ? "row-time" : undefined} className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
             {formatRelative(conversation.latestMessage?.sentAt ?? conversation.stageEnteredAt)}
           </span>
+          {directorSkinEnabled ? <ConversationRowActions conversation={conversation} onOpen={onClick} /> : null}
         </span>
         <span className="truncate text-xs leading-5 text-muted-foreground">
           {conversation.latestMessage?.direction === "outgoing" || conversation.latestMessage?.direction === "outbound" ? "Você: " : ""}
@@ -2274,6 +2283,11 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled, v
         {conversation.tags?.length ? <LeadTagChips tags={conversation.tags} className="pt-0.5" /> : null}
         <span className="flex items-center gap-2 pt-0.5">
           {renderRowQualificationBadge(conversation)}
+          {directorSkinEnabled && conversation.corretorId ? (
+            <span data-conversations-part="row-broker-chip" title={displayBrokerName ? `Com ${displayBrokerName}` : "Com corretor"}>
+              <UserCheck aria-hidden="true" className="size-3" />Corretor
+            </span>
+          ) : null}
           <span data-conversations-part={directorSkinEnabled ? "row-message-count" : undefined} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
             <Clock aria-hidden="true" className="size-3" />
             {hasHistory
@@ -2283,6 +2297,66 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled, v
         </span>
       </span>
     </div>
+  );
+}
+
+/**
+ * Menu "⋯" da linha (estilo Accordee, 21/11/2026): com mouse, aparece no lugar da hora ao passar o mouse ou focar a
+ * linha. Só ações que a linha já sabe fazer, sem buscar nada no servidor. Abrir é nível 0 do FEEDBACK.md; copiar
+ * confirma com um aviso curto (nível 1) e, se falhar, diz o motivo.
+ */
+function ConversationRowActions({ conversation, onOpen }: { conversation: ConversationItem; onOpen: () => void }) {
+  const isLead = !conversation.id.startsWith("unassigned-");
+  const digits = conversation.telefone.replace(/\D/g, "");
+  async function copy(text: string, done: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(done);
+    } catch {
+      toast.error("Não foi possível copiar: o navegador bloqueou a área de transferência.");
+    }
+  }
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <button
+            type="button"
+            aria-label={`Ações da conversa com ${conversation.nome}`}
+            data-conversations-part="row-actions"
+            className="relative z-10 -my-0.5 inline-grid size-5 shrink-0 place-items-center rounded-md text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+          />
+        }
+      >
+        <MoreHorizontal aria-hidden="true" className="size-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 p-1">
+        <DropdownMenuLabel className="truncate px-2 py-1 text-xs font-normal text-muted-foreground">{conversation.nome}</DropdownMenuLabel>
+        <DropdownMenuItem onClick={onOpen} className="gap-2 text-sm">
+          <ChatCircleText className="size-4 shrink-0 text-muted-foreground" />Abrir conversa
+        </DropdownMenuItem>
+        {isLead ? (
+          <DropdownMenuItem render={<Link href={`/leads/${conversation.id}`} />} className="gap-2 text-sm">
+            <ArrowSquareOut className="size-4 shrink-0 text-muted-foreground" />Abrir lead
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuSeparator className="my-1" />
+        <DropdownMenuItem render={<a href={getWhatsAppUrl(conversation.telefone)} rel="noreferrer" target="_blank" />} className="gap-2 text-sm">
+          <WhatsappLogo className="size-4 shrink-0 text-muted-foreground" />Abrir no WhatsApp
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<a href={`tel:${digits}`} />} className="gap-2 text-sm">
+          <Phone className="size-4 shrink-0 text-muted-foreground" />Ligar
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => void copy(conversation.telefone, "Telefone copiado.")} className="gap-2 text-sm">
+          <Copy className="size-4 shrink-0 text-muted-foreground" />Copiar telefone
+        </DropdownMenuItem>
+        {isLead ? (
+          <DropdownMenuItem onClick={() => void copy(`${window.location.origin}/conversas?leadId=${conversation.id}`, "Link da conversa copiado.")} className="gap-2 text-sm">
+            <LinkSimple className="size-4 shrink-0 text-muted-foreground" />Copiar link da conversa
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
