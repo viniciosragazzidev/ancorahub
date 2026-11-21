@@ -3,6 +3,8 @@ import "server-only";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 
+import { getFollowupStats } from "./followup-stats";
+
 export type QualificationStatsSummary = {
   operation: {
     startedToday: number;
@@ -177,14 +179,11 @@ export async function getQualificationStats(tenantId: string): Promise<Qualifica
         avgCostPerSessionBrl,
         avgCostPerQualifiedBrl,
       },
-      followup: {
-        scheduled: 0,
-        sent: 0,
-        responded: 0,
-        interrupted: 0,
-        conversionsPostFollowup: 0,
-        costPerRecoveryBrl: 0,
-      },
+      // Turbo reminders and silence follow-up of the last 30 days (phase 0 of the recovery plan).
+      followup: await getFollowupStats(tenantId).catch((error) => {
+        console.error("[qualification-stats] followup", error instanceof Error ? error.message : error);
+        return { scheduled: 0, sent: 0, responded: 0, interrupted: 0, conversionsPostFollowup: 0, costPerRecoveryBrl: 0 };
+      }),
     };
   } catch (err) {
     console.error("[qualification-stats] Error aggregating stats:", err);
