@@ -100,7 +100,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const negotiationsAreaPromise = context.role === "director" || context.role === "manager" || context.role === "supervisor"
     ? getFeatureFlag(FEATURE_FLAGS.NEGOTIATIONS_AREA).catch(() => "false")
     : Promise.resolve("false");
-  const postSaleAuditFlagPromise = context.role === "director" || context.role === "manager"
+  // Gestor sem unidade: a página do pós-venda nega (escopo da unidade), então a aba nem aparece (20/11).
+  const postSaleAuditFlagPromise = context.role === "director" || (context.role === "manager" && Boolean(context.branchId))
     ? getFeatureFlag(FEATURE_FLAGS.POST_SALE_AUDIT).catch(() => "false")
     : Promise.resolve("false");
   // Venda Automatizada (DEC-182): chave por empresa; a aba some com ela desligada.

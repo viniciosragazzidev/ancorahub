@@ -66,13 +66,22 @@ Equipe passando; typecheck limpo.
    a negociação (`auto-sale/service.ts:116`); a tela `/vendas` segue fora do menu do gestor. Se o gestor não deve
    escolher, basta trocar `assertManager` por `isOutsideManagerScope`.
 
-## 6. Pendências (próximas etapas)
+## 6. Pendências fechadas em 20/11 ("faz todos recomendados")
 
-| # | O quê | Recomendado |
+| # | O quê | Feito |
 |---|---|---|
-| P1 | Pós-venda do gestor (F5 de 10/11) | Decidir com a direção; hoje fora |
-| P2 | Gestão (`/gestao`) no modo normal | Não fazer: Equipe e unidade cobrem |
-| P3 | Funções marketing/financeiro com papel manager barradas em alguns layouts com `role === "manager"` puro (`marketing`, `qualificacao`, `integrations`, `leads/distribuicao`) | Trocar por `isOutsideManagerScope(role, jobTitle)` quando houver alguém com essas funções (hoje nenhum em produção) |
-| P4 | Plantão "todas as unidades" com corretor de outra unidade some da visão do gestor | Esperado pela regra de escopo |
-| P5 | Conferência visual com um gestor real (Matriz e Niterói) e um gestor sem unidade | Fazer no próximo deploy |
-| P6 | Comunicar os gestores sobre o Painel novo | Junto com P5 |
+| P1 | Pós-venda do gestor | **Volta, escopado à unidade.** `/equipe/pos-venda` entrou em `MANAGER_ALLOWED_ROUTES` e o layout que barrava saiu. As ações já escopavam tudo à unidade da sessão (campanhas criadas por ele ou com público da unidade, respostas e alertas de leads da unidade, relatório só dos corretores da unidade); régua automática e regra R0 continuam só com o diretor (`canEdit` falso). "Abrir conversa" (conversas de qualificação, do diretor) some para o gestor. Gestor sem unidade não vê a aba (layout do painel) e a página nega. |
+| P2 | Gestão (`/gestao`) no modo normal | Não feito, pelo recomendado: Equipe e unidade cobrem. |
+| P3 | Funções com papel manager barradas por `role === "manager"` puro | Marketing: a função marketing abre `/marketing`; gestor de unidade e financeiro continuam fora. Qualificação, integrações e distribuição continuam negadas a qualquer manager, como antes de 10/11 (não são áreas dessas funções). |
+| P4 | Plantão "todas as unidades" com corretor de outra unidade | Esperado pela regra de escopo; nada a mudar. |
+| P5 | Conferência visual | Feita em `/dev/gestor-preview?caso=matriz\|niteroi\|sem-unidade&tela=painel\|pos-venda`, com os componentes reais e dados de exemplo (o localhost aponta para o banco de produção, onde não há contas de teste; não se entrou como gestor real). Prints na pasta de notas da sessão (`gestor-prints-2026-11-20`). Achado e corrigido: o gestor sem unidade via a aba Pós-venda e caía em Acesso negado. **Falta**: um gestor real conferir depois do deploy. |
+| P6 | Aviso aos gestores | Texto abaixo, para o usuário mandar pelo canal que escolher (não pelo número oficial). Nada foi enviado. |
+
+### Texto do aviso aos gestores (P6, para o usuário enviar)
+
+> Oi! O Painel do AncoraHub do gestor mudou um pouco:
+> - Os atalhos agora levam para o que é seu: **Plantões da unidade**, **Minha equipe** e **Convidar corretor**.
+> - Os números do dia continuam lá, só da sua unidade.
+> - O **Pós-venda** voltou (Equipe → Pós-venda) com as pesquisas e respostas dos clientes da sua unidade. Você pode criar campanhas para a sua unidade; a régua automática continua com a direção.
+> - Para reativar um corretor que ficou fora do ar: Equipe → sua unidade → Reativar.
+> Qualquer coisa estranha, me chama.
