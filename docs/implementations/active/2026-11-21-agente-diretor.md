@@ -168,7 +168,8 @@ Todas L, Direto, papel dir. Devolvem texto curto + dados estruturados + link da 
 | `plantao_reenviar_convite_presenca` | Reenvia o convite de presença por WhatsApp | `plantao_id`, `escala_id` | idem | E | Toque (WhatsApp ao corretor) | Não | `sendDutyPresenceInviteManuallyAction` |
 | `plantao_modo_online` | Marca corretor como online num plantão presencial | `plantao_id`, `escala_id`, `online` | idem | E | Direto | Inverso | `setDutyAssignmentAttendanceModeAction` |
 | `plantao_ordem_rodizio` | Define a ordem do rodízio da ocorrência ativa / volta ao automático | `plantao_id`, `data`, `corretor_ids[]` ou `resetar` | idem + dir | E | Direto | Resetar ou ordem anterior | `saveDutyManualQueueAction`, `resetDutyManualQueueAction` |
-| `plantao_dar_leads` | **"Dê 5 leads do plantão para a Ana"**. Pega os leads sem dono das filas do plantão (critério: mais antigos, mais quentes ou os indicados) e entrega um a um, respeitando escala, falta e pausa | `plantao_id`, `corretor_id`, `quantidade` (1 a 20), `criterio: antigos | quentes | ids`, `lead_ids?` | idem + `leads_assign` + kill switch | E | Direto até 3; Toque de 4 a 20 (lista os leads) | Desatribuir os mesmos leads (voltam para a fila) | **Nova composição**: `getDutyAvailableLeadsAction` + `assignDutyLeadToBrokerAction` × N (não existe ação única; ver 7.2) |
+| `plantao_dar_cadeiras` | **"Dê 5 cadeiras para a Ana"** (correção do usuário em 21/11: cadeira = vaga num plantão, não lead). Acha as próximas N ocorrências com vaga livre na escala publicada (respeitando os filtros ditos: dias da semana, tipo, unidade, turno, a partir de quando) em que ela ainda não está, e a escala uma vez em cada. Sem escala publicada para essas datas: escala no rascunho do mês e avisa que falta publicar | `corretor_id`, `quantidade` (1 a 20), `dias_semana?`, `tipo?`, `unidade_id?`, `turno?`, `a_partir_de?`, `ate?` | `duty_schedules_manage` + dir | E | Toque sempre (lista as N datas e horários antes) | Tirar das mesmas ocorrências | **Nova composição**: `getMonthlyDutyPlanAction` + `addBrokerToPublishedOccurrenceAction` × N (ou `updateMonthlyDutyDraftAction` `add`) |
+| `plantao_dar_leads` | "Passa 5 leads do plantão para a Ana" (entregar leads, diferente de cadeira). Pega os leads sem dono das filas do plantão (critério: mais antigos, mais quentes ou os indicados) e entrega um a um, respeitando escala, falta e pausa | `plantao_id`, `corretor_id`, `quantidade` (1 a 20), `criterio: antigos | quentes | ids`, `lead_ids?` | idem + `leads_assign` + kill switch | E | Direto até 3; Toque de 4 a 20 (lista os leads) | Desatribuir os mesmos leads (voltam para a fila) | **Nova composição**: `getDutyAvailableLeadsAction` + `assignDutyLeadToBrokerAction` × N (não existe ação única; ver 7.2) |
 | `plantao_limite_leads` | Teto de leads por corretor no plantão ("carteiras" no sentido de vagas) | `plantao_id`, `max_por_corretor` | idem | E | Toque | Valor anterior | `updateDutyScheduleAction` (`maxLeadsPerBroker`) |
 | `plantao_criar` | Cria plantão (dias, datas, horário, turnos, filas, limites, tipo) | campos do formulário | `duty_schedules_manage` | E | Toque (prévia do que será criado) | Arquivar | `createDutyScheduleAction` |
 | `plantao_editar` | Edita horário, vigência, limites, tipo, filas | `plantao_id` + campos | idem | E | Toque (mexe na escala inteira) | Editar de volta (guarda o anterior) | `updateDutyScheduleAction` |
@@ -518,7 +519,7 @@ O botão "Confirmar" segue o padrão do §4 do FEEDBACK (repouso, pressionado, e
 
 - Fluxo novo "Agente do diretor": a gaveta real sobre a moldura do diretor, com o `ToolBackend` simulado (equipe de 8 pessoas, 3 plantões hoje, 2 Anas, 12 leads sem dono) e um modelo de mentira com roteiro (`MockLanguageModelV4` do `ai/test`) por pedido pronto.
 - Contrato em `DevLab`: `directorAgent?: { backend: ToolBackend; model?: "roteiro" | "real" }`.
-- Painel: resposta do servidor (ok, falha, ambíguo, lento), "Recomeçar", pedidos prontos ("Coloque a Ana no plantão da manhã", "Tire o Bruno do plantão de hoje", "Dê 5 leads do plantão para a Carla", "Verifique por que o Diego não recebe lead", "Distribua todos os sem dono", "Mande para o cliente…").
+- Painel: resposta do servidor (ok, falha, ambíguo, lento), "Recomeçar", pedidos prontos ("Coloque a Ana no plantão da manhã", "Tire o Bruno do plantão de hoje", "Dê 5 cadeiras para a Carla", "Verifique por que o Diego não recebe lead", "Distribua todos os sem dono", "Mande para o cliente…").
 - Cada fase só fecha com o fluxo cobrindo ok, falha, ambíguo, lento, aprovação, recusa e Desfazer, mais o checklist do FEEDBACK §10 e a revisão visual do usuário.
 
 ---
@@ -531,6 +532,7 @@ Os 7 problemas da seção 3.1 entram na fase 0.
 
 ### 7.2 Ações que não existem e viram composição
 
+- **"Dar N cadeiras"**: não há ação única. `plantao_dar_cadeiras` lê a escala do mês, escolhe as próximas N vagas livres e chama `addBrokerToPublishedOccurrenceAction` em cada uma (no rascunho, `updateMonthlyDutyDraftAction`).
 - **"Dar N leads do plantão"**: não há ação única. `plantao_dar_leads` lista com `getDutyAvailableLeadsAction` e chama `assignDutyLeadToBrokerAction` N vezes (respeita escala, falta e pausa). `assignLeadBatchToBrokerAction` existe, mas ignora o plantão: não usar para este pedido.
 - **"Tirar do plantão" por (corretor, plantão)**: as ações pedem `assignmentId`/`occurrenceId`; a composição resolve antes.
 - **Mudar etapa de um lead com dono pelo diretor**: `changeLeadStatus` bloqueia; usar `bulkChangeLeadStatusAction` com um id.
@@ -571,7 +573,7 @@ Branch por fase a partir da mais nova (`feat/agente-diretor-f0` …), merge em `
 - 4.4 inteira e 4.5 inteira (menos Fora), com as três composições (colocar, tirar, dar leads).
 - `agent_director_writes_enabled` ligada no piloto (empresa do usuário).
 - Evals de escrita (25 casos) com pass^3.
-- **Pronto**: "coloque a Ana no plantão da manhã", "tire o Bruno do plantão de hoje" e "dê 5 leads do plantão para a Carla" funcionam ponta a ponta, com Desfazer e auditoria, no laboratório e na empresa piloto.
+- **Pronto**: "coloque a Ana no plantão da manhã", "tire o Bruno do plantão de hoje" e "dê 5 cadeiras para a Carla" funcionam ponta a ponta, com Desfazer e auditoria, no laboratório e na empresa piloto.
 
 ### Fase 3 · Equipe, leads e conversas
 
@@ -639,3 +641,70 @@ Branch por fase a partir da mais nova (`feat/agente-diretor-f0` …), merge em `
 - Novos: `src/features/agent/**`, `src/app/api/ai/agent-drawer/chat/route.ts` (reescrita), `drizzle/02xx_agent_actions.sql`, `evals/agente-diretor/**`, `src/app/dev/laboratorio/agente-diretor-lab.tsx`.
 - Alterados: `src/components/agent-drawer/agent-drawer.tsx` (partes, cartões), `agent-drawer-provider.tsx` (atalhos), `src/lib/dev-lab.tsx` (contrato), `src/shared/db/schema.ts`, `docs/runbooks/coolify-scheduled-tasks.md` (limpeza no job existente), Super-admin (perfil de modelo e flag).
 - Removidos no fim da fase 0: `src/features/agent-drawer/mcp-tools.ts` e `prompt-builder.ts` (substituídos).
+
+---
+
+## 12. Ações do dia a dia, em ordem de aplicação (pedido do usuário, 21/11)
+
+Uma por vez, cada uma entregue de ponta a ponta (ferramenta, prévia, Desfazer, auditoria, laboratório, evals). Antes da primeira, a fundação (fase 0), sem a qual nenhuma funciona. A coluna "Fala" é o jeito de pedir; o agente aceita variações.
+
+### Bloco A · Escala e plantões (o que o diretor mais faz)
+
+| # | Ação | Fala | Confirmação |
+|---|---|---|---|
+| A1 | Dar cadeiras | "Dê 5 cadeiras para a Ana", "dá 3 cadeiras de sábado pro Bruno", "dá 4 cadeiras online pra Carla a partir de segunda" | Toque com as datas |
+| A2 | Escalar num dia | "Escala a Ana no plantão de sexta, 28/11", "põe o Bruno no plantão da manhã de amanhã" | Direto (Toque se o plantão já começou ou está lotado) |
+| A3 | Tirar de um dia | "Tira o Bruno do plantão de hoje", "tira a Ana do sábado" | Direto (Toque se já começou) |
+| A4 | Tirar de todas as próximas | "Tira a Ana de todos os plantões até o fim do mês" | Toque com a lista |
+| A5 | Trocar duas pessoas | "Troca a Ana com o Bruno no plantão de sexta" | Toque |
+| A6 | Passar a cadeira de uma pessoa para outra | "Passa a cadeira da Ana de sexta para a Carla" | Toque |
+| A7 | Marcar falta / desfazer falta | "A Ana faltou hoje" | Toque |
+| A8 | Liberar presença | "Libera a presença do Bruno, ele está aqui" | Toque |
+| A9 | Pausar alguém só neste plantão / retomar | "Pausa a Ana no plantão agora", "volta a Ana" | Direto |
+| A10 | Pausar / ativar recebimento geral do corretor | "Pausa o Bruno", "ativa o Bruno" | Direto |
+| A11 | Ordem do rodízio | "Põe a Carla primeiro no rodízio" | Direto |
+| A12 | Online num plantão presencial | "A Ana vai fazer online hoje" | Direto |
+| A13 | Reenviar convite de presença | "Manda de novo o aviso de presença pra Ana" | Toque |
+| A14 | Ver a escala | "Quem está no plantão agora?", "escala de sábado", "quantas cadeiras a Ana tem no mês?", "onde falta gente esta semana?" | Leitura |
+| A15 | Feriado | "Tira o dia 25 da escala" | Forte |
+| A16 | Publicar a escala do mês | "Publica a escala de dezembro" | Forte |
+
+### Bloco B · Leads e distribuição
+
+| # | Ação | Fala | Confirmação |
+|---|---|---|---|
+| B1 | Entregar leads do plantão | "Passa 5 leads do plantão para a Ana" | Direto até 3, Toque acima |
+| B2 | Dar um lead a alguém | "Dá o lead da Maria Souza para o Bruno" | Direto |
+| B3 | Tirar o lead de alguém / devolver à fila | "Tira o lead do João do Bruno", "devolve pra fila" | Direto |
+| B4 | Transferir a carteira | "Passa todos os leads do Bruno para a Ana" | Forte |
+| B5 | Reenviar oferta | "Reenvia o lead da Maria para o Bruno" | Direto |
+| B6 | Mudar etapa | "Põe o lead do João em negociação", "marca como perdido, preço" | Direto (1), Toque (vários) |
+| B7 | Nota e tarefa no lead | "Anota no lead da Maria que…", "cria retorno amanhã às 10 pro Bruno com a Maria" | Direto |
+| B8 | Distribuir os sem dono | "Distribui os leads sem dono" | Forte |
+| B9 | Ver leads | "Quantos sem dono?", "o que aconteceu com o lead da Maria?", "quem recebeu mais hoje?" | Leitura |
+| B10 | Diagnóstico | "Por que a Ana não está recebendo lead?" | Leitura |
+
+### Bloco C · Equipe
+
+| # | Ação | Fala | Confirmação |
+|---|---|---|---|
+| C1 | Convidar corretor | "Convida o Pedro Lima, 21 99999-0000, unidade Centro" | Toque |
+| C2 | Reenviar / revogar convite | "Reenvia o convite do Pedro" | Direto / Toque |
+| C3 | Trocar de unidade | "Passa a Ana para a unidade Barra" | Toque |
+| C4 | Ativar / desativar | "Desativa o Bruno" | Toque |
+| C5 | Mensagem para corretores | "Manda pra equipe da manhã: reunião às 9h" | Forte |
+| C6 | Aviso no Início | "Põe no Início: plantão extra sábado" | Toque |
+| C7 | Ver equipe | "Quem está pausado?", "como a Ana foi esta semana?" | Leitura |
+
+### Bloco D · Conversas e operação
+
+| # | Ação | Fala | Confirmação |
+|---|---|---|---|
+| D1 | Assumir / devolver conversa à IA | "Assume a conversa da Maria", "devolve pra IA" | Direto / Toque |
+| D2 | Mensagem ao cliente | "Manda pra Maria: sua proposta sai amanhã" | Forte com o texto |
+| D3 | Unidade recebe / pausa leads | "Pausa a entrada de leads na Barra" | Toque |
+| D4 | Fila manual / automática | "Deixa a fila PME manual" | Toque |
+| D5 | Saúde | "Tem WhatsApp caído?", "a IA está qualificando?" | Leitura |
+| D6 | Relatório do plantão agora | "Manda o relatório do plantão" | Toque |
+
+Ordem recomendada: fundação → A14 (ler escala, base de tudo) → A1 → A2 → A3 → A9/A10 → A5/A6 → A7/A8 → B1 → B2/B3 → B9/B10 → o resto de A → B → C → D.
