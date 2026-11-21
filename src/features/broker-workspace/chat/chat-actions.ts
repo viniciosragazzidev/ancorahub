@@ -16,6 +16,7 @@ import { quickReminderAction } from "@/features/leads/reminder-actions";
 import { setLeadTaskDoneAction } from "@/features/leads/task-actions";
 import { acknowledgeAction } from "@/features/relationship/actions";
 import { addBrokerToMyTeamAction } from "@/features/supervisor-workspace/actions";
+import { SASA_PLAN_ACTIONS } from "@/features/sasa/command-core";
 
 /** warning: it worked, but part of it did not (shown as an alert, not as success). */
 /** whatsapp: the client's WhatsApp link after an accept, opened in the same tap by the chat. */
@@ -23,7 +24,8 @@ export type ChatServerActionResult = { ok: boolean; message: string; href?: stri
 
 const leadPayload = z.object({ leadId: z.string().min(1) });
 const taskPayload = z.object({ taskId: z.string().uuid(), leadName: z.string().max(120).optional() });
-const actionName = z.enum(["lead.accept", "lead.decline", "lead.registerContact", "lead.changeStep", "lead.scheduleReturn", "lead.completeReturn", "lead.cancelReturn", "lead.reopenReturn", "lead.undoReturn", "lead.restoreStep", "lead.markLost", "lead.addNote", "duty.pause", "duty.resume", "notifications.markRead", "relationship.ack", "team.addBroker"]);
+const actionName = z.enum(["lead.accept", "lead.decline", "lead.registerContact", "lead.changeStep", "lead.scheduleReturn", "lead.completeReturn", "lead.cancelReturn", "lead.reopenReturn", "lead.undoReturn", "lead.restoreStep", "lead.markLost", "lead.addNote", "duty.pause", "duty.resume", "notifications.markRead", "relationship.ack", "team.addBroker", "sasa.plan"]);
+const planSteps = z.array(z.object({ name: z.enum(SASA_PLAN_ACTIONS), payload: z.record(z.string(), z.string()), label: z.string().max(300).optional() })).min(1).max(3);
 
 const whenPreset = z.enum(["today", "tomorrow", "in_2_days", "in_3_days"]);
 const RETURN_TEXT: Record<z.infer<typeof whenPreset>, string> = {
@@ -134,11 +136,38 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
         return result.success ? { ok: true, message: "Desfeito. A etapa voltou a ser a de antes." } : { ok: false, message: "Não consegui desfazer. Toque de novo em alguns segundos." };
       }
       case "lead.markLost": {
-        const { leadId, reason } = leadPayload.extend({ reason: z.enum(MOTIVOS_PERDA) }).parse(payload);
+        const { leadId, reason, previous } = leadPayload.extend({ reason: z.enum(MOTIVOS_PERDA), previous: z.string().max(40).optional() }).parse(payload);
         const result = await changeLeadStatusAction({}, form({ leadId, newStatus: "lost", motivoPerda: reason }));
+        // Pela Sasá (fase 5) vem a etapa anterior: o "Desfazer" reabre o atendimento nela.
+        const reopen = previous && (RESTORABLE_STEPS as readonly string[]).includes(previous)
+          ? { label: "Desfazer", action: { kind: "server" as const, name: "lead.restoreStep" as const, payload: { leadId, status: previous } } }
+          : undefined;
         return result.success
-          ? { ok: true, message: "Registrei. O atendimento foi encerrado e conta no seu histórico." }
+          ? { ok: true, message: "Registrei. O atendimento foi encerrado e conta no seu histórico.", undo: reopen }
           : { ok: false, message: "O atendimento não foi encerrado. Toque de novo em alguns segundos." };
+      }
+      case "sasa.plan": {
+        // Cada passo roda pela ação de sempre, na ordem; para no primeiro que falhar e diz o que já valeu.
+        const { steps } = z.object({ steps: z.string().max(6000) }).parse(payload);
+        const list = planSteps.parse(JSON.parse(steps));
+        const done: string[] = [];
+        const undos: Array<{ name: ChatServerActionName; payload: Record<string, string> }> = [];
+        for (const [index, step] of list.entries()) {
+          const result = await runChatServerAction(step.name, step.payload);
+          if (!result.ok) {
+            const rest = list.length - index - 1;
+            const failed = `Não consegui: ${step.label ?? "um dos pedidos"}.${rest ? ` ${rest === 1 ? "O passo seguinte não foi feito" : "Os passos seguintes não foram feitos"}.` : ""}`;
+            if (!done.length) return { ok: false, message: `${failed} Nada foi alterado.` };
+            return { ok: true, warning: true, message: `Feito: ${done.join("; ")}. ${failed}`, undo: undos.length ? { label: "Desfazer", action: { kind: "server", name: "sasa.plan", payload: { steps: JSON.stringify([...undos].reverse()) } } } : undefined };
+          }
+          done.push(step.label ?? result.message);
+          if (result.undo) undos.push({ name: result.undo.action.name, payload: Object.fromEntries(Object.entries(result.undo.action.payload).map(([key, value]) => [key, String(value)])) });
+        }
+        return {
+          ok: true,
+          message: done.length === 1 ? `Pronto: ${done[0]}.` : `Pronto, fiz as ${done.length} coisas.`,
+          undo: undos.length ? { label: "Desfazer", action: { kind: "server", name: "sasa.plan", payload: { steps: JSON.stringify([...undos].reverse()) } } } : undefined,
+        };
       }
       case "lead.addNote": {
         const { leadId, content, clientMessageId } = leadPayload.extend({ content: z.string().trim().min(1).max(2000), clientMessageId: clientMessageIdSchema.optional() }).parse(payload);
