@@ -4,6 +4,7 @@ import { TurboAdmin } from "@/features/qualification-turbo/components/turbo-admi
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { TurboAdminLite } from "@/features/qualification-turbo/components/turbo-admin-lite";
+import { getRecoverySettings } from "@/features/lead-recovery/settings";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { hasCapability } from "@/shared/auth/permissions";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -25,7 +26,7 @@ export default async function QualificacaoTurboPage() {
       <>
         <DashboardHeader breadcrumb="Qualificação" title="Qualificação turbo" summary={summary} />
         <main className={litePage.stack}>
-          <TurboAdminLite data={data} />
+          <TurboAdminLite data={data} recovery={await getRecoverySettings(context.tenantId).catch(() => null)} />
         </main>
       </>
     );

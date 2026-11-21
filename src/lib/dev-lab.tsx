@@ -29,6 +29,8 @@ export type DevLab = {
   sale?: SaleChatServices;
   /** Leads na qualificação (recuperação, fase 1): no lugar da linha do tempo e do "Não contatar". */
   qualificationLeads?: QualificationLeadsServices;
+  /** Recuperação (fase 3): no lugar de salvar a configuração. */
+  recoverySettings?: (settings: import("@/features/lead-recovery/settings-core").RecoverySettings) => Promise<{ ok: true; settings: import("@/features/lead-recovery/settings-core").RecoverySettings } | { ok: false; error: string }>;
   /** Sasá agêntica: no lugar de sasaCommandAction e das ações do chat (Desfazer, atalhos de data). */
   sasa?: {
     command: (input: SasaClientCommand) => Promise<SasaReply>;

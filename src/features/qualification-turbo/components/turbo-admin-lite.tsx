@@ -26,10 +26,12 @@ import { useFeedback } from "@/lib/feedback/use-feedback";
 import { submitRecommendedTemplatesAction, updateTurboSettingsAction, type TurboAdminData } from "../actions";
 import { ActionNote, BusyLabel, useActionStatus } from "./action-status-lite";
 import { SILENCE_FOLLOW_UP_CHANNEL_OPTIONS, SILENCE_FOLLOW_UP_DESCRIPTION } from "./silence-follow-up-copy";
+import { RecoverySettingsLite } from "@/features/lead-recovery/components/recovery-settings-lite";
+import { recoveryBlockers, type RecoverySettings } from "@/features/lead-recovery/settings-core";
 
 type TemplateRow = TurboAdminData["templates"][number];
 
-const TOUCH_LABEL: Record<string, string> = { t0: "1ª mensagem", t1: "Lembrete 20 min", t2: "Reengajamento 3h", t3: "Oferta de ligação", t4: "Despedida", reactivation: "Reativação" };
+const TOUCH_LABEL: Record<string, string> = { t0: "1ª mensagem", t1: "Lembrete 20 min", t2: "Reengajamento 3h", t3: "Oferta de ligação", t4: "Despedida", reactivation: "Reativação", s4: "Recuperação D+2", s5: "Recuperação D+4", s6: "Recuperação D+7", nurture: "Nutrição mensal" };
 const STATUS: Record<string, { label: string; tone?: "success" | "warning" | "danger" }> = {
   APPROVED: { label: "Aprovado", tone: "success" },
   PENDING: { label: "Em análise na Meta", tone: "warning" },
@@ -115,9 +117,10 @@ function TurboSettingsLite({ data }: { data: TurboAdminData }) {
   );
 }
 
-export function TurboAdminLite({ data }: { data: TurboAdminData }) {
+export function TurboAdminLite({ data, recovery }: { data: TurboAdminData; recovery?: RecoverySettings | null }) {
   const [isPending, startTransition] = useTransition();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const missing = data.templates.filter((row) => row.status === "MISSING" || row.status === "REJECTED");
   const approved = data.templates.filter((row) => row.status === "APPROVED").length;
 
@@ -205,9 +208,33 @@ export function TurboAdminLite({ data }: { data: TurboAdminData }) {
         ) : null}
         <LiteResponsiveData caption="Templates da qualificação" columns={columns} rows={data.templates} rowKey={(row) => row.name} empty={<p className={page.emptyText}>Nenhum template recomendado.</p>} />
       </section>
+      {recovery ? (
+        <section className={page.group} aria-labelledby="recovery-settings-title">
+          <header className={page.cardHead}>
+            <h2 id="recovery-settings-title" className={page.cardTitle}>Recuperação de leads</h2>
+            <p className={page.cardDescription}>
+              {recoveryBlockers(recovery).length
+                ? `Desligada. ${recoveryBlockers(recovery).join(" ")}`
+                : `Ligada · ${[recovery.stoppedMidway && "parou no meio", recovery.warmBridge && "morno", recovery.callQueue && "fila de ligação", recovery.nurture && "nutrição"].filter(Boolean).join(", ") || "nenhum segmento"} · controle de ${recovery.controlPct}%.`}
+            </p>
+          </header>
+          <div className={page.toolbar}>
+            <button type="button" className={page.button} onClick={() => setRecoveryOpen(true)}>
+              <Settings aria-hidden="true" size={16} />
+              Configurar recuperação
+            </button>
+            <Link href="/qualificacao/recuperacao" className={page.button}>Ver o funil de recuperação</Link>
+          </div>
+        </section>
+      ) : null}
       <p className={page.cardDescription}>
         Os resultados (quem respondeu, qual mensagem funciona melhor, custo) ficam no <Link href="/dashboard?tab=funnel" className={sections.link}>Funil de qualificação do painel</Link>.
       </p>
+      {recovery ? (
+        <LiteSidePanel open={recoveryOpen} onOpenChange={setRecoveryOpen} title="Recuperação de leads" description="Cadência única para quem parou no meio, ponte do morno, fila de ligação e nutrição. Tudo nasce desligado.">
+          <RecoverySettingsLite initial={recovery} canEdit={data.canEdit} />
+        </LiteSidePanel>
+      ) : null}
       <LiteSidePanel open={settingsOpen} onOpenChange={setSettingsOpen} title="Qualificação turbo" description="Primeira mensagem por tipo de anúncio, testes A/B e lembretes automáticos.">
         <TurboSettingsLite data={data} />
       </LiteSidePanel>
