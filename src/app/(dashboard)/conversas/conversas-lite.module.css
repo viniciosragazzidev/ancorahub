@@ -962,3 +962,32 @@
   font-weight: 500;
   white-space: nowrap;
 }
+
+/* Uma rolagem só (21/11/2026): no computador a área principal do diretor é um painel 8px solto da janela, com borda de
+   1px (director-accordee.css). A tela de Conversas tinha a altura da janela inteira e passava 18px do painel, criando
+   uma segunda barra de rolagem por fora. Agora ela cabe exatamente no painel. */
+@media (min-width: 768px) {
+  .root[data-skin="diretor"] { height: calc(var(--app-dvh, 100dvh) - 18px); }
+}
+
+/* Chat sem balão, mensagens seguidas (21/11/2026): o avatar guarda sempre a coluna de 32px (as seguintes vinham sem
+   coluna e desalinhavam), e o texto fica à esquerda e quebra links longos (o conteúdo alinhado à direita vazava para
+   fora do painel quando um link não cabia). */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-avatar"] { width: 32px; min-width: 32px; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-content"] { min-width: 0; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="bubble"] { min-width: 0; align-items: flex-start; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="bubble-content"] { align-self: flex-start; max-width: min(72ch, 100%); overflow-wrap: anywhere; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-content"] > * { max-width: 100%; }
+
+/* Link na mensagem: uma linha, reticências, cor de link (texto, não fundo). */
+.root[data-skin="diretor"] [data-conversations-part="message-link"] { color: var(--series-1-text, var(--series-1)); overflow-wrap: normal; white-space: nowrap; }
+
+/* Áudio no chat sem balão: play em botão claro com borda e barras em cinza do texto apagado, legíveis no branco, no
+   bloco cinza da IA e no bloco azul do corretor, nos dois temas. */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="bubble-content"] button[class*="bg-primary/10"] {
+  border: 1px solid var(--border-strong);
+  background: var(--surface) !important;
+  color: var(--foreground);
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="bubble-content"] button[class*="bg-primary/10"]:hover { background: var(--surface-muted) !important; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="bubble-content"] [class*="bg-muted-foreground/50"] { background: var(--text-muted) !important; }

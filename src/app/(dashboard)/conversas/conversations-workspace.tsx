@@ -1899,13 +1899,16 @@ function MessageRow({
                   url: mediaData.url,
                   caption: message.body?.startsWith("[") && message.body?.endsWith("]") ? null : message.body,
                 }}
-                isOutbound={isOutbound}
+                // Sem balão (diretor), a mídia enviada usa as cores neutras: as do balão azul ficavam brancas no fundo claro.
+                isOutbound={teamAvatar ? false : isOutbound}
                 onOpenFullscreen={setFullscreenMedia}
               />
             ) : mediaData && !mediaData.url ? (
-              <MediaUnavailable isOutbound={isOutbound} />
+              <MediaUnavailable isOutbound={teamAvatar ? false : isOutbound} />
             ) : mediaPlaceholderLabel(message.body) ? (
               <p className="whitespace-pre-wrap leading-5 italic opacity-80">{mediaPlaceholderLabel(message.body)}</p>
+            ) : teamAvatar ? (
+              <p className="whitespace-pre-wrap leading-5">{linkifiedBody(message.body)}</p>
             ) : (
               <p className="whitespace-pre-wrap leading-5">{message.body}</p>
             )}
@@ -1946,6 +1949,25 @@ function MessageRow({
         <MediaLightbox media={fullscreenMedia} onClose={() => setFullscreenMedia(null)} />
       ) : null}
     </Message>
+  );
+}
+
+/**
+ * Diretor (sem balão, 21/11/2026): endereços na mensagem viram link clicável numa linha só, com reticências e o endereço
+ * completo no título, no lugar de um texto longo que quebrava no meio ou vazava do painel.
+ */
+function linkifiedBody(body: string | null | undefined): ReactNode {
+  if (!body) return body;
+  const parts = body.split(/(https?:\/\/[^\s]+)/g);
+  if (parts.length === 1) return body;
+  return parts.map((part, index) =>
+    /^https?:\/\//.test(part) ? (
+      <a key={index} href={part} target="_blank" rel="noreferrer noopener" title={part} data-conversations-part="message-link" className="block max-w-full truncate text-primary underline underline-offset-2">
+        {part}
+      </a>
+    ) : (
+      <Fragment key={index}>{part}</Fragment>
+    ),
   );
 }
 

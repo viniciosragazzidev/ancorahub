@@ -124,6 +124,8 @@ function DirectorDashboardHeader({
             <button type="button" aria-label="Buscar páginas, leads e clientes" title="Buscar (Ctrl+K)" className="director-header-action director-search-trigger" onClick={() => window.dispatchEvent(new Event("open-command-palette"))}>
               <Search aria-hidden="true" className="size-4" />
             </button>
+            {/* Tema claro/escuro no topo do diretor (21/11/2026, o escuro do diretor está em director-accordee.css). */}
+            <ThemeToggle />
             <NotificationPopover />
             <button type="button" aria-label="Reportar problema" title="Reportar problema" className="director-header-action director-feedback-trigger" onClick={() => window.dispatchEvent(new Event("open-system-feedback"))}>
               <CircleHelp aria-hidden="true" className="size-4" />
