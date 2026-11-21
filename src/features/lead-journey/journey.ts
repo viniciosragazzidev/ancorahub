@@ -133,7 +133,7 @@ export function currentField(collected: readonly string[] | undefined) {
 
 function cadenceNext(cadence: JourneyCadence | null | undefined, now: Date, fallback: string) {
   if (!cadence) return fallback;
-  if (cadence.stopped || cadence.sent >= cadence.total) return "Fim dos lembretes: vai para a fila de ligação";
+  if (cadence.stopped || cadence.sent >= cadence.total) return "Fim dos lembretes automáticos";
   const nextAt = toDate(cadence.nextAt);
   const which = `Lembrete ${cadence.sent + 1} de ${cadence.total}`;
   return nextAt ? `${which} ${formatWhen(nextAt, now)}` : which;
@@ -246,6 +246,8 @@ export function journeyTitle(journey: LeadJourney) {
 
 /** Fase da régua para mostrar ao lado da barra. */
 export function journeyPhaseLabel(journey: LeadJourney) {
+  if (journey.phase === "recuperacao") return "Recuperação";
+  if (journey.phase === "encerrado") return journey.code === "N6" ? "Ganho" : "Encerrado";
   if (journey.step <= stepOf("Q5")) return "Qualificação";
   if (journey.step === stepOf("N1")) return "Corretor";
   return "Negociação";

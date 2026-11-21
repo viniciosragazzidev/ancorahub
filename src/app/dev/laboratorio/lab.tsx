@@ -32,10 +32,11 @@ import styles from "./lab.module.css";
 import { MotionShowcase } from "./motion-showcase";
 import { LeadHoverLab } from "./lead-hover-lab";
 import { labQualificationServices, QualificationLeadsLab } from "./qualification-leads-lab";
+import { RecoveryFunnelLab } from "./recovery-funnel-lab";
 import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, labSasaQuestionsBlock, labSasaWorld } from "./sasa-lab";
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -50,6 +51,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "callAncora", label: "Call Âncora (celular simulado)" },
   { id: "leadHover", label: "Hover card do lead (desktop)" },
   { id: "etapaLead", label: "Etapa do lead (qualificação)" },
+  { id: "funilRecuperacao", label: "Funil de recuperação" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -286,6 +288,8 @@ export function FlowLab() {
           <LeadHoverLab />
         ) : flow === "etapaLead" ? (
           <QualificationLeadsLab />
+        ) : flow === "funilRecuperacao" ? (
+          <RecoveryFunnelLab />
         ) : flow === "callAncora" ? (
           <CallAncoraWorkspace brokerFirstName="Vinicios" />
         ) : (

@@ -5928,3 +5928,40 @@ export const sasaCommands = pgTable(
     index("sasa_commands_purge_idx").on(table.createdAt).where(sql`${table.purgedAt} IS NULL`),
   ],
 );
+
+/**
+ * Toques de recuperação (fase 2 do plano de recuperação, 21/11/2026; migration 0234). Um por toque: passo, canal,
+ * resultado, resposta e custo estimado. Lido pelo funil de recuperação e escrito pelo turbo, pelo follow-up de
+ * silêncio e pela cadência única. Plano: docs/implementations/active/2026-11-21-recuperacao-de-leads.md.
+ */
+export const leadRecoveryTouches = pgTable(
+  "lead_recovery_touches",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    /** never_replied | stopped_midway | warm | call_queue | nurture */
+    segment: text("segment").notNull(),
+    /** t1..t4, s1..s6, call, n1..n3 */
+    step: text("step").notNull(),
+    attempt: integer("attempt").notNull().default(1),
+    /** meta | waha | call */
+    channel: text("channel"),
+    template: text("template"),
+    /** sent | skipped | failed | held */
+    status: text("status").notNull(),
+    reason: text("reason"),
+    errorCode: text("error_code"),
+    outboundId: text("outbound_id"),
+    messageId: text("message_id"),
+    costBrl: numeric("cost_brl", { precision: 10, scale: 4 }).notNull().default("0"),
+    controlGroup: boolean("control_group").notNull().default(false),
+    repliedAt: timestamp("replied_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("lead_recovery_touches_once_unique").on(table.tenantId, table.leadId, table.step, table.attempt),
+    index("lead_recovery_touches_tenant_created_idx").on(table.tenantId, table.createdAt),
+    index("lead_recovery_touches_lead_idx").on(table.leadId, table.createdAt),
+  ],
+);

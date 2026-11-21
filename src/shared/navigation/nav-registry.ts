@@ -168,6 +168,7 @@ export const NAV_AREAS: readonly NavArea[] = [
       { id: "simulador", label: "Simulador", href: "/qualificacao?tab=simulator", permission: "acessar_qualificacao_ia", inPlace: true, aliases: { tab: ["alerts"] } },
       { id: "turbo", label: "Qualificação turbo", href: "/qualificacao/turbo", permission: "acessar_qualificacao_ia" },
       { id: "leads-qualificacao", label: "Leads na qualificação", href: "/qualificacao/leads", permission: "acessar_qualificacao_ia" },
+      { id: "recuperacao", label: "Recuperação", href: "/qualificacao/recuperacao", permission: "acessar_qualificacao_ia" },
       { id: "situacoes", label: "Situações", href: "/atendimento/situacoes", permission: "acessar_qualificacao_ia", paths: ["/atendimento"] },
       { id: "mensagens", label: "Mensagens", href: "/atendimento/mensagens", permission: "acessar_qualificacao_ia" },
       { id: "perguntas", label: "Fluxo de atendimento", href: "/atendimento/fluxo", permission: "acessar_qualificacao_ia" },
