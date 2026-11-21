@@ -917,3 +917,11 @@
 .root[data-skin="diretor"] [data-conversations-part="row"] :global(.truncate.text-sm):has(+ [data-conversations-part="row-owner-name"]) { max-width: calc(100% - 4.5rem); }
 .root[data-skin="diretor"] [data-conversations-part="row"] [data-conversations-part="row-owner-name"] { flex-shrink: 1; min-width: 4rem; }
 .root[data-skin="diretor"] [data-conversations-part="row"] :global(.pt-0\.5) { flex-wrap: wrap; row-gap: 4px; }
+
+/* Corretor só no hover da linha (pedido do Vinicios, 21/11/2026): com mouse, a linha mostra o nome do cliente inteiro e
+   o "· corretor" aparece ao passar o mouse ou focar a linha. No toque não há hover, então o corretor segue visível. */
+@media (hover: hover) and (pointer: fine) {
+  .root[data-skin="diretor"] [data-conversations-part="row"] [data-conversations-part="row-owner-name"] { display: none; }
+  .root[data-skin="diretor"] [data-conversations-part="row"]:is(:hover, :focus-within) [data-conversations-part="row-owner-name"] { display: block; }
+  .root[data-skin="diretor"] [data-conversations-part="row"]:not(:hover):not(:focus-within) :global(.truncate.text-sm) { max-width: 100%; }
+}
