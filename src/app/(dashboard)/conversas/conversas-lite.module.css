@@ -822,8 +822,8 @@
 .root[data-skin="diretor"] [data-conversations-part="chat-header-details"] > p { flex: 0 1 auto; min-width: 0; margin: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .root[data-skin="diretor"] [data-conversations-part="chat-header-title"] { flex-wrap: nowrap; min-width: 0; gap: 6px; }
 /* O nome nunca some: ocupa até 14rem; o status encolhe e corta antes dele. */
-.root[data-skin="diretor"] [data-conversations-part="chat-header"] h2 { flex: 0 0 auto; max-width: 14rem; min-width: 0; }
-.root[data-skin="diretor"] [data-conversations-part="chat-header-title"] > [data-slot="animated-badge"] { flex-shrink: 1; min-width: 0; overflow: hidden; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] h2 { flex: 0 0 auto; max-width: 18rem; min-width: 0; overflow: hidden; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-title"] > [data-slot="animated-badge"] { flex-shrink: 0; }
 .root[data-skin="diretor"] [data-conversations-part="chat-header-actions"] { width: auto; gap: 2px; }
 .root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Ações do atendimento"] { height: 28px; min-height: 28px; padding-inline: 8px; font-size: 12px; font-weight: 500; }
 .root[data-skin="diretor"] [data-conversations-part="header-tags"] { flex: 0 1 auto; min-width: 0; padding: 0; }
@@ -877,3 +877,43 @@
   .root[data-skin="diretor"] [data-conversations-part="panes"][data-profile-open="true"] [data-conversations-part="chat-header-title"] > [data-slot="animated-badge"]:first-of-type,
   .root[data-skin="diretor"] [data-conversations-part="panes"][data-profile-open="true"] [data-conversations-part="header-owner-name"] { display: none; }
 }
+
+/* Cliente x equipe/IA (pedido do Vinicios, 21/11/2026): sem balão, a fala da equipe e da IA fica num bloco em Paper Mist
+   com uma barra de 2px à esquerda; a do cliente fica solta no branco. Rótulo da equipe/IA no texto secundário, o do
+   cliente no texto principal. Uma cor só (neutra) para não competir com o status. */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] {
+  gap: 2px;
+  margin-inline: -8px;
+  padding: 2px 0;
+  border-left: 2px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-muted);
+}
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message"] { margin-inline: 0; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message"]:hover { background: transparent; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-slot="message-header"] > span { color: var(--text-secondary); }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-sender-group="system"] [data-conversations-part="team-avatar"] > span { background: var(--surface); }
+
+/* Topo estreito (coluna da conversa abaixo de ~620px): telefone e status saem do topo; seguem na linha da lista e no perfil. */
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] { container-type: inline-size; }
+@container (max-width: 680px) {
+  .root[data-skin="diretor"] [data-conversations-part="chat-header-details"] > p,
+  .root[data-skin="diretor"] [data-conversations-part="chat-header-title"] > [data-slot="animated-badge"] { display: none; }
+}
+@container (max-width: 520px) {
+  .root[data-skin="diretor"] [data-conversations-part="header-owner-name"] { display: none; }
+}
+
+/* Nada cortado (pedido do Vinicios, 21/11/2026): o que não cabe quebra linha ou sai inteiro, nunca vira lasca. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .root[data-skin="diretor"] [data-conversations-part="panes"] { grid-template-columns: 320px minmax(0, 1fr); }
+}
+.root[data-skin="diretor"] [data-conversations-part="search-header"] { flex-wrap: wrap; }
+.root[data-skin="diretor"] [data-conversations-part="search-header"] > [data-conversations-part="search"] { flex: 1 1 10rem; }
+.root[data-skin="diretor"] .quickTabs { flex-wrap: wrap; }
+.root[data-skin="diretor"] .quickTab { flex-shrink: 0; }
+/* Linha da lista: o nome do cliente aparece inteiro antes do nome do corretor; selos quebram linha. */
+.root[data-skin="diretor"] [data-conversations-part="row"] :global(.truncate.text-sm) { flex-shrink: 0; max-width: 100%; }
+.root[data-skin="diretor"] [data-conversations-part="row"] :global(.truncate.text-sm):has(+ [data-conversations-part="row-owner-name"]) { max-width: calc(100% - 4.5rem); }
+.root[data-skin="diretor"] [data-conversations-part="row"] [data-conversations-part="row-owner-name"] { flex-shrink: 1; min-width: 4rem; }
+.root[data-skin="diretor"] [data-conversations-part="row"] :global(.pt-0\.5) { flex-wrap: wrap; row-gap: 4px; }
