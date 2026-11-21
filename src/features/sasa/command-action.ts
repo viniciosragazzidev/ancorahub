@@ -1,12 +1,15 @@
 "use server";
 
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { brokerAiAccess } from "@/features/ai-gateway/broker-ai-pilot";
 import { readAiConsent } from "@/features/ai-gateway/consent";
 import { getCachedBrokerWorkspaceData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { runChatServerAction } from "@/features/broker-workspace/chat/chat-actions";
+import { canRevealLightContact } from "@/features/broker-workspace/lead-contact-privacy";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { getDatabase, schema } from "@/shared/db";
 
 import { runSasaCommand, sasaWorldOf, type SasaReply } from "./command-core";
 import { isSasaDynamicAiEnabled } from "./dynamic-ai-flag";
@@ -112,6 +115,12 @@ export async function sasaCommandAction(raw: { text: string; clientCommandId?: s
       whenText: interpreted?.whenText,
       stamp: String(now.getTime()),
       run: (name, payload) => runChatServerAction(name, payload),
+      // Rascunho (fase 5): telefone só de lead do próprio corretor e só quando o contato pode ser revelado a ele.
+      contactOf: async (leadId) => {
+        const [lead] = await getDatabase().select({ telefone: schema.leads.telefone, status: schema.leads.status, corretorId: schema.leads.corretorId })
+          .from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, context.userId), isNull(schema.leads.deletedAt))).limit(1);
+        return lead && canRevealLightContact({ status: lead.status, isCurrentBroker: lead.corretorId === context.userId }) ? lead.telefone : null;
+      },
     });
     if (!reply.handled) {
       await save("not_command");

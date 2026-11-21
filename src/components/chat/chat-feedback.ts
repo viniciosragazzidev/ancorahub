@@ -30,6 +30,7 @@ export const CHAT_ACTION_FEEDBACK: Record<ChatServerActionName, ChatActionFeedba
   "notifications.markRead": { level: 0 },
   "relationship.ack": { level: 0 },
   "team.addBroker": { level: 0 },
+  "sasa.plan": { level: 1, success: "confirm" },
 };
 
 type Fire = (kind: FeedbackKind, options?: { sound?: boolean }) => unknown;

@@ -12,7 +12,7 @@ import { SASA_STAGES, type SasaIntent } from "./intent-rules";
  * Contexto mínimo (plano §3.5): primeiros nomes dos leads e a hora local; nada de telefone, CPF ou mensagem.
  */
 const replySchema = z.object({
-  tool: z.enum(["duty.next", "duty.pause", "duty.resume", "leads.waiting", "agenda.list", "returns.schedule", "returns.reschedule", "returns.complete", "returns.cancel", "lead.stage", "lead.note", "sale.start", "quote.start", "none"]),
+  tool: z.enum(["duty.next", "duty.pause", "duty.resume", "leads.waiting", "agenda.list", "returns.schedule", "returns.reschedule", "returns.complete", "returns.cancel", "lead.stage", "lead.note", "sale.start", "quote.start", "lead.accept", "lead.decline", "lead.lost", "message.draft", "none"]),
   lead: z.string().trim().max(80).nullish(),
   when: z.string().trim().max(80).nullish(),
   status: z.enum(SASA_STAGES).nullish(),
@@ -32,6 +32,10 @@ const TOOL_GUIDE = [
   "lead.note: o corretor conta o que o cliente disse ou pediu (lead).",
   "sale.start: o corretor fechou a venda com um lead (lead; copie no when o trecho de início da vigência, se houver).",
   "quote.start: o corretor quer uma cotação ou simulação (idades e tipo ficam no texto).",
+  "lead.accept: aceitar o lead novo que foi oferecido (lead, se disser).",
+  "lead.decline: recusar o lead novo oferecido (lead, se disser; o motivo fica no texto).",
+  "lead.lost: o cliente desistiu ou foi perdido, encerrar o atendimento (lead; o motivo fica no texto).",
+  "message.draft: escrever uma mensagem para o cliente (lead; o recado fica no texto). Nunca envia.",
   "none: qualquer outra coisa (pergunta geral, dúvida de plano, conversa).",
 ].join("\n");
 
@@ -65,6 +69,7 @@ export async function interpretSasaText(input: { tenantId: string; userId: strin
     case "returns.schedule": return { intent: { tool: "returns.schedule", reschedule: false }, leadHint, whenText };
     case "lead.stage": return value.status ? { intent: { tool: "lead.stage", status: value.status }, leadHint, whenText } : null;
     case "duty.next": case "duty.pause": case "duty.resume": case "leads.waiting": case "agenda.list": case "returns.complete": case "returns.cancel": case "lead.note": case "sale.start": case "quote.start":
+    case "lead.accept": case "lead.decline": case "lead.lost": case "message.draft":
       return { intent: { tool: value.tool }, leadHint, whenText };
     default: return null;
   }

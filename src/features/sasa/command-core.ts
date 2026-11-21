@@ -8,9 +8,12 @@
  */
 import type { ChatBlock, ChatChoice, ChatLeadRow, ChatServerActionName } from "@/components/chat/types";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
+import { DECLINE_REASONS } from "@/features/broker-workspace/components/light-lead-detail/types";
+import { MOTIVO_PERDA_LABELS, type MotivoPerda } from "@/features/leads/lead-status-constants";
+import { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";
 
 import { parseSpokenQuote, parseSpokenSale, type SasaOpen } from "./drafts";
-import { classifySasaText, nameHintOf, SASA_STAGE_LABEL, type SasaIntent, type SasaStage } from "./intent-rules";
+import { classifySasaText, nameHintOf, splitSasaSteps, SASA_STAGE_LABEL, type SasaIntent, type SasaStage, type SasaTool } from "./intent-rules";
 import { clockLabel, parseWhenPtBr, whenLabel } from "./parse-when";
 import { firstNameOf, resolveLead, type SasaLead } from "./resolve-entities";
 
@@ -26,6 +29,8 @@ export type SasaWorld = {
   returns: SasaReturn[];
   waiting: SasaWaiting[];
   duty: { active: SasaDuty | null; next: SasaDuty | null };
+  /** Fase 5: ofertas de lead novo esperando aceite (aceitar/recusar pela Sasá). */
+  offers?: Array<{ leadId: string; name: string; expiresAt: Date }>;
 };
 
 export type SasaActionResult = { ok: boolean; message: string; warning?: boolean; undo?: { label: string; action: { kind: "server"; name: ChatServerActionName; payload: Record<string, string> } } };
@@ -35,7 +40,8 @@ export type SasaRun = (name: ChatServerActionName, payload: Record<string, strin
 export type SasaReply = {
   handled: boolean;
   blocks: ChatBlock[];
-  tool?: SasaIntent["tool"];
+  /** "plan" = vários passos numa frase (fase 5). */
+  tool?: SasaIntent["tool"] | "plan";
   /** Rodou uma ação de escrita: o nome dela e se o servidor confirmou (para o feedback de nível 1). */
   executed?: { action: ChatServerActionName; ok: boolean; warning?: boolean };
   /** Fase 4: a tela guarda o rascunho no aparelho e abre a venda ou a cotação já preenchida. */
@@ -50,6 +56,17 @@ export type SasaCommandInput = {
   /** Escrito ou falado (a voz já chegou transcrita). */
   origin?: "text" | "voice" | null;
 };
+
+/**
+ * Fase 5: ações que um plano de vários passos pode juntar num toque (só as reversíveis e os Desfazer delas).
+ * O servidor confere cada passo de novo (`sasa.plan` em chat-actions), com as checagens da ação de sempre.
+ */
+export const SASA_PLAN_ACTIONS = [
+  "lead.addNote", "lead.scheduleReturn", "lead.changeStep", "lead.completeReturn", "lead.cancelReturn", "duty.pause", "duty.resume",
+  "lead.undoReturn", "lead.reopenReturn", "lead.restoreStep",
+] as const satisfies readonly ChatServerActionName[];
+const PLAN_TOOLS = new Set<SasaTool>(["lead.note", "returns.schedule", "returns.complete", "returns.cancel", "lead.stage", "duty.pause", "duty.resume"]);
+const MAX_PLAN_STEPS = 3;
 
 /** O pedido como sai do aparelho: a hora da gravação viaja como texto ISO. */
 export type SasaClientCommand = SasaCommandInput & { recordedAt?: string | null };
@@ -109,11 +126,16 @@ export function sasaWorldOf(data: BrokerWorkspaceData, now: Date): SasaWorld {
       active: data.duty?.active ? { name: data.duty.active.scheduleName, startsAt: data.duty.active.startsAt, endsAt: data.duty.active.endsAt, paused: data.duty.active.paused } : null,
       next: data.duty?.next ? { name: data.duty.next.scheduleName, startsAt: data.duty.next.startsAt, endsAt: data.duty.next.endsAt } : null,
     },
+    offers: (data.pendingOffers ?? []).filter((offer) => offer.expiresAt.getTime() > now.getTime()).map((offer) => ({ leadId: offer.leadId, name: offer.name, expiresAt: offer.expiresAt })),
   };
 }
 
 type Plan =
   | { kind: "answer"; blocks: ChatBlock[]; open?: SasaOpen }
+  /** Fase 5: encerra algo ou sai do app (aceitar, recusar, perder): confirma em um toque, nunca executa sozinho. */
+  | { kind: "confirm"; prompt: string; confirm: ChatChoice; alternatives?: ChatChoice[] }
+  /** Fase 5: rascunho de mensagem ao cliente; o corretor envia (D3). */
+  | { kind: "draft"; leadId: string; name: string; message: string }
   | { kind: "run"; name: ChatServerActionName; payload: Record<string, string>; done: string; failed: string; /** O pedido como pergunta ("Marcar retorno com Ana amanhã às 10:00"). */ ask: string; /** Depois de feito: próximos passos sugeridos, um toque cada. */ then?: ChatBlock | null };
 
 /** Etapa que a fala sugere, só quando é para a frente e diferente da atual. */
@@ -146,6 +168,62 @@ function noteSuggestions(text: string, lead: SasaLead, world: SasaWorld, base: D
   if (open && !when && /\b(liguei|falei|conversei|retornei)\b/.test(said)) choices.push({ id: "complete", label: "Concluir o retorno de hoje", action: { kind: "server", name: "lead.completeReturn", payload: { taskId: open.taskId, leadName: name } } });
   return choices.length ? { type: "question", id: `sasa-note-next-${stamp}`, prompt: `E com ${name}, quer também:`, choices } : null;
 }
+
+const said = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+/** Motivo da recusa pela fala; sem pista, "Outro" com o que foi dito. */
+export function declineReasonOf(text: string): string {
+  const t = said(text);
+  if (/\b(outra cidade|outro estado|outra regiao|fora do (meu )?perfil|nao atendo|nao e do meu|nao trabalho com)\b/.test(t)) return DECLINE_REASONS[2]!;
+  if (/\b(muitos atendimentos|muita gente|cheio|lotad\w*)\b/.test(t)) return DECLINE_REASONS[1]!;
+  if (/\b(sem disponibilidade|sem tempo|ocupad\w*|saindo|indo embora|de folga)\b/.test(t)) return DECLINE_REASONS[0]!;
+  if (/\b(agora nao|nao consigo agora|nao da agora)\b/.test(t)) return DECLINE_REASONS[3]!;
+  const rest = text.replace(/^\s*(sasa,?\s*)?(recusa|recusar|recuso|rejeita|rejeitar|dispensa|dispensar)\b[\s,.:;-]*/i, "").trim();
+  return rest ? `Outro: ${rest}`.slice(0, 200) : DECLINE_REASONS[4]!;
+}
+
+/** Motivo de perda pela fala (MOTIVOS_PERDA). O preço vence "desistiu": "desistiu, achou caro" é preço. */
+export function lostReasonOf(text: string): MotivoPerda {
+  const t = said(text);
+  if (/\b(mais barato|outra corretora|concorren\w*)\b/.test(t)) return "encontrou_mais_barato";
+  if (/\b(caro|preco|valor alto|nao cabe no bolso|muito alto)\b/.test(t)) return "preco";
+  if (/\b(ja contratou|ja tem plano|fechou com outr\w*|contratou com outr\w*)\b/.test(t)) return "ja_contratou";
+  if (/\bcarencia\b/.test(t)) return "carência";
+  if (/\b(saude|doenca|cirurgia|tratamento)\b/.test(t)) return "problema_saude";
+  if (/\b(nao qualificad\w*|nao tem cnpj|nao se encaixa)\b/.test(t)) return "nao_qualificado";
+  if (/\b(sumiu|nao responde|sem contato|nao atende)\b/.test(t)) return "sem_contato";
+  if (/\b(sem interesse|nao quer mais|perdeu o interesse)\b/.test(t)) return "sem_interesse";
+  if (/\b(desistiu|desistiram)\b/.test(t)) return "desistiu";
+  return "outro";
+}
+
+/** "manda pra Ana que a proposta sai amanhã" → "Oi, Ana! A proposta sai amanhã." */
+export function draftMessageOf(text: string, firstName: string): string | null {
+  const match = text.match(/\b(?:que|dizendo|falando|avisando)\b[\s:,]*(.+)$/i);
+  const body = match?.[1]?.trim().replace(/\s+/g, " ");
+  if (!body) return null;
+  const sentence = body.charAt(0).toLocaleUpperCase("pt-BR") + body.slice(1);
+  return `Oi, ${firstName}! ${/[.!?]$/.test(sentence) ? sentence : `${sentence}.`}`;
+}
+
+/** A oferta do pedido: pelo nome; sem nome e com uma só, ela; com várias, a escolha por toque. */
+function offerOf(input: SasaTimedInput, world: SasaWorld, stamp: string, hint: string | null): { lead: SasaLead } | { plan: Plan } {
+  const offers = (world.offers ?? []).map((offer) => ({ id: offer.leadId, name: offer.name, status: "new" }));
+  if (!offers.length) return { plan: { kind: "answer", blocks: [sasaSay(`sasa-no-offer-${stamp}`, "Você não tem lead novo esperando aceite agora.")] } };
+  if (input.pickedLeadId) {
+    const lead = offers.find((item) => item.id === input.pickedLeadId);
+    return lead ? { lead } : { plan: { kind: "answer", blocks: [sasaSay(`sasa-offer-gone-${stamp}`, "Essa oferta não está mais com você. Nada foi alterado.")] } };
+  }
+  const match = resolveLead(input.text, offers, hint);
+  if (match.kind === "one") return { lead: match.lead };
+  const named = hint ?? nameHintOf(input.text);
+  if (match.kind === "none" && offers.length === 1 && !named) return { lead: offers[0]! };
+  if (match.kind === "none" && named) return { plan: { kind: "answer", blocks: [sasaSay(`sasa-offer-none-${stamp}`, `${named} não está entre as ofertas para você agora. Nada foi alterado.`)] } };
+  const options = match.kind === "many" ? match.leads : offers.slice(0, 4);
+  return { plan: { kind: "answer", blocks: [{ type: "question", id: `sasa-offer-pick-${stamp}`, prompt: "Qual lead?", choices: options.map((lead) => ({ id: `pick-${lead.id}`, label: lead.name, reply: lead.name, action: { kind: "local" as const, value: sasaPickValue(input.text, lead.id) } })) }] } };
+}
+
+const dropChoice = (label = "Deixar pra lá"): ChatChoice => ({ id: "drop", label, reply: label, action: { kind: "local", value: SASA_DROP_VALUE } });
 
 function dayDate(date: Date) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "2-digit" }).format(date);
@@ -320,12 +398,55 @@ function plan(intent: SasaIntent, input: SasaTimedInput, world: SasaWorld, stamp
       if ("plan" in found) return found.plan;
       const lead = found.lead;
       const name = firstNameOf(lead.name);
-      const content = input.text.trim().slice(0, 2000);
+      const asked = input.text.trim().replace(/^(sasa,?\s*)?(anota|anotar|anote|registra|registrar|nota)(\s+a[ií])?(\s+que)?\s+/i, "");
+      const content = (asked ? asked.charAt(0).toLocaleUpperCase("pt-BR") + asked.slice(1) : input.text.trim()).slice(0, 2000);
       return {
         kind: "run", name: "lead.addNote", payload: { leadId: lead.id, content },
         done: `Anotei no histórico de ${name}.`, failed: `Não consegui anotar no histórico de ${name}. Nada foi salvo.`, ask: `Anotar no histórico de ${name}: "${content}"`,
         then: noteSuggestions(content, lead, world, input.recordedAt ?? world.now, stamp),
       };
+    }
+    case "lead.accept": {
+      const found = offerOf(input, world, stamp, hint);
+      if ("plan" in found) return found.plan;
+      const name = firstNameOf(found.lead.name);
+      return {
+        kind: "confirm",
+        prompt: `Aceitar ${found.lead.name}? O WhatsApp do cliente abre com a mensagem pronta.`,
+        confirm: { id: "confirm", label: "Aceitar", reply: `Aceitar ${name}`, action: { kind: "server", name: "lead.accept", payload: { leadId: found.lead.id } } },
+      };
+    }
+    case "lead.decline": {
+      const found = offerOf(input, world, stamp, hint);
+      if ("plan" in found) return found.plan;
+      const reason = declineReasonOf(input.text);
+      const name = firstNameOf(found.lead.name);
+      const others = DECLINE_REASONS.filter((item) => item !== reason && item !== "Outro").slice(0, 2);
+      return {
+        kind: "confirm",
+        prompt: `Recusar ${found.lead.name}? Motivo: ${reason}. Ele volta para a fila e vai para outro corretor.`,
+        confirm: { id: "confirm", label: "Recusar", reply: `Recusar ${name}`, action: { kind: "server", name: "lead.decline", payload: { leadId: found.lead.id, reason } } },
+        alternatives: others.map((item, index) => ({ id: `reason-${index}`, label: `Recusar: ${item}`, reply: `Recusar ${name}: ${item}`, action: { kind: "server" as const, name: "lead.decline" as const, payload: { leadId: found.lead.id, reason: item } } })),
+      };
+    }
+    case "lead.lost": {
+      const found = leadOf(input, world, stamp, hint);
+      if ("plan" in found) return found.plan;
+      const reason = lostReasonOf(input.text);
+      const name = firstNameOf(found.lead.name);
+      return {
+        kind: "confirm",
+        prompt: `Encerrar o atendimento de ${found.lead.name} como perdido? Motivo: ${MOTIVO_PERDA_LABELS[reason]}.`,
+        confirm: { id: "confirm", label: "Encerrar", reply: `Encerrar ${name}`, action: { kind: "server", name: "lead.markLost", payload: { leadId: found.lead.id, reason, previous: found.lead.status } } },
+      };
+    }
+    case "message.draft": {
+      const found = leadOf(input, world, stamp, hint);
+      if ("plan" in found) return found.plan;
+      const name = firstNameOf(found.lead.name);
+      const message = draftMessageOf(input.text, name);
+      if (!message) return { kind: "answer", blocks: [sasaSay(`sasa-draft-empty-${stamp}`, `O que você quer dizer para ${name}? Por exemplo: "manda pra ${name} que a proposta sai amanhã".`)] };
+      return { kind: "draft", leadId: found.lead.id, name, message: message.slice(0, 600) };
     }
     case "lead.stage": {
       const found = leadOf(input, world, stamp, hint);
@@ -339,6 +460,48 @@ function plan(intent: SasaIntent, input: SasaTimedInput, world: SasaWorld, stamp
 }
 
 /**
+ * Fase 5 (intenção 22): "anota que a Ana vai pensar e marca retorno pra sexta às 10" vira uma lista confirmada em um
+ * toque. Só junta pedidos reversíveis; o lead dito num passo vale para os outros ("ela"). Sem casar todos os passos,
+ * devolve null e o pedido segue como um só.
+ */
+function planSteps(steps: string[], input: SasaTimedInput & { world: SasaWorld }, stamp: string): SasaReply | null {
+  const intents = steps.map((step) => classifySasaText(step));
+  if (intents.some((intent) => !intent || !PLAN_TOOLS.has(intent.tool))) return null;
+  const world = input.world;
+  let leadId = input.pickedLeadId ?? null;
+  if (!leadId) {
+    const matches = steps.map((step) => resolveLead(step, world.leads));
+    const one = matches.find((match) => match.kind === "one");
+    if (one?.kind === "one") leadId = one.lead.id;
+    else if (intents.some((intent) => intent!.tool !== "duty.pause" && intent!.tool !== "duty.resume")) {
+      const found = leadOf(input, world, stamp, null);
+      if ("plan" in found && found.plan.kind === "answer") return { handled: true, tool: "plan", blocks: found.plan.blocks };
+      if ("lead" in found) leadId = found.lead.id;
+    }
+  }
+  const runs: Array<Extract<Plan, { kind: "run" }>> = [];
+  for (const [index, step] of steps.slice(0, MAX_PLAN_STEPS).entries()) {
+    const next = plan(intents[index]!, { ...input, text: step, pickedLeadId: leadId }, world, `${stamp}-${index}`, null, null);
+    // Um passo que precisa perguntar (quando? qual lead?) pergunta antes; nada roda pela metade.
+    if (next.kind === "answer") return { handled: true, tool: "plan", blocks: next.blocks };
+    if (next.kind !== "run") return null;
+    runs.push(next);
+  }
+  const list = runs.map((run, index) => `${index + 1}) ${run.ask}`).join("; ");
+  return {
+    handled: true,
+    tool: "plan",
+    blocks: [{
+      type: "question", id: `sasa-plan-${stamp}`, prompt: `Vou fazer ${runs.length} coisas: ${list}. Confirma?`,
+      choices: [
+        { id: "confirm", label: "Fazer tudo", reply: "Fazer tudo", action: { kind: "server", name: "sasa.plan", payload: { steps: JSON.stringify(runs.map((run) => ({ name: run.name, payload: run.payload, label: run.ask }))) } } },
+        dropChoice(),
+      ],
+    }],
+  };
+}
+
+/**
  * Roda um pedido. `intent` vem da IA quando as regras não casaram; sem ela, só as regras.
  * Sucesso só depois da confirmação do servidor; erro diz o que continua valendo e oferece "Tentar de novo".
  */
@@ -349,12 +512,38 @@ export async function runSasaCommand(input: SasaTimedInput & {
   leadHint?: string | null;
   whenText?: string | null;
   stamp?: string;
+  /** Fase 5: telefone do lead para o rascunho, só quando o contato pode ser revelado ao corretor. */
+  contactOf?: (leadId: string) => Promise<string | null>;
 }): Promise<SasaReply> {
+  const stamp = input.stamp ?? String(input.world.now.getTime());
+  if (!input.intent) {
+    const steps = splitSasaSteps(input.text);
+    if (steps.length > 1) {
+      const multi = planSteps(steps, input, stamp);
+      if (multi) return multi;
+    }
+  }
   const intent = input.intent ?? classifySasaText(input.text);
   if (!intent) return { handled: false, blocks: [] };
-  const stamp = input.stamp ?? String(input.world.now.getTime());
   const next = plan(intent, input, input.world, stamp, input.leadHint ?? null, input.whenText ?? null);
   if (next.kind === "answer") return { handled: true, tool: intent.tool, blocks: next.blocks, ...(next.open ? { open: next.open } : {}) };
+  if (next.kind === "confirm") {
+    return { handled: true, tool: intent.tool, blocks: [{ type: "question", id: `sasa-confirm-${stamp}`, prompt: next.prompt, choices: [next.confirm, ...(next.alternatives ?? []), dropChoice()] }] };
+  }
+  if (next.kind === "draft") {
+    const phone = await input.contactOf?.(next.leadId).catch(() => null) ?? null;
+    const choices: ChatChoice[] = phone
+      ? [{ id: "open-whatsapp", label: "Abrir no WhatsApp", action: { kind: "href", href: buildWhatsAppWebUrl(phone, next.message) } }]
+      : [{ id: "open-lead", label: `Abrir a ficha de ${next.name}`, action: { kind: "href", href: `/leads/${encodeURIComponent(next.leadId)}` } }];
+    return {
+      handled: true,
+      tool: intent.tool,
+      blocks: [
+        sasaSay(`sasa-draft-${stamp}`, `Rascunho para ${next.name}: "${next.message}"`),
+        { type: "question", id: `sasa-draft-open-${stamp}`, prompt: phone ? "Eu não envio sozinha: confira e envie você." : `O contato de ${next.name} ainda não está liberado para você. Copie o texto e envie pela ficha.`, choices },
+      ],
+    };
+  }
   if (sasaArrivedLate(input.recordedAt, input.world.now)) {
     // Gravado sem internet há mais de 30 min: o corretor confirma num toque (a ação roda pelo mesmo caminho do chat).
     const at = clockLabel(input.recordedAt!);

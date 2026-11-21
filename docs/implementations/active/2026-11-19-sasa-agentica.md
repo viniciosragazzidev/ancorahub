@@ -376,6 +376,20 @@ Pedido do usuário: "Hoje não responde quanto tenho a receber, sobre vendas etc
 - Intenções 11 a 13 (aceitar/recusar, perder, rascunho de mensagem), 22 (vários passos numa frase, lista confirmada em um toque), e avaliação de tool calling nativo para leituras encadeadas.
 - Laboratório: casos de confirmação em um toque e de plano com 2 passos.
 
+**Entregue em 20/11 (branch `feat/sasa-fase-5`), pelas opções recomendadas.**
+
+- **Aceitar / recusar oferta** (`lead.accept`, `lead.decline`): "aceita o lead da Júlia", "recusa, ela é de outra cidade". A Sasá acha a oferta pendente do corretor (`pendingOffers` do painel, só as que não venceram; com uma só, nem precisa do nome) e pergunta antes, num toque: "Aceitar Júlia Prado? O WhatsApp do cliente abre com a mensagem pronta." A recusa leva o motivo da fala mapeado para `DECLINE_REASONS` (fora do perfil, muitos atendimentos, sem disponibilidade, agora não; sem pista, "Outro: <o que foi dito>") e oferece dois outros motivos. Sem oferta: "Você não tem lead novo esperando aceite agora."
+- **Perder lead** (`lead.lost`): "o Pedro desistiu, achou caro" → confirma "Encerrar o atendimento de Pedro Lima como perdido? Motivo: Preço acima do esperado." O motivo vem da fala (`MOTIVOS_PERDA`; preço vence "desistiu"). Depois de encerrado, **Desfazer** reabre na etapa anterior (`lead.markLost` agora devolve `lead.restoreStep` quando recebe `previous`). "Fechou com outra corretora" é perdido, não venda.
+- **Rascunho de mensagem** (`message.draft`, D3): "manda pra Ana que a proposta sai amanhã" → "Oi, Ana! A proposta sai amanhã." A Sasá nunca envia: com o contato liberado (`canRevealLightContact`, lead do próprio corretor e já aceito), "Abrir no WhatsApp" com o texto; sem ele, a ficha do lead. O telefone é lido no servidor só para montar o link.
+- **Vários passos numa frase** (intenção 22): "anota que a Ana vai pensar e marca retorno com ela sexta às 10" vira "Vou fazer 2 coisas: 1) Anotar no histórico de Ana…; 2) Marcar retorno com Ana…. Confirma?" com **Fazer tudo** e Deixar pra lá. Corta só antes de verbo de pedido (até 3 passos); o lead dito num passo vale para os outros ("ela"); sem nome em nenhum, pergunta de qual lead. Só junta pedidos reversíveis (nota, retorno, etapa, concluir/cancelar retorno, pausar/voltar). No servidor, `sasa.plan` roda cada passo pela ação de sempre, na ordem, para no primeiro que falhar e diz o que já valeu ("Feito: … Não consegui: …"); o Desfazer desfaz todos os passos de trás para frente.
+- **"Anota que…"** virou nota direto, só com o que vem depois de "anota que".
+- O interpretador por IA conhece as quatro intenções novas (sem vários passos: esse é só por regra).
+- Pergunta nunca escreve: "o Pedro desistiu?" continua leitura.
+- Laboratório: falas prontas "Dois passos", "Aceitar lead", "Perdeu" e "Mensagem" no painel "Próxima fala" e na lista de pedidos; a Júlia chega como oferta; as ações simuladas aceitam, recusam, encerram, reabrem e rodam o plano. Testes em `phase5.test.ts`.
+
+**Avaliação de tool calling nativo (20/11)**: fica o JSON + zod pelo `runGateway` (D1), sem mudar para o tool calling nativo do `ai@7`. As leituras encadeadas já existem no laço limitado de `ecosystem-agent.ts` (até 4 leituras, ~15 s, só ferramentas de leitura do corretor), com a mesma garantia de segurança (o modelo escolhe uma ferramenta tipada; o servidor valida e executa). O nativo prenderia o laço a provedores com suporte a ferramentas e tiraria a cadeia de provedores, o `sensitive` e o `logAiUsage` que o gateway já dá. Escrita encadeada não passa por IA: vários passos são por regra e sempre confirmados num toque. Reavaliar se o laço precisar de chamadas paralelas ou de mais de 4 leituras.
+- **Pendente**: conferir no aparelho com a IA real; a oferta pendente da Sasá usa o painel do dia (cache curto), então uma oferta que venceu há segundos ainda pode aparecer; o aceite então falha com a mensagem de sempre ("O aceite não foi registrado").
+
 Critério de pronto de cada fase: testes puros verdes, fluxo no laboratório cobrindo ok/falha/ambíguo/lento, checklist do `FEEDBACK.md` §10, revisão visual do usuário antes do merge.
 
 ---

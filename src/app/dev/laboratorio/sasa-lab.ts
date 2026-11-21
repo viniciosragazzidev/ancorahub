@@ -50,6 +50,8 @@ export function labSasaWorld(now = new Date()): SasaWorld {
       active: { name: "TESTE", startsAt: at(-60), endsAt: at(300) },
       next: { name: "PME Manhã", startsAt: at(60 * 20), endsAt: at(60 * 24) },
     },
+    // Fase 5: a Júlia chegou como oferta (aceitar ou recusar pela Sasá).
+    offers: [{ leadId: "lab-julia", name: "Júlia Prado", expiresAt: at(4) }],
   };
 }
 
@@ -59,12 +61,23 @@ export const LAB_SASA_SPEECH = {
   venda: "Fechou a venda do Carlos Teixeira, Amil S380 familiar, 3 vidas, 35, 32 e 8 anos, R$ 1.290 por mês",
   disse: "A Ana disse que gostou da proposta e vai ver com o marido, me liga sexta às 10",
   cotacao: "Cotação para 3 vidas, 35, 32 e 8 anos, pessoa física",
+  // Fase 5: sensíveis (confirma em um toque) e vários passos numa frase.
+  aceitar: "Aceita o lead da Júlia",
+  recusar: "Recusa, ela é de outra cidade",
+  perdeu: "O Pedro desistiu, achou caro",
+  mensagem: "Manda pra Ana que a proposta sai amanhã de manhã",
+  passos: "Anota que a Ana vai pensar e marca retorno com ela sexta às 10",
 } as const;
 
 export const LAB_SASA_PHRASES = [
   LAB_SASA_SPEECH.disse,
   LAB_SASA_SPEECH.venda,
   LAB_SASA_SPEECH.cotacao,
+  LAB_SASA_SPEECH.passos,
+  LAB_SASA_SPEECH.aceitar,
+  LAB_SASA_SPEECH.recusar,
+  LAB_SASA_SPEECH.perdeu,
+  LAB_SASA_SPEECH.mensagem,
   "Qual é meu próximo plantão?",
   "Pausa meu plantão",
   "Quem está esperando resposta?",
@@ -259,6 +272,37 @@ export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["retu
           ? { ok: true, message: "Pronto.", undo: undo("Desfazer", "lead.restoreStep", { leadId: lead.id, status: previous }) }
           : { ok: true, message: "Desfeito. A etapa voltou a ser a de antes." };
       }
+      case "lead.accept": {
+        const offer = world.offers?.find((item) => item.leadId === payload.leadId);
+        if (!offer) return { ok: false, message: "A oferta expirou ou foi para outro corretor. Nada foi alterado." };
+        world.offers = world.offers?.filter((item) => item !== offer);
+        const lead = world.leads.find((item) => item.id === offer.leadId);
+        if (lead) lead.status = "in_contact";
+        return { ok: true, message: "Aceito. Abrindo o WhatsApp do cliente com a mensagem pronta (simulado)." };
+      }
+      case "lead.decline": {
+        world.offers = world.offers?.filter((item) => item.leadId !== payload.leadId);
+        world.leads = world.leads.filter((item) => item.id !== payload.leadId);
+        return { ok: true, message: `Recusado (${payload.reason}). Ele volta para a fila e vai para outro corretor.` };
+      }
+      case "lead.markLost": {
+        const lead = world.leads.find((item) => item.id === payload.leadId);
+        if (!lead) return { ok: false, message: "Lead não encontrado." };
+        const previous = payload.previous || lead.status;
+        lead.status = "lost";
+        return { ok: true, message: "Registrei. O atendimento foi encerrado e conta no seu histórico.", undo: undo("Desfazer", "lead.restoreStep", { leadId: lead.id, status: previous }) };
+      }
+      case "sasa.plan": {
+        // Mesmo laço do servidor: passo a passo, para no primeiro que falhar.
+        const steps = JSON.parse(payload.steps || "[]") as Array<{ name: ChatServerActionName; payload: Record<string, string>; label?: string }>;
+        const undos: Array<{ name: ChatServerActionName; payload: Record<string, string> }> = [];
+        for (const step of steps) {
+          const result = await run(step.name, step.payload);
+          if (!result.ok) return { ok: false, message: `Não consegui: ${step.label ?? step.name}.` };
+          if (result.undo) undos.push({ name: result.undo.action.name, payload: result.undo.action.payload });
+        }
+        return { ok: true, message: steps.length === 1 ? "Pronto." : `Pronto, fiz as ${steps.length} coisas.`, undo: undos.length ? undo("Desfazer", "sasa.plan", { steps: JSON.stringify(undos.reverse()) }) : undefined };
+      }
       default: return { ok: true, message: "Pronto (simulado)." };
     }
   };
@@ -280,7 +324,11 @@ export function createLabSasa(state: { world: SasaWorld; closed: SasaWorld["retu
       if (state.offline) throw new TypeError("Failed to fetch");
       await wait(Math.min(options.delay, 600));
       state.world.now = new Date();
-      return runSasaCommand({ ...input, recordedAt: input.recordedAt ? new Date(input.recordedAt) : null, world: state.world, run: (name, payload) => run(name, payload) });
+      return runSasaCommand({
+        ...input, recordedAt: input.recordedAt ? new Date(input.recordedAt) : null, world: state.world, run: (name, payload) => run(name, payload),
+        // Telefone de mentira só para lead já aceito (como no servidor: lead novo não revela o contato).
+        contactOf: async (leadId) => { const lead = state.world.leads.find((item) => item.id === leadId); return lead && lead.status !== "new" ? "21999990000" : null; },
+      });
     },
   };
 }

@@ -320,6 +320,10 @@ export function FlowLab() {
                 <button type="button" aria-pressed={nextSpeech === "venda"} onClick={() => chooseSpeech("venda")}>Fechou a venda</button>
                 <button type="button" aria-pressed={nextSpeech === "disse"} onClick={() => chooseSpeech("disse")}>O cliente disse</button>
                 <button type="button" aria-pressed={nextSpeech === "cotacao"} onClick={() => chooseSpeech("cotacao")}>Cotação</button>
+                <button type="button" aria-pressed={nextSpeech === "passos"} onClick={() => chooseSpeech("passos")}>Dois passos</button>
+                <button type="button" aria-pressed={nextSpeech === "aceitar"} onClick={() => chooseSpeech("aceitar")}>Aceitar lead</button>
+                <button type="button" aria-pressed={nextSpeech === "perdeu"} onClick={() => chooseSpeech("perdeu")}>Perdeu</button>
+                <button type="button" aria-pressed={nextSpeech === "mensagem"} onClick={() => chooseSpeech("mensagem")}>Mensagem</button>
               </fieldset>
               <fieldset><legend>Internet</legend>
                 <button type="button" aria-pressed={!offline} onClick={() => setInternet(true)}>Com internet</button>
