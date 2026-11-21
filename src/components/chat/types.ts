@@ -44,7 +44,9 @@ export type ChatServerActionName =
   | "duty.resume"
   | "notifications.markRead"
   | "relationship.ack"
-  | "team.addBroker";
+  | "team.addBroker"
+  /** Fase 5 da Sasá: vários passos reversíveis confirmados num toque (payload `steps` em JSON, conferido no servidor). */
+  | "sasa.plan";
 
 export type ChatChoice = {
   id: string;
