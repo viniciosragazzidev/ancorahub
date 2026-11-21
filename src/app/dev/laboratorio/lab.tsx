@@ -34,10 +34,11 @@ import { LeadHoverLab } from "./lead-hover-lab";
 import { labQualificationServices, QualificationLeadsLab } from "./qualification-leads-lab";
 import { labRecoveryCallQueue, RecoveryFunnelLab } from "./recovery-funnel-lab";
 import { labRecoverySettings, RecoveryCadenceLab } from "./recovery-cadence-lab";
+import { NurtureLab } from "./nurture-lab";
 import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, labSasaQuestionsBlock, labSasaWorld } from "./sasa-lab";
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao" | "nutricao";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -54,6 +55,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "etapaLead", label: "Etapa do lead (qualificação)" },
   { id: "funilRecuperacao", label: "Funil de recuperação e fila de ligação" },
   { id: "cadenciaRecuperacao", label: "Cadência de recuperação" },
+  { id: "nutricao", label: "Nutrição, A/B e Sasá (recuperar)" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -296,6 +298,8 @@ export function FlowLab() {
           <RecoveryFunnelLab />
         ) : flow === "cadenciaRecuperacao" ? (
           <RecoveryCadenceLab />
+        ) : flow === "nutricao" ? (
+          <NurtureLab />
         ) : flow === "callAncora" ? (
           <CallAncoraWorkspace brokerFirstName="Vinicios" />
         ) : (

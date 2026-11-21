@@ -64,14 +64,17 @@ export type RecoveryCadenceInput = {
   automaticSentSinceStart: number;
   /** Último envio automático para o lead (qualquer passo), para o intervalo mínimo. */
   lastAutomaticAt: Date | null;
+  /** Templates que podem sair: aprovados na WABA ativa e Utility (DEC-155, 27/10: a qualificação não usa Marketing). */
   approvedTemplates: ReadonlySet<string>;
+  /** Aprovados, mas de Marketing: barrados pela DEC-155 (o passo é pulado com esse motivo). */
+  marketingTemplates?: ReadonlySet<string>;
 };
 
 export type RecoveryCadenceDecision =
   | { action: "stop"; reason: "disabled" | "legal_pending" | "control" | "replied" | "opted_out" | "closed" | "assigned" | "broker_contacted" | "human" | "meta_limit" }
   | { action: "finished"; next: "call_queue" | null }
   | { action: "wait"; reason: "too_early" | "outside_hours" | "gap" | "meta_limit_cooldown" }
-  | { action: "skip"; step: RecoveryStepDef; reason: "step_disabled" | "template_not_approved" | "window_closed" | "no_channel" | "stale" }
+  | { action: "skip"; step: RecoveryStepDef; reason: "step_disabled" | "template_not_approved" | "marketing_blocked" | "window_closed" | "no_channel" | "stale" }
   | { action: "send"; step: RecoveryStepDef; channel: RecoveryChannel; fallback: RecoveryChannel | null; attempt: number };
 
 const CLOSED_LEAD = new Set(["lost", "converted"]);
@@ -129,7 +132,9 @@ export function decideRecoveryTouch(input: RecoveryCadenceInput): RecoveryCadenc
   const following = steps[steps.indexOf(next) + 1];
   if (following && elapsed >= following.afterMinutes) return { action: "skip", step: next, reason: "stale" };
   if (elapsed > next.afterMinutes + STALE_AFTER_MINUTES && next.kind === "free") return { action: "skip", step: next, reason: "stale" };
-  if (next.kind === "template" && !input.approvedTemplates.has(next.template!)) return { action: "skip", step: next, reason: "template_not_approved" };
+  if (next.kind === "template" && !input.approvedTemplates.has(next.template!)) {
+    return { action: "skip", step: next, reason: input.marketingTemplates?.has(next.template!) ? "marketing_blocked" : "template_not_approved" };
+  }
 
   const metaWindowOpen = Boolean(input.lastMetaInboundAt && now.getTime() - input.lastMetaInboundAt.getTime() < META_WINDOW_MS);
   const valid: Record<RecoveryChannel, boolean> = {

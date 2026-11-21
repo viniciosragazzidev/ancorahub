@@ -20,7 +20,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { formatLeadPhone } from "@/features/leads/format-lead-phone";
 import { useDevLab } from "@/lib/dev-lab";
 
-import { getLeadTimelineAction, markDoNotContactAction, sendToCallQueueAction } from "../actions";
+import { getLeadTimelineAction, markBadMomentAction, markDoNotContactAction, sendToCallQueueAction } from "../actions";
 import { formatElapsed } from "../journey";
 import { JOURNEY_TABS, rowsForTab, type QualificationLeadRow } from "../rows";
 import type { TimelineItem } from "../timeline";
@@ -31,6 +31,7 @@ export type QualificationLeadsServices = {
   timeline: (leadId: string) => Promise<{ ok: true; data: { items: TimelineItem[] } } | { ok: false; error: string }>;
   doNotContact: (leadId: string) => Promise<{ ok: true; data: unknown } | { ok: false; error: string }>;
   toCallQueue: (leadId: string) => Promise<{ ok: true; data: { score: string } } | { ok: false; error: string }>;
+  badMoment: (leadId: string) => Promise<{ ok: true; data: { until: string } } | { ok: false; error: string }>;
 };
 
 function normalize(text: string) {
@@ -52,7 +53,7 @@ export function QualificationLeadsWorkspace({ rows, filters, summary, truncated 
 }) {
   const router = useRouter();
   const lab = useDevLab();
-  const services: QualificationLeadsServices = lab?.qualificationLeads ?? { timeline: (leadId) => getLeadTimelineAction({ leadId }), doNotContact: (leadId) => markDoNotContactAction({ leadId }), toCallQueue: (leadId) => sendToCallQueueAction({ leadId }) };
+  const services: QualificationLeadsServices = lab?.qualificationLeads ?? { timeline: (leadId) => getLeadTimelineAction({ leadId }), doNotContact: (leadId) => markDoNotContactAction({ leadId }), toCallQueue: (leadId) => sendToCallQueueAction({ leadId }), badMoment: (leadId) => markBadMomentAction({ leadId }) };
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const [tab, setTab] = useState("all");
   const [query, setQuery] = useState("");
@@ -110,6 +111,15 @@ export function QualificationLeadsWorkspace({ rows, filters, summary, truncated 
     if (!lab) router.refresh();
   };
 
+  const badMoment = async (row: QualificationLeadRow) => {
+    notice.tap();
+    const result = await services.badMoment(row.id).catch(() => ({ ok: false as const, error: "Sem conexão agora." }));
+    if (!result.ok) { notice.fail(result.error, { keeps: "O lead continua como estava.", retry: () => void badMoment(row) }); return; }
+    setQueued((current) => new Map(current).set(row.id, "Momento ruim"));
+    notice.succeed(`${row.name} volta em ${new Date(result.data.until).toLocaleDateString("pt-BR")}. Até lá, nenhuma mensagem automática.`);
+    if (!lab) router.refresh();
+  };
+
   const columns: LiteColumn<QualificationLeadRow>[] = [
     {
       id: "lead", label: "Lead", primary: true,
@@ -120,8 +130,8 @@ export function QualificationLeadsWorkspace({ rows, filters, summary, truncated 
         </span>
       ),
     },
-    { id: "journey", label: "Etapa", render: (row) => (marked.has(row.id) ? <span className={page.badge} data-tone="danger">Não contatar</span> : queued.has(row.id) ? <span className={page.badge} data-tone="warning">Fila de ligação</span> : <LeadJourneyView journey={row.journey} variant="compact" />) },
-    { id: "score", label: "Perfil", nowrap: true, render: (row) => <span className={page.badge} data-tone={row.score.profile === "A" ? "success" : undefined} title={`Perfil ${row.score.profile} (${row.score.profilePoints} pts) · interesse ${row.score.interest} (${row.score.interestPoints} pts)`}>{queued.get(row.id) ?? row.score.label}</span> },
+    { id: "journey", label: "Etapa", render: (row) => (marked.has(row.id) ? <span className={page.badge} data-tone="danger">Não contatar</span> : queued.has(row.id) ? <span className={page.badge} data-tone="warning">{queued.get(row.id) === "Momento ruim" ? "Momento ruim" : "Fila de ligação"}</span> : <LeadJourneyView journey={row.journey} variant="compact" />) },
+    { id: "score", label: "Perfil", nowrap: true, render: (row) => <span className={page.badge} data-tone={row.score.profile === "A" ? "success" : undefined} title={`Perfil ${row.score.profile} (${row.score.profilePoints} pts) · interesse ${row.score.interest} (${row.score.interestPoints} pts)`}>{queued.get(row.id) && queued.get(row.id) !== "Momento ruim" ? queued.get(row.id) : row.score.label}</span> },
     { id: "field", label: "Campo atual", secondary: true, render: (row) => row.field ?? <span className={page.muted}>—</span> },
     { id: "touches", label: "Lembretes", numeric: true, nowrap: true, render: (row) => (row.touches.sent ? `${row.touches.sent} de ${row.touches.total}` : <span className={page.muted}>Nenhum</span>) },
     { id: "reply", label: "Última resposta", numeric: true, nowrap: true, render: (row) => (row.lastInboundAt ? timeAgo(row.lastInboundAt, now) : <span className={page.muted}>Nunca</span>) },
@@ -136,6 +146,7 @@ export function QualificationLeadsWorkspace({ rows, filters, summary, truncated 
               ...(row.phone ? [{ id: "copy", label: "Copiar telefone", onSelect: () => copyPhone(row.phone) }] : []),
               { id: "ficha", label: "Abrir ficha do lead", href: `/leads/${row.id}` },
               ...(!["X1", "X2", "R4", "N1", "N2", "N3", "N4", "N5", "N6", "N7"].includes(row.journey.code) && !queued.has(row.id) && !marked.has(row.id) ? [{ id: "queue", label: "Mandar para a fila de ligação", onSelect: () => void toCallQueue(row) }] : []),
+              ...(!["X1", "X2", "R5", "N6", "N7"].includes(row.journey.code) && !queued.has(row.id) && !marked.has(row.id) ? [{ id: "bad", label: "Momento ruim (volta em 30 dias)", onSelect: () => void badMoment(row) }] : []),
               ...(row.journey.code !== "X1" && !marked.has(row.id) ? [{ id: "dnc", label: "Não contatar", tone: "danger" as const, onSelect: () => void doNotContact(row) }] : []),
             ]}
           />

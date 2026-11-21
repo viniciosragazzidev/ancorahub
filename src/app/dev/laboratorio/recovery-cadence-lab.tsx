@@ -14,20 +14,21 @@ import { decideRecoveryTouch, buildRecoveryText, pendingAskFor, type RecoveryTou
 import { RecoverySettingsLite } from "@/features/lead-recovery/components/recovery-settings-lite";
 import { isRecoveryControl, parseRecoverySettings, type RecoverySettings } from "@/features/lead-recovery/settings-core";
 
-type Scenario = "silencio" | "responde" | "limite" | "sair" | "semTemplate";
+type Scenario = "silencio" | "responde" | "limite" | "sair" | "semTemplate" | "dec155";
 const SCENARIOS: Array<{ id: Scenario; label: string }> = [
   { id: "silencio", label: "Nunca mais responde" },
   { id: "responde", label: "Responde depois do S3" },
   { id: "limite", label: "131049 no S4" },
   { id: "sair", label: "Pede SAIR no S2" },
   { id: "semTemplate", label: "Templates não aprovados" },
+  { id: "dec155", label: "Marketing barrado (DEC-155)" },
 ];
 
 const fmt = new Intl.DateTimeFormat("pt-BR", { weekday: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 const REASON: Record<string, string> = {
   disabled: "recuperação ou segmento desligado", legal_pending: "falta a conferência jurídica", control: "lead no grupo de controle", replied: "o cliente respondeu: volta para a IA",
   opted_out: "pediu SAIR: não contatar", closed: "lead encerrado", assigned: "recebeu corretor", broker_contacted: "corretor fez contato", human: "pessoa no atendimento", meta_limit: "2º erro 131049: para",
-  step_disabled: "passo desligado", template_not_approved: "template não aprovado", window_closed: "janela de 24 h fechada e sem WAHA", no_channel: "sem canal válido", stale: "passou da hora",
+  step_disabled: "passo desligado", template_not_approved: "template não aprovado", marketing_blocked: "template de Marketing barrado pela DEC-155 (só Utility na qualificação)", window_closed: "janela de 24 h fechada e sem WAHA", no_channel: "sem canal válido", stale: "passou da hora",
 };
 
 /** Lead fora do controle de 10%, para a simulação mostrar a cadência. */
@@ -46,7 +47,9 @@ function simulate(settings: RecoverySettings, scenario: Scenario) {
   let optOut: Date | null = null;
   let sent = 1;
   let lastAutomatic: Date | null = touches[0].at;
-  const approved = scenario === "semTemplate" ? new Set<string>() : new Set(["anc_s4_cotacao", "anc_s5_ligacao", "anc_s6_despedida"]);
+  const templates = new Set(["anc_s4_cotacao", "anc_s5_ligacao", "anc_s6_despedida"]);
+  const approved = scenario === "semTemplate" || scenario === "dec155" ? new Set<string>() : templates;
+  const marketing = scenario === "dec155" ? templates : new Set<string>();
   for (let minutes = 30; minutes <= 8 * 24 * 60; minutes += 30) {
     const now = new Date(start.getTime() + minutes * 60_000);
     const decision = decideRecoveryTouch({
@@ -54,7 +57,7 @@ function simulate(settings: RecoverySettings, scenario: Scenario) {
       lead: { status: "new", qualificationStatus: "cold", corretorId: null, firstContactAt: null, recoveryState: null },
       conversation: { status: "WAITING_CUSTOMER", automationState: "AI_ACTIVE", optOutAt: optOut, wrongNumberAt: null },
       startAt: start, lastInboundAt: inbound, lastMetaInboundAt: inbound, conversationChannel: "meta", wahaAvailable: false,
-      touches, automaticSentSinceStart: sent, lastAutomaticAt: lastAutomatic, approvedTemplates: approved,
+      touches, automaticSentSinceStart: sent, lastAutomaticAt: lastAutomatic, approvedTemplates: approved, marketingTemplates: marketing,
     });
     if (decision.action === "wait") continue;
     if (decision.action === "stop") { lines.push({ at: now, text: `Parou: ${REASON[decision.reason] ?? decision.reason}`, tone: decision.reason === "replied" ? "success" : "warning" }); break; }

@@ -89,6 +89,11 @@ describe("decideRecoveryTouch: não enviar", () => {
     expect(decision).toMatchObject({ action: "skip", reason: "template_not_approved" });
   });
 
+  it("template de Marketing aprovado, mas barrado pela DEC-155: pula com esse motivo", () => {
+    const decision = decideRecoveryTouch(input({ startAt: ago(2 * 24 * 60 + 30), lastInboundAt: ago(2 * 24 * 60 + 40), touches: ["s2", "s3"].map((step) => ({ step, status: "sent", attempt: 1, errorCode: null, at: ago(3000) })), automaticSentSinceStart: 3, approvedTemplates: new Set(), marketingTemplates: new Set(["anc_s4_cotacao"]) }));
+    expect(decision).toMatchObject({ action: "skip", reason: "marketing_blocked" });
+  });
+
   it("passo desligado na configuração: pula", () => {
     const settings = { ...on, steps: { ...on.steps, s2: { enabled: false, channel: "same" as const } } };
     expect(decideRecoveryTouch(input({ settings }))).toMatchObject({ action: "skip", reason: "step_disabled" });

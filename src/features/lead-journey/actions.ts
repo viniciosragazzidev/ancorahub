@@ -80,3 +80,28 @@ export async function sendToCallQueueAction(input: { leadId: string }): Promise<
     return { ok: false, error: "Não consegui mandar para a fila agora. O lead continua como estava." };
   }
 }
+
+/**
+ * "Momento ruim" (R5, fase 5): o cliente disse "agora não". O lead sai das cadências e volta pela nutrição na data
+ * combinada (padrão: 30 dias). Só marca: não manda nada agora.
+ */
+export async function markBadMomentAction(input: { leadId: string; days?: number }): Promise<JourneyActionResult<{ until: string }>> {
+  try {
+    const context = await requireQualificationAccess();
+    const { leadId } = leadInput.parse(input);
+    const days = Math.min(180, Math.max(7, Math.round(input.days ?? 30)));
+    const now = new Date();
+    const until = new Date(now.getTime() + days * 86_400_000).toISOString();
+    const updated = await getDatabase().update(schema.leads)
+      .set({ qualificationDetails: sql`jsonb_set(coalesce(${schema.leads.qualificationDetails}, '{}'::jsonb), '{recovery}', ${JSON.stringify({ state: "bad_moment", at: now.toISOString(), until, touches: 0, by: context.userId })}::jsonb)` })
+      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId)))
+      .returning({ id: schema.leads.id });
+    if (!updated.length) return { ok: false, error: "Lead não encontrado." };
+    await getDatabase().insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: leadId, acao: `recovery.bad_moment:${days}`, createdAt: now }).catch(() => undefined);
+    revalidatePath("/qualificacao/leads");
+    return { ok: true, data: { until } };
+  } catch (error) {
+    console.error("[lead-journey] bad_moment", error instanceof Error ? error.message : error);
+    return { ok: false, error: "Não consegui marcar agora. O lead continua como estava." };
+  }
+}

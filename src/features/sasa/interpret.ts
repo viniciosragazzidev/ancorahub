@@ -23,6 +23,7 @@ const TOOL_GUIDE = [
   "duty.pause: pausar o recebimento de leads.",
   "duty.resume: voltar a receber leads.",
   "leads.waiting: quem está esperando resposta ou atendimento.",
+  "leads.recover: quem recuperar hoje (leads parados em negociação, sem retorno marcado).",
   "agenda.list: o que tem na agenda, retornos de hoje.",
   "returns.schedule: marcar retorno com um lead (lead e when).",
   "returns.reschedule: mudar o horário de um retorno que já existe (lead e when).",

@@ -38,6 +38,7 @@ export const LAB_QUALIFICATION_SOURCES: QualificationLeadSource[] = [
   source({ id: "lab-n2", nome: "João Cotação", status: "quote_sent", qualification_status: "hot", corretor_id: "u1", broker_name: "Ana Paula", assigned_at: minutesAgo(600), first_contact_at: minutesAgo(590), inbound_count: 8 }),
   source({ id: "lab-n6", nome: "Karen Ganho", status: "converted", qualification_status: "hot", corretor_id: "u1", broker_name: "Ana Paula", inbound_count: 9 }),
   source({ id: "lab-r4", nome: "Marina Fila de ligação", qualification_status: "cold", recovery: { state: "call_queue", at: minutesAgo(30), score: "A2" }, turbo: { ...turbo(4, 6000), stoppedAt: minutesAgo(40), stopReason: "finished" }, score_memory: { planType: { value: "empresarial" }, numberOfLives: { value: "5" } }, operator: "Amil" }),
+  source({ id: "lab-r6", nome: "Nina Nutrição", qualification_status: "cold", recovery: { state: "nurture", at: minutesAgo(60 * 24 * 3), until: new Date(Date.now() + 27 * 86_400_000).toISOString(), touches: 1 }, inbound_count: 3 }),
   source({ id: "lab-x1", nome: "Lucas Saiu", qualification_status: "cold", opt_out_at: minutesAgo(60), inbound_count: 1, last_inbound_at: minutesAgo(60) }),
 ];
 
@@ -61,6 +62,10 @@ export function labQualificationServices(delay: number, failing: boolean) {
     toCallQueue: async () => {
       await wait();
       return failing ? { ok: false as const, error: "Não consegui mandar para a fila agora." } : { ok: true as const, data: { score: "B2" } };
+    },
+    badMoment: async () => {
+      await wait();
+      return failing ? { ok: false as const, error: "Não consegui marcar agora." } : { ok: true as const, data: { until: new Date(Date.now() + 30 * 86_400_000).toISOString() } };
     },
     doNotContact: async () => {
       await wait();
