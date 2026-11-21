@@ -360,6 +360,14 @@
   font-size: var(--text-sm);
 }
 
+/* Ritmo do FEEDBACK.md (§1) no vazio: o primeiro item na hora, o segundo +80ms, o resto (ação) +160ms. */
+.empty > * { animation: emptyIn var(--duration-standard, 240ms) var(--ease-enter, cubic-bezier(0.16, 1, 0.3, 1)) backwards; }
+.empty > *:nth-child(2) { animation-delay: var(--duration-micro, 80ms); }
+.empty > *:nth-child(n + 3) { animation-delay: calc(var(--duration-micro, 80ms) * 2); }
+@keyframes emptyIn { from { opacity: 0; transform: translateY(var(--distance-micro, 4px)); } }
+:global(html[data-interface-motion="off"]) .empty > * { animation: none; }
+@media (prefers-reduced-motion: reduce) { .empty > * { animation: none; } }
+
 .card {
   display: grid;
   gap: 16px;

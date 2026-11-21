@@ -54,5 +54,7 @@ describe("carregamento de página inteira", () => {
     const director = render(<ArcScopeProvider enabled><RouteLoading /></ArcScopeProvider>);
     expect(screen.getByRole("status")).toHaveTextContent("Carregando…");
     expect(director.container.querySelector("main")).toHaveAttribute("data-skin", "diretor");
+    // Etapa 3 do plano de movimento: no diretor, a forma da página (título, números, painel) no lugar do anel.
+    expect(director.container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThanOrEqual(6);
   });
 });

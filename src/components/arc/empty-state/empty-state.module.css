@@ -10,4 +10,9 @@
 .action { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3, .75rem); margin-top: var(--space-5, 1.25rem); }
 /* The icon settles in once when the state first appears; later changes crossfade in place. */
 @keyframes empty-state-icon { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) { .icon { animation: none; } }
+/* Ritmo do FEEDBACK.md (§1): visual na hora, texto +80ms, ação +160ms. Só na primeira aparição; "backwards" não prende nada. */
+.frame { animation: empty-state-copy var(--duration-standard) var(--ease-enter) var(--duration-micro, 80ms) backwards; }
+.action { animation: empty-state-copy var(--duration-standard) var(--ease-enter) calc(var(--duration-micro, 80ms) * 2) backwards; }
+@keyframes empty-state-copy { from { opacity: 0; transform: translateY(var(--distance-micro, 4px)); } }
+@media (prefers-reduced-motion: reduce) { .icon, .frame, .action { animation: none; } }
+:global(html[data-interface-motion="off"]) :is(.icon, .frame, .action) { animation: none; }
