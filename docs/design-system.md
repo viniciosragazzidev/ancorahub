@@ -169,6 +169,9 @@ The Filled Dark CTA reads its text and hover from **On Primary Action** and **Pr
 | buttons | 8px |
 | largeCards | 16px |
 
+> **Modo diretor (aprovado em 21/11/2026):** cartões com 8px e botões com 6px, no estilo Accordee
+> (`docs/design-system/referencias/accordee.md`, `src/components/arc/director-accordee.css`). Pílula segue em tags e badges.
+
 ### Shadows
 
 | Name | Value | Token |

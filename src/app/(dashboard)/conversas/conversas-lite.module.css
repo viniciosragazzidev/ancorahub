@@ -675,9 +675,9 @@
 
 /* Lista */
 .root[data-skin="diretor"] [data-conversations-part="search-header"] { border-bottom: 1px solid var(--border); padding: 8px; }
-.root[data-skin="diretor"] [data-conversations-part="search"] input { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 13px; }
+.root[data-skin="diretor"] [data-conversations-part="search"] input { border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 13px; }
 .root[data-skin="diretor"] .quickTabs { gap: 4px; padding: 8px; border-bottom-color: var(--border); }
-.root[data-skin="diretor"] .quickTab { border: 1px solid transparent; border-radius: 8px; font-size: 13px; font-weight: 400; }
+.root[data-skin="diretor"] .quickTab { border: 1px solid transparent; border-radius: 6px; font-size: 13px; font-weight: 400; }
 .root[data-skin="diretor"] .quickTab[data-active="true"] { border-color: var(--border); background: var(--surface-muted); }
 .root[data-skin="diretor"] .quickCount { min-width: 0; padding: 0; background: transparent; font-size: 12px; }
 .root[data-skin="diretor"] .quickTab[data-active="true"] .quickCount { background: transparent; }
@@ -716,7 +716,7 @@
   gap: 12px;
   margin-inline: -8px;
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 14px;
   transition: background-color var(--duration-fast, 150ms) var(--ease-in-out, ease);
 }
@@ -762,7 +762,7 @@
   align-items: center;
   padding: 8px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--ac-shadow-frame, none);
 }
@@ -773,8 +773,107 @@
 @media (hover: hover) and (pointer: fine) {
   .root[data-skin="diretor"] .quickTab { min-height: 28px; padding: 0 10px; }
   .root[data-skin="diretor"] [data-conversations-part="search"] input { min-height: 32px; height: 32px; }
-  .root[data-skin="diretor"] [data-conversations-part="search-header"] button { min-height: 32px; height: 32px; border-radius: 8px; }
-  .root[data-skin="diretor"] [data-conversations-part="workspace"] [data-conversations-part="chat-header"] :is(button, a[aria-label]) { min-height: 28px; height: 28px; border-radius: 8px; }
-  .root[data-skin="diretor"] [data-conversations-part="workspace"] [data-conversations-part="chat-input"] :is(button, a[aria-label]) { min-height: 28px; height: 28px; min-width: 28px; border-radius: 8px; }
+  .root[data-skin="diretor"] [data-conversations-part="search-header"] button { min-height: 32px; height: 32px; border-radius: 6px; }
+  .root[data-skin="diretor"] [data-conversations-part="workspace"] [data-conversations-part="chat-header"] :is(button, a[aria-label]) { min-height: 28px; height: 28px; border-radius: 6px; }
+  .root[data-skin="diretor"] [data-conversations-part="workspace"] [data-conversations-part="chat-input"] :is(button, a[aria-label]) { min-height: 28px; height: 28px; min-width: 28px; border-radius: 6px; }
   .root[data-skin="diretor"] [data-conversations-part="composer-input"] { min-height: 28px; }
+}
+
+/* ------------------------------------------------------------------ estilo Accordee, segunda rodada (21/11/2026)
+ * Grupos por data na lista, topo da conversa numa linha, perfil em pares rótulo/valor, avatar da equipe nas enviadas.
+ */
+
+/* Grupo por data: rótulo de 11px em caixa alta, fixo no topo ao rolar. */
+.dayGroup {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 12px 16px 6px;
+  background: color-mix(in oklab, var(--surface) 95%, transparent);
+  backdrop-filter: blur(4px);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Topo da conversa numa linha: nome · dono, status e telefone; ações à direita; tags no fim da mesma linha. */
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-height: 44px;
+  padding: 6px 8px 6px 16px;
+}
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] > [data-conversations-part="chat-header-layout"] {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.root[data-skin="diretor"] [data-conversations-part="chat-header-identity"] { width: auto; flex: 1 1 auto; min-width: 0; align-items: center; gap: 8px; overflow: hidden; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-identity"] > [role="img"] { width: 24px; height: 24px; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-details"] { display: flex; flex: 1 1 auto; flex-wrap: nowrap; align-items: center; gap: 8px; min-width: 0; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-details"] > p { flex: 0 1 auto; min-width: 0; margin: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-title"] { flex-wrap: nowrap; min-width: 0; gap: 6px; }
+/* O nome nunca some: ocupa até 14rem; o status encolhe e corta antes dele. */
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] h2 { flex: 0 0 auto; max-width: 14rem; min-width: 0; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-title"] > [data-slot="animated-badge"] { flex-shrink: 1; min-width: 0; overflow: hidden; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header-actions"] { width: auto; gap: 2px; }
+.root[data-skin="diretor"] [data-conversations-part="chat-header"] [aria-label="Ações do atendimento"] { height: 28px; min-height: 28px; padding-inline: 8px; font-size: 12px; font-weight: 500; }
+.root[data-skin="diretor"] [data-conversations-part="header-tags"] { flex: 0 1 auto; min-width: 0; padding: 0; }
+.root[data-skin="diretor"] [data-conversations-part="header-tags"] button { height: 28px; min-height: 28px; font-size: 12px; }
+/* Com mouse, o botão de tags fica só com o ícone (o nome segue no aria-label/título do botão). */
+@media (hover: hover) and (pointer: fine) {
+  .root[data-skin="diretor"] [data-conversations-part="header-tags"] > button:last-child { width: 28px; min-width: 28px; padding: 0; justify-content: center; gap: 0; font-size: 0; }
+}
+
+/* Perfil: pares rótulo/valor separados por hairline, sem caixas cinza. */
+.root[data-skin="diretor"] [aria-label="Perfil do cliente"] [class*="rounded-[var(--radius-card)]"][class*="border"][class*="p-3"],
+.root[data-skin="diretor"] [data-conversations-part="workspace"] [aria-label="Perfil do cliente"] [class*="rounded-[var(--radius-card)]"][class*="border"][class*="p-3"] {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.root[data-skin="diretor"] [aria-label="Perfil do cliente"] :global(.space-y-5) > * + * { padding-top: 16px; border-top: 1px solid var(--border); }
+.root[data-skin="diretor"] [aria-label="Perfil do cliente"] dl { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.root[data-skin="diretor"] [aria-label="Perfil do cliente"] dl > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent !important;
+}
+.root[data-skin="diretor"] [aria-label="Perfil do cliente"] dl > div:last-child { border-bottom: 0; }
+.root[data-skin="diretor"] [aria-label="Perfil do cliente"] dl dt { font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.root[data-skin="diretor"] [aria-label="Perfil do cliente"] dl dd { margin: 0; font-size: 13px; text-align: right; }
+/* Ligar · WhatsApp · Abrir lead: botões de 28px com ícone e verbo na mesma linha. */
+.root[data-skin="diretor"] [aria-label="Perfil do cliente"] :global(.grid-cols-3) > [data-slot="button"] {
+  min-height: 28px;
+  flex-direction: row;
+  gap: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+/* Avatar ao lado do rótulo (topo da mensagem), da equipe ou da IA nas enviadas. */
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message-avatar"] { align-self: flex-start; margin-top: 0; transform: none; translate: none; background: transparent; }
+.root[data-skin="diretor"] [data-conversations-part="message-history"] [data-slot="message"][data-align="end"]:has([data-conversations-part="team-avatar"]) { padding-left: 8px; }
+
+/* Com o perfil aberto ao lado (1280px+), o topo não repete o que o perfil já mostra no alto: telefone e status de
+   qualificação. Com o perfil fechado, os dois voltam ao topo. */
+@media (min-width: 1280px) {
+  .root[data-skin="diretor"] [data-conversations-part="panes"][data-profile-open="true"] [data-conversations-part="chat-header-details"] > p,
+  .root[data-skin="diretor"] [data-conversations-part="panes"][data-profile-open="true"] [data-conversations-part="chat-header-title"] > [data-slot="animated-badge"]:first-of-type,
+  .root[data-skin="diretor"] [data-conversations-part="panes"][data-profile-open="true"] [data-conversations-part="header-owner-name"] { display: none; }
 }
