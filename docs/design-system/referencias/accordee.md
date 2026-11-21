@@ -125,3 +125,17 @@ Nenhuma rota pediu login. Nada foi digitado no demo.
   lead, Abrir no WhatsApp, Ligar, Copiar telefone, Copiar link da conversa); corretor só no hover da linha; lead já com
   corretor: selo neutro "Corretor" na lista e, no chat, a fala humana em bloco azul lavado com barra azul (IA segue
   cinza, cliente solto no branco).
+
+## 8. Todas as rotas do diretor (21/11/2026)
+
+- Auditoria automática das 65 telas da moldura de teste (`/dev/diretor-shell-real`), no claro e no escuro: nenhuma com
+  rolagem dupla nem estouro lateral visível.
+- Componentes compartilhados do Lite, só no escopo do diretor: botões, seletores, chips, "⋯", abas com contagem
+  (`lite-page`, `select`, `controls`), abas de `ui/tabs`, campos de texto e botões de cada tela com 6px e alturas
+  compactas com mouse. O corretor no celular não muda.
+- Escuro: `--primary`, `--chat-action-text` e `--series-1-text` em azul claro (`#c0d4f2`); o azul-marinho da marca
+  usado como texto sumia no fundo escuro.
+- Chat: cliente à esquerda, solto no branco, com avatar ao lado do nome; equipe e IA à direita em balão (azul lavado
+  para o atendente, cinza para a IA), com rótulo e hora em cima. Substituiu os blocos de largura total com barra, que
+  ficaram confusos com dados reais.
+- Botão de tema claro/escuro no topo do diretor.
