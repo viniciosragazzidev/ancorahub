@@ -48,6 +48,11 @@ export type DevLab = {
     /** Fase 4: no lugar de navegar para a venda ou a cotação (o laboratório troca de fluxo). */
     open?: (open: import("@/features/sasa/drafts").SasaOpen) => void;
   };
+  /** Agente IA do diretor (21/11): conversa num mundo em memória (modelo com roteiro) e Desfazer simulado. */
+  directorAgent?: {
+    transport: import("ai").ChatTransport<import("ai").UIMessage>;
+    undo: (actionId: string) => Promise<{ ok: boolean; message: string }>;
+  };
 };
 
 const DevLabContext = createContext<DevLab | null>(null);

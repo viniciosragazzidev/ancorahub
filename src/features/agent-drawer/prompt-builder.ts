@@ -58,51 +58,22 @@ export const ROLE_SHORTCUTS_MAP: Record<TenantContext["role"], RoleShortcut[]> =
       prompt: "Listar corretores que estão de plantão e volume de atendimentos.",
     },
   ],
+  // Agente do diretor (21/11): pedidos do dia a dia que o agente já resolve (plano §12, A14 e A1).
   director: [
     {
       key: "Ctrl 1",
-      label: "Saúde geral & Robô de IA",
-      prompt: "Qual o status de saúde da operação, conexões do WhatsApp e qualificação por IA?",
+      label: "Plantões agora",
+      prompt: "Quem está no plantão agora?",
     },
     {
       key: "Ctrl 2",
-      label: "Funil & Faturamento",
-      prompt: "Apresente um resumo executivo com total de leads, qualificados e taxa de conversão em vendas.",
+      label: "Onde falta gente",
+      prompt: "Onde falta gente na escala desta semana?",
     },
     {
       key: "Ctrl 3",
-      label: "Estouro de SLA & Filiais",
-      prompt: "Existem filiais com gargalo de atendimento ou estouro de SLA ativo?",
+      label: "Dar cadeiras",
+      prompt: "Dê 5 cadeiras para ",
     },
   ],
 };
-
-export function buildAgentSystemPrompt(context: TenantContext & { userName?: string; tenantName?: string }) {
-  const roleNameMap: Record<TenantContext["role"], string> = {
-    broker: "Corretor(a) de Planos de Saúde",
-    supervisor: "Supervisor(a) Comercial de Filial",
-    manager: "Gestor(a) Comercial / Operacional",
-    director: "Diretor(a) Executivo(a)",
-  };
-
-  const roleTitle = roleNameMap[context.role] || context.jobTitle;
-
-  return `Você é o Agente Virtual Operacional do CorreTop (AncoraHub), um assistente especializado e integrado ao sistema por ferramentas MCP.
-
-CONTEXTO DO USUÁRIO LOGADO:
-- Nome: ${context.userName || "Usuário"}
-- Papel Operacional: ${roleTitle} (${context.role})
-- ID do Usuário: ${context.userId}
-- Tenant ID: ${context.tenantId} ${context.tenantName ? `(${context.tenantName})` : ""}
-- Filial Atribuída: ${context.branchId || "Todas as Filiais (Global)"}
-
-INSTRUÇÕES E DIRETRIZES:
-1. Seja altamente direto, profissional e prestativo. Suas respostas devem ser claras, estruturadas e formatadas em Markdown elegante.
-2. Utilize as ferramentas MCP disponíveis para consultar dados reais da operação em tempo real (leads, plantão, estatísticas, SLA, saúde da IA).
-3. Respeite os limites do papel do usuário:
-   - Se o usuário for Corretor, foque na fila pessoal e no plantão individual.
-   - Se o usuário for Supervisor, apoie na gestão da filial, estouro de SLA e corretores em plantão.
-   - Se o usuário for Gestor ou Diretor, forneça relatórios consolidados do funil, métricas de conversão e saúde da infraestrutura.
-4. Quando uma ação for realizada com sucesso (ex: alteração de plantão ou reatribuição de lead), confirme com os detalhes específicos de forma concisa.
-5. Se uma informação for confidencial ou exigir autorização adicional, informe com cortesia.`;
-}

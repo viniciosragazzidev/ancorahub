@@ -1,7 +1,13 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
+import {
+  DefaultChatTransport,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+  lastAssistantMessageIsCompleteWithToolCalls,
+  type UIMessage,
+} from "ai";
 import {
   X,
   Maximize2,
@@ -13,8 +19,6 @@ import {
   RotateCcw,
   Bot,
   User,
-  Wrench,
-  CheckCircle2,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -23,6 +27,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { AgentShortcutChips } from "./agent-shortcut-chips";
 import { useAgentDrawer } from "./agent-drawer-provider";
 import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { catalogEntry } from "@/features/agent/catalog-meta";
+import type { ToolResult } from "@/features/agent/types";
+import { undoAgentActionAction } from "@/features/agent/undo-action";
+import { useDevLab } from "@/lib/dev-lab";
+import { useFeedback } from "@/lib/feedback/use-feedback";
+import { AgentToolPart, isToolPart, seatLabelsFrom } from "./agent-parts";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,8 +47,36 @@ export function AgentDrawer() {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { messages, sendMessage, status, setMessages } = useChat();
+  const lab = useDevLab()?.directorAgent ?? null;
+  const transport = useMemo(() => lab?.transport ?? new DefaultChatTransport<UIMessage>({ api: "/api/ai/agent-drawer/chat" }), [lab]);
+  const undo = lab?.undo ?? undoAgentActionAction;
+  const feedback = useFeedback();
+  const { messages, sendMessage, status, setMessages, error, addToolApprovalResponse, addToolOutput, regenerate } = useChat({
+    transport,
+    // Continua sozinho depois de um toque em "Escalar"/"Não fazer" ou de uma escolha ("qual Ana?").
+    sendAutomaticallyWhen: ({ messages: current }) => {
+      if (lastAssistantMessageIsCompleteWithApprovalResponses({ messages: current })) return true;
+      const last = current.at(-1);
+      const lastTool = last?.role === "assistant" ? [...last.parts].reverse().find(isToolPart) : undefined;
+      return lastTool?.type === "tool-escolher" && lastTool.state === "output-available" && lastAssistantMessageIsCompleteWithToolCalls({ messages: current });
+    },
+  });
   const isLoading = status === "submitted" || status === "streaming";
+  const seatLabels = useMemo(() => seatLabelsFrom(messages.flatMap((message) => message.parts)), [messages]);
+
+  // Nível 1 (FEEDBACK.md): confirmação só depois do servidor, uma vez por ação de escrita.
+  const confirmed = useRef(new Set<string>());
+  useEffect(() => {
+    for (const message of messages) {
+      for (const part of message.parts) {
+        if (!isToolPart(part) || part.state !== "output-available" || confirmed.current.has(part.toolCallId)) continue;
+        confirmed.current.add(part.toolCallId);
+        const entry = catalogEntry(part.type.slice(5));
+        if (!entry || entry.risk.readOnly) continue;
+        feedback((part.output as ToolResult | undefined)?.ok ? "confirm" : "error");
+      }
+    }
+  }, [messages, feedback]);
 
   // Handle active prompt triggered by keyboard shortcuts or chip clicks
   useEffect(() => {
@@ -178,25 +216,22 @@ export function AgentDrawer() {
                   <div
                     className={directorLite ? `director-agent-bubble ${m.role === "user" ? "is-user" : "is-assistant"}` : `max-w-[85%] rounded-2xl px-4 py-3 space-y-2 ${m.role === "user" ? "bg-primary text-primary-foreground font-medium rounded-tr-xs" : "bg-card border border-border/80 text-foreground shadow-2xs rounded-tl-xs"}`}
                   >
-                    {/* Tool Calls Execution Feed */}
-                    {m.parts &&
-                      m.parts.map((part: any, idx: number) => {
-                        if (part.type === "tool-invocation") {
-                          return (
-                            <div
-                              key={idx}
-                              className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-lg border border-border/40"
-                            >
-                              <Wrench className="size-3 text-primary shrink-0" />
-                              <span className="font-mono text-[10px]">{part.toolName}</span>
-                              <CheckCircle2 className="size-3 text-emerald-500 ml-auto shrink-0" />
-                            </div>
-                          );
-                        }
-                        return null;
-                      })}
-
-                    <div className="whitespace-pre-wrap">{m.parts ? m.parts.map((p: any) => p.text).join("") : m.content}</div>
+                    {m.parts.map((part: { type: string; text?: string }, idx: number) => {
+                      if (part.type === "text") return part.text ? <div key={idx} className="whitespace-pre-wrap">{part.text}</div> : null;
+                      if (isToolPart(part)) {
+                        return (
+                          <AgentToolPart
+                            key={part.toolCallId}
+                            part={part}
+                            seatLabels={seatLabels}
+                            undo={undo}
+                            onApprove={(id, approved) => addToolApprovalResponse({ id, approved, reason: approved ? undefined : "O diretor preferiu não fazer." })}
+                            onChoose={(toolCallId, choice) => addToolOutput({ tool: "escolher", toolCallId, output: choice })}
+                          />
+                        );
+                      }
+                      return null;
+                    })}
                   </div>
 
                   {m.role === "user" && (
@@ -206,6 +241,15 @@ export function AgentDrawer() {
                   )}
                 </div>
               ))}
+
+              {error && !isLoading ? (
+                <div className="director-agent-step is-danger" role="alert">
+                  <div className="director-agent-step-body">
+                    Não consegui responder agora. Nada foi alterado.{" "}
+                    <button type="button" className="director-agent-link-button" onClick={() => void regenerate()}>Tentar de novo</button>
+                  </div>
+                </div>
+              ) : null}
 
               {isLoading && (
                 <div className="flex gap-3 items-center text-xs text-muted-foreground pl-1">

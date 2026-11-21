@@ -14,6 +14,7 @@ import {
   updateDutyShiftReminderPilotAction,
   updateAiAudioTranscriptionAction,
   updateSasaDynamicAiAction,
+  updateAgentDirectorWritesAction,
   updateCustomerWaitingModeAction,
   updateQualificationContextAnalysisTenantAction,
   updateQualificationContextAnalysisQueueAction,
@@ -38,6 +39,7 @@ import { customerWaitingSettingKey, parseCustomerWaitingMode } from "@/features/
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import { aiAudioTranscriptionSettingKey } from "@/features/ai-agent/audio-transcription/flag";
 import { sasaDynamicAiSettingKey } from "@/features/sasa/dynamic-ai-flag";
+import { agentDirectorWritesSettingKey } from "@/features/agent/settings";
 import { AutoSaleSuperAdminCard } from "@/features/auto-sale/components/super-admin-card";
 import { qualificationContextAnalysisSettingKeys } from "@/features/ai-agent/qualification-context-analysis-settings";
 import { CLEAN_UI_FEATURE, getCleanUiOperationalLegacyTenantIds } from "@/features/clean-ui/feature";
@@ -100,6 +102,7 @@ export default async function SuperAdminTenantDetailPage({
       dutyShiftReminderSettingKey(tenantId.data),
       aiAudioTranscriptionSettingKey(tenantId.data),
       sasaDynamicAiSettingKey(tenantId.data),
+      agentDirectorWritesSettingKey(tenantId.data),
       customerWaitingSettingKey(tenantId.data),
       qualificationContextAnalysisSettingKeys(tenantId.data).tenant,
     ]),
@@ -124,6 +127,7 @@ export default async function SuperAdminTenantDetailPage({
   const dutyShiftReminderEnabled = settingMap.get(dutyShiftReminderSettingKey(tenant.id)) === "true";
   const aiAudioEnabled = settingMap.get(aiAudioTranscriptionSettingKey(tenant.id)) === "true";
   const sasaDynamicAiEnabled = settingMap.get(sasaDynamicAiSettingKey(tenant.id)) !== "false";
+  const agentWritesEnabled = settingMap.get(agentDirectorWritesSettingKey(tenant.id)) === "true";
   const customerWaitingObserving = parseCustomerWaitingMode(settingMap.get(customerWaitingSettingKey(tenant.id))) === "observe";
   const contextAnalysisTenantKey = qualificationContextAnalysisSettingKeys(tenant.id).tenant;
   const contextAnalysisTenantEnabled = settingMap.get(contextAnalysisTenantKey) !== "false";
@@ -140,6 +144,7 @@ export default async function SuperAdminTenantDetailPage({
   const dutyShiftReminderAction = updateDutyShiftReminderPilotAction.bind(null, tenant.id);
   const aiAudioAction = updateAiAudioTranscriptionAction.bind(null, tenant.id);
   const sasaDynamicAiAction = updateSasaDynamicAiAction.bind(null, tenant.id);
+  const agentWritesAction = updateAgentDirectorWritesAction.bind(null, tenant.id);
   const customerWaitingAction = updateCustomerWaitingModeAction.bind(null, tenant.id);
   const contextAnalysisTenantAction = updateQualificationContextAnalysisTenantAction.bind(null, tenant.id);
 
@@ -283,6 +288,21 @@ export default async function SuperAdminTenantDetailPage({
                   <input name="enabled" type="hidden" value={sasaDynamicAiEnabled ? "false" : "true"} />
                   <Button type="submit" variant={sasaDynamicAiEnabled ? "outline" : "default"}>
                     {sasaDynamicAiEnabled ? "Desligar" : "Ligar"}
+                  </Button>
+                </form>
+              </div>
+              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="max-w-2xl">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-medium">Ações do Agente IA do diretor</h3>
+                    <Badge variant={agentWritesEnabled ? "success" : "outline"}>{agentWritesEnabled ? "Ligado" : "Desligado"}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">O agente do diretor passa a mexer na escala (dar cadeiras, escalar e tirar de plantões), com confirmação, trilha e Desfazer por 10 min. Desligado, ele só consulta.</p>
+                </div>
+                <form action={agentWritesAction}>
+                  <input name="enabled" type="hidden" value={agentWritesEnabled ? "false" : "true"} />
+                  <Button type="submit" variant={agentWritesEnabled ? "outline" : "default"}>
+                    {agentWritesEnabled ? "Desligar" : "Ligar"}
                   </Button>
                 </form>
               </div>

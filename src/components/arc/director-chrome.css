@@ -777,6 +777,117 @@
   color: var(--accent-strong);
 }
 
+/* Agente IA (21/11): passos, cartão de confirmação, escolha e Desfazer. Bordas definem; sem sombra pesada. */
+.arc-venancor[data-skin="diretor"] .director-agent-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 6px 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.arc-venancor[data-skin="diretor"] .director-agent-step.is-danger { color: var(--danger); }
+.arc-venancor[data-skin="diretor"] .director-agent-step-icon { display: inline-flex; padding-top: 3px; }
+.arc-venancor[data-skin="diretor"] .director-agent-step-body { min-width: 0; flex: 1; }
+
+.arc-venancor[data-skin="diretor"] .director-agent-result-text {
+  margin: 0;
+  color: var(--foreground);
+  white-space: pre-wrap;
+}
+
+.arc-venancor[data-skin="diretor"] .director-agent-result-actions,
+.arc-venancor[data-skin="diretor"] .director-agent-undo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.arc-venancor[data-skin="diretor"] .director-agent-undo-message { color: var(--text-secondary); }
+
+.arc-venancor[data-skin="diretor"] .director-agent-card {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 12px;
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.arc-venancor[data-skin="diretor"] .director-agent-card.is-strong { border-color: var(--border-strong); }
+.arc-venancor[data-skin="diretor"] .director-agent-card-title { margin: 0; font-weight: 600; }
+.arc-venancor[data-skin="diretor"] .director-agent-card-note { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); }
+
+.arc-venancor[data-skin="diretor"] .director-agent-card-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+  list-style: disc;
+}
+
+.arc-venancor[data-skin="diretor"] .director-agent-card-actions,
+.arc-venancor[data-skin="diretor"] .director-agent-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.arc-venancor[data-skin="diretor"] .director-agent-confirm,
+.arc-venancor[data-skin="diretor"] .director-agent-choice {
+  display: inline-flex;
+  min-width: 128px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  padding: 8px 14px;
+  background: var(--surface);
+  color: var(--foreground);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.arc-venancor[data-skin="diretor"] .director-agent-choice { flex-direction: column; align-items: flex-start; font-weight: 500; }
+.arc-venancor[data-skin="diretor"] .director-agent-choice.is-picked { border-color: var(--accent); color: var(--accent-strong); }
+.arc-venancor[data-skin="diretor"] .director-agent-choice-detail { color: var(--text-secondary); font-size: var(--text-xs, 12px); }
+
+.arc-venancor[data-skin="diretor"] .director-agent-confirm:hover:not(:disabled),
+.arc-venancor[data-skin="diretor"] .director-agent-choice:hover:not(:disabled) { background: var(--surface-muted); }
+
+.arc-venancor[data-skin="diretor"] .director-agent-confirm:active:not(:disabled),
+.arc-venancor[data-skin="diretor"] .director-agent-choice:active:not(:disabled) { transform: scale(0.98); }
+
+.arc-venancor[data-skin="diretor"] .director-agent-confirm:disabled,
+.arc-venancor[data-skin="diretor"] .director-agent-choice:disabled { cursor: default; opacity: 0.7; }
+
+.arc-venancor[data-skin="diretor"] .director-agent-link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--accent-strong);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.arc-venancor[data-skin="diretor"] .director-agent-drawer .director-agent-link-button { min-height: 0; }
+.arc-venancor[data-skin="diretor"] .director-agent-inline-link { color: var(--accent-strong); text-decoration: underline; text-underline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .arc-venancor[data-skin="diretor"] .director-agent-confirm:active:not(:disabled),
+  .arc-venancor[data-skin="diretor"] .director-agent-choice:active:not(:disabled) { transform: none; }
+}
+
 .arc-venancor[data-skin="diretor"] .director-agent-drawer button,
 .arc-venancor[data-skin="diretor"] .director-agent-drawer textarea,
 .arc-venancor[data-skin="diretor"].director-agent-drawer button,

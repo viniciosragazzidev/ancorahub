@@ -176,6 +176,9 @@ export default async function SuperAdminSettingsPage() {
     "ai_primary_model",
     "ai_fallback_provider",
     "ai_fallback_model",
+    // Antes faltava aqui: o campo aparecia vazio e salvar o formulário apagava o modelo (21/11).
+    "ai_learning_model",
+    "ai_agent_director_model",
     "ai_temperature",
     "ai_max_tokens",
     "ai_system_prompt",
@@ -315,6 +318,7 @@ export default async function SuperAdminSettingsPage() {
   const aiFallbackProvider = settingMap.get("ai_fallback_provider") ?? "none";
   const aiFallbackModel = settingMap.get("ai_fallback_model") ?? "";
   const aiLearningModel = settingMap.get("ai_learning_model") ?? "";
+  const aiAgentDirectorModel = settingMap.get("ai_agent_director_model") ?? "";
   const aiTemperature = settingMap.get("ai_temperature") ?? "0.7";
   const aiMaxTokens = settingMap.get("ai_max_tokens") ?? "1024";
   const aiSystemPrompt =
@@ -1727,6 +1731,19 @@ export default async function SuperAdminSettingsPage() {
                       />
                       <p className="text-xs text-muted-foreground">
                         Modelo do OpenRouter usado para agrupar as perguntas dos clientes e sugerir situações. Deixe em branco para usar os modelos padrão.
+                      </p>
+                    </div>
+
+                    {/* Agente IA do diretor (21/11) */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Modelo do Agente IA do diretor</label>
+                      <Input
+                        name="agentDirectorModel"
+                        placeholder="Ex: anthropic/claude-sonnet-4.5"
+                        defaultValue={aiAgentDirectorModel}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Modelo do OpenRouter com chamada de ferramentas, usado pela gaveta Agente IA. Em branco: anthropic/claude-sonnet-4.5 quando há chave do OpenRouter; sem ela, o provedor primário.
                       </p>
                     </div>
 

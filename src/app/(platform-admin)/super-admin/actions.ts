@@ -44,6 +44,7 @@ import { customerWaitingSettingKey, customerWaitingSinceKey } from "@/features/c
 import { dutyShiftReminderSettingKey } from "@/features/lead-distribution/duty-shift-reminder-flag";
 import { aiAudioTranscriptionSettingKey } from "@/features/ai-agent/audio-transcription/flag";
 import { sasaDynamicAiSettingKey } from "@/features/sasa/dynamic-ai-flag";
+import { AGENT_DIRECTOR_MODEL_SETTING, agentDirectorWritesSettingKey } from "@/features/agent/settings";
 import { qualificationContextAnalysisSettingKeys } from "@/features/ai-agent/qualification-context-analysis-settings";
 import { EXTENSION_PILOT_USERS_SETTING } from "@/features/browser-extension/pilot";
 
@@ -567,6 +568,20 @@ export async function updateSasaDynamicAiAction(tenantId: string, formData: Form
   revalidatePath(`/super-admin/tenants/${targetTenantId}`);
 }
 
+/** Liga ou desliga, por empresa, as ações de escrita do Agente IA do diretor (desligadas por padrão até o piloto). */
+export async function updateAgentDirectorWritesAction(tenantId: string, formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
+  const now = new Date();
+  await setSystemSetting(agentDirectorWritesSettingKey(targetTenantId), input.enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "agent_director_writes.tenant_updated",
+    targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now,
+  });
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
+}
+
 /** Super-admin kill switches for contextual qualification analysis, by tenant and queue. */
 export async function updateQualificationContextAnalysisTenantAction(tenantId: string, formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
@@ -847,6 +862,7 @@ export async function updateAiSettingsAction(formData: FormData) {
   const fallbackProvider = String(formData.get("fallbackProvider") ?? "none").trim();
   const fallbackModel = String(formData.get("fallbackModel") ?? "").trim();
   const learningModel = String(formData.get("learningModel") ?? "").trim().slice(0, 120);
+  const agentDirectorModel = String(formData.get("agentDirectorModel") ?? "").trim().slice(0, 120);
   const temperature = String(formData.get("temperature") ?? "0.7").trim();
   const maxTokens = String(formData.get("maxTokens") ?? "1024").trim();
   const systemPrompt = String(formData.get("systemPrompt") ?? "").trim();
@@ -861,6 +877,7 @@ export async function updateAiSettingsAction(formData: FormData) {
   await setSystemSetting("ai_fallback_provider", fallbackProvider, now);
   await setSystemSetting("ai_fallback_model", fallbackModel, now);
   await setSystemSetting("ai_learning_model", learningModel, now);
+  await setSystemSetting(AGENT_DIRECTOR_MODEL_SETTING, agentDirectorModel, now);
   await setSystemSetting("ai_temperature", temperature, now);
   await setSystemSetting("ai_max_tokens", maxTokens, now);
   await setSystemSetting("ai_system_prompt", systemPrompt, now);

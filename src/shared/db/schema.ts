@@ -5930,6 +5930,40 @@ export const sasaCommands = pgTable(
 );
 
 /**
+ * Ações do Agente IA do diretor (21/11/2026; migration 0235). Uma linha por chamada de ferramenta de escrita: pedido,
+ * entrada com ids resolvidos, aprovação, resultado e Desfazer. Única por usuário e `tool_call_id` (idempotência).
+ * `request_text` é apagado depois de 90 dias pelo job de limpeza da Sasá. Plano: docs/implementations/active/2026-11-21-agente-diretor.md.
+ */
+export const agentActions = pgTable(
+  "agent_actions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    toolCallId: text("tool_call_id").notNull(),
+    tool: text("tool").notNull(),
+    /** Frase do diretor que gerou a chamada; null depois da limpeza de 90 dias. */
+    requestText: text("request_text"),
+    input: jsonb("input").$type<Record<string, unknown>>().notNull(),
+    /** auto | user */
+    approval: text("approval").notNull(),
+    /** done | failed | undone */
+    status: text("status").notNull(),
+    message: text("message").notNull(),
+    undo: jsonb("undo").$type<{ tool: string; input: Record<string, unknown>; label: string } | null>(),
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
+    durationMs: integer("duration_ms"),
+    purgedAt: timestamp("purged_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("agent_actions_user_call_unique").on(table.userId, table.toolCallId),
+    index("agent_actions_tenant_user_created_idx").on(table.tenantId, table.userId, table.createdAt),
+  ],
+);
+
+/**
  * Toques de recuperação (fase 2 do plano de recuperação, 21/11/2026; migration 0234). Um por toque: passo, canal,
  * resultado, resposta e custo estimado. Lido pelo funil de recuperação e escrito pelo turbo, pelo follow-up de
  * silêncio e pela cadência única. Plano: docs/implementations/active/2026-11-21-recuperacao-de-leads.md.

@@ -1,89 +1,70 @@
-import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 import { NextResponse } from "next/server";
-import { streamText, tool, type ModelMessage } from "ai";
-import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { createAgentUIStreamResponse, type UIMessage } from "ai";
+
+import { createDirectorAgent } from "@/features/agent/agent";
+import { createServerAgentBackend } from "@/features/agent/backend-server";
+import { isAgentDirectorWritesEnabled, resolveAgentDirectorModel } from "@/features/agent/settings";
+import { logAiUsage } from "@/features/ai-agent/ai-usage-log";
 import { readChatRequest } from "@/features/ai/chat-request-guard";
-import { getAiEngineSettings } from "@/features/ai/engine";
-import { getAiModelInstance } from "@/features/ai/providers";
-import { getMcpToolsForRole } from "@/features/agent-drawer/mcp-tools";
-import { buildAgentSystemPrompt } from "@/features/agent-drawer/prompt-builder";
+import { isOutsideManagerScope } from "@/features/manager-scope/manager-routes";
 import { getUserDisplayInfo } from "@/shared/auth/actions";
-import { answerIfOperatorQuestion, lastUserText } from "@/features/operator-catalog/answer";
+import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+
+/**
+ * Gaveta "Agente IA" do diretor (plano: docs/implementations/active/2026-11-21-agente-diretor.md, fase 0).
+ * ai@7: ToolLoopAgent + aprovação por ferramenta + fluxo de mensagens de UI (passos aparecem na gaveta).
+ * Tenant, usuário e papel só da sessão; o modelo nunca escolhe empresa nem pessoa fora das ferramentas.
+ */
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
     const context = await getRequiredTenantContext();
-    // Gestor sem o Agente IA desde 10/11: as ferramentas liam filas e plantões de outras unidades.
-    if (isOutsideManagerScope(context.role, context.jobTitle)) return NextResponse.json({ error: "O Agente IA não está disponível para o gestor." }, { status: 403 });
+    // Gestor sem o Agente IA desde 10/11; o agente novo nasce só para o diretor (plano §3.4).
+    if (isOutsideManagerScope(context.role, context.jobTitle) || context.role !== "director") {
+      return NextResponse.json({ error: "O Agente IA está disponível só para o diretor." }, { status: 403 });
+    }
     const guard = await readChatRequest(req, context);
     if (!guard.ok) {
       return NextResponse.json({ error: guard.error }, { status: guard.status, headers: guard.retryAfterSeconds ? { "Retry-After": String(guard.retryAfterSeconds) } : undefined });
     }
-    const messages = guard.messages as ModelMessage[];
+    const messages = guard.messages as UIMessage[];
 
-    // Operators, plans, prices, carências: only the imported material answers, never the free model.
-    const operatorAnswer = await answerIfOperatorQuestion({ tenantId: context.tenantId, userId: context.userId, question: lastUserText(messages) }).catch(() => null);
-    if (operatorAnswer) return new Response(operatorAnswer, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    const [resolved, writesEnabled, userInfo] = await Promise.all([
+      resolveAgentDirectorModel(),
+      isAgentDirectorWritesEnabled(context.tenantId),
+      getUserDisplayInfo().catch(() => null),
+    ]);
+    if (!resolved) return NextResponse.json({ error: "O motor de IA está desligado pelo Super-admin." }, { status: 403 });
 
-    const userInfo = await getUserDisplayInfo();
-    const settings = await getAiEngineSettings();
-
-    if (!settings.enabled) {
-      return NextResponse.json(
-        { error: "O motor de Inteligência Artificial está desativado pelo administrador." },
-        { status: 403 }
-      );
-    }
-
-    const systemPrompt = buildAgentSystemPrompt({
-      ...context,
-      userName: userInfo?.name ?? "Usuário",
-    });
-
-    const roleTools = getMcpToolsForRole(context.role);
-
-    // Convert MCP tools to the AI SDK (`ai` package) tool format
-    const mcpToolsRecord: Record<string, any> = {};
-    for (const mcpTool of roleTools) {
-      mcpToolsRecord[mcpTool.name] = (tool as any)({
-        description: mcpTool.description,
-        parameters: mcpTool.parameters,
-        execute: async (input: any) => {
-          try {
-            return await mcpTool.execute(input, context);
-          } catch (err) {
-            console.error(`[MCP Tool Execution Error] ${mcpTool.name}:`, err);
-            return { error: err instanceof Error ? err.message : "Erro na execução da ferramenta." };
-          }
-        },
-      });
-    }
-
-    const keys = {
-      groqKey: settings.groqApiKey,
-      openaiKey: settings.openaiApiKey,
-      googleKey: settings.googleApiKey,
-      openrouterKey: settings.openrouterApiKey,
-    };
-
-    const model = getAiModelInstance(settings.primaryProvider, settings.primaryModel, keys);
-
-    const result = streamText({
-      model,
-      system: systemPrompt,
+    const startedAt = Date.now();
+    const agent = createDirectorAgent({
+      model: resolved.model,
+      backend: createServerAgentBackend(context),
+      viewer: { role: context.role, viewAs: Boolean(context.viewAs), writesEnabled },
+      firstName: userInfo?.name?.trim().split(/\s+/)[0] ?? null,
       messages,
-      tools: mcpToolsRecord,
-      temperature: settings.temperature,
-      maxOutputTokens: settings.maxTokens,
+      onUsage: (usage) => {
+        void logAiUsage({
+          tenantId: context.tenantId,
+          purpose: "agent_director",
+          model: resolved.label,
+          startedAt,
+          usage: { prompt_tokens: usage.inputTokens, completion_tokens: usage.outputTokens, total_tokens: usage.totalTokens },
+          success: true,
+        });
+      },
     });
 
-    return result.toTextStreamResponse();
+    return createAgentUIStreamResponse({
+      agent,
+      uiMessages: messages,
+      abortSignal: req.signal,
+      // Nunca ecoa erro de provedor ou banco para o navegador.
+      onError: () => "Não consegui responder agora. Nada foi alterado. Tente de novo.",
+    });
   } catch (error) {
-    console.error("[Agent Drawer Chat Error]:", error);
-    return NextResponse.json(
-      // Never echo provider or database errors to the browser.
-      { error: "Não foi possível responder agora. Tente novamente." },
-      { status: 500 }
-    );
+    console.error("[Agent Drawer Chat Error]:", error instanceof Error ? error.message.slice(0, 200) : "unknown");
+    return NextResponse.json({ error: "Não foi possível responder agora. Tente novamente." }, { status: 500 });
   }
 }
