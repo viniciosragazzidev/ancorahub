@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { CommandCenter } from "@/features/dashboard/components/command-center";
 import { UnitManagerLinks } from "@/features/dashboard/components/allowed-link";
 import { AUTO_RULE_KEYS, defaultAutoRuleSettings } from "@/features/post-sale-audit/auto-rules";
@@ -52,9 +53,11 @@ function postSaleData(brokers: string[]): WorkspaceData {
 export function ManagerPreview({ caseId, screen }: { caseId: Case; screen: Screen }) {
   const item = CASES[caseId];
   const now = new Date(NOW_ISO);
-  const areas = visibleNavAreas(MANAGER);
+  // Mesma regra do layout do painel: sem unidade, a aba Pós-venda não aparece.
+  const areas = visibleNavAreas({ ...MANAGER, postSaleAuditEnabled: Boolean(item.unit) });
   return (
-    <div className="flex min-h-screen bg-background">
+    <SidebarProvider>
+    <div className="flex min-h-screen w-full bg-background">
       <aside aria-label="Menu do gestor" className="w-56 shrink-0 border-r border-border p-4 text-sm">
         <p className="mb-3 font-semibold">{item.label}</p>
         {areas.map(({ area, tabs }) => (
@@ -83,5 +86,6 @@ export function ManagerPreview({ caseId, screen }: { caseId: Case; screen: Scree
         )}
       </main>
     </div>
+    </SidebarProvider>
   );
 }
