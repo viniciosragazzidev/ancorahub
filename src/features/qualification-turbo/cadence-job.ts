@@ -1,5 +1,8 @@
 import "server-only";
 
+import { recordRecoveryTouch } from "@/features/lead-recovery/touches";
+import { isRecoveryControl } from "@/features/lead-recovery/settings-core";
+import { getRecoverySettings } from "@/features/lead-recovery/settings";
 import { and, desc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
 import { getQualificationTenantSettings } from "@/features/ai-qualification/tenant-settings-service";
@@ -119,17 +122,18 @@ async function runCadence(now: Date): Promise<CadenceRunResult> {
   const lastInbound = new Map(inbound.map((row) => [row.leadId, row.at ? new Date(row.at) : null]));
   const conversationByLead = new Map(conversations.map((row) => [row.leadId, row]));
 
-  const tenantCache = new Map<string, { cadence: boolean; approved: Set<string>; empresa: string; botName: string }>();
+  const tenantCache = new Map<string, { cadence: boolean; approved: Set<string>; empresa: string; botName: string; controlPct: number }>();
   const tenantContext = async (tenantId: string) => {
     const cached = tenantCache.get(tenantId);
     if (cached) return cached;
     const settings = await getTurboSettings(tenantId);
-    const [approved, empresa, qualification] = await Promise.all([
+    const [approved, empresa, qualification, recovery] = await Promise.all([
       listApprovedTemplateNames(tenantId),
       companyNameFor(tenantId, settings),
       getQualificationTenantSettings(tenantId).catch(() => null),
+      getRecoverySettings(tenantId).catch(() => null),
     ]);
-    const value = { cadence: settings.enabled && settings.cadence, approved, empresa, botName: qualification?.assistantName?.trim() || "Assistente" };
+    const value = { cadence: settings.enabled && settings.cadence, approved, empresa, botName: qualification?.assistantName?.trim() || "Assistente", controlPct: recovery?.controlPct ?? 10 };
     tenantCache.set(tenantId, value);
     return value;
   };
@@ -165,6 +169,8 @@ async function runCadence(now: Date): Promise<CadenceRunResult> {
     if (decision.action === "skip") {
       const skipped: TurboTouchRecord = { touch: decision.step.touch, template: decision.step.template, at: now.toISOString(), status: "skipped", errorCode: decision.reason };
       await writeTurboState(lead.tenantId, lead.id, { ...state, touches: [...state.touches, skipped] });
+      // Funil de recuperação (fase 2): o toque pulado também conta, com o motivo.
+      await recordRecoveryTouch({ tenantId: lead.tenantId, leadId: lead.id, segment: "never_replied", step: decision.step.touch, attempt: state.touches.filter((touch) => touch.touch === decision.step.touch).length + 1, channel: "meta", template: decision.step.template, status: "skipped", reason: decision.reason, controlGroup: isRecoveryControl(lead.id, tenant.controlPct) });
       result.skipped += 1;
       continue;
     }
@@ -210,6 +216,20 @@ async function runCadence(now: Date): Promise<CadenceRunResult> {
     }
     const next: TurboState = { ...state, touches: [...state.touches, record] };
     await writeTurboState(lead.tenantId, lead.id, next);
+    await recordRecoveryTouch({
+      tenantId: lead.tenantId,
+      leadId: lead.id,
+      segment: "never_replied",
+      step: decision.step.touch,
+      attempt,
+      channel: "meta",
+      template: decision.step.template,
+      status: record.status === "sent" ? "sent" : record.errorCode === "held" ? "held" : "failed",
+      errorCode: record.errorCode ?? null,
+      outboundId: record.outboundId ?? null,
+      controlGroup: isRecoveryControl(lead.id, tenant.controlPct),
+      kind: decision.step.touch === "t1" ? "utility" : "marketing",
+    });
   }
   return result;
 }

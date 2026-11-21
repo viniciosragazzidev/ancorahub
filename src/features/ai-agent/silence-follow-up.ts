@@ -8,6 +8,7 @@ import { resolveCanonicalWhatsAppDestination } from "@/features/communication-ch
 import { getTurboSettings } from "@/features/qualification-turbo/service";
 import { enqueueWahaAiReply } from "@/features/waha-cadence/service";
 import { getDatabase, schema } from "@/shared/db";
+import { recordRecoveryTouch } from "@/features/lead-recovery/touches";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 
 import { decideSilenceFollowUp, silenceFollowUpMessageId, type SilenceFollowUpChannel, type SilenceFollowUpSkipReason } from "./silence-follow-up-rules";
@@ -192,6 +193,10 @@ export async function runSilenceFollowUpSweep(input: { now?: Date; deadlineAt?: 
         acao: delivered ? `qualification.silence_follow_up_sent:${delivered.channel}` : "qualification.silence_follow_up_failed",
         createdAt: new Date(),
       }).catch(() => undefined);
+      await recordRecoveryTouch({
+        tenantId, leadId, segment: "stopped_midway", step: "s1", channel: delivered?.channel ?? decision.channel,
+        status: delivered ? "sent" : "failed", messageId: delivered?.messageId ?? null, kind: "free",
+      });
       if (delivered) {
         result.sent += 1;
         console.info("[silence-follow-up] sent", { tenantId, leadId, channel: delivered.channel });

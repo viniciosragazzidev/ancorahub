@@ -1191,6 +1191,13 @@
                         "when":  1794800000000,
                         "tag":  "0233_sasa_commands",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  170,
+                        "version":  "7",
+                        "when":  1794800100000,
+                        "tag":  "0234_lead_recovery_touches",
+                        "breakpoints":  true
                     }
                 ]
 }
