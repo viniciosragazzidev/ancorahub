@@ -45,11 +45,11 @@
   color: var(--accent-strong);
 }
 
-/* Estilo Accordee (21/11/2026, docs/design-system/referencias/accordee.md): com mouse, abas de 28px sem borda,
-   ativa em Paper Mist (--surface-muted) com texto principal. No toque seguem os chips de 44px. */
+/* Estilo Accordee, só no modo diretor (21/11/2026, docs/design-system/referencias/accordee.md): com mouse, abas de 28px
+   sem borda, ativa em Paper Mist com texto principal. O Lite do corretor segue com os chips de 44px. */
 @media (hover: hover) and (pointer: fine) {
-  .list { gap: 4px; }
-  .tab { min-height: 28px; padding: 0 8px; border-color: transparent; border-radius: 6px; background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 400; }
-  .tab:hover { background: var(--surface-muted); color: var(--foreground); }
-  .tab[aria-current="page"] { background: var(--surface-muted); color: var(--foreground); font-weight: 500; }
+  :global(.arc-venancor[data-skin="diretor"]) .list { gap: 4px; }
+  :global(.arc-venancor[data-skin="diretor"]) .tab { min-height: 28px; padding: 0 8px; border-color: transparent; border-radius: 6px; background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 400; }
+  :global(.arc-venancor[data-skin="diretor"]) .tab:hover { background: var(--surface-muted); color: var(--foreground); }
+  :global(.arc-venancor[data-skin="diretor"]) .tab[aria-current="page"] { background: var(--surface-muted); color: var(--foreground); font-weight: 500; }
 }

@@ -13,6 +13,8 @@
 .arc-venancor[data-skin="diretor"] {
   --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --surface-muted: #f5f5f5; /* Paper Mist */
   --text-secondary: #525252; /* Steel */
   --text-muted: #737373; /* Fog */
@@ -267,3 +269,9 @@
 .arc-venancor[data-skin="diretor"] [data-slot="app-content"] :is(button, a)[class*="filtersButton__"],
 .arc-venancor[data-skin="diretor"] [data-slot="app-content"] [class*="_segmented__"],
 .arc-venancor[data-skin="diretor"] [data-slot="app-content"] [class*="_segment__"] { border-radius: 6px; }
+
+/* Topo da sidebar só com o logo (pedido do Vinicios, 21/11/2026): sem "Âncora CRM / Menu principal". O nome segue no
+   title e no alt do logo. Logo largo da empresa até 140px de largura. */
+.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div:first-child > div:not(.director-super-admin-actions) { display: none; }
+.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child:has(img:not([src="/icon.png"])) { max-width: 140px; }
+.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child img:not([src="/icon.png"]) { max-width: 140px; height: 28px; }
