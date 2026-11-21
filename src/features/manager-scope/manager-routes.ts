@@ -3,7 +3,8 @@
  * diretor) e só enxerga a gestão da própria unidade. Fonte única das rotas que ele pode abrir; o menu lateral, o
  * layout do painel e os layouts de cada área leem daqui. Tudo que não está aqui é negado no servidor (fail closed).
  * Decisão do Vinicios: sem configuração do sistema, distribuição, conversas de qualificação, comercial, lista geral
- * de leads, marketing, atendimento IA e pós-venda (pós-venda volta depois).
+ * de leads, marketing e atendimento IA. Pós-venda voltou em 20/11, escopado à unidade (campanhas da unidade, respostas
+ * dos clientes da unidade; régua automática e regra R0 só o diretor edita).
  * Plano: docs/implementations/active/2026-11-10-gestor-versao-antiga-escopo-unidade.md
  */
 
@@ -14,6 +15,7 @@ export const MANAGER_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/dashboard$/,
   /^\/equipe$/,
   /^\/equipe\/plantoes$/,
+  /^\/equipe\/pos-venda$/,
   /^\/equipe\/convidar$/,
   new RegExp(`^/equipe/(?!cargos$|convidar$|dashboard$|recuperacoes$|pos-venda$|minha$|plantao$|plantoes$|repassar$|transferencia$|desempenho$)${ID}$`),
   new RegExp(`^/unidades/${ID}$`),

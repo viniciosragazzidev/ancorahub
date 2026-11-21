@@ -9,6 +9,7 @@ const ALLOWED = [
   "/dashboard",
   "/equipe",
   "/equipe/plantoes",
+  "/equipe/pos-venda",
   "/equipe/convidar",
   "/equipe/7f1c2b9e-0000-4000-8000-000000000001",
   "/unidades/branch-1",
@@ -32,7 +33,7 @@ const BLOCKED = [
   "/qualificacao", "/qualificacao/turbo", "/atendimento/situacoes", "/atendimento/mensagens", "/atendimento/fluxo",
   "/fluxos-whatsapp", "/assistente", "/integrations", "/integrations/meta", "/integrations/whatsapp",
   "/settings/feedback-templates", "/settings/waha-diagnostic", "/settings/extension", "/settings/whatsapp",
-  "/equipe/cargos", "/equipe/recuperacoes", "/equipe/dashboard", "/equipe/pos-venda", "/equipe/minha",
+  "/equipe/cargos", "/equipe/recuperacoes", "/equipe/dashboard", "/equipe/minha",
   "/equipe/plantao", "/equipe/desempenho", "/equipe/transferencia", "/equipe/repassar", "/gestao", "/gestao/equipes/abc",
   "/relacionamento", "/noc", "/assinatura", "/guia", "/guia/webhook", "/relatorios", "/relatorios/drill/abc",
   "/empresas", "/integridade", "/tarefas", "/cotacao", "/plantoes", "/plantoes/agora", "/filiais", "/roadmap",
@@ -68,11 +69,11 @@ function userFor(role: "director" | "manager" | "supervisor" | "broker"): NavAcc
 }
 
 describe("menu do gestor (10/11)", () => {
-  it("mostra só Início (Painel), Equipe (Pessoas e Plantões da unidade) e Configurações (Ajustes)", () => {
+  it("mostra só Início (Painel), Equipe (Pessoas, Plantões da unidade e Pós-venda com a chave) e Configurações (Ajustes)", () => {
     const areas = visibleNavAreas(userFor("manager"));
     expect(areas.map(({ area, tabs }) => [area.id, tabs.map((tab) => tab.id)])).toEqual([
       ["inicio", ["painel"]],
-      ["equipe", ["pessoas", "plantoes-unidade"]],
+      ["equipe", ["pessoas", "plantoes-unidade", "pos-venda"]],
       ["configuracoes", ["ajustes"]],
     ]);
   });
