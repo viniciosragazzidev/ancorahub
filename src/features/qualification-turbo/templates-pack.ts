@@ -13,7 +13,8 @@ import type { MetaGraphTemplateComponent, MetaTemplateCategory } from "@/feature
  * Meta rejects a body that starts or ends with a variable: every text opens
  * with a word ("Olá, {{nome}}" / "Oi, {{nome}}") and ends with plain text.
  */
-export type TurboTouch = "t0" | "t1" | "t2" | "t3" | "t4" | "reactivation";
+/** s4–s6: cadência de recuperação de quem parou no meio; nurture: nutrição mensal (plano de recuperação 21/11). */
+export type TurboTouch = "t0" | "t1" | "t2" | "t3" | "t4" | "reactivation" | "s4" | "s5" | "s6" | "nurture";
 
 export type RecommendedTemplate = {
   name: string;
@@ -119,6 +120,44 @@ export const RECOMMENDED_TEMPLATES: readonly RecommendedTemplate[] = [
     body: "Oi, {{nome}}. Não quero te incomodar. Posso encerrar seu pedido de cotação de plano de saúde ou ainda quer receber as opções?",
     buttons: ["Quero receber", "Pode encerrar"],
     examples: { nome: "Ana" },
+  },
+  // Recuperação (21/11/2026, docs/implementations/active/2026-11-21-recuperacao-de-leads.md §5): quem parou no
+  // meio da qualificação, depois que a janela de 24 h fechou. Cada um com saída visível ("Não quero mais").
+  {
+    name: "anc_s4_cotacao",
+    touch: "s4",
+    category: "MARKETING",
+    label: "Recuperação: lembrete da cotação",
+    body: "Oi, {{nome}}. Sua cotação de plano de saúde na {{empresa}} ficou pela metade. Com mais uma ou duas respostas eu já te mostro as opções. Vamos terminar?",
+    buttons: ["Vamos terminar", "Prefiro ligação", "Não quero mais"],
+    examples: { nome: "Ana", empresa: "Âncora Saúde" },
+  },
+  {
+    name: "anc_s5_ligacao",
+    touch: "s5",
+    category: "MARKETING",
+    label: "Recuperação: oferecer ligação",
+    body: "Oi, {{nome}}. Se ficar mais fácil, um especialista da {{empresa}} te liga e fecha a sua cotação de plano de saúde em poucos minutos. Pode ser?",
+    buttons: ["Pode me ligar", "Prefiro por aqui", "Não quero mais"],
+    examples: { nome: "Ana", empresa: "Âncora Saúde" },
+  },
+  {
+    name: "anc_s6_despedida",
+    touch: "s6",
+    category: "MARKETING",
+    label: "Recuperação: despedida",
+    body: "Oi, {{nome}}. Vou encerrar o seu pedido de cotação de plano de saúde por aqui. Se ainda quiser ver as opções, é só responder.",
+    buttons: ["Ainda quero", "Pode encerrar"],
+    examples: { nome: "Ana" },
+  },
+  {
+    name: "anc_n_reajuste",
+    touch: "nurture",
+    category: "MARKETING",
+    label: "Nutrição: reajuste e faixa de idade",
+    body: "Oi, {{nome}}. Muitos planos de saúde mudam de preço no reajuste anual e na troca de faixa de idade. Quer que a {{empresa}} compare as opções de hoje para você?",
+    buttons: ["Quero comparar", "Agora não", "Não quero mais"],
+    examples: { nome: "Ana", empresa: "Âncora Saúde" },
   },
   {
     name: "anc_reativacao",

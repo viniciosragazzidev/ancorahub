@@ -24,6 +24,9 @@ const CLOSED_QUALIFICATION = new Set(["qualified", "hot", "warm", "waiting_human
 
 /** The automatic +3h requalification is replaced by the cadence when its +3h touch can go out. */
 export async function turboCadenceCoversRequalification(tenantId: string) {
+  // A cadência única de recuperação (fase 3), quando pronta para sair, assume quem parou no meio (S2 a +3 h).
+  const recovery = await getRecoverySettings(tenantId).catch(() => null);
+  if (recovery?.enabled && recovery.stoppedMidway && recovery.legalReviewedAt) return true;
   const settings = await getTurboSettings(tenantId);
   if (!settings.enabled || !settings.cadence) return false;
   return (await listApprovedTemplateNames(tenantId)).has("anc_t2_beneficio");

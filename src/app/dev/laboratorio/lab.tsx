@@ -33,10 +33,11 @@ import { MotionShowcase } from "./motion-showcase";
 import { LeadHoverLab } from "./lead-hover-lab";
 import { labQualificationServices, QualificationLeadsLab } from "./qualification-leads-lab";
 import { RecoveryFunnelLab } from "./recovery-funnel-lab";
+import { labRecoverySettings, RecoveryCadenceLab } from "./recovery-cadence-lab";
 import { createLabSasa, LAB_SASA_SPEECH, labSasaOpenBlock, labSasaPhrasesBlock, labSasaQuestionsBlock, labSasaWorld } from "./sasa-lab";
 import type { SaleSpokenDraft } from "@/features/sasa/drafts";
 
-type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao";
+type Flow = "plantao" | "lead" | "venda" | "sasa" | "botao" | "lista" | "conquistas" | "movimento" | "callAncora" | "leadHover" | "etapaLead" | "funilRecuperacao" | "cadenciaRecuperacao";
 type Outcome = "ok" | "falha" | "liberacao";
 
 const FLOWS: { id: Flow; label: string }[] = [
@@ -52,6 +53,7 @@ const FLOWS: { id: Flow; label: string }[] = [
   { id: "leadHover", label: "Hover card do lead (desktop)" },
   { id: "etapaLead", label: "Etapa do lead (qualificação)" },
   { id: "funilRecuperacao", label: "Funil de recuperação" },
+  { id: "cadenciaRecuperacao", label: "Cadência de recuperação" },
 ];
 const DELAYS = [{ ms: 400, label: "Rápido" }, { ms: 1200, label: "Normal" }, { ms: 3000, label: "Lento" }];
 
@@ -138,6 +140,7 @@ export function FlowLab() {
   };
   const lab = useMemo<DevLab>(() => ({
     qualificationLeads: labQualificationServices(delay, outcome === "falha"),
+    recoverySettings: labRecoverySettings(delay, outcome === "falha"),
     sasa: {
       ...createLabSasa(sasaState.current, { delay, outcome }),
       open: (open) => {
@@ -290,6 +293,8 @@ export function FlowLab() {
           <QualificationLeadsLab />
         ) : flow === "funilRecuperacao" ? (
           <RecoveryFunnelLab />
+        ) : flow === "cadenciaRecuperacao" ? (
+          <RecoveryCadenceLab />
         ) : flow === "callAncora" ? (
           <CallAncoraWorkspace brokerFirstName="Vinicios" />
         ) : (
