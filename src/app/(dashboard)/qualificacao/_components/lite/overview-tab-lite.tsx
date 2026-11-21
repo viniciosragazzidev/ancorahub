@@ -54,7 +54,7 @@ export function OverviewTabLite({ stats, fields, onChange, onToggleEnabled, enab
     { label: "Qualificados", value: n(stats.qualification.totalQualified), hint: `${n(stats.qualification.hotLeads)} quentes · ${stats.qualification.completionRatePct}% de conclusão` },
     { label: "Fila de espera", value: n(stats.distribution.waitingQueue), hint: "aguardando corretor" },
     { label: "Custo de operação", value: brl(stats.costs.aiCostBrl + stats.costs.whatsappCostBrl), hint: `${brl(stats.costs.avgCostPerSessionBrl)} por atendimento` },
-    { label: "Follow-ups", value: `${n(stats.followup.sent)} enviados`, hint: `${n(stats.followup.conversionsPostFollowup)} recuperados depois do follow-up` },
+    { label: "Follow-ups (30 dias)", value: `${n(stats.followup.sent)} enviados`, hint: `${n(stats.followup.responded)} responderam · ${n(stats.followup.conversionsPostFollowup)} recuperados` },
   ];
   return (
     <>
