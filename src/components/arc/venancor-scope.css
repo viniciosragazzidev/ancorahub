@@ -116,8 +116,8 @@
   --radius-control: 9999px;
   --radius-panel: 1.5rem;
   --radius-surface: 1.75rem;
-  --font-body: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --control-height-sm: max(44px, 2.75rem);
   --control-height-md: max(44px, 2.75rem); /* root text scaling must not shrink touch targets */
   /* The chat action blue, also for Lite screens outside the chat (team, journey, recados).

@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
-import { Plus_Jakarta_Sans, Geist_Mono, JetBrains_Mono } from "next/font/google";
+import { Inter, Geist_Mono, JetBrains_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { AppProviders } from "@/components/app-providers";
@@ -17,8 +17,9 @@ import { isDirectorShellRealDevPreview } from "@/components/light/director-shell
 import { isNegotiationsDevPreview } from "@/components/light/negotiations-dev-preview";
 import "./globals.css";
 
-const jakartaSans = Plus_Jakarta_Sans({
-  variable: "--font-jakarta-sans",
+// Inter em toda a interface (21/11/2026, pedido do Vinicios ao trazer o estilo Accordee). Satoshi só em 36px+.
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
@@ -137,7 +138,7 @@ export default async function RootLayout({
   const theme = !directorLiteEnabled && cookieStore.get("corretop-theme")?.value === "dark" ? "dark" : "light";
 
   return (
-    <html lang="pt-BR" data-interface-motion="off" suppressHydrationWarning className={`${jakartaSans.variable} ${geistMono.variable} ${jetbrainsMono.variable} ${theme === "dark" ? "dark" : ""} h-full antialiased`}>
+    <html lang="pt-BR" data-interface-motion="off" suppressHydrationWarning className={`${inter.variable} ${geistMono.variable} ${jetbrainsMono.variable} ${theme === "dark" ? "dark" : ""} h-full antialiased`}>
       <head>
         <Script id="ancora-splash-boot" strategy="beforeInteractive">{SPLASH_BOOT_SCRIPT}</Script>
       </head>

@@ -2,6 +2,7 @@ import "@/components/arc/venancor-scope.css";
 import "@/components/arc/director-skin.css";
 import "@/components/arc/director-primitives.css";
 import "@/components/arc/director-chrome.css";
+import "@/components/arc/director-accordee.css";
 
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";

@@ -1,5 +1,5 @@
 /* Guided tour of the broker app (Lite tokens: docs/design-system/lite §2, §3). */
-.root { position: fixed; inset: 0; z-index: 95; font-family: var(--font-body, var(--font-jakarta-sans), system-ui, sans-serif); color: #0b0b12; }
+.root { position: fixed; inset: 0; z-index: 95; font-family: var(--font-body, var(--font-inter), system-ui, sans-serif); color: #0b0b12; }
 .backdrop { position: absolute; inset: 0; width: 100%; height: 100%; }
 
 .ring {
