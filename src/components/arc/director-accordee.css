@@ -48,6 +48,12 @@
   --accent-foreground: #f3f3f3;
   --accent-strong: #c0d4f2; /* Electric Blue no escuro */
   --series-1-text: #c0d4f2; /* texto azul (links) legível no escuro */
+  --chat-action-text: #c0d4f2;
+  /* Primária no escuro: muitas telas usam --primary como cor de texto e link; o azul-marinho da marca sumia no fundo
+     escuro. Usa o azul claro do documento, com texto escuro por cima nos botões. Vence a cor da marca (estilo inline). */
+  --primary: #c0d4f2 !important;
+  --primary-foreground: #0a0a0a !important;
+  --ring: #c0d4f2;
   --accent-subtle: #1e2a3f; /* Powder Blue no escuro */
   --hover: #252525;
   --input: #2a2a2a;
@@ -231,7 +237,7 @@
 .arc-venancor[data-skin="diretor"] .director-sidebar .director-duty-link > span:first-child { width: 16px; justify-content: center; }
 .arc-venancor[data-skin="diretor"] .director-sidebar .director-duty-link > span:last-child { font-size: 13px; font-weight: 400; }
 /* Logo da empresa (imagem larga): cabe inteiro, sem a caixa quadrada. */
-.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child:has(img:not([src="/icon.png"])) { width: auto; max-width: 96px; padding: 0; border: 0; background: transparent; }
+.arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child:has(img:not([src="/icon.png"])) { flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; max-width: 96px; height: 28px !important; padding: 0 !important; overflow: hidden; border: 0; background: transparent; }
 .arc-venancor[data-skin="diretor"] .director-sidebar [data-slot="sidebar-header"] > div > a:first-child img:not([src="/icon.png"]) { width: auto; max-width: 96px; height: 24px; object-fit: contain; }
 @media (hover: hover) and (pointer: fine) {
   .arc-venancor[data-skin="diretor"] .director-sidebar .director-role-switcher [data-slot="dropdown-menu-trigger"],
@@ -241,3 +247,23 @@
 
 /* Botão de tema no topo: mesmo desenho das outras ações do topo (sem borda própria). */
 .arc-venancor[data-skin="diretor"] .director-theme-toggle { border: 0; box-shadow: none; }
+
+/* Demais botões das telas (módulos de cada rota): raio de botão (6px) no lugar da pílula, sem mexer em interruptores,
+   caixas de seleção e avatares. Selos e contagens seguem em pílula. */
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] :is(button, a):is([class*="utton_"], [class*="utton__"], [class*="_primary__"], [class*="_secondary__"], [class*="_linkButton__"], [class*="_action__"], [class*="_cta__"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]) { border-radius: 6px; }
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] :is([data-slot="select-trigger"], [data-slot="tabs-trigger"], [class*="_actionLink__"], [class*="_navItem__"], a[class*="_tab__"], button[class*="_tab__"], [class*="_tocItem__"], button[class*="Tab__"], button[class*="_choice__"], a[class*="_view__"]) { border-radius: 6px; }
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] [data-slot="tabs-list"] { border-radius: 8px; }
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] [data-slot="tabs-list"] [data-slot="tab-indicator"],
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] [data-slot="tabs-list"] > span[aria-hidden="true"] { border-radius: 6px; }
+
+/* Abas em trilho (variante "segment" de ui/tabs) e campos de texto das telas: no padrão do demo. Trilho sem fundo,
+   aba ativa em Paper Mist com 6px; campos com raio de input (6px) no lugar da pílula. */
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] [role="tablist"]:has(> [data-slot="tabs-trigger"], > div > [data-slot="tabs-trigger"]) { gap: 4px; padding: 0; border-radius: 0; background: transparent; }
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] [data-slot="tabs-trigger"] { border-radius: 6px; }
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] [role="tablist"] [data-slot="tabs-trigger"] + span,
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] [role="tablist"] span[class*="absolute"][class*="inset-0"] { border-radius: 6px; background: var(--surface-muted); box-shadow: none; }
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]) { border-radius: 6px; }
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] :is(button, a)[class*="Submit__"],
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] :is(button, a)[class*="filtersButton__"],
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] [class*="_segmented__"],
+.arc-venancor[data-skin="diretor"] [data-slot="app-content"] [class*="_segment__"] { border-radius: 6px; }

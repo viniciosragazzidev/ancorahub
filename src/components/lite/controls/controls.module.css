@@ -282,3 +282,17 @@
   cursor: progress;
   opacity: 0.6;
 }
+
+/* Modo diretor, estilo Accordee (21/11/2026): chip de filtro com borda e 6px, sem sombra; 28px com mouse. */
+:global(.arc-venancor[data-skin="diretor"]) .chip { border: 1px solid var(--border); border-radius: 6px; }
+:global(.arc-venancor[data-skin="diretor"]) .chip:not(.chipRemovable) { box-shadow: none; }
+:global(.arc-venancor[data-skin="diretor"]) .chip[aria-pressed="true"] { border-color: transparent; background: var(--surface-muted); color: var(--foreground); }
+@media (hover: hover) and (pointer: fine) {
+  :global(.arc-venancor[data-skin="diretor"]) .chip { min-height: 28px; padding: 0 10px; font-size: 13px; }
+}
+/* Modo diretor: "⋯" da linha com 6px; 28px com mouse. */
+:global(.arc-venancor[data-skin="diretor"]) .menuTrigger { border-radius: 6px; background: transparent; }
+:global(.arc-venancor[data-skin="diretor"]) .menuTrigger:hover { background: var(--surface-muted); }
+@media (hover: hover) and (pointer: fine) {
+  :global(.arc-venancor[data-skin="diretor"]) .menuTrigger { width: 28px; height: 28px; }
+}
