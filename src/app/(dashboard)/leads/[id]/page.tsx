@@ -42,6 +42,8 @@ import { MarkLeadInServiceButton } from "@/features/leads/components/mark-lead-i
 import { canDirectorMarkLeadInService } from "@/features/leads/director-service-start";
 import { SupervisionPanel } from "./supervision-panel";
 import { DirectorLiteLeadDetail } from "./director-lite-lead-detail";
+import { LeadJourneyCard } from "@/features/lead-journey/components/lead-journey-card";
+import { getLeadJourneyRow } from "@/features/lead-journey/queries";
 import litePageStyles from "../leads-lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { DeleteLeadControl } from "./delete-lead-control";
@@ -684,6 +686,8 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
   // Visual Lite das telas internas (mesma regra do useDirectorLitePage, no servidor): o perfil sai no Lite com as mesmas peças.
   const directorLitePage = await isDirectorLitePageOnServer(context, `/leads/${id}`);
   if (directorLitePage) {
+    // Etapa do lead (plano de recuperação §8.1): régua, etapa atual e próximo passo no topo da ficha.
+    const leadJourney = await getLeadJourneyRow(context.tenantId, lead.id).catch(() => null);
     const qualDetails = lead.qualificationDetails as { status?: string; score?: number } | null;
     const leadNextBestAction = resolveLeadNextBestAction({
       id: lead.id,
@@ -791,7 +795,7 @@ async function LeadDetailContent({ id, ficha = false, quickSaleRequested = false
                   {canRegisterSaleForBroker ? <RegisterSaleButton leadId={lead.id} documents={saleDocuments} carriers={carriers} size="xs" /> : null}
                 </>
               ),
-              nextBestAction: <NextBestActionCard action={leadNextBestAction} />,
+              nextBestAction: <>{leadJourney ? <LeadJourneyCard journey={leadJourney.journey} /> : null}<NextBestActionCard action={leadNextBestAction} /></>,
               postSale: postSaleEnabled ? <PostSaleLeadCard leadId={lead.id} /> : null,
               saleDetails: <SaleDetailsCard leadId={lead.id} />,
               supervision: isManagement ? (

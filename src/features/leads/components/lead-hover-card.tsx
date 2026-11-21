@@ -16,6 +16,7 @@ import { SegmentBar } from "@/components/ui/segment-bar";
 import { WhatsappLogo } from "@/components/huge-icons";
 import { formatLeadPhone } from "@/features/leads/format-lead-phone";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
+import { journeyTitle, type LeadJourney } from "@/features/lead-journey/journey";
 import { formatCurrencyDisplay } from "@/shared/utils/format";
 import { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";
 import { openWhatsApp } from "@/lib/whatsapp-open";
@@ -44,6 +45,8 @@ export type LeadPreviewData = {
   nextAction?: string | null;
   /** Linha curta de contexto: fila, unidade, origem. */
   context?: string | null;
+  /** Etapa do lead (plano de recuperação §8.1): troca a barra do funil e dá o próximo passo quando a lista não sabe. */
+  journey?: LeadJourney | null;
 };
 
 const STATUS_TONE: Record<string, DsStatusBadgeStatus> = {
@@ -159,7 +162,17 @@ export function LeadHoverCardContent({ lead, onOpen, href }: LeadHoverCardConten
           </div>
         ) : null}
 
-        {step ? (
+        {lead.journey ? (
+          <div className="flex flex-col gap-ds-4" data-slot="lead-journey" data-code={lead.journey.code}>
+            <div className="flex items-center gap-ds-12">
+              <SegmentBar value={lead.journey.step} total={lead.journey.total} label={`${journeyTitle(lead.journey)}: passo ${lead.journey.step} de ${lead.journey.total}`} />
+              <span className="shrink-0 text-ds-caption text-ds-fog tabular-nums" aria-hidden>
+                {lead.journey.step} de {lead.journey.total}
+              </span>
+            </div>
+            <p className="truncate text-ds-caption text-ds-steel">{journeyTitle(lead.journey)}</p>
+          </div>
+        ) : step ? (
           <div className="flex items-center gap-ds-12">
             <SegmentBar value={step.step} total={step.total} label={`Etapa ${step.step} de ${step.total} do funil`} />
             <span className="shrink-0 text-ds-caption text-ds-fog" aria-hidden>
@@ -199,6 +212,16 @@ export function LeadHoverCardContent({ lead, onOpen, href }: LeadHoverCardConten
             <span className="truncate">{formatLastActivity(lead.lastActivityAt)}</span>
           </Stat>
         </dl>
+
+        {lead.nextAction === undefined && lead.journey?.nextStep ? (
+          <div className="flex flex-col gap-ds-8 border-t border-ds-ash pt-ds-12">
+            <SectionLabel>Próximo passo</SectionLabel>
+            <p className="flex items-center gap-ds-8 text-ds-body text-ds-charcoal">
+              <CalendarClock aria-hidden className="size-3.5 shrink-0 text-ds-fog" />
+              <span className="truncate">{lead.journey.nextStep}</span>
+            </p>
+          </div>
+        ) : null}
 
         {lead.nextAction !== undefined ? (
           <div className="flex flex-col gap-ds-8 border-t border-ds-ash pt-ds-12">

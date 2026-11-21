@@ -8,6 +8,7 @@
  * Ações da linha num menu; seleção em massa com a barra de lote. A busca fica nos filtros Lite.
  */
 import { formatLastActivity, LeadNameHoverCard } from "@/features/leads/components/lead-hover-card";
+import { journeyFromLeadFields } from "@/features/lead-journey/rows";
 import { PersonInitials } from "@/components/ui/person-chip";
 import { toast } from "@/components/ui/sonner";
 import { getLeadProductLabel } from "@/features/leads/meta-lead-display";
@@ -256,6 +257,7 @@ function LeadName({ lead, hideEntry, onOpen }: { lead: LeadWorkspaceItem; hideEn
           lastActivityAt: lastActivity(lead),
           brokerName: lead.corretorNome ?? null,
           context: [lead.queueName, lead.branchName, hideEntry ? null : lead.origem].filter(Boolean).join(" · ") || null,
+          journey: journeyFromLeadFields(lead),
         }}
         onOpen={onOpen ? () => onOpen(lead) : undefined}
         href={onOpen ? undefined : `/leads/${lead.id}`}

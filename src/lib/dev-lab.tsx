@@ -12,6 +12,7 @@ import type { SasaActionResult, SasaClientCommand, SasaReply } from "@/features/
 import type { ChatServerActionName } from "@/components/chat/types";
 import type { VoiceTranscribe } from "@/components/chat/voice-recorder";
 import type { TeamListApi } from "@/features/supervisor-workspace/lead-import/parse-contacts";
+import type { QualificationLeadsServices } from "@/features/lead-journey/components/qualification-leads-workspace";
 
 export type DevLab = {
   /** No lugar de acceptLeadOfferAction. */
@@ -26,6 +27,8 @@ export type DevLab = {
   teamList?: TeamListApi;
   /** Registrar venda em conversa: no lugar de ler o contrato e de registrar a venda. */
   sale?: SaleChatServices;
+  /** Leads na qualificação (recuperação, fase 1): no lugar da linha do tempo e do "Não contatar". */
+  qualificationLeads?: QualificationLeadsServices;
   /** Sasá agêntica: no lugar de sasaCommandAction e das ações do chat (Desfazer, atalhos de data). */
   sasa?: {
     command: (input: SasaClientCommand) => Promise<SasaReply>;
