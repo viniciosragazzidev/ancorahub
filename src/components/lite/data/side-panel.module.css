@@ -74,3 +74,20 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/*
+ * Movimento (plano de movimento 18/11/2026, etapa 6): o véu aparece em `fast`, o painel desliza 12px da borda
+ * em `standard` com `ease-enter`, e as primeiras seções do corpo entram em sequência curta (35ms, até 4).
+ * Fill "backwards": nada fica preso. Movimento reduzido, "Menos animação" e kill switch: aparece pronto.
+ */
+.scrim { animation: scrimIn var(--duration-fast, 160ms) var(--ease-standard, cubic-bezier(0.22, 1, 0.36, 1)) backwards; }
+.panel { animation: panelIn var(--duration-standard, 240ms) var(--ease-enter, cubic-bezier(0.16, 1, 0.3, 1)) backwards; }
+.body > * { animation: sectionIn var(--duration-standard, 240ms) var(--ease-enter, cubic-bezier(0.16, 1, 0.3, 1)) backwards; animation-delay: var(--duration-micro, 80ms); }
+.body > *:nth-child(2) { animation-delay: calc(var(--duration-micro, 80ms) + var(--duration-stagger, 35ms)); }
+.body > *:nth-child(3) { animation-delay: calc(var(--duration-micro, 80ms) + var(--duration-stagger, 35ms) * 2); }
+.body > *:nth-child(n + 4) { animation-delay: calc(var(--duration-micro, 80ms) + var(--duration-stagger, 35ms) * 3); }
+@keyframes scrimIn { from { opacity: 0; } }
+@keyframes panelIn { from { opacity: 0; transform: translateX(var(--distance-medium, 12px)); } }
+@keyframes sectionIn { from { opacity: 0; transform: translateY(var(--distance-micro, 4px)); } }
+:global(html[data-interface-motion="off"]) :is(.scrim, .panel, .body > *) { animation: none; }
+@media (prefers-reduced-motion: reduce) { :is(.scrim, .panel, .body > *) { animation: none; } }
