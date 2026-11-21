@@ -21,27 +21,34 @@ import { getSystemSettings } from "@/features/system-settings/queries";
 import { parseRecoverySettings, type RecoverySettings } from "./settings-core";
 import { touchCostBrl } from "./touch-cost";
 import { enterCallQueue, sweepTurboFinishedIntoCallQueue } from "./call-queue";
+import { decideNurtureTouch, LOST_REASON_FOR_NURTURE, LOST_TO_NURTURE_DAYS, nextNurtureDate, NURTURE_TEMPLATE } from "./nurture-rules";
+import { chooseStepVariant, stepVariantText } from "./step-experiments";
 
 const TIME_BUDGET_MS = 40_000;
 const LIMIT_PER_SEGMENT = 60;
 
-export type RecoveryCadenceResult = { tenants: number; candidates: number; sent: number; skipped: number; finished: number; failed: number; waiting: number; toCallQueue: number; nurture?: number; reason?: string };
+export type RecoveryCadenceResult = { tenants: number; candidates: number; sent: number; skipped: number; finished: number; failed: number; waiting: number; toCallQueue: number; nurture?: number; replied?: number; reason?: string };
 
 function rowsOf<T>(result: unknown): T[] {
   return (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as T[];
 }
 
-/** Templates aprovados de qualquer categoria na WABA ativa (S4–S6 são de marketing). */
+/**
+ * Templates aprovados na WABA ativa, separados por categoria. Só Utility pode sair (DEC-155, 27/10/2026: a
+ * qualificação e os lembretes não usam Marketing); os de Marketing aprovados viram o motivo "marketing_blocked".
+ */
 async function approvedTemplates(tenantId: string) {
   const wabaId = await getActiveWabaId(tenantId);
-  if (!wabaId) return new Set<string>();
-  const rows = await getDatabase().select({ name: schema.metaWhatsAppTemplates.name }).from(schema.metaWhatsAppTemplates).where(and(
+  if (!wabaId) return { utility: new Set<string>(), marketing: new Set<string>() };
+  const rows = await getDatabase().select({ name: schema.metaWhatsAppTemplates.name, category: schema.metaWhatsAppTemplates.category }).from(schema.metaWhatsAppTemplates).where(and(
     eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
     eq(schema.metaWhatsAppTemplates.wabaId, wabaId),
     eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
     isNull(schema.metaWhatsAppTemplates.deletedAt),
   ));
-  return new Set(rows.map((row) => row.name));
+  const utility = new Set(rows.filter((row) => (row.category ?? "").toUpperCase() === "UTILITY").map((row) => row.name));
+  const marketing = new Set(rows.filter((row) => (row.category ?? "").toUpperCase() !== "UTILITY").map((row) => row.name));
+  return { utility, marketing };
 }
 
 /** Empresas com a cadência nova pronta para sair: ligada, com segmento ligado e conferência jurídica registrada. */
@@ -81,6 +88,8 @@ async function runRecoveryCadence(now: Date): Promise<RecoveryCadenceResult> {
   }
 
   for (const { tenantId, settings } of tenants) {
+    // Quem respondeu sai da fila de ligação e da nutrição e volta para a IA (conta como recuperado).
+    result.replied = (result.replied ?? 0) + await clearRepliedMarks(tenantId, now).catch(() => 0);
     // Fase 4: quem terminou os lembretes do turbo sem responder vai para a fila de ligação.
     if (settings.callQueue) result.toCallQueue += await sweepTurboFinishedIntoCallQueue(tenantId, now).catch(() => 0);
     const segments: RecoverySegment[] = [...(settings.stoppedMidway ? ["stopped_midway" as const] : []), ...(settings.warmBridge ? ["warm" as const] : [])];
@@ -90,6 +99,14 @@ async function runRecoveryCadence(now: Date): Promise<RecoveryCadenceResult> {
       getQualificationTenantSettings(tenantId).catch(() => null),
     ]);
     const botName = qualification?.assistantName?.trim() || "Assistente";
+    // Fase 5: nutrição mensal (e o perdido por preço ou momento há 60 dias entra nela).
+    if (settings.nurture) {
+      await sweepLostIntoNurture(tenantId, now).catch(() => 0);
+      result.nurture = (result.nurture ?? 0) + await runNurture({ tenantId, settings, now, approved, empresa, botName, deadline: started + TIME_BUDGET_MS }).catch((error) => {
+        console.error("[lead-recovery] nurture_failed", { tenantId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
+        return 0;
+      });
+    }
     for (const segment of segments) {
       const candidates = segment === "stopped_midway" ? await stoppedMidwayCandidates(tenantId, now) : await warmCandidates(tenantId, now);
       result.candidates += candidates.length;
@@ -159,7 +176,7 @@ async function processLead(input: {
   leadId: string;
   startAt: Date;
   now: Date;
-  approved: Set<string>;
+  approved: { utility: Set<string>; marketing: Set<string> };
   empresa: string;
   botName: string;
 }): Promise<"sent" | "skipped" | "finished" | "failed" | "waiting"> {
@@ -227,7 +244,8 @@ async function processLead(input: {
     touches: touches.map((touch) => ({ ...touch, at: touch.at })),
     automaticSentSinceStart: automatic.length,
     lastAutomaticAt: automatic[0]?.sentAt ?? null,
-    approvedTemplates: input.approved,
+    approvedTemplates: input.approved.utility,
+    marketingTemplates: input.approved.marketing,
   });
 
   if (decision.action === "wait" || decision.action === "stop") return "waiting";
@@ -250,16 +268,19 @@ async function processLead(input: {
   // Reserva o toque antes de enviar: dois runs nunca mandam o mesmo passo.
   const claimed = await claim(tenantId, leadId, input.segment, decision.step, decision.attempt, "held", null);
   if (!claimed) return "skipped";
+  // Fase 5: A/B por passo (hoje só o S2), Thompson quando ligado; desligado, a variante padrão.
+  const variant = chooseStepVariant({ leadId, step: decision.step.id, enabled: input.settings.stepExperiments, stats: input.settings.stepExperiments ? await stepVariantStats(tenantId, decision.step.id) : [] });
+  const baseText = decision.step.kind === "free" ? buildRecoveryText(decision.step.id, { leadName: lead.nome, brokerName: input.segment === "warm" ? await brokerName(lead.corretorId) : null, pendingAsk: pendingAskFor(collectedOf(conversation?.memory)) }) : null;
   const sent = await sendStep({
     tenantId, leadId, phone: lead.telefone, step: decision.step, channels: [decision.channel, decision.fallback].filter((value): value is RecoveryChannel => Boolean(value)),
     wahaRunId: wahaRun?.id ?? null, attempt: decision.attempt,
-    text: decision.step.kind === "free" ? buildRecoveryText(decision.step.id, { leadName: lead.nome, brokerName: input.segment === "warm" ? await brokerName(lead.corretorId) : null, pendingAsk: pendingAskFor(collectedOf(conversation?.memory)) }) : null,
+    text: baseText ? stepVariantText(decision.step.id, variant, baseText, lead.nome) : null,
     variables: qualificationTemplateVariables(lead.nome || "Cliente", input.botName, input.empresa, null),
   });
   await db.update(schema.leadRecoveryTouches).set({
     status: sent.ok ? "sent" : "failed",
     channel: sent.channel,
-    template: decision.step.template ?? null,
+    template: variant ? `variante:${variant}` : decision.step.template ?? null,
     errorCode: sent.ok ? null : sent.errorCode,
     outboundId: sent.outboundId,
     messageId: sent.messageId,
@@ -280,7 +301,7 @@ async function brokerName(userId: string | null) {
   return row?.name ?? null;
 }
 
-async function claim(tenantId: string, leadId: string, segment: RecoverySegment, step: RecoveryStepDef, attempt: number, status: "held" | "skipped", reason: string | null) {
+async function claim(tenantId: string, leadId: string, segment: RecoverySegment | "nurture", step: RecoveryStepDef, attempt: number, status: "held" | "skipped", reason: string | null) {
   const id = randomUUID();
   const [row] = await getDatabase().insert(schema.leadRecoveryTouches).values({
     id, tenantId, leadId, segment, step: step.id, attempt, status, reason, template: step.template ?? null,
@@ -353,4 +374,114 @@ async function sendStep(input: { tenantId: string; leadId: string; phone: string
     }
   }
   return { ok: false, channel: input.channels[0] ?? null, errorCode: "all_channels_failed", outboundId: null, messageId: null };
+}
+
+/** Envios e respostas em 24 h por variante de um passo (para o Thompson). */
+async function stepVariantStats(tenantId: string, step: string) {
+  const result = await getDatabase().execute(sql`
+    select r.template as variant,
+      count(*) filter (where r.status = 'sent')::int as sent,
+      count(*) filter (where r.status = 'sent' and exists (select 1 from whatsapp_messages i where i.tenant_id = r.tenant_id and i.lead_id = r.lead_id
+        and i.direction in ('incoming', 'inbound') and i.sent_at > r.created_at and i.sent_at < r.created_at + interval '24 hours'))::int as replied
+    from lead_recovery_touches r
+    where r.tenant_id = ${tenantId} and r.step = ${step} and r.template like 'variante:%'
+    group by r.template
+  `);
+  return rowsOf<{ variant: string; sent: number; replied: number }>(result).map((row) => ({ variant: row.variant.replace("variante:", ""), sent: Number(row.sent) || 0, replied: Number(row.replied) || 0 }));
+}
+
+/** Quem respondeu depois de entrar na fila de ligação ou na nutrição sai dela (a IA continua a conversa). */
+async function clearRepliedMarks(tenantId: string, now: Date) {
+  const result = await getDatabase().execute(sql`
+    update leads l set qualification_details = jsonb_set(l.qualification_details, '{recovery}',
+      ((l.qualification_details->'recovery') - 'state') || jsonb_build_object('repliedAt', ${now.toISOString()}::text, 'repliedFrom', l.qualification_details->'recovery'->>'state'))
+    where l.tenant_id = ${tenantId} and l.deleted_at is null
+      and l.qualification_details->'recovery'->>'state' in ('call_queue', 'nurture', 'bad_moment')
+      and exists (select 1 from whatsapp_messages i where i.tenant_id = l.tenant_id and i.lead_id = l.id and i.direction in ('incoming', 'inbound')
+        and i.sent_at > (l.qualification_details->'recovery'->>'at')::timestamptz)
+    returning l.id
+  `);
+  const ids = rowsOf<{ id: string }>(result).map((row) => row.id);
+  for (const id of ids) await audit(tenantId, id, "recovery.replied");
+  return ids.length;
+}
+
+/** Perdido por preço ou momento há 60 dias (sem opt-out e sem marca) entra na nutrição (§4.3, N7 → R6). */
+async function sweepLostIntoNurture(tenantId: string, now: Date) {
+  const result = await getDatabase().execute(sql`
+    update leads l set qualification_details = jsonb_set(coalesce(l.qualification_details, '{}'::jsonb), '{recovery}',
+      jsonb_build_object('state', 'nurture', 'at', ${now.toISOString()}::text, 'until', ${now.toISOString()}::text, 'touches', 0, 'from', 'lost'))
+    where l.tenant_id = ${tenantId} and l.deleted_at is null and l.archived_at is null and l.status = 'lost'
+      and coalesce(l.stage_entered_at, l.created_at) <= ${new Date(now.getTime() - LOST_TO_NURTURE_DAYS * 86_400_000).toISOString()}::timestamptz
+      and coalesce(l.stage_entered_at, l.created_at) >= ${new Date(now.getTime() - 365 * 86_400_000).toISOString()}::timestamptz
+      and coalesce(l.motivo_perda, '') ~* ${LOST_REASON_FOR_NURTURE.source}
+      and l.qualification_details->'recovery' is null
+      and not exists (select 1 from ai_conversations c where c.tenant_id = l.tenant_id and c.lead_id = l.id and (c.opt_out_at is not null or c.wrong_number_at is not null))
+    returning l.id
+  `);
+  const ids = rowsOf<{ id: string }>(result).map((row) => row.id);
+  for (const id of ids) await audit(tenantId, id, "recovery.nurture:lost");
+  return ids.length;
+}
+
+type NurtureRow = {
+  id: string;
+  nome: string | null;
+  telefone: string;
+  corretor_id: string | null;
+  recovery: { state: "nurture" | "bad_moment"; at?: string; until?: string | null; touches?: number };
+  last_in: string | null;
+  opted_out: boolean;
+};
+
+/** Nutrição mensal: um template por mês, no máximo 3 (regras em nurture-rules.ts). */
+async function runNurture(input: { tenantId: string; settings: RecoverySettings; now: Date; approved: { utility: Set<string>; marketing: Set<string> }; empresa: string; botName: string; deadline: number }) {
+  const db = getDatabase();
+  const { tenantId, now } = input;
+  const result = await db.execute(sql`
+    select l.id, l.nome, l.telefone, l.corretor_id, l.qualification_details->'recovery' as recovery,
+      (select max(i.sent_at) from whatsapp_messages i where i.tenant_id = l.tenant_id and i.lead_id = l.id and i.direction in ('incoming', 'inbound')) as last_in,
+      exists (select 1 from ai_conversations c where c.tenant_id = l.tenant_id and c.lead_id = l.id and (c.opt_out_at is not null or c.wrong_number_at is not null)) as opted_out
+    from leads l
+    where l.tenant_id = ${tenantId} and l.deleted_at is null and l.archived_at is null and l.telefone is not null
+      and l.qualification_details->'recovery'->>'state' in ('nurture', 'bad_moment')
+      and coalesce((l.qualification_details->'recovery'->>'until')::timestamptz, ${now.toISOString()}::timestamptz) <= ${now.toISOString()}::timestamptz
+    limit 60
+  `);
+  let sent = 0;
+  for (const row of rowsOf<NurtureRow>(result)) {
+    if (Date.now() > input.deadline) break;
+    const touches = Number(row.recovery.touches) || 0;
+    const decision = decideNurtureTouch({
+      now, settings: input.settings, leadId: row.id,
+      nurture: { state: row.recovery.state, at: new Date(row.recovery.at ?? now.toISOString()), until: row.recovery.until ? new Date(row.recovery.until) : null, touches },
+      lastInboundAt: row.last_in ? new Date(row.last_in) : null, optedOut: Boolean(row.opted_out), hasBroker: Boolean(row.corretor_id), approvedTemplates: input.approved.utility, marketingTemplates: input.approved.marketing,
+    });
+    const update = (value: Record<string, unknown>) => db.update(schema.leads).set({
+      qualificationDetails: sql`jsonb_set(coalesce(${schema.leads.qualificationDetails}, '{}'::jsonb), '{recovery}', coalesce(${schema.leads.qualificationDetails}->'recovery', '{}'::jsonb) || ${JSON.stringify(value)}::jsonb)`,
+    }).where(and(eq(schema.leads.id, row.id), eq(schema.leads.tenantId, tenantId)));
+    if (decision.action === "wait" || decision.action === "stop" || decision.action === "replied") continue;
+    if (decision.action === "finished") {
+      await db.update(schema.leads).set({
+        qualificationDetails: sql`jsonb_set(coalesce(${schema.leads.qualificationDetails}, '{}'::jsonb), '{recovery}', ((${schema.leads.qualificationDetails}->'recovery') - 'state') || ${JSON.stringify({ nurtureFinishedAt: now.toISOString() })}::jsonb)`,
+      }).where(and(eq(schema.leads.id, row.id), eq(schema.leads.tenantId, tenantId)));
+      await audit(tenantId, row.id, "recovery.nurture_finished");
+      continue;
+    }
+    const step: RecoveryStepDef = { id: decision.step as RecoveryStepDef["id"], segment: "stopped_midway", afterMinutes: 0, kind: "template", template: NURTURE_TEMPLATE };
+    if (decision.action === "skip") {
+      await claim(tenantId, row.id, "nurture", step, 1, "skipped", decision.reason);
+      await update({ touches: touches + 1, until: nextNurtureDate(now).toISOString() });
+      continue;
+    }
+    const claimed = await claim(tenantId, row.id, "nurture", step, 1, "held", null);
+    if (!claimed) continue;
+    const outcome = await sendStep({ tenantId, leadId: row.id, phone: row.telefone, step, channels: ["meta"], wahaRunId: null, attempt: 1, text: null, variables: qualificationTemplateVariables(row.nome || "Cliente", input.botName, input.empresa, null) });
+    await db.update(schema.leadRecoveryTouches).set({ status: outcome.ok ? "sent" : "failed", channel: "meta", errorCode: outcome.ok ? null : outcome.errorCode, outboundId: outcome.outboundId, messageId: outcome.messageId, costBrl: String(outcome.ok ? touchCostBrl("marketing", "meta") : 0) })
+      .where(and(eq(schema.leadRecoveryTouches.id, claimed), eq(schema.leadRecoveryTouches.tenantId, tenantId)));
+    await update({ touches: touches + 1, until: nextNurtureDate(now).toISOString(), lastTouchAt: now.toISOString() });
+    await audit(tenantId, row.id, outcome.ok ? `recovery.nurture_sent:${decision.step}` : `recovery.nurture_failed:${decision.step}`);
+    if (outcome.ok) sent += 1;
+  }
+  return sent;
 }

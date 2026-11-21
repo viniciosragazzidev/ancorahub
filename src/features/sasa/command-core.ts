@@ -31,6 +31,8 @@ export type SasaWorld = {
   duty: { active: SasaDuty | null; next: SasaDuty | null };
   /** Fase 5: ofertas de lead novo esperando aceite (aceitar/recusar pela Sasá). */
   offers?: Array<{ leadId: string; name: string; expiresAt: Date }>;
+  /** Recuperação (fase 5): leads da carteira parados numa etapa de negociação e sem retorno marcado. */
+  recover?: Array<{ leadId: string; name: string; status: string; since: Date | null }>;
 };
 
 export type SasaActionResult = { ok: boolean; message: string; warning?: boolean; undo?: { label: string; action: { kind: "server"; name: ChatServerActionName; payload: Record<string, string> } } };
@@ -127,6 +129,7 @@ export function sasaWorldOf(data: BrokerWorkspaceData, now: Date): SasaWorld {
       next: data.duty?.next ? { name: data.duty.next.scheduleName, startsAt: data.duty.next.startsAt, endsAt: data.duty.next.endsAt } : null,
     },
     offers: (data.pendingOffers ?? []).filter((offer) => offer.expiresAt.getTime() > now.getTime()).map((offer) => ({ leadId: offer.leadId, name: offer.name, expiresAt: offer.expiresAt })),
+    recover: recoverListOf(data.queue, new Set(data.agenda.map((item) => item.leadId).filter((id): id is string => Boolean(id)))),
   };
 }
 
@@ -244,6 +247,33 @@ function dutyAnswer(world: SasaWorld, stamp: string): Plan {
   };
 }
 
+/** Ordem de quem recuperar: quem está mais perto de fechar primeiro, e o mais antigo antes. */
+const RECOVER_ORDER = ["negotiation", "quote_sent", "awaiting_reply", "in_contact"];
+
+export function recoverListOf(queue: ReadonlyArray<{ id: string; name: string; status: string; arrivedAt: Date | null }>, withReturn: ReadonlySet<string>) {
+  return queue
+    .filter((lead) => RECOVER_ORDER.includes(lead.status) && !withReturn.has(lead.id))
+    .sort((a, b) => RECOVER_ORDER.indexOf(a.status) - RECOVER_ORDER.indexOf(b.status) || (a.arrivedAt?.getTime() ?? 0) - (b.arrivedAt?.getTime() ?? 0))
+    .map((lead) => ({ leadId: lead.id, name: lead.name, status: lead.status, since: lead.arrivedAt }));
+}
+
+function recoverAnswer(world: SasaWorld, stamp: string): Plan {
+  const list = world.recover ?? [];
+  if (!list.length) return { kind: "answer", blocks: [sasaSay(`sasa-recover-${stamp}`, "Ninguém parado na sua carteira: todo lead em negociação tem retorno marcado.")] };
+  const rows: ChatLeadRow[] = list.slice(0, 8).map((lead) => ({
+    leadId: lead.leadId, name: lead.name, initials: initialsOf(lead.name), context: `${STATUS_LABEL[lead.status] ?? lead.status} · sem retorno marcado`,
+    chip: { label: "Recuperar", tone: "warning" as const },
+  }));
+  const count = list.length;
+  return {
+    kind: "answer",
+    blocks: [
+      sasaSay(`sasa-recover-${stamp}`, `${count === 1 ? "1 lead está parado" : `${count} leads estão parados`} sem retorno marcado. Comece por ${firstNameOf(list[0]!.name)}: chame no WhatsApp e marque o próximo retorno.`),
+      { type: "leads", id: `sasa-recover-list-${stamp}`, title: "Recuperar hoje", icon: "reply", rows, emptyText: "Ninguém parado.", updatedAt: clockLabel(world.now) },
+    ],
+  };
+}
+
 function waitingAnswer(world: SasaWorld, stamp: string): Plan {
   if (!world.waiting.length) return { kind: "answer", blocks: [sasaSay(`sasa-waiting-${stamp}`, "Ninguém está esperando por você agora. Quando um lead responder, eu mostro aqui.")] };
   const ordered = [...world.waiting].sort((a, b) => Number(b.urgent) - Number(a.urgent));
@@ -320,6 +350,7 @@ function plan(intent: SasaIntent, input: SasaTimedInput, world: SasaWorld, stamp
   switch (intent.tool) {
     case "duty.next": return dutyAnswer(world, stamp);
     case "leads.waiting": return waitingAnswer(world, stamp);
+    case "leads.recover": return recoverAnswer(world, stamp);
     case "agenda.list": return agendaAnswer(world, stamp);
     case "duty.pause":
       if (world.availability === "paused") return { kind: "answer", blocks: [sasaSay(`sasa-paused-${stamp}`, "Você já está pausado. Para voltar, diga \"volta a receber\".")] };

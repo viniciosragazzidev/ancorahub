@@ -15,6 +15,8 @@ export type SasaIntent =
   | { tool: "duty.pause" }
   | { tool: "duty.resume" }
   | { tool: "leads.waiting" }
+  /** Recuperação (fase 5, 21/11): leads da carteira parados em negociação e sem retorno marcado. */
+  | { tool: "leads.recover" }
   | { tool: "agenda.list" }
   | { tool: "returns.schedule"; reschedule: boolean }
   | { tool: "returns.complete" }
@@ -35,7 +37,7 @@ export type SasaIntent =
   | { tool: "message.draft" };
 
 export type SasaTool = SasaIntent["tool"];
-export const SASA_TOOLS: readonly SasaTool[] = ["duty.next", "duty.pause", "duty.resume", "leads.waiting", "agenda.list", "returns.schedule", "returns.complete", "returns.cancel", "lead.stage", "lead.note", "sale.start", "quote.start", "lead.accept", "lead.decline", "lead.lost", "message.draft"];
+export const SASA_TOOLS: readonly SasaTool[] = ["duty.next", "duty.pause", "duty.resume", "leads.waiting", "leads.recover", "agenda.list", "returns.schedule", "returns.complete", "returns.cancel", "lead.stage", "lead.note", "sale.start", "quote.start", "lead.accept", "lead.decline", "lead.lost", "message.draft"];
 
 /** Pedidos que escrevem a partir de uma descrição: em forma de pergunta, viram leitura (resposta pelo ecossistema). */
 const WRITES_FROM_DESCRIPTION = new Set<SasaTool>(["lead.note", "sale.start", "lead.stage", "quote.start", "lead.lost", "lead.decline", "message.draft"]);
@@ -87,6 +89,8 @@ function classifyRaw(input: string): SasaIntent | null {
   // Leituras rápidas com lista na conversa. Perguntas mais finas (tempo de espera, escala da semana, confirmação,
   // avisos, dinheiro) seguem para as respostas do ecossistema, que trazem esses números.
   const finer = /\b(quanto tempo|ha quanto|semana|escala|confirmad\w*|presenca|avisos?|notificac\w*|novidades?|de novo|whatsapp|vendas?|comiss\w*|receber|recebi)\b/.test(text);
+  // Recuperação (fase 5, 21/11): "quem eu recupero hoje?", "quem está parado?".
+  if (!finer && (/\b(recuperar|recupero|recupera|reativar|reativo|esfriando|parados?)\b/.test(text) || /\bquem (eu )?(chamo|ligo|puxo) hoje\b/.test(text))) return { tool: "leads.recover" };
   if (!finer && (/\b(esperando|aguardando|sem resposta)\b/.test(text) || /\bquem (eu )?(atendo|respondo|devo|tenho que)\b/.test(text))) return { tool: "leads.waiting" };
   if (!finer && /\bagenda\b|\bo que (eu )?tenho\b|\bmeus retornos\b|\bretornos? (de )?(hoje|amanha|atrasados?)\b|\bcomo (esta|ta) (o )?meu dia\b/.test(text)) return { tool: "agenda.list" };
   if (!finer && /\bplantao\b|\bplantoes\b/.test(text)) return { tool: "duty.next" };

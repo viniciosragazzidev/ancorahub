@@ -100,6 +100,7 @@ const STEP_ORDER = Object.keys(STEP_LABEL);
 
 export const SKIP_REASON_LABEL: Record<string, string> = {
   template_not_approved: "template não aprovado",
+  marketing_blocked: "Marketing barrado (DEC-155)",
   stale: "passou da hora",
   held: "retido na fila de envio",
   "131049": "limite da Meta (131049)",

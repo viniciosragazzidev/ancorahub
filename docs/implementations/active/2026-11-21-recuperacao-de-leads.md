@@ -364,3 +364,27 @@ Os números de migration são **conferidos de novo na hora** (maior número entr
 5. **Como provar que dobrou.** Recomendado: métrica **recuperados por semana**, só leads de anúncio (linha de base 120, meta 240), com **10% de controle** e 6–8 semanas antes de concluir.
 
 **Pendência só do usuário:** aprovar na Meta os templates de marketing (T2–T4), o que destrava a fase 0. A conferência jurídica (LGPD e telemarketing estadual) precisa acontecer antes da fase 3.
+
+
+## 13. Estado da implementação (21/11/2026)
+
+Tudo na `feat/diretor-visual-lite`, fase por fase. **Toda automação nova nasce DESLIGADA**, por empresa, em `/qualificacao/turbo` › "Configurar recuperação". O que envia mensagem ou põe lead para ligação também exige a "Conferência jurídica feita" registrada pelo diretor.
+
+| Fase | O que entrou | Onde testar | Liga como |
+|---|---|---|---|
+| 0 | Follow-ups reais na Visão (30 dias: enviados, responderam, recuperados) | `/qualificacao` › Visão | sempre ligado (só leitura) |
+| 1 | `deriveLeadJourney` + `LeadJourneyView` (hover card, ficha, Conversas); `/qualificacao/leads` com abas por etapa, J/K, drawer com a linha do tempo, "Não contatar" | laboratório › "Etapa do lead" | sempre ligado (leitura; "Não contatar" só marca) |
+| 2 | Migration **0234** `lead_recovery_touches`; turbo e follow-up de silêncio gravam cada toque; `/qualificacao/recuperacao` (números, por follow-up, meta × controle, saúde) | laboratório › "Funil de recuperação e fila de ligação" | sempre ligado (leitura); sem a 0234, só os toques novos somem |
+| 3 | Cadência única: S2/S3 (texto livre na janela), S4–S6 (template), ponte do morno W2/W3, regra dos 6 toques, 131049, seg–sáb, "SAIR" em toda mensagem, controle de 10% | laboratório › "Cadência de recuperação" | Recuperação + "Parou no meio"/"Morno" + conferência jurídica |
+| 4 | Pontuação A–D × 1–4; fila "Sem resposta" (marca por lead, sem migration 0235); Call Âncora liga para ela primeiro, pela pontuação; resultado da ligação tira o lead da fila; coluna "Perfil" e ação "Mandar para a fila de ligação"; fila por unidade com ação em lote | laboratório › "Funil…" e "Etapa do lead" | Recuperação + "Fila de ligação" + conferência jurídica |
+| 5 | Nutrição mensal (3 toques, perdido por preço/momento após 60 dias, "Momento ruim"), A/B do S2 por Thompson, Sasá "quem eu recupero hoje?" | laboratório › "Nutrição, A/B e Sasá" | Recuperação + "Nutrição" / "Teste A/B por passo" + conferência jurídica; a Sasá responde sempre |
+
+**Correção da linha de base (achado na implementação):** o T2–T4 é pulado não só por falta de aprovação: a **DEC-155 (27/10)** decidiu que a qualificação, os lembretes e a requalificação usam só template **Utility**, e `listApprovedTemplateNames` filtra Utility. T2–T4 são Marketing, então são pulados mesmo aprovados. A cadência nova respeita a mesma regra: S4, S5, S6 e a nutrição (`anc_s4_cotacao`, `anc_s5_ligacao`, `anc_s6_despedida`, `anc_n_reajuste`) são Marketing e ficam **pulados com o motivo "Marketing barrado (DEC-155)"** até o diretor decidir uma de duas coisas: (a) abrir exceção na DEC-155 para a recuperação, ou (b) reescrever esses passos como Utility (a Meta tende a reclassificar lembrete de cotação como Marketing). Os passos de texto livre (S1, S2, S3, W2, W3) não dependem disso.
+
+**Diferenças em relação ao plano:**
+- A fila por unidade e a ação em lote ficaram em `/qualificacao/recuperacao` (não em `/leads/distribuicao`), para não mexer na central de filas.
+- A fila "Sem resposta" é a marca `qualification_details.recovery.state = "call_queue"` por lead, sem fila nova em `lead_queues`: a migration 0235 não foi necessária.
+- A tela de configuração não foi renomeada: virou a seção "Recuperação de leads" dentro de `/qualificacao/turbo` (regra de manter nomes de rota).
+- O "SAIR" usa a detecção de opt-out que a IA já tem (`quick-reply`: "sair" → `optOutAt`).
+
+**Para ligar, nesta ordem:** aplicar `drizzle/0234_lead_recovery_touches.sql`; conferência jurídica (LGPD e telemarketing de SP e RJ) e marcar "Conferência jurídica feita"; decidir a DEC-155 para os passos de template; ligar "Recuperação de leads" e os segmentos um de cada vez; acompanhar `/qualificacao/recuperacao` por 6 a 8 semanas antes de concluir.

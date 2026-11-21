@@ -52,6 +52,11 @@ export function labSasaWorld(now = new Date()): SasaWorld {
     },
     // Fase 5: a Júlia chegou como oferta (aceitar ou recusar pela Sasá).
     offers: [{ leadId: "lab-julia", name: "Júlia Prado", expiresAt: at(4) }],
+    // Recuperação (fase 5): "quem eu recupero hoje?" lista quem está parado sem retorno.
+    recover: [
+      { leadId: "lab-carlos-t", name: "Carlos Teixeira", status: "negotiation", since: at(-60 * 72) },
+      { leadId: "lab-marina", name: "Marina Alves", status: "quote_sent", since: at(-60 * 50) },
+    ],
   };
 }
 
@@ -81,6 +86,7 @@ export const LAB_SASA_PHRASES = [
   "Qual é meu próximo plantão?",
   "Pausa meu plantão",
   "Quem está esperando resposta?",
+  "Quem eu recupero hoje?",
   "O que tenho na agenda hoje?",
   "Marca retorno com a Ana amanhã às 10",
   "Marca retorno com o Carlos sexta às 15h",
