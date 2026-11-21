@@ -2,12 +2,12 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { assignLeadToBroker } from "@/features/lead-distribution/service";
 import { getDatabase, schema } from "@/shared/db";
 
-import { CALL_ANCORA_SOURCE } from "./cold-base";
+import { CALL_ANCORA_SOURCE, COLD_MAX_ATTEMPTS } from "./cold-base";
 import type { CallAncoraLastCall, CallOutcome } from "./session-store";
 
 export const CALL_ANCORA_LEAD_TAKEN_MESSAGE = "Este lead já foi para outro corretor.";
@@ -112,6 +112,16 @@ export async function recordColdOutcome(input: {
       assigned,
     },
   });
+
+  // Recuperação, fase 4: o resultado tira o lead da fila "Sem resposta" (interesse, nutrição ou não contatar).
+  try {
+    const { applyCallQueueOutcome } = await import("@/features/lead-recovery/call-queue");
+    const [{ attempts }] = await db.select({ attempts: sql<number>`count(*)::int` }).from(schema.leadInteractions)
+      .where(and(eq(schema.leadInteractions.leadId, input.leadId), sql`${schema.leadInteractions.metadata}->>'source' = ${CALL_ANCORA_SOURCE}`));
+    await applyCallQueueOutcome({ tenantId: input.tenantId, leadId: input.leadId, outcome: input.outcome, assigned, attempts: Number(attempts) || 0, maxAttempts: COLD_MAX_ATTEMPTS });
+  } catch (error) {
+    console.warn("[call-ancora] recovery_outcome_failed", error instanceof Error ? error.message.slice(0, 160) : "unknown");
+  }
 
   return { assigned, conflict };
 }

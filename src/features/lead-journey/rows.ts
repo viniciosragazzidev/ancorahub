@@ -1,4 +1,5 @@
 import { CADENCE } from "@/features/qualification-turbo/cadence";
+import { scoreInputFromMemory, scoreLead, type LeadScore } from "@/features/lead-recovery/scoring";
 
 import { deriveLeadJourney, type JourneyCode, type LeadJourney, type RecoveryMark } from "./journey";
 
@@ -29,6 +30,10 @@ export type QualificationLeadSource = {
   last_ai_at: string | Date | null;
   first_ai_at: string | Date | null;
   silence_sent: boolean | null;
+  /** Só os campos da memória que a pontuação usa (nada de saúde). */
+  score_memory?: unknown;
+  operator?: string | null;
+  first_inbound_at?: string | Date | null;
 };
 
 /** Linha pronta para a tela (serializável). */
@@ -49,6 +54,8 @@ export type QualificationLeadRow = {
   /** Toques automáticos de recuperação enviados / previstos. */
   touches: { sent: number; total: number };
   lastInboundAt: string | null;
+  /** Perfil × interesse ("A3", plano §7). */
+  score: LeadScore;
   journey: LeadJourney;
 };
 
@@ -126,6 +133,17 @@ export function buildQualificationRow(source: QualificationLeadSource, now = new
     field: journey.code === "Q3" || journey.code === "R2" ? journey.detail : null,
     touches: { sent: touches.sent, total: touches.total },
     lastInboundAt: iso(source.last_inbound_at),
+    score: scoreLead({
+      now,
+      ...scoreInputFromMemory(source.score_memory),
+      cityServed: Boolean(source.queue_id),
+      operatorRequested: Boolean(source.operator),
+      replied: inboundCount > 0,
+      firstReplyMinutes: source.first_inbound_at && (source.first_ai_at ?? turboState?.firstContactAt)
+        ? Math.max(0, (new Date(source.first_inbound_at).getTime() - new Date((source.first_ai_at ?? turboState?.firstContactAt)!).getTime()) / 60_000)
+        : null,
+      lastInteractionAt: source.last_inbound_at,
+    }),
     journey,
   };
 }

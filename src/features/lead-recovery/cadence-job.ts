@@ -20,11 +20,12 @@ import { getSystemSettings } from "@/features/system-settings/queries";
 
 import { parseRecoverySettings, type RecoverySettings } from "./settings-core";
 import { touchCostBrl } from "./touch-cost";
+import { enterCallQueue, sweepTurboFinishedIntoCallQueue } from "./call-queue";
 
 const TIME_BUDGET_MS = 40_000;
 const LIMIT_PER_SEGMENT = 60;
 
-export type RecoveryCadenceResult = { tenants: number; candidates: number; sent: number; skipped: number; finished: number; failed: number; waiting: number; reason?: string };
+export type RecoveryCadenceResult = { tenants: number; candidates: number; sent: number; skipped: number; finished: number; failed: number; waiting: number; toCallQueue: number; nurture?: number; reason?: string };
 
 function rowsOf<T>(result: unknown): T[] {
   return (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as T[];
@@ -50,7 +51,7 @@ async function readyTenants() {
   for (const row of settingsRows) {
     if (!row.key.startsWith("lead_recovery_")) continue;
     const settings = parseRecoverySettings(row.value ?? null);
-    if (settings.enabled && settings.legalReviewedAt && (settings.stoppedMidway || settings.warmBridge)) out.push({ tenantId: row.key.slice("lead_recovery_".length), settings });
+    if (settings.enabled && settings.legalReviewedAt && (settings.stoppedMidway || settings.warmBridge || settings.callQueue || settings.nurture)) out.push({ tenantId: row.key.slice("lead_recovery_".length), settings });
   }
   return out;
 }
@@ -68,7 +69,7 @@ export async function runRecoveryCadenceJob(now = new Date()): Promise<RecoveryC
 
 async function runRecoveryCadence(now: Date): Promise<RecoveryCadenceResult> {
   const started = Date.now();
-  const result: RecoveryCadenceResult = { tenants: 0, candidates: 0, sent: 0, skipped: 0, finished: 0, failed: 0, waiting: 0 };
+  const result: RecoveryCadenceResult = { tenants: 0, candidates: 0, sent: 0, skipped: 0, finished: 0, failed: 0, waiting: 0, toCallQueue: 0 };
   const tenants = await readyTenants();
   result.tenants = tenants.length;
   if (!tenants.length) return { ...result, reason: "off" };
@@ -80,6 +81,8 @@ async function runRecoveryCadence(now: Date): Promise<RecoveryCadenceResult> {
   }
 
   for (const { tenantId, settings } of tenants) {
+    // Fase 4: quem terminou os lembretes do turbo sem responder vai para a fila de ligação.
+    if (settings.callQueue) result.toCallQueue += await sweepTurboFinishedIntoCallQueue(tenantId, now).catch(() => 0);
     const segments: RecoverySegment[] = [...(settings.stoppedMidway ? ["stopped_midway" as const] : []), ...(settings.warmBridge ? ["warm" as const] : [])];
     const [approved, empresa, qualification] = await Promise.all([
       approvedTemplates(tenantId),
@@ -229,13 +232,14 @@ async function processLead(input: {
 
   if (decision.action === "wait" || decision.action === "stop") return "waiting";
   if (decision.action === "finished") {
-    const marker = decision.next === "call_queue"
-      ? { state: "call_queue", at: input.now.toISOString(), from: "cadence" }
-      : { cadenceFinishedAt: input.now.toISOString() };
+    if (decision.next === "call_queue") {
+      await enterCallQueue(tenantId, leadId, "cadence", input.now);
+      return "finished";
+    }
     await db.update(schema.leads).set({
-      qualificationDetails: sql`jsonb_set(coalesce(${schema.leads.qualificationDetails}, '{}'::jsonb), '{recovery}', coalesce(${schema.leads.qualificationDetails}->'recovery', '{}'::jsonb) || ${JSON.stringify(marker)}::jsonb)`,
+      qualificationDetails: sql`jsonb_set(coalesce(${schema.leads.qualificationDetails}, '{}'::jsonb), '{recovery}', coalesce(${schema.leads.qualificationDetails}->'recovery', '{}'::jsonb) || ${JSON.stringify({ cadenceFinishedAt: input.now.toISOString() })}::jsonb)`,
     }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
-    await audit(tenantId, leadId, decision.next === "call_queue" ? "recovery.call_queue" : "recovery.cadence_finished");
+    await audit(tenantId, leadId, "recovery.cadence_finished");
     return "finished";
   }
   if (decision.action === "skip") {

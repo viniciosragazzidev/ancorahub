@@ -65,3 +65,18 @@ export async function markDoNotContactAction(input: { leadId: string }): Promise
     return { ok: false, error: "Não consegui marcar agora. O lead continua como estava." };
   }
 }
+
+/** "Mandar para a fila de ligação" (R4, fase 4): só marca o lead e calcula a pontuação. Não liga nem manda nada. */
+export async function sendToCallQueueAction(input: { leadId: string }): Promise<JourneyActionResult<{ score: string }>> {
+  try {
+    const context = await requireQualificationAccess();
+    const { leadId } = leadInput.parse(input);
+    const { enterCallQueue } = await import("@/features/lead-recovery/call-queue");
+    const score = await enterCallQueue(context.tenantId, leadId, "manual", new Date(), context.userId);
+    revalidatePath("/qualificacao/leads");
+    return { ok: true, data: { score: score.label } };
+  } catch (error) {
+    console.error("[lead-journey] call_queue", error instanceof Error ? error.message : error);
+    return { ok: false, error: "Não consegui mandar para a fila agora. O lead continua como estava." };
+  }
+}

@@ -16,7 +16,14 @@ export function labRecoveryFunnelData(now = new Date()): RecoveryFunnelData {
     controlPct: 10,
     recoveryEnabled: false,
     touchesTableMissing: false,
-    numbers: { entered: 1251, qualifying: 96, hot: 541, stoppedMidway: 212, neverReplied: 285, inFollowUp: 140, callQueue: 0, nurture: 0, recovered: 127, doNotContact: 19 },
+    numbers: { entered: 1251, qualifying: 96, hot: 541, stoppedMidway: 212, neverReplied: 285, inFollowUp: 140, callQueue: 184, nurture: 37, recovered: 127, doNotContact: 19 },
+    callQueue: [
+      { branch: "Unidade Centro", branchId: "b1", total: 96, avgHours: 30, profileA: 14 },
+      { branch: "Unidade Niterói", branchId: "b2", total: 61, avgHours: 52, profileA: 9 },
+      { branch: "Sem unidade", branchId: null, total: 27, avgHours: 75, profileA: 2 },
+    ],
+    heldCold: 1240,
+    callQueueEnabled: true,
     steps: [
       { step: "t1", label: "T1 · lembrete 20 min", sent: 284, skipped: 12, topSkipReason: "passou da hora", failed: 3, replied: 91, recovered: 58, costBrl: 10.79 },
       { step: "t2", label: "T2 · benefício (3 h)", sent: 31, skipped: 188, topSkipReason: "template não aprovado", failed: 0, replied: 4, recovered: 3, costBrl: 10.85 },
@@ -47,7 +54,16 @@ export function labRecoveryFunnelData(now = new Date()): RecoveryFunnelData {
 export function RecoveryFunnelLab() {
   return (
     <main className="arc-venancor mx-auto flex max-w-6xl flex-col gap-ds-24 p-ds-24 font-ds-inter">
-      <RecoveryFunnelView data={labRecoveryFunnelData()} />
+      <RecoveryFunnelView data={labRecoveryFunnelData()} canEdit />
     </main>
   );
+}
+
+export function labRecoveryCallQueue(delay: number, failing: boolean) {
+  return {
+    moveHeld: async () => {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return failing ? { ok: false as const, error: "Não deu para mandar para a fila agora." } : { ok: true as const, moved: 300 };
+    },
+  };
 }

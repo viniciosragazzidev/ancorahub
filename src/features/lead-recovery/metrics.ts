@@ -14,6 +14,7 @@ import {
   type RecoveryLeadRow,
   type RecoveryTouchRow,
 } from "./metrics-core";
+import { callQueueByBranch } from "./call-queue";
 import { getRecoverySettings } from "./settings";
 import { META_COST_BRL } from "./touch-cost";
 
@@ -159,6 +160,16 @@ async function loadHealth(tenantId: string, since: Date, sends: number): Promise
   return { sends, optOuts: Number(row?.opt_outs) || 0, limit131049: Number(row?.limit_131049) || 0 };
 }
 
+async function countHeldCold(tenantId: string) {
+  const result = await getDatabase().execute(sql`
+    select count(*)::int as total from leads l
+    where l.tenant_id = ${tenantId} and l.deleted_at is null and l.archived_at is null and l.corretor_id is null
+      and l.status not in ('lost', 'converted') and l.qualification_status = 'cold' and l.distribution_status = 'manual_hold'
+      and l.qualification_details->'recovery'->>'state' is null
+  `);
+  return Number(rowsOf<{ total: number }>(result)[0]?.total) || 0;
+}
+
 /**
  * Tudo o que /qualificacao/recuperacao mostra. `since` é o início do período escolhido (números e passos); a
  * série semanal sempre cobre 8 semanas.
@@ -184,7 +195,11 @@ export async function getRecoveryFunnel(input: {
   const recoveredLeads = new Set(leadRows.filter(isRecovered).map((row) => row.leadId));
   const touches = [...legacy, ...(recorded ?? [])];
   const sends = touches.filter((touch) => touch.status === "sent").length;
-  const health = await loadHealth(input.tenantId, input.since, sends);
+  const [health, callQueue, heldCold] = await Promise.all([
+    loadHealth(input.tenantId, input.since, sends),
+    callQueueByBranch(input.tenantId, now).catch(() => []),
+    countHeldCold(input.tenantId).catch(() => 0),
+  ]);
   return {
     periodText: input.periodText,
     queueName: input.queueName,
@@ -195,5 +210,8 @@ export async function getRecoveryFunnel(input: {
     steps: recoverySteps(touches, recoveredLeads),
     weeks: recoveryWeeks(leadRows, settings.controlPct, WEEKS, now),
     health: { ...health, templatesNotApproved: input.templatesNotApproved },
+    callQueue,
+    heldCold,
+    callQueueEnabled: settings.callQueue,
   };
 }
