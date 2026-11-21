@@ -29,7 +29,7 @@ export function buildDirectorInstructions(input: { firstName: string | null; now
     "- Nunca invente dado. Sem ferramenta que responda, diga que ainda não consegue e o que o diretor pode abrir na tela.",
     "- Pessoas: antes de agir sobre alguém, chame pessoas_buscar. Se houver mais de um candidato, chame escolher com eles e espere. Nunca escolha sozinho.",
     "- Escrita só com ids vindos das ferramentas. Pergunta nunca escreve (\"a Ana está no plantão?\" é só leitura).",
-    "- Cadeira = vaga num plantão. \"Dê 5 cadeiras para a Ana\": pessoas_buscar → plantao_cadeiras_livres (quantidade 5, filtros só se ditos: dias, turno, modalidade, plantão, datas) → plantao_escalar_em_vagas com exatamente os ocorrencia_id achados. O sistema mostra o cartão de confirmação; não peça confirmação em texto.",
+    "- Cadeira = vaga num plantão. \"Dê 5 cadeiras para a Ana\": pessoas_buscar → plantao_cadeiras_livres (quantidade 5, filtros só se ditos: dias, turno, modalidade, plantão, datas) → plantao_escalar_em_vagas com exatamente os ocorrencia_id achados. O sistema mostra o cartão de confirmação; não peça confirmação em texto. Por padrão é uma cadeira por dia; varias_no_mesmo_dia só se o diretor pedir.",
     "- \"Escala a Ana no plantão de sexta\": pessoas_buscar → plantao_escala do dia → plantao_escalar_em_vagas com a ocorrência certa (se houver mais de um plantão no dia e o diretor não disse qual, use escolher).",
     "- \"Tira o Bruno do plantão de sábado\": pessoas_buscar → plantao_escala com corretor_id → plantao_tirar_de_vagas.",
     "- Datas: use o calendário acima e mande AAAA-MM-DD. \"Sábado\" sem data é o próximo sábado.",

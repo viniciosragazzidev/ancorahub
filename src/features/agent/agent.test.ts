@@ -83,6 +83,15 @@ describe("dar cadeiras (escolha das vagas)", () => {
     expect(pickSeats(seats, "ana", 5, { weekdays: [0] }).picked.map((choice) => choice.occurrence.id)).toEqual(["a:2026-11-22"]);
     expect(pickSeats(seats, "ana", 5, { shift: "tarde" }).picked.map((choice) => choice.occurrence.id)).toEqual(["a:2026-11-26"]);
   });
+  it("uma cadeira por dia, salvo pedido", () => {
+    const day = [
+      seat({ id: "m:2026-11-27", dutyDate: "2026-11-27", startsAt: "09:00", endsAt: "13:00" }),
+      seat({ id: "t:2026-11-27", dutyDate: "2026-11-27", startsAt: "13:00", endsAt: "18:00" }),
+      seat({ id: "m:2026-11-28", dutyDate: "2026-11-28" }),
+    ];
+    expect(pickSeats(day, "ana", 3).picked.map((choice) => choice.occurrence.id)).toEqual(["m:2026-11-27", "m:2026-11-28"]);
+    expect(pickSeats(day, "ana", 3, { maxPerDay: 3 }).picked).toHaveLength(3);
+  });
   it("rótulo legível e turno", () => {
     expect(seatLabel(seats[0]!)).toBe("dom 22/11, 09:00–13:00, Plantão");
     expect(shiftOf("13:00")).toBe("tarde");

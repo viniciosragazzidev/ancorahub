@@ -17,6 +17,8 @@ export type SeatFilters = {
   until?: string | null;
   /** Aceitar plantão cujo tipo não inclui a unidade da pessoa (o diretor confirma). */
   includeOutsideType?: boolean;
+  /** Cadeiras no mesmo dia. Padrão 1: "5 cadeiras" são 5 dias, não um dia de manhã, tarde e noite. */
+  maxPerDay?: number;
 };
 
 export type SeatChoice = { occurrence: SeatOccurrence; outsideType: boolean };
@@ -102,8 +104,12 @@ export function pickSeats(occurrences: readonly SeatOccurrence[], brokerId: stri
   const outside = candidates.filter((occurrence) => !occurrence.allowedBrokerIds.includes(brokerId));
   const pool = filters.includeOutsideType ? candidates : inside;
   const picked: SeatChoice[] = [];
+  const perDay = Math.max(1, filters.maxPerDay ?? 1);
+  // Dias em que ela já tem cadeira contam para o limite do dia.
+  const dayCount = (dutyDate: string) => mine.filter((taken) => taken.dutyDate === dutyDate).length + picked.filter((choice) => choice.occurrence.dutyDate === dutyDate).length;
   for (const occurrence of pool) {
     if (picked.length >= quantity) break;
+    if (dayCount(occurrence.dutyDate) >= perDay) continue;
     if (picked.some((choice) => overlaps(choice.occurrence, occurrence))) continue;
     picked.push({ occurrence, outsideType: !occurrence.allowedBrokerIds.includes(brokerId) });
   }

@@ -197,6 +197,7 @@ export function buildAgentTools(env: ToolEnv) {
         de: DATE.optional(),
         ate: DATE.optional(),
         incluir_fora_do_tipo: z.boolean().optional().describe("Só se o diretor aceitar plantão de tipo fora da unidade da pessoa."),
+        varias_no_mesmo_dia: z.boolean().optional().describe("Só se o diretor pedir mais de uma cadeira no mesmo dia. Padrão: uma por dia."),
       }),
       execute: async (input): Promise<ToolResult> => {
         const today = spDateKey(backend.now());
@@ -216,6 +217,7 @@ export function buildAgentTools(env: ToolEnv) {
           from,
           until,
           includeOutsideType: input.incluir_fora_do_tipo,
+          maxPerDay: input.varias_no_mesmo_dia ? 3 : 1,
         });
         const vagas = pick.picked.map((choice) => ({
           ocorrencia_id: choice.occurrence.id,

@@ -99,7 +99,7 @@ export function sampleWorld(now: Date): MemoryWorld {
         maximumBrokers: schedule.max,
         minimumBrokers: 2,
         // Alguns já cheios e alguns com gente, para o "onde falta gente".
-        brokerIds: (day + index) % 4 === 0 ? brokers.slice(1, 1 + schedule.max) : (day + index) % 3 === 0 ? ["u-carla"] : [],
+        brokerIds: (day * 3 + index) % 7 === 0 ? brokers.slice(1, 1 + schedule.max) : (day * 3 + index) % 5 === 0 ? ["u-carla"] : [],
         allowedBrokerIds: schedule.typeId === "t-online" ? brokers.filter((id) => id !== "u-ana-lima") : brokers,
         started,
         ended: day === 0 && minutesNow >= end,
