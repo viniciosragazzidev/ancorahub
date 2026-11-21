@@ -731,3 +731,16 @@ registro: docs/implementations/active/2026-11-18-identidade-capitao-ancora.md.
 ## Feedback e movimento · 14/11/2026
 
 O padrão geral de resposta a ações e eventos (camadas visual, texto, som, vibração e mascote; níveis 0 a 3; estados do botão de ação) está em `docs/design-system/FEEDBACK.md` e vale para todo o app. No modo descrito neste documento valem os níveis 0 a 2: o CTA Deep Sapphire ganha os estados enviando, confirmado e falhou, sem base sólida, sem bounce e sem confete. Plano de adoção por rota: `docs/implementations/active/2026-11-14-feedback-padrao.md`.
+
+## Exceção: superfícies de marca · 18/11/2026 (registrada em 20/11)
+
+Decidida no §8 do plano `docs/implementations/active/2026-11-18-refinamento-movimento-areas.md` (opções recomendadas).
+Vale **só** fora do produto logado: landing, login e onboarding. Nunca nas telas internas, onde o azul continua sendo destaque e nunca fundo de superfície grande.
+
+- **Fundo:** o azul de marca dos tokens (`--color-ds-electric-blue`), sem gradiente.
+- **Textura:** só o pontilhado (ponto branco a 12% de opacidade, passo de 12px). Sem halftone e sem grão.
+- **Forma:** raio de 16px (cartão grande); texto em branco.
+- **Peça pronta:** `BrandSurface` (`src/components/brand/brand-surface.tsx`). Use-a em vez de recriar o fundo em cada página.
+- **Retrato ou vídeo de pessoa sobreposto:** só na landing, com raio de 16px e borda esfumada por máscara, e só com imagem que tenha direito de uso.
+- **Troca automática de abas e animação ligada à rolagem:** só nessas superfícies.
+- **Ainda não aplicada:** o login segue a folha branca aprovada em 22/10. Trocar login ou landing para a superfície de marca pede o aval do dono do produto.
